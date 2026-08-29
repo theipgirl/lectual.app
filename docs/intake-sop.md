@@ -73,11 +73,15 @@ The proposal is a stored record, not a PDF. It freezes what the client was shown
 
 On confirm:
 
-1. Generate the LOE from the chosen package — via the **existing** `generateTrademarkLoe`
-2. Route it to the approval queue — Rebecca reviews before anything reaches the client
-3. On approval: file the LOE to the Lawmatics matter, create the invoice with the amount **already computed**
-4. Client pays through Lawmatics / LawPay — Lectual never touches money
-5. Lead moves to **LOE & Invoice Sent**
+1. The selection is frozen on the proposal, and the total is computed once
+2. Staff open the Document Center LOE form, now **pre-filled** — package, chart rows, class list, class count and amount all carried over, nothing typed
+3. Staff choose the **current or legacy** template — a hard rule that is never guessed, and not a choice a client can make — and generate
+4. The draft lands in the approval queue; Rebecca reviews before anything reaches the client
+5. On approval: file the LOE to the Lawmatics matter, create the invoice with the amount **already computed**
+6. Client pays through Lawmatics / LawPay — Lectual never touches money
+7. Lead moves to **LOE & Invoice Sent**
+
+> **Why acceptance doesn't just generate the letter.** The current-vs-legacy template choice is a staff judgment the SOP forbids guessing, and an LOE is a legal document. So confirming produces a *pre-filled form*, not a letter. The typing disappears; the judgment stays with the firm.
 
 Steps 3 and 4 depend on an unverified Lawmatics API capability. See `lawmatics-capability-audit.md` §4 and its fallback.
 
@@ -91,19 +95,23 @@ That cancellation is a named requirement, not a detail. A client paid at night a
 
 ## 3. The offering
 
-### 3.1 Packages
+### 3.1 Packages — **confirmed from the firm's own proposal**
 
-Three tiers: **Essential**, **Enhanced**, **Concierge**. Each includes a number of classes; more can be added.
+Transcribed from the Woody Remy / "Ravi" trademark proposal (July 2026), the chart Dawn pastes into every LOE by hand today. These are now seeded, not placeholders.
 
-**[DECISION] Rebecca to supply, per package:** display name · price · classes included · price per additional class · the benefit rows shown in the chart.
+| | ESSENTIAL™ | ENHANCED™ | CONCIERGE™ |
+|---|---|---|---|
+| Legal fee | **$1,950** | **$3,250** | **$4,950** |
+| Classes included | 1 | 2 | 3 |
+| Additional class | $825 | $825 | $825 |
+| Corresponding word/logo discount | 10% | 15% | 20% |
+| Total estimated value | ≈ $7,800+ | ≈ $12,000+ | ≈ $17,750+ |
 
-`crm_package` is currently **empty**. Until it's filled in, any prototype runs on placeholder numbers. The settings screen exists so Rebecca enters the real ones herself rather than sending them to a developer.
+Sixteen benefit rows sit beneath, verbatim, in the firm's own wording — from "Preliminary Consultation Strategy Call ($450)" through "Trademark Assignment Agreement ($1,500)". Values are free text (`✔`, `Unlimited`, `2 if high risk`, `—`) and are never parsed; they round-trip into the LOE fee chart unchanged.
 
-Benefit rows follow the existing LOE chart format:
-```
-Preliminary Consultation Strategy Call ($450) — ✓
-Comprehensive Trademark Search Report — 1 included
-```
+Three printed rows are **structured fields** rather than chart text, because the product does arithmetic with them: classes included, the corresponding-mark discount, and the estimated value. The proposal page re-renders them in their printed positions, so the client sees the chart exactly as designed.
+
+> **The corresponding word/logo discount was not in the original brief and is a real pricing rule.** When a client protects the same trademark as both a word mark and a design mark, the cheaper package is discounted by its own tier's percentage. It is implemented and tested. It applies only to a genuine word+design pair of the same mark — two unrelated marks earn nothing, and two word marks are a duplicate filing, not a pair.
 
 ### 3.2 Government filing fees
 
@@ -167,7 +175,7 @@ Existing rule that stays in force: **every dollar figure in an LOE traces to a s
 2. **[3.4]** Discount codes and percentages — and confirmation that ad-hoc dollar discounts stop
 3. **[2.2]** Zoom or Fathom as the authoritative transcript source
 4. **[§2.4]** If the Lawmatics API can't create invoices or file documents, is the Dawn-clicks-send fallback acceptable for v1?
-5. Proposal expiry window — suggest 14 days, matching the existing LOE signature deadline
+5. ~~Proposal expiry window~~ — **answered by the chart itself: 7 days from receipt.** Implemented. (Distinct from the LOE's 14-day signature deadline, which is unchanged.)
 6. Who besides Rebecca may approve an LOE, if anyone
 
 ---
