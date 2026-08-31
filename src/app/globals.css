@@ -1,104 +1,140 @@
 @import "tailwindcss";
 
 /*
- * Design tokens for the docket dashboard.
+ * Design tokens for the docket dashboard — LECTUAL BRAND.
  *
- * This is a NEW visual identity — deliberately not the main app's firm.css.
- * The palette is built around one job: making "what is on fire" legible in
- * under a second, without colour ever being the only signal (every urgency
- * band also carries a text label in the UI).
+ * The palette is Lectual's own: cobalt signature on warm paper, ink rather
+ * than black. Values are taken from the main app's brand sheet so the two
+ * products read as one company:
+ *   cobalt #2F5BE6 · paper #F7F2E9 · ink #1B1815
  *
- * Three urgency bands, each with a solid ink colour, a low-alpha background
- * and a border tint so a badge, a row highlight and a calendar dot can all be
- * derived from the same triple:
+ * It is deliberately NOT any firm's brand. Cabanis Law's crm_org_theme row is
+ * plum (#5A3060) and RPB's is burnt orange with a logo that spells out its own
+ * name — rendering a per-firm theme here would put one firm's identity on
+ * another's screen, which is exactly the bug this app exists downstream of.
+ * This dashboard wears Lectual's brand and shows the firm's NAME as text.
+ *
+ * The second job of the palette is making "what is on fire" legible in under a
+ * second, without colour ever being the only signal — every urgency band also
+ * carries a text label in the UI. Each band is a triple (ink, low-alpha
+ * background, border tint) so a badge, a row highlight and a calendar dot all
+ * derive from one source:
  *   overdue → red    · a blown date; always wins its bucket
  *   soon    → amber  · due inside 7 days
- *   later   → blue   · everything further out
+ *   later   → cobalt · everything further out
+ *
+ * The urgency reds and ambers are warmed slightly against the paper ground so
+ * they sit in the same world as the cobalt rather than looking bolted on.
  */
 
 :root {
   color-scheme: light;
 
-  /* Surfaces */
-  --surface: #ffffff;
-  --surface-2: #f6f7f9;
-  --surface-3: #eceff3;
+  /* Surfaces — warm paper, not cool grey */
+  --surface: #fbf7ef;
+  --surface-2: #f7f2e9;
+  --surface-3: #efe8db;
 
   /* Text */
-  --ink: #10151c;
-  --ink-2: #3d4855;
-  --muted: #6b7885;
+  --ink: #1b1815;
+  --ink-2: #57514a;
+  --muted: #8b8275;
 
   /* Lines */
-  --border: #dde2e8;
-  --border-strong: #c3ccd6;
+  --border: #e3dacb;
+  --border-strong: #cdc0aa;
 
-  /* Accent (interactive, not urgency) */
-  --accent: #1f4fd8;
+  /* Accent — the Lectual cobalt signature (interactive, not urgency) */
+  --accent: #2f5be6;
+  --accent-press: #2348be;
+  --accent-soft: #e6ecfb;
   --accent-ink: #ffffff;
 
+  /* Left rail — deep ink ground so the workspace frame recedes and the
+     docket carries the colour. */
+  --rail: #1b1815;
+  --rail-2: #262019;
+  --rail-ink: #f7f2e9;
+  --rail-muted: #a2988a;
+  --rail-border: rgb(247 242 233 / 0.1);
+
   /* Urgency — overdue */
-  --overdue: #c02626;
-  --overdue-bg: rgb(192 38 38 / 0.09);
-  --overdue-border: rgb(192 38 38 / 0.35);
+  --overdue: #b3261e;
+  --overdue-bg: rgb(179 38 30 / 0.1);
+  --overdue-border: rgb(179 38 30 / 0.34);
 
   /* Urgency — due soon (within 7 days) */
-  --soon: #a35a02;
-  --soon-bg: rgb(214 138 12 / 0.13);
-  --soon-border: rgb(214 138 12 / 0.4);
+  --soon: #96590a;
+  --soon-bg: rgb(203 129 20 / 0.15);
+  --soon-border: rgb(203 129 20 / 0.42);
 
-  /* Urgency — later */
-  --later: #1f5fa8;
-  --later-bg: rgb(31 95 168 / 0.1);
-  --later-border: rgb(31 95 168 / 0.32);
+  /* Urgency — later (the cobalt, at rest) */
+  --later: #2f5be6;
+  --later-bg: rgb(47 91 230 / 0.09);
+  --later-border: rgb(47 91 230 / 0.3);
 
   /* Neutral non-obligations (tasks, Outlook events) */
-  --neutral: #6b7885;
-  --neutral-bg: rgb(107 120 133 / 0.1);
+  --neutral: #8b8275;
+  --neutral-bg: rgb(139 130 117 / 0.12);
 
   /* Shape */
   --r-sm: 6px;
   --r-md: 10px;
   --r-lg: 14px;
-  --shadow: 0 1px 2px rgb(16 21 28 / 0.06), 0 8px 24px rgb(16 21 28 / 0.06);
+  --shadow: 0 1px 2px rgb(27 24 21 / 0.05), 0 8px 24px rgb(27 24 21 / 0.06);
 
-  /* Type */
-  --font-body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  /* Type — Lectual's faces, each with a real fallback stack so a failed
+     webfont degrades instead of blanking. --font-display/--font-body are set
+     by next/font in layout.tsx; these are the fallbacks. */
+  --font-body: var(--font-body-loaded, "Hanken Grotesk"), ui-sans-serif, system-ui,
+    -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-display: var(--font-display-loaded, "Bricolage Grotesque"), var(--font-body);
+  --font-mono: var(--font-mono-loaded, "Space Mono"), ui-monospace, SFMono-Regular,
+    "SF Mono", Menlo, Consolas, monospace;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
 
-    --surface: #12161c;
-    --surface-2: #181d25;
-    --surface-3: #212832;
+    /* Warm-neutral dark, so the paper identity survives the inversion
+       instead of turning blue-grey. */
+    --surface: #1a1714;
+    --surface-2: #141210;
+    --surface-3: #241f1a;
 
-    --ink: #eef2f6;
-    --ink-2: #c2ccd6;
-    --muted: #8b97a4;
+    --ink: #f4efe6;
+    --ink-2: #cdc4b6;
+    --muted: #968c7d;
 
-    --border: #2a323d;
-    --border-strong: #3b4553;
+    --border: #302a23;
+    --border-strong: #453d33;
 
-    --accent: #7aa2ff;
-    --accent-ink: #0b1018;
+    --accent: #8ba9ff;
+    --accent-press: #a8bfff;
+    --accent-soft: rgb(139 169 255 / 0.16);
+    --accent-ink: #10131c;
 
-    --overdue: #ff8080;
-    --overdue-bg: rgb(255 128 128 / 0.14);
-    --overdue-border: rgb(255 128 128 / 0.4);
+    --rail: #100e0c;
+    --rail-2: #1a1714;
+    --rail-ink: #f4efe6;
+    --rail-muted: #968c7d;
+    --rail-border: rgb(244 239 230 / 0.09);
 
-    --soon: #f2b45c;
-    --soon-bg: rgb(242 180 92 / 0.14);
-    --soon-border: rgb(242 180 92 / 0.4);
+    --overdue: #ff8f85;
+    --overdue-bg: rgb(255 143 133 / 0.14);
+    --overdue-border: rgb(255 143 133 / 0.4);
 
-    --later: #79b6f2;
-    --later-bg: rgb(121 182 242 / 0.13);
-    --later-border: rgb(121 182 242 / 0.36);
+    --soon: #eeb45f;
+    --soon-bg: rgb(238 180 95 / 0.14);
+    --soon-border: rgb(238 180 95 / 0.4);
 
-    --neutral: #8b97a4;
-    --neutral-bg: rgb(139 151 164 / 0.14);
+    --later: #8ba9ff;
+    --later-bg: rgb(139 169 255 / 0.13);
+    --later-border: rgb(139 169 255 / 0.36);
+
+    --neutral: #968c7d;
+    --neutral-bg: rgb(150 140 125 / 0.14);
 
     --shadow: 0 1px 2px rgb(0 0 0 / 0.5), 0 8px 24px rgb(0 0 0 / 0.4);
   }
@@ -115,7 +151,14 @@
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
   --color-accent: var(--accent);
+  --color-accent-press: var(--accent-press);
+  --color-accent-soft: var(--accent-soft);
   --color-accent-ink: var(--accent-ink);
+  --color-rail: var(--rail);
+  --color-rail-2: var(--rail-2);
+  --color-rail-ink: var(--rail-ink);
+  --color-rail-muted: var(--rail-muted);
+  --color-rail-border: var(--rail-border);
   --color-overdue: var(--overdue);
   --color-overdue-bg: var(--overdue-bg);
   --color-overdue-border: var(--overdue-border);
@@ -131,6 +174,7 @@
   --radius-md: var(--r-md);
   --radius-lg: var(--r-lg);
   --font-sans: var(--font-body);
+  --font-display: var(--font-display);
   --font-mono: var(--font-mono);
 }
 
