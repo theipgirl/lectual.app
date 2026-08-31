@@ -3,10 +3,9 @@
 /*
  * Design tokens for the docket dashboard — LECTUAL BRAND.
  *
- * The palette is Lectual's own: cobalt signature on warm paper, ink rather
- * than black. Values are taken from the main app's brand sheet so the two
- * products read as one company:
- *   cobalt #2F5BE6 · paper #F7F2E9 · ink #1B1815
+ * Light theme, one palette, no dark variant. The signature is Lectual's cobalt
+ * over white cards on a barely-warm ground, with ink rather than black:
+ *   cobalt #2F5BE6 · card #FFFFFF · ground #F7F6F3 · ink #1B1815
  *
  * It is deliberately NOT any firm's brand. Cabanis Law's crm_org_theme row is
  * plum (#5A3060) and RPB's is burnt orange with a logo that spells out its own
@@ -30,33 +29,37 @@
 :root {
   color-scheme: light;
 
-  /* Surfaces — warm paper, not cool grey */
-  --surface: #fbf7ef;
-  --surface-2: #f7f2e9;
-  --surface-3: #efe8db;
+  /* Surfaces. Cards are white; the page sits on a barely-warm ground so the
+     cards read as paper on a desk rather than white-on-white. Kept close to
+     neutral on purpose — the earlier heavier cream fought the cobalt and made
+     the urgency reds look muddy. */
+  --surface: #ffffff;
+  --surface-2: #f7f6f3;
+  --surface-3: #edebe6;
 
   /* Text */
   --ink: #1b1815;
-  --ink-2: #57514a;
-  --muted: #8b8275;
+  --ink-2: #55504a;
+  --muted: #837c72;
 
   /* Lines */
-  --border: #e3dacb;
-  --border-strong: #cdc0aa;
+  --border: #e4e1da;
+  --border-strong: #cbc6bc;
 
   /* Accent — the Lectual cobalt signature (interactive, not urgency) */
   --accent: #2f5be6;
   --accent-press: #2348be;
-  --accent-soft: #e6ecfb;
+  --accent-soft: #e8edfc;
   --accent-ink: #ffffff;
 
-  /* Left rail — deep ink ground so the workspace frame recedes and the
-     docket carries the colour. */
-  --rail: #1b1815;
-  --rail-2: #262019;
-  --rail-ink: #f7f2e9;
-  --rail-muted: #a2988a;
-  --rail-border: rgb(247 242 233 / 0.1);
+  /* Left rail. Light, like the rest of the app: a white ground with a hairline
+     edge, cobalt-soft for the current screen. A dark rail read as a second
+     theme bolted onto a light page. */
+  --rail: #ffffff;
+  --rail-2: #f0eee9;
+  --rail-ink: #1b1815;
+  --rail-muted: #706a61;
+  --rail-border: #e4e1da;
 
   /* Urgency — overdue */
   --overdue: #b3261e;
@@ -93,52 +96,17 @@
     "SF Mono", Menlo, Consolas, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-
-    /* Warm-neutral dark, so the paper identity survives the inversion
-       instead of turning blue-grey. */
-    --surface: #1a1714;
-    --surface-2: #141210;
-    --surface-3: #241f1a;
-
-    --ink: #f4efe6;
-    --ink-2: #cdc4b6;
-    --muted: #968c7d;
-
-    --border: #302a23;
-    --border-strong: #453d33;
-
-    --accent: #8ba9ff;
-    --accent-press: #a8bfff;
-    --accent-soft: rgb(139 169 255 / 0.16);
-    --accent-ink: #10131c;
-
-    --rail: #100e0c;
-    --rail-2: #1a1714;
-    --rail-ink: #f4efe6;
-    --rail-muted: #968c7d;
-    --rail-border: rgb(244 239 230 / 0.09);
-
-    --overdue: #ff8f85;
-    --overdue-bg: rgb(255 143 133 / 0.14);
-    --overdue-border: rgb(255 143 133 / 0.4);
-
-    --soon: #eeb45f;
-    --soon-bg: rgb(238 180 95 / 0.14);
-    --soon-border: rgb(238 180 95 / 0.4);
-
-    --later: #8ba9ff;
-    --later-bg: rgb(139 169 255 / 0.13);
-    --later-border: rgb(139 169 255 / 0.36);
-
-    --neutral: #968c7d;
-    --neutral-bg: rgb(150 140 125 / 0.14);
-
-    --shadow: 0 1px 2px rgb(0 0 0 / 0.5), 0 8px 24px rgb(0 0 0 / 0.4);
-  }
-}
+/*
+ * No dark-mode block, deliberately.
+ *
+ * This app is light-themed and commits to it: `color-scheme: light` above is
+ * declared unconditionally, so the browser paints light form controls and
+ * scrollbars even for a viewer whose OS is set to dark. An earlier
+ * prefers-color-scheme block meant the same screen showed two different
+ * palettes depending on a setting nobody here chose, and the urgency bands —
+ * the one thing on this page that must read identically every time — were the
+ * part that shifted most.
+ */
 
 /* Expose the tokens to Tailwind v4 utilities (bg-surface, text-overdue, …). */
 @theme inline {
@@ -183,6 +151,27 @@ body {
   background: var(--surface-2);
   color: var(--ink);
   font-family: var(--font-body);
+
+  /*
+   * The page itself never scrolls sideways.
+   *
+   * Wide content — the stage board's lane strip, the matters table — lives in
+   * its own `overflow-x-auto` container and scrolls there. Those containers are
+   * correctly constrained (every ancestor carries `min-w-0`, and their measured
+   * clientWidth matches the viewport), yet on a 390px viewport the ROOT scroller
+   * still reported ~727px of extra width and the whole page could be swiped
+   * right into blank space. Nothing is painted out there: scrolling to it shows
+   * bare `<html>`, and no element escapes a clipping ancestor.
+   *
+   * `clip` rather than `hidden` on purpose: `overflow: hidden` makes the element
+   * a scroll container, which would break `position: sticky` on the left rail
+   * and the calendar card. `clip` just clips.
+   *
+   * This cannot hide real content. Anything genuinely wider than the viewport is
+   * already inside a scroller of its own, and tests assert the page does not
+   * scroll while those inner scrollers still do.
+   */
+  overflow-x: clip;
 }
 
 * {

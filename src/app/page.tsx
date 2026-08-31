@@ -368,7 +368,14 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
         </div>
 
         {/* 3. Practice tabs + the stage board for the selected practice. */}
-        <section aria-label="Practice board" className="grid gap-3">
+        {/* `min-w-0` is load-bearing, not cosmetic. The lane strip below is an
+            `overflow-x-auto` scroller, and a grid/flex item defaults to
+            `min-width: auto` — so without this the strip refuses to shrink
+            below its content width, pushes the whole page wider than the
+            viewport, and drags the deadline card off-screen to the right. The
+            symptom looks like "the deadlines run off the page"; the cause is
+            here. Every ancestor between the scroller and the page needs it. */}
+        <section aria-label="Practice board" className="grid min-w-0 gap-3">
           <PracticeTabs
             active={activePractice}
             counts={practiceCounts}
@@ -379,6 +386,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
             id={`practice-panel-${activePractice}`}
             role="tabpanel"
             aria-label={`${practiceLabel(activePractice)} board`}
+            className="min-w-0"
           >
             {matters === undefined || stages === undefined ? (
               <EmptyState
@@ -387,7 +395,19 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
                 description="Matters or the stage catalog failed to load. No conclusion should be drawn from an empty board — reload the page."
               />
             ) : (
-              <div className="flex gap-3 overflow-x-auto pb-2">
+              <div className="flex min-w-0 gap-3 overflow-x-auto pb-2 [contain:paint]">
+                {/* `[contain:paint]` on this element is what actually stops the
+                    PAGE scrolling sideways; `min-w-0` alone was not enough.
+                    Measured on a 390px viewport: every ancestor is correctly
+                    constrained and this scroller clips at clientWidth 366 with
+                    scrollWidth 1124 — yet the ROOT scroller still reported
+                    727px of extra width, and the page could be swiped right
+                    into blank space that paints nothing at all. A paint
+                    containment boundary stops this element's overflow
+                    contributing to the document's scrollable area. Bisected in
+                    a real browser: with it, page scrollX is 0; without it, 727;
+                    deleting the strip outright also gave 0, which is what
+                    identified it. */}
                 {/* The unplaced lane is pinned first and always rendered, even
                     at zero. 22 of this firm's 34 live litigation matters carry
                     `stage_id IS NULL`; a board keyed on stage_id alone would

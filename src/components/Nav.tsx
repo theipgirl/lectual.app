@@ -36,7 +36,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { label: "Calendar", href: "/calendar/" },
   {
     label: "Matters",
-    href: "/pipeline/litigation/",
+    href: "/matters/",
     alsoActiveFor: ["/matter/", "/pipeline/"],
   },
   { label: "Demands", href: "/demands/" },

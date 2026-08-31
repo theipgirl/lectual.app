@@ -57,8 +57,11 @@ describe("nav route integrity", () => {
     },
   );
 
-  it("has no link to /matters/, which does not exist", () => {
-    expect(NAV_ITEMS.map((i) => i.href)).not.toContain("/matters/");
+  it("links Matters at the index page, which exists", () => {
+    // Regression: this once pointed at /matters/ before that route existed and
+    // 404'd from the primary nav. The route now exists; the discovery
+    // assertion above is what actually guards it.
+    expect(NAV_ITEMS.map((i) => i.href)).toContain("/matters/");
   });
 
   it("gives every href a trailing slash (next.config sets trailingSlash)", () => {
@@ -89,7 +92,7 @@ describe("isNavItemActive", () => {
   });
 
   it("lights Matters for both a matter page and any pipeline board", () => {
-    const matters = item("/pipeline/litigation/", ["/matter/", "/pipeline/"]);
+    const matters = item("/matters/", ["/matter/", "/pipeline/"]);
     expect(isNavItemActive(matters, "/matter/26-CC-011354/")).toBe(true);
     expect(isNavItemActive(matters, "/pipeline/collections/")).toBe(true);
     expect(isNavItemActive(matters, "/pipeline/litigation/")).toBe(true);

@@ -33,6 +33,10 @@ export async function sendMagicLink(
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
+      // Supabase appends the flow parameters to this URL — `?code=` for PKCE,
+      // or `?token_hash=&type=` when the project's email template uses
+      // `{{ .TokenHash }}`. The callback accepts both, so the same link works
+      // whether or not it is opened in the browser that asked for it.
       emailRedirectTo: `${origin}/auth/callback/?next=${encodeURIComponent(next)}`,
     },
   });

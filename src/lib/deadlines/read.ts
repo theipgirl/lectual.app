@@ -18,11 +18,28 @@ import type { Database } from "@/lib/db/types.generated";
  * NO NEAR-END DATE FILTER, ANYWHERE IN THIS FILE — ALSO ON PURPOSE
  * ---------------------------------------------------------------
  * A horizon bounds the FAR end only (`due_date <= horizon`). There is no
- * `due_date >= today` in this module and there must never be one. Two of the
+ * `due_date >= today` in this module and there must never be one. Some of the
  * deadlines on this docket are intentionally-overdue lapsed appeal windows,
  * left `status='open'` so they keep rendering at the top of the screen; a
  * near-end filter would quietly delete exactly the rows that matter most.
  * Overdue rows are the product, not noise.
+ *
+ * CLOSED MATTERS ARE EXCLUDED — AND THAT IS A DIFFERENT THING
+ * ----------------------------------------------------------
+ * Filtering by *date* would hide live obligations. Filtering by whether the
+ * *matter* is closed does not: a disposed case cannot owe the court a future
+ * act, so an open row hanging off it is bookkeeping the importer never tidied,
+ * and showing it in red teaches the attorney that red means "probably stale".
+ * That is the failure this dashboard exists to prevent — an overdue badge has
+ * to be worth reacting to every single time.
+ *
+ * `on_hold` is NOT closed and is NOT excluded. A stayed or unverified case can
+ * still owe something, and the one matter here in that state has a live
+ * Rule 1.540(b) route open until 2027.
+ *
+ * Excluded rows are not deleted, not mutated, and remain on the case file via
+ * `listDeadlinesForMatter`. This is a display decision, reversible by editing
+ * this file — no legal determination is made or recorded.
  */
 
 export type MatterDeadlineRow = Database["public"]["Tables"]["crm_matter_deadline"]["Row"];
@@ -32,6 +49,8 @@ export type OpenDeadline = MatterDeadlineRow & {
   /** For this firm, `crm_matter.matter_number` IS the court case number. */
   matter_number: string;
   matter_title: string | null;
+  /** `open` | `on_hold` | `closed` — the matter's lifecycle, not the row's. */
+  matter_status: string | null;
 };
 
 export type ListOpenDeadlinesOptions = {
@@ -47,7 +66,20 @@ export type ListOpenDeadlinesOptions = {
 };
 
 /** The joined shape Supabase returns for the embedded matter. */
-type JoinedMatter = { matter_number: string; title: string | null } | null;
+type JoinedMatter = {
+  matter_number: string;
+  title: string | null;
+  status: string | null;
+} | null;
+
+/**
+ * Matter lifecycle values that mean "this case is over".
+ *
+ * Deliberately just `closed`. `on_hold` is a live case that is waiting, and
+ * `open` is obviously live. Kept as a named constant so the rule is greppable
+ * and so widening it is a visible decision rather than an edited string.
+ */
+const CLOSED_MATTER_STATUSES = ["closed"] as const;
 
 /**
  * Every OPEN deadline visible to the caller, soonest first — overdue rows at
@@ -65,8 +97,12 @@ export async function listOpenDeadlines(
 
   let query = supabase
     .from("crm_matter_deadline")
-    .select("*, crm_matter!inner(matter_number, title)")
-    .eq("status", "open");
+    .select("*, crm_matter!inner(matter_number, title, status)")
+    .eq("status", "open")
+    // Rows on a closed matter are excluded from the live docket. `!inner`
+    // makes this a real join filter rather than a post-hoc trim, so `limit`
+    // still counts only rows the caller will actually see.
+    .not("crm_matter.status", "in", `(${CLOSED_MATTER_STATUSES.join(",")})`);
 
   if (options.withinDays != null) {
     // Far end only. Computed in UTC, which can only ever widen the window by
@@ -95,7 +131,9 @@ export async function listDeadlinesForMatter(matterId: string): Promise<OpenDead
 
   const { data, error } = await supabase
     .from("crm_matter_deadline")
-    .select("*, crm_matter!inner(matter_number, title)")
+    // No closed-matter filter here on purpose: the case file shows a matter's
+    // full docket history, including rows left open when it was disposed.
+    .select("*, crm_matter!inner(matter_number, title, status)")
     .eq("matter_id", matterId)
     .order("status", { ascending: true })
     .order("due_date", { ascending: true });
@@ -109,8 +147,11 @@ export async function countOpenDeadlines(): Promise<number> {
   const supabase = await getScopedClient();
   const { count, error } = await supabase
     .from("crm_matter_deadline")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "open");
+    // Must mirror listOpenDeadlines exactly, or the header count and the rows
+    // beneath it disagree — the one thing this screen can never do.
+    .select("id, crm_matter!inner(status)", { count: "exact", head: true })
+    .eq("status", "open")
+    .not("crm_matter.status", "in", `(${CLOSED_MATTER_STATUSES.join(",")})`);
   if (error) throw error;
   return count ?? 0;
 }
@@ -118,6 +159,7 @@ export async function countOpenDeadlines(): Promise<number> {
 function flatten(row: MatterDeadlineRow & { crm_matter: JoinedMatter }): OpenDeadline {
   const { crm_matter: matter, ...rest } = row;
   return {
+    matter_status: matter?.status ?? null,
     ...rest,
     matter_number: matter?.matter_number ?? "",
     matter_title: matter?.title ?? null,
