@@ -1,0 +1,146 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens for the docket dashboard.
+ *
+ * This is a NEW visual identity — deliberately not the main app's firm.css.
+ * The palette is built around one job: making "what is on fire" legible in
+ * under a second, without colour ever being the only signal (every urgency
+ * band also carries a text label in the UI).
+ *
+ * Three urgency bands, each with a solid ink colour, a low-alpha background
+ * and a border tint so a badge, a row highlight and a calendar dot can all be
+ * derived from the same triple:
+ *   overdue → red    · a blown date; always wins its bucket
+ *   soon    → amber  · due inside 7 days
+ *   later   → blue   · everything further out
+ */
+
+:root {
+  color-scheme: light;
+
+  /* Surfaces */
+  --surface: #ffffff;
+  --surface-2: #f6f7f9;
+  --surface-3: #eceff3;
+
+  /* Text */
+  --ink: #10151c;
+  --ink-2: #3d4855;
+  --muted: #6b7885;
+
+  /* Lines */
+  --border: #dde2e8;
+  --border-strong: #c3ccd6;
+
+  /* Accent (interactive, not urgency) */
+  --accent: #1f4fd8;
+  --accent-ink: #ffffff;
+
+  /* Urgency — overdue */
+  --overdue: #c02626;
+  --overdue-bg: rgb(192 38 38 / 0.09);
+  --overdue-border: rgb(192 38 38 / 0.35);
+
+  /* Urgency — due soon (within 7 days) */
+  --soon: #a35a02;
+  --soon-bg: rgb(214 138 12 / 0.13);
+  --soon-border: rgb(214 138 12 / 0.4);
+
+  /* Urgency — later */
+  --later: #1f5fa8;
+  --later-bg: rgb(31 95 168 / 0.1);
+  --later-border: rgb(31 95 168 / 0.32);
+
+  /* Neutral non-obligations (tasks, Outlook events) */
+  --neutral: #6b7885;
+  --neutral-bg: rgb(107 120 133 / 0.1);
+
+  /* Shape */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --shadow: 0 1px 2px rgb(16 21 28 / 0.06), 0 8px 24px rgb(16 21 28 / 0.06);
+
+  /* Type */
+  --font-body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --surface: #12161c;
+    --surface-2: #181d25;
+    --surface-3: #212832;
+
+    --ink: #eef2f6;
+    --ink-2: #c2ccd6;
+    --muted: #8b97a4;
+
+    --border: #2a323d;
+    --border-strong: #3b4553;
+
+    --accent: #7aa2ff;
+    --accent-ink: #0b1018;
+
+    --overdue: #ff8080;
+    --overdue-bg: rgb(255 128 128 / 0.14);
+    --overdue-border: rgb(255 128 128 / 0.4);
+
+    --soon: #f2b45c;
+    --soon-bg: rgb(242 180 92 / 0.14);
+    --soon-border: rgb(242 180 92 / 0.4);
+
+    --later: #79b6f2;
+    --later-bg: rgb(121 182 242 / 0.13);
+    --later-border: rgb(121 182 242 / 0.36);
+
+    --neutral: #8b97a4;
+    --neutral-bg: rgb(139 151 164 / 0.14);
+
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.5), 0 8px 24px rgb(0 0 0 / 0.4);
+  }
+}
+
+/* Expose the tokens to Tailwind v4 utilities (bg-surface, text-overdue, …). */
+@theme inline {
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-overdue: var(--overdue);
+  --color-overdue-bg: var(--overdue-bg);
+  --color-overdue-border: var(--overdue-border);
+  --color-soon: var(--soon);
+  --color-soon-bg: var(--soon-bg);
+  --color-soon-border: var(--soon-border);
+  --color-later: var(--later);
+  --color-later-bg: var(--later-bg);
+  --color-later-border: var(--later-border);
+  --color-neutral: var(--neutral);
+  --color-neutral-bg: var(--neutral-bg);
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-mono);
+}
+
+html,
+body {
+  background: var(--surface-2);
+  color: var(--ink);
+  font-family: var(--font-body);
+}
+
+* {
+  border-color: var(--border);
+}
