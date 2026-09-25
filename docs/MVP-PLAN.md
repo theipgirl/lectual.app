@@ -48,7 +48,7 @@ Porting rule: copy the files and record the source commit SHA in `lectual.app/PO
 - Turn the design into tokens in `src/app/globals.css` plus a component list.
 - This becomes the **single** visual system, which resolves the three-system drift the decisions log flagged (2026-08-03-01). Record it as a new `brain/decisions.md` entry in `lectual`.
 
-### Step 1 · Scaffold `lectual.app`
+### Step 1 · Scaffold `lectual.app` (done)
 - Stack: Next.js 16.2.7, React 19.2, TypeScript, Tailwind 4, pnpm 11, Vitest.
   - Use the same versions and configs as `lectual`: `pnpm-workspace.yaml` allowBuilds, eslint, and `AGENTS.md`/`CLAUDE.md` copied with a pointer back to `lectual` for DB rules.
 - Point `.env.local` / `.env.test` at lectual-dev (`vncamzabuhvlliscprmm`).

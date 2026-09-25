@@ -1,0 +1,422 @@
+@import "tailwindcss";
+
+/*
+ * Lectual design tokens — the ONE visual system for lectual.app.
+ * Source: design/Matters_Prototype.dc.html and design/Lectual_Other_Pages.html.
+ * Add to this file rather than introducing new colours or faces in components.
+ */
+:root {
+  --paper: #f6f0e3;
+  --card: #fffdf7;
+  --well: #f1e8d8;
+  --ink: #2a1216;
+  --body: #4a2a2e;
+  --muted: #7a5a5e;
+  --ox: #6a1f2b;
+  --ox-hover: #5a1924;
+  --ox-deep: #230810;
+  --wine: #8e2733;
+  --ok: #43602f;
+  --warn: #7c5312;
+  --cream: #fdf7eb;
+  --rail-ink: #c7adb2;
+  --line: rgba(42, 18, 22, 0.13);
+  --line-2: rgba(42, 18, 22, 0.08);
+  --shadow: 0 1px 2px rgba(20, 4, 8, 0.05), 0 12px 28px -22px rgba(20, 4, 8, 0.4);
+  --shadow-lift: 0 24px 60px -20px rgba(20, 4, 8, 0.5);
+
+  --serif: var(--font-instrument-serif), "Instrument Serif", Georgia, serif;
+  --sans: var(--font-geist), Geist, system-ui, sans-serif;
+  --mono: var(--font-courier-prime), "Courier Prime", "Courier New", monospace;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-card: var(--card);
+  --color-well: var(--well);
+  --color-ink: var(--ink);
+  --color-body: var(--body);
+  --color-muted: var(--muted);
+  --color-ox: var(--ox);
+  --color-wine: var(--wine);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-cream: var(--cream);
+  --font-serif: var(--serif);
+  --font-sans: var(--sans);
+  --font-mono: var(--mono);
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+}
+a {
+  color: var(--wine);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--ox);
+  text-decoration: underline;
+}
+:focus-visible {
+  outline: 2px solid var(--ox);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── type ─────────────────────────────────────────────────────────── */
+.lx-label {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.lx-h1 {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 38px;
+  line-height: 1.05;
+  margin: 4px 0 0;
+}
+.lx-h2 {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 27px;
+  line-height: 1.1;
+  margin: 0;
+}
+.lx-sub {
+  font-size: 15.5px;
+  color: var(--body);
+  line-height: 1.55;
+  max-width: 640px;
+  text-wrap: pretty;
+  margin: 8px 0 0;
+}
+.lx-note {
+  font-size: 13.5px;
+  color: var(--muted);
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+/* ── surfaces ─────────────────────────────────────────────────────── */
+.lx-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+.lx-upl {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(106, 31, 43, 0.06);
+  border: 1px solid rgba(106, 31, 43, 0.16);
+  font-size: 13.5px;
+  color: var(--body);
+  line-height: 1.5;
+}
+
+/* ── controls ─────────────────────────────────────────────────────── */
+.lx-btn {
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+}
+.lx-btn:hover {
+  text-decoration: none;
+}
+.lx-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.lx-btn-pri {
+  background: var(--ox);
+  color: var(--cream);
+}
+.lx-btn-pri:hover:not(:disabled) {
+  background: var(--ox-hover);
+  color: var(--cream);
+}
+.lx-btn-sec {
+  background: var(--card);
+  color: var(--ink);
+  border-color: var(--line);
+}
+.lx-btn-sec:hover:not(:disabled) {
+  background: var(--well);
+  color: var(--ink);
+}
+.lx-btn-ghost {
+  background: transparent;
+  color: var(--body);
+}
+.lx-btn-ghost:hover:not(:disabled) {
+  background: var(--well);
+  color: var(--ink);
+}
+.lx-btn-sm {
+  height: 32px;
+  padding: 0 12px;
+  font-size: 13.5px;
+}
+.lx-input {
+  font: inherit;
+  font-size: 15px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 10px 12px;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+.lx-pill {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 5px;
+  white-space: nowrap;
+  display: inline-block;
+}
+.lx-pill-ok {
+  background: rgba(67, 96, 47, 0.12);
+  color: var(--ok);
+}
+.lx-pill-warn {
+  background: rgba(124, 83, 18, 0.14);
+  color: var(--warn);
+}
+.lx-pill-risk {
+  background: rgba(142, 39, 51, 0.11);
+  color: var(--wine);
+}
+.lx-pill-mute {
+  background: var(--well);
+  color: var(--muted);
+}
+
+/* ── shell ────────────────────────────────────────────────────────── */
+.lx-app {
+  height: 100dvh;
+  min-height: 600px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.lx-top {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  height: 76px;
+  padding: 0 26px;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+}
+.lx-wordmark {
+  font-family: var(--serif);
+  font-size: 27px;
+  color: var(--ox);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 280px;
+}
+.lx-vr {
+  width: 1px;
+  height: 26px;
+  background: var(--line);
+  flex: 0 0 auto;
+}
+.lx-section {
+  font-family: var(--mono);
+  font-size: 13.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ox);
+  white-space: nowrap;
+}
+.lx-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: var(--ox);
+  color: var(--cream);
+  font-family: var(--mono);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border: 0;
+  cursor: pointer;
+}
+.lx-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.lx-rail-slot {
+  flex: 0 0 auto;
+  width: 94px;
+  position: relative;
+}
+.lx-rail {
+  position: absolute;
+  left: 16px;
+  top: 16px;
+  bottom: 16px;
+  width: 62px;
+  border-radius: 16px;
+  background: var(--ox-deep);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 0;
+  box-shadow: var(--shadow);
+  overflow-y: auto;
+  z-index: 40;
+}
+.lx-rail-item {
+  width: 46px;
+  height: 46px;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--rail-ink);
+  position: relative;
+  flex: 0 0 auto;
+}
+.lx-rail-item:hover {
+  background: rgba(253, 247, 235, 0.08);
+  color: var(--cream);
+  text-decoration: none;
+}
+.lx-rail-item[aria-current="page"] {
+  background: var(--cream);
+  color: var(--ox);
+}
+.lx-rail-item svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.lx-rail-badge {
+  position: absolute;
+  top: 5px;
+  right: 4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--wine);
+  color: var(--cream);
+  font-family: var(--mono);
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+.lx-rail-sep {
+  width: 30px;
+  height: 1px;
+  background: rgba(253, 247, 235, 0.14);
+  margin: 6px 0;
+  flex: 0 0 auto;
+}
+.lx-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  padding: 18px 26px 18px 0;
+  overflow: hidden;
+}
+.lx-page {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+@media (max-width: 900px) {
+  .lx-top {
+    padding: 0 16px;
+    gap: 12px;
+  }
+  .lx-top .lx-section,
+  .lx-top .lx-vr {
+    display: none;
+  }
+  .lx-rail-slot {
+    width: 0;
+  }
+  .lx-rail {
+    position: fixed;
+    top: auto;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: auto;
+    max-width: calc(100vw - 20px);
+    height: 58px;
+    flex-direction: row;
+    padding: 0 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  .lx-rail-sep {
+    width: 1px;
+    height: 26px;
+    margin: 0 4px;
+  }
+  .lx-content {
+    padding: 16px 16px 84px;
+  }
+  .lx-h1 {
+    font-size: 31px;
+  }
+}
