@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lectual · Other pages</title>
+<!--
+  Companion to Matters_Prototype.dc.html. Same tokens, type and components:
+  paper #F6F0E3 · card #FFFDF7 · ink #2A1216 · body #4A2A2E · muted #7A5A5E
+  oxblood #6A1F2B (primary) · wine #8E2733 (links, risk) · ok #43602F · warn #7C5312
+  Instrument Serif (titles) · Geist (UI) · Courier Prime (labels, numbers)
+  Pages: Documents · Client portals · Campaigns · Settings (Mailboxes, Agents, Team, Firm).
+  Plain HTML + vanilla JS so it opens anywhere; the rail here stands in for the dc Rail component.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300..700&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F6F0E3;--card:#FFFDF7;--well:#F1E8D8;--ink:#2A1216;--body:#4A2A2E;--muted:#7A5A5E;
+  --ox:#6A1F2B;--ox-deep:#230810;--wine:#8E2733;--ok:#43602F;--warn:#7C5312;--cream:#FDF7EB;
+  --line:rgba(42,18,22,.13);--line2:rgba(42,18,22,.08);
+  --shadow:0 1px 2px rgba(20,4,8,.05),0 12px 28px -22px rgba(20,4,8,.4);
+  --serif:'Instrument Serif',serif;--mono:'Courier Prime','Courier New',monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--paper);color:var(--ink);font-family:Geist,system-ui,sans-serif;-webkit-font-smoothing:antialiased;font-size:15px}
+a{color:var(--wine);text-decoration:none}a:hover{color:var(--ox);text-decoration:underline}
+[role=button],[role=switch],[role=tab]{cursor:pointer}
+[role=button]:focus-visible,[role=switch]:focus-visible,[role=tab]:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--ox);outline-offset:2px;border-radius:8px}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes drawer{from{transform:translateX(26px);opacity:0}to{transform:none;opacity:1}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes toast{from{transform:translateY(10px);opacity:0}to{transform:none;opacity:1}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+/* shell */
+.app{height:100vh;min-height:600px;display:flex;flex-direction:column;overflow:hidden}
+.top{flex:0 0 auto;display:flex;align-items:center;gap:18px;height:76px;padding:0 26px;background:var(--card);border-bottom:1px solid var(--line)}
+.mark{font-family:var(--serif);font-size:27px;letter-spacing:.01em;color:var(--ox);white-space:nowrap}
+.mark sup{font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--muted);margin-left:4px}
+.vr{width:1px;height:26px;background:var(--line)}
+.sect{font-family:var(--mono);font-size:13.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--ox);white-space:nowrap}
+.search{display:flex;align-items:center;gap:9px;height:36px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:var(--paper);flex:0 1 240px;min-width:120px}
+.search input{flex:1;min-width:0;border:0;outline:none;background:transparent;font:inherit;font-size:15px;color:var(--ink)}
+.me{width:34px;height:34px;border-radius:999px;background:var(--ox);color:var(--cream);font-family:var(--mono);font-size:12px;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.main{flex:1;min-height:0;display:flex}
+.rail{flex:0 0 auto;width:94px;position:relative}
+.rail nav{position:absolute;left:16px;top:16px;bottom:16px;width:62px;border-radius:16px;background:var(--ox-deep);display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 0;box-shadow:var(--shadow);overflow-y:auto}
+.rail .ri{width:46px;height:46px;border-radius:11px;display:flex;align-items:center;justify-content:center;color:#C7ADB2;position:relative;flex:0 0 auto}
+.rail .ri:hover{background:rgba(253,247,235,.08);color:var(--cream)}
+.rail .ri.on{background:var(--cream);color:var(--ox)}
+.rail .ri .tip{position:absolute;left:56px;top:50%;transform:translateY(-50%);background:var(--ink);color:var(--cream);font-size:13px;padding:5px 9px;border-radius:7px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .12s;z-index:60}
+.rail .ri:hover .tip,.rail .ri:focus-visible .tip{opacity:1}
+.rail .sep{width:30px;height:1px;background:rgba(253,247,235,.14);margin:6px 0}
+.rail svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.content{flex:1;min-width:0;display:flex;padding:18px 26px 18px 0;overflow:hidden}
+.page{flex:1;min-width:0;display:flex;gap:20px;animation:fade .18s}
+
+/* shared bits */
+.lbl{font-family:var(--mono);font-size:12.5px;letter-spacing:.17em;text-transform:uppercase;color:var(--muted)}
+.h1{font-family:var(--serif);font-size:38px;line-height:1.05;margin:4px 0 0;font-weight:400}
+.h2{font-family:var(--serif);font-size:27px;line-height:1.1;margin:0;font-weight:400}
+.sub{font-size:15.5px;color:var(--body);line-height:1.55;max-width:640px;text-wrap:pretty;margin:8px 0 0}
+.card{border:1px solid var(--line);border-radius:14px;background:var(--card);box-shadow:var(--shadow)}
+.side{width:210px;flex:0 0 auto;display:flex;flex-direction:column;gap:24px;overflow-y:auto;padding-right:2px}
+.side .grp{display:flex;flex-direction:column;gap:6px}
+.fi{display:flex;align-items:center;gap:8px;height:34px;padding:0 10px;border-radius:8px;font-size:14.5px;color:var(--body);white-space:nowrap}
+.fi:hover{background:var(--well)}
+.fi.on{background:var(--card);color:var(--ink);font-weight:500;box-shadow:0 1px 2px rgba(20,4,8,.08)}
+.fi .n{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.col{flex:1;min-width:0;display:flex;flex-direction:column;gap:18px;overflow-y:auto;padding-right:4px}
+.head{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.head .grow{flex:1;min-width:260px}
+.btn{height:38px;padding:0 16px;border-radius:9px;display:inline-flex;align-items:center;gap:8px;font-size:14.5px;font-weight:500;white-space:nowrap;border:1px solid transparent;user-select:none}
+.btn.pri{background:var(--ox);color:var(--cream)}.btn.pri:hover{background:#5A1924}
+.btn.sec{background:var(--card);color:var(--ink);border-color:var(--line)}.btn.sec:hover{background:var(--well)}
+.btn.ghost{color:var(--body)}.btn.ghost:hover{background:var(--well)}
+.btn.sm{height:32px;padding:0 12px;font-size:13.5px}
+.btn.danger{color:var(--wine);border-color:rgba(142,39,51,.3);background:var(--card)}
+.segs{display:flex;padding:3px;border-radius:10px;background:var(--well);gap:2px}
+.segs div{height:30px;padding:0 13px;border-radius:8px;display:flex;align-items:center;font-size:14px;color:var(--body);white-space:nowrap}
+.segs div.on{background:var(--card);color:var(--ink);font-weight:500;box-shadow:0 1px 2px rgba(20,4,8,.08)}
+.pill{font-family:var(--mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;padding:3px 8px;border-radius:5px;white-space:nowrap;display:inline-block}
+.p-ok{background:rgba(67,96,47,.12);color:var(--ok)}.p-warn{background:rgba(124,83,18,.14);color:var(--warn)}
+.p-risk{background:rgba(142,39,51,.11);color:var(--wine)}.p-mute{background:var(--well);color:var(--muted)}.p-ox{background:var(--ox);color:var(--cream)}
+.dot{width:9px;height:9px;border-radius:999px;flex:0 0 auto;display:inline-block}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tbl{width:100%;border-collapse:separate;border-spacing:0}
+.tbl th{font-family:var(--mono);font-size:11.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);font-weight:400;text-align:left;padding:12px 14px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--card);z-index:1}
+.tbl td{padding:0 14px;height:52px;border-bottom:1px solid var(--line2);font-size:14.5px;color:var(--body);white-space:nowrap}
+.tbl tr:last-child td{border-bottom:0}
+.tbl tbody tr:hover td{background:#FBF6EC}
+.tbl td.pri{color:var(--ink);font-weight:500}
+.tbl .clip{max-width:280px;overflow:hidden;text-overflow:ellipsis}
+.toggle{width:40px;height:23px;border-radius:999px;padding:2px;display:flex;align-items:center;flex:0 0 auto;background:var(--well);border:1px solid rgba(42,18,22,.15);justify-content:flex-start;transition:background .15s}
+.toggle i{width:19px;height:19px;border-radius:999px;background:var(--muted)}
+.toggle.on{background:var(--ox);border-color:var(--ox);justify-content:flex-end}.toggle.on i{background:var(--cream)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.kpi{padding:16px 18px}.kpi .v{font-family:var(--mono);font-size:27px;margin-top:8px;font-variant-numeric:tabular-nums}.kpi .s{font-size:13.5px;color:var(--muted);margin-top:4px}
+.field{display:flex;flex-direction:column;gap:6px}
+.field input,.field textarea,.field select{font:inherit;font-size:15px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:9px 12px;outline:none}
+.field textarea{min-height:88px;resize:vertical;line-height:1.5}
+.rule{border-top:1px solid var(--line)}
+.note{font-size:13.5px;color:var(--muted);line-height:1.5;text-wrap:pretty}
+.upl{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:10px;background:rgba(106,31,43,.06);border:1px solid rgba(106,31,43,.16);font-size:13.5px;color:var(--body);line-height:1.5}
+.upl b{color:var(--ox);font-weight:600}
+.av{width:30px;height:30px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;color:var(--cream);flex:0 0 auto}
+.empty{padding:40px;text-align:center;color:var(--muted)}
+
+/* drawer + modal + toast */
+.scrim{position:fixed;inset:0;background:rgba(35,8,16,.28);z-index:80;animation:fade .15s}
+.drawer{position:fixed;top:14px;right:14px;bottom:14px;width:min(520px,calc(100vw - 28px));background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 60px -20px rgba(20,4,8,.5);z-index:90;display:flex;flex-direction:column;animation:drawer .22s cubic-bezier(.4,0,.2,1)}
+.drawer .dh{padding:20px 22px 14px;border-bottom:1px solid var(--line);display:flex;gap:14px;align-items:flex-start}
+.drawer .db{flex:1;overflow-y:auto;padding:18px 22px;display:flex;flex-direction:column;gap:16px}
+.drawer .df{padding:14px 20px;border-top:1px solid var(--line);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.x{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--muted);margin-left:auto;flex:0 0 auto}.x:hover{background:var(--well)}
+.modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(460px,calc(100vw - 32px));background:var(--card);border-radius:16px;border:1px solid var(--line);box-shadow:0 30px 80px -20px rgba(20,4,8,.55);z-index:95;animation:fade .15s;overflow:hidden}
+.toastw{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:99}
+.toastw div{background:var(--ink);color:var(--cream);padding:11px 18px;border-radius:10px;font-size:14.5px;animation:toast .2s;box-shadow:0 12px 30px -12px rgba(20,4,8,.6)}
+.spin{width:18px;height:18px;border-radius:999px;border:2px solid rgba(106,31,43,.2);border-top-color:var(--ox);animation:spin .8s linear infinite;flex:0 0 auto}
+
+/* documents */
+.doc-kind{width:34px;height:40px;border-radius:5px;border:1px solid var(--line);background:var(--paper);display:flex;align-items:flex-end;justify-content:center;padding-bottom:4px;font-family:var(--mono);font-size:9px;letter-spacing:.08em;color:var(--ox);flex:0 0 auto;position:relative}
+.doc-kind:before{content:"";position:absolute;top:-1px;right:-1px;width:10px;height:10px;background:var(--well);border-left:1px solid var(--line);border-bottom:1px solid var(--line);border-radius:0 5px 0 4px}
+.paperpv{background:#fff;border:1px solid var(--line);border-radius:8px;padding:26px 28px;font-size:13.5px;line-height:1.6;color:#2b2123;box-shadow:inset 0 0 0 6px #fbf8f2}
+.paperpv h4{font-family:var(--serif);font-size:21px;font-weight:400;margin:0 0 10px}
+
+/* portals */
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px}
+.pcard{padding:18px;display:flex;flex-direction:column;gap:12px}
+.browser{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--paper)}
+.browser .bar{height:30px;display:flex;align-items:center;gap:6px;padding:0 10px;background:var(--well);border-bottom:1px solid var(--line)}
+.browser .bar i{width:8px;height:8px;border-radius:99px;background:rgba(42,18,22,.18)}
+.browser .bar span{margin-left:8px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.steps{display:flex;gap:0;align-items:flex-start}
+.steps .st{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:6px;position:relative;font-size:11px;line-height:1.2;padding:0 3px;color:var(--muted);text-align:center;overflow-wrap:anywhere}
+.steps .st:before{content:"";position:absolute;top:8px;left:-50%;right:50%;height:2px;background:var(--line)}
+.steps .st:first-child:before{display:none}
+.steps .st.done:before,.steps .st.now:before{background:var(--ok)}
+.steps .st b{width:18px;height:18px;border-radius:99px;background:var(--card);border:2px solid var(--line);position:relative;z-index:1}
+.steps .st.done b{background:var(--ok);border-color:var(--ok)}
+.steps .st.now b{background:var(--card);border-color:var(--ox);box-shadow:0 0 0 4px rgba(106,31,43,.12)}
+.steps .st.now{color:var(--ox);font-weight:600}
+
+/* campaigns */
+.seq{display:flex;flex-direction:column;gap:0}
+.seq .step{display:flex;gap:14px;position:relative;padding-bottom:18px}
+.seq .step:after{content:"";position:absolute;left:15px;top:32px;bottom:0;width:2px;background:var(--line)}
+.seq .step:last-child:after{display:none}
+.seq .ix{width:32px;height:32px;border-radius:99px;background:var(--well);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;color:var(--ox);flex:0 0 auto}
+.bar-h{height:8px;border-radius:99px;background:var(--well);overflow:hidden}.bar-h i{display:block;height:100%;background:var(--ox);border-radius:99px}
+
+/* settings */
+.stabs{display:flex;flex-direction:column;gap:2px}
+.mbx{display:flex;align-items:center;gap:14px;padding:16px 18px}
+.mbx + .mbx{border-top:1px solid var(--line2)}
+.prov{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:#fff;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.agrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.lv{display:flex;padding:3px;border-radius:9px;background:var(--well);gap:2px}
+.lv div{flex:1;text-align:center;padding:6px 0;border-radius:7px;font-size:13.5px;color:var(--muted)}
+.lv div.on{background:var(--card);color:var(--ox);font-weight:600;box-shadow:0 1px 2px rgba(20,4,8,.12)}
+.runs td{height:44px}
+
+@media (max-width:900px){
+  .side{display:none}
+  .top{padding:0 16px;gap:12px}.top .sect{display:none}
+  .rail{width:0}.rail nav{position:fixed;left:auto;right:auto;top:auto;bottom:10px;left:50%;transform:translateX(-50%);width:auto;height:58px;flex-direction:row;padding:0 8px;z-index:70}
+  .rail .sep{width:1px;height:26px;margin:0 4px}.rail .tip{display:none}
+  .content{padding:16px 16px 84px}
+  .h1{font-size:31px}
+  .mbx{flex-wrap:wrap}.mbx>div:nth-child(2){flex:1 1 calc(100% - 54px)!important}.hide-sm{display:none}
+  .rail nav{max-width:calc(100vw - 20px);overflow-x:auto}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div class="mark" id="firmMark">RPB Law<sup>OS</sup></div>
+    <div class="vr"></div>
+    <div class="sect" id="sect">Documents</div>
+    <div style="flex:1"></div>
+    <div class="search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7A5A5E" stroke-width="1.7" stroke-linecap="round"><path d="M10.5 17a6.5 6.5 0 1 1 0-13 6.5 6.5 0 0 1 0 13zM15.5 15.5L20 20"/></svg>
+      <input id="q" type="text" placeholder="Client, mark or serial" aria-label="Search">
+    </div>
+    <div class="me" title="Taylor McGhee · Intake">TAM</div>
+  </div>
+  <div class="main">
+    <div class="rail"><nav id="rail" aria-label="Sections"></nav></div>
+    <div class="content"><div class="page" id="page"></div></div>
+  </div>
+</div>
+<div id="overlay"></div>
+<div class="toastw" id="toast"></div>
+
+<script>
+/* ---------- data (fictional, matches the Matters prototype's sample clients) ---------- */
+const PEOPLE = {
+  RB:{name:"Rebecca Beliard",role:"Owner",c:"#6A1F2B"}, DO:{name:"Dawn Otiti",role:"Senior admin",c:"#8E4A2F"},
+  AB:{name:"Amor Bajarla",role:"Admin",c:"#43602F"}, TAM:{name:"Taylor McGhee",role:"Intake",c:"#7C5312"},
+  RL:{name:"Rayn Lathome",role:"Law clerk",c:"#4A2A2E"}, CS:{name:"Caitlyn Simmons",role:"Paralegal",c:"#9C3B4B"}
+};
+const DOCS = [
+  {id:"d1",kind:"LOE",type:"Engagement letter",title:"Engagement letter — ONEFORME PILATES",client:"Irina Vilarino",mark:"ONEFORME PILATES",status:"approval",by:"agent",who:"Post-consult agent",at:"Today, 6:12 PM",ver:1},
+  {id:"d2",kind:"OPN",type:"Opinion letter",title:"Clearance opinion — NORTHBOUND SUPPLY",client:"Sana Okafor",mark:"NORTHBOUND SUPPLY",status:"draft",by:"agent",who:"Clearance agent",at:"Yesterday",ver:2},
+  {id:"d3",kind:"SPC",type:"Specimen",title:"Specimen — VELA (Class 25, hang tag)",client:"Vela Athletics",mark:"VELA",status:"filed",by:"client",who:"Uploaded via portal",at:"22 Sep",ver:1},
+  {id:"d4",kind:"OA",type:"Office action",title:"Non-final office action — MAISON PETRA",client:"Maison Petra",mark:"MAISON PETRA",status:"received",by:"uspto",who:"USPTO TSDR",at:"19 Sep",ver:1},
+  {id:"d5",kind:"RSP",type:"OA response",title:"Response to office action — MAISON PETRA",client:"Maison Petra",mark:"MAISON PETRA",status:"draft",by:"staff",who:"Rayn Lathome",at:"20 Sep",ver:3},
+  {id:"d6",kind:"FR",type:"Filing receipt",title:"Filing receipt · Serial 98/412,077",client:"Birchwood Coffee Co.",mark:"BIRCHWOOD",status:"filed",by:"uspto",who:"USPTO TEAS",at:"18 Sep",ver:1},
+  {id:"d7",kind:"LOE",type:"Engagement letter",title:"Engagement letter — CASA SETTE",client:"Dario Sette",mark:"CASA SETTE",status:"signed",by:"client",who:"Signed via portal",at:"15 Sep",ver:1},
+  {id:"d8",kind:"RNW",type:"Renewal",title:"§8/§9 renewal packet — ORIN & HALE",client:"Orin & Hale",mark:"ORIN & HALE",status:"draft",by:"agent",who:"Renewal agent",at:"12 Sep",ver:1},
+  {id:"d9",kind:"CLR",type:"Clearance search",title:"Knockout search — HALCYON ROWE",client:"Halcyon Rowe",mark:"HALCYON ROWE",status:"approval",by:"agent",who:"Clearance agent",at:"11 Sep",ver:1}
+];
+const DSTATUS = {
+  draft:{label:"Draft",cls:"p-mute"}, approval:{label:"Waiting on you",cls:"p-warn"}, signed:{label:"Signed",cls:"p-ok"},
+  filed:{label:"Filed",cls:"p-ok"}, received:{label:"Received",cls:"p-risk"}
+};
+const PORTALS = [
+  {id:"p1",client:"Irina Vilarino",mark:"ONEFORME PILATES",stage:1,last:"Viewed 2h ago",owed:"Sign engagement letter",unread:1,on:true},
+  {id:"p2",client:"Vela Athletics",mark:"VELA",stage:3,last:"Viewed yesterday",owed:"",unread:0,on:true},
+  {id:"p3",client:"Maison Petra",mark:"MAISON PETRA",stage:3,last:"Viewed 4 days ago",owed:"Approve OA response",unread:2,on:true},
+  {id:"p4",client:"Birchwood Coffee Co.",mark:"BIRCHWOOD",stage:2,last:"Never opened",owed:"",unread:0,on:true},
+  {id:"p5",client:"Dario Sette",mark:"CASA SETTE",stage:2,last:"Viewed 1 week ago",owed:"Upload specimen",unread:0,on:true},
+  {id:"p6",client:"Orin & Hale",mark:"ORIN & HALE",stage:4,last:"Invite not sent",owed:"",unread:0,on:false}
+];
+const PSTAGES = ["Engaged","Opinion","Filed","Examination","Registered"];
+const CAMPAIGNS = [
+  {id:"c1",name:"PNC nurture — didn't book a strategy session",aud:"Intake · Nurture (8)",n:41,status:"live",steps:4,open:62,reply:9,next:"Tomorrow 9:00 AM · 6 emails",gate:"Every send held for approval"},
+  {id:"c2",name:"Post-consult follow-up — no LOE after 5 days",aud:"Intake · Pending LOE (6)",n:7,status:"live",steps:3,open:71,reply:28,next:"Today 4:00 PM · 2 emails",gate:"Every send held for approval"},
+  {id:"c3",name:"Registration anniversary — portfolio check-in",aud:"Registered marks · 1 yr",n:18,status:"draft",steps:2,open:null,reply:null,next:"—",gate:"Not started"},
+  {id:"c4",name:"§8 renewal window opens",aud:"Registered marks · year 5",n:5,status:"paused",steps:3,open:58,reply:40,next:"Paused by Dawn Otiti",gate:"Every send held for approval"}
+];
+const SEQ = {
+  c1:[{d:"Day 0",s:"Still thinking it over?",b:"A short note from the attorney: what a strategy session covers, and the one question most founders ask first."},
+      {d:"Day 4",s:"What a trademark actually protects",b:"Plain-language explainer from the firm's approved claims library. No case-specific advice."},
+      {d:"Day 10",s:"Two common filing mistakes",b:"Educational. Links to the firm's published article."},
+      {d:"Day 21",s:"Should we close your file?",b:"Polite close-out; a reply of 'yes' re-opens the lead."}],
+  c2:[{d:"Day 5",s:"Your engagement letter",b:"Resends the LOE link with the quoted flat fee."},{d:"Day 9",s:"Any questions on the quote?",b:"Offers a 10-minute call with the paralegal."},{d:"Day 16",s:"Holding your filing slot",b:"Last nudge before the lead moves to Nurture."}],
+  c3:[{d:"Day 0",s:"One year registered",b:"Congratulations note and a portfolio review offer."},{d:"Day 14",s:"Watch service",b:"Explains monitoring as a flat-fee add-on."}],
+  c4:[{d:"−180 d",s:"Your renewal window is coming",b:"Explains §8/§9 and the flat fee."},{d:"−90 d",s:"Specimen needed",b:"Asks for a current specimen via the portal."},{d:"−30 d",s:"Final reminder",b:"Last call before the grace period."}]
+};
+let MAILBOXES = [
+  {id:"m1",scope:"firm",provider:"microsoft",email:"intake@rpblaw.com",label:"Intake · shared",by:"Dawn Otiti",status:"ok",synced:"3 min ago",matched:212,since:"Aug 26"},
+  {id:"m2",scope:"firm",provider:"microsoft",email:"trademark@rpblaw.com",label:"Trademark · shared",by:"Dawn Otiti",status:"ok",synced:"3 min ago",matched:486,since:"Aug 26"},
+  {id:"m3",scope:"personal",provider:"google",email:"taylor@rpblaw.com",label:"My mailbox",by:"You",status:"reauth",synced:"2 days ago",matched:37,since:"Sep 10"}
+];
+const AGENTS = [
+  {id:"intel",name:"Email → client intel",src:"Connected mailboxes",desc:"Reads mail matched to a lead or matter. Pulls the client's name, company, mark, goods and any dates, and proposes the field changes on the record.",out:"Record updates, held for review",lvl:"draft",on:true,ran:"Ran 6:45 PM",badge:"14 proposals",tone:"p-warn",isNew:true},
+  {id:"triage",name:"Intake triage",src:"New leads + assessment",desc:"Scores every new lead for readiness, value, urgency and practice fit, sets a lane, and writes the reason on the card.",out:"Lane + reason on the lead",lvl:"act",on:true,ran:"Ran 6:40 PM",badge:"23 leads",tone:"p-ok",isNew:true},
+  {id:"consult",name:"Post-consult drafter",src:"Zoom transcript + notes",desc:"After a consult, drafts the follow-up email, the internal summary and the quote from what was said on the call.",out:"Drafts into the approval queue",lvl:"draft",on:true,ran:"Ran 6:12 PM",badge:"2 held",tone:"p-warn",isNew:false},
+  {id:"docket",name:"Docket agent",src:"USPTO TSDR",desc:"Reads TSDR every hour, dockets deadlines and writes status notes on the matter.",out:"Deadlines + notes",lvl:"act",on:true,ran:"Ran 6:41 PM",badge:"94 actions",tone:"p-ok"},
+  {id:"renew",name:"Renewal agent",src:"Registered marks",desc:"Watches §8 and §9 windows and drafts the reminder six months out.",out:"Drafts into the approval queue",lvl:"suggest",on:false,ran:"Off · never run",badge:"",tone:""}
+];
+const LEVELS=[{k:"suggest",label:"Suggest",hint:"Flags what it would do. You do the work."},{k:"draft",label:"Draft",hint:"Writes it and holds it for your approval."},{k:"act",label:"Act",hint:"Updates internal records on its own and logs every change. Client-facing work still waits for you."}];
+const RUNS = [
+  {agent:"Email → client intel",trig:"Every 15 min",st:"ok",in:"38 messages",out:"4 proposals",at:"6:45 PM",dur:"41s"},
+  {agent:"Intake triage",trig:"New lead",st:"ok",in:"1 lead",out:"Lane: Hot",at:"6:40 PM",dur:"6s"},
+  {agent:"Post-consult drafter",trig:"Zoom webhook",st:"ok",in:"1 transcript",out:"3 drafts",at:"6:12 PM",dur:"1m 12s"},
+  {agent:"Email → client intel",trig:"Every 15 min",st:"warn",in:"0 messages",out:"taylor@ needs reconnecting",at:"6:30 PM",dur:"2s"},
+  {agent:"Docket agent",trig:"Hourly",st:"ok",in:"212 matters",out:"3 deadlines",at:"6:41 PM",dur:"2m 03s"},
+  {agent:"Intake triage",trig:"Nightly backfill",st:"ok",in:"23 leads",out:"23 lanes",at:"2:00 AM",dur:"48s"}
+];
+const TEAM = [
+  {k:"RB",email:"rebecca@rpblaw.com",role:"Owner",mbx:"—",last:"Today"},
+  {k:"DO",email:"dawn@rpblaw.com",role:"Senior admin",mbx:"—",last:"Today"},
+  {k:"AB",email:"amor@rpblaw.com",role:"Admin",mbx:"Outlook",last:"Yesterday"},
+  {k:"TAM",email:"taylor@rpblaw.com",role:"Intake",mbx:"Gmail",last:"Now"},
+  {k:"RL",email:"rayn@rpblaw.com",role:"Law clerk",mbx:"—",last:"3 days ago"},
+  {k:"CS",email:"caitlyn@rpblaw.com",role:"Paralegal",mbx:"Outlook",last:"Today"}
+];
+const ROLES = ["Owner","Attorney","Senior admin","Admin","Paralegal","Law clerk","Intake","Billing","Marketing","Read only"];
+
+/* ---------- state ---------- */
+const S = {
+  section: (location.hash||"#Documents").slice(1).replace(/%20/g," "),
+  q:"", docF:"all", docView:"table", sel:null, portalSel:null, camp:null,
+  setTab:"Mailboxes", agOn:{}, agLvl:{}, oauth:null, confirm:null
+};
+const NAV = [
+  {k:"Matters",ic:'<path d="M4 6h16M4 12h16M4 18h10"/>',ext:true},
+  {k:"Queue",ic:'<path d="M4 5h16v10H4zM8 19h8"/>',ext:true},
+  {k:"My Mail",ic:'<path d="M3 6h18v12H3z"/><path d="M3 7l9 6 9-6"/>',ext:true},
+  {k:"Calendar",ic:'<path d="M4 6h16v14H4zM4 10h16M9 3v4M15 3v4"/>',ext:true},
+  {sep:true},
+  {k:"Documents",ic:'<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>'},
+  {k:"Client portals",ic:'<circle cx="12" cy="8" r="3.5"/><path d="M5 20c1.2-3.6 4-5.5 7-5.5s5.8 1.9 7 5.5"/>'},
+  {k:"Campaigns",ic:'<path d="M4 10v4l11 5V5z"/><path d="M15 9a3 3 0 0 1 0 6M7 14l1.5 5"/>'},
+  {sep:true},
+  {k:"Agents",ic:'<path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><circle cx="12" cy="12" r="5"/>',go:"Settings",tab:"Agents"},
+  {k:"Settings",ic:'<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>'}
+];
+
+/* ---------- helpers ---------- */
+const $ = (s,r=document)=>r.querySelector(s);
+const esc = s => String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const av = (k,size=30)=>{const p=PEOPLE[k]||{c:"#7A5A5E"};return `<span class="av" style="width:${size}px;height:${size}px;background:${p.c}">${esc(k)}</span>`};
+const G = {
+  google:'<svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.6c0-1.6-.1-3.1-.4-4.6H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.4 5.7c4.3-4 6.9-9.9 6.9-17z"/><path fill="#FBBC05" d="M10.6 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.9-6.1C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.7c-2.1 1.4-4.8 2.3-8.5 2.3-6.2 0-11.5-4.1-13.4-9.8l-7.9 6.1C6.6 42.6 14.6 48 24 48z"/></svg>',
+  microsoft:'<svg width="18" height="18" viewBox="0 0 23 23"><path fill="#F35325" d="M1 1h10v10H1z"/><path fill="#81BC06" d="M12 1h10v10H12z"/><path fill="#05A6F0" d="M1 12h10v10H1z"/><path fill="#FFBA08" d="M12 12h10v10H12z"/></svg>'
+};
+const PNAME = {google:"Gmail",microsoft:"Outlook"};
+function toast(msg){const t=$("#toast");t.innerHTML=`<div>${esc(msg)}</div>`;clearTimeout(toast._t);toast._t=setTimeout(()=>t.innerHTML="",2600)}
+function go(sec,tab){ if(tab) S.setTab=tab; S.section=sec; S.sel=null; S.camp=null; S.portalSel=null; history.replaceState(null,"","#"+encodeURIComponent(sec)); render(); }
+function onKey(e){ if((e.key==="Enter"||e.key===" ")&&e.target.matches("[role=button],[role=switch],[role=tab]")){e.preventDefault();e.target.click()} if(e.key==="Escape"){S.sel=null;S.camp=null;S.portalSel=null;S.oauth=null;S.confirm=null;renderOverlay()} }
+document.addEventListener("keydown",onKey);
+
+/* ---------- rail ---------- */
+function renderRail(){
+  const active = S.section==="Settings" && S.setTab==="Agents" ? "Agents" : S.section;
+  $("#rail").innerHTML = NAV.map(n=> n.sep?'<div class="sep"></div>':
+    `<div class="ri ${active===n.k?"on":""}" role="button" tabindex="0" aria-label="${esc(n.k)}" data-nav="${esc(n.k)}"><svg viewBox="0 0 24 24">${n.ic}</svg><span class="tip">${esc(n.k)}${n.ext?" · in Matters prototype":""}</span></div>`).join("");
+  $("#rail").querySelectorAll("[data-nav]").forEach(el=>el.onclick=()=>{
+    const n=NAV.find(x=>x.k===el.dataset.nav);
+    if(n.ext){toast(n.k+" lives in the Matters prototype");return}
+    n.go?go(n.go,n.tab):go(n.k);
+  });
+}
+
+/* ---------- Documents ---------- */
+function docsPage(){
+  const q=S.q.toLowerCase();
+  const F=[["all","Everything"],["approval","Waiting on you"],["draft","Drafts"],["received","From the USPTO"],["client","From clients"],["filed","Filed & signed"]];
+  const test={all:()=>1,approval:d=>d.status==="approval",draft:d=>d.status==="draft",received:d=>d.by==="uspto",client:d=>d.by==="client",filed:d=>d.status==="filed"||d.status==="signed"};
+  const base=DOCS.filter(d=>!q||(d.title+d.client+d.mark).toLowerCase().includes(q));
+  const rows=base.filter(test[S.docF]);
+  const T=[["LOE","Engagement letter"],["OPN","Opinion letter"],["CLR","Clearance search"],["RSP","OA response"],["RNW","Renewal packet"]];
+  return `
+  <div class="side">
+    <div class="grp"><div class="lbl">Show</div>${F.map(([k,l])=>`<div class="fi ${S.docF===k?"on":""}" role="button" tabindex="0" data-docf="${k}">${l}<span class="n">${base.filter(test[k]).length}</span></div>`).join("")}</div>
+    <div class="grp"><div class="lbl">Generate</div>${T.map(([k,l])=>`<div class="fi" role="button" tabindex="0" data-gen="${l}"><span class="doc-kind" style="width:22px;height:26px;font-size:7px;padding-bottom:2px">${k}</span>${l}</div>`).join("")}
+      <div class="note" style="padding:4px 2px 0">Every generated document starts as a draft in the approval queue.</div></div>
+  </div>
+  <div class="col">
+    <div class="head"><div class="grow"><div class="lbl">Matter files</div><h1 class="h1">Documents</h1>
+      <p class="sub">Every letter, filing, specimen and USPTO notice, on the matter it belongs to. Agents draft; nothing leaves the firm until an attorney approves it.</p></div>
+      <div class="segs" role="tablist"><div role="tab" tabindex="0" class="${S.docView==="table"?"on":""}" data-dview="table">List</div><div role="tab" tabindex="0" class="${S.docView==="client"?"on":""}" data-dview="client">By client</div></div>
+      <div class="btn pri" role="button" tabindex="0" data-upload>Upload</div></div>
+    ${S.docView==="table"?`
+    <div class="card" style="overflow:auto">
+      <table class="tbl"><thead><tr><th>Document</th><th>Client · mark</th><th>Status</th><th>Source</th><th>Updated</th></tr></thead><tbody>
+      ${rows.map(d=>`<tr role="button" tabindex="0" data-doc="${d.id}"><td class="pri"><div style="display:flex;gap:12px;align-items:center"><span class="doc-kind">${d.kind}</span><div><div class="clip">${esc(d.title)}</div><div class="note">${esc(d.type)} · v${d.ver}</div></div></div></td>
+        <td>${esc(d.client)}<div class="note num">${esc(d.mark)}</div></td><td><span class="pill ${DSTATUS[d.status].cls}">${DSTATUS[d.status].label}</span></td>
+        <td>${d.by==="agent"?'<span class="dot" style="background:#6A1F2B;margin-right:7px"></span>':""}${esc(d.who)}</td><td class="num" style="color:var(--muted)">${esc(d.at)}</td></tr>`).join("")||`<tr><td colspan="5" class="empty">Nothing matches.</td></tr>`}
+      </tbody></table></div>`:
+    `<div class="pgrid">${[...new Set(rows.map(d=>d.client))].map(c=>{const ds=rows.filter(d=>d.client===c);return `<div class="card pcard"><div><div class="lbl">${esc(ds[0].mark)}</div><div class="h2" style="font-size:23px;margin-top:4px">${esc(c)}</div></div>
+      ${ds.map(d=>`<div style="display:flex;gap:10px;align-items:center" role="button" tabindex="0" data-doc="${d.id}"><span class="doc-kind" style="width:26px;height:31px;font-size:8px">${d.kind}</span><div style="flex:1;min-width:0;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(d.type)}</div><span class="pill ${DSTATUS[d.status].cls}">${DSTATUS[d.status].label}</span></div>`).join("")}</div>`}).join("")}</div>`}
+  </div>`;
+}
+function docDrawer(d){
+  const pre = d.kind==="LOE"?`<h4>Engagement letter</h4><p>Dear ${esc(d.client.split(" ")[0])},</p><p>Thank you for meeting with us about <b>${esc(d.mark)}</b>. This letter sets out the scope of the work we discussed and our flat fee for it…</p><p style="color:#9a8a8c">[ Scope · Fee · Timeline · Signature ]</p>`
+    : d.kind==="OPN"||d.kind==="CLR"?`<h4>Clearance summary</h4><p>We searched federal registrations and common-law sources for marks similar to <b>${esc(d.mark)}</b>…</p><p style="color:#9a8a8c">[ Method · Close citations · Risk · Recommendation ]</p>`
+    : `<h4>${esc(d.type)}</h4><p>${esc(d.title)}</p><p style="color:#9a8a8c">[ Original file preview ]</p>`;
+  return `<div class="scrim" data-close></div><aside class="drawer" role="dialog" aria-label="${esc(d.title)}">
+   <div class="dh"><span class="doc-kind">${d.kind}</span><div style="min-width:0"><div class="lbl">${esc(d.type)} · v${d.ver}</div><div class="h2" style="font-size:24px;margin-top:4px">${esc(d.title)}</div><div class="note" style="margin-top:6px">${esc(d.client)} · ${esc(d.who)} · ${esc(d.at)}</div></div><div class="x" role="button" tabindex="0" data-close aria-label="Close">✕</div></div>
+   <div class="db">
+     ${d.by==="agent"?`<div class="upl"><span>●</span><div><b>Drafted by the ${esc(d.who)}.</b> Read it as a first draft. It goes to the client only after an attorney approves it in the queue.</div></div>`:""}
+     <div class="paperpv">${pre}</div>
+     <div><div class="lbl" style="margin-bottom:8px">History</div>
+       <div style="display:flex;flex-direction:column;gap:8px;font-size:14px;color:var(--body)">
+        <div>● v${d.ver} · ${esc(d.who)} · ${esc(d.at)}</div>${d.ver>1?`<div style="color:var(--muted)">○ v${d.ver-1} · edited by Rayn Lathome</div>`:""}<div style="color:var(--muted)">○ Filed on matter · ${esc(d.mark)}</div></div></div>
+   </div>
+   <div class="df"><div class="note" style="flex:1;min-width:140px">${d.status==="approval"?"Approving sends it into the client email draft, not to the client.":"Stored on the matter. Only the firm and, if shared, the client can see it."}</div>
+     <div class="btn sec sm" role="button" tabindex="0" data-share="${d.id}">Share to portal</div>
+     ${d.status==="approval"||d.status==="draft"?`<div class="btn pri sm" role="button" tabindex="0" data-toqueue="${d.id}">${d.status==="approval"?"Review in queue":"Send for approval"}</div>`:`<div class="btn pri sm" role="button" tabindex="0" data-dl>Download</div>`}</div>
+  </aside>`;
+}
+
+/* ---------- Client portals ---------- */
+function portalsPage(){
+  const q=S.q.toLowerCase(); const ps=PORTALS.filter(p=>!q||(p.client+p.mark).toLowerCase().includes(q));
+  const live=PORTALS.filter(p=>p.on).length, owed=PORTALS.filter(p=>p.owed).length;
+  return `<div class="col">
+    <div class="head"><div class="grow"><div class="lbl">Client-facing</div><h1 class="h1">Client portals</h1>
+      <p class="sub">What each client sees: where their mark is, what we need from them, and the documents we've shared. The portal shows your firm's name, powered by Lectual. It's one login per founder, however many firms they work with.</p></div>
+      <div class="btn sec" role="button" tabindex="0" data-preview-portal="p1">Preview as a client</div><div class="btn pri" role="button" tabindex="0" data-invite>Invite a client</div></div>
+    <div class="kpis">
+      <div class="card kpi"><div class="lbl">Live portals</div><div class="v">${live}</div><div class="s">${PORTALS.length-live} not yet invited</div></div>
+      <div class="card kpi"><div class="lbl">Waiting on a client</div><div class="v" style="color:var(--warn)">${owed}</div><div class="s">Signature, specimen or approval</div></div>
+      <div class="card kpi"><div class="lbl">Unread client messages</div><div class="v">${PORTALS.reduce((a,p)=>a+p.unread,0)}</div><div class="s">They land in My Mail too</div></div>
+      <div class="card kpi"><div class="lbl">Opened this week</div><div class="v">4</div><div class="s">of ${live} live portals</div></div>
+    </div>
+    <div class="pgrid">${ps.map(p=>`<div class="card pcard" style="${p.on?"":"opacity:.7"}">
+      <div style="display:flex;gap:10px;align-items:flex-start"><div style="flex:1;min-width:0"><div class="lbl">${esc(p.mark)}</div><div class="h2" style="font-size:23px;margin-top:4px">${esc(p.client)}</div></div>
+      ${p.unread?`<span class="pill p-ox">${p.unread} new</span>`:""}</div>
+      <div class="steps">${PSTAGES.map((s,i)=>`<div class="st ${i<p.stage?"done":i===p.stage?"now":""}"><b></b>${s}</div>`).join("")}</div>
+      <div class="rule"></div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:14px"><span class="dot" style="background:${p.owed?"#7C5312":"#43602F"}"></span><span style="flex:1">${p.owed?esc(p.owed):"Nothing owed by the client"}</span></div>
+      <div style="display:flex;align-items:center;gap:8px"><span class="note" style="flex:1">${esc(p.last)}</span>
+        ${p.on?`<div class="btn ghost sm" role="button" tabindex="0" data-preview-portal="${p.id}">Preview</div>`:`<div class="btn sec sm" role="button" tabindex="0" data-invite-one="${p.id}">Send invite</div>`}</div>
+    </div>`).join("")}</div>
+    <div class="upl"><span>§</span><div><b>What a portal never shows:</b> internal notes, agent reasoning, drafts that haven't been approved, or anything about other clients. Messages from a client go to the matter's owner. The portal never gives an answer on its own.</div></div>
+  </div>`;
+}
+function portalPreview(p){
+  return `<div class="scrim" data-close></div><aside class="drawer" style="width:min(600px,calc(100vw - 28px))" role="dialog" aria-label="Portal preview">
+   <div class="dh"><div><div class="lbl">Preview · as ${esc(p.client)}</div><div class="h2" style="font-size:24px;margin-top:4px">What the client sees</div></div><div class="x" role="button" tabindex="0" data-close aria-label="Close">✕</div></div>
+   <div class="db"><div class="browser"><div class="bar"><i></i><i></i><i></i><span>portal.lectual.app/rpb</span></div>
+    <div style="padding:22px;display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;align-items:center;gap:10px"><div class="mark" style="font-size:23px">RPB Law</div><div class="note" style="margin-left:auto">powered by Lectual</div></div>
+      <div><div class="h2">Hi ${esc(p.client.split(" ")[0])}, here's where <i>${esc(p.mark)}</i> stands.</div></div>
+      <div class="card" style="padding:16px;box-shadow:none"><div class="steps">${PSTAGES.map((s,i)=>`<div class="st ${i<p.stage?"done":i===p.stage?"now":""}"><b></b>${s}</div>`).join("")}</div></div>
+      ${p.owed?`<div class="card" style="padding:16px;box-shadow:none;border-color:rgba(124,83,18,.35);background:#FFF9EC"><div class="lbl" style="color:var(--warn)">We need from you</div><div style="margin-top:6px;font-size:15.5px">${esc(p.owed)}</div><div class="btn pri sm" style="margin-top:12px">Do it now</div></div>`:""}
+      <div><div class="lbl" style="margin-bottom:8px">Shared documents</div>${DOCS.filter(d=>d.client===p.client&&d.status!=="draft"&&d.status!=="approval").map(d=>`<div style="display:flex;gap:10px;align-items:center;padding:6px 0"><span class="doc-kind" style="width:24px;height:29px;font-size:7px">${d.kind}</span><span style="font-size:14px">${esc(d.type)}</span><span class="note" style="margin-left:auto">${esc(d.at)}</span></div>`).join("")||'<div class="note">Nothing shared yet.</div>'}</div>
+      <div class="field"><div class="lbl">Message your attorney</div><textarea placeholder="Ask a question about your matter…" disabled></textarea></div>
+      <div class="note" style="border-top:1px solid var(--line);padding-top:10px">RPB Law is your law firm. Lectual / Oath Innovation Inc is not a law firm and does not give legal advice.</div>
+    </div></div></div>
+   <div class="df"><div class="note" style="flex:1">A preview only. Nothing here is visible to the client until it's shared.</div><div class="btn sec sm" role="button" tabindex="0" data-close>Close</div></div>
+  </aside>`;
+}
+
+/* ---------- Campaigns ---------- */
+function campaignsPage(){
+  const st={live:["Live","p-ok"],draft:["Draft","p-mute"],paused:["Paused","p-warn"]};
+  return `<div class="col">
+    <div class="head"><div class="grow"><div class="lbl">Nurture & follow-up</div><h1 class="h1">Campaigns</h1>
+      <p class="sub">Follow-up sequences for leads who haven't signed yet and for registered clients. Each email is written from the firm's approved claims library, and every send is held for a person to approve.</p></div>
+      <div class="btn pri" role="button" tabindex="0" data-newcamp>New campaign</div></div>
+    <div class="kpis">
+      <div class="card kpi"><div class="lbl">Enrolled</div><div class="v">${CAMPAIGNS.reduce((a,c)=>a+c.n,0)}</div><div class="s">across ${CAMPAIGNS.filter(c=>c.status==="live").length} live campaigns</div></div>
+      <div class="card kpi"><div class="lbl">Held for approval</div><div class="v" style="color:var(--warn)">8</div><div class="s">Next batch sends at 9:00 AM</div></div>
+      <div class="card kpi"><div class="lbl">Replies · 30 days</div><div class="v">11</div><div class="s">3 booked a strategy session</div></div>
+      <div class="card kpi"><div class="lbl">Signed after a campaign</div><div class="v" style="color:var(--ok)">2</div><div class="s">Flat-fee engagements</div></div>
+    </div>
+    <div class="card" style="overflow:auto"><table class="tbl"><thead><tr><th>Campaign</th><th>Audience</th><th>Status</th><th>Opened</th><th>Replied</th><th>Next</th></tr></thead><tbody>
+    ${CAMPAIGNS.map(c=>`<tr role="button" tabindex="0" data-camp="${c.id}"><td class="pri"><div class="clip" style="max-width:340px">${esc(c.name)}</div><div class="note">${c.steps} emails · ${esc(c.gate)}</div></td>
+      <td>${esc(c.aud)}<div class="note num">${c.n} enrolled</div></td><td><span class="pill ${st[c.status][1]}">${st[c.status][0]}</span></td>
+      <td style="min-width:110px">${c.open==null?'<span class="note">—</span>':`<div class="num" style="font-size:13px">${c.open}%</div><div class="bar-h" style="margin-top:4px"><i style="width:${c.open}%"></i></div>`}</td>
+      <td style="min-width:110px">${c.reply==null?'<span class="note">—</span>':`<div class="num" style="font-size:13px">${c.reply}%</div><div class="bar-h" style="margin-top:4px"><i style="width:${c.reply}%;background:var(--ok)"></i></div>`}</td>
+      <td class="note">${esc(c.next)}</td></tr>`).join("")}</tbody></table></div>
+    <div class="upl"><span>§</span><div><b>Attorney advertising:</b> campaigns can only use claims from the approved list in Firm Brain. Anything outside that list is flagged before it's queued. A reply stops the sequence for that person.</div></div>
+  </div>`;
+}
+function campDrawer(c){
+  const steps=SEQ[c.id]||[];
+  return `<div class="scrim" data-close></div><aside class="drawer" role="dialog" aria-label="${esc(c.name)}">
+   <div class="dh"><div style="min-width:0"><div class="lbl">${esc(c.aud)}</div><div class="h2" style="font-size:24px;margin-top:4px">${esc(c.name)}</div><div class="note" style="margin-top:6px">${c.n} enrolled · ${esc(c.next)}</div></div><div class="x" role="button" tabindex="0" data-close aria-label="Close">✕</div></div>
+   <div class="db">
+     <div class="field"><div class="lbl">Who enters</div><select><option>${esc(c.aud)}</option><option>Intake · Nurture (8)</option><option>Intake · Lost lead (9)</option><option>Registered marks · any</option></select></div>
+     <div class="field"><div class="lbl">Leaves when</div><div style="display:flex;gap:6px;flex-wrap:wrap">${["They reply","They book a session","They sign the LOE","Status changes"].map(x=>`<span class="pill p-mute" style="text-transform:none;letter-spacing:0;font-family:Geist;font-size:13px;padding:5px 10px">${x}</span>`).join("")}</div></div>
+     <div><div class="lbl" style="margin-bottom:12px">Sequence</div><div class="seq">${steps.map((s,i)=>`<div class="step"><div class="ix">${i+1}</div><div style="flex:1;min-width:0"><div style="display:flex;gap:8px;align-items:baseline"><span class="num" style="font-size:12.5px;color:var(--muted)">${esc(s.d)}</span><span style="font-weight:500">${esc(s.s)}</span></div><div class="note" style="margin-top:3px">${esc(s.b)}</div></div></div>`).join("")}
+       <div class="step"><div class="ix" style="border-style:dashed">+</div><div class="btn ghost sm" role="button" tabindex="0" data-addstep>Add an email</div></div></div></div>
+     <div class="field"><div class="lbl">Sending</div>
+      <label style="display:flex;gap:10px;align-items:center;font-size:14.5px"><span class="toggle on" role="switch" aria-checked="true" tabindex="0"><i></i></span>Hold every email for approval</label>
+      <div class="note">Sends from the matter owner's connected mailbox, so replies land in their inbox and on the lead's timeline.</div></div>
+   </div>
+   <div class="df"><div class="note" style="flex:1">Nothing sends until the batch is approved in the queue.</div>
+    ${c.status==="live"?`<div class="btn sec sm" role="button" tabindex="0" data-pause>Pause</div>`:`<div class="btn pri sm" role="button" tabindex="0" data-start>Start campaign</div>`}</div>
+  </aside>`;
+}
+
+/* ---------- Settings ---------- */
+function settingsPage(){
+  const tabs=["Mailboxes","Agents","Team & roles","Firm profile","Modules"];
+  let body="";
+  if(S.setTab==="Mailboxes") body=mailboxesTab();
+  else if(S.setTab==="Agents") body=agentsTab();
+  else if(S.setTab==="Team & roles") body=teamTab();
+  else if(S.setTab==="Firm profile") body=firmTab();
+  else body=modulesTab();
+  return `<div class="side"><div class="grp"><div class="lbl">Settings</div><div class="stabs">${tabs.map(t=>`<div class="fi ${S.setTab===t?"on":""}" role="button" tabindex="0" data-stab="${t}">${t}${t==="Mailboxes"&&MAILBOXES.some(m=>m.status==="reauth")?'<span class="dot" style="background:#8E2733;margin-left:auto"></span>':""}</div>`).join("")}</div></div>
+    <div class="note">Firm-wide settings need Senior admin or above. Your own mailbox is always yours to connect.</div></div>
+    <div class="col">${body}</div>`;
+}
+function mbxRow(m){
+  const st=m.status==="ok"?`<span class="pill p-ok">Syncing</span>`:m.status==="reauth"?`<span class="pill p-risk">Reconnect</span>`:`<span class="pill p-mute">Connecting</span>`;
+  return `<div class="mbx"><div class="prov">${G[m.provider]}</div>
+    <div style="flex:1;min-width:0"><div style="font-weight:500;overflow:hidden;text-overflow:ellipsis">${esc(m.email)}</div>
+    <div class="note">${esc(PNAME[m.provider])} · ${esc(m.label)} · connected by ${esc(m.by)} · since ${esc(m.since)}</div></div>
+    <div style="text-align:right;min-width:110px" class="hide-sm"><div class="num" style="font-size:14px">${m.matched}</div><div class="note">matched to clients</div></div>
+    <div style="text-align:right;min-width:92px"><div>${st}</div><div class="note" style="margin-top:4px">${esc(m.synced)}</div></div>
+    ${m.status==="reauth"?`<div class="btn pri sm" role="button" tabindex="0" data-reauth="${m.id}">Reconnect</div>`:`<div class="btn ghost sm" role="button" tabindex="0" data-disconnect="${m.id}">Disconnect</div>`}</div>`;
+}
+function mailboxesTab(){
+  const firm=MAILBOXES.filter(m=>m.scope==="firm"), mine=MAILBOXES.filter(m=>m.scope==="personal");
+  return `<div class="head"><div class="grow"><div class="lbl">Settings</div><h1 class="h1">Mailboxes</h1>
+    <p class="sub">Connect Gmail or Outlook so Lectual can match client email to the right lead or matter, keep "last heard from" current, and let the intel agent fill in what's missing. Mail from people who aren't clients is never stored.</p></div></div>
+  <div class="card">
+    <div style="padding:18px 18px 6px;display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap"><div style="flex:1;min-width:220px"><div class="h2" style="font-size:23px">My mailbox</div><div class="note" style="margin-top:4px">Only you can see or disconnect this. Matched client mail shows on the client's record for the team.</div></div>
+      <div class="btn sec sm" role="button" tabindex="0" data-connect="google" data-scope="personal"><span style="display:flex">${G.google}</span>Connect Gmail</div>
+      <div class="btn sec sm" role="button" tabindex="0" data-connect="microsoft" data-scope="personal"><span style="display:flex">${G.microsoft}</span>Connect Outlook</div></div>
+    ${mine.map(mbxRow).join("")||'<div class="empty">No personal mailbox connected.</div>'}
+  </div>
+  <div class="card">
+    <div style="padding:18px 18px 6px;display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap"><div style="flex:1;min-width:220px"><div class="h2" style="font-size:23px">Firm mailboxes</div><div class="note" style="margin-top:4px">Shared inboxes like intake@ and trademark@. Senior admins and owners manage these.</div></div>
+      <div class="btn sec sm" role="button" tabindex="0" data-connect="google" data-scope="firm"><span style="display:flex">${G.google}</span>Add Google Workspace</div>
+      <div class="btn sec sm" role="button" tabindex="0" data-connect="microsoft" data-scope="firm"><span style="display:flex">${G.microsoft}</span>Add Microsoft 365</div></div>
+    ${firm.map(mbxRow).join("")}
+  </div>
+  <div class="card" style="padding:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px">
+    <div><div class="lbl">What we read</div><div class="note" style="margin-top:6px;color:var(--body)">The sender, recipients, subject, date and a short preview. Full bodies are read only by the intel agent, for messages already matched to a client.</div></div>
+    <div><div class="lbl">What we store</div><div class="note" style="margin-top:6px;color:var(--body)">One timeline line per matched message, with a link back to your mail client. Access tokens are encrypted and scoped to this firm.</div></div>
+    <div><div class="lbl">What we never do</div><div class="note" style="margin-top:6px;color:var(--body)">Send, delete or move mail. Replies are created as <b>drafts</b> in your mailbox after someone approves them in the queue.</div></div>
+  </div>`;
+}
+function agentsTab(){
+  const cards=AGENTS.map(a=>{const on=S.agOn[a.id]!==undefined?S.agOn[a.id]:a.on;const lvl=S.agLvl[a.id]||a.lvl;
+    return `<div class="card" style="padding:20px;display:flex;flex-direction:column;gap:14px;box-shadow:none;${on?"":"opacity:.62"}">
+      <div style="display:flex;gap:10px;align-items:flex-start"><div style="flex:1;min-width:0"><div style="display:flex;gap:8px;align-items:center"><span style="font-size:17px;font-weight:600">${esc(a.name)}</span>${a.isNew?'<span class="pill p-ox">MVP</span>':""}</div><div class="lbl" style="margin-top:4px;font-size:11px">Reads · ${esc(a.src)}</div></div>
+        <span class="toggle ${on?"on":""}" role="switch" aria-checked="${on}" aria-label="Turn ${esc(a.name)} ${on?"off":"on"}" tabindex="0" data-agtoggle="${a.id}"><i></i></span></div>
+      <div style="font-size:14.5px;color:var(--body);line-height:1.5">${esc(a.desc)}</div>
+      <div><div class="lbl" style="font-size:11px;margin-bottom:6px">Autonomy</div><div class="lv">${LEVELS.map(l=>`<div class="${lvl===l.k?"on":""}" role="button" tabindex="0" title="${esc(l.hint)}" data-aglvl="${a.id}:${l.k}">${l.label}</div>`).join("")}</div>
+      <div class="note" style="margin-top:6px">${esc(LEVELS.find(l=>l.k===lvl).hint)}</div></div>
+      <div class="rule"></div>
+      <div style="display:flex;align-items:center;gap:8px"><span class="note" style="flex:1">${on?esc(a.ran):"Off · paused"}</span>${on&&a.badge?`<span class="pill ${a.tone}">${esc(a.badge)}</span>`:""}<div class="btn ghost sm" role="button" tabindex="0" data-runnow="${a.id}">Run now</div></div>
+    </div>`}).join("");
+  return `<div class="head"><div class="grow"><div class="lbl">IP.OS</div><h1 class="h1">Agents</h1>
+    <p class="sub">Each agent reads one source and writes one kind of thing. Anything addressed to a client goes into the approval queue, so switching an agent on can never put a word in front of a client.</p></div></div>
+  <div class="agrid">${cards}</div>
+  <div class="card" style="overflow:auto"><div style="padding:16px 18px 4px;display:flex;align-items:center"><div class="h2" style="font-size:23px;flex:1">Recent runs</div><span class="note">Every run is logged for the firm</span></div>
+    <table class="tbl runs"><thead><tr><th>Agent</th><th>Trigger</th><th>Read</th><th>Wrote</th><th>When</th><th></th></tr></thead><tbody>
+    ${RUNS.map(r=>`<tr><td class="pri">${esc(r.agent)}</td><td>${esc(r.trig)}</td><td>${esc(r.in)}</td><td>${r.st==="warn"?`<span style="color:var(--wine)">${esc(r.out)}</span>`:esc(r.out)}</td><td class="num">${esc(r.at)} <span class="note">· ${esc(r.dur)}</span></td><td><span class="dot" style="background:${r.st==="ok"?"#43602F":"#8E2733"}"></span></td></tr>`).join("")}</tbody></table></div>
+  <div class="upl"><span>§</span><div><b>The one rule.</b> No agent can send to a client. The approval queue is the only way anything leaves this firm. Agents never answer a legal question; they route it to the matter's attorney.</div></div>`;
+}
+function teamTab(){
+  return `<div class="head"><div class="grow"><div class="lbl">Settings</div><h1 class="h1">Team &amp; roles</h1>
+    <p class="sub">Ten roles, enforced in the database, not just hidden in the menu. A role decides what someone can open, edit and approve.</p></div><div class="btn pri" role="button" tabindex="0" data-inviteuser>Invite teammate</div></div>
+  <div class="card" style="overflow:auto"><table class="tbl"><thead><tr><th>Person</th><th>Role</th><th>Mailbox</th><th>Can approve</th><th>Last seen</th></tr></thead><tbody>
+  ${TEAM.map(t=>{const p=PEOPLE[t.k];const appr=["Owner","Senior admin","Attorney"].includes(t.role);return `<tr><td class="pri"><div style="display:flex;gap:10px;align-items:center">${av(t.k)}<div><div>${esc(p.name)}</div><div class="note">${esc(t.email)}</div></div></div></td>
+    <td><select aria-label="Role for ${esc(p.name)}" style="font:inherit;font-size:14px;border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:5px 8px;color:var(--ink)">${ROLES.map(r=>`<option ${r===t.role?"selected":""}>${r}</option>`).join("")}</select></td>
+    <td>${t.mbx==="—"?'<span class="note">—</span>':`<span style="display:inline-flex;gap:6px;align-items:center">${t.mbx==="Gmail"?G.google:G.microsoft}${t.mbx}</span>`}</td>
+    <td>${appr?'<span class="pill p-ok">Yes</span>':'<span class="pill p-mute">No</span>'}</td><td class="note">${esc(t.last)}</td></tr>`}).join("")}</tbody></table></div>`;
+}
+function firmTab(){
+  return `<div class="head"><div class="grow"><div class="lbl">Settings</div><h1 class="h1">Firm profile</h1><p class="sub">How the firm appears on client portals, documents and outgoing drafts.</p></div></div>
+  <div class="card" style="padding:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px">
+    <div class="field"><div class="lbl">Firm name</div><input value="RPB Law"></div>
+    <div class="field"><div class="lbl">Portal address</div><input value="portal.lectual.app/rpb"></div>
+    <div class="field"><div class="lbl">Reply-to for client drafts</div><select><option>Matter owner's mailbox</option><option>intake@rpblaw.com</option></select></div>
+    <div class="field"><div class="lbl">Time zone</div><select><option>America/New_York</option></select></div>
+    <div class="field" style="grid-column:1/-1"><div class="lbl">Email signature</div><textarea>RPB Law · Trademark & Brand Protection
+This message is from RPB Law. It is not legal advice until you have signed an engagement letter.</textarea></div>
+  </div>
+  <div class="card" style="padding:20px;display:flex;gap:16px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:220px"><div class="lbl">Billing</div><div style="margin-top:6px;font-size:15px">Lectual Firm · flat monthly fee</div><div class="note">Lectual never takes a share of legal fees or charges per referral.</div></div><div class="btn sec sm" role="button" tabindex="0">Manage plan</div></div>`;
+}
+function modulesTab(){
+  const M=[["Inbox & My Mail","inbox",true,"Reads connected mailboxes into the timeline."],["Agents & skills","agent-toolkit",true,"Scheduled agents that draft into the queue."],["Document Center","document-center",true,"Opinion letters, clearance and engagement letters."],["Litigation","litigation",false,"Court deadlines and litigation matters."],["Lawmatics import","lawmatics-import",false,"One-time import from Lawmatics."]];
+  return `<div class="head"><div class="grow"><div class="lbl">Settings</div><h1 class="h1">Modules</h1><p class="sub">Features switched on for this firm. A module that's off is invisible, not just greyed out, and its pages don't exist for this firm.</p></div></div>
+  <div class="card">${M.map(([n,k,on,d],i)=>`<div class="mbx" style="${i?"border-top:1px solid var(--line2)":""}"><div style="flex:1;min-width:0"><div style="font-weight:500">${n}</div><div class="note">${d} <span class="num">· ${k}</span></div></div><span class="toggle ${on?"on":""}" role="switch" aria-checked="${on}" aria-label="${n}" tabindex="0" style="cursor:not-allowed" title="Set by Lectual staff"><i></i></span></div>`).join("")}</div>
+  <div class="note">Modules are turned on by Lectual during onboarding. Ask your account contact to change them.</div>`;
+}
+
+/* ---------- OAuth + confirm overlays ---------- */
+function oauthModal(o){
+  const name=PNAME[o.provider], acct=o.scope==="firm"?(o.provider==="google"?"intake@rpblaw.com":"trademark@rpblaw.com"):"taylor@rpblaw.com";
+  const scopes=o.provider==="google"
+    ?["See your email messages and settings (read-only)","Create drafts. Nothing is sent without you","See your primary email address","Keep access while you're signed out"]
+    :["Read your mail"+(o.scope==="firm"?" and mail shared with you":""),"Create and edit drafts. Lectual never sends","Sign you in and read your profile","Keep access while you're signed out"];
+  const steps=["Choose an account","Review access","Connecting"];
+  return `<div class="scrim" data-oauth-cancel></div><div class="modal" role="dialog" aria-label="Connect ${name}">
+    <div style="padding:20px 22px;display:flex;gap:12px;align-items:center;border-bottom:1px solid var(--line)"><div class="prov">${G[o.provider]}</div><div><div style="font-weight:600;font-size:16px">Connect ${name}${o.scope==="firm"?" · firm mailbox":""}</div><div class="lbl" style="font-size:11px;margin-top:3px">Step ${o.step+1} of 3 · ${steps[o.step]}</div></div></div>
+    <div style="padding:20px 22px;display:flex;flex-direction:column;gap:14px;min-height:170px">
+      ${o.step===0?`<div style="font-size:15px;color:var(--body)">Sign in to continue to RPB Law OS.</div>
+        <div class="card" role="button" tabindex="0" data-oauth-next style="padding:12px 14px;display:flex;gap:12px;align-items:center;box-shadow:none"><span class="av" style="background:#6A1F2B">${o.scope==="firm"?"IN":"TM"}</span><div><div style="font-weight:500">${o.scope==="firm"?"Shared mailbox":"Taylor McGhee"}</div><div class="note">${acct}</div></div></div>
+        <div class="note">${o.scope==="firm"&&o.provider==="microsoft"?"Your Microsoft 365 admin may need to approve Lectual once for the whole firm.":"You'll be sent to "+(o.provider==="google"?"Google":"Microsoft")+" to sign in. We never see your password."}</div>`:""}
+      ${o.step===1?`<div style="font-size:15px;color:var(--body)">RPB Law OS is asking for access to <b>${acct}</b>.</div>
+        <div style="display:flex;flex-direction:column;gap:9px">${scopes.map(s=>`<div style="display:flex;gap:10px;align-items:flex-start;font-size:14.5px"><span class="dot" style="background:#43602F;margin-top:6px"></span>${esc(s)}</div>`).join("")}</div>
+        <div class="note">You can revoke this from Settings, or from your own account's security page. We never delete mail and never send without your review.</div>`:""}
+      ${o.step===2?`<div style="display:flex;gap:12px;align-items:center;padding:24px 0"><div class="spin"></div><div style="font-size:15px">Connecting the mailbox and pulling the last 30 days.</div></div>`:""}
+    </div>
+    <div style="padding:14px 20px;border-top:1px solid var(--line);display:flex;align-items:center;gap:10px"><div class="lbl" style="flex:1;font-size:11px">Token stored for this firm only</div>
+      <div class="btn ghost sm" role="button" tabindex="0" data-oauth-cancel>Cancel</div>${o.step<2?`<div class="btn pri sm" role="button" tabindex="0" data-oauth-next>${o.step===0?"Continue":"Allow"}</div>`:""}</div>
+  </div>`;
+}
+function confirmModal(c){
+  return `<div class="scrim" data-confirm-cancel></div><div class="modal" role="alertdialog" aria-label="${esc(c.title)}"><div style="padding:22px;display:flex;flex-direction:column;gap:10px">
+    <div class="h2" style="font-size:25px">${esc(c.title)}</div><div style="font-size:15px;color:var(--body);line-height:1.55">${esc(c.body)}</div></div>
+    <div style="padding:14px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px"><div class="btn ghost sm" role="button" tabindex="0" data-confirm-cancel>Keep it</div><div class="btn pri sm" role="button" tabindex="0" data-confirm-ok>${esc(c.ok)}</div></div></div>`;
+}
+
+/* ---------- render + events ---------- */
+function render(){
+  $("#sect").textContent = S.section==="Settings"?(S.setTab==="Agents"?"Agents":"Settings"):S.section;
+  renderRail();
+  const pages={"Documents":docsPage,"Client portals":portalsPage,"Campaigns":campaignsPage,"Settings":settingsPage};
+  $("#page").innerHTML=(pages[S.section]||docsPage)();
+  renderOverlay();
+}
+function renderOverlay(){
+  let h="";
+  if(S.sel) h=docDrawer(DOCS.find(d=>d.id===S.sel));
+  else if(S.portalSel) h=portalPreview(PORTALS.find(p=>p.id===S.portalSel));
+  else if(S.camp) h=campDrawer(CAMPAIGNS.find(c=>c.id===S.camp));
+  if(S.oauth) h+=oauthModal(S.oauth);
+  if(S.confirm) h+=confirmModal(S.confirm);
+  $("#overlay").innerHTML=h;
+  const f=$("#overlay [role=dialog],#overlay [role=alertdialog]"); if(f){const b=f.querySelector("[role=button]");b&&b.focus({preventScroll:true})}
+}
+document.addEventListener("click",e=>{
+  const t=e.target.closest("[data-docf],[data-dview],[data-doc],[data-close],[data-preview-portal],[data-camp],[data-stab],[data-agtoggle],[data-aglvl],[data-runnow],[data-connect],[data-oauth-next],[data-oauth-cancel],[data-disconnect],[data-reauth],[data-confirm-ok],[data-confirm-cancel],[data-toqueue],[data-share],[data-gen],[data-upload],[data-invite],[data-invite-one],[data-newcamp],[data-pause],[data-start],[data-inviteuser],[data-addstep],[data-dl]");
+  if(!t) return; const d=t.dataset;
+  if(d.docf){S.docF=d.docf;return render()}
+  if(d.dview){S.docView=d.dview;return render()}
+  if(d.doc){S.sel=d.doc;return renderOverlay()}
+  if("close" in d){S.sel=null;S.portalSel=null;S.camp=null;return renderOverlay()}
+  if(d.previewPortal){S.portalSel=d.previewPortal;return renderOverlay()}
+  if(d.camp){S.camp=d.camp;return renderOverlay()}
+  if(d.stab){S.setTab=d.stab;return render()}
+  if(d.agtoggle){const a=AGENTS.find(x=>x.id===d.agtoggle);const on=S.agOn[a.id]!==undefined?S.agOn[a.id]:a.on;S.agOn[a.id]=!on;toast(a.name+(on?" paused":" switched on"));return render()}
+  if(d.aglvl){const [id,k]=d.aglvl.split(":");const a=AGENTS.find(x=>x.id===id);const on=S.agOn[id]!==undefined?S.agOn[id]:a.on;if(!on)return;S.agLvl[id]=k;return render()}
+  if(d.runnow){const a=AGENTS.find(x=>x.id===d.runnow);RUNS.unshift({agent:a.name,trig:"Run now · Taylor",st:"ok",in:"—",out:"Queued",at:"Just now",dur:"…"});toast(a.name+" queued to run");return render()}
+  if(d.connect){S.oauth={provider:d.connect,scope:d.scope,step:0};return renderOverlay()}
+  if(d.reauth){const m=MAILBOXES.find(x=>x.id===d.reauth);S.oauth={provider:m.provider,scope:m.scope,step:1,reauth:m.id};return renderOverlay()}
+  if("oauthCancel" in d){S.oauth=null;return renderOverlay()}
+  if("oauthNext" in d){const o=S.oauth;o.step++;renderOverlay();if(o.step===2){setTimeout(()=>{
+      if(o.reauth){const m=MAILBOXES.find(x=>x.id===o.reauth);m.status="ok";m.synced="just now"}
+      else MAILBOXES.push({id:"m"+Date.now(),scope:o.scope,provider:o.provider,email:o.scope==="firm"?(o.provider==="google"?"intake@rpblaw.com":"trademark@rpblaw.com"):"taylor@rpblaw.com",label:o.scope==="firm"?"Shared":"My mailbox",by:"You",status:"ok",synced:"just now",matched:0,since:"Today"});
+      S.oauth=null;render();toast(PNAME[o.provider]+" connected · first sync running")},1400)}return}
+  if(d.disconnect){const m=MAILBOXES.find(x=>x.id===d.disconnect);S.confirm={title:"Disconnect "+m.email+"?",body:"Lectual stops reading this mailbox and deletes its stored access. Timeline entries already matched to clients stay on their records.",ok:"Disconnect",id:m.id};return renderOverlay()}
+  if("confirmCancel" in d){S.confirm=null;return renderOverlay()}
+  if("confirmOk" in d){MAILBOXES=MAILBOXES.filter(m=>m.id!==S.confirm.id);S.confirm=null;toast("Mailbox disconnected");return render()}
+  if(d.toqueue){toast("Opened in the approval queue");return}
+  if(d.share){toast("Shared to the client's portal");return}
+  if(d.gen){toast(d.gen+": pick a matter to draft from");return}
+  if("upload" in d){toast("Drop files on a matter to upload");return}
+  if("invite" in d||d.inviteOne){toast("Portal invite drafted into the queue");return}
+  if("newcamp" in d){S.camp="c3";return renderOverlay()}
+  if("pause" in d){toast("Campaign paused");return}
+  if("start" in d){toast("Campaign started. First batch held for approval");return}
+  if("inviteuser" in d){toast("Invite sent by magic link");return}
+  if("addstep" in d){toast("New email step added");return}
+  if("dl" in d){toast("Downloading…");return}
+});
+$("#q").addEventListener("input",e=>{S.q=e.target.value;render();$("#q").focus()});
+window.addEventListener("hashchange",()=>{S.section=decodeURIComponent(location.hash.slice(1))||"Documents";S.sel=S.camp=S.portalSel=S.oauth=S.confirm=null;render()});
+render();
+</script>
+</body>
+</html>
