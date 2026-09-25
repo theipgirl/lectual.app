@@ -14,6 +14,97 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_run: {
+        Row: {
+          agent: string
+          cost_usd: number | null
+          drafts_out: number
+          error: string | null
+          finished_at: string | null
+          id: string
+          items_in: number
+          org_id: string
+          started_at: string
+          status: string
+          summary: string | null
+          trigger: string
+          triggered_by: string | null
+        }
+        Insert: {
+          agent: string
+          cost_usd?: number | null
+          drafts_out?: number
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          items_in?: number
+          org_id: string
+          started_at?: string
+          status?: string
+          summary?: string | null
+          trigger: string
+          triggered_by?: string | null
+        }
+        Update: {
+          agent?: string
+          cost_usd?: number | null
+          drafts_out?: number
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          items_in?: number
+          org_id?: string
+          started_at?: string
+          status?: string
+          summary?: string | null
+          trigger?: string
+          triggered_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_run_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_org"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_setting: {
+        Row: {
+          agent: string
+          autonomy: string
+          enabled: boolean
+          org_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          agent: string
+          autonomy?: string
+          enabled?: boolean
+          org_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          agent?: string
+          autonomy?: string
+          enabled?: boolean
+          org_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_setting_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_org"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assessment_intent: {
         Row: {
           assessment_id: string
@@ -2312,6 +2403,80 @@ export type Database = {
           phone?: string | null
         }
         Relationships: []
+      }
+      mailbox_connection: {
+        Row: {
+          access_token_enc: string | null
+          created_at: string
+          created_by: string | null
+          email: string
+          id: string
+          label: string | null
+          last_error: string | null
+          last_synced_at: string | null
+          matched_count: number
+          org_id: string
+          provider: string
+          refresh_token_enc: string | null
+          scope: string
+          scopes: string[]
+          status: string
+          sync_cursor: string | null
+          token_expires_at: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          access_token_enc?: string | null
+          created_at?: string
+          created_by?: string | null
+          email: string
+          id?: string
+          label?: string | null
+          last_error?: string | null
+          last_synced_at?: string | null
+          matched_count?: number
+          org_id: string
+          provider: string
+          refresh_token_enc?: string | null
+          scope: string
+          scopes?: string[]
+          status?: string
+          sync_cursor?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          access_token_enc?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string
+          id?: string
+          label?: string | null
+          last_error?: string | null
+          last_synced_at?: string | null
+          matched_count?: number
+          org_id?: string
+          provider?: string
+          refresh_token_enc?: string | null
+          scope?: string
+          scopes?: string[]
+          status?: string
+          sync_cursor?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mailbox_connection_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_org"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_org_preference: {
         Row: {

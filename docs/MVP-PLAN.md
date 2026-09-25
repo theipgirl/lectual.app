@@ -55,7 +55,7 @@ Porting rule: copy the files and record the source commit SHA in `lectual.app/PO
 - Port auth, the db client, `org/modules`, the queue, and the UI primitives.
 - Done when: `pnpm build` passes, and magic-link sign-in into a dev firm renders an empty shell.
 
-### Step 2 · Mailbox schema (migrations in `lectual`, same branch name)
+### Step 2 · Mailbox schema (migrations in `lectual`, same branch name) (written; not yet applied)
 **`0057_mailbox_connection.sql`**
 - **Table `mailbox_connection`**
   - Columns: `id`, `org_id` (FK `crm_org`), `user_id` (nullable), `scope` (`'personal'|'firm'`), `provider` (`'google'|'microsoft'`), `email`, `status`, `scopes text[]`, `access_token_enc`, `refresh_token_enc`, `expires_at`, `sync_cursor` (Gmail historyId / Graph deltaLink), `last_synced_at`, `last_error`, `created_by`, `created_at`.
@@ -67,11 +67,12 @@ Porting rule: copy the files and record the source commit SHA in `lectual.app/PO
   - Token columns: revoke column-level `SELECT` on `*_token_enc` from `authenticated`. Only the service-role sync job reads them.
 - **Encryption:** tokens are AES-256-GCM encrypted app-side with `MAILBOX_TOKEN_KEY` (`src/lib/mailbox/crypto.ts`). The DB never sees plaintext.
 - **Other additions**
-  - Extend `crm_activity_type` with `email_intel` if it's needed for the agent's proposals.
-  - Add the modules `mailbox` and `agents` to the `crm_org.modules` allowed list.
-- **`0058_agent_run.sql`**
-  - Table `agent_run`: `org_id`, `agent`, `trigger` (`cron|manual|webhook`), `status`, `started_at`, `finished_at`, `items_in`, `drafts_out`, `error`, `cost_usd`.
-  - RLS is org-scoped and read-only for authenticated users. Rows are written by the service role.
+  - `crm_activity_type` is NOT extended yet: step 5 decides whether the intel agent's proposals need their own activity type.
+  - `crm_org.modules` has no allowed-list constraint (0040), so `mailbox` and `agents` needed no migration.
+- **`0058_agents.sql`**
+  - Table `agent_setting` (`org_id`, `agent`, `enabled`, `autonomy`): per-firm on/off and autonomy. No row means off. Only owner/admin/senior_admin can write it.
+  - Table `agent_run`: `org_id`, `agent` (the three agents plus `mailbox-sync`), `trigger` (`cron|manual|webhook|event`), `status`, `started_at`, `finished_at`, `items_in`, `drafts_out`, `summary`, `error`, `cost_usd`, `triggered_by`.
+  - `agent_run` has no insert/update/delete policies, so only the service-role runner can write it. Staff can read their own firm's log but cannot forge or erase entries.
 - **Isolation gate:** add cross-tenant read and write cases for both tables to `tests/tenant-isolation.test.ts`. Also add a *cross-user* case: user A in org X cannot read user B's personal mailbox row.
 - Apply to lectual-dev, then lectual-prod (additive), and check both with `list_migrations`.
 
@@ -159,7 +160,7 @@ Porting rule: copy the files and record the source commit SHA in `lectual.app/PO
 ## Critical files
 - `lectual`:
   - `supabase/migrations/0057_mailbox_connection.sql`
-  - `supabase/migrations/0058_agent_run.sql`
+  - `supabase/migrations/0058_agents.sql`
   - `tests/tenant-isolation.test.ts`
   - `src/lib/org/modules.ts`
   - `brain/decisions.md`

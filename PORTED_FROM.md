@@ -5,7 +5,8 @@ Source commit: `610c206` (main, 2026-09-25). Copy, don't import: when a ported f
 
 | lectual.app | From lectual | Changes |
 |---|---|---|
-| `src/lib/db/{admin,scoped-client,types}.ts` | same paths | none |
+| `src/lib/db/{admin,scoped-client}.ts` | same paths | none |
+| `src/lib/db/types.ts` | same path | copied after lectual's 0057/0058 commit; the three new tables were hand-added there until dev is unpaused and types can be regenerated |
 | `src/lib/auth/{roles,actions}.ts` | same paths | none |
 | `src/lib/org/modules.ts` | same path | adds modules `mailbox`, `agents` |
 | `src/lib/queue/{api,load,org,roles}.ts` | same paths | none |
