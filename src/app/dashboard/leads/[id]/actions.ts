@@ -1,13 +1,17 @@
 "use server";
 
 // Ported from lectual src/app/(firm)/dashboard/leads/[id]/actions.ts: role gate,
-// assign, move stage, edit and note are unchanged. Not ported yet: tags,
-// founder link, prep-consult and voice notes. New: reviewProposalAction.
+// assign, move stage, edit, note, tags, prep-consult and voice notes are
+// unchanged. Not ported: the founder link. New: reviewProposalAction.
 
 import { revalidatePath } from "next/cache";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { ROLES, type Role } from "@/lib/auth/roles";
-import { addLeadNote, assignLead, updateLead } from "@/lib/pipeline";
+import { addLeadNote, applyTag, assignLead, removeTag, updateLead } from "@/lib/pipeline";
+import { orgHasModule } from "@/lib/org/modules";
+import { addVoiceNote, VOICE_NOTE_MAX_BYTES } from "@/lib/voice/notes";
+import { queuePrepConsultDrafts } from "@/lib/prep-consult/generate";
+import { PrepConsultFlowError } from "@/lib/prep-consult/errors";
 import { validateLeadEdit, validateNote } from "@/lib/pipeline/lead-input";
 import { LeadWriteError } from "@/lib/pipeline/errors";
 import { logActivity } from "@/lib/matters/activity";
@@ -244,6 +248,139 @@ export async function reviewProposalAction(_prev: ActionState, formData: FormDat
     });
   } catch (err) {
     return { error: friendlyLeadWriteError(err, "Couldn't save this review.") };
+  }
+
+  revalidatePath(`/dashboard/leads/${leadId}/`);
+  return {};
+}
+
+export async function applyTagAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const leadId = String(formData.get("leadId") ?? "");
+  const tagId = String(formData.get("tagId") ?? "");
+  if (!leadId || !tagId) return { error: "Choose a tag to apply." };
+
+  try {
+    await requireLeadWriteRole();
+    await applyTag(leadId, tagId, { source: "human" });
+  } catch (err) {
+    return { error: friendlyLeadWriteError(err, "Couldn't apply this tag.") };
+  }
+
+  revalidatePath(`/dashboard/leads/${leadId}/`);
+  return {};
+}
+
+export async function removeTagAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const leadId = String(formData.get("leadId") ?? "");
+  const tagId = String(formData.get("tagId") ?? "");
+  if (!leadId || !tagId) return { error: "Missing tag." };
+
+  try {
+    await requireLeadWriteRole();
+    await removeTag(leadId, tagId);
+  } catch (err) {
+    return { error: friendlyLeadWriteError(err, "Couldn't remove this tag.") };
+  }
+
+  revalidatePath(`/dashboard/leads/${leadId}/`);
+  return {};
+}
+
+export type PrepConsultActionState = {
+  error?: string;
+  headsUpQueueItemId?: string;
+  clientPrepQueueItemId?: string;
+};
+
+/**
+ * "Prep this consult" trigger — the `prep-consult` skill's booking-triggered
+ * drafts (HEADS-UP + CLIENT-PREP EMAIL), staff-invoked from the lead detail
+ * page. See @/lib/prep-consult/generate.ts for the full orchestration and the
+ * judgment-boundary discipline (never a Nice class, risk tier, package name,
+ * or price). Like every other queue-writing action in this app, nothing here
+ * sends anything — both drafts land in the approval queue for review.
+ */
+export async function prepConsultAction(
+  _prev: PrepConsultActionState,
+  formData: FormData,
+): Promise<PrepConsultActionState> {
+  const leadId = String(formData.get("leadId") ?? "");
+  if (!leadId) return { error: "Missing lead." };
+
+  // The action is its own entry point — gating the card does not gate this.
+  // It drafts client-facing copy in one firm's attorney voice, so a firm
+  // without the toolkit must not be able to invoke it by posting directly.
+  if (!(await orgHasModule("agent-toolkit"))) {
+    return { error: "This isn't available for your firm." };
+  }
+
+  try {
+    const result = await queuePrepConsultDrafts({
+      leadId,
+      practiceArea: String(formData.get("practiceArea") ?? ""),
+      inquiryDescription: String(formData.get("inquiryDescription") ?? ""),
+      sessionWhen: String(formData.get("sessionWhen") ?? ""),
+      zoomLink: String(formData.get("zoomLink") ?? ""),
+    });
+    return {
+      headsUpQueueItemId: result.headsUpQueueItemId,
+      clientPrepQueueItemId: result.clientPrepQueueItemId,
+    };
+  } catch (err) {
+    return {
+      error:
+        err instanceof PrepConsultFlowError
+          ? err.message
+          : "Something went wrong drafting the consult prep emails. Try again, or check that this deployment has an AI provider configured.",
+    };
+  }
+}
+
+/**
+ * Saves a recorded voice note onto the lead's timeline. The audio arrives as
+ * a File in the form data (recorded in the browser by VoiceNoteRecorder);
+ * addVoiceNote uploads it to the org-scoped private bucket, transcribes it
+ * best-effort, and appends the 'voice_note' activity row. Like addNoteAction,
+ * the activity row IS the mutation — failures surface to the person who
+ * recorded it. Nothing is sent to the client.
+ */
+export async function addVoiceNoteAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const leadId = String(formData.get("leadId") ?? "");
+  if (!leadId) return { error: "Missing lead." };
+
+  const audio = formData.get("audio");
+  if (!(audio instanceof File) || audio.size === 0) {
+    return { error: "No recording to save — record a voice note first." };
+  }
+  if (audio.size > VOICE_NOTE_MAX_BYTES) {
+    return { error: "That recording is too large — keep voice notes under 10 minutes." };
+  }
+  const durationSeconds = Number(formData.get("durationSeconds") ?? 0);
+
+  try {
+    await requireLeadWriteRole();
+    await addVoiceNote(
+      { leadId },
+      {
+        bytes: new Uint8Array(await audio.arrayBuffer()),
+        // The recorder puts the real MediaRecorder mimeType on the File; strip
+        // codec parameters ("audio/webm;codecs=opus" → "audio/webm") so it
+        // matches the bucket's allowed_mime_types.
+        mime: (audio.type || "").split(";")[0].trim(),
+        durationSeconds,
+      },
+    );
+  } catch (err) {
+    return { error: friendlyLeadWriteError(err, "Couldn't save this voice note.") };
   }
 
   revalidatePath(`/dashboard/leads/${leadId}/`);

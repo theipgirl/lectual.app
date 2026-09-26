@@ -123,3 +123,41 @@ export const callClaude: StructuredCall = async (req) => {
   };
   return { output: response.parsed_output, model: response.model, usage, costUsd: costFor(response.model, usage) };
 };
+
+export type AskClaudeInput = { system: string; prompt: string; maxTokens?: number };
+export type AskClaudeResult = { skipped: true } | { text: string; model: string; costUsd: number | null };
+
+/**
+ * Plain-text call, same contract as lectual's enrichment `askClaude`: advisory,
+ * so a missing key, a refusal or any provider failure comes back as
+ * `{ skipped: true }` and the caller decides what that means. Used by the
+ * prep-consult drafts, which then pass through the approval queue.
+ */
+export async function askClaude(input: AskClaudeInput): Promise<AskClaudeResult> {
+  if (!aiConfigured()) return { skipped: true };
+  try {
+    const response = await getClient().beta.messages.create({
+      model: agentModel(),
+      max_tokens: input.maxTokens ?? 1024,
+      betas: ["server-side-fallback-2026-07-01"],
+      fallbacks: "default",
+      system: [{ type: "text", text: input.system, cache_control: { type: "ephemeral" } }],
+      messages: [{ role: "user", content: input.prompt }],
+    });
+    if (response.stop_reason === "refusal") return { skipped: true };
+    const text = response.content
+      .map((b) => (b.type === "text" ? b.text : ""))
+      .join("")
+      .trim();
+    if (!text) return { skipped: true };
+    const usage: Usage = {
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens,
+      cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
+      cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
+    };
+    return { text, model: response.model, costUsd: costFor(response.model, usage) };
+  } catch {
+    return { skipped: true };
+  }
+}

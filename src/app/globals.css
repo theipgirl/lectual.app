@@ -990,3 +990,10 @@ a:hover {
 .lx-view-toggle a { padding: 6px 12px; border-radius: 8px; color: var(--body); font-size: 14px; }
 .lx-view-toggle a:hover { text-decoration: none; color: var(--ink); }
 .lx-view-toggle a.on { background: var(--card); color: var(--ink); font-weight: 500; box-shadow: 0 1px 2px rgba(20, 4, 8, 0.08); }
+
+/* ── lead tags ────────────────────────────────────────────────────── */
+.lx-tag { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 10px; border-radius: 999px; background: var(--well); font-size: 13px; color: var(--ink); }
+span.lx-tag { padding-right: 10px; }
+.lx-tag button { border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; padding: 0 6px; border-radius: 999px; }
+.lx-tag button:hover { color: var(--wine); background: rgba(142, 39, 51, 0.08); }
+.lx-tag-dot { width: 8px; height: 8px; border-radius: 999px; }

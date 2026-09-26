@@ -6,8 +6,14 @@ import { CAN_WRITE_LEAD, getLead, listStages } from "@/lib/pipeline";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { pendingProposals } from "@/lib/agents/proposals";
 import { relativeTime } from "@/lib/relative-time";
-import { describeActivity } from "@/components/leads/describe";
 import { AssignSelect, EditLeadForm, NoteComposer, ProposalCard, StageSelect } from "@/components/leads/LeadForms";
+import { LeadTags, PrepConsult } from "@/components/leads/LeadExtras";
+import { Timeline } from "@/components/timeline/Timeline";
+import VoiceNoteRecorder from "@/components/voice/VoiceNoteRecorder";
+import { listTags, tagsForLead } from "@/lib/pipeline/tags";
+import { orgHasModule } from "@/lib/org/modules";
+import { voiceNotePlaybackUrls } from "@/lib/voice/notes";
+import { addVoiceNoteAction } from "./actions";
 
 export default async function LeadPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -19,6 +25,11 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   if (!lead) notFound();
 
   const supabase = await getScopedClient();
+  const [hasAgentToolkit, applied, catalog] = await Promise.all([
+    orgHasModule("agent-toolkit"),
+    tagsForLead(id).catch(() => []),
+    listTags().catch(() => []),
+  ]);
   const [stages, members, { data: activity }] = await Promise.all([
     listStages(),
     listMemberDirectory().catch(() => []),
@@ -30,6 +41,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
       .limit(100),
   ]);
   const rows = activity ?? [];
+  const voiceUrls = await voiceNotePlaybackUrls(rows);
   const proposals = pendingProposals(rows);
   const canWrite = CAN_WRITE_LEAD.includes(session.role);
   const name = `${lead.first_name} ${lead.last_name}`.trim() || lead.email;
@@ -96,6 +108,15 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             </section>
           )}
 
+          {canWrite && hasAgentToolkit && (
+            <details className="lx-card lx-disclosure">
+              <summary>Prep this consult</summary>
+              <div style={{ padding: "0 18px 18px" }}>
+                <PrepConsult leadId={lead.id} practiceArea={lead.practice_area} />
+              </div>
+            </details>
+          )}
+
           {canWrite && (
             <section className="lx-card" style={{ padding: 18 }}>
               <NoteComposer leadId={lead.id} />
@@ -106,33 +127,23 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             <h2 className="lx-h2" style={{ fontSize: 23, marginBottom: 10 }}>
               Timeline
             </h2>
-            {rows.length === 0 ? (
-              <p className="lx-note">Nothing yet.</p>
-            ) : (
-              <ol className="lx-timeline">
-                {rows.map((r) => {
-                  const d = describeActivity(r);
-                  return (
-                    <li key={r.id} data-tone={d.tone}>
-                      <div className="lx-timeline-head">
-                        <span>{d.title}</span>
-                        <span className="lx-note">{relativeTime(r.created_at)}</span>
-                      </div>
-                      {d.detail && <p>{d.detail}</p>}
-                      {d.link && (
-                        <a href={d.link} target="_blank" rel="noreferrer noopener" className="lx-note">
-                          Open in mail
-                        </a>
-                      )}
-                    </li>
-                  );
-                })}
-              </ol>
+            {canWrite && (
+              <div style={{ marginBottom: 14 }}>
+                <VoiceNoteRecorder target={{ kind: "lead", id: lead.id }} action={addVoiceNoteAction} />
+              </div>
             )}
+            <Timeline rows={rows} mediaUrls={voiceUrls} />
           </section>
         </div>
 
         <aside className="lx-card lx-aside" style={{ width: 340 }}>
+          <div className="lx-label">Tags</div>
+          <LeadTags
+            leadId={lead.id}
+            applied={applied.map((t) => ({ id: t.id, label: t.label, color: t.color }))}
+            catalog={catalog.map((t) => ({ id: t.id, label: t.label, color: t.color }))}
+            canWrite={canWrite}
+          />
           <div className="lx-label">Details</div>
           {canWrite ? (
             <EditLeadForm

@@ -22,7 +22,7 @@ Source commit: `610c206` (main, 2026-09-25). Copy, don't import: when a ported f
 | `src/app/dashboard/queue/**`, `src/components/queue/*` | `src/app/(firm)/dashboard/queue/**` | logic and role gates unchanged; re-skinned; approve adds a draft in the approver's own mailbox when the queue has no send channel; Document Center post-approve hook not ported (Document Center isn't in this app yet) |
 | `src/lib/{pipeline,matters,automation,members,mentions,notifications,time}/**` | same paths | none — copied as the import closure of `@/lib/pipeline` and `@/lib/matters` |
 | `src/app/dashboard/leads/{actions,errors}.ts` | `src/app/(firm)/dashboard/pipeline/{actions,errors}.ts` | paths only |
-| `src/app/dashboard/leads/[id]/actions.ts` | `src/app/(firm)/dashboard/leads/[id]/actions.ts` | role gate, assign, move stage, edit, note unchanged; tags, founder link, prep-consult, voice notes not yet ported; adds `reviewProposalAction` |
+| `src/app/dashboard/leads/[id]/actions.ts` | `src/app/(firm)/dashboard/leads/[id]/actions.ts` | role gate, assign, move stage, edit, note, tags, prep-consult and voice notes unchanged; founder link not ported; adds `reviewProposalAction` |
 | `tests/pipeline/*`, `tests/matters/*`, `tests/mentions/*`, `tests/time/*` | same paths | `lead-actions.test.ts` retargeted at the new action paths |
 | `src/lib/matters/board.ts` | same path | none (pure; kept for a board view) |
 | `src/app/dashboard/matters/{list-utils,labels}.ts` | `src/app/(firm)/dashboard/matters/_components/{list-utils,labels}.ts` | list-utils none; labels drops `MATTER_TYPE_TONE` |
@@ -41,6 +41,8 @@ Source commit: `610c206` (main, 2026-09-25). Copy, don't import: when a ported f
 | `src/components/voice/VoiceNoteRecorder.tsx` | `src/components/firm/VoiceNoteRecorder.tsx` | recording logic unchanged; restyled |
 | matter actions: litigation, voice note, welcome email, filing follow-up | `src/app/(firm)/dashboard/matters/[id]/actions.ts` | unchanged gates (module in the action); errors through `friendlyMatterError` |
 | `tests/matters/{matter-board,filing-followup*,court-time}.test.ts`, `tests/welcome/*`, `tests/voice.test.ts` | same paths | none |
+| `src/lib/prep-consult/*`, `tests/prep-consult/*` | same paths | drafts call `askClaude` from `src/lib/ai/claude.ts` (same advisory contract) instead of `@/lib/enrichment/client` |
+| lead actions: tags, prep-consult, voice note | `src/app/(firm)/dashboard/leads/[id]/actions.ts` | unchanged; prep-consult keeps its agent-toolkit gate in the action |
 | `tsconfig.json`, `eslint.config.mjs`, `postcss.config.mjs`, `pnpm-workspace.yaml` | same paths | lint ignores `design/` |
 
 New in this repo: Settings → Firm profile (`src/lib/org/profile*.ts`, lectual 0073) and Modules, `src/lib/lawmatics/connection.ts` and the Lawmatics import UI (`src/components/lawmatics/*`), `src/lib/matters/worklist.ts` (the design's whose-move-is-it bands), `src/lib/mailbox/*` (except the apply port above), `src/lib/nav.ts`, `src/lib/fonts`, `src/components/shell/*`, `src/app/dashboard/*`,
