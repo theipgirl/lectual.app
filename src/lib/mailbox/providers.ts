@@ -10,7 +10,7 @@ import { pkceChallenge } from "./state";
  *   Microsoft Mail.Read, Mail.ReadWrite — the same pair in Graph terms
  *             (ReadWrite is what drafts need; we never send or delete)
  *   Both      offline_access / access_type=offline — a refresh token, so the
- *             15-minute sync keeps working while nobody is signed in
+ *             scheduled sync keeps working while nobody is signed in
  *
  * A firm mailbox (intake@, trademark@) is connected by signing in AS that
  * mailbox's own account. That works the same on both providers and needs no

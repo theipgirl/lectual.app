@@ -110,7 +110,7 @@ Porting rule: copy the files and record the source commit SHA in `lectual.app/PO
   - **Privacy rule:** messages that match no lead or contact are dropped. Nothing from unmatched personal mail is persisted.
 - **Contact and matter matching:** extend the matcher to also check `crm_contact.email` and link through `crm_matter_contact`. That's new code, with tests added next to `tests/intake/email-match.test.ts`.
 - **Cron route** `src/app/api/cron/mailbox-sync/route.ts`:
-  - Runs every 15 minutes via `vercel.json`.
+  - Runs every 15 minutes via `vercel.json` on Vercel Pro; daily while the team is on Hobby.
   - Protected by `CRON_SECRET`.
   - Uses a service-role client, but every write carries the connection's own `org_id` (read from the row, never from input).
   - Records an `agent_run` row.

@@ -156,7 +156,7 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
             <h2 className="lx-h2" style={{ fontSize: 25 }}>{sent ? "Nothing sent to clients yet" : "No client mail yet"}</h2>
             <p className="lx-note" style={{ margin: 0 }}>
               {connections.every((c) => !c.last_synced_at)
-                ? "The first sync hasn't run yet. It pulls the last 30 days, and then checks every 15 minutes."
+                ? "The first sync hasn't run yet. It pulls the last 30 days, and then keeps checking for new mail."
                 : `Last checked ${relativeTime(connections.map((c) => c.last_synced_at ?? "").sort().at(-1) ?? now.toISOString())}. Only mail with your leads and clients shows here.`}
             </p>
           </div>

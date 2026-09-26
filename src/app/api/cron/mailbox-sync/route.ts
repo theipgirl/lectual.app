@@ -10,7 +10,7 @@ import { runMailboxSync } from "@/lib/mailbox/sync";
 export const maxDuration = 300;
 
 /**
- * Every 15 minutes (vercel.json): pull new mail from every connected mailbox
+ * On the vercel.json schedule (daily on Hobby; every 15 minutes once on Pro): pull new mail from every connected mailbox
  * and file what matches a client. The response carries counts only.
  */
 export async function GET(req: NextRequest) {

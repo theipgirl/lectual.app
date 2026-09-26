@@ -70,11 +70,13 @@ The surface is behind the `mailbox` module (fail-closed). Add it to the firm's
 
 ## 5. The sync (step 4)
 
-`/api/cron/mailbox-sync/` runs every 15 minutes (`vercel.json`).
+`/api/cron/mailbox-sync/` runs on the `vercel.json` schedule. It's **once a day** (12:03 UTC) for now,
+because the team is on Vercel Hobby.
 - **Auth:** Vercel Cron sends `Authorization: Bearer $CRON_SECRET`. With no `CRON_SECRET`
   set, the route refuses every call.
-- **Plan:** a 15-minute schedule needs Vercel **Pro**. Hobby only allows daily crons, and
-  the deploy fails if a cron is more frequent than the plan allows.
+- **Plan:** Hobby only allows daily crons, and Vercel refuses to create ANY deployment (preview
+  included) if a cron is more frequent than the plan allows. On Pro, set the schedules back to
+  `*/15 * * * *` (mailbox sync) and `7,37 * * * *` (agents).
 
 What each run does:
 - **Scope:** for every firm with the `mailbox` module, it syncs every `active` or `error`

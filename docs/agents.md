@@ -39,5 +39,5 @@ to a client goes into the approval queue, and a person sends it.
 ## Not done yet
 - **Approving intel proposals in-app:** they are on the timeline now; a review UI comes with
   the lead page in step 6.
-- **Webhook trigger for post-consult:** it runs on the cron today, so drafts appear within
-  30 minutes of the notes landing.
+- **Webhook trigger for post-consult:** it runs on the cron today: once a day on Vercel
+  Hobby, every 30 minutes on Pro (see `docs/mailbox-oauth-setup.md`).

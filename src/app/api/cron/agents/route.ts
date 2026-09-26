@@ -8,7 +8,7 @@ import { productionRunnerDeps } from "@/lib/agents/deps";
 export const maxDuration = 300;
 
 /**
- * Every 30 minutes (vercel.json): each enabled agent in each firm holding the
+ * On the vercel.json schedule (daily on Hobby; every 30 minutes once on Pro): each enabled agent in each firm holding the
  * `agents` module. Counts only in the response; details are in agent_run.
  */
 export async function GET(req: NextRequest) {
