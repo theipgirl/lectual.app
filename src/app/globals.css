@@ -381,6 +381,11 @@ a:hover {
   overflow-y: auto;
   padding-right: 4px;
 }
+/* Sections keep their natural height and the page scrolls. Without this, a
+   section with overflow (the runs table) is allowed to shrink to nothing. */
+.lx-page > * {
+  flex-shrink: 0;
+}
 
 @media (max-width: 900px) {
   .lx-top {
@@ -594,3 +599,146 @@ a:hover {
     display: none;
   }
 }
+
+/* ── agents ───────────────────────────────────────────────────────── */
+.lx-page-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.lx-agrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+}
+.lx-agent {
+  padding: 20px;
+  box-shadow: none;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "head toggle"
+    "desc desc"
+    "autonomy autonomy"
+    "foot foot";
+  gap: 14px;
+  align-content: start;
+  transition: opacity 0.15s;
+}
+.lx-agent.off .lx-agent-head,
+.lx-agent.off .lx-agent-desc,
+.lx-agent.off .lx-agent-slot-autonomy {
+  opacity: 0.62;
+}
+.lx-agent-head { grid-area: head; }
+.lx-agent-toggle { grid-area: toggle; }
+.lx-agent-desc {
+  grid-area: desc;
+  margin: 0;
+  font-size: 14.5px;
+  color: var(--body);
+  line-height: 1.5;
+}
+.lx-agent-slot-autonomy { grid-area: autonomy; }
+.lx-agent-foot {
+  grid-area: foot;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  padding-right: 96px; /* room for Run now, which is laid over the footer */
+}
+.lx-agent-slot-run {
+  grid-area: foot;
+  justify-self: end;
+  align-self: end;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+.lx-toggle {
+  width: 40px;
+  height: 23px;
+  border-radius: 999px;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  background: var(--well);
+  border: 1px solid rgba(42, 18, 22, 0.15);
+  justify-content: flex-start;
+  cursor: pointer;
+}
+.lx-toggle i {
+  width: 17px;
+  height: 17px;
+  border-radius: 999px;
+  background: var(--muted);
+}
+.lx-toggle.on {
+  background: var(--ox);
+  border-color: var(--ox);
+  justify-content: flex-end;
+}
+.lx-toggle.on i { background: var(--cream); }
+.lx-toggle:disabled { cursor: default; opacity: 0.7; }
+.lx-lv {
+  display: flex;
+  padding: 3px;
+  border-radius: 9px;
+  background: var(--well);
+  gap: 2px;
+}
+.lx-lv button {
+  flex: 1;
+  padding: 6px 0;
+  border-radius: 7px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.lx-lv button.on {
+  background: var(--card);
+  color: var(--ox);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(20, 4, 8, 0.12);
+}
+.lx-lv button:disabled { cursor: default; }
+.lx-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  display: inline-block;
+}
+.lx-tbl {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.lx-tbl th {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 400;
+  text-align: left;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.lx-tbl td {
+  padding: 10px 14px;
+  height: 44px;
+  border-bottom: 1px solid var(--line-2);
+  font-size: 14.5px;
+  color: var(--body);
+  white-space: nowrap;
+}
+.lx-tbl td.wrap { white-space: normal; min-width: 240px; }
+.lx-tbl td.pri { color: var(--ink); font-weight: 500; }
+.lx-tbl tr:last-child td { border-bottom: 0; }

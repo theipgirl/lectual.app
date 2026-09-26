@@ -32,6 +32,10 @@ class Query implements PromiseLike<Result> {
   in(column: string, value: unknown) { this.rec.filters.push({ op: "in", column, value }); return this; }
   not(column: string, _op: string, value: unknown) { this.rec.filters.push({ op: "not", column, value }); return this; }
   contains(column: string, value: unknown) { this.rec.filters.push({ op: "contains", column, value }); return this; }
+  is(column: string, value: unknown) { this.rec.filters.push({ op: "is", column, value }); return this; }
+  gte(column: string, value: unknown) { this.rec.filters.push({ op: "gte", column, value }); return this; }
+  upsert(values: unknown) { this.rec.action = "insert"; this.rec.values = values; return this; }
+  limit() { return this; }
   range() { return this; }
   order() { return this; }
   maybeSingle() { this.isSingle = true; return this; }

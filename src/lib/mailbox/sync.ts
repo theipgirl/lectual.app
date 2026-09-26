@@ -52,7 +52,7 @@ export type ConnectionOutcome =
   | { id: string; orgId: string; ok: false; status: "reauth" | "error"; error: string };
 
 /** Refresh the access token if it expires within two minutes; re-seal what changed. */
-async function freshAccessToken(deps: SyncDeps, row: ConnectionRow): Promise<string> {
+export async function freshAccessToken(deps: SyncDeps, row: ConnectionRow): Promise<string> {
   const now = deps.now?.() ?? Date.now();
   if (!row.refresh_token_enc) throw new ProviderError("No stored refresh token. Reconnect this mailbox.", "reauth");
   const current = row.access_token_enc ? openToken(deps.root, row.access_token_enc) : null;

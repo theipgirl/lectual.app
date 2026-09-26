@@ -384,3 +384,64 @@ async function fetchGraph(args: FetchArgs): Promise<FetchResult> {
 
   return { messages, cursor: JSON.stringify(nextCursor), truncated, restarted };
 }
+
+// ── one message body, for the email-intel agent only ─────────────────────────
+
+const BODY_MAX = 8000;
+
+/** Crude but safe HTML → text: drop script/style, tags, collapse whitespace. */
+export function htmlToText(html: string): string {
+  return decodeEntities(
+    html
+      .replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ")
+      .replace(/<br\s*\/?>|<\/p>|<\/div>|<\/li>/gi, "\n")
+      .replace(/<[^>]+>/g, " "),
+  )
+    .replace(/[ \t\f\v]+/g, " ")
+    .replace(/\n\s*\n+/g, "\n\n")
+    .trim();
+}
+
+type GmailPart = { mimeType?: string; body?: { data?: string }; parts?: GmailPart[] };
+
+function gmailBodyText(part: GmailPart | undefined): string {
+  if (!part) return "";
+  const decode = (d?: string) => (d ? Buffer.from(d, "base64url").toString("utf8") : "");
+  if (part.mimeType === "text/plain" && part.body?.data) return decode(part.body.data);
+  for (const child of part.parts ?? []) {
+    const text = gmailBodyText(child);
+    if (text) return text;
+  }
+  if (part.mimeType === "text/html" && part.body?.data) return htmlToText(decode(part.body.data));
+  return "";
+}
+
+/**
+ * The text of ONE already-matched message, capped at BODY_MAX characters.
+ * Used only by the email-intel agent, only for a message the sync has already
+ * filed on a client's record, and the text is never stored: it goes to the
+ * model and is discarded. Returns null if the message no longer exists.
+ */
+export async function fetchMessageBody(
+  provider: MailboxProvider,
+  args: { accessToken: string; messageId: string; fetchImpl?: typeof fetch },
+): Promise<string | null> {
+  const { accessToken, fetchImpl = fetch } = args;
+  const rawId = args.messageId.replace(/^(gmail|graph):/, "");
+  if (!/^[A-Za-z0-9_=+\-/.]+$/.test(rawId)) return null; // never splice odd ids into a URL
+  const url =
+    provider === "google"
+      ? `${GMAIL}/messages/${encodeURIComponent(rawId)}?format=full`
+      : `https://graph.microsoft.com/v1.0/me/messages/${encodeURIComponent(rawId)}?$select=body`;
+  const res = await getJson(url, accessToken, fetchImpl, provider === "microsoft" ? { prefer: 'outlook.body-content-type="text"' } : {});
+  if (res.status === 404) return null;
+  if (!res.ok) throw new ProviderError(`Message read failed (${res.status}).`, "fetch-failed");
+  const json = (await res.json()) as { payload?: GmailPart; body?: { contentType?: string; content?: string } };
+  const text =
+    provider === "google"
+      ? gmailBodyText(json.payload)
+      : json.body?.contentType === "html"
+        ? htmlToText(json.body.content ?? "")
+        : (json.body?.content ?? "");
+  return text.slice(0, BODY_MAX);
+}

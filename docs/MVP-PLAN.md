@@ -116,7 +116,7 @@ Porting rule: copy the files and record the source commit SHA in `lectual.app/PO
   - Records an `agent_run` row.
 - This supersedes the "no Vercel Cron" note in `docs/2026-08-09-agent-activation-plan.md`. Log a decision entry for it.
 
-### Step 5 · AI agents (in-app, scheduled, draft-only)
+### Step 5 · AI agents (in-app, scheduled, draft-only) (built; see docs/agents.md)
 **Shared runner** `src/lib/agents/runner.ts`:
 - Runs agents per org, only where `orgHasModule("agents")` is on.
 - Writes an `agent_run` row per run.
