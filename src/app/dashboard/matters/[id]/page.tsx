@@ -60,7 +60,11 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
 
   // Per-firm modules (0040): litigation facts, and the agent-toolkit cards,
   // whose copy is written in one firm's voice. Each action re-checks.
-  const [hasLitigation, hasAgentToolkit] = await Promise.all([orgHasModule("litigation"), orgHasModule("agent-toolkit")]);
+  const [hasLitigation, hasAgentToolkit, hasDocumentCenter] = await Promise.all([
+    orgHasModule("litigation"),
+    orgHasModule("agent-toolkit"),
+    orgHasModule("document-center"),
+  ]);
 
   const [stages, tasks, activity, deadlines, client, members, litigation] = await Promise.all([
     listMatterStages().catch(() => []),
@@ -359,6 +363,11 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
               <span>Package</span>
               <span>{matter.package_name ?? "—"}</span>
             </div>
+            {hasDocumentCenter && canWrite && (
+              <Link href={`/dashboard/documents/new/${matter.id}/`} className="lx-btn lx-btn-sec lx-btn-sm" style={{ justifySelf: "start" }}>
+                Draft a letter
+              </Link>
+            )}
             <div className="lx-meta">
               <span>Came from</span>
               <span>{matter.referral_source ?? "—"}</span>

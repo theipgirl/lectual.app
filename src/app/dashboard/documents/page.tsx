@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { DOC_FILTERS, DOC_KIND, DOC_TYPE_LABEL, docStatus, isDocFilter, type DocFilter } from "@/lib/documents/list";
 import { relativeTime } from "@/lib/relative-time";
+import { orgHasModule } from "@/lib/org/modules";
 
 export const dynamic = "force-dynamic";
 
@@ -10,13 +11,15 @@ type Row = { id: string; matter_id: string; doc_type: string; status: string; fi
 /**
  * Documents: every letter generated for a matter (crm_document_draft), with
  * where it stands. Read through RLS, so a firm only ever sees its own. The
- * template generators themselves are per-firm (one firm's letterhead and
- * attorney voice) and module-gated in lectual; they are not in this app yet.
+ * template generators are per-firm (one firm's letterhead and
+ * attorney voice), so they live under /dashboard/documents/new behind the
+ * `document-center` module.
  */
 export default async function DocumentsPage({ searchParams }: { searchParams: Promise<{ f?: string }> }) {
   const { f } = await searchParams;
   const filter: DocFilter = isDocFilter(f) ? f : "all";
   const supabase = await getScopedClient();
+  const canGenerate = await orgHasModule("document-center");
 
   const { data, error } = await supabase
     .from("crm_document_draft")
@@ -42,6 +45,11 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
             Every letter drafted for a matter, on the matter it belongs to. Nothing leaves the firm until an attorney approves it in the queue.
           </p>
         </div>
+        {canGenerate && (
+          <Link href="/dashboard/documents/new/" className="lx-btn lx-btn-pri">
+            New letter
+          </Link>
+        )}
       </div>
 
       <nav aria-label="Filter documents" className="lx-chips">

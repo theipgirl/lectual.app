@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { getQueueItem, resolveQueueItem, saveQueueEdit } from "@/lib/queue/api";
+import { generateApprovedDocument } from "@/lib/documents/approve-hook";
 import { activeQueueOrgKey } from "@/lib/queue/org";
 import { QUEUE_APPROVE_ROLES, QUEUE_EDIT_ROLES, resolveQueueRole } from "@/lib/queue/roles";
 import { draftInMyMailbox } from "@/lib/mailbox/my-mailbox";
@@ -86,6 +87,15 @@ export async function reviewQueueAction(_prev: ReviewState, formData: FormData):
           console.error("[queue] mailbox draft failed", err);
           sendStatus = "mailbox-failed";
         }
+      }
+
+      // Document Center: an approved letter draft becomes a real .docx now.
+      // Best-effort (the hook itself never throws); wrapped again so a docx
+      // bug can never turn a successful approval into a failed submission.
+      try {
+        await generateApprovedDocument(qKey, id);
+      } catch (err) {
+        console.error("[document-center] post-approve hook threw unexpectedly", err);
       }
     } else if (intent === "reject") {
       if (!note) return { error: "Add a short note explaining the rejection — it feeds the improvement loop." };
