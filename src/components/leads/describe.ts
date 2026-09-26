@@ -16,6 +16,27 @@ const AI_SOURCES: Record<string, string> = {
   "post-consult": "Post-consult drafter",
 };
 
+const MATTER_CHANGE: Record<string, string> = {
+  status: "Status changed",
+  notes: "Notes updated",
+  ip_fields: "Filing details updated",
+  owner_assigned: "Owner assigned",
+  deadline_docketed: "Deadline docketed",
+  deadline_confirmed: "Deadline confirmed by an attorney",
+  deadline_closed: "Deadline closed out",
+  deadline_extended: "Deadline extended",
+  litigation_detail: "Case details updated",
+};
+
+function matterChangeDetail(p: Record<string, unknown>): string | null {
+  if (Array.isArray(p.fields)) return (p.fields as string[]).join(", ").replaceAll("_", " ");
+  const due = str(p.due_date) ?? str(p.to);
+  const kind = str(p.kind)?.replaceAll("_", " ") ?? null;
+  if (kind || due) return [kind, due].filter(Boolean).join(" · ");
+  if (str(p.from) && str(p.to)) return `${str(p.from)} → ${str(p.to)}`;
+  return null;
+}
+
 export function describeActivity(row: Row): Described {
   const p = (row.payload ?? {}) as Record<string, unknown>;
   switch (row.type) {
@@ -30,13 +51,17 @@ export function describeActivity(row: Row): Described {
     case "voice_note":
       return { title: "Voice note", detail: str(p.transcript), tone: "note", link: null };
     case "stage_changed":
-      return { title: `Moved to ${str(p.to_stage_name) ?? str(p.to) ?? "a new stage"}`, detail: null, tone: "system", link: null };
+      return { title: `Moved to ${str(p.to_stage_name) ?? str(p.to_label) ?? str(p.to) ?? "a new stage"}`, detail: null, tone: "system", link: null };
     case "lead_created":
       return { title: "Lead created", detail: str(p.source), tone: "system", link: null };
     case "lead_assigned":
       return { title: "Lead assigned", detail: null, tone: "system", link: null };
     case "lead_updated":
       return { title: "Details updated", detail: Array.isArray(p.fields) ? (p.fields as string[]).join(", ") : null, tone: "system", link: null };
+    case "matter_opened":
+      return { title: "Matter opened", detail: str(p.matter_number), tone: "system", link: null };
+    case "matter_updated":
+      return { title: MATTER_CHANGE[str(p.change) ?? ""] ?? "Matter updated", detail: matterChangeDetail(p), tone: "system", link: null };
     case "queue_drafted":
       return { title: "Draft queued for approval", detail: str(p.subject), tone: "ai", link: null };
     case "ai_insight": {

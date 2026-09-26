@@ -23,4 +23,15 @@ describe("timeline wording", () => {
     expect(describeActivity({ type: "email_received", actor_type: null, created_at: "", payload: null }).title).toBe("Email from the client");
     expect(describeActivity(row("something_new", {})).title).toBe("Something new");
   });
+
+  it("describes matter activity: stage moves, docket changes, openings", () => {
+    const at = "2026-09-26T00:00:00Z";
+    expect(describeActivity({ type: "stage_changed", actor_type: "user", created_at: at, payload: { to_label: "OA Issued" } }).title).toBe("Moved to OA Issued");
+    const d = describeActivity({ type: "matter_updated", actor_type: "user", created_at: at, payload: { change: "deadline_docketed", kind: "office_action_response", due_date: "2026-12-01" } });
+    expect(d.title).toBe("Deadline docketed");
+    expect(d.detail).toBe("office action response · 2026-12-01");
+    expect(describeActivity({ type: "matter_updated", actor_type: "user", created_at: at, payload: { change: "ip_fields", fields: ["serial_number"] } }).detail).toBe("serial number");
+    expect(describeActivity({ type: "matter_opened", actor_type: "system", created_at: at, payload: { matter_number: "TM-2026-0001" } }).detail).toBe("TM-2026-0001");
+  });
 });
+

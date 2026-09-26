@@ -857,3 +857,29 @@ a:hover {
 .lx-timeline li[data-tone="note"]::before { background: var(--ok); }
 .lx-timeline-head { display: flex; gap: 10px; justify-content: space-between; font-weight: 500; font-size: 14.5px; }
 .lx-timeline p { margin: 4px 0 0; color: var(--body); font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
+
+/* ── matters ──────────────────────────────────────────────────────── */
+.lx-chip-count { margin-left: 6px; font-family: var(--mono); font-size: 11.5px; opacity: 0.75; }
+.lx-band { padding: 0; }
+.lx-band-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; padding: 16px 18px 10px; }
+.lx-band-head .lx-h2 { font-size: 23px; }
+.lx-banner-warn { background: rgba(124, 83, 18, 0.08); color: var(--warn); border-color: rgba(124, 83, 18, 0.25); }
+.lx-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.lx-list > li + li { border-top: 1px solid var(--line-2); }
+.lx-deadline { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: flex-start; padding: 12px 0; }
+.lx-deadline-main { flex: 1; min-width: 220px; display: grid; gap: 3px; color: var(--ink); font-size: 14.5px; }
+.lx-deadline-due { display: grid; gap: 4px; justify-items: end; font-size: 14px; color: var(--ink); }
+.lx-row-actions { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; }
+.lx-row-actions .lx-inline-form { display: flex; gap: 6px; align-items: center; }
+.lx-row-actions .lx-inline-form input[type="date"] { width: auto; }
+.lx-task { display: flex; gap: 10px; justify-content: space-between; align-items: flex-start; padding: 8px 0; color: var(--ink); font-size: 14.5px; }
+.lx-disclosure-inline > summary { cursor: pointer; color: var(--ox); font-weight: 500; font-size: 14.5px; margin-bottom: 10px; }
+.lx-band .lx-tbl { table-layout: fixed; min-width: 760px; }
+.lx-col-aside { flex: 0 0 340px; }
+.lx-col-aside > .lx-aside { width: auto; align-self: stretch; }
+@media (max-width: 900px) {
+  .lx-col-aside { flex: 1 1 auto; }
+}
+@media (max-width: 600px) {
+  .lx-deadline-due { grid-auto-flow: column; justify-items: start; align-items: center; }
+}
