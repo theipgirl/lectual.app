@@ -32,9 +32,19 @@ export const FollowUpSchema = z.object({
 });
 export type FollowUp = z.infer<typeof FollowUpSchema>;
 
-const SYSTEM = `${AGENT_POLICY}
+const TASK = `Your job: draft the follow-up email an IP attorney sends after a consultation with a prospective client, using only the consult notes you are given. Thank them, recap what was discussed in plain language, restate the next step from the notes, and invite questions. Do not add legal analysis that is not in the notes, do not quote a price unless the notes contain it, and do not promise an outcome. Also write a short internal summary for the attorney.`;
 
-Your job: draft the follow-up email an IP attorney sends after a consultation with a prospective client, using only the consult notes you are given. Thank them, recap what was discussed in plain language, restate the next step from the notes, and invite questions. Do not add legal analysis that is not in the notes, do not quote a price unless the notes contain it, and do not promise an outcome. Sign off with "[Attorney name]" as a placeholder; the attorney edits and sends it. Also write a short internal summary for the attorney.`;
+/**
+ * The firm's own sign-off (Settings → Firm profile, lectual 0073) when it has
+ * one, else a placeholder the attorney fills in. Either way the draft waits in
+ * the approval queue.
+ */
+export function followUpSystem(signOff: string | null): string {
+  const ending = signOff
+    ? `End the email with exactly this sign-off, unchanged:\n<sign_off>\n${signOff}\n</sign_off>`
+    : `Sign off with "[Attorney name]" as a placeholder; the attorney edits and sends it.`;
+  return `${AGENT_POLICY}\n\n${TASK} ${ending}`;
+}
 
 type ConsultNotes = {
   summary?: string;
@@ -96,6 +106,13 @@ export async function runPostConsult(ctx: AgentContext): Promise<AgentResult> {
   const handled = new Set((done ?? []).map((d) => (d.payload as Record<string, string>).consult_note_id));
   const todo = withNotes.filter((n) => !handled.has(n.id)).slice(0, CONSULT_BATCH);
 
+  const { data: profile } = await admin
+    .from("crm_org_profile")
+    .select("email_signature")
+    .eq("org_id", orgId)
+    .maybeSingle();
+  const system = followUpSystem((profile?.email_signature as string | null | undefined)?.trim() || null);
+
   let drafted = 0;
   for (const note of todo) {
     const { data: lead } = await admin
@@ -121,7 +138,7 @@ export async function runPostConsult(ctx: AgentContext): Promise<AgentResult> {
     }
 
     const { output } = await llm({
-      system: SYSTEM,
+      system,
       user: followUpPrompt(lead, (note.notes ?? {}) as ConsultNotes),
       schema: FollowUpSchema,
       effort: "high",

@@ -1862,6 +1862,41 @@ export type Database = {
           },
         ]
       }
+      crm_org_profile: {
+        Row: {
+          display_name: string | null
+          email_signature: string | null
+          org_id: string
+          time_zone: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          display_name?: string | null
+          email_signature?: string | null
+          org_id: string
+          time_zone?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          display_name?: string | null
+          email_signature?: string | null
+          org_id?: string
+          time_zone?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_org_profile_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "crm_org"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crm_org_theme: {
         Row: {
           accent_color: string

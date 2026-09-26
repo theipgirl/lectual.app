@@ -18,7 +18,7 @@ const isAgent = (v: unknown): v is AgentId => typeof v === "string" && (AGENT_ID
 /**
  * Each action is its own POST entry point, so each repeats the gates the page
  * applies: the module (fail closed), and the role. The database enforces the
- * role again on agent_setting (0058 RLS: owner/admin/senior_admin only).
+ * role again on agent_setting (0071 RLS: owner/admin/senior_admin only).
  */
 async function adminSession() {
   if (!(await orgHasModule("agents"))) return null;

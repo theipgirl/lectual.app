@@ -7,7 +7,7 @@ import { rootKeyOrNull } from "@/lib/mailbox/config";
 import { createLawmaticsClient, LawmaticsApiError, type FetchLike, type LawmaticsClient } from "./client";
 
 /**
- * A firm's own Lawmatics connection (lectual 0059, `lawmatics_connection`).
+ * A firm's own Lawmatics connection (lectual 0072, `lawmatics_connection`).
  *
  * lectual's importer reads ONE deployment-wide LAWMATICS_TOKEN, which is why
  * it is locked to one firm by the `lawmatics-import` module. Here each firm
@@ -112,7 +112,7 @@ export type SaveResult = { ok: true } | { ok: false; reason: string };
 
 /**
  * Stores (or replaces) the firm's token as the signed-in admin, through RLS:
- * 0059's policies refuse anyone below senior_admin and any other org.
+ * 0072's policies refuse anyone below senior_admin and any other org.
  */
 export async function saveLawmaticsToken(args: { root: Buffer; orgId: string; userId: string; token: string }): Promise<SaveResult> {
   const supabase = await getScopedClient();

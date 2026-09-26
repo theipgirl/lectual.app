@@ -5,7 +5,7 @@ import { createCipheriv, createDecipheriv, createHmac, hkdfSync, randomBytes, ti
  *
  * Tokens are sealed with AES-256-GCM before they reach the database, so the
  * DB (and anyone reading a backup of it) only ever holds ciphertext. The
- * 0057 migration adds a second wall on top: `authenticated` has no SELECT on
+ * 0070 migration adds a second wall on top: `authenticated` has no SELECT on
  * the token columns at all. Only the service-role sync job decrypts.
  *
  * One root secret, MAILBOX_TOKEN_KEY (32 random bytes, base64), with a

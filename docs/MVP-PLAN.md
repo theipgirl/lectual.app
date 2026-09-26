@@ -14,7 +14,7 @@ Visual design: Taylor will upload it. Step 0 below waits on it, and nothing visu
 
 **Binding constraints carried over** (`brain/decisions.md`, `AGENTS.md`):
 - **One DB, many frontends (2026-07-14-03).** `lectual.app` is a new *frontend* on the same Supabase projects. It is not a new backend.
-- **Migrations stay single-chain in `lectual/supabase/migrations`.** The next free number is 0057.
+- **Migrations stay single-chain in `lectual/supabase/migrations`.** Numbered 0070–0073: other unmerged branches had already claimed 0057–0069.
 - **The isolation gate `tests/tenant-isolation.test.ts` stays in `lectual`.** It gets a case for every new table.
 - Everything else carries over unchanged:
   - Supabase Auth, no Clerk.
@@ -56,7 +56,7 @@ Porting rule: copy the files and record the source commit SHA in `lectual.app/PO
 - Done when: `pnpm build` passes, and magic-link sign-in into a dev firm renders an empty shell.
 
 ### Step 2 · Mailbox schema (migrations in `lectual`, same branch name) (written; not yet applied)
-**`0057_mailbox_connection.sql`**
+**`0070_mailbox_connection.sql`**
 - **Table `mailbox_connection`**
   - Columns: `id`, `org_id` (FK `crm_org`), `user_id` (nullable), `scope` (`'personal'|'firm'`), `provider` (`'google'|'microsoft'`), `email`, `status`, `scopes text[]`, `access_token_enc`, `refresh_token_enc`, `expires_at`, `sync_cursor` (Gmail historyId / Graph deltaLink), `last_synced_at`, `last_error`, `created_by`, `created_at`.
   - Check constraint: `scope='personal' ⇔ user_id not null`.
@@ -69,7 +69,7 @@ Porting rule: copy the files and record the source commit SHA in `lectual.app/PO
 - **Other additions**
   - `crm_activity_type` is NOT extended yet: step 5 decides whether the intel agent's proposals need their own activity type.
   - `crm_org.modules` has no allowed-list constraint (0040), so `mailbox` and `agents` needed no migration.
-- **`0058_agents.sql`**
+- **`0071_agents.sql`**
   - Table `agent_setting` (`org_id`, `agent`, `enabled`, `autonomy`): per-firm on/off and autonomy. No row means off. Only owner/admin/senior_admin can write it.
   - Table `agent_run`: `org_id`, `agent` (the three agents plus `mailbox-sync`), `trigger` (`cron|manual|webhook|event`), `status`, `started_at`, `finished_at`, `items_in`, `drafts_out`, `summary`, `error`, `cost_usd`, `triggered_by`.
   - `agent_run` has no insert/update/delete policies, so only the service-role runner can write it. Staff can read their own firm's log but cannot forge or erase entries.
@@ -159,8 +159,8 @@ Porting rule: copy the files and record the source commit SHA in `lectual.app/PO
 
 ## Critical files
 - `lectual`:
-  - `supabase/migrations/0057_mailbox_connection.sql`
-  - `supabase/migrations/0058_agents.sql`
+  - `supabase/migrations/0070_mailbox_connection.sql`
+  - `supabase/migrations/0071_agents.sql`
   - `tests/tenant-isolation.test.ts`
   - `src/lib/org/modules.ts`
   - `brain/decisions.md`

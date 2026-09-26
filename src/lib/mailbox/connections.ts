@@ -5,7 +5,7 @@ import { openToken, sealToken } from "./crypto";
 import { revokeToken, type MailboxProvider, type MailboxScope, type TokenSet } from "./providers";
 
 /**
- * Reads and writes of `mailbox_connection` (migration 0057).
+ * Reads and writes of `mailbox_connection` (migration 0070).
  *
  * Everything goes through the caller's RLS-scoped client, so the database
  * decides who sees and changes which row. Two things to know about that table:
@@ -58,7 +58,7 @@ export type SaveOutcome =
 /**
  * Stores a freshly consented mailbox. Reconnecting an existing row refreshes
  * its tokens and clears any `reauth` / `error` state; otherwise a new row is
- * inserted. `email` is stored lower-cased (0057's unique index is on
+ * inserted. `email` is stored lower-cased (0070's unique index is on
  * lower(email)), so the equality lookup below is exact.
  */
 export async function saveConnection(args: {

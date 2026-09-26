@@ -9,7 +9,7 @@ import type { MailboxProvider } from "./providers";
 /**
  * Put an approved client email into the APPROVER'S OWN mailbox as a draft.
  *
- * Which mailbox is decided by the caller's RLS-scoped read: 0057 only shows a
+ * Which mailbox is decided by the caller's RLS-scoped read: 0070 only shows a
  * personal row to its owner, so this can only ever find the signed-in
  * person's own Gmail/Outlook. Only then does the service-role client read
  * that row's sealed tokens, by id AND the org_id the scoped read returned.

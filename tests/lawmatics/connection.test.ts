@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { randomBytes } from "node:crypto";
 
 /**
- * The per-firm Lawmatics connection (lectual 0059). The properties that
+ * The per-firm Lawmatics connection (lectual 0072). The properties that
  * matter: the token is read back only by the row the caller's own RLS read
  * returned (id AND org_id), a firm with no connection gets no client, and a
  * pasted token is checked before anything is stored.

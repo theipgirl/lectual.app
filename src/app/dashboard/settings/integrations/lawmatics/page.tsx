@@ -9,7 +9,7 @@ import { ClientsImport, ConnectLawmatics, DisconnectLawmatics, MattersImport } f
 export const dynamic = "force-dynamic";
 
 /**
- * Import from Lawmatics, using the firm's OWN token (lectual 0059). No module
+ * Import from Lawmatics, using the firm's OWN token (lectual 0072). No module
  * gate: the token is the boundary, since a firm can only ever read the account
  * it connected. The role gate (owner/admin/senior_admin) is here for the page
  * and again in every action, because each action is its own POST.

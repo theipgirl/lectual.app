@@ -3,7 +3,7 @@ import { canManageScope, isScope } from "@/lib/mailbox/access";
 import { ROLES } from "@/lib/auth/roles";
 import { outcomeMessage } from "@/lib/mailbox/outcome";
 
-describe("who may connect which mailbox (mirrors 0057 RLS)", () => {
+describe("who may connect which mailbox (mirrors 0070 RLS)", () => {
   it("every role may manage its own personal mailbox", () => {
     for (const role of ROLES) expect(canManageScope(role, "personal")).toBe(true);
   });
