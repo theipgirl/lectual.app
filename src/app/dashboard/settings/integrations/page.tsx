@@ -5,6 +5,8 @@ import { canManageScope } from "@/lib/mailbox/access";
 import { connectableProviders } from "@/lib/mailbox/config";
 import { listConnections, type MailboxConnection } from "@/lib/mailbox/connections";
 import { outcomeMessage } from "@/lib/mailbox/outcome";
+import { getLawmaticsConnection } from "@/lib/lawmatics/connection";
+import Link from "next/link";
 import { PROVIDER_LABEL, PROVIDERS, isProvider, type MailboxProvider } from "@/lib/mailbox/providers";
 import { relativeTime } from "@/lib/relative-time";
 import { ProviderMark } from "@/components/mailbox/ProviderMark";
@@ -112,12 +114,18 @@ export default async function IntegrationsPage({
 }: {
   searchParams: Promise<{ connected?: string; reconnected?: string; error?: string }>;
 }) {
-  if (!(await orgHasModule("mailbox"))) notFound();
+  // Integrations itself is open to every firm: Lawmatics uses the firm's own
+  // token. The mailbox parts are what the `mailbox` module switches on.
   const session = await resolveFirmSession();
   if (session.kind !== "ok") notFound();
+  const hasMailbox = await orgHasModule("mailbox");
 
   const { connected, reconnected, error } = await searchParams;
-  const list = await listConnections();
+  const [list, lawmatics] = await Promise.all([
+    hasMailbox ? listConnections() : Promise.resolve({ ok: true as const, connections: [] }),
+    getLawmaticsConnection(),
+  ]);
+  const lm = lawmatics.ok ? lawmatics.connection : null;
   const connectable = connectableProviders();
   const canManageFirm = canManageScope(session.role, "firm");
 
@@ -158,6 +166,7 @@ export default async function IntegrationsPage({
         </div>
       )}
 
+      {hasMailbox && (
       <section className="lx-hero" aria-labelledby="hero-title">
         <div className="lx-hero-marks" aria-hidden="true">
           <ProviderMark provider="google" size={22} />
@@ -189,6 +198,7 @@ export default async function IntegrationsPage({
           </a>
         </div>
       </section>
+      )}
 
       <section className="lx-int-import" aria-labelledby="lawmatics-title">
         <div style={{ flex: 1, minWidth: 240 }}>
@@ -196,16 +206,21 @@ export default async function IntegrationsPage({
             Import from Lawmatics
           </h2>
           <p className="lx-sub" style={{ margin: "4px 0 0" }}>
-            Bring over your contacts and matters, and keep them in step while you move over.
+            {lm?.status === "active"
+              ? `Connected${lm.last_import_at ? ` · last import ${relativeTime(lm.last_import_at)}` : ""}. Bring over contacts and matters, and re-run it any time to pick up changes.`
+              : lm
+                ? "Lawmatics stopped accepting your firm's token. Reconnect to keep importing."
+                : "Bring over your contacts and matters, and re-run it any time while you move over."}
           </p>
         </div>
-        <span className="lx-btn lx-btn-sec" aria-disabled="true" style={{ opacity: 0.6, cursor: "not-allowed" }}>
-          Coming soon
-        </span>
+        {lm && lm.status !== "active" && <span className="lx-pill lx-pill-risk">Reconnect</span>}
+        <Link href="/dashboard/settings/integrations/lawmatics/" className={`lx-btn ${lm?.status === "active" ? "lx-btn-sec" : "lx-btn-pri"}`}>
+          {lm?.status === "active" ? "Open Lawmatics import" : lm ? "Reconnect" : "Connect Lawmatics"}
+        </Link>
       </section>
 
       <section className="lx-card lx-int" aria-label="Services">
-        {PROVIDERS.map((p) => {
+        {hasMailbox && PROVIDERS.map((p) => {
           const rows = byProvider(p);
           const mineHere = rows.filter((c) => c.scope === "personal");
           const firmHere = rows.filter((c) => c.scope === "firm");
@@ -269,6 +284,7 @@ export default async function IntegrationsPage({
         ))}
       </section>
 
+      {hasMailbox && (
       <section id="how" className="lx-card lx-facts">
         <div>
           <div className="lx-label">What we read</div>
@@ -292,6 +308,7 @@ export default async function IntegrationsPage({
           </p>
         </div>
       </section>
+      )}
     </>
   );
 }

@@ -31,7 +31,11 @@ Source commit: `610c206` (main, 2026-09-25). Copy, don't import: when a ported f
 | `src/app/dashboard/calendar/page.tsx` | `src/app/(firm)/dashboard/calendar/page.tsx` | same sources, merge and grouping; re-skinned; marks unconfirmed docket dates |
 | `src/app/dashboard/page.tsx` (Today) | `src/app/(firm)/dashboard/page.tsx` (ops home) | same independent reads and "a failed read is never a zero" rule; priority weighting kept (`src/lib/today/priorities.ts`), with stalled matters and unclaimed hot leads in place of stalled leads; reports and the matters copilot not ported |
 | `src/app/dashboard/documents/**` | reads `crm_document_draft` (0045) | new list over Document Center's table; the per-firm generators (`document-center/[matterId]/*`, `src/lib/documents/*`) are not ported |
+| `src/lib/lawmatics/{client,jsonapi,normalize,import-plan,stage-map,matters-normalize,matters-import-plan}.ts`, `src/lib/intake/referral-source.ts` | same paths | none |
+| `src/lib/lawmatics/{import,matters-import}.ts` | same paths | the client comes from the calling firm's own token (`connection.ts`, lectual 0059) instead of `LAWMATICS_TOKEN`; the env readers and `connectionStatus` are gone |
+| `src/app/dashboard/settings/integrations/lawmatics/actions.ts` | `src/app/(firm)/dashboard/import/actions.ts` | preview/confirm/fingerprint unchanged; no `lawmatics-import` module gate (the token is per firm); adds connect/disconnect; a 401 marks the connection invalid; coded DB errors don't reach the screen |
+| `tests/lawmatics/*`, `tests/__fixtures__/lawmatics.fixture.ts` | same paths | `apply-budget` and `import-actions` mock the firm connection instead of env/module; `pull-source` fixture gains `includeDropped` (was a type error in lectual too) |
 | `tsconfig.json`, `eslint.config.mjs`, `postcss.config.mjs`, `pnpm-workspace.yaml` | same paths | lint ignores `design/` |
 
-New in this repo: `src/lib/matters/worklist.ts` (the design's whose-move-is-it bands), `src/lib/mailbox/*` (except the apply port above), `src/lib/nav.ts`, `src/lib/fonts`, `src/components/shell/*`, `src/app/dashboard/*`,
+New in this repo: `src/lib/lawmatics/connection.ts` and the Lawmatics import UI (`src/components/lawmatics/*`), `src/lib/matters/worklist.ts` (the design's whose-move-is-it bands), `src/lib/mailbox/*` (except the apply port above), `src/lib/nav.ts`, `src/lib/fonts`, `src/components/shell/*`, `src/app/dashboard/*`,
 `src/app/globals.css` (design tokens).

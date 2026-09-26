@@ -6,7 +6,7 @@ type Tab = { label: string; href: string | null; module?: string };
 // Only Integrations (mailboxes) is live; the rest land with later steps and are
 // shown (not linked) so the section's shape matches the design.
 const TABS: Tab[] = [
-  { label: "Integrations", href: "/dashboard/settings/integrations/", module: "mailbox" },
+  { label: "Integrations", href: "/dashboard/settings/integrations/" },
   { label: "Agents", href: null, module: "agents" },
   { label: "Team & roles", href: null },
   { label: "Firm profile", href: null },

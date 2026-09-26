@@ -2404,6 +2404,56 @@ export type Database = {
         }
         Relationships: []
       }
+      lawmatics_connection: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          last_error: string | null
+          last_import_at: string | null
+          last_verified_at: string | null
+          org_id: string
+          status: string
+          token_enc: string | null
+          token_hint: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_error?: string | null
+          last_import_at?: string | null
+          last_verified_at?: string | null
+          org_id: string
+          status?: string
+          token_enc?: string | null
+          token_hint?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_error?: string | null
+          last_import_at?: string | null
+          last_verified_at?: string | null
+          org_id?: string
+          status?: string
+          token_enc?: string | null
+          token_hint?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lawmatics_connection_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "crm_org"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mailbox_connection: {
         Row: {
           access_token_enc: string | null
