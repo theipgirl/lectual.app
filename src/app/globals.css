@@ -959,3 +959,7 @@ a:hover {
   .lx-mail-subj { grid-column: 1 / -1; grid-row: 2; white-space: normal; }
 }
 .lx-col > * { flex-shrink: 0; }
+.lx-int-import { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; padding: 6px 2px 18px; border-bottom: 1px solid var(--line); }
+.lx-int-summary { display: flex; align-items: center; gap: 14px; padding: 16px 0; }
+.lx-int-soon .lx-int-icon { color: var(--muted); }
+.lx-int-soon .lx-int-name { color: var(--body); }

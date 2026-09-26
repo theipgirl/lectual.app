@@ -17,6 +17,20 @@ const STATUS: Record<MailboxConnection["status"], { label: string; tone: string 
   revoked: { label: "Disconnected", tone: "lx-pill-mute" },
 };
 
+/** Shown so the section has its full shape; none of these connect to anything yet. */
+const SOON = [
+  {
+    name: "Email (IMAP)",
+    sub: "Connect any other mailbox with an app password, for firms not on Gmail or Outlook.",
+    icon: "M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM16 12v1.5a2.5 2.5 0 0 0 5 0V12a9 9 0 1 0-3.5 7.1",
+  },
+  {
+    name: "AI assistants",
+    sub: "Connect Claude, ChatGPT or any MCP client to your workspace.",
+    icon: "M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM18 15l.9 2.1L21 18l-2.1.9L18 21l-.9-2.1L15 18l2.1-.9z",
+  },
+];
+
 function connectHref(provider: MailboxProvider, scope: "personal" | "firm") {
   return `/api/mailbox/connect/${provider}/?scope=${scope}`;
 }
@@ -176,6 +190,20 @@ export default async function IntegrationsPage({
         </div>
       </section>
 
+      <section className="lx-int-import" aria-labelledby="lawmatics-title">
+        <div style={{ flex: 1, minWidth: 240 }}>
+          <h2 id="lawmatics-title" className="lx-h2" style={{ fontSize: 27 }}>
+            Import from Lawmatics
+          </h2>
+          <p className="lx-sub" style={{ margin: "4px 0 0" }}>
+            Bring over your contacts and matters, and keep them in step while you move over.
+          </p>
+        </div>
+        <span className="lx-btn lx-btn-sec" aria-disabled="true" style={{ opacity: 0.6, cursor: "not-allowed" }}>
+          Coming soon
+        </span>
+      </section>
+
       <section className="lx-card lx-int" aria-label="Services">
         {PROVIDERS.map((p) => {
           const rows = byProvider(p);
@@ -221,6 +249,24 @@ export default async function IntegrationsPage({
             </details>
           );
         })}
+        {SOON.map((x) => (
+          <div key={x.name} className="lx-int-row lx-int-soon">
+            <div className="lx-int-summary">
+              <span className="lx-int-icon" aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                  <path d={x.icon} />
+                </svg>
+              </span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span className="lx-int-name">{x.name}</span>
+                <span className="lx-note" style={{ display: "block" }}>
+                  {x.sub}
+                </span>
+              </span>
+              <span className="lx-pill lx-pill-mute">Coming soon</span>
+            </div>
+          </div>
+        ))}
       </section>
 
       <section id="how" className="lx-card lx-facts">
