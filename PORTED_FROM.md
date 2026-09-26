@@ -37,6 +37,10 @@ Source commit: `610c206` (main, 2026-09-25). Copy, don't import: when a ported f
 | `tests/lawmatics/*`, `tests/__fixtures__/lawmatics.fixture.ts` | same paths | `apply-budget` and `import-actions` mock the firm connection instead of env/module; `pull-source` fixture gains `includeDropped` (was a type error in lectual too) |
 | `src/lib/settings/{admin,members,enums,index}.ts`, `src/lib/members/email.ts` | same paths | none |
 | `src/app/dashboard/settings/team/actions.ts` | `src/app/(firm)/dashboard/settings/actions.ts` (member actions) | errors go through `friendlySettingsError`; stages, tags and theme not ported |
+| `src/lib/voice/*`, `src/lib/welcome/*`, `src/lib/matters/{filing-followup,filing-followup-action,filing-followup-queue,court-time}.ts`, `src/lib/documents/errors.ts` | same paths | none |
+| `src/components/voice/VoiceNoteRecorder.tsx` | `src/components/firm/VoiceNoteRecorder.tsx` | recording logic unchanged; restyled |
+| matter actions: litigation, voice note, welcome email, filing follow-up | `src/app/(firm)/dashboard/matters/[id]/actions.ts` | unchanged gates (module in the action); errors through `friendlyMatterError` |
+| `tests/matters/{matter-board,filing-followup*,court-time}.test.ts`, `tests/welcome/*`, `tests/voice.test.ts` | same paths | none |
 | `tsconfig.json`, `eslint.config.mjs`, `postcss.config.mjs`, `pnpm-workspace.yaml` | same paths | lint ignores `design/` |
 
 New in this repo: Settings → Firm profile (`src/lib/org/profile*.ts`, lectual 0073) and Modules, `src/lib/lawmatics/connection.ts` and the Lawmatics import UI (`src/components/lawmatics/*`), `src/lib/matters/worklist.ts` (the design's whose-move-is-it bands), `src/lib/mailbox/*` (except the apply port above), `src/lib/nav.ts`, `src/lib/fonts`, `src/components/shell/*`, `src/app/dashboard/*`,

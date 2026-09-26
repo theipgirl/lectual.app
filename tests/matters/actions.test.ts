@@ -49,6 +49,9 @@ vi.mock("next/navigation", () => ({
 }));
 
 const {
+  sendWelcomeEmailAction,
+  queueMonthlyStatusUpdateAction,
+  updateLitigationAction,
   requireMatterWriteRole,
   createMatterAction,
   updateMatterStatusAction,
@@ -223,5 +226,24 @@ describe("createMatterAction: litigation is module-gated at the action", () => {
     expect((await createMatterAction({}, fd)).error).toMatch(/case number/);
     fd.set("matterNumber", "26-CC-011354");
     await expect(createMatterAction({}, fd)).rejects.toThrow("NEXT_REDIRECT");
+  });
+});
+
+describe("module-gated matter actions refuse a firm without the module, before doing anything", () => {
+  const fd = () => {
+    const f = new FormData();
+    f.set("matterId", "matter-1");
+    return f;
+  };
+  it("welcome email and filing follow-up need agent-toolkit", async () => {
+    expect((await sendWelcomeEmailAction({}, fd())).error).toMatch(/isn't available/);
+    expect((await queueMonthlyStatusUpdateAction({}, fd())).error).toMatch(/isn't available/);
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+  it("case details need litigation", async () => {
+    const f = fd();
+    f.set("caseNumber", "26-CC-011354");
+    expect((await updateLitigationAction({}, f)).error).toMatch(/isn't available/);
+    expect(mockRpc).not.toHaveBeenCalled();
   });
 });

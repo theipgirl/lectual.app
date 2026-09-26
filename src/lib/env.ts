@@ -18,6 +18,8 @@ const fieldSchemas = {
   DASHBOARD_API_TOKEN: z.string().optional(),
   // AI. ANTHROPIC_API_KEY wins over the gateway key when both are set.
   ANTHROPIC_API_KEY: z.string().optional(),
+  // Voice notes: optional Whisper transcription. Unset = notes save untranscribed.
+  OPENAI_API_KEY: z.string().optional(),
   VERCEL_AI_GATEWAY_KEY: z.string().optional(),
   // Model for the in-app agents (src/lib/ai/claude.ts). Unset = claude-opus-5.
   AGENT_MODEL: z.string().optional(),

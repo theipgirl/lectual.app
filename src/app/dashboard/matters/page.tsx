@@ -17,6 +17,10 @@ import {
   type SegmentKey,
 } from "@/lib/matters/worklist";
 import { NewMatterForm } from "@/components/matters/MatterForms";
+import { MatterBoard } from "@/components/matters/MatterBoard";
+import { listMatterStages } from "@/lib/matters/stages";
+import { resolveFirmSession } from "@/lib/firm/session";
+import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import { matterIdsNeedingReview } from "./list-utils";
 import { MATTER_TYPE_LABEL } from "./labels";
 
@@ -27,8 +31,9 @@ export const dynamic = "force-dynamic";
  * Filters are links (a filtered worklist is a shareable URL); the server
  * re-filters on navigation.
  */
-export default async function MattersPage({ searchParams }: { searchParams: Promise<{ seg?: string; q?: string }> }) {
-  const { seg: segRaw, q } = await searchParams;
+export default async function MattersPage({ searchParams }: { searchParams: Promise<{ seg?: string; q?: string; view?: string }> }) {
+  const { seg: segRaw, q, view } = await searchParams;
+  const boardView = view === "board";
   const seg: SegmentKey = isSegment(segRaw) ? segRaw : "open";
   const search = (q ?? "").trim().slice(0, 80);
 
@@ -40,11 +45,13 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
     loadError = true;
   }
 
-  const [queue, members, leads, canCreateLitigation] = await Promise.all([
+  const [queue, members, leads, canCreateLitigation, stages, role] = await Promise.all([
     loadActiveQueue(),
     listMemberDirectory().catch(() => []),
     listLeads().catch(() => []),
     orgHasModule("litigation"),
+    boardView ? listMatterStages().catch(() => []) : Promise.resolve([]),
+    resolveFirmSession().then((x) => (x.kind === "ok" ? x.role : null)),
   ]);
 
   // "Needs your review" means something only when the queue was reached.
@@ -64,12 +71,14 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
     label: [l.business_name?.trim() || `${l.first_name} ${l.last_name}`.trim(), l.email].filter(Boolean).join(" · "),
   }));
 
-  const href = (next: { seg?: string; q?: string }) => {
+  const href = (next: { seg?: string; q?: string; view?: string | null }) => {
     const p = new URLSearchParams();
     const s = next.seg ?? seg;
     if (s !== "open") p.set("seg", s);
     const term = next.q ?? search;
     if (term) p.set("q", term);
+    const v = next.view === undefined ? (boardView ? "board" : null) : next.view;
+    if (v) p.set("view", v);
     const qs = p.toString();
     return `/dashboard/matters/${qs ? `?${qs}` : ""}`;
   };
@@ -82,7 +91,16 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
           <h1 className="lx-h1">Matters</h1>
           <p className="lx-sub">Every engaged matter, grouped by whose move it is. Longest in its stage first.</p>
         </div>
+        <nav className="lx-segs lx-view-toggle" aria-label="View">
+          <Link href={href({ view: null })} aria-current={!boardView ? "page" : undefined} className={!boardView ? "on" : undefined}>
+            List
+          </Link>
+          <Link href={href({ view: "board" })} aria-current={boardView ? "page" : undefined} className={boardView ? "on" : undefined}>
+            Board
+          </Link>
+        </nav>
         <form className="lx-search-form" role="search">
+          {boardView && <input type="hidden" name="view" value="board" />}
           {seg !== "open" && <input type="hidden" name="seg" value={seg} />}
           <input className="lx-input" name="q" defaultValue={search} placeholder="Mark, number, owner or serial" aria-label="Search matters" />
         </form>
@@ -114,6 +132,14 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
             This is a problem reaching the database, not an empty docket. Try again in a moment.
           </p>
         </div>
+      ) : boardView && shown.length > 0 ? (
+        <MatterBoard
+          stages={stages}
+          matters={shown}
+          canMove={!!role && MATTER_WRITE_ROLES.includes(role)}
+          reviewIds={reviewIds}
+          ownerName={(id) => (id ? memberName.get(id) ?? "Teammate" : null)}
+        />
       ) : bands.length === 0 ? (
         <div className="lx-card lx-empty-card">
           <h2 className="lx-h2" style={{ fontSize: 25 }}>{all.length === 0 ? "No matters yet" : "Nothing matches"}</h2>

@@ -17,8 +17,16 @@ import { CALCULATED_DEADLINE_NOTICE, daysUntil, deadlineKindLabel, deadlineSourc
 import { matterLabel } from "@/lib/matters/docket-summary";
 import { matterStatusLabel } from "@/lib/matters/status";
 import { BAND_COPY, bandOf, stageAge } from "@/lib/matters/worklist";
-import { relativeTime } from "@/lib/relative-time";
-import { describeActivity } from "@/components/leads/describe";
+import { Timeline } from "@/components/timeline/Timeline";
+import VoiceNoteRecorder from "@/components/voice/VoiceNoteRecorder";
+import { FilingFollowUpCard, LitigationForm, WelcomeEmailCard } from "@/components/matters/MatterExtras";
+import { addVoiceNoteAction } from "./actions";
+import { orgHasModule } from "@/lib/org/modules";
+import { getLitigationDetail } from "@/lib/matters/litigation";
+import { toCourtDateTimeLocal } from "@/lib/matters/court-time";
+import { voiceNotePlaybackUrls } from "@/lib/voice/notes";
+import { AWAITING_REGISTRATION_STAGE_CODE, computeFollowUpStatus, type FollowUpStatus } from "@/lib/matters/filing-followup";
+import { loadFollowUpQueueState, queuedMonthsLookupFor } from "@/lib/matters/filing-followup-queue";
 import {
   DeadlineActions,
   DeadlineComposer,
@@ -50,14 +58,30 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
   const matter = await getMatter(id);
   if (!matter) notFound();
 
-  const [stages, tasks, activity, deadlines, client, members] = await Promise.all([
+  // Per-firm modules (0040): litigation facts, and the agent-toolkit cards,
+  // whose copy is written in one firm's voice. Each action re-checks.
+  const [hasLitigation, hasAgentToolkit] = await Promise.all([orgHasModule("litigation"), orgHasModule("agent-toolkit")]);
+
+  const [stages, tasks, activity, deadlines, client, members, litigation] = await Promise.all([
     listMatterStages().catch(() => []),
     listTasks({ matterId: matter.id }),
     activityForMatter(matter.id),
     listMatterDeadlines(matter.id),
     resolveMatterClientName(matter),
     listMemberDirectory().catch(() => []),
+    matter.type === "LIT" && hasLitigation ? getLitigationDetail(matter.id) : Promise.resolve(null),
   ]);
+  const voiceUrls = await voiceNotePlaybackUrls(activity);
+
+  // Monthly status updates: only for a mark awaiting registration, and only
+  // one queue round trip for those matters.
+  let followUp: FollowUpStatus | null = null;
+  if (hasAgentToolkit && matter.mark_text && matter.stage?.code === AWAITING_REGISTRATION_STAGE_CODE) {
+    const lookup = queuedMonthsLookupFor(await loadFollowUpQueueState());
+    followUp = computeFollowUpStatus({ filingDate: matter.filing_date, monthsAlreadyQueued: lookup ? lookup.get(matter.id) ?? [] : null });
+  }
+  const welcome = activity.find((a) => (a.type as string) === "welcome_email");
+  const welcomeQueueId = (welcome?.payload as { queueItemId?: string } | null)?.queueItemId ?? null;
 
   const canWrite = MATTER_WRITE_ROLES.includes(session.role);
   const canConfirm = (DEADLINE_CONFIRM_ROLES as readonly string[]).includes(session.role);
@@ -187,6 +211,61 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
             )}
           </section>
 
+          {matter.type === "LIT" && hasLitigation && (
+            <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }}>
+              <h2 className="lx-h2" style={{ fontSize: 23 }}>
+                The case
+              </h2>
+              {canWrite ? (
+                <LitigationForm
+                  matterId={matter.id}
+                  values={{
+                    caseNumber: litigation?.case_number ?? null,
+                    caseStyle: litigation?.case_style ?? null,
+                    county: litigation?.county ?? null,
+                    courtDivision: litigation?.court_division ?? null,
+                    judge: litigation?.judge ?? null,
+                    role: litigation?.role ?? null,
+                    filedOn: litigation?.filed_on ?? null,
+                    caseStatus: litigation?.case_status ?? null,
+                    nextHearingAt: toCourtDateTimeLocal(litigation?.next_hearing_at ?? null),
+                    nextHearingPurpose: litigation?.next_hearing_purpose ?? null,
+                    noticeOfAppearance: litigation?.notice_of_appearance ?? null,
+                    motionToDismiss: litigation?.motion_to_dismiss ?? null,
+                    missedHearing: litigation?.missed_hearing ?? null,
+                    defaultStatus: litigation?.default_status ?? null,
+                    notes: litigation?.notes ?? null,
+                  }}
+                />
+              ) : (
+                <p className="lx-note" style={{ margin: 0 }}>
+                  {litigation?.case_number ? `Case ${litigation.case_number}` : "No case details recorded yet."}
+                  {litigation?.next_hearing_at ? ` · next hearing ${toCourtDateTimeLocal(litigation.next_hearing_at).replace("T", " ")}` : ""}
+                </p>
+              )}
+            </section>
+          )}
+
+          {(followUp || (matter.type === "TM" && hasAgentToolkit)) && canWrite && (
+            <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }}>
+              <h2 className="lx-h2" style={{ fontSize: 23 }}>
+                Client updates
+              </h2>
+              {matter.type === "TM" && hasAgentToolkit && (
+                <div style={{ display: "grid", gap: 6 }}>
+                  <div className="lx-label">Welcome email</div>
+                  <WelcomeEmailCard matterId={matter.id} alreadySent={!!welcome} sentQueueItemId={welcomeQueueId} />
+                </div>
+              )}
+              {followUp && (
+                <div style={{ display: "grid", gap: 6 }}>
+                  <div className="lx-label">Monthly status update</div>
+                  <FilingFollowUpCard matterId={matter.id} status={followUp} />
+                </div>
+              )}
+            </section>
+          )}
+
           <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }}>
             <h2 className="lx-h2" style={{ fontSize: 23 }}>
               The filing
@@ -231,29 +310,12 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
             <h2 className="lx-h2" style={{ fontSize: 23, marginBottom: 10 }}>
               Timeline
             </h2>
-            {activity.length === 0 ? (
-              <p className="lx-note">Nothing yet.</p>
-            ) : (
-              <ol className="lx-timeline">
-                {activity.slice(0, 100).map((r) => {
-                  const d = describeActivity(r);
-                  return (
-                    <li key={r.id} data-tone={d.tone}>
-                      <div className="lx-timeline-head">
-                        <span>{d.title}</span>
-                        <span className="lx-note">{relativeTime(r.created_at)}</span>
-                      </div>
-                      {d.detail && <p>{d.detail}</p>}
-                      {d.link && (
-                        <a href={d.link} target="_blank" rel="noreferrer noopener" className="lx-note">
-                          Open in mail
-                        </a>
-                      )}
-                    </li>
-                  );
-                })}
-              </ol>
+            {canWrite && (
+              <div style={{ marginBottom: 14 }}>
+                <VoiceNoteRecorder target={{ kind: "matter", id: matter.id }} action={addVoiceNoteAction} />
+              </div>
             )}
+            <Timeline rows={activity} mediaUrls={voiceUrls} />
           </section>
         </div>
 
