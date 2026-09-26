@@ -99,7 +99,7 @@ Porting rule: copy the files and record the source commit SHA in `lectual.app/PO
 - **Env:** `GOOGLE_OAUTH_CLIENT_ID/SECRET`, `MS_OAUTH_CLIENT_ID/SECRET`, `MAILBOX_TOKEN_KEY`, `SITE_URL`.
 - **Gates:** both the page and the actions are gated with `orgHasModule("mailbox")`.
 
-### Step 4 · Mailbox sync (reads client info)
+### Step 4 · Mailbox sync (reads client info) (built; runs against recorded provider responses until dev and the app registrations exist)
 - **Provider adapters** in `src/lib/mailbox/{google,microsoft}.ts`:
   - Both map to the existing `ThreadMessage` type: metadata plus a ≤300-char preview, no bodies stored.
   - Incremental sync: Gmail `history.list` from `historyId`; Graph `messages/delta`.

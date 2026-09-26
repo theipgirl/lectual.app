@@ -46,7 +46,12 @@ export class ProviderError extends Error {
       | "no-refresh-token"
       | "missing-permission"
       | "no-email"
-      | "profile-failed",
+      | "profile-failed"
+      // The refresh token is dead (revoked, expired, password reset). Only a
+      // person reconnecting can fix it, so the sync marks the row `reauth`.
+      | "reauth"
+      | "refresh-failed"
+      | "fetch-failed",
   ) {
     super(message);
   }
@@ -254,4 +259,50 @@ export async function revokeToken(args: {
     body: new URLSearchParams({ token: args.token }),
   });
   return res.ok;
+}
+
+/**
+ * A fresh access token from the stored refresh token. Microsoft rotates the
+ * refresh token on every use and the new one MUST be stored, or the next
+ * refresh replays a consumed token; Google usually returns none, and the old
+ * one stays valid.
+ */
+export async function refreshAccessToken(args: {
+  provider: MailboxProvider;
+  creds: ClientCredentials;
+  refreshToken: string;
+  fetchImpl?: typeof fetch;
+  now?: number;
+}): Promise<{ accessToken: string; refreshToken: string | null; expiresAt: string }> {
+  const { provider, creds, fetchImpl = fetch, now = Date.now() } = args;
+  const body = new URLSearchParams({
+    client_id: creds.clientId,
+    client_secret: creds.clientSecret,
+    refresh_token: args.refreshToken,
+    grant_type: "refresh_token",
+  });
+  if (provider === "microsoft") body.set("scope", CONFIG.microsoft.scopes.join(" "));
+
+  const res = await fetchImpl(CONFIG[provider].tokenUrl, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body,
+  });
+  const json = (await res.json().catch(() => ({}))) as TokenResponse;
+  if (!res.ok || !json.access_token) {
+    if (json.error === "invalid_grant") {
+      throw new ProviderError(
+        provider === "google"
+          ? "Google revoked access. Reconnect to resume syncing."
+          : "Microsoft revoked access. Reconnect to resume syncing.",
+        "reauth",
+      );
+    }
+    throw new ProviderError(json.error_description || json.error || `Refresh failed (${res.status}).`, "refresh-failed");
+  }
+  return {
+    accessToken: json.access_token,
+    refreshToken: json.refresh_token ?? null,
+    expiresAt: new Date(now + (json.expires_in ?? 3600) * 1000).toISOString(),
+  };
 }

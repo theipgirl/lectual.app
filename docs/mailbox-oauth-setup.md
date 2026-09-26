@@ -67,3 +67,24 @@ The surface is behind the `mailbox` module (fail-closed). Add it to the firm's
   - a signed, httpOnly, 10-minute state cookie;
   - a check that the person finishing is the same user, in the same firm, who started.
 - **Disconnecting** deletes the row, and for Google also revokes the refresh token.
+
+## 5. The sync (step 4)
+
+`/api/cron/mailbox-sync/` runs every 15 minutes (`vercel.json`).
+- **Auth:** Vercel Cron sends `Authorization: Bearer $CRON_SECRET`. With no `CRON_SECRET`
+  set, the route refuses every call.
+- **Plan:** a 15-minute schedule needs Vercel **Pro**. Hobby only allows daily crons, and
+  the deploy fails if a cron is more frequent than the plan allows.
+
+What each run does:
+- **Scope:** for every firm with the `mailbox` module, it syncs every `active` or `error`
+  connection. `reauth` connections wait until a person reconnects them.
+- **First sync:** reads the last 30 days (Gmail search, or Graph delta on Inbox and Sent Items).
+- **Later syncs:** read only what's new (Gmail History API, or the stored Graph delta link).
+- **Matching:** each message is matched to a lead (by address, name and mark) or to a
+  matter (through its contacts' addresses). Only matched messages produce anything: a
+  timeline row with no body or preview, updated "last heard from" dates, and a bell
+  notification on a new reply.
+- **Run log:** one `agent_run` row per firm (`mailbox-sync`), with counts only.
+
+Run it by hand against dev: `curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/mailbox-sync/`
