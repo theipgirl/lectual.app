@@ -883,3 +883,20 @@ a:hover {
 @media (max-width: 600px) {
   .lx-deadline-due { grid-auto-flow: column; justify-items: start; align-items: center; }
 }
+
+/* ── today ────────────────────────────────────────────────────────── */
+.lx-pill-ox { background: rgba(106, 31, 43, 0.1); color: var(--ox); }
+.lx-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+.lx-kpi { padding: 16px 18px; display: grid; gap: 4px; color: inherit; }
+.lx-kpi:hover { text-decoration: none; border-color: rgba(106, 31, 43, 0.35); }
+.lx-kpi-value { font-family: var(--serif); font-size: 44px; line-height: 1; color: var(--ink); }
+.lx-prio > li { display: grid; grid-template-columns: 96px 1fr; gap: 12px; align-items: start; padding: 10px 0; position: relative; }
+.lx-prio .lx-pill { justify-self: start; }
+.lx-list > li { position: relative; }
+
+/* ── documents ────────────────────────────────────────────────────── */
+.lx-doc-kind {
+  width: 30px; height: 36px; flex: 0 0 auto; border-radius: 3px; border: 1px solid var(--line);
+  background: var(--card); display: flex; align-items: flex-end; justify-content: center; padding-bottom: 4px;
+  font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.06em; color: var(--ox);
+}

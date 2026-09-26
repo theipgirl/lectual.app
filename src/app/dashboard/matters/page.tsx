@@ -51,11 +51,13 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
   // Unconfigured or unavailable is never shown as "nothing to review".
   const reviewIds = queue.status === "ok" ? matterIdsNeedingReview(queue.items) : new Set<string>();
   const stalledIds = new Set(summarizeDocket(all).stalled.map((m) => m.id));
-  const segments = SEGMENTS.filter((s) => s.key !== "review" || queue.status === "ok");
+  const sets = { review: reviewIds, stalled: stalledIds };
+  const counts = new Map(SEGMENTS.map((s) => [s.key, filterBySegment(all, s.key, sets).length]));
+  // Review only when the queue was reached; court only for a firm that has court matters.
+  const segments = SEGMENTS.filter((s) => (s.key !== "review" || queue.status === "ok") && (s.key !== "court" || (counts.get("court") ?? 0) > 0 || seg === "court"));
 
-  const shown = searchMatters(filterBySegment(all, seg, { review: reviewIds, stalled: stalledIds }), search);
+  const shown = searchMatters(filterBySegment(all, seg, sets), search);
   const bands = groupIntoBands(shown);
-  const counts = new Map(segments.map((s) => [s.key, filterBySegment(all, s.key, { review: reviewIds, stalled: stalledIds }).length]));
   const memberName = new Map(members.map((m) => [m.userId, m.displayName ?? m.email ?? "Teammate"]));
   const leadOptions = leads.map((l) => ({
     id: l.id,

@@ -3,19 +3,13 @@ import { listLeads, listStages, type Lead } from "@/lib/pipeline";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { relativeTime } from "@/lib/relative-time";
 import { NewLeadForm } from "@/components/leads/LeadForms";
+import { laneOf } from "@/lib/leads/lane";
 
 const TEMP: Record<string, { label: string; tone: string }> = {
   hot: { label: "Hot", tone: "lx-pill-risk" },
   warm: { label: "Warm", tone: "lx-pill-warn" },
   cold: { label: "Cold", tone: "lx-pill-mute" },
 };
-
-/** The AI's lane, read off ai_summary ("HOT — reason"), when no person has set a temperature. */
-function laneOf(lead: Lead): string | null {
-  if (lead.temperature) return lead.temperature;
-  const m = lead.ai_summary?.match(/^(HOT|WARM|COLD)\b/);
-  return m ? m[1].toLowerCase() : null;
-}
 
 function lastTouch(lead: Lead): string | null {
   const a = lead.last_inbound_at ? Date.parse(lead.last_inbound_at) : 0;

@@ -54,6 +54,7 @@ export const SEGMENTS = [
   { key: "firm", label: "Waiting on us" },
   { key: "client", label: "Waiting on the client" },
   { key: "uspto", label: "With the USPTO" },
+  { key: "court", label: "With the court" },
   { key: "stalled", label: "Gone quiet" },
   { key: "review", label: "Needs your review" },
   { key: "unassigned", label: "Unassigned" },

@@ -28,6 +28,9 @@ Source commit: `610c206` (main, 2026-09-25). Copy, don't import: when a ported f
 | `src/app/dashboard/matters/{list-utils,labels}.ts` | `src/app/(firm)/dashboard/matters/_components/{list-utils,labels}.ts` | list-utils none; labels drops `MATTER_TYPE_TONE` |
 | `src/app/dashboard/matters/[id]/actions.ts` | `src/app/(firm)/dashboard/matters/[id]/actions.ts` + `team-status/actions.ts` (`assignMatterOwnerAction`) | validation and role gates unchanged; errors go through `friendlyMatterError` so no raw database message reaches the screen (**lectual should take this fix**); litigation, voice notes, welcome email and filing follow-up not yet ported |
 | `tests/matters/{list-utils,actions}.test.ts` | `tests/matters/matters-page.test.ts` (pure list-utils and mocked role-gating blocks) | retargeted; adds owner, stage-error and LIT-gate cases |
+| `src/app/dashboard/calendar/page.tsx` | `src/app/(firm)/dashboard/calendar/page.tsx` | same sources, merge and grouping; re-skinned; marks unconfirmed docket dates |
+| `src/app/dashboard/page.tsx` (Today) | `src/app/(firm)/dashboard/page.tsx` (ops home) | same independent reads and "a failed read is never a zero" rule; priority weighting kept (`src/lib/today/priorities.ts`), with stalled matters and unclaimed hot leads in place of stalled leads; reports and the matters copilot not ported |
+| `src/app/dashboard/documents/**` | reads `crm_document_draft` (0045) | new list over Document Center's table; the per-firm generators (`document-center/[matterId]/*`, `src/lib/documents/*`) are not ported |
 | `tsconfig.json`, `eslint.config.mjs`, `postcss.config.mjs`, `pnpm-workspace.yaml` | same paths | lint ignores `design/` |
 
 New in this repo: `src/lib/matters/worklist.ts` (the design's whose-move-is-it bands), `src/lib/mailbox/*` (except the apply port above), `src/lib/nav.ts`, `src/lib/fonts`, `src/components/shell/*`, `src/app/dashboard/*`,
