@@ -420,3 +420,177 @@ a:hover {
     font-size: 31px;
   }
 }
+
+/* ── two-column sections (Settings) ───────────────────────────────── */
+.lx-split {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 20px;
+  min-height: 0;
+}
+.lx-side {
+  width: 210px;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+}
+.lx-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.lx-fi {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 14.5px;
+  color: var(--body);
+  white-space: nowrap;
+}
+.lx-fi:hover {
+  background: var(--well);
+  color: var(--ink);
+  text-decoration: none;
+}
+.lx-fi[aria-current="page"] {
+  background: var(--card);
+  color: var(--ink);
+  font-weight: 500;
+  box-shadow: 0 1px 2px rgba(20, 4, 8, 0.08);
+}
+.lx-fi-n {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ── mailboxes ────────────────────────────────────────────────────── */
+.lx-card-head {
+  padding: 18px 18px 6px;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.lx-mbx {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+}
+.lx-mbx + .lx-mbx,
+.lx-card-head + .lx-mbx {
+  border-top: 1px solid var(--line-2);
+}
+.lx-mbx-main {
+  flex: 1;
+  min-width: 0;
+}
+.lx-mbx-count {
+  text-align: right;
+  min-width: 110px;
+}
+.lx-prov {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+.lx-num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+}
+.lx-empty {
+  padding: 22px 18px 24px;
+  color: var(--muted);
+  font-size: 14.5px;
+}
+.lx-facts {
+  padding: 18px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+}
+.lx-facts p {
+  margin: 6px 0 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--body);
+}
+.lx-banner {
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 14.5px;
+  line-height: 1.5;
+  border: 1px solid;
+}
+.lx-banner-ok {
+  background: rgba(67, 96, 47, 0.08);
+  border-color: rgba(67, 96, 47, 0.3);
+  color: var(--ok);
+}
+.lx-banner-risk {
+  background: rgba(142, 39, 51, 0.07);
+  border-color: rgba(142, 39, 51, 0.3);
+  color: var(--wine);
+}
+.lx-banner-mute {
+  background: var(--well);
+  border-color: var(--line);
+  color: var(--body);
+}
+.lx-dialog {
+  /* Tailwind's preflight zeroes margins, which removes the browser's own
+     centring of a modal <dialog>. Put it back. */
+  margin: auto;
+  width: min(460px, calc(100vw - 32px));
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 30px 80px -20px rgba(20, 4, 8, 0.55);
+}
+.lx-dialog::backdrop {
+  background: rgba(35, 8, 16, 0.28);
+}
+.lx-dialog-foot {
+  padding: 14px 20px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+@media (max-width: 900px) {
+  .lx-split {
+    flex-direction: column;
+  }
+  .lx-side {
+    width: auto;
+  }
+  .lx-mbx {
+    flex-wrap: wrap;
+  }
+  .lx-mbx-main {
+    flex: 1 1 calc(100% - 54px);
+  }
+  .lx-mbx-count {
+    display: none;
+  }
+}

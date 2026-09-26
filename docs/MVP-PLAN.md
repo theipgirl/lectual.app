@@ -76,7 +76,7 @@ Porting rule: copy the files and record the source commit SHA in `lectual.app/PO
 - **Isolation gate:** add cross-tenant read and write cases for both tables to `tests/tenant-isolation.test.ts`. Also add a *cross-user* case: user A in org X cannot read user B's personal mailbox row.
 - Apply to lectual-dev, then lectual-prod (additive), and check both with `list_migrations`.
 
-### Step 3 · OAuth connect flow (`lectual.app`)
+### Step 3 · OAuth connect flow (`lectual.app`) (built; needs the Google and Microsoft app registrations to test end to end, see docs/mailbox-oauth-setup.md)
 - **Routes**
   - `src/app/api/mailbox/connect/[provider]/route.ts` builds the auth URL:
     - Carries a signed `state`: user_id, org_id, scope and nonce, set in an httpOnly cookie.
