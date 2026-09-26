@@ -19,7 +19,6 @@ function header(value: string): string {
 /** MIME-encode a subject so non-ASCII (é, —, curly quotes) survives. */
 function encodeSubject(subject: string): string {
   const clean = header(subject);
-  // eslint-disable-next-line no-control-regex
   return /^[\x20-\x7e]*$/.test(clean) ? clean : `=?UTF-8?B?${Buffer.from(clean, "utf8").toString("base64")}?=`;
 }
 

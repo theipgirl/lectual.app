@@ -25,6 +25,8 @@ export type NavItem = {
 export const NAV: readonly NavItem[] = [
   { slug: "", label: "Today", href: "/dashboard/", group: "work", step: 6,
     icon: "M4 11l8-7 8 7M6 10v10h12V10" },
+  { slug: "leads", label: "Leads", href: "/dashboard/leads/", group: "work", step: 6,
+    icon: "M4 7h16M4 12h10M4 17h6M17 14l3 3-3 3" },
   { slug: "matters", label: "Matters", href: "/dashboard/matters/", group: "work", step: 6,
     icon: "M4 6h16M4 12h16M4 18h10" },
   { slug: "queue", label: "Queue", href: "/dashboard/queue/", group: "work", step: 6,
