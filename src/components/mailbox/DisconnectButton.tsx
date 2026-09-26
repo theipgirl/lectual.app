@@ -4,7 +4,7 @@ import { useActionState, useRef } from "react";
 import {
   disconnectMailboxAction,
   type DisconnectState,
-} from "@/app/dashboard/settings/mailboxes/actions";
+} from "@/app/dashboard/settings/integrations/actions";
 
 /** "Disconnect" with the design's confirm dialog in front of it. */
 export function DisconnectButton({ id, email }: { id: string; email: string }) {

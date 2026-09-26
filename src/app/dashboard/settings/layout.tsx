@@ -3,10 +3,10 @@ import { activeOrgModules } from "@/lib/org/modules";
 
 type Tab = { label: string; href: string | null; module?: string };
 
-// Only Mailboxes is live in step 3; the rest land with later steps and are
+// Only Integrations (mailboxes) is live; the rest land with later steps and are
 // shown (not linked) so the section's shape matches the design.
 const TABS: Tab[] = [
-  { label: "Mailboxes", href: "/dashboard/settings/mailboxes/", module: "mailbox" },
+  { label: "Integrations", href: "/dashboard/settings/integrations/", module: "mailbox" },
   { label: "Agents", href: null, module: "agents" },
   { label: "Team & roles", href: null },
   { label: "Firm profile", href: null },
@@ -24,7 +24,7 @@ export default async function SettingsLayout({ children }: { children: React.Rea
         <nav style={{ display: "grid", gap: 2 }}>
           {tabs.map((t) =>
             t.href ? (
-              // Mailboxes is the only live tab, so it is always the current one.
+              // Integrations is the only live tab, so it is always the current one.
               <Link key={t.label} href={t.href} className="lx-fi" aria-current="page">
                 {t.label}
               </Link>

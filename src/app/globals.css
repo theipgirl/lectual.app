@@ -900,3 +900,62 @@ a:hover {
   background: var(--card); display: flex; align-items: flex-end; justify-content: center; padding-bottom: 4px;
   font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.06em; color: var(--ox);
 }
+
+/* ── integrations ─────────────────────────────────────────────────── */
+.lx-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  padding: 30px 32px;
+  color: var(--cream);
+  background:
+    radial-gradient(120% 140% at 100% 0%, rgba(142, 39, 51, 0.95) 0%, rgba(142, 39, 51, 0) 55%),
+    radial-gradient(90% 120% at 85% 110%, rgba(196, 122, 46, 0.75) 0%, rgba(196, 122, 46, 0) 60%),
+    linear-gradient(120deg, #2a1216 0%, #3b151c 45%, #5a1924 100%);
+  display: grid;
+  gap: 14px;
+  box-shadow: 0 10px 30px rgba(42, 18, 22, 0.18);
+}
+.lx-hero-marks { display: flex; gap: 10px; align-items: center; }
+.lx-hero-marks svg { background: #fffdf7; border-radius: 6px; padding: 3px; box-sizing: content-box; }
+.lx-hero-title { font-family: var(--serif); font-weight: 400; font-size: clamp(30px, 4vw, 42px); line-height: 1.08; margin: 0; }
+.lx-hero-sub { margin: 0; max-width: 560px; color: rgba(253, 247, 235, 0.78); font-size: 15px; line-height: 1.55; }
+.lx-hero-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 8px; }
+.lx-btn-cream { background: var(--cream); color: var(--ink); }
+.lx-btn-cream:hover { text-decoration: none; background: #fff; color: var(--ink); }
+.lx-btn-glass { background: rgba(253, 247, 235, 0.08); color: var(--cream); border: 1px solid rgba(253, 247, 235, 0.25); }
+.lx-btn-glass:hover { text-decoration: none; background: rgba(253, 247, 235, 0.16); color: var(--cream); }
+.lx-hero-link { color: var(--cream); font-weight: 500; padding: 0 8px; }
+.lx-int { padding: 0 18px; }
+.lx-int-row + .lx-int-row { border-top: 1px solid var(--line-2); }
+.lx-int-row > summary { display: flex; align-items: center; gap: 14px; padding: 16px 0; cursor: pointer; list-style: none; }
+.lx-int-row > summary::-webkit-details-marker { display: none; }
+.lx-int-icon { width: 46px; height: 46px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+.lx-int-name { font-size: 16px; font-weight: 500; color: var(--ink); }
+.lx-int-chev { font-size: 22px; color: var(--muted); transition: transform 0.15s; }
+.lx-int-row[open] .lx-int-chev { transform: rotate(90deg); }
+.lx-int-body { padding: 0 0 16px 60px; display: grid; gap: 0; }
+.lx-int-body .lx-card-head { padding: 12px 0; border: 0; }
+@media (max-width: 600px) {
+  .lx-hero { padding: 24px 20px; }
+  .lx-int-body { padding-left: 0; }
+}
+
+/* ── my mail ──────────────────────────────────────────────────────── */
+.lx-connect { margin: 8vh auto 0; max-width: 620px; width: 100%; padding: 44px 32px; display: grid; justify-items: center; gap: 16px; }
+.lx-connect-icon { width: 76px; height: 76px; border-radius: 20px; background: rgba(142, 39, 51, 0.1); color: var(--wine); display: flex; align-items: center; justify-content: center; }
+.lx-fi-box { min-width: 0; }
+.lx-fi-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+.lx-mail { padding: 4px 18px 10px; }
+.lx-mail-group { font-family: var(--mono); font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); font-weight: 400; margin: 14px 0 4px; }
+.lx-mail-row { display: grid; grid-template-columns: minmax(140px, 220px) 1fr auto; gap: 14px; align-items: center; padding: 11px 0; font-size: 14.5px; }
+.lx-mail-who { color: var(--ink); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lx-mail-subj { color: var(--body); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lx-mail-tag { margin-left: 8px; vertical-align: 1px; }
+.lx-mail-tag:hover { text-decoration: none; }
+.lx-mail-meta { display: flex; gap: 12px; align-items: center; color: var(--muted); font-size: 13px; }
+@media (max-width: 700px) {
+  .lx-mail-row { grid-template-columns: 1fr auto; }
+  .lx-mail-subj { grid-column: 1 / -1; grid-row: 2; white-space: normal; }
+}
+.lx-col > * { flex-shrink: 0; }

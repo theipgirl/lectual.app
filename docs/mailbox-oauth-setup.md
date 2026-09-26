@@ -1,6 +1,6 @@
 # Mailbox OAuth setup (Gmail and Outlook)
 
-The "Connect Gmail / Outlook" buttons on **Settings → Mailboxes** stay greyed out until the
+The "Connect Gmail / Outlook" buttons on **Settings → Integrations** stay greyed out until the
 env vars below are set on the deployment. Code: `src/lib/mailbox/`, `src/app/api/mailbox/`.
 
 ## 1. Encryption key (required for both)

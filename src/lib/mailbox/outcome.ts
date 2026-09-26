@@ -1,5 +1,5 @@
 /**
- * The result of a connect attempt, carried back to the Mailboxes page as a
+ * The result of a connect attempt, carried back to Settings → Integrations as a
  * query parameter. Codes only — never a provider's raw text or anything from
  * the callback URL — so nothing an attacker puts in a link is echoed back.
  */
@@ -24,4 +24,5 @@ export function outcomeMessage(code: string | undefined): string | null {
   return code && code in OUTCOME_MESSAGES ? OUTCOME_MESSAGES[code as OutcomeCode] : null;
 }
 
-export const MAILBOXES_PATH = "/dashboard/settings/mailboxes/";
+/** Where every connect/callback outcome lands: Settings → Integrations. */
+export const MAILBOXES_PATH = "/dashboard/settings/integrations/";

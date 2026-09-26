@@ -22,7 +22,7 @@ import {
  * of the database, never out of a request.
  *
  * One connection failing never stops the others. A dead refresh token marks
- * the row `reauth` (the Mailboxes page shows "Reconnect"); anything else marks
+ * the row `reauth` (Settings → Integrations and My Mail show "Reconnect"); anything else marks
  * it `error` and the next run tries again.
  */
 
@@ -274,7 +274,7 @@ export async function runMailboxSync(deps: SyncDeps): Promise<RunSummary> {
           drafts_out: 0,
           // Counts only — never an address, subject or name.
           summary: `${outcomes.length} mailbox(es): ${read} message(s) read, ${written} matched and logged${failed ? `, ${failed} failed` : ""}.`,
-          error: failed ? `${failed} mailbox(es) failed; see Settings → Mailboxes.` : null,
+          error: failed ? `${failed} mailbox(es) failed; see Settings → Integrations.` : null,
         })
         .eq("id", run.id)
         .eq("org_id", orgId);
