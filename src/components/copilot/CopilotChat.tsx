@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 type Citation = { type: "matter" | "lead"; id: string; label: string; href: string };
-type ChatResponse = { answer: string; citations: Citation[]; declined: boolean };
+type ChatResponse = { answer: string; citations: Citation[]; declined: boolean; readFailed: boolean };
 
 type Exchange = {
   id: string;
@@ -13,12 +13,13 @@ type Exchange = {
   answer?: string;
   citations?: Citation[];
   declined?: boolean;
+  readFailed?: boolean;
   error?: string;
 };
 
 const SUGGESTED_PROMPTS = [
   "What's due in the next two weeks?",
-  "Which matters haven't moved in 30 days?",
+  "Which matters are stalled right now?",
   "What happened across the firm this week?",
   "Is anything overdue right now?",
 ];
@@ -74,7 +75,7 @@ export function CopilotChat() {
 
       setExchanges((prev) =>
         prev.map((e) =>
-          e.id === id ? { ...e, status: "done", answer: data.answer, citations: data.citations, declined: data.declined } : e,
+          e.id === id ? { ...e, status: "done", answer: data.answer, citations: data.citations, declined: data.declined, readFailed: data.readFailed } : e,
         ),
       );
     } catch {
@@ -93,7 +94,7 @@ export function CopilotChat() {
 
   return (
     <div className="cpl-panel lx-card">
-      <div className="cpl-thread">
+      <div className="cpl-thread" role="log" aria-live="polite" aria-label="Copilot conversation">
         {exchanges.length === 0 ? (
           <div className="cpl-empty">
             <p className="lx-note" style={{ margin: 0 }}>
@@ -113,7 +114,7 @@ export function CopilotChat() {
               <div className="cpl-bubble cpl-bubble-user">{ex.question}</div>
 
               {ex.status === "pending" && (
-                <div className="cpl-bubble cpl-bubble-copilot cpl-thinking" aria-live="polite">
+                <div className="cpl-bubble cpl-bubble-copilot cpl-thinking">
                   Reading the firm&apos;s records…
                 </div>
               )}
@@ -127,6 +128,12 @@ export function CopilotChat() {
               {ex.status === "done" && (
                 <div className="cpl-bubble cpl-bubble-copilot">
                   <div className="cpl-label">{ex.declined ? "Copilot · not a records question" : "Copilot"}</div>
+                  {ex.readFailed && (
+                    <p className="lx-banner lx-banner-warn" role="alert" style={{ margin: 0 }}>
+                      Some of the firm&apos;s records couldn&apos;t be read while answering, so this
+                      answer may be incomplete. Try again, or check the record directly.
+                    </p>
+                  )}
                   <p style={{ margin: 0 }}>{ex.answer}</p>
                   {ex.citations && ex.citations.length > 0 ? (
                     <div className="cpl-cites">

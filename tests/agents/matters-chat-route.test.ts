@@ -3,16 +3,16 @@ import { NextRequest } from "next/server";
 
 /**
  * POST /api/matters-chat — the AI copilot's answer endpoint. Mock-based: both
- * getScopedClient() (auth check) and answerMattersChatQuestion() (the model
+ * resolveFirmSession() (access check) and answerMattersChatQuestion() (the model
  * call) are mocked, so this never touches a DB or a real model — it only
  * verifies the route's own contract (validation, auth gate, error shape).
  */
 
-function mockAuthedUser(user: { id: string } | null) {
-  vi.doMock("@/lib/db/scoped-client", () => ({
-    getScopedClient: vi.fn(async () => ({
-      auth: { getUser: vi.fn(async () => ({ data: { user } })) },
-    })),
+function mockAuthedUser(user: { id: string } | null, kind: "ok" | "no-access" = "ok") {
+  vi.doMock("@/lib/firm/session", () => ({
+    resolveFirmSession: vi.fn(async () =>
+      !user ? { kind: "signed-out", redirectTo: "/sign-in/" } : { kind, user },
+    ),
   }));
 }
 
@@ -60,6 +60,17 @@ describe("POST /api/matters-chat", () => {
 
     const res = await POST(postRequest({ question: "what's the status of AURELIA" }));
     expect(res.status).toBe(401);
+    expect(answerMattersChatQuestion).not.toHaveBeenCalled();
+  });
+
+  it("403s for a signed-in account with no firm workspace, and never calls the model", async () => {
+    mockAuthedUser({ id: "u-1" }, "no-access");
+    const answerMattersChatQuestion = vi.fn();
+    vi.doMock("@/lib/agents/matters-chat", () => ({ answerMattersChatQuestion }));
+    const { POST } = await import("@/app/api/matters-chat/route");
+
+    const res = await POST(postRequest({ question: "what's the status of AURELIA" }));
+    expect(res.status).toBe(403);
     expect(answerMattersChatQuestion).not.toHaveBeenCalled();
   });
 

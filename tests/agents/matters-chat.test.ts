@@ -270,4 +270,120 @@ describe("answerMattersChatQuestion", () => {
     expect(result.declined).toBe(false);
     expect(result.answer.length).toBeGreaterThan(0);
   });
+  it("reports a failed deadline read as unavailable and flags readFailed, never as 'no deadlines'", async () => {
+    const matters = [matter()];
+    mockMatters({
+      getMatter: vi.fn(async () => matters[0]),
+      listMatterDeadlines: vi.fn(async () => {
+        throw new Error("permission denied");
+      }),
+    });
+    mockPipeline();
+
+    const { answerMattersChatQuestion } = await import("@/lib/agents/matters-chat");
+
+    let seen: unknown = null;
+    let call = 0;
+    const fakeCall: Call = async ({ messages }) => {
+      call += 1;
+      if (call === 1) return toolCallResponse([{ toolName: "get_matter_detail", input: { matterId: "m-1" } }]);
+      const last = messages[messages.length - 1];
+      seen = Array.isArray(last.content) ? (last.content[0] as { content: string }).content : null;
+      return textResponse("I couldn't read AURELIA's deadlines right now.");
+    };
+
+    const result = await answerMattersChatQuestion("any deadlines on AURELIA?", fakeCall);
+
+    expect(result.readFailed).toBe(true);
+    const detail = JSON.parse(String(seen)) as { openDeadlines: unknown };
+    expect(detail.openDeadlines).toMatchObject({ unavailable: true });
+  });
+
+  it("flags readFailed when a whole tool call throws", async () => {
+    mockMatters({
+      listMatters: vi.fn(async () => {
+        throw new Error("network down");
+      }),
+    });
+    mockPipeline();
+
+    const { answerMattersChatQuestion } = await import("@/lib/agents/matters-chat");
+
+    let call = 0;
+    const fakeCall: Call = async () => {
+      call += 1;
+      if (call === 1) return toolCallResponse([{ toolName: "search_matters", input: { query: "AURELIA" } }]);
+      return textResponse("The matter records couldn't be read right now.");
+    };
+
+    const result = await answerMattersChatQuestion("status of AURELIA", fakeCall);
+    expect(result.readFailed).toBe(true);
+  });
+
+  it("tells the model when search results are truncated instead of passing a capped count as the total", async () => {
+    const many = Array.from({ length: 12 }, (_, i) => matter({ id: `m-${i}`, matter_number: `TM-2026-${1000 + i}`, title: "ACME" }));
+    mockMatters({ listMatters: vi.fn(async () => many) });
+    mockPipeline();
+
+    const { answerMattersChatQuestion } = await import("@/lib/agents/matters-chat");
+
+    let seen = "";
+    let call = 0;
+    const fakeCall: Call = async ({ messages }) => {
+      call += 1;
+      if (call === 1) return toolCallResponse([{ toolName: "search_matters", input: { query: "acme" } }]);
+      const last = messages[messages.length - 1];
+      seen = Array.isArray(last.content) ? (last.content[0] as { content: string }).content : "";
+      return textResponse("There are 12 ACME matters; here are the first 8.");
+    };
+
+    const result = await answerMattersChatQuestion("ACME matters?", fakeCall);
+    const parsed = JSON.parse(seen) as { totalMatches: number; truncated: boolean; matters: unknown[] };
+    expect(parsed.totalMatches).toBe(12);
+    expect(parsed.truncated).toBe(true);
+    expect(parsed.matters).toHaveLength(8);
+    expect(result.citations).toHaveLength(8);
+    expect(result.readFailed).toBe(false);
+  });
+
+  it("lists stalled matters by the docket's own staleness rule and cites them", async () => {
+    const old = new Date(Date.now() - 45 * 86_400_000).toISOString();
+    const stalled = matter({
+      id: "m-stale",
+      matter_number: "TM-2026-0040",
+      title: "SHEERWAVE",
+      stage_entered_at: old,
+      stage: { id: "s", code: "3", label: "Drafting", order_index: 3, is_open: true, waiting_on: "firm" },
+    } as Partial<Matter>);
+    const fresh = matter({ id: "m-fresh" });
+    mockMatters({ listMatters: vi.fn(async () => [stalled, fresh]) });
+    mockPipeline();
+
+    const { answerMattersChatQuestion } = await import("@/lib/agents/matters-chat");
+
+    let seen = "";
+    let call = 0;
+    const fakeCall: Call = async ({ messages }) => {
+      call += 1;
+      if (call === 1) return toolCallResponse([{ toolName: "list_stalled_matters", input: {} }]);
+      const last = messages[messages.length - 1];
+      seen = Array.isArray(last.content) ? (last.content[0] as { content: string }).content : "";
+      return textResponse("SHEERWAVE has sat in Drafting for 45 days.");
+    };
+
+    const result = await answerMattersChatQuestion("which matters are stalled?", fakeCall);
+    const parsed = JSON.parse(seen) as { totalStalled: number; stalled: Array<{ id: string; daysInStage: number }> };
+    expect(parsed.totalStalled).toBe(1);
+    expect(parsed.stalled[0].id).toBe("m-stale");
+    expect(result.citations.map((c) => c.id)).toEqual(["m-stale"]);
+  });
+
+  it("strips PostgREST filter syntax from a lead search term", async () => {
+    mockMatters();
+    mockPipeline();
+    const { leadSearchTerm } = await import("@/lib/agents/matters-chat");
+    expect(leadSearchTerm("Smith, Jones (Co)")).toBe("Smith Jones Co");
+    expect(leadSearchTerm("x,org_id.neq.1")).toBe("x org_id.neq.1");
+    expect(leadSearchTerm(undefined)).toBe("");
+  });
 });

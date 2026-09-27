@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getScopedClient } from "@/lib/db/scoped-client";
+import { resolveFirmSession } from "@/lib/firm/session";
 import { answerMattersChatQuestion } from "@/lib/agents/matters-chat";
 import { AiNotConfiguredError } from "@/lib/ai/claude";
 
@@ -16,11 +16,11 @@ const bodySchema = z.object({
  * @/lib/agents/matters-chat for the tool set, the UPL-firewall system
  * prompt, and why every answer carries citations.
  *
- * Auth is checked here even though getScopedClient() + RLS is the real
- * tenant boundary for every read the model can make (an unauthenticated
- * caller would just get zero rows back, never another org's data) — this is
- * the same defense-in-depth posture as the rest of the app: fail closed
- * before spending a model call on a request with no signed-in session.
+ * Access is checked here (resolveFirmSession, the dashboard's own door) even
+ * though getScopedClient() + RLS is the real tenant boundary for every read
+ * the model can make (a caller with no firm would just get zero rows back,
+ * never another org's data) — fail closed before spending a model call on a
+ * request that has no firm workspace to read.
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
   let body: unknown;
@@ -35,12 +35,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Ask a question (1–2000 characters)." }, { status: 422 });
   }
 
-  const supabase = await getScopedClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
+  // The same door the dashboard layout opens: signed in is not enough. A
+  // signed-in account with no firm (a founder, a revoked member) would
+  // otherwise spend a model call to be told, wrongly, that the firm has no
+  // matters — RLS would hand every tool an empty result.
+  const session = await resolveFirmSession();
+  if (session.kind === "signed-out") {
     return NextResponse.json({ error: "Sign in to use the copilot." }, { status: 401 });
+  }
+  if (session.kind === "no-access") {
+    return NextResponse.json({ error: "You don't have access to a firm workspace." }, { status: 403 });
   }
 
   try {
