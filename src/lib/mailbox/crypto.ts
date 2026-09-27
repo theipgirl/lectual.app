@@ -31,16 +31,24 @@ export function parseRootKey(base64: string | undefined): Buffer {
   return key;
 }
 
-function derive(root: Buffer, purpose: "token-seal" | "oauth-state"): Buffer {
-  return Buffer.from(hkdfSync("sha256", root, Buffer.alloc(0), `lectual-mailbox:${purpose}`, 32));
+/**
+ * HKDF contexts. Each integration that borrows this root gets its OWN context,
+ * so a key derived for LawPay can never open a mailbox token or verify a
+ * mailbox state cookie, and the reverse. `lectual-mailbox` is the original and
+ * must never change: every sealed mailbox and Lawmatics token depends on it.
+ */
+export type SealContext = "lectual-mailbox" | "lectual-lawpay";
+
+function derive(root: Buffer, purpose: "token-seal" | "oauth-state", context: SealContext = "lectual-mailbox"): Buffer {
+  return Buffer.from(hkdfSync("sha256", root, Buffer.alloc(0), `${context}:${purpose}`, 32));
 }
 
 const b64u = (b: Buffer) => b.toString("base64url");
 const unb64u = (s: string) => Buffer.from(s, "base64url");
 
 /** Seal a token. Output: `v1.<iv>.<tag>.<ciphertext>`, base64url parts. */
-export function sealToken(root: Buffer, plaintext: string): string {
-  const key = derive(root, "token-seal");
+export function sealToken(root: Buffer, plaintext: string, context: SealContext = "lectual-mailbox"): string {
+  const key = derive(root, "token-seal", context);
   const iv = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", key, iv);
   const ct = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
@@ -48,25 +56,30 @@ export function sealToken(root: Buffer, plaintext: string): string {
 }
 
 /** Open a sealed token. Throws on any tampering, truncation or wrong key. */
-export function openToken(root: Buffer, sealed: string): string {
+export function openToken(root: Buffer, sealed: string, context: SealContext = "lectual-mailbox"): string {
   const parts = sealed.split(".");
   if (parts.length !== 4 || parts[0] !== SEALED_PREFIX) {
     throw new MailboxKeyError("Not a sealed mailbox token.");
   }
   const [, iv, tag, ct] = parts;
-  const decipher = createDecipheriv("aes-256-gcm", derive(root, "token-seal"), unb64u(iv));
+  const decipher = createDecipheriv("aes-256-gcm", derive(root, "token-seal", context), unb64u(iv));
   decipher.setAuthTag(unb64u(tag));
   return Buffer.concat([decipher.update(unb64u(ct)), decipher.final()]).toString("utf8");
 }
 
 /** HMAC-SHA256 signature over `data`, for the OAuth state cookie. */
-export function signState(root: Buffer, data: string): string {
-  return b64u(createHmac("sha256", derive(root, "oauth-state")).update(data).digest());
+export function signState(root: Buffer, data: string, context: SealContext = "lectual-mailbox"): string {
+  return b64u(createHmac("sha256", derive(root, "oauth-state", context)).update(data).digest());
 }
 
 /** Constant-time signature check. */
-export function verifyStateSignature(root: Buffer, data: string, signature: string): boolean {
-  const expected = unb64u(signState(root, data));
+export function verifyStateSignature(
+  root: Buffer,
+  data: string,
+  signature: string,
+  context: SealContext = "lectual-mailbox",
+): boolean {
+  const expected = unb64u(signState(root, data, context));
   const given = unb64u(signature);
   return given.length === expected.length && timingSafeEqual(given, expected);
 }

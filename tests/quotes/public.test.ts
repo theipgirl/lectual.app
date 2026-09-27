@@ -439,13 +439,14 @@ describe("the client's pick is validated against the offer they were shown — �
     expect(result.snapshot.totals.due_at_filing).toBe(35_000 + 35_000);
   });
 
-  it("gives an anonymous caller exactly two write endpoints — accept and decline", async () => {
+  it("gives an anonymous caller exactly three write endpoints — accept, decline and pay (after signing)", async () => {
     // The ported engine persisted every tick from this unauthenticated route
     // (`saveSelectionAction`). Here the rows' `selected` is the firm's offer
     // until signature, so no endpoint lets a client write it: ticking a box
-    // writes nothing, and the pick arrives once, with the signature.
+    // writes nothing, and the pick arrives once, with the signature. Paying is
+    // its own endpoint that only works on an already-accepted quote (spec §7.4).
     const actions = await import("@/app/q/[token]/actions");
-    expect(Object.keys(actions).sort()).toEqual(["acceptQuoteAction", "declineQuoteAction"]);
+    expect(Object.keys(actions).sort()).toEqual(["acceptQuoteAction", "declineQuoteAction", "payQuoteAction"]);
   });
 });
 

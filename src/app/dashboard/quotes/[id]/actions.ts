@@ -26,6 +26,7 @@ import type { QuoteLineRow, QuoteRow } from "@/lib/quotes/types";
 import { parseDollarsToCents } from "@/lib/quotes/money";
 import { endOfFirmDay } from "@/lib/quotes/firm-time";
 import { friendlyQuoteError, NOT_ENTITLED, type ActionState } from "../errors";
+import { reconcilePendingPayment, recordManualPayment } from "@/lib/payments/quote-payments";
 
 /**
  * The quote BUILDER's own write surface — everything that mutates ONE
@@ -633,4 +634,53 @@ async function firmNameFor(
   const name = typeof data?.name === "string" ? data.name.trim() : "";
   if (!name) throw new Error("This firm has no name set, so the agreement's parties clause can't be written.");
   return name;
+}
+
+// ── Payments ─────────────────────────────────────────────────────────────
+
+/**
+ * "Record a payment": money that moved outside Lectual (a cheque, a wire, a
+ * charge run in LawPay itself). The account kind and the purpose are required
+ * form fields with no default (src/lib/payments/manual.ts). attorney+, like
+ * every action here; RLS (crm_payment insert, staff tier) underneath.
+ */
+export async function recordPaymentAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  if (!(await callerHasRole("attorney"))) return NOT_ENTITLED;
+  const quoteId = String(formData.get("quoteId") ?? "");
+  if (!quoteId) return { error: "Missing quote." };
+  const supabase = await getScopedClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Sign in again to record a payment." };
+  const result = await recordManualPayment({
+    quoteId,
+    userId: user.id,
+    amount: String(formData.get("amount") ?? ""),
+    accountKind: formData.get("accountKind"),
+    purpose: formData.get("purpose"),
+    occurredOn: String(formData.get("occurredOn") ?? ""),
+    note: String(formData.get("note") ?? ""),
+  });
+  if (!result.ok) return { error: result.reason };
+  revalidateQuote(quoteId);
+  return { saved: true };
+}
+
+/**
+ * Resolve a LawPay attempt left pending (LawPay gave no clear answer). Admin
+ * tier: correcting a money record is supervisory (0068's crm_payment update
+ * policy), so this checks senior_admin, not attorney.
+ */
+export async function reconcilePaymentAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  if (!(await callerHasRole("senior_admin"))) return { error: "Only owners and admins can resolve a payment." };
+  const quoteId = String(formData.get("quoteId") ?? "");
+  const paymentId = String(formData.get("paymentId") ?? "");
+  const outcome = formData.get("outcome");
+  if (!quoteId || !/^[0-9a-f-]{36}$/i.test(paymentId)) return { error: "Unknown payment." };
+  if (outcome !== "succeeded" && outcome !== "failed") return { error: "Choose what LawPay shows." };
+  const result = await reconcilePendingPayment({ paymentId, outcome });
+  if (!result.ok) return { error: result.reason };
+  revalidateQuote(quoteId);
+  return { saved: true };
 }

@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { acceptPublicQuote, declinePublicQuote, type AcceptRefusal, type DeclineRefusal } from "@/lib/quotes/public";
 import { readClientChoice } from "@/lib/quotes/packages";
+import { payAcceptedQuote, type PayRefusal } from "@/lib/quotes/public-payment";
 
 /**
  * The two server actions an ANONYMOUS visitor may invoke.
@@ -43,7 +44,8 @@ export type AcceptActionResult = { ok: boolean; reason?: AcceptRefusal; message?
  * they picked (`choice`, re-validated against the offer as it stands now) and
  * the agreement fingerprint of the render they read (only ever COMPARED to one
  * recomputed from a fresh read — a stale or missing one refuses). Nothing is
- * charged: this app takes no payments.
+ * charged here: payment is a separate step on the receipt (payQuoteAction), so
+ * a declined card can never cost a signature.
  */
 export async function acceptQuoteAction(input: {
   token: string;
@@ -78,4 +80,30 @@ export type DeclineActionResult = { ok: boolean; reason?: DeclineRefusal };
 export async function declineQuoteAction(token: string): Promise<DeclineActionResult> {
   const result = await declinePublicQuote(String(token ?? ""), new Date());
   return result.ok ? { ok: true } : { ok: false, reason: result.reason };
+}
+
+export type PayActionResult = { ok: boolean; reason?: PayRefusal; message?: string };
+
+/**
+ * Pay the amount due at signing on an ALREADY-SIGNED proposal (spec §7.4).
+ *
+ * Takes the link's token and the single-use Hosted Fields payment token —
+ * nothing else. The amount, the quote, the firm, and the firm's operating
+ * account are all re-resolved server-side from the token and the SIGNED
+ * snapshot (src/lib/quotes/public-payment.ts). No card number ever reaches this
+ * server: the browser sends an opaque token from AffiniPay's own iframes.
+ */
+export async function payQuoteAction(input: { token: string; methodToken: string }): Promise<PayActionResult> {
+  try {
+    const result = await payAcceptedQuote(
+      { token: String(input?.token ?? ""), methodToken: String(input?.methodToken ?? "") },
+      new Date(),
+    );
+    return result.ok ? { ok: true } : { ok: false, reason: result.reason, message: result.message };
+  } catch (err) {
+    // Never a thrown digest on a payment page. Whether anything was sent is
+    // unknown from here, so the page is told to confirm, not to retry.
+    console.error("[payments] payQuoteAction threw", err instanceof Error ? err.message : err);
+    return { ok: false, reason: "indeterminate" };
+  }
 }

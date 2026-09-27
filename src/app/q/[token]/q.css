@@ -199,6 +199,32 @@
 .qp-print:hover { background: var(--qp-oxbg); }
 .qp-small { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin: 0; }
 
+/* the Pay section (receipt only) — spec §7.4 */
+.qp-pay { border-top: 1px solid var(--line); padding-top: 16px; display: flex; flex-direction: column; gap: 10px; }
+.qp-pay[data-tone="good"] .qp-pay-title { color: var(--ok); }
+.qp-pay[data-tone="warn"] .qp-pay-title { color: var(--warn); }
+.qp-pay-title { font-family: var(--serif); font-weight: 400; font-size: 22px; line-height: 1.2; margin: 0; color: var(--ink); }
+.qp-pay-body { font-size: 14px; color: var(--body); line-height: 1.6; margin: 0; }
+.qp-pay-fields { display: flex; flex-direction: column; gap: 10px; }
+.qp-pay-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.qp-pay-label { display: flex; flex-direction: column; gap: 5px; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.qp-pay-input, .qp-pay-hosted {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--well);
+  font: inherit;
+  font-size: 15px;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--ink);
+}
+.qp-pay-input:focus { outline: none; border-color: var(--ox); }
+.qp-pay-error { margin: 0; font-size: 13px; line-height: 1.55; color: var(--wine); }
+
 @media print {
   @page { margin: 16mm; }
   html, body { background: #fff !important; height: auto !important; }

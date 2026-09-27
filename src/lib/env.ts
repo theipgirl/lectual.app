@@ -36,6 +36,23 @@ const fieldSchemas = {
   // signs the render stamp. Optional: unset = sessions are not hashed (null),
   // stamps are unsigned. Never reuse another secret here.
   INTAKE_EVENT_SALT: z.string().optional(),
+  // LawPay (AffiniPay) partner OAuth app — docs/lawpay-setup.md. All optional:
+  // unset = "Connect LawPay" is disabled with an explanation, and payments are
+  // recorded manually. The firm signs in to ITS OWN LawPay account; there is
+  // no deployment-wide LawPay secret key anywhere. Tokens are sealed with
+  // MAILBOX_TOKEN_KEY under their own HKDF context.
+  LAWPAY_OAUTH_CLIENT_ID: z.string().optional(),
+  LAWPAY_OAUTH_CLIENT_SECRET: z.string().optional(),
+  // Override only if 8am says so. Default https://secure.lawpay.com/oauth/authorize.
+  LAWPAY_OAUTH_AUTHORIZE_URL: z.string().optional(),
+  // Must match the partner app's registered redirect exactly. Unset = derived
+  // from the request origin: <origin>/api/lawpay/callback/.
+  LAWPAY_OAUTH_REDIRECT_URI: z.string().optional(),
+  // Gateway/API host. Default https://api.8am.com.
+  LAWPAY_API_BASE: z.string().optional(),
+  // "test" (default) or "live". Which half of a merchant's credentials this
+  // deployment charges with. Anything but the exact string "live" is test.
+  LAWPAY_MODE: z.string().optional(),
 } as const;
 
 type FieldSchemas = typeof fieldSchemas;

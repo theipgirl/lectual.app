@@ -328,6 +328,132 @@ export type Database = {
           },
         ]
       }
+      crm_org_payment_account: {
+        Row: {
+          account_kind: Database["public"]["Enums"]["crm_payment_account_kind"]
+          created_at: string
+          id: string
+          label: string | null
+          org_id: string
+          provider: string
+          provider_account_id: string
+          updated_at: string
+          verified_at: string | null
+        }
+        Insert: {
+          account_kind: Database["public"]["Enums"]["crm_payment_account_kind"]
+          created_at?: string
+          id?: string
+          label?: string | null
+          org_id: string
+          provider: string
+          provider_account_id: string
+          updated_at?: string
+          verified_at?: string | null
+        }
+        Update: {
+          account_kind?: Database["public"]["Enums"]["crm_payment_account_kind"]
+          created_at?: string
+          id?: string
+          label?: string | null
+          org_id?: string
+          provider?: string
+          provider_account_id?: string
+          updated_at?: string
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_org_payment_account_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_org"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_payment: {
+        Row: {
+          account_kind: Database["public"]["Enums"]["crm_payment_account_kind"]
+          amount_cents: number
+          created_at: string
+          currency: string
+          failure_reason: string | null
+          id: string
+          matter_id: string | null
+          occurred_at: string
+          org_id: string
+          provider: string
+          provider_account_id: string | null
+          provider_charge_id: string | null
+          purpose: Database["public"]["Enums"]["crm_payment_purpose"]
+          quote_id: string | null
+          recorded_by: string | null
+          status: Database["public"]["Enums"]["crm_payment_status"]
+          updated_at: string
+        }
+        Insert: {
+          account_kind: Database["public"]["Enums"]["crm_payment_account_kind"]
+          amount_cents: number
+          created_at?: string
+          currency?: string
+          failure_reason?: string | null
+          id?: string
+          matter_id?: string | null
+          occurred_at?: string
+          org_id: string
+          provider: string
+          provider_account_id?: string | null
+          provider_charge_id?: string | null
+          purpose: Database["public"]["Enums"]["crm_payment_purpose"]
+          quote_id?: string | null
+          recorded_by?: string | null
+          status?: Database["public"]["Enums"]["crm_payment_status"]
+          updated_at?: string
+        }
+        Update: {
+          account_kind?: Database["public"]["Enums"]["crm_payment_account_kind"]
+          amount_cents?: number
+          created_at?: string
+          currency?: string
+          failure_reason?: string | null
+          id?: string
+          matter_id?: string | null
+          occurred_at?: string
+          org_id?: string
+          provider?: string
+          provider_account_id?: string | null
+          provider_charge_id?: string | null
+          purpose?: Database["public"]["Enums"]["crm_payment_purpose"]
+          quote_id?: string | null
+          recorded_by?: string | null
+          status?: Database["public"]["Enums"]["crm_payment_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_payment_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_org"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_payment_quote_fk"
+            columns: ["quote_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_quote"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "crm_payment_matter_fk"
+            columns: ["matter_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_matter"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
       crm_quote: {
         Row: {
           accepted_at: string | null
@@ -3083,6 +3209,77 @@ export type Database = {
           },
         ]
       }
+      lawpay_connection: {
+        Row: {
+          access_token_enc: string | null
+          accounts: Json
+          created_at: string
+          created_by: string | null
+          display_hint: string | null
+          expires_at: string | null
+          gateway_credentials_enc: string | null
+          id: string
+          last_error: string | null
+          last_verified_at: string | null
+          merchant_id: string | null
+          merchant_name: string | null
+          mode: string
+          org_id: string
+          refresh_token_enc: string | null
+          scopes: string[]
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          access_token_enc?: string | null
+          accounts?: Json
+          created_at?: string
+          created_by?: string | null
+          display_hint?: string | null
+          expires_at?: string | null
+          gateway_credentials_enc?: string | null
+          id?: string
+          last_error?: string | null
+          last_verified_at?: string | null
+          merchant_id?: string | null
+          merchant_name?: string | null
+          mode?: string
+          org_id: string
+          refresh_token_enc?: string | null
+          scopes?: string[]
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          access_token_enc?: string | null
+          accounts?: Json
+          created_at?: string
+          created_by?: string | null
+          display_hint?: string | null
+          expires_at?: string | null
+          gateway_credentials_enc?: string | null
+          id?: string
+          last_error?: string | null
+          last_verified_at?: string | null
+          merchant_id?: string | null
+          merchant_name?: string | null
+          mode?: string
+          org_id?: string
+          refresh_token_enc?: string | null
+          scopes?: string[]
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lawpay_connection_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_org"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mailbox_connection: {
         Row: {
           access_token_enc: string | null
@@ -3288,6 +3485,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      lawpay_accounts_valid: { Args: { accounts: Json }; Returns: boolean }
       current_org_id: { Args: never; Returns: string }
       current_org_role: { Args: never; Returns: string }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
@@ -3384,6 +3582,9 @@ export type Database = {
         | "discount"
       crm_quote_charge_at: "signing" | "filing" | "not_charged"
       crm_quote_line_selection: "included" | "optional" | "tier_option"
+      crm_payment_purpose: "legal_fee" | "government_fee" | "expense" | "other"
+      crm_payment_account_kind: "trust" | "operating"
+      crm_payment_status: "pending" | "succeeded" | "failed" | "refunded"
       crm_activity_type:
         | "note"
         | "email_sent"
@@ -3407,6 +3608,8 @@ export type Database = {
         // 0056: a start/stop of an internal time entry, so the timeline can
         // say "clock event" without a fabricated note (blueprint §13.1).
         | "time_logged"
+        // 0076: the client proposal page took (or could not confirm) a signing payment.
+        | "quote_payment"
       crm_actor_type: "user" | "system" | "ai" | "automation" | "pathset"
       crm_ai_enrichment_layer: "layer1" | "layer2" | "layer3"
       crm_ai_enrichment_type:
@@ -3658,6 +3861,7 @@ export const Constants = {
         "queue_drafted",
         "queue_resolved",
         "time_logged",
+        "quote_payment",
       ],
       crm_actor_type: ["user", "system", "ai", "automation", "pathset"],
       crm_ai_enrichment_layer: ["layer1", "layer2", "layer3"],

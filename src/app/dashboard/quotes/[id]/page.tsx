@@ -27,6 +27,13 @@ import type { QuoteEventRow, QuoteLineRow } from "@/lib/quotes/types";
 import { QuoteBuilder, type BuilderEvent, type BuilderLine } from "@/components/quotes/QuoteBuilder";
 import { TermsPanel, type TermsReadOnlyView } from "@/components/quotes/QuoteParts";
 import { QuotesRestricted } from "@/components/quotes/QuotesRestricted";
+import { PaymentsPanel, type PanelPayment, type PanelSummary } from "@/components/quotes/PaymentsPanel";
+import { listQuotePayments } from "@/lib/payments/quote-payments";
+import { PURPOSE_LABEL, firmPaymentSummary, type FirmPaymentSummary } from "@/lib/payments/manual";
+import { getLawPayConnection } from "@/lib/payments/lawpay-connection";
+import { listLawPayMappings } from "@/lib/payments/accounts";
+import { lawPayDeploymentMode } from "@/lib/payments/lawpay-config";
+import { formatCents } from "@/lib/quotes/money";
 import "../quotes.css";
 
 export const dynamic = "force-dynamic";
@@ -100,7 +107,7 @@ export default async function QuoteBuilderPage({ params }: { params: Promise<{ i
   // Secondary reads, each best-effort: none is why this page exists, so a
   // failure degrades its own part. The events read says so out loud — "no
   // activity" and "couldn't read activity" differ.
-  const [eventsRead, serviceItems, clients, origin, matter] = await Promise.all([
+  const [eventsRead, serviceItems, clients, origin, matter, paymentsRead, lawpay, mappings] = await Promise.all([
     listQuoteEvents(quote.id).then(
       (events): { events: QuoteEventRow[]; error: boolean } => ({ events, error: false }),
       () => ({ events: [], error: true }),
@@ -109,6 +116,9 @@ export default async function QuoteBuilderPage({ params }: { params: Promise<{ i
     quoteClientLabels([quote]),
     getSiteOrigin(),
     quoteMatterRef(quote.matter_id),
+    listQuotePayments(quote.id),
+    getLawPayConnection(),
+    listLawPayMappings(),
   ]);
   const client = clients.get(quote.id) ?? null;
 
@@ -177,6 +187,29 @@ export default async function QuoteBuilderPage({ params }: { params: Promise<{ i
         matter={matter}
       />
 
+      <PaymentsPanel
+        quoteId={quote.id}
+        currency={quote.currency}
+        summary={paymentSummaryPill(
+          paymentsRead.status === "ok"
+            ? firmPaymentSummary(paymentsRead.payments, snapshot ? toAmount(snapshot.totals?.due_at_signing) : null)
+            : null,
+          quote.currency,
+        )}
+        payments={paymentsRead.status === "ok" ? paymentsRead.payments.map(toPanelPayment) : null}
+        canRecord
+        canReconcile={hasRole(session.role, "senior_admin")}
+        cardNote={
+          !lawpay.ok || mappings.status !== "ok"
+            ? "Couldn't check whether card payments are set up."
+            : lawpay.connection?.status === "active" &&
+                lawpay.connection.mode === lawPayDeploymentMode() &&
+                mappings.rows.some((r) => r.account_kind === "operating")
+              ? `Once signed, the client can pay the amount due at signing by card on their proposal, into your LawPay operating account (${lawpay.connection.mode} mode). USPTO fees are never charged at signing.`
+              : "Card payment isn't set up (Settings → Integrations → LawPay), so the client is told you'll send a way to pay. Record payments by hand here."
+        }
+      />
+
       <TermsPanel
         quoteId={quote.id}
         termsBody={quote.terms_body}
@@ -186,6 +219,39 @@ export default async function QuoteBuilderPage({ params }: { params: Promise<{ i
       />
     </>
   );
+}
+
+function paymentSummaryPill(summary: FirmPaymentSummary | null, currency: string): PanelSummary {
+  if (!summary) return { tone: "mute", text: "Status unknown" };
+  switch (summary.status) {
+    case "not_signed":
+      return { tone: "mute", text: "Not signed yet" };
+    case "nothing_due":
+      return { tone: "mute", text: "Nothing due at signing" };
+    case "unpaid":
+      return { tone: "warn", text: `${formatCents(summary.dueCents, currency)} due at signing` };
+    case "part_paid":
+      return { tone: "warn", text: `${formatCents(summary.receivedCents, currency)} of ${formatCents(summary.dueCents, currency)} received` };
+    case "paid":
+      return { tone: "ok", text: summary.via === "card" ? "Paid by card (authorised)" : "Paid (recorded)" };
+    case "needs_reconciling":
+      return { tone: "risk", text: "Check in LawPay" };
+  }
+}
+
+function toPanelPayment(p: import("@/lib/payments/quote-payments").QuotePayment): PanelPayment {
+  return {
+    id: p.id,
+    when: formatShortFirmDate(p.occurred_at),
+    amountCents: Number(p.amount_cents),
+    currency: p.currency,
+    purposeLabel: PURPOSE_LABEL[p.purpose] ?? p.purpose,
+    provider: p.provider,
+    status: p.status,
+    accountKind: p.account_kind,
+    accountHint: p.provider_account_id ? p.provider_account_id.slice(-4) : null,
+    failureReason: p.status === "failed" ? p.failure_reason : null,
+  };
 }
 
 function toBuilderLine(line: QuoteLineRow): BuilderLine {
