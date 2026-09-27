@@ -11,6 +11,8 @@ import {
   quoteTotals,
   type QuoteLineInput,
 } from "./pricing";
+import { applyClientChoice, isOfferIntact, offeredLines, readClientChoice, type ClientChoice } from "./packages";
+import { openMatterForAcceptedQuote, type MatterOpenResult } from "./accept-matter";
 import { effectiveQuoteStatus } from "./status";
 
 /**
@@ -48,13 +50,23 @@ import { effectiveQuoteStatus } from "./status";
  *
  * ── THE WRITES, ALL OF THEM ─────────────────────────────────────────────────
  *   READING THE PAGE       1. one `viewed` event, deduped to one per window.
- *   TICKING BOXES          2. `crm_quote_line.selected` (two set-based updates)
- *                          3. one `selection_changed` event.
- *   SIGNING                4. one conditional update on `crm_quote` that
- *                             cannot fire twice, and 5. one `accepted` event.
+ *   TICKING BOXES          nothing. The client's pick stays on their page and
+ *                          travels with the signature (packages.ts explains
+ *                          why the rows' `selected` is the firm's offer until
+ *                          then).
+ *   SIGNING                2. one conditional update on `crm_quote` that
+ *                             cannot fire twice, 3. one `accepted` event, and —
+ *                             only for the request that won that update —
+ *                          4. one set-based update writing the client's choice
+ *                             back to `crm_quote_line.selected`, and
+ *                          5. the matter auto-open in `accept-matter.ts`: at most
+ *                             one `crm_matter`, the `crm_quote.matter_id` link,
+ *                             one `crm_quote_event` and one `crm_activity` row.
  *   DECLINING              6. one conditional update on `crm_quote`, and
  *                          7. one `declined` event.
- * Nothing else. No delete, no write to any other table.
+ * Nothing else. Every one of them is fenced by the id and org_id read off the
+ * token's own row. The one delete is accept-matter.ts removing a matter IT
+ * created a moment earlier when the link to the quote loses a race.
  *
  * ── lectual.app PORT ────────────────────────────────────────────────────────
  * From `lectual` (branch claude/lectual-firm-dashboard-prd-f3loev), minus what
@@ -100,6 +112,7 @@ export interface PublicDbQuery<T = unknown> extends PromiseLike<PublicDbResult<T
   insert(rows: unknown): PublicDbQuery<T>;
   eq(column: string, value: unknown): PublicDbQuery<T>;
   in(column: string, values: readonly unknown[]): PublicDbQuery<T>;
+  delete(): PublicDbQuery<T>;
   is(column: string, value: null): PublicDbQuery<T>;
   or(filter: string): PublicDbQuery<T>;
   order(column: string, options?: { ascending?: boolean }): PublicDbQuery<T>;
@@ -283,6 +296,14 @@ export type PublicQuoteHandle = {
   expiresAt: string | null;
   acceptedAt: string | null;
   currency: string;
+  /**
+   * `isOfferIntact` over EVERY line the quote has, withheld ones included — the
+   * one fact about the withheld lines the accept path needs, computed here so
+   * the lines themselves never leave this module. False means the client must
+   * not sign what they can see (packages exist and none is offered, or a line
+   * this build cannot place).
+   */
+  offerIntact: boolean;
 };
 
 export type PublicQuoteRead =
@@ -399,7 +420,13 @@ export async function readPublicQuote(
 
     if (linesResult.error && !isNoRowsError(linesResult.error)) return { status: "unavailable" };
     if (orgResult.error && !isNoRowsError(orgResult.error)) return { status: "unavailable" };
-    const lines = normalizeLines(linesResult.data);
+    const allLines = normalizeLines(linesResult.data);
+    // THE OFFER, NOT THE WORKSHEET. A package or add-on the firm switched off
+    // is not part of what this client was sent, so it is not in the payload —
+    // not hidden by the page, absent from it (packages.ts). The fingerprint
+    // below is over this same set, so switching something on or off while the
+    // client reads refuses their signature exactly as a re-price does.
+    const lines = offeredLines(allLines);
 
     const firmName = readString((orgResult.data as Record<string, unknown> | null)?.name);
     if (!firmName) {
@@ -437,6 +464,7 @@ export async function readPublicQuote(
         expiresAt,
         acceptedAt: view.acceptedAt,
         currency: view.currency,
+        offerIntact: isOfferIntact(allLines),
       },
     };
   } catch {
@@ -528,10 +556,12 @@ function normalizeLines(data: unknown): PublicQuoteLine[] {
  * single amount), its `selection` and `tier_group` (whether it is a choice at
  * all, and which choice), and the two numbers that multiply into its amount.
  *
- * NOT `selected`: the client's own ticking changes it constantly, and their
- * choice travels separately as `selectedLineIds` and is validated on its own
- * terms. A fingerprint that moved when the client ticked a box would refuse
- * every acceptance that involved a choice.
+ * NOT `selected`, and it does not need to be. The lines digested are the
+ * OFFER (`offeredLines`), so switching a package or add-on on or off adds or
+ * removes lines from the set and moves the digest by itself; and the client's
+ * own pick travels separately (`AcceptInput.choice`) and is validated on its
+ * own terms. A fingerprint that moved when the client ticked a box would
+ * refuse every acceptance that involved a choice.
  *
  * NOT `label`, `description` or `sort_index`: fixing a typo or reordering the
  * list changes nothing about what is owed, and refusing a signature over it
@@ -687,9 +717,11 @@ export type QuoteAcceptedSnapshot = {
     terms_body: string | null;
     expires_at: string | null;
   };
-  /** EVERY line, not just the selected ones — the record has to show what was
-   * offered as well as what was chosen, or a declined add-on becomes invisible
-   * and the quote reads as though it was never on the table. */
+  /** EVERY OFFERED line, not just the selected ones — the record has to show
+   * what was offered as well as what was chosen, or a declined add-on (or the
+   * package not taken) becomes invisible and reads as though it was never on
+   * the table. `selected` here is the CLIENT's choice. Lines the firm withheld
+   * were never offered and are not in the record. */
   lines: QuoteAcceptedSnapshotLine[];
   totals: {
     due_at_signing: number;
@@ -889,189 +921,47 @@ export async function recordQuoteViewed(
   }
 }
 
-/* ─────────────────────────── selection (§4.2) ───────────────────────────── */
-
-export type SelectionRefusal =
-  /** The quote is not `sent`, or has expired. */
-  | "not_live"
-  /** An id that is not one of this quote's own selectable lines. REJECTED, not
-   *  filtered out — see `applySelection`. */
-  | "unknown_line"
-  /** Two options ticked in one mutually-exclusive package group. */
-  | "invalid_tier"
-  | "not_found"
-  | "unconfigured"
-  | "unavailable";
-
-export type SelectionResult =
-  | { ok: true; lines: PublicQuoteLine[] }
-  | { ok: false; reason: SelectionRefusal };
+/* ─────────────────────────── the client's choice ────────────────────────── */
 
 /**
- * Which of a quote's lines the client is allowed to toggle at all.
- * `included` lines are always in the total and cannot be deselected (§4.2, and
- * `crm_quote_line_included_selected` enforces it in the database) — so they are
- * not merely ignored here, they are not part of the addressable set, and naming
- * one in a selection is as invalid as naming another quote's line.
- */
-function isSelectable(line: PublicQuoteLine): boolean {
-  return line.selection === "optional" || line.selection === "tier_option";
-}
-
-/**
- * Validate a client-submitted selection against THIS quote's own lines.
+ * ── THE CLIENT'S PICK IS NOT WRITTEN WHILE THEY READ ────────────────────────
+ * The ported engine persisted every tick (`applyPublicSelection`): two updates
+ * and a `selection_changed` event per click, from an unauthenticated endpoint.
+ * In this app `crm_quote_line.selected` is the FIRM's offer until signature
+ * (packages.ts), so a client ticking a box cannot be allowed to write it — and
+ * nothing else needs the half-made choice. The pick lives on the client's page
+ * and arrives once, with the signature, where `applyClientChoice` validates it
+ * against the offer they were shown and it is frozen into the snapshot.
  *
- * Pure, exported, and separately tested, because it is the entire input
- * validation for one of the three writes an anonymous caller can cause.
- *
- * An unrecognised id is REJECTED rather than dropped. Dropping it would mean a
- * client whose form posted a stale id — because the firm edited the quote while
- * they had it open — silently gets a different selection than the one they
- * ticked, and then signs it. A refusal makes them reload and look.
+ * That removed two anonymous writes and the refusal paths that existed only to
+ * keep them safe. The firm's timeline still records the opening (`viewed`) and
+ * the signature (`accepted`, which names the package taken).
  */
-export function validateSelection(
-  lines: readonly PublicQuoteLine[],
-  requestedIds: readonly string[],
-): { ok: true; select: string[]; deselect: string[] } | { ok: false; reason: SelectionRefusal } {
-  const selectable = new Map(lines.filter(isSelectable).map((line) => [line.id, line]));
-  const requested = new Set<string>();
 
-  for (const id of requestedIds) {
-    if (typeof id !== "string" || !selectable.has(id)) return { ok: false, reason: "unknown_line" };
-    requested.add(id);
-  }
-
-  // At most one option per package group. Zero is fine — the client has not
-  // chosen yet, and `quoteReadiness` is what blocks the accept button for that.
-  const perGroup = new Map<string, number>();
-  for (const id of requested) {
-    const line = selectable.get(id);
-    if (!line || line.selection !== "tier_option") continue;
-    const group = (line.tier_group ?? "").trim();
-    if (!group) return { ok: false, reason: "invalid_tier" };
-    const count = (perGroup.get(group) ?? 0) + 1;
-    if (count > 1) return { ok: false, reason: "invalid_tier" };
-    perGroup.set(group, count);
-  }
-
-  const select: string[] = [];
-  const deselect: string[] = [];
-  for (const line of selectable.values()) {
-    (requested.has(line.id) ? select : deselect).push(line.id);
-  }
-  return { ok: true, select, deselect };
-}
-
-/** Whether the validated selection is already exactly what the rows say. */
-function isUnchangedSelection(
-  lines: readonly PublicQuoteLine[],
-  select: readonly string[],
-): boolean {
-  const current = lines.filter((line) => isSelectable(line) && line.selected).map((l) => l.id);
-  if (current.length !== select.length) return false;
-  const wanted = new Set(select);
-  return current.every((id) => wanted.has(id));
-}
-
-/**
- * Persist a client's package/add-on choice.
- *
- * Resolves the quote from the TOKEN, never from an id the caller sent. A
- * `"use server"` function is its own POST entry point — it never renders a
- * layout and never inherits a page's checks — so everything this needs is
- * derived here, from the one credential the client legitimately holds.
- */
-export async function applyPublicSelection(
-  token: string,
-  requestedIds: readonly string[],
-  now: Date,
-  db?: PublicQuotesDb,
-): Promise<SelectionResult> {
-  const read = await readPublicQuote(token, now, db);
-  if (read.status !== "ok") return { ok: false, reason: read.status };
-  if (read.view.status !== "sent") return { ok: false, reason: "not_live" };
-
-  const validated = validateSelection(read.view.lines, requestedIds);
-  if (!validated.ok) return { ok: false, reason: validated.reason };
-
-  // A selection identical to the stored one writes NOTHING — no update, no
-  // event. Two reasons, and both are about this being an unauthenticated write
-  // endpoint. It is an amplification target: a loop re-posting the same
-  // selection would otherwise append a `crm_quote_event` row per request, in a
-  // table with an append-only trigger and no way to prune. And a
-  // `selection_changed` row where nothing changed is worse audit data than no
-  // row — the firm reads that timeline to see the client deliberating.
-  if (isUnchangedSelection(read.view.lines, validated.select)) {
-    return { ok: true, lines: read.view.lines };
-  }
-
-  try {
-    const client = publicQuotesDb(db);
-    const { quoteId, orgId } = read.handle;
-
-    // Two set-based updates rather than one per line: fewer round trips, and
-    // every predicate re-states the quote and org so a row outside this quote
-    // cannot be reached even if an id slipped past validation above.
-    if (validated.select.length > 0) {
-      const { error } = await client
-        .from("crm_quote_line")
-        .update({ selected: true })
-        .eq("quote_id", quoteId)
-        .eq("org_id", orgId)
-        .in("id", validated.select);
-      if (error) return { ok: false, reason: "unavailable" };
-    }
-    if (validated.deselect.length > 0) {
-      const { error } = await client
-        .from("crm_quote_line")
-        .update({ selected: false })
-        .eq("quote_id", quoteId)
-        .eq("org_id", orgId)
-        .in("id", validated.deselect);
-      if (error) return { ok: false, reason: "unavailable" };
-    }
-
-    // The payload holds ids of the firm's own rows — server-derived, never the
-    // caller's text.
-    //
-    // The selection itself is already written; this event is its shadow, so a
-    // failure here does not fail the call. It IS read, though: PostgREST
-    // resolves with `error` rather than throwing, so an unchecked insert is an
-    // audit row that goes missing without a line anywhere saying so.
-    const { error: eventError } = await client.from("crm_quote_event").insert({
-      org_id: orgId,
-      quote_id: quoteId,
-      type: "selection_changed",
-      actor: "client",
-      payload: { selected_line_ids: validated.select },
-    });
-    if (eventError) {
-      console.error(`[quotes] failed to record selection_changed quote=${quoteId}`, eventError);
-    }
-
-    const lines = read.view.lines.map((line) =>
-      isSelectable(line) ? { ...line, selected: validated.select.includes(line.id) } : line,
-    );
-    return { ok: true, lines };
-  } catch {
-    return { ok: false, reason: "unavailable" };
-  }
+/** Every `ChoiceRefusal` surfaces as `unknown_line`: the page's answer to both
+ * is the same — "this proposal changed while you had it open, reload". */
+function choiceRefusalReason(): "unknown_line" {
+  return "unknown_line";
 }
 
 /* ─────────────────────────── acceptance (§6.5) ──────────────────────────── */
 
 export type AcceptRefusal =
   | "not_live"
-  /** `quoteReadiness` says no — an unchosen package, or a data problem. */
+  /** `quoteReadiness` says no — an unchosen package, or a data problem — or the
+   *  offer itself is not signable (`PublicQuoteHandle.offerIntact`). */
   | "not_ready"
   | "invalid_name"
   | "invalid_email"
+  /** A package or add-on the client named is not in the offer they can see now
+   *  — renamed, switched off or removed while their page was open. */
   | "unknown_line"
   /** THE FIGURES MOVED. The lines the client read are not the lines the firm
-   *  now has — a line was re-priced, re-scheduled, or added — so this signature
-   *  would be a signature over a document nobody put in front of them. Sibling
-   *  to `unknown_line`, which catches the same interference when it shows up as
-   *  an id that no longer exists rather than as an amount that changed. */
+   *  now offers — a line was re-priced, re-scheduled, added, or a package or
+   *  add-on switched on or off — so this signature would be a signature over a
+   *  document nobody put in front of them. Sibling to `unknown_line`, which
+   *  catches the same interference when it shows up as a choice that no longer
+   *  exists rather than as an amount that changed. */
   | "quote_changed"
   /** THE TERMS MOVED. Same interference, the other half of the document: the
    *  engagement letter the client read is not the one the firm now has. Kept
@@ -1079,7 +969,6 @@ export type AcceptRefusal =
    *  re-read — being sent back to check the amounts when it was a fee clause
    *  that changed is how a client re-signs without noticing. */
   | "terms_changed"
-  | "invalid_tier"
   /** THE RACE. Somebody — another tab, a double-submit, a second reader of the
    *  same forwarded email — accepted first, and the conditional update matched
    *  zero rows. Not an error: the quote IS accepted, just not by this request. */
@@ -1089,22 +978,24 @@ export type AcceptRefusal =
   | "unavailable";
 
 export type AcceptResult =
-  | { ok: true; acceptedAt: string; snapshot: QuoteAcceptedSnapshot }
+  | { ok: true; acceptedAt: string; snapshot: QuoteAcceptedSnapshot; matter: MatterOpenResult }
   | { ok: false; reason: AcceptRefusal; message?: string };
 
 export type AcceptInput = {
   token: string;
   name: string;
-  email: string;
-  /** The selection as the client last saw it. Applied and validated before the
-   * snapshot is frozen, so the choices that are signed are the choices that
-   * were ticked. */
-  selectedLineIds?: readonly string[];
+  /** Optional. The design signs with a typed name alone; an address, when one
+   * is given, is shape-checked and kept with the signing record. */
+  email?: string | null;
+  /** The package and add-ons as the client last saw them. Validated against
+   * the offer before anything is written, so the choices that are signed are
+   * the choices that were made. Absent means nothing chosen. */
+  choice?: ClientChoice;
   /**
    * `PublicQuoteView.linesFingerprint` from the render the client signed on —
    * the other half of "what is signed is what was on screen", and the half that
-   * covers the PRICES AND THE ENGAGEMENT TERMS rather than the choices. (The
-   * field name predates the terms joining the digest; see
+   * covers the PRICES, THE OFFER AND THE ENGAGEMENT TERMS rather than the
+   * choices. (The field name predates the terms joining the digest; see
    * `quoteAgreementFingerprint` for what it actually covers.)
    *
    * Required, with no "absent means skip the check" branch, because absent is
@@ -1121,7 +1012,7 @@ export type AcceptInput = {
 
 /** A typed signature has to be a name someone could have typed. Bounds only —
  * this is not a place to be clever about what a person's name may contain. */
-function normalizeSignatureName(value: unknown): string | null {
+export function normalizeSignatureName(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const name = value.trim().replace(/\s+/g, " ");
   return name.length >= 2 && name.length <= 200 ? name : null;
@@ -1201,24 +1092,34 @@ function truncateUserAgent(value: string | null | undefined): string | null {
  * ── WHAT IS SIGNED IS WHAT WAS ON SCREEN ────────────────────────────────────
  * The race above is about two clients. This is about the FIRM: a staff member
  * editing the quote while the client has it open. Both halves of the document
- * are checked against what the client actually read — the ids they ticked, via
- * `validateSelection`, and the amounts AND ENGAGEMENT TERMS they were shown,
- * via `quoteAgreementFingerprint`. Ids alone were not enough: a re-priced line
- * keeps its id, so before the fingerprint existed the whole stale-quote guard
- * was silent about the one change that alters what the client owes — and the
- * terms, once the engagement letter started riding this signature, were that
- * same hole again for the wording rather than for the money.
+ * are checked against what the client actually read — the package and add-ons
+ * they picked, via `applyClientChoice` against the CURRENT offer, and the
+ * amounts, the offer AND the engagement terms they were shown, via
+ * `quoteAgreementFingerprint`. A re-priced line keeps its id and a withheld
+ * package keeps its name in the client's page, so the ids alone were never
+ * enough.
  *
- * ── ORDERING: STATE FIRST, THEN THE EVENT ───────────────────────────────────
+ * NOTHING IS WRITTEN BEFORE THE CONDITIONAL UPDATE. Every refusal — a bad
+ * name, a stale choice, moved figures, an unchosen package — is decided from
+ * one read and the submission, and leaves the rows exactly as it found them.
+ * What this does NOT do is make the fingerprint check atomic with the update:
+ * the amounts live on `crm_quote_line`, so an edit landing between the read and
+ * the statement is still possible, and closing that would mean putting the
+ * amounts into the update's own predicate — a schema change, and separate
+ * work. This shuts the window that is minutes wide: the one a client actually
+ * sits in, reading a proposal and typing their name.
+ *
+ * ── ORDERING: STATE FIRST, THEN THE EVENT, THEN THE FOLLOW-ONS ──────────────
  * `store.ts` writes the event BEFORE a lifecycle transition, deliberately, so a
  * crash leaves an audit row with no state change rather than a silent state
  * change. This function inverts that, and the inversion is the point: until the
  * conditional update returns, nobody knows whether THIS request is the one that
  * accepted. An `accepted` event written first would record an acceptance that
  * the loser of the race never performed — a false entry in the audit trail is
- * worse than a missing one. The event write is therefore swallowed: the
- * acceptance is already durable, and telling a client their signature failed
- * when it did not is the one outcome worse than a missing log line.
+ * worse than a missing one. The event, the choice write-back and the matter
+ * auto-open all run only in the winner, and all are swallowed: the acceptance
+ * is already durable, and telling a client their signature failed when it did
+ * not is the one outcome worse than a missing log line.
  */
 export async function acceptPublicQuote(
   input: AcceptInput,
@@ -1227,17 +1128,12 @@ export async function acceptPublicQuote(
 ): Promise<AcceptResult> {
   const name = normalizeSignatureName(input.name);
   if (!name) return { ok: false, reason: "invalid_name", message: "Type your full name to sign." };
-  const email = normalizeSignatureEmail(input.email);
-  if (!email) {
-    return { ok: false, reason: "invalid_email", message: "Enter an email we can send a copy to." };
+  const rawEmail = typeof input.email === "string" ? input.email.trim() : "";
+  const email = rawEmail ? normalizeSignatureEmail(rawEmail) : null;
+  if (rawEmail && !email) {
+    return { ok: false, reason: "invalid_email", message: "That email address doesn't look complete." };
   }
 
-  // LIVENESS IS CHECKED BEFORE THE SELECTION IS TOUCHED, and the order is not
-  // cosmetic. A double-submit against an already-accepted quote must come back
-  // `already_resolved` — the page turns that into the receipt — and if the
-  // selection write ran first it would refuse with its own, blunter
-  // `not_live`, which reads to the client as "reload and try again" on a quote
-  // they have in fact already signed.
   const read = await readPublicQuote(input.token, now, db);
   if (read.status !== "ok") return { ok: false, reason: read.status };
   if (read.view.status !== "sent") {
@@ -1245,84 +1141,30 @@ export async function acceptPublicQuote(
       ? { ok: false, reason: "already_resolved" }
       : { ok: false, reason: "not_live" };
   }
-
-  // ── NO REFUSAL IS DECIDED AFTER A WRITE IT COULD HAVE BEEN DECIDED BEFORE ─
-  // The submitted selection is validated and PROJECTED IN MEMORY first, and
-  // readiness is judged against that projection, so every refusal available
-  // from the client's own submission leaves the stored rows exactly as it found
-  // them.
-  //
-  // It is NOT true that nothing durable is written before any refusal, and the
-  // heading here used to say so. `applyPublicSelection` below commits the
-  // client's ticking, and two refusals follow it: its own failure, and the
-  // second fingerprint comparison that catches a re-price landing mid-
-  // acceptance. What survives such a refusal is the client's OWN selection,
-  // saved exactly as the background `saveSelectionAction` would have saved it
-  // while they were still reading — no signature, no snapshot, no acceptance,
-  // and nothing the firm did not already see them choose. That is the write
-  // order this section is actually defending, and the reason it matters is
-  // below: it was once the other way round, and a bare POST could strip a
-  // client's package while reporting an error.
-  //
-  // This ordering is a fix, not a preference. The selection used to be written
-  // before `quoteReadiness` ran, with no transaction and nothing to roll it
-  // back, so `accept({ selectedLineIds: [] })` — a bare POST at a `"use server"`
-  // action, which never renders a page and never sees the form — cleared the
-  // package the client had chosen and THEN returned "Choose a package." Anyone
-  // holding the forwarded link could strip a client's selection while the call
-  // reported an error, and the comment here claimed the opposite.
-  let lines = read.view.lines;
-  if (input.selectedLineIds) {
-    const validated = validateSelection(read.view.lines, input.selectedLineIds);
-    // Every SelectionRefusal is also an AcceptRefusal, so the reason survives
-    // to the page verbatim rather than being flattened into "something failed".
-    if (!validated.ok) return { ok: false, reason: validated.reason };
-    lines = read.view.lines.map((line) =>
-      isSelectable(line) ? { ...line, selected: validated.select.includes(line.id) } : line,
-    );
+  if (!read.handle.offerIntact) {
+    return {
+      ok: false,
+      reason: "not_ready",
+      message: "This proposal isn't ready to sign yet. Contact the firm that sent it.",
+    };
   }
 
-  // ── AND THE FIGURES MUST STILL BE THE FIGURES THE CLIENT READ ─────────────
-  // Validating the selection catches a line that was DELETED while the client
-  // had the page open, because its id stops resolving. It is blind to one that
-  // was RE-PRICED, because the id is the same id — so a client who read "Due
-  // today $2,500.00" could sign, be refused nothing, and have $4,750.00 frozen
-  // into `accepted_snapshot` as the amount they had agreed to. That is the one
-  // failure §5 exists to make impossible: a frozen legal record is only worth
-  // freezing if it records what somebody actually saw.
-  //
-  // So the page sends back the fingerprint it rendered with and this recomputes
-  // it from the read above — a fresh read of the firm's CURRENT lines, made
-  // inside this request. Equal means the offer on screen is still the offer;
-  // different means it is not, and the signature is refused rather than
-  // silently applied to the new price.
-  //
-  // It sits after `validateSelection` so the more specific refusal keeps
-  // winning: a line deleted out from under the client still reports
-  // `unknown_line`, and only interference that the ids could not reveal reaches
-  // here. And it sits before every write below, so a stale quote is refused
-  // without leaving anything behind — see the block above.
-  //
-  // What this does NOT do is make the check atomic with the update. The
-  // conditional update guards the QUOTE row (status, expiry, one acceptance);
-  // the amounts live on `crm_quote_line`, so an edit landing between this
-  // comparison and that statement is still possible, and closing that would
-  // mean putting the amounts into the update's own predicate — a schema change,
-  // and separate work. This shuts the window that is minutes wide: the one a
-  // client actually sits in, reading a proposal and typing their name.
-  //
-  // AND IT COVERS THE ENGAGEMENT TERMS, not only the figures. `terms_body` is
-  // the fee agreement the client is signing (0068), and it is frozen into the
-  // snapshot alongside the amounts — so leaving it out of this comparison left
-  // exactly the same hole for the LEGAL half of the document that the amounts
-  // had for the money half: staff rewrite the terms, every line id still
-  // resolves, every figure still matches, and the signature lands on wording
-  // the client never saw. The two halves are reported separately because the
-  // client has to be told which one to go back and read.
-  const drift = fingerprintDrift(input.linesFingerprint, quoteAgreementFingerprint({
-    lines,
-    termsBody: read.view.termsBody,
-  }));
+  // The pick first, so a package that vanished from under the client says so
+  // (`unknown_line`) rather than the blunter "the figures changed".
+  const projected = applyClientChoice(read.view.lines, readClientChoice(input.choice));
+  if (!projected.ok) return { ok: false, reason: choiceRefusalReason() };
+  const lines = projected.lines;
+
+  // AND THE FIGURES MUST STILL BE THE FIGURES THE CLIENT READ. The page sends
+  // back the fingerprint it rendered with; this recomputes it from the read
+  // above — the firm's CURRENT offer. Equal means the offer on screen is still
+  // the offer; different means it is not, and the signature is refused rather
+  // than applied to the new price. The terms are compared too, separately, so
+  // the client is told which half to go back and read.
+  const drift = fingerprintDrift(
+    input.linesFingerprint,
+    quoteAgreementFingerprint({ lines: read.view.lines, termsBody: read.view.termsBody }),
+  );
   if (drift.lines) return { ok: false, reason: "quote_changed" };
   if (drift.terms) return { ok: false, reason: "terms_changed" };
 
@@ -1331,51 +1173,13 @@ export async function acceptPublicQuote(
     return { ok: false, reason: "not_ready", message: readiness.message };
   }
 
-  // Only now persist it, so the snapshot freezes what the client was looking at
-  // rather than what the database happened to hold. Any refusal here still
-  // refuses the whole acceptance — a signature over a selection we could not
-  // save is a signature over something else.
-  //
-  // AND THEN CHECK THE PRICES AGAIN, because `applyPublicSelection` performs its
-  // OWN read: the rows it hands back are not the rows fingerprinted above, they
-  // are whatever the table held a moment later. A comment here used to claim the
-  // opposite ("the updated lines come back from that call rather than being
-  // re-read"), and that claim was the whole of the residual bug — a re-price
-  // landing between the comparison above and that read was accepted and frozen
-  // at the new amount, which is the original defect again in a narrower window.
-  //
-  // Re-comparing is sound precisely because the digest excludes `selected`: the
-  // only thing this call is supposed to have changed is the client's own ticking,
-  // so a digest that still matches proves nothing about the MONEY moved, while a
-  // digest that differs means a real edit landed mid-acceptance.
-  if (input.selectedLineIds) {
-    const applied = await applyPublicSelection(input.token, input.selectedLineIds, now, db);
-    if (!applied.ok) return { ok: false, reason: applied.reason };
-    //
-    // `termsBody` is carried through from the read above rather than re-read,
-    // and the asymmetry is deliberate: the SNAPSHOT's terms also come from that
-    // read, so what gets frozen is the wording the client's fingerprint already
-    // matched. There is no window here for the lines' problem to recur — the
-    // lines have to be re-checked because `applyPublicSelection` re-read THEM
-    // and the snapshot is built from what it returned. Re-reading the terms
-    // here would compare the snapshot's own value against a newer one and
-    // refuse a signature over wording the client did read.
-    if (
-      quoteAgreementFingerprint({ lines: applied.lines, termsBody: read.view.termsBody }) !==
-      input.linesFingerprint
-    ) {
-      return { ok: false, reason: "quote_changed" };
-    }
-    lines = applied.lines;
-  }
-
   const acceptedAt = now.toISOString();
   const snapshot = buildAcceptedSnapshot({
     view: read.view,
     lines,
     acceptedAt,
     name,
-    email,
+    email: email ?? "",
   });
 
   try {
@@ -1418,6 +1222,9 @@ export async function acceptPublicQuote(
       return { ok: false, reason: "already_resolved" };
     }
 
+    const packageName =
+      (lines.find((line) => line.selection === "tier_option" && line.selected)?.tier_group ?? "").trim() || null;
+
     try {
       // Read, not just awaited: PostgREST answers a refused insert with `error`
       // set instead of throwing, so the `catch` below never saw the ordinary
@@ -1431,6 +1238,7 @@ export async function acceptPublicQuote(
         actor: "client",
         payload: {
           accepted_at: acceptedAt,
+          package: packageName,
           due_at_signing_cents: snapshot.totals.due_at_signing,
           due_at_filing_cents: snapshot.totals.due_at_filing,
         },
@@ -1444,11 +1252,39 @@ export async function acceptPublicQuote(
       console.error(`[quotes] failed to record accepted event quote=${quoteId}`, err);
     }
 
-    return { ok: true, acceptedAt, snapshot };
+    // THE ROWS NOW SAY WHAT THE CLIENT TOOK. Until this instant `selected` on a
+    // package or add-on line was the firm's offer; the offered lines the client
+    // did not take are switched off, so the rows agree with the snapshot (and
+    // with 0068's own description of the column). Withheld lines are already
+    // off, and nothing else is touched. The snapshot, not this, is the record:
+    // a failure here is logged and the acceptance stands.
+    const notTaken = lines
+      .filter((line) => (line.selection === "tier_option" || line.selection === "optional") && !line.selected)
+      .map((line) => line.id);
+    if (notTaken.length > 0) {
+      try {
+        const { error: rowError } = await client
+          .from("crm_quote_line")
+          .update({ selected: false, updated_at: acceptedAt })
+          .eq("quote_id", quoteId)
+          .eq("org_id", orgId)
+          .in("id", notTaken);
+        if (rowError) console.error(`[quotes] failed to record the client's choice on the lines quote=${quoteId}`, rowError);
+      } catch (err) {
+        console.error(`[quotes] failed to record the client's choice on the lines quote=${quoteId}`, err);
+      }
+    }
+
+    // "Matter opens automatically" — best-effort, idempotent, and unable to
+    // undo anything above (accept-matter.ts never throws).
+    const matter = await openMatterForAcceptedQuote(client, { quoteId, orgId }, { packageName, now });
+
+    return { ok: true, acceptedAt, snapshot, matter };
   } catch {
     return { ok: false, reason: "unavailable" };
   }
 }
+
 
 /* ─────────────────────────── declining ──────────────────────────────────── */
 

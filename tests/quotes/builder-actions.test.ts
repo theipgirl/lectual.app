@@ -18,9 +18,15 @@ const db = vi.hoisted(() => ({
   role: "owner" as string | null,
   /** What `crm_quote ... maybeSingle()` hands back to the editability read. */
   quoteRow: null as Record<string, unknown> | null,
-  /** What the UPDATE resolves to. `data: []` is PostgREST reporting that the
-   * conditional update matched NOTHING — the race this suite is about. */
+  /** What the crm_quote UPDATE resolves to. `data: []` is PostgREST reporting
+   * that the conditional update matched NOTHING — the race this suite is about. */
   updateResult: { data: [] as unknown, error: null as unknown },
+  /** What a list read of `crm_quote_line` returns (the offer). */
+  lines: [] as Record<string, unknown>[],
+  /** What `crm_quote_line ... maybeSingle()` returns (one line by id). */
+  lineRow: null as Record<string, unknown> | null,
+  /** What `crm_service_item ... maybeSingle()` returns. */
+  serviceItem: null as Record<string, unknown> | null,
   ops: [] as Op[],
 }));
 
@@ -50,13 +56,31 @@ function makeQuery(table: string): Record<string, unknown> {
   q.in = () => q;
   q.order = () => q;
   q.limit = () => q;
-  q.single = async () => ({ data: null, error: null });
+  q.single = async () => ({
+    data: op.verb === "insert" ? { id: "new-line", ...(op.payload as Record<string, unknown>) } : null,
+    error: null,
+  });
   q.maybeSingle = async () => ({
-    data: table === "crm_quote" && op.verb === "select" ? db.quoteRow : null,
+    data:
+      op.verb !== "select"
+        ? null
+        : table === "crm_quote"
+          ? db.quoteRow
+          : table === "crm_quote_line"
+            ? db.lineRow
+            : table === "crm_service_item"
+              ? db.serviceItem
+              : null,
     error: null,
   });
   q.then = (onFulfilled: (v: unknown) => unknown) =>
-    Promise.resolve(op.verb === "update" ? db.updateResult : { data: [], error: null }).then(onFulfilled);
+    Promise.resolve(
+      op.verb === "update" && table === "crm_quote"
+        ? db.updateResult
+        : op.verb === "select" && table === "crm_quote_line"
+          ? { data: db.lines, error: null }
+          : { data: [], error: null },
+    ).then(onFulfilled);
   return q;
 }
 
@@ -65,6 +89,9 @@ function reset() {
   db.role = "owner";
   db.quoteRow = { id: "q-1", org_id: "org-1", status: "sent", expires_at: null };
   db.updateResult = { data: [], error: null };
+  db.lines = [];
+  db.lineRow = null;
+  db.serviceItem = null;
   db.ops = [];
   vi.doMock("@/lib/db/scoped-client", () => ({
     getScopedClient: vi.fn(async () => ({
@@ -170,11 +197,16 @@ describe("every builder action re-checks attorney+ as its own POST endpoint", ()
 
   const calls: Array<[string, Record<string, string>]> = [
     ["updateDetailsAction", { quoteId: "q-1", title: "T" }],
-    ["addLineAction", { quoteId: "q-1", kind: "legal_fee", chargeAt: "signing", label: "L", amount: "10" }],
-    ["updateLineAction", { quoteId: "q-1", lineId: "l-1", kind: "legal_fee", chargeAt: "signing", label: "L", quantity: "1", amount: "10" }],
+    ["addLineAction", { quoteId: "q-1", kind: "legal_fee", label: "L", amount: "10", placement: "package", packageName: "P" }],
+    ["editLineAction", { quoteId: "q-1", lineId: "l-1", kind: "legal_fee", label: "L", amount: "10" }],
+    ["setChargeAtAction", { quoteId: "q-1", lineId: "l-1", chargeAt: "filing" }],
     ["deleteLineAction", { quoteId: "q-1", lineId: "l-1" }],
-    ["moveLineAction", { quoteId: "q-1", lineId: "l-1", direction: "up" }],
-    ["applyServiceItemAction", { quoteId: "q-1", serviceItemId: "s-1" }],
+    ["applyServiceItemAction", { quoteId: "q-1", serviceItemId: "s-1", placement: "add_on" }],
+    ["setPackageOfferedAction", { quoteId: "q-1", packageName: "P", offered: "false" }],
+    ["setAddOnOfferedAction", { quoteId: "q-1", lineId: "l-1", offered: "true" }],
+    ["renamePackageAction", { quoteId: "q-1", packageName: "P", newName: "Q" }],
+    ["duplicatePackageAction", { quoteId: "q-1", packageName: "P", newName: "Q" }],
+    ["deletePackageAction", { quoteId: "q-1", packageName: "P" }],
     ["sendQuoteAction", { quoteId: "q-1" }],
     ["withdrawQuoteAction", { quoteId: "q-1" }],
     ["saveTermsAction", { quoteId: "q-1", termsBody: "x" }],
@@ -210,5 +242,186 @@ describe("createQuoteAction re-checks the gate too", () => {
     const state = await createQuoteAction({}, form({ title: "T" }));
     expect(state.error).toContain("attorneys");
     expect(tableOps()).toHaveLength(0);
+  });
+});
+
+/* ── packages and add-ons (packages.ts's mapping, through the store) ──────── */
+
+const pkgLine = (id: string, pkg: string, selected: boolean, over: Record<string, unknown> = {}) => ({
+  id,
+  selection: "tier_option",
+  tier_group: pkg,
+  selected,
+  kind: "legal_fee",
+  charge_at: "signing",
+  quantity: 1,
+  unit_amount_cents: 100_000,
+  label: id,
+  ...over,
+});
+const lineWrites = () => db.ops.filter((op) => op.table === "crm_quote_line" && op.verb !== "select");
+
+describe("a package's offer switch", () => {
+  beforeEach(reset);
+
+  it("refuses to withhold the last offered package, and writes nothing", async () => {
+    db.lines = [pkgLine("a1", "Full", true), pkgLine("b1", "Filing only", false)];
+    const state = await (await actions()).setPackageOfferedAction({}, form({ quoteId: "q-1", packageName: "Full", offered: "false" }));
+    expect(state.error).toBe("At least one package has to be offered.");
+    expect(lineWrites()).toHaveLength(0);
+  });
+
+  it("switches every line of the package at once, fenced on the quote AND the package", async () => {
+    db.lines = [pkgLine("a1", "Full", true), pkgLine("a2", "Full", true), pkgLine("b1", "Filing only", true)];
+    const state = await (await actions()).setPackageOfferedAction({}, form({ quoteId: "q-1", packageName: "Full", offered: "false" }));
+    expect(state.error).toBeUndefined();
+    const [write] = lineWrites();
+    expect(write.verb).toBe("update");
+    expect(write.payload).toMatchObject({ selected: false });
+    expect(write.filters).toEqual(
+      expect.arrayContaining([
+        ["quote_id", "q-1"],
+        ["selection", "tier_option"],
+        ["tier_group", "Full"],
+      ]),
+    );
+  });
+
+  it("refuses a package that isn't on the quote", async () => {
+    db.lines = [pkgLine("a1", "Full", true)];
+    const state = await (await actions()).setPackageOfferedAction({}, form({ quoteId: "q-1", packageName: "Nope", offered: "true" }));
+    expect(state.error).toBe("That package isn't on this quote.");
+    expect(lineWrites()).toHaveLength(0);
+  });
+
+  it("does not touch an accepted quote", async () => {
+    db.quoteRow = { id: "q-1", org_id: "org-1", status: "accepted", expires_at: null };
+    db.lines = [pkgLine("a1", "Full", true), pkgLine("b1", "Filing only", true)];
+    const state = await (await actions()).setPackageOfferedAction({}, form({ quoteId: "q-1", packageName: "Full", offered: "false" }));
+    expect(state.error).toContain("accepted");
+    expect(lineWrites()).toHaveLength(0);
+  });
+});
+
+describe("placing a new line", () => {
+  beforeEach(reset);
+
+  it("gives a line joining a WITHHELD package that package's switch, not a posted one", async () => {
+    db.lines = [pkgLine("a1", "Full", true), pkgLine("b1", "Filing only", false)];
+    db.serviceItem = { id: "s-1", kind: "legal_fee", charge_at: "signing", unit_amount_cents: 90_000, label: "Filing, per class", description: null };
+    const state = await (await actions()).applyServiceItemAction(
+      {},
+      form({ quoteId: "q-1", serviceItemId: "s-1", placement: "package", packageName: "Filing only", selected: "true" }),
+    );
+    expect(state.error).toBeUndefined();
+    const insert = lineWrites().find((op) => op.verb === "insert");
+    expect(insert?.payload).toMatchObject({ selection: "tier_option", tier_group: "Filing only", selected: false });
+  });
+
+  it("starts a new package offered, and a government fee at filing whatever was posted", async () => {
+    db.lines = [pkgLine("a1", "Full", true)];
+    const state = await (await actions()).addLineAction(
+      {},
+      form({ quoteId: "q-1", placement: "package", packageName: "  Filing   only ", kind: "government_fee", chargeAt: "signing", label: "USPTO fee", amount: "350" }),
+    );
+    expect(state.error).toBeUndefined();
+    const insert = lineWrites().find((op) => op.verb === "insert");
+    expect(insert?.payload).toMatchObject({
+      selection: "tier_option",
+      tier_group: "Filing only",
+      selected: true,
+      kind: "government_fee",
+      charge_at: "filing",
+      unit_amount_cents: 35_000,
+    });
+  });
+
+  it("adds an add-on as an offered optional line", async () => {
+    const state = await (await actions()).addLineAction(
+      {},
+      form({ quoteId: "q-1", placement: "add_on", kind: "legal_fee", label: "Watch service", amount: "600" }),
+    );
+    expect(state.error).toBeUndefined();
+    const insert = lineWrites().find((op) => op.verb === "insert");
+    expect(insert?.payload).toMatchObject({ selection: "optional", tier_group: null, selected: true, unit_amount_cents: 60_000 });
+  });
+
+  it("refuses a line with nowhere to go", async () => {
+    const state = await (await actions()).addLineAction({}, form({ quoteId: "q-1", kind: "legal_fee", label: "L", amount: "10" }));
+    expect(state.error).toBe("Choose where this line goes.");
+    expect(lineWrites()).toHaveLength(0);
+  });
+});
+
+describe("renaming, copying and removing packages", () => {
+  beforeEach(reset);
+
+  it("refuses a name another package already has", async () => {
+    db.lines = [pkgLine("a1", "Full", true), pkgLine("b1", "Filing only", true)];
+    const state = await (await actions()).renamePackageAction({}, form({ quoteId: "q-1", packageName: "Full", newName: "Filing only" }));
+    expect(state.error).toBe("There's already a package called “Filing only”.");
+    expect(lineWrites()).toHaveLength(0);
+  });
+
+  it("renames every line of the package, fenced on the old name", async () => {
+    db.lines = [pkgLine("a1", "Full", true), pkgLine("a2", "Full", true)];
+    await (await actions()).renamePackageAction({}, form({ quoteId: "q-1", packageName: "Full", newName: "Full prosecution" }));
+    const [write] = lineWrites();
+    expect(write.payload).toMatchObject({ tier_group: "Full prosecution" });
+    expect(write.filters).toEqual(expect.arrayContaining([["quote_id", "q-1"], ["tier_group", "Full"]]));
+  });
+
+  it("copies a package's lines under the new name, offered", async () => {
+    db.lines = [pkgLine("a1", "Full", true), pkgLine("a2", "Full", false)];
+    await (await actions()).duplicatePackageAction({}, form({ quoteId: "q-1", packageName: "Full", newName: "Filing only" }));
+    const insert = lineWrites().find((op) => op.verb === "insert");
+    const rows = insert?.payload as Record<string, unknown>[];
+    expect(rows).toHaveLength(2);
+    for (const row of rows) expect(row).toMatchObject({ org_id: "org-1", quote_id: "q-1", selection: "tier_option", tier_group: "Filing only", selected: true });
+  });
+
+  it("will not remove the only offered package while withheld ones remain", async () => {
+    db.lines = [pkgLine("a1", "Full", true), pkgLine("b1", "Filing only", false)];
+    const state = await (await actions()).deletePackageAction({}, form({ quoteId: "q-1", packageName: "Full" }));
+    expect(state.error).toContain("At least one package has to be offered");
+    expect(lineWrites()).toHaveLength(0);
+  });
+});
+
+describe("the add-on switch and the Charged pill", () => {
+  beforeEach(reset);
+
+  it("offers only an optional line on its own — never one line of a package", async () => {
+    db.lineRow = { id: "a1", quote_id: "q-1", selection: "tier_option", label: "a1" };
+    const state = await (await actions()).setAddOnOfferedAction({}, form({ quoteId: "q-1", lineId: "a1", offered: "false" }));
+    expect(state.error).toBe("Only an add-on can be offered on its own.");
+    expect(lineWrites()).toHaveLength(0);
+  });
+
+  it("refuses to move a government fee to signing", async () => {
+    db.lineRow = { id: "g1", quote_id: "q-1", kind: "government_fee", charge_at: "filing", selection: "included", tier_group: null, selected: true, unit_amount_cents: 35_000 };
+    const state = await (await actions()).setChargeAtAction({}, form({ quoteId: "q-1", lineId: "g1", chargeAt: "signing" }));
+    expect(state.error).toContain("can't be charged at signing");
+    expect(lineWrites()).toHaveLength(0);
+  });
+});
+
+describe("Send refuses an offer the client could not sign", () => {
+  beforeEach(reset);
+
+  it("refuses a draft whose packages are all withheld, before any event or status write", async () => {
+    db.quoteRow = { id: "q-1", org_id: "org-1", status: "draft", expires_at: null };
+    db.lines = [pkgLine("a1", "Full", false)];
+    const state = await (await actions()).sendQuoteAction({}, form({ quoteId: "q-1" }));
+    expect(state.error).toBe("At least one package has to be offered.");
+    expect(quoteUpdates()).toHaveLength(0);
+    expect(eventInserts()).toHaveLength(0);
+  });
+
+  it("refuses an empty draft", async () => {
+    db.quoteRow = { id: "q-1", org_id: "org-1", status: "draft", expires_at: null };
+    const state = await (await actions()).sendQuoteAction({}, form({ quoteId: "q-1" }));
+    expect(state.error).toBe("Add at least one line before sending.");
+    expect(quoteUpdates()).toHaveLength(0);
   });
 });

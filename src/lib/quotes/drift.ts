@@ -53,20 +53,19 @@ export function describeLineDrift(
         `“${signedLine.label}” was signed as charged ${chargeWords(signedLine.charge_at)} and is now charged ${chargeWords(current.charge_at)}.`,
       );
     }
-    if (Boolean(current.selected) !== Boolean(signedLine.selected)) {
-      out.push(
-        signedLine.selected
-          ? `“${signedLine.label}” was included in the signed agreement and is now marked declined.`
-          : `“${signedLine.label}” was declined in the signed agreement and is now marked included.`,
-      );
-    }
+    // `selected` is NOT compared. Before signature a package or add-on line's
+    // `selected` was the firm's offer switch, and the client's pick lives in the
+    // snapshot (packages.ts); a difference there is the offer-versus-choice
+    // distinction, not an edit to what was agreed.
   }
 
   const signedIds = new Set(signedLines.map((line) => line.id));
   for (const line of liveLines) {
-    if (!signedIds.has(line.id)) {
-      out.push(`“${line.label}” was added to the quote after it was signed.`);
-    }
+    if (signedIds.has(line.id)) continue;
+    // A package or add-on the firm withheld was never offered, so it was never
+    // in the signed record — its absence there is not an addition.
+    if (line.selection !== "included" && !line.selected) continue;
+    out.push(`“${line.label}” was added to the quote after it was signed.`);
   }
 
   return out;

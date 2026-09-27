@@ -1,3 +1,5 @@
+import { FirmHeader } from "./FirmHeader";
+
 /**
  * The third state — "we could not check", which is not "there is nothing here".
  * Rendering `notFound()` on an unreachable database would tell a client the
@@ -6,12 +8,13 @@
  */
 export function Unavailable() {
   return (
-    <div className="lx-card" style={{ padding: "40px 32px", textAlign: "center", display: "grid", gap: 10 }}>
-      <h1 className="lx-h2">We can&rsquo;t load this proposal right now</h1>
-      <p className="lx-note" style={{ margin: 0, fontSize: 15 }}>
-        Your link is fine — something on our side is not responding. Please try again in a few minutes. Nothing has
-        been signed.
-      </p>
-    </div>
+    <>
+      <FirmHeader firmName={null} note="Sent to you by link. No account, no login." />
+      <div className="qp-locked">
+        <div className="qp-locked-mark" aria-hidden="true" />
+        <h1>We can&rsquo;t load this proposal right now.</h1>
+        <p>Your link is fine — something on our side is not responding. Please try again in a few minutes. Nothing has been signed.</p>
+      </div>
+    </>
   );
 }

@@ -323,57 +323,75 @@ describe("percentDiscountCents — the one rounding in the module", () => {
   });
 });
 
-describe("tier groups and readiness", () => {
-  const tier = (id: string, group: string, selected: boolean, cents: number): QuoteLineInput =>
-    line({ id, selection: "tier_option", tier_group: group, selected, unit_amount_cents: cents });
+describe("tier groups are PACKAGES, chosen whole", () => {
+  // lectual.app's builder (design/Quote_Builder_Prototype.dc.html): a package
+  // is every tier_option line sharing a tier_group — its fees AND its own USPTO
+  // fees — and the client picks ONE package and takes all of it. The ported
+  // engine read a group as "pick one line out of these"; totals were always the
+  // sum of the selected lines and still are, which is why no stored quote's
+  // figures moved when the reading did.
+  const tier = (id: string, group: string, selected: boolean, cents: number, over: Partial<QuoteLineInput> = {}): QuoteLineInput =>
+    line({ id, selection: "tier_option", tier_group: group, selected, unit_amount_cents: cents, ...over });
+
+  const full = (selected: boolean) => [
+    tier("f-search", "Full prosecution", selected, 145_000),
+    tier("f-oa", "Full prosecution", selected, 95_000),
+    tier("f-uspto", "Full prosecution", selected, 35_000, { kind: "government_fee", charge_at: "filing", quantity: 2 }),
+  ];
+  const filingOnly = (selected: boolean) => [
+    tier("o-search", "Filing only", selected, 95_000),
+    tier("o-uspto", "Filing only", selected, 35_000, { kind: "government_fee", charge_at: "filing", quantity: 2 }),
+  ];
 
   it("blocks with a reason a button can say, not a bare boolean", () => {
-    const lines = [
-      tier("std", "package", false, 200_000),
-      tier("prem", "package", false, 350_000),
-    ];
-    expect(quoteReadiness(lines)).toMatchObject({
+    expect(quoteReadiness([...full(false), ...filingOnly(false)])).toMatchObject({
       ready: false,
       reason: "tier_group_unselected",
       message: "Choose a package.",
-      tierGroup: "package",
     });
   });
 
-  it("is ready when exactly one option is chosen in every group", () => {
-    const lines = [
-      tier("std", "package", true, 200_000),
-      tier("prem", "package", false, 350_000),
-      tier("search-basic", "search", true, 50_000),
-      tier("search-full", "search", false, 90_000),
-    ];
+  it("is ready when exactly one package is chosen, and totals ALL of its lines", () => {
+    const lines = [...full(true), ...filingOnly(false)];
     expect(quoteReadiness(lines)).toEqual({ ready: true });
-    expect(quoteTotals(lines).dueAtSigning).toBe(250_000);
+    const totals = quoteTotals(lines);
+    // Both of the package's legal fees at signing, its own USPTO fees at filing.
+    expect(totals.dueAtSigning).toBe(145_000 + 95_000);
+    expect(totals.dueAtFiling).toBe(70_000);
   });
 
-  it("blocks when two options in one group are ticked", () => {
-    const lines = [tier("std", "package", true, 200_000), tier("prem", "package", true, 350_000)];
-    expect(quoteReadiness(lines)).toMatchObject({
+  it("blocks when two packages are chosen", () => {
+    expect(quoteReadiness([...full(true), ...filingOnly(true)])).toMatchObject({
       ready: false,
       reason: "tier_group_multiple",
-      tierGroup: "package",
+      message: "Choose only one package.",
     });
   });
 
-  it("blocks on the group that is unanswered when another group is answered", () => {
+  it("blocks a package chosen in part — a package is never half-bought", () => {
+    const lines = [...full(true).map((l) => (l.id === "f-oa" ? { ...l, selected: false } : l)), ...filingOnly(false)];
+    const blockers = quoteBlockers(lines);
+    expect(blockers).toContainEqual(expect.objectContaining({ reason: "tier_group_partial", tierGroup: "Full prosecution" }));
+    expect(quoteReadiness(lines).ready).toBe(false);
+  });
+
+  it("one package chosen is enough — the others are simply not taken", () => {
+    // Under the old reading every group had to be answered; a second package is
+    // an alternative, not a second question.
+    const lines = [...filingOnly(true), ...full(false)];
+    expect(quoteReadiness(lines)).toEqual({ ready: true });
+    expect(quoteTotals(lines).dueAtSigning).toBe(95_000);
+  });
+
+  it("leaves a quote with no packages alone — included lines and add-ons are not a package", () => {
     const lines = [
-      tier("std", "package", true, 200_000),
-      tier("search-basic", "search", false, 50_000),
-      tier("search-full", "search", false, 90_000),
+      line({ id: "flat", unit_amount_cents: 150_000 }),
+      line({ id: "watch", selection: "optional", selected: false, unit_amount_cents: 60_000 }),
     ];
-    expect(quoteReadiness(lines)).toMatchObject({
-      ready: false,
-      reason: "tier_group_unselected",
-      tierGroup: "search",
-    });
+    expect(quoteReadiness(lines)).toEqual({ ready: true });
   });
 
-  it("groups options by tier_group in first-appearance order", () => {
+  it("groups a package's lines by tier_group in first-appearance order", () => {
     const groups = tierGroups([
       tier("a", "search", false, 1),
       tier("b", "package", true, 2),

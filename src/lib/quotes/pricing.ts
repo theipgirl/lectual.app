@@ -387,24 +387,47 @@ export function discountBaseCents(
   return base;
 }
 
-/* ────────────────────────────── tier groups ─────────────────────────────── */
+/**
+ * Which bucket a line's money lands in — `signing`, `filing` or `not_charged` —
+ * by exactly the rule `quoteTotals` uses. Exported so a surface that LISTS lines
+ * under "due today" / "at filing" (the signed copy, the package blurb) sorts
+ * them by the same rule that summed them, instead of re-deriving it from
+ * `charge_at` and disagreeing about a government fee.
+ */
+export function chargeBucket(line: QuoteLineInput): QuoteChargeAt {
+  return bucketOf(line);
+}
 
-/** One mutually-exclusive package choice (§4.2). */
+/* ─────────────────────────── tier groups = packages ─────────────────────── */
+
+/**
+ * One PACKAGE (lectual.app's quote builder; see `packages.ts`).
+ *
+ * `tier_group` is the package's name and every `tier_option` line carrying it
+ * is one of the package's lines — its fees, its USPTO fees, its discount. The
+ * client picks ONE package and takes all of its lines. This replaced the
+ * ported engine's reading ("exactly one selected line per group, every group
+ * answered"), which could express "Standard or Comprehensive search" but not
+ * the design's packages, each several lines with their own government fees.
+ * Totals are unaffected: they were and are the sum of the selected lines.
+ * `options` keeps its name for the callers that read it; it is the package's
+ * lines.
+ */
 export type TierGroup = {
   group: string;
   options: QuoteLineInput[];
-  /** How many options in this group the client currently has ticked. */
+  /** How many of this package's lines are currently selected. */
   selectedCount: number;
 };
 
 /**
- * The tier groups on a quote, in first-appearance order (which is the order
+ * The packages on a quote, in first-appearance order (which is the order
  * `sort_index` produced when the caller read them — this module does not
  * re-sort, because the firm's chosen ordering is the one the client sees).
  *
  * A `tier_option` line with no `tier_group` is skipped here and reported by
  * `quoteBlockers`; grouping it under `""` or under its own label would invent
- * a package choice the firm did not author.
+ * a package the firm did not author.
  */
 export function tierGroups(lines: readonly QuoteLineInput[]): TierGroup[] {
   const groups = new Map<string, TierGroup>();
@@ -434,10 +457,13 @@ export function tierGroups(lines: readonly QuoteLineInput[]): TierGroup[] {
 export type QuoteBlockReason =
   /** Nothing to accept. */
   | "no_lines"
-  /** A package group with nothing chosen — the ordinary, expected one. */
+  /** The quote has packages and none is chosen — the ordinary, expected one. */
   | "tier_group_unselected"
-  /** Two options ticked in one mutually-exclusive group. */
+  /** More than one package chosen. */
   | "tier_group_multiple"
+  /** A package chosen in part — some of its lines selected, some not. A package
+   * is taken whole, so this is a data problem, never a client's answer. */
+  | "tier_group_partial"
   /** A `tier_option` line carrying no `tier_group` (0068 check violated). */
   | "tier_option_without_group"
   /** A USPTO fee marked `charge_at = 'signing'` (§0 / 0068 check violated). */
@@ -539,19 +565,24 @@ export function quoteBlockers(lines: readonly QuoteLineInput[]): QuoteBlocker[] 
     }
   }
 
-  for (const group of tierGroups(lines)) {
-    if (group.selectedCount === 0) {
-      blockers.push({
-        reason: "tier_group_unselected",
-        message: "Choose a package.",
-        tierGroup: group.group,
-      });
-    } else if (group.selectedCount > 1) {
-      blockers.push({
-        reason: "tier_group_multiple",
-        message: "Choose only one option in each package.",
-        tierGroup: group.group,
-      });
+  // Packages: exactly ONE is chosen, and it is chosen whole. The choice is
+  // ACROSS the groups (one package out of several), not within each group.
+  const packages = tierGroups(lines);
+  if (packages.length > 0) {
+    const chosen = packages.filter((group) => group.selectedCount > 0);
+    for (const group of chosen) {
+      if (group.selectedCount < group.options.length) {
+        blockers.push({
+          reason: "tier_group_partial",
+          message: "A package is taken whole — every line in it, or none.",
+          tierGroup: group.group,
+        });
+      }
+    }
+    if (chosen.length === 0) {
+      blockers.push({ reason: "tier_group_unselected", message: "Choose a package." });
+    } else if (chosen.length > 1) {
+      blockers.push({ reason: "tier_group_multiple", message: "Choose only one package." });
     }
   }
 

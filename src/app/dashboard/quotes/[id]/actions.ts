@@ -3,17 +3,21 @@
 import { revalidatePath } from "next/cache";
 import { callerHasRole } from "@/lib/auth/current-role";
 import {
-  addQuoteLine,
-  applyServiceItem,
+  addLineTo,
+  applyServiceItemTo,
+  deletePackage,
   deleteQuoteLine,
-  reorderQuoteLines,
+  duplicatePackage,
+  renamePackage,
   sendQuote,
+  setAddOnOffered,
+  setPackageOffered,
   updateQuoteDetails,
   updateQuoteLine,
   withdrawQuote,
-  listQuoteLines,
   quotesDb,
   requireQuoteWriteRole,
+  type LinePlacement,
 } from "@/lib/quotes/store";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { effectiveQuoteStatus, isQuoteEditable } from "@/lib/quotes/status";
@@ -25,10 +29,12 @@ import { friendlyQuoteError, NOT_ENTITLED, type ActionState } from "../errors";
 
 /**
  * The quote BUILDER's own write surface — everything that mutates ONE
- * existing quote (header, lines, service-library application, lifecycle,
- * engagement terms). Ported from `lectual` without the payment and client
- * line-request actions (see PORTED_FROM.md); `updateDetailsAction` is new.
- * Quote CREATION lives one level up, in `../actions.ts`.
+ * existing quote (header, lines, packages and add-ons, service-library
+ * application, lifecycle, engagement terms). Ported from `lectual` without the
+ * payment and client line-request actions (see PORTED_FROM.md);
+ * `updateDetailsAction` and the package/add-on actions are new, for the
+ * builder in design/Quote_Builder_Prototype.dc.html (packages.ts has the
+ * mapping). Quote CREATION lives one level up, in `../actions.ts`.
  *
  * Every function here is its own POST entry point (AGENTS.md: a "use server"
  * function never renders a layout), and every one of them calls straight into
@@ -104,109 +110,114 @@ export async function updateDetailsAction(_prev: ActionState, formData: FormData
 
 // ── Lines ────────────────────────────────────────────────────────────────
 
+/**
+ * Where a new line goes, read from the form: `placement` is "package" (with
+ * `packageName`), "add_on" or "common" (in every package). The store turns it
+ * into selection fields and — for an existing package — copies that package's
+ * offer switch, so no posted value decides whether a line is offered.
+ */
+function readPlacement(formData: FormData): LinePlacement | null {
+  const kind = String(formData.get("placement") ?? "");
+  if (kind === "common") return { kind: "common" };
+  if (kind === "add_on") return { kind: "add_on" };
+  if (kind === "package") return { kind: "package", name: String(formData.get("packageName") ?? "") };
+  return null;
+}
+
+/** The user types a POSITIVE figure — "a $500 discount", not "-500"; the sign
+ * comes from the kind. `assertLineAmountSign` in the store is what enforces the
+ * stored sign against the line's real kind. */
+function signedCents(kind: string, raw: string): number | null {
+  const magnitude = parseDollarsToCents(raw);
+  if (magnitude === null || magnitude < 0) return null;
+  return kind === "discount" ? -magnitude : magnitude;
+}
+
+/** A one-off line a library item doesn't cover, placed in a package, in every
+ * package, or as an add-on. */
 export async function addLineAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   if (!(await callerHasRole("attorney"))) return NOT_ENTITLED;
 
   const quoteId = String(formData.get("quoteId") ?? "");
-  const kind = String(formData.get("kind") ?? "");
-  const chargeAt = String(formData.get("chargeAt") ?? "");
-  const selection = String(formData.get("selection") ?? "included");
-  const tierGroup = String(formData.get("tierGroup") ?? "").trim() || null;
+  const kind = String(formData.get("kind") ?? "legal_fee");
   const label = String(formData.get("label") ?? "").trim();
-  const description = String(formData.get("description") ?? "").trim() || null;
-  const quantityRaw = String(formData.get("quantity") ?? "1").trim();
-  const amountRaw = String(formData.get("amount") ?? "");
-
+  const placement = readPlacement(formData);
   if (!quoteId) return { error: "Missing quote." };
+  if (!placement) return { error: "Choose where this line goes." };
   if (!label) return { error: "Enter a label for this line." };
 
-  const quantity = Number(quantityRaw);
-  if (!Number.isSafeInteger(quantity) || quantity <= 0) {
-    return { error: "Quantity must be a whole number greater than zero." };
-  }
-
-  // The client always types a POSITIVE dollar figure — "a $500 discount", not
-  // "-500" — and this is the one place that sign gets applied, based on the
-  // kind the firm actually chose. assertLineAmountSign (called inside
-  // addQuoteLine) is what actually enforces the stored sign; this is only
-  // about not asking a front-desk user to type a minus sign.
-  const magnitude = parseDollarsToCents(amountRaw);
-  if (magnitude === null || magnitude < 0) {
-    return { error: "Enter a valid amount, e.g. 1250.00." };
-  }
-  const unitAmountCents = kind === "discount" ? -magnitude : magnitude;
+  // The schedule follows the kind: a government fee is charged at filing (and
+  // the store refuses anything else at signing); everything else starts at
+  // signing and can be moved with the Charged pill.
+  const chargeAt = kind === "government_fee" ? "filing" : String(formData.get("chargeAt") ?? "signing");
+  const unitAmountCents = signedCents(kind, String(formData.get("amount") ?? ""));
+  if (unitAmountCents === null) return { error: "Enter a valid amount, e.g. 1250.00." };
 
   try {
-    await addQuoteLine(quoteId, {
-      kind,
-      chargeAt,
-      selection,
-      tierGroup,
-      label,
-      description,
-      quantity,
-      unitAmountCents,
-    });
+    await addLineTo(quoteId, { kind, chargeAt, label, unitAmountCents }, placement);
   } catch (err) {
     return errorState(err, "Couldn't add this line.");
   }
 
   revalidateQuote(quoteId);
-  return {};
+  return { saved: true };
 }
 
-export async function updateLineAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+/** Inline edit of a line's label and/or amount — the builder's table. Only the
+ * fields posted are changed. */
+export async function editLineAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   if (!(await callerHasRole("attorney"))) return NOT_ENTITLED;
 
   const quoteId = String(formData.get("quoteId") ?? "");
   const lineId = String(formData.get("lineId") ?? "");
-  const kind = String(formData.get("kind") ?? "");
-  const chargeAt = String(formData.get("chargeAt") ?? "");
-  const selection = String(formData.get("selection") ?? "");
-  const tierGroup = String(formData.get("tierGroup") ?? "").trim() || null;
-  const label = String(formData.get("label") ?? "").trim();
-  const description = String(formData.get("description") ?? "").trim() || null;
-  const quantityRaw = String(formData.get("quantity") ?? "").trim();
-  const amountRaw = String(formData.get("amount") ?? "");
-  // Present only for optional/tier_option lines' checkbox — an included line's
-  // form doesn't render the checkbox at all, so an absent field here must NOT
-  // be read as "unchecked and now deselected". Distinguished with a hidden
-  // marker field rather than trusting FormData's own absence.
-  const selectedFieldPresent = formData.get("selectedFieldPresent") === "1";
-  const selected = formData.get("selected") === "on";
-
   if (!quoteId || !lineId) return { error: "Missing line." };
-  if (!label) return { error: "Enter a label for this line." };
 
-  const quantity = Number(quantityRaw);
-  if (!Number.isSafeInteger(quantity) || quantity <= 0) {
-    return { error: "Quantity must be a whole number greater than zero." };
+  const patch: { label?: string; unitAmountCents?: number } = {};
+  if (formData.has("label")) {
+    const label = String(formData.get("label") ?? "").trim();
+    if (!label || label.length > 300) return { error: "A line needs a label of 1-300 characters." };
+    patch.label = label;
   }
-
-  const magnitude = parseDollarsToCents(amountRaw);
-  if (magnitude === null || magnitude < 0) {
-    return { error: "Enter a valid amount, e.g. 1250.00." };
+  if (formData.has("amount")) {
+    const cents = signedCents(String(formData.get("kind") ?? ""), String(formData.get("amount") ?? ""));
+    if (cents === null) return { error: "Enter a valid amount, e.g. 1250.00." };
+    patch.unitAmountCents = cents;
   }
-  const unitAmountCents = kind === "discount" ? -magnitude : magnitude;
+  if (patch.label === undefined && patch.unitAmountCents === undefined) return {};
 
   try {
-    await updateQuoteLine(lineId, {
-      kind,
-      chargeAt,
-      selection,
-      tierGroup,
-      label,
-      description,
-      quantity,
-      unitAmountCents,
-      ...(selectedFieldPresent ? { selected } : {}),
-    });
+    await updateQuoteLine(lineId, patch);
   } catch (err) {
     return errorState(err, "Couldn't update this line.");
   }
 
   revalidateQuote(quoteId);
-  return {};
+  return { saved: true };
+}
+
+/**
+ * The Charged pill: move a line between signing and filing. A government fee
+ * cannot be moved to signing — the builder explains that without calling this,
+ * and if something calls it anyway the store's `assertLineKindChargeAt` (and
+ * then 0068's CHECK) refuses.
+ */
+export async function setChargeAtAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  if (!(await callerHasRole("attorney"))) return NOT_ENTITLED;
+
+  const quoteId = String(formData.get("quoteId") ?? "");
+  const lineId = String(formData.get("lineId") ?? "");
+  const chargeAt = String(formData.get("chargeAt") ?? "");
+  if (!quoteId || !lineId) return { error: "Missing line." };
+  if (chargeAt !== "signing" && chargeAt !== "filing") return { error: "Choose signing or filing." };
+
+  try {
+    await updateQuoteLine(lineId, { chargeAt });
+  } catch (err) {
+    return errorState(err, "Couldn't move this charge.");
+  }
+
+  revalidateQuote(quoteId);
+  return { saved: true };
 }
 
 export async function deleteLineAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -226,60 +237,119 @@ export async function deleteLineAction(_prev: ActionState, formData: FormData): 
   return {};
 }
 
-/**
- * Moves one line up (`-1`) or down (`+1`) among ITS OWN kind of siblings —
- * really just among all of this quote's lines, reordered by the caller's
- * current on-screen order. `reorderQuoteLines` requires the COMPLETE set of
- * this quote's line ids (assertIdsMatchSet), so this re-reads the current
- * order fresh rather than trusting a possibly-stale list from the form.
- */
-export async function moveLineAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  // Also gated even though a reorder "only" changes order_index: an
-  // unentitled caller must not be able to read this quote's line ids back out
-  // via listQuoteLines below, let alone rewrite their order.
-  if (!(await callerHasRole("attorney"))) return NOT_ENTITLED;
-
-  const quoteId = String(formData.get("quoteId") ?? "");
-  const lineId = String(formData.get("lineId") ?? "");
-  const direction = String(formData.get("direction") ?? "");
-  if (!quoteId || !lineId) return { error: "Missing line." };
-  if (direction !== "up" && direction !== "down") return { error: "Invalid move." };
-
-  try {
-    const lines = await listQuoteLines(quoteId);
-    const ids = lines.map((l) => l.id);
-    const index = ids.indexOf(lineId);
-    if (index === -1) return { error: "That line isn't on this quote." };
-    const swapWith = direction === "up" ? index - 1 : index + 1;
-    if (swapWith < 0 || swapWith >= ids.length) {
-      // Already at the edge — not an error, just nothing to do.
-      return {};
-    }
-    [ids[index], ids[swapWith]] = [ids[swapWith], ids[index]];
-    await reorderQuoteLines(quoteId, ids);
-  } catch (err) {
-    return errorState(err, "Couldn't reorder this line.");
-  }
-
-  revalidateQuote(quoteId);
-  return {};
-}
-
+/** Click a service-library item: COPY it onto the quote, in the package being
+ * edited (or every package, or as an add-on). */
 export async function applyServiceItemAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   if (!(await callerHasRole("attorney"))) return NOT_ENTITLED;
 
   const quoteId = String(formData.get("quoteId") ?? "");
   const serviceItemId = String(formData.get("serviceItemId") ?? "");
+  const placement = readPlacement(formData);
   if (!quoteId || !serviceItemId) return { error: "Choose a service to add." };
+  if (!placement) return { error: "Choose where this service goes." };
 
   try {
-    await applyServiceItem(quoteId, serviceItemId);
+    await applyServiceItemTo(quoteId, serviceItemId, placement);
   } catch (err) {
     return errorState(err, "Couldn't add this service.");
   }
 
   revalidateQuote(quoteId);
-  return {};
+  return { saved: true };
+}
+
+// ── Packages and add-ons ─────────────────────────────────────────────────
+
+/** Offer or withhold a whole package. The store refuses to withhold the last
+ * offered one. */
+export async function setPackageOfferedAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  if (!(await callerHasRole("attorney"))) return NOT_ENTITLED;
+
+  const quoteId = String(formData.get("quoteId") ?? "");
+  const packageName = String(formData.get("packageName") ?? "");
+  const offered = formData.get("offered") === "true";
+  if (!quoteId || !packageName) return { error: "Missing package." };
+
+  try {
+    await setPackageOffered(quoteId, packageName, offered);
+  } catch (err) {
+    return errorState(err, "Couldn't change this package.");
+  }
+
+  revalidateQuote(quoteId);
+  return { saved: true };
+}
+
+/** Offer or withhold one add-on. */
+export async function setAddOnOfferedAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  if (!(await callerHasRole("attorney"))) return NOT_ENTITLED;
+
+  const quoteId = String(formData.get("quoteId") ?? "");
+  const lineId = String(formData.get("lineId") ?? "");
+  const offered = formData.get("offered") === "true";
+  if (!quoteId || !lineId) return { error: "Missing add-on." };
+
+  try {
+    await setAddOnOffered(lineId, offered);
+  } catch (err) {
+    return errorState(err, "Couldn't change this add-on.");
+  }
+
+  revalidateQuote(quoteId);
+  return { saved: true };
+}
+
+export async function renamePackageAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  if (!(await callerHasRole("attorney"))) return NOT_ENTITLED;
+
+  const quoteId = String(formData.get("quoteId") ?? "");
+  const from = String(formData.get("packageName") ?? "");
+  const to = String(formData.get("newName") ?? "");
+  if (!quoteId || !from) return { error: "Missing package." };
+
+  try {
+    await renamePackage(quoteId, from, to);
+  } catch (err) {
+    return errorState(err, "Couldn't rename this package.");
+  }
+
+  revalidateQuote(quoteId);
+  return { saved: true };
+}
+
+export async function duplicatePackageAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  if (!(await callerHasRole("attorney"))) return NOT_ENTITLED;
+
+  const quoteId = String(formData.get("quoteId") ?? "");
+  const from = String(formData.get("packageName") ?? "");
+  const to = String(formData.get("newName") ?? "");
+  if (!quoteId || !from) return { error: "Missing package." };
+
+  try {
+    await duplicatePackage(quoteId, from, to);
+  } catch (err) {
+    return errorState(err, "Couldn't copy this package.");
+  }
+
+  revalidateQuote(quoteId);
+  return { saved: true };
+}
+
+export async function deletePackageAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  if (!(await callerHasRole("attorney"))) return NOT_ENTITLED;
+
+  const quoteId = String(formData.get("quoteId") ?? "");
+  const packageName = String(formData.get("packageName") ?? "");
+  if (!quoteId || !packageName) return { error: "Missing package." };
+
+  try {
+    await deletePackage(quoteId, packageName);
+  } catch (err) {
+    return errorState(err, "Couldn't remove this package.");
+  }
+
+  revalidateQuote(quoteId);
+  return { saved: true };
 }
 
 // ── Lifecycle ────────────────────────────────────────────────────────────
@@ -297,7 +367,7 @@ export async function sendQuoteAction(_prev: ActionState, formData: FormData): P
   }
 
   revalidateQuote(quoteId);
-  return {};
+  return { saved: true };
 }
 
 export async function withdrawQuoteAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -314,7 +384,7 @@ export async function withdrawQuoteAction(_prev: ActionState, formData: FormData
   }
 
   revalidateQuote(quoteId);
-  return {};
+  return { saved: true };
 }
 
 // ── Engagement terms ─────────────────────────────────────────────────────

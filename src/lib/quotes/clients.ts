@@ -124,3 +124,19 @@ export async function quoteClientOptions(): Promise<QuoteClientOptions> {
     return empty;
   }
 }
+
+/**
+ * The matter a quote is linked to (`crm_quote.matter_id`) — its number and
+ * page, for the builder's "matter opened" line. Scoped read, best-effort: a
+ * failure is null and the builder simply does not mention the matter.
+ */
+export async function quoteMatterRef(matterId: string | null): Promise<{ href: string; number: string } | null> {
+  if (!matterId) return null;
+  try {
+    const supabase = await getScopedClient();
+    const { data } = await supabase.from("crm_matter").select("id, matter_number").eq("id", matterId).maybeSingle();
+    return data ? { href: `/dashboard/matters/${data.id}/`, number: data.matter_number } : null;
+  } catch {
+    return null;
+  }
+}

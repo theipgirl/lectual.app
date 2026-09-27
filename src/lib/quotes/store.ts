@@ -8,6 +8,7 @@ import {
   isQuoteLineKind,
   isQuoteLineSelection,
 } from "./pricing";
+import { normalizePackageName, offerProblems, readOffer } from "./packages";
 import {
   assertQuoteTransition,
   effectiveQuoteStatus,
@@ -437,15 +438,30 @@ export async function createQuote(input: CreateQuoteInput): Promise<QuoteRow> {
 }
 
 /** Transitions a DRAFT quote to SENT. Staff-gated. Does not require
- * `quoteReadiness` (pricing.ts) — sending a proposal with an unmade tier
+ * `quoteReadiness` (pricing.ts) — sending a proposal with an unmade package
  * choice is the normal case; it's the CLIENT'S job to make that choice, and
- * `quoteReadiness` gates ACCEPTANCE, not sending. */
+ * `quoteReadiness` gates ACCEPTANCE, not sending.
+ *
+ * It DOES refuse an offer that cannot be signed as built (packages.ts's
+ * `offerProblems` marked `blocksSending`): no lines, packages with none
+ * offered, a package switched half on. Sending those would put a link in a
+ * client's hands that shows them the wrong deal or no deal. */
 export async function sendQuote(quoteId: string): Promise<QuoteRow> {
   const supabase = await getScopedClient();
   await requireQuoteWriteRole(supabase);
   const db = quotesDb(supabase);
 
   const quote = await fetchQuoteForTransition(db, quoteId);
+  if (quote.status === "draft") {
+    const { data: lineData, error: lineError } = await db
+      .from("crm_quote_line")
+      .select("id, kind, charge_at, selection, tier_group, selected, label, quantity, unit_amount_cents")
+      .eq("quote_id", quoteId)
+      .order("sort_index", { ascending: true });
+    if (lineError) throw lineError;
+    const blocking = offerProblems((lineData as QuoteLineRow[] | null) ?? []).find((p) => p.blocksSending);
+    if (blocking) throw new Error(blocking.message);
+  }
   return transitionQuote({
     db,
     supabase,
@@ -841,3 +857,257 @@ export async function applyServiceItem(
   return line;
 }
 
+
+/* ─────────────────────────── packages and add-ons ─────────────────────────
+ * The design's builder, on the same table (see packages.ts for the mapping):
+ * a package is every `tier_option` line sharing a `tier_group`, and its
+ * "offered" switch is `selected` on all of those lines at once. Every function
+ * below is staff-gated, refuses a quote that is no longer editable, writes
+ * through the caller's own scoped client, and fences every multi-row write on
+ * `quote_id` AND `tier_group` so it cannot reach another package's lines.
+ */
+
+/** Where a new line goes. */
+export type LinePlacement =
+  | { kind: "common" }
+  | { kind: "package"; name: string }
+  | { kind: "add_on" };
+
+type PlacementFields = { selection: "included" | "optional" | "tier_option"; tierGroup: string | null; selected: boolean };
+
+type OfferRow = Pick<QuoteLineRow, "id" | "selection" | "tier_group" | "selected" | "kind" | "charge_at" | "quantity" | "unit_amount_cents" | "label">;
+
+async function readOfferRows(db: QuotesDbClient, quoteId: string): Promise<OfferRow[]> {
+  const { data, error } = await db
+    .from("crm_quote_line")
+    .select("id, selection, tier_group, selected, kind, charge_at, quantity, unit_amount_cents, label")
+    .eq("quote_id", quoteId)
+    .order("sort_index", { ascending: true });
+  if (error) throw error;
+  return (data as OfferRow[] | null) ?? [];
+}
+
+/**
+ * The selection fields a line gets from where it is placed. A line joining an
+ * EXISTING package takes that package's switch, so a package is never left half
+ * offered by an addition; a new package, and a new add-on, start offered.
+ */
+async function placementFields(db: QuotesDbClient, quoteId: string, placement: LinePlacement): Promise<PlacementFields> {
+  if (placement.kind === "common") return { selection: "included", tierGroup: null, selected: true };
+  if (placement.kind === "add_on") return { selection: "optional", tierGroup: null, selected: true };
+  const name = normalizePackageName(placement.name);
+  if (!name) throw new Error("A package needs a name of 1-120 characters.");
+  const pkg = readOffer(await readOfferRows(db, quoteId)).packages.find((p) => p.name === name);
+  return { selection: "tier_option", tierGroup: name, selected: pkg ? pkg.offered : true };
+}
+
+/** `addQuoteLine`, placed in a package, in every package, or as an add-on. */
+export async function addLineTo(
+  quoteId: string,
+  input: Omit<AddQuoteLineInput, "selection" | "tierGroup" | "selected">,
+  placement: LinePlacement,
+): Promise<QuoteLineRow> {
+  const supabase = await getScopedClient();
+  await requireQuoteWriteRole(supabase);
+  const db = quotesDb(supabase);
+  await loadEditableQuote(db, quoteId);
+  const fields = await placementFields(db, quoteId, placement);
+  return addQuoteLine(quoteId, { ...input, ...fields });
+}
+
+/** `applyServiceItem` (a COPY of the library item), placed the same way. */
+export async function applyServiceItemTo(quoteId: string, serviceItemId: string, placement: LinePlacement): Promise<QuoteLineRow> {
+  const supabase = await getScopedClient();
+  await requireQuoteWriteRole(supabase);
+  const db = quotesDb(supabase);
+  await loadEditableQuote(db, quoteId);
+  const fields = await placementFields(db, quoteId, placement);
+  return applyServiceItem(quoteId, serviceItemId, fields);
+}
+
+/**
+ * Offer or withhold a whole package. Refuses to withhold the last offered
+ * package — the design's own rule, and the reason: a quote with packages and
+ * none offered shows the client nothing to choose.
+ */
+export async function setPackageOffered(quoteId: string, packageName: string, offered: boolean): Promise<void> {
+  const supabase = await getScopedClient();
+  await requireQuoteWriteRole(supabase);
+  const db = quotesDb(supabase);
+  const quote = await loadEditableQuote(db, quoteId);
+
+  const name = normalizePackageName(packageName);
+  const offer = readOffer(await readOfferRows(db, quoteId));
+  const pkg = offer.packages.find((p) => p.name === name);
+  if (!name || !pkg) throw new Error("That package isn't on this quote.");
+  if (!offered && !offer.packages.some((p) => p.name !== name && p.offered)) {
+    throw new Error("At least one package has to be offered.");
+  }
+
+  const { error } = await db
+    .from("crm_quote_line")
+    .update({ selected: offered, updated_at: new Date().toISOString() })
+    .eq("quote_id", quoteId)
+    .eq("selection", "tier_option")
+    .eq("tier_group", name);
+  if (error) throw error;
+
+  if (quote.status === "sent") {
+    await writeQuoteEventSafe(db, supabase, quote.id, quote.org_id, "revised", {
+      change: offered ? "package_offered" : "package_withheld",
+      package: name,
+    });
+  }
+}
+
+/** Offer or withhold one add-on. Only an `optional` line has this switch. */
+export async function setAddOnOffered(lineId: string, offered: boolean): Promise<void> {
+  const supabase = await getScopedClient();
+  await requireQuoteWriteRole(supabase);
+  const db = quotesDb(supabase);
+
+  const { data, error: readError } = await db
+    .from("crm_quote_line")
+    .select("id, quote_id, selection, label")
+    .eq("id", lineId)
+    .maybeSingle();
+  if (readError) throw readError;
+  const line = data as Pick<QuoteLineRow, "id" | "quote_id" | "selection" | "label"> | null;
+  if (!line) throw new Error("That line isn't in your firm.");
+  if (line.selection !== "optional") throw new Error("Only an add-on can be offered on its own.");
+  const quote = await loadEditableQuote(db, line.quote_id);
+
+  const { error } = await db
+    .from("crm_quote_line")
+    .update({ selected: offered, updated_at: new Date().toISOString() })
+    .eq("id", lineId)
+    .eq("quote_id", line.quote_id);
+  if (error) throw error;
+
+  if (quote.status === "sent") {
+    await writeQuoteEventSafe(db, supabase, quote.id, quote.org_id, "revised", {
+      change: offered ? "add_on_offered" : "add_on_withheld",
+      label: line.label,
+    });
+  }
+}
+
+/** Rename a package — its lines' `tier_group`, together. */
+export async function renamePackage(quoteId: string, from: string, to: string): Promise<string> {
+  const supabase = await getScopedClient();
+  await requireQuoteWriteRole(supabase);
+  const db = quotesDb(supabase);
+  const quote = await loadEditableQuote(db, quoteId);
+
+  const source = normalizePackageName(from);
+  const target = normalizePackageName(to);
+  if (!source) throw new Error("That package isn't on this quote.");
+  if (!target) throw new Error("A package needs a name of 1-120 characters.");
+  if (source === target) return target;
+  const offer = readOffer(await readOfferRows(db, quoteId));
+  if (!offer.packages.some((p) => p.name === source)) throw new Error("That package isn't on this quote.");
+  if (offer.packages.some((p) => p.name === target)) throw new Error(`There's already a package called “${target}”.`);
+
+  const { error } = await db
+    .from("crm_quote_line")
+    .update({ tier_group: target, updated_at: new Date().toISOString() })
+    .eq("quote_id", quoteId)
+    .eq("selection", "tier_option")
+    .eq("tier_group", source);
+  if (error) throw error;
+
+  if (quote.status === "sent") {
+    await writeQuoteEventSafe(db, supabase, quote.id, quote.org_id, "revised", {
+      change: "package_renamed",
+      from: source,
+      package: target,
+    });
+  }
+  return target;
+}
+
+/** Copy a package's lines into a new package — the fast way to build "Filing
+ * only" out of "Full prosecution". The copy starts offered. */
+export async function duplicatePackage(quoteId: string, from: string, to: string): Promise<string> {
+  const supabase = await getScopedClient();
+  await requireQuoteWriteRole(supabase);
+  const db = quotesDb(supabase);
+  const quote = await loadEditableQuote(db, quoteId);
+
+  const source = normalizePackageName(from);
+  const target = normalizePackageName(to);
+  if (!source) throw new Error("That package isn't on this quote.");
+  if (!target) throw new Error("A package needs a name of 1-120 characters.");
+  const offer = readOffer(await readOfferRows(db, quoteId));
+  if (offer.packages.some((p) => p.name === target)) throw new Error(`There's already a package called “${target}”.`);
+
+  const { data, error: readError } = await db
+    .from("crm_quote_line")
+    .select("*")
+    .eq("quote_id", quoteId)
+    .eq("selection", "tier_option")
+    .eq("tier_group", source)
+    .order("sort_index", { ascending: true });
+  if (readError) throw readError;
+  const lines = (data as QuoteLineRow[] | null) ?? [];
+  if (lines.length === 0) throw new Error("That package isn't on this quote.");
+
+  const start = await nextLineSortIndex(db, quoteId);
+  const { error } = await db.from("crm_quote_line").insert(
+    lines.map((line, i) => ({
+      org_id: quote.org_id,
+      quote_id: quoteId,
+      kind: line.kind,
+      charge_at: line.charge_at,
+      selection: "tier_option",
+      tier_group: target,
+      selected: true,
+      label: line.label,
+      description: line.description,
+      quantity: line.quantity,
+      unit_amount_cents: line.unit_amount_cents,
+      source_service_item_id: line.source_service_item_id,
+      sort_index: start + i,
+    })),
+  );
+  if (error) throw error;
+
+  if (quote.status === "sent") {
+    await writeQuoteEventSafe(db, supabase, quote.id, quote.org_id, "revised", {
+      change: "package_added",
+      from: source,
+      package: target,
+    });
+  }
+  return target;
+}
+
+/** Remove a package and every line in it. Refuses to remove the last offered
+ * package while other (withheld) packages remain. */
+export async function deletePackage(quoteId: string, packageName: string): Promise<void> {
+  const supabase = await getScopedClient();
+  await requireQuoteWriteRole(supabase);
+  const db = quotesDb(supabase);
+  const quote = await loadEditableQuote(db, quoteId);
+
+  const name = normalizePackageName(packageName);
+  const offer = readOffer(await readOfferRows(db, quoteId));
+  const pkg = offer.packages.find((p) => p.name === name);
+  if (!name || !pkg) throw new Error("That package isn't on this quote.");
+  const others = offer.packages.filter((p) => p.name !== name);
+  if (others.length > 0 && !others.some((p) => p.offered)) {
+    throw new Error("At least one package has to be offered — switch another package on first.");
+  }
+
+  const { error } = await db
+    .from("crm_quote_line")
+    .delete()
+    .eq("quote_id", quoteId)
+    .eq("selection", "tier_option")
+    .eq("tier_group", name);
+  if (error) throw error;
+
+  if (quote.status === "sent") {
+    await writeQuoteEventSafe(db, supabase, quote.id, quote.org_id, "revised", { change: "package_removed", package: name });
+  }
+}

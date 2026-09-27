@@ -66,28 +66,36 @@ From `theipgirl/lectual` branch `claude/lectual-firm-dashboard-prd-f3loev` @ `0f
 
 | lectual.app | From lectual | Changes |
 |---|---|---|
-| `src/lib/quotes/{pricing,engagement-terms,index}.ts` | same paths | none |
+| `src/lib/quotes/index.ts` | same path | none |
+| `src/lib/quotes/pricing.ts` | same path | a `tier_group` is a PACKAGE chosen whole (exactly one package, all of its lines; new `tier_group_partial`), not "one line per group, every group answered"; exports `chargeBucket`. Totals unchanged (still the sum of selected lines) |
+| `src/lib/quotes/engagement-terms.ts` | same path | states each offered package's two figures and the add-ons; withheld lines left out. A quote without packages or add-ons gets the same text as before |
 | `src/lib/quotes/status.ts` | same path | firm-zone helpers come from `./firm-time` (this app's `calendar-rows.ts` has no `FIRM_TIME_ZONE`/`firmCivilDate`) |
 | `src/lib/quotes/types.ts` | same path | drops `crm_payment`, `crm_org_payment_account`, `crm_quote_line_request` and `public_slug` |
-| `src/lib/quotes/store.ts` | same path | no `public_slug` (0070), no line-request promotion (0071/0073), no manual payments; adds `updateQuoteDetails` (status-pinned, zero rows = lost race) |
+| `src/lib/quotes/store.ts` | same path | no `public_slug` (0070), no line-request promotion (0071/0073), no manual payments; adds `updateQuoteDetails` (status-pinned, zero rows = lost race), the package/add-on operations (offer switch, rename, duplicate, remove, placed adds) and a Send gate on offers that can't be signed |
 | `src/lib/quotes/load.ts` | same path | no line-request loader; list ordered by `updated_at`; adds `loadLinesForQuotes` (one `.in()` read for list totals) |
 | `src/lib/quotes/service-library.ts` | same path | none |
-| `src/lib/quotes/public.ts` | same path | reads `/q/<token>` only (no slug column, no retry), firm name only (no `crm_org_theme` logo), no line requests, no `quote_accepted` `crm_activity` write (0062's enum value; `crm_quote_event` records it); snapshot version 1 (no `line_requests`); adds `declinePublicQuote` (same conditional-update shape as accept) |
+| `src/lib/quotes/public.ts` | same path | reads `/q/<token>` only (no slug column, no retry), firm name only (no `crm_org_theme` logo), no line requests, no `quote_accepted` `crm_activity` write (0062's enum value; `crm_quote_event` records it); snapshot version 1 (no `line_requests`); adds `declinePublicQuote` (same conditional-update shape as accept). For the package builder: publishes only the OFFER (withheld lines never leave the server), removes `applyPublicSelection`/`saveSelectionAction` (the pick travels with the signature, so no refusal writes anything and the accept path reads the lines once), email optional, writes the client's choice back to `selected` after the winning update, then runs the matter auto-open |
 | `src/lib/auth/current-role.ts` | same path | none |
-| `src/lib/quotes/drift.ts` | `describeLineDrift` in `quotes/[id]/_components/LinesEditor.tsx` | moved to a pure module |
+| `src/lib/quotes/drift.ts` | `describeLineDrift` in `quotes/[id]/_components/LinesEditor.tsx` | moved to a pure module; `selected` is not compared and withheld lines are not "added after signing" (the offer model) |
 | `src/lib/quotes/{money,labels}.ts` | the per-slice `money.ts` / `line-fields.ts` / `field-meta.ts` / `quote-meta.ts` copies | one copy; `parseDollarsToCents` also accepts a leading `$` |
 | `src/lib/quotes/firm-time.ts` | `FIRM_TIME_ZONE`/`firmCivilDate` from `src/lib/matters/calendar-rows.ts` | adds `endOfFirmDay` (expiry is 23:59:59 in the firm's zone; lectual stored 23:59:59 UTC) |
-| `src/lib/quotes/clients.ts` | — | new: client names for the list/builder, and the "New quote" picker (leads, matters, contacts) |
+| `src/lib/quotes/clients.ts` | — | new: client names for the list/builder, the "New quote" picker (leads, matters, contacts), and the linked matter's number |
+| `src/lib/quotes/packages.ts` | — | new: the offer model for design/Quote_Builder_Prototype.dc.html — packages (`tier_group`), add-ons (`optional`), every-package lines (`included`), `selected` as the firm's offer switch until signature, the client's pick, derived blurbs |
+| `src/lib/quotes/accept-matter.ts` | `ensureMatterForLead` (src/lib/matters/matters.ts), as a service-role step | new: on a winning public acceptance, opens one matter for the quote's lead (type from the PA tag, `createMatter`'s numbering, first open docket stage), links it with a `matter_id is null` conditional update, records a `revised` quote event and a `matter_opened` activity; idempotent and never fails the acceptance |
 | `src/app/dashboard/quotes/{page,actions,errors}.ts(x)` | `src/app/(firm)/dashboard/quotes/{page,actions}.tsx` | same attorney+ gate on page and action; adds client and total columns; errors through `friendlyQuoteError` (lectual put raw PostgREST text on screen); the refusal copy names attorneys too |
-| `src/app/dashboard/quotes/[id]/{page,actions}.ts(x)` | `src/app/(firm)/dashboard/quotes/[id]/*` | same gates, terms race guard and snapshot-first rendering; no payments or line-request panels; client link is `/q/<token>/`; adds `updateDetailsAction` |
-| `src/components/quotes/*` | `quotes/[id]/_components/*`, `quotes/_components/*`, `settings/service-library/_components/*` | re-skinned to `lx-*`; logic unchanged |
+| `src/app/dashboard/quotes/[id]/{page,actions}.ts(x)` | `src/app/(firm)/dashboard/quotes/[id]/*` | same gates, terms race guard and snapshot-first rendering; no payments or line-request panels; client link is `/q/<token>/`; adds `updateDetailsAction`. The builder is the uploaded design's (`QuoteBuilder.tsx`, `quotes.css`), with package/add-on actions; the per-line full edit form and reorder are gone |
+| `src/components/quotes/*` | `quotes/[id]/_components/*`, `quotes/_components/*`, `settings/service-library/_components/*` | re-skinned to `lx-*`; `QuoteBuilder.tsx` is new (the design's builder) |
 | `src/app/dashboard/settings/services/*` | `src/app/(firm)/dashboard/settings/service-library/*` | Settings tab; attorneys can read it; a discount item is stored negative (lectual's action stored the magnitude, which its own CHECK refused) |
-| `src/app/q/[token]/*`, `src/components/proposal/*` | `src/app/q/[token]/*`, `src/app/proposal/_components/*` | one route, no `/proposal/<slug>/` twin, no PayPanel; adds Decline; UPL footer from `NOT_A_LAW_FIRM_DISCLAIMER` |
+| `src/app/q/[token]/*`, `src/components/proposal/*` | `src/app/q/[token]/*`, `src/app/proposal/_components/*` | one route, no `/proposal/<slug>/` twin, no PayPanel; adds Decline; UPL footer from `NOT_A_LAW_FIRM_DISCLAIMER`. Redesigned to the uploaded design (`q.css`): package cards, add-on checkboxes, typed-name signature, one locked page for unknown/draft/expired/withdrawn links, a frozen signed copy with a print stylesheet ("Download or print signed copy" opens the print dialog — no PDF library) |
 | `tests/quotes/{pricing,status,engagement-terms}.test.ts` | same paths | none |
 | `tests/quotes/store.test.ts` | same path | pure blocks only (the `promoteLineRequest` block is gone with the feature) |
-| `tests/quotes/public.test.ts` | same path | without the line-request, slug, logo and timeline blocks; adds decline cases |
+| `tests/quotes/public.test.ts` | same path | without the line-request, slug, logo and timeline blocks; adds decline cases; the fake PostgREST moved to `tests/quotes/fake-db.ts`; selection-persistence cases replaced by offer/pick cases, "no refusal writes anything", write-back and matter auto-open cases. New: `tests/quotes/{packages,accept-matter}.test.ts` |
 | `tests/quotes/builder-actions.test.ts` | `tests/quotes/quote-signed-copy.test.ts` (terms race) + `quotes-access.test.ts` (idea) | retargeted; adds the header-edit race and the per-action gate sweep |
 | `tests/quotes/money-and-drift.test.ts` | `quote-signed-copy.test.ts` (drift block) | new cases for money and the firm's calendar |
+
+**lectual should know:** its unmerged quote branch reads `tier_group` as "one line per group" and `selected` as the
+client's live pick. Quotes built by this app's builder use packages chosen whole and `selected` as the firm's offer
+until signature (see `src/lib/quotes/packages.ts`); after acceptance the rows carry the client's choice again.
 
 Not ported: payments (LawPay, `PaymentForm`, `PayPanel`, `public-payment.ts`), client line requests (0071/0073),
 readable proposal slugs and `/proposal/<slug>/<token>` (0070/0074), and the `quote_accepted`/`quote_payment` timeline

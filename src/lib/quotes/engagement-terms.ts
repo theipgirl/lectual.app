@@ -7,6 +7,7 @@ import {
   type QuoteLineInput,
 } from "./pricing";
 import { formatQuoteExpiry } from "./status";
+import { offeredLines, readOffer } from "./packages";
 
 /**
  * The engagement letter, as text, generated from THE SAME FIGURES the quote is
@@ -191,7 +192,11 @@ function signingFeeLines(lines: readonly QuoteLineInput[], currency: string): st
  */
 export function buildEngagementTerms(input: EngagementTermsInput): string {
   const currency = input.currency || DEFAULT_CURRENCY;
-  const totals = quoteTotals(input.lines, currency);
+  // THE OFFER, not the worksheet: a package or add-on the firm switched off is
+  // not part of what the client is signing (packages.ts).
+  const lines = offeredLines(input.lines);
+  const offer = readOffer(lines, currency);
+  const totals = quoteTotals(lines, currency);
   const client = (input.entityName ?? "").trim() || input.clientName.trim();
   const mark = (input.markText ?? "").trim();
 
@@ -200,8 +205,8 @@ export function buildEngagementTerms(input: EngagementTermsInput): string {
   // and in the firm's time zone, never the server's (see `formatQuoteExpiry`).
   const deadline = formatQuoteExpiry(input.expiresAt ?? null);
 
-  const govLines = governmentFeeLines(input.lines, currency);
-  const signingLines = signingFeeLines(input.lines, currency);
+  const govLines = governmentFeeLines(lines, currency);
+  const signingLines = signingFeeLines(lines, currency);
 
   const sections: string[] = [];
 
@@ -225,29 +230,18 @@ The Firm will perform the services itemised above and nothing beyond them. Work 
   // the totals panel above them uses. A client reading the agreement and the
   // panel must never be able to find two different answers to "what do I pay
   // today?".
-  const feeBody: string[] = [
-    `Due at signing: ${money(totals.dueAtSigning, currency)}`,
-    signingLines.length ? signingLines.join("\n") : "- [no fee lines are marked due at signing — check the proposal before sending]",
-    "",
-    `Due later, at filing: ${money(totals.dueAtFiling, currency)}`,
-  ];
-
-  if (govLines.length) {
-    feeBody.push(govLines.join("\n"));
-  } else if (totals.dueAtFiling !== 0) {
-    feeBody.push("- [an amount is due at filing but no government-fee line explains it — check the proposal before sending]");
-  } else {
-    feeBody.push("- No government filing fees are payable on this engagement.");
-  }
-
-  feeBody.push(
-    "",
-    `Full project cost: ${money(fullProjectCost(totals), currency)}. That is the two amounts above added together; it is not an amount due at signing.`,
-  );
-
+  //
+  // A quote the client makes CHOICES on (packages, add-ons) has no one pair of
+  // figures until they choose, so each package is stated in full — its own two
+  // figures, itemised — and each add-on with its price. The client's pick is
+  // frozen with their signature beside the amounts it selects.
   sections.push(`FEES
 
-${feeBody.join("\n")}`);
+${
+  offer.packages.length > 0 || offer.addOns.length > 0
+    ? choiceFees(offer, currency)
+    : singleOfferFees(totals, signingLines, govLines, currency)
+}`);
 
   // ── The §0 sentence, stated as a TERM and not only as a caption. The panel
   // above says it in a caption a client may skim; the thing they sign has to
@@ -274,4 +268,90 @@ Typing your name signs this agreement. Your name, email address, IP address and 
   }`);
 
   return sections.join("\n\n");
+}
+
+/** The FEES body for a quote the client makes no choice on: two timed figures,
+ * itemised, and the project cost below them. */
+function singleOfferFees(
+  totals: ReturnType<typeof quoteTotals>,
+  signingLines: string[],
+  govLines: string[],
+  currency: string,
+): string {
+  const feeBody: string[] = [
+    `Due at signing: ${money(totals.dueAtSigning, currency)}`,
+    signingLines.length ? signingLines.join("\n") : "- [no fee lines are marked due at signing — check the proposal before sending]",
+    "",
+    `Due later, at filing: ${money(totals.dueAtFiling, currency)}`,
+  ];
+
+  if (govLines.length) {
+    feeBody.push(govLines.join("\n"));
+  } else if (totals.dueAtFiling !== 0) {
+    feeBody.push("- [an amount is due at filing but no government-fee line explains it — check the proposal before sending]");
+  } else {
+    feeBody.push("- No government filing fees are payable on this engagement.");
+  }
+
+  feeBody.push(
+    "",
+    `Full project cost: ${money(fullProjectCost(totals), currency)}. That is the two amounts above added together; it is not an amount due at signing.`,
+  );
+  return feeBody.join("\n");
+}
+
+/**
+ * The FEES body for a quote with packages or add-ons: every package with its
+ * own two timed figures and the lines behind them, then the add-ons. Every
+ * figure is a sum of the lines, through the same helpers as the single-offer
+ * body, and the sum of the two is again named "full project cost" and said not
+ * to be due at signing.
+ */
+function choiceFees(offer: ReturnType<typeof readOffer>, currency: string): string {
+  const out: string[] = [];
+  if (offer.packages.length > 0) {
+    out.push("You choose one package on this page. What is due, and when, depends on that choice:");
+    for (const pkg of offer.packages) {
+      const chosen = [...offer.common, ...pkg.lines.map((line) => ({ ...line, selected: true }))];
+      const signing = signingFeeLines(chosen, currency);
+      const gov = governmentFeeLines(chosen, currency);
+      out.push(
+        "",
+        pkg.name.toUpperCase(),
+        `Due at signing: ${money(pkg.totals.dueAtSigning, currency)}`,
+        signing.length ? signing.join("\n") : "- [no fee lines in this package are marked due at signing — check the proposal before sending]",
+        `Due later, at filing: ${money(pkg.totals.dueAtFiling, currency)}`,
+        gov.length
+          ? gov.join("\n")
+          : pkg.totals.dueAtFiling !== 0
+            ? "- [an amount is due at filing but no government-fee line explains it — check the proposal before sending]"
+            : "- No government filing fees are payable with this package.",
+        `Full project cost for this package: ${money(fullProjectCost(pkg.totals), currency)}. That is the two amounts above added together; it is not an amount due at signing.`,
+      );
+    }
+  } else {
+    const base = offer.commonTotals;
+    out.push(
+      `Due at signing: ${money(base.dueAtSigning, currency)}`,
+      signingFeeLines(offer.common, currency).join("\n") || "- [no fee lines are marked due at signing — check the proposal before sending]",
+      "",
+      `Due later, at filing: ${money(base.dueAtFiling, currency)}`,
+      governmentFeeLines(offer.common, currency).join("\n") || "- No government filing fees are payable on this engagement.",
+    );
+  }
+
+  if (offer.addOns.length > 0) {
+    out.push("", "OPTIONAL ADD-ONS", "Charged only if you choose them on this page:");
+    for (const { line } of offer.addOns) {
+      const label = (line.label ?? "").trim() || "Add-on";
+      const when = line.kind === "government_fee" || line.charge_at === "filing" ? "at filing" : line.charge_at === "not_charged" ? "not charged" : "at signing";
+      out.push(`- ${label}: ${money(lineAmountCents({ ...line, selected: true }), currency)}, ${when}`);
+    }
+  }
+
+  out.push(
+    "",
+    "The package and any add-ons you choose are recorded with your signature, and the amounts that apply to you are the ones stated for them here.",
+  );
+  return out.join("\n");
 }

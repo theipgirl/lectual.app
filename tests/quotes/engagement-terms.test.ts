@@ -209,3 +209,41 @@ describe("flat fees only", () => {
     expect(terms).toContain("not a percentage of anything");
   });
 });
+
+describe("a quote with packages and add-ons", () => {
+  const pkg = (id: string, name: string, cents: number, over: Partial<QuoteLineInput> = {}) =>
+    line({ id, selection: "tier_option", tier_group: name, label: id, unit_amount_cents: cents, ...over });
+
+  const lines = [
+    pkg("Clearance search", "Full prosecution", 145_000),
+    pkg("Office action allowance", "Full prosecution", 95_000),
+    pkg("USPTO fee, class 25", "Full prosecution", 35_000, { kind: "government_fee", charge_at: "filing" }),
+    pkg("Knockout search", "Filing only", 95_000),
+    pkg("Budget search", "Budget", 40_000, { selected: false }),
+    line({ id: "watch", selection: "optional", selected: true, label: "Watch service, 12 months", unit_amount_cents: 60_000 }),
+    line({ id: "drawing", selection: "optional", selected: false, label: "Design mark drawing", unit_amount_cents: 25_000 }),
+  ];
+
+  it("states each offered package with its own two figures, itemised", () => {
+    const terms = buildEngagementTerms({ ...BASE, lines });
+    expect(terms).toContain("You choose one package on this page.");
+    expect(terms).toContain("FULL PROSECUTION\nDue at signing: $2,400.00");
+    expect(terms).toContain("Due later, at filing: $350.00");
+    expect(terms).toContain("- USPTO fee, class 25: $350.00 × 1 class = $350.00, charged when the application is filed.");
+    expect(terms).toContain("FILING ONLY\nDue at signing: $950.00");
+    expect(terms).toContain("Full project cost for this package: $2,750.00.");
+  });
+
+  it("lists the add-ons as charged only if chosen, and leaves out what the firm withheld", () => {
+    const terms = buildEngagementTerms({ ...BASE, lines });
+    expect(terms).toContain("- Watch service, 12 months: $600.00, at signing");
+    expect(terms).not.toContain("Design mark drawing");
+    expect(terms).not.toContain("BUDGET");
+    expect(terms).not.toContain("Budget search");
+  });
+
+  it("still never calls a sum a total", () => {
+    expect(buildEngagementTerms({ ...BASE, lines }).toLowerCase()).not.toContain("total");
+  });
+});
+
