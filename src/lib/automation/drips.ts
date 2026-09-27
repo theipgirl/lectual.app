@@ -6,8 +6,10 @@ export type DripSequence = Database["public"]["Tables"]["crm_drip_sequence"]["Ro
 export type DripStep = Database["public"]["Tables"]["crm_drip_step"]["Row"];
 export type EmailTemplate = Database["public"]["Tables"]["crm_email_template"]["Row"];
 export type DripEnrollment = Database["public"]["Tables"]["crm_drip_enrollment"]["Row"];
-type DripStepType = Database["public"]["Enums"]["crm_drip_step_type"];
-type DripEnrollmentStatus = Database["public"]["Enums"]["crm_drip_enrollment_status"];
+// Exported so callers (the campaigns UI's step-type picker, enrollment status
+// labels — see src/lib/campaigns/steps.ts) don't reach into Database directly.
+export type DripStepType = Database["public"]["Enums"]["crm_drip_step_type"];
+export type DripEnrollmentStatus = Database["public"]["Enums"]["crm_drip_enrollment_status"];
 
 function isUniqueViolation(error: unknown): boolean {
   return !!error && typeof error === "object" && (error as { code?: string }).code === "23505";
@@ -26,6 +28,18 @@ export async function listSequences(): Promise<DripSequence[]> {
   return data ?? [];
 }
 
+/** Fetches a single sequence by id, or null if not found / not visible under RLS. */
+export async function getSequence(id: string): Promise<DripSequence | null> {
+  const supabase = await getScopedClient();
+  const { data, error } = await supabase
+    .from("crm_drip_sequence")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  return data ?? null;
+}
+
 export type CreateSequenceInput = { name: string; description?: string; active?: boolean };
 
 /** Creates a drip sequence. Admin-gated (owner/admin/senior_admin). */
@@ -42,6 +56,36 @@ export async function createSequence(input: CreateSequenceInput): Promise<DripSe
       description: input.description ?? "",
       active: input.active ?? true,
     })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export type UpdateSequenceInput = { name: string; description?: string };
+
+/** Updates a sequence's name/description (not its active flag — see toggleSequenceActive). Admin-gated. */
+export async function updateSequenceDetails(id: string, input: UpdateSequenceInput): Promise<DripSequence> {
+  const supabase = await getScopedClient();
+  await requireAutomationAdminRole(supabase);
+  const { data, error } = await supabase
+    .from("crm_drip_sequence")
+    .update({ name: input.name, description: input.description ?? "", updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/** Flips a sequence's active flag ("pause" / "start"). Admin-gated. */
+export async function toggleSequenceActive(id: string, active: boolean): Promise<DripSequence> {
+  const supabase = await getScopedClient();
+  await requireAutomationAdminRole(supabase);
+  const { data, error } = await supabase
+    .from("crm_drip_sequence")
+    .update({ active, updated_at: new Date().toISOString() })
+    .eq("id", id)
     .select("*")
     .single();
   if (error) throw error;
@@ -95,6 +139,23 @@ export async function addStep(sequenceId: string, input: AddStepInput): Promise<
     .single();
   if (error) throw error;
   return data;
+}
+
+/**
+ * Removes a step from a sequence. Admin-gated.
+ *
+ * `crm_drip_enrollment.current_step` counts steps already run, not a
+ * foreign key to one — so deleting (or adding) a step ahead of an
+ * in-flight enrollment shifts which step it hits next, same as it would for
+ * a step inserted at an earlier order_index. That is a real edit to a live
+ * sequence, not a bug in this function; the caller (the sequence builder UI)
+ * is expected to only let an admin do this deliberately.
+ */
+export async function deleteStep(id: string): Promise<void> {
+  const supabase = await getScopedClient();
+  await requireAutomationAdminRole(supabase);
+  const { error } = await supabase.from("crm_drip_step").delete().eq("id", id);
+  if (error) throw error;
 }
 
 // ── Email templates (admin-managed) ──────────────────────────────────────────
