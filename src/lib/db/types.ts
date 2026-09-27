@@ -14,6 +14,352 @@ export type Database = {
   }
   public: {
     Tables: {
+      crm_calendar_event: {
+        Row: {
+          all_day: boolean
+          contact_name: string | null
+          created_at: string
+          ends_at: string | null
+          event_type: string | null
+          id: string
+          lawmatics_id: string
+          location: string | null
+          matter_id: string | null
+          org_id: string
+          starts_at: string
+          synced_at: string
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          all_day?: boolean
+          contact_name?: string | null
+          created_at?: string
+          ends_at?: string | null
+          event_type?: string | null
+          id?: string
+          lawmatics_id: string
+          location?: string | null
+          matter_id?: string | null
+          org_id: string
+          starts_at: string
+          synced_at?: string
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          all_day?: boolean
+          contact_name?: string | null
+          created_at?: string
+          ends_at?: string | null
+          event_type?: string | null
+          id?: string
+          lawmatics_id?: string
+          location?: string | null
+          matter_id?: string | null
+          org_id?: string
+          starts_at?: string
+          synced_at?: string
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_calendar_event_matter_fk"
+            columns: ["matter_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_matter"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "crm_calendar_event_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_org"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_quote: {
+        Row: {
+          accepted_at: string | null
+          accepted_by_email: string | null
+          accepted_by_name: string | null
+          accepted_ip: unknown
+          accepted_snapshot: Json | null
+          accepted_user_agent: string | null
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          declined_at: string | null
+          expires_at: string | null
+          id: string
+          intro_body: string | null
+          lead_id: string | null
+          matter_id: string | null
+          org_id: string
+          public_token: string
+          sent_at: string | null
+          status: Database["public"]["Enums"]["crm_quote_status"]
+          terms_body: string | null
+          title: string
+          updated_at: string
+          withdrawn_at: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by_email?: string | null
+          accepted_by_name?: string | null
+          accepted_ip?: unknown
+          accepted_snapshot?: Json | null
+          accepted_user_agent?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          declined_at?: string | null
+          expires_at?: string | null
+          id?: string
+          intro_body?: string | null
+          lead_id?: string | null
+          matter_id?: string | null
+          org_id: string
+          public_token: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["crm_quote_status"]
+          terms_body?: string | null
+          title: string
+          updated_at?: string
+          withdrawn_at?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by_email?: string | null
+          accepted_by_name?: string | null
+          accepted_ip?: unknown
+          accepted_snapshot?: Json | null
+          accepted_user_agent?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          declined_at?: string | null
+          expires_at?: string | null
+          id?: string
+          intro_body?: string | null
+          lead_id?: string | null
+          matter_id?: string | null
+          org_id?: string
+          public_token?: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["crm_quote_status"]
+          terms_body?: string | null
+          title?: string
+          updated_at?: string
+          withdrawn_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_quote_contact_fk"
+            columns: ["contact_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contact"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "crm_quote_lead_fk"
+            columns: ["lead_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_lead"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "crm_quote_matter_fk"
+            columns: ["matter_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_matter"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "crm_quote_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_org"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_quote_event: {
+        Row: {
+          actor: Database["public"]["Enums"]["crm_quote_event_actor"]
+          actor_user_id: string | null
+          created_at: string
+          id: string
+          org_id: string
+          payload: Json
+          quote_id: string
+          type: Database["public"]["Enums"]["crm_quote_event_type"]
+        }
+        Insert: {
+          actor: Database["public"]["Enums"]["crm_quote_event_actor"]
+          actor_user_id?: string | null
+          created_at?: string
+          id?: string
+          org_id: string
+          payload?: Json
+          quote_id: string
+          type: Database["public"]["Enums"]["crm_quote_event_type"]
+        }
+        Update: {
+          actor?: Database["public"]["Enums"]["crm_quote_event_actor"]
+          actor_user_id?: string | null
+          created_at?: string
+          id?: string
+          org_id?: string
+          payload?: Json
+          quote_id?: string
+          type?: Database["public"]["Enums"]["crm_quote_event_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_quote_event_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_org"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_quote_event_quote_fk"
+            columns: ["quote_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_quote"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
+      crm_quote_line: {
+        Row: {
+          charge_at: Database["public"]["Enums"]["crm_quote_charge_at"]
+          created_at: string
+          description: string | null
+          id: string
+          kind: Database["public"]["Enums"]["crm_quote_line_kind"]
+          label: string
+          org_id: string
+          quantity: number
+          quote_id: string
+          selected: boolean
+          selection: Database["public"]["Enums"]["crm_quote_line_selection"]
+          sort_index: number
+          source_service_item_id: string | null
+          tier_group: string | null
+          unit_amount_cents: number
+          updated_at: string
+        }
+        Insert: {
+          charge_at: Database["public"]["Enums"]["crm_quote_charge_at"]
+          created_at?: string
+          description?: string | null
+          id?: string
+          kind: Database["public"]["Enums"]["crm_quote_line_kind"]
+          label: string
+          org_id: string
+          quantity?: number
+          quote_id: string
+          selected?: boolean
+          selection?: Database["public"]["Enums"]["crm_quote_line_selection"]
+          sort_index?: number
+          source_service_item_id?: string | null
+          tier_group?: string | null
+          unit_amount_cents: number
+          updated_at?: string
+        }
+        Update: {
+          charge_at?: Database["public"]["Enums"]["crm_quote_charge_at"]
+          created_at?: string
+          description?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["crm_quote_line_kind"]
+          label?: string
+          org_id?: string
+          quantity?: number
+          quote_id?: string
+          selected?: boolean
+          selection?: Database["public"]["Enums"]["crm_quote_line_selection"]
+          sort_index?: number
+          source_service_item_id?: string | null
+          tier_group?: string | null
+          unit_amount_cents?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_quote_line_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_org"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_quote_line_quote_fk"
+            columns: ["quote_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_quote"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
+      crm_service_item: {
+        Row: {
+          active: boolean
+          charge_at: Database["public"]["Enums"]["crm_quote_charge_at"]
+          created_at: string
+          description: string | null
+          id: string
+          kind: Database["public"]["Enums"]["crm_quote_line_kind"]
+          label: string
+          org_id: string
+          sort_index: number
+          unit_amount_cents: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          charge_at: Database["public"]["Enums"]["crm_quote_charge_at"]
+          created_at?: string
+          description?: string | null
+          id?: string
+          kind: Database["public"]["Enums"]["crm_quote_line_kind"]
+          label: string
+          org_id: string
+          sort_index?: number
+          unit_amount_cents: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          charge_at?: Database["public"]["Enums"]["crm_quote_charge_at"]
+          created_at?: string
+          description?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["crm_quote_line_kind"]
+          label?: string
+          org_id?: string
+          sort_index?: number
+          unit_amount_cents?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_service_item_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_org"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_run: {
         Row: {
           agent: string
@@ -2764,6 +3110,32 @@ export type Database = {
       }
     }
     Enums: {
+      crm_quote_status:
+        | "draft"
+        | "sent"
+        | "accepted"
+        | "declined"
+        | "expired"
+        | "withdrawn"
+      crm_quote_event_type:
+        | "created"
+        | "sent"
+        | "viewed"
+        | "selection_changed"
+        | "accepted"
+        | "declined"
+        | "expired"
+        | "withdrawn"
+        | "revised"
+        | "payment_recorded"
+      crm_quote_event_actor: "firm" | "client" | "system"
+      crm_quote_line_kind:
+        | "legal_fee"
+        | "government_fee"
+        | "expense"
+        | "discount"
+      crm_quote_charge_at: "signing" | "filing" | "not_charged"
+      crm_quote_line_selection: "included" | "optional" | "tier_option"
       crm_activity_type:
         | "note"
         | "email_sent"

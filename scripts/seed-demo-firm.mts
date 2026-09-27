@@ -396,6 +396,23 @@ async function main() {
     "tasks",
   );
 
+  // ── Consults and meetings (crm_calendar_event, normally synced from Lawmatics)
+  const at = (days: number, hourUtc: number, minute = 0) => {
+    const d = new Date(now + days * DAY);
+    d.setUTCHours(hourUtc, minute, 0, 0);
+    return d.toISOString();
+  };
+  ok(
+    await db.from("crm_calendar_event").insert([
+      { org_id: orgId, title: "Strategy session — Grace Whitfield", starts_at: at(1, 15), ends_at: at(1, 16), event_type: "Strategy Session", contact_name: "Grace Whitfield", location: "Zoom" },
+      { org_id: orgId, title: "Discovery call — Keisha Adeyemi", starts_at: at(2, 19, 30), ends_at: at(2, 20), event_type: "Discovery Call", contact_name: "Keisha Adeyemi" },
+      { org_id: orgId, title: "Discovery call — Maya Lindqvist", starts_at: at(0, 21), ends_at: at(0, 21, 30), event_type: "Discovery Call", contact_name: "Maya Lindqvist" },
+      { org_id: orgId, title: "Client check-in — Tidepool Kids", starts_at: at(5, 16), ends_at: at(5, 16, 30), event_type: "Meeting", contact_name: "Beth Nakamura", matter_id: matterId(4) },
+      { org_id: orgId, title: "Team docket review", starts_at: at(-3, 14), ends_at: at(-3, 15), event_type: "Internal" },
+    ].map((e, i) => ({ all_day: false, location: null, matter_id: null, lawmatics_id: `demo-event-${i + 1}`, synced_at: new Date(now).toISOString(), ...e }))),
+    "calendar events",
+  );
+
   // ── Documents: two approved letters with real .docx files ──────────────────
   const letters = [
     { n: 1, type: "loe_trademark_current", file: "Bellwether Coffee — Engagement Letter.docx", title: "Engagement letter — BELLWETHER", body: ["Scope: federal trademark clearance and application for BELLWETHER in Classes 30 and 43.", "Flat fee as quoted. Government filing fees billed at cost."] },
