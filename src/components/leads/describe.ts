@@ -45,9 +45,10 @@ export function describeActivity(row: Row): Described {
     case "email_sent":
       return { title: "Email sent", detail: str(p.subject) ?? str(p.body), tone: "mail", link: str(p.web_link) };
     case "note":
-      return { title: "Note", detail: str(p.body) ?? str(p.text), tone: "note", link: null };
+      // addNote (src/lib/pipeline/notes.ts) writes `note`; older producers wrote `body`/`text`.
+      return { title: "Note", detail: str(p.note) ?? str(p.body) ?? str(p.text), tone: "note", link: null };
     case "call_logged":
-      return { title: "Call logged", detail: str(p.body), tone: "note", link: null };
+      return { title: "Call logged", detail: str(p.summary) ?? str(p.notes) ?? str(p.body), tone: "note", link: null };
     case "voice_note":
       return { title: "Voice note", detail: str(p.transcript), tone: "note", link: null };
     case "stage_changed":

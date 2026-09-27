@@ -34,7 +34,7 @@ export async function moveLeadStageAction(
     return { ok: false, error: friendlyMoveStageError(err) };
   }
 
-  revalidatePath("/dashboard/leads/");
+  revalidatePath("/dashboard/intake/");
   revalidatePath(`/dashboard/leads/${leadId}/`);
   return { ok: true };
 }
@@ -110,7 +110,7 @@ export async function createLeadAction(
     };
   }
 
-  revalidatePath("/dashboard/leads/");
+  revalidatePath("/dashboard/intake/");
   revalidatePath("/dashboard/");
   return { ok: true, leadId };
 }

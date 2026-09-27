@@ -18,6 +18,8 @@ export type NavItem = {
   module?: OrgModule;
   /** Caller must be at least this privileged. */
   minRole?: Role;
+  /** Other path prefixes that belong to this section (a lead's page is part of Intake). */
+  also?: readonly string[];
   /** Build step that delivers the real page (docs/MVP-PLAN.md). */
   step: number;
 };
@@ -25,7 +27,7 @@ export type NavItem = {
 export const NAV: readonly NavItem[] = [
   { slug: "", label: "Today", href: "/dashboard/", group: "work", step: 6,
     icon: "M4 11l8-7 8 7M6 10v10h12V10" },
-  { slug: "leads", label: "Leads", href: "/dashboard/leads/", group: "work", step: 6,
+  { slug: "intake", label: "Intake", href: "/dashboard/intake/", also: ["/dashboard/leads/"], group: "work", step: 6,
     icon: "M4 7h16M4 12h10M4 17h6M17 14l3 3-3 3" },
   { slug: "matters", label: "Matters", href: "/dashboard/matters/", group: "work", step: 6,
     icon: "M4 6h16M4 12h16M4 18h10" },
@@ -46,6 +48,14 @@ export const NAV: readonly NavItem[] = [
   { slug: "settings", label: "Settings", href: "/dashboard/settings/", group: "system", step: 3,
     icon: "M12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" },
 ];
+
+/**
+ * Cookie the rail's pinned state lives in. Read by the dashboard layout so the
+ * first paint is already the right width. It lives here, not in the (client)
+ * Rail, because a server component cannot read a value exported from a
+ * "use client" module.
+ */
+export const RAIL_PIN_COOKIE = "lx_rail";
 
 /** Whether `item` exists for a firm holding `modules`, viewed by `role`. Fails closed. */
 export function navItemAllowed(item: NavItem, modules: readonly string[], role: Role): boolean {

@@ -285,7 +285,7 @@ export async function importAction(
       const report = await applyImport(fingerprint, options);
       // The pipeline and lead surfaces now have new rows behind them.
       await recordLawmaticsOutcome({ imported: true });
-      revalidatePath("/dashboard/leads/");
+      revalidatePath("/dashboard/intake/");
       revalidatePath(PAGE);
       return {
         phase: "done",

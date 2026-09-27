@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { loadActiveQueue } from "@/lib/queue/load";
-import { visibleNav } from "@/lib/nav";
+import { RAIL_PIN_COOKIE, visibleNav } from "@/lib/nav";
 import { Rail } from "@/components/shell/Rail";
+import { loadRailCounts } from "@/lib/nav-counts";
 import { SectionLabel } from "@/components/shell/SectionLabel";
 import { AccountMenu } from "@/components/shell/AccountMenu";
 import { NoFirmAccess } from "@/components/shell/NoFirmAccess";
@@ -32,7 +34,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   // Three states, carried to the rail badge — an unreachable queue must never
   // render like an empty one (src/lib/queue/load.ts).
-  const queue = await loadActiveQueue();
+  const [queue, counts, cookieStore] = await Promise.all([
+    loadActiveQueue(),
+    loadRailCounts().catch(() => ({})),
+    cookies(),
+  ]);
+  const railPinned = cookieStore.get(RAIL_PIN_COOKIE)?.value === "pinned";
 
   return (
     <div className="lx-app">
@@ -70,9 +77,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
         />
       </header>
       <div className="lx-main">
-        <div className="lx-rail-slot">
-          <Rail items={items} queueStatus={queue.status} pendingCount={queue.items.length} />
-        </div>
+        <Rail
+          items={items}
+          queueStatus={queue.status}
+          pendingCount={queue.items.length}
+          counts={counts}
+          initialPinned={railPinned}
+        />
         <div className="lx-content">
           <div className="lx-page">{children}</div>
         </div>

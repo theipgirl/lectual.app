@@ -55,8 +55,8 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
 
   return (
     <>
-      <Link href="/dashboard/leads/" className="lx-back">
-        ← Leads
+      <Link href="/dashboard/intake/" className="lx-back">
+        ← Intake
       </Link>
       <div className="lx-page-head">
         <div style={{ flex: 1, minWidth: 260 }}>

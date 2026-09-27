@@ -50,3 +50,11 @@ Source commit: `610c206` (main, 2026-09-25). Copy, don't import: when a ported f
 
 New in this repo: Settings → Firm profile (`src/lib/org/profile*.ts`, lectual 0073) and Modules, `src/lib/lawmatics/connection.ts` and the Lawmatics import UI (`src/components/lawmatics/*`), `src/lib/matters/worklist.ts` (the design's whose-move-is-it bands), `src/lib/mailbox/*` (except the apply port above), `src/lib/nav.ts`, `src/lib/fonts`, `src/components/shell/*`, `src/app/dashboard/*`,
 `src/app/globals.css` (design tokens).
+
+## Intake (table, board by stage, board by owner)
+From `theipgirl/lectual` main @ 610c206 (`src/app/(intake)/intake`):
+- `_components/*` → `src/app/dashboard/intake/_components/`; `actions.ts`, `time-actions.ts` → `src/app/dashboard/intake/`.
+- `src/lib/intake/{index,leads,reply,rows,scope,temperature,views}.ts`, `src/lib/time/entries.ts`, `src/components/intake/{TimeChip,TimeEntryDialog}.tsx`.
+- `intake.css` adapted: same tokens and components, but the route group's own rail, top bar and 100dvh frame are dropped because the app shell provides them. Mono labels use the app's Courier Prime.
+- `IntakeTopBar` is now just the page's status line. The notification bell and the `/intake/import` page were not ported; Import points to Settings → Integrations → Lawmatics.
+- Tests: `tests/intake/{reply,rows,scope,temperature,views}.test.ts`. The DB-backed `list-intake` and `time/entries` suites stay in lectual.

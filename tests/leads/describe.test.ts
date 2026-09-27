@@ -33,5 +33,11 @@ describe("timeline wording", () => {
     expect(describeActivity({ type: "matter_updated", actor_type: "user", created_at: at, payload: { change: "ip_fields", fields: ["serial_number"] } }).detail).toBe("serial number");
     expect(describeActivity({ type: "matter_opened", actor_type: "system", created_at: at, payload: { matter_number: "TM-2026-0001" } }).detail).toBe("TM-2026-0001");
   });
-});
 
+  it("shows the text of notes and calls saved from the app (note / summary keys)", () => {
+    const at = "2026-09-26T00:00:00Z";
+    expect(describeActivity({ type: "note", actor_type: "user", created_at: at, payload: { note: "Client prefers email." } }).detail).toBe("Client prefers email.");
+    expect(describeActivity({ type: "note", actor_type: "user", created_at: at, payload: { body: "Older producer." } }).detail).toBe("Older producer.");
+    expect(describeActivity({ type: "call_logged", actor_type: "user", created_at: at, payload: { summary: "Discussed classes", notes: "long notes" } }).detail).toBe("Discussed classes");
+  });
+});

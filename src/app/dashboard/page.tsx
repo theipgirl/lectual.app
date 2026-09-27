@@ -125,7 +125,7 @@ export default async function TodayPage() {
         <Kpi label="Waiting on you" value={queueValue} sub="drafts to approve" href="/dashboard/queue/" failed={queueFailed} />
         <Kpi label="Overdue" value={calendarNote && deadlines === null && tasks === null ? null : overdue} sub="deadlines and tasks past due" href="/dashboard/calendar/" />
         <Kpi label="Our move" value={docket ? docket.waitingOn.firm : null} sub={docket ? `of ${docket.open} open matters` : ""} href="/dashboard/matters/?seg=firm" />
-        <Kpi label="New leads" value={newLeads ? newLeads.length : null} sub="in the last 7 days" href="/dashboard/leads/" />
+        <Kpi label="New leads" value={newLeads ? newLeads.length : null} sub="in the last 7 days" href="/dashboard/intake/" />
       </div>
 
       {queue.status === "unavailable" && (

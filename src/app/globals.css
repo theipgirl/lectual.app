@@ -294,6 +294,12 @@ a:hover {
   flex: 0 0 auto;
   width: 94px;
   position: relative;
+  transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+/* Pinned (the prototype's railPinned): the slot opens to 294px and the
+   rail becomes a 262px panel with each section's name and count. */
+.lx-rail-slot.is-pinned {
+  width: 294px;
 }
 .lx-rail {
   position: absolute;
@@ -309,8 +315,17 @@ a:hover {
   gap: 4px;
   padding: 12px 0;
   box-shadow: var(--shadow);
-  overflow-y: auto;
+  /* Visible, not auto: the collapsed rail's name tooltips hang outside it,
+     and an auto overflow on either axis would clip them. */
+  overflow: visible;
   z-index: 40;
+  transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.lx-rail.is-pinned {
+  width: 262px;
+  align-items: stretch;
+  padding: 12px 8px;
+  overflow-y: auto;
 }
 .lx-rail-item {
   width: 46px;
@@ -331,6 +346,75 @@ a:hover {
 .lx-rail-item[aria-current="page"] {
   background: var(--cream);
   color: var(--ox);
+}
+button.lx-rail-item {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+}
+.lx-rail-name,
+.lx-rail-count {
+  display: none;
+}
+.lx-rail.is-pinned .lx-rail-item {
+  width: auto;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 0 12px 0 13px;
+}
+.lx-rail.is-pinned .lx-rail-name {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  font-size: 14.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+.lx-rail.is-pinned .lx-rail-count {
+  display: block;
+  font-family: var(--mono);
+  font-size: 12px;
+  opacity: 0.75;
+}
+.lx-rail-count.is-alert {
+  color: var(--cream);
+  background: var(--wine);
+  border-radius: 999px;
+  padding: 0 6px;
+  opacity: 1;
+}
+.lx-rail.is-pinned .lx-rail-sep {
+  width: auto;
+  margin: 6px 12px;
+}
+.lx-rail-spacer {
+  flex: 1;
+  min-height: 8px;
+}
+/* The design's hover label on the collapsed rail. */
+.lx-rail-tip {
+  position: absolute;
+  left: 56px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--ink);
+  color: var(--cream);
+  font-size: 13px;
+  padding: 5px 9px;
+  border-radius: 7px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s;
+  z-index: 60;
+}
+.lx-rail-item:hover .lx-rail-tip,
+.lx-rail-item:focus-visible .lx-rail-tip {
+  opacity: 1;
 }
 .lx-rail-item svg {
   width: 20px;
@@ -417,6 +501,26 @@ a:hover {
     width: 1px;
     height: 26px;
     margin: 0 4px;
+  }
+  .lx-rail-slot.is-pinned {
+    width: 0;
+  }
+  .lx-rail.is-pinned {
+    width: auto;
+    padding: 0 8px;
+    align-items: center;
+  }
+  .lx-rail.is-pinned .lx-rail-item {
+    width: 46px;
+    padding: 0;
+    justify-content: center;
+  }
+  .lx-rail.is-pinned .lx-rail-name,
+  .lx-rail.is-pinned .lx-rail-count,
+  .lx-rail-tip,
+  .lx-rail-pin,
+  .lx-rail-spacer {
+    display: none;
   }
   .lx-content {
     padding: 16px 16px 84px;

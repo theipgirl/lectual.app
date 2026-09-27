@@ -158,7 +158,7 @@ export async function editLeadAction(
   }
 
   revalidatePath(`/dashboard/leads/${leadId}/`);
-  revalidatePath("/dashboard/leads/");
+  revalidatePath("/dashboard/intake/");
   return { saved: true };
 }
 
