@@ -65,7 +65,6 @@ export const NAV: readonly NavItem[] = [
   { slug: "agents", label: "Agents", href: "/dashboard/agents/", icon: ICON.bolt, module: "agents", step: 5 },
   { slug: "skills", label: "Skills", href: "/dashboard/skills/", icon: ICON.cycle, step: 7 },
   { slug: "brain", label: "Firm brain", href: "/dashboard/brain/", icon: ICON.globe, step: 7 },
-  { slug: "reports", label: "Reports", href: "/dashboard/reports/", icon: ICON.bars, step: 7 },
   { slug: "settings", label: "Settings", href: "/dashboard/settings/", icon: ICON.sliders, step: 3 },
 ];
 
@@ -75,7 +74,9 @@ export type RailNode =
   | {
       label: string;
       icon: string;
-      /** Page the parent opens; else its first visible child. */
+      /** The section's report view (/dashboard/reports/<report>/), which the parent opens. */
+      report: ReportKey;
+      /** Which child's page is the section's main list (drawn "open" with the parent). */
       link?: string;
       /** Whose count the parent shows (defaults to `link`). */
       countFrom?: string;
@@ -87,15 +88,35 @@ export type RailNode =
  * spacer. Settings is not here: the rail pins it to the bottom.
  */
 export const RAIL_TREE: readonly (readonly RailNode[])[] = [
-  [{ slug: "" }, { label: "Communication", icon: ICON.chat, countFrom: "queue", kids: ["mail", "queue", "campaigns", "sms"] }, { slug: "calendar" }],
   [
-    { label: "Intake", icon: ICON.tray, link: "intake", kids: ["intake", "forms"] },
-    { slug: "quotes" },
-    { label: "Active matters", icon: ICON.case, link: "matters", kids: ["matters", "documents", "portals"] },
+    { slug: "" },
+    { label: "Communication", icon: ICON.chat, report: "communication", countFrom: "queue", kids: ["mail", "queue", "campaigns", "sms"] },
+    { slug: "calendar" },
   ],
-  [{ label: "IP.OS", icon: ICON.shield, kids: ["copilot", "agents", "skills", "brain"] }],
-  [{ slug: "reports" }],
+  [
+    { label: "Intake", icon: ICON.tray, report: "intake", link: "intake", kids: ["intake", "forms"] },
+    { slug: "quotes" },
+    { label: "Active matters", icon: ICON.case, report: "matters", link: "matters", kids: ["matters", "documents", "portals"] },
+  ],
+  [{ label: "IP.OS", icon: ICON.shield, report: "ipos", kids: ["copilot", "agents", "skills", "brain"] }],
 ];
+
+/**
+ * Each parent section opens a REPORT view of itself (the prototype's
+ * isReport pages): KPIs for the period, what is waiting on the firm, and a
+ * link to each child with its count. There is no separate Reports section.
+ */
+export const REPORTS = {
+  communication: { label: "Communication", href: "/dashboard/reports/communication/" },
+  intake: { label: "Intake", href: "/dashboard/reports/intake/" },
+  matters: { label: "Active matters", href: "/dashboard/reports/matters/" },
+  ipos: { label: "IP.OS", href: "/dashboard/reports/ipos/" },
+} as const;
+export type ReportKey = keyof typeof REPORTS;
+
+export function isReportKey(value: unknown): value is ReportKey {
+  return typeof value === "string" && Object.prototype.hasOwnProperty.call(REPORTS, value);
+}
 
 /**
  * Cookie the rail's pinned state lives in. Read by the dashboard layout so the
@@ -158,14 +179,15 @@ export function railGroups(visible: readonly NavItem[], pathname: string): RailE
         return item ? [{ key: item.slug, label: item.railLabel ?? item.label, icon: item.icon, href: item.href, active: isNavActive(pathname, item), countKey: item.slug }] : [];
       });
       if (kids.length === 0) return [];
-      const linked = node.link ? kids.find((k) => k.key === node.link) : undefined;
+      const report = REPORTS[node.report];
+      const path = pathname.endsWith("/") ? pathname : `${pathname}/`;
       return [
         {
           key: node.label,
           label: node.label,
           icon: node.icon,
-          href: (linked ?? kids[0]).href,
-          active: false,
+          href: report.href,
+          active: path.startsWith(report.href),
           childActive: kids.some((k) => k.active),
           countKey: node.countFrom ?? node.link ?? null,
           kids,

@@ -14,6 +14,254 @@ export type Database = {
   }
   public: {
     Tables: {
+      crm_intake_form: {
+        Row: {
+          agreement_signed_at: string | null
+          allowed_domains: string[]
+          config: Json
+          created_at: string
+          created_by: string | null
+          id: string
+          org_id: string
+          published_at: string | null
+          receives_referrals: boolean
+          slug: string
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          agreement_signed_at?: string | null
+          allowed_domains?: string[]
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          org_id: string
+          published_at?: string | null
+          receives_referrals?: boolean
+          slug: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          agreement_signed_at?: string | null
+          allowed_domains?: string[]
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          org_id?: string
+          published_at?: string | null
+          receives_referrals?: boolean
+          slug?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_intake_form_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "crm_org"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_intake_submission: {
+        Row: {
+          answers: Json
+          contact: Json
+          created_at: string
+          fit: string
+          form_id: string
+          id: string
+          last_active_at: string
+          lead_id: string | null
+          mode: string
+          org_id: string
+          screening_note: string | null
+          source_host: string | null
+          started_at: string
+          status: string
+          submitted_at: string | null
+        }
+        Insert: {
+          answers?: Json
+          contact?: Json
+          created_at?: string
+          fit?: string
+          form_id: string
+          id?: string
+          last_active_at?: string
+          lead_id?: string | null
+          mode: string
+          org_id: string
+          screening_note?: string | null
+          source_host?: string | null
+          started_at?: string
+          status?: string
+          submitted_at?: string | null
+        }
+        Update: {
+          answers?: Json
+          contact?: Json
+          created_at?: string
+          fit?: string
+          form_id?: string
+          id?: string
+          last_active_at?: string
+          lead_id?: string | null
+          mode?: string
+          org_id?: string
+          screening_note?: string | null
+          source_host?: string | null
+          started_at?: string
+          status?: string
+          submitted_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_intake_submission_form_fk"
+            columns: ["form_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_intake_form"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "crm_intake_submission_lead_fk"
+            columns: ["lead_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_lead"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "crm_intake_submission_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_org"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_intake_event: {
+        Row: {
+          form_id: string
+          id: number
+          kind: string
+          occurred_at: string
+          org_id: string
+          session_hash: string | null
+        }
+        Insert: {
+          form_id: string
+          id?: never
+          kind: string
+          occurred_at?: string
+          org_id: string
+          session_hash?: string | null
+        }
+        Update: {
+          form_id?: string
+          id?: never
+          kind?: string
+          occurred_at?: string
+          org_id?: string
+          session_hash?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_intake_event_form_fk"
+            columns: ["form_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_intake_form"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "crm_intake_event_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_org"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_intake_request: {
+        Row: {
+          answers: Json | null
+          completed_at: string | null
+          contact_id: string | null
+          created_at: string
+          form_id: string
+          id: string
+          matter_id: string
+          org_id: string
+          sent_at: string
+          sent_by: string | null
+          status: string
+          token: string
+        }
+        Insert: {
+          answers?: Json | null
+          completed_at?: string | null
+          contact_id?: string | null
+          created_at?: string
+          form_id: string
+          id?: string
+          matter_id: string
+          org_id: string
+          sent_at?: string
+          sent_by?: string | null
+          status?: string
+          token: string
+        }
+        Update: {
+          answers?: Json | null
+          completed_at?: string | null
+          contact_id?: string | null
+          created_at?: string
+          form_id?: string
+          id?: string
+          matter_id?: string
+          org_id?: string
+          sent_at?: string
+          sent_by?: string | null
+          status?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_intake_request_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contact"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_intake_request_form_fk"
+            columns: ["form_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_intake_form"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "crm_intake_request_matter_fk"
+            columns: ["matter_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_matter"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "crm_intake_request_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_org"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crm_calendar_event: {
         Row: {
           all_day: boolean

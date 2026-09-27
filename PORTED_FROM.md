@@ -58,3 +58,36 @@ From `theipgirl/lectual` main @ 610c206 (`src/app/(intake)/intake`):
 - `intake.css` adapted: same tokens and components, but the route group's own rail, top bar and 100dvh frame are dropped because the app shell provides them. Mono labels use the app's Courier Prime.
 - `IntakeTopBar` is now just the page's status line. The notification bell and the `/intake/import` page were not ported; Import points to Settings → Integrations → Lawmatics.
 - Tests: `tests/intake/{reply,rows,scope,temperature,views}.test.ts`. The DB-backed `list-intake` and `time/entries` suites stay in lectual.
+
+## Quotes & proposals
+From `theipgirl/lectual` branch `claude/lectual-firm-dashboard-prd-f3loev` @ `0f13772` (unmerged). Uses only
+0068's tables (`crm_quote`, `crm_quote_line`, `crm_quote_event`, `crm_service_item`); no migration here.
+
+| lectual.app | From lectual | Changes |
+|---|---|---|
+| `src/lib/quotes/{pricing,engagement-terms,index}.ts` | same paths | none |
+| `src/lib/quotes/status.ts` | same path | firm-zone helpers come from `./firm-time` (this app's `calendar-rows.ts` has no `FIRM_TIME_ZONE`/`firmCivilDate`) |
+| `src/lib/quotes/types.ts` | same path | drops `crm_payment`, `crm_org_payment_account`, `crm_quote_line_request` and `public_slug` |
+| `src/lib/quotes/store.ts` | same path | no `public_slug` (0070), no line-request promotion (0071/0073), no manual payments; adds `updateQuoteDetails` (status-pinned, zero rows = lost race) |
+| `src/lib/quotes/load.ts` | same path | no line-request loader; list ordered by `updated_at`; adds `loadLinesForQuotes` (one `.in()` read for list totals) |
+| `src/lib/quotes/service-library.ts` | same path | none |
+| `src/lib/quotes/public.ts` | same path | reads `/q/<token>` only (no slug column, no retry), firm name only (no `crm_org_theme` logo), no line requests, no `quote_accepted` `crm_activity` write (0062's enum value; `crm_quote_event` records it); snapshot version 1 (no `line_requests`); adds `declinePublicQuote` (same conditional-update shape as accept) |
+| `src/lib/auth/current-role.ts` | same path | none |
+| `src/lib/quotes/drift.ts` | `describeLineDrift` in `quotes/[id]/_components/LinesEditor.tsx` | moved to a pure module |
+| `src/lib/quotes/{money,labels}.ts` | the per-slice `money.ts` / `line-fields.ts` / `field-meta.ts` / `quote-meta.ts` copies | one copy; `parseDollarsToCents` also accepts a leading `$` |
+| `src/lib/quotes/firm-time.ts` | `FIRM_TIME_ZONE`/`firmCivilDate` from `src/lib/matters/calendar-rows.ts` | adds `endOfFirmDay` (expiry is 23:59:59 in the firm's zone; lectual stored 23:59:59 UTC) |
+| `src/lib/quotes/clients.ts` | — | new: client names for the list/builder, and the "New quote" picker (leads, matters, contacts) |
+| `src/app/dashboard/quotes/{page,actions,errors}.ts(x)` | `src/app/(firm)/dashboard/quotes/{page,actions}.tsx` | same attorney+ gate on page and action; adds client and total columns; errors through `friendlyQuoteError` (lectual put raw PostgREST text on screen); the refusal copy names attorneys too |
+| `src/app/dashboard/quotes/[id]/{page,actions}.ts(x)` | `src/app/(firm)/dashboard/quotes/[id]/*` | same gates, terms race guard and snapshot-first rendering; no payments or line-request panels; client link is `/q/<token>/`; adds `updateDetailsAction` |
+| `src/components/quotes/*` | `quotes/[id]/_components/*`, `quotes/_components/*`, `settings/service-library/_components/*` | re-skinned to `lx-*`; logic unchanged |
+| `src/app/dashboard/settings/services/*` | `src/app/(firm)/dashboard/settings/service-library/*` | Settings tab; attorneys can read it; a discount item is stored negative (lectual's action stored the magnitude, which its own CHECK refused) |
+| `src/app/q/[token]/*`, `src/components/proposal/*` | `src/app/q/[token]/*`, `src/app/proposal/_components/*` | one route, no `/proposal/<slug>/` twin, no PayPanel; adds Decline; UPL footer from `NOT_A_LAW_FIRM_DISCLAIMER` |
+| `tests/quotes/{pricing,status,engagement-terms}.test.ts` | same paths | none |
+| `tests/quotes/store.test.ts` | same path | pure blocks only (the `promoteLineRequest` block is gone with the feature) |
+| `tests/quotes/public.test.ts` | same path | without the line-request, slug, logo and timeline blocks; adds decline cases |
+| `tests/quotes/builder-actions.test.ts` | `tests/quotes/quote-signed-copy.test.ts` (terms race) + `quotes-access.test.ts` (idea) | retargeted; adds the header-edit race and the per-action gate sweep |
+| `tests/quotes/money-and-drift.test.ts` | `quote-signed-copy.test.ts` (drift block) | new cases for money and the firm's calendar |
+
+Not ported: payments (LawPay, `PaymentForm`, `PayPanel`, `public-payment.ts`), client line requests (0071/0073),
+readable proposal slugs and `/proposal/<slug>/<token>` (0070/0074), and the `quote_accepted`/`quote_payment` timeline
+rows (0062/0072). None of their schema is in lectual.app's databases.

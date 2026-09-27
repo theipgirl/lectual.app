@@ -54,12 +54,22 @@ describe("rail tree (design/Rail.dc.html)", () => {
     const intake = groups.flat().find((e) => e.label === "Intake")!;
     expect(intake.childActive).toBe(true);
     expect(intake.kids.find((k) => k.label === "PNC")?.active).toBe(true);
-    expect(intake.href).toBe("/dashboard/intake/");
+    expect(intake.active).toBe(false);
+    expect(intake.href).toBe("/dashboard/reports/intake/");
   });
 
   it("marks Today active only on the home page", () => {
     const today = (path: string) => railGroups(visibleNav([], "owner"), path).flat().find((e) => e.label === "Today")!.active;
     expect(today("/dashboard/")).toBe(true);
     expect(today("/dashboard/matters/")).toBe(false);
+  });
+
+  it("opens each parent's report view, and there is no Reports section", () => {
+    const groups = railGroups(visibleNav(["mailbox", "agents"], "owner"), "/dashboard/reports/matters/");
+    const matters = groups.flat().find((e) => e.label === "Active matters")!;
+    expect(matters.active).toBe(true);
+    expect(groups.flat().map((e) => e.label)).not.toContain("Reports");
+    expect(navItemBySlug("reports")).toBeUndefined();
+    for (const e of groups.flat().filter((x) => x.kids.length)) expect(e.href).toMatch(/^\/dashboard\/reports\/[a-z]+\/$/);
   });
 });
