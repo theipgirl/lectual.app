@@ -1,4 +1,4 @@
-import { readTrustFlag, type LawPayAccount, type LawPayMode } from "./lawpay-oauth";
+import { readTrustFlag, secretKeyFor, type GatewayCredentials, type LawPayAccount, type LawPayMode } from "./lawpay-oauth";
 import { isPaymentAccountKind, type PaymentAccountKind } from "./types";
 
 /**
@@ -95,4 +95,58 @@ export function checkMappingRequest(input: {
 export function accountLabel(account: LawPayAccount): string {
   const name = account.name ?? (account.type === "AchAccount" ? "eCheck account" : "Card account");
   return `${name} · ${account.type === "AchAccount" ? "eCheck" : "card"} · ···${account.id.slice(-4)}`;
+}
+
+/* ───────────────────── the sealed half of a connection ──────────────────── */
+
+/**
+ * What goes inside `gateway_credentials_enc`: the per-account secret keys AND
+ * LawPay's own trust flag and mode for each account, as LawPay returned them.
+ *
+ * Why the facts are sealed as well as stored in the readable `accounts` column:
+ * `accounts` has to be writable by a firm admin's scoped client (that is how a
+ * connection is saved), so anyone holding an admin session can PATCH it through
+ * the API — for instance marking the IOLTA account `trust_account: false` and
+ * then mapping it as operating. The database guards compare against that
+ * column, so they would agree. The sealed copy cannot be forged without the
+ * server's key, and the charge path (loadChargeCredentials) checks it, so a
+ * forged flag leaves the firm with no card form rather than with earned fees
+ * landing in trust.
+ */
+export const SEALED_GATEWAY_VERSION = 2;
+
+export type SealedGateway = {
+  v: typeof SEALED_GATEWAY_VERSION;
+  secrets: Record<string, string>;
+  accounts: { id: string; mode: LawPayMode; trust_account: boolean }[];
+};
+
+export function sealedGatewayPayload(gateway: Pick<GatewayCredentials, "secrets" | "accounts">): SealedGateway {
+  return {
+    v: SEALED_GATEWAY_VERSION,
+    secrets: gateway.secrets,
+    accounts: gateway.accounts.map((a) => ({ id: a.id, mode: a.mode, trust_account: a.trust_account })),
+  };
+}
+
+/**
+ * The secret key for one account, only if the SEALED facts say it is that mode
+ * and that side of the books. Anything unreadable, missing or disagreeing → null
+ * (the caller answers "not configured"; it never guesses).
+ */
+export function readSealedAccount(
+  payload: unknown,
+  input: { accountId: string; mode: LawPayMode; kind: unknown },
+): { secretKey: string } | null {
+  if (!isPaymentAccountKind(input.kind)) return null;
+  const p = payload && typeof payload === "object" && !Array.isArray(payload) ? (payload as Record<string, unknown>) : null;
+  if (!p || p.v !== SEALED_GATEWAY_VERSION || !Array.isArray(p.accounts)) return null;
+  const facts = (p.accounts as unknown[]).find(
+    (a) => a && typeof a === "object" && (a as Record<string, unknown>).id === input.accountId && (a as Record<string, unknown>).mode === input.mode,
+  ) as Record<string, unknown> | undefined;
+  if (!facts || typeof facts.trust_account !== "boolean") return null;
+  if (facts.trust_account !== (input.kind === "trust")) return null;
+  const secrets = p.secrets && typeof p.secrets === "object" ? (p.secrets as Record<string, unknown>) : null;
+  const secretKey = secrets?.[secretKeyFor(input.mode, input.accountId)];
+  return typeof secretKey === "string" && secretKey ? { secretKey } : null;
 }

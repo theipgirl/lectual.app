@@ -14,6 +14,7 @@ export type PayRefusalReason =
   | "awaiting_confirmation"
   | "manual"
   | "declined"
+  | "not_processed"
   | "rejected"
   | "indeterminate"
   | "charged_unrecorded"
@@ -62,6 +63,8 @@ export function payMessage(reason: PayRefusalReason | undefined, detail: string 
         ? `That payment didn't go through: ${sentence} Nothing has been charged — you can try another card.`
         : "That payment didn't go through. Nothing has been charged — you can try another card.";
     }
+    case "not_processed":
+      return `That payment couldn't be processed. Nothing has been charged — check the card details or try another card. If it keeps happening, contact ${firmName}.`;
     case "rejected":
       return `We couldn't take that payment. Nothing has been charged — your signature is recorded, and ${firmName} will be in touch to take payment another way.`;
     case "manual":

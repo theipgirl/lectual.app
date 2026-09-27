@@ -57,9 +57,19 @@ firm will send them a way to pay. Staff record payments by hand on the quote.
     index allows only one open charge per quote.
   - The result is then reconciled. An indeterminate answer stays `pending`. An admin resolves it on
     the quote's Payments panel.
-  - If LawPay refuses the firm's own request (for example a bad key or an inactive account), the
-    connection is flagged `reauth`. The firm's card form then disappears everywhere until an admin
-    fixes it.
+  - The charge is refused (nothing is sent) unless the snapshot's lines recompute to exactly the
+    frozen `totals.due_at_signing` the client signed.
+  - If LawPay rejects the firm's own credentials (HTTP 401/403), the connection is flagged `reauth`.
+    The firm's card form then disappears everywhere until an admin reconnects.
+  - Any other refusal (another 4xx, a 2xx `VOIDED`) is about that one request, whose payment token
+    the anonymous visitor chose. It fails the row, writes a timeline row for the firm, and leaves card
+    payments on. It never pauses the firm, or one junk request could turn off every client's form.
+  - After 5 failed card attempts on one quote, the form is withdrawn and the client is told the firm
+    will send a way to pay. The link has no login and no rate limiter, and this stops it being used
+    to test stolen cards against the firm's merchant account.
+  - Only a mapping with `verified_at` set (the admin's confirmation tick) is charged.
+  - The account's trust flag and mode are checked against the SEALED copy LawPay returned, not only
+    the readable `accounts` column, which a firm admin can write through the API.
 - **Manual payments** (quote builder → Payments → Record a payment). Staff must choose the amount,
   the purpose and the account kind explicitly. An earned legal fee can't be recorded into trust.
 
@@ -109,3 +119,10 @@ applied to **lectual-dev only**. Prod still needs it before this ships.
 - `tests/tenant-isolation.test.ts`: 11 new cases, 183/183 on dev.
 - `src/lib/db/types.ts`: `lawpay_connection`, `lawpay_accounts_valid` and `quote_payment`.
 - `AGENTS.md`: a section headed "LawPay connections and the signing-charge guards (0076)".
+
+Then commit `ffc6728` on the same branch (documentation only, no schema change):
+
+- `AGENTS.md`: a bullet in that section saying `accounts` is not proof of LawPay's trust flag.
+  Owner/admin can UPDATE it through the API and the guards compare against it, so lectual.app
+  also seals LawPay's own trust flag and mode with the secret keys and checks that sealed copy
+  before every charge. Any charge path added in lectual must do the same.

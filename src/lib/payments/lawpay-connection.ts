@@ -11,7 +11,6 @@ import {
   fetchGatewayCredentials,
   needsRefresh,
   refreshLawPayToken,
-  secretKeyFor,
   type FetchLike,
   type GatewayCredentials,
   type LawPayAccount,
@@ -20,7 +19,7 @@ import {
   type LawPayTokenSet,
 } from "./lawpay-oauth";
 import { lawPayApiBase, lawPayDeploymentMode } from "./lawpay-config";
-import { accountFitsKind, parseStoredAccounts } from "./lawpay-accounts";
+import { accountFitsKind, parseStoredAccounts, readSealedAccount, sealedGatewayPayload } from "./lawpay-accounts";
 import type { PaymentAccountKind } from "./types";
 
 /**
@@ -105,7 +104,8 @@ function sealedFields(root: Buffer, tokens: LawPayTokenSet, gateway: GatewayCred
   return {
     access_token_enc: sealToken(root, tokens.accessToken, "lectual-lawpay"),
     refresh_token_enc: tokens.refreshToken ? sealToken(root, tokens.refreshToken, "lectual-lawpay") : null,
-    gateway_credentials_enc: sealToken(root, JSON.stringify(gateway.secrets), "lectual-lawpay"),
+    // Secrets AND LawPay's own trust flag / mode per account (see lawpay-accounts.ts).
+    gateway_credentials_enc: sealToken(root, JSON.stringify(sealedGatewayPayload(gateway)), "lectual-lawpay"),
     expires_at: tokens.expiresAt,
     scopes: tokens.scopes,
   };
@@ -368,25 +368,35 @@ export async function loadChargeCredentials(input: {
 
     const root = rootKeyOrNull();
     if (!root) return { status: "unconfigured" };
-    let secrets: Record<string, unknown>;
+    let payload: unknown;
     try {
-      secrets = JSON.parse(openToken(root, data.gateway_credentials_enc, "lectual-lawpay")) as Record<string, unknown>;
+      payload = JSON.parse(openToken(root, data.gateway_credentials_enc, "lectual-lawpay"));
     } catch {
       return { status: "unconfigured" };
     }
-    const secretKey = secrets[secretKeyFor(mode, account.id)];
-    if (typeof secretKey !== "string" || !secretKey) return { status: "unconfigured" };
-    return { status: "ok", secretKey, publicKey: account.public_key, mode, connectionId: data.id };
+    // The readable `accounts` column is admin-writable; the sealed copy of
+    // LawPay's own trust flag and mode is what decides whether this account may
+    // be charged as `kind`.
+    const sealed = readSealedAccount(payload, { accountId: account.id, mode, kind: input.kind });
+    if (!sealed) {
+      console.error(`[payments] LawPay account facts disagree with the sealed credentials org=${orgId}; not charging`);
+      return { status: "unconfigured" };
+    }
+    return { status: "ok", secretKey: sealed.secretKey, publicKey: account.public_key, mode, connectionId: data.id };
   } catch {
     return { status: "unavailable" };
   }
 }
 
 /**
- * LawPay refused the firm's own request (a rejected key, an inactive merchant
- * account). No card can work until the firm acts, so the connection goes to
- * `reauth` and every proposal of this firm stops offering a card form — rather
- * than re-offering one that is certain to fail. Fenced on the quote's org_id.
+ * LawPay rejected the firm's own credentials (401/403 on a charge). No card can
+ * work until the firm reconnects, so the connection goes to `reauth` and every
+ * proposal of this firm stops offering a card form — rather than re-offering
+ * one that is certain to fail. Fenced on the quote's org_id.
+ *
+ * ONLY for a credential rejection. Any other refusal is about one request whose
+ * payment token an anonymous visitor chose; pausing on it would let anyone with
+ * one proposal link switch off the firm's card payments.
  */
 export async function markConnectionNeedsAttention(input: { db: AdminLike; orgId: string; detail: string }): Promise<void> {
   try {

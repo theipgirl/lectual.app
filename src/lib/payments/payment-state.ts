@@ -17,8 +17,9 @@ import type { ChargeableAmountResult } from "./types";
  *   payable     everything is configured and nothing is recorded. The only
  *               state with a card form.
  *   manual      the firm takes this payment elsewhere (no connection, no mapped
- *               operating account, a firm-side refusal, a quote this build won't
- *               charge), or `nothingDue`: everything is due at filing.
+ *               operating account, a rejected firm credential, a quote this
+ *               build won't charge, too many failed card attempts), or
+ *               `nothingDue`: everything is due at filing.
  *   unavailable the payment record (or the firm's setup) could not be read.
  */
 export type PublicPaymentState =
@@ -52,6 +53,20 @@ function cents(row: PaymentRowLike): number {
 /** Any succeeded signing-bucket row, whoever recorded it. Blocks a charge. */
 export function hasSettledSigningPayment(rows: readonly PaymentRowLike[]): boolean {
   return signingRows(rows).some((r) => r.status === "succeeded");
+}
+
+/**
+ * How many failed LawPay attempts a quote may collect before the card form is
+ * withdrawn. The proposal link is unauthenticated and has no rate limiter, so
+ * without a cap it is a card-testing endpoint on the firm's own merchant
+ * account (every decline costs the firm and risks the account). Five covers a
+ * client who mistypes and then tries another card.
+ */
+export const MAX_FAILED_CARD_ATTEMPTS = 5;
+
+/** Failed LawPay signing attempts on this quote (declines and refusals alike). */
+export function failedCardAttempts(rows: readonly PaymentRowLike[]): number {
+  return signingRows(rows).filter((r) => r.status === "failed" && r.provider === "lawpay").length;
 }
 
 /** A LawPay attempt whose outcome was never established. */
@@ -88,6 +103,8 @@ export function settledPaymentState(payments: PaymentsRead, charge: ChargeableAm
   if (hasUnresolvedAttempt(payments.rows)) return { status: "confirming" };
   if (!charge) return { status: "manual", nothingDue: false };
   if (!charge.ok) return { status: "manual", nothingDue: charge.reason === "nothing_due_at_signing" };
+  // Too many failed card attempts: the firm takes it from here, no more forms.
+  if (failedCardAttempts(payments.rows) >= MAX_FAILED_CARD_ATTEMPTS) return { status: "manual", nothingDue: false };
   return null;
 }
 

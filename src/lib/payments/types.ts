@@ -91,7 +91,8 @@ export type ChargeableAmountRefusal =
   | { reason: "quote_blocked"; message: string; blocker: QuoteBlocker }
   | { reason: "nothing_due_at_signing"; message: string }
   | { reason: "not_a_positive_amount"; message: string }
-  | { reason: "unsupported_currency"; message: string };
+  | { reason: "unsupported_currency"; message: string }
+  | { reason: "snapshot_mismatch"; message: string };
 
 export type ChargeableAmountResult = { ok: true; amount: ChargeableAmount } | ({ ok: false } & ChargeableAmountRefusal);
 
@@ -111,6 +112,13 @@ export function signingChargeForQuote(input: {
   quoteId: string;
   currency: string;
   lines: readonly QuoteLineInput[];
+  /**
+   * The snapshot's FROZEN `totals.due_at_signing` — the figure the client read
+   * and signed. When given, the recomputed amount must equal it exactly, or
+   * nothing is charged: a later change to the pricing code must never move a
+   * charge away from what was signed.
+   */
+  signedDueAtSigningCents?: number;
 }): ChargeableAmountResult {
   const currency = (input.currency || "").trim().toUpperCase();
   if (!/^[A-Z]{3}$/.test(currency)) {
@@ -125,6 +133,13 @@ export function signingChargeForQuote(input: {
   if (blocker) return { ok: false, reason: "quote_blocked", message: blocker.message, blocker };
 
   const amountCents = quoteTotals(input.lines, currency).dueAtSigning;
+  if (input.signedDueAtSigningCents !== undefined && input.signedDueAtSigningCents !== amountCents) {
+    return {
+      ok: false,
+      reason: "snapshot_mismatch",
+      message: "The amount due at signing no longer recomputes to the figure that was signed, so it can't be charged online.",
+    };
+  }
   if (amountCents === 0) return { ok: false, reason: "nothing_due_at_signing", message: "Nothing on this quote is due at signing." };
   if (!Number.isSafeInteger(amountCents) || amountCents < 0) {
     return { ok: false, reason: "not_a_positive_amount", message: "The amount due at signing is not a positive whole number of cents." };

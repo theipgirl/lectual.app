@@ -28,8 +28,8 @@ import { payQuoteAction } from "@/app/q/[token]/actions";
  * ── IT NEVER RETRIES INTO A BUTTON THAT CANNOT WORK ─────────────────────────
  * `retryPolicy` decides: a decline brings the form back; an indeterminate
  * answer removes it (no idempotency key — a retry could charge twice); a
- * firm-side refusal removes it too (the server also pauses the firm's card
- * payments, so a reload shows the calm manual state, not a live form).
+ * rejected firm credential removes it too (the server also pauses the firm's
+ * card payments, so a reload shows the calm manual state, not a live form).
  */
 export function PayPanel({ token, state, firmName }: { token: string; state: PublicPaymentState; firmName: string }) {
   switch (state.status) {

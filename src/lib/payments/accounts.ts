@@ -151,7 +151,9 @@ export async function loadPublicRouteOperatingAccount(input: {
     if (error) return { status: "unavailable" };
     const row = data?.[0];
     const id = (row?.provider_account_id ?? "").trim();
-    if (!row || !id) return { status: "unmapped" };
+    // An unconfirmed mapping (verified_at null) is not charged: 0068 says an
+    // unverified mapping renders as unverified, never as good.
+    if (!row || !id || !row.verified_at) return { status: "unmapped" };
     return {
       status: "ok",
       account: mint({ provider: "lawpay", accountKind: "operating", providerAccountId: id, label: row.label ?? null, verifiedAt: row.verified_at ?? null }),

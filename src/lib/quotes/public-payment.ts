@@ -6,7 +6,9 @@ import { lawPayApiBase } from "@/lib/payments/lawpay-config";
 import { loadChargeCredentials, markConnectionNeedsAttention } from "@/lib/payments/lawpay-connection";
 import { createLawPayChargeClient } from "@/lib/payments/lawpay";
 import {
+  MAX_FAILED_CARD_ATTEMPTS,
   cardPaymentState,
+  failedCardAttempts,
   hasSettledSigningPayment,
   hasUnresolvedAttempt,
   settledPaymentState,
@@ -72,7 +74,16 @@ async function readQuotePayments(db: ReturnType<typeof adminDb>, handle: PublicQ
 
 function snapshotCharge(quoteId: string, snapshot: QuoteAcceptedSnapshot | null): ChargeableAmountResult | null {
   if (!snapshot) return null;
-  return signingChargeForQuote({ quoteId, currency: snapshot.currency, lines: snapshot.lines as readonly QuoteLineInput[] });
+  const signed = snapshot.totals?.due_at_signing;
+  // The frozen figure the client signed. A snapshot without a readable one
+  // can't be charged online (parseAcceptedSnapshot already requires a number).
+  if (typeof signed !== "number" || !Number.isSafeInteger(signed)) return null;
+  return signingChargeForQuote({
+    quoteId,
+    currency: snapshot.currency,
+    lines: snapshot.lines as readonly QuoteLineInput[],
+    signedDueAtSigningCents: signed,
+  });
 }
 
 /** Can this firm take the signing payment by card right now? Service role, fenced on orgId. */
@@ -132,6 +143,7 @@ export type PayRefusal =
   | "awaiting_confirmation"
   | "manual"
   | "declined"
+  | "not_processed"
   | "rejected"
   | "indeterminate"
   | "charged_unrecorded"
@@ -169,6 +181,8 @@ export async function payAcceptedQuote(input: { token: string; methodToken: stri
   if (payments.status !== "ok") return { ok: false, reason: "unavailable" };
   if (hasSettledSigningPayment(payments.rows)) return { ok: false, reason: "already_paid" };
   if (hasUnresolvedAttempt(payments.rows)) return { ok: false, reason: "awaiting_confirmation" };
+  // The link is unauthenticated: cap the attempts so it can't be used to test cards.
+  if (failedCardAttempts(payments.rows) >= MAX_FAILED_CARD_ATTEMPTS) return { ok: false, reason: "manual" };
 
   const charge = snapshotCharge(read.handle.quoteId, snapshot);
   if (!charge || !charge.ok) return { ok: false, reason: "manual" };
@@ -202,12 +216,22 @@ export async function payAcceptedQuote(input: { token: string; methodToken: stri
       return { ok: true, amountCents: outcome.amountCents, currency: outcome.currency };
     case "failed":
       if (outcome.failure === "card") return { ok: false, reason: "declined", message: outcome.clientDetail };
-      // The gateway refused the FIRM's request. No card can work until the firm
-      // acts, so the connection is flagged (every proposal of this firm stops
-      // offering a form) and the firm gets a timeline row.
-      await markConnectionNeedsAttention({ db, orgId: read.handle.orgId, detail: `A client payment was refused by LawPay: ${outcome.detail}` });
-      await event("rejected", outcome.detail);
-      return { ok: false, reason: "rejected" };
+      if (outcome.credentialRejected) {
+        // LawPay refused the FIRM's key (401/403). No card can work until the
+        // firm reconnects, so the connection is flagged (every proposal of this
+        // firm stops offering a form) and the firm gets a timeline row.
+        await markConnectionNeedsAttention({ db, orgId: read.handle.orgId, detail: `LawPay rejected the firm's credentials on a client payment: ${outcome.detail}` });
+        await event("rejected", outcome.detail);
+        return { ok: false, reason: "rejected" };
+      }
+      // Any other refusal (a 4xx, a 2xx VOIDED) is about THIS request, and the
+      // request carries a payment token the anonymous caller chose. It must not
+      // pause the firm's card payments: otherwise anyone holding one proposal
+      // link could switch off every client's card form with a junk token. The
+      // row is failed (nothing moved), the firm sees it, and the attempt cap
+      // bounds the retries.
+      await event("refused", outcome.detail);
+      return { ok: false, reason: "not_processed" };
     case "indeterminate":
     case "charged_unrecorded":
       await event(outcome.status, outcome.detail);
@@ -227,7 +251,7 @@ async function readQuoteTargets(db: ReturnType<typeof adminDb>, handle: PublicQu
   }
 }
 
-type EventState = "succeeded" | "account_mismatch" | "indeterminate" | "charged_unrecorded" | "rejected";
+type EventState = "succeeded" | "account_mismatch" | "indeterminate" | "charged_unrecorded" | "rejected" | "refused";
 
 function summarizeForStaff(state: EventState, detail: string | undefined, mode: "test" | "live"): string {
   const test = mode === "test" ? " (LawPay test mode — no real money)" : "";
@@ -242,7 +266,12 @@ function summarizeForStaff(state: EventState, detail: string | undefined, mode: 
       return `Card payment went through and was NOT fully recorded. Reconcile it in LawPay before anyone charges again${test}.`;
     case "rejected":
       return (
-        `LawPay refused the firm's request before any card was charged — nothing was taken. Card payments are paused until LawPay is reconnected in Settings → Integrations${test}.` +
+        `LawPay rejected the firm's credentials before any card was charged — nothing was taken. Card payments are paused until LawPay is reconnected in Settings → Integrations${test}.` +
+        (detail ? ` LawPay said: ${detail.slice(0, 300)}` : "")
+      );
+    case "refused":
+      return (
+        `LawPay refused a card payment attempt on this proposal — nothing was taken, and card payments stay on. If this keeps happening, check the operating account in LawPay${test}.` +
         (detail ? ` LawPay said: ${detail.slice(0, 300)}` : "")
       );
   }
