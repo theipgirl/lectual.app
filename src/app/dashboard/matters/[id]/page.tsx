@@ -364,7 +364,9 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
               <IntakeRequestCard
                 matterId={matter.id}
                 origin={origin}
-                requests={intakeRequests.requests}
+                // The token IS the client's /r/ credential. Only people who may
+                // copy or withdraw a link get it; everyone else sees status only.
+                requests={canSendIntake ? intakeRequests.requests : intakeRequests.requests.map((r) => ({ ...r, token: "" }))}
                 formReady={intakeRequests.formReady}
                 canSend={canSendIntake}
               />
