@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { NOT_A_LAW_FIRM_DISCLAIMER } from "@/lib/legal/disclaimer";
+import "./q.css";
 
 /**
  * The shell for the client's proposal — deliberately OUTSIDE `/dashboard`, so
@@ -26,14 +27,12 @@ export const metadata: Metadata = {
 
 export default function ProposalLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", background: "var(--paper)" }}>
-      <main style={{ flex: 1, width: "100%", maxWidth: 760, margin: "0 auto", padding: "40px 20px 24px", boxSizing: "border-box", display: "grid", gap: 18, alignContent: "start" }}>
-        {children}
-      </main>
-      <footer style={{ width: "100%", maxWidth: 760, margin: "0 auto", padding: "0 20px 28px", boxSizing: "border-box" }}>
+    <div className="qp-root">
+      <main className="qp-sheet">{children}</main>
+      <footer className="qp-footer">
         <p className="lx-upl" style={{ margin: 0 }}>
           {NOT_A_LAW_FIRM_DISCLAIMER} Lectual provides the software this proposal is presented in; the proposal itself is
-          from the firm named above.
+          from the firm that sent it.
         </p>
       </footer>
     </div>

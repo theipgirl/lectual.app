@@ -18,14 +18,16 @@ import { Unavailable } from "@/components/proposal/Unavailable";
  * acceptance impossible. Read that file's header before changing anything here.
  *
  * Outcomes, each its own component:
- *  - `not_found` → `notFound()`, indistinguishable for an unknown token,
- *    another firm's, a malformed one and a DRAFT.
+ *  - `not_found`, and an EXPIRED or WITHDRAWN quote → `notFound()`: the locked
+ *    page, identical for an unknown token, another firm's, a malformed one, a
+ *    DRAFT, and a link that has closed (the design asks for them to look the
+ *    same, and a page that told them apart would say which tokens are real).
  *  - `unconfigured` / `unavailable` → `<Unavailable />`, never a 404: telling
  *    a client their proposal does not exist because we could not reach the
  *    database is the worst answer available.
  *  - accepted → `<Receipt />`, from `accepted_snapshot` only.
- *  - expired / withdrawn / declined (or a status this build does not know) →
- *    `<StatusNotice />`: the state, no quote body, no controls.
+ *  - declined (or a status this build does not know) → `<StatusNotice />`: the
+ *    state, no quote body, no controls.
  *  - sent and live → `<QuoteDocument />`, the only branch with accept/decline.
  *
  * The status branched on is `effectiveQuoteStatus` — expiry evaluated on READ,
@@ -45,14 +47,17 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
   if (read.status === "not_found") notFound();
   if (read.status !== "ok") return <Unavailable />;
 
+  const { view } = read;
+  // Locked: resolves to nothing, exactly like a draft — no view is recorded.
+  if (view.status === "expired" || view.status === "withdrawn") notFound();
+
   // Awaited (a dangling promise in a serverless function may be killed with
   // the response) and fully swallowed inside, so a broken audit table cannot
   // take down the page a client came to read.
   await recordQuoteViewed(read.handle, (await headers()).get("user-agent"), now);
 
-  const { view } = read;
   if (view.status === "accepted") return <Receipt view={view} />;
   // Fail closed: the accept control is reachable from exactly one branch.
   if (view.status !== "sent") return <StatusNotice view={view} />;
-  return <QuoteDocument token={token} view={view} />;
+  return <QuoteDocument token={token} view={view} ready={read.handle.offerIntact} />;
 }

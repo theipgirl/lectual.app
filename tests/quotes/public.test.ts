@@ -5,7 +5,6 @@ import {
   PUBLIC_QUOTE_COLUMNS,
   PUBLIC_QUOTE_LINE_COLUMNS,
   acceptPublicQuote,
-  applyPublicSelection,
   declinePublicQuote,
   buildAcceptedSnapshot,
   coarseUserAgent,
@@ -15,14 +14,13 @@ import {
   quoteLinesFingerprint,
   readPublicQuote,
   recordQuoteViewed,
-  validateSelection,
   type AcceptInput,
   type AcceptResult,
-  type PublicDbQuery,
-  type PublicDbResult,
   type PublicQuoteLine,
-  type PublicQuotesDb,
 } from "@/lib/quotes/public";
+import { quoteTotals } from "@/lib/quotes/pricing";
+import type { ClientChoice } from "@/lib/quotes/packages";
+import { FakeDb, type Row } from "./fake-db";
 
 /**
  * `/q/[token]` is the only unauthenticated surface in this product, and RLS
@@ -38,12 +36,11 @@ import {
  * committed. A fake with a barrier can arrange exactly that, deterministically,
  * on every run.
  *
- * The fake is a small PostgREST shape — `.eq/.in/.is/.or/.order/.limit`,
- * projection by the requested column list, and set-based updates that return
- * the rows they actually changed. That last part is the one that matters: the
- * acceptance guard is a WHERE clause, and "how many rows came back" is the
- * signal it turns on. A fake that always returned the row would pass a broken
- * implementation, so it does not.
+ * The fake (./fake-db.ts) is a small PostgREST shape — `.eq/.in/.is/.or/
+ * .order/.limit`, projection by the requested column list, and set-based
+ * updates that return the rows they actually changed. That last part is the one
+ * that matters: the acceptance guard is a WHERE clause, and "how many rows came
+ * back" is the signal it turns on.
  *
  * What this cannot test, and what covers it instead: that Postgres evaluates
  * the same predicate under real concurrency (row locks), and that RLS is
@@ -52,231 +49,12 @@ import {
  *
  * Ported from lectual (branch claude/lectual-firm-dashboard-prd-f3loev) without
  * the line-request, readable-slug, logo and crm_activity-timeline cases — this
- * app has none of those (see PORTED_FROM.md). The decline cases are new.
+ * app has none of those (see PORTED_FROM.md). The decline cases are new, and so
+ * is the offer model (packages.ts): packages chosen whole, `selected` as the
+ * firm's offer until signature, the client's pick travelling with the
+ * signature. The selection-persistence cases went with the endpoint they
+ * tested; what replaced them asserts that no refusal writes anything.
  */
-
-/* ────────────────────────── the fake PostgREST ──────────────────────────── */
-
-type Row = Record<string, unknown>;
-
-type Filter =
-  | { kind: "eq"; column: string; value: unknown }
-  | { kind: "in"; column: string; values: readonly unknown[] }
-  | { kind: "is"; column: string; value: null }
-  | { kind: "or"; expr: string };
-
-type Tables = Record<string, Row[]>;
-
-class FakeDb implements PublicQuotesDb {
-  readonly tables: Tables;
-  /** Every select string this route asked for, so a test can assert the
-   * allowlist is what actually went over the wire — not merely what a constant
-   * says. */
-  readonly selects: { table: string; columns: string }[] = [];
-  readonly queryCount: { value: number } = { value: 0 };
-  /** Lets a test hold a query open (the race barrier). */
-  beforeQuery: ((table: string, op: string) => Promise<void>) | null = null;
-  /** Forces the next N queries against a table to fail, for the unavailable path. */
-  failTable: string | null = null;
-  /** Forces every query against a table to report PGRST205 — "0071 has not been
-   * applied in this environment". A DIFFERENT answer from `failTable`: a table
-   * that is not there yet is not an outage, and the two must not collapse. */
-  missingTable: string | null = null;
-  /** Forces every query NAMING this column on this table to fail the way
-   * PostgREST fails a select against a column the table does not have. A THIRD
-   * answer again: the table is there, the row is there, one column of the
-   * allowlist is not — which is what a project that applied 0071 before 0073
-   * existed actually looks like. */
-  missingColumn: { table: string; column: string } | null = null;
-  /** Fails the next INSERT into a table with this PostgREST code, once. Lets a
-   * test drive the unique-violation race the application's own duplicate check
-   * cannot see (two posts, both past the check, one losing at the index). */
-  insertFailure: { table: string; code: string } | null = null;
-  /** Stands in for the `created_at timestamptz not null default now()` the
-   * event tables carry. Settable so a test can advance time deliberately rather
-   * than depend on how fast the suite runs — the `viewed` dedupe window is a
-   * time comparison, and a test of it that used the wall clock would be the
-   * flake this repo keeps rewriting. */
-  clock = "2026-09-09T15:00:00.000Z";
-
-  constructor(tables: Tables) {
-    this.tables = tables;
-  }
-
-  from(table: string): PublicDbQuery {
-    return new FakeQuery(this, table) as unknown as PublicDbQuery;
-  }
-}
-
-class FakeQuery {
-  private op: "select" | "update" | "insert" = "select";
-  private columns: string[] | null = null;
-  private patch: Row = {};
-  private inserts: Row[] = [];
-  private filters: Filter[] = [];
-  private orderBy: { column: string; ascending: boolean } | null = null;
-  private limitN: number | null = null;
-  private singleMode = false;
-
-  constructor(
-    private readonly db: FakeDb,
-    private readonly table: string,
-  ) {}
-
-  select(columns: string) {
-    this.columns = columns.split(",").map((c) => c.trim());
-    this.db.selects.push({ table: this.table, columns });
-    return this;
-  }
-  update(patch: Row) {
-    this.op = "update";
-    this.patch = patch;
-    return this;
-  }
-  insert(rows: Row | Row[]) {
-    this.op = "insert";
-    this.inserts = Array.isArray(rows) ? rows : [rows];
-    return this;
-  }
-  eq(column: string, value: unknown) {
-    this.filters.push({ kind: "eq", column, value });
-    return this;
-  }
-  in(column: string, values: readonly unknown[]) {
-    this.filters.push({ kind: "in", column, values });
-    return this;
-  }
-  is(column: string, value: null) {
-    this.filters.push({ kind: "is", column, value });
-    return this;
-  }
-  or(expr: string) {
-    this.filters.push({ kind: "or", expr });
-    return this;
-  }
-  order(column: string, options?: { ascending?: boolean }) {
-    this.orderBy = { column, ascending: options?.ascending !== false };
-    return this;
-  }
-  limit(count: number) {
-    this.limitN = count;
-    return this;
-  }
-  maybeSingle() {
-    this.singleMode = true;
-    return this;
-  }
-
-  then<TResult1, TResult2 = never>(
-    onfulfilled?: ((value: PublicDbResult) => TResult1 | PromiseLike<TResult1>) | null,
-    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
-  ): PromiseLike<TResult1 | TResult2> {
-    return this.run().then(onfulfilled, onrejected);
-  }
-
-  private async run(): Promise<PublicDbResult> {
-    this.db.queryCount.value += 1;
-    if (this.db.beforeQuery) await this.db.beforeQuery(this.table, this.op);
-    if (this.db.failTable === this.table) {
-      return { data: null, error: { code: "08006", message: "connection failure" } };
-    }
-    if (this.db.missingTable === this.table) {
-      return {
-        data: null,
-        error: { code: "PGRST205", message: "Could not find the table in the schema cache" },
-      };
-    }
-    const absent = this.db.missingColumn;
-    if (absent && absent.table === this.table && (this.columns ?? []).includes(absent.column)) {
-      return {
-        data: null,
-        error: {
-          code: "42703",
-          message: `column ${this.table}.${absent.column} does not exist`,
-        },
-      };
-    }
-
-    const rows = this.db.tables[this.table] ?? (this.db.tables[this.table] = []);
-
-    if (this.op === "insert") {
-      const failure = this.db.insertFailure;
-      if (failure && failure.table === this.table) {
-        this.db.insertFailure = null;
-        return { data: null, error: { code: failure.code, message: "insert refused" } };
-      }
-      for (const row of this.inserts) {
-        rows.push({ id: `gen-${rows.length + 1}`, created_at: this.db.clock, ...row });
-      }
-      return { data: null, error: null };
-    }
-
-    const matched = rows.filter((row) => this.matches(row));
-
-    if (this.op === "update") {
-      for (const row of matched) Object.assign(row, this.patch);
-      return { data: matched.map((row) => this.project(row)), error: null };
-    }
-
-    let result = matched;
-    if (this.orderBy) {
-      const { column, ascending } = this.orderBy;
-      result = [...result].sort((a, b) => {
-        const av = String(a[column] ?? "");
-        const bv = String(b[column] ?? "");
-        return ascending ? av.localeCompare(bv) : bv.localeCompare(av);
-      });
-    }
-    if (this.limitN !== null) result = result.slice(0, this.limitN);
-    const projected = result.map((row) => this.project(row));
-    return this.singleMode
-      ? { data: projected[0] ?? null, error: null }
-      : { data: projected, error: null };
-  }
-
-  /** Projection is the point of the fake: a column the route did not ask for
-   * must not come back, so a test asserting "no org_id in the payload" is
-   * asserting something real. */
-  private project(row: Row): Row {
-    if (!this.columns) return { ...row };
-    const out: Row = {};
-    for (const column of this.columns) out[column] = row[column];
-    return out;
-  }
-
-  private matches(row: Row): boolean {
-    return this.filters.every((filter) => {
-      switch (filter.kind) {
-        case "eq":
-          return row[filter.column] === filter.value;
-        case "in":
-          return filter.values.includes(row[filter.column]);
-        case "is":
-          return row[filter.column] === null || row[filter.column] === undefined;
-        case "or":
-          return filter.expr.split(",").some((term) => this.matchesTerm(row, term));
-      }
-    });
-  }
-
-  /** PostgREST splits a filter term on its FIRST TWO dots only — which is what
-   * makes `expires_at.gt.2026-09-09T12:00:00.000Z` (three more dots in the
-   * value) a legal filter and not a parse error. Mirrored here so the fake
-   * agrees with the thing it is standing in for. */
-  private matchesTerm(row: Row, term: string): boolean {
-    const firstDot = term.indexOf(".");
-    const secondDot = term.indexOf(".", firstDot + 1);
-    if (firstDot < 0 || secondDot < 0) return false;
-    const column = term.slice(0, firstDot);
-    const operator = term.slice(firstDot + 1, secondDot);
-    const value = term.slice(secondDot + 1);
-    const cell = row[column];
-    if (operator === "is") return value === "null" ? cell === null || cell === undefined : false;
-    if (operator === "gt") return typeof cell === "string" && cell > value;
-    if (operator === "gte") return typeof cell === "string" && cell >= value;
-    return false;
-  }
-}
 
 /* ────────────────────────────── fixtures ───────────────────────────────── */
 
@@ -288,16 +66,28 @@ const OTHER_TOKEN = "ZZZZZZ2p3wEhVsD8lQd0XgYbZn7RTuJc1MkO5eA9iL4";
 
 const NOW = new Date("2026-09-09T15:00:00.000Z");
 
-/** A quote with a package choice, an add-on, and a USPTO fee — the shape §0 is
- * about. Amounts in integer cents. */
+/**
+ * A quote with two offered PACKAGES (Comprehensive carries its own second-class
+ * USPTO fee), a line in every package, an offered add-on, and a USPTO fee — the
+ * shape §0 is about — plus a package and an add-on the firm has WITHHELD
+ * (`selected: false`), which must never reach the client. Integer cents.
+ */
 function lineFixtures(): Row[] {
   return [
     line({ id: "line-flat", kind: "legal_fee", charge_at: "signing", selection: "included", selected: true, label: "Trademark filing — flat fee", unit_amount_cents: 150_000, sort_index: 10 }),
-    line({ id: "line-std", kind: "legal_fee", charge_at: "signing", selection: "tier_option", tier_group: "package", selected: false, label: "Standard search", unit_amount_cents: 95_000, sort_index: 20 }),
-    line({ id: "line-prem", kind: "legal_fee", charge_at: "signing", selection: "tier_option", tier_group: "package", selected: false, label: "Comprehensive search", unit_amount_cents: 165_000, sort_index: 30 }),
-    line({ id: "line-monitor", kind: "legal_fee", charge_at: "signing", selection: "optional", selected: false, label: "Watch service, year one", unit_amount_cents: 50_000, sort_index: 40 }),
+    line({ id: "line-std", kind: "legal_fee", charge_at: "signing", selection: "tier_option", tier_group: "Standard", selected: true, label: "Standard search", unit_amount_cents: 95_000, sort_index: 20 }),
+    line({ id: "line-prem", kind: "legal_fee", charge_at: "signing", selection: "tier_option", tier_group: "Comprehensive", selected: true, label: "Comprehensive search", unit_amount_cents: 165_000, sort_index: 30 }),
+    line({ id: "line-prem-uspto", kind: "government_fee", charge_at: "filing", selection: "tier_option", tier_group: "Comprehensive", selected: true, label: "USPTO fee, second class", unit_amount_cents: 35_000, sort_index: 35 }),
+    line({ id: "line-budget", kind: "legal_fee", charge_at: "signing", selection: "tier_option", tier_group: "Budget", selected: false, label: "Knockout search only", unit_amount_cents: 40_000, sort_index: 38 }),
+    line({ id: "line-monitor", kind: "legal_fee", charge_at: "signing", selection: "optional", selected: true, label: "Watch service, year one", unit_amount_cents: 50_000, sort_index: 40 }),
+    line({ id: "line-drawing", kind: "legal_fee", charge_at: "signing", selection: "optional", selected: false, label: "Design mark drawing", unit_amount_cents: 25_000, sort_index: 45 }),
     line({ id: "line-uspto", kind: "government_fee", charge_at: "filing", selection: "included", selected: true, label: "USPTO filing fee (1 class)", unit_amount_cents: 35_000, sort_index: 50 }),
   ];
+}
+
+/** The client's pick, as the page sends it. */
+function pick(pkg: string | null, addOns: string[] = []): ClientChoice {
+  return { package: pkg, addOns };
 }
 
 function line(overrides: Row): Row {
@@ -473,6 +263,45 @@ describe("the payload sent to the client", () => {
     if (read.status !== "ok") throw new Error("expected ok");
     expect(read.view.firm).toEqual({ name: "Beliard IP" });
   });
+
+  it("publishes the OFFER — a withheld package or add-on never reaches the browser", async () => {
+    // `selected` on a package/add-on line is the firm's offer switch until
+    // signature (packages.ts). What the firm switched off is not part of what
+    // this client was sent, so it is absent from the payload, not merely hidden.
+    const db = makeDb();
+    const read = await readPublicQuote(TOKEN, NOW, db);
+    if (read.status !== "ok") throw new Error("expected ok");
+    expect(read.view.lines.map((l) => l.id)).toEqual([
+      "line-flat",
+      "line-std",
+      "line-prem",
+      "line-prem-uspto",
+      "line-monitor",
+      "line-uspto",
+    ]);
+    const wire = JSON.stringify(read.view);
+    expect(wire).not.toContain("Knockout search only");
+    expect(wire).not.toContain("Budget");
+    expect(wire).not.toContain("Design mark drawing");
+    expect(read.handle.offerIntact).toBe(true);
+  });
+
+  it("marks an offer with packages but none switched on as not signable", async () => {
+    const db = makeDb(
+      {},
+      lineFixtures().map((l) => (l.selection === "tier_option" ? { ...l, selected: false } : l)),
+    );
+    const read = await readPublicQuote(TOKEN, NOW, db);
+    if (read.status !== "ok") throw new Error("expected ok");
+    expect(read.handle.offerIntact).toBe(false);
+    const result = await acceptPublicQuote(
+      { token: TOKEN, name: "Dana Reyes", choice: pick(null), linesFingerprint: read.view.linesFingerprint, ip: null, userAgent: null },
+      NOW,
+      db,
+    );
+    expect(result).toMatchObject({ ok: false, reason: "not_ready" });
+    expect(db.tables.crm_quote[0].status).toBe("sent");
+  });
 });
 
 describe("an unknown token is nothing at all — §6.3", () => {
@@ -569,106 +398,54 @@ describe("terminal states — §6.4", () => {
     expect(result).toEqual({ ok: false, reason: "not_live" });
   });
 
-  it("refuses to change the selection on a quote that is not live", async () => {
-    const db = makeDb({ status: "withdrawn", withdrawn_at: "2026-09-09T09:00:00.000Z" });
-    const result = await applyPublicSelection(TOKEN, ["line-std"], NOW, db);
-    expect(result).toEqual({ ok: false, reason: "not_live" });
-    expect(db.tables.crm_quote_line.find((l) => l.id === "line-std")?.selected).toBe(false);
-  });
 });
 
-describe("selection is validated against this quote's OWN lines — §6.5", () => {
-  const lines = (): PublicQuoteLine[] =>
-    lineFixtures().map((row) => ({
-      id: row.id as string,
-      kind: row.kind as string,
-      charge_at: row.charge_at as string,
-      selection: row.selection as string,
-      tier_group: (row.tier_group as string | null) ?? null,
-      selected: row.selected as boolean,
-      label: row.label as string,
-      description: null,
-      quantity: 1,
-      unit_amount_cents: row.unit_amount_cents as number,
-      sort_index: row.sort_index as number,
-    }));
+describe("the client's pick is validated against the offer they were shown — §6.5", () => {
+  const signer = { name: "Dana Reyes", email: "dana@example.test" };
 
-  it("REJECTS a line id from another quote rather than ignoring it", () => {
-    // Ignoring it would silently give the client a different selection than the
-    // one they ticked, and then let them sign it.
-    expect(validateSelection(lines(), ["line-std", "someone-elses-line"])).toEqual({
-      ok: false,
-      reason: "unknown_line",
-    });
+  async function signWith(db: FakeDb, choice: ClientChoice): Promise<AcceptResult> {
+    return signAsClient({ token: TOKEN, ...signer, choice, ip: null, userAgent: null }, NOW, db);
+  }
+
+  it("REJECTS a package that is not on offer rather than ignoring it", async () => {
+    // Ignoring it would sign the client up for something other than what they
+    // picked. A withheld package is as unknown to them as a made-up one.
+    for (const name of ["Budget", "Platinum"]) {
+      const db = makeDb();
+      const result = await signWith(db, pick(name));
+      expect(result, name).toEqual({ ok: false, reason: "unknown_line" });
+      expect(db.writes, name).toEqual([]);
+    }
   });
 
-  it("rejects an attempt to name an `included` line", () => {
-    // An included line is not merely always-on; it is not addressable. Naming
-    // one is as invalid as naming another quote's line.
-    expect(validateSelection(lines(), ["line-flat"])).toEqual({
-      ok: false,
-      reason: "unknown_line",
-    });
+  it("REJECTS an add-on id from outside the offer — withheld, included, or another quote's", async () => {
+    for (const id of ["line-drawing", "line-flat", "line-prem", "someone-elses-line"]) {
+      const db = makeDb();
+      const result = await signWith(db, pick("Standard", [id]));
+      expect(result, id).toEqual({ ok: false, reason: "unknown_line" });
+      expect(db.writes, id).toEqual([]);
+    }
   });
 
-  it("rejects two options in one mutually-exclusive package group", () => {
-    expect(validateSelection(lines(), ["line-std", "line-prem"])).toEqual({
-      ok: false,
-      reason: "invalid_tier",
-    });
-  });
-
-  it("accepts one package plus an add-on, and deselects everything else", () => {
-    const result = validateSelection(lines(), ["line-prem", "line-monitor"]);
+  it("takes the package whole: every one of its lines, and none of the other package's", async () => {
+    const db = makeDb();
+    const result = await signWith(db, pick("Comprehensive", ["line-monitor"]));
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.select.sort()).toEqual(["line-monitor", "line-prem"]);
-    expect(result.deselect).toEqual(["line-std"]);
+    const taken = result.snapshot.lines.filter((l) => l.selected).map((l) => l.id);
+    expect(taken.sort()).toEqual(["line-flat", "line-monitor", "line-prem", "line-prem-uspto", "line-uspto"]);
+    expect(result.snapshot.totals.due_at_signing).toBe(150_000 + 165_000 + 50_000);
+    // The package's own USPTO fee is at filing with the every-package one.
+    expect(result.snapshot.totals.due_at_filing).toBe(35_000 + 35_000);
   });
 
-  it("allows an empty selection — the client has simply not chosen yet", () => {
-    const result = validateSelection(lines(), []);
-    expect(result.ok).toBe(true);
-  });
-
-  it("persists the choice and logs one selection_changed event", async () => {
-    const db = makeDb();
-    const result = await applyPublicSelection(TOKEN, ["line-prem"], NOW, db);
-    expect(result.ok).toBe(true);
-    const rows = db.tables.crm_quote_line;
-    expect(rows.find((l) => l.id === "line-prem")?.selected).toBe(true);
-    expect(rows.find((l) => l.id === "line-std")?.selected).toBe(false);
-    // Included lines are untouched — the update never addresses them.
-    expect(rows.find((l) => l.id === "line-flat")?.selected).toBe(true);
-
-    const events = db.tables.crm_quote_event;
-    expect(events).toHaveLength(1);
-    expect(events[0].type).toBe("selection_changed");
-    expect(events[0].actor).toBe("client");
-    // The payload holds ids of the firm's own rows — nothing the caller typed.
-    expect(events[0].payload).toEqual({ selected_line_ids: ["line-prem"] });
-  });
-
-  it("writes nothing at all when the selection is unchanged", async () => {
-    // An unauthenticated write endpoint with no rate limiter in front of it:
-    // re-posting the same selection in a loop must not append a row per
-    // request to an append-only table. It is also better audit data — the firm
-    // reads that timeline to see the client deliberating.
-    const db = makeDb(
-      {},
-      lineFixtures().map((l) => (l.id === "line-prem" ? { ...l, selected: true } : l)),
-    );
-    const result = await applyPublicSelection(TOKEN, ["line-prem"], NOW, db);
-    expect(result.ok).toBe(true);
-    expect(db.tables.crm_quote_event).toHaveLength(0);
-  });
-
-  it("writes nothing when a submitted id does not belong to the quote", async () => {
-    const db = makeDb();
-    const result = await applyPublicSelection(TOKEN, ["not-a-line"], NOW, db);
-    expect(result).toEqual({ ok: false, reason: "unknown_line" });
-    expect(db.tables.crm_quote_event).toHaveLength(0);
-    expect(db.tables.crm_quote_line.find((l) => l.id === "line-std")?.selected).toBe(false);
+  it("gives an anonymous caller exactly two write endpoints — accept and decline", async () => {
+    // The ported engine persisted every tick from this unauthenticated route
+    // (`saveSelectionAction`). Here the rows' `selected` is the firm's offer
+    // until signature, so no endpoint lets a client write it: ticking a box
+    // writes nothing, and the pick arrives once, with the signature.
+    const actions = await import("@/app/q/[token]/actions");
+    expect(Object.keys(actions).sort()).toEqual(["acceptQuoteAction", "declineQuoteAction"]);
   });
 });
 
@@ -689,7 +466,7 @@ describe("acceptance", () => {
   it("accepts once, freezing the snapshot with the two amounts split", async () => {
     const db = makeDb();
     const result = await signAsClient(
-      { token: TOKEN, ...signer, selectedLineIds: ["line-prem"], ip: "203.0.113.9", userAgent: "Mozilla/5.0 (Macintosh)" },
+      { token: TOKEN, ...signer, choice: pick("Comprehensive"), ip: "203.0.113.9", userAgent: "Mozilla/5.0 (Macintosh)" },
       NOW,
       db,
     );
@@ -703,32 +480,46 @@ describe("acceptance", () => {
     expect(row.accepted_snapshot).toBeTruthy();
 
     const snapshot = result.snapshot;
-    // §0: the firm's flat fee and the chosen package at signing; the USPTO fee
-    // is NOT in that figure, and never can be.
+    // §0: the firm's flat fee and the chosen package at signing; the USPTO fees
+    // — the every-package one and the package's own — are NOT in that figure,
+    // and never can be.
     expect(snapshot.totals.due_at_signing).toBe(150_000 + 165_000);
-    expect(snapshot.totals.due_at_filing).toBe(35_000);
-    expect(snapshot.totals.full_project_cost).toBe(150_000 + 165_000 + 35_000);
-    // The declined package is in the record too — what was offered, not only
-    // what was taken.
+    expect(snapshot.totals.due_at_filing).toBe(35_000 + 35_000);
+    expect(snapshot.totals.full_project_cost).toBe(150_000 + 165_000 + 35_000 + 35_000);
+    // The package not taken is in the record too — what was offered, not only
+    // what was taken — and so is the add-on the client left unticked.
     expect(snapshot.lines.find((l) => l.id === "line-std")?.selected).toBe(false);
+    expect(snapshot.lines.find((l) => l.id === "line-monitor")?.selected).toBe(false);
+    // What the firm withheld was never offered, so it is not in the record.
+    expect(snapshot.lines.map((l) => l.id)).not.toContain("line-budget");
+    expect(snapshot.lines.map((l) => l.id)).not.toContain("line-drawing");
     expect(snapshot.signature).toEqual({ name: "Dana Reyes", email: "dana@example.test" });
     expect(snapshot.quote.terms_body).toBe("Flat fees, billed as set out above.");
 
     const events = db.tables.crm_quote_event.filter((e) => e.type === "accepted");
     expect(events).toHaveLength(1);
+    expect(events[0].payload).toMatchObject({ package: "Comprehensive", due_at_signing_cents: 315_000 });
+  });
+
+  it("signs with a typed name alone — an email is optional, and checked only if given", async () => {
+    const db = makeDb();
+    const result = await signAsClient({ token: TOKEN, name: "Dana Reyes", choice: pick("Standard"), ip: null, userAgent: null }, NOW, db);
+    expect(result.ok).toBe(true);
+    expect(db.tables.crm_quote[0].accepted_by_email).toBeNull();
+    expect((db.tables.crm_quote[0].accepted_snapshot as { signature: { email: string } }).signature.email).toBe("");
   });
 
   it("cannot be accepted twice — the second attempt is refused, not applied", async () => {
     const db = makeDb();
     const first = await signAsClient(
-      { token: TOKEN, ...signer, selectedLineIds: ["line-prem"], ip: null, userAgent: null },
+      { token: TOKEN, ...signer, choice: pick("Comprehensive"), ip: null, userAgent: null },
       NOW,
       db,
     );
     expect(first.ok).toBe(true);
 
     const second = await signAsClient(
-      { token: TOKEN, name: "Someone Else", email: "else@example.test", selectedLineIds: ["line-std"], ip: null, userAgent: null },
+      { token: TOKEN, name: "Someone Else", email: "else@example.test", choice: pick("Standard"), ip: null, userAgent: null },
       new Date(NOW.getTime() + 1000),
       db,
     );
@@ -747,10 +538,7 @@ describe("acceptance", () => {
     // both pass every JavaScript check on a `sent` quote and both reach the
     // UPDATE. The only thing standing between that and two acceptances is the
     // conditional WHERE clause — which is exactly what this asserts.
-    const db = makeDb(
-      {},
-      lineFixtures().map((l) => (l.id === "line-prem" ? { ...l, selected: true } : l)),
-    );
+    const db = makeDb();
 
     // Both readers are looking at the same unchanged page, so they hold the
     // same fingerprint. Captured before the barrier goes in, so the only reads
@@ -770,8 +558,8 @@ describe("acceptance", () => {
     };
 
     const [a, b] = await Promise.all([
-      acceptPublicQuote({ token: TOKEN, name: "First Signer", email: "a@example.test", linesFingerprint: onScreen, ip: null, userAgent: null }, NOW, db),
-      acceptPublicQuote({ token: TOKEN, name: "Second Signer", email: "b@example.test", linesFingerprint: onScreen, ip: null, userAgent: null }, NOW, db),
+      acceptPublicQuote({ token: TOKEN, name: "First Signer", email: "a@example.test", choice: pick("Comprehensive"), linesFingerprint: onScreen, ip: null, userAgent: null }, NOW, db),
+      acceptPublicQuote({ token: TOKEN, name: "Second Signer", email: "b@example.test", choice: pick("Standard"), linesFingerprint: onScreen, ip: null, userAgent: null }, NOW, db),
     ]);
 
     const outcomes = [a, b];
@@ -786,6 +574,14 @@ describe("acceptance", () => {
     expect(db.tables.crm_quote[0].accepted_by_name).toBe(
       winner && winner.ok ? winner.snapshot.signature.name : "",
     );
+    // Only the winner writes its choice back to the rows — the loser's pick
+    // touches nothing.
+    expect(db.writes.filter((w) => w.table === "crm_quote_line")).toHaveLength(1);
+    const taken = winner && winner.ok ? winner.snapshot.lines.filter((l) => l.selected && l.selection === "tier_option")[0]?.tier_group : null;
+    const rows = db.tables.crm_quote_line;
+    for (const row of rows.filter((r) => r.selection === "tier_option")) {
+      expect(row.selected, String(row.id)).toBe(row.tier_group === taken);
+    }
   });
 
   it("accepts on the exact expiry millisecond — the boundary is exclusive", async () => {
@@ -795,7 +591,7 @@ describe("acceptance", () => {
     // and the client is told somebody else signed first.
     const db = makeDb({ expires_at: NOW.toISOString() }, lineFixtures());
     const result = await signAsClient(
-      { token: TOKEN, ...signer, selectedLineIds: ["line-prem"], ip: null, userAgent: null },
+      { token: TOKEN, ...signer, choice: pick("Comprehensive"), ip: null, userAgent: null },
       NOW,
       db,
     );
@@ -806,7 +602,7 @@ describe("acceptance", () => {
   it("refuses a signature that is not a name or not an email, before touching the row", async () => {
     const db = makeDb();
     const noName = await signAsClient(
-      { token: TOKEN, name: " ", email: "dana@example.test", selectedLineIds: ["line-prem"], ip: null, userAgent: null },
+      { token: TOKEN, name: " ", email: "dana@example.test", choice: pick("Comprehensive"), ip: null, userAgent: null },
       NOW,
       db,
     );
@@ -814,7 +610,7 @@ describe("acceptance", () => {
     if (!noName.ok) expect(noName.reason).toBe("invalid_name");
 
     const badEmail = await signAsClient(
-      { token: TOKEN, name: "Dana Reyes", email: "dana@nope", selectedLineIds: ["line-prem"], ip: null, userAgent: null },
+      { token: TOKEN, name: "Dana Reyes", email: "dana@nope", choice: pick("Comprehensive"), ip: null, userAgent: null },
       NOW,
       db,
     );
@@ -822,21 +618,21 @@ describe("acceptance", () => {
     if (!badEmail.ok) expect(badEmail.reason).toBe("invalid_email");
 
     expect(db.tables.crm_quote[0].status).toBe("sent");
-    // The refusal happens before the selection write, so a rejected signature
+    // The refusal happens before any write, so a rejected signature
     // leaves nothing behind at all.
     expect(db.tables.crm_quote_event).toHaveLength(0);
   });
 
-  it("refuses the whole acceptance when the selection it carries is invalid", async () => {
-    // A signature over a selection we could not save is a signature over
-    // something else.
+  it("refuses the whole acceptance when the pick it carries is not on offer", async () => {
+    // A signature over a choice the client could not have made is a signature
+    // over something else.
     const db = makeDb();
     const result = await signAsClient(
-      { token: TOKEN, name: "Dana Reyes", email: "dana@example.test", selectedLineIds: ["line-std", "line-prem"], ip: null, userAgent: null },
+      { token: TOKEN, name: "Dana Reyes", email: "dana@example.test", choice: pick("Budget"), ip: null, userAgent: null },
       NOW,
       db,
     );
-    expect(result).toEqual({ ok: false, reason: "invalid_tier" });
+    expect(result).toEqual({ ok: false, reason: "unknown_line" });
     expect(db.tables.crm_quote[0].status).toBe("sent");
   });
 
@@ -846,7 +642,7 @@ describe("acceptance", () => {
     // stop someone signing. Unparseable means null.
     const db = makeDb();
     const result = await signAsClient(
-      { token: TOKEN, name: "Dana Reyes", email: "dana@example.test", selectedLineIds: ["line-prem"], ip: "not-an-ip", userAgent: null },
+      { token: TOKEN, name: "Dana Reyes", email: "dana@example.test", choice: pick("Comprehensive"), ip: "not-an-ip", userAgent: null },
       NOW,
       db,
     );
@@ -855,16 +651,13 @@ describe("acceptance", () => {
   });
 
   it("reports unavailable rather than failure when the update cannot be run", async () => {
-    const db = makeDb(
-      {},
-      lineFixtures().map((l) => (l.id === "line-prem" ? { ...l, selected: true } : l)),
-    );
+    const db = makeDb();
     // The client read the page while the database was still up; it goes down
     // between that render and their signature.
     const onScreen = await renderedFingerprint(db);
     db.failTable = "crm_quote";
     const result = await acceptPublicQuote(
-      { token: TOKEN, name: "Dana Reyes", email: "dana@example.test", linesFingerprint: onScreen, ip: null, userAgent: null },
+      { token: TOKEN, name: "Dana Reyes", email: "dana@example.test", choice: pick("Comprehensive"), linesFingerprint: onScreen, ip: null, userAgent: null },
       NOW,
       db,
     );
@@ -891,7 +684,7 @@ describe("a signature over figures that moved is refused, never repriced", () =>
    * client signed $6,400 having read $3,150, and §5's frozen legal record —
    * whose entire purpose is to hold what someone agreed to — stored the number
    * they were never shown. The selection carries only line IDS, and a re-priced
-   * line keeps its id, so `validateSelection` had nothing to object to.
+   * line keeps its id, so the ids alone had nothing to object to.
    */
   it("REFUSES when a line was re-priced after the client read the page", async () => {
     const db = makeDb();
@@ -908,7 +701,7 @@ describe("a signature over figures that moved is refused, never repriced", () =>
     flat.unit_amount_cents = 475_000;
 
     const result = await acceptPublicQuote(
-      { token: TOKEN, ...signer, selectedLineIds: ["line-prem"], linesFingerprint: onScreen, ip: null, userAgent: null },
+      { token: TOKEN, ...signer, choice: pick("Comprehensive"), linesFingerprint: onScreen, ip: null, userAgent: null },
       NOW,
       db,
     );
@@ -925,47 +718,45 @@ describe("a signature over figures that moved is refused, never repriced", () =>
     expect(db.tables.crm_quote_event.filter((e) => e.type === "accepted")).toHaveLength(0);
   });
 
-  it("refuses a re-price that lands BETWEEN the fingerprint check and the snapshot read", async () => {
-    // The narrower version of the same defect, found by re-verifying the fix
-    // for the wide one. `applyPublicSelection` performs its own read, so there
-    // are TWO reads on the accept path: the one that is fingerprint-checked,
-    // and the one the snapshot is actually built from. An edit landing between
-    // them used to be accepted and frozen at the new amount — the client signs
-    // a figure they never saw, which is the whole failure the fingerprint
-    // exists to stop, just in a window measured in microseconds instead of
-    // minutes.
-    //
-    // Reproduced the way the verifier did: fire on the SECOND crm_quote_line
-    // read, which is the one applyPublicSelection issues.
+  it("reads the lines ONCE — the snapshot is built from the rows the fingerprint was checked against", async () => {
+    // The ported engine re-read the lines inside the accept path (to persist
+    // the selection), which opened a window between the fingerprint check and
+    // the snapshot. With no selection write there is one read, so the frozen
+    // figures are by construction the checked figures.
     const db = makeDb();
-    const read = await readPublicQuote(TOKEN, NOW, db);
-    if (read.status !== "ok") throw new Error("expected ok");
-    const onScreen = read.view.linesFingerprint;
-
+    const onScreen = await renderedFingerprint(db);
     let lineReads = 0;
     db.beforeQuery = async (table, op) => {
-      if (table !== "crm_quote_line" || op !== "select") return;
-      lineReads += 1;
-      if (lineReads === 2) {
-        const flat = db.tables.crm_quote_line.find((l) => l.id === "line-flat");
-        if (flat) flat.unit_amount_cents = 999_000;
-      }
+      if (table === "crm_quote_line" && op === "select") lineReads += 1;
     };
-
     const result = await acceptPublicQuote(
-      { token: TOKEN, ...signer, selectedLineIds: ["line-prem"], linesFingerprint: onScreen, ip: null, userAgent: null },
+      { token: TOKEN, ...signer, choice: pick("Comprehensive"), linesFingerprint: onScreen, ip: null, userAgent: null },
       NOW,
       db,
     );
     db.beforeQuery = null;
+    expect(result.ok).toBe(true);
+    expect(lineReads).toBe(1);
+  });
 
-    expect(result).toEqual({ ok: false, reason: "quote_changed" });
-
-    // And crucially: nothing was frozen at 999_000.
-    const row = db.tables.crm_quote[0];
-    expect(row.status).toBe("sent");
-    expect(row.accepted_at).toBeNull();
-    expect(row.accepted_snapshot).toBeNull();
+  it("REFUSES when the firm switches a package on or off while the client reads", async () => {
+    // Switching the offer changes which lines the client may take without
+    // touching an amount. The fingerprint is over the OFFERED lines, so it moves.
+    for (const change of ["withhold", "offer"] as const) {
+      const db = makeDb();
+      const onScreen = await renderedFingerprint(db);
+      for (const row of db.tables.crm_quote_line) {
+        if (change === "withhold" && row.tier_group === "Standard") row.selected = false;
+        if (change === "offer" && row.tier_group === "Budget") row.selected = true;
+      }
+      const result = await acceptPublicQuote(
+        { token: TOKEN, ...signer, choice: pick("Comprehensive"), linesFingerprint: onScreen, ip: null, userAgent: null },
+        NOW,
+        db,
+      );
+      expect(result, change).toEqual({ ok: false, reason: "quote_changed" });
+      expect(db.tables.crm_quote[0].status, change).toBe("sent");
+    }
   });
 
   it("accepts when the proposal has not moved", async () => {
@@ -974,7 +765,7 @@ describe("a signature over figures that moved is refused, never repriced", () =>
     // fix is worse than the defect.
     const db = makeDb();
     const result = await signAsClient(
-      { token: TOKEN, ...signer, selectedLineIds: ["line-prem"], ip: null, userAgent: null },
+      { token: TOKEN, ...signer, choice: pick("Comprehensive"), ip: null, userAgent: null },
       NOW,
       db,
     );
@@ -995,14 +786,14 @@ describe("a signature over figures that moved is refused, never repriced", () =>
     if (flat) flat.unit_amount_cents = 475_000;
 
     const refused = await acceptPublicQuote(
-      { token: TOKEN, ...signer, selectedLineIds: ["line-prem"], linesFingerprint: stale, ip: null, userAgent: null },
+      { token: TOKEN, ...signer, choice: pick("Comprehensive"), linesFingerprint: stale, ip: null, userAgent: null },
       NOW,
       db,
     );
     expect(refused).toEqual({ ok: false, reason: "quote_changed" });
 
     const result = await signAsClient(
-      { token: TOKEN, ...signer, selectedLineIds: ["line-prem"], ip: null, userAgent: null },
+      { token: TOKEN, ...signer, choice: pick("Comprehensive"), ip: null, userAgent: null },
       NOW,
       db,
     );
@@ -1021,7 +812,7 @@ describe("a signature over figures that moved is refused, never repriced", () =>
     if (flat) flat.charge_at = "filing";
 
     const result = await acceptPublicQuote(
-      { token: TOKEN, ...signer, selectedLineIds: ["line-prem"], linesFingerprint: onScreen, ip: null, userAgent: null },
+      { token: TOKEN, ...signer, choice: pick("Comprehensive"), linesFingerprint: onScreen, ip: null, userAgent: null },
       NOW,
       db,
     );
@@ -1029,16 +820,16 @@ describe("a signature over figures that moved is refused, never repriced", () =>
     expect(db.tables.crm_quote[0].status).toBe("sent");
   });
 
-  it("still reports unknown_line — not quote_changed — when a chosen line was DELETED", async () => {
-    // Unchanged behaviour, deliberately. A line that vanished is the more
-    // specific fact and `validateSelection` still gets to say so first; the
-    // fingerprint only speaks about interference the ids could not reveal.
+  it("still reports unknown_line — not quote_changed — when the chosen package was REMOVED", async () => {
+    // A package that vanished is the more specific fact and the choice check
+    // still gets to say so first; the fingerprint only speaks about
+    // interference the pick could not reveal.
     const db = makeDb();
     const onScreen = await renderedFingerprint(db);
-    db.tables.crm_quote_line = db.tables.crm_quote_line.filter((l) => l.id !== "line-prem");
+    db.tables.crm_quote_line = db.tables.crm_quote_line.filter((l) => l.tier_group !== "Comprehensive");
 
     const result = await acceptPublicQuote(
-      { token: TOKEN, ...signer, selectedLineIds: ["line-prem"], linesFingerprint: onScreen, ip: null, userAgent: null },
+      { token: TOKEN, ...signer, choice: pick("Comprehensive"), linesFingerprint: onScreen, ip: null, userAgent: null },
       NOW,
       db,
     );
@@ -1068,7 +859,7 @@ describe("a signature over figures that moved is refused, never repriced", () =>
     );
 
     const result = await acceptPublicQuote(
-      { token: TOKEN, ...signer, selectedLineIds: ["line-prem"], linesFingerprint: onScreen, ip: null, userAgent: null },
+      { token: TOKEN, ...signer, choice: pick("Comprehensive"), linesFingerprint: onScreen, ip: null, userAgent: null },
       NOW,
       db,
     );
@@ -1090,7 +881,7 @@ describe("a signature over figures that moved is refused, never repriced", () =>
     }
 
     const result = await acceptPublicQuote(
-      { token: TOKEN, ...signer, selectedLineIds: ["line-prem"], linesFingerprint: onScreen, ip: null, userAgent: null },
+      { token: TOKEN, ...signer, choice: pick("Comprehensive"), linesFingerprint: onScreen, ip: null, userAgent: null },
       NOW,
       db,
     );
@@ -1103,7 +894,7 @@ describe("a signature over figures that moved is refused, never repriced", () =>
     // for exactly the caller who wants it optional.
     const db = makeDb();
     const result = await acceptPublicQuote(
-      { token: TOKEN, ...signer, selectedLineIds: ["line-prem"], linesFingerprint: "", ip: null, userAgent: null },
+      { token: TOKEN, ...signer, choice: pick("Comprehensive"), linesFingerprint: "", ip: null, userAgent: null },
       NOW,
       db,
     );
@@ -1185,7 +976,7 @@ describe("an accepted quote — §5", () => {
   it("hands the receipt the frozen snapshot, and reads terminal", async () => {
     const db = makeDb();
     await signAsClient(
-      { token: TOKEN, name: "Dana Reyes", email: "dana@example.test", selectedLineIds: ["line-prem"], ip: null, userAgent: null },
+      { token: TOKEN, name: "Dana Reyes", email: "dana@example.test", choice: pick("Comprehensive"), ip: null, userAgent: null },
       NOW,
       db,
     );
@@ -1208,7 +999,7 @@ describe("an accepted quote — §5", () => {
     // would route around the allowlist through a jsonb column.
     const db = makeDb();
     await signAsClient(
-      { token: TOKEN, name: "Dana Reyes", email: "dana@example.test", selectedLineIds: ["line-prem"], ip: null, userAgent: null },
+      { token: TOKEN, name: "Dana Reyes", email: "dana@example.test", choice: pick("Comprehensive"), ip: null, userAgent: null },
       NOW,
       db,
     );
@@ -1375,132 +1166,86 @@ describe("buildAcceptedSnapshot", () => {
   });
 });
 
-describe("a refused acceptance leaves the stored selection untouched", () => {
+describe("no refusal writes anything; the winning signature writes the choice back", () => {
   const signer = { name: "Dana Reyes", email: "dana@example.test" };
 
-  /** The fingerprint the page would have rendered with — read the same way the
-   * server component reads it, so these tests exercise the real accept path
-   * rather than a shortcut past its staleness guard. */
-  async function renderedFingerprint(db: FakeDb): Promise<string> {
-    const read = await readPublicQuote(TOKEN, NOW, db);
-    if (read.status !== "ok") throw new Error("expected ok");
-    return read.view.linesFingerprint;
-  }
-
   /**
-   * THE REPRODUCTION, verbatim.
-   *
-   * The client picks Standard, which is saved. Someone then POSTs straight at
-   * the `"use server"` accept action with an EMPTY selection — no page, no
-   * form, just the forwarded link and a request body. The acceptance must be
-   * refused (`not_ready`, "Choose a package."), and refusing it must not have
-   * cost the client the package they chose.
-   *
-   * Before the readiness check moved ahead of the write, the selection was
-   * persisted first and rolled back by nothing: the call returned an error and
-   * `line-std` came back deselected. Anyone holding the link could clear a
-   * client's chosen package at will, and the comment above the write claimed
-   * "any refusal here refuses the whole acceptance".
+   * The ported engine had to defend a stored selection against a bare POST:
+   * `accept({ selectedLineIds: [] })` once cleared a client's package while
+   * reporting an error. There is no stored selection to strip any more — the
+   * pick travels only with the signature — and these pin the stronger property
+   * that replaced it: every refusal leaves every row exactly as it was.
    */
-  it("does not strip the client's package when readiness refuses the accept", async () => {
+  it("refuses a bare POST with no package, and touches no row", async () => {
     const db = makeDb();
     const linesFingerprint = await renderedFingerprint(db);
-
-    const saved = await applyPublicSelection(TOKEN, ["line-std"], NOW, db);
-    expect(saved.ok).toBe(true);
-    expect(
-      db.tables.crm_quote_line
-        .filter((l) => l.selected)
-        .map((l) => l.id)
-        .sort(),
-    ).toEqual(["line-flat", "line-std", "line-uspto"]);
-    const eventsAfterSave = db.tables.crm_quote_event.length;
-
-    const refused = await acceptPublicQuote(
-      { token: TOKEN, ...signer, selectedLineIds: [], linesFingerprint, ip: null, userAgent: null },
-      NOW,
-      db,
-    );
-    expect(refused).toEqual({
-      ok: false,
-      reason: "not_ready",
-      message: "Choose a package.",
-    });
-
-    // The stored rows are exactly as the client left them.
-    expect(
-      db.tables.crm_quote_line
-        .filter((l) => l.selected)
-        .map((l) => l.id)
-        .sort(),
-    ).toEqual(["line-flat", "line-std", "line-uspto"]);
-
-    // …and no `selection_changed` was written, so the firm's engagement
-    // timeline does not show the client un-choosing a package they never
-    // un-chose.
-    expect(db.tables.crm_quote_event).toHaveLength(eventsAfterSave);
-    expect(db.tables.crm_quote_event.filter((e) => e.type === "selection_changed")).toHaveLength(1);
-
-    // The quote itself is untouched: still live, still signable.
-    expect(db.tables.crm_quote[0].status).toBe("sent");
-    expect(db.tables.crm_quote[0].accepted_at).toBeNull();
+    const before = JSON.stringify(db.tables);
+    const refused = await acceptPublicQuote({ token: TOKEN, ...signer, linesFingerprint, ip: null, userAgent: null }, NOW, db);
+    expect(refused).toEqual({ ok: false, reason: "not_ready", message: "Choose a package." });
+    expect(db.writes).toEqual([]);
+    expect(JSON.stringify(db.tables)).toBe(before);
   });
 
-  it("does not strip it when the submitted selection is invalid either", async () => {
-    // Two options in one mutually-exclusive group. Same rule: the refusal is
-    // decided before anything durable happens.
-    const db = makeDb();
-    const linesFingerprint = await renderedFingerprint(db);
-    await applyPublicSelection(TOKEN, ["line-std"], NOW, db);
-
-    const refused = await acceptPublicQuote(
-      {
-        token: TOKEN,
-        ...signer,
-        selectedLineIds: ["line-std", "line-prem"],
-        linesFingerprint,
-        ip: null,
-        userAgent: null,
-      },
-      NOW,
-      db,
-    );
-    expect(refused).toEqual({ ok: false, reason: "invalid_tier" });
-    expect(db.tables.crm_quote_line.find((l) => l.id === "line-std")?.selected).toBe(true);
-    expect(db.tables.crm_quote_line.find((l) => l.id === "line-prem")?.selected).toBe(false);
+  it("touches no row for any refusal the submission alone decides", async () => {
+    const cases: Array<[string, Partial<AcceptInput>]> = [
+      ["bad name", { name: " " }],
+      ["bad email", { email: "dana@nope" }],
+      ["unknown package", { choice: pick("Budget") }],
+      ["unknown add-on", { choice: pick("Standard", ["line-drawing"]) }],
+      ["stale fingerprint", { linesFingerprint: "0".repeat(32) + "." + "0".repeat(32) }],
+    ];
+    for (const [label, override] of cases) {
+      const db = makeDb();
+      const linesFingerprint = await renderedFingerprint(db);
+      const result = await acceptPublicQuote(
+        { token: TOKEN, ...signer, choice: pick("Standard"), linesFingerprint, ip: null, userAgent: null, ...override },
+        NOW,
+        db,
+      );
+      expect(result.ok, label).toBe(false);
+      expect(db.writes, label).toEqual([]);
+    }
   });
 
-  it("still persists the selection it was given when the acceptance succeeds", async () => {
-    // The reordering must not turn the write off: what the client had on screen
-    // is still what gets stored, and still what the snapshot freezes.
+  it("writes the client's choice back, so the rows then read as what they took", async () => {
     const db = makeDb();
-    const linesFingerprint = await renderedFingerprint(db);
-    await applyPublicSelection(TOKEN, ["line-std"], NOW, db);
-
-    const result = await acceptPublicQuote(
-      {
-        token: TOKEN,
-        ...signer,
-        selectedLineIds: ["line-prem", "line-monitor"],
-        linesFingerprint,
-        ip: null,
-        userAgent: null,
-      },
-      NOW,
-      db,
-    );
+    const result = await signAsClient({ token: TOKEN, ...signer, choice: pick("Comprehensive", ["line-monitor"]), ip: null, userAgent: null }, NOW, db);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    expect(
-      db.tables.crm_quote_line
-        .filter((l) => l.selected)
-        .map((l) => l.id)
-        .sort(),
-    ).toEqual(["line-flat", "line-monitor", "line-prem", "line-uspto"]);
-    expect(result.snapshot.lines.find((l) => l.id === "line-prem")?.selected).toBe(true);
-    expect(result.snapshot.lines.find((l) => l.id === "line-std")?.selected).toBe(false);
-    expect(result.snapshot.totals.due_at_signing).toBe(150_000 + 165_000 + 50_000);
+    const selected = db.tables.crm_quote_line.filter((l) => l.selected).map((l) => l.id).sort();
+    expect(selected).toEqual(["line-flat", "line-monitor", "line-prem", "line-prem-uspto", "line-uspto"]);
+    // …and the live rows now total exactly what was frozen.
+    const live = quoteTotals(db.tables.crm_quote_line as never);
+    expect(live.dueAtSigning).toBe(result.snapshot.totals.due_at_signing);
+    expect(live.dueAtFiling).toBe(result.snapshot.totals.due_at_filing);
+    // The write-back is one statement, fenced on this quote and its org.
+    const lineWrites = db.writes.filter((w) => w.table === "crm_quote_line");
+    expect(lineWrites).toHaveLength(1);
+    expect(lineWrites[0].filters).toEqual(
+      expect.arrayContaining([
+        { kind: "eq", column: "quote_id", value: QUOTE_ID },
+        { kind: "eq", column: "org_id", value: ORG_ID },
+      ]),
+    );
+  });
+
+  it("does not undo a signature when writing the choice back fails", async () => {
+    const db = makeDb();
+    const linesFingerprint = await renderedFingerprint(db);
+    db.beforeQuery = async (table, op) => {
+      if (table === "crm_quote_line" && op === "update") db.failTable = "crm_quote_line";
+    };
+    const result = await acceptPublicQuote(
+      { token: TOKEN, ...signer, choice: pick("Standard"), linesFingerprint, ip: null, userAgent: null },
+      NOW,
+      db,
+    );
+    db.beforeQuery = null;
+    db.failTable = null;
+    expect(result.ok).toBe(true);
+    expect(db.tables.crm_quote[0].status).toBe("accepted");
+    expect(db.tables.crm_quote_event.filter((e) => e.type === "accepted")).toHaveLength(1);
   });
 });
 
@@ -1518,13 +1263,13 @@ describe("a signature over TERMS that moved is refused, never applied", () => {
 
     // The firm rewrites the fee agreement while it is open on their screen.
     // Note what does NOT change: no line is added, deleted or re-priced, so
-    // `validateSelection` sees a perfectly valid selection and every amount
+    // the client's pick is perfectly valid and every amount
     // still matches. Before the terms joined the digest this returned `ok`.
     db.tables.crm_quote[0].terms_body =
       "Flat fees, billed as set out above. A 40% cancellation fee applies on withdrawal.";
 
     const result = await acceptPublicQuote(
-      { token: TOKEN, ...signer, selectedLineIds: ["line-prem"], linesFingerprint: onScreen, ip: null, userAgent: null },
+      { token: TOKEN, ...signer, choice: pick("Comprehensive"), linesFingerprint: onScreen, ip: null, userAgent: null },
       NOW,
       db,
     );
@@ -1556,7 +1301,7 @@ describe("a signature over TERMS that moved is refused, never applied", () => {
       {
         token: TOKEN,
         ...signer,
-        selectedLineIds: ["line-prem"],
+        choice: pick("Comprehensive"),
         linesFingerprint: read.view.linesFingerprint,
         ip: null,
         userAgent: null,
@@ -1583,7 +1328,7 @@ describe("a signature over TERMS that moved is refused, never applied", () => {
       {
         token: TOKEN,
         ...signer,
-        selectedLineIds: ["line-prem"],
+        choice: pick("Comprehensive"),
         linesFingerprint: read.view.linesFingerprint,
         ip: null,
         userAgent: null,
@@ -1610,7 +1355,7 @@ describe("a signature over TERMS that moved is refused, never applied", () => {
       {
         token: TOKEN,
         ...signer,
-        selectedLineIds: ["line-prem"],
+        choice: pick("Comprehensive"),
         linesFingerprint: read.view.linesFingerprint,
         ip: null,
         userAgent: null,
@@ -1635,7 +1380,7 @@ describe("a signature over TERMS that moved is refused, never applied", () => {
       {
         token: TOKEN,
         ...signer,
-        selectedLineIds: ["line-prem"],
+        choice: pick("Comprehensive"),
         linesFingerprint: read.view.linesFingerprint,
         ip: null,
         userAgent: null,
@@ -1652,7 +1397,7 @@ describe("a signature over TERMS that moved is refused, never applied", () => {
     // frozen record is what proves later which agreement was signed.
     const db = makeDb();
     const result = await signAsClient(
-      { token: TOKEN, ...signer, selectedLineIds: ["line-prem"], ip: null, userAgent: null },
+      { token: TOKEN, ...signer, choice: pick("Comprehensive"), ip: null, userAgent: null },
       NOW,
       db,
     );
@@ -1742,7 +1487,7 @@ describe("declining — the client's own terminal state", () => {
 
   it("cannot decline a signed quote, and says so without touching it", async () => {
     const db = makeDb();
-    const accepted = await signAsClient({ token: TOKEN, ...signer, selectedLineIds: ["line-std"], ip: null, userAgent: null }, NOW, db);
+    const accepted = await signAsClient({ token: TOKEN, ...signer, choice: pick("Standard"), ip: null, userAgent: null }, NOW, db);
     expect(accepted.ok).toBe(true);
     const before = JSON.stringify(db.tables.crm_quote[0]);
 
@@ -1775,7 +1520,7 @@ describe("declining — the client's own terminal state", () => {
     expect(held).toBe(true);
     db.beforeQuery = null;
     const accepted = await acceptPublicQuote(
-      { token: TOKEN, ...signer, selectedLineIds: ["line-std"], linesFingerprint: fingerprint, ip: null, userAgent: null },
+      { token: TOKEN, ...signer, choice: pick("Standard"), linesFingerprint: fingerprint, ip: null, userAgent: null },
       NOW,
       db,
     );
@@ -1789,5 +1534,55 @@ describe("declining — the client's own terminal state", () => {
     const db = makeDb();
     expect(await declinePublicQuote("nope", NOW, db)).toEqual({ ok: false, reason: "not_found" });
     expect(db.queryCount.value).toBe(0);
+  });
+});
+
+/* ───────────────────── the matter opens on acceptance ────────────────────── */
+
+describe("acceptance opens the matter — and nothing about that can undo it", () => {
+  const LEAD_ID = "44444444-4444-4444-4444-444444444444";
+
+  function withLead(): FakeDb {
+    const db = makeDb({ lead_id: LEAD_ID, matter_id: null });
+    db.tables.crm_lead = [{ id: LEAD_ID, org_id: ORG_ID, first_name: "Dana", last_name: "Reyes", business_name: "Reyes Roasting" }];
+    db.tables.crm_matter_stage = [{ id: "stage-1", org_id: ORG_ID, order_index: 10, is_open: true }];
+    db.tables.crm_matter = [];
+    db.unique = { crm_matter: [["org_id", "matter_number"]] };
+    return db;
+  }
+
+  it("opens one matter for the quote's lead and links it, only for the winning signature", async () => {
+    const db = withLead();
+    const result = await signAsClient({ token: TOKEN, name: "Dana Reyes", choice: pick("Standard"), ip: null, userAgent: null }, NOW, db);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.matter).toMatchObject({ status: "opened", matterNumber: "TM-2026-0001" });
+    expect(db.tables.crm_matter).toEqual([
+      expect.objectContaining({ org_id: ORG_ID, lead_id: LEAD_ID, package_name: "Standard", status: "open", stage_id: "stage-1" }),
+    ]);
+    expect(db.tables.crm_quote[0].matter_id).toBe(db.tables.crm_matter[0].id);
+
+    // A second signature attempt is refused before it could open another.
+    const again = await signAsClient({ token: TOKEN, name: "Dana Reyes", choice: pick("Standard"), ip: null, userAgent: null }, NOW, db);
+    expect(again).toEqual({ ok: false, reason: "already_resolved" });
+    expect(db.tables.crm_matter).toHaveLength(1);
+  });
+
+  it("still accepts when the matter cannot be opened", async () => {
+    const db = withLead();
+    db.failInsertTable = "crm_matter";
+    const result = await signAsClient({ token: TOKEN, name: "Dana Reyes", choice: pick("Standard"), ip: null, userAgent: null }, NOW, db);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.matter).toEqual({ status: "failed" });
+    expect(db.tables.crm_quote[0].status).toBe("accepted");
+    expect(db.tables.crm_quote[0].matter_id).toBeNull();
+  });
+
+  it("leaves a quote that already names a matter alone", async () => {
+    const db = makeDb();
+    const result = await signAsClient({ token: TOKEN, name: "Dana Reyes", choice: pick("Standard"), ip: null, userAgent: null }, NOW, db);
+    expect(result.ok && result.matter).toEqual({ status: "skipped", reason: "has_matter" });
+    expect(db.tables.crm_matter ?? []).toEqual([]);
   });
 });

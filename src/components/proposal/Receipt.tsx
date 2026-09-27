@@ -1,8 +1,10 @@
 import { formatFirmDateTime } from "@/lib/quotes/labels";
 import { formatCents } from "@/lib/quotes/money";
-import { toAmount, toCount } from "@/lib/quotes/drift";
+import { toAmount } from "@/lib/quotes/drift";
+import { describeSignedChoice } from "@/lib/quotes/packages";
 import type { PublicQuoteView, QuoteAcceptedSnapshot } from "@/lib/quotes/public";
 import { FirmHeader } from "./FirmHeader";
+import { PrintButton } from "./PrintButton";
 
 /**
  * The client's copy of what they signed, rendered from `accepted_snapshot` and
@@ -14,9 +16,13 @@ import { FirmHeader } from "./FirmHeader";
  * WITHOUT figures — true — rather than falling back to the live lines, which
  * is the exact substitution §5 forbids.
  *
- * No form of any kind. And no promise of a notification: nothing here emails
- * anyone, so the copy says the acceptance is on file with the firm, not that
- * the firm "has been told".
+ * The design's "Download signed copy (PDF)" is a print-optimised page (q.css's
+ * print stylesheet) and a button that opens the browser's print dialog, where
+ * "Save as PDF" is one of the destinations. It is labelled as exactly that —
+ * no PDF is generated here, and this app adds no dependency to make one.
+ *
+ * No form of any kind, no payment step and no promise of an email: the copy
+ * says the acceptance is on file with the firm, which is what happened.
  */
 export function Receipt({ view }: { view: PublicQuoteView }) {
   const snapshot = view.acceptedSnapshot;
@@ -24,92 +30,109 @@ export function Receipt({ view }: { view: PublicQuoteView }) {
 
   return (
     <>
-      <FirmHeader firm={view.firm} />
-      <section role="status" className="lx-banner lx-banner-ok" style={{ display: "grid", gap: 6 }}>
-        <strong style={{ fontFamily: "var(--serif)", fontWeight: 400, fontSize: 24, color: "var(--ok)" }}>Accepted</strong>
-        <span style={{ color: "var(--ink)" }}>
-          {view.acceptedByName ? (
-            <>
-              Signed by <strong style={{ fontWeight: 500 }}>{view.acceptedByName}</strong>
-              {acceptedAt ? <> on {acceptedAt}</> : null}.
-            </>
-          ) : (
-            <>Your acceptance is recorded{acceptedAt ? <> — {acceptedAt}</> : null}.</>
-          )}{" "}
-          It is on file with {view.firm.name}, and nothing was charged on this page. If you don&rsquo;t hear
-          back, contact {view.firm.name} directly.
-        </span>
-      </section>
-
-      <section className="lx-card" style={{ padding: "26px 24px", display: "grid", gap: 14 }}>
-        <span className="lx-label">Your agreement</span>
-        <h1 className="lx-h2">{snapshot?.quote.title ?? view.title}</h1>
+      <FirmHeader firmName={view.firm.name} note={acceptedAt ? `Signed ${acceptedAt}` : "Signed"} />
+      <div className="qp-body">
         {snapshot ? (
-          <SnapshotBody snapshot={snapshot} />
+          <SnapshotBody snapshot={snapshot} signer={view.acceptedByName} acceptedAt={acceptedAt} firmName={view.firm.name} />
         ) : (
-          <p style={{ margin: 0, color: "var(--body)", fontSize: 15, lineHeight: 1.6 }}>
-            Your acceptance is on file with {view.firm.name}. The signed copy isn&rsquo;t available to display here —
-            contact {view.firm.name} and they can send it to you.
-          </p>
+          <>
+            <div>
+              <span className="qp-accepted-pill">Accepted</span>
+              <h1 className="qp-title" style={{ marginTop: 11 }}>
+                {view.title}
+              </h1>
+            </div>
+            <p className="qp-intro" style={{ marginTop: 0 }}>
+              Your acceptance{acceptedAt ? ` of ${acceptedAt}` : ""} is on file with {view.firm.name}. The signed copy
+              isn&rsquo;t available to display here — contact {view.firm.name} and they can send it to you.
+            </p>
+          </>
         )}
-      </section>
+      </div>
     </>
   );
 }
 
-function SnapshotBody({ snapshot }: { snapshot: QuoteAcceptedSnapshot }) {
-  const accepted = snapshot.lines.filter((line) => line.selected);
-  const declined = snapshot.lines.filter((line) => !line.selected);
+function SnapshotBody({
+  snapshot,
+  signer,
+  acceptedAt,
+  firmName,
+}: {
+  snapshot: QuoteAcceptedSnapshot;
+  signer: string | null;
+  acceptedAt: string;
+  firmName: string;
+}) {
   const currency = snapshot.currency;
+  const choice = describeSignedChoice(snapshot.lines);
+  const name = signer ?? snapshot.signature?.name ?? "";
   return (
     <>
-      <ul className="lx-list">
-        {accepted.map((line) => (
-          <li key={line.id} style={{ display: "flex", justifyContent: "space-between", gap: 16, padding: "10px 0" }}>
-            <span style={{ color: "var(--ink)" }}>
-              {line.label}
-              {toCount(line.quantity) > 1 && <span className="lx-note"> × {toCount(line.quantity)}</span>}
-              {line.charge_at === "filing" && <span className="lx-note" style={{ display: "block" }}>charged later, at filing</span>}
-              {line.charge_at === "not_charged" && <span className="lx-note" style={{ display: "block" }}>no charge</span>}
-            </span>
-            <span className="lx-num" style={{ whiteSpace: "nowrap" }}>
-              {formatCents(toAmount(line.amount_cents), currency)}
-            </span>
-          </li>
-        ))}
-      </ul>
-      {/* An add-on the client turned down is part of what was agreed; dropping
-          it would make it look like one that was never offered. */}
-      {declined.length > 0 && (
-        <p className="lx-note" style={{ margin: 0 }}>
-          Not included: {declined.map((line) => line.label).join(", ")}.
+      <div>
+        <span className="qp-accepted-pill">Accepted</span>
+        <h1 className="qp-title" style={{ marginTop: 11 }}>
+          {choice.packageName ? `${choice.packageName} — ${snapshot.quote.title}` : snapshot.quote.title}
+        </h1>
+        <p className="qp-intro" style={{ color: "var(--muted)", fontSize: 13.5 }}>
+          A frozen snapshot of what you agreed to. Later edits by the firm can&rsquo;t change it.
         </p>
-      )}
-      {/* §0's split survives on the signed copy: two timed figures, the project
-          cost below them and never beside them. */}
-      <div style={{ display: "grid", gap: 8, padding: "14px 16px", borderRadius: 10, background: "var(--well)" }}>
-        <Row label="Due at signing" value={formatCents(toAmount(snapshot.totals?.due_at_signing), currency)} strong />
-        <Row label="Due later, at filing (USPTO fees)" value={formatCents(toAmount(snapshot.totals?.due_at_filing), currency)} strong />
-        <Row label="Full project cost (not an amount due today)" value={formatCents(toAmount(snapshot.totals?.full_project_cost), currency)} />
       </div>
+
+      <div className="qp-section">
+        <div className="qp-due-now">{formatCents(toAmount(snapshot.totals?.due_at_signing), currency)}</div>
+        <div className="qp-due-label">Due at signing{acceptedAt ? ` · signed ${acceptedAt}` : ""}</div>
+        <div className="qp-due-note">Invoiced by {firmName}. Nothing was charged on this page.</div>
+        <div className="qp-due-later">{formatCents(toAmount(snapshot.totals?.due_at_filing), currency)}</div>
+        <div className="qp-due-later-label">Due at filing · not yet charged</div>
+        <div className="qp-due-note">USPTO government fees, collected when the applications are filed.</div>
+        <div className="qp-project">
+          Full project cost {formatCents(toAmount(snapshot.totals?.full_project_cost), currency)} — not an amount due at signing
+        </div>
+      </div>
+
+      <div className="qp-section">
+        <div className="qp-kicker">What you agreed to</div>
+        <div className="qp-lines">
+          {choice.agreed.map((line) => (
+            <div key={line.id} className="qp-line">
+              <span className="qp-line-label">
+                {line.label}
+                {line.quantity > 1 ? ` × ${line.quantity}` : ""}
+                {line.bucket === "filing" ? " (at filing)" : line.bucket === "not_charged" ? " (not charged)" : ""}
+                {line.isAddOn ? " · add-on" : ""}
+              </span>
+              <span className="qp-line-amount">{formatCents(line.amountCents, currency)}</span>
+            </div>
+          ))}
+        </div>
+        {/* What was offered and not taken is part of the record too: dropping it
+            would make it look as though it was never on the table. */}
+        {(choice.otherPackages.length > 0 || choice.declinedAddOns.length > 0) && (
+          <p className="qp-small" style={{ marginTop: 10 }}>
+            Also offered, not taken: {[...choice.otherPackages, ...choice.declinedAddOns].join(", ")}.
+          </p>
+        )}
+      </div>
+
       {snapshot.quote.terms_body && (
-        <div style={{ display: "grid", gap: 8, paddingTop: 14, borderTop: "1px solid var(--line-2)" }}>
-          <span className="lx-label">Terms you agreed to</span>
+        <div className="qp-terms">
+          <div className="qp-kicker">Terms you agreed to</div>
           {/* Text with pre-wrap, never HTML: this route has no sanitiser. */}
-          <p style={{ margin: 0, whiteSpace: "pre-wrap", fontSize: 14.5, lineHeight: 1.65, color: "var(--body)" }}>{snapshot.quote.terms_body}</p>
+          <p className="qp-terms-body">{snapshot.quote.terms_body}</p>
         </div>
       )}
-    </>
-  );
-}
 
-function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", gap: 16, color: strong ? "var(--ink)" : "var(--muted)" }}>
-      <span style={{ fontWeight: strong ? 500 : 400 }}>{label}</span>
-      <span className="lx-num" style={{ fontWeight: strong ? 700 : 400, whiteSpace: "nowrap" }}>
-        {value}
-      </span>
-    </div>
+      <div className="qp-section">
+        <div className="qp-kicker">Signed by</div>
+        <div className="qp-signature">{name}</div>
+        {acceptedAt && <p className="qp-small">{acceptedAt}</p>}
+      </div>
+
+      <div className="qp-noprint" style={{ display: "grid", gap: 8 }}>
+        <PrintButton />
+        <p className="qp-hint">Opens your browser&rsquo;s print dialog — choose &ldquo;Save as PDF&rdquo; to keep a file.</p>
+      </div>
+    </>
   );
 }

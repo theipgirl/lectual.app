@@ -136,4 +136,19 @@ describe("describeLineDrift: what the live rows say that the signed record does 
     expect(entries).toContain("“Search and opinion” has been deleted from the quote since it was signed.");
     expect(entries).toContain("“Rush fee” was added to the quote after it was signed.");
   });
+
+  it("does not call a package or add-on the firm withheld an addition — it was never offered", () => {
+    // Withheld lines are not in the signed record (only the OFFER is), and
+    // their `selected: false` says so.
+    expect(describeLineDrift([signedLine], [live(), live({ id: "l-7", label: "Budget search", selection: "tier_option", tier_group: "Budget", selected: false })])).toEqual([]);
+    // An offered line that appears afterwards still is one.
+    expect(describeLineDrift([signedLine], [live(), live({ id: "l-8", label: "Rush", selection: "optional", selected: true })])).toEqual([
+      "“Rush” was added to the quote after it was signed.",
+    ]);
+  });
+
+  it("does not report `selected` as drift — before signature it was the firm's offer, not the agreement", () => {
+    const signed = { ...signedLine, selection: "optional", selected: false };
+    expect(describeLineDrift([signed], [live({ selection: "optional", selected: true })])).toEqual([]);
+  });
 });

@@ -137,3 +137,121 @@ export function expiryInputValue(expiresAt: string | null | undefined): string {
 }
 
 export { QUOTE_LINE_KINDS, QUOTE_LINE_SELECTIONS };
+
+/* ─────────────────────── the builder's short forms ─────────────────────── */
+
+/**
+ * The quote's reference on screen — "qt-3f9a1c". There is no number column
+ * (0068 has none), so it is the first six hex digits of the id: stable, short
+ * enough to say on the phone, and derived rather than stored, so it cannot
+ * drift from the row it names. It is a label, never a lookup key.
+ */
+export function quoteReference(id: string): string {
+  return `qt-${id.replace(/-/g, "").slice(0, 6).toLowerCase()}`;
+}
+
+/** "Sep 18" in the firm's zone, or "" when there is no readable instant. */
+export function formatShortFirmDate(value: string | null | undefined): string {
+  if (!value) return "";
+  const ms = Date.parse(value.replace(/^(\d{4}-\d{2}-\d{2}) /, "$1T").replace(/([+-]\d{2})$/, "$1:00"));
+  if (Number.isNaN(ms)) return "";
+  return new Intl.DateTimeFormat("en-US", { timeZone: FIRM_TIME_ZONE, month: "short", day: "numeric" }).format(new Date(ms));
+}
+
+/** "Sep 10, 4:02 PM" in the firm's zone — the activity log's time column. */
+export function formatFirmStamp(value: string | null | undefined): string {
+  if (!value) return "";
+  const ms = Date.parse(value);
+  if (Number.isNaN(ms)) return value;
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: FIRM_TIME_ZONE,
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(ms));
+}
+
+/** "7 days" / "1 day" / "today" / "passed" — the expiry countdown's words. */
+export function daysLeftLabel(days: number | null): string {
+  if (days === null) return "";
+  if (days < 0) return "passed";
+  if (days === 0) return "today";
+  return days === 1 ? "1 day" : `${days} days`;
+}
+
+type EventLike = { type: string; actor?: string | null; payload?: Record<string, unknown> | null };
+
+function payloadText(payload: Record<string, unknown> | null | undefined, key: string): string | null {
+  const value = payload?.[key];
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+/**
+ * One activity-log sentence per `crm_quote_event`. Payload values are
+ * rendered as text by the caller, never as HTML. A change this build does not
+ * know is shown as a plain "Revised", never guessed at.
+ */
+export function describeQuoteEvent(event: EventLike): string {
+  const p = event.payload ?? null;
+  switch (event.type) {
+    case "created":
+      return "Draft created";
+    case "sent":
+      return "Sent — the client link is live (nothing was emailed)";
+    case "viewed":
+      return "Client opened the link";
+    case "selection_changed":
+      return "Client changed a selection";
+    case "accepted": {
+      const pkg = payloadText(p, "package");
+      return pkg ? `Accepted and signed — ${pkg}` : "Accepted and signed";
+    }
+    case "declined":
+      return "Declined by the client";
+    case "withdrawn":
+      return "Withdrawn by the firm";
+    case "expired":
+      return "Expired";
+    case "payment_recorded":
+      return "Payment recorded";
+    case "revised": {
+      const change = payloadText(p, "change");
+      const pkg = payloadText(p, "package");
+      const label = payloadText(p, "label");
+      switch (change) {
+        case "matter_opened":
+          return `Matter ${payloadText(p, "matter_number") ?? ""} opened automatically`.replace("  ", " ");
+        case "package_offered":
+          return `Package offered — ${pkg ?? ""}`;
+        case "package_withheld":
+          return `Package withheld — ${pkg ?? ""}`;
+        case "package_renamed":
+          return `Package renamed — ${payloadText(p, "from") ?? ""} → ${pkg ?? ""}`;
+        case "package_added":
+          return `Package added — ${pkg ?? ""}`;
+        case "package_removed":
+          return `Package removed — ${pkg ?? ""}`;
+        case "add_on_offered":
+          return `Add-on offered — ${label ?? ""}`;
+        case "add_on_withheld":
+          return `Add-on withheld — ${label ?? ""}`;
+        case "line_added":
+          return label ? `Line added — ${label}` : "Line added";
+        case "line_deleted":
+          return label ? `Line removed — ${label}` : "Line removed";
+        case "line_updated":
+          return "Line edited";
+        case "service_item_applied":
+          return "Line added from the service library";
+        case "lines_reordered":
+          return "Lines reordered";
+        case "details_updated":
+          return "Title, intro or expiry edited";
+      }
+      if (payloadText(p, "field") === "terms_body") return "Engagement terms edited";
+      return "Revised";
+    }
+  }
+  return eventLabel(event.type);
+}

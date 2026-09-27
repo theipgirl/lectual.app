@@ -4,9 +4,11 @@ import { hasRole } from "@/lib/auth/roles";
 import { loadLinesForQuotes, loadQuotes } from "@/lib/quotes/load";
 import { quoteClientLabels, quoteClientOptions } from "@/lib/quotes/clients";
 import { daysUntilQuoteExpiry, effectiveQuoteStatus, formatQuoteExpiry, QUOTE_STATUSES, quoteStatusLabel } from "@/lib/quotes/status";
-import { fullProjectCost, quoteTotals } from "@/lib/quotes/pricing";
+import { offerHeadline } from "@/lib/quotes/packages";
+import { parseAcceptedSnapshot } from "@/lib/quotes/public";
+import { toAmount } from "@/lib/quotes/drift";
 import { formatCents } from "@/lib/quotes/money";
-import { quoteStatusTone } from "@/lib/quotes/labels";
+import { quoteReference, quoteStatusTone } from "@/lib/quotes/labels";
 import { relativeTime } from "@/lib/relative-time";
 import { NewQuoteForm } from "@/components/quotes/QuoteForms";
 import { QuotesRestricted } from "@/components/quotes/QuotesRestricted";
@@ -41,7 +43,10 @@ export const dynamic = "force-dynamic";
  *
  * ── NEW IN lectual.app ──────────────────────────────────────────────────────
  * Client and total columns. Totals are one extra `.in()` read over the listed
- * quotes (not one per quote) and degrade to "—", never to $0.00.
+ * quotes (not one per quote) and degrade to "—", never to $0.00. An accepted
+ * quote shows its SIGNED figures (the snapshot); an unsigned one with packages
+ * has no single price until the client picks, so it shows the range across the
+ * packages offered (packages.ts's `offerHeadline`, add-ons excluded).
  */
 export default async function QuotesPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
   const { status: statusRaw } = await searchParams;
@@ -150,7 +155,7 @@ export default async function QuotesPage({ searchParams }: { searchParams: Promi
               {rows.map(({ quote, effective }) => {
                 const client = clients.get(quote.id);
                 const lines = linesByQuote?.get(quote.id) ?? (linesByQuote ? [] : null);
-                const totals = lines ? quoteTotals(lines, quote.currency) : null;
+                const figures = listFigures(quote, lines);
                 const expiry = formatQuoteExpiry(quote.expires_at);
                 const daysLeft = daysUntilQuoteExpiry(quote.expires_at, now);
                 return (
@@ -159,6 +164,9 @@ export default async function QuotesPage({ searchParams }: { searchParams: Promi
                       <Link href={`/dashboard/quotes/${quote.id}/`} className="lx-rowlink">
                         {quote.title}
                       </Link>
+                      <span className="lx-note lx-num" style={{ marginLeft: 8, fontSize: 12 }}>
+                        {quoteReference(quote.id)}
+                      </span>
                       {effective === "sent" && expiry && (
                         <div className="lx-note">
                           Open until {expiry}
@@ -171,10 +179,10 @@ export default async function QuotesPage({ searchParams }: { searchParams: Promi
                       <span className={`lx-pill ${quoteStatusTone(effective)}`}>{quoteStatusLabel(effective)}</span>
                     </td>
                     <td className="lx-num" style={{ textAlign: "right" }}>
-                      {totals ? formatCents(totals.dueAtSigning, totals.currency) : "—"}
+                      {figures ? figures.signing : "—"}
                     </td>
                     <td className="lx-num" style={{ textAlign: "right" }}>
-                      {totals ? formatCents(fullProjectCost(totals), totals.currency) : "—"}
+                      {figures ? figures.project : "—"}
                     </td>
                     <td className="lx-num">{relativeTime(quote.updated_at)}</td>
                   </tr>
@@ -191,4 +199,34 @@ export default async function QuotesPage({ searchParams }: { searchParams: Promi
       )}
     </>
   );
+}
+
+/** "$4,550.00", or "$2,750.00 – $3,650.00" across the packages offered. */
+function range(low: number, high: number, currency: string): string {
+  return low === high ? formatCents(low, currency) : `${formatCents(low, currency)} – ${formatCents(high, currency)}`;
+}
+
+/**
+ * The two list figures for one quote. Signed figures for an accepted quote
+ * (never re-derived from rows that may have moved since); for any other, the
+ * offer's range. Null when the lines could not be read — rendered as "—",
+ * never as $0.00.
+ */
+function listFigures(
+  quote: { status: string; accepted_snapshot: Record<string, unknown> | null; currency: string },
+  lines: Parameters<typeof offerHeadline>[0] | null,
+): { signing: string; project: string } | null {
+  const snapshot = quote.status === "accepted" ? parseAcceptedSnapshot(quote.accepted_snapshot) : null;
+  if (snapshot) {
+    return {
+      signing: formatCents(toAmount(snapshot.totals.due_at_signing), snapshot.currency),
+      project: formatCents(toAmount(snapshot.totals.full_project_cost), snapshot.currency),
+    };
+  }
+  if (!lines) return null;
+  const headline = offerHeadline(lines, quote.currency);
+  return {
+    signing: range(headline.dueAtSigning.low, headline.dueAtSigning.high, headline.currency),
+    project: range(headline.fullProjectCost.low, headline.fullProjectCost.high, headline.currency),
+  };
 }
