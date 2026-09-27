@@ -3,7 +3,9 @@
 // Seeds a demo firm, "Hartwell IP (demo)", into lectual-dev so every page of
 // the workspace has something to click through: leads across the intake
 // stages, trademark and litigation matters on the board, docketed deadlines,
-// timeline activity, tasks for Today, and two generated letters on Documents.
+// timeline activity, tasks for Today, two generated letters on Documents, a
+// live public intake form with submissions and 30 days of funnel events, a
+// follow-up campaign with an enrollment, and Firm brain entries and claims.
 //
 // WHY A SCRIPT: content is not schema. A migration replays into every
 // environment, and demo leads in the migration chain once reached production
@@ -17,15 +19,22 @@
 //   NEXT_PUBLIC_SUPABASE_URL=https://vncamzabuhvlliscprmm.supabase.co \
 //   SUPABASE_SERVICE_ROLE_KEY=... pnpm seed:demo [--reset] [--member you@firm.com]
 //
-//   --reset          delete the demo firm (and its stored letters) and seed it again
+//   --reset          delete the demo firm (and its stored letters and voice notes) and
+//                    seed it again; everything else goes with the org (on delete cascade)
 //   --member <email> also make that existing or new login an owner of the demo firm,
 //                    so you can sign in to it with your own magic link
 //
 // The slug is `hartwell-ip`, which lectual's test teardown spares. Demo logins
 // use the reserved `.test` domain (never deliverable); every client name,
 // address and mark is fictional.
+import { createHash } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { Document, Packer, Paragraph, TextRun } from "docx";
+// Pure modules only (no "@/" imports), so the seed builds the intake config
+// and decides "live" exactly as the Forms page's save does.
+import { defaultIntakeConfig, validateIntakeConfig } from "../src/lib/intake-forms/config.ts";
+import { checklistComplete, goLiveChecklist } from "../src/lib/intake-forms/checklist.ts";
+import { slugFromFirmName } from "../src/lib/intake-forms/slug.ts";
 
 const DEV_REF = "vncamzabuhvlliscprmm";
 const SLUG = "hartwell-ip";
@@ -441,7 +450,209 @@ async function main() {
     );
   }
 
-  console.log(`Seeded ${NAME} (${orgId}): ${leads.length} leads, ${matters.length} matters, 5 deadlines, 2 letters.`);
+  // ── Public intake form (lectual 0075; dev only until it reaches prod) ─────
+  // Built from the Forms page's own defaults and saved "live" only because the
+  // same go-live checklist passes, as saveIntakeForm decides it.
+  const intakeConfig = defaultIntakeConfig([]);
+  intakeConfig.firmName = "Hartwell IP";
+  intakeConfig.feesOn = false;
+  intakeConfig.knows = "Demo firm. Trademark clearance and filing for small consumer brands; flat fees quoted after a discovery call.";
+  intakeConfig.fitText = "US businesses launching or rebranding a consumer product or service who need clearance and a federal filing. Not a fit: patents, disputes outside the US.";
+  const checkedIntake = validateIntakeConfig(intakeConfig);
+  if (!checkedIntake.ok) throw new Error(`intake config: ${checkedIntake.errors.join(" ")}`);
+  const intakeLive = checklistComplete(goLiveChecklist(checkedIntake.config, { receivesReferrals: false, agreementSigned: false }));
+  const intakeSlug = slugFromFirmName(NAME);
+  const form = must(
+    await db
+      .from("crm_intake_form")
+      .insert({
+        org_id: orgId,
+        slug: intakeSlug,
+        status: intakeLive ? "live" : "draft",
+        config: checkedIntake.config,
+        allowed_domains: ["www.hartwell-ip.test"],
+        published_at: intakeLive ? daysAgo(31) : null,
+        created_by: ownerId,
+        updated_by: ownerId,
+        created_at: daysAgo(31),
+      })
+      .select("id")
+      .single(),
+    "intake form",
+  );
+  const q = checkedIntake.config.questions;
+
+  // Submissions, each filed the way submitPublicIntake files one: the
+  // submission row, then a lead in the first open intake stage with
+  // referral_source "Intake form", a lead_created and an answers note.
+  type SubmissionSeed = {
+    name: string; email: string; phone: string; company: string; mode: "form" | "conversation"; age: number;
+    answers: string[]; fit: "fit" | "non_fit" | "unscored"; note: string | null;
+    status: "new" | "referred" | "consult_booked" | "engaged" | "rejected" | "stopped"; host: string | null;
+  };
+  const submissionSeeds: SubmissionSeed[] = [
+    { name: "Priya Castellanos", email: "priya.castellanos@example.com", phone: "512-555-0142", company: "Juniper Row Tea", mode: "conversation", age: 0.3, answers: ["JUNIPER ROW", "Not yet; launching at a farmers market in March.", "Loose-leaf tea and tea subscriptions"], fit: "fit", note: "US consumer brand, pre-launch, wants a federal filing: matches the firm's stated criteria.", status: "new", host: "www.hartwell-ip.test" },
+    { name: "Ben Oduya", email: "ben.oduya@example.com", phone: "", company: "Tallgrass Cycles", mode: "form", age: 3, answers: ["TALLGRASS", "Yes, on our shop sign and website since 2024.", "Bicycle repair and custom frames"], fit: "fit", note: "Trademark, US, existing use in commerce; within the firm's criteria.", status: "consult_booked", host: null },
+    { name: "Sofia Lindgren", email: "sofia.lindgren@example.com", phone: "", company: "", mode: "form", age: 6, answers: ["A method for recycling carbon fibre", "Shown at a trade fair last month.", "Industrial recycling"], fit: "non_fit", note: "Describes a process invention (patent), which the firm's criteria list as not a fit.", status: "referred", host: "www.hartwell-ip.test" },
+    { name: "Marcus Webb", email: "marcus.webb@example.com", phone: "303-555-0199", company: "Webb & Daughters Hot Sauce", mode: "conversation", age: 12, answers: ["WEBB & DAUGHTERS", "Yes, at local markets.", "Hot sauce and spice rubs"], fit: "fit", note: "US consumer food brand seeking clearance and filing.", status: "engaged", host: null },
+    { name: "Ada Nwosu", email: "ada.nwosu@example.com", phone: "", company: "", mode: "conversation", age: 19, answers: ["Something for my podcast, not sure yet", "", ""], fit: "unscored", note: null, status: "stopped", host: null },
+  ];
+  const intakeStage = stages.filter((s) => s.category === "open").sort((a, b) => a.order_index - b.order_index)[0]?.id ?? null;
+  const markQuestion = q[0]!;
+  for (const sub of submissionSeeds) {
+    const answered = sub.answers
+      .map((answer, i) => ({ id: q[i]!.id, question: q[i]!.text, answer }))
+      .filter((a) => a.answer);
+    const at = daysAgo(sub.age);
+    const contact = { name: sub.name, email: sub.email, phone: sub.phone, company: sub.company };
+    const row = must(
+      await db
+        .from("crm_intake_submission")
+        .insert({
+          org_id: orgId, form_id: form.id, mode: sub.mode, contact, answers: answered, fit: sub.fit,
+          screening_note: sub.note, status: sub.status, source_host: sub.host,
+          started_at: new Date(Date.parse(at) - 4 * 60_000).toISOString(), submitted_at: at, last_active_at: at, created_at: at,
+        })
+        .select("id")
+        .single(),
+      "intake submission",
+    );
+    if (!intakeStage) continue;
+    const [first, ...rest] = sub.name.split(" ");
+    const how = sub.mode === "conversation" ? "Chat" : "Form";
+    const mark = answered.find((a) => a.id === markQuestion.id)?.answer ?? null;
+    const lead = must(
+      await db
+        .from("crm_lead")
+        .insert({
+          org_id: orgId, first_name: first!, last_name: rest.join(" "), email: sub.email, phone: sub.phone || null,
+          business_name: sub.company || null, practice_area: "Trademark", mark_text: mark,
+          referral_source: "Intake form", referral_detail: sub.host ? `${how} on ${sub.host}` : how,
+          current_stage_id: intakeStage, stage_entered_at: at, last_activity_at: at, last_inbound_at: at, created_at: at,
+        })
+        .select("id")
+        .single(),
+      "intake lead",
+    );
+    ok(await db.from("crm_intake_submission").update({ lead_id: lead.id }).eq("id", row.id).eq("org_id", orgId), "link intake lead");
+    const note = [`Intake form (${how.toLowerCase()}${sub.host ? ` on ${sub.host}` : ""})`, [sub.name, sub.email, sub.phone, sub.company].filter(Boolean).join(" · ")];
+    for (const a of answered) note.push("", `Q: ${a.question}`, `A: ${a.answer}`);
+    ok(
+      await db.from("crm_activity").insert([
+        { org_id: orgId, lead_id: lead.id, type: "lead_created", actor_type: "system", payload: { summary: sub.name, email: sub.email, stage_id: intakeStage, source: "Intake form", mode: sub.mode }, created_at: at },
+        { org_id: orgId, lead_id: lead.id, type: "note", actor_type: "system", payload: { note: note.join("\n"), source: "intake-form" }, created_at: at },
+      ]),
+      "intake lead activity",
+    );
+  }
+
+  // Funnel events for the last 30 days: a few sessions a day that visit and
+  // mostly start (chat or form) without finishing, plus one visit → start →
+  // complete session per submission above, so "Completed" matches the table.
+  // Hashes stand in for the salted session hash (64 hex chars, as 0075
+  // allows); no identities.
+  const events: Array<{ org_id: string; form_id: string; kind: string; session_hash: string; occurred_at: string }> = [];
+  let session = 0;
+  const sessionEvents = (t0: number, kinds: string[]) => {
+    session++;
+    const hash = createHash("sha256").update(`hartwell-demo-session-${session}`).digest("hex");
+    kinds.forEach((kind, i) => events.push({ org_id: orgId, form_id: form.id, kind, session_hash: hash, occurred_at: new Date(t0 + i * 3 * 60_000).toISOString() }));
+  };
+  for (let d = 29; d >= 0; d--) {
+    const perDay = 2 + (d % 3);
+    for (let i = 0; i < perDay; i++) {
+      const t0 = now - d * DAY - (i * 3 + 1) * 3_600_000;
+      sessionEvents(t0, (session + 1) % 3 === 0 ? ["visit"] : ["visit", session % 2 ? "start_conversation" : "start_form"]);
+    }
+  }
+  for (const sub of submissionSeeds) {
+    sessionEvents(Date.parse(daysAgo(sub.age)) - 6 * 60_000, ["visit", sub.mode === "conversation" ? "start_conversation" : "start_form", "complete"]);
+  }
+  ok(await db.from("crm_intake_event").insert(events), "intake events");
+
+  // ── Campaign: templates, a sequence with steps, enrollments ───────────────
+  // A task step first, so "Run next step" works on a firm with no approval
+  // queue connected; the email steps draft into the queue when one is.
+  const templates = must(
+    await db
+      .from("crm_email_template")
+      .insert([
+        { org_id: orgId, name: "Inquiry follow-up", subject: "Following up on {{business_name}}", body_text: "Hi {{first_name}},\n\nThanks for getting in touch with Hartwell IP. When would suit you for a short discovery call?\n\nHartwell IP (demo firm)", body_html: "", created_by: ownerId },
+        { org_id: orgId, name: "Still interested?", subject: "Checking in", body_text: "Hi {{first_name}},\n\nJust checking whether you'd still like to talk. Reply to this email and we'll find a time.\n\nHartwell IP (demo firm)", body_html: "", created_by: ownerId },
+      ])
+      .select("id, name"),
+    "email templates",
+  );
+  const templateId = (name: string) => templates.find((t) => t.name === name)!.id;
+  const sequence = must(
+    await db
+      .from("crm_drip_sequence")
+      .insert({ org_id: orgId, name: "New inquiry follow-up", description: "For intake leads who haven't booked a discovery call.", active: true, created_by: ownerId, created_at: daysAgo(20) })
+      .select("id")
+      .single(),
+    "campaign sequence",
+  );
+  ok(
+    await db.from("crm_drip_step").insert([
+      { org_id: orgId, sequence_id: sequence.id, order_index: 0, type: "task", delay_hours: 0, config: { title: "Call to confirm the intake details" } },
+      { org_id: orgId, sequence_id: sequence.id, order_index: 1, type: "email", delay_hours: 24, template_id: templateId("Inquiry follow-up"), config: {} },
+      { org_id: orgId, sequence_id: sequence.id, order_index: 2, type: "wait", delay_hours: 72, config: {} },
+      { org_id: orgId, sequence_id: sequence.id, order_index: 3, type: "email", delay_hours: 0, template_id: templateId("Still interested?"), config: {} },
+    ]),
+    "campaign steps",
+  );
+  ok(
+    await db.from("crm_drip_enrollment").insert([
+      { org_id: orgId, sequence_id: sequence.id, lead_id: leadId("Diego"), status: "active", current_step: 0, enrolled_at: daysAgo(1) },
+      { org_id: orgId, sequence_id: sequence.id, lead_id: leadId("Omar"), status: "paused", current_step: 0, enrolled_at: daysAgo(8) },
+    ]),
+    "campaign enrollments",
+  );
+
+  // ── Firm brain: entries, and claims through propose → review ──────────────
+  ok(
+    await db.from("crm_firm_brain_entry").insert([
+      { org_id: orgId, category: "identity", key: "firm-summary", title: "Who we are", body: "Hartwell IP is a (fictional) two-attorney trademark practice for small consumer brands.", created_by: ownerId },
+      { org_id: orgId, category: "voice", key: "tone", title: "How we write to clients", body: "Plain English, short paragraphs, no jargon. Sign off with the attorney's first name.", created_by: ownerId },
+      { org_id: orgId, category: "pricing", key: "flat-fees", title: "Flat fees only", body: "Every engagement is quoted as a flat fee from the service library. Government fees are billed at cost.", created_by: ownerId },
+      { org_id: orgId, category: "engagement_norms", key: "reply-time", title: "Reply time", body: "Every inquiry gets a reply within one business day, even when we're not the right fit.", created_by: ownerId },
+    ]),
+    "brain entries",
+  );
+  const claims = must(
+    await db
+      .from("crm_claim_library")
+      .insert([
+        { org_id: orgId, claim: "We reply to every inquiry within one business day.", context: "Website and intake closing message", created_by: ids.intake, status: "proposed" },
+        { org_id: orgId, claim: "Flat-fee pricing, quoted before any work starts.", context: "Proposals", created_by: ids.intake, status: "proposed" },
+        { org_id: orgId, claim: "We guarantee your trademark will be registered.", context: "Suggested for ads", created_by: ids.intake, status: "proposed" },
+        { org_id: orgId, claim: "Our attorneys have filed hundreds of applications.", context: "Website draft", created_by: ids.intake, status: "proposed" },
+      ])
+      .select("id, claim"),
+    "brain claims",
+  );
+  const reviews: Array<[number, "approved" | "forbidden", string]> = [
+    [0, "approved", ""],
+    [1, "approved", ""],
+    [2, "forbidden", "No outcome guarantees, ever."],
+  ];
+  for (const [i, status, notes] of reviews) {
+    const reviewedAt = daysAgo(5 - i);
+    ok(
+      await db.from("crm_claim_library").update({ status, notes, reviewed_by: ids.attorney, reviewed_at: reviewedAt, updated_at: reviewedAt }).eq("id", claims[i]!.id),
+      "review claim",
+    );
+    ok(
+      await db.from("crm_claim_review_log").insert({ org_id: orgId, claim_id: claims[i]!.id, status, notes, reviewed_by: ids.attorney, reviewed_at: reviewedAt }),
+      "claim review log",
+    );
+  }
+
+  console.log(
+    `Seeded ${NAME} (${orgId}): ${leads.length} leads, ${matters.length} matters, 5 deadlines, 2 letters, ` +
+      `intake /i/${intakeSlug} (${intakeLive ? "live" : "draft"}) with ${submissionSeeds.length} submissions and ${events.length} events, ` +
+      `1 campaign, 4 brain entries, ${claims.length} claims.`,
+  );
   console.log(`Owner login: avery@hartwell-ip.test${extraMember ? `, plus ${extraMember}` : ""}. Modules: ${MODULES.join(", ")}.`);
 }
 

@@ -11,16 +11,17 @@ Source commit: `610c206` (main, 2026-09-25). Copy, don't import: when a ported f
 | `src/lib/org/modules.ts` | same path | adds modules `mailbox`, `agents` |
 | `src/lib/queue/{api,load,org,roles}.ts` | same paths | none |
 | `src/lib/firm/session.ts` | same path | per-firm theme read removed (one design system) |
-| `src/lib/env.ts` | same path | trimmed to vars this app reads; adds mailbox OAuth, token key, cron secret |
+| `src/lib/env.ts` | same path | trimmed to vars this app reads; adds mailbox OAuth, token key, cron secret, optional `INTAKE_EVENT_SALT` |
 | `src/lib/site-origin.ts`, `src/lib/legal/disclaimer.ts` | same paths | none |
-| `src/proxy.ts`, `src/app/auth/callback/route.ts`, `src/app/sign-in/actions.ts` | same paths | none |
+| `src/app/auth/callback/route.ts`, `src/app/sign-in/actions.ts` | same paths | none |
+| `src/proxy.ts` | same path | session refresh unchanged; adds the intake `frame-ancestors` header for `/i/` and `/r/` |
 | `src/app/sign-in/{page,LoginForm}.tsx` | same paths | restyled to the Lectual design; logic unchanged |
 | `tests/roles.test.ts`, `tests/queue/{queue-load,create-draft}.test.ts` | same paths | roles test checks `QUEUE_APPROVE_ROLES` instead of Firm Brain's `CLAIM_REVIEW_ROLES`; the `queueUnavailableCopy` block now lives in `tests/queue/queue-unavailable.test.ts` (step 6) |
 | `src/lib/intake/{email-match,email-threads,initials}.ts`, `src/lib/matters/tracker-import.ts` | same paths | none (pure modules) |
 | `tests/intake/email-match.test.ts`, `tests/fixtures/intake/{mail-threads.json,README.md}` | same paths | none |
 | `src/lib/mailbox/apply.ts` (write half) | `scripts/sync-intake-email.ts` `applyEvidence()` | same rules (dedupe on message_id, advance-only timestamps, placeholder-only address recovery, one bell per reply); adds matter rows, source `mailbox-sync`, returns counts instead of logging |
 | `src/app/dashboard/queue/**`, `src/components/queue/*` | `src/app/(firm)/dashboard/queue/**` | logic and role gates unchanged; re-skinned; approve adds a draft in the approver's own mailbox when the queue has no send channel; Document Center post-approve hook ported with the generators |
-| `src/lib/{pipeline,matters,automation,members,mentions,notifications,time}/**` | same paths | none — copied as the import closure of `@/lib/pipeline` and `@/lib/matters` |
+| `src/lib/{pipeline,matters,automation,members,mentions,notifications,time}/**` | same paths | none — copied as the import closure of `@/lib/pipeline` and `@/lib/matters` (except `automation/drips.ts`; see Campaigns) |
 | `src/app/dashboard/leads/{actions,errors}.ts` | `src/app/(firm)/dashboard/pipeline/{actions,errors}.ts` | paths only |
 | `src/app/dashboard/leads/[id]/actions.ts` | `src/app/(firm)/dashboard/leads/[id]/actions.ts` | role gate, assign, move stage, edit, note, tags, prep-consult and voice notes unchanged; founder link not ported; adds `reviewProposalAction` |
 | `tests/pipeline/*`, `tests/matters/*`, `tests/mentions/*`, `tests/time/*` | same paths | `lead-actions.test.ts` retargeted at the new action paths |
@@ -91,3 +92,42 @@ From `theipgirl/lectual` branch `claude/lectual-firm-dashboard-prd-f3loev` @ `0f
 Not ported: payments (LawPay, `PaymentForm`, `PayPanel`, `public-payment.ts`), client line requests (0071/0073),
 readable proposal slugs and `/proposal/<slug>/<token>` (0070/0074), and the `quote_accepted`/`quote_payment` timeline
 rows (0062/0072). None of their schema is in lectual.app's databases.
+
+## Firm brain
+From `theipgirl/lectual` main @ `610c206`. Backed by 0024/0026 (`crm_firm_brain_entry`, `crm_claim_library`,
+`crm_claim_review_log`), on both dev and prod; no migration here.
+
+| lectual.app | From lectual | Changes |
+|---|---|---|
+| `src/lib/brain/{entries,claims,index}.ts` | same paths | doc-comment migration references only; role gates (`BRAIN_ADMIN_ROLES`, `CLAIM_{PROPOSE,REVIEW,DELETE}_ROLES`) and the fail-closed review log unchanged |
+| `src/app/dashboard/brain/{page,actions,enums}.ts(x)`, `_components/*` | `src/app/(firm)/dashboard/brain/**` | rebuilt on `lx-*` instead of the `rpb-*` components; same data flow and gates; grouped by category/status (no `BrainSearchShell` filter); a failed read says so instead of an empty list |
+| `tests/brain/brain.test.ts`, `tests/brain-ui/brain-page.test.ts` | same paths | pure and mocked blocks only; the DB-backed RLS block stays in lectual's isolation suite |
+
+Not ported: `src/lib/brain/rpb-seed.ts` (one firm's content).
+
+## AI copilot
+From `theipgirl/lectual` main @ `610c206`.
+
+| lectual.app | From lectual | Changes |
+|---|---|---|
+| `src/lib/agents/matters-chat.ts` | same path | the `ai` SDK tool loop is rebuilt on `callClaudeWithTools` (new in `src/lib/ai/claude.ts`); same read-only tools over `@/lib/matters`/`@/lib/pipeline` (scoped client), same UPL guardrails and mechanically collected citations; adds `list_stalled_matters`, real totals with a `truncated` flag, and `readFailed` so a failed read is never an empty answer (**lectual should take the honest-read fix**) |
+| `src/app/api/matters-chat/route.ts` | same path | gated by `resolveFirmSession` (403 with no firm) |
+| `src/components/copilot/CopilotChat.tsx`, `src/app/dashboard/copilot/page.tsx` | `src/components/firm/MattersCopilotBox.tsx` | a page of its own instead of the home-page box; says when no AI provider is configured |
+| `tests/agents/{matters-chat,matters-chat-route,copilot-page}.test.ts` | `tests/agents/matters-chat*.test.ts` | retargeted at the new primitive and route gate |
+
+## Campaigns
+New in this repo over the already-ported `src/lib/automation/drips.ts` (0022's `crm_drip_*` and
+`crm_email_template`, on both dev and prod). The "New campaign" form follows lectual's
+`src/app/(firm)/dashboard/automation/_components/NewSequenceForm.tsx` and `createSequenceAction`, re-skinned;
+the step builder, enrollments, templates page and "Run next step" have no lectual counterpart.
+
+| lectual.app | From lectual | Changes |
+|---|---|---|
+| `src/lib/automation/drips.ts` | same path | adds `getSequence`, `updateSequenceDetails`, `toggleSequenceActive`, `deleteStep` (lectual's automation page never edits or pauses a sequence) |
+| `src/lib/campaigns/{steps,advance}.ts`, `src/app/dashboard/campaigns/**` | — | new. There is no cron: a step runs only when staff click "Run next step". An email step only ever calls `createDraft` (the approval queue); a step is claimed with a compare-and-set before any side effect; a paused campaign runs nothing; condition steps have no branch target in this schema and are a no-op |
+
+## Report views, Intake forms
+New in this repo, nothing ported. Reports (`src/lib/reports/*`, `src/app/dashboard/reports/**`) compose the
+existing ported readers. Intake forms (`src/lib/intake-forms/*`, `src/app/dashboard/forms/**`, `src/app/i/**`,
+`src/app/r/**`, `public/embed.js`, the frame-ancestors policy in `src/proxy.ts`) read lectual's 0075 tables, which
+are on dev only until 0075 merges in lectual and is applied to prod.
