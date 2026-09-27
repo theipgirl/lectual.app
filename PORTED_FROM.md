@@ -139,3 +139,22 @@ New in this repo, nothing ported. Reports (`src/lib/reports/*`, `src/app/dashboa
 existing ported readers. Intake forms (`src/lib/intake-forms/*`, `src/app/dashboard/forms/**`, `src/app/i/**`,
 `src/app/r/**`, `public/embed.js`, the frame-ancestors policy in `src/proxy.ts`) read lectual's 0075 tables, which
 are on dev only until 0075 merges in lectual and is applied to prod.
+
+## LawPay payments (per-firm OAuth)
+From `theipgirl/lectual` branch `claude/lectual-firm-dashboard-prd-f3loev` (quote-engine payments). Needs lectual 0076
+(`lawpay_connection` + signing-charge guards). Setup and the lectual-side change list: `docs/lawpay-setup.md`.
+
+| lectual.app | From lectual | Changes |
+|---|---|---|
+| `src/lib/payments/types.ts` | same path | no `lawpay` module constant and no CosmoLex adapter; `credentialRejected` on a 401/403 |
+| `src/lib/payments/lawpay.ts` | same path | built from ONE firm's account secret key (from its own connection), never `LAWPAY_SECRET_KEY`; `lawPayFromEnv`/module gate removed; request, statuses and failure split unchanged (5xx/429 stay `unknown`) |
+| `src/lib/payments/registry.ts` | same path | takes the firm's charge client instead of a module list; a 23505 at the pending insert is `already_open`; a refusal before sending closes the row `failed` instead of leaving it pending forever; the echoed account id is flagged, not written over the mapped one (**lectual should take both fixes**) |
+| `src/lib/payments/accounts.ts` | same path | LawPay mappings only; adds `mapLawPayAccount` / `unmapLawPayAccount` (explicit kind + confirmation) |
+| `src/lib/payments/hosted-fields.ts` | same path | unchanged; the public key is the firm's own operating account's |
+| `src/lib/quotes/public-payment.ts`, `src/components/proposal/PayPanel.tsx` | `src/lib/quotes/public-payment.ts`, `src/app/q/[token]/_components/PayPanel.tsx` | five states (received / confirming / payable / manual / unavailable) from a pure machine in `src/lib/payments/payment-state.ts`; a firm-side refusal pauses the firm's card payments server-side (the reload no longer re-offers a dead form) |
+| `src/lib/payments/lawpay-{oauth,state,config,connection,accounts}.ts`, `src/app/api/lawpay/**`, `src/app/dashboard/settings/integrations/lawpay/**`, `src/lib/payments/{manual,quote-payments,payment-state,pay-messages}.ts`, `src/components/quotes/PaymentsPanel.tsx` | — | new |
+
+Runbook (`docs/runbooks/publish-proposal-links.md`) Step 5 defects: #2 (manual rendered as card; partial manual
+read as settled) fixed in `payment-state.ts`; #4 (pre-signature "nothing is charged" depending on an unpicked
+package) fixed by answering from the firm's setup only (`firmTakesCardPayments`); #5 (5xx/429 as decline) kept
+fixed in `lawpay.ts`; #1 and #3 concern client line requests (0071/0073), which this app does not have.

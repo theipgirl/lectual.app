@@ -213,8 +213,11 @@ export function describeQuoteEvent(event: EventLike): string {
       return "Withdrawn by the firm";
     case "expired":
       return "Expired";
-    case "payment_recorded":
-      return "Payment recorded";
+    case "payment_recorded": {
+      // The staff sentence public-payment.ts / the manual entry wrote.
+      const summary = payloadText(p, "summary");
+      return summary ?? "Payment recorded";
+    }
     case "revised": {
       const change = payloadText(p, "change");
       const pkg = payloadText(p, "package");

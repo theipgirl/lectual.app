@@ -3,7 +3,9 @@ import { formatCents } from "@/lib/quotes/money";
 import { toAmount } from "@/lib/quotes/drift";
 import { describeSignedChoice } from "@/lib/quotes/packages";
 import type { PublicQuoteView, QuoteAcceptedSnapshot } from "@/lib/quotes/public";
+import type { PublicPaymentState } from "@/lib/payments/payment-state";
 import { FirmHeader } from "./FirmHeader";
+import { PayPanel } from "./PayPanel";
 import { PrintButton } from "./PrintButton";
 
 /**
@@ -21,10 +23,14 @@ import { PrintButton } from "./PrintButton";
  * "Save as PDF" is one of the destinations. It is labelled as exactly that —
  * no PDF is generated here, and this app adds no dependency to make one.
  *
- * No form of any kind, no payment step and no promise of an email: the copy
- * says the acceptance is on file with the firm, which is what happened.
+ * The Pay section (spec §7.4) sits under the signed record. Its state is read
+ * server-side (src/lib/quotes/public-payment.ts) and only `payable` renders a
+ * card form — AffiniPay Hosted Fields, so no card data reaches this app. The
+ * amount line above says what is true for each state; "nothing is charged until
+ * you pay below" is shown only when there is something to pay below. No
+ * promise of an email anywhere.
  */
-export function Receipt({ view }: { view: PublicQuoteView }) {
+export function Receipt({ token, view, payment }: { token: string; view: PublicQuoteView; payment: PublicPaymentState }) {
   const snapshot = view.acceptedSnapshot;
   const acceptedAt = formatFirmDateTime(snapshot?.accepted_at ?? view.acceptedAt);
 
@@ -33,7 +39,14 @@ export function Receipt({ view }: { view: PublicQuoteView }) {
       <FirmHeader firmName={view.firm.name} note={acceptedAt ? `Signed ${acceptedAt}` : "Signed"} />
       <div className="qp-body">
         {snapshot ? (
-          <SnapshotBody snapshot={snapshot} signer={view.acceptedByName} acceptedAt={acceptedAt} firmName={view.firm.name} />
+          <SnapshotBody
+            snapshot={snapshot}
+            signer={view.acceptedByName}
+            acceptedAt={acceptedAt}
+            firmName={view.firm.name}
+            payment={payment}
+            payPanel={<PayPanel token={token} state={payment} firmName={view.firm.name} />}
+          />
         ) : (
           <>
             <div>
@@ -46,6 +59,9 @@ export function Receipt({ view }: { view: PublicQuoteView }) {
               Your acceptance{acceptedAt ? ` of ${acceptedAt}` : ""} is on file with {view.firm.name}. The signed copy
               isn&rsquo;t available to display here — contact {view.firm.name} and they can send it to you.
             </p>
+            <div className="qp-noprint">
+              <PayPanel token={token} state={payment} firmName={view.firm.name} />
+            </div>
           </>
         )}
       </div>
@@ -53,16 +69,38 @@ export function Receipt({ view }: { view: PublicQuoteView }) {
   );
 }
 
+/** The sentence under "Due at signing", true for each payment state. */
+function signingNote(payment: PublicPaymentState, firmName: string): string {
+  switch (payment.status) {
+    case "payable":
+      return "Pay it by card below, to the firm's operating account. Nothing is charged until you pay below.";
+    case "received":
+      if (payment.outstandingCents && payment.outstandingCents > 0) return `Part of this has been received — ${firmName} will be in touch about the balance.`;
+      return payment.via === "card" ? "Authorised on your card — see below." : `Recorded as paid by ${firmName}.`;
+    case "confirming":
+      return `A card payment is being confirmed by ${firmName} — see below.`;
+    case "unavailable":
+      return "Your signature is recorded. The payment status couldn't be loaded just now.";
+    case "manual":
+      return payment.nothingDue ? "Nothing is due at signing." : `Invoiced by ${firmName}. Nothing was charged on this page.`;
+  }
+}
+
 function SnapshotBody({
   snapshot,
   signer,
   acceptedAt,
   firmName,
+  payment,
+  payPanel,
 }: {
   snapshot: QuoteAcceptedSnapshot;
   signer: string | null;
   acceptedAt: string;
   firmName: string;
+  payment: PublicPaymentState;
+  /** The Pay section, placed right under the amounts it pays. */
+  payPanel: React.ReactNode;
 }) {
   const currency = snapshot.currency;
   const choice = describeSignedChoice(snapshot.lines);
@@ -82,14 +120,18 @@ function SnapshotBody({
       <div className="qp-section">
         <div className="qp-due-now">{formatCents(toAmount(snapshot.totals?.due_at_signing), currency)}</div>
         <div className="qp-due-label">Due at signing{acceptedAt ? ` · signed ${acceptedAt}` : ""}</div>
-        <div className="qp-due-note">Invoiced by {firmName}. Nothing was charged on this page.</div>
+        <div className="qp-due-note">{signingNote(payment, firmName)}</div>
         <div className="qp-due-later">{formatCents(toAmount(snapshot.totals?.due_at_filing), currency)}</div>
         <div className="qp-due-later-label">Due at filing · not yet charged</div>
-        <div className="qp-due-note">USPTO government fees, collected when the applications are filed.</div>
+        <div className="qp-due-note">
+          USPTO government fees. Not charged now — {firmName} collects them when the applications are filed.
+        </div>
         <div className="qp-project">
           Full project cost {formatCents(toAmount(snapshot.totals?.full_project_cost), currency)} — not an amount due at signing
         </div>
       </div>
+
+      <div className="qp-noprint">{payPanel}</div>
 
       <div className="qp-section">
         <div className="qp-kicker">What you agreed to</div>

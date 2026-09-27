@@ -6,6 +6,8 @@ import { connectableProviders } from "@/lib/mailbox/config";
 import { listConnections, type MailboxConnection } from "@/lib/mailbox/connections";
 import { outcomeMessage } from "@/lib/mailbox/outcome";
 import { getLawmaticsConnection } from "@/lib/lawmatics/connection";
+import { getLawPayConnection } from "@/lib/payments/lawpay-connection";
+import { lawPaySetup } from "@/lib/payments/lawpay-config";
 import Link from "next/link";
 import { PROVIDER_LABEL, PROVIDERS, isProvider, type MailboxProvider } from "@/lib/mailbox/providers";
 import { relativeTime } from "@/lib/relative-time";
@@ -121,10 +123,13 @@ export default async function IntegrationsPage({
   const hasMailbox = await orgHasModule("mailbox");
 
   const { connected, reconnected, error } = await searchParams;
-  const [list, lawmatics] = await Promise.all([
+  const [list, lawmatics, lawpay] = await Promise.all([
     hasMailbox ? listConnections() : Promise.resolve({ ok: true as const, connections: [] }),
     getLawmaticsConnection(),
+    getLawPayConnection(),
   ]);
+  const lp = lawpay.ok ? lawpay.connection : null;
+  const lawpayReady = lawPaySetup().ready;
   const lm = lawmatics.ok ? lawmatics.connection : null;
   const connectable = connectableProviders();
   const canManageFirm = canManageScope(session.role, "firm");
@@ -216,6 +221,30 @@ export default async function IntegrationsPage({
         {lm && lm.status !== "active" && <span className="lx-pill lx-pill-risk">Reconnect</span>}
         <Link href="/dashboard/settings/integrations/lawmatics/" className={`lx-btn ${lm?.status === "active" ? "lx-btn-sec" : "lx-btn-pri"}`}>
           {lm?.status === "active" ? "Open Lawmatics import" : lm ? "Reconnect" : "Connect Lawmatics"}
+        </Link>
+      </section>
+
+      <section className="lx-int-import" aria-labelledby="lawpay-title">
+        <div style={{ flex: 1, minWidth: 240 }}>
+          <h2 id="lawpay-title" className="lx-h2" style={{ fontSize: 27 }}>
+            LawPay
+          </h2>
+          <p className="lx-sub" style={{ margin: "4px 0 0" }}>
+            {!lawpay.ok
+              ? "We couldn't check your LawPay connection just now."
+              : lp?.status === "active"
+                ? `Connected${lp.display_hint ? ` · ${lp.display_hint}` : ""} · ${lp.mode === "live" ? "live" : "test"} mode. Clients pay the amount due at signing by card, into your operating account.`
+                : lp
+                  ? "LawPay stopped accepting your firm's connection. Reconnect to take card payments again."
+                  : lawpayReady
+                    ? "Sign in to your firm's LawPay account so clients can pay the amount due at signing by card."
+                    : "Not available yet — Lectual's LawPay sign-in isn't set up on this deployment. Payments can be recorded by hand on each quote."}
+          </p>
+        </div>
+        {lp && lp.status !== "active" && <span className="lx-pill lx-pill-risk">Reconnect</span>}
+        {lp && <span className={`lx-pill ${lp.mode === "live" ? "lx-pill-ox" : "lx-pill-warn"}`}>{lp.mode === "live" ? "Live" : "Test"}</span>}
+        <Link href="/dashboard/settings/integrations/lawpay/" className={`lx-btn ${lp?.status === "active" || !lawpayReady ? "lx-btn-sec" : "lx-btn-pri"}`}>
+          {lp?.status === "active" ? "Manage LawPay" : lp ? "Reconnect" : lawpayReady ? "Connect LawPay" : "About LawPay"}
         </Link>
       </section>
 

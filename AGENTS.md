@@ -27,6 +27,17 @@ Plan: `docs/MVP-PLAN.md`. Design: `design/` (one visual system; tokens live in
 ## Ported code
 See `PORTED_FROM.md`. When changing a ported file, consider whether `lectual` needs the same fix.
 
+## LawPay (per-firm) — `docs/lawpay-setup.md`
+- Each firm signs in to ITS OWN LawPay account (lectual 0076 `lawpay_connection`). There is no
+  deployment-wide LawPay key; never add one. Charges use the firm's own account secret, looked up
+  by the quote's org_id. Sealed columns have no SELECT grant: name the columns.
+- The charged amount comes ONLY from the signed snapshot (`signingChargeForQuote`), to the mapped
+  OPERATING account. The account kind is never defaulted or inferred. The pending `crm_payment` row is
+  written before LawPay is called; 0076's index allows one open signing charge per quote.
+- Payment-state reads are five-state (received / confirming / payable / manual / unavailable). A failed
+  read is never "unpaid".
+- Tests never call LawPay. Unset `LAWPAY_OAUTH_*` means "not configured", and manual recording keeps working.
+
 ## Commands
 `pnpm build` · `pnpm lint` · `pnpm test`. Env: copy `.env.example` to `.env.local` and fill it in
 from lectual-dev.

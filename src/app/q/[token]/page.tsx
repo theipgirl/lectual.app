@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { readPublicQuote, recordQuoteViewed } from "@/lib/quotes/public";
+import { firmTakesCardPayments, readPublicPaymentState } from "@/lib/quotes/public-payment";
 import { QuoteDocument } from "@/components/proposal/QuoteDocument";
 import { Receipt } from "@/components/proposal/Receipt";
 import { StatusNotice } from "@/components/proposal/StatusNotice";
@@ -25,7 +26,9 @@ import { Unavailable } from "@/components/proposal/Unavailable";
  *  - `unconfigured` / `unavailable` → `<Unavailable />`, never a 404: telling
  *    a client their proposal does not exist because we could not reach the
  *    database is the worst answer available.
- *  - accepted → `<Receipt />`, from `accepted_snapshot` only.
+ *  - accepted → `<Receipt />`, from `accepted_snapshot` only, with the Pay
+ *    section (spec §7.4) whose state is read server-side here: received /
+ *    confirming / payable / manual / unavailable. Only `payable` has a form.
  *  - declined (or a status this build does not know) → `<StatusNotice />`: the
  *    state, no quote body, no controls.
  *  - sent and live → `<QuoteDocument />`, the only branch with accept/decline.
@@ -56,8 +59,14 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
   // take down the page a client came to read.
   await recordQuoteViewed(read.handle, (await headers()).get("user-agent"), now);
 
-  if (view.status === "accepted") return <Receipt view={view} />;
+  if (view.status === "accepted") {
+    const payment = await readPublicPaymentState({ handle: read.handle, snapshot: view.acceptedSnapshot });
+    return <Receipt token={token} view={view} payment={payment} />;
+  }
   // Fail closed: the accept control is reachable from exactly one branch.
   if (view.status !== "sent") return <StatusNotice view={view} />;
-  return <QuoteDocument token={token} view={view} ready={read.handle.offerIntact} />;
+  // Whether a card form follows the signature — from the firm's setup only,
+  // never from the package the client hasn't picked yet (runbook defect 4).
+  const cardAfterSigning = await firmTakesCardPayments(read.handle);
+  return <QuoteDocument token={token} view={view} ready={read.handle.offerIntact} cardAfterSigning={cardAfterSigning} />;
 }

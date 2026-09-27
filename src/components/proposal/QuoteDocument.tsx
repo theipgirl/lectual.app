@@ -26,8 +26,10 @@ import { FirmHeader } from "./FirmHeader";
  * ── THE SPLIT ───────────────────────────────────────────────────────────────
  * "Due today" and "Due later, at filing" are separate figures; the full project
  * cost is labelled as neither and says it is not due today. There is no row on
- * this page that reads "Total". Nothing is charged here — no card, no payment
- * step — and the page says so rather than promising one.
+ * this page that reads "Total". Nothing is charged on THIS page. When the firm
+ * has connected its own LawPay account (`cardAfterSigning`), the copy says the
+ * amount due today can be paid by card after signing — decided from the firm's
+ * setup alone, never from whether a package is picked yet (runbook defect 4).
  *
  * ── WHAT IS SIGNED IS WHAT WAS ON SCREEN ────────────────────────────────────
  * The signature carries the pick and the fingerprint the server computed for
@@ -38,7 +40,18 @@ import { FirmHeader } from "./FirmHeader";
  * Everything the client or the firm typed is rendered as text (pre-wrap),
  * never as HTML: this route has no login and no sanitiser.
  */
-export function QuoteDocument({ token, view, ready }: { token: string; view: PublicQuoteView; ready: boolean }) {
+export function QuoteDocument({
+  token,
+  view,
+  ready,
+  cardAfterSigning = null,
+}: {
+  token: string;
+  view: PublicQuoteView;
+  ready: boolean;
+  /** True: the firm takes the signing payment by card on the receipt. Null: unknown. */
+  cardAfterSigning?: boolean | null;
+}) {
   const router = useRouter();
   const offer = useMemo(() => readOffer(view.lines, view.currency), [view.lines, view.currency]);
   const [pick, setPick] = useState<string | null>(() => (offer.packages.length === 1 ? offer.packages[0].name : null));
@@ -72,6 +85,8 @@ export function QuoteDocument({ token, view, ready }: { token: string; view: Pub
   const canAccept = ready && readiness.ready && nameOk && !busy;
   const expiry = formatQuoteExpiry(view.expiresAt);
 
+  // Never "pay by card" over $0.00 due today (a filing-only quote).
+  const payByCard = cardAfterSigning === true && totals.dueAtSigning > 0;
   const hint = !ready
     ? "This proposal isn't ready to sign yet. Contact the firm that sent it."
     : !choiceMade
@@ -80,7 +95,9 @@ export function QuoteDocument({ token, view, ready }: { token: string; view: Pub
         ? readiness.message
         : !nameOk
           ? "Type your full name to enable signing."
-          : "Nothing is charged on this page. Signing records your acceptance with the firm.";
+          : payByCard
+            ? "Signing records your acceptance with the firm. Nothing is charged until you pay on the next screen."
+            : "Nothing is charged on this page. Signing records your acceptance with the firm.";
 
   function toggleAddOn(id: string) {
     setAddOns((current) => (current.includes(id) ? current.filter((x) => x !== id) : [...current, id]));
@@ -238,7 +255,11 @@ export function QuoteDocument({ token, view, ready }: { token: string; view: Pub
           <div className="qp-due-label">Due today</div>
           <div className="qp-due-note">
             {choiceMade
-              ? `Legal fees${picked ? ` for ${picked.name}` : ""}${addOns.length ? ", with your add-ons" : ""}. Due when you sign — the firm invoices you; nothing is charged on this page.`
+              ? `Legal fees${picked ? ` for ${picked.name}` : ""}${addOns.length ? ", with your add-ons" : ""}. Due when you sign — ${
+                  payByCard
+                    ? "after signing you can pay it by card; nothing is charged until you do."
+                    : "the firm invoices you; nothing is charged on this page."
+                }`
               : "Choose a package above before accepting."}
           </div>
           <div className="qp-due-later">{formatCents(totals.dueAtFiling, view.currency)}</div>

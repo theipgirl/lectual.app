@@ -63,6 +63,10 @@ export function describeActivity(row: Row): Described {
       return { title: "Matter opened", detail: str(p.matter_number), tone: "system", link: null };
     case "matter_updated":
       return { title: MATTER_CHANGE[str(p.change) ?? ""] ?? "Matter updated", detail: matterChangeDetail(p), tone: "system", link: null };
+    case "quote_payment":
+      // Written by the client proposal page (src/lib/quotes/public-payment.ts)
+      // and by a manual entry on the quote builder. `summary` is staff-facing.
+      return { title: p.needs_reconciliation === true ? "Payment needs checking" : "Quote payment", detail: str(p.summary), tone: "system", link: null };
     case "queue_drafted":
       return { title: "Draft queued for approval", detail: str(p.subject), tone: "ai", link: null };
     case "ai_insight": {
