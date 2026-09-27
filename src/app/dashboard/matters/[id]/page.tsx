@@ -38,6 +38,9 @@ import {
   TaskComposer,
   TaskDone,
 } from "@/components/matters/MatterForms";
+import { IntakeRequestCard } from "@/components/matters/IntakeRequestCard";
+import { canSendIntakeRequest, listMatterIntakeRequests } from "@/lib/intake-forms/requests";
+import { intakeOrigin } from "@/lib/intake-forms/origin";
 import { MATTER_TYPE_LABEL } from "../labels";
 
 export const dynamic = "force-dynamic";
@@ -75,7 +78,14 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
     listMemberDirectory().catch(() => []),
     matter.type === "LIT" && hasLitigation ? getLitigationDetail(matter.id) : Promise.resolve(null),
   ]);
-  const voiceUrls = await voiceNotePlaybackUrls(activity);
+  const canSendIntake = canSendIntakeRequest(session.role);
+  const [voiceUrls, intakeRequests, origin] = await Promise.all([
+    voiceNotePlaybackUrls(activity),
+    // Intake questions (0075): a failed read says so on the card; it never
+    // reads as "no links sent".
+    listMatterIntakeRequests(matter.id),
+    intakeOrigin(),
+  ]);
 
   // Monthly status updates: only for a mark awaiting registration, and only
   // one queue round trip for those matters.
@@ -348,6 +358,25 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
             <div className="lx-label">Notes</div>
             {canWrite ? <NotesForm matterId={matter.id} notes={matter.notes} /> : <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{matter.notes ?? "—"}</p>}
           </section>
+
+          {intakeRequests.status === "ok" ? (
+            (canSendIntake || intakeRequests.requests.length > 0) && (
+              <IntakeRequestCard
+                matterId={matter.id}
+                origin={origin}
+                requests={intakeRequests.requests}
+                formReady={intakeRequests.formReady}
+                canSend={canSendIntake}
+              />
+            )
+          ) : intakeRequests.status === "unavailable" ? (
+            <section className="lx-card lx-aside">
+              <div className="lx-label">Intake questions</div>
+              <p className="lx-note" style={{ margin: 0 }}>
+                The intake links for this matter couldn&rsquo;t be loaded. This is a problem reaching the database, not an empty list.
+              </p>
+            </section>
+          ) : null}
 
           <section className="lx-card lx-aside">
             <div className="lx-label">About</div>

@@ -1,0 +1,392 @@
+/*
+ * The public intake (/i/<slug>) and the client's intake questions (/r/<token>).
+ * Same look as the editor's live preview (dashboard/forms/forms.css, ifm-pv-*),
+ * which is the design's picture of this page. Colours come from the firm's
+ * appearance settings through --ipub-light-* / --ipub-dark-*; the theme is the
+ * `data-theme` attribute (auto follows the visitor's system setting).
+ */
+
+.ipub {
+  --ipub-bg: var(--ipub-light-bg, #fffdf7);
+  --ipub-acc: var(--ipub-light-acc, #6a1f2b);
+  --ipub-ink: #2a1216;
+  --ipub-mute: #7a5a5e;
+  --ipub-line: rgba(42, 18, 22, 0.12);
+  --ipub-field: #ffffff;
+  --ipub-bot: #f1e8d8;
+  --ipub-on-acc: #ffffff;
+  --ipub-risk: #8e2733;
+  min-height: 100dvh;
+  box-sizing: border-box;
+  padding: 40px 16px 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  background: var(--paper);
+  font-family: var(--sans);
+  color: var(--ipub-ink);
+}
+.ipub[data-theme="dark"] {
+  --ipub-bg: var(--ipub-dark-bg, #1e0a0e);
+  --ipub-acc: var(--ipub-dark-acc, #e0a9b0);
+  --ipub-ink: #f6ede4;
+  --ipub-mute: rgba(246, 237, 228, 0.66);
+  --ipub-line: rgba(246, 237, 228, 0.14);
+  --ipub-field: rgba(246, 237, 228, 0.06);
+  --ipub-bot: rgba(246, 237, 228, 0.08);
+  --ipub-on-acc: #1e0a0e;
+  --ipub-risk: #f0a4ad;
+  background: #120508;
+}
+@media (prefers-color-scheme: dark) {
+  .ipub[data-theme="auto"] {
+    --ipub-bg: var(--ipub-dark-bg, #1e0a0e);
+    --ipub-acc: var(--ipub-dark-acc, #e0a9b0);
+    --ipub-ink: #f6ede4;
+    --ipub-mute: rgba(246, 237, 228, 0.66);
+    --ipub-line: rgba(246, 237, 228, 0.14);
+    --ipub-field: rgba(246, 237, 228, 0.06);
+    --ipub-bot: rgba(246, 237, 228, 0.08);
+    --ipub-on-acc: #1e0a0e;
+    --ipub-risk: #f0a4ad;
+    background: #120508;
+  }
+}
+/* Inside a firm's page: no page chrome, the frame is the whole widget. */
+.ipub.embed {
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+}
+.ipub.embed .ipub-frame {
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+.ipub-frame {
+  width: 100%;
+  max-width: 680px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  background: var(--ipub-bg);
+  border: 1px solid var(--ipub-line);
+  box-shadow: 0 20px 44px -28px rgba(20, 4, 8, 0.5);
+  overflow: hidden;
+}
+.ipub-notice {
+  padding: 28px 24px;
+  gap: 10px;
+}
+.ipub-head {
+  padding: 22px 24px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-bottom: 1px solid var(--ipub-line);
+}
+.ipub-firm {
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--ipub-acc);
+}
+.ipub-headline {
+  margin: 0;
+  font-size: 21px;
+  line-height: 28px;
+  font-weight: 600;
+  text-wrap: pretty;
+}
+.ipub-small {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 18px;
+  text-wrap: pretty;
+  color: var(--ipub-mute);
+}
+
+/* conversation */
+.ipub-thread {
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 260px;
+  max-height: min(62dvh, 560px);
+  overflow-y: auto;
+}
+.ipub.embed .ipub-thread {
+  max-height: none;
+}
+.ipub-bubble {
+  max-width: 82%;
+  padding: 10px 13px;
+  font-size: 14.5px;
+  line-height: 21px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ipub-bubble.bot {
+  align-self: flex-start;
+  border-radius: 14px 14px 14px 4px;
+  background: var(--ipub-bot);
+}
+.ipub-bubble.you {
+  align-self: flex-end;
+  border-radius: 14px 14px 4px 14px;
+  background: var(--ipub-acc);
+  color: var(--ipub-on-acc);
+}
+.ipub-final {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 6px 0 2px;
+}
+.ipub-composer-wrap {
+  padding: 10px 16px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid var(--ipub-line);
+}
+.ipub-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 5px 5px 5px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--ipub-line);
+  background: var(--ipub-field);
+}
+.ipub-composer textarea {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  resize: none;
+  background: transparent;
+  font: inherit;
+  font-size: 15px;
+  line-height: 22px;
+  padding: 5px 0;
+  max-height: 140px;
+  field-sizing: content;
+  color: var(--ipub-ink);
+}
+.ipub-send {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex: 0 0 auto;
+  border: 0;
+  background: var(--ipub-acc);
+  color: var(--ipub-on-acc);
+}
+.ipub-skip {
+  height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ipub-mute);
+  cursor: pointer;
+}
+.ipub-skip:hover {
+  background: var(--ipub-bot);
+}
+
+/* form */
+.ipub-body {
+  padding: 20px 24px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.ipub-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ipub-label {
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 19px;
+}
+.ipub-req {
+  color: var(--ipub-acc);
+}
+.ipub-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 11px;
+  border-radius: 8px;
+  border: 1px solid var(--ipub-line);
+  background: var(--ipub-field);
+  font: inherit;
+  font-size: 15px;
+  color: var(--ipub-ink);
+}
+textarea.ipub-input {
+  resize: vertical;
+  line-height: 21px;
+}
+.ipub-input:focus-visible,
+.ipub-composer:focus-within {
+  outline: 2px solid var(--ipub-acc);
+  outline-offset: 1px;
+}
+.ipub-input[aria-invalid="true"] {
+  border-color: var(--ipub-risk);
+}
+.ipub-consent {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  font-size: 13.5px;
+  line-height: 19px;
+  cursor: pointer;
+}
+.ipub-consent input {
+  margin: 2px 0 0;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--ipub-acc);
+  flex: 0 0 auto;
+}
+.ipub-consent.bad {
+  color: var(--ipub-risk);
+}
+.ipub-submit {
+  align-self: flex-start;
+  height: 42px;
+  padding: 0 22px;
+  border-radius: 9px;
+  border: 0;
+  background: var(--ipub-acc);
+  color: var(--ipub-on-acc);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ipub-submit:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.ipub-error {
+  margin: 0;
+  white-space: pre-line;
+  font-size: 13.5px;
+  line-height: 19px;
+  color: var(--ipub-risk);
+}
+.ipub-closing {
+  font-size: 16px;
+  line-height: 24px;
+  white-space: pre-wrap;
+  padding: 8px 0;
+}
+
+/* packages */
+.ipub-pkgs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ipub-pkg {
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--ipub-line);
+  background: var(--ipub-field);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.ipub-pkg-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.ipub-pkg-name {
+  flex: 1;
+  font-size: 14.5px;
+  font-weight: 600;
+}
+.ipub-pkg-price {
+  font-family: var(--mono);
+  font-size: 14.5px;
+}
+
+.ipub-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px 14px;
+}
+.ipub-link {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--ipub-acc);
+  background: none;
+  border: 0;
+  padding: 0;
+}
+.ipub-powered {
+  font-size: 11.5px;
+  color: var(--ipub-mute);
+}
+.ipub-upl {
+  width: 100%;
+  max-width: 680px;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0 4px;
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--ipub-mute);
+  text-wrap: pretty;
+}
+.ipub-frame .ipub-upl {
+  padding: 0;
+}
+.ipub.embed .ipub-upl {
+  padding: 8px 4px 2px;
+}
+/* The honeypot: out of sight and out of the tab order, but not display:none
+   (some bots skip fields that are). */
+.ipub-hp {
+  position: absolute;
+  left: -10000px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+@media (max-width: 520px) {
+  .ipub {
+    padding: 16px 12px 20px;
+  }
+  .ipub-head,
+  .ipub-body {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .ipub-bubble {
+    max-width: 90%;
+  }
+}

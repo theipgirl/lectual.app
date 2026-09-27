@@ -32,6 +32,10 @@ const fieldSchemas = {
   MAILBOX_TOKEN_KEY: z.string().optional(),
   // Shared secret Vercel Cron sends to /api/cron/* (steps 4–5).
   CRON_SECRET: z.string().optional(),
+  // Public intake (/i/<slug>): salts the anonymous funnel session hash and
+  // signs the render stamp. Optional: unset = sessions are not hashed (null),
+  // stamps are unsigned. Never reuse another secret here.
+  INTAKE_EVENT_SALT: z.string().optional(),
 } as const;
 
 type FieldSchemas = typeof fieldSchemas;

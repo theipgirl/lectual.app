@@ -1,5 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { frameAncestors, intakeSlugFromPath } from "@/lib/intake-forms/frame-policy";
+import { readFrameDomains } from "@/lib/intake-forms/frame-lookup";
 
 /**
  * Session refresh — the piece scoped-client.ts has always assumed existed.
@@ -38,6 +40,40 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     return NextResponse.redirect(target);
   }
 
+  const response = await refreshSession(request);
+  await applyFramePolicy(request, response);
+  return response;
+}
+
+/**
+ * Who may frame the public intake pages. A response header, so it can only be
+ * set here (or in a route handler) — a page cannot set its own headers.
+ *
+ *  /i/<slug>   the form's allowed domains (frame-policy.ts): none listed means
+ *              any site may embed it; a failed lookup means 'self' only.
+ *  /r/<token>  never framed: the token in its URL is a credential.
+ *
+ * Like the session refresh, this never blocks the request: on any error the
+ * page still renders (with the fail-closed 'self' policy).
+ */
+async function applyFramePolicy(request: NextRequest, response: NextResponse): Promise<void> {
+  const path = request.nextUrl.pathname;
+  if (path.startsWith("/r/")) {
+    response.headers.set("Content-Security-Policy", "frame-ancestors 'none'");
+    return;
+  }
+  const slug = intakeSlugFromPath(path);
+  if (!slug) return;
+  let policy: string | null = "frame-ancestors 'self'";
+  try {
+    policy = frameAncestors(await readFrameDomains(slug));
+  } catch {
+    // keep the fail-closed default
+  }
+  if (policy) response.headers.set("Content-Security-Policy", policy);
+}
+
+async function refreshSession(request: NextRequest): Promise<NextResponse> {
   let response = NextResponse.next({ request });
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
