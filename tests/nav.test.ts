@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { NAV, navItemAllowed, navItemBySlug, visibleNav } from "@/lib/nav";
+import { NAV, RAIL_TREE, navItemAllowed, navItemBySlug, railGroups, visibleNav } from "@/lib/nav";
 
 describe("rail sections fail closed on modules", () => {
   it("hides every module-gated section from a firm with no modules", () => {
@@ -24,5 +24,42 @@ describe("rail sections fail closed on modules", () => {
   it("keeps slugs unique so a URL resolves to exactly one section", () => {
     const slugs = NAV.map((n) => n.slug);
     expect(new Set(slugs).size).toBe(slugs.length);
+  });
+});
+
+describe("rail tree (design/Rail.dc.html)", () => {
+  const labels = (groups: ReturnType<typeof railGroups>) => groups.flat().flatMap((e) => [e.label, ...e.kids.map((k) => k.label)]);
+
+  it("only names real sections", () => {
+    for (const group of RAIL_TREE) {
+      for (const node of group) {
+        const slugs = "slug" in node ? [node.slug] : node.kids;
+        for (const slug of slugs) expect(navItemBySlug(slug), slug).toBeDefined();
+      }
+    }
+  });
+
+  it("drops module-gated children for a firm without the module", () => {
+    const shown = labels(railGroups(visibleNav([], "owner"), "/dashboard/"));
+    expect(shown).not.toContain("My Mail");
+    expect(shown).not.toContain("Agents");
+    expect(shown).toContain("Queue");
+    const withAll = labels(railGroups(visibleNav(["mailbox", "agents"], "owner"), "/dashboard/"));
+    expect(withAll).toContain("My Mail");
+    expect(withAll).toContain("Agents");
+  });
+
+  it("opens the parent of the current page, and a lead's page belongs to Intake", () => {
+    const groups = railGroups(visibleNav([], "owner"), "/dashboard/leads/abc/");
+    const intake = groups.flat().find((e) => e.label === "Intake")!;
+    expect(intake.childActive).toBe(true);
+    expect(intake.kids.find((k) => k.label === "PNC")?.active).toBe(true);
+    expect(intake.href).toBe("/dashboard/intake/");
+  });
+
+  it("marks Today active only on the home page", () => {
+    const today = (path: string) => railGroups(visibleNav([], "owner"), path).flat().find((e) => e.label === "Today")!.active;
+    expect(today("/dashboard/")).toBe(true);
+    expect(today("/dashboard/matters/")).toBe(false);
   });
 });

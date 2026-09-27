@@ -83,6 +83,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
           pendingCount={queue.items.length}
           counts={counts}
           initialPinned={railPinned}
+          initials={initialsOf(displayName)}
+          name={displayName}
         />
         <div className="lx-content">
           <div className="lx-page">{children}</div>

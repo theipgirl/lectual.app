@@ -290,165 +290,7 @@ a:hover {
   min-height: 0;
   display: flex;
 }
-.lx-rail-slot {
-  flex: 0 0 auto;
-  width: 94px;
-  position: relative;
-  transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
-}
-/* Pinned (the prototype's railPinned): the slot opens to 294px and the
-   rail becomes a 262px panel with each section's name and count. */
-.lx-rail-slot.is-pinned {
-  width: 294px;
-}
-.lx-rail {
-  position: absolute;
-  left: 16px;
-  top: 16px;
-  bottom: 16px;
-  width: 62px;
-  border-radius: 16px;
-  background: var(--ox-deep);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 12px 0;
-  box-shadow: var(--shadow);
-  /* Visible, not auto: the collapsed rail's name tooltips hang outside it,
-     and an auto overflow on either axis would clip them. */
-  overflow: visible;
-  z-index: 40;
-  transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.lx-rail.is-pinned {
-  width: 262px;
-  align-items: stretch;
-  padding: 12px 8px;
-  overflow-y: auto;
-}
-.lx-rail-item {
-  width: 46px;
-  height: 46px;
-  border-radius: 11px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--rail-ink);
-  position: relative;
-  flex: 0 0 auto;
-}
-.lx-rail-item:hover {
-  background: rgba(253, 247, 235, 0.08);
-  color: var(--cream);
-  text-decoration: none;
-}
-.lx-rail-item[aria-current="page"] {
-  background: var(--cream);
-  color: var(--ox);
-}
-button.lx-rail-item {
-  border: 0;
-  background: none;
-  cursor: pointer;
-  font: inherit;
-  padding: 0;
-}
-.lx-rail-name,
-.lx-rail-count {
-  display: none;
-}
-.lx-rail.is-pinned .lx-rail-item {
-  width: auto;
-  justify-content: flex-start;
-  gap: 12px;
-  padding: 0 12px 0 13px;
-}
-.lx-rail.is-pinned .lx-rail-name {
-  display: block;
-  flex: 1;
-  min-width: 0;
-  font-size: 14.5px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-align: left;
-}
-.lx-rail.is-pinned .lx-rail-count {
-  display: block;
-  font-family: var(--mono);
-  font-size: 12px;
-  opacity: 0.75;
-}
-.lx-rail-count.is-alert {
-  color: var(--cream);
-  background: var(--wine);
-  border-radius: 999px;
-  padding: 0 6px;
-  opacity: 1;
-}
-.lx-rail.is-pinned .lx-rail-sep {
-  width: auto;
-  margin: 6px 12px;
-}
-.lx-rail-spacer {
-  flex: 1;
-  min-height: 8px;
-}
-/* The design's hover label on the collapsed rail. */
-.lx-rail-tip {
-  position: absolute;
-  left: 56px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: var(--ink);
-  color: var(--cream);
-  font-size: 13px;
-  padding: 5px 9px;
-  border-radius: 7px;
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.12s;
-  z-index: 60;
-}
-.lx-rail-item:hover .lx-rail-tip,
-.lx-rail-item:focus-visible .lx-rail-tip {
-  opacity: 1;
-}
-.lx-rail-item svg {
-  width: 20px;
-  height: 20px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.lx-rail-badge {
-  position: absolute;
-  top: 5px;
-  right: 4px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: 999px;
-  background: var(--wine);
-  color: var(--cream);
-  font-family: var(--mono);
-  font-size: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-}
-.lx-rail-sep {
-  width: 30px;
-  height: 1px;
-  background: rgba(253, 247, 235, 0.14);
-  margin: 6px 0;
-  flex: 0 0 auto;
-}
+
 .lx-content {
   flex: 1;
   min-width: 0;
@@ -480,48 +322,7 @@ button.lx-rail-item {
   .lx-top .lx-vr {
     display: none;
   }
-  .lx-rail-slot {
-    width: 0;
-  }
-  .lx-rail {
-    position: fixed;
-    top: auto;
-    bottom: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: auto;
-    max-width: calc(100vw - 20px);
-    height: 58px;
-    flex-direction: row;
-    padding: 0 8px;
-    overflow-x: auto;
-    overflow-y: hidden;
-  }
-  .lx-rail-sep {
-    width: 1px;
-    height: 26px;
-    margin: 0 4px;
-  }
-  .lx-rail-slot.is-pinned {
-    width: 0;
-  }
-  .lx-rail.is-pinned {
-    width: auto;
-    padding: 0 8px;
-    align-items: center;
-  }
-  .lx-rail.is-pinned .lx-rail-item {
-    width: 46px;
-    padding: 0;
-    justify-content: center;
-  }
-  .lx-rail.is-pinned .lx-rail-name,
-  .lx-rail.is-pinned .lx-rail-count,
-  .lx-rail-tip,
-  .lx-rail-pin,
-  .lx-rail-spacer {
-    display: none;
-  }
+
   .lx-content {
     padding: 16px 16px 84px;
   }
@@ -1185,6 +986,7 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
 @media (max-width: 900px) {
   .lx-cal-day { min-height: 64px; padding: 4px 3px; }
   .lx-cal-month .lx-cal-item { font-size: 0; padding: 0; height: 6px; border-left-width: 0; border-radius: 3px; }
+  .lx-cal-month .lx-cal-time { display: none; }
   .lx-cal-month .lx-cal-item.is-deadline { background: var(--ox); }
   .lx-cal-month .lx-cal-item.is-event { background: var(--ok); }
   .lx-cal-month .lx-cal-item.is-task { background: var(--warn); }
@@ -1195,4 +997,248 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
   .lx-cal-col { min-height: 0; }
   .lx-cal-col + .lx-cal-col { border-left: 0; border-top: 1px solid var(--line); }
   .lx-cal-colhead { flex-direction: row; justify-content: flex-start; gap: 10px; }
+}
+
+/* ---- Rail (design/Rail.dc.html) ------------------------------------
+   62px glass column. It opens to 262px while hovered or focused (over the
+   page, the slot stays 94px) and stays open when pinned (the slot widens to
+   294px so the page moves over). */
+.lx-rail-slot {
+  flex: 0 0 auto;
+  width: 94px;
+  position: relative;
+  transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.lx-rail-slot.is-pinned { width: 294px; }
+.lx-rail {
+  position: absolute;
+  left: 16px;
+  top: 16px;
+  bottom: 16px;
+  z-index: 40;
+  width: 62px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 9px;
+  border-radius: 26px;
+  border: 1px solid rgba(253, 247, 235, 0.14);
+  /* The design's rgba(30,8,13,.8) glass sat over a dark shader; over the
+     cream page it goes brown, so the same colour is carried nearly opaque. */
+  background: rgba(30, 8, 13, 0.94);
+  -webkit-backdrop-filter: blur(24px) saturate(1.1);
+  backdrop-filter: blur(24px) saturate(1.1);
+  box-shadow: 0 30px 70px -34px rgba(0, 0, 0, 0.75);
+  transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+.lx-rail:hover,
+.lx-rail:focus-within,
+.lx-rail.is-pinned { width: 262px; }
+.lx-rail-headrow { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 1px; flex: 0 0 auto; }
+.lx-rail-kicker {
+  flex: 1;
+  min-width: 0;
+  font-size: 10px;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+  color: rgba(253, 247, 235, 0.5);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.lx-rail-pin {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  cursor: pointer;
+  box-sizing: border-box;
+  border: 1px solid rgba(253, 247, 235, 0.24);
+  color: rgba(253, 247, 235, 0.6);
+  background: transparent;
+  padding: 0;
+  transition: background 0.12s, color 0.12s, border-color 0.12s, opacity 0.14s;
+}
+.lx-rail-pin.is-on { border-color: rgba(253, 247, 235, 0.55); color: var(--cream); background: rgba(253, 247, 235, 0.14); }
+.lx-rail-pin:hover { color: var(--cream); border-color: rgba(253, 247, 235, 0.55); }
+.lx-rail svg { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; flex: 0 0 auto; }
+.lx-rail-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 1px; scrollbar-width: none; }
+.lx-rail-group,
+.lx-rail-node { display: flex; flex-direction: column; gap: 1px; }
+.lx-rail-spacer { height: 8px; flex: 0 0 auto; }
+.lx-rail-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 37px;
+  flex: 0 0 auto;
+  border-radius: 13px;
+  padding: 0 10px;
+  box-sizing: border-box;
+  overflow: hidden;
+  font-size: 13px;
+  color: rgba(253, 247, 235, 0.76);
+  background: transparent;
+  transition: background 0.12s, color 0.12s;
+}
+.lx-rail-item:hover,
+.lx-rail-kid:hover { background: rgba(253, 247, 235, 0.1); color: var(--cream); text-decoration: none; }
+.lx-rail-item.is-parent { background: rgba(253, 247, 235, 0.07); color: var(--cream); }
+.lx-rail-item.is-active,
+.lx-rail-item.is-active:hover {
+  background: var(--cream);
+  color: var(--ink);
+  font-weight: 500;
+  box-shadow: 0 8px 20px -10px rgba(0, 0, 0, 0.55);
+}
+.lx-rail-icon { width: 24px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; position: relative; }
+.lx-rail-dot { position: absolute; top: -1px; right: 0; width: 5px; height: 5px; border-radius: 999px; background: #efd9dc; }
+.lx-rail-dot.is-alert { background: #e7a0a8; }
+.lx-rail-label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0;
+  transition: opacity 0.14s;
+}
+.lx-rail-count,
+.lx-rail-kidcount {
+  font-family: var(--mono);
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.lx-rail-count { font-size: 10.5px; color: rgba(253, 247, 235, 0.6); opacity: 0; transition: opacity 0.14s; }
+.lx-rail-item.is-active .lx-rail-count { color: var(--wine); }
+.lx-rail-kidcount { font-size: 10px; color: rgba(253, 247, 235, 0.66); opacity: 0.7; }
+.lx-rail-kid.is-active .lx-rail-kidcount { color: var(--wine); opacity: 1; }
+.lx-rail-count.is-alert,
+.lx-rail-kidcount.is-alert { color: #f2b8bf; opacity: 1; }
+.lx-rail-kids {
+  display: none;
+  flex-direction: column;
+  gap: 1px;
+  margin-left: 21px;
+  padding-left: 22px;
+  border-left: 1px solid rgba(253, 247, 235, 0.14);
+}
+.lx-rail-kid {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 27px;
+  flex: 0 0 auto;
+  border-radius: 9px;
+  padding: 0 10px;
+  box-sizing: border-box;
+  overflow: hidden;
+  font-size: 12.5px;
+  color: rgba(253, 247, 235, 0.66);
+  transition: background 0.12s, color 0.12s;
+}
+.lx-rail-kid .lx-rail-label { opacity: 1; }
+.lx-rail-kid.is-active,
+.lx-rail-kid.is-active:hover { background: var(--cream); color: var(--ink); font-weight: 500; }
+.lx-rail-rule { height: 1px; background: rgba(253, 247, 235, 0.12); margin: 0 2px; flex: 0 0 auto; }
+.lx-rail-me { display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 10px; flex: 0 0 auto; overflow: hidden; }
+.lx-rail-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: var(--cream);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  letter-spacing: 0.03em;
+}
+.lx-rail-mewho { display: flex; flex-direction: column; }
+.lx-rail-mename { font-size: 12.5px; font-weight: 500; color: var(--cream); overflow: hidden; text-overflow: ellipsis; }
+.lx-rail-meact { font-size: 10.5px; color: rgba(253, 247, 235, 0.55); white-space: nowrap; }
+.lx-rail-meact a,
+.lx-rail-meact button { color: inherit; font: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.lx-rail-meact a:hover,
+.lx-rail-meact button:hover { color: var(--cream); text-decoration: underline; }
+
+/* Collapsed: icons only. Open (hover, focus, pinned): labels, counts, children, pin. */
+.lx-rail-kicker,
+.lx-rail-pin { opacity: 0; pointer-events: none; }
+.lx-rail:hover :is(.lx-rail-label, .lx-rail-count, .lx-rail-kicker),
+.lx-rail:focus-within :is(.lx-rail-label, .lx-rail-count, .lx-rail-kicker),
+.lx-rail.is-pinned :is(.lx-rail-label, .lx-rail-count, .lx-rail-kicker) { opacity: 1; }
+.lx-rail:hover .lx-rail-pin,
+.lx-rail:focus-within .lx-rail-pin,
+.lx-rail.is-pinned .lx-rail-pin { opacity: 1; pointer-events: auto; }
+.lx-rail:hover .lx-rail-kids,
+.lx-rail:focus-within .lx-rail-kids,
+.lx-rail.is-pinned .lx-rail-kids { display: flex; }
+.lx-rail:hover .lx-rail-dot,
+.lx-rail:focus-within .lx-rail-dot,
+.lx-rail.is-pinned .lx-rail-dot { display: none; }
+/* Pin tooltip, as in the design: a cream label to the pin's left. */
+.lx-rail-pin::after {
+  content: attr(data-tip);
+  position: absolute;
+  right: 31px;
+  top: 50%;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  padding: 4px 9px;
+  border-radius: 7px;
+  background: var(--cream);
+  color: var(--ink);
+  font-size: 11.5px;
+  box-shadow: 0 1px 2px rgba(20, 4, 8, 0.16), 0 10px 22px -16px rgba(20, 4, 8, 0.7);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.lx-rail-pin:hover::after { opacity: 1; }
+
+/* Phone: the rail lies down as a bottom bar of top-level icons. */
+@media (max-width: 900px) {
+  .lx-rail-slot,
+  .lx-rail-slot.is-pinned { width: 0; }
+  .lx-rail,
+  .lx-rail:hover,
+  .lx-rail:focus-within,
+  .lx-rail.is-pinned {
+    position: fixed;
+    top: auto;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: auto;
+    max-width: calc(100vw - 20px);
+    height: 58px;
+    flex-direction: row;
+    align-items: center;
+    gap: 2px;
+    padding: 0 8px;
+    border-radius: 20px;
+    overflow-x: auto;
+    z-index: 70;
+  }
+  .lx-rail-scroll,
+  .lx-rail-group { flex-direction: row; overflow: visible; gap: 2px; flex: 0 0 auto; }
+  .lx-rail-headrow,
+  .lx-rail-kids,
+  .lx-rail:hover .lx-rail-kids,
+  .lx-rail.is-pinned .lx-rail-kids,
+  .lx-rail-label,
+  .lx-rail-count,
+  .lx-rail-rule,
+  .lx-rail-me,
+  .lx-rail-spacer { display: none !important; }
+  .lx-rail-item { width: 42px; height: 42px; padding: 0; justify-content: center; }
+  .lx-rail .lx-rail-dot { display: block; }
 }

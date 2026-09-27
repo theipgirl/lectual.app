@@ -3,38 +3,42 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { RAIL_PIN_COOKIE, type NavItem } from "@/lib/nav";
+import { signOutAction } from "@/lib/auth/actions";
+import { ICON, RAIL_PIN_COOKIE, isNavActive, navItemBySlug, railGroups, type NavItem } from "@/lib/nav";
 import type { QueueLoadStatus } from "@/lib/queue/load";
-
 
 type Props = {
   items: NavItem[];
   queueStatus: QueueLoadStatus;
   pendingCount: number;
-  /** Section counts for the pinned rail, keyed by slug. Absent = unknown, never 0. */
+  /** Section counts keyed by slug. Absent = unknown, and nothing is drawn (never a false 0). */
   counts: Partial<Record<string, number>>;
   initialPinned: boolean;
+  initials: string;
+  name: string;
 };
 
-function isActive(pathname: string, item: NavItem): boolean {
-  const path = pathname.endsWith("/") ? pathname : `${pathname}/`;
-  if (item.slug === "") return path === "/dashboard/";
-  return path.startsWith(item.href) || (item.also ?? []).some((prefix) => path.startsWith(prefix));
+const PIN = "M9 4h6M12 4v6M7 10h10l-1 5H8zM12 15v5";
+
+function Icon({ d, size }: { d: string; size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <path d={d} />
+    </svg>
+  );
 }
 
-const PIN_ICON = "M9 4h6l-1 5 3 3H7l3-3zM12 12v8";
-const COLLAPSE_ICON = "M15 6l-6 6 6 6";
-
 /**
- * The floating oxblood rail from the design. Collapsed it is the 62px icon
- * column with a named tooltip on hover; pinned (the prototype's `railPinned`)
- * it opens to a 262px panel with each section's name and count.
+ * The navigation rail from design/Rail.dc.html: a 62px glass column that
+ * opens to 262px while hovered (over the page) or stays open when pinned
+ * (beside it). Sections are grouped as in the design, parents show their
+ * children when open, and a collapsed section with a count shows a dot.
  *
- * The Queue badge carries all three queue states: a count when we reached it,
- * "!" when we could not (so an outage never reads as "nothing waiting"),
+ * The Queue count carries all three queue states: a number when we reached
+ * it, "!" when we could not (an outage never reads as "nothing waiting"),
  * nothing when there is no queue.
  */
-export function Rail({ items, queueStatus, pendingCount, counts, initialPinned }: Props) {
+export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, initials, name }: Props) {
   const pathname = usePathname() ?? "/dashboard/";
   const [pinned, setPinned] = useState(initialPinned);
 
@@ -44,60 +48,112 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned }
     document.cookie = `${RAIL_PIN_COOKIE}=${next ? "pinned" : "collapsed"}; path=/; max-age=31536000; samesite=lax`;
   }
 
+  function countFor(key: string | null): string | null {
+    if (!key) return null;
+    if (key === "queue") {
+      if (queueStatus === "unavailable") return "!";
+      return queueStatus === "ok" && pendingCount > 0 ? String(pendingCount > 99 ? "99+" : pendingCount) : null;
+    }
+    const n = counts[key];
+    return n === undefined || n === 0 ? null : String(n > 999 ? "999+" : n);
+  }
+
+  const groups = railGroups(items, pathname);
+  const settings = items.find((i) => i.slug === "settings") ?? navItemBySlug("settings")!;
+  const settingsActive = isNavActive(pathname, settings);
+
   return (
     <div className={`lx-rail-slot${pinned ? " is-pinned" : ""}`}>
       <nav className={`lx-rail${pinned ? " is-pinned" : ""}`} aria-label="Sections">
-        {items.map((item, i) => {
-          const sep = i > 0 && items[i - 1].group !== item.group;
-          const active = isActive(pathname, item);
-          const queueBadge =
-            item.slug !== "queue"
-              ? null
-              : queueStatus === "unavailable"
-                ? "!"
-                : queueStatus === "ok" && pendingCount > 0
-                  ? String(pendingCount > 99 ? "99+" : pendingCount)
-                  : null;
-          const count = item.slug === "queue" ? (queueStatus === "ok" ? pendingCount : undefined) : counts[item.slug];
-          const label =
-            queueBadge === "!"
-              ? `${item.label} — couldn't reach the queue`
-              : queueBadge
-                ? `${item.label} — ${queueBadge} waiting`
-                : item.label;
-          return (
-            <span key={item.slug} style={{ display: "contents" }}>
-              {sep && <span className="lx-rail-sep" aria-hidden="true" />}
-              <Link href={item.href} className="lx-rail-item" aria-current={active ? "page" : undefined} aria-label={label}>
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d={item.icon} />
-                </svg>
-                {queueBadge && !pinned && <span className="lx-rail-badge">{queueBadge}</span>}
-                <span className="lx-rail-name">{item.label}</span>
-                {pinned && (queueBadge === "!" ? (
-                  <span className="lx-rail-count is-alert">!</span>
-                ) : count !== undefined ? (
-                  <span className="lx-rail-count">{count > 999 ? "999+" : count}</span>
-                ) : null)}
-                {!pinned && <span className="lx-rail-tip" aria-hidden="true">{label}</span>}
-              </Link>
-            </span>
-          );
-        })}
-        <span className="lx-rail-spacer" />
-        <button
-          type="button"
-          className="lx-rail-item lx-rail-pin"
-          onClick={togglePin}
-          aria-pressed={pinned}
-          aria-label={pinned ? "Collapse the menu" : "Pin the menu open"}
+        <div className="lx-rail-headrow">
+          <span className="lx-rail-kicker">Navigate</span>
+          <button
+            type="button"
+            className={`lx-rail-pin${pinned ? " is-on" : ""}`}
+            onClick={togglePin}
+            aria-pressed={pinned}
+            aria-label={pinned ? "Unpin navigation" : "Pin navigation"}
+            data-tip={pinned ? "Unpin navigation" : "Pin navigation"}
+          >
+            <Icon d={PIN} size={13} />
+          </button>
+        </div>
+
+        <div className="lx-rail-scroll">
+          {groups.map((group, gi) => (
+            <div key={gi} className="lx-rail-group">
+              {gi > 0 && <div className="lx-rail-spacer" aria-hidden="true" />}
+              {group.map((entry) => {
+                const count = countFor(entry.countKey);
+                return (
+                  <div key={entry.key} className="lx-rail-node">
+                    <Link
+                      href={entry.href}
+                      className={`lx-rail-item${entry.active ? " is-active" : entry.childActive ? " is-parent" : ""}`}
+                      aria-current={entry.active ? "page" : undefined}
+                      aria-label={count ? `${entry.label} (${count === "!" ? "couldn't reach the queue" : count})` : entry.label}
+                    >
+                      <span className="lx-rail-icon">
+                        <Icon d={entry.icon} size={17} />
+                        {count && !entry.active && <span className={`lx-rail-dot${count === "!" ? " is-alert" : ""}`} aria-hidden="true" />}
+                      </span>
+                      <span className="lx-rail-label">{entry.label}</span>
+                      {count && <span className={`lx-rail-count${count === "!" ? " is-alert" : ""}`}>{count}</span>}
+                    </Link>
+                    {entry.kids.length > 0 && (
+                      <div className="lx-rail-kids">
+                        {entry.kids.map((kid) => {
+                          const kc = countFor(kid.countKey);
+                          return (
+                            <Link
+                              key={kid.key}
+                              href={kid.href}
+                              className={`lx-rail-kid${kid.active ? " is-active" : ""}`}
+                              aria-current={kid.active ? "page" : undefined}
+                            >
+                              <Icon d={kid.icon} size={13} />
+                              <span className="lx-rail-label">{kid.label}</span>
+                              {kc && <span className={`lx-rail-kidcount${kc === "!" ? " is-alert" : ""}`}>{kc}</span>}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+
+        <div className="lx-rail-rule" aria-hidden="true" />
+
+        <Link
+          href={settings.href}
+          className={`lx-rail-item lx-rail-settings${settingsActive ? " is-active" : ""}`}
+          aria-current={settingsActive ? "page" : undefined}
+          aria-label="Settings"
         >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d={pinned ? COLLAPSE_ICON : PIN_ICON} />
-          </svg>
-          <span className="lx-rail-name">{pinned ? "Collapse" : "Pin open"}</span>
-          {!pinned && <span className="lx-rail-tip" aria-hidden="true">Pin the menu open</span>}
-        </button>
+          <span className="lx-rail-icon">
+            <Icon d={ICON.sliders} size={17} />
+          </span>
+          <span className="lx-rail-label">Settings</span>
+        </Link>
+
+        <div className="lx-rail-me">
+          <span className="lx-rail-avatar" title={name}>
+            {initials}
+          </span>
+          <span className="lx-rail-label lx-rail-mewho">
+            <span className="lx-rail-mename">{name}</span>
+            <span className="lx-rail-meact">
+              <Link href="/dashboard/settings/firm/">Profile</Link> ·{" "}
+              <form action={signOutAction} style={{ display: "inline" }}>
+                <button type="submit">Sign out</button>
+              </form>
+            </span>
+          </span>
+        </div>
       </nav>
     </div>
   );

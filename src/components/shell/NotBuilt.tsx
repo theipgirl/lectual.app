@@ -10,7 +10,7 @@ export function NotBuilt({ label, step }: { label: string; step: number }) {
           Not built yet
         </h1>
         <p style={{ margin: 0, color: "var(--body)", lineHeight: 1.6 }}>
-          This section arrives in build step {step} of the MVP plan. The design for it is in{" "}
+          {step <= 6 ? `This section arrives in build step ${step} of the MVP plan.` : "This section is designed but not built yet."} The design for it is in{" "}
           <code>design/</code>.
         </p>
         <Link href="/dashboard/" className="lx-btn lx-btn-pri" style={{ justifySelf: "start" }}>
