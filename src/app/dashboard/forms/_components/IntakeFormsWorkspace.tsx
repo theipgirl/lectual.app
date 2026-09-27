@@ -769,7 +769,7 @@ export function IntakeFormsWorkspace(props: Props) {
                 </span>
                 <Toggle on={config.powered} label="Show Powered by Lectual" onClick={() => edit({ powered: !config.powered })} />
               </div>
-              <p className="ifm-help">Applies to the embedded widget. Your public link uses Lectual&apos;s look.</p>
+              <p className="ifm-help">Applies to your public link and the embedded widget.</p>
             </section>
 
             <section id="ifm-sec-share" className="ifm-card">

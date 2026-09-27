@@ -12,7 +12,7 @@ import {
   SUBMIT_LIMITS,
 } from "@/lib/intake-forms/public-submit";
 import { checkStamp, clientIp, clientKey, makeStamp, refererHost, sessionHash, SlidingWindowThrottle } from "@/lib/intake-forms/spam";
-import { frameAncestors, intakeSlugFromPath } from "@/lib/intake-forms/frame-policy";
+import { frameAncestors, frameTarget, intakeSlugFromPath } from "@/lib/intake-forms/frame-policy";
 import { generateRequestToken, isRequestTokenShape } from "@/lib/intake-forms/request-token";
 import { intakeRequestUrl } from "@/lib/intake-forms/request-links";
 import { buildScreeningPrompt, parseScreening, SCREENING_SYSTEM } from "@/lib/intake-forms/screening";
@@ -241,6 +241,17 @@ describe("frame-ancestors", () => {
     expect(intakeSlugFromPath("/i/hartwell-ip")).toBe("hartwell-ip");
     expect(intakeSlugFromPath("/i/Bad_Slug/")).toBeNull();
     expect(intakeSlugFromPath("/dashboard/")).toBeNull();
+  });
+
+  it("matches the DECODED path, so a percent-encoded slug can't dodge the header", () => {
+    // The router renders /i/hartwell%2Dip/ as the hartwell-ip intake.
+    expect(frameTarget("/i/hartwell%2Dip/")).toEqual({ kind: "intake", slug: "hartwell-ip" });
+    expect(frameTarget("/i/hartwell-i%70/")).toEqual({ kind: "intake", slug: "hartwell-ip" });
+    // Under /i/ but not a clean slug: still an intake path, slug null → 'self'.
+    expect(frameTarget("/i/hartwell%252Dip/")).toEqual({ kind: "intake", slug: null });
+    expect(frameTarget("/i/bad%/")).toEqual({ kind: "intake", slug: null });
+    expect(frameTarget("/r/abc/")).toEqual({ kind: "request" });
+    expect(frameTarget("/dashboard/")).toEqual({ kind: "none" });
   });
 });
 

@@ -25,6 +25,28 @@ export function frameAncestors(domains: readonly string[] | null): string | null
   return clean.length ? `frame-ancestors 'self' ${clean.join(" ")}` : "frame-ancestors 'self'";
 }
 
+/**
+ * Which framing rule a request path falls under. The path is matched AFTER
+ * percent-decoding, because the router decodes it too: `/i/acme%2Dlaw/`
+ * renders the `acme-law` intake, so matching the raw path would serve that
+ * page with no frame-ancestors header at all — any site could embed it.
+ * Anything under `/i/` that isn't a clean slug gets 'self' (slug null), never
+ * "no header".
+ */
+export type FrameTarget = { kind: "none" } | { kind: "request" } | { kind: "intake"; slug: string | null };
+
+export function frameTarget(pathname: string): FrameTarget {
+  let path = pathname;
+  try {
+    path = decodeURIComponent(pathname);
+  } catch {
+    // A malformed escape: match the raw path; under /i/ that fails closed below.
+  }
+  if (path.startsWith("/r/") || pathname.startsWith("/r/")) return { kind: "request" };
+  if (path.startsWith("/i/") || pathname.startsWith("/i/")) return { kind: "intake", slug: intakeSlugFromPath(path) };
+  return { kind: "none" };
+}
+
 /** `/i/<slug>` or `/i/<slug>/` → the slug; anything else → null. */
 export function intakeSlugFromPath(pathname: string): string | null {
   const m = /^\/i\/([a-z0-9-]{3,60})\/?$/.exec(pathname);

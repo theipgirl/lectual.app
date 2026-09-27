@@ -2,7 +2,7 @@ import "server-only";
 
 import { getAdminClient } from "@/lib/db/admin";
 import type { Database, Json } from "@/lib/db/types";
-import { askClaude } from "@/lib/ai/claude";
+import { aiConfigured, askClaude } from "@/lib/ai/claude";
 import { parseIntakeConfig, publicConfig, type IntakeFormConfig, type PublicIntakeConfig } from "./config";
 import { publicPackages, type LibraryItem } from "./packages";
 import {
@@ -293,13 +293,29 @@ async function createIntakeLead(
   return lead.id;
 }
 
+/** Screened intakes per form per hour; see screenSubmission. */
+export const SCREENING_HOURLY_CAP = 40;
+
 /**
  * Scores fit against the firm's criteria and files the note on the
  * submission. Runs after the response (`after()`); every failure — no key,
  * a refusal, a timeout, an unparseable answer — leaves `unscored`.
  */
 export async function screenSubmission(handle: IntakeHandle, submissionId: string, sub: ValidatedSubmission): Promise<void> {
+  if (!aiConfigured()) return;
   try {
+    // A public page spends the firm's model budget, and the per-IP throttle
+    // is per instance. Past SCREENING_HOURLY_CAP intakes an hour on this form
+    // the rest stay `unscored` (still filed, still leads) instead of each
+    // costing a model call; a count that fails also skips.
+    const since = new Date(Date.now() - 60 * 60_000).toISOString();
+    const { count, error: countErr } = await db()
+      .from("crm_intake_submission")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", handle.orgId)
+      .eq("form_id", handle.formId)
+      .gte("created_at", since);
+    if (countErr || count === null || count > SCREENING_HOURLY_CAP) return;
     const result = await askClaude({ system: SCREENING_SYSTEM, prompt: buildScreeningPrompt(handle.config, sub), maxTokens: 600 });
     if ("skipped" in result) return;
     const parsed = parseScreening(result.text);

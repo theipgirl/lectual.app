@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { frameAncestors, intakeSlugFromPath } from "@/lib/intake-forms/frame-policy";
+import { frameAncestors, frameTarget } from "@/lib/intake-forms/frame-policy";
 import { readFrameDomains } from "@/lib/intake-forms/frame-lookup";
 
 /**
@@ -57,18 +57,19 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
  * page still renders (with the fail-closed 'self' policy).
  */
 async function applyFramePolicy(request: NextRequest, response: NextResponse): Promise<void> {
-  const path = request.nextUrl.pathname;
-  if (path.startsWith("/r/")) {
+  const target = frameTarget(request.nextUrl.pathname);
+  if (target.kind === "request") {
     response.headers.set("Content-Security-Policy", "frame-ancestors 'none'");
     return;
   }
-  const slug = intakeSlugFromPath(path);
-  if (!slug) return;
+  if (target.kind !== "intake") return;
   let policy: string | null = "frame-ancestors 'self'";
-  try {
-    policy = frameAncestors(await readFrameDomains(slug));
-  } catch {
-    // keep the fail-closed default
+  if (target.slug) {
+    try {
+      policy = frameAncestors(await readFrameDomains(target.slug));
+    } catch {
+      // keep the fail-closed default
+    }
   }
   if (policy) response.headers.set("Content-Security-Policy", policy);
 }
