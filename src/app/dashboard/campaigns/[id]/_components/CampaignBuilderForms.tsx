@@ -186,11 +186,14 @@ export function EnrollmentActions({
   enrollmentId,
   status,
   hasMoreSteps,
+  canRun,
 }: {
   sequenceId: string;
   enrollmentId: string;
   status: "active" | "paused" | "completed" | "cancelled";
   hasMoreSteps: boolean;
+  /** False while the campaign is paused (the action refuses too) or its steps couldn't be read. */
+  canRun: boolean;
 }) {
   const [advanceState, advanceAction, advancing] = useActionState<ActionState, FormData>(advanceEnrollmentAction, {});
   const [pauseState, pauseFormAction, pausing] = useActionState<ActionState, FormData>(pauseEnrollmentAction, {});
@@ -201,11 +204,14 @@ export function EnrollmentActions({
   return (
     <div style={{ display: "grid", gap: 6, justifyItems: "flex-end" }}>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
-        {status === "active" && hasMoreSteps && (
+        {status === "active" && canRun && (
+          // With no steps left (the sequence was emptied or shortened under
+          // it) running closes the enrollment out instead of leaving it
+          // "active" forever with nothing to run.
           <form action={advanceAction}>
             <Hidden values={hidden} />
             <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={advancing}>
-              {advancing ? "Running…" : "Run next step"}
+              {advancing ? "Running…" : hasMoreSteps ? "Run next step" : "Close out"}
             </button>
           </form>
         )}

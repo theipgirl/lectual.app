@@ -33,6 +33,8 @@ import "../campaigns.css";
 
 export const dynamic = "force-dynamic";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /**
  * One campaign's builder: its details, its ordered steps, and everyone
  * enrolled in it (which doubles as this campaign's activity view — every
@@ -61,6 +63,8 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
   const canManage = role !== null && AUTOMATION_ADMIN_ROLES.includes(role);
   const canOperate = role !== null && AUTOMATION_STAFF_ROLES.includes(role);
 
+  // A malformed id is a 404, not a Postgres "invalid input syntax for uuid" 500.
+  if (!UUID_RE.test(id)) notFound();
   const sequence = await getSequence(id);
   if (!sequence) notFound();
 
@@ -73,20 +77,25 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
       enrollments: [],
       error: err instanceof Error ? err.message : "Couldn't load who's enrolled.",
     })),
-    listTemplates().catch(() => []),
+    // Templates and leads are reads too: a failure must say so, never pass
+    // for "no templates" (every email step would claim it has none attached)
+    // or "no leads" (every enrolled name would read "no longer visible").
+    listTemplates().then((templates) => ({ templates, failed: false })).catch(() => ({ templates: [], failed: true })),
     // Fetched even for a view-only role: this is what turns an enrollment's
     // raw lead_id into a readable name below, not only the enroll picker.
-    listLeads().catch(() => []),
+    listLeads().then((leads) => ({ leads, failed: false })).catch(() => ({ leads: [], failed: true })),
   ]);
 
   const steps = stepsRead.steps;
   const enrollments = enrollmentsRead.enrollments;
-  const templateOptions = templatesRead.map((t) => ({ id: t.id, name: t.name, subject: t.subject }));
-  const templateById = new Map(templatesRead.map((t) => [t.id, t]));
-  const leadById = new Map(leadsRead.map((lead) => [lead.id, lead]));
+  const templatesFailed = templatesRead.failed;
+  const leadsFailed = leadsRead.failed;
+  const templateOptions = templatesRead.templates.map((t) => ({ id: t.id, name: t.name, subject: t.subject }));
+  const templateById = new Map(templatesRead.templates.map((t) => [t.id, t]));
+  const leadById = new Map(leadsRead.leads.map((lead) => [lead.id, lead]));
 
   const alreadyEnrolledLeadIds = new Set(enrollments.map((e) => e.lead_id));
-  const leadOptions = leadsRead
+  const leadOptions = leadsRead.leads
     .filter((lead) => !alreadyEnrolledLeadIds.has(lead.id))
     .map((lead) => ({ id: lead.id, label: `${leadDisplayName(lead)} — ${lead.email || "no email"}`, hasEmail: !!lead.email }));
 
@@ -119,7 +128,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
       <section className="lx-card lx-band">
         <header className="lx-band-head">
           <h2 className="lx-h2">Sequence</h2>
-          <span className="lx-note">{steps.length} step{steps.length === 1 ? "" : "s"}</span>
+          <span className="lx-note">{stepsRead.error ? "—" : `${steps.length} step${steps.length === 1 ? "" : "s"}`}</span>
         </header>
         {stepsRead.error ? (
           <p className="lx-note lx-campaigns-inlineerror">{stepsRead.error}</p>
@@ -146,6 +155,8 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
                           <>
                             Template: <strong>{template.name}</strong> — {template.subject}
                           </>
+                        ) : templatesFailed && step.template_id ? (
+                          <span style={{ color: "var(--wine)" }}>Couldn&apos;t load the template library to show this step&apos;s template.</span>
                         ) : (
                           <span style={{ color: "var(--wine)" }}>No template attached — this step can&apos;t run yet.</span>
                         )}
@@ -169,6 +180,11 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
         )}
         {canManage && (
           <div style={{ padding: "0 18px 18px" }}>
+            {templatesFailed && (
+              <p className="lx-note" style={{ color: "var(--wine)", margin: "0 0 8px" }}>
+                The template library couldn&apos;t be loaded, so email steps can&apos;t be added right now. Try again shortly.
+              </p>
+            )}
             <AddStepForm sequenceId={sequence.id} templates={templateOptions} />
           </div>
         )}
@@ -177,12 +193,26 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
       <section className="lx-card lx-band">
         <header className="lx-band-head">
           <h2 className="lx-h2">Enrolled</h2>
-          <span className="lx-note">{enrollments.length} lead{enrollments.length === 1 ? "" : "s"} · this is also this campaign&apos;s activity</span>
+          <span className="lx-note">
+            {enrollmentsRead.error ? "—" : `${enrollments.length} lead${enrollments.length === 1 ? "" : "s"}`} · this is also this
+            campaign&apos;s activity
+          </span>
         </header>
-        {canOperate && (
-          <div style={{ padding: "0 18px 14px" }}>
-            <EnrollLeadForm sequenceId={sequence.id} leads={leadOptions} />
-          </div>
+        {canOperate &&
+          (leadsFailed || enrollmentsRead.error ? (
+            <p className="lx-note lx-campaigns-inlineerror" style={{ paddingBottom: 14 }}>
+              {leadsFailed ? "Intake couldn't be loaded" : "Who's already enrolled couldn't be loaded"}, so leads can&apos;t be
+              enrolled right now. Try again shortly.
+            </p>
+          ) : (
+            <div style={{ padding: "0 18px 14px" }}>
+              <EnrollLeadForm sequenceId={sequence.id} leads={leadOptions} />
+            </div>
+          ))}
+        {!sequence.active && enrollments.length > 0 && (
+          <p className="lx-note" style={{ padding: "0 18px 14px", margin: 0 }}>
+            This campaign is paused — no steps run until it&apos;s started again.
+          </p>
         )}
         {enrollmentsRead.error ? (
           <p className="lx-note lx-campaigns-inlineerror">{enrollmentsRead.error}</p>
@@ -217,7 +247,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
                             column, and the overlay would swallow every click on
                             them. */}
                         <Link href={`/dashboard/leads/${enrollment.lead_id}/`} style={{ color: "var(--ink)", fontWeight: 500 }}>
-                          {lead ? leadDisplayName(lead) : "Lead no longer visible"}
+                          {lead ? leadDisplayName(lead) : leadsFailed ? "Lead (name couldn't be loaded)" : "Lead no longer visible"}
                         </Link>
                         {lead?.email && <div className="lx-note">{lead.email}</div>}
                       </td>
@@ -247,6 +277,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
                             enrollmentId={enrollment.id}
                             status={enrollment.status}
                             hasMoreSteps={enrollment.current_step < steps.length}
+                            canRun={sequence.active && !stepsRead.error}
                           />
                         </td>
                       )}

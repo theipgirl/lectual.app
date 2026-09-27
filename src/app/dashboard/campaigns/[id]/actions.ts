@@ -5,7 +5,10 @@ import {
   addStep,
   deleteStep,
   enrollLead,
+  getSequence,
+  listEnrollments,
   listSteps,
+  listTemplates,
   setEnrollmentStatus,
   toggleSequenceActive,
   updateSequenceDetails,
@@ -39,6 +42,18 @@ function revalidateCampaign(sequenceId: string): void {
 
 function errorState(err: unknown, fallback: string): ActionState {
   return { error: friendlyCampaignError(err, fallback) };
+}
+
+/**
+ * The ids below arrive in a form, so each one is re-read through the scoped
+ * client before it is written anywhere. The drip tables' foreign keys are
+ * single-column (`sequence_id`, `template_id` reference the row's id only, not
+ * `(id, org_id)`), so RLS's with-check on OUR org_id would happily accept a
+ * row pointing at ANOTHER firm's sequence or template. A read that RLS hides
+ * refuses it here instead.
+ */
+async function requireVisibleSequence(sequenceId: string): Promise<void> {
+  if (!(await getSequence(sequenceId))) throw new Error("That campaign couldn't be found. Refresh and try again.");
 }
 
 function isStepType(value: unknown): value is DripStepType {
@@ -80,10 +95,11 @@ export async function toggleSequenceAction(_prev: ActionState, formData: FormDat
 // ── Steps ────────────────────────────────────────────────────────────────
 
 /**
- * Appends a step. `order_index` is computed here from the sequence's CURRENT
- * step count (re-read fresh, never taken from the form) — that is what
- * `unique(sequence_id, order_index)` requires, and trusting a client-sent
- * index would let a stale page collide with a step someone else just added.
+ * Appends a step. `order_index` is computed here as one past the sequence's
+ * CURRENT highest index (re-read fresh, never taken from the form) — that is
+ * what `unique(sequence_id, order_index)` requires. Not the step COUNT:
+ * removing a middle step leaves a gap, and count would then collide with the
+ * last step's index.
  */
 export async function addStepAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const sequenceId = String(formData.get("sequenceId") ?? "");
@@ -99,9 +115,14 @@ export async function addStepAction(_prev: ActionState, formData: FormData): Pro
   if (typeRaw === "email" && !templateId) return { error: "Choose an email template for this step." };
 
   try {
+    await requireVisibleSequence(sequenceId);
+    if (typeRaw === "email" && !(await listTemplates()).some((t) => t.id === templateId)) {
+      return { error: "That template couldn't be found. Refresh and try again." };
+    }
     const existing = await listSteps(sequenceId);
+    const nextIndex = existing.reduce((max, step) => Math.max(max, step.order_index + 1), 0);
     await addStep(sequenceId, {
-      orderIndex: existing.length,
+      orderIndex: nextIndex,
       type: typeRaw,
       delayHours: Math.round(delayHours),
       templateId: typeRaw === "email" ? templateId : null,
@@ -137,6 +158,7 @@ export async function enrollLeadAction(_prev: ActionState, formData: FormData): 
   if (!leadId) return { error: "Choose a lead to enroll." };
 
   try {
+    await requireVisibleSequence(sequenceId);
     await enrollLead(leadId, sequenceId);
   } catch (err) {
     return errorState(err, "Couldn't enroll this lead.");
@@ -163,6 +185,15 @@ async function setStatusAction(formData: FormData, status: "active" | "paused" |
   if (!sequenceId || !enrollmentId) return { error: "Missing enrollment." };
 
   try {
+    // Only the transitions the page offers: pause/cancel an active one,
+    // resume/cancel a paused one. A completed or cancelled enrollment is
+    // final — a hand-posted "resume" must not revive it.
+    const allowedFrom = status === "active" ? ["paused"] : status === "paused" ? ["active"] : ["active", "paused"];
+    const current = (await listEnrollments({ sequenceId })).find((e) => e.id === enrollmentId);
+    if (!current) return { error: "That enrollment couldn't be found. Refresh and try again." };
+    if (!allowedFrom.includes(current.status)) {
+      return { error: `This enrollment is ${current.status} — refresh to see where it is now.` };
+    }
     await setEnrollmentStatus(enrollmentId, status);
   } catch (err) {
     return errorState(err, "Couldn't update this enrollment.");
