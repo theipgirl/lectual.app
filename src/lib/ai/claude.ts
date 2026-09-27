@@ -1,6 +1,11 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
+import type {
+  BetaContentBlock,
+  BetaMessageParam,
+  BetaTool,
+} from "@anthropic-ai/sdk/resources/beta/messages/messages";
 import type { z } from "zod";
 import { env } from "@/lib/env";
 
@@ -160,4 +165,53 @@ export async function askClaude(input: AskClaudeInput): Promise<AskClaudeResult>
   } catch {
     return { skipped: true };
   }
+}
+
+export type ToolTurnRequest = {
+  system: string;
+  /** Full conversation so far, including the tool_use/tool_result round trips. */
+  messages: BetaMessageParam[];
+  tools: BetaTool[];
+  maxTokens?: number;
+};
+
+export type ToolTurnResult = {
+  /** Raw content blocks (text and/or tool_use) — the caller decides what to do with each. */
+  content: BetaContentBlock[];
+  model: string;
+  usage: Usage;
+  costUsd: number | null;
+};
+
+/**
+ * One turn of a tool-calling conversation — the primitive behind the matters
+ * copilot (src/lib/agents/matters-chat.ts). Unlike `callClaude`, the caller
+ * drives the loop: this just makes one request (same fallback/caching
+ * posture as the rest of this file) and hands back whatever content blocks
+ * came out, so the agent can execute any `tool_use` blocks, append a
+ * `tool_result` turn, and call this again.
+ *
+ * Deliberately does not special-case `stop_reason === "refusal"` — a refusal
+ * still comes back as ordinary text content (often the model declining in
+ * its own words), which is exactly what a retrieval-only, UPL-firewalled
+ * agent wants to show verbatim rather than swallow.
+ */
+export async function callClaudeWithTools(req: ToolTurnRequest): Promise<ToolTurnResult> {
+  const response = await getClient().beta.messages.create({
+    model: agentModel(),
+    max_tokens: req.maxTokens ?? 4096,
+    betas: ["server-side-fallback-2026-07-01"],
+    fallbacks: "default",
+    system: [{ type: "text", text: req.system, cache_control: { type: "ephemeral" } }],
+    messages: req.messages,
+    tools: req.tools,
+  });
+
+  const usage: Usage = {
+    inputTokens: response.usage.input_tokens,
+    outputTokens: response.usage.output_tokens,
+    cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
+    cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
+  };
+  return { content: response.content, model: response.model, usage, costUsd: costFor(response.model, usage) };
 }
