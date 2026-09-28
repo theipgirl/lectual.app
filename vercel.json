@@ -8,6 +8,10 @@
     {
       "path": "/api/cron/agents/",
       "schedule": "33 12 * * *"
+    },
+    {
+      "path": "/api/cron/meetings-import/",
+      "schedule": "48 11 * * *"
     }
   ]
 }

@@ -37,7 +37,7 @@ export function parseRootKey(base64: string | undefined): Buffer {
  * mailbox state cookie, and the reverse. `lectual-mailbox` is the original and
  * must never change: every sealed mailbox and Lawmatics token depends on it.
  */
-export type SealContext = "lectual-mailbox" | "lectual-lawpay";
+export type SealContext = "lectual-mailbox" | "lectual-lawpay" | "lectual-meetings";
 
 function derive(root: Buffer, purpose: "token-seal" | "oauth-state", context: SealContext = "lectual-mailbox"): Buffer {
   return Buffer.from(hkdfSync("sha256", root, Buffer.alloc(0), `${context}:${purpose}`, 32));
