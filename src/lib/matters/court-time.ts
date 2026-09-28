@@ -23,6 +23,12 @@
  * spring-forward gap) has no instant to map to and is nudged forwards, not
  * silently back an hour; no court sets a hearing in it.
  *
+ * This is deliberately NOT the firm profile's time zone (crm_org_profile,
+ * which the rest of the dashboard now formats in). A hearing's time belongs to
+ * the courthouse: a firm that sets its profile to Central still attends a
+ * Pinellas hearing at 10:00 Eastern, and converting the court's clock through
+ * the firm's would move every hearing by an hour.
+ *
  * Eastern is a deliberate constant, not a guess at the user's locale: a
  * paralegal opening the docket from another state must see the time the court
  * will call the case, not the time on their own wall. If this product ever

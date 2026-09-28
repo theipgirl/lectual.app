@@ -2,6 +2,7 @@ import Link from "next/link";
 import { RANGES, intakeDetail, intakeTableRows, type RangeDays } from "@/lib/intake-forms/performance";
 import { INTAKE_TABLE_LIMIT, loadFunnel, loadIntakeList, loadIntakeSubmission } from "@/lib/intake-forms/load-performance";
 import type { IntakeFormRecord } from "@/lib/intake-forms/store";
+import { getFirmTimeZone } from "@/lib/org/profile";
 import { IntakeStatusForm } from "./IntakeStatusForm";
 
 /**
@@ -47,14 +48,15 @@ export async function IntakePerformance({
   intakeId: string | null;
   canChangeStatus: boolean;
 }) {
-  const [funnel, list, detail] = await Promise.all([
+  const [funnel, list, detail, tz] = await Promise.all([
     loadFunnel(form.id, range),
     loadIntakeList(form.id),
     intakeId ? loadIntakeSubmission(intakeId) : Promise.resolve(null),
+    getFirmTimeZone(),
   ]);
 
   const nothingYet = !form.everSaved && funnel.status === "ok" && funnel.value.visited === 0 && list.status === "ok" && list.value.length === 0;
-  const rows = list.status === "ok" ? intakeTableRows(list.value) : [];
+  const rows = list.status === "ok" ? intakeTableRows(list.value, undefined, tz) : [];
 
   return (
     <div className="ifm-perf">
@@ -170,21 +172,23 @@ export async function IntakePerformance({
         </>
       )}
 
-      {intakeId && detail && <IntakeDrawer detail={detail} closeHref={hrefFor(range)} canChangeStatus={canChangeStatus} />}
+      {intakeId && detail && <IntakeDrawer detail={detail} tz={tz} closeHref={hrefFor(range)} canChangeStatus={canChangeStatus} />}
     </div>
   );
 }
 
 function IntakeDrawer({
+  tz,
   detail,
   closeHref,
   canChangeStatus,
 }: {
   detail: Awaited<ReturnType<typeof loadIntakeSubmission>>;
+  tz: string;
   closeHref: string;
   canChangeStatus: boolean;
 }) {
-  const d = detail.status === "ok" && detail.value ? intakeDetail(detail.value) : null;
+  const d = detail.status === "ok" && detail.value ? intakeDetail(detail.value, tz) : null;
   return (
     <div className="ifm-drawer-wrap">
       <Link href={closeHref} scroll={false} className="ifm-drawer-scrim" aria-label="Close" />

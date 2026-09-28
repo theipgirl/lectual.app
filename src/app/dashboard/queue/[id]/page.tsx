@@ -6,6 +6,7 @@ import { getScopedClient } from "@/lib/db/scoped-client";
 import { QUEUE_APPROVE_ROLES, QUEUE_EDIT_ROLES, resolveQueueRole } from "@/lib/queue/roles";
 import { QueueUnavailable } from "@/components/queue/QueueUnavailable";
 import { ReviewPanel } from "@/components/queue/ReviewPanel";
+import { getFirmTimeZone } from "@/lib/org/profile";
 import { STATUS_PILL, agentLabel, fmtWhen, isUnconfiguredError, outcomeText, typeLabel } from "@/components/queue/format";
 
 function Meta({ label, value }: { label: string; value: React.ReactNode }) {
@@ -42,9 +43,10 @@ export default async function QueueItemPage({
   }
 
   const supabase = await getScopedClient();
-  const [approveRole, editRole] = await Promise.all([
+  const [approveRole, editRole, tz] = await Promise.all([
     resolveQueueRole(supabase, QUEUE_APPROVE_ROLES),
     resolveQueueRole(supabase, QUEUE_EDIT_ROLES),
+    getFirmTimeZone(),
   ]);
 
   const back = (
@@ -103,12 +105,12 @@ export default async function QueueItemPage({
           <Meta label="Client" value={item.client_name} />
           <Meta label="To" value={item.recipient} />
           <Meta label="Subject" value={item.subject} />
-          <Meta label="Send at" value={item.proposed_send_at ? fmtWhen(item.proposed_send_at) : null} />
+          <Meta label="Send at" value={item.proposed_send_at ? fmtWhen(item.proposed_send_at, tz) : null} />
           <Meta label="Attachments" value={item.attachments?.length ? item.attachments.map((a) => a.name).join(", ") : null} />
-          <Meta label="Queued" value={fmtWhen(item.created_at)} />
+          <Meta label="Queued" value={fmtWhen(item.created_at, tz)} />
           {resolved && (
             <>
-              <Meta label="Resolved" value={fmtWhen(item.resolved_at)} />
+              <Meta label="Resolved" value={fmtWhen(item.resolved_at, tz)} />
               <Meta label="By" value={item.resolved_by} />
               <Meta label="Note" value={item.resolution_note} />
             </>

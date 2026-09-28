@@ -72,3 +72,29 @@ export function buildPriorities(input: PriorityInput, limit = 5): Priority[] {
 
   return pool.sort((a, b) => b.score - a.score).slice(0, limit);
 }
+
+/**
+ * What "Top of the list" says when there is nothing to rank. Three states for
+ * the queue, never two (AGENTS.md): a queue that is merely not CONNECTED is
+ * not a failure and must not read as one, and a queue we could not REACH must
+ * never read as empty.
+ */
+export function emptyPrioritiesNote(input: {
+  queue: "ok" | "unconfigured" | "unavailable";
+  calendarOk: boolean;
+  docketOk: boolean;
+}): string {
+  const othersOk = input.calendarOk && input.docketOk;
+  if (input.queue === "ok" && othersOk) return "Nothing overdue, nothing waiting on you, nothing gone quiet.";
+  if (input.queue === "unconfigured" && othersOk) {
+    return "Nothing overdue and nothing gone quiet. No approval queue is connected for this firm, so there are no drafts to count.";
+  }
+  return "Nothing to rank from what loaded. Some sources are unavailable, so this may not be the whole picture.";
+}
+
+/** The hour of day (0–23) at `now` on the firm's clock, for the greeting. */
+export function hourInZone(now: Date, tz: string): number {
+  const h = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", hourCycle: "h23" }).format(now);
+  const n = Number.parseInt(h, 10);
+  return Number.isNaN(n) ? now.getUTCHours() : n % 24;
+}

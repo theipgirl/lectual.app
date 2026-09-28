@@ -51,8 +51,19 @@ export function describeActivity(row: Row): Described {
       return { title: "Call logged", detail: str(p.summary) ?? str(p.notes) ?? str(p.body), tone: "note", link: null };
     case "voice_note":
       return { title: "Voice note", detail: str(p.transcript), tone: "note", link: null };
-    case "stage_changed":
-      return { title: `Moved to ${str(p.to_stage_name) ?? str(p.to_label) ?? str(p.to) ?? "a new stage"}`, detail: null, tone: "system", link: null };
+    case "stage_changed": {
+      // moveLeadStage and the quote-acceptance advance write `to_stage` /
+      // `from_stage` (names); other producers wrote the older keys.
+      const to = str(p.to_stage) ?? str(p.to_stage_name) ?? str(p.to_label) ?? str(p.to);
+      const from = str(p.from_stage) ?? str(p.from_stage_name) ?? str(p.from_label);
+      const why = str(p.source) === "quote_accepted" ? "Proposal signed" : null;
+      return {
+        title: `Moved to ${to ?? "a new stage"}`,
+        detail: [from ? `from ${from}` : null, why].filter(Boolean).join(" · ") || null,
+        tone: "system",
+        link: null,
+      };
+    }
     case "lead_created":
       return { title: "Lead created", detail: str(p.source), tone: "system", link: null };
     case "lead_assigned":

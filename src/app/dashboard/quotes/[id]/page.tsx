@@ -34,6 +34,7 @@ import { getLawPayConnection } from "@/lib/payments/lawpay-connection";
 import { listLawPayMappings } from "@/lib/payments/accounts";
 import { lawPayDeploymentMode } from "@/lib/payments/lawpay-config";
 import { formatCents } from "@/lib/quotes/money";
+import { getFirmTimeZone } from "@/lib/org/profile";
 import "../quotes.css";
 
 export const dynamic = "force-dynamic";
@@ -107,7 +108,7 @@ export default async function QuoteBuilderPage({ params }: { params: Promise<{ i
   // Secondary reads, each best-effort: none is why this page exists, so a
   // failure degrades its own part. The events read says so out loud — "no
   // activity" and "couldn't read activity" differ.
-  const [eventsRead, serviceItems, clients, origin, matter, paymentsRead, lawpay, mappings] = await Promise.all([
+  const [eventsRead, serviceItems, clients, origin, matter, paymentsRead, lawpay, mappings, tz] = await Promise.all([
     listQuoteEvents(quote.id).then(
       (events): { events: QuoteEventRow[]; error: boolean } => ({ events, error: false }),
       () => ({ events: [], error: true }),
@@ -119,13 +120,14 @@ export default async function QuoteBuilderPage({ params }: { params: Promise<{ i
     listQuotePayments(quote.id),
     getLawPayConnection(),
     listLawPayMappings(),
+    getFirmTimeZone(),
   ]);
   const client = clients.get(quote.id) ?? null;
 
   // THE client link. `/q/<token>/` only — this app has no per-firm proposal
   // slug (lectual 0070 is not in its databases). trailingSlash is on.
   const publicUrl = `${origin}/q/${quote.public_token}/`;
-  const daysLeft = daysUntilQuoteExpiry(quote.expires_at, now);
+  const daysLeft = daysUntilQuoteExpiry(quote.expires_at, now, tz);
 
   const builderLines: BuilderLine[] =
     mode === "signed" && snapshot
@@ -145,7 +147,7 @@ export default async function QuoteBuilderPage({ params }: { params: Promise<{ i
   const signedChoice = snapshot ? describeSignedChoice(snapshot.lines) : null;
   const events: BuilderEvent[] = eventsRead.events.map((event) => ({
     id: event.id,
-    time: formatFirmStamp(event.created_at),
+    time: formatFirmStamp(event.created_at, tz),
     text: describeQuoteEvent(event),
     actor: event.actor,
   }));
@@ -161,8 +163,8 @@ export default async function QuoteBuilderPage({ params }: { params: Promise<{ i
         editable={editable}
         mode={mode}
         client={client ? { label: client.label, href: client.href } : null}
-        expiry={quote.expires_at ? { short: formatShortFirmDate(quote.expires_at), days: effective === "sent" || effective === "draft" ? daysLeftLabel(daysLeft) : "" } : null}
-        details={{ introBody: quote.intro_body, expiresInput: expiryInputValue(quote.expires_at) }}
+        expiry={quote.expires_at ? { short: formatShortFirmDate(quote.expires_at, tz), days: effective === "sent" || effective === "draft" ? daysLeftLabel(daysLeft) : "" } : null}
+        details={{ introBody: quote.intro_body, expiresInput: expiryInputValue(quote.expires_at, tz) }}
         publicUrl={publicUrl}
         currency={quote.currency}
         lines={builderLines}
@@ -171,7 +173,7 @@ export default async function QuoteBuilderPage({ params }: { params: Promise<{ i
           snapshot
             ? {
                 name: quote.accepted_by_name ?? snapshot.signature?.name ?? null,
-                acceptedOn: formatShortFirmDate(snapshot.accepted_at ?? quote.accepted_at),
+                acceptedOn: formatShortFirmDate(snapshot.accepted_at ?? quote.accepted_at, tz),
                 packageName: signedChoice?.packageName ?? null,
                 dueAtSigning: toAmount(snapshot.totals?.due_at_signing),
                 dueAtFiling: toAmount(snapshot.totals?.due_at_filing),
@@ -196,7 +198,7 @@ export default async function QuoteBuilderPage({ params }: { params: Promise<{ i
             : null,
           quote.currency,
         )}
-        payments={paymentsRead.status === "ok" ? paymentsRead.payments.map(toPanelPayment) : null}
+        payments={paymentsRead.status === "ok" ? paymentsRead.payments.map((pay) => toPanelPayment(pay, tz)) : null}
         canRecord
         canReconcile={hasRole(session.role, "senior_admin")}
         cardNote={
@@ -239,10 +241,10 @@ function paymentSummaryPill(summary: FirmPaymentSummary | null, currency: string
   }
 }
 
-function toPanelPayment(p: import("@/lib/payments/quote-payments").QuotePayment): PanelPayment {
+function toPanelPayment(p: import("@/lib/payments/quote-payments").QuotePayment, tz: string): PanelPayment {
   return {
     id: p.id,
-    when: formatShortFirmDate(p.occurred_at),
+    when: formatShortFirmDate(p.occurred_at, tz),
     amountCents: Number(p.amount_cents),
     currency: p.currency,
     purposeLabel: PURPOSE_LABEL[p.purpose] ?? p.purpose,

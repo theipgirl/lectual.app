@@ -23,6 +23,15 @@ export function timeZoneOptions(): string[] {
   return [...us, ...all.filter((z) => !us.includes(z))];
 }
 
+/**
+ * A stored time zone made safe to hand to Intl: the value when the runtime
+ * knows it, else the default. A bad value in the profile must never turn a
+ * date label into a RangeError that takes the page down with it.
+ */
+export function resolveTimeZone(value: string | null | undefined): string {
+  return value && isTimeZone(value) ? value : DEFAULT_TIME_ZONE;
+}
+
 export function isTimeZone(value: string): boolean {
   try {
     new Intl.DateTimeFormat("en-US", { timeZone: value });

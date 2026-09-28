@@ -27,6 +27,12 @@ describe("timeline wording", () => {
   it("describes matter activity: stage moves, docket changes, openings", () => {
     const at = "2026-09-26T00:00:00Z";
     expect(describeActivity({ type: "stage_changed", actor_type: "user", created_at: at, payload: { to_label: "OA Issued" } }).title).toBe("Moved to OA Issued");
+    // moveLeadStage's own payload keys — these used to fall through to "a new stage".
+    const moved = describeActivity({ type: "stage_changed", actor_type: "user", created_at: at, payload: { from_stage: "New PNC", to_stage: "Discovery Call", to_stage_id: "s2" } });
+    expect(moved.title).toBe("Moved to Discovery Call");
+    expect(moved.detail).toBe("from New PNC");
+    const signed = describeActivity({ type: "stage_changed", actor_type: "system", created_at: at, payload: { to_stage: "Hired Client", source: "quote_accepted" } });
+    expect(signed).toMatchObject({ title: "Moved to Hired Client", detail: "Proposal signed" });
     const d = describeActivity({ type: "matter_updated", actor_type: "user", created_at: at, payload: { change: "deadline_docketed", kind: "office_action_response", due_date: "2026-12-01" } });
     expect(d.title).toBe("Deadline docketed");
     expect(d.detail).toBe("office action response · 2026-12-01");

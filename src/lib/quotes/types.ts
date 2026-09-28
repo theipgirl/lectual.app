@@ -357,6 +357,33 @@ export function serviceItemToLineFields(
   };
 }
 
+/**
+ * The line already on the quote that a library item would duplicate EXACTLY —
+ * same library item, same placement (selection and package), same kind,
+ * timing, label, description and price — or undefined.
+ *
+ * Adding the same service twice then raises that line's quantity instead of
+ * showing the client two identical rows. A line that differs in anything the
+ * client can see (someone re-priced or relabelled it) is not a duplicate: the
+ * new copy gets its own row, as before.
+ */
+export function findDuplicateLibraryLine<L extends Pick<
+  QuoteLineRow,
+  "source_service_item_id" | "selection" | "tier_group" | "kind" | "charge_at" | "label" | "description" | "unit_amount_cents"
+>>(existing: readonly L[], fields: QuoteLineCopyFields): L | undefined {
+  return existing.find(
+    (l) =>
+      l.source_service_item_id === fields.source_service_item_id &&
+      l.selection === fields.selection &&
+      (l.tier_group ?? null) === (fields.tier_group ?? null) &&
+      l.kind === fields.kind &&
+      l.charge_at === fields.charge_at &&
+      l.label === fields.label &&
+      (l.description ?? null) === (fields.description ?? null) &&
+      Number(l.unit_amount_cents) === Number(fields.unit_amount_cents),
+  );
+}
+
 // Local, loose guards (accept `string` rather than the narrow union) so this
 // function can validate a caller-supplied override the same way pricing.ts
 // validates a wire row — a bad override is dropped back to the item's own

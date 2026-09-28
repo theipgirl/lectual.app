@@ -42,7 +42,7 @@ export async function listQuotePayments(quoteId: string): Promise<QuotePaymentsR
 
 export type RecordResult = { ok: true } | { ok: false; reason: string };
 
-/** Records money that moved outside Lectual (cheque, wire, a charge run in LawPay itself). */
+/** Records money that moved outside Lectual (check, wire, a charge run in LawPay itself). */
 export async function recordManualPayment(input: ManualPaymentInput & { quoteId: string; userId: string }): Promise<RecordResult> {
   const check = checkManualPayment(input);
   if (!check.ok) return check;

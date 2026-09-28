@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { callerHasRole } from "@/lib/auth/current-role";
 import { createQuote } from "@/lib/quotes/store";
 import { endOfFirmDay } from "@/lib/quotes/firm-time";
+import { getFirmTimeZone } from "@/lib/org/profile";
 import type { QuoteRow } from "@/lib/quotes/types";
 import { friendlyQuoteError, NOT_ENTITLED, type ActionState } from "./errors";
 
@@ -41,7 +42,7 @@ export async function createQuoteAction(_prev: ActionState, formData: FormData):
   const expiresRaw = String(formData.get("expiresAt") ?? "").trim();
   let expiresAt: string | null = null;
   if (expiresRaw) {
-    expiresAt = endOfFirmDay(expiresRaw);
+    expiresAt = endOfFirmDay(expiresRaw, await getFirmTimeZone());
     if (!expiresAt) return { error: "Enter a valid expiry date." };
   }
 

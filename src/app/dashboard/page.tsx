@@ -9,7 +9,8 @@ import { buildCalendarRows } from "@/lib/matters/calendar-rows";
 import { BAND_COPY } from "@/lib/matters/worklist";
 import { formatCivilDate } from "@/lib/matters/ip-fields";
 import { laneOf, laneReason } from "@/lib/leads/lane";
-import { buildPriorities, type PriorityTag } from "@/lib/today/priorities";
+import { buildPriorities, emptyPrioritiesNote, hourInZone, type PriorityTag } from "@/lib/today/priorities";
+import { getFirmTimeZone } from "@/lib/org/profile";
 import { AGENT_DEFS, type AgentId } from "@/lib/agents/types";
 import { relativeTime } from "@/lib/relative-time";
 
@@ -106,7 +107,8 @@ export default async function TodayPage() {
 
   const queueValue = queue.status === "ok" ? queue.items.length : null;
   const queueFailed = queue.status === "unavailable" ? "Queue unreachable, so we can't say" : "No queue connected yet";
-  const dateLine = now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  const tz = await getFirmTimeZone();
+  const dateLine = now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: tz });
 
   return (
     <>
@@ -116,7 +118,7 @@ export default async function TodayPage() {
             {session.org.name} · {dateLine}
           </div>
           <h1 className="lx-h1">
-            Good {greeting(now.getHours())}, {session.displayName.split(" ")[0]}.
+            Good {greeting(hourInZone(now, tz))}, {session.displayName.split(" ")[0]}.
           </h1>
         </div>
       </div>
@@ -142,9 +144,7 @@ export default async function TodayPage() {
             </h2>
             {priorities.length === 0 ? (
               <p className="lx-note" style={{ margin: 0 }}>
-                {queue.status === "ok" && !calendarNote && docket
-                  ? "Nothing overdue, nothing waiting on you, nothing gone quiet."
-                  : "Nothing to rank from what loaded. Some sources are unavailable, so this may not be the whole picture."}
+                {emptyPrioritiesNote({ queue: queue.status, calendarOk: !calendarNote, docketOk: !!docket })}
               </p>
             ) : (
               <ol className="lx-list lx-prio">

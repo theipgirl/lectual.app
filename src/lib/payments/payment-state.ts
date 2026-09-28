@@ -7,7 +7,7 @@ import type { ChargeableAmountResult } from "./types";
  * FIVE STATES, and a failed read is never "unpaid":
  *   received    money is recorded against the signing amount. `via` says HOW:
  *               `card` only when a LawPay charge on this page succeeded, and
- *               `recorded` for money the firm entered itself (cheque, wire).
+ *               `recorded` for money the firm entered itself (check, wire).
  *               `outstandingCents` > 0 is a PART payment — named, never shown as
  *               settled (runbook defect 2: a partial manual payment used to mark
  *               the whole quote received and a manual one read as "on your

@@ -32,7 +32,7 @@ import { PrintButton } from "./PrintButton";
  */
 export function Receipt({ token, view, payment }: { token: string; view: PublicQuoteView; payment: PublicPaymentState }) {
   const snapshot = view.acceptedSnapshot;
-  const acceptedAt = formatFirmDateTime(snapshot?.accepted_at ?? view.acceptedAt);
+  const acceptedAt = formatFirmDateTime(snapshot?.accepted_at ?? view.acceptedAt, view.firm.timeZone);
 
   return (
     <>

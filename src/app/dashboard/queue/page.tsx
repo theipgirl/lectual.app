@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { loadActiveQueue } from "@/lib/queue/load";
 import { QueueUnavailable } from "@/components/queue/QueueUnavailable";
+import { getFirmTimeZone } from "@/lib/org/profile";
 import { STATUS_PILL, agentLabel, fmtWhen, parseQueueStatus, preview, typeLabel, type QueueStatus } from "@/components/queue/format";
 
 const TABS: { status: QueueStatus; label: string }[] = [
@@ -23,7 +24,7 @@ const EMPTY: Record<QueueStatus, { title: string; body: string }> = {
  */
 export default async function QueuePage({ searchParams }: { searchParams: Promise<{ status?: string | string[] }> }) {
   const status = parseQueueStatus((await searchParams).status);
-  const load = await loadActiveQueue(status);
+  const [load, tz] = await Promise.all([loadActiveQueue(status), getFirmTimeZone()]);
 
   return (
     <>
@@ -84,7 +85,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
                   <td>
                     <span className={`lx-pill ${STATUS_PILL[item.status].tone}`}>{STATUS_PILL[item.status].label}</span>
                   </td>
-                  <td className="lx-num">{fmtWhen(item.created_at)}</td>
+                  <td className="lx-num">{fmtWhen(item.created_at, tz)}</td>
                 </tr>
               ))}
             </tbody>

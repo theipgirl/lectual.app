@@ -9,6 +9,7 @@ import {
   assertTierGroupShape,
   QuoteLineConstraintError,
   serviceItemToLineFields,
+  findDuplicateLibraryLine,
   type ServiceItemRow,
 } from "@/lib/quotes/types";
 
@@ -146,6 +147,36 @@ describe("assertIdsMatchSet — reorderQuoteLines' defence against a foreign or 
 
   it("accepts two empty sets (a quote with no lines yet)", () => {
     expect(() => assertIdsMatchSet([], [])).not.toThrow();
+  });
+});
+
+describe("findDuplicateLibraryLine — adding the same service twice", () => {
+  const item: Pick<ServiceItemRow, "id" | "kind" | "charge_at" | "unit_amount_cents" | "label" | "description"> = {
+    id: "item-1",
+    kind: "government_fee",
+    charge_at: "filing",
+    unit_amount_cents: 35000,
+    label: "USPTO filing fee (per class)",
+    description: null,
+  };
+  const fields = serviceItemToLineFields(item);
+  const line = { id: "l-1", ...fields, tier_group: null as string | null };
+
+  it("finds the identical copy already on the quote", () => {
+    expect(findDuplicateLibraryLine([line], fields)?.id).toBe("l-1");
+  });
+
+  it("is not a duplicate once the line was re-priced, relabelled, or placed elsewhere", () => {
+    expect(findDuplicateLibraryLine([{ ...line, unit_amount_cents: 40000 }], fields)).toBeUndefined();
+    expect(findDuplicateLibraryLine([{ ...line, label: "Filing fee, class 30" }], fields)).toBeUndefined();
+    expect(findDuplicateLibraryLine([{ ...line, selection: "optional" as const }], fields)).toBeUndefined();
+    expect(findDuplicateLibraryLine([{ ...line, source_service_item_id: "item-2" }], fields)).toBeUndefined();
+  });
+
+  it("tells packages apart", () => {
+    const inPkg = serviceItemToLineFields(item, { selection: "tier_option", tierGroup: "Standard" });
+    expect(findDuplicateLibraryLine([{ ...line, ...inPkg, tier_group: "Premium" }], inPkg)).toBeUndefined();
+    expect(findDuplicateLibraryLine([{ ...line, ...inPkg }], inPkg)?.id).toBe("l-1");
   });
 });
 

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { nextMatterNumber, openMatterForAcceptedQuote } from "@/lib/quotes/accept-matter";
+import {
+  advanceLeadForAcceptedQuote,
+  markFromTerms,
+  nextMatterNumber,
+  openMatterForAcceptedQuote,
+} from "@/lib/quotes/accept-matter";
 import { FakeDb, type Row } from "./fake-db";
 
 /**
@@ -26,8 +31,17 @@ function tables(quote: Row = {}): Record<string, Row[]> {
   return {
     crm_quote: [{ id: QUOTE, org_id: ORG, status: "accepted", lead_id: LEAD, matter_id: null, ...quote }],
     crm_lead: [
-      { id: LEAD, org_id: ORG, first_name: "Nadia", last_name: "Petra", business_name: "Halcyon Rowe LLC" },
-      { id: "lead-elsewhere", org_id: OTHER_ORG, first_name: "Other", last_name: "Firm", business_name: null },
+      {
+        id: LEAD,
+        org_id: ORG,
+        first_name: "Nadia",
+        last_name: "Petra",
+        business_name: "Halcyon Rowe LLC",
+        mark_text: "HALCYON",
+        referral_source: "Intake form",
+        current_stage_id: "ls-consult",
+      },
+      { id: "lead-elsewhere", org_id: OTHER_ORG, first_name: "Other", last_name: "Firm", business_name: null, current_stage_id: null },
     ],
     crm_lead_tag: [
       { org_id: ORG, lead_id: LEAD, tag_id: "tag-cr" },
@@ -47,6 +61,14 @@ function tables(quote: Row = {}): Record<string, Row[]> {
       { id: "m-1", org_id: ORG, matter_number: "HIP-2026-001" },
       { id: "m-2", org_id: ORG, matter_number: "HIP-2026-002" },
       { id: "m-x", org_id: OTHER_ORG, matter_number: "CR-2026-0003" },
+    ],
+    crm_stage: [
+      { id: "ls-new", org_id: ORG, name: "New PNC", category: "open", order_index: 1 },
+      { id: "ls-consult", org_id: ORG, name: "Consult booked", category: "open", order_index: 2 },
+      { id: "ls-lost", org_id: ORG, name: "Not moving forward", category: "lost", order_index: 9 },
+      { id: "ls-hired", org_id: ORG, name: "Hired Client", category: "won", order_index: 5 },
+      { id: "ls-filed", org_id: ORG, name: "Filed", category: "won", order_index: 6 },
+      { id: "ls-other-won", org_id: OTHER_ORG, name: "Other firm won", category: "won", order_index: 0 },
     ],
     crm_quote_event: [],
     crm_activity: [],
@@ -139,6 +161,94 @@ describe("opening the matter", () => {
     const result = await run(db);
     if (result.status !== "opened") throw new Error("expected opened");
     expect(db.tables.crm_matter.find((m) => m.id === result.matterId)).toMatchObject({ stage_id: null, stage_entered_at: null });
+  });
+});
+
+describe("what the matter carries over", () => {
+  it("takes the mark from the lead and 'Came from' from the lead's source", async () => {
+    const db = makeDb();
+    const result = await run(db);
+    if (result.status !== "opened") throw new Error("expected opened");
+    expect(db.tables.crm_matter.find((m) => m.id === result.matterId)).toMatchObject({
+      mark_text: "HALCYON",
+      referral_source: "Intake form",
+    });
+  });
+
+  it("prefers the mark the client signed for in the generated terms", async () => {
+    const db = makeDb({
+      terms_body: "SCOPE\n\nThe Firm will represent you in connection with the mark ROWE & CO, performing the services itemised above.",
+    });
+    const result = await run(db);
+    if (result.status !== "opened") throw new Error("expected opened");
+    expect(db.tables.crm_matter.find((m) => m.id === result.matterId)?.mark_text).toBe("ROWE & CO");
+  });
+
+  it("reads only the generated scope sentence", () => {
+    expect(markFromTerms(null)).toBeNull();
+    expect(markFromTerms("We will help with your brand.")).toBeNull();
+    expect(markFromTerms("…in connection with the mark BEAN THERE, performing the services…")).toBe("BEAN THERE");
+  });
+
+  it("uses the firm's time zone for the matter number's year", async () => {
+    const db = makeDb();
+    db.tables.crm_lead_tag = [];
+    // 03:00 UTC on Jan 1 is still Dec 31 in Los Angeles.
+    const result = await openMatterForAcceptedQuote(
+      db,
+      { quoteId: QUOTE, orgId: ORG },
+      { packageName: null, now: new Date("2027-01-01T03:00:00Z"), timeZone: "America/Los_Angeles" },
+    );
+    expect(result).toMatchObject({ status: "opened", matterNumber: "TM-2026-0003" });
+  });
+});
+
+describe("the lead moves to the firm's won stage", () => {
+  const advance = (db: FakeDb) => advanceLeadForAcceptedQuote(db, { quoteId: QUOTE, orgId: ORG }, { now: NOW });
+
+  it("moves the lead to the lowest won stage of THIS firm and names it on the timeline", async () => {
+    const db = makeDb();
+    expect(await advance(db)).toEqual({ status: "moved", stageId: "ls-hired", stageName: "Hired Client" });
+    expect(db.tables.crm_lead[0]).toMatchObject({ current_stage_id: "ls-hired", stage_entered_at: NOW.toISOString() });
+    expect(db.tables.crm_activity).toEqual([
+      expect.objectContaining({
+        org_id: ORG,
+        lead_id: LEAD,
+        type: "stage_changed",
+        actor_type: "system",
+        payload: expect.objectContaining({ from_stage: "Consult booked", to_stage: "Hired Client", to_stage_id: "ls-hired" }),
+      }),
+    ]);
+    for (const write of db.writes.filter((w) => w.op !== "insert")) {
+      expect(write.filters).toContainEqual({ kind: "eq", column: "org_id", value: ORG });
+    }
+  });
+
+  it("opens no second matter", async () => {
+    const db = makeDb();
+    await run(db);
+    await advance(db);
+    expect(ours(db)).toHaveLength(3);
+  });
+
+  it("leaves a lead already in a won stage alone", async () => {
+    const db = makeDb();
+    db.tables.crm_lead[0].current_stage_id = "ls-filed";
+    expect(await advance(db)).toEqual({ status: "skipped", reason: "already_won" });
+    expect(db.writes).toEqual([]);
+  });
+
+  it("does nothing for a firm with no won stage, or a quote not accepted", async () => {
+    const db = makeDb();
+    db.tables.crm_stage = db.tables.crm_stage.filter((st) => st.org_id !== ORG || st.category !== "won");
+    expect(await advance(db)).toEqual({ status: "skipped", reason: "no_won_stage" });
+    expect(await advance(makeDb({ status: "sent" }))).toEqual({ status: "skipped", reason: "not_accepted" });
+  });
+
+  it("never throws", async () => {
+    const db = makeDb();
+    db.failTable = "crm_stage";
+    await expect(advance(db)).resolves.toEqual({ status: "failed" });
   });
 });
 

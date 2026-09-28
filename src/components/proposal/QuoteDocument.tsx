@@ -83,7 +83,7 @@ export function QuoteDocument({
   const choiceMade = !hasPackages || picked !== null;
   const nameOk = name.trim().replace(/\s+/g, " ").length >= 2;
   const canAccept = ready && readiness.ready && nameOk && !busy;
-  const expiry = formatQuoteExpiry(view.expiresAt);
+  const expiry = formatQuoteExpiry(view.expiresAt, view.firm.timeZone);
 
   // Never "pay by card" over $0.00 due today (a filing-only quote).
   const payByCard = cardAfterSigning === true && totals.dueAtSigning > 0;

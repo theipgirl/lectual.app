@@ -261,7 +261,27 @@ describe("the payload sent to the client", () => {
     const db = makeDb();
     const read = await readPublicQuote(TOKEN, NOW, db);
     if (read.status !== "ok") throw new Error("expected ok");
-    expect(read.view.firm).toEqual({ name: "Beliard IP" });
+    expect(read.view.firm).toEqual({ name: "Beliard IP", timeZone: "America/New_York" });
+  });
+
+  it("shows dates on the quote's OWN firm's clock, read by the quote's org id", async () => {
+    const db = makeDb();
+    db.tables.crm_org_profile = [
+      { org_id: "some-other-org", time_zone: "Asia/Tokyo" },
+      { org_id: ORG_ID, time_zone: "America/Denver", email_signature: "private" },
+    ];
+    const read = await readPublicQuote(TOKEN, NOW, db);
+    if (read.status !== "ok") throw new Error("expected ok");
+    expect(read.view.firm.timeZone).toBe("America/Denver");
+    expect(db.selects.filter((q) => q.table === "crm_org_profile").map((q) => q.columns)).toEqual(["time_zone"]);
+  });
+
+  it("falls back to the default zone when the profile cannot be read, rather than failing the page", async () => {
+    const db = makeDb();
+    db.failTable = "crm_org_profile";
+    const read = await readPublicQuote(TOKEN, NOW, db);
+    expect(read.status).toBe("ok");
+    if (read.status === "ok") expect(read.view.firm.timeZone).toBe("America/New_York");
   });
 
   it("publishes the OFFER — a withheld package or add-on never reaches the browser", async () => {

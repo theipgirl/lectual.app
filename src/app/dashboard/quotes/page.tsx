@@ -9,6 +9,7 @@ import { parseAcceptedSnapshot } from "@/lib/quotes/public";
 import { toAmount } from "@/lib/quotes/drift";
 import { formatCents } from "@/lib/quotes/money";
 import { quoteReference, quoteStatusTone } from "@/lib/quotes/labels";
+import { getFirmTimeZone } from "@/lib/org/profile";
 import { relativeTime } from "@/lib/relative-time";
 import { NewQuoteForm } from "@/components/quotes/QuoteForms";
 import { QuotesRestricted } from "@/components/quotes/QuotesRestricted";
@@ -57,7 +58,7 @@ export default async function QuotesPage({ searchParams }: { searchParams: Promi
   const status = QUOTE_STATUSES.includes(statusRaw as never) ? statusRaw : undefined;
   const canManageLibrary = hasRole(session.role, "senior_admin");
 
-  const [load, options] = await Promise.all([loadQuotes(), quoteClientOptions()]);
+  const [load, options, tz] = await Promise.all([loadQuotes(), quoteClientOptions(), getFirmTimeZone()]);
   const all = load.status === "ok" ? load.quotes.map((quote) => ({ quote, effective: effectiveQuoteStatus(quote, now) })) : [];
   const rows = status ? all.filter((r) => r.effective === status) : all;
   const [linesByQuote, clients] = await Promise.all([
@@ -156,8 +157,8 @@ export default async function QuotesPage({ searchParams }: { searchParams: Promi
                 const client = clients.get(quote.id);
                 const lines = linesByQuote?.get(quote.id) ?? (linesByQuote ? [] : null);
                 const figures = listFigures(quote, lines);
-                const expiry = formatQuoteExpiry(quote.expires_at);
-                const daysLeft = daysUntilQuoteExpiry(quote.expires_at, now);
+                const expiry = formatQuoteExpiry(quote.expires_at, tz);
+                const daysLeft = daysUntilQuoteExpiry(quote.expires_at, now, tz);
                 return (
                   <tr key={quote.id}>
                     <td className="pri wrap">
