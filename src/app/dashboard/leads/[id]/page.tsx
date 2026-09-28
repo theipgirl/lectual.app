@@ -14,6 +14,8 @@ import { listTags, tagsForLead } from "@/lib/pipeline/tags";
 import { orgHasModule } from "@/lib/org/modules";
 import { voiceNotePlaybackUrls } from "@/lib/voice/notes";
 import { addVoiceNoteAction } from "./actions";
+import { meetingsFor } from "@/lib/meetings/read";
+import { LinkedMeetings } from "@/components/meetings/LinkedMeetings";
 
 export default async function LeadPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -25,10 +27,11 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   if (!lead) notFound();
 
   const supabase = await getScopedClient();
-  const [hasAgentToolkit, applied, catalog] = await Promise.all([
+  const [hasAgentToolkit, applied, catalog, meetings] = await Promise.all([
     orgHasModule("agent-toolkit"),
     tagsForLead(id).catch(() => []),
     listTags().catch(() => []),
+    meetingsFor({ leadId: id }),
   ]);
   const [stages, members, { data: activity }] = await Promise.all([
     listStages(),
@@ -122,6 +125,8 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
               <NoteComposer leadId={lead.id} />
             </section>
           )}
+
+          <LinkedMeetings read={meetings} />
 
           <section className="lx-card" style={{ padding: 18 }}>
             <h2 className="lx-h2" style={{ fontSize: 23, marginBottom: 10 }}>

@@ -43,6 +43,17 @@ See `PORTED_FROM.md`. When changing a ported file, consider whether `lectual` ne
   read is never "unpaid".
 - Tests never call LawPay. Unset `LAWPAY_OAUTH_*` means "not configured", and manual recording keeps working.
 
+## Meetings (Fathom / Zoom) — `docs/meetings-setup.md`
+- Each firm connects ITS OWN Fathom (API key, pasted, checked, sealed) or Zoom (OAuth, PKCE, sealed
+  rotating refresh token) in lectual 0077 `meeting_source_connection`. No deployment-wide Fathom or
+  Zoom credential; never add one. That is why Meetings has no module gate.
+- `crm_meeting` rows are inserted only by the service-role importer, stamped with the importing
+  connection's org_id. Staff change only the link columns. Transcripts are stored (privileged,
+  org-scoped like consult notes).
+- Meeting reads are three-state (ok / unavailable / none): a failed read is never "no meetings".
+- "Draft follow-up" goes to the approval queue only (agents module + queue required). Never send.
+- Tests never call Fathom or Zoom. Unset `ZOOM_OAUTH_*` means Zoom is "not set up"; Fathom still works.
+
 ## Commands
 `pnpm build` · `pnpm lint` · `pnpm test`. Env: copy `.env.example` to `.env.local` and fill it in
 from lectual-dev.

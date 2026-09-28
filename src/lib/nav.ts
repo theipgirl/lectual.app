@@ -46,6 +46,8 @@ export const ICON = {
   globe: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3.5 9h17M3.5 15h17M12 3c3 3.6 3 14.4 0 18M12 3c-3 3.6-3 14.4 0 18",
   bars: "M4 20V11M10 20V4M16 20v-6M21 20H3",
   sliders: "M4 6h12M18 6h2M4 12h2M8 12h12M4 18h12M18 18h2M16 4v4M6 10v4M16 16v4",
+  // A camera: a recorded call.
+  video: "M3 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1zM15 10l6-3.5v11L15 14",
 } as const;
 
 export const NAV: readonly NavItem[] = [
@@ -54,6 +56,8 @@ export const NAV: readonly NavItem[] = [
   { slug: "queue", label: "Queue", href: "/dashboard/queue/", icon: ICON.tray, step: 6 },
   { slug: "campaigns", label: "Campaigns", href: "/dashboard/campaigns/", icon: ICON.send, step: 6 },
   { slug: "sms", label: "SMS", href: "/dashboard/sms/", icon: ICON.sms, step: 7 },
+  // No module: each firm imports only from the Fathom / Zoom account it connected itself (lectual 0077).
+  { slug: "meetings", label: "Meetings", href: "/dashboard/meetings/", icon: ICON.video, step: 7 },
   { slug: "calendar", label: "Calendar", href: "/dashboard/calendar/", icon: ICON.cal, step: 6 },
   { slug: "intake", label: "Intake", railLabel: "PNC", href: "/dashboard/intake/", also: ["/dashboard/leads/"], icon: ICON.users, step: 6 },
   { slug: "forms", label: "Intake forms", railLabel: "Forms", href: "/dashboard/forms/", icon: ICON.file, step: 7 },
@@ -90,7 +94,7 @@ export type RailNode =
 export const RAIL_TREE: readonly (readonly RailNode[])[] = [
   [
     { slug: "" },
-    { label: "Communication", icon: ICON.chat, report: "communication", countFrom: "queue", kids: ["mail", "queue", "campaigns", "sms"] },
+    { label: "Communication", icon: ICON.chat, report: "communication", countFrom: "queue", kids: ["mail", "meetings", "queue", "campaigns", "sms"] },
     { slug: "calendar" },
   ],
   [

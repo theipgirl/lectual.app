@@ -53,6 +53,16 @@ const fieldSchemas = {
   // "test" (default) or "live". Which half of a merchant's credentials this
   // deployment charges with. Anything but the exact string "live" is test.
   LAWPAY_MODE: z.string().optional(),
+  // Meetings (docs/meetings-setup.md). Fathom needs nothing here: each firm
+  // pastes its OWN API key. Zoom needs Lectual's user-managed OAuth app;
+  // unset = "Connect Zoom" is shown as not set up. There is no deployment-wide
+  // Fathom or Zoom credential anywhere. Tokens are sealed with
+  // MAILBOX_TOKEN_KEY under their own HKDF context.
+  ZOOM_OAUTH_CLIENT_ID: z.string().optional(),
+  ZOOM_OAUTH_CLIENT_SECRET: z.string().optional(),
+  // Must match the Zoom app's registered redirect exactly. Unset = derived
+  // from the request origin: <origin>/api/meetings/zoom/callback/.
+  ZOOM_OAUTH_REDIRECT_URI: z.string().optional(),
 } as const;
 
 type FieldSchemas = typeof fieldSchemas;

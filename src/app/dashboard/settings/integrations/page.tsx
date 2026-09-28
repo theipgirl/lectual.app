@@ -8,6 +8,7 @@ import { outcomeMessage } from "@/lib/mailbox/outcome";
 import { getLawmaticsConnection } from "@/lib/lawmatics/connection";
 import { getLawPayConnection } from "@/lib/payments/lawpay-connection";
 import { lawPaySetup } from "@/lib/payments/lawpay-config";
+import { listMeetingConnections } from "@/lib/meetings/connection";
 import Link from "next/link";
 import { PROVIDER_LABEL, PROVIDERS, isProvider, type MailboxProvider } from "@/lib/mailbox/providers";
 import { relativeTime } from "@/lib/relative-time";
@@ -123,11 +124,14 @@ export default async function IntegrationsPage({
   const hasMailbox = await orgHasModule("mailbox");
 
   const { connected, reconnected, error } = await searchParams;
-  const [list, lawmatics, lawpay] = await Promise.all([
+  const [list, lawmatics, lawpay, meetingConns] = await Promise.all([
     hasMailbox ? listConnections() : Promise.resolve({ ok: true as const, connections: [] }),
     getLawmaticsConnection(),
     getLawPayConnection(),
+    listMeetingConnections(),
   ]);
+  const meetingSources = meetingConns.ok ? meetingConns.connections : [];
+  const meetingsNeedAttention = meetingSources.some((c) => c.status !== "active");
   const lp = lawpay.ok ? lawpay.connection : null;
   const lawpayReady = lawPaySetup().ready;
   const lm = lawmatics.ok ? lawmatics.connection : null;
@@ -245,6 +249,25 @@ export default async function IntegrationsPage({
         {lp && <span className={`lx-pill ${lp.mode === "live" ? "lx-pill-ox" : "lx-pill-warn"}`}>{lp.mode === "live" ? "Live" : "Test"}</span>}
         <Link href="/dashboard/settings/integrations/lawpay/" className={`lx-btn ${lp?.status === "active" || !lawpayReady ? "lx-btn-sec" : "lx-btn-pri"}`}>
           {lp?.status === "active" ? "Manage LawPay" : lp ? "Reconnect" : lawpayReady ? "Connect LawPay" : "About LawPay"}
+        </Link>
+      </section>
+
+      <section className="lx-int-import" aria-labelledby="meetings-title">
+        <div style={{ flex: 1, minWidth: 240 }}>
+          <h2 id="meetings-title" className="lx-h2" style={{ fontSize: 27 }}>
+            Meetings
+          </h2>
+          <p className="lx-sub" style={{ margin: "4px 0 0" }}>
+            {!meetingConns.ok
+              ? "We couldn't check your meeting connections just now."
+              : meetingSources.length > 0
+                ? `Connected: ${meetingSources.map((c) => (c.provider === "fathom" ? "Fathom" : "Zoom")).join(" and ")}. Consult recordings, summaries and transcripts land in Meetings.`
+                : "Connect Fathom or Zoom to bring consult recordings, summaries and transcripts into Meetings."}
+          </p>
+        </div>
+        {meetingsNeedAttention && <span className="lx-pill lx-pill-risk">Reconnect</span>}
+        <Link href="/dashboard/settings/integrations/meetings/" className={`lx-btn ${meetingSources.length > 0 ? "lx-btn-sec" : "lx-btn-pri"}`}>
+          {meetingSources.length > 0 ? "Manage meetings" : "Connect Fathom or Zoom"}
         </Link>
       </section>
 

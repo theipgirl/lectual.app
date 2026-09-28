@@ -328,6 +328,117 @@ export type Database = {
           },
         ]
       }
+      crm_meeting: {
+        Row: {
+          attendees: Json
+          created_at: string
+          duration_seconds: number | null
+          external_id: string
+          id: string
+          imported_at: string
+          imported_by: string | null
+          lead_id: string | null
+          link_source: string | null
+          linked_at: string | null
+          linked_by: string | null
+          matter_id: string | null
+          org_id: string
+          provider: string
+          share_url: string | null
+          started_at: string | null
+          suggested_lead_id: string | null
+          suggested_matter_id: string | null
+          summary: string | null
+          title: string
+          transcript: Json | null
+          updated_at: string
+        }
+        Insert: {
+          attendees?: Json
+          created_at?: string
+          duration_seconds?: number | null
+          external_id: string
+          id?: string
+          imported_at?: string
+          imported_by?: string | null
+          lead_id?: string | null
+          link_source?: string | null
+          linked_at?: string | null
+          linked_by?: string | null
+          matter_id?: string | null
+          org_id: string
+          provider: string
+          share_url?: string | null
+          started_at?: string | null
+          suggested_lead_id?: string | null
+          suggested_matter_id?: string | null
+          summary?: string | null
+          title?: string
+          transcript?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          attendees?: Json
+          created_at?: string
+          duration_seconds?: number | null
+          external_id?: string
+          id?: string
+          imported_at?: string
+          imported_by?: string | null
+          lead_id?: string | null
+          link_source?: string | null
+          linked_at?: string | null
+          linked_by?: string | null
+          matter_id?: string | null
+          org_id?: string
+          provider?: string
+          share_url?: string | null
+          started_at?: string | null
+          suggested_lead_id?: string | null
+          suggested_matter_id?: string | null
+          summary?: string | null
+          title?: string
+          transcript?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_meeting_lead_fk"
+            columns: ["lead_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_lead"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "crm_meeting_matter_fk"
+            columns: ["matter_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_matter"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "crm_meeting_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_org"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_meeting_suggested_lead_fk"
+            columns: ["suggested_lead_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_lead"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "crm_meeting_suggested_matter_fk"
+            columns: ["suggested_matter_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_matter"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
       crm_org_payment_account: {
         Row: {
           account_kind: Database["public"]["Enums"]["crm_payment_account_kind"]
@@ -3347,6 +3458,77 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "mailbox_connection_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_org"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meeting_source_connection: {
+        Row: {
+          access_token_enc: string | null
+          account_hint: string | null
+          api_key_enc: string | null
+          created_at: string
+          created_by: string | null
+          external_user_id: string | null
+          id: string
+          import_cursor: string | null
+          last_error: string | null
+          last_import_at: string | null
+          last_import_count: number | null
+          last_verified_at: string | null
+          org_id: string
+          provider: string
+          refresh_token_enc: string | null
+          status: string
+          token_expires_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          access_token_enc?: string | null
+          account_hint?: string | null
+          api_key_enc?: string | null
+          created_at?: string
+          created_by?: string | null
+          external_user_id?: string | null
+          id?: string
+          import_cursor?: string | null
+          last_error?: string | null
+          last_import_at?: string | null
+          last_import_count?: number | null
+          last_verified_at?: string | null
+          org_id: string
+          provider: string
+          refresh_token_enc?: string | null
+          status?: string
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          access_token_enc?: string | null
+          account_hint?: string | null
+          api_key_enc?: string | null
+          created_at?: string
+          created_by?: string | null
+          external_user_id?: string | null
+          id?: string
+          import_cursor?: string | null
+          last_error?: string | null
+          last_import_at?: string | null
+          last_import_count?: number | null
+          last_verified_at?: string | null
+          org_id?: string
+          provider?: string
+          refresh_token_enc?: string | null
+          status?: string
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_source_connection_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "crm_org"

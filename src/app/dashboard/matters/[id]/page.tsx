@@ -18,6 +18,8 @@ import { matterLabel } from "@/lib/matters/docket-summary";
 import { matterStatusLabel } from "@/lib/matters/status";
 import { BAND_COPY, bandOf, stageAge } from "@/lib/matters/worklist";
 import { Timeline } from "@/components/timeline/Timeline";
+import { meetingsFor } from "@/lib/meetings/read";
+import { LinkedMeetings } from "@/components/meetings/LinkedMeetings";
 import VoiceNoteRecorder from "@/components/voice/VoiceNoteRecorder";
 import { FilingFollowUpCard, LitigationForm, WelcomeEmailCard } from "@/components/matters/MatterExtras";
 import { addVoiceNoteAction } from "./actions";
@@ -80,12 +82,13 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
     matter.type === "LIT" && hasLitigation ? getLitigationDetail(matter.id) : Promise.resolve(null),
   ]);
   const canSendIntake = canSendIntakeRequest(session.role);
-  const [voiceUrls, intakeRequests, origin] = await Promise.all([
+  const [voiceUrls, intakeRequests, origin, meetings] = await Promise.all([
     voiceNotePlaybackUrls(activity),
     // Intake questions (0075): a failed read says so on the card; it never
     // reads as "no links sent".
     listMatterIntakeRequests(matter.id),
     intakeOrigin(),
+    meetingsFor({ matterId: matter.id }),
   ]);
 
   // Monthly status updates: only for a mark awaiting registration, and only
@@ -320,6 +323,8 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
               </div>
             )}
           </section>
+
+          <LinkedMeetings read={meetings} />
 
           <section className="lx-card" style={{ padding: 18 }}>
             <h2 className="lx-h2" style={{ fontSize: 23, marginBottom: 10 }}>
