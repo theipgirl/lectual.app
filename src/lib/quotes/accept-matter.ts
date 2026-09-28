@@ -80,13 +80,13 @@ export function nextMatterNumber(type: string, year: string, existing: readonly 
 export async function openMatterForAcceptedQuote(
   db: PublicQuotesDb,
   ids: { quoteId: string; orgId: string },
-  context: { packageName: string | null; now: Date },
+  context: { packageName: string | null; now: Date; timeZone?: string },
 ): Promise<MatterOpenResult> {
   const { quoteId, orgId } = ids;
   try {
     const { data: quoteData, error: quoteError } = await db
       .from("crm_quote")
-      .select("id, org_id, status, lead_id, matter_id")
+      .select("id, org_id, status, lead_id, matter_id, terms_body")
       .eq("id", quoteId)
       .eq("org_id", orgId)
       .maybeSingle();
@@ -99,7 +99,7 @@ export async function openMatterForAcceptedQuote(
 
     const { data: leadData, error: leadError } = await db
       .from("crm_lead")
-      .select("id, first_name, last_name, business_name")
+      .select("id, first_name, last_name, business_name, mark_text, referral_source")
       .eq("id", leadId)
       .eq("org_id", orgId)
       .maybeSingle();
@@ -120,7 +120,12 @@ export async function openMatterForAcceptedQuote(
     const existing = (Array.isArray(numberRows) ? numberRows : [])
       .map((row) => str((row as Record<string, unknown>).matter_number))
       .filter((n): n is string => n !== null);
-    const year = firmCivilDate(context.now).slice(0, 4);
+    const year = firmCivilDate(context.now, context.timeZone).slice(0, 4);
+    // The mark the client signed for (the engagement terms' scope line), else
+    // the one the lead came in with; and where the lead came from, so the
+    // matter's "Came from" is not blank for a client the firm's own form found.
+    const markText = markFromTerms(str(quote.terms_body)) ?? str(lead.mark_text);
+    const referralSource = str(lead.referral_source);
     const stamp = context.now.toISOString();
 
     let matter: { id: string; matterNumber: string } | null = null;
@@ -134,6 +139,8 @@ export async function openMatterForAcceptedQuote(
           lead_id: leadId,
           title,
           package_name: context.packageName,
+          mark_text: markText,
+          referral_source: referralSource,
           matter_number: matterNumber,
           status: "open",
           stage_id: stageId,
@@ -190,6 +197,122 @@ export async function openMatterForAcceptedQuote(
   } catch (err) {
     return fail("open the matter", err);
   }
+}
+
+/**
+ * The mark named in engagement terms `buildEngagementTerms` wrote — its scope
+ * line reads "…in connection with the mark <MARK>, performing the services…".
+ * Only that exact sentence is read: terms a person rewrote by hand give null,
+ * and the lead's own mark is used instead. Nothing here guesses at prose.
+ */
+export function markFromTerms(terms: string | null | undefined): string | null {
+  if (!terms) return null;
+  const m = /in connection with the mark (.+?), performing the services/.exec(terms);
+  const mark = m?.[1]?.trim();
+  return mark && mark.length <= 200 ? mark : null;
+}
+
+export type LeadAdvanceResult =
+  | { status: "moved"; stageId: string; stageName: string }
+  | { status: "skipped"; reason: "not_accepted" | "no_lead" | "no_won_stage" | "already_won" }
+  | { status: "failed" };
+
+/**
+ * Signing is the client hiring the firm, so the quote's lead moves to the
+ * firm's first "won" lead stage (crm_stage.category = 'won', lowest
+ * order_index — "Hired Client" in the default pipeline), with a timeline row
+ * that names the stage.
+ *
+ * Fenced exactly like `openMatterForAcceptedQuote`: the quote is re-read by
+ * (id, org_id) and must be accepted; the lead and the stages are read with
+ * `org_id = orgId`; the update is fenced on (id, org_id). It deliberately does
+ * NOT go through `moveLeadStage`, whose won-stage handoff calls
+ * `ensureMatterForLead` — the matter for this acceptance is already opened
+ * above, and a second one is exactly what that would risk.
+ *
+ * A lead already in a won stage is left where it is (the firm may have moved
+ * it by hand to a later won column). Never throws; never fails the acceptance.
+ */
+export async function advanceLeadForAcceptedQuote(
+  db: PublicQuotesDb,
+  ids: { quoteId: string; orgId: string },
+  context: { now: Date },
+): Promise<LeadAdvanceResult> {
+  const { quoteId, orgId } = ids;
+  try {
+    const { data: quoteData, error: quoteError } = await db
+      .from("crm_quote")
+      .select("id, status, lead_id")
+      .eq("id", quoteId)
+      .eq("org_id", orgId)
+      .maybeSingle();
+    if (quoteError || !quoteData) return failLead("read the quote", quoteError);
+    const quote = quoteData as Record<string, unknown>;
+    if (quote.status !== "accepted") return { status: "skipped", reason: "not_accepted" };
+    const leadId = str(quote.lead_id);
+    if (!leadId) return { status: "skipped", reason: "no_lead" };
+
+    const { data: leadData, error: leadError } = await db
+      .from("crm_lead")
+      .select("id, current_stage_id")
+      .eq("id", leadId)
+      .eq("org_id", orgId)
+      .maybeSingle();
+    if (leadError) return failLead("read the lead", leadError);
+    if (!leadData) return { status: "skipped", reason: "no_lead" };
+    const fromStageId = str((leadData as Record<string, unknown>).current_stage_id);
+
+    const { data: stageRows, error: stageError } = await db
+      .from("crm_stage")
+      .select("id, name, category, order_index")
+      .eq("org_id", orgId)
+      .order("order_index", { ascending: true });
+    if (stageError) return failLead("read the lead stages", stageError);
+    const stages = (Array.isArray(stageRows) ? stageRows : []) as Record<string, unknown>[];
+    const from = fromStageId ? stages.find((st) => st.id === fromStageId) : undefined;
+    if (from?.category === "won") return { status: "skipped", reason: "already_won" };
+    const won = stages.find((st) => st.category === "won");
+    const wonId = str(won?.id);
+    if (!won || !wonId) return { status: "skipped", reason: "no_won_stage" };
+    const wonName = str(won.name) ?? "Hired";
+
+    const stamp = context.now.toISOString();
+    const { data: moved, error: moveError } = await db
+      .from("crm_lead")
+      .update({ current_stage_id: wonId, stage_entered_at: stamp, last_activity_at: stamp })
+      .eq("id", leadId)
+      .eq("org_id", orgId)
+      .select("id");
+    if (moveError || !Array.isArray(moved) || moved.length === 0) return failLead("move the lead", moveError);
+
+    // Same payload shape moveLeadStage writes, so the timeline reads it the
+    // same way ("Moved to Hired Client").
+    const { error: activityError } = await db.from("crm_activity").insert({
+      org_id: orgId,
+      lead_id: leadId,
+      type: "stage_changed",
+      actor_type: "system",
+      payload: {
+        from_stage: str(from?.name),
+        to_stage: wonName,
+        from_stage_id: fromStageId,
+        to_stage_id: wonId,
+        auto: true,
+        source: "quote_accepted",
+        quote_id: quoteId,
+      },
+    });
+    if (activityError) console.error(`[quotes] lead moved but its activity row failed quote=${quoteId}`, activityError);
+
+    return { status: "moved", stageId: wonId, stageName: wonName };
+  } catch (err) {
+    return failLead("advance the lead", err);
+  }
+}
+
+function failLead(step: string, err: unknown): LeadAdvanceResult {
+  console.error(`[quotes] lead advance on acceptance: could not ${step}`, err);
+  return { status: "failed" };
 }
 
 async function matterTypeFor(db: PublicQuotesDb, orgId: string, leadId: string): Promise<string> {

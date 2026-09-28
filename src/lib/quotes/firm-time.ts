@@ -12,17 +12,23 @@
  * the server's calendar fields would tell a client the 12th.
  */
 
-/** Pinned, not left to the runtime. Same zone the queue formatter and
- * `COURT_TIME_ZONE` pin. When a tenant in another zone arrives this becomes the
- * firm profile's time zone, and this constant is the one place that changes. */
-export const FIRM_TIME_ZONE = "America/New_York";
+import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
+
+/**
+ * The FALLBACK zone, used only when the firm's own zone is not known: every
+ * function here takes the firm's zone (crm_org_profile.time_zone, Settings →
+ * Firm profile) as its last argument. Callers read it with `getFirmTimeZone()`
+ * (signed-in pages) or off the quote's own org (`/q/[token]`), never from the
+ * runtime's zone and never from anything a caller sent.
+ */
+export const FIRM_TIME_ZONE = DEFAULT_TIME_ZONE;
 
 const MS_PER_DAY = 86_400_000;
 
 /** What civil date it is FOR THE FIRM at instant `d` — "2026-09-11". */
-export function firmCivilDate(d: Date): string {
+export function firmCivilDate(d: Date, tz: string = FIRM_TIME_ZONE): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: FIRM_TIME_ZONE,
+    timeZone: tz,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -46,7 +52,7 @@ export function civilDaysBetween(from: string, to: string): number {
  * it was meant to be open. The offset is read for the day itself, so DST is
  * handled without a table.
  */
-export function endOfFirmDay(dateInput: string): string | null {
+export function endOfFirmDay(dateInput: string, tz: string = FIRM_TIME_ZONE): string | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateInput.trim());
   if (!m) return null;
   const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
@@ -56,7 +62,7 @@ export function endOfFirmDay(dateInput: string): string | null {
   // What wall-clock time is `utcGuess` in the firm's zone? The difference is
   // the zone's offset on that day.
   const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: FIRM_TIME_ZONE,
+    timeZone: tz,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",

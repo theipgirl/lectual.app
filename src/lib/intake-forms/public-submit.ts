@@ -183,6 +183,25 @@ export function inferPracticeArea(
 /** The Trademark pack's first question asks for the mark itself. */
 const MARK_QUESTION = PACKS.Trademark[0];
 
+/**
+ * The mark, when the answer to the mark question actually IS one.
+ *
+ * People answer "What name, logo or slogan do you want to protect?" with the
+ * name ("Rivera Roasters") as often as with a paragraph about their business,
+ * and the paragraph used to land in `mark_text` verbatim and then headline the
+ * lead and every matter opened from it. A mark is short and on one line; an
+ * answer that is not is left for a person to read in the timeline note, and
+ * the field stays empty rather than wrong. Surrounding quotes are dropped.
+ */
+export function markFromAnswer(answer: string | null | undefined): string | null {
+  if (!answer) return null;
+  const text = answer.trim().replace(/^["'\u201c\u2018]+|["'\u201d\u2019]+$/g, "").trim();
+  if (!text || /[\r\n]/.test(text)) return null;
+  if (text.length > 60) return null;
+  if (text.split(/\s+/).length > 8) return null;
+  return text;
+}
+
 export type LeadFields = {
   first_name: string;
   last_name: string;
@@ -213,7 +232,7 @@ export function leadFromSubmission(
     phone: sub.contact.phone || null,
     business_name: sub.contact.company || null,
     practice_area: practice,
-    mark_text: practice === "Trademark" && markAnswer ? markAnswer.slice(0, 200) : null,
+    mark_text: practice === "Trademark" ? markFromAnswer(markAnswer) : null,
     referral_source: INTAKE_REFERRAL_SOURCE,
     referral_detail: sourceHost ? `${how} on ${sourceHost}` : how,
   };

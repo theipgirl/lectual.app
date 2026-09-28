@@ -99,11 +99,11 @@ export type IntakeTableRow = {
 };
 
 /** "Sep 25, 8:04 AM", on the firm's clock (Vercel runs UTC; the firm doesn't). */
-export function formatIntakeTime(iso: string): string {
+export function formatIntakeTime(iso: string, tz: string = FIRM_TIME_ZONE): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
   return new Intl.DateTimeFormat("en-US", {
-    timeZone: FIRM_TIME_ZONE,
+    timeZone: tz,
     month: "short",
     day: "numeric",
     hour: "numeric",
@@ -111,7 +111,7 @@ export function formatIntakeTime(iso: string): string {
   }).format(d);
 }
 
-export function intakeTableRows(rows: SubmissionListRow[], now = Date.now()): IntakeTableRow[] {
+export function intakeTableRows(rows: SubmissionListRow[], now = Date.now(), tz: string = FIRM_TIME_ZONE): IntakeTableRow[] {
   return rows.map((r) => {
     const c = parseContact(r.contact);
     return {
@@ -119,7 +119,7 @@ export function intakeTableRows(rows: SubmissionListRow[], now = Date.now()): In
       name: c.name || c.email || "No name given",
       company: c.company || "—",
       email: c.email,
-      started: formatIntakeTime(r.started_at),
+      started: formatIntakeTime(r.started_at, tz),
       mode: submissionModeLabel(r.mode),
       fit: submissionFitLabel(r.fit),
       fitKey: r.fit,
@@ -145,7 +145,7 @@ export type IntakeDetail = {
   answers: { q: string; a: string }[];
 };
 
-export function intakeDetail(r: SubmissionDetailRow): IntakeDetail {
+export function intakeDetail(r: SubmissionDetailRow, tz: string = FIRM_TIME_ZONE): IntakeDetail {
   const c = parseContact(r.contact);
   const answers: IntakeAnswer[] = parseAnswers(r.answers);
   const contactLine = [c.name, c.email, c.phone].filter(Boolean).join(" · ") || "Not given";
@@ -157,7 +157,7 @@ export function intakeDetail(r: SubmissionDetailRow): IntakeDetail {
     fitKey: r.fit,
     status: submissionStatusLabel(r.status),
     statusKey: r.status,
-    modeLine: `${submissionModeLabel(r.mode)} · ${formatIntakeTime(r.started_at)}${r.submitted_at ? "" : " · not submitted"}`,
+    modeLine: `${submissionModeLabel(r.mode)} · ${formatIntakeTime(r.started_at, tz)}${r.submitted_at ? "" : " · not submitted"}`,
     why: r.screening_note?.trim() || "Not screened yet.",
     answers: [{ q: "Contact", a: contactLine }, ...answers.map((a) => ({ q: a.question || "Question", a: a.answer || "—" }))],
   };

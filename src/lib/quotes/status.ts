@@ -280,9 +280,10 @@ export function isQuoteAcceptable(quote: QuoteExpiryInput, now: Date): boolean {
  */
 export function quoteExpiryCivilDate(
   expiresAt: string | Date | null | undefined,
+  tz: string = FIRM_TIME_ZONE,
 ): string | null {
   const instant = parseInstant(expiresAt);
-  return instant ? firmCivilDate(instant) : null;
+  return instant ? firmCivilDate(instant, tz) : null;
 }
 
 /**
@@ -294,11 +295,12 @@ export function quoteExpiryCivilDate(
  */
 export function formatQuoteExpiry(
   expiresAt: string | Date | null | undefined,
+  tz: string = FIRM_TIME_ZONE,
 ): string | null {
   const instant = parseInstant(expiresAt);
   if (!instant) return null;
   return new Intl.DateTimeFormat("en-US", {
-    timeZone: FIRM_TIME_ZONE,
+    timeZone: tz,
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -322,9 +324,10 @@ export function formatQuoteExpiry(
 export function daysUntilQuoteExpiry(
   expiresAt: string | Date | null | undefined,
   now: Date,
+  tz: string = FIRM_TIME_ZONE,
 ): number | null {
   const instant = parseInstant(expiresAt);
   if (!instant) return null;
   if (!(now instanceof Date) || Number.isNaN(now.getTime())) return null;
-  return civilDaysBetween(firmCivilDate(now), firmCivilDate(instant));
+  return civilDaysBetween(firmCivilDate(now, tz), firmCivilDate(instant, tz));
 }

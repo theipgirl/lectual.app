@@ -23,6 +23,7 @@ import {
   assertTierGroupShape,
   QUOTE_STAFF_WRITE_ROLES,
   serviceItemToLineFields,
+  findDuplicateLibraryLine,
   type QuoteEventActor,
   type QuoteEventRow,
   type QuoteEventType,
@@ -835,6 +836,36 @@ export async function applyServiceItem(
   assertLineAmountSign(fields.kind, fields.unit_amount_cents);
   assertTierGroupShape(fields.selection, fields.tier_group);
   assertIncludedIsSelected(fields.selection, fields.selected);
+
+  // The same service added again: one line with a higher quantity, not two
+  // identical rows on the client's page (findDuplicateLibraryLine).
+  const { data: sameItemRows, error: sameItemError } = await db
+    .from("crm_quote_line")
+    .select("*")
+    .eq("quote_id", quoteId)
+    .eq("source_service_item_id", serviceItemId);
+  if (sameItemError) throw sameItemError;
+  const duplicate = findDuplicateLibraryLine((sameItemRows as QuoteLineRow[] | null) ?? [], fields);
+  if (duplicate) {
+    const quantity = Number(duplicate.quantity) + fields.quantity;
+    const { data: bumped, error: bumpError } = await db
+      .from("crm_quote_line")
+      .update({ quantity, updated_at: new Date().toISOString() })
+      .eq("id", duplicate.id)
+      .eq("quote_id", quoteId)
+      .select("*")
+      .single();
+    if (bumpError) throw bumpError;
+    if (quote.status === "sent") {
+      await writeQuoteEventSafe(db, supabase, quote.id, quote.org_id, "revised", {
+        change: "line_quantity_changed",
+        source_service_item_id: serviceItemId,
+        line_id: duplicate.id,
+        quantity: String(quantity),
+      });
+    }
+    return bumped as QuoteLineRow;
+  }
 
   const sortIndex = await nextLineSortIndex(db, quoteId);
 

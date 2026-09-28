@@ -6,6 +6,7 @@ import {
   firstOpenIntakeStageId,
   inferPracticeArea,
   leadFromSubmission,
+  markFromAnswer,
   splitName,
   validateAnswers,
   validatePublicSubmission,
@@ -120,6 +121,25 @@ describe("lead mapping", () => {
       practice_area: "Trademark",
       mark_text: "answer 1",
     });
+  });
+
+  it("takes the mark only when the answer is a mark, not a paragraph", () => {
+    expect(markFromAnswer("Rivera Roasters")).toBe("Rivera Roasters");
+    expect(markFromAnswer("  \u201cBean There\u201d ")).toBe("Bean There");
+    expect(markFromAnswer("")).toBeNull();
+    expect(markFromAnswer(null)).toBeNull();
+    expect(
+      markFromAnswer("We roast coffee in Austin and want to protect our company name and the logo on our bags before we expand"),
+    ).toBeNull();
+    expect(markFromAnswer("Rivera\nRoasters")).toBeNull();
+    const tm = c.questions.find((q) => q.pack === "Trademark")!;
+    const long = "I run a small coffee roastery and we have been using our name for three years at markets";
+    const lead = leadFromSubmission(
+      { ...valid.value, answers: valid.value.answers.map((a) => (a.id === tm.id ? { ...a, answer: long } : a)) },
+      c,
+      null,
+    );
+    expect(lead.mark_text).toBeNull();
   });
 
   it("sets the practice area only when it is obvious", () => {

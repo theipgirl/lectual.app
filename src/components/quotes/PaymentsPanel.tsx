@@ -102,7 +102,7 @@ function RecordForm({ quoteId, currency }: { quoteId: string; currency: string }
     <form action={action} style={{ display: "grid", gap: 10, marginTop: 10, maxWidth: 520 }}>
       <input type="hidden" name="quoteId" value={quoteId} />
       <p className="lx-note" style={{ margin: 0 }}>
-        For money that reached the firm outside Lectual — a cheque, a wire, or a charge run in LawPay itself. Nothing is charged.
+        For money that reached the firm outside Lectual — a check, a wire, or a charge run in LawPay itself. Nothing is charged.
       </p>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         <label className="lx-field" style={{ display: "grid", gap: 4 }}>
@@ -138,7 +138,7 @@ function RecordForm({ quoteId, currency }: { quoteId: string; currency: string }
       </fieldset>
       <label className="lx-field" style={{ display: "grid", gap: 4 }}>
         <span className="lx-label">Note (optional)</span>
-        <input name="note" className="lx-input" maxLength={300} placeholder="e.g. cheque #1042" />
+        <input name="note" className="lx-input" maxLength={300} placeholder="e.g. check #1042" />
       </label>
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={pending}>

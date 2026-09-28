@@ -74,7 +74,22 @@ function AutoSelect(props: {
   );
 }
 
-export function StageSelect({ matterId, stageId, stages }: { matterId: string; stageId: string | null; stages: { id: string; code: string; label: string }[] }) {
+/**
+ * The docket stage picker, or a plain sentence when there is nothing to pick.
+ * `stages` is null when the stage list could not be read — said differently
+ * from "none set up", because the fix for each is different.
+ */
+export function StageSelect({ matterId, stageId, stages }: { matterId: string; stageId: string | null; stages: { id: string; code: string; label: string }[] | null }) {
+  if (stages === null) {
+    return <span className="lx-note" style={{ alignSelf: "center" }}>Couldn&apos;t load docket stages. Reload to try again.</span>;
+  }
+  if (stages.length === 0) {
+    return (
+      <span className="lx-note" style={{ alignSelf: "center" }}>
+        Your firm has no docket stages set up yet, so this matter can&apos;t be placed on the docket. Contact Lectual support to set them up.
+      </span>
+    );
+  }
   return (
     <AutoSelect
       action={updateMatterStageAction}

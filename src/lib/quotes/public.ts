@@ -12,8 +12,9 @@ import {
   type QuoteLineInput,
 } from "./pricing";
 import { applyClientChoice, isOfferIntact, offeredLines, readClientChoice, type ClientChoice } from "./packages";
-import { openMatterForAcceptedQuote, type MatterOpenResult } from "./accept-matter";
+import { advanceLeadForAcceptedQuote, openMatterForAcceptedQuote, type MatterOpenResult } from "./accept-matter";
 import { effectiveQuoteStatus } from "./status";
+import { resolveTimeZone } from "@/lib/org/profile-rules";
 
 /**
  * The `/q/[token]` read and write path — the ONLY service-role code in the
@@ -197,9 +198,15 @@ export const PUBLIC_QUOTE_LINE_COLUMNS = [
 /** The firm's display identity, and nothing else. */
 export const PUBLIC_ORG_COLUMNS = ["name"] as const;
 
+/** From the firm's profile (0073): only the clock its dates are shown on. The
+ * signature and display name are the firm's drafting settings, not the
+ * client's business. */
+export const PUBLIC_PROFILE_COLUMNS = ["time_zone"] as const;
+
 const QUOTE_SELECT = PUBLIC_QUOTE_COLUMNS.join(", ");
 const LINE_SELECT = PUBLIC_QUOTE_LINE_COLUMNS.join(", ");
 const ORG_SELECT = PUBLIC_ORG_COLUMNS.join(", ");
+const PROFILE_SELECT = PUBLIC_PROFILE_COLUMNS.join(", ");
 
 /* ─────────────────────────── payload shapes ─────────────────────────────── */
 
@@ -228,6 +235,9 @@ export type PublicQuoteLine = {
 
 export type PublicQuoteFirm = {
   name: string;
+  /** The firm's own time zone (Settings → Firm profile), which every date on
+   * the page is shown in. The default zone when the firm has not set one. */
+  timeZone: string;
 };
 
 /**
@@ -404,7 +414,7 @@ export async function readPublicQuote(
 
     // Two independent lookups keyed on ids we already hold. No embedding, no
     // `!inner`, nothing that can traverse to a row the token did not name.
-    const [linesResult, orgResult] = await Promise.all([
+    const [linesResult, orgResult, profileResult] = await Promise.all([
       client
         .from("crm_quote_line")
         .select(LINE_SELECT)
@@ -416,6 +426,10 @@ export async function readPublicQuote(
         .eq("org_id", orgId)
         .order("sort_index", { ascending: true }),
       client.from("crm_org").select(ORG_SELECT).eq("id", orgId).maybeSingle(),
+      // The firm's clock, keyed on the org id read off THIS quote — never on
+      // anything the caller sent. A failed read is not a failed page: the
+      // default zone only moves a date label, and expiry compares instants.
+      client.from("crm_org_profile").select(PROFILE_SELECT).eq("org_id", orgId).maybeSingle(),
     ]);
 
     if (linesResult.error && !isNoRowsError(linesResult.error)) return { status: "unavailable" };
@@ -451,7 +465,12 @@ export async function readPublicQuote(
         termsBody: asNullableString(quote.terms_body),
       }),
       acceptedSnapshot: redactSnapshotForClient(parseAcceptedSnapshot(quote.accepted_snapshot)),
-      firm: { name: firmName },
+      firm: {
+        name: firmName,
+        timeZone: resolveTimeZone(
+          profileResult.error ? null : readString((profileResult.data as Record<string, unknown> | null)?.time_zone),
+        ),
+      },
     };
 
     return {
@@ -1277,7 +1296,14 @@ export async function acceptPublicQuote(
 
     // "Matter opens automatically" — best-effort, idempotent, and unable to
     // undo anything above (accept-matter.ts never throws).
-    const matter = await openMatterForAcceptedQuote(client, { quoteId, orgId }, { packageName, now });
+    const matter = await openMatterForAcceptedQuote(
+      client,
+      { quoteId, orgId },
+      { packageName, now, timeZone: read.view.firm.timeZone },
+    );
+    // The lead has hired the firm: move it to the firm's won stage. Same
+    // fencing, same promise — it never undoes or fails the signature.
+    await advanceLeadForAcceptedQuote(client, { quoteId, orgId }, { now });
 
     return { ok: true, acceptedAt, snapshot, matter };
   } catch {

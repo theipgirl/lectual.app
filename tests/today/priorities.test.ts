@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildPriorities } from "@/lib/today/priorities";
+import { buildPriorities, emptyPrioritiesNote, hourInZone } from "@/lib/today/priorities";
 import type { CalendarRow } from "@/lib/matters/calendar-rows";
 import type { StalledMatter } from "@/lib/matters/docket-summary";
 
@@ -35,5 +35,36 @@ describe("buildPriorities", () => {
     const out = buildPriorities({ ...empty, stalled: [stalled("a", 1), stalled("b", 2), stalled("c", 3)], queue: [q("x", "2026-09-26T00:00:00Z"), q("y", "2026-09-26T00:00:00Z")] }, 3);
     expect(out).toHaveLength(3);
     for (const p of out) expect(p.href).toMatch(/^\/dashboard\/(queue|matters)\/[a-z]+\/$/);
+  });
+});
+
+describe("emptyPrioritiesNote — three queue states, never two", () => {
+  it("is calm when everything loaded", () => {
+    expect(emptyPrioritiesNote({ queue: "ok", calendarOk: true, docketOk: true })).toMatch(/^Nothing overdue, nothing waiting/);
+  });
+
+  it("says no queue is connected, not that sources are unavailable, when the queue is unconfigured", () => {
+    const note = emptyPrioritiesNote({ queue: "unconfigured", calendarOk: true, docketOk: true });
+    expect(note).toMatch(/No approval queue is connected/);
+    expect(note).not.toMatch(/unavailable/);
+  });
+
+  it("keeps the warning when the queue is unreachable, and never calls it empty", () => {
+    const note = emptyPrioritiesNote({ queue: "unavailable", calendarOk: true, docketOk: true });
+    expect(note).toMatch(/Some sources are unavailable/);
+    expect(note).not.toMatch(/Nothing overdue, nothing waiting/);
+  });
+
+  it("warns when another source failed, whatever the queue said", () => {
+    expect(emptyPrioritiesNote({ queue: "unconfigured", calendarOk: false, docketOk: true })).toMatch(/unavailable/);
+    expect(emptyPrioritiesNote({ queue: "ok", calendarOk: true, docketOk: false })).toMatch(/unavailable/);
+  });
+});
+
+describe("hourInZone", () => {
+  it("reads the hour on the firm's clock, not the server's", () => {
+    const t = new Date("2026-09-26T03:30:00Z");
+    expect(hourInZone(t, "America/New_York")).toBe(23);
+    expect(hourInZone(t, "UTC")).toBe(3);
   });
 });

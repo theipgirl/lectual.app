@@ -105,12 +105,12 @@ export function eventLabel(type: string): string {
  * Component options rather than dateStyle/timeStyle, because ECMA-402 throws if
  * those are combined with `timeZoneName`.
  */
-export function formatFirmDateTime(value: string | null | undefined): string {
+export function formatFirmDateTime(value: string | null | undefined, tz: string = FIRM_TIME_ZONE): string {
   if (!value) return "";
   const ms = Date.parse(value);
   if (Number.isNaN(ms)) return value;
   return new Intl.DateTimeFormat("en-US", {
-    timeZone: FIRM_TIME_ZONE,
+    timeZone: tz,
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -122,12 +122,12 @@ export function formatFirmDateTime(value: string | null | undefined): string {
 
 /** The firm-zone civil date of an instant, for a `<input type="date">`'s
  * default value — "2026-09-30". Empty when there is none. */
-export function expiryInputValue(expiresAt: string | null | undefined): string {
+export function expiryInputValue(expiresAt: string | null | undefined, tz: string = FIRM_TIME_ZONE): string {
   if (!expiresAt) return "";
   const ms = Date.parse(expiresAt);
   if (Number.isNaN(ms)) return "";
   const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: FIRM_TIME_ZONE,
+    timeZone: tz,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -151,20 +151,20 @@ export function quoteReference(id: string): string {
 }
 
 /** "Sep 18" in the firm's zone, or "" when there is no readable instant. */
-export function formatShortFirmDate(value: string | null | undefined): string {
+export function formatShortFirmDate(value: string | null | undefined, tz: string = FIRM_TIME_ZONE): string {
   if (!value) return "";
   const ms = Date.parse(value.replace(/^(\d{4}-\d{2}-\d{2}) /, "$1T").replace(/([+-]\d{2})$/, "$1:00"));
   if (Number.isNaN(ms)) return "";
-  return new Intl.DateTimeFormat("en-US", { timeZone: FIRM_TIME_ZONE, month: "short", day: "numeric" }).format(new Date(ms));
+  return new Intl.DateTimeFormat("en-US", { timeZone: tz, month: "short", day: "numeric" }).format(new Date(ms));
 }
 
 /** "Sep 10, 4:02 PM" in the firm's zone — the activity log's time column. */
-export function formatFirmStamp(value: string | null | undefined): string {
+export function formatFirmStamp(value: string | null | undefined, tz: string = FIRM_TIME_ZONE): string {
   if (!value) return "";
   const ms = Date.parse(value);
   if (Number.isNaN(ms)) return value;
   return new Intl.DateTimeFormat("en-US", {
-    timeZone: FIRM_TIME_ZONE,
+    timeZone: tz,
     month: "short",
     day: "numeric",
     hour: "numeric",
@@ -247,6 +247,8 @@ export function describeQuoteEvent(event: EventLike): string {
           return "Line edited";
         case "service_item_applied":
           return "Line added from the service library";
+        case "line_quantity_changed":
+          return `Quantity raised to ${payloadText(p, "quantity") ?? "?"} — same service added again`;
         case "lines_reordered":
           return "Lines reordered";
         case "details_updated":

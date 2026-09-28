@@ -85,6 +85,9 @@ export type EngagementTermsInput = {
   /** The mark, when this is a trademark engagement. Null omits the scope line
    * entirely rather than printing an empty one. */
   markText?: string | null;
+  /** The firm's time zone (crm_org_profile), for the signing deadline's date.
+   * Omitted means the default zone. */
+  timeZone?: string | null;
   /** The quote's lines, exactly as priced. The single source of every figure
    * below. */
   lines: readonly QuoteLineInput[];
@@ -203,7 +206,7 @@ export function buildEngagementTerms(input: EngagementTermsInput): string {
   // The same string `/q/[token]` prints above the proposal, from the same
   // function, so the header and the agreement cannot name two different days —
   // and in the firm's time zone, never the server's (see `formatQuoteExpiry`).
-  const deadline = formatQuoteExpiry(input.expiresAt ?? null);
+  const deadline = formatQuoteExpiry(input.expiresAt ?? null, input.timeZone ?? undefined);
 
   const govLines = governmentFeeLines(lines, currency);
   const signingLines = signingFeeLines(lines, currency);

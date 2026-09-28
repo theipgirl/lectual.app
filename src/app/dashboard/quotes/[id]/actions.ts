@@ -25,6 +25,7 @@ import { buildEngagementTerms } from "@/lib/quotes/engagement-terms";
 import type { QuoteLineRow, QuoteRow } from "@/lib/quotes/types";
 import { parseDollarsToCents } from "@/lib/quotes/money";
 import { endOfFirmDay } from "@/lib/quotes/firm-time";
+import { getFirmTimeZone } from "@/lib/org/profile";
 import { friendlyQuoteError, NOT_ENTITLED, type ActionState } from "../errors";
 import { reconcilePendingPayment, recordManualPayment } from "@/lib/payments/quote-payments";
 
@@ -95,7 +96,7 @@ export async function updateDetailsAction(_prev: ActionState, formData: FormData
 
   let expiresAt: string | null = null;
   if (expiresRaw) {
-    expiresAt = endOfFirmDay(expiresRaw);
+    expiresAt = endOfFirmDay(expiresRaw, await getFirmTimeZone());
     if (!expiresAt) return { error: "Enter a valid expiry date." };
   }
 
@@ -605,6 +606,7 @@ export async function generateTermsAction(_prev: ActionState, formData: FormData
       lines,
       currency: meta.currency,
       expiresAt: meta.expires_at,
+      timeZone: await getFirmTimeZone(),
     });
 
     await writeTermsBody(quoteId, termsBody);
@@ -639,7 +641,7 @@ async function firmNameFor(
 // ── Payments ─────────────────────────────────────────────────────────────
 
 /**
- * "Record a payment": money that moved outside Lectual (a cheque, a wire, a
+ * "Record a payment": money that moved outside Lectual (a check, a wire, a
  * charge run in LawPay itself). The account kind and the purpose are required
  * form fields with no default (src/lib/payments/manual.ts). attorney+, like
  * every action here; RLS (crm_payment insert, staff tier) underneath.

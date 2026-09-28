@@ -70,7 +70,8 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
   ]);
 
   const [stages, tasks, activity, deadlines, client, members, litigation] = await Promise.all([
-    listMatterStages().catch(() => []),
+    // null = could not read, which is not the same as "this firm has none".
+    listMatterStages().catch(() => null),
     listTasks({ matterId: matter.id }),
     activityForMatter(matter.id),
     listMatterDeadlines(matter.id),

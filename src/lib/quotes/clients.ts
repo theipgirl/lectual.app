@@ -1,6 +1,7 @@
 import "server-only";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { contactDisplayName, leadDisplayName } from "@/lib/matters/client-name";
+import { leadPickerLabel } from "./client-labels";
 
 /**
  * Who a quote is FOR, for the quote list and builder — and the options the
@@ -108,7 +109,7 @@ export async function quoteClientOptions(): Promise<QuoteClientOptions> {
     return {
       leads: (leads.data ?? []).map((l) => ({
         value: `lead:${l.id}`,
-        label: [leadDisplayName(l) ?? "Unnamed lead", l.email].filter(Boolean).join(" · "),
+        label: leadPickerLabel(l),
       })),
       matters: (matters.data ?? []).map((m) => ({
         value: `matter:${m.id}`,

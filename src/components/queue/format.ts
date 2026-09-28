@@ -1,4 +1,5 @@
 import type { QueueItem } from "@/lib/queue/api";
+import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
 
 /** Presentation helpers for the queue (ported from lectual's queue/_components/format). */
 
@@ -10,11 +11,13 @@ export function parseQueueStatus(value: string | string[] | undefined): QueueSta
   return (QUEUE_STATUSES as readonly string[]).includes(v ?? "") ? (v as QueueStatus) : "pending";
 }
 
-export function fmtWhen(iso: string | null): string {
+/** An instant on the FIRM's clock (`getFirmTimeZone()`); the default zone only
+ * when the caller has none to give. */
+export function fmtWhen(iso: string | null, tz: string = DEFAULT_TIME_ZONE): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/New_York" });
+  return d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: tz });
 }
 
 export function preview(item: QueueItem, max = 160): string {

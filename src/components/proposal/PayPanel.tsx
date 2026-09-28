@@ -57,7 +57,7 @@ export function PayPanel({ token, state, firmName }: { token: string; state: Pub
                 will confirm it on your file.
               </>
             ) : (
-              // NOT "on your card": the firm recorded this itself (cheque, transfer).
+              // NOT "on your card": the firm recorded this itself (check, transfer).
               <>
                 <strong>{formatCents(state.receivedCents, state.currency)}</strong> has been recorded against this proposal by {firmName}. Nothing was
                 charged on this page.
