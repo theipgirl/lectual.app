@@ -42,7 +42,7 @@ describe("Autopilot pause is honoured by the runner (cron path)", () => {
     expect(log.some((q) => q.table === "agent_run")).toBe(false);
   });
 
-  it("an environment without the 0078 table has no pause, so agents still run", async () => {
+  it("an environment without the 0082 table has no pause, so agents still run", async () => {
     const { deps: d } = deps(firm({ data: null, error: { message: "relation missing", code: "PGRST205" } }));
     expect((await runAllAgents(d)).length).toBe(1);
   });

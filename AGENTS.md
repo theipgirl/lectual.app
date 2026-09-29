@@ -28,12 +28,12 @@ Plan: `docs/MVP-PLAN.md`. Design: `design/` (one visual system; tokens live in
 See `PORTED_FROM.md`. When changing a ported file, consider whether `lectual` needs the same fix.
 
 ## LawPay (per-firm) — `docs/lawpay-setup.md`
-- Each firm signs in to ITS OWN LawPay account (lectual 0076 `lawpay_connection`). There is no
+- Each firm signs in to ITS OWN LawPay account (lectual 0080 `lawpay_connection`). There is no
   deployment-wide LawPay key; never add one. Charges use the firm's own account secret, looked up
   by the quote's org_id. Sealed columns have no SELECT grant: name the columns.
 - The charged amount comes ONLY from the signed snapshot (`signingChargeForQuote`), to the mapped
   OPERATING account. The account kind is never defaulted or inferred. The pending `crm_payment` row is
-  written before LawPay is called; 0076's index allows one open signing charge per quote.
+  written before LawPay is called; 0080's index allows one open signing charge per quote.
 - Only a 401/403 on the firm's key pauses the firm's card payments (`reauth`). A refusal of one request
   never does: the payment token in it came from an anonymous visitor. A quote allows 5 failed card
   attempts, then the form is withdrawn (the link has no login and no rate limiter).
@@ -45,7 +45,7 @@ See `PORTED_FROM.md`. When changing a ported file, consider whether `lectual` ne
 
 ## Meetings (Fathom / Zoom) — `docs/meetings-setup.md`
 - Each firm connects ITS OWN Fathom (API key, pasted, checked, sealed) or Zoom (OAuth, PKCE, sealed
-  rotating refresh token) in lectual 0077 `meeting_source_connection`. No deployment-wide Fathom or
+  rotating refresh token) in lectual 0081 `meeting_source_connection`. No deployment-wide Fathom or
   Zoom credential; never add one. That is why Meetings has no module gate.
 - `crm_meeting` rows are inserted only by the service-role importer, stamped with the importing
   connection's org_id. Staff change only the link columns. Transcripts are stored (privileged,

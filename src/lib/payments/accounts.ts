@@ -67,7 +67,7 @@ export type MapResult = { ok: true } | { ok: false; reason: string };
 
 /**
  * Maps one LawPay account to one role, as the signed-in admin, through RLS
- * (admin tier) and 0076's guard trigger (must be a listed, in-mode account
+ * (admin tier) and 0080's guard trigger (must be a listed, in-mode account
  * whose trust flag matches). `kind` is required and explicit; `confirmed` is
  * the admin's tick that this is the account they think it is, and stamps
  * `verified_at`.

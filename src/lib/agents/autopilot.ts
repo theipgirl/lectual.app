@@ -8,7 +8,7 @@ export const AUTOPILOT_COLUMNS = "paused, paused_by, paused_at, reason, minutes_
 /**
  * The caller's firm's Autopilot row, read through RLS. Three states, the same
  * discipline as the queue: `ok` (no row is a real answer: on, default
- * minutes), `missing` (0078 isn't applied in this environment, so there is no
+ * minutes), `missing` (0082 isn't applied in this environment, so there is no
  * pause switch to show), `unavailable` (a real read failure: we don't know
  * whether the firm is paused, and must not say "on").
  */

@@ -2,16 +2,16 @@ import type { Role } from "@/lib/auth/roles";
 import { AGENT_IDS, type AgentId } from "./types";
 
 /**
- * Autopilot: the firm-wide pause over every in-app agent (lectual 0078,
+ * Autopilot: the firm-wide pause over every in-app agent (lectual 0082,
  * `agent_autopilot`). Pure, so the rules are tested without a database and
  * can be imported by client components.
  *
  * WHO MAY PAUSE / RESUME. Pausing only ever makes the software do LESS, so the
  * practising attorney can stop it without first finding an admin: owner,
  * admin, senior_admin and attorney may pause. Resuming turns automation back
- * on, which is the same administrative act as switching an agent on (0071's
+ * on, which is the same administrative act as switching an agent on (0076's
  * agent_setting gate), so only owner/admin/senior_admin may resume. The
- * database enforces the same split (0078's policies + trigger); these lists
+ * database enforces the same split (0082's policies + trigger); these lists
  * only decide which buttons to draw.
  */
 

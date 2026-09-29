@@ -276,7 +276,7 @@ describe("frame-ancestors", () => {
 });
 
 describe("request tokens", () => {
-  it("are 32 random bytes in base64url, inside 0075's length check", () => {
+  it("are 32 random bytes in base64url, inside 0079's length check", () => {
     const a = generateRequestToken();
     const b = generateRequestToken();
     expect(a).toMatch(/^[A-Za-z0-9_-]{43}$/);

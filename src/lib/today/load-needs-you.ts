@@ -82,7 +82,7 @@ function contactName(contact: unknown): string {
   return s("business_name") || `${s("first_name")} ${s("last_name")}`.trim() || s("name") || s("email") || "A new submission";
 }
 
-/** Public intake submissions still marked `new` (0075). */
+/** Public intake submissions still marked `new` (0079). */
 export async function loadUnreviewedSubmissions(): Promise<NeedsYouSubmission[] | null> {
   const supabase = await getScopedClient();
   const rows = ok(

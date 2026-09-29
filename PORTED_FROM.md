@@ -6,7 +6,7 @@ Source commit: `610c206` (main, 2026-09-25). Copy, don't import: when a ported f
 | lectual.app | From lectual | Changes |
 |---|---|---|
 | `src/lib/db/{admin,scoped-client}.ts` | same paths | none |
-| `src/lib/db/types.ts` | same path | copied after lectual's 0070/0071 commit; the three new tables were hand-added there until dev is unpaused and types can be regenerated |
+| `src/lib/db/types.ts` | same path | copied after lectual's 0075/0076 commit; the three new tables were hand-added there until dev is unpaused and types can be regenerated |
 | `src/lib/auth/{roles,actions}.ts` | same paths | none |
 | `src/lib/org/modules.ts` | same path | adds modules `mailbox`, `agents` |
 | `src/lib/queue/{api,load,org,roles}.ts` | same paths | none |
@@ -33,7 +33,7 @@ Source commit: `610c206` (main, 2026-09-25). Copy, don't import: when a ported f
 | `src/app/dashboard/page.tsx` (Today) | `src/app/(firm)/dashboard/page.tsx` (ops home) | same independent reads and "a failed read is never a zero" rule; priority weighting kept (`src/lib/today/priorities.ts`), with stalled matters and unclaimed hot leads in place of stalled leads; the list is now "Needs you" (`src/lib/today/needs-you.ts`, a superset: quotes, payments, reconnects, agent failures, intake review); reports and the matters copilot not ported |
 | `src/app/dashboard/documents/**` | reads `crm_document_draft` (0045) | new list over Document Center's table; the per-firm generators (`document-center/[matterId]/*`, `src/lib/documents/*`) are not ported |
 | `src/lib/lawmatics/{client,jsonapi,normalize,import-plan,stage-map,matters-normalize,matters-import-plan}.ts`, `src/lib/intake/referral-source.ts` | same paths | none |
-| `src/lib/lawmatics/{import,matters-import}.ts` | same paths | the client comes from the calling firm's own token (`connection.ts`, lectual 0072) instead of `LAWMATICS_TOKEN`; the env readers and `connectionStatus` are gone |
+| `src/lib/lawmatics/{import,matters-import}.ts` | same paths | the client comes from the calling firm's own token (`connection.ts`, lectual 0077) instead of `LAWMATICS_TOKEN`; the env readers and `connectionStatus` are gone |
 | `src/app/dashboard/settings/integrations/lawmatics/actions.ts` | `src/app/(firm)/dashboard/import/actions.ts` | preview/confirm/fingerprint unchanged; no `lawmatics-import` module gate (the token is per firm); adds connect/disconnect; a 401 marks the connection invalid; coded DB errors don't reach the screen |
 | `tests/lawmatics/*`, `tests/__fixtures__/lawmatics.fixture.ts` | same paths | `apply-budget` and `import-actions` mock the firm connection instead of env/module; `pull-source` fixture gains `includeDropped` (was a type error in lectual too) |
 | `src/lib/settings/{admin,members,enums,index}.ts`, `src/lib/members/email.ts` | same paths | none |
@@ -49,7 +49,7 @@ Source commit: `610c206` (main, 2026-09-25). Copy, don't import: when a ported f
 | queue approve → `generateApprovedDocument` | `src/app/(firm)/dashboard/queue/actions.ts` | same best-effort post-approve hook |
 | `tsconfig.json`, `eslint.config.mjs`, `postcss.config.mjs`, `pnpm-workspace.yaml` | same paths | lint ignores `design/` |
 
-New in this repo: Settings → Firm profile (`src/lib/org/profile*.ts`, lectual 0073) and Modules, `src/lib/lawmatics/connection.ts` and the Lawmatics import UI (`src/components/lawmatics/*`), `src/lib/matters/worklist.ts` (the design's whose-move-is-it bands), `src/lib/mailbox/*` (except the apply port above), `src/lib/nav.ts`, `src/lib/fonts`, `src/components/shell/*`, `src/app/dashboard/*`,
+New in this repo: Settings → Firm profile (`src/lib/org/profile*.ts`, lectual 0078) and Modules, `src/lib/lawmatics/connection.ts` and the Lawmatics import UI (`src/components/lawmatics/*`), `src/lib/matters/worklist.ts` (the design's whose-move-is-it bands), `src/lib/mailbox/*` (except the apply port above), `src/lib/nav.ts`, `src/lib/fonts`, `src/components/shell/*`, `src/app/dashboard/*`,
 `src/app/globals.css` (design tokens).
 
 ## Intake (table, board by stage, board by owner)
@@ -137,14 +137,14 @@ the step builder, enrollments, templates page and "Run next step" have no lectua
 ## Report views, Intake forms
 New in this repo, nothing ported. Reports (`src/lib/reports/*`, `src/app/dashboard/reports/**`) compose the
 existing ported readers. Intake forms (`src/lib/intake-forms/*`, `src/app/dashboard/forms/**`, `src/app/i/**`,
-`src/app/r/**`, `public/embed.js`, the frame-ancestors policy in `src/proxy.ts`) read lectual's 0075 tables, which
-are on dev only until 0075 merges in lectual and is applied to prod.
+`src/app/r/**`, `public/embed.js`, the frame-ancestors policy in `src/proxy.ts`) read lectual's 0079 tables, which
+are on dev only until 0079 merges in lectual and is applied to prod.
 
 ## LawPay payments (per-firm OAuth)
 From `theipgirl/lectual` branch `claude/lectual-firm-dashboard-prd-f3loev` @ `0f13772` (unmerged; the payments
 files were last changed there in `e046999`), quote-engine payments per spec `docs/specs/2026-09-09-quote-engine.md`
 §0, §5, §7, §7.4 and `docs/research/2026-09-09-lawpay-cosmolex.md`. Reuses 0068's `crm_payment` and
-`crm_org_payment_account` (on dev and prod); the unapplied 0072_quote_payment_guard is replaced by 0076. Needs lectual 0076
+`crm_org_payment_account` (on dev and prod); the unapplied 0072_quote_payment_guard is replaced by 0080. Needs lectual 0080
 (`lawpay_connection` + signing-charge guards; lectual commits `c2a9e26` and `ffc6728`). Setup and the lectual-side
 change list: `docs/lawpay-setup.md`.
 

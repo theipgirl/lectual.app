@@ -9,7 +9,7 @@ import { SUBMIT_LIMITS } from "./public-submit";
  * Nothing here stores or returns an IP address or a cookie value. The throttle
  * keys on an HMAC of the IP, held in memory only; the funnel's `session_hash`
  * is an HMAC of a random first-party cookie, and is null when no salt is
- * configured (0075: "session_hash is a salted hash, never an IP or cookie
+ * configured (0079: "session_hash is a salted hash, never an IP or cookie
  * value" — an unsalted hash of a cookie would be the cookie by another name).
  *
  * ── THE RENDER STAMP ────────────────────────────────────────────────────────
@@ -88,7 +88,7 @@ export function clientKey(ip: string | null, key: string): string | null {
   return ip ? hmac(key, `ip:${ip}`).slice(0, 32) : null;
 }
 
-/** The funnel's `session_hash` (≤ 64 chars, 0075's check), or null without a salt or a cookie. */
+/** The funnel's `session_hash` (≤ 64 chars, 0079's check), or null without a salt or a cookie. */
 export function sessionHash(sessionId: string | null | undefined, formId: string, salt: string | null): string | null {
   if (!salt || !sessionId) return null;
   return createHmac("sha256", salt).update(`session:${formId}:${sessionId}`).digest("hex");

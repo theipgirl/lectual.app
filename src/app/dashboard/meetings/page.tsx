@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Meetings: the firm's consult recordings imported from ITS OWN Fathom / Zoom
- * account (lectual 0077). No module gate: there is no deployment-wide
+ * account (lectual 0081). No module gate: there is no deployment-wide
  * credential behind this page, and every row is RLS-scoped to the firm.
  *
  * Three states, never two: a failed read says so, and only a read that

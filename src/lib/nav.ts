@@ -56,7 +56,7 @@ export const NAV: readonly NavItem[] = [
   { slug: "queue", label: "Queue", href: "/dashboard/queue/", icon: ICON.tray, step: 6 },
   { slug: "campaigns", label: "Campaigns", href: "/dashboard/campaigns/", icon: ICON.send, step: 6 },
   { slug: "sms", label: "SMS", href: "/dashboard/sms/", icon: ICON.sms, step: 7 },
-  // No module: each firm imports only from the Fathom / Zoom account it connected itself (lectual 0077).
+  // No module: each firm imports only from the Fathom / Zoom account it connected itself (lectual 0081).
   { slug: "meetings", label: "Meetings", href: "/dashboard/meetings/", icon: ICON.video, step: 7 },
   { slug: "calendar", label: "Calendar", href: "/dashboard/calendar/", icon: ICON.cal, step: 6 },
   { slug: "intake", label: "Intake", railLabel: "PNC", href: "/dashboard/intake/", also: ["/dashboard/leads/"], icon: ICON.users, step: 6 },

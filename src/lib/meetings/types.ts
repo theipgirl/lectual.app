@@ -1,5 +1,5 @@
 /**
- * Meetings (lectual 0077): a firm's consult and meeting recordings, imported
+ * Meetings (lectual 0081): a firm's consult and meeting recordings, imported
  * from its OWN Fathom or Zoom account. Pure types, shared by the provider
  * clients, the importer and the pages.
  */
@@ -66,7 +66,7 @@ export function cleanEmail(value: unknown): string | null {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) && e.length <= 320 ? e : null;
 }
 
-/** Bounds every field to what the 0077 CHECKs accept, so an odd payload is trimmed, not refused. */
+/** Bounds every field to what the 0081 CHECKs accept, so an odd payload is trimmed, not refused. */
 export function boundMeeting(m: NormalizedMeeting): NormalizedMeeting {
   const seen = new Set<string>();
   const attendees: Attendee[] = [];

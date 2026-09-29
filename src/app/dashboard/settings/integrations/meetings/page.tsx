@@ -31,7 +31,7 @@ function StatusLine({ c }: { c: MeetingConnection }) {
 /**
  * Settings → Integrations → Meetings. Each firm connects ITS OWN Fathom
  * account (API key) or Zoom account (sign-in); there is no deployment-wide
- * credential, so no module gate (lectual 0077). The role gate
+ * credential, so no module gate (lectual 0081). The role gate
  * (owner/admin/senior_admin) is here for the controls and again in every action.
  */
 export default async function MeetingsIntegrationPage({ searchParams }: { searchParams: Promise<{ connected?: string; reconnected?: string; error?: string }> }) {

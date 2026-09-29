@@ -7,9 +7,9 @@ import { generateRequestToken } from "./request-token";
 import { isMissingTableError } from "./store";
 
 /**
- * "Send intake questions" on a matter (`crm_intake_request`, 0075), through
+ * "Send intake questions" on a matter (`crm_intake_request`, 0079), through
  * the caller's SCOPED client only: RLS keys every statement on the active org,
- * and 0075's policies let anyone but a viewer create or revoke. The role is
+ * and 0079's policies let anyone but a viewer create or revoke. The role is
  * also checked here, on every call, so a viewer gets a sentence, not a
  * permission error.
  *
@@ -96,7 +96,7 @@ export async function createMatterIntakeRequest(matterId: string): Promise<strin
   const { data: user } = await supabase.auth.getUser();
   const token = generateRequestToken();
   const { error } = await supabase.from("crm_intake_request").insert({
-    // The matter's own org, read through RLS; 0075's composite keys and the
+    // The matter's own org, read through RLS; 0079's composite keys and the
     // insert policy both refuse anything else.
     org_id: matter.org_id,
     form_id: form.id,

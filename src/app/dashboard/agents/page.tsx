@@ -137,7 +137,7 @@ export default async function AgentsPage() {
           />
         ) : autopilot.status === "missing" ? (
           <p className="lx-note" style={{ margin: 0 }}>
-            The Autopilot switch isn&apos;t set up in this environment yet (lectual migration 0078). Agents follow their own switches.
+            The Autopilot switch isn&apos;t set up in this environment yet (lectual migration 0082). Agents follow their own switches.
           </p>
         ) : (
           <p className="lx-note" role="alert" style={{ margin: 0, color: "var(--warn)" }}>

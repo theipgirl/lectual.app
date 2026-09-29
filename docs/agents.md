@@ -27,11 +27,11 @@ to a client goes into the approval queue, and a person sends it.
 - **Run log:** every run writes an `agent_run` row with trigger, counts, a one-line summary,
   cost in USD and any error. The Agents page shows the last 25.
 
-## Autopilot (pause) and the run digest (lectual 0078)
+## Autopilot (pause) and the run digest (lectual 0082)
 - `agent_autopilot` (one row per firm, no row = on) is a firm-wide pause above each agent's own
   switch. `runOneAgent` checks it for every path (cron and Run now) and writes no run row when
   paused; `runAllAgents` skips a paused firm. An unreadable pause state counts as paused (fail
-  closed); only a missing table (0078 not applied) lets agents run.
+  closed); only a missing table (0082 not applied) lets agents run.
 - Attorney and above may pause; only owner/admin/senior_admin may resume or change minutes per
   task. The database enforces the same split (policies + trigger) and stamps who paused.
 - The "Overnight run" digest (Today, Agents) is built only from `agent_run` rows

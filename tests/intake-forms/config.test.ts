@@ -41,7 +41,7 @@ describe("defaultIntakeConfig", () => {
 });
 
 describe("parseIntakeConfig", () => {
-  it("fills a stored {} (0075's column default) with defaults", () => {
+  it("fills a stored {} (0079's column default) with defaults", () => {
     const c = parseIntakeConfig({});
     expect(c.mode).toBe("conversation");
     expect(c.questions.length).toBe(4);
@@ -109,7 +109,7 @@ describe("domains", () => {
       expect(normalizeDomain(bad)).toBeNull();
     }
   });
-  it("caps the list at 0075's 25 and de-duplicates", () => {
+  it("caps the list at 0079's 25 and de-duplicates", () => {
     expect(validateAllowedDomains(["a.com", "A.com"])).toEqual({ ok: true, domains: ["a.com"] });
     expect(validateAllowedDomains(Array.from({ length: 26 }, (_, i) => `d${i}.com`)).ok).toBe(false);
     expect(validateAllowedDomains(["not a domain"]).ok).toBe(false);

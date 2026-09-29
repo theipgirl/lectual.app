@@ -7,7 +7,7 @@ import { checkProfileInput, DEFAULT_TIME_ZONE, resolveTimeZone, type OrgProfile,
 export type { OrgProfile, ProfileInput } from "./profile-rules";
 
 /**
- * The firm's own presentation settings (lectual 0073, crm_org_profile). No
+ * The firm's own presentation settings (lectual 0078, crm_org_profile). No
  * row means defaults. Read by anyone in the firm through RLS; written only by
  * senior_admin and above, and org_id is always the caller's active org.
  */

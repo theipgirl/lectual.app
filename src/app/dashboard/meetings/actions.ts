@@ -14,7 +14,7 @@ import { hasMaterial, meetingFollowUpPrompt } from "@/lib/meetings/follow-up";
 
 /**
  * Meeting actions. Each is its own POST entry point, so each re-checks the
- * session and role itself; RLS (0077) is the real boundary underneath: staff
+ * session and role itself; RLS (0081) is the real boundary underneath: staff
  * may change only a meeting's link columns, and the composite foreign keys
  * refuse a lead or matter from another firm.
  */

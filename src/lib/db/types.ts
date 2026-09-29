@@ -901,7 +901,7 @@ export type Database = {
           },
         ]
       }
-      // agent_autopilot: hand-added to mirror lectual supabase/migrations/0078_agent_autopilot.sql.
+      // agent_autopilot: hand-added to mirror lectual supabase/migrations/0082_agent_autopilot.sql.
       agent_autopilot: {
         Row: {
           minutes_per_task: Json
@@ -3838,7 +3838,7 @@ export type Database = {
         // 0056: a start/stop of an internal time entry, so the timeline can
         // say "clock event" without a fabricated note (blueprint §13.1).
         | "time_logged"
-        // 0076: the client proposal page took (or could not confirm) a signing payment.
+        // 0080: the client proposal page took (or could not confirm) a signing payment.
         | "quote_payment"
       crm_actor_type: "user" | "system" | "ai" | "automation" | "pathset"
       crm_ai_enrichment_layer: "layer1" | "layer2" | "layer3"

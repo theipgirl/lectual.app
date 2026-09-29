@@ -35,7 +35,7 @@ export type FollowUp = z.infer<typeof FollowUpSchema>;
 const TASK = `Your job: draft the follow-up email an IP attorney sends after a consultation with a prospective client, using only the consult notes you are given. Thank them, recap what was discussed in plain language, restate the next step from the notes, and invite questions. Do not add legal analysis that is not in the notes, do not quote a price unless the notes contain it, and do not promise an outcome. Also write a short internal summary for the attorney.`;
 
 /**
- * The firm's own sign-off (Settings → Firm profile, lectual 0073) when it has
+ * The firm's own sign-off (Settings → Firm profile, lectual 0078) when it has
  * one, else a placeholder the attorney fills in. Either way the draft waits in
  * the approval queue.
  */

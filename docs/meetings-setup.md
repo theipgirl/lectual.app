@@ -7,7 +7,7 @@ to the recording, and the lead or matter it was about. Staff can link or unlink 
 "Draft follow-up" writes the client email into the **approval queue** with the post-consult
 drafter. Nothing is ever sent from here.
 
-Schema: lectual migration `0077_meetings.sql` (`meeting_source_connection`, `crm_meeting`); see
+Schema: lectual migration `0081_meetings.sql` (`meeting_source_connection`, `crm_meeting`); see
 lectual `AGENTS.md` → "Meetings". Code: `src/lib/meetings/`, `src/app/dashboard/meetings/`,
 `src/app/dashboard/settings/integrations/meetings/`, `src/app/api/meetings/zoom/`,
 `src/app/api/cron/meetings-import/`.

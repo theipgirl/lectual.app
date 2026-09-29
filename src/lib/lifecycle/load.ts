@@ -50,7 +50,7 @@ export async function loadPipeline(now: Date = new Date()): Promise<PipelineLoad
       return new Set((data ?? []).map((r) => r.lead_id as string));
     })(),
     (async () => {
-      // Public-form submissions not yet turned into a lead. Written by the server (0075); staff read.
+      // Public-form submissions not yet turned into a lead. Written by the server (0079); staff read.
       const { data, error } = await supabase
         .from("crm_intake_submission")
         .select("id, contact, status, submitted_at, created_at")

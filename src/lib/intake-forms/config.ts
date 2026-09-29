@@ -1,6 +1,6 @@
 /**
  * The shape of a firm's public intake — `crm_intake_form.config` (lectual
- * 0075) — and the one place that decides what a prospect may see of it.
+ * 0079) — and the one place that decides what a prospect may see of it.
  *
  * Pure: no DB, no `server-only`. The setup page's client editor, the server
  * action that saves it, and the public `/i/<slug>` page all import this, so
@@ -10,7 +10,7 @@
  * The config holds things a prospect must never see: the assistant's firm
  * notes (`knows`) and the fit criteria a prospect is screened against
  * (`fitIp`, `fitJur`, `fitText`). The design labels each "Only you see this",
- * and 0075's column comment says the public page is served a PUBLIC SUBSET.
+ * and 0079's column comment says the public page is served a PUBLIC SUBSET.
  * `publicConfig()` below IS that subset. It is an allowlist, not a delete of
  * the private keys: a key added to the config later stays private until
  * someone adds it here on purpose.
@@ -95,7 +95,7 @@ export const LIMITS = {
   closing: 600,
   office: 300,
   packages: 100,
-  // 0075: crm_intake_form_domains_len.
+  // 0079: crm_intake_form_domains_len.
   domains: 25,
   domain: 253,
 } as const;
@@ -206,7 +206,7 @@ export function isHexColor(v: unknown): v is string {
 /**
  * Stored JSON → a complete config. Never throws: a key that is missing or the
  * wrong shape takes its default, so a config written by an older version of
- * this app (or `{}` from 0075's column default) still renders. Over-long text
+ * this app (or `{}` from 0079's column default) still renders. Over-long text
  * is cut, not rejected — rejecting is `validateIntakeConfig`'s job, on save.
  */
 export function parseIntakeConfig(raw: unknown): IntakeFormConfig {

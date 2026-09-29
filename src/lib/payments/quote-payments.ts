@@ -106,7 +106,7 @@ export async function recordManualPayment(input: ManualPaymentInput & { quoteId:
 /**
  * Resolves a LawPay attempt left `pending` (LawPay gave no clear answer). An
  * admin checks LawPay and says what happened. Only status moves; the money
- * facts are untouched, so 0076's guard does not re-judge the row.
+ * facts are untouched, so 0080's guard does not re-judge the row.
  */
 export async function reconcilePendingPayment(input: { paymentId: string; outcome: "succeeded" | "failed" }): Promise<RecordResult> {
   const supabase = await getScopedClient();

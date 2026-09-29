@@ -40,7 +40,7 @@ firm will send them a way to pay. Staff record payments by hand on the quote.
   - The secrets are sealed. The row is written through the caller's scoped client.
 - **Map accounts.** Only accounts that LawPay itself lists are offered: in the connection's mode,
   and with a trust flag that matches the role. Nothing is preselected, and saving requires an
-  explicit confirmation tick, which stamps `verified_at`. lectual 0076's trigger enforces the same
+  explicit confirmation tick, which stamps `verified_at`. lectual 0080's trigger enforces the same
   rules again.
 - **Refresh accounts.** Re-reads the credentials with the stored grant. The grant is refreshed first
   if LawPay ever returns an expiry and a refresh token. LawPay documents neither today. A 401 marks
@@ -53,7 +53,7 @@ firm will send them a way to pay. Staff record payments by hand on the quote.
 - **Pay** (the receipt on `/q/<token>`).
   - The amount is the **signed snapshot's** due-at-signing and goes to the **operating** account.
     USPTO fees are never included.
-  - A `pending` `crm_payment` row is written **before** LawPay is called. 0076's partial unique
+  - A `pending` `crm_payment` row is written **before** LawPay is called. 0080's partial unique
     index allows only one open charge per quote.
   - The result is then reconciled. An indeterminate answer stays `pending`. An admin resolves it on
     the quote's Payments panel.
@@ -92,7 +92,7 @@ Every test mocks HTTP. No test or check ever calls LawPay. The first real charge
 `theipgirl/lectual`, branch `claude/lectual-mvp-email-oauth-bklroa`, commit `c2a9e26`. It is
 applied to **lectual-dev only**. Prod still needs it before this ships.
 
-- `supabase/migrations/0076_lawpay_connection.sql`:
+- `supabase/migrations/0080_lawpay_connection.sql`:
   - The `lawpay_connection` table:
     - one row per firm;
     - the sealed `access_token_enc`, `refresh_token_enc` and `gateway_credentials_enc` have no
@@ -118,7 +118,7 @@ applied to **lectual-dev only**. Prod still needs it before this ships.
     - for a signing charge, be against a signed quote.
 - `tests/tenant-isolation.test.ts`: 11 new cases, 183/183 on dev.
 - `src/lib/db/types.ts`: `lawpay_connection`, `lawpay_accounts_valid` and `quote_payment`.
-- `AGENTS.md`: a section headed "LawPay connections and the signing-charge guards (0076)".
+- `AGENTS.md`: a section headed "LawPay connections and the signing-charge guards (0080)".
 
 Then commit `ffc6728` on the same branch (documentation only, no schema change):
 

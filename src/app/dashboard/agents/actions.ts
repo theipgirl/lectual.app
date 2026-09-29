@@ -20,7 +20,7 @@ const isAgent = (v: unknown): v is AgentId => typeof v === "string" && (AGENT_ID
 /**
  * Each action is its own POST entry point, so each repeats the gates the page
  * applies: the module (fail closed), and the role. The database enforces the
- * role again on agent_setting (0071 RLS: owner/admin/senior_admin only).
+ * role again on agent_setting (0076 RLS: owner/admin/senior_admin only).
  */
 async function adminSession() {
   if (!(await orgHasModule("agents"))) return null;
@@ -95,7 +95,7 @@ export async function runAgentNowAction(_prev: AgentActionState, formData: FormD
   return { ok: true, message: outcome.result?.summary };
 }
 
-// ── Autopilot (lectual 0078) ─────────────────────────────────────────────────
+// ── Autopilot (lectual 0082) ─────────────────────────────────────────────────
 
 /** Module gate + a signed-in firm session. The role checks differ per action. */
 async function autopilotSession() {
@@ -106,7 +106,7 @@ async function autopilotSession() {
 
 /**
  * Pause: owner/admin/senior_admin/attorney. Resume: owner/admin/senior_admin.
- * The database enforces the same split (0078 policies + trigger) and stamps
+ * The database enforces the same split (0082 policies + trigger) and stamps
  * who paused from the session, so the form cannot name someone else.
  */
 export async function setAutopilotAction(_prev: AgentActionState, formData: FormData): Promise<AgentActionState> {

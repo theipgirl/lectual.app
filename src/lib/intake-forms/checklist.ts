@@ -10,7 +10,7 @@ import type { IntakeFormConfig } from "./config";
  * The office and participation-agreement items exist only for a firm that
  * receives Lectual referrals (`crm_intake_form.receives_referrals`). Both of
  * those facts — whether the firm is in the referral program and whether its
- * agreement is signed — are columns only Lectual can write (0075 grants the
+ * agreement is signed — are columns only Lectual can write (0079 grants the
  * firm no INSERT/UPDATE on them), so the firm cannot tick its own box.
  */
 

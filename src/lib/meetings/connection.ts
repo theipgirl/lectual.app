@@ -8,7 +8,7 @@ import { SECRET_COLUMNS, type ConnectionSecrets } from "./import";
 import type { MeetingProvider } from "./types";
 
 /**
- * A firm's own Fathom / Zoom connections (lectual 0077,
+ * A firm's own Fathom / Zoom connections (lectual 0081,
  * `meeting_source_connection`).
  *
  * Reads and writes by a signed-in admin go through the caller's scoped client,

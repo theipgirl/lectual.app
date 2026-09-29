@@ -13,7 +13,7 @@ import { PROVIDER_LABEL, isMeetingProvider } from "@/lib/meetings/types";
 
 /**
  * Settings → Integrations → Meetings. owner / admin / senior_admin only,
- * re-checked in every action (each is its own POST), and RLS (0077) refuses
+ * re-checked in every action (each is its own POST), and RLS (0081) refuses
  * anyone else underneath. The org and user always come from the session.
  */
 

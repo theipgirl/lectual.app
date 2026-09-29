@@ -31,7 +31,7 @@ function Unreadable({ what, unconfigured }: { what: string; unconfigured: boolea
   return (
     <div className="lx-banner lx-banner-warn" role="status">
       {unconfigured
-        ? `${what} aren't set up in this environment (lectual migration 0075). Nothing is broken; it needs the migration.`
+        ? `${what} aren't set up in this environment (lectual migration 0079). Nothing is broken; it needs the migration.`
         : `${what} couldn't be loaded. This is a problem reaching the database, not an empty result. Try again shortly.`}
     </div>
   );

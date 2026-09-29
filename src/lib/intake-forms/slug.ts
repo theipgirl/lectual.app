@@ -1,7 +1,7 @@
 /**
  * The public intake's address: `<origin>/i/<slug>`.
  *
- * `SLUG_PATTERN` is 0075's `crm_intake_form_slug_shape` check, character for
+ * `SLUG_PATTERN` is 0079's `crm_intake_form_slug_shape` check, character for
  * character: 3–60 characters of a-z, 0-9 and hyphens, starting and ending
  * with a letter or digit. Everything here produces strings that pass it, so
  * an insert never trips the check constraint.

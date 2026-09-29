@@ -23,7 +23,7 @@ import type { Stage } from "@/lib/pipeline/stages";
  * no session at all.
  *
  * ── WHY A SERVICE-ROLE CLIENT, AND WHAT FENCES IT ───────────────────────────
- * A prospect has no JWT, so `current_org_id()` is null and every 0075 policy
+ * A prospect has no JWT, so `current_org_id()` is null and every 0079 policy
  * returns nothing — correct, and useless for a public page. So RLS is not the
  * boundary on these routes; the SLUG (a published, live form) or the TOKEN
  * (32 random bytes) is. Every rule below exists because of that:
@@ -36,7 +36,7 @@ import type { Stage } from "@/lib/pipeline/stages";
  *     public page by accident.
  *  3. Every other read (org name, fee packages, stages) and EVERY WRITE is
  *     fenced on the `org_id` (and `id`) read off that row — never on anything
- *     the browser sent. 0075's composite foreign keys back this up: a
+ *     the browser sent. 0079's composite foreign keys back this up: a
  *     submission, lead link or request can't point at another firm's rows
  *     even from the service role.
  *  4. The config is parsed here and only `publicConfig()` of it leaves: the

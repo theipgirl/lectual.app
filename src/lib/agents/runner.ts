@@ -16,7 +16,7 @@ import { AGENT_DEFS, AGENT_IDS, type AgentContext, type AgentId, type AgentResul
  * Runs as the service role (the cron has nobody signed in), so every agent is
  * handed the orgId and fences every statement with it; see the tests.
  *
- * Above both sits the firm-wide Autopilot pause (0078): a paused firm runs
+ * Above both sits the firm-wide Autopilot pause (0082): a paused firm runs
  * nothing, and "paused" is also what an unreadable pause state means.
  *
  * Each run is one agent_run row: counts, a one-line summary, cost, and the
@@ -64,10 +64,10 @@ export type RunOutcome = {
 };
 
 /**
- * Whether the firm's Autopilot (lectual 0078) lets agents run. FAIL CLOSED: a
+ * Whether the firm's Autopilot (lectual 0082) lets agents run. FAIL CLOSED: a
  * read that errors counts as paused, because a firm that pressed Pause must
  * never have an agent run on it because a read failed. The one exception is
- * the table not existing in this environment (0078 not applied yet): then no
+ * the table not existing in this environment (0082 not applied yet): then no
  * firm can have paused, and stopping every firm's agents would be an outage
  * with no switch to undo it.
  */

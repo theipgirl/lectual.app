@@ -20,8 +20,8 @@ State checked 2026-09-29 (lectual-prod, read-only):
 
 1. **Migrations.** Reconcile migration numbering across open branches (lectual
    `docs/2026-09-21-migration-reconciliation.md`; `claude/lectual-firm-dashboard-prd-f3loev`
-   also claims 0070–0073), merge theipgirl/lectual#26 to `main`, then apply 0070–0073 and
-   0075–0078 to **lectual-prod** (additive) and confirm with `list_migrations`.
+   also claims 0075–0078), merge theipgirl/lectual#26 to `main`, then apply 0075–0078 and
+   0079–0082 to **lectual-prod** (additive) and confirm with `list_migrations`.
 2. **Ship lectual.app from `main`.** Merge theipgirl/lectual.app#1. In Vercel → lectual-app →
    Settings → Git, set the **Production Branch to `main`** (it currently deploys
    `claude/mycase-dashboard-tracy-bwdfp4`). Never promote a preview.

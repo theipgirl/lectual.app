@@ -16,7 +16,7 @@ import {
  * themselves, with their three states, are in `load-performance.ts`.
  *
  * Visits are anonymous. An event carries a salted `session_hash` and nothing
- * else (0075), so "Visited" is distinct sessions, not people — the page says
+ * else (0079), so "Visited" is distinct sessions, not people — the page says
  * "estimated". An event with no hash counts once on its own.
  */
 

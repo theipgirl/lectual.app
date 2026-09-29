@@ -198,7 +198,7 @@ export const PUBLIC_QUOTE_LINE_COLUMNS = [
 /** The firm's display identity, and nothing else. */
 export const PUBLIC_ORG_COLUMNS = ["name"] as const;
 
-/** From the firm's profile (0073): only the clock its dates are shown on. The
+/** From the firm's profile (0078): only the clock its dates are shown on. The
  * signature and display name are the firm's drafting settings, not the
  * client's business. */
 export const PUBLIC_PROFILE_COLUMNS = ["time_zone"] as const;

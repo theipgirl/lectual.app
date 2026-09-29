@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
  * ── NO MODULE GATE, ON PURPOSE ──────────────────────────────────────────────
  * Modules exist for surfaces RLS cannot isolate: data from outside this
  * database, or content hardcoded to one firm. This page is neither — every
- * row it reads or writes is in a 0075 table with org-scoped RLS, and nothing
+ * row it reads or writes is in a 0079 table with org-scoped RLS, and nothing
  * on it names a firm but the caller's own. It is available to every firm.
  *
  * ── WHO SEES WHAT ───────────────────────────────────────────────────────────
@@ -28,7 +28,7 @@ export const dynamic = "force-dynamic";
  * The first admin visit creates the draft row.
  *
  * ── THREE STATES ────────────────────────────────────────────────────────────
- * 0075 is applied on lectual-dev; an environment without it renders
+ * 0079 is applied on lectual-dev; an environment without it renders
  * "not set up in this environment", and an unreachable read says so — never
  * an empty editor that would overwrite nothing and look like a fresh form.
  */
@@ -67,7 +67,7 @@ export default async function IntakeFormsPage({
           </h2>
           <p className="lx-note" style={{ margin: 0 }}>
             {load.status === "unconfigured"
-              ? "The intake tables (lectual migration 0075) are not in this database. Nothing is broken; it needs the migration."
+              ? "The intake tables (lectual migration 0079) are not in this database. Nothing is broken; it needs the migration."
               : load.status === "unavailable"
                 ? "This is a problem reaching the database, not a missing intake. Nothing was changed. Try again shortly."
                 : "An owner, admin or senior admin sets it up here."}

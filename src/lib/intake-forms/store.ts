@@ -10,15 +10,15 @@ import { isOfferablePackage, type LibraryItem } from "./packages";
 import { slugCandidates, slugFromFirmName } from "./slug";
 
 /**
- * The firm's intake setup (`crm_intake_form`, lectual 0075), read and written
+ * The firm's intake setup (`crm_intake_form`, lectual 0079), read and written
  * ONLY through the caller's scoped client. RLS scopes every statement to the
  * active org; nothing here filters by org_id or accepts one from a caller.
  *
  * ── WHO WRITES ──────────────────────────────────────────────────────────────
- * owner / admin / senior_admin, checked here on every write AND by 0075's
+ * owner / admin / senior_admin, checked here on every write AND by 0079's
  * insert/update policies. Everyone else in the firm reads.
  *
- * `receives_referrals` and `agreement_signed_at` are Lectual's: 0075 grants
+ * `receives_referrals` and `agreement_signed_at` are Lectual's: 0079 grants
  * `authenticated` no INSERT/UPDATE on them, and no statement below names them
  * in a write. They are only ever read, to draw the compliance section and to
  * decide the go-live checklist.
@@ -30,7 +30,7 @@ import { slugCandidates, slugFromFirmName } from "./slug";
  * `status: left ? "draft" : "live"`).
  *
  * ── THREE STATES ────────────────────────────────────────────────────────────
- * `unconfigured` is 0075 not applied to this environment (PostgREST
+ * `unconfigured` is 0079 not applied to this environment (PostgREST
  * `PGRST205` / Postgres `42P01`); `unavailable` is anything else. Neither is
  * ever drawn as "no intake yet".
  */
@@ -50,7 +50,7 @@ export type IntakeFormRecord = {
   receivesReferrals: boolean;
   agreementSignedAt: string | null;
   publishedAt: string | null;
-  /** False until the first save (0075 leaves `updated_by` null on insert). */
+  /** False until the first save (0079 leaves `updated_by` null on insert). */
   everSaved: boolean;
   updatedAt: string;
 };

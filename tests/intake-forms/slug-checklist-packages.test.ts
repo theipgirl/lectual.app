@@ -6,7 +6,7 @@ import { defaultIntakeConfig } from "@/lib/intake-forms/config";
 import { intakeEmbedSnippet, intakePublicUrl } from "@/lib/intake-forms/links";
 
 describe("slug", () => {
-  it("mirrors 0075's crm_intake_form_slug_shape check exactly", () => {
+  it("mirrors 0079's crm_intake_form_slug_shape check exactly", () => {
     expect(SLUG_PATTERN.source).toBe("^[a-z0-9](?:[a-z0-9-]{1,58}[a-z0-9])$");
   });
 

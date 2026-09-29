@@ -8,7 +8,7 @@ import type { ZoomClientCredentials } from "./zoom";
  * reason rather than throwing, so the pages can say "not set up yet".
  *
  * Deliberately NO deployment-wide Fathom or Zoom credential: each firm
- * connects its own account (lectual 0077).
+ * connects its own account (lectual 0081).
  */
 
 export function zoomClientCredentials(): ZoomClientCredentials | null {

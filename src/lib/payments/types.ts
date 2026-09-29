@@ -21,7 +21,7 @@
  *  3. An explicit account on the wrong side of the books. A signing charge is an
  *     earned flat fee and belongs in OPERATING. See
  *     `PAYMENT_ACCOUNT_KINDS_FOR_PURPOSE`, the registry's runtime check, and
- *     lectual 0076's CHECK `crm_payment_lawpay_legal_fee_operating`.
+ *     lectual 0080's CHECK `crm_payment_lawpay_legal_fee_operating`.
  */
 
 import { quoteBlockers, quoteTotals, type QuoteBlocker, type QuoteLineInput } from "@/lib/quotes/pricing";

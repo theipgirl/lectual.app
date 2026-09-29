@@ -15,10 +15,10 @@ import type { OperatingPaymentAccount } from "./accounts";
  * there is no deployment-wide key through which another firm's charge could go.
  *
  * ── THE ORDER IS THE SAFETY ─────────────────────────────────────────────────
- *   1. Refuse an earned fee bound for trust (also a DB CHECK, 0076).
+ *   1. Refuse an earned fee bound for trust (also a DB CHECK, 0080).
  *   2. Check the amount belongs to this quote.
  *   3. **Write a `pending` crm_payment row.** If that fails, NOTHING is sent.
- *      lectual 0076's partial unique index `crm_payment_one_open_signing_charge`
+ *      lectual 0080's partial unique index `crm_payment_one_open_signing_charge`
  *      makes a second concurrent attempt fail right here (23505), before any
  *      request reaches LawPay — the double-charge guarantee lives in the DB.
  *   4. Charge exactly once, sending the row id as `reference`.
@@ -133,7 +133,7 @@ export async function chargeQuoteAtSigning(input: QuoteChargeInput): Promise<Quo
 
   // 5. Record what happened.
   if (result.outcome === "succeeded") {
-    // provider_account_id is NOT overwritten with the echo: 0076's guard pins
+    // provider_account_id is NOT overwritten with the echo: 0080's guard pins
     // it to the mapped account, and a gateway that charged a different account
     // is a reconciliation fact, surfaced as `accountMismatch`.
     const accountMismatch = result.accountId !== null && result.accountId !== account.providerAccountId;

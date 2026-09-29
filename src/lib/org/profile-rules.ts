@@ -1,4 +1,4 @@
-/** Pure rules for the firm profile (lectual 0073's limits, checked before the database sees them). */
+/** Pure rules for the firm profile (lectual 0078's limits, checked before the database sees them). */
 
 export type OrgProfile = {
   display_name: string | null;

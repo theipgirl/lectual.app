@@ -2,7 +2,7 @@ import { readTrustFlag, secretKeyFor, type GatewayCredentials, type LawPayAccoun
 import { isPaymentAccountKind, type PaymentAccountKind } from "./types";
 
 /**
- * Pure rules about a firm's LawPay accounts. The same rules lectual 0076
+ * Pure rules about a firm's LawPay accounts. The same rules lectual 0080
  * enforces in the database (crm_org_payment_account_lawpay_guard and
  * crm_payment_lawpay_guard); checked here too so an admin gets a sentence
  * instead of a constraint error, and so tests can pin them without a database.

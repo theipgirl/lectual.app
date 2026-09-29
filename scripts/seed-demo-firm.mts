@@ -460,7 +460,7 @@ async function main() {
     );
   }
 
-  // ── Public intake form (lectual 0075; dev only until it reaches prod) ─────
+  // ── Public intake form (lectual 0079; dev only until it reaches prod) ─────
   // Built from the Forms page's own defaults and saved "live" only because the
   // same go-live checklist passes, as saveIntakeForm decides it.
   const intakeConfig = defaultIntakeConfig([]);
@@ -559,7 +559,7 @@ async function main() {
   // Funnel events for the last 30 days: a few sessions a day that visit and
   // mostly start (chat or form) without finishing, plus one visit → start →
   // complete session per submission above, so "Completed" matches the table.
-  // Hashes stand in for the salted session hash (64 hex chars, as 0075
+  // Hashes stand in for the salted session hash (64 hex chars, as 0079
   // allows); no identities.
   const events: Array<{ org_id: string; form_id: string; kind: string; session_hash: string; occurred_at: string }> = [];
   let session = 0;

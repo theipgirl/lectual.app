@@ -23,7 +23,7 @@ import { accountFitsKind, parseStoredAccounts, readSealedAccount, sealedGatewayP
 import type { PaymentAccountKind } from "./types";
 
 /**
- * A firm's OWN LawPay connection (lectual migration 0076, `lawpay_connection`).
+ * A firm's OWN LawPay connection (lectual migration 0080, `lawpay_connection`).
  *
  * The firm signs in to LawPay; nobody pastes a key. The OAuth token fetches the
  * merchant's gateway credentials, whose per-account secret keys are what a
