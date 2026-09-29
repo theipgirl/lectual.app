@@ -901,6 +901,54 @@ export type Database = {
           },
         ]
       }
+      // agent_autopilot: hand-added to mirror lectual supabase/migrations/0078_agent_autopilot.sql.
+      agent_autopilot: {
+        Row: {
+          minutes_per_task: Json
+          org_id: string
+          paused: boolean
+          paused_at: string | null
+          paused_by: string | null
+          reason: string | null
+          resumed_at: string | null
+          resumed_by: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          minutes_per_task?: Json
+          org_id: string
+          paused?: boolean
+          paused_at?: string | null
+          paused_by?: string | null
+          reason?: string | null
+          resumed_at?: string | null
+          resumed_by?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          minutes_per_task?: Json
+          org_id?: string
+          paused?: boolean
+          paused_at?: string | null
+          paused_by?: string | null
+          reason?: string | null
+          resumed_at?: string | null
+          resumed_by?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_autopilot_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "crm_org"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_setting: {
         Row: {
           agent: string

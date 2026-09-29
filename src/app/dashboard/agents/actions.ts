@@ -9,6 +9,8 @@ import { aiConfigured } from "@/lib/ai/claude";
 import { runOneAgent } from "@/lib/agents/runner";
 import { productionRunnerDeps } from "@/lib/agents/deps";
 import { AGENT_IDS, type AgentId, type Autonomy } from "@/lib/agents/types";
+import { canPauseAutopilot, canResumeAutopilot, parseMinutesForm } from "@/lib/agents/autopilot-rules";
+import { loadAutopilot } from "@/lib/agents/autopilot";
 
 export type AgentActionState = { ok?: boolean; error?: string; message?: string };
 
@@ -68,6 +70,16 @@ export async function runAgentNowAction(_prev: AgentActionState, formData: FormD
     .maybeSingle();
   if (!setting?.enabled) return { error: "Switch the agent on first." };
 
+  // The firm-wide pause, read as the caller for a clear message. runOneAgent
+  // checks it again with the service role, so this is not the only guard.
+  const autopilot = await loadAutopilot();
+  if (autopilot.status === "unavailable") {
+    return { error: "We couldn't check whether Autopilot is paused, so nothing ran. Try again shortly." };
+  }
+  if (autopilot.status === "ok" && autopilot.state.paused) {
+    return { error: "Autopilot is paused for the firm, so no agent runs, including Run now. Resume Autopilot first." };
+  }
+
   const outcome = await runOneAgent(productionRunnerDeps(), {
     orgId: session.org.id,
     agent,
@@ -76,6 +88,65 @@ export async function runAgentNowAction(_prev: AgentActionState, formData: FormD
     triggeredBy: session.user.id,
   });
   refresh();
+  if (outcome.reason === "paused") {
+    return { error: "Autopilot is paused for the firm (or its state couldn't be read), so nothing ran." };
+  }
   if (outcome.status === "error") return { error: `The run failed: ${outcome.error}` };
   return { ok: true, message: outcome.result?.summary };
+}
+
+// ── Autopilot (lectual 0078) ─────────────────────────────────────────────────
+
+/** Module gate + a signed-in firm session. The role checks differ per action. */
+async function autopilotSession() {
+  if (!(await orgHasModule("agents"))) return null;
+  const session = await resolveFirmSession();
+  return session.kind === "ok" ? session : null;
+}
+
+/**
+ * Pause: owner/admin/senior_admin/attorney. Resume: owner/admin/senior_admin.
+ * The database enforces the same split (0078 policies + trigger) and stamps
+ * who paused from the session, so the form cannot name someone else.
+ */
+export async function setAutopilotAction(_prev: AgentActionState, formData: FormData): Promise<AgentActionState> {
+  const session = await autopilotSession();
+  if (!session) return { error: "Agents aren't available for this firm." };
+  const pause = formData.get("paused") === "true";
+  if (pause && !canPauseAutopilot(session.role)) return { error: "Only an attorney or an admin can pause Autopilot." };
+  if (!pause && !canResumeAutopilot(session.role)) return { error: "Only an owner, admin or senior admin can resume Autopilot." };
+  const reasonRaw = String(formData.get("reason") ?? "").trim().slice(0, 280);
+
+  const supabase = await getScopedClient();
+  const { error } = await supabase.from("agent_autopilot").upsert(
+    { org_id: session.org.id, paused: pause, reason: pause ? reasonRaw || null : null },
+    { onConflict: "org_id" },
+  );
+  if (error) return { error: `Couldn't ${pause ? "pause" : "resume"} Autopilot: ${error.message}` };
+  refresh();
+  return { ok: true, message: pause ? "Autopilot paused. No agent will run until it is resumed." : "Autopilot resumed." };
+}
+
+/** The firm's minutes-per-task estimate behind "Hours saved (est.)". Admins only. */
+export async function saveMinutesPerTaskAction(_prev: AgentActionState, formData: FormData): Promise<AgentActionState> {
+  const session = await adminSession();
+  if (!session) return { error: "Only an owner, admin or senior admin can change this." };
+  const parsed = parseMinutesForm(formData);
+  if (!parsed.ok) return { error: parsed.reason };
+
+  // Update only the minutes, never the pause: a read-then-write of `paused`
+  // could quietly undo a pause made a moment ago.
+  const supabase = await getScopedClient();
+  const { data: updated, error: updateError } = await supabase
+    .from("agent_autopilot")
+    .update({ minutes_per_task: parsed.value })
+    .eq("org_id", session.org.id)
+    .select("org_id");
+  let error = updateError;
+  if (!error && (updated ?? []).length === 0) {
+    ({ error } = await supabase.from("agent_autopilot").insert({ org_id: session.org.id, minutes_per_task: parsed.value }));
+  }
+  if (error) return { error: `Couldn't save: ${error.message}` };
+  refresh();
+  return { ok: true, message: "Saved." };
 }

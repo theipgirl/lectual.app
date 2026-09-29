@@ -27,6 +27,20 @@ to a client goes into the approval queue, and a person sends it.
 - **Run log:** every run writes an `agent_run` row with trigger, counts, a one-line summary,
   cost in USD and any error. The Agents page shows the last 25.
 
+## Autopilot (pause) and the run digest (lectual 0078)
+- `agent_autopilot` (one row per firm, no row = on) is a firm-wide pause above each agent's own
+  switch. `runOneAgent` checks it for every path (cron and Run now) and writes no run row when
+  paused; `runAllAgents` skips a paused firm. An unreadable pause state counts as paused (fail
+  closed); only a missing table (0078 not applied) lets agents run.
+- Attorney and above may pause; only owner/admin/senior_admin may resume or change minutes per
+  task. The database enforces the same split (policies + trigger) and stamps who paused.
+- The "Overnight run" digest (Today, Agents) is built only from `agent_run` rows
+  (`src/lib/agents/digest.ts`). A failed read says so; a failure is shown only while it is the
+  agent's latest run, with the fix the error points to.
+- "Hours saved (est.)" = completed tasks (triage: leads screened, email intel: emails read,
+  post-consult: follow-ups drafted) × the firm's minutes per task (defaults 10 / 5 / 20). It is
+  labelled an estimate everywhere and is never billing or metering.
+
 ## Configuration
 - `ANTHROPIC_API_KEY` (required).
 - `AGENT_MODEL` (optional; defaults to `claude-opus-5`).

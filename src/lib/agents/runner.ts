@@ -16,6 +16,9 @@ import { AGENT_DEFS, AGENT_IDS, type AgentContext, type AgentId, type AgentResul
  * Runs as the service role (the cron has nobody signed in), so every agent is
  * handed the orgId and fences every statement with it; see the tests.
  *
+ * Above both sits the firm-wide Autopilot pause (0078): a paused firm runs
+ * nothing, and "paused" is also what an unreadable pause state means.
+ *
  * Each run is one agent_run row: counts, a one-line summary, cost, and the
  * error if it failed. One agent failing never stops the next.
  */
@@ -49,7 +52,37 @@ export type RunnerDeps = {
   now?: () => number;
 };
 
-export type RunOutcome = { agent: AgentId; orgId: string; status: "ok" | "error" | "skipped"; runId: string | null; result?: AgentResult; error?: string };
+export type RunOutcome = {
+  agent: AgentId;
+  orgId: string;
+  status: "ok" | "error" | "skipped";
+  runId: string | null;
+  result?: AgentResult;
+  error?: string;
+  /** Set when the run never started because the firm's Autopilot is paused (or its state couldn't be read). */
+  reason?: "paused";
+};
+
+/**
+ * Whether the firm's Autopilot (lectual 0078) lets agents run. FAIL CLOSED: a
+ * read that errors counts as paused, because a firm that pressed Pause must
+ * never have an agent run on it because a read failed. The one exception is
+ * the table not existing in this environment (0078 not applied yet): then no
+ * firm can have paused, and stopping every firm's agents would be an outage
+ * with no switch to undo it.
+ */
+export async function autopilotAllowsRuns(admin: SupabaseClient, orgId: string): Promise<boolean> {
+  try {
+    const { data, error } = await admin.from("agent_autopilot").select("paused").eq("org_id", orgId).maybeSingle();
+    if (error) {
+      const code = (error as { code?: string }).code;
+      return code === "PGRST205" || code === "42P01";
+    }
+    return !(data as { paused?: boolean } | null)?.paused;
+  } catch {
+    return false;
+  }
+}
 
 /** One agent, one firm, one agent_run row. */
 export async function runOneAgent(
@@ -59,6 +92,12 @@ export async function runOneAgent(
   const { admin } = deps;
   const now = deps.now ?? Date.now;
   const { orgId, agent } = args;
+
+  // Checked here, not only by the callers, so every path into an agent (cron,
+  // "Run now", anything added later) honours the pause. No run row is written.
+  if (!(await autopilotAllowsRuns(admin, orgId))) {
+    return { agent, orgId, status: "skipped", runId: null, reason: "paused" };
+  }
 
   const { data: run } = await admin
     .from("agent_run")
@@ -130,6 +169,8 @@ export async function runAllAgents(deps: RunnerDeps): Promise<RunOutcome[]> {
   if (error) throw new Error(`org read failed: ${error.message}`);
   const outcomes: RunOutcome[] = [];
   for (const { id: orgId } of (orgs ?? []) as { id: string }[]) {
+    // A paused firm runs nothing. Each agent's own switch is left exactly as it is.
+    if (!(await autopilotAllowsRuns(deps.admin, orgId))) continue;
     let settings: Map<AgentId, AgentSetting>;
     try {
       settings = await loadAgentSettings(deps.admin, orgId);

@@ -91,6 +91,7 @@ export async function loadIntakeReport(period: ReportPeriod): Promise<IntakeRepo
       href: "/dashboard/quotes/",
       count: quotesSent.status === "ok" ? quotesSent.quotes.length : null,
     },
+    { label: "Pipeline", sub: "Every client from intake to registration", href: "/dashboard/pipeline/", count: null },
   ];
 
   return {
