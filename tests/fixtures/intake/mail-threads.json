@@ -1,0 +1,561 @@
+{
+  "status": "ok",
+  "detail": null,
+  "mailbox": "trademark@rpblawfirm.com",
+  "since": "2026-07-20T00:00:00.000Z",
+  "until": null,
+  "count": 25,
+  "truncated": false,
+  "messages": [
+    {
+      "id": "m21",
+      "conversationId": "c-amara",
+      "mailbox": "trademark@rpblawfirm.com",
+      "folder": "sent",
+      "direction": "outbound",
+      "at": "2026-07-28T14:02:00Z",
+      "from": {
+        "name": "Taylor McGhee",
+        "address": "info@rpblawfirm.com"
+      },
+      "to": [
+        {
+          "name": "Amara Nwosu",
+          "address": "amara.nwosu@example.com"
+        }
+      ],
+      "cc": [],
+      "subject": "Discovery call scheduled — NWOSU NATURALS",
+      "preview": "Confirming your discovery call for Thursday. Taylor will walk you through next steps.",
+      "webLink": "https://outlook.office.com/mail/deeplink/m21"
+    },
+    {
+      "id": "m01",
+      "conversationId": "c-amara",
+      "mailbox": "trademark@rpblawfirm.com",
+      "folder": "sent",
+      "direction": "outbound",
+      "at": "2026-08-03T14:02:00Z",
+      "from": {
+        "name": "Dawn Otiti",
+        "address": "support@rpblawfirm.com"
+      },
+      "to": [
+        {
+          "name": "Amara Nwosu",
+          "address": "amara.nwosu@example.com"
+        }
+      ],
+      "cc": [],
+      "subject": "NWOSU NATURALS — post-consult summary",
+      "preview": "Summary of what we discussed and what happens next.",
+      "webLink": "https://outlook.office.com/mail/deeplink/m01"
+    },
+    {
+      "id": "m02",
+      "conversationId": "c-amara",
+      "mailbox": "trademark@rpblawfirm.com",
+      "folder": "sent",
+      "direction": "outbound",
+      "at": "2026-08-10T14:02:00Z",
+      "from": {
+        "name": "Rayn Lathome",
+        "address": "rayn@rpblawfirm.com"
+      },
+      "to": [
+        {
+          "name": "Amara Nwosu",
+          "address": "amara.nwosu@example.com"
+        }
+      ],
+      "cc": [],
+      "subject": "Following up on NWOSU NATURALS search",
+      "preview": "Just following up on the preliminary search results.",
+      "webLink": "https://outlook.office.com/mail/deeplink/m02"
+    },
+    {
+      "id": "m03",
+      "conversationId": "c-amara",
+      "mailbox": "trademark@rpblawfirm.com",
+      "folder": "inbox",
+      "direction": "inbound",
+      "at": "2026-08-11T09:12:00Z",
+      "from": {
+        "name": "Amara Nwosu",
+        "address": "amara.nwosu@example.com"
+      },
+      "to": [
+        {
+          "name": "RPB Law Trademarks",
+          "address": "trademark@rpblawfirm.com"
+        }
+      ],
+      "cc": [],
+      "subject": "Re: Following up on NWOSU NATURALS search",
+      "preview": "Thanks for this — yes, please go ahead.",
+      "webLink": "https://outlook.office.com/mail/deeplink/m03"
+    },
+    {
+      "id": "m25",
+      "conversationId": "c-amara",
+      "mailbox": "trademark@rpblawfirm.com",
+      "folder": "sent",
+      "direction": "outbound",
+      "at": null,
+      "from": {
+        "name": "Dawn Otiti",
+        "address": "support@rpblawfirm.com"
+      },
+      "to": [
+        {
+          "name": "Amara Nwosu",
+          "address": "amara.nwosu@example.com"
+        }
+      ],
+      "cc": [],
+      "subject": "NWOSU NATURALS — draft for review",
+      "preview": "Draft attached. (This message reached us with no timestamp.)",
+      "webLink": "https://outlook.office.com/mail/deeplink/m25"
+    },
+    {
+      "id": "m04",
+      "conversationId": "c-kwame",
+      "mailbox": "trademark@rpblawfirm.com",
+      "folder": "sent",
+      "direction": "outbound",
+      "at": "2026-08-01T12:00:00Z",
+      "from": {
+        "name": "RPB Law Trademarks",
+        "address": "trademark@rpblawfirm.com"
+      },
+      "to": [
+        {
+          "name": "Kwame Boateng",
+          "address": "kwame@sankofabrew.example"
+        }
+      ],
+      "cc": [],
+      "subject": "Welcome to RPB Law — SANKOFA BREW",
+      "preview": "Welcome aboard. Here is what happens in the first two weeks.",
+      "webLink": "https://outlook.office.com/mail/deeplink/m04"
+    },
+    {
+      "id": "m05",
+      "conversationId": "c-kwame",
+      "mailbox": "trademark@rpblawfirm.com",
+      "folder": "sent",
+      "direction": "outbound",
+      "at": "2026-08-05T12:00:00Z",
+      "from": {
+        "name": "Taylor McGhee",
+        "address": "info@rpblawfirm.com"
+      },
+      "to": [
+        {
+          "name": "Kwame Boateng",
+          "address": "kwame@sankofabrew.example"
+        }
+      ],
+      "cc": [],
+      "subject": "SANKOFA BREW — questionnaire",
+      "preview": "Please complete the attached questionnaire when you have a moment.",
+      "webLink": "https://outlook.office.com/mail/deeplink/m05"
+    },
+    {
+      "id": "m06",
+      "conversationId": "c-kwame",
+      "mailbox": "trademark@rpblawfirm.com",
+      "folder": "sent",
+      "direction": "outbound",
+      "at": "2026-08-13T12:00:00Z",
+      "from": {
+        "name": "Dawn Otiti",
+        "address": "support@rpblawfirm.com"
+      },
+      "to": [
+        {
+          "name": "Kwame Boateng",
+          "address": "kwame@sankofabrew.example"
+        }
+      ],
+      "cc": [],
+      "subject": "SANKOFA BREW — engagement letter and invoice",
+      "preview": "The engagement letter and the deposit invoice are attached.",
+      "webLink": "https://outlook.office.com/mail/deeplink/m06"
+    },
+    {
+      "id": "m22",
+      "conversationId": "c-aya",
+      "mailbox": "trademark@rpblawfirm.com",
+      "folder": "sent",
+      "direction": "outbound",
+      "at": "2026-08-03T10:00:00Z",
+      "from": {
+        "name": "Taylor McGhee",
+        "address": "info@rpblawfirm.com"
+      },
+      "to": [
+        {
+          "name": "Mireille (Mimi) Toussaint",
+          "address": "leslie@ayaforstudio.example"
+        }
+      ],
+      "cc": [],
+      "subject": "Your interest form",
+      "preview": "Here is the interest form we mentioned.",
+      "webLink": "https://outlook.office.com/mail/deeplink/m22"
+    },
+    {
+      "id": "m07",
+      "conversationId": "c-aya",
+      "mailbox": "trademark@rpblawfirm.com",
+      "folder": "sent",
+      "direction": "outbound",
+      "at": "2026-08-06T10:00:00Z",
+      "from": {
+        "name": "Dawn Otiti",
+        "address": "support@rpblawfirm.com"
+      },
+      "to": [
+        {
+          "name": "Mireille (Mimi) Toussaint",
+          "address": "leslie@ayaforstudio.example"
+        }
+      ],
+      "cc": [],
+      "subject": "Discovery call — next steps",
+      "preview": "Great speaking today. Next steps below.",
+      "webLink": "https://outlook.office.com/mail/deeplink/m07"
+    },
+    {
+      "id": "m08",
+      "conversationId": "c-aya",
+      "mailbox": "trademark@rpblawfirm.com",
+      "folder": "inbox",
+      "direction": "inbound",
+      "at": "2026-08-07T11:15:00Z",
+      "from": {
+        "name": "Mireille (Mimi) Toussaint",
+        "address": "leslie@ayaforstudio.example"
+      },
+      "to": [
+        {
+          "name": "RPB Law Trademarks",
+          "address": "trademark@rpblawfirm.com"
+        }
+      ],
+      "cc": [],
+      "subject": "Re: Discovery call — next steps",
+      "preview": "Sounds good, thank you.",
+      "webLink": "https://outlook.office.com/mail/deeplink/m08"
+    },
+    {
+      "id": "m09",
+      "conversationId": "c-patricia",
+      "mailbox": "trademark@rpblawfirm.com",
+      "folder": "sent",
+      "direction": "outbound",
+      "at": "2026-08-04T09:00:00Z",
+      "from": {
+        "name": "Dawn Otiti",
+        "address": "support@rpblawfirm.com"
+      },
+      "to": [
+        {
+          "name": "Dr. Patricia Morgan",
+          "address": "pmorgan@morganmethod.example"
+        }
+      ],
+      "cc": [],
+      "subject": "Your legal strategy session link",
+      "preview": "Here is the link for your session on Tuesday.",
+      "webLink": "https://outlook.office.com/mail/deeplink/m09"
+    },
+    {
+      "id": "m10",
+      "conversationId": "c-patricia",
+      "mailbox": "trademark@rpblawfirm.com",
+      "folder": "inbox",
+      "direction": "inbound",
+      "at": "2026-08-04T16:40:00Z",
+      "from": {
+        "name": "Dr. Patricia Morgan",
+        "address": "patricia.morgan@example.com"
+      },
+      "to": [
+        {
+          "name": "RPB Law Trademarks",
+          "address": "trademark@rpblawfirm.com"
+        }
+      ],
+      "cc": [],
+      "subject": "Re: Your legal strategy session link",
+      "preview": "Got it — see you Tuesday.",
+      "webLink": "https://outlook.office.com/mail/deeplink/m10"
+    },
+    {
+      "id": "m11",
+      "conversationId": "c-renee",
+      "mailbox": "trademark@rpblawfirm.com",
+      "folder": "sent",
+      "direction": "outbound",
+      "at": "2026-08-02T13:00:00Z",
+      "from": {
+        "name": "Rayn Lathome",
+        "address": "rayn@rpblawfirm.com"
+      },
+      "to": [
+        {
+          "name": "Renée Dubois",
+          "address": "renee@maisonrenee.example"
+        }
+      ],
+      "cc": [],
+      "subject": "Checking in after our conversation",
+      "preview": "Checking in to see whether you would like us to proceed.",
+      "webLink": "https://outlook.office.com/mail/deeplink/m11"
+    },
+    {
+      "id": "m12",
+      "conversationId": "c-renee",
+      "mailbox": "trademark@rpblawfirm.com",
+      "folder": "sent",
+      "direction": "outbound",
+      "at": "2026-08-06T13:00:00Z",
+      "from": {
+        "name": "Rayn Lathome",
+        "address": "rayn@rpblawfirm.com"
+      },
+      "to": [
+        {
+          "name": "Renée Dubois",
+          "address": "renee@maisonrenee.example"
+        }
+      ],
+      "cc": [],
+      "subject": "Circling back on your trademark search",
+      "preview": "Circling back on the search we discussed.",
+      "webLink": "https://outlook.office.com/mail/deeplink/m12"
+    },
+    {
+      "id": "m13",
+      "conversationId": "c-renee",
+      "mailbox": "trademark@rpblawfirm.com",
+      "folder": "sent",
+      "direction": "outbound",
+      "at": "2026-08-16T13:00:00Z",
+      "from": {
+        "name": "RPB Law Trademarks",
+        "address": "trademark@rpblawfirm.com"
+      },
+      "to": [
+        {
+          "name": "Renée Dubois",
+          "address": "renee@maisonrenee.example"
+        }
+      ],
+      "cc": [],
+      "subject": "Circling back once more",
+      "preview": "Following up one more time before we close the file.",
+      "webLink": "https://outlook.office.com/mail/deeplink/m13"
+    },
+    {
+      "id": "m14",
+      "conversationId": "c-jordan",
+      "mailbox": "trademark@rpblawfirm.com",
+      "folder": "inbox",
+      "direction": "inbound",
+      "at": "2026-08-09T08:00:00Z",
+      "from": {
+        "name": "Jordan Ellis",
+        "address": "jordan@ellisworks.example"
+      },
+      "to": [
+        {
+          "name": "RPB Law Trademarks",
+          "address": "trademark@rpblawfirm.com"
+        }
+      ],
+      "cc": [],
+      "subject": "Checking in on next steps",
+      "preview": "Wanted to see where things stand.",
+      "webLink": "https://outlook.office.com/mail/deeplink/m14"
+    },
+    {
+      "id": "m24",
+      "conversationId": "c-jordan",
+      "mailbox": "trademark@rpblawfirm.com",
+      "folder": "sent",
+      "direction": "outbound",
+      "at": "2026-08-05T10:00:00Z",
+      "from": {
+        "name": "Dawn Otiti",
+        "address": "support@rpblawfirm.com"
+      },
+      "to": [
+        {
+          "name": "Jordan Ellis",
+          "address": "jordan@ellisworks.example"
+        }
+      ],
+      "cc": [],
+      "subject": "Following up",
+      "preview": "Following up on your enquiry.",
+      "webLink": "https://outlook.office.com/mail/deeplink/m24"
+    },
+    {
+      "id": "m23",
+      "conversationId": "c-hollis",
+      "mailbox": "trademark@rpblawfirm.com",
+      "folder": "sent",
+      "direction": "outbound",
+      "at": "2026-07-30T09:00:00Z",
+      "from": {
+        "name": "RPB Law Trademarks",
+        "address": "trademark@rpblawfirm.com"
+      },
+      "to": [
+        {
+          "name": "Hollis Vance",
+          "address": "hollis@vanceco.example"
+        }
+      ],
+      "cc": [],
+      "subject": "Welcome to RPB Law",
+      "preview": "Welcome aboard — here is what happens next.",
+      "webLink": "https://outlook.office.com/mail/deeplink/m23"
+    },
+    {
+      "id": "m15",
+      "conversationId": "c-hollis-admin",
+      "mailbox": "trademark@rpblawfirm.com",
+      "folder": "inbox",
+      "direction": "inbound",
+      "at": "2026-08-12T17:20:00Z",
+      "from": {
+        "name": "Vance Studio Admin",
+        "address": "admin@vanceco.example"
+      },
+      "to": [
+        {
+          "name": "RPB Law Trademarks",
+          "address": "trademark@rpblawfirm.com"
+        }
+      ],
+      "cc": [],
+      "subject": "Question about VANCE & CO filing",
+      "preview": "I help Hollis with admin and had a question about the filing.",
+      "webLink": "https://outlook.office.com/mail/deeplink/m15"
+    },
+    {
+      "id": "m16",
+      "conversationId": "c-desmond",
+      "mailbox": "trademark@rpblawfirm.com",
+      "folder": "inbox",
+      "direction": "inbound",
+      "at": "2026-08-14T10:00:00Z",
+      "from": {
+        "name": "Desmond Okafor",
+        "address": "desmond.okafor@example.com"
+      },
+      "to": [
+        {
+          "name": "RPB Law Trademarks",
+          "address": "trademark@rpblawfirm.com"
+        }
+      ],
+      "cc": [],
+      "subject": "Opposing counsel letter re OKAFOR ROAST",
+      "preview": "Their opposing counsel sent this yesterday and I am not sure what to do.",
+      "webLink": "https://outlook.office.com/mail/deeplink/m16"
+    },
+    {
+      "id": "m17",
+      "conversationId": "c-desmond",
+      "mailbox": "trademark@rpblawfirm.com",
+      "folder": "sent",
+      "direction": "outbound",
+      "at": "2026-08-15T09:00:00Z",
+      "from": {
+        "name": "Dawn Otiti",
+        "address": "support@rpblawfirm.com"
+      },
+      "to": [
+        {
+          "name": "Desmond Okafor",
+          "address": "desmond.okafor@example.com"
+        }
+      ],
+      "cc": [],
+      "subject": "Re: OKAFOR ROAST",
+      "preview": "Thank you — Rebecca will review this and call you.",
+      "webLink": "https://outlook.office.com/mail/deeplink/m17"
+    },
+    {
+      "id": "m18",
+      "conversationId": "c-vendor-1",
+      "mailbox": "trademark@rpblawfirm.com",
+      "folder": "inbox",
+      "direction": "inbound",
+      "at": "2026-08-08T06:30:00Z",
+      "from": {
+        "name": "Trademark Renewal Services",
+        "address": "billing@tm-renewals.example"
+      },
+      "to": [
+        {
+          "name": "RPB Law Trademarks",
+          "address": "trademark@rpblawfirm.com"
+        }
+      ],
+      "cc": [],
+      "subject": "Your registration is about to expire",
+      "preview": "Final notice: renewal fee due.",
+      "webLink": "https://outlook.office.com/mail/deeplink/m18"
+    },
+    {
+      "id": "m19",
+      "conversationId": "c-vendor-2",
+      "mailbox": "trademark@rpblawfirm.com",
+      "folder": "inbox",
+      "direction": "inbound",
+      "at": "2026-08-08T07:00:00Z",
+      "from": {
+        "name": "IP Law Weekly",
+        "address": "news@iplawweekly.example"
+      },
+      "to": [
+        {
+          "name": "RPB Law Trademarks",
+          "address": "trademark@rpblawfirm.com"
+        }
+      ],
+      "cc": [],
+      "subject": "Newsletter: this week in trademarks",
+      "preview": "The week's filings, oppositions and registrations.",
+      "webLink": "https://outlook.office.com/mail/deeplink/m19"
+    },
+    {
+      "id": "m20",
+      "conversationId": "c-vendor-3",
+      "mailbox": "trademark@rpblawfirm.com",
+      "folder": "inbox",
+      "direction": "inbound",
+      "at": "2026-08-17T12:00:00Z",
+      "from": {
+        "name": "Office Supplies Co",
+        "address": "orders@supplies.example"
+      },
+      "to": [
+        {
+          "name": "RPB Law Trademarks",
+          "address": "trademark@rpblawfirm.com"
+        }
+      ],
+      "cc": [],
+      "subject": "Your invoice is ready",
+      "preview": "Invoice 4471 for your July order is attached.",
+      "webLink": "https://outlook.office.com/mail/deeplink/m20"
+    }
+  ]
+}

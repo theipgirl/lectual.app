@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>@keyframes ifspin { to { transform: rotate(360deg); } }</style>
+</helmet>
+<div style="height:100%;display:flex;flex-direction:column;position:relative;overflow:hidden;font-family:Geist,system-ui,sans-serif;color:#2A1216">
+
+  <div style="flex:0 0 64px;display:flex;align-items:center;gap:16px;border-bottom:1px solid rgba(42,18,22,.1)">
+    <div style="flex:1;min-width:0">
+      <div style="font-size:24px;line-height:32px;font-weight:600;letter-spacing:-.01em">Intake</div>
+      <div style="font-size:13px;line-height:18px;color:#7A5A5E;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Your public intake, how it looks, and where it lives.</div>
+    </div>
+    <div style="{{ statusPillStyle }}">
+      <div style="{{ statusDotStyle }}"></div>
+      <span>{{ statusLabel }}</span>
+    </div>
+    <div style="height:36px;padding:0 14px;border-radius:8px;border:1px solid rgba(42,18,22,.18);background:#FFFDF7;display:flex;align-items:center;gap:8px;font-size:14px;color:#4A2A2E;cursor:pointer;white-space:nowrap" style-hover="border-color:#6A1F2B;color:#6A1F2B" onClick="{{ onCopyLink }}" role="button" tabindex="0">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"></path></svg>
+      Copy link
+    </div>
+    <div style="height:36px;padding:0 14px;border-radius:8px;border:1px solid rgba(42,18,22,.18);background:#FFFDF7;display:flex;align-items:center;font-size:14px;color:#4A2A2E;cursor:pointer;white-space:nowrap" style-hover="border-color:#6A1F2B;color:#6A1F2B" onClick="{{ onPreview }}" role="button" tabindex="0">Preview</div>
+    <div style="{{ saveBtnStyle }}" onClick="{{ onSave }}" role="button" tabindex="0">
+      <sc-if value="{{ saving }}" hint-placeholder-val="{{ false }}">{{ spinner }}</sc-if>
+      <span>{{ saveLabel }}</span>
+    </div>
+  </div>
+
+  <div style="flex:0 0 48px;display:flex;align-items:flex-end;gap:24px;border-bottom:1px solid rgba(42,18,22,.1)">
+    <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="2">
+      <div style="{{ t.style }}" onClick="{{ t.onClick }}" role="button" tabindex="0">{{ t.label }}</div>
+    </sc-for>
+  </div>
+
+  <sc-if value="{{ isSetup }}" hint-placeholder-val="{{ true }}">
+  <div style="flex:1;min-height:0;display:flex;gap:32px;padding-top:24px">
+
+    <div ref="{{ edRef }}" style="flex:0 1 680px;min-width:0;overflow-y:auto;position:relative;display:flex;flex-direction:column;gap:24px;padding:0 4px 120px 0">
+
+      <sc-if value="{{ checklistDone }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:12px;background:rgba(67,96,47,.12);border:1px solid rgba(67,96,47,.3)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#43602F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:0 0 auto"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg>
+          <div style="flex:1;min-width:0;font-size:14px;line-height:20px;color:#2F4A20;font-weight:500">Live at {{ liveUrl }}</div>
+          <div style="height:32px;padding:0 12px;border-radius:8px;background:#43602F;color:#FFFFFF;display:flex;align-items:center;font-size:13.5px;font-weight:500;cursor:pointer" onClick="{{ onCopyLink }}" role="button" tabindex="0">Copy</div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ checklistOpen }}" hint-placeholder-val="{{ true }}">
+        <div style="background:#FFFDF7;border:1px solid rgba(106,31,43,.3);border-radius:12px;padding:24px;display:flex;flex-direction:column;gap:16px;box-shadow:0 12px 28px -24px rgba(20,4,8,.5)">
+          <div style="display:flex;align-items:baseline;gap:12px">
+            <div style="flex:1;font-size:16px;line-height:24px;font-weight:600">Finish these to go live.</div>
+            <div style="font-family:'Courier Prime','Courier New',monospace;font-size:13px;color:#7A5A5E">{{ checklistCount }}</div>
+          </div>
+          <div style="height:6px;border-radius:999px;background:#F1E8D8;overflow:hidden">
+            <div style="{{ progressStyle }}"></div>
+          </div>
+          <div style="display:flex;flex-direction:column">
+            <sc-for list="{{ checklist }}" as="c" hint-placeholder-count="5">
+              <div style="display:flex;align-items:center;gap:12px;min-height:40px;border-top:1px solid rgba(42,18,22,.07)">
+                <div style="{{ c.iconStyle }}">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="{{ c.iconD }}"></path></svg>
+                </div>
+                <div style="{{ c.labelStyle }}">{{ c.label }}</div>
+                <sc-if value="{{ c.showFix }}" hint-placeholder-val="{{ false }}">
+                  <div style="font-size:14px;font-weight:500;color:#6A1F2B;cursor:pointer" style-hover="text-decoration:underline" onClick="{{ c.onFix }}" role="button" tabindex="0">Fix</div>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <div data-sec="mode" style="background:#FFFDF7;border:1px solid rgba(42,18,22,.13);border-radius:12px;padding:24px;display:flex;flex-direction:column;gap:16px">
+        <div style="font-size:16px;line-height:24px;font-weight:600">What visitors see first</div>
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+          <sc-for list="{{ modes }}" as="m" hint-placeholder-count="2">
+            <div style="{{ m.style }}" onClick="{{ m.onClick }}" role="button" tabindex="0">
+              <div style="display:flex;align-items:center;gap:10px">
+                <div style="width:32px;height:32px;border-radius:8px;background:#F1E8D8;color:#6A1F2B;display:flex;align-items:center;justify-content:center;flex:0 0 auto">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="{{ m.d }}"></path></svg>
+                </div>
+                <div style="flex:1;min-width:0;font-size:14px;line-height:20px;font-weight:600">{{ m.title }}</div>
+                <sc-if value="{{ m.on }}" hint-placeholder-val="{{ false }}">
+                  <div style="width:20px;height:20px;border-radius:999px;background:#6A1F2B;color:#FFFFFF;display:flex;align-items:center;justify-content:center">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"></path></svg>
+                  </div>
+                </sc-if>
+              </div>
+              <div style="font-size:13px;line-height:18px;color:#7A5A5E">{{ m.desc }}</div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="font-size:13px;line-height:18px;color:#7A5A5E">Visitors can switch modes either way.</div>
+      </div>
+
+      <div data-sec="assistant" style="background:#FFFDF7;border:1px solid rgba(42,18,22,.13);border-radius:12px;padding:24px;display:flex;flex-direction:column;gap:16px">
+        <div style="font-size:16px;line-height:24px;font-weight:600">Assistant</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;align-items:baseline;gap:8px">
+            <div style="flex:1;font-size:14px;line-height:20px;font-weight:500">Opening message</div>
+            <div style="font-family:'Courier Prime','Courier New',monospace;font-size:12px;color:#7A5A5E">{{ openingCount }}</div>
+          </div>
+          <input type="text" value="{{ opening }}" onChange="{{ onOpening }}" maxLength="280" placeholder="Hi — tell me about what you're building." style="width:100%;box-sizing:border-box;height:40px;padding:0 12px;border:1px solid rgba(42,18,22,.2);border-radius:8px;background:#FFFFFF;font-size:14px;line-height:20px;color:#2A1216;font-family:inherit;outline:none" style-focus="border-color:#6A1F2B;box-shadow:0 0 0 3px rgba(106,31,43,.12)">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <div style="font-size:14px;line-height:20px;font-weight:500">What the assistant knows about your firm</div>
+            <div style="display:flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:999px;background:#F1E8D8;font-size:12px;color:#4A2A2E">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3"></path></svg>
+              Only you see this
+            </div>
+            <div style="flex:1"></div>
+            <div style="font-family:'Courier Prime','Courier New',monospace;font-size:12px;color:#7A5A5E">{{ knowsCount }}</div>
+          </div>
+          <textarea value="{{ knows }}" onChange="{{ onKnows }}" rows="{{ knowsRows }}" maxLength="4000" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid rgba(42,18,22,.2);border-radius:8px;background:#FFFFFF;font-size:14px;line-height:20px;color:#2A1216;font-family:inherit;outline:none;resize:none" style-focus="border-color:#6A1F2B;box-shadow:0 0 0 3px rgba(106,31,43,.12)"></textarea>
+          <div style="font-size:13px;line-height:18px;color:#7A5A5E">Practice areas, how consults work, response times. The assistant answers only from this and never gives legal advice.</div>
+        </div>
+      </div>
+
+      <div data-sec="intro" style="background:#FFFDF7;border:1px solid rgba(42,18,22,.13);border-radius:12px;padding:24px;display:flex;flex-direction:column;gap:16px">
+        <div style="font-size:16px;line-height:24px;font-weight:600">Introduction</div>
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="font-size:14px;line-height:20px;font-weight:500">Firm name</div>
+            <input type="text" value="{{ firmName }}" onChange="{{ onFirmName }}" placeholder="{{ defaults.firmName }}" style="width:100%;box-sizing:border-box;height:40px;padding:0 12px;border:1px solid rgba(42,18,22,.2);border-radius:8px;background:#FFFFFF;font-size:14px;color:#2A1216;font-family:inherit;outline:none" style-focus="border-color:#6A1F2B;box-shadow:0 0 0 3px rgba(106,31,43,.12)">
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="font-size:14px;line-height:20px;font-weight:500">Headline</div>
+            <input type="text" value="{{ headline }}" onChange="{{ onHeadline }}" placeholder="{{ defaults.headline }}" style="width:100%;box-sizing:border-box;height:40px;padding:0 12px;border:1px solid rgba(42,18,22,.2);border-radius:8px;background:#FFFFFF;font-size:14px;color:#2A1216;font-family:inherit;outline:none" style-focus="border-color:#6A1F2B;box-shadow:0 0 0 3px rgba(106,31,43,.12)">
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="font-size:14px;line-height:20px;font-weight:500">Disclaimer</div>
+          <textarea value="{{ disclaimer }}" onChange="{{ onDisclaimer }}" rows="3" placeholder="{{ defaults.disclaimer }}" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid rgba(42,18,22,.2);border-radius:8px;background:#FFFFFF;font-size:14px;line-height:20px;color:#2A1216;font-family:inherit;outline:none;resize:vertical" style-focus="border-color:#6A1F2B;box-shadow:0 0 0 3px rgba(106,31,43,.12)"></textarea>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="font-size:14px;line-height:20px;font-weight:500">Consent notice</div>
+          <textarea value="{{ consent }}" onChange="{{ onConsent }}" rows="2" placeholder="{{ defaults.consent }}" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid rgba(42,18,22,.2);border-radius:8px;background:#FFFFFF;font-size:14px;line-height:20px;color:#2A1216;font-family:inherit;outline:none;resize:vertical" style-focus="border-color:#6A1F2B;box-shadow:0 0 0 3px rgba(106,31,43,.12)"></textarea>
+        </div>
+        <div style="font-size:13px;line-height:18px;color:#7A5A5E">Leave blank to use the standard wording.</div>
+      </div>
+
+      <div data-sec="questions" style="background:#FFFDF7;border:1px solid rgba(42,18,22,.13);border-radius:12px;padding:24px;display:flex;flex-direction:column;gap:16px">
+        <div style="font-size:16px;line-height:24px;font-weight:600">Questions</div>
+
+        <div style="display:flex;align-items:center;gap:12px;min-height:56px;padding:8px 14px;border-radius:10px;background:#F6F0E3;border:1px solid rgba(42,18,22,.08)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7A5A5E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:0 0 auto"><path d="M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3"></path></svg>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;line-height:20px;font-weight:500">Contact details · Always asked first</div>
+            <div style="font-size:13px;line-height:18px;color:#7A5A5E">Full name · Email · Phone · Company</div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="font-size:14px;line-height:20px;font-weight:500">Start from an IP pack.</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <sc-for list="{{ packChips }}" as="p" hint-placeholder-count="4">
+              <div style="{{ p.style }}" onClick="{{ p.onClick }}" role="button" tabindex="0">
+                <sc-if value="{{ p.on }}" hint-placeholder-val="{{ false }}">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"></path></svg>
+                </sc-if>
+                <span>{{ p.label }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <sc-if value="{{ hasQuestions }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <sc-for list="{{ qRows }}" as="q" hint-placeholder-count="4">
+              <div style="{{ q.rowStyle }}" draggable="true" onDragStart="{{ q.onDragStart }}" onDragOver="{{ q.onDragOver }}" onDrop="{{ q.onDrop }}" onDragEnd="{{ q.onDragEnd }}">
+                <div style="width:20px;height:32px;display:flex;align-items:center;justify-content:center;color:#7A5A5E;cursor:grab;flex:0 0 auto" title="Drag to reorder">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"></circle><circle cx="15" cy="6" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="18" r="1.6"></circle><circle cx="15" cy="18" r="1.6"></circle></svg>
+                </div>
+                <input type="text" value="{{ q.text }}" onChange="{{ q.onText }}" maxLength="200" placeholder="e.g. Have you used this name publicly yet?" aria-label="Question" style="flex:1;min-width:0;height:40px;box-sizing:border-box;padding:0 12px;border:1px solid rgba(42,18,22,.2);border-radius:8px;background:#FFFFFF;font-size:14px;color:#2A1216;font-family:inherit;outline:none" style-focus="border-color:#6A1F2B;box-shadow:0 0 0 3px rgba(106,31,43,.12)">
+                <sc-if value="{{ q.hasPack }}" hint-placeholder-val="{{ false }}">
+                  <div style="font-family:'Courier Prime','Courier New',monospace;font-size:11.5px;padding:3px 7px;border-radius:5px;background:#F1E8D8;color:#7A5A5E;white-space:nowrap;flex:0 0 auto">{{ q.packLabel }}</div>
+                </sc-if>
+                <div style="display:flex;align-items:center;gap:8px;flex:0 0 auto;cursor:pointer" onClick="{{ q.onReq }}" role="button" tabindex="0">
+                  <div style="font-size:13px;color:#4A2A2E">Required</div>
+                  <div style="{{ q.reqTrack }}"><div style="{{ q.reqKnob }}"></div></div>
+                </div>
+                <div style="position:relative;flex:0 0 auto">
+                  <div style="width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#4A2A2E;cursor:pointer" style-hover="background:#F1E8D8" onClick="{{ q.onMenu }}" role="button" tabindex="0" aria-label="More">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="19" cy="12" r="1.8"></circle></svg>
+                  </div>
+                  <sc-if value="{{ q.menuOpen }}" hint-placeholder-val="{{ false }}">
+                    <div style="position:absolute;right:0;top:36px;z-index:20;width:160px;padding:6px;border-radius:10px;background:#FFFFFF;border:1px solid rgba(42,18,22,.13);box-shadow:0 14px 32px -12px rgba(20,4,8,.35);display:flex;flex-direction:column">
+                      <div style="{{ q.upStyle }}" style-hover="background:#F6F0E3" onClick="{{ q.onUp }}" role="button" tabindex="0">Move up</div>
+                      <div style="{{ q.downStyle }}" style-hover="background:#F6F0E3" onClick="{{ q.onDown }}" role="button" tabindex="0">Move down</div>
+                      <div style="height:34px;padding:0 10px;border-radius:6px;display:flex;align-items:center;font-size:14px;color:#8E2733;cursor:pointer" style-hover="background:rgba(142,39,51,.08)" onClick="{{ q.onRemove }}" role="button" tabindex="0">Remove</div>
+                    </div>
+                  </sc-if>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ noQuestions }}" hint-placeholder-val="{{ false }}">
+          <div style="{{ emptyQStyle }}">No questions yet. Prospects will only share contact details.</div>
+        </sc-if>
+
+        <div style="align-self:flex-start;height:36px;padding:0 12px;border-radius:8px;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:500;color:#6A1F2B;cursor:pointer" style-hover="background:rgba(106,31,43,.07)" onClick="{{ onAddQuestion }}" role="button" tabindex="0">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+          Add question
+        </div>
+      </div>
+
+      <div data-sec="fees" style="background:#FFFDF7;border:1px solid rgba(42,18,22,.13);border-radius:12px;padding:24px;display:flex;flex-direction:column;gap:16px">
+        <div style="font-size:16px;line-height:24px;font-weight:600">Fee packages</div>
+        <div style="display:flex;align-items:center;gap:12px;cursor:pointer" onClick="{{ onFeesOn }}" role="button" tabindex="0">
+          <div style="flex:1;font-size:14px;line-height:20px;font-weight:500">Show my flat-fee packages in the intake.</div>
+          <div style="{{ feesTrack }}"><div style="{{ feesKnob }}"></div></div>
+        </div>
+        <sc-if value="{{ hasPkgs }}" hint-placeholder-val="{{ true }}">
+          <div style="{{ pkgListStyle }}">
+            <sc-for list="{{ pkgRows }}" as="p" hint-placeholder-count="3">
+              <div style="display:flex;align-items:center;gap:14px;padding:12px 14px;border-top:1px solid rgba(42,18,22,.08)">
+                <div style="flex:1;min-width:0">
+                  <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+                    <div style="font-size:14px;line-height:20px;font-weight:600">{{ p.name }}</div>
+                    <div style="font-family:'Courier Prime','Courier New',monospace;font-size:14px;font-variant-numeric:tabular-nums;color:#2A1216">{{ p.price }}</div>
+                  </div>
+                  <div style="font-size:13px;line-height:18px;color:#7A5A5E">{{ p.includes }}</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;cursor:pointer;flex:0 0 auto" onClick="{{ p.onToggle }}" role="button" tabindex="0">
+                  <div style="font-size:13px;color:#4A2A2E">{{ p.visLabel }}</div>
+                  <div style="{{ p.track }}"><div style="{{ p.knob }}"></div></div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="font-size:13px;line-height:18px;color:#7A5A5E">Prices come from your packages exactly as written. The assistant never estimates fees.</div>
+        </sc-if>
+        <sc-if value="{{ noPkgs }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:20px;border-radius:10px;border:1px dashed rgba(42,18,22,.2);display:flex;align-items:center;gap:10px;font-size:14px;color:#7A5A5E">
+            <span style="flex:1">No packages yet.</span>
+            <span style="color:#6A1F2B;font-weight:500;cursor:pointer" style-hover="text-decoration:underline" onClick="{{ onGoSettings }}" role="button" tabindex="0">Add packages</span>
+          </div>
+        </sc-if>
+      </div>
+
+      <div data-sec="screening" style="background:#FFFDF7;border:1px solid rgba(42,18,22,.13);border-radius:12px;padding:24px;display:flex;flex-direction:column;gap:16px">
+        <div style="font-size:16px;line-height:24px;font-weight:600">Screening</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="font-size:14px;line-height:20px;font-weight:500">Fit criteria</div>
+            <div style="display:flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:999px;background:#F1E8D8;font-size:12px;color:#4A2A2E">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3"></path></svg>
+              Only you see this
+            </div>
+          </div>
+          <div style="font-size:13px;color:#7A5A5E">IP type</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <sc-for list="{{ fitIpChips }}" as="p" hint-placeholder-count="4">
+              <div style="{{ p.style }}" onClick="{{ p.onClick }}" role="button" tabindex="0">{{ p.label }}</div>
+            </sc-for>
+          </div>
+          <div style="font-size:13px;color:#7A5A5E">Jurisdiction</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <sc-for list="{{ fitJurChips }}" as="p" hint-placeholder-count="5">
+              <div style="{{ p.style }}" onClick="{{ p.onClick }}" role="button" tabindex="0">{{ p.label }}</div>
+            </sc-for>
+          </div>
+          <textarea value="{{ fitText }}" onChange="{{ onFitText }}" rows="4" placeholder="e.g. Founders and small brands filing their first US trademark. Not litigation, not patents." aria-label="Fit criteria" style="{{ fitTextStyle }}" style-focus="border-color:#6A1F2B;box-shadow:0 0 0 3px rgba(106,31,43,.12)"></textarea>
+          <sc-if value="{{ fitErr }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:13px;line-height:18px;color:#8E2733">Describe who you take on, so the assistant can screen.</div>
+          </sc-if>
+          <div style="font-size:13px;line-height:18px;color:#7A5A5E">Prospects are screened against this and never see it.</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;align-items:baseline;gap:8px">
+            <div style="flex:1;font-size:14px;line-height:20px;font-weight:500">Closing message</div>
+            <div style="font-family:'Courier Prime','Courier New',monospace;font-size:12px;color:#7A5A5E">{{ closingCount }}</div>
+          </div>
+          <textarea value="{{ closing }}" onChange="{{ onClosing }}" rows="3" maxLength="600" aria-label="Closing message" style="{{ closingStyle }}" style-focus="border-color:#6A1F2B;box-shadow:0 0 0 3px rgba(106,31,43,.12)"></textarea>
+          <sc-if value="{{ closingErr }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:13px;line-height:18px;color:#8E2733">Add a closing message. Everyone sees it after they submit.</div>
+          </sc-if>
+          <div style="font-size:13px;line-height:18px;color:#7A5A5E">Everyone sees this, not just people outside your fit. Say what happens next.</div>
+        </div>
+      </div>
+
+      <sc-if value="{{ referrals }}" hint-placeholder-val="{{ true }}">
+      <div data-sec="compliance" style="background:#FFFDF7;border:1px solid rgba(42,18,22,.13);border-radius:12px;padding:24px;display:flex;flex-direction:column;gap:16px">
+        <div style="font-size:16px;line-height:24px;font-weight:600">Compliance</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="font-size:14px;line-height:20px;font-weight:500">Office location</div>
+          <input type="text" value="{{ office }}" onChange="{{ onOffice }}" placeholder="Street, city, state, ZIP" aria-label="Office location" style="{{ officeStyle }}" style-focus="border-color:#6A1F2B;box-shadow:0 0 0 3px rgba(106,31,43,.12)">
+          <sc-if value="{{ officeErr }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:13px;line-height:18px;color:#8E2733">An office address is required for referred founders.</div>
+          </sc-if>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="font-size:14px;line-height:20px;font-weight:500">Participation agreement</div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="{{ agreeBadgeStyle }}">{{ agreeLabel }}</div>
+            <div style="font-size:14px;font-weight:500;color:#6A1F2B;cursor:pointer" style-hover="text-decoration:underline" onClick="{{ onAgree }}" role="button" tabindex="0">{{ agreeAction }}</div>
+          </div>
+          <sc-if value="{{ agreeErr }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:13px;line-height:18px;color:#8E2733">Sign the participation agreement to receive referrals.</div>
+          </sc-if>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;align-items:baseline;gap:8px">
+            <div style="font-size:14px;line-height:20px;font-weight:500">4-7.22 disclosure</div>
+            <div style="font-size:13px;color:#7A5A5E">Shown to every referred founder.</div>
+          </div>
+          <div style="padding:12px 14px;border-radius:8px;background:#F6F0E3;border:1px solid rgba(42,18,22,.08);font-size:14px;line-height:20px;color:#4A2A2E;text-wrap:pretty">{{ disclosure }}</div>
+        </div>
+      </div>
+      </sc-if>
+
+      <div data-sec="appearance" style="background:#FFFDF7;border:1px solid rgba(42,18,22,.13);border-radius:12px;padding:24px;display:flex;flex-direction:column;gap:16px">
+        <div style="font-size:16px;line-height:24px;font-weight:600">Appearance</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="font-size:14px;line-height:20px;font-weight:500">Theme</div>
+          <div style="display:flex;padding:3px;border-radius:9px;background:#F1E8D8;gap:2px;align-self:flex-start">
+            <sc-for list="{{ themeTabs }}" as="t" hint-placeholder-count="3">
+              <div style="{{ t.style }}" onClick="{{ t.onClick }}" role="button" tabindex="0">{{ t.label }}</div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="font-size:14px;line-height:20px;font-weight:500">Colors</div>
+          <sc-for list="{{ colorRows }}" as="r" hint-placeholder-count="2">
+            <div style="display:grid;grid-template-columns:56px repeat(2,minmax(0,1fr));gap:12px;align-items:center">
+              <div style="font-size:13px;color:#7A5A5E">{{ r.label }}</div>
+              <sc-for list="{{ r.swatches }}" as="s" hint-placeholder-count="2">
+                <div style="display:flex;align-items:center;gap:8px;min-width:0">
+                  <input type="color" value="{{ s.value }}" onChange="{{ s.onChange }}" aria-label="{{ s.aria }}" style="width:36px;height:36px;padding:2px;border:1px solid rgba(42,18,22,.2);border-radius:8px;background:#FFFFFF;cursor:pointer;flex:0 0 auto">
+                  <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                    <div style="font-size:12px;color:#7A5A5E">{{ s.name }}</div>
+                    <input type="text" value="{{ s.value }}" onChange="{{ s.onChange }}" maxLength="7" style="width:100%;box-sizing:border-box;height:30px;padding:0 8px;border:1px solid rgba(42,18,22,.2);border-radius:6px;background:#FFFFFF;font-family:'Courier Prime','Courier New',monospace;font-size:13px;color:#2A1216;outline:none" style-focus="border-color:#6A1F2B">
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;cursor:pointer" onClick="{{ onPowered }}" role="button" tabindex="0">
+          <div style="flex:1;font-size:14px;line-height:20px;font-weight:500">Show 'Powered by Lectual'</div>
+          <div style="{{ poweredTrack }}"><div style="{{ poweredKnob }}"></div></div>
+        </div>
+        <div style="font-size:13px;line-height:18px;color:#7A5A5E">Applies to the embedded widget. Your public link uses Lectual's look.</div>
+      </div>
+
+      <div data-sec="share" style="background:#FFFDF7;border:1px solid rgba(42,18,22,.13);border-radius:12px;padding:24px;display:flex;flex-direction:column;gap:16px">
+        <div style="font-size:16px;line-height:24px;font-weight:600">Share</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="font-size:14px;line-height:20px;font-weight:500">Direct link</div>
+          <div style="display:flex;gap:8px">
+            <input type="text" value="{{ liveUrlFull }}" readOnly="{{ true }}" aria-label="Direct link" style="flex:1;min-width:0;height:40px;box-sizing:border-box;padding:0 12px;border:1px solid rgba(42,18,22,.13);border-radius:8px;background:#F6F0E3;font-size:14px;color:#4A2A2E;font-family:inherit;outline:none">
+            <div style="height:40px;padding:0 14px;border-radius:8px;border:1px solid rgba(42,18,22,.18);background:#FFFDF7;display:flex;align-items:center;font-size:14px;color:#4A2A2E;cursor:pointer" style-hover="border-color:#6A1F2B;color:#6A1F2B" onClick="{{ onCopyLink }}" role="button" tabindex="0">Copy</div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="flex:1;font-size:14px;line-height:20px;font-weight:500">Embed snippet</div>
+            <div style="height:30px;padding:0 12px;border-radius:7px;border:1px solid rgba(42,18,22,.18);background:#FFFDF7;display:flex;align-items:center;font-size:13px;color:#4A2A2E;cursor:pointer" style-hover="border-color:#6A1F2B;color:#6A1F2B" onClick="{{ onCopyEmbed }}" role="button" tabindex="0">Copy</div>
+          </div>
+          <div style="padding:14px 16px;border-radius:8px;background:#2A1216;color:#F1E3DA;font-family:'Courier Prime','Courier New',monospace;font-size:13px;line-height:20px;white-space:pre-wrap;word-break:break-all">{{ embed }}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="font-size:14px;line-height:20px;font-weight:500">Allowed domains</div>
+          <div style="min-height:40px;box-sizing:border-box;padding:5px 6px;border:1px solid rgba(42,18,22,.2);border-radius:8px;background:#FFFFFF;display:flex;flex-wrap:wrap;align-items:center;gap:6px">
+            <sc-for list="{{ domainChips }}" as="d" hint-placeholder-count="1">
+              <div style="height:28px;padding:0 6px 0 10px;border-radius:6px;background:#F1E8D8;display:flex;align-items:center;gap:6px;font-family:'Courier Prime','Courier New',monospace;font-size:13px;color:#2A1216">
+                <span>{{ d.label }}</span>
+                <div style="width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#7A5A5E" style-hover="background:rgba(42,18,22,.1)" onClick="{{ d.onRemove }}" role="button" tabindex="0" aria-label="Remove domain">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+                </div>
+              </div>
+            </sc-for>
+            <input type="text" value="{{ domInput }}" onChange="{{ onDomInput }}" onKeyDown="{{ onDomKey }}" placeholder="example.com or *.example.com" aria-label="Add domain" style="flex:1;min-width:160px;height:28px;border:0;outline:none;background:transparent;font-size:14px;color:#2A1216;font-family:inherit;padding:0 6px">
+          </div>
+          <sc-if value="{{ noDomains }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:13px;line-height:18px;color:#7A5A5E">Any site can embed this.</div>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+
+    <div style="flex:1 1 0;min-width:360px;display:flex;flex-direction:column;border:1px solid rgba(42,18,22,.13);border-radius:12px;background:#F6F0E3;overflow:hidden;margin-bottom:24px">
+      <div style="flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid rgba(42,18,22,.1);background:#FFFDF7;flex-wrap:wrap">
+        <div style="flex:1;min-width:0;font-size:14px;font-weight:600;white-space:nowrap">Live preview</div>
+        <div style="display:flex;padding:3px;border-radius:8px;background:#F1E8D8;gap:2px">
+          <sc-for list="{{ pvDevices }}" as="t" hint-placeholder-count="2">
+            <div style="{{ t.style }}" onClick="{{ t.onClick }}" role="button" tabindex="0">{{ t.label }}</div>
+          </sc-for>
+        </div>
+        <div style="display:flex;padding:3px;border-radius:8px;background:#F1E8D8;gap:2px">
+          <sc-for list="{{ pvThemes }}" as="t" hint-placeholder-count="2">
+            <div style="{{ t.style }}" onClick="{{ t.onClick }}" role="button" tabindex="0">{{ t.label }}</div>
+          </sc-for>
+        </div>
+        <div style="height:30px;padding:0 10px;border-radius:7px;display:flex;align-items:center;gap:6px;font-size:13px;color:#4A2A2E;cursor:pointer" style-hover="background:#F1E8D8" onClick="{{ onRestart }}" role="button" tabindex="0">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"></path></svg>
+          Restart
+        </div>
+      </div>
+
+      <div style="flex:1;min-height:0;display:flex;justify-content:center;padding:20px;overflow:hidden">
+        <div style="{{ frameStyle }}">
+          <div style="{{ pv.headStyle }}">
+            <div style="{{ pv.firmStyle }}">{{ pv.firm }}</div>
+            <div style="{{ pv.headlineStyle }}">{{ pv.headline }}</div>
+          </div>
+
+          <sc-if value="{{ pvIsChat }}" hint-placeholder-val="{{ true }}">
+            <div style="flex:1;min-height:0;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:10px">
+              <sc-for list="{{ pvThread }}" as="b" hint-placeholder-count="2">
+                <div style="{{ b.style }}">{{ b.text }}</div>
+              </sc-for>
+              <sc-if value="{{ pvShowPkgs }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px">
+                  <sc-for list="{{ pvPkgs }}" as="p" hint-placeholder-count="2">
+                    <div style="{{ pv.cardStyle }}">
+                      <div style="display:flex;align-items:baseline;gap:8px">
+                        <div style="{{ pv.pkgNameStyle }}">{{ p.name }}</div>
+                        <div style="{{ pv.pkgPriceStyle }}">{{ p.price }}</div>
+                      </div>
+                      <div style="{{ pv.smallMuteStyle }}">{{ p.includes }}</div>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+            <div style="{{ pv.composerWrap }}">
+              <div style="{{ pv.composer }}">
+                <input type="text" value="{{ pvDraft }}" onChange="{{ onPvDraft }}" onKeyDown="{{ onPvKey }}" placeholder="Type your answer…" aria-label="Preview composer" style="{{ pv.composerInput }}">
+                <div style="{{ pv.sendBtn }}" onClick="{{ onPvSend }}" role="button" tabindex="0">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="{{ pv.linkStyle }}" onClick="{{ onPvToForm }}" role="button" tabindex="0">Switch to form</div>
+                <div style="flex:1"></div>
+                <sc-if value="{{ powered }}" hint-placeholder-val="{{ true }}">
+                  <div style="{{ pv.poweredStyle }}">Powered by Lectual</div>
+                </sc-if>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ pvIsForm }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:1;min-height:0;overflow-y:auto;padding:16px 20px 20px;display:flex;flex-direction:column;gap:14px">
+              <sc-for list="{{ pvFields }}" as="f" hint-placeholder-count="4">
+                <div style="display:flex;flex-direction:column;gap:5px">
+                  <div style="{{ pv.labelStyle }}">{{ f.label }}<span style="{{ pv.reqStyle }}">{{ f.req }}</span></div>
+                  <div style="{{ pv.fieldBox }}"></div>
+                </div>
+              </sc-for>
+              <sc-if value="{{ pvShowPkgs }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <div style="{{ pv.labelStyle }}">Flat-fee packages</div>
+                  <sc-for list="{{ pvPkgs }}" as="p" hint-placeholder-count="2">
+                    <div style="{{ pv.cardStyle }}">
+                      <div style="display:flex;align-items:baseline;gap:8px">
+                        <div style="{{ pv.pkgNameStyle }}">{{ p.name }}</div>
+                        <div style="{{ pv.pkgPriceStyle }}">{{ p.price }}</div>
+                      </div>
+                      <div style="{{ pv.smallMuteStyle }}">{{ p.includes }}</div>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+              <div style="{{ pv.smallMuteStyle }}">{{ pv.disclaimer }}</div>
+              <div style="display:flex;gap:8px;align-items:flex-start">
+                <div style="{{ pv.checkBox }}"></div>
+                <div style="{{ pv.consentStyle }}">{{ pv.consent }}</div>
+              </div>
+              <div style="{{ pv.submitStyle }}">Submit</div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="{{ pv.linkStyle }}" onClick="{{ onPvToChat }}" role="button" tabindex="0">Chat instead</div>
+                <div style="flex:1"></div>
+                <sc-if value="{{ powered }}" hint-placeholder-val="{{ true }}">
+                  <div style="{{ pv.poweredStyle }}">Powered by Lectual</div>
+                </sc-if>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isPerf }}" hint-placeholder-val="{{ false }}">
+  <div style="flex:1;min-height:0;overflow-y:auto;padding:24px 0 40px;display:flex;flex-direction:column;gap:24px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="flex:1;font-size:16px;line-height:24px;font-weight:600">Performance</div>
+      <div style="display:flex;padding:3px;border-radius:9px;background:#F1E8D8;gap:2px">
+        <sc-for list="{{ ranges }}" as="t" hint-placeholder-count="3">
+          <div style="{{ t.style }}" onClick="{{ t.onClick }}" role="button" tabindex="0">{{ t.label }}</div>
+        </sc-for>
+      </div>
+    </div>
+    <sc-if value="{{ perfEmpty }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:56px 24px;border-radius:12px;border:1px dashed rgba(42,18,22,.2);background:#FFFDF7;text-align:center;font-size:15px;color:#7A5A5E">Tracking starts after your first save.</div>
+    </sc-if>
+    <sc-if value="{{ perfFull }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:stretch">
+          <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="3">
+            <div style="display:flex;align-items:stretch;flex:1 1 0;min-width:0">
+              <sc-if value="{{ k.hasArrow }}" hint-placeholder-val="{{ false }}">
+                <div style="flex:0 0 76px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#7A5A5E">
+                  <svg width="26" height="14" viewBox="0 0 26 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M1 7h23M18 1l6 6-6 6"></path></svg>
+                  <div style="font-family:'Courier Prime','Courier New',monospace;font-size:13px;color:#2A1216;font-weight:700">{{ k.conv }}</div>
+                </div>
+              </sc-if>
+              <div style="flex:1;min-width:0;background:#FFFDF7;border:1px solid rgba(42,18,22,.13);border-radius:12px;padding:20px 24px;display:flex;flex-direction:column;gap:6px">
+                <div style="font-size:14px;line-height:20px;font-weight:500;color:#4A2A2E">{{ k.label }}</div>
+                <div style="font-size:32px;line-height:40px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.01em">{{ k.value }}</div>
+                <div style="font-size:13px;line-height:18px;color:#7A5A5E">{{ k.sub }}</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="font-size:13px;line-height:18px;color:#7A5A5E">Visits are estimated anonymously. No identities stored.</div>
+      </div>
+      <div style="background:#FFFDF7;border:1px solid rgba(42,18,22,.13);border-radius:12px;overflow:hidden">
+        <div style="padding:16px 24px;font-size:16px;line-height:24px;font-weight:600;border-bottom:1px solid rgba(42,18,22,.1)">All intakes</div>
+        <div style="display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1.1fr) 80px 100px minmax(0,1.2fr) minmax(0,1fr);gap:12px;padding:10px 24px;background:#F6F0E3;font-family:'Courier Prime','Courier New',monospace;font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:#7A5A5E">
+          <div>Name</div><div>Started</div><div>Mode</div><div>Fit</div><div>Status</div><div>Last active</div>
+        </div>
+        <sc-for list="{{ intakes }}" as="r" hint-placeholder-count="8">
+          <div style="display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1.1fr) 80px 100px minmax(0,1.2fr) minmax(0,1fr);gap:12px;align-items:center;padding:12px 24px;border-top:1px solid rgba(42,18,22,.07);cursor:pointer" style-hover="background:#F6F0E3" onClick="{{ r.onClick }}" role="button" tabindex="0">
+            <div style="min-width:0">
+              <div style="font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</div>
+              <div style="font-size:12.5px;color:#7A5A5E;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.company }}</div>
+            </div>
+            <div style="font-size:13.5px;color:#4A2A2E;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.started }}</div>
+            <div style="font-size:13.5px;color:#4A2A2E">{{ r.mode }}</div>
+            <div style="display:flex"><div style="{{ r.fitStyle }}">{{ r.fit }}</div></div>
+            <div style="display:flex;min-width:0"><div style="{{ r.statusStyle }}">{{ r.status }}</div></div>
+            <div style="font-size:13.5px;color:#7A5A5E;white-space:nowrap">{{ r.last }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ hasDrawer }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;z-index:30;display:flex;justify-content:flex-end;background:rgba(42,18,22,.18)" onClick="{{ onCloseDrawer }}">
+      <div style="width:440px;max-width:100%;height:100%;box-sizing:border-box;background:#FFFDF7;border-left:1px solid rgba(42,18,22,.13);box-shadow:-24px 0 48px -24px rgba(20,4,8,.4);display:flex;flex-direction:column" onClick="{{ stop }}">
+        <div style="flex:0 0 auto;padding:20px 24px;border-bottom:1px solid rgba(42,18,22,.1);display:flex;align-items:flex-start;gap:12px">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:20px;line-height:28px;font-weight:600">{{ dr.name }}</div>
+            <div style="font-size:13px;color:#7A5A5E">{{ dr.sub }}</div>
+          </div>
+          <div style="width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#4A2A2E" style-hover="background:#F1E8D8" onClick="{{ onCloseDrawer }}" role="button" tabindex="0" aria-label="Close">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+          </div>
+        </div>
+        <div style="flex:1;min-height:0;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:20px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <div style="{{ dr.fitStyle }}">{{ dr.fit }}</div>
+            <div style="{{ dr.statusStyle }}">{{ dr.status }}</div>
+            <div style="height:24px;padding:0 9px;border-radius:999px;display:inline-flex;align-items:center;font-size:12.5px;background:#F1E8D8;color:#4A2A2E">{{ dr.modeLine }}</div>
+          </div>
+          <div style="padding:12px 14px;border-radius:10px;background:#F6F0E3;display:flex;flex-direction:column;gap:4px">
+            <div style="font-family:'Courier Prime','Courier New',monospace;font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:#7A5A5E">Screening note</div>
+            <div style="font-size:14px;line-height:20px;color:#2A1216;text-wrap:pretty">{{ dr.why }}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <sc-for list="{{ dr.answers }}" as="a" hint-placeholder-count="3">
+              <div style="display:flex;flex-direction:column;gap:3px">
+                <div style="font-size:13px;color:#7A5A5E">{{ a.q }}</div>
+                <div style="font-size:14.5px;line-height:21px;color:#2A1216;text-wrap:pretty">{{ a.a }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <div style="{{ unsavedStyle }}">
+    <div style="width:8px;height:8px;border-radius:999px;background:#E0B36A;flex:0 0 auto"></div>
+    <div style="flex:1;min-width:0;font-size:14px;font-weight:500">Unsaved changes</div>
+    <div style="height:34px;padding:0 14px;border-radius:8px;display:flex;align-items:center;font-size:14px;color:#F1E3DA;cursor:pointer" style-hover="background:rgba(253,247,235,.1)" onClick="{{ onDiscard }}" role="button" tabindex="0">Discard</div>
+    <div style="height:34px;padding:0 16px;border-radius:8px;background:#FDF7EB;color:#2A1216;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;cursor:pointer" onClick="{{ onSave }}" role="button" tabindex="0">
+      <sc-if value="{{ saving }}" hint-placeholder-val="{{ false }}">{{ spinnerDark }}</sc-if>
+      <span>{{ saveBarLabel }}</span>
+    </div>
+  </div>
+
+  <sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;top:76px;right:0;z-index:40;display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;background:#2A1216;color:#FDF7EB;font-size:14px;box-shadow:0 14px 30px -14px rgba(20,4,8,.6)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9CC182" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"></path></svg>
+      <span>{{ toast }}</span>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;agreement&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;signed&quot;,&quot;pending&quot;,&quot;missing&quot;],&quot;default&quot;:&quot;pending&quot;,&quot;tsType&quot;:&quot;'signed'|'pending'|'missing'&quot;},&quot;referrals&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;emptyStates&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;onNav&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;(k: string) => void&quot;}}">
+const PACKS = {
+  "Trademark": ["What name, logo or slogan do you want to protect?", "Have you used this name publicly yet?", "Which products or services will it cover?"],
+  "Patent": ["Describe the invention in a few sentences.", "Has it been shown, sold or published anywhere?", "Is anyone else named as an inventor?"],
+  "Copyright": ["What is the work: software, art, writing or music?", "Who created it, and were they an employee or contractor?"],
+  "Trade secret": ["What information do you need to keep confidential?", "Who has access to it today?"]
+};
+const IP_TYPES = ["Trademark", "Patent", "Copyright", "Trade secret"];
+const JURS = ["US federal", "State", "EU", "UK", "Canada", "Worldwide (Madrid)"];
+const DEFAULTS = {
+  firmName: "RPB Law",
+  headline: "Tell us about your IP. We reply within one business day.",
+  disclaimer: "Submitting this form does not create an attorney–client relationship. Please don't share confidential details until we confirm there is no conflict.",
+  consent: "I agree to be contacted about my inquiry by email or phone."
+};
+const PKGS = [
+  { name: "Starter", price: "$1,250", includes: "One mark · one class · clearance search", visible: true },
+  { name: "Concierge™", price: "$3,250", includes: "One mark · up to three classes · office-action response", visible: true },
+  { name: "Portfolio", price: "$5,800", includes: "Up to three marks · 12 months of watch monitoring", visible: false }
+];
+const PERF = {
+  7: { visited: 412, chat: 58, form: 31, completed: 54 },
+  30: { visited: 1840, chat: 262, form: 131, completed: 241 },
+  90: { visited: 5210, chat: 702, form: 388, completed: 668 }
+};
+const INTAKES = [
+  { name: "Nadia Petra", company: "Maison Petra", email: "nadia@maisonpetra.co", started: "Sep 25, 8:04 AM", mode: "Chat", fit: "Fit", status: "Consult booked", last: "12 min ago", why: "US trademark, two classes, first filing. Matches your fit criteria.", answers: [["What name, logo or slogan do you want to protect?", "MAISON PETRA, the word mark, and our script logo."], ["Have you used this name publicly yet?", "Yes, selling online since March."], ["Which products or services will it cover?", "Candles and home fragrance, possibly apparel later."]] },
+  { name: "Theo Vela", company: "Vela Athletics", email: "theo@velaathletics.com", started: "Sep 24, 4:12 PM", mode: "Form", fit: "Fit", status: "Engaged", last: "Yesterday", why: "Word mark and logo for athletic apparel, US only.", answers: [["What name, logo or slogan do you want to protect?", "VELA and the sail logo."], ["Have you used this name publicly yet?", "Launched in June."], ["Which products or services will it cover?", "Apparel and footwear."]] },
+  { name: "Priya Anand", company: "Loom Labs", email: "priya@loomlabs.ai", started: "Sep 24, 11:30 AM", mode: "Chat", fit: "Non-fit", status: "Referred", last: "Yesterday", why: "Utility patent for a machine-learning method. Outside your fit (patents).", answers: [["Describe the invention in a few sentences.", "A training method that cuts inference cost for vision models."], ["Has it been shown, sold or published anywhere?", "A preprint went up in August."]] },
+  { name: "Marcus Hale", company: "Orin & Hale", email: "marcus@orinhale.com", started: "Sep 23, 2:48 PM", mode: "Chat", fit: "Fit", status: "New", last: "2 days ago", why: "Clearance for a new product line, US federal.", answers: [["What name, logo or slogan do you want to protect?", "ORIN RESERVE."], ["Have you used this name publicly yet?", "Not yet."]] },
+  { name: "Lena Birch", company: "Birchwood Studio", email: "lena@birchwood.studio", started: "Sep 22, 9:15 AM", mode: "Form", fit: "Fit", status: "Consult booked", last: "3 days ago", why: "Opposition received on an existing US mark.", answers: [["What name, logo or slogan do you want to protect?", "BIRCHWOOD."], ["Which products or services will it cover?", "Interior design services."]] },
+  { name: "Sam Okoro", company: "—", email: "sam.okoro@gmail.com", started: "Sep 21, 7:02 PM", mode: "Chat", fit: "Unscored", status: "Stopped replying", last: "4 days ago", why: "Left after contact details. Not enough to screen.", answers: [] },
+  { name: "Jules Moreau", company: "Atelier JM", email: "jules@ateliermoreau.fr", started: "Sep 20, 3:40 PM", mode: "Form", fit: "Non-fit", status: "Rejected", last: "5 days ago", why: "EU-only filing. Outside the jurisdictions you selected.", answers: [["What name, logo or slogan do you want to protect?", "ATELIER JM."]] },
+  { name: "Dana Kim", company: "Tidewater Co.", email: "dana@tidewater.co", started: "Sep 19, 10:05 AM", mode: "Chat", fit: "Fit", status: "Engaged", last: "6 days ago", why: "Three marks, US federal, portfolio package interest.", answers: [["What name, logo or slogan do you want to protect?", "TIDEWATER, TIDE & CO., and the wave logo."]] }
+];
+const EDIT_KEYS = ["mode", "opening", "knows", "firmName", "headline", "disclaimer", "consent", "questions", "packs", "feesOn", "pkgs", "fitIp", "fitJur", "fitText", "closing", "office", "agreement", "theme", "lightBg", "lightAcc", "darkBg", "darkAcc", "powered", "domains"];
+let QID = 100;
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    const empty = !!props.emptyStates;
+    const s = {
+      tab: "setup", status: "draft", dirty: false, saving: false, toast: null, showErrors: false, everSaved: false,
+      mode: "conversation",
+      opening: "Hi — thanks for stopping by. Tell me a little about what you're building.",
+      knows: "RPB Law is a trademark boutique. We file US federal trademarks and handle office actions and oppositions. Consults are 30 minutes by video and free for founders. We reply within one business day.",
+      firmName: "", headline: "", disclaimer: "", consent: "",
+      questions: PACKS["Trademark"].map((t) => ({ id: "q" + (QID++), text: t, required: true, pack: "Trademark", edited: false }))
+        .concat([{ id: "q" + (QID++), text: "When do you hope to launch or file?", required: false, pack: null, edited: false }]),
+      packs: { "Trademark": true }, justAdded: {}, menu: null, drag: null, over: null,
+      feesOn: true, pkgs: empty ? [] : PKGS.map((p) => Object.assign({}, p)),
+      fitIp: { "Trademark": true }, fitJur: { "US federal": true }, fitText: "",
+      closing: "Thanks. An attorney reads every intake. You'll hear from us by email within one business day with next steps, even if we're not the right fit.",
+      office: "", agreement: props.agreement || "pending",
+      theme: "auto", lightBg: "#FFFDF7", lightAcc: "#6A1F2B", darkBg: "#1E0A0E", darkAcc: "#E0A9B0", powered: true,
+      domains: empty ? [] : ["rpblaw.com"], domInput: "",
+      pvDevice: "desktop", pvTheme: "light", pvMsgs: [], pvDraft: "", pvMode: null,
+      range: 30, drawer: null
+    };
+    s.saved = this.snap(s);
+    this.state = s;
+    this.edRef = React.createRef();
+  }
+  snap(s) { const o = {}; EDIT_KEYS.forEach((k) => { o[k] = JSON.parse(JSON.stringify(s[k])); }); return o; }
+  componentDidUpdate(prev) {
+    if (prev.agreement !== this.props.agreement && this.props.agreement) this.setState({ agreement: this.props.agreement });
+    if (prev.emptyStates !== this.props.emptyStates) {
+      const e = !!this.props.emptyStates;
+      this.setState({ pkgs: e ? [] : PKGS.map((p) => Object.assign({}, p)), domains: e ? [] : ["rpblaw.com"] });
+    }
+  }
+  componentWillUnmount() { clearTimeout(this._t); clearTimeout(this._s); clearTimeout(this._a); }
+  flash(msg) { clearTimeout(this._t); this.setState({ toast: msg }); this._t = setTimeout(() => this.setState({ toast: null }), 2400); }
+  edit(patch) { this.setState((s) => Object.assign({ dirty: true }, typeof patch === "function" ? patch(s) : patch)); }
+  copy(text, msg) { try { navigator.clipboard && navigator.clipboard.writeText(text); } catch (e) {} this.flash(msg); }
+  items(st) {
+    const refs = this.props.referrals !== false;
+    const list = [
+      { k: "fit", label: "Fit criteria", ok: !!st.fitText.trim(), sec: "screening" },
+      { k: "closing", label: "Closing message", ok: !!st.closing.trim(), sec: "screening" },
+      { k: "questions", label: "At least one question or question pack", ok: st.questions.length > 0, sec: "questions" }
+    ];
+    if (refs) {
+      list.push({ k: "office", label: "Office location", ok: !!st.office.trim(), sec: "compliance" });
+      list.push({ k: "agreement", label: "Participation agreement signed", ok: st.agreement === "signed", sec: "compliance" });
+    }
+    return list;
+  }
+  save() {
+    if (this.state.saving) return;
+    this.setState({ saving: true });
+    clearTimeout(this._s);
+    this._s = setTimeout(() => {
+      const st = this.state;
+      const left = this.items(st).filter((i) => !i.ok).length;
+      this.setState({ saving: false, dirty: false, everSaved: true, saved: this.snap(st), status: left ? "draft" : "live", showErrors: left > 0 });
+      this.flash(left ? "Saved as draft · " + left + " left to go live" : "Saved");
+    }, 900);
+  }
+  discard() { this.setState(Object.assign({ dirty: false, showErrors: false }, JSON.parse(JSON.stringify(this.state.saved)))); this.flash("Changes discarded"); }
+  scrollTo(sec) {
+    const ed = this.edRef.current;
+    if (!ed) return;
+    const el = ed.querySelector('[data-sec="' + sec + '"]');
+    if (el) ed.scrollTo({ top: Math.max(0, el.offsetTop - 8), behavior: "smooth" });
+    this.setState({ showErrors: true });
+  }
+  togglePack(p) {
+    const st = this.state;
+    if (st.packs[p]) {
+      const mine = st.questions.filter((q) => q.pack === p);
+      const kept = mine.filter((q) => q.edited).length;
+      this.edit({
+        packs: Object.assign({}, st.packs, { [p]: false }),
+        questions: st.questions.filter((q) => q.pack !== p || q.edited).map((q) => q.pack === p ? Object.assign({}, q, { pack: null }) : q)
+      });
+      this.flash("Removed " + (mine.length - kept) + " from " + p + (kept ? " · kept " + kept + " you edited" : ""));
+    } else {
+      const have = st.questions.map((q) => q.text);
+      const add = PACKS[p].filter((t) => have.indexOf(t) === -1).map((t) => ({ id: "q" + (QID++), text: t, required: true, pack: p, edited: false }));
+      const ja = {}; add.forEach((q) => { ja[q.id] = true; });
+      this.edit({ packs: Object.assign({}, st.packs, { [p]: true }), questions: st.questions.concat(add), justAdded: ja });
+      clearTimeout(this._a);
+      this._a = setTimeout(() => this.setState({ justAdded: {} }), 1400);
+      this.flash("Added " + add.length + " " + p + " questions");
+    }
+  }
+  moveQ(i, d) {
+    const qs = this.state.questions.slice();
+    const j = i + d;
+    if (j < 0 || j >= qs.length) return;
+    const t = qs[i]; qs[i] = qs[j]; qs[j] = t;
+    this.edit({ questions: qs, menu: null });
+  }
+  pvSend() {
+    const st = this.state;
+    const v = st.pvDraft.trim();
+    if (!v) return;
+    const answered = st.pvMsgs.filter((m) => m.who === "you").length;
+    const qs = st.questions.filter((q) => q.text.trim());
+    const next = qs[answered] ? qs[answered].text : (st.closing || "Thanks — we'll be in touch.");
+    this.setState({ pvMsgs: st.pvMsgs.concat([{ who: "you", text: v }, { who: "bot", text: next }]), pvDraft: "" });
+  }
+
+  renderVals() {
+    const st = this.state;
+    const refs = this.props.referrals !== false;
+    const empty = !!this.props.emptyStates;
+    const track = (on) => "width:36px;height:20px;border-radius:999px;position:relative;flex:0 0 auto;transition:background .15s;background:" + (on ? "#6A1F2B" : "rgba(42,18,22,.2)");
+    const knob = (on) => "position:absolute;top:2px;width:16px;height:16px;border-radius:999px;background:#FFFFFF;box-shadow:0 1px 2px rgba(20,4,8,.3);transition:left .15s;left:" + (on ? "18px" : "2px");
+    const seg = (on) => "height:30px;padding:0 12px;border-radius:7px;display:flex;align-items:center;font-size:13.5px;cursor:pointer;white-space:nowrap;" + (on ? "background:#FFFDF7;color:#2A1216;font-weight:600;box-shadow:0 1px 2px rgba(20,4,8,.12)" : "color:#7A5A5E");
+    const chip = (on) => "height:32px;padding:0 12px;border-radius:999px;display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer;white-space:nowrap;box-sizing:border-box;" + (on ? "background:#6A1F2B;color:#FDF7EB;border:1px solid #6A1F2B" : "background:#FFFFFF;color:#4A2A2E;border:1px solid rgba(42,18,22,.2)");
+    const field = (err) => "width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid " + (err ? "#8E2733" : "rgba(42,18,22,.2)") + ";border-radius:8px;background:" + (err ? "#FDF4F5" : "#FFFFFF") + ";font-size:14px;line-height:20px;color:#2A1216;font-family:inherit;outline:none;resize:vertical";
+    const badge = (bg, fg) => "height:24px;padding:0 9px;border-radius:999px;display:inline-flex;align-items:center;font-size:12.5px;font-weight:500;white-space:nowrap;background:" + bg + ";color:" + fg;
+
+    const items = this.items(st);
+    const done = items.filter((i) => i.ok).length;
+    const allDone = done === items.length;
+    const err = (k) => { const it = items.filter((i) => i.k === k)[0]; return !!(st.showErrors && it && !it.ok); };
+    const firm = st.firmName || DEFAULTS.firmName;
+    const slug = (firm.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")) || "firm";
+    const liveUrl = "lectual.com/i/" + slug;
+    const live = st.status === "live";
+    const spin = (c1, c2) => React.createElement("span", { style: { width: 13, height: 13, boxSizing: "border-box", border: "2px solid " + c1, borderTopColor: c2, borderRadius: 999, display: "inline-block", animation: "ifspin .7s linear infinite" } });
+
+    const perf = PERF[st.range];
+    const started = perf.chat + perf.form;
+    const pct = (a, b) => (b ? (a / b * 100).toFixed(1) : "0") + "%";
+    const FIT = { "Fit": badge("rgba(67,96,47,.12)", "#43602F"), "Non-fit": badge("rgba(142,39,51,.1)", "#8E2733"), "Unscored": badge("#F1E8D8", "#7A5A5E") };
+    const STATUS = {
+      "New": badge("rgba(106,31,43,.1)", "#6A1F2B"), "Referred": badge("#EFE7D6", "#4A2A2E"), "Consult booked": badge("rgba(124,83,18,.14)", "#7C5312"),
+      "Engaged": badge("rgba(67,96,47,.12)", "#43602F"), "Rejected": badge("rgba(142,39,51,.1)", "#8E2733"), "Stopped replying": badge("#F1E8D8", "#7A5A5E")
+    };
+
+    const pvDark = st.pvTheme === "dark";
+    const bg = pvDark ? st.darkBg : st.lightBg;
+    const acc = pvDark ? st.darkAcc : st.lightAcc;
+    const ink = pvDark ? "#F6EDE4" : "#2A1216";
+    const mute = pvDark ? "rgba(246,237,228,.66)" : "#7A5A5E";
+    const line = pvDark ? "rgba(246,237,228,.14)" : "rgba(42,18,22,.12)";
+    const fieldBg = pvDark ? "rgba(246,237,228,.06)" : "#FFFFFF";
+    const onAccent = pvDark ? "#1E0A0E" : "#FFFFFF";
+    const pvMode = st.pvMode || st.mode;
+    const bubble = (who) => "max-width:82%;padding:10px 13px;font-size:14px;line-height:20px;text-wrap:pretty;white-space:pre-wrap;" + (who === "you"
+      ? "align-self:flex-end;border-radius:14px 14px 4px 14px;background:" + acc + ";color:" + onAccent
+      : "align-self:flex-start;border-radius:14px 14px 14px 4px;background:" + (pvDark ? "rgba(246,237,228,.08)" : "#F1E8D8") + ";color:" + ink);
+    const thread = [
+      { who: "bot", text: st.opening.trim() || "Hi — tell me about what you're building." },
+      { who: "bot", text: "First, what's your full name, email, phone and company?" }
+    ].concat(st.pvMsgs).map((m) => ({ text: m.text, style: bubble(m.who) }));
+    const visPkgs = st.pkgs.filter((p) => p.visible);
+    const dr = st.drawer !== null ? INTAKES[st.drawer] : null;
+
+    return {
+      statusLabel: live ? "Live" : "Draft",
+      statusPillStyle: "height:28px;padding:0 11px;border-radius:999px;display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;flex:0 0 auto;" + (live ? "background:rgba(67,96,47,.12);color:#43602F" : "background:#F1E8D8;color:#7A5A5E"),
+      statusDotStyle: "width:7px;height:7px;border-radius:999px;background:" + (live ? "#43602F" : "#B8A7A0"),
+      saveBtnStyle: "height:36px;padding:0 16px;border-radius:8px;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;white-space:nowrap;" + (st.dirty || st.saving ? "background:#6A1F2B;color:#FDF7EB;cursor:pointer" : "background:rgba(106,31,43,.4);color:#FDF7EB;cursor:pointer"),
+      saveLabel: st.saving ? "Saving…" : "Save changes",
+      saveBarLabel: st.saving ? "Saving…" : "Save",
+      saving: st.saving,
+      spinner: spin("rgba(253,247,235,.4)", "#FDF7EB"),
+      spinnerDark: spin("rgba(42,18,22,.25)", "#2A1216"),
+      onSave: () => this.save(),
+      onDiscard: () => this.discard(),
+      onCopyLink: () => this.copy("https://" + liveUrl, "Link copied"),
+      onPreview: () => this.flash("Opened " + liveUrl + " in a new tab"),
+      tabs: [["setup", "Form setup"], ["perf", "Performance"]].map((t) => ({
+        label: t[1],
+        style: "height:48px;display:flex;align-items:center;font-size:14px;cursor:pointer;margin-bottom:-1px;" + (st.tab === t[0] ? "font-weight:600;color:#2A1216;box-shadow:inset 0 -2px 0 #6A1F2B" : "color:#7A5A5E"),
+        onClick: () => this.setState({ tab: t[0], menu: null })
+      })),
+      isSetup: st.tab === "setup",
+      isPerf: st.tab === "perf",
+      edRef: this.edRef,
+
+      checklistDone: allDone,
+      checklistOpen: !allDone,
+      checklistCount: done + " of " + items.length,
+      progressStyle: "height:100%;border-radius:999px;background:#6A1F2B;transition:width .3s;width:" + (done / items.length * 100) + "%",
+      checklist: items.map((i) => {
+        const bad = !i.ok && st.showErrors;
+        return {
+          label: i.label,
+          iconD: i.ok ? "M5 12l5 5 9-10" : bad ? "M12 7v6M12 17h.01" : "",
+          iconStyle: "width:20px;height:20px;border-radius:999px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;box-sizing:border-box;" + (i.ok ? "background:#43602F;color:#FFFFFF" : bad ? "background:#8E2733;color:#FFFFFF" : "border:1.5px solid rgba(42,18,22,.3)"),
+          labelStyle: "flex:1;min-width:0;font-size:14px;line-height:20px;" + (i.ok ? "color:#7A5A5E;text-decoration:line-through" : bad ? "color:#8E2733;font-weight:500" : "color:#2A1216"),
+          showFix: !i.ok,
+          onFix: () => this.scrollTo(i.sec)
+        };
+      }),
+      liveUrl, liveUrlFull: "https://" + liveUrl,
+
+      modes: [
+        { k: "conversation", title: "Conversation", desc: "An assistant asks your questions one at a time.", d: "M21 12a8 8 0 1 1-3.4-6.5L21 4l-1 4.5A7.9 7.9 0 0 1 21 12z" },
+        { k: "form", title: "Form", desc: "Every question on one page, filled in at their pace.", d: "M6 3h12v18H6zM9 8h6M9 12h6M9 16h4" }
+      ].map((m) => ({
+        title: m.title, desc: m.desc, d: m.d, on: st.mode === m.k,
+        style: "padding:16px;border-radius:10px;cursor:pointer;display:flex;flex-direction:column;gap:8px;background:#FFFFFF;" + (st.mode === m.k ? "border:1.5px solid #6A1F2B;box-shadow:0 0 0 3px rgba(106,31,43,.1)" : "border:1px solid rgba(42,18,22,.15)"),
+        onClick: () => this.edit({ mode: m.k, pvMode: null })
+      })),
+
+      opening: st.opening, onOpening: (e) => this.edit({ opening: e.target.value }), openingCount: st.opening.length + " / 280",
+      knows: st.knows, onKnows: (e) => this.edit({ knows: e.target.value }), knowsCount: st.knows.length.toLocaleString() + " / 4,000",
+      knowsRows: Math.max(5, st.knows.split("\n").reduce((n, l) => n + Math.max(1, Math.ceil(l.length / 78)), 0)),
+      firmName: st.firmName, onFirmName: (e) => this.edit({ firmName: e.target.value }),
+      headline: st.headline, onHeadline: (e) => this.edit({ headline: e.target.value }),
+      disclaimer: st.disclaimer, onDisclaimer: (e) => this.edit({ disclaimer: e.target.value }),
+      consent: st.consent, onConsent: (e) => this.edit({ consent: e.target.value }),
+      defaults: DEFAULTS,
+
+      packChips: IP_TYPES.map((p) => ({ label: p, on: !!st.packs[p], style: chip(!!st.packs[p]), onClick: () => this.togglePack(p) })),
+      hasQuestions: st.questions.length > 0,
+      noQuestions: st.questions.length === 0,
+      emptyQStyle: "padding:20px;border-radius:10px;border:1px dashed " + (err("questions") ? "#8E2733" : "rgba(42,18,22,.2)") + ";font-size:14px;color:" + (err("questions") ? "#8E2733" : "#7A5A5E") + ";text-align:center",
+      qRows: st.questions.map((q, i) => ({
+        text: q.text,
+        hasPack: !!q.pack, packLabel: q.pack || "",
+        rowStyle: "display:flex;align-items:center;gap:10px;min-height:56px;box-sizing:border-box;padding:8px 10px 8px 6px;border-radius:10px;transition:background .4s;" +
+          (st.over === q.id && st.drag && st.drag !== q.id ? "box-shadow:inset 0 2px 0 #6A1F2B;" : "") +
+          (st.drag === q.id ? "opacity:.4;" : "") +
+          (st.justAdded[q.id] ? "background:rgba(106,31,43,.08);border:1px solid rgba(106,31,43,.25)" : "background:#FFFFFF;border:1px solid rgba(42,18,22,.1)"),
+        onText: (e) => { const v = e.target.value; this.edit((s) => ({ questions: s.questions.map((x) => x.id === q.id ? Object.assign({}, x, { text: v, edited: true }) : x) })); },
+        reqTrack: track(q.required), reqKnob: knob(q.required),
+        onReq: () => this.edit((s) => ({ questions: s.questions.map((x) => x.id === q.id ? Object.assign({}, x, { required: !x.required }) : x) })),
+        menuOpen: st.menu === q.id,
+        onMenu: () => this.setState({ menu: st.menu === q.id ? null : q.id }),
+        upStyle: "height:34px;padding:0 10px;border-radius:6px;display:flex;align-items:center;font-size:14px;cursor:pointer;color:" + (i === 0 ? "rgba(42,18,22,.3)" : "#2A1216"),
+        downStyle: "height:34px;padding:0 10px;border-radius:6px;display:flex;align-items:center;font-size:14px;cursor:pointer;color:" + (i === st.questions.length - 1 ? "rgba(42,18,22,.3)" : "#2A1216"),
+        onUp: () => this.moveQ(i, -1),
+        onDown: () => this.moveQ(i, 1),
+        onRemove: () => this.edit((s) => ({ questions: s.questions.filter((x) => x.id !== q.id), menu: null })),
+        onDragStart: (e) => { e.dataTransfer.effectAllowed = "move"; try { e.dataTransfer.setData("text/plain", q.id); } catch (x) {} this.setState({ drag: q.id, menu: null }); },
+        onDragOver: (e) => { e.preventDefault(); if (this.state.over !== q.id) this.setState({ over: q.id }); },
+        onDrop: (e) => {
+          e.preventDefault();
+          const from = this.state.drag;
+          if (!from || from === q.id) { this.setState({ drag: null, over: null }); return; }
+          const qs = this.state.questions.slice();
+          const moved = qs.splice(qs.findIndex((x) => x.id === from), 1)[0];
+          qs.splice(qs.findIndex((x) => x.id === q.id), 0, moved);
+          this.edit({ questions: qs, drag: null, over: null });
+        },
+        onDragEnd: () => this.setState({ drag: null, over: null })
+      })),
+      onAddQuestion: () => this.edit((s) => ({ questions: s.questions.concat([{ id: "q" + (QID++), text: "", required: false, pack: null, edited: true }]) })),
+
+      onFeesOn: () => this.edit({ feesOn: !st.feesOn }),
+      feesTrack: track(st.feesOn), feesKnob: knob(st.feesOn),
+      hasPkgs: st.pkgs.length > 0,
+      noPkgs: st.pkgs.length === 0,
+      pkgListStyle: "border:1px solid rgba(42,18,22,.1);border-radius:10px;overflow:hidden;" + (st.feesOn ? "" : "opacity:.5"),
+      pkgRows: st.pkgs.map((p, i) => ({
+        name: p.name, price: p.price, includes: p.includes,
+        visLabel: p.visible ? "Shown" : "Hidden",
+        track: track(p.visible), knob: knob(p.visible),
+        onToggle: () => this.edit((s) => ({ pkgs: s.pkgs.map((x, j) => j === i ? Object.assign({}, x, { visible: !x.visible }) : x) }))
+      })),
+      onGoSettings: () => this.props.onNav ? this.props.onNav("Settings") : this.flash("Open Settings → Packages"),
+
+      fitIpChips: IP_TYPES.map((p) => ({ label: p, style: chip(!!st.fitIp[p]), onClick: () => this.edit((s) => ({ fitIp: Object.assign({}, s.fitIp, { [p]: !s.fitIp[p] }) })) })),
+      fitJurChips: JURS.map((p) => ({ label: p, style: chip(!!st.fitJur[p]), onClick: () => this.edit((s) => ({ fitJur: Object.assign({}, s.fitJur, { [p]: !s.fitJur[p] }) })) })),
+      fitText: st.fitText, onFitText: (e) => this.edit({ fitText: e.target.value }), fitTextStyle: field(err("fit")), fitErr: err("fit"),
+      closing: st.closing, onClosing: (e) => this.edit({ closing: e.target.value }), closingStyle: field(err("closing")), closingErr: err("closing"), closingCount: st.closing.length + " / 600",
+
+      referrals: refs,
+      office: st.office, onOffice: (e) => this.edit({ office: e.target.value }), officeErr: refs && err("office"),
+      officeStyle: "width:100%;box-sizing:border-box;height:40px;padding:0 12px;border:1px solid " + (err("office") ? "#8E2733" : "rgba(42,18,22,.2)") + ";border-radius:8px;background:" + (err("office") ? "#FDF4F5" : "#FFFFFF") + ";font-size:14px;color:#2A1216;font-family:inherit;outline:none",
+      agreeLabel: st.agreement === "signed" ? "Signed" : st.agreement === "pending" ? "Pending" : "Missing",
+      agreeBadgeStyle: st.agreement === "signed" ? badge("rgba(67,96,47,.12)", "#43602F") : st.agreement === "pending" ? badge("rgba(124,83,18,.14)", "#7C5312") : badge("rgba(142,39,51,.1)", "#8E2733"),
+      agreeAction: st.agreement === "signed" ? "View" : "Sign",
+      onAgree: () => { if (st.agreement === "signed") { this.flash("Opened the signed agreement"); return; } this.edit({ agreement: "signed" }); this.flash("Participation agreement signed"); },
+      agreeErr: refs && err("agreement"),
+      disclosure: "You were referred to " + firm + " through Lectual, a lawyer referral service. " + firm + " pays Lectual a fee to take part. Lectual is not a law firm, has not reviewed your matter, and does not vouch for any lawyer's skill.",
+
+      themeTabs: [["light", "Light"], ["dark", "Dark"], ["auto", "Auto"]].map((t) => ({ label: t[1], style: seg(st.theme === t[0]), onClick: () => this.edit({ theme: t[0], pvTheme: t[0] === "auto" ? st.pvTheme : t[0] }) })),
+      colorRows: [["Light", "lightBg", "lightAcc"], ["Dark", "darkBg", "darkAcc"]].map((r) => ({
+        label: r[0],
+        swatches: [[r[1], "Background"], [r[2], "Accent"]].map((s) => ({
+          name: s[1], value: st[s[0]], aria: r[0] + " " + s[1].toLowerCase(),
+          onChange: (e) => { let v = e.target.value; if (v && v[0] !== "#") v = "#" + v; this.edit({ [s[0]]: v }); }
+        }))
+      })),
+      powered: st.powered, onPowered: () => this.edit({ powered: !st.powered }),
+      poweredTrack: track(st.powered), poweredKnob: knob(st.powered),
+
+      embed: '<script src="https://lectual.com/embed.js"\n  data-intake="' + slug + '" async></scr' + 'ipt>',
+      onCopyEmbed: () => this.copy('<script src="https://lectual.com/embed.js" data-intake="' + slug + '" async></scr' + 'ipt>', "Embed snippet copied"),
+      domainChips: st.domains.map((d) => ({ label: d, onRemove: () => this.edit((s) => ({ domains: s.domains.filter((x) => x !== d) })) })),
+      noDomains: st.domains.length === 0,
+      domInput: st.domInput,
+      onDomInput: (e) => this.setState({ domInput: e.target.value }),
+      onDomKey: (e) => {
+        if (e.key === "Enter" || e.key === ",") {
+          e.preventDefault();
+          const v = st.domInput.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+          if (!v) return;
+          if (!/^(\*\.)?[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(v)) { this.flash("Use a domain like example.com or *.example.com"); return; }
+          if (st.domains.indexOf(v) === -1) this.edit({ domains: st.domains.concat([v]), domInput: "" }); else this.setState({ domInput: "" });
+        } else if (e.key === "Backspace" && !st.domInput && st.domains.length) {
+          this.edit({ domains: st.domains.slice(0, -1) });
+        }
+      },
+
+      pvDevices: [["desktop", "Desktop"], ["mobile", "Mobile"]].map((t) => ({ label: t[1], style: seg(st.pvDevice === t[0]), onClick: () => this.setState({ pvDevice: t[0] }) })),
+      pvThemes: [["light", "Light"], ["dark", "Dark"]].map((t) => ({ label: t[1], style: seg(st.pvTheme === t[0]), onClick: () => this.setState({ pvTheme: t[0] }) })),
+      onRestart: () => this.setState({ pvMsgs: [], pvDraft: "", pvMode: null }),
+      frameStyle: "display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box;height:100%;background:" + bg + ";border:1px solid " + line + ";box-shadow:0 20px 44px -28px rgba(20,4,8,.5);" +
+        (st.pvDevice === "mobile" ? "width:390px;max-width:100%;border-radius:28px" : "width:100%;border-radius:12px"),
+      pv: {
+        firm: firm, headline: st.headline || DEFAULTS.headline,
+        disclaimer: st.disclaimer || DEFAULTS.disclaimer, consent: st.consent || DEFAULTS.consent,
+        headStyle: "flex:0 0 auto;padding:18px 20px 14px;display:flex;flex-direction:column;gap:4px;border-bottom:1px solid " + line,
+        firmStyle: "font-size:12px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:" + acc,
+        headlineStyle: "font-size:18px;line-height:24px;font-weight:600;text-wrap:pretty;color:" + ink,
+        cardStyle: "padding:12px 14px;border-radius:10px;border:1px solid " + line + ";background:" + fieldBg + ";display:flex;flex-direction:column;gap:3px",
+        pkgNameStyle: "flex:1;font-size:14px;font-weight:600;color:" + ink,
+        pkgPriceStyle: "font-family:'Courier Prime','Courier New',monospace;font-size:14px;color:" + ink,
+        smallMuteStyle: "font-size:12.5px;line-height:17px;text-wrap:pretty;color:" + mute,
+        composerWrap: "flex:0 0 auto;padding:10px 14px 12px;display:flex;flex-direction:column;gap:8px;border-top:1px solid " + line,
+        composer: "display:flex;align-items:center;gap:8px;padding:5px 5px 5px 14px;border-radius:999px;border:1px solid " + line + ";background:" + fieldBg,
+        composerInput: "flex:1;min-width:0;border:0;outline:none;background:transparent;font-size:14px;font-family:inherit;color:" + ink,
+        sendBtn: "width:32px;height:32px;border-radius:999px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto;background:" + acc + ";color:" + onAccent,
+        linkStyle: "font-size:12.5px;font-weight:500;cursor:pointer;color:" + acc,
+        poweredStyle: "font-size:11.5px;color:" + mute,
+        labelStyle: "font-size:13px;font-weight:500;color:" + ink,
+        reqStyle: "color:" + acc,
+        fieldBox: "height:38px;border-radius:8px;border:1px solid " + line + ";background:" + fieldBg,
+        checkBox: "width:16px;height:16px;border-radius:4px;flex:0 0 auto;margin-top:1px;box-sizing:border-box;border:1.5px solid " + mute,
+        consentStyle: "font-size:12.5px;line-height:17px;color:" + ink,
+        submitStyle: "height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:600;background:" + acc + ";color:" + onAccent
+      },
+      pvIsChat: pvMode === "conversation",
+      pvIsForm: pvMode === "form",
+      pvThread: thread,
+      pvShowPkgs: st.feesOn && visPkgs.length > 0,
+      pvPkgs: visPkgs,
+      pvFields: [{ label: "Full name", req: " *" }, { label: "Email", req: " *" }, { label: "Phone", req: "" }, { label: "Company", req: "" }]
+        .concat(st.questions.filter((q) => q.text.trim()).map((q) => ({ label: q.text, req: q.required ? " *" : "" }))),
+      pvDraft: st.pvDraft,
+      onPvDraft: (e) => this.setState({ pvDraft: e.target.value }),
+      onPvKey: (e) => { if (e.key === "Enter") this.pvSend(); },
+      onPvSend: () => this.pvSend(),
+      onPvToForm: () => this.setState({ pvMode: "form" }),
+      onPvToChat: () => this.setState({ pvMode: "conversation" }),
+
+      ranges: [7, 30, 90].map((r) => ({ label: r + " days", style: seg(st.range === r), onClick: () => this.setState({ range: r }) })),
+      perfEmpty: empty,
+      perfFull: !empty,
+      kpis: [
+        { label: "Visited", value: perf.visited.toLocaleString(), sub: "Unique visitors to the intake", hasArrow: false, conv: "" },
+        { label: "Started", value: started.toLocaleString(), sub: perf.chat.toLocaleString() + " chat · " + perf.form.toLocaleString() + " form", hasArrow: true, conv: pct(started, perf.visited) },
+        { label: "Completed", value: perf.completed.toLocaleString(), sub: "Submitted with contact details", hasArrow: true, conv: pct(perf.completed, started) }
+      ],
+      intakes: INTAKES.map((r, i) => ({
+        name: r.name, company: r.company, started: r.started, mode: r.mode, fit: r.fit, status: r.status, last: r.last,
+        fitStyle: FIT[r.fit], statusStyle: STATUS[r.status],
+        onClick: () => this.setState({ drawer: i })
+      })),
+      hasDrawer: !!dr && st.tab === "perf",
+      dr: dr ? {
+        name: dr.name, sub: (dr.company !== "—" ? dr.company + " · " : "") + dr.email, fit: dr.fit, status: dr.status, modeLine: dr.mode + " · " + dr.started, why: dr.why,
+        fitStyle: FIT[dr.fit], statusStyle: STATUS[dr.status],
+        answers: [{ q: "Contact", a: dr.name + " · " + dr.email }].concat(dr.answers.map((a) => ({ q: a[0], a: a[1] })))
+      } : {},
+      onCloseDrawer: () => this.setState({ drawer: null }),
+      stop: (e) => e.stopPropagation(),
+
+      unsavedStyle: "position:absolute;left:50%;bottom:20px;z-index:35;width:min(560px,calc(100% - 40px));box-sizing:border-box;display:flex;align-items:center;gap:10px;padding:10px 10px 10px 16px;border-radius:12px;background:#2A1216;color:#FDF7EB;box-shadow:0 20px 40px -18px rgba(20,4,8,.6);transition:transform .25s cubic-bezier(.2,.8,.2,1),opacity .2s;transform:translate(-50%," + (st.dirty || st.saving ? "0" : "140%") + ");opacity:" + (st.dirty || st.saving ? "1" : "0") + ";pointer-events:" + (st.dirty || st.saving ? "auto" : "none"),
+      hasToast: !!st.toast,
+      toast: st.toast || ""
+    };
+  }
+}
+</script>
+</body>
+</html>

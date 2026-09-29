@@ -1,0 +1,19 @@
+{
+  "limit": 1,
+  "next_cursor": null,
+  "items": [
+    {
+      "title": "Trademark consult",
+      "url": "https://fathom.video/abc",
+      "share_url": "https://fathom.video/share/abc",
+      "created_at": "2025-03-02T10:31:00Z",
+      "recording_start_time": "2025-03-02T10:00:00Z",
+      "recording_end_time": "2025-03-02T10:30:00Z",
+      "recording_id": 987654321,
+      "calendar_invitees": [{ "name": "Dana Founder", "email": "dana@markright.example" }],
+      "recorded_by": { "name": "Attorney", "email": "atty@firm.example" },
+      "transcript": null,
+      "default_summary": null
+    }
+  ]
+}

@@ -1,0 +1,238 @@
+/* ============================================================
+   CLIENT LINK — /q/<token>, the right-hand screen of
+   design/Quote_Builder_Prototype.dc.html, in the app's own system
+   (globals.css tokens, light theme only). Scoped under `.qp-root`.
+   Ends with the print stylesheet for the signed copy.
+   ============================================================ */
+
+.qp-root {
+  --qp-oxbg: rgba(106, 31, 43, 0.1);
+  --qp-okbg: rgba(67, 96, 47, 0.12);
+  --qp-blush: #efd9dc;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--paper);
+  padding: 32px 16px 24px;
+  box-sizing: border-box;
+  gap: 18px;
+}
+.qp-sheet {
+  width: 100%;
+  max-width: 520px;
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--card);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+}
+.qp-footer { width: 100%; max-width: 520px; }
+
+.qp-kicker {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* the firm's band */
+.qp-band { background: var(--ox); color: var(--cream); padding: 20px 22px 18px; }
+.qp-band-firm { font-family: var(--serif); font-size: 23px; line-height: 1.15; }
+.qp-band-note {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+  opacity: 0.8;
+  margin-top: 6px;
+}
+
+.qp-body { padding: 22px; display: flex; flex-direction: column; gap: 18px; }
+.qp-title { font-family: var(--serif); font-weight: 400; font-size: 28px; line-height: 1.15; margin: 0; text-wrap: balance; color: var(--ink); }
+.qp-intro { font-size: 14.5px; color: var(--body); line-height: 1.6; margin: 9px 0 0; white-space: pre-wrap; }
+.qp-meta { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-top: 8px; }
+
+/* packages */
+.qp-pkgs { display: flex; flex-direction: column; gap: 10px; }
+.qp-pkg {
+  border-radius: 13px;
+  padding: 15px;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: var(--card);
+  text-align: left;
+  font: inherit;
+  color: var(--ink);
+  width: 100%;
+  box-sizing: border-box;
+}
+.qp-pkg[aria-checked="true"] { border-color: var(--ox); background: var(--qp-blush); }
+.qp-pkg:disabled { cursor: default; }
+.qp-pkg-head { display: flex; align-items: baseline; gap: 9px; }
+.qp-pkg-name { font-size: 16px; font-weight: 500; flex: 1; }
+.qp-pkg-price { font-family: var(--mono); font-size: 16px; font-weight: 700; }
+.qp-pkg-blurb { font-size: 13px; color: var(--body); margin-top: 6px; line-height: 1.5; }
+.qp-pkg-filing { font-family: var(--mono); font-size: 12px; color: var(--warn); margin-top: 6px; }
+.qp-common { font-size: 13px; color: var(--body); line-height: 1.5; margin: 0; }
+
+/* add-ons */
+.qp-addons { display: flex; flex-direction: column; gap: 9px; }
+.qp-addon {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 13px;
+  border-radius: 12px;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: var(--card);
+  font: inherit;
+  color: var(--ink);
+  text-align: left;
+  width: 100%;
+  box-sizing: border-box;
+}
+.qp-addon[aria-checked="true"] { border-color: var(--ox); background: var(--qp-blush); }
+.qp-addon:disabled { cursor: default; }
+.qp-box {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  background: var(--card);
+}
+.qp-addon[aria-checked="true"] .qp-box { background: var(--ox); border-color: var(--ox); }
+.qp-addon[aria-checked="true"] .qp-box::after { content: ""; width: 9px; height: 9px; border-radius: 2px; background: var(--cream); }
+.qp-addon-label { flex: 1; font-size: 14.5px; }
+.qp-addon-price { font-family: var(--mono); font-size: 14.5px; }
+
+/* the two amounts */
+.qp-due { border-top: 1px solid var(--line); padding-top: 16px; }
+.qp-due-now { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 32px; line-height: 1; font-weight: 700; color: var(--ink); }
+.qp-due-now[data-empty="true"] { color: var(--muted); }
+.qp-due-label { font-size: 14px; color: var(--body); margin-top: 6px; }
+.qp-due-note { font-size: 13px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+.qp-due-later { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 21px; font-weight: 700; color: var(--warn); margin-top: 16px; }
+.qp-due-later-label { font-size: 13.5px; color: var(--warn); margin-top: 4px; }
+.qp-project { font-family: var(--mono); font-size: 12.5px; color: var(--muted); margin-top: 12px; }
+
+/* terms */
+.qp-terms { border-top: 1px solid var(--line); padding-top: 16px; }
+.qp-terms-body { margin: 9px 0 0; white-space: pre-wrap; font-size: 13.5px; line-height: 1.6; color: var(--body); max-height: 360px; overflow: auto; }
+
+/* sign */
+.qp-sign { display: flex; flex-direction: column; gap: 10px; }
+.qp-name { padding: 12px 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--well); display: block; }
+.qp-name input {
+  border: 0;
+  background: transparent;
+  outline: none;
+  width: 100%;
+  font-family: var(--serif);
+  font-size: 23px;
+  margin-top: 6px;
+  padding: 0;
+  color: var(--ink);
+}
+.qp-name:focus-within { border-color: var(--ox); }
+.qp-accept {
+  height: 50px;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 15.5px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--ox);
+  background: var(--ox);
+  color: var(--cream);
+}
+.qp-accept[data-ready="false"] { background: var(--well); border-color: var(--line); color: var(--muted); }
+.qp-hint { font-size: 12.5px; color: var(--muted); line-height: 1.5; text-align: center; margin: 0; }
+.qp-decline { font: inherit; font-size: 13px; color: var(--muted); background: none; border: 0; padding: 0; cursor: pointer; align-self: center; text-decoration: underline; }
+.qp-decline:hover { color: var(--wine); }
+
+/* locked — the same for draft, expired, withdrawn and unknown links */
+.qp-locked { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 13px; padding: 48px 34px 52px; }
+.qp-locked-mark { width: 52px; height: 52px; border-radius: 999px; background: var(--well); display: flex; align-items: center; justify-content: center; }
+.qp-locked-mark::after { content: ""; width: 14px; height: 2px; background: var(--muted); }
+.qp-locked h1 { font-family: var(--serif); font-weight: 400; font-size: 28px; line-height: 1.15; margin: 0; color: var(--ink); }
+.qp-locked p { font-size: 14.5px; color: var(--body); max-width: 34ch; line-height: 1.55; margin: 0; }
+
+/* accepted — the frozen snapshot */
+.qp-accepted-pill {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: 5px;
+  background: var(--qp-okbg);
+  color: var(--ok);
+  display: inline-block;
+}
+.qp-section { border-top: 1px solid var(--line); padding-top: 16px; }
+.qp-lines { display: flex; flex-direction: column; gap: 7px; margin-top: 10px; }
+.qp-line { display: flex; gap: 12px; align-items: baseline; }
+.qp-line-label { flex: 1; min-width: 0; font-size: 14px; color: var(--body); }
+.qp-line-amount { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 14px; color: var(--ink); white-space: nowrap; }
+.qp-signature { font-family: var(--serif); font-style: italic; font-size: 25px; margin-top: 7px; color: var(--ink); }
+.qp-print {
+  height: 50px;
+  border-radius: 9px;
+  border: 1px solid var(--ox);
+  color: var(--ox);
+  background: var(--card);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  width: 100%;
+}
+.qp-print:hover { background: var(--qp-oxbg); }
+.qp-small { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin: 0; }
+
+/* the Pay section (receipt only) — spec §7.4 */
+.qp-pay { border-top: 1px solid var(--line); padding-top: 16px; display: flex; flex-direction: column; gap: 10px; }
+.qp-pay[data-tone="good"] .qp-pay-title { color: var(--ok); }
+.qp-pay[data-tone="warn"] .qp-pay-title { color: var(--warn); }
+.qp-pay-title { font-family: var(--serif); font-weight: 400; font-size: 22px; line-height: 1.2; margin: 0; color: var(--ink); }
+.qp-pay-body { font-size: 14px; color: var(--body); line-height: 1.6; margin: 0; }
+.qp-pay-fields { display: flex; flex-direction: column; gap: 10px; }
+.qp-pay-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.qp-pay-label { display: flex; flex-direction: column; gap: 5px; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.qp-pay-input, .qp-pay-hosted {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--well);
+  font: inherit;
+  font-size: 15px;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--ink);
+}
+.qp-pay-input:focus { outline: none; border-color: var(--ox); }
+.qp-pay-error { margin: 0; font-size: 13px; line-height: 1.55; color: var(--wine); }
+
+@media print {
+  @page { margin: 16mm; }
+  html, body { background: #fff !important; height: auto !important; }
+  .qp-root { background: #fff; padding: 0; min-height: 0; display: block; }
+  .qp-sheet { max-width: none; border: 0; box-shadow: none; border-radius: 0; overflow: visible; }
+  .qp-footer { max-width: none; margin-top: 18px; }
+  .qp-band { -webkit-print-color-adjust: exact; print-color-adjust: exact; border-radius: 0; }
+  .qp-terms-body { max-height: none; overflow: visible; }
+  .qp-noprint { display: none !important; }
+  .qp-section, .qp-line { break-inside: avoid; }
+}
