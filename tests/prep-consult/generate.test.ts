@@ -18,6 +18,7 @@ function baseMocks(overrides: {
   createDraftImpl?: (input: unknown) => Promise<{ id: string }>;
   headsUp?: { headline: string; summary: string; subject: string; draftBody: string };
   clientPrep?: { headline: string; summary: string; subject: string; draftBody: string };
+  clientPrepImpl?: () => Promise<{ headline: string; summary: string; subject: string; draftBody: string }>;
 } = {}) {
   const resolveCurrentRole = vi.fn(async () => overrides.role ?? "attorney");
   const getLead = vi.fn(async () => overrides.lead ?? null);
@@ -43,13 +44,14 @@ function baseMocks(overrides: {
       },
   );
   const buildClientPrepDraft = vi.fn(
-    async () =>
-      overrides.clientPrep ?? {
-        headline: "Consult prep email DRAFT — Jane Doe (Trademark)",
-        summary: "summary",
-        subject: "Preparing for your strategy session — Jane Doe",
-        draftBody: "client prep body",
-      },
+    overrides.clientPrepImpl ??
+      (async () =>
+        overrides.clientPrep ?? {
+          headline: "Consult prep email DRAFT — Jane Doe (Trademark)",
+          summary: "summary",
+          subject: "Preparing for your strategy session — Jane Doe",
+          draftBody: "client prep body",
+        }),
   );
 
   vi.doMock("@/lib/db/scoped-client", () => ({ getScopedClient: vi.fn(async () => ({})) }));
@@ -207,18 +209,12 @@ describe("queuePrepConsultDrafts", () => {
   });
 
   it("builds both drafts before queuing either, so a build failure never orphans a queued draft", async () => {
-    const { createDraft } = baseMocks({ lead });
-    vi.doMock("@/lib/prep-consult/drafts", () => ({
-      buildHeadsUpDraft: vi.fn(async () => ({
-        headline: "h",
-        summary: "s",
-        subject: "s",
-        draftBody: "b",
-      })),
-      buildClientPrepDraft: vi.fn(async () => {
+    const { createDraft } = baseMocks({
+      lead,
+      clientPrepImpl: async () => {
         throw new Error("model refused");
-      }),
-    }));
+      },
+    });
     const { queuePrepConsultDrafts } = await import("@/lib/prep-consult/generate");
 
     await expect(queuePrepConsultDrafts(input)).rejects.toThrow(/model refused/);
