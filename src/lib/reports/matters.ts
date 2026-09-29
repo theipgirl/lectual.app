@@ -32,6 +32,7 @@ export async function loadMattersReport(period: ReportPeriod): Promise<MattersRe
       waiting: [],
       links: [
         { label: "All matters", sub: "The full worklist, grouped by client", href: "/dashboard/matters/", count: null },
+        { label: "Pipeline", sub: "Every client from intake to registration", href: "/dashboard/pipeline/", count: null },
         { label: "Documents", sub: "Filings, specimens and letters", href: "/dashboard/documents/", count: null },
         { label: "Client portals", sub: "What each client can see", href: "/dashboard/portals/", count: null },
       ],
@@ -70,6 +71,7 @@ export async function loadMattersReport(period: ReportPeriod): Promise<MattersRe
 
   const links: LinkTile[] = [
     { label: "All matters", sub: "The full worklist, grouped by client", href: "/dashboard/matters/", count: docket.open },
+    { label: "Pipeline", sub: "Every client from intake to registration", href: "/dashboard/pipeline/", count: null },
     { label: "Documents", sub: "Filings, specimens and letters", href: "/dashboard/documents/", count: null },
     { label: "Client portals", sub: "What each client can see", href: "/dashboard/portals/", count: null },
   ];

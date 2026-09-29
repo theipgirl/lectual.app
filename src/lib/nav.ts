@@ -62,6 +62,8 @@ export const NAV: readonly NavItem[] = [
   { slug: "intake", label: "Intake", railLabel: "PNC", href: "/dashboard/intake/", also: ["/dashboard/leads/"], icon: ICON.users, step: 6 },
   { slug: "forms", label: "Intake forms", railLabel: "Forms", href: "/dashboard/forms/", icon: ICON.file, step: 7 },
   { slug: "quotes", label: "Quotes & proposals", href: "/dashboard/quotes/", icon: ICON.file, step: 7 },
+  // One board from referral to registration (src/lib/lifecycle). No module: it reads only the firm's own leads and matters.
+  { slug: "pipeline", label: "Pipeline", href: "/dashboard/pipeline/", icon: ICON.bars, step: 7 },
   { slug: "matters", label: "Matters", railLabel: "All matters", href: "/dashboard/matters/", icon: ICON.case, step: 6 },
   { slug: "documents", label: "Documents", href: "/dashboard/documents/", icon: ICON.file, step: 6 },
   { slug: "portals", label: "Client portals", href: "/dashboard/portals/", icon: ICON.users, step: 6 },
@@ -100,7 +102,7 @@ export const RAIL_TREE: readonly (readonly RailNode[])[] = [
   [
     { label: "Intake", icon: ICON.tray, report: "intake", link: "intake", kids: ["intake", "forms"] },
     { slug: "quotes" },
-    { label: "Active matters", icon: ICON.case, report: "matters", link: "matters", kids: ["matters", "documents", "portals"] },
+    { label: "Active matters", icon: ICON.case, report: "matters", link: "matters", kids: ["matters", "pipeline", "documents", "portals"] },
   ],
   [{ label: "IP.OS", icon: ICON.shield, report: "ipos", kids: ["copilot", "agents", "skills", "brain"] }],
 ];

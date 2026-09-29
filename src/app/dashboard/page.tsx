@@ -9,20 +9,33 @@ import { buildCalendarRows } from "@/lib/matters/calendar-rows";
 import { BAND_COPY } from "@/lib/matters/worklist";
 import { formatCivilDate } from "@/lib/matters/ip-fields";
 import { laneOf, laneReason } from "@/lib/leads/lane";
-import { buildPriorities, emptyPrioritiesNote, hourInZone, type PriorityTag } from "@/lib/today/priorities";
+import { hourInZone } from "@/lib/today/priorities";
+import { buildNeedsYou, emptyNeedsYouNote, type NeedsYouItem } from "@/lib/today/needs-you";
+import { loadConnectionsNeedingReauth, loadDeadlinesClosedSince, loadOpenQuotes, loadUnreviewedSubmissions } from "@/lib/today/load-needs-you";
+import { civilInZone, deadlinesMetThisMonth, mattersOpenedThisMonth, monthQueryFloor, monthStartCivil } from "@/lib/today/outcomes";
 import { getFirmTimeZone } from "@/lib/org/profile";
-import { AGENT_DEFS, type AgentId } from "@/lib/agents/types";
-import { relativeTime } from "@/lib/relative-time";
+import { loadAutopilot, type AutopilotLoad } from "@/lib/agents/autopilot";
+import {
+  autopilotStateLine,
+  canPauseAutopilot,
+  canResumeAutopilot,
+  DEFAULT_MINUTES_PER_TASK,
+  estimateAssumption,
+  estimateHoursSaved,
+} from "@/lib/agents/autopilot-rules";
+import { buildRunDigest, type DigestRun } from "@/lib/agents/digest";
+import { listMemberDirectory } from "@/lib/members/directory";
+import { leadDisplayName } from "@/lib/matters/client-name";
+import { civilDate } from "@/lib/matters/calendar-rows";
+import { deadlineKindLabel } from "@/lib/matters/deadline-rules";
+import { AutopilotControl } from "@/components/agents/AutopilotControl";
+import { RunDigestList } from "@/components/agents/RunDigestList";
 
 export const dynamic = "force-dynamic";
 
-const TAG: Record<PriorityTag, { label: string; tone: string }> = {
-  overdue: { label: "Overdue", tone: "lx-pill-risk" },
-  deadline: { label: "Due soon", tone: "lx-pill-warn" },
-  approval: { label: "Approve", tone: "lx-pill-ox" },
-  hot: { label: "Hot lead", tone: "lx-pill-warn" },
-  quiet: { label: "Gone quiet", tone: "lx-pill-mute" },
-};
+const TONE: Record<NeedsYouItem["tone"], string> = { risk: "lx-pill-risk", warn: "lx-pill-warn", ox: "lx-pill-ox", mute: "lx-pill-mute" };
+/** How many "Needs you" rows Today draws before summarising the rest. */
+const NEEDS_YOU_SHOWN = 10;
 
 function greeting(hour: number): string {
   return hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening";
@@ -49,26 +62,37 @@ export default async function TodayPage() {
   const session = await resolveFirmSession();
   if (session.kind !== "ok") return null; // the layout already handled this
   const now = new Date();
-  const hasAgents = await orgHasModule("agents");
+  const [hasAgents, tz] = await Promise.all([orgHasModule("agents"), getFirmTimeZone()]);
+  const monthFloor = monthQueryFloor(now, tz);
 
-  const [queueS, leadsS, mattersS, deadlinesS, tasksS, runsS] = await Promise.allSettled([
-    loadActiveQueue(),
-    listLeads(),
-    listMatters(),
-    listUpcomingDeadlines({ limit: 100 }),
-    listTasks({ status: "open" }),
-    hasAgents
-      ? getScopedClient().then(async (sb) => {
-          const { data, error } = await sb
-            .from("agent_run")
-            .select("id, agent, status, started_at, drafts_out, summary")
-            .order("started_at", { ascending: false })
-            .limit(6);
-          if (error) throw error;
-          return data ?? [];
-        })
-      : Promise.resolve(null),
-  ]);
+  const [queueS, leadsS, mattersS, deadlinesS, tasksS, runsS, autopilotS, quotesS, connectionsS, submissionsS, closedS, membersS] =
+    await Promise.allSettled([
+      loadActiveQueue(),
+      listLeads(),
+      listMatters(),
+      listUpcomingDeadlines({ limit: 100 }),
+      listTasks({ status: "open" }),
+      hasAgents
+        ? getScopedClient().then(async (sb) => {
+            // This month's runs, and at least the last 24 hours: the digest and the estimate.
+            const since = new Date(Math.min(Date.parse(monthFloor), now.getTime() - 86_400_000)).toISOString();
+            const { data, error } = await sb
+              .from("agent_run")
+              .select("agent, status, started_at, finished_at, items_in, drafts_out, summary, error")
+              .gte("started_at", since)
+              .order("started_at", { ascending: false })
+              .limit(2000);
+            if (error) throw error;
+            return (data ?? []) as DigestRun[];
+          })
+        : Promise.resolve(null),
+      hasAgents ? loadAutopilot() : Promise.resolve(null),
+      loadOpenQuotes(),
+      loadConnectionsNeedingReauth(),
+      loadUnreviewedSubmissions(),
+      loadDeadlinesClosedSince(monthFloor),
+      listMemberDirectory(),
+    ]);
 
   // loadActiveQueue never throws; a rejection would be a bug, shown as unavailable.
   const queue: QueueLoad = queueS.status === "fulfilled" ? queueS.value : { status: "unavailable", items: [] };
@@ -76,7 +100,14 @@ export default async function TodayPage() {
   const matters = mattersS.status === "fulfilled" ? mattersS.value : null;
   const deadlines = deadlinesS.status === "fulfilled" ? deadlinesS.value : null;
   const tasks = tasksS.status === "fulfilled" ? tasksS.value : null;
+  // null = no agents module; undefined = the log couldn't be read.
   const runs = runsS.status === "fulfilled" ? runsS.value : undefined;
+  const autopilot: AutopilotLoad | null = autopilotS.status === "fulfilled" ? autopilotS.value : { status: "unavailable" };
+  const openQuotes = quotesS.status === "fulfilled" ? quotesS.value : { quotes: null, payments: null };
+  const connections = connectionsS.status === "fulfilled" ? connectionsS.value : null;
+  const submissions = submissionsS.status === "fulfilled" ? submissionsS.value : null;
+  const closedDeadlines = closedS.status === "fulfilled" ? closedS.value : null;
+  const members = membersS.status === "fulfilled" ? membersS.value : [];
 
   const docket = matters ? summarizeDocket(matters, now) : null;
   const rows = buildCalendarRows(deadlines ?? [], tasks ?? [], now);
@@ -97,17 +128,66 @@ export default async function TodayPage() {
     .filter((l) => laneOf(l) === "hot" && !l.assigned_to && Date.parse(l.created_at) >= now.getTime() - 14 * 86_400_000)
     .map((l) => ({ id: l.id, name: `${l.first_name} ${l.last_name}`.trim() || l.business_name || l.email, reason: laneReason(l.ai_summary) }));
 
-  const priorities = buildPriorities({
-    deadlines: rows,
-    queue: queue.status === "ok" ? queue.items : [],
-    stalled: docket?.stalled ?? [],
-    hotLeads,
+  const digest = hasAgents ? buildRunDigest(runs === undefined ? null : runs ?? [], now, 24) : null;
+  const matterOwner = new Map((matters ?? []).map((m) => [m.id, m.assigned_to]));
+  const leadName = new Map((leads ?? []).map((l) => [l.id, leadDisplayName(l)]));
+
+  const needs = buildNeedsYou({
+    userId: session.user.id,
     now,
+    deadlines:
+      deadlines?.map((d) => ({
+        id: d.id,
+        matterId: d.matter_id,
+        name: d.title ?? deadlineKindLabel(d.kind),
+        dueDate: d.due_date,
+        confirmed: d.attorney_confirmed,
+        matterRef: [d.matter_number, d.matter_title].filter(Boolean).join(" · ") || "Docket",
+        ownerId: matterOwner.get(d.matter_id) ?? null,
+      })) ?? null,
+    tasks:
+      tasks
+        ?.filter((t) => t.due_at)
+        .map((t) => ({
+          id: t.id,
+          title: t.title,
+          dueDate: civilDate(new Date(t.due_at as string)),
+          href: t.matter_id ? `/dashboard/matters/${t.matter_id}/` : t.lead_id ? `/dashboard/leads/${t.lead_id}/` : "/dashboard/calendar/",
+          assigneeId: t.assignee_id,
+        })) ?? null,
+    queue: queue.status === "ok" ? { status: "ok", items: queue.items } : { status: queue.status },
+    quotes:
+      openQuotes.quotes?.map((q) => ({
+        id: q.id,
+        title: q.title,
+        status: q.status,
+        expiresAt: q.expires_at,
+        acceptedAt: q.accepted_at,
+        clientName: q.lead_id ? leadName.get(q.lead_id) ?? null : null,
+        createdBy: q.created_by,
+      })) ?? null,
+    payments: openQuotes.payments,
+    agentFailures: digest ? (digest.status === "ok" ? digest.failures : null) : [],
+    connections,
+    submissions,
+    hotLeads,
+    stalled: docket ? docket.stalled : null,
   });
+  const forYouCount = needs.items.filter((i) => i.forYou).length;
+
+  // Outcomes. Each is "—" with why when its source couldn't be read.
+  const opened = matters ? mattersOpenedThisMonth(matters, now, tz) : null;
+  const met = closedDeadlines ? deadlinesMetThisMonth(closedDeadlines, now, tz) : null;
+  const minutes = autopilot?.status === "ok" ? autopilot.state.minutesPerTask : DEFAULT_MINUTES_PER_TASK;
+  const monthStart = monthStartCivil(now, tz);
+  const estimate = runs ? estimateHoursSaved(runs.filter((r) => civilInZone(new Date(r.started_at), tz) >= monthStart), minutes) : null;
+
+  const paused = autopilot?.status === "ok" && autopilot.state.paused;
+  const pausedBy = autopilot?.status === "ok" ? autopilot.state.pausedBy : null;
+  const pausedByName = pausedBy ? (members.find((m) => m.userId === pausedBy)?.displayName ?? members.find((m) => m.userId === pausedBy)?.email ?? null) : null;
 
   const queueValue = queue.status === "ok" ? queue.items.length : null;
   const queueFailed = queue.status === "unavailable" ? "Queue unreachable, so we can't say" : "No queue connected yet";
-  const tz = await getFirmTimeZone();
   const dateLine = now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: tz });
 
   return (
@@ -138,28 +218,49 @@ export default async function TodayPage() {
 
       <div className="lx-split">
         <div className="lx-col">
-          <section className="lx-card" style={{ padding: 18, display: "grid", gap: 10 }}>
-            <h2 className="lx-h2" style={{ fontSize: 25 }}>
-              Top of the list
-            </h2>
-            {priorities.length === 0 ? (
+          <section className="lx-card" style={{ padding: 18, display: "grid", gap: 10 }} aria-labelledby="needs-you-h">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+              <h2 id="needs-you-h" className="lx-h2" style={{ fontSize: 25 }}>
+                Needs you{needs.items.length > 0 && <span className="lx-note" style={{ fontSize: 16 }}> · {needs.items.length}</span>}
+              </h2>
+              {forYouCount > 0 && <span className="lx-pill lx-pill-ox">{forYouCount} yours</span>}
+            </div>
+            {needs.items.length > 0 && needs.unavailable.length > 0 && (
+              <p className="lx-note" style={{ margin: 0, color: "var(--warn)" }}>
+                {needs.unavailable.join(", ")} couldn&apos;t be read, so this list may be missing items.
+              </p>
+            )}
+            {needs.items.length === 0 ? (
               <p className="lx-note" style={{ margin: 0 }}>
-                {emptyPrioritiesNote({ queue: queue.status, calendarOk: !calendarNote, docketOk: !!docket })}
+                {emptyNeedsYouNote(needs, queue.status)}
               </p>
             ) : (
               <ol className="lx-list lx-prio">
-                {priorities.map((p) => (
-                  <li key={p.key}>
-                    <span className={`lx-pill ${TAG[p.tag].tone}`}>{TAG[p.tag].label}</span>
+                {needs.items.slice(0, NEEDS_YOU_SHOWN).map((n) => (
+                  <li key={n.key}>
+                    <span className={`lx-pill ${TONE[n.tone]}`}>{n.forYou ? "You" : "Firm"}</span>
                     <span style={{ minWidth: 0 }}>
-                      <Link href={p.href} className="lx-rowlink">
-                        {p.title}
+                      <Link href={n.href} className="lx-rowlink">
+                        {n.action}
                       </Link>
-                      {p.detail && <span className="lx-note" style={{ display: "block" }}>{p.detail}</span>}
+                      <span className="lx-note" style={{ display: "block" }}>
+                        {n.subject}
+                        {n.detail ? ` · ${n.detail}` : ""}
+                        {" · "}
+                        <Link href={n.href} style={{ fontWeight: 500, color: "var(--ox)", whiteSpace: "nowrap" }}>
+                          {n.cta} →
+                        </Link>
+                      </span>
                     </span>
                   </li>
                 ))}
               </ol>
+            )}
+            {needs.items.length > NEEDS_YOU_SHOWN && (
+              <p className="lx-note" style={{ margin: 0 }}>
+                And {needs.items.length - NEEDS_YOU_SHOWN} more. See the <Link href="/dashboard/queue/">Queue</Link> and the{" "}
+                <Link href="/dashboard/calendar/">Calendar</Link>.
+              </p>
             )}
           </section>
 
@@ -197,6 +298,59 @@ export default async function TodayPage() {
 
         <aside className="lx-col lx-col-aside">
           <section className="lx-card lx-aside">
+            <div className="lx-label">This month</div>
+            <div className="lx-task" style={{ padding: "2px 0" }}>
+              <Link href="/dashboard/matters/">Matters opened</Link>
+              <span className="lx-num">{opened ?? "—"}</span>
+            </div>
+            <div className="lx-task" style={{ padding: "2px 0" }}>
+              <Link href="/dashboard/calendar/" title="Deadlines closed as satisfied this month, on or before their due date">
+                Deadlines met
+              </Link>
+              <span className="lx-num">{met ? `${met.met} of ${met.closed}` : "—"}</span>
+            </div>
+            {hasAgents && (
+              <div className="lx-task" style={{ padding: "2px 0" }}>
+                <Link href="/dashboard/agents/" title={`est. using ${estimateAssumption(minutes)}`}>
+                  Hours saved (est.)*
+                </Link>
+                <span className="lx-num">{estimate ? estimate.hours : "—"}</span>
+              </div>
+            )}
+            {(opened === null || met === null) && <p className="lx-note" style={{ margin: 0 }}>A figure shown as — couldn&apos;t be read just now.</p>}
+            {hasAgents && (
+              <p className="lx-note" style={{ margin: 0, fontSize: 12 }}>
+                * An estimate, not a measurement: completed agent tasks × your firm&apos;s minutes per task ({estimateAssumption(minutes)}).{" "}
+                <Link href="/dashboard/agents/">Change the minutes</Link>
+              </p>
+            )}
+          </section>
+
+          {hasAgents && digest && (
+            <section className="lx-card lx-aside">
+              <div className="lx-label">Overnight run</div>
+              {autopilot?.status === "ok" ? (
+                <AutopilotControl
+                  compact
+                  paused={paused}
+                  reason={autopilot.state.reason}
+                  stateLine={autopilotStateLine(autopilot.state, { lastRunAt: digest.status === "ok" ? digest.lastRunAt : null, pausedByName, now, tz })}
+                  canPause={canPauseAutopilot(session.role)}
+                  canResume={canResumeAutopilot(session.role)}
+                />
+              ) : autopilot?.status === "unavailable" ? (
+                <p className="lx-note" role="alert" style={{ margin: 0, color: "var(--warn)" }}>
+                  We couldn&apos;t read whether Autopilot is paused. Until we can, no agent runs.
+                </p>
+              ) : null}
+              <RunDigestList digest={digest} paused={paused} />
+              <Link href="/dashboard/agents/" className="lx-note">
+                Agents →
+              </Link>
+            </section>
+          )}
+
+          <section className="lx-card lx-aside">
             <div className="lx-label">The docket</div>
             {docket ? (
               <>
@@ -211,39 +365,14 @@ export default async function TodayPage() {
                     {docket.stalled.length} gone quiet →
                   </Link>
                 )}
+                <Link href="/dashboard/pipeline/" className="lx-note">
+                  Pipeline →
+                </Link>
               </>
             ) : (
               <p className="lx-note" style={{ margin: 0 }}>Matters couldn&apos;t be loaded.</p>
             )}
           </section>
-
-          {hasAgents && (
-            <section className="lx-card lx-aside">
-              <div className="lx-label">Agents overnight</div>
-              {runs === undefined ? (
-                <p className="lx-note" style={{ margin: 0 }}>The run log couldn&apos;t be loaded.</p>
-              ) : !runs || runs.length === 0 ? (
-                <p className="lx-note" style={{ margin: 0 }}>No runs yet. Switch agents on in Agents.</p>
-              ) : (
-                <ul className="lx-list">
-                  {runs.map((r) => (
-                    <li key={r.id} style={{ padding: "8px 0", display: "grid", gap: 2 }}>
-                      <span style={{ color: "var(--ink)", fontWeight: 500 }}>
-                        {AGENT_DEFS[r.agent as AgentId]?.name ?? r.agent}
-                        <span className="lx-note"> · {relativeTime(r.started_at)}</span>
-                      </span>
-                      <span className="lx-note" style={r.status === "error" ? { color: "var(--wine)" } : undefined}>
-                        {r.status === "error" ? "Failed. See Agents." : r.summary ?? r.status}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <Link href="/dashboard/agents/" className="lx-note">
-                Agents →
-              </Link>
-            </section>
-          )}
 
           <div className="lx-upl">
             <span aria-hidden="true">§</span>
