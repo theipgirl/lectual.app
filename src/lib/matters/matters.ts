@@ -5,6 +5,7 @@ import { logActivity } from "./activity";
 import { type MatterStatus, isMatterStatus } from "./status";
 import type { FilingBasis } from "./ip-fields";
 import { type MatterStage, listMatterStages } from "./stages";
+import { nextMatterNumber } from "./numbering";
 
 /** The crm_matter row exactly as the table stores it. */
 export type MatterRow = Database["public"]["Tables"]["crm_matter"]["Row"];
@@ -184,9 +185,8 @@ function ipColumns(input: MatterIpFields): Record<string, unknown> {
 
 /**
  * Creates a matter. Staff-role-gated (see MATTER_WRITE_ROLES).
- * When matterNumber is omitted, generates `${type}-${year}-${4-digit}`,
- * derived from the current count of the org's matters + 1, zero-padded
- * (e.g. TM-2026-0001). The (org_id, matter_number) unique constraint is the
+ * When matterNumber is omitted, generates the next number in that type's
+ * sequence for the year (e.g. TM-2026-0001; see nextMatterNumber). The (org_id, matter_number) unique constraint is the
  * real guard against a race producing a duplicate — this is a best-effort
  * generator, not a reservation.
  */
@@ -203,13 +203,17 @@ export async function createMatter(input: CreateMatterInput): Promise<MatterRow>
 
   let matterNumber = input.matterNumber;
   if (!matterNumber) {
-    const { count, error: countError } = await supabase
+    const year = String(new Date().getFullYear());
+    const { data: numberRows, error: numberError } = await supabase
       .from("crm_matter")
-      .select("id", { count: "exact", head: true });
-    if (countError) throw countError;
-    const next = (count ?? 0) + 1;
-    const year = new Date().getFullYear();
-    matterNumber = `${input.type}-${year}-${String(next).padStart(4, "0")}`;
+      .select("matter_number")
+      .like("matter_number", `${input.type}-${year}-%`);
+    if (numberError) throw numberError;
+    matterNumber = nextMatterNumber(
+      input.type,
+      year,
+      (numberRows ?? []).map((r) => r.matter_number as string),
+    );
   }
 
   const { data, error } = await supabase

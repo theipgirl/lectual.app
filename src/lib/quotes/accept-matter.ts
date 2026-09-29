@@ -5,6 +5,9 @@ import "server-only";
 // engine.
 import type { PublicQuotesDb } from "./public";
 import { firmCivilDate } from "./firm-time";
+import { nextMatterNumber } from "@/lib/matters/numbering";
+
+export { nextMatterNumber };
 
 /**
  * "Matter opens automatically" — the design's promise on acceptance, kept only
@@ -58,23 +61,6 @@ const NUMBER_ATTEMPTS = 3;
 
 function str(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-/**
- * The next free `${type}-${year}-NNNN` for this org. `createMatter` uses the
- * org's matter count + 1; this does the same, then steps past any number
- * already taken (a firm whose older matters were numbered by hand can hold the
- * count's own number already).
- */
-export function nextMatterNumber(type: string, year: string, existing: readonly string[], skip = 0): string {
-  const taken = new Set(existing);
-  let n = existing.length + 1 + skip;
-  let candidate = `${type}-${year}-${String(n).padStart(4, "0")}`;
-  while (taken.has(candidate)) {
-    n += 1;
-    candidate = `${type}-${year}-${String(n).padStart(4, "0")}`;
-  }
-  return candidate;
 }
 
 export async function openMatterForAcceptedQuote(

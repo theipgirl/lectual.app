@@ -90,7 +90,7 @@ describe("opening the matter", () => {
   it("opens one open matter for the quote's lead, in the firm's first open docket stage", async () => {
     const db = makeDb();
     const result = await run(db);
-    expect(result).toMatchObject({ status: "opened", matterNumber: "CR-2026-0003" });
+    expect(result).toMatchObject({ status: "opened", matterNumber: "CR-2026-0001" });
     if (result.status !== "opened") return;
 
     const matter = db.tables.crm_matter.find((m) => m.id === result.matterId);
@@ -120,7 +120,7 @@ describe("opening the matter", () => {
         quote_id: QUOTE,
         type: "revised",
         actor: "system",
-        payload: { change: "matter_opened", matter_id: result.matterId, matter_number: "CR-2026-0003" },
+        payload: { change: "matter_opened", matter_id: result.matterId, matter_number: "CR-2026-0001" },
       }),
     ]);
     expect(db.tables.crm_activity).toEqual([
@@ -151,7 +151,7 @@ describe("opening the matter", () => {
       title: "Nadia Petra",
       type: "TM",
       package_name: null,
-      matter_number: "TM-2026-0003",
+      matter_number: "TM-2026-0001",
     });
   });
 
@@ -199,7 +199,7 @@ describe("what the matter carries over", () => {
       { quoteId: QUOTE, orgId: ORG },
       { packageName: null, now: new Date("2027-01-01T03:00:00Z"), timeZone: "America/Los_Angeles" },
     );
-    expect(result).toMatchObject({ status: "opened", matterNumber: "TM-2026-0003" });
+    expect(result).toMatchObject({ status: "opened", matterNumber: "TM-2026-0001" });
   });
 });
 
@@ -252,10 +252,13 @@ describe("the lead moves to the firm's won stage", () => {
   });
 });
 
-describe("matter numbers — createMatter's count + 1, never a taken one", () => {
-  it("is the org's matter count + 1, zero-padded", () => {
+describe("matter numbers — one sequence per type per year, never a taken one", () => {
+  it("is the highest number in that type-and-year sequence + 1, zero-padded", () => {
     expect(nextMatterNumber("TM", "2026", [])).toBe("TM-2026-0001");
-    expect(nextMatterNumber("TM", "2026", ["A", "B"])).toBe("TM-2026-0003");
+    expect(nextMatterNumber("TM", "2026", ["A", "B"])).toBe("TM-2026-0001");
+    // Other types, other years and other schemes never advance this sequence.
+    expect(nextMatterNumber("TM", "2026", ["HIP-2026-009", "CR-2026-0004", "TM-2025-0007"])).toBe("TM-2026-0001");
+    expect(nextMatterNumber("TM", "2026", ["TM-2026-0003", "TM-2026-0001"])).toBe("TM-2026-0004");
   });
 
   it("steps past a number already taken", () => {
@@ -266,7 +269,7 @@ describe("matter numbers — createMatter's count + 1, never a taken one", () =>
     const db = makeDb();
     db.insertFailure = { table: "crm_matter", code: "23505" };
     const result = await run(db);
-    expect(result).toMatchObject({ status: "opened", matterNumber: "CR-2026-0004" });
+    expect(result).toMatchObject({ status: "opened", matterNumber: "CR-2026-0002" });
   });
 });
 

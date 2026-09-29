@@ -15,6 +15,10 @@ class FakeQuery
     this.calls.push(["select", a]);
     return this;
   }
+  like(...a: unknown[]) {
+    this.calls.push(["like", a]);
+    return this;
+  }
   eq(...a: unknown[]) {
     this.calls.push(["eq", a]);
     return this;
@@ -124,40 +128,39 @@ describe("MATTER_WRITE_ROLES membership", () => {
 });
 
 describe("createMatter matter_number generation", () => {
-  it("formats as `${type}-${year}-${4-digit}`, derived from count + 1", async () => {
+  const year = new Date().getFullYear();
+
+  it("is the next number in that type's sequence for the year", async () => {
     state.queue = [
-      { data: null, error: null, count: 41 },
-      {
-        data: { id: "matter-1", type: "TM", matter_number: "TM-placeholder" },
-        error: null,
-      },
+      { data: [{ matter_number: `TM-${year}-0041` }, { matter_number: `TM-${year}-0007` }], error: null },
+      { data: { id: "matter-1", type: "TM", matter_number: "TM-placeholder" }, error: null },
     ];
 
     await createMatter({ type: "TM" });
 
-    const year = new Date().getFullYear();
     const insertCall = lastInsertQuery().calls.find(([name]) => name === "insert");
     const payload = insertCall![1][0] as Record<string, unknown>;
     expect(payload.matter_number).toBe(`TM-${year}-0042`);
   });
 
-  it("zero-pads to 4 digits for small counts", async () => {
+  it("only reads numbers in that type-and-year sequence", async () => {
     state.queue = [
-      { data: null, error: null, count: 0 },
+      { data: [], error: null },
       { data: { id: "matter-2" }, error: null },
     ];
 
     await createMatter({ type: "CR" });
 
-    const year = new Date().getFullYear();
+    const numberQuery = mockFrom.mock.results[0].value as { calls: [string, unknown[]][] };
+    expect(numberQuery.calls).toContainEqual(["like", ["matter_number", `CR-${year}-%`]]);
     const insertCall = lastInsertQuery().calls.find(([name]) => name === "insert");
     const payload = insertCall![1][0] as Record<string, unknown>;
     expect(payload.matter_number).toBe(`CR-${year}-0001`);
   });
 
-  it("does not pad past 4 digits for large counts", async () => {
+  it("does not pad past 4 digits for large sequences", async () => {
     state.queue = [
-      { data: null, error: null, count: 12345 },
+      { data: [{ matter_number: `TM-${year}-12345` }], error: null },
       { data: { id: "matter-3" }, error: null },
     ];
 
@@ -168,7 +171,7 @@ describe("createMatter matter_number generation", () => {
     expect(payload.matter_number).toMatch(/^TM-\d{4}-12346$/);
   });
 
-  it("uses the caller-supplied matterNumber verbatim when given, skipping the count lookup", async () => {
+  it("uses the caller-supplied matterNumber verbatim when given, skipping the number lookup", async () => {
     state.queue = [{ data: { id: "matter-4" }, error: null }];
 
     await createMatter({ type: "TM", matterNumber: "TM-CUSTOM-0007" });
@@ -183,7 +186,7 @@ describe("createMatter role gating", () => {
   it("allows paralegal", async () => {
     state.role = "paralegal";
     state.queue = [
-      { data: null, error: null, count: 0 },
+      { data: [], error: null },
       { data: { id: "matter-1" }, error: null },
     ];
     await expect(createMatter({ type: "TM" })).resolves.toBeTruthy();

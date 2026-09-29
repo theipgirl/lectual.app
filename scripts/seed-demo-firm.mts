@@ -302,13 +302,23 @@ async function main() {
     "contacts",
   );
 
+  // The app's own scheme (src/lib/matters/numbering.ts): TYPE-YEAR-NNNN, one
+  // sequence per type, so a matter the firm opens next continues the demo's.
+  const seqByType = new Map<string, number>();
+  const matterNo = new Map<number, string>();
+  for (const m of matterSeeds) {
+    const next = (seqByType.get(m.type) ?? 0) + 1;
+    seqByType.set(m.type, next);
+    matterNo.set(m.n, `${m.type}-2026-${String(next).padStart(4, "0")}`);
+  }
+
   const matters = must(
     await db
       .from("crm_matter")
       .insert(
         matterSeeds.map((m) => ({
           org_id: orgId,
-          matter_number: `HIP-2026-${String(m.n).padStart(3, "0")}`,
+          matter_number: matterNo.get(m.n)!,
           title: m.title,
           type: m.type,
           status: "open",
@@ -386,7 +396,7 @@ async function main() {
       act({ lead_id: leadId("Keisha"), type: "call_logged", actor_id: ids.intake, payload: { summary: "Discovery call: rebrand ships in Q1; needs clearance across 9/35/42." }, created_at: daysAgo(3) }),
       act({ lead_id: leadId("Maya"), type: "email_received", actor_type: "system", payload: { from: "maya.lindqvist@example.com", subject: "Retail launch dates" }, created_at: daysAgo(0.2) }),
       act({ lead_id: leadId("Ravi"), type: "ai_insight", actor_type: "ai", payload: { source: "intake-triage", lane: "consult", reason: "Clear mark, launch date set, budget confirmed." }, created_at: daysAgo(12) }),
-      ...matterSeeds.map((m) => act({ matter_id: matterId(m.n), type: "matter_opened", actor_id: ids.owner, payload: { matter_number: `HIP-2026-${String(m.n).padStart(3, "0")}` }, created_at: daysAgo(m.age) })),
+      ...matterSeeds.map((m) => act({ matter_id: matterId(m.n), type: "matter_opened", actor_id: ids.owner, payload: { matter_number: matterNo.get(m.n)! }, created_at: daysAgo(m.age) })),
       act({ matter_id: matterId(4), type: "note", actor_id: ids.paralegal, payload: { note: "Examiner cites a 2(d) refusal against TIDE POOL (Cl. 25). Drafted arguments; client reviewing specimen." }, created_at: daysAgo(5) }),
       act({ matter_id: matterId(4), type: "matter_updated", actor_id: ids.paralegal, payload: { change: "deadline_docketed", kind: "office_action_response", due_date: dateIn(12) }, created_at: daysAgo(70) }),
       act({ matter_id: matterId(2), type: "email_sent", actor_id: ids.paralegal, payload: { subject: "Questionnaire: a few details before we file" }, created_at: daysAgo(6) }),
