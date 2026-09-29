@@ -47,12 +47,13 @@ export function TermsPanel(props: {
   readOnly: TermsReadOnlyView | null;
   isLive: boolean;
   defaultClientName: string;
+  defaultMark?: string | null;
 }) {
   const { readOnly } = props;
   return (
     <Panel title={readOnly?.kind === "signed" ? "Engagement terms as signed" : "Engagement terms"}>
       {!readOnly ? (
-        <TermsEditor quoteId={props.quoteId} termsBody={props.termsBody} isLive={props.isLive} defaultClientName={props.defaultClientName} />
+        <TermsEditor quoteId={props.quoteId} termsBody={props.termsBody} isLive={props.isLive} defaultClientName={props.defaultClientName} defaultMark={props.defaultMark} />
       ) : readOnly.kind === "signed" ? (
         <>
           <p className="lx-note" style={{ margin: 0 }}>

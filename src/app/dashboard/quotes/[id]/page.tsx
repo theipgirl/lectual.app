@@ -6,7 +6,7 @@ import { getSiteOrigin } from "@/lib/site-origin";
 import { loadQuote } from "@/lib/quotes/load";
 import { listQuoteEvents } from "@/lib/quotes/store";
 import { listServiceItems } from "@/lib/quotes/service-library";
-import { quoteClientLabels, quoteMatterRef } from "@/lib/quotes/clients";
+import { quoteClientLabels, quoteDefaultMark, quoteMatterRef } from "@/lib/quotes/clients";
 import { daysUntilQuoteExpiry, effectiveQuoteStatus, isQuoteEditable, quoteStatusLabel } from "@/lib/quotes/status";
 import {
   daysLeftLabel,
@@ -123,6 +123,7 @@ export default async function QuoteBuilderPage({ params }: { params: Promise<{ i
     getFirmTimeZone(),
   ]);
   const client = clients.get(quote.id) ?? null;
+  const defaultMark = await quoteDefaultMark(quote);
 
   // THE client link. `/q/<token>/` only — this app has no per-firm proposal
   // slug (lectual 0070 is not in its databases). trailingSlash is on.
@@ -218,6 +219,7 @@ export default async function QuoteBuilderPage({ params }: { params: Promise<{ i
         readOnly={termsReadOnly}
         isLive={effective === "sent"}
         defaultClientName={client && client.kind !== "matter" ? client.label : ""}
+        defaultMark={defaultMark}
       />
     </>
   );

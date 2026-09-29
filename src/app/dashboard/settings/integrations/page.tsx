@@ -198,7 +198,7 @@ export default async function IntegrationsPage({
               </a>
             ) : (
               <span key={p} className={`lx-btn ${p === "google" ? "lx-btn-cream" : "lx-btn-glass"}`} aria-disabled="true" title={`${PROVIDER_LABEL[p]} isn't set up on this deployment yet`} style={{ opacity: 0.55, cursor: "not-allowed" }}>
-                <span aria-hidden="true">↗</span> Connect {PROVIDER_LABEL[p]}
+                {PROVIDER_LABEL[p]} · not set up yet
               </span>
             ),
           )}

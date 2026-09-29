@@ -180,7 +180,14 @@ function signingFeeLines(lines: readonly QuoteLineInput[], currency: string): st
     if (line.kind === "government_fee") continue;
     if (line.charge_at !== "signing") continue;
     const label = (line.label ?? "").trim() || "Legal fee";
-    out.push(`- ${label}: ${money(lineAmountCents(line), currency)}`);
+    const qty = Number(line.quantity ?? 1);
+    const total = money(lineAmountCents(line), currency);
+    if (Number.isFinite(qty) && qty > 1) {
+      const unit = money(lineAmountCents({ quantity: 1, unit_amount_cents: line.unit_amount_cents }), currency);
+      out.push(`- ${label}: ${unit} × ${qty} = ${total}`);
+    } else {
+      out.push(`- ${label}: ${total}`);
+    }
   }
   return out;
 }

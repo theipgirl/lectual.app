@@ -141,3 +141,25 @@ export async function quoteMatterRef(matterId: string | null): Promise<{ href: s
     return null;
   }
 }
+
+/**
+ * The mark to prefill the engagement-terms generator with: the linked lead's
+ * mark, else the linked matter's. Scoped read, best-effort: any failure is null
+ * and the field simply starts empty.
+ */
+export async function quoteDefaultMark(links: { lead_id: string | null; matter_id: string | null }): Promise<string | null> {
+  try {
+    const supabase = await getScopedClient();
+    if (links.lead_id) {
+      const { data } = await supabase.from("crm_lead").select("mark_text").eq("id", links.lead_id).maybeSingle();
+      if (data?.mark_text?.trim()) return data.mark_text.trim();
+    }
+    if (links.matter_id) {
+      const { data } = await supabase.from("crm_matter").select("mark_text").eq("id", links.matter_id).maybeSingle();
+      if (data?.mark_text?.trim()) return data.mark_text.trim();
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}

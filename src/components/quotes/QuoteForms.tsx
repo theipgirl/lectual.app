@@ -159,7 +159,7 @@ export function QuoteDetailsForm(props: { quoteId: string; title: string; introB
  * a signature made from the copy the client already had open is refused and
  * they are asked to re-read.
  */
-export function TermsEditor(props: { quoteId: string; termsBody: string | null; isLive: boolean; defaultClientName: string }) {
+export function TermsEditor(props: { quoteId: string; termsBody: string | null; isLive: boolean; defaultClientName: string; defaultMark?: string | null }) {
   const [saveState, saveAction, saving] = useActionState<ActionState, FormData>(saveTermsAction, {});
   const [genState, genAction, generating] = useActionState<ActionState, FormData>(generateTermsAction, {});
 
@@ -190,7 +190,7 @@ export function TermsEditor(props: { quoteId: string; termsBody: string | null; 
           </label>
           <label className="lx-field">
             <span className="lx-label">Mark (optional)</span>
-            <input className="lx-input" name="markText" maxLength={200} placeholder="e.g. ACME" />
+            <input className="lx-input" name="markText" maxLength={200} placeholder="e.g. ACME" defaultValue={props.defaultMark ?? ""} />
           </label>
           <div style={{ gridColumn: "1 / -1", display: "flex", gap: 10, alignItems: "center" }}>
             <button type="submit" className="lx-btn lx-btn-sec" disabled={generating}>

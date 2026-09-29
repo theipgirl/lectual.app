@@ -64,7 +64,7 @@ export function IntakeRequestCard(props: { matterId: string; origin: string; req
             Makes a private link to your intake questions. Nothing is emailed; copy the link and send it to the client yourself.
           </p>
           <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" style={{ justifySelf: "start" }} onClick={create} disabled={pending}>
-            {pending ? "Working…" : "Send intake questions"}
+            {pending ? "Working…" : "Create intake link"}
           </button>
         </>
       ) : null}
