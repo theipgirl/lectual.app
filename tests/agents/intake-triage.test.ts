@@ -28,7 +28,7 @@ function handler(rows: unknown[]) {
 }
 
 describe("intake triage", () => {
-  it("act: scores, sets temperature only when unset, and briefs the queue on a hot lead", async () => {
+  it("act: scores and SUGGESTS a lane — never writes the lane or the temperature — and briefs the queue on a hot lead", async () => {
     const { llm, calls } = fakeLlm(hot);
     const { ctx, log, createDraft } = agentCtx(handler([lead(), lead({ id: "lead-2", temperature: "cold" })]), { autonomy: "act", queue: true, llm });
     const result = await runIntakeTriage(ctx);
@@ -36,9 +36,16 @@ describe("intake triage", () => {
     expect(result).toMatchObject({ itemsIn: 2, draftsOut: 2 });
     expect(calls[0].effort).toBe("low");
     const updates = writes(log, "crm_lead", "update");
-    expect(updates[0].values).toMatchObject({ temperature: "hot", ai_summary: expect.stringContaining("HOT") });
-    // A person already set lead-2 to cold: the agent must not overwrite it.
-    expect(updates[1].values).not.toHaveProperty("temperature");
+    // SOP Stage 2: routing is a suggestion, not a status. The suggestion lives
+    // in ai_summary; a person's lane (and the board's temperature) is never touched.
+    expect(updates[0].values).toMatchObject({ ai_summary: expect.stringContaining("HOT") });
+    for (const u of updates) {
+      expect(u.values).not.toHaveProperty("temperature");
+      expect(u.values).not.toHaveProperty("lane");
+    }
+    expect(writes(log, "crm_activity", "insert")[0].values).toMatchObject({
+      payload: expect.objectContaining({ lane: "hot", applied: { lane: false, temperature: false, summary: true } }),
+    });
     expect(createDraft).toHaveBeenCalledWith(expect.objectContaining({ type: "BRIEFING", orgKey: "firm-queue-key" }));
     assertOrgFenced(log);
   });

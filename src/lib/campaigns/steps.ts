@@ -102,6 +102,8 @@ export function enrollmentStatusLabel(status: DripEnrollmentStatus): string {
       return "Completed";
     case "cancelled":
       return "Cancelled";
+    case "stopped":
+      return "Stopped";
     default:
       return status;
   }
@@ -117,6 +119,8 @@ export function enrollmentStatusTone(status: DripEnrollmentStatus): string {
       return "lx-pill-mute";
     case "cancelled":
       return "lx-pill-risk";
+    case "stopped":
+      return "lx-pill-warn";
     default:
       return "lx-pill-mute";
   }

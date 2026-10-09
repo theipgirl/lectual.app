@@ -7,11 +7,22 @@ import { reviewQueueAction, type ReviewState } from "@/app/dashboard/queue/actio
  * Edit / approve / reject for one pending item. `canApprove` / `canEdit` only
  * decide what is rendered; the action re-checks the role on every submit.
  */
-export function ReviewPanel(props: { id: string; initialBody: string; canApprove: boolean; canEdit: boolean }) {
-  const { id, initialBody, canApprove, canEdit } = props;
+export function ReviewPanel(props: {
+  id: string;
+  initialBody: string;
+  canApprove: boolean;
+  canEdit: boolean;
+  /** Set when the client signed / paid / became a client since this was
+   * queued (or that couldn't be checked): Approve stays disabled until the
+   * approver ticks this. The action refuses without it too. */
+  confirmStale?: string | null;
+}) {
+  const { id, initialBody, canApprove, canEdit, confirmStale } = props;
   const [state, action, pending] = useActionState<ReviewState, FormData>(reviewQueueAction, {});
   const [body, setBody] = useState(initialBody);
+  const [staleConfirmed, setStaleConfirmed] = useState(false);
   const dirty = body !== initialBody;
+  const approveBlocked = !!confirmStale && !staleConfirmed;
 
   return (
     <form action={action} className="lx-review">
@@ -38,9 +49,30 @@ export function ReviewPanel(props: { id: string; initialBody: string; canApprove
         </>
       )}
 
+      {canApprove && confirmStale && (
+        <label className="lx-banner lx-banner-risk" style={{ display: "flex", gap: 10, alignItems: "flex-start", margin: 0, cursor: "pointer" }}>
+          <input
+            type="checkbox"
+            name="confirm_stale"
+            value="yes"
+            checked={staleConfirmed}
+            onChange={(e) => setStaleConfirmed(e.target.checked)}
+            style={{ marginTop: 3 }}
+          />
+          <span>{confirmStale}</span>
+        </label>
+      )}
+
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         {canApprove && (
-          <button type="submit" name="intent" value="approve" disabled={pending} className="lx-btn lx-btn-pri">
+          <button
+            type="submit"
+            name="intent"
+            value="approve"
+            disabled={pending || approveBlocked}
+            title={approveBlocked ? "Tick the box above first — this client's status changed since the draft was queued." : undefined}
+            className="lx-btn lx-btn-pri"
+          >
             {pending ? "Working…" : dirty ? "Approve with edits" : "Approve"}
           </button>
         )}

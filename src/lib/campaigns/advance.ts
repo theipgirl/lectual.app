@@ -6,6 +6,11 @@ import { listSteps, type DripEnrollment, type DripStep } from "@/lib/automation/
 import { activeQueueOrgKey } from "@/lib/queue/org";
 import { createDraft } from "@/lib/queue/api";
 import { addDelay, leadDisplayName, leadTemplateVars, renderTemplate } from "./steps";
+import { STOP_REASON_LABEL, stopFor, type StopDecision } from "./stops";
+import { loadStopFacts } from "./stop-facts";
+import { stopLeadSequences } from "./stop";
+import { sessionUserId } from "./stop-staff";
+import type { StopDb } from "./stop-db";
 
 /**
  * Advances ONE enrollment by exactly one step. This is the only place a drip
@@ -33,7 +38,13 @@ export class CampaignAdvanceError extends Error {}
 type Lead = Database["public"]["Tables"]["crm_lead"]["Row"];
 type EmailTemplateRow = Database["public"]["Tables"]["crm_email_template"]["Row"];
 
-export type AdvanceResult = { queueItemId: string | null; completed: boolean; stepType: DripStep["type"] };
+export type AdvanceResult = {
+  queueItemId: string | null;
+  completed: boolean;
+  stepType: DripStep["type"];
+  /** Set when the guard found a stop fact and stopped the sequence instead of running the step. */
+  stopped?: StopDecision;
+};
 
 async function loadEnrollment(
   supabase: Awaited<ReturnType<typeof getScopedClient>>,
@@ -132,6 +143,42 @@ export async function advanceEnrollment(enrollmentId: string): Promise<AdvanceRe
 
   const steps = await listSteps(enrollment.sequence_id);
   const index = enrollment.current_step;
+
+  // ── THE GUARD (SOP §2.5: "check payment state before sending") ──────────
+  // Before ANY step runs, re-read what is recorded about this lead: a signed
+  // quote, a payment, a matter, a won stage, a reply or a call since
+  // enrolling. If one is there the sequence stops instead — even when the
+  // path that recorded the fact never called the stop (a Lawmatics import,
+  // lectual's own dashboard, a stop that failed to write). A failed read
+  // drafts nothing: "we couldn't check" is never "they haven't paid".
+  const factsRead = await loadStopFacts(supabase as unknown as StopDb, { leadId: enrollment.lead_id });
+  if (factsRead.status !== "ok") {
+    throw new CampaignAdvanceError(
+      "Couldn't confirm this lead hasn't signed, paid or replied, so nothing was drafted. Try again shortly.",
+    );
+  }
+  const stop = stopFor(factsRead.facts, enrollment.enrolled_at);
+  if (stop) {
+    const client = stop.reason !== "replied" && stop.reason !== "booked";
+    const outcome = await stopLeadSequences(supabase as unknown as StopDb, {
+      orgId: enrollment.org_id,
+      leadIds: [enrollment.lead_id],
+      reason: stop.reason,
+      actor: { type: "user", id: await sessionUserId(supabase) },
+      factAt: stop.at,
+      // A reply or a call ends only the sequences it answered; a client
+      // leaves all of them.
+      enrolledBefore: client ? null : stop.at,
+      evidence: { detected_by: "advance_guard", enrollment_id: enrollment.id },
+    });
+    if (outcome.status !== "ok" || !outcome.stopped.some((s) => s.enrollmentId === enrollment.id)) {
+      throw new CampaignAdvanceError(
+        `This sequence should stop (${STOP_REASON_LABEL[stop.reason]}), so nothing was drafted — but the stop couldn't be recorded. Refresh and try again.`,
+      );
+    }
+    return { queueItemId: null, completed: false, stepType: index < steps.length ? steps[index].type : "wait", stopped: stop };
+  }
+
   const completedPatch = (count: number): EnrollmentPatch => ({
     current_step: count,
     status: "completed",
@@ -188,6 +235,9 @@ export async function advanceEnrollment(enrollmentId: string): Promise<AdvanceRe
   // The step is ours. If its side effect fails, hand the step back so it can
   // be run again — conditional on nobody having moved the row since.
   const release = async () => {
+    // Never across a stop: a sequence stopped while this step was in flight
+    // stays stopped (0085's trigger refuses it anyway; this keeps the
+    // statement from even trying).
     const { error } = await supabase
       .from("crm_drip_enrollment")
       .update({
@@ -197,7 +247,8 @@ export async function advanceEnrollment(enrollmentId: string): Promise<AdvanceRe
         next_step_at: enrollment.next_step_at,
       })
       .eq("id", enrollmentId)
-      .eq("current_step", nextIndex);
+      .eq("current_step", nextIndex)
+      .in("status", ["active", "completed"]);
     if (error) console.error("[campaigns] failed to release a claimed step:", error);
   };
 

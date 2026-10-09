@@ -10,12 +10,15 @@ import {
   listSteps,
   listTemplates,
   setEnrollmentStatus,
+  stopEnrollment,
   toggleSequenceActive,
   updateSequenceDetails,
   type DripStepType,
 } from "@/lib/automation/drips";
 import { advanceEnrollment } from "@/lib/campaigns/advance";
 import { DRIP_STEP_TYPES } from "@/lib/campaigns/steps";
+import { stopLine } from "@/lib/campaigns/stops";
+import { getFirmTimeZone } from "@/lib/org/profile";
 import { friendlyCampaignError, type ActionState } from "../errors";
 
 /**
@@ -175,20 +178,39 @@ export async function resumeEnrollmentAction(_prev: ActionState, formData: FormD
   return setStatusAction(formData, "active");
 }
 
-export async function cancelEnrollmentAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  return setStatusAction(formData, "cancelled");
+/**
+ * "Stop" — ends an active or paused enrollment by hand, RECORDED: status
+ * `stopped`, reason `manual`, who and when stamped by the database (0085).
+ * Replaces the old unrecorded "Cancel" (SOP rule 1: "the stop is a recorded
+ * event — not someone remembering").
+ */
+export async function stopEnrollmentAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const sequenceId = String(formData.get("sequenceId") ?? "");
+  const enrollmentId = String(formData.get("enrollmentId") ?? "");
+  if (!sequenceId || !enrollmentId) return { error: "Missing enrollment." };
+  try {
+    const current = (await listEnrollments({ sequenceId })).find((e) => e.id === enrollmentId);
+    if (!current) return { error: "That enrollment couldn't be found. Refresh and try again." };
+    await stopEnrollment(enrollmentId, "manual");
+    revalidatePath(`/dashboard/leads/${current.lead_id}`);
+  } catch (err) {
+    return errorState(err, "Couldn't stop this sequence.");
+  }
+  revalidateCampaign(sequenceId);
+  return { saved: true, message: "Sequence stopped." };
 }
 
-async function setStatusAction(formData: FormData, status: "active" | "paused" | "cancelled"): Promise<ActionState> {
+async function setStatusAction(formData: FormData, status: "active" | "paused"): Promise<ActionState> {
   const sequenceId = String(formData.get("sequenceId") ?? "");
   const enrollmentId = String(formData.get("enrollmentId") ?? "");
   if (!sequenceId || !enrollmentId) return { error: "Missing enrollment." };
 
   try {
-    // Only the transitions the page offers: pause/cancel an active one,
-    // resume/cancel a paused one. A completed or cancelled enrollment is
-    // final — a hand-posted "resume" must not revive it.
-    const allowedFrom = status === "active" ? ["paused"] : status === "paused" ? ["active"] : ["active", "paused"];
+    // Only the transitions the page offers: pause an active one, resume a
+    // paused one. A completed, cancelled or stopped enrollment is final — a
+    // hand-posted "resume" must not revive it (0085's trigger refuses a
+    // stopped one at the database too).
+    const allowedFrom = status === "active" ? ["paused"] : ["active"];
     const current = (await listEnrollments({ sequenceId })).find((e) => e.id === enrollmentId);
     if (!current) return { error: "That enrollment couldn't be found. Refresh and try again." };
     if (!allowedFrom.includes(current.status)) {
@@ -216,6 +238,12 @@ export async function advanceEnrollmentAction(_prev: ActionState, formData: Form
   try {
     const result = await advanceEnrollment(enrollmentId);
     revalidateCampaign(sequenceId);
+    if (result.stopped) {
+      return {
+        saved: true,
+        message: `${stopLine({ reason: result.stopped.reason, at: result.stopped.at }, await getFirmTimeZone())}. Nothing was drafted.`,
+      };
+    }
     if (result.queueItemId) {
       return { saved: true, message: "Drafted into the approval queue — nothing sent yet." };
     }

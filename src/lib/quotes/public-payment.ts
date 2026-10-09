@@ -20,6 +20,8 @@ import { chargeQuoteAtSigning, type PaymentWriteClient } from "@/lib/payments/re
 import { signingChargeForQuote, type ChargeableAmountResult } from "@/lib/payments/types";
 import type { QuoteLineInput } from "./pricing";
 import { readPublicQuote, type PublicQuoteHandle, type QuoteAcceptedSnapshot } from "./public";
+import { stopSequencesForQuote } from "@/lib/campaigns/stop";
+import type { StopDb } from "@/lib/campaigns/stop-db";
 
 /**
  * THE SIGNING PAYMENT ON THE CLIENT'S PROPOSAL PAGE (spec §7.4).
@@ -213,6 +215,17 @@ export async function payAcceptedQuote(input: { token: string; methodToken: stri
   switch (outcome.status) {
     case "succeeded":
       await event(outcome.accountMismatch ? "account_mismatch" : "succeeded");
+      // SOP §2.5: once the client has paid, nothing queued may nudge them.
+      // Signing already stopped their sequences; this records the payment as
+      // a stop too, for anything enrolled since. Fenced on the quote's org;
+      // never throws, so it cannot change what the client is told.
+      await stopSequencesForQuote(db as unknown as StopDb, { quoteId: read.handle.quoteId, orgId: read.handle.orgId }, {
+        reason: "paid",
+        actor: { type: "system" },
+        factAt: now.toISOString(),
+        evidence: { provider: "lawpay" },
+        now,
+      });
       return { ok: true, amountCents: outcome.amountCents, currency: outcome.currency };
     case "failed":
       if (outcome.failure === "card") return { ok: false, reason: "declined", message: outcome.clientDetail };

@@ -1,4 +1,5 @@
 import { getScopedClient } from "@/lib/db/scoped-client";
+import { stopLeadSequencesAsStaff } from "@/lib/campaigns/stop-staff";
 import type { Database } from "@/lib/db/types";
 import { ROLES, type Role } from "@/lib/auth/roles";
 import { logActivity } from "./activity";
@@ -230,6 +231,17 @@ export async function createMatter(input: CreateMatterInput): Promise<MatterRow>
     .select("*")
     .single();
   if (error) throw error;
+
+  // SOP Stage 8: a matter opened for a lead means they are a client — every
+  // sequence they are in stops now. Never throws; the matter stands.
+  if (data.lead_id) {
+    await stopLeadSequencesAsStaff({
+      leadIds: [data.lead_id],
+      reason: "matter_opened",
+      factAt: data.created_at,
+      evidence: { matter_id: data.id, matter_number: data.matter_number },
+    });
+  }
   return data;
 }
 

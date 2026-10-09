@@ -1,6 +1,12 @@
 import { getScopedClient } from "@/lib/db/scoped-client";
 import type { Database } from "@/lib/db/types";
 import { requireAutomationAdminRole, requireAutomationStaffRole, currentOrgId } from "./rules";
+import { getFirmTimeZone } from "@/lib/org/profile";
+import { clientFact, enrollRefusal, stopLine, type StopReason } from "@/lib/campaigns/stops";
+import { loadStopFacts } from "@/lib/campaigns/stop-facts";
+import { stopLeadSequences } from "@/lib/campaigns/stop";
+import { sessionUserId } from "@/lib/campaigns/stop-staff";
+import type { StopDb } from "@/lib/campaigns/stop-db";
 
 export type DripSequence = Database["public"]["Tables"]["crm_drip_sequence"]["Row"];
 export type DripStep = Database["public"]["Tables"]["crm_drip_step"]["Row"];
@@ -228,7 +234,14 @@ export async function listEnrollments(filter: EnrollmentFilter = {}): Promise<Dr
  * AUTOMATION_STAFF_ROLES in ./rules). org_id is read off the lead row
  * (denormalized, matching RLS's own requirement) — never taken from the
  * caller. Idempotent on the unique(lead_id, sequence_id) constraint: a
- * duplicate enroll returns the existing enrollment rather than throwing.
+ * duplicate enroll returns the existing enrollment rather than throwing —
+ * unless that enrollment was STOPPED, which is final and is said so.
+ *
+ * REFUSES A CLIENT (intake SOP Stage 3: "is already a client" is a stop). A
+ * lead with a signed quote, a recorded payment, a matter or a won stage is
+ * not enrolled, and the refusal names the fact and its date. If those facts
+ * can't be read, nothing is enrolled either — the same fail-closed rule the
+ * advance() guard follows.
  */
 export async function enrollLead(leadId: string, sequenceId: string): Promise<DripEnrollment> {
   const supabase = await getScopedClient();
@@ -236,10 +249,20 @@ export async function enrollLead(leadId: string, sequenceId: string): Promise<Dr
 
   const { data: lead, error: leadError } = await supabase
     .from("crm_lead")
-    .select("org_id")
+    .select("org_id, first_name, last_name, business_name")
     .eq("id", leadId)
     .single();
   if (leadError) throw leadError;
+
+  const facts = await loadStopFacts(supabase as unknown as StopDb, { leadId });
+  if (facts.status !== "ok") {
+    throw new Error("Couldn't confirm this lead isn't already a client, so nothing was enrolled. Try again shortly.");
+  }
+  const client = clientFact(facts.facts);
+  if (client) {
+    const name = lead.business_name?.trim() || `${lead.first_name} ${lead.last_name}`.trim() || "This lead";
+    throw new Error(enrollRefusal(name, client, await getFirmTimeZone()));
+  }
 
   const { data, error } = await supabase
     .from("crm_drip_enrollment")
@@ -256,11 +279,87 @@ export async function enrollLead(leadId: string, sequenceId: string): Promise<Dr
         .eq("sequence_id", sequenceId)
         .single();
       if (existingError) throw existingError;
+      if (existing.status === "stopped") {
+        throw new Error(
+          `${stopLine({ reason: existing.stop_reason, at: existing.stopped_at }, await getFirmTimeZone())}. A stopped sequence can't be restarted for the same lead.`,
+        );
+      }
       return existing;
     }
     throw error;
   }
+
+  // The lead's timeline says it entered the campaign. Best effort.
+  const { data: seq } = await supabase.from("crm_drip_sequence").select("name").eq("id", sequenceId).maybeSingle();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { error: actError } = await supabase.from("crm_activity").insert({
+    org_id: lead.org_id,
+    lead_id: leadId,
+    type: "drip_enrolled",
+    actor_type: "user",
+    actor_id: user?.id ?? null,
+    payload: { enrollment_id: data.id, sequence_id: sequenceId, sequence_name: seq?.name ?? null },
+  });
+  if (actError) console.error("[campaigns] enrolled but the timeline row failed", actError.code);
   return data;
+}
+
+/**
+ * A person stops an enrollment by hand ("Stop sequence"), with the reason they
+ * pick — manual, or a fact the software cannot detect (they asked us to stop,
+ * they booked a call, they replied somewhere the mailbox sync doesn't read).
+ * Staff-gated like every enrollment write; the 0085 trigger stamps who and
+ * when, and makes it final. The org comes from the enrollment row via RLS.
+ */
+export async function stopEnrollment(id: string, reason: StopReason): Promise<DripEnrollment> {
+  const supabase = await getScopedClient();
+  await requireAutomationStaffRole(supabase);
+  const { data: current, error: readError } = await supabase
+    .from("crm_drip_enrollment")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (readError) throw readError;
+  if (!current) throw new Error("That enrollment couldn't be found. Refresh and try again.");
+  if (current.status !== "active" && current.status !== "paused") {
+    throw new Error(`This enrollment is already ${current.status}.`);
+  }
+  const outcome = await stopLeadSequences(supabase as unknown as StopDb, {
+    orgId: current.org_id,
+    leadIds: [current.lead_id],
+    enrollmentIds: [id],
+    reason,
+    actor: { type: "user", id: await sessionUserId(supabase) },
+    evidence: { by_hand: true },
+  });
+  if (outcome.status !== "ok") throw new Error("Couldn't stop this sequence. Try again shortly.");
+  const { data: after, error } = await supabase.from("crm_drip_enrollment").select("*").eq("id", id).single();
+  if (error) throw error;
+  return after;
+}
+
+export type LeadEnrollment = DripEnrollment & { sequence_name: string | null };
+
+/** One lead's enrollments with their campaign names, newest first. RLS-scoped; throws on a failed read. */
+export async function listLeadEnrollments(leadId: string): Promise<LeadEnrollment[]> {
+  const supabase = await getScopedClient();
+  const { data, error } = await supabase
+    .from("crm_drip_enrollment")
+    .select("*")
+    .eq("lead_id", leadId)
+    .order("enrolled_at", { ascending: false });
+  if (error) throw error;
+  const rows = data ?? [];
+  if (rows.length === 0) return [];
+  const { data: seqs, error: seqError } = await supabase
+    .from("crm_drip_sequence")
+    .select("id, name")
+    .in("id", [...new Set(rows.map((r) => r.sequence_id))]);
+  if (seqError) throw seqError;
+  const names = new Map((seqs ?? []).map((s) => [s.id, s.name]));
+  return rows.map((r) => ({ ...r, sequence_name: names.get(r.sequence_id) ?? null }));
 }
 
 /** Updates a drip enrollment's status. Staff-gated. Stamps completed_at only when transitioning to 'completed'. */

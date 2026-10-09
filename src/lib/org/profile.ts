@@ -2,7 +2,16 @@ import "server-only";
 import { cache } from "react";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { currentOrgId, requireSettingsAdminRole } from "@/lib/settings/admin";
-import { checkProfileInput, DEFAULT_TIME_ZONE, resolveTimeZone, type OrgProfile, type ProfileInput } from "./profile-rules";
+import {
+  checkLaneLinksInput,
+  checkProfileInput,
+  DEFAULT_TIME_ZONE,
+  resolveTimeZone,
+  type LaneLinksInput,
+  type OrgProfile,
+  type ProfileInput,
+} from "./profile-rules";
+import { NO_LANE_LINKS, type LaneLinks } from "@/lib/leads/lane";
 
 export type { OrgProfile, ProfileInput } from "./profile-rules";
 
@@ -15,7 +24,7 @@ export async function getOrgProfile(): Promise<OrgProfile | null> {
   const supabase = await getScopedClient();
   const { data, error } = await supabase
     .from("crm_org_profile")
-    .select("display_name, time_zone, email_signature, updated_at")
+    .select("display_name, time_zone, email_signature, updated_at, strategy_session_url, discovery_call_url, nurture_sequence_id")
     .maybeSingle();
   if (error) throw error;
   return data;
@@ -39,16 +48,49 @@ export const getFirmTimeZone = cache(async (): Promise<string> => {
   }
 });
 
-export async function saveOrgProfile(input: ProfileInput): Promise<void> {
+export async function saveOrgProfile(input: ProfileInput & { laneLinks?: LaneLinksInput }): Promise<void> {
   const checked = checkProfileInput(input);
   if (!checked.ok) throw new Error(checked.reason);
+  const links = input.laneLinks ? checkLaneLinksInput(input.laneLinks) : null;
+  if (links && !links.ok) throw new Error(links.reason);
   const supabase = await getScopedClient();
   await requireSettingsAdminRole(supabase);
   const orgId = await currentOrgId(supabase);
+  // The nurture campaign must be one of this firm's own (0085's composite FK
+  // says so too); read through RLS for a sentence rather than an FK error.
+  const nurtureId = links?.ok ? links.value.nurture_sequence_id : null;
+  if (nurtureId) {
+    const { data: seq, error: seqError } = await supabase.from("crm_drip_sequence").select("id").eq("id", nurtureId).maybeSingle();
+    if (seqError) throw seqError;
+    if (!seq) throw new Error("That nurture campaign couldn't be found. Refresh and choose it again.");
+  }
   const { data: user } = await supabase.auth.getUser();
   const { error } = await supabase.from("crm_org_profile").upsert(
-    { org_id: orgId, ...checked.value, updated_by: user.user?.id ?? null, updated_at: new Date().toISOString() },
+    {
+      org_id: orgId,
+      ...checked.value,
+      ...(links?.ok ? links.value : {}),
+      updated_by: user.user?.id ?? null,
+      updated_at: new Date().toISOString(),
+    },
     { onConflict: "org_id" },
   );
   if (error) throw error;
+}
+
+/** The lane next-step settings, for a lead page. A failed read is null links plus `failed`, never "not set". */
+export async function getLaneLinks(): Promise<{ links: LaneLinks; failed: boolean }> {
+  try {
+    const profile = await getOrgProfile();
+    return {
+      links: {
+        strategySessionUrl: profile?.strategy_session_url ?? null,
+        discoveryCallUrl: profile?.discovery_call_url ?? null,
+        nurtureSequenceId: profile?.nurture_sequence_id ?? null,
+      },
+      failed: false,
+    };
+  } catch {
+    return { links: NO_LANE_LINKS, failed: true };
+  }
 }

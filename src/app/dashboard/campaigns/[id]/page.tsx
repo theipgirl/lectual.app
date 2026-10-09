@@ -21,6 +21,8 @@ import {
   stepTypeLabel,
 } from "@/lib/campaigns/steps";
 import { relativeTime } from "@/lib/relative-time";
+import { stopLine } from "@/lib/campaigns/stops";
+import { getFirmTimeZone } from "@/lib/org/profile";
 import {
   AddStepForm,
   DeleteStepButton,
@@ -100,6 +102,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
     .map((lead) => ({ id: lead.id, label: `${leadDisplayName(lead)} — ${lead.email || "no email"}`, hasEmail: !!lead.email }));
 
   const now = new Date();
+  const tz = await getFirmTimeZone();
 
   return (
     <>
@@ -251,8 +254,15 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
                         </Link>
                         {lead?.email && <div className="lx-note">{lead.email}</div>}
                       </td>
-                      <td>
+                      <td className="wrap">
                         <span className={`lx-pill ${enrollmentStatusTone(enrollment.status)}`}>{enrollmentStatusLabel(enrollment.status)}</span>
+                        {enrollment.status === "stopped" && (
+                          // The recorded reason, in the firm's words of the
+                          // SOP: "Sequence stopped — signed quote, Oct 3".
+                          <div className="lx-note" style={{ marginTop: 4 }}>
+                            {stopLine({ reason: enrollment.stop_reason, at: enrollment.stopped_at }, tz)}
+                          </div>
+                        )}
                       </td>
                       <td className="lx-num">
                         {enrollment.current_step} / {steps.length}
@@ -292,7 +302,9 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
 
       <p className="lx-note lx-campaigns-firmnote">
         Nothing sends on its own. Running an email step drafts it into the approval queue from the template above —
-        review it on the <Link href="/dashboard/queue/">Queue</Link> before it reaches anyone.
+        review it on the <Link href="/dashboard/queue/">Queue</Link> before it reaches anyone. A lead who signs, pays,
+        becomes a client, replies or has a call leaves the sequence the moment that is recorded, and every step
+        re-checks first.
       </p>
     </>
   );

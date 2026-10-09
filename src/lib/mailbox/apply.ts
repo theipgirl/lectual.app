@@ -11,6 +11,8 @@ import {
   type ThreadMessage,
 } from "@/lib/intake/email-match";
 import type { MatterMatch } from "./matter-match";
+import { stopLeadSequences } from "@/lib/campaigns/stop";
+import type { StopDb } from "@/lib/campaigns/stop-db";
 
 /**
  * Turning a sync run's findings into rows.
@@ -199,6 +201,25 @@ export async function applyRun(
     const { error } = await admin.from("crm_lead").update(changes).eq("id", lead.id).eq("org_id", orgId);
     if (error) throw new Error(`lead update failed: ${error.message}`);
     counts.leadsUpdated += 1;
+  }
+
+  // ── a reply stops the sequences it answers (SOP Stage 3) ──────────────────
+  // Only an inbound message this run is the first to see, and only sequences
+  // that were already running when it arrived. Fenced on the connection's
+  // org; stopLeadSequences never throws, so a failed stop never fails the
+  // sync (advance()'s guard re-reads last_inbound_at before any step anyway).
+  for (const entry of report.leads) {
+    const at = entry.cadence.lastInboundAt;
+    if (!at || !isLaterInstant(at, entry.lead.lastInboundAt)) continue;
+    await stopLeadSequences(admin as unknown as StopDb, {
+      orgId,
+      leadIds: [entry.lead.id],
+      reason: "replied",
+      actor: { type: "system" },
+      factAt: at,
+      enrolledBefore: at,
+      evidence: { source: MAILBOX_ACTIVITY_SOURCE },
+    });
   }
 
   // ── reply notifications, once per (lead, reply, recipient) ─────────────────
