@@ -6,6 +6,7 @@ import { type MatterStatus, isMatterStatus } from "./status";
 import type { FilingBasis } from "./ip-fields";
 import { type MatterStage, listMatterStages } from "./stages";
 import { nextMatterNumber } from "./numbering";
+import { carryPayload, consultCarryForLead, type ConsultDb } from "@/lib/consult/store";
 
 /** The crm_matter row exactly as the table stores it. */
 export type MatterRow = Database["public"]["Tables"]["crm_matter"]["Row"];
@@ -301,7 +302,7 @@ export async function ensureMatterForLead(leadId: string): Promise<MatterRow | n
 
   const { data: lead, error: leadError } = await supabase
     .from("crm_lead")
-    .select("first_name, last_name, business_name")
+    .select("first_name, last_name, business_name, mark_text")
     .eq("id", leadId)
     .maybeSingle();
   if (leadError) throw leadError;
@@ -326,13 +327,25 @@ export async function ensureMatterForLead(leadId: string): Promise<MatterRow | n
 
   const title =
     lead.business_name?.trim() || `${lead.first_name} ${lead.last_name}`.trim();
-  const matter = await createMatter({ type, leadId, title });
+  // lectual.app only: the lead's REVIEWED consult details (mark, filing basis,
+  // classes, goods/services) go onto the matter's own filing columns. Never
+  // throws; when nothing is carried the matter is created exactly as before.
+  const carry = await consultCarryForLead(supabase as unknown as ConsultDb, { leadId, preferredMark: lead.mark_text });
+  const carried = carry.skipped === null;
+  const matter = await createMatter({
+    type,
+    leadId,
+    title,
+    ...carry.fields,
+    // A matched lead mark keeps its own spelling; the consult's is used when the lead has none.
+    ...(carried ? { markText: lead.mark_text?.trim() || carry.fields.markText } : {}),
+  });
 
   await logActivity({
     type: "matter_opened",
     leadId,
     matterId: matter.id,
-    payload: { matter_number: matter.matter_number, auto: true, source: "hired_stage" },
+    payload: { matter_number: matter.matter_number, auto: true, source: "hired_stage", ...carryPayload(carry) },
   });
 
   return matter;

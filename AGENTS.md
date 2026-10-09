@@ -54,6 +54,23 @@ See `PORTED_FROM.md`. When changing a ported file, consider whether `lectual` ne
 - "Draft follow-up" goes to the approval queue only (agents module + queue required). Never send.
 - Tests never call Fathom or Zoom. Unset `ZOOM_OAUTH_*` means Zoom is "not set up"; Fathom still works.
 
+## Consult details (filing basis per mark) — Aug 29 SOP §2.2
+- Stored in `crm_consult_note.notes.consult_details` (jsonb, beside lectual's own keys; no schema change,
+  no module gate: it is the firm's own rows). `src/lib/consult/` owns the rules; `classes`/`class_count`
+  stay lectual's.
+- It records what was SAID: per mark, word/design, classes with goods/services, filing basis
+  `1a` / `1b` / `unknown`, first-use date if stated; plus package and discount as noted. A basis the model
+  gives with no evidence is stored as `unknown`. `unknown` is shown and stored as unknown, never guessed or carried.
+- Filled by the post-consult drafter and Meetings "Draft follow-up" (same call as the email, never put in
+  the email). Saving it never blocks or repeats the queued draft, and never overwrites existing details.
+  A meeting's details go on a note of the app's own (keyed to the meeting), never on lectual's note for the
+  same recording: claiming that one would get the call drafted twice.
+- Nothing is relied on until a person reviews it on the lead page (stamped with who and when). Saves are
+  conditional on `rev`: a stale form is refused. Only REVIEWED details carry onto a matter, when it opens by
+  signed quote or the hired stage, and only for the mark being filed; several marks with none chosen, or a
+  mismatched mark, carry nothing, and the `matter_opened` timeline row says what was or wasn't carried.
+- Reads are three-state: details / none / couldn't be loaded. Unreadable saved details are reported, not hidden.
+
 ## Commands
 `pnpm build` · `pnpm lint` · `pnpm test`. Env: copy `.env.example` to `.env.local` and fill it in
 from lectual-dev.
