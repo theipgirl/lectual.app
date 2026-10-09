@@ -24,7 +24,10 @@ const draft: FollowUp = {
   },
 };
 
-const NOTE_BODY = { summary: "Wants to file SANKOFA.", next_step: "Send the engagement letter." };
+const NOTE_BODY = {
+  summary: "Wants to file SANKOFA for sparkling water in class 32. Amara said the drink hasn't launched yet.",
+  next_step: "Send the engagement letter.",
+};
 
 function handler(opts: { email?: string; handled?: string[]; notes?: Record<string, unknown>; failNoteWrite?: boolean } = {}) {
   return (q: Recorded) => {
@@ -126,9 +129,25 @@ describe("post-consult drafter", () => {
       expect(notes.consult_details.marks[0].filing_basis).toBe("unknown");
     });
 
+    it("records a basis as unknown when its quoted evidence isn't in the consult notes it was given", async () => {
+      // The model returns a plausible sentence; the notes never said it.
+      const { llm, calls } = fakeLlm(draft);
+      const { ctx, log } = agentCtx(handler({ notes: { summary: "Wants to file SANKOFA for sparkling water in class 32.", next_step: "Send the engagement letter." } }), {
+        autonomy: "draft",
+        queue: true,
+        llm,
+      });
+      await runPostConsult(ctx);
+      expect(calls[0].user).not.toContain("hasn't launched");
+      const notes = (writes(log, "crm_consult_note", "update")[0].values as { notes: { consult_details: { marks: Array<Record<string, unknown>> } } }).notes;
+      expect(notes.consult_details.marks[0]).toMatchObject({ filing_basis: "unknown", extracted_basis: "unknown", basis_evidence: null });
+      // the class number IS in the notes, so it stays
+      expect(notes.consult_details.marks[0].classes).toEqual([{ class: 32, goods: expect.stringContaining("sparkling water") }]);
+    });
+
     it("never overwrites details a person already reviewed", async () => {
       const mine = applyReview(
-        normalizeExtraction(draft.consult_details, { now: new Date(NOW), source: "post-consult-agent" }),
+        normalizeExtraction(draft.consult_details, { now: new Date(NOW), source: "post-consult-agent", sourceText: NOTE_BODY.summary }),
         { marks: [{ id: "m1", mark: "SANKOFA", mark_type: "word", filing_basis: "1a", first_use_date: null, classes: [] }], recommended_package: null, discount_discussed: null },
         { userId: "u1", name: "Dawn", role: "paralegal" },
         new Date(NOW),

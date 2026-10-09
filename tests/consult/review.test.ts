@@ -16,7 +16,7 @@ const extracted = (): StoredConsultDetails =>
       recommended_package: null,
       discount_discussed: null,
     },
-    { now: NOW, source: "post-consult-agent" },
+    { now: NOW, source: "post-consult-agent", sourceText: "SANKOFA t-shirts, class 25. Nothing sold yet." },
   )!;
 
 const input = (basis: "1a" | "1b" | "unknown" = "1a"): ReviewInput => ({

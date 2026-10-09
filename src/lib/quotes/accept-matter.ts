@@ -121,7 +121,7 @@ export async function openMatterForAcceptedQuote(
     const markText = markFromTerms(str(quote.terms_body)) ?? str(lead.mark_text);
     const referralSource = str(lead.referral_source);
     const stamp = context.now.toISOString();
-    const carry = await consultCarryForLead(db, { leadId, orgId, preferredMark: markText });
+    const carry = await consultCarryForLead(db, { leadId, orgId, preferredMark: markText, matterType: type });
 
     let matter: { id: string; matterNumber: string } | null = null;
     for (let attempt = 0; attempt < NUMBER_ATTEMPTS && !matter; attempt += 1) {

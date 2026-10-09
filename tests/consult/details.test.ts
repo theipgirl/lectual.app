@@ -14,7 +14,13 @@ import {
 } from "@/lib/consult/details";
 
 const NOW = new Date("2026-10-09T12:00:00.000Z");
-const meta = { now: NOW, source: "post-consult-agent" as const };
+/** What the model was given. Every answer below is checked against it. */
+const SOURCE = [
+  "Summary: Client said the line launches in spring and nothing has been sold yet.",
+  "Goods/services: t-shirts (class 25); online retail (class 35).",
+  "The design version was first shown on March 5, 2024; the hats first sold on November 1, 2023.",
+].join("\n");
+const meta = { now: NOW, source: "post-consult-agent" as const, sourceText: SOURCE };
 
 const mark = (over: Partial<ConsultDetailsExtract["marks"][number]> = {}): ConsultDetailsExtract["marks"][number] => ({
   mark: "SANKOFA",
@@ -68,6 +74,38 @@ describe("normalizeExtraction: what the model said, cleaned, never improved", ()
       const d = normalizeExtraction(extract([mark({ filing_basis: "1a", basis_evidence: evidence })]), meta)!;
       expect(d.marks[0]).toMatchObject({ filing_basis: "unknown", extracted_basis: "unknown", basis_evidence: null });
     }
+  });
+
+  it("keeps a basis only when its evidence is a verbatim quote from what the model was given", () => {
+    const keep = (basis_evidence: string) => normalizeExtraction(extract([mark({ filing_basis: "1b", basis_evidence })]), meta)!.marks[0].filing_basis;
+    // the same words, whatever the case, punctuation or line breaks
+    expect(keep("nothing has been sold yet")).toBe("1b");
+    expect(keep("“Nothing has been SOLD yet!”")).toBe("1b");
+    // invented, paraphrased, or a fragment too short to mean anything on its own
+    expect(keep("The client confirmed the mark has never been used in commerce.")).toBe("unknown");
+    expect(keep("Client said nothing was sold yet.")).toBe("unknown");
+    expect(keep("sold yet")).toBe("unknown");
+    // the quote has to stand on whole words: "first shown on March" is not in "first shown on Marches"
+    const d = normalizeExtraction(extract([mark({ filing_basis: "1a", basis_evidence: "first shown on March" })]), { ...meta, sourceText: "It was first shown on Marches" })!;
+    expect(d.marks[0]).toMatchObject({ filing_basis: "unknown", extracted_basis: "unknown", basis_evidence: null });
+  });
+
+  it("with nothing to check against, keeps no basis, class number or date at all", () => {
+    const d = normalizeExtraction(extract([mark({ first_use_date: "2024-03-05" })]), { ...meta, sourceText: "" })!;
+    expect(d.marks[0]).toMatchObject({ filing_basis: "unknown", basis_evidence: null, first_use_date: null, classes: [{ class: null, goods: "Clothing, namely t-shirts" }] });
+  });
+
+  it("drops a class number the source never gave, keeping the goods unclassified", () => {
+    const d = normalizeExtraction(extract([mark({ classes: [{ class: 25, goods: "T-shirts" }, { class: 18, goods: "Tote bags" }] })]), meta)!;
+    expect(d.marks[0].classes).toEqual([
+      { class: 25, goods: "T-shirts" },
+      { class: null, goods: "Tote bags" },
+    ]);
+  });
+
+  it("drops a first-use date whose year and day aren't in the source", () => {
+    expect(normalizeExtraction(extract([mark({ first_use_date: "2022-06-14" })]), meta)!.marks[0].first_use_date).toBeNull();
+    expect(normalizeExtraction(extract([mark({ first_use_date: "2024-03-05" })]), meta)!.marks[0].first_use_date).toBe("2024-03-05");
   });
 
   it("leaves an unknown basis unknown, and drops evidence it can't attach to anything", () => {

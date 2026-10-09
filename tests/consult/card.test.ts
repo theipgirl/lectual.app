@@ -30,7 +30,7 @@ const extraction: ConsultDetailsExtract = {
   recommended_package: "Enhanced",
   discount_discussed: "Friends and family",
 };
-const extracted = () => normalizeExtraction(extraction, { now: NOW, source: "post-consult-agent" })!;
+const extracted = () => normalizeExtraction(extraction, { now: NOW, source: "post-consult-agent", sourceText: "SANKOFA in class 25, t-shirts. Nothing has been sold yet." })!;
 const reviewedBy = (d: StoredConsultDetails) =>
   applyReview(d, { marks: d.marks.map((m) => ({ id: m.id, mark: m.mark, mark_type: m.mark_type, filing_basis: m.filing_basis, first_use_date: null, classes: m.classes })), recommended_package: d.recommended_package, discount_discussed: d.discount_discussed }, { userId: "u1", name: "Dawn", role: "paralegal" }, NOW);
 

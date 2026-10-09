@@ -102,7 +102,7 @@ function leadDb(notes: Row[] = []) {
   return db;
 }
 const withDetails = () =>
-  Object.assign({ id: NOTE, org_id: ORG, lead_id: LEAD, created_at: "2026-10-01T00:00:00Z", notes: withConsultDetails({ summary: "x" }, normalizeExtraction(extraction, { now: NOW, source: "post-consult-agent" })!) });
+  Object.assign({ id: NOTE, org_id: ORG, lead_id: LEAD, created_at: "2026-10-01T00:00:00Z", notes: withConsultDetails({ summary: "x" }, normalizeExtraction(extraction, { now: NOW, source: "post-consult-agent", sourceText: "SANKOFA, class 25. Not launched yet." })!) });
 
 beforeEach(() => {
   h.session = session();
@@ -214,6 +214,16 @@ describe("Meetings → Draft follow-up now also files the consult details", () =
     expect(stored).toMatchObject({ review: null, extracted: { source: "meeting-follow-up", meeting_id: MEETING }, marks: [{ mark: "SANKOFA", filing_basis: "1b" }] });
     // the draft's own record is unchanged
     expect(db.tables.crm_activity[0]).toMatchObject({ type: "queue_drafted", payload: { source: "post-consult", meeting_id: MEETING, queue_id: "q-1" } });
+  });
+
+  it("checks the extraction against the meeting it read: a basis quoted from nowhere is stored as unknown", async () => {
+    const db = leadDb([]);
+    h.meeting = meeting({ summary: "Amara wants SANKOFA for sparkling water." });
+    h.claude.output = followUp();
+    expect((await draftFollowUpAction({}, meetingForm())).ok).toBe(true);
+    const stored = (db.tables.crm_consult_note[0].notes as Row).consult_details as { marks: Row[] };
+    // "Not launched yet." is not in the summary, and neither is class 25
+    expect(stored.marks[0]).toMatchObject({ mark: "SANKOFA", filing_basis: "unknown", basis_evidence: null, classes: [{ class: null, goods: "T-shirts" }] });
   });
 
   it("a failure filing the details is told to the caller and never loses or repeats the queued draft", async () => {

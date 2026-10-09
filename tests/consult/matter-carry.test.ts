@@ -41,7 +41,7 @@ function reviewed(marks: ReviewInput["marks"] = [markIn()]): StoredConsultDetail
 function unreviewed(): StoredConsultDetails {
   return normalizeExtraction(
     { marks: [{ mark: "HALCYON", mark_type: "word", classes: [{ class: 25, goods: "T-shirts" }], filing_basis: "1b", basis_evidence: "Not launched.", first_use_date: null }], recommended_package: null, discount_discussed: null },
-    { now: NOW, source: "post-consult-agent" },
+    { now: NOW, source: "post-consult-agent", sourceText: "HALCYON t-shirts in class 25. Not launched." },
   )!;
 }
 const consultNote = (details: StoredConsultDetails, over: Row = {}): Row => ({
@@ -154,6 +154,18 @@ describe("signed quote → matter", () => {
     expect(activityPayload(db)).toMatchObject({ consult_details: { carried: [], skipped: "unavailable" } });
   });
 
+  it("puts no trademark basis or Nice classes on a copyright matter", async () => {
+    const db = quoteDb([consultNote(reviewed())]);
+    db.tables.crm_lead_tag.push({ lead_id: LEAD, org_id: ORG, tag_id: "t-cr" });
+    db.tables.crm_tag.push({ id: "t-cr", org_id: ORG, dimension: "PA", code: "PA-COPYRIGHT" });
+    expect((await openFrom(db)).status).toBe("opened");
+    expect(matterOf(db).type).toBe("CR");
+    expect(matterOf(db).filing_basis).toBeUndefined();
+    expect(matterOf(db).international_classes).toBeUndefined();
+    expect(matterOf(db).goods_services).toBeUndefined();
+    expect(activityPayload(db)).toMatchObject({ consult_details: { carried: [], skipped: "not_trademark" } });
+  });
+
   it("opens the matter exactly as before when the lead has no consult details at all", async () => {
     const db = quoteDb([]);
     await openFrom(db);
@@ -240,6 +252,17 @@ describe("hired stage → matter", () => {
     expect(matter).not.toBeNull();
     expect(matter?.filing_basis ?? null).toBeNull();
     expect(stageActivity(db)).toMatchObject({ consult_details: { carried: [], skipped: "unavailable" } });
+  });
+
+  it("puts no trademark basis or Nice classes on a patent matter", async () => {
+    const db = stageDb([consultNote(reviewed())]);
+    db.tables.crm_lead_tag.push({ lead_id: LEAD, org_id: ORG, tag_id: "t-pat" });
+    db.tables.crm_tag.push({ id: "t-pat", org_id: ORG, dimension: "PA", code: "PA-PATENT" });
+    const matter = await ensureMatterForLead(LEAD);
+    expect(matter?.type).toBe("PATENT");
+    expect(matter?.filing_basis ?? null).toBeNull();
+    expect(matter?.international_classes ?? null).toBeNull();
+    expect(stageActivity(db)).toMatchObject({ consult_details: { carried: [], skipped: "not_trademark" } });
   });
 
   it("still opens at most one matter per lead", async () => {

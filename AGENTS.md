@@ -65,9 +65,12 @@ See `PORTED_FROM.md`. When changing a ported file, consider whether `lectual` ne
   the email). Saving it never blocks or repeats the queued draft, and never overwrites existing details.
   A meeting's details go on a note of the app's own (keyed to the meeting), never on lectual's note for the
   same recording: claiming that one would get the call drafted twice.
+- A 1a/1b is kept only when the model quotes words that really are in what it was given (`sourceText`, the prompt);
+  a paraphrase or invention is stored as `unknown`. Class numbers and first-use dates not found there are dropped too.
 - Nothing is relied on until a person reviews it on the lead page (stamped with who and when). Saves are
   conditional on `rev`: a stale form is refused. Only REVIEWED details carry onto a matter, when it opens by
-  signed quote or the hired stage, and only for the mark being filed; several marks with none chosen, or a
+  signed quote or the hired stage, only onto a TM matter, only when the NEWEST consult details are the reviewed ones
+  (a newer unreviewed or unreadable record blocks the carry), and only for the mark being filed; several marks with none chosen, or a
   mismatched mark, carry nothing, and the `matter_opened` timeline row says what was or wasn't carried.
 - Reads are three-state: details / none / couldn't be loaded. Unreadable saved details are reported, not hidden.
 

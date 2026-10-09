@@ -61,6 +61,7 @@ function carriedDetail(p: Record<string, unknown>): string | null {
     unreadable: "consult details couldn't be read, so not carried",
     ambiguous_marks: "several marks, none chosen — set the filing details by hand",
     mark_mismatch: "no reviewed mark matches this one — set the filing details by hand",
+    not_trademark: "consult details are trademark filing details, so not carried onto this matter",
   };
   return (skipped && WHY[skipped]) || null;
 }

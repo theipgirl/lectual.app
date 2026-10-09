@@ -75,7 +75,7 @@ export const ExtractedMarkSchema = z.object({
   basis_evidence: z
     .string()
     .nullable()
-    .describe("The words in the notes that state the basis, quoted or closely paraphrased. null when filing_basis is unknown"),
+    .describe("The words in the notes that state the basis, copied exactly as they appear (a short verbatim quote, not a paraphrase). null when filing_basis is unknown"),
   first_use_date: z.string().nullable().describe("YYYY-MM-DD, ONLY if a complete first-use date is stated in the notes; otherwise null"),
 });
 
@@ -158,6 +158,45 @@ function validDate(value: unknown): string | null {
   }
 }
 
+/**
+ * Words and numbers only, lower-cased and single-spaced, padded so a substring
+ * test matches whole words. A quote then matches the source whatever its
+ * punctuation, capitalisation or line breaks.
+ */
+function matchText(text: string): string {
+  const t = text.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  return t ? ` ${t} ` : "";
+}
+
+/** A quote shorter than this ("in use") could match a sentence that says the opposite. */
+export const MIN_EVIDENCE_CHARS = 12;
+
+/**
+ * What the model was actually given, so its answer can be checked against it.
+ * The model is asked to report, and a report can be checked: a basis is kept
+ * only when its quoted evidence really is in the notes, a class number only
+ * when that number appears in them, and a first-use date only when its year
+ * and day do. Anything the model could have made up is dropped, not trusted.
+ */
+export type ExtractionSourceText = { text: string; words: string; numbers: Set<number> };
+
+export function sourceOf(text: string): ExtractionSourceText {
+  return { text, words: matchText(text), numbers: new Set((text.match(/\d+/g) ?? []).map(Number)) };
+}
+
+/** True when the evidence is a real quote from the source, not a paraphrase or an invention. */
+export function evidenceInSource(evidence: string | null, source: ExtractionSourceText): boolean {
+  if (!evidence) return false;
+  const quote = matchText(evidence);
+  return quote.trim().length >= MIN_EVIDENCE_CHARS && source.words.includes(quote);
+}
+
+function dateInSource(date: string | null, source: ExtractionSourceText): string | null {
+  if (!date) return null;
+  const [year, , day] = date.split("-").map(Number);
+  return source.numbers.has(year) && source.numbers.has(day) ? date : null;
+}
+
 /** Case- and punctuation-insensitive key for "is this the same mark". */
 export function markKey(text: string | null | undefined): string {
   return (text ?? "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
@@ -177,19 +216,25 @@ function dedupeClasses(list: ConsultClass[]): ConsultClass[] {
 
 /**
  * Turns the model's answer into a stored record, or null when it is not even
- * the right shape. Rules, in order of importance:
+ * the right shape. `sourceText` is exactly what the model was given (the
+ * prompt), and every answer is checked against it. Rules, in order of
+ * importance:
  *
- *  1. A basis of 1a/1b with no evidence behind it becomes `unknown`.
- *  2. A class number outside 1-45 is dropped; the goods stay, unclassified.
- *  3. A first-use date that is not a real complete date is dropped.
+ *  1. A basis of 1a/1b whose evidence is not a verbatim quote from the source
+ *     becomes `unknown` — a model can write a plausible sentence nobody said.
+ *  2. A class number outside 1-45, or one that does not appear in the source,
+ *     is dropped; the goods stay, unclassified.
+ *  3. A first-use date that is not a real complete date, or whose year and day
+ *     are not in the source, is dropped.
  *  4. Marks with no text are dropped; the same mark twice is one mark.
  */
 export function normalizeExtraction(
   raw: unknown,
-  meta: { now: Date; source: Exclude<ExtractionSource, "manual">; meetingId?: string | null },
+  meta: { now: Date; source: Exclude<ExtractionSource, "manual">; meetingId?: string | null; sourceText: string },
 ): StoredConsultDetails | null {
   const parsed = ConsultDetailsExtractSchema.safeParse(raw);
   if (!parsed.success) return null;
+  const source = sourceOf(typeof meta.sourceText === "string" ? meta.sourceText : "");
 
   const byKey = new Map<string, Omit<ConsultMark, "id">>();
   for (const m of parsed.data.marks) {
@@ -198,12 +243,13 @@ export function normalizeExtraction(
     const classes: ConsultClass[] = [];
     for (const c of m.classes) {
       const goods = clean(c.goods, MAX_GOODS_TEXT) ?? "";
-      const cls = validClass(c.class);
+      const valid = validClass(c.class);
+      const cls = valid !== null && source.numbers.has(valid) ? valid : null;
       if (cls === null && !goods) continue;
       classes.push({ class: cls, goods });
     }
     const evidence = clean(m.basis_evidence, MAX_EVIDENCE_TEXT);
-    const basis: ConsultBasis = m.filing_basis !== "unknown" && evidence ? m.filing_basis : "unknown";
+    const basis: ConsultBasis = m.filing_basis !== "unknown" && evidenceInSource(evidence, source) ? m.filing_basis : "unknown";
     const entry: Omit<ConsultMark, "id"> = {
       mark: text,
       mark_type: m.mark_type,
@@ -211,7 +257,7 @@ export function normalizeExtraction(
       filing_basis: basis,
       extracted_basis: basis,
       basis_evidence: basis === "unknown" ? null : evidence,
-      first_use_date: validDate(m.first_use_date),
+      first_use_date: dateInSource(validDate(m.first_use_date), source),
     };
     const key = `${markKey(text)}|${entry.mark_type}`;
     const prior = byKey.get(key);
@@ -399,7 +445,7 @@ export function applyReview(
 
 /* ──────────────────────── carrying onto a matter ────────────────────────── */
 
-export type CarrySkip = "no_details" | "not_reviewed" | "no_marks" | "ambiguous_marks" | "mark_mismatch" | "unreadable" | "unavailable";
+export type CarrySkip = "no_details" | "not_reviewed" | "no_marks" | "ambiguous_marks" | "mark_mismatch" | "not_trademark" | "unreadable" | "unavailable";
 
 /** The crm_matter columns a reviewed consult can fill (a subset of MatterIpFields). */
 export type MatterCarryFields = {

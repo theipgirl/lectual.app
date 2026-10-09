@@ -330,7 +330,7 @@ export async function ensureMatterForLead(leadId: string): Promise<MatterRow | n
   // lectual.app only: the lead's REVIEWED consult details (mark, filing basis,
   // classes, goods/services) go onto the matter's own filing columns. Never
   // throws; when nothing is carried the matter is created exactly as before.
-  const carry = await consultCarryForLead(supabase as unknown as ConsultDb, { leadId, preferredMark: lead.mark_text });
+  const carry = await consultCarryForLead(supabase as unknown as ConsultDb, { leadId, preferredMark: lead.mark_text, matterType: type });
   const carried = carry.skipped === null;
   const matter = await createMatter({
     type,

@@ -68,6 +68,7 @@ describe("timeline wording", () => {
     expect(opened({ carried: [], skipped: "unavailable" }).detail).toMatch(/couldn't be read, so not carried/);
     expect(opened({ carried: [], skipped: "ambiguous_marks" }).detail).toMatch(/set the filing details by hand/);
     expect(opened({ carried: [], skipped: "mark_mismatch" }).detail).toMatch(/no reviewed mark matches/);
+    expect(opened({ carried: [], skipped: "not_trademark" }).detail).toMatch(/trademark filing details, so not carried/);
     expect(opened().detail).toBe("TM-2026-0004");
   });
 });

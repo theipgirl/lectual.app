@@ -51,7 +51,7 @@ const TASK = `Your job: draft the follow-up email an IP attorney sends after a c
  * basis is the attorney's determination (SOP §4) and the software must not make
  * it: a basis is only ever what the notes say, with the words that say it.
  */
-const EXTRACTION_TASK = `Also fill in consult_details: a record of what the notes say about each mark, for the attorney to check. This is extraction, not advice. For each mark discussed give the mark text; whether it was described as a word mark or a design mark (unknown if the notes do not say); and each class with its goods or services as the notes state them, giving a class number only if the notes give one. For filing_basis answer 1a only if the notes say the mark is already in use in commerce, 1b only if they say it is not yet in use and the client intends to use it, and otherwise unknown, and put the words that state it in basis_evidence. Never infer a basis from the kind of business, from what would be typical, or from anything else, and never choose classes, a package or a discount yourself. Give first_use_date only if a complete date is stated. Report the package and any discount only as the notes put them. Do not mention the filing basis in the email.`;
+const EXTRACTION_TASK = `Also fill in consult_details: a record of what the notes say about each mark, for the attorney to check. This is extraction, not advice. For each mark discussed give the mark text; whether it was described as a word mark or a design mark (unknown if the notes do not say); and each class with its goods or services as the notes state them, giving a class number only if the notes give one. For filing_basis answer 1a only if the notes say the mark is already in use in commerce, 1b only if they say it is not yet in use and the client intends to use it, and otherwise unknown, and copy the exact words from the notes that state it into basis_evidence (a short verbatim quote, not a paraphrase: a basis whose quote is not found word for word in the notes is recorded as unknown). Never infer a basis from the kind of business, from what would be typical, or from anything else, and never choose classes, a package or a discount yourself. Give first_use_date only if a complete date is stated, and a class number only if the notes give that number. Report the package and any discount only as the notes put them. Do not mention the filing basis in the email.`;
 
 /**
  * The firm's own sign-off (Settings → Firm profile, lectual 0078) when it has
@@ -156,9 +156,12 @@ export async function runPostConsult(ctx: AgentContext): Promise<AgentResult> {
       continue;
     }
 
+    // The prompt is also what the extraction is checked against: a basis is kept
+    // only if its quoted evidence is really in these notes.
+    const prompt = followUpPrompt(lead, (note.notes ?? {}) as ConsultNotes);
     const { output } = await llm({
       system,
-      user: followUpPrompt(lead, (note.notes ?? {}) as ConsultNotes),
+      user: prompt,
       schema: FollowUpSchema,
       effort: "high",
       maxTokens: 8000,
@@ -187,6 +190,7 @@ export async function runPostConsult(ctx: AgentContext): Promise<AgentResult> {
       noteId: note.id as string,
       extraction: output.consult_details,
       source: "post-consult-agent",
+      sourceText: prompt,
       now: new Date(ctx.now()),
     });
 

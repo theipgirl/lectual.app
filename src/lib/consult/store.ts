@@ -96,10 +96,19 @@ export type SaveExtractionResult = "saved" | "kept" | "nothing" | "failed";
  */
 export async function saveExtraction(
   db: ConsultDb,
-  args: { orgId: string; noteId: string; extraction: unknown; source: Exclude<ExtractionSource, "manual">; meetingId?: string | null; now: Date },
+  args: {
+    orgId: string;
+    noteId: string;
+    extraction: unknown;
+    source: Exclude<ExtractionSource, "manual">;
+    meetingId?: string | null;
+    /** Exactly what the model was given: every basis, class number and date is checked against it. */
+    sourceText: string;
+    now: Date;
+  },
 ): Promise<SaveExtractionResult> {
   try {
-    const details = normalizeExtraction(args.extraction, { now: args.now, source: args.source, meetingId: args.meetingId });
+    const details = normalizeExtraction(args.extraction, { now: args.now, source: args.source, meetingId: args.meetingId, sourceText: args.sourceText });
     if (!details) return "nothing";
     const { data, error } = await db
       .from("crm_consult_note")
@@ -172,10 +181,10 @@ export async function findOrCreateMeetingNote(
  */
 export async function saveMeetingExtraction(
   db: ConsultDb,
-  args: { orgId: string; leadId: string; meetingId: string; provider: string; extraction: unknown; now: Date },
+  args: { orgId: string; leadId: string; meetingId: string; provider: string; extraction: unknown; sourceText: string; now: Date },
 ): Promise<SaveExtractionResult> {
   try {
-    if (!normalizeExtraction(args.extraction, { now: args.now, source: "meeting-follow-up", meetingId: args.meetingId })) return "nothing";
+    if (!normalizeExtraction(args.extraction, { now: args.now, source: "meeting-follow-up", meetingId: args.meetingId, sourceText: args.sourceText })) return "nothing";
     const note = await findOrCreateMeetingNote(db, args);
     if (!note) return "failed";
     return await saveExtraction(db, {
@@ -184,6 +193,7 @@ export async function saveMeetingExtraction(
       extraction: args.extraction,
       source: "meeting-follow-up",
       meetingId: args.meetingId,
+      sourceText: args.sourceText,
       now: args.now,
     });
   } catch {
@@ -197,18 +207,23 @@ export type ReviewedConsultRead =
   | { status: "ok"; details: StoredConsultDetails | null; unreadable: boolean; unreviewed: boolean }
   | { status: "unavailable" };
 
-/** The newest REVIEWED details among a lead's consult notes. Unreviewed ones are never returned. */
+/**
+ * The lead's current consult details, if a person has reviewed them. The
+ * NEWEST record decides (notes with no details at all are passed over): an
+ * older reviewed record is never used while a newer one is waiting for review
+ * or can't be read, because the newer consult may have changed the basis, and
+ * carrying the old answer would present a superseded basis as reviewed fact.
+ */
 export async function loadReviewedConsult(db: ConsultDb, leadId: string, orgId?: string): Promise<ReviewedConsultRead> {
   const read = await loadConsultEntries(db, leadId, orgId);
   if (read.status !== "ok") return { status: "unavailable" };
-  let unreadable = false;
-  let unreviewed = false;
   for (const e of read.entries) {
-    if (e.read.kind === "invalid") unreadable = true;
-    if (e.read.kind === "ok" && !e.read.details.review) unreviewed = true;
-    if (e.read.kind === "ok" && e.read.details.review) return { status: "ok", details: e.read.details, unreadable, unreviewed };
+    if (e.read.kind === "none") continue;
+    if (e.read.kind === "invalid") return { status: "ok", details: null, unreadable: true, unreviewed: false };
+    if (!e.read.details.review) return { status: "ok", details: null, unreadable: false, unreviewed: true };
+    return { status: "ok", details: e.read.details, unreadable: false, unreviewed: false };
   }
-  return { status: "ok", details: null, unreadable, unreviewed };
+  return { status: "ok", details: null, unreadable: false, unreviewed: false };
 }
 
 /**
@@ -219,12 +234,21 @@ export async function loadReviewedConsult(db: ConsultDb, leadId: string, orgId?:
  */
 export async function consultCarryForLead(
   db: ConsultDb,
-  args: { leadId: string; orgId?: string; preferredMark: string | null | undefined },
+  args: {
+    leadId: string;
+    orgId?: string;
+    preferredMark: string | null | undefined;
+    /** crm_matter.type. Only a trademark matter (TM) has a §1 basis and Nice classes to fill. */
+    matterType: string;
+  },
 ): Promise<MatterCarry> {
   try {
     const read = await loadReviewedConsult(db, args.leadId, args.orgId);
     if (read.status !== "ok") return { fields: {}, carried: [], skipped: "unavailable" };
     if (!read.details) return { fields: {}, carried: [], skipped: read.unreadable ? "unreadable" : read.unreviewed ? "not_reviewed" : "no_details" };
+    // A §1(a)/§1(b) basis and Nice classes are trademark facts; on a patent or
+    // copyright matter they would be wrong, not merely blank.
+    if (args.matterType !== "TM") return { fields: {}, carried: [], skipped: "not_trademark" };
     return matterFieldsFromDetails(read.details, args.preferredMark);
   } catch {
     return { fields: {}, carried: [], skipped: "unavailable" };

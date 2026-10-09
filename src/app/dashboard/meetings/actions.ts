@@ -113,10 +113,12 @@ export async function draftFollowUpAction(_prev: ActionState, formData: FormData
   let queueId: string;
   let subject: string;
   let extraction: unknown;
+  // Also what the extraction is checked against (a basis needs a verbatim quote from it).
+  const prompt = meetingFollowUpPrompt(lead, meeting);
   try {
     const { output } = await callClaude({
       system: followUpSystem(signOff),
-      user: meetingFollowUpPrompt(lead, meeting),
+      user: prompt,
       schema: FollowUpSchema,
       effort: "high",
       maxTokens: 8000,
@@ -162,6 +164,7 @@ export async function draftFollowUpAction(_prev: ActionState, formData: FormData
     meetingId: meeting.id,
     provider: meeting.provider,
     extraction,
+    sourceText: prompt,
     now: new Date(),
   });
   revalidatePath(`/dashboard/meetings/${meeting.id}/`);
