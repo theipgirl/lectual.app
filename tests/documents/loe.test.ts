@@ -81,7 +81,9 @@ describe("buildTrademarkLoeDraft — opened from a signed quote", () => {
 
   it("names the signed quote it came from, and records it on the draft", () => {
     const draft = buildTrademarkLoeDraft({ ...base, signedQuote: source });
-    expect(draft.draftBody).toContain("Mark: SUNBEAM\nSource: signed quote QT-3F9A1C (accepted Sep 27, 2026). Figures were copied from the signed copy, not re-priced.");
+    expect(draft.draftBody).toContain(
+      "Mark: SUNBEAM\nSource: signed quote QT-3F9A1C (accepted Sep 27, 2026). Pre-filled from the signed copy, not re-priced. Nothing taken from it was changed.",
+    );
     expect(draft.draftBody).not.toContain("Check before sending");
     expect(draft.payload.signedQuote).toEqual({ quoteId: "q-1", reference: "QT-3F9A1C", differences: [] });
   });
@@ -179,6 +181,9 @@ describe("buildGeneralLoeDraft — AI bullets, human-entered fee math", () => {
     });
 
     expect(draft.draftBody).toContain("Source: signed quote QT-3F9A1C (accepted Sep 27, 2026).");
+    // An edited letter never claims it is the signed copy unchanged.
+    expect(draft.draftBody).toContain("Some were changed before generating");
+    expect(draft.draftBody).not.toContain("Nothing taken from it was changed");
     expect(draft.draftBody).toContain("## Check before sending — differs from signed quote QT-3F9A1C");
     expect(draft.payload.signedQuote).toMatchObject({ quoteId: "q-1", reference: "QT-3F9A1C" });
   });

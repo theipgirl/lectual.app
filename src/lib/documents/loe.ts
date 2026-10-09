@@ -46,7 +46,11 @@ export type LoeSignedQuoteSource = {
 function signedQuoteSourceLine(source: LoeSignedQuoteSource | null | undefined): string {
   if (!source) return "";
   const on = source.acceptedOn ? ` (accepted ${source.acceptedOn})` : "";
-  return `\nSource: signed quote ${source.reference}${on}. Figures were copied from the signed copy, not re-priced.`;
+  const edited =
+    source.differences.length > 0
+      ? " Some were changed before generating: see “Check before sending” below."
+      : " Nothing taken from it was changed.";
+  return `\nSource: signed quote ${source.reference}${on}. Pre-filled from the signed copy, not re-priced.${edited}`;
 }
 
 function signedQuoteCheckSection(source: LoeSignedQuoteSource | null | undefined): string {

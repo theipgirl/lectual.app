@@ -325,8 +325,40 @@ describe("buildLoePrefill — the general letter's fields", () => {
   it("carries the quoted amount, a flat-fee statement and the service labels", () => {
     const p = build(snapshotOf(enhancedLines()));
     expect(p.quotedAmount).toBe("3500.00");
-    expect(p.feeStructure).toBe("Flat fee: $3,500 due at signing; $700 due later, at filing");
+    expect(p.feeStructure).toBe(
+      "Flat fee: $3,500 due at signing; USPTO government filing fees of $700, due at filing (not part of the firm's fee)",
+    );
     expect(p.scopeDescription).toBe("Enhanced package (2 classes)\nWatch service, year one");
+  });
+
+  it("never calls the USPTO fee part of the firm's flat fee, and keeps the firm's own filing fee apart from it", () => {
+    const p = build(
+      snapshotOf([
+        pl({ id: "p", label: "Package", unit_amount_cents: 200_000 }),
+        pl({ id: "f", label: "Filing preparation", charge_at: "filing", unit_amount_cents: 50_000 }),
+        pl({ id: "g", kind: "government_fee", charge_at: "filing", label: "USPTO fee", quantity: 2, unit_amount_cents: 35_000 }),
+      ]),
+    );
+    expect(p.feeStructure).toBe(
+      "Flat fee: $2,000 due at signing; $500 more of the firm's fee due at filing; USPTO government filing fees of $700, due at filing (not part of the firm's fee)",
+    );
+    // The deposit base is the firm's quoted fee, never the government fee.
+    expect(p.quotedAmount).toBe("2500.00");
+    expect(p.checks.some((c) => c.includes("due at filing"))).toBe(false);
+  });
+
+  it("flags a frozen filing total that does not match its own lines", () => {
+    const snapshot = snapshotOf(enhancedLines());
+    snapshot.totals.due_at_filing = 99_900;
+    const p = build(snapshot);
+    expect(p.checks.some((c) => c.includes("amount due at filing ($999)"))).toBe(true);
+  });
+
+  it("flags totals that are not whole cents instead of silently printing $0", () => {
+    const snapshot = snapshotOf(enhancedLines());
+    snapshot.totals.due_at_signing = 350_000.5;
+    const p = build(snapshot);
+    expect(p.checks.some((c) => c.includes("not whole amounts in cents"))).toBe(true);
   });
 
   it("leaves the quoted amount empty when nothing was due at signing", () => {
@@ -427,6 +459,43 @@ describe("loeDifferences — a figure that departs from what the client signed i
     expect(loeDifferences(prefill, { quotedAmount: 3500 })).toEqual([]);
     expect(loeDifferences(prefill, { quotedAmount: 3000 })[0]).toMatch(/Quoted amount.*\$3000\.00.*\$3500\.00/);
     expect(loeDifferences(prefill, { quotedAmount: null })[0]).toMatch(/nothing/);
+  });
+
+  it("reports an edited, added or removed chart row, so a changed price in a row is never silent", () => {
+    const rows = prefill.benefitRowsText;
+    expect(loeDifferences(prefill, { benefitRowsText: rows })).toEqual([]);
+    // Bullets, spacing and case do not count as edits.
+    expect(loeDifferences(prefill, { benefitRowsText: rows.split("\n").map((r) => `- ${r.toUpperCase()}  `).join("\n") })).toEqual([]);
+
+    const first = rows.split("\n")[0];
+    const edited = rows.replace(first, first.replace("$3,250", "$2,250"));
+    const out = loeDifferences(prefill, { benefitRowsText: edited });
+    expect(out).toHaveLength(1);
+    expect(out[0]).toContain("Chart rows differ from");
+    expect(out[0]).toContain(`not in the letter: "${first}"`);
+    expect(out[0]).toContain("$2,250");
+
+    const added = loeDifferences(prefill, { benefitRowsText: `${rows}\nRush fee — $500` });
+    expect(added[0]).toContain(`not on ${prefill.reference}: "Rush fee — $500"`);
+    expect(loeDifferences(prefill, { benefitRowsText: "" })[0]).toContain("not in the letter");
+  });
+
+  it("reports edited or removed discount math, and math added where the quote had none", () => {
+    expect(loeDifferences(prefill, { amountPaidMath: prefill.amountPaidMath })).toEqual([]);
+    expect(loeDifferences(prefill, { amountPaidMath: "$3,750 − $500 = $3,250" })[0]).toMatch(/Discount math is entered as/);
+    expect(loeDifferences(prefill, { amountPaidMath: "" })[0]).toMatch(/Discount math was removed/);
+    const bare = build(snapshotOf([pl({ id: "p", label: "Package", unit_amount_cents: 100_000 })]));
+    expect(bare.amountPaidMath).toBe("");
+    expect(loeDifferences(bare, { amountPaidMath: "" })).toEqual([]);
+    expect(loeDifferences(bare, { amountPaidMath: "$1,200 − $200 = $1,000" })[0]).toMatch(/was added/);
+  });
+
+  it("reports an edited fee structure and scope on the general letter", () => {
+    expect(loeDifferences(prefill, { feeStructure: prefill.feeStructure, scopeDescription: prefill.scopeDescription })).toEqual([]);
+    const out = loeDifferences(prefill, { feeStructure: "Flat fee: $2,000", scopeDescription: "Enhanced package (2 classes)" });
+    expect(out).toHaveLength(2);
+    expect(out[0]).toMatch(/Fee structure is entered as "Flat fee: \$2,000"/);
+    expect(out[1]).toMatch(/Scope lines differ.*not in the letter: "Watch service, year one"/);
   });
 
   it("has nothing to compare against where the quote has no value", () => {

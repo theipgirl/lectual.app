@@ -21,6 +21,8 @@ const h = vi.hoisted(() => ({
   load: { status: "ok", quotes: [] } as unknown,
   role: "attorney",
   moduleCalls: 0,
+  loadCalls: 0,
+  modules: ["document-center"] as string[],
 }));
 
 vi.mock("server-only", () => ({}));
@@ -51,7 +53,18 @@ vi.mock("@/lib/matters", () => ({
 vi.mock("@/lib/matters/docket-summary", () => ({ matterLabel: () => "HALCYON ROWE" }));
 vi.mock("@/lib/firm/session", () => ({ resolveFirmSession: async () => ({ kind: "ok", role: h.role }) }));
 vi.mock("@/lib/org/profile", () => ({ getFirmTimeZone: async () => "America/New_York" }));
-vi.mock("@/lib/documents/loe-prefill-load", () => ({ loadSignedQuotesForMatter: async () => h.load }));
+vi.mock("@/lib/documents/loe-prefill-load", () => ({
+  loadSignedQuotesForMatter: async () => {
+    h.loadCalls += 1;
+    return h.load;
+  },
+}));
+vi.mock("@/lib/org/modules", () => ({
+  orgHasModule: async (mod: string) => {
+    h.moduleCalls += 1;
+    return h.modules.includes(mod);
+  },
+}));
 vi.mock("@/app/dashboard/documents/new/[matterId]/loe/actions", () => ({ generateLoeAction: async () => ({}) }));
 
 const { default: Page } = await import("@/app/dashboard/documents/new/[matterId]/loe/page");
@@ -99,6 +112,24 @@ function ok(...quotes: SignedQuoteForLoe[]): SignedQuotesLoad {
 beforeEach(() => {
   h.load = ok();
   h.role = "attorney";
+  h.modules = ["document-center"];
+  h.moduleCalls = 0;
+  h.loadCalls = 0;
+});
+
+describe("engagement letter page — the module gate", () => {
+  it("404s a firm without the Document Center before reading any signed quote", async () => {
+    h.modules = [];
+    h.load = ok(signed(Q1, "2026-09-27T15:00:00Z"));
+    await expect(render()).rejects.toThrow("NEXT_NOT_FOUND");
+    expect(h.moduleCalls).toBe(1);
+    expect(h.loadCalls).toBe(0);
+  });
+
+  it("checks the module itself, not only through the segment layout", async () => {
+    await render();
+    expect(h.moduleCalls).toBe(1);
+  });
 });
 
 describe("engagement letter page — no signed quote", () => {

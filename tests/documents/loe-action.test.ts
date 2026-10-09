@@ -166,6 +166,24 @@ describe("generateLoeAction — opened from a signed quote", () => {
     expect(sent.quotedAmount).toBe(3000);
     expect(sent.signedQuote.reference).toBe("QT-3F9A1C");
     expect(sent.signedQuote.differences[0]).toMatch(/Quoted amount/);
+    // The fee wording and scope were also typed over, and the approver is told.
+    expect(sent.signedQuote.differences.join("\n")).toMatch(/Fee structure is entered as "Flat fee"/);
+    expect(sent.signedQuote.differences.join("\n")).toMatch(/Scope lines differ/);
+  });
+
+  it("carries an edited chart-row price and edited discount math to the approver", async () => {
+    await expect(
+      generateLoeAction(
+        {},
+        fd({ ...tmForm, quoteId: "q-1", benefitRowsText: "Enhanced package (2 classes) — $2,250", amountPaidMath: "$3,750 − $1,250 = $2,500" }),
+      ),
+    ).rejects.toThrow("NEXT_REDIRECT");
+    const sent = h.tm[0] as { signedQuote: { differences: string[] } };
+    const text = sent.signedQuote.differences.join("\n");
+    expect(sent.signedQuote.differences).toHaveLength(2);
+    expect(text).toMatch(/Chart rows differ from QT-3F9A1C/);
+    expect(text).toContain("$2,250");
+    expect(text).toMatch(/Discount math is entered as/);
   });
 });
 

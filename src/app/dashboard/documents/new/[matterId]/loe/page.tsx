@@ -5,6 +5,7 @@ import { matterLabel } from "@/lib/matters/docket-summary";
 import { hasRole } from "@/lib/auth/roles";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { getFirmTimeZone } from "@/lib/org/profile";
+import { orgHasModule } from "@/lib/org/modules";
 import {
   LOE_QUOTE_NONE,
   LOE_QUOTE_PICK,
@@ -23,8 +24,10 @@ export const dynamic = "force-dynamic";
  * quote it is the blank form it has always been.
  *
  * The Document Center module gate is the segment layout's (../../layout.tsx);
- * the generate action re-checks it. This page adds no second gate and reads
- * quotes only through the caller's scoped client.
+ * the generate action re-checks it. This page checks it too, FIRST: a layout
+ * and its page render in parallel, and this page now reads the client's signed
+ * amounts, so it does not lean on the layout having thrown before its reads run.
+ * Quotes are read only through the caller's scoped client.
  *
  * ── THE READ HAS THREE STATES ───────────────────────────────────────────────
  * `unavailable` is shown as "we couldn't check", never as "no signed quote",
@@ -44,6 +47,8 @@ export default async function Page({
   const { matterId } = await params;
   const { quote: quoteParamRaw } = await searchParams;
   const quoteParam = Array.isArray(quoteParamRaw) ? quoteParamRaw[0] : quoteParamRaw;
+
+  if (!(await orgHasModule("document-center"))) notFound();
 
   const matter = await getMatter(matterId);
   if (!matter) notFound();

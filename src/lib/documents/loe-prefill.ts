@@ -199,8 +199,14 @@ export function buildLoePrefill(input: {
   const checks: string[] = [];
 
   // ── the money: the snapshot's frozen totals ────────────────────────────────
-  const dueAtSigning = frozenTotal(snapshot.totals?.due_at_signing) ?? 0;
-  const dueAtFiling = frozenTotal(snapshot.totals?.due_at_filing) ?? 0;
+  const signingTotal = frozenTotal(snapshot.totals?.due_at_signing);
+  const filingTotal = frozenTotal(snapshot.totals?.due_at_filing);
+  if (signingTotal === null || filingTotal === null) {
+    // Never a silent "$0": a total that is not whole cents is a record to look at.
+    checks.push("The signed copy's totals are not whole amounts in cents, so the amounts below read as $0. Check the quote and enter them.");
+  }
+  const dueAtSigning = signingTotal ?? 0;
+  const dueAtFiling = filingTotal ?? 0;
   const fullProject = frozenTotal(snapshot.totals?.full_project_cost) ?? dueAtSigning + dueAtFiling;
 
   // The record is arithmetic-independent, but a frozen total that disagrees with
@@ -301,7 +307,25 @@ export function buildLoePrefill(input: {
   const govText = govLines.length > 0 ? govFeesText(govLines, currency) : "[none on the signed quote — confirm before sending]";
 
   // ── general-LOE fields ─────────────────────────────────────────────────────
-  const feeStructure = `Flat fee: ${dollars(dueAtSigning, currency)} due at signing${dueAtFiling !== 0 ? `; ${dollars(dueAtFiling, currency)} due later, at filing` : ""}`;
+  // The amount due at filing is NOT all the firm's fee: on a trademark quote it is
+  // mostly the USPTO's government fee (pricing.ts §0). Calling it part of a "flat
+  // fee" would tell the client the firm charges it, so the two are named apart.
+  const filingLegal = taken
+    .filter((line) => line.kind !== "government_fee" && chargeBucket(line) === "filing")
+    .reduce((sum, line) => sum + frozenAmountCents(line), 0);
+  const filingGov = govLines.filter((line) => chargeBucket(line) === "filing").reduce((sum, line) => sum + frozenAmountCents(line), 0);
+  if (filingLegal + filingGov !== dueAtFiling) {
+    checks.push(
+      `The signed copy's amount due at filing (${dollars(dueAtFiling, currency)}) does not equal its filing lines added up (${dollars(filingLegal + filingGov, currency)}). The fee structure names the lines; check the quote before sending.`,
+    );
+  }
+  const feeParts = [`Flat fee: ${dollars(dueAtSigning, currency)} due at signing`];
+  if (filingLegal !== 0) feeParts.push(`${dollars(filingLegal, currency)} more of the firm's fee due at filing`);
+  if (filingGov !== 0) feeParts.push(`USPTO government filing fees of ${dollars(filingGov, currency)}, due at filing (not part of the firm's fee)`);
+  const feeStructure = feeParts.join("; ");
+  // What a deposit % applies to is the firm's quoted fee: what is due at signing
+  // plus any of the firm's own fee due at filing. Never the government fees.
+  const quotedLegalFee = dueAtSigning + filingLegal;
 
   return {
     quoteId: input.quoteId,
@@ -319,7 +343,7 @@ export function buildLoePrefill(input: {
     govFeesText: govText,
     scopeDescription: rowLines.map((line) => (line.label ?? "").trim()).filter(Boolean).join("\n"),
     feeStructure,
-    quotedAmount: dueAtSigning > 0 ? centsToInput(dueAtSigning) : "",
+    quotedAmount: quotedLegalFee > 0 ? centsToInput(quotedLegalFee) : "",
     totals: {
       dueAtSigning: dollars(dueAtSigning, currency),
       dueAtFiling: dollars(dueAtFiling, currency),
@@ -380,7 +404,45 @@ export type LoeSubmitted = {
   amountPaid?: string;
   govFeesText?: string;
   quotedAmount?: number | null;
+  /** The chart rows, one per line. Each row carries a signed amount. */
+  benefitRowsText?: string;
+  amountPaidMath?: string;
+  feeStructure?: string;
+  scopeDescription?: string;
 };
+
+/** A multi-line field as its rows: trimmed, no bullets, no blanks. */
+function rowsOf(text: string): string[] {
+  return text
+    .split("\n")
+    .map((row) => norm(row.replace(/^\s*[-•*]\s+/, "")))
+    .filter(Boolean);
+}
+
+/** Rows in `a` that `b` does not have (as a multiset, ignoring case). */
+function rowsMissing(a: string[], b: string[]): string[] {
+  const left = new Map<string, number>();
+  for (const row of b) left.set(row.toLowerCase(), (left.get(row.toLowerCase()) ?? 0) + 1);
+  const out: string[] = [];
+  for (const row of a) {
+    const n = left.get(row.toLowerCase()) ?? 0;
+    if (n > 0) left.set(row.toLowerCase(), n - 1);
+    else out.push(row);
+  }
+  return out;
+}
+
+function rowsDifference(label: string, ref: string, submitted: string, signed: string): string | null {
+  const entered = rowsOf(submitted);
+  const quoted = rowsOf(signed);
+  const removed = rowsMissing(quoted, entered);
+  const added = rowsMissing(entered, quoted);
+  if (removed.length === 0 && added.length === 0) return null;
+  const parts: string[] = [];
+  if (removed.length > 0) parts.push(`not in the letter: ${removed.map((r) => `"${r}"`).join(", ")}`);
+  if (added.length > 0) parts.push(`not on ${ref}: ${added.map((r) => `"${r}"`).join(", ")}`);
+  return `${label} differ from ${ref} — ${parts.join("; ")}.`;
+}
 
 const norm = (s: string) => s.trim().replace(/\s+/g, " ");
 const sameText = (a: string, b: string) => norm(a).toLowerCase() === norm(b).toLowerCase();
@@ -425,6 +487,26 @@ export function loeDifferences(prefill: LoePrefill, submitted: LoeSubmitted): st
         `Quoted amount is entered as ${entered === null ? "nothing" : `$${centsToInput(entered)}`}; ${ref} says $${prefill.quotedAmount}.`,
       );
     }
+  }
+  if (submitted.amountPaidMath !== undefined && prefill.amountPaidMath && !sameText(submitted.amountPaidMath, prefill.amountPaidMath)) {
+    out.push(
+      submitted.amountPaidMath.trim()
+        ? `Discount math is entered as "${norm(submitted.amountPaidMath)}"; ${ref} says "${prefill.amountPaidMath}".`
+        : `Discount math was removed; ${ref} says "${prefill.amountPaidMath}".`,
+    );
+  } else if (submitted.amountPaidMath !== undefined && !prefill.amountPaidMath && submitted.amountPaidMath.trim()) {
+    out.push(`Discount math "${norm(submitted.amountPaidMath)}" was added; ${ref} has none.`);
+  }
+  if (submitted.benefitRowsText !== undefined) {
+    const diff = rowsDifference("Chart rows", ref, submitted.benefitRowsText, prefill.benefitRowsText);
+    if (diff) out.push(diff);
+  }
+  if (submitted.feeStructure !== undefined && prefill.feeStructure && !sameText(submitted.feeStructure, prefill.feeStructure)) {
+    out.push(`Fee structure is entered as "${norm(submitted.feeStructure)}"; ${ref} says "${prefill.feeStructure}".`);
+  }
+  if (submitted.scopeDescription !== undefined) {
+    const diff = rowsDifference("Scope lines", ref, submitted.scopeDescription, prefill.scopeDescription);
+    if (diff) out.push(diff);
   }
   return out;
 }

@@ -108,7 +108,15 @@ export async function generateLoeAction(_prev: LoeState, formData: FormData): Pr
         amountPaid,
         amountPaidMath,
         govFeesText,
-        signedQuote: sourceOf(prefill, { packageName, markText, classCount, amountPaid, govFeesText: govFeesText ?? "" }),
+        signedQuote: sourceOf(prefill, {
+          packageName,
+          markText,
+          classCount,
+          amountPaid,
+          amountPaidMath: amountPaidMath ?? "",
+          govFeesText: govFeesText ?? "",
+          benefitRowsText,
+        }),
         sendDateIso: new Date().toISOString().slice(0, 10),
       });
     } else if (kind === "general") {
@@ -129,7 +137,7 @@ export async function generateLoeAction(_prev: LoeState, formData: FormData): Pr
         depositStatedTerms,
         depositPercent: numOrNull(formData.get("depositPercent")),
         quotedAmount,
-        signedQuote: sourceOf(prefill, { quotedAmount }),
+        signedQuote: sourceOf(prefill, { quotedAmount, feeStructure, scopeDescription }),
       });
     } else {
       return { error: "Choose Trademark or General before generating." };
