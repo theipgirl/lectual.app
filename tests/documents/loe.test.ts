@@ -54,6 +54,59 @@ describe("buildTrademarkLoeDraft — deterministic, no AI", () => {
   });
 });
 
+describe("buildTrademarkLoeDraft — opened from a signed quote", () => {
+  const base = {
+    variant: "current" as const,
+    clientName: "Jane Doe",
+    entityName: null,
+    markText: "SUNBEAM",
+    packageName: "ENHANCED",
+    benefitRowsText: "Enhanced package (2 classes) — $3,250",
+    classSelected: "Classes 25, 35 — Clothing",
+    classCount: 2,
+    amountPaid: "$3,500",
+    amountPaidMath: "$3,750 − $250 = $3,500",
+    sendDateIso: "2026-08-01",
+  };
+  const source = { quoteId: "q-1", reference: "QT-3F9A1C", acceptedOn: "Sep 27, 2026", differences: [] as string[] };
+
+  it("is byte-for-byte today's letter when there is no signed quote", () => {
+    const draft = buildTrademarkLoeDraft(base);
+    expect(draft.draftBody).not.toContain("Source:");
+    expect(draft.draftBody).not.toContain("Check before sending");
+    expect(draft.draftBody).toContain("- **Government Filing Fees (Unpaid):** $700 (350 × 2 classes)\n\n## Human steps remaining");
+    expect(draft.payload).not.toHaveProperty("signedQuote");
+    expect(draft.payload).not.toHaveProperty("govFeesText");
+  });
+
+  it("names the signed quote it came from, and records it on the draft", () => {
+    const draft = buildTrademarkLoeDraft({ ...base, signedQuote: source });
+    expect(draft.draftBody).toContain("Mark: SUNBEAM\nSource: signed quote QT-3F9A1C (accepted Sep 27, 2026). Figures were copied from the signed copy, not re-priced.");
+    expect(draft.draftBody).not.toContain("Check before sending");
+    expect(draft.payload.signedQuote).toEqual({ quoteId: "q-1", reference: "QT-3F9A1C", differences: [] });
+  });
+
+  it("prints the signed quote's own government-fee wording, not the $350 constant", () => {
+    const draft = buildTrademarkLoeDraft({ ...base, govFeesText: "$0 — $700 (350 × 2 classes) absorbed by the firm, not charged", signedQuote: source });
+    expect(draft.draftBody).toContain("**Government Filing Fees (Unpaid):** $0 — $700 (350 × 2 classes) absorbed by the firm, not charged");
+    expect(draft.draftBody).not.toContain("$700 (350 × 2 classes)\n");
+    expect(draft.payload.govFees).toBeNull();
+    expect(draft.payload.govFeesText).toContain("absorbed");
+  });
+
+  it("puts every departure from the signed quote in front of the approver", () => {
+    const differences = ["Amount paid is entered as $3,000; QT-3F9A1C says $3,500."];
+    const draft = buildTrademarkLoeDraft({ ...base, amountPaid: "$3,000", signedQuote: { ...source, differences } });
+    expect(draft.draftBody).toContain("## Check before sending — differs from signed quote QT-3F9A1C\n- Amount paid is entered as $3,000; QT-3F9A1C says $3,500.\n\n## Human steps remaining");
+    expect((draft.payload.signedQuote as { differences: string[] }).differences).toEqual(differences);
+  });
+
+  it("still requires the explicit template and at least one class", () => {
+    expect(() => buildTrademarkLoeDraft({ ...base, classCount: 0, signedQuote: source })).toThrow(DocumentFlowError);
+    expect(buildTrademarkLoeDraft({ ...base, variant: "legacy", signedQuote: source }).docType).toBe("loe_trademark_legacy");
+  });
+});
+
 describe("buildGeneralLoeDraft — AI bullets, human-entered fee math", () => {
   beforeEach(() => {
     vi.resetModules();
@@ -101,6 +154,33 @@ describe("buildGeneralLoeDraft — AI bullets, human-entered fee math", () => {
     });
 
     expect(draft.draftBody).toContain("no deposit terms stated");
+  });
+
+  it("names the signed quote and flags a quoted amount that was edited", async () => {
+    vi.doMock("@/lib/ai/claude", () => ({
+      askClaude: vi.fn(async () => ({ text: "- Some scope", model: "test", costUsd: 0 })),
+    }));
+    const { buildGeneralLoeDraft } = await import("@/lib/documents/loe");
+
+    const draft = await buildGeneralLoeDraft({
+      clientName: "Jane Doe",
+      entityName: null,
+      scopeDescription: "Something",
+      feeStructure: "Flat fee: $3,500 due at signing",
+      depositStatedTerms: null,
+      depositPercent: 50,
+      quotedAmount: 3000,
+      signedQuote: {
+        quoteId: "q-1",
+        reference: "QT-3F9A1C",
+        acceptedOn: "Sep 27, 2026",
+        differences: ["Quoted amount is entered as $3000.00; QT-3F9A1C says $3500.00."],
+      },
+    });
+
+    expect(draft.draftBody).toContain("Source: signed quote QT-3F9A1C (accepted Sep 27, 2026).");
+    expect(draft.draftBody).toContain("## Check before sending — differs from signed quote QT-3F9A1C");
+    expect(draft.payload.signedQuote).toMatchObject({ quoteId: "q-1", reference: "QT-3F9A1C" });
   });
 
   it("throws DocumentFlowError when no AI provider is configured", async () => {

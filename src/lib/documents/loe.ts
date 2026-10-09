@@ -27,6 +27,41 @@ export type LoeTemplateVariant = "current" | "legacy";
 const GOV_FILING_FEE_PER_CLASS = 350;
 const SIGNATURE_DEADLINE_DAYS = 14;
 
+/**
+ * Where a letter's figures came from, when staff opened the form from a SIGNED
+ * quote (loe-prefill.ts). The figures are still whatever was submitted — the
+ * fields stay editable — so `differences` carries every place the submitted
+ * letter departs from what the client signed, for the approver to read. The
+ * quote itself is never re-read here and nothing is re-priced.
+ */
+export type LoeSignedQuoteSource = {
+  quoteId: string;
+  /** "QT-3F9A1C". */
+  reference: string;
+  /** "Sep 27, 2026", or "" when unreadable. */
+  acceptedOn: string;
+  differences: string[];
+};
+
+function signedQuoteSourceLine(source: LoeSignedQuoteSource | null | undefined): string {
+  if (!source) return "";
+  const on = source.acceptedOn ? ` (accepted ${source.acceptedOn})` : "";
+  return `\nSource: signed quote ${source.reference}${on}. Figures were copied from the signed copy, not re-priced.`;
+}
+
+function signedQuoteCheckSection(source: LoeSignedQuoteSource | null | undefined): string {
+  if (!source || source.differences.length === 0) return "";
+  return `## Check before sending — differs from signed quote ${source.reference}
+${source.differences.map((d) => `- ${d}`).join("\n")}
+
+`;
+}
+
+function signedQuotePayload(source: LoeSignedQuoteSource | null | undefined): Record<string, unknown> {
+  if (!source) return {};
+  return { signedQuote: { quoteId: source.quoteId, reference: source.reference, differences: source.differences } };
+}
+
 function plusDays(iso: string, days: number): string {
   const d = new Date(iso);
   d.setUTCDate(d.getUTCDate() + days);
@@ -53,6 +88,12 @@ export type TrademarkLoeInput = {
   /** Optional discount math shown verbatim, e.g. "$2,775 − $250 = $2,525". */
   amountPaidMath: string | null;
   sendDateIso: string;
+  /** The "Government Filing Fees" value exactly as it should print, when it
+   * comes from a signed quote's own government-fee lines. Absent: computed
+   * below as $350 × class count, as it always has been. */
+  govFeesText?: string | null;
+  /** Set when the form was opened from a signed quote. */
+  signedQuote?: LoeSignedQuoteSource | null;
 };
 
 export type LoeDraft = {
@@ -86,11 +127,18 @@ export function buildTrademarkLoeDraft(input: TrademarkLoeInput): LoeDraft {
     .map((l) => l.trim())
     .filter(Boolean);
 
+  // A signed quote's own government-fee lines win over the constant: if the
+  // firm quoted something else, or absorbed the fee, THAT is what the client
+  // signed (loe-prefill.ts).
+  const govFeesOverride = input.govFeesText?.trim() || null;
+  const govFeesValue =
+    govFeesOverride ?? `$${govFees} (${GOV_FILING_FEE_PER_CLASS} × ${input.classCount} class${input.classCount === 1 ? "" : "es"})`;
+
   const draftBody = `# ${clientOrEntity} — ${templateLabel} — ${input.markText}
 
 Template: **${templateLabel}**
 Client: ${input.clientName}${input.entityName ? ` (${input.entityName})` : ""}
-Mark: ${input.markText}
+Mark: ${input.markText}${signedQuoteSourceLine(input.signedQuote)}
 
 ## Fee chart (paste at the bottom of the LOE's estimated-costs section)
 
@@ -99,9 +147,9 @@ Package: ${input.packageName}
 ${chartRows.map((r) => `- ${r}`).join("\n")}
 - **Class Selected:** ${input.classSelected}
 - **Amount Paid:** ${input.amountPaid}${input.amountPaidMath ? ` (${input.amountPaidMath})` : ""}
-- **Government Filing Fees (Unpaid):** $${govFees} (${GOV_FILING_FEE_PER_CLASS} × ${input.classCount} class${input.classCount === 1 ? "" : "es"})
+- **Government Filing Fees (Unpaid):** ${govFeesValue}
 
-## Human steps remaining
+${signedQuoteCheckSection(input.signedQuote)}## Human steps remaining
 1. Open the **${templateLabel}** template in Lawmatics for this matter.
 2. Paste the chart above at the bottom of the estimated-costs section.
 3. Set the signature deadline field to **${signatureDeadline}** (send date + 14 days).
@@ -122,8 +170,10 @@ ${chartRows.map((r) => `- ${r}`).join("\n")}
       classSelected: input.classSelected,
       classCount: input.classCount,
       amountPaid: input.amountPaid,
-      govFees,
+      govFees: govFeesOverride ? null : govFees,
+      ...(govFeesOverride ? { govFeesText: govFeesOverride } : {}),
       signatureDeadline,
+      ...signedQuotePayload(input.signedQuote),
     },
   };
 }
@@ -141,6 +191,8 @@ export type GeneralLoeInput = {
   depositStatedTerms: string | null;
   depositPercent: number | null;
   quotedAmount: number | null;
+  /** Set when the form was opened from a signed quote. */
+  signedQuote?: LoeSignedQuoteSource | null;
 };
 
 const GENERAL_LOE_SYSTEM_PROMPT = `You are summarizing an engagement's scope for RPB Law's General Letter of Engagement, in the voice of Rebecca P. Beliard, Esq. Turn the scope description below into 3-7 SHORT bullet points (not prose) describing what the firm will do — e.g. "Phone consultation regarding [topic]", "Review of [agreement type]", "Drafting of [document type]". Use ONLY what is in the scope description; never invent a service that isn't mentioned. Output ONLY the bullet points, one per line, each starting with "- ".`;
@@ -176,7 +228,7 @@ export async function buildGeneralLoeDraft(input: GeneralLoeInput): Promise<LoeD
   const clientOrEntity = input.entityName?.trim() || input.clientName;
   const draftBody = `# ${clientOrEntity} — General LOE
 
-Client: ${input.clientName}${input.entityName ? ` (${input.entityName})` : ""}
+Client: ${input.clientName}${input.entityName ? ` (${input.entityName})` : ""}${signedQuoteSourceLine(input.signedQuote)}
 
 ## In connection with
 
@@ -187,7 +239,7 @@ ${scopeBullets}
 - Fee structure: ${input.feeStructure}
 - Deposit: ${depositLine}
 
-## Human steps remaining
+${signedQuoteCheckSection(input.signedQuote)}## Human steps remaining
 1. Open the General LOE form template in Lawmatics for this matter.
 2. Paste the scope bullets and fee/deposit terms above.
 3. Review, save, send.`;
@@ -203,6 +255,7 @@ ${scopeBullets}
       feeStructure: input.feeStructure,
       depositPercent: input.depositPercent,
       quotedAmount: input.quotedAmount,
+      ...signedQuotePayload(input.signedQuote),
     },
   };
 }

@@ -4,7 +4,9 @@ import { orgHasModule } from "@/lib/org/modules";
 import { redirect } from "next/navigation";
 import { generateTrademarkLoe, generateGeneralLoe } from "@/lib/documents/generate";
 import { DocumentFlowError } from "@/lib/documents/errors";
-import type { LoeTemplateVariant } from "@/lib/documents/loe";
+import type { LoeSignedQuoteSource, LoeTemplateVariant } from "@/lib/documents/loe";
+import { loeDifferences, type LoePrefill, type LoeSubmitted } from "@/lib/documents/loe-prefill";
+import { prefillForSignedQuote, type SignedQuotePrefill } from "@/lib/documents/loe-prefill-load";
 
 export type LoeState = { error?: string };
 
@@ -15,11 +17,36 @@ function numOrNull(v: FormDataEntryValue | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+const SIGNED_QUOTE_REFUSAL: Record<Extract<SignedQuotePrefill, { ok: false }>["reason"], string> = {
+  matter_not_found: "Matter not found.",
+  not_signed: "That isn't a signed quote on this matter. Reload the page and choose again.",
+  unreadable:
+    "That quote is signed, but its signed copy can't be read, so the letter can't be checked against it. Reload the page and fill it in by hand.",
+  unavailable: "We couldn't check the signed quote just now. Nothing was generated; try again in a moment.",
+};
+
+/** The source block the draft carries when the form was opened from a signed quote. */
+function sourceOf(prefill: LoePrefill | null, submitted: LoeSubmitted): LoeSignedQuoteSource | null {
+  if (!prefill) return null;
+  return {
+    quoteId: prefill.quoteId,
+    reference: prefill.reference,
+    acceptedOn: prefill.acceptedOn,
+    differences: loeDifferences(prefill, submitted),
+  };
+}
+
 /**
  * One action for both LOE paths (trademark fee chart / general AI-summarized
  * scope) — routed on the "kind" field the form sets, per
  * draft-engagement-letter's two-path SOP. matterId travels as a hidden
  * field, same convention as every other matter form action.
+ *
+ * When the form was opened from a SIGNED quote it also carries `quoteId`. That
+ * id is checked here against the matter's signed quotes (never trusted), and
+ * the submitted figures are compared with the signed snapshot so that any edit
+ * is printed for the approver. The template variant is not part of any of it:
+ * it is read from the form and refused when absent, signed quote or not.
  */
 export async function generateLoeAction(_prev: LoeState, formData: FormData): Promise<LoeState> {
   const matterId = String(formData.get("matterId") ?? "");
@@ -38,6 +65,14 @@ export async function generateLoeAction(_prev: LoeState, formData: FormData): Pr
   const entityName = String(formData.get("entityName") ?? "").trim() || null;
   if (!clientName) return { error: "Client name is required." };
 
+  let prefill: LoePrefill | null = null;
+  const quoteId = String(formData.get("quoteId") ?? "").trim();
+  if (quoteId) {
+    const checked = await prefillForSignedQuote(matterId, quoteId);
+    if (!checked.ok) return { error: SIGNED_QUOTE_REFUSAL[checked.reason] };
+    prefill = checked.prefill;
+  }
+
   let result: { queueItemId: string } | null = null;
   try {
     if (kind === "trademark") {
@@ -55,6 +90,7 @@ export async function generateLoeAction(_prev: LoeState, formData: FormData): Pr
       const amountPaid = String(formData.get("amountPaid") ?? "").trim();
       const amountPaidMath = String(formData.get("amountPaidMath") ?? "").trim() || null;
       const benefitRowsText = String(formData.get("benefitRowsText") ?? "");
+      const govFeesText = String(formData.get("govFeesText") ?? "").trim() || null;
       if (!markText || !packageName || !classSelected || !amountPaid || !classCount) {
         return { error: "Mark, package, class(es), class count, and amount paid are all required." };
       }
@@ -71,6 +107,8 @@ export async function generateLoeAction(_prev: LoeState, formData: FormData): Pr
         classCount,
         amountPaid,
         amountPaidMath,
+        govFeesText,
+        signedQuote: sourceOf(prefill, { packageName, markText, classCount, amountPaid, govFeesText: govFeesText ?? "" }),
         sendDateIso: new Date().toISOString().slice(0, 10),
       });
     } else if (kind === "general") {
@@ -80,6 +118,7 @@ export async function generateLoeAction(_prev: LoeState, formData: FormData): Pr
       if (!scopeDescription || !feeStructure) {
         return { error: "Scope description and fee structure are required." };
       }
+      const quotedAmount = numOrNull(formData.get("quotedAmount"));
 
       result = await generateGeneralLoe({
         matterId,
@@ -89,7 +128,8 @@ export async function generateLoeAction(_prev: LoeState, formData: FormData): Pr
         feeStructure,
         depositStatedTerms,
         depositPercent: numOrNull(formData.get("depositPercent")),
-        quotedAmount: numOrNull(formData.get("quotedAmount")),
+        quotedAmount,
+        signedQuote: sourceOf(prefill, { quotedAmount }),
       });
     } else {
       return { error: "Choose Trademark or General before generating." };
