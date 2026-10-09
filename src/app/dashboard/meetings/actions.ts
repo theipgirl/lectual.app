@@ -11,6 +11,7 @@ import { aiConfigured, callClaude } from "@/lib/ai/claude";
 import { FollowUpSchema, followUpSystem } from "@/lib/agents/post-consult";
 import { getMeeting } from "@/lib/meetings/read";
 import { hasMaterial, meetingFollowUpPrompt } from "@/lib/meetings/follow-up";
+import { saveMeetingExtraction, type ConsultDb } from "@/lib/consult/store";
 
 /**
  * Meeting actions. Each is its own POST entry point, so each re-checks the
@@ -111,6 +112,7 @@ export async function draftFollowUpAction(_prev: ActionState, formData: FormData
 
   let queueId: string;
   let subject: string;
+  let extraction: unknown;
   try {
     const { output } = await callClaude({
       system: followUpSystem(signOff),
@@ -135,6 +137,7 @@ export async function draftFollowUpAction(_prev: ActionState, formData: FormData
     });
     queueId = created.id;
     subject = output.subject;
+    extraction = output.consult_details;
   } catch {
     return { error: "The draft couldn't be written or queued. Nothing was sent. Try again shortly." };
   }
@@ -148,6 +151,27 @@ export async function draftFollowUpAction(_prev: ActionState, formData: FormData
     actor_type: "user",
     payload: { source: "post-consult", meeting_id: meeting.id, queue_id: queueId, subject },
   });
+
+  // The same call also read the marks, classes and filing basis off the call.
+  // They go on the lead's consult details to be REVIEWED; nothing relies on
+  // them until a person confirms. The draft is already queued, so a failure
+  // here is told to the caller, not raised.
+  const detailsSaved = await saveMeetingExtraction(supabase as unknown as ConsultDb, {
+    orgId: session.org.id,
+    leadId: lead.id,
+    meetingId: meeting.id,
+    provider: meeting.provider,
+    extraction,
+    now: new Date(),
+  });
   revalidatePath(`/dashboard/meetings/${meeting.id}/`);
-  return { ok: true, notice: "Follow-up drafted. It's waiting in the approval queue for an attorney to edit and send." };
+  revalidatePath(`/dashboard/leads/${lead.id}/`);
+  const base = "Follow-up drafted. It's waiting in the approval queue for an attorney to edit and send.";
+  const extra =
+    detailsSaved === "saved"
+      ? " The marks, classes and filing basis it read from the call are on the lead's Consult details for review. Nothing relies on them until someone confirms."
+      : detailsSaved === "failed"
+        ? " The consult details couldn't be saved; you can enter them on the lead."
+        : "";
+  return { ok: true, notice: base + extra };
 }
