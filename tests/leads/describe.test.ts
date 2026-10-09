@@ -46,4 +46,28 @@ describe("timeline wording", () => {
     expect(describeActivity({ type: "note", actor_type: "user", created_at: at, payload: { body: "Older producer." } }).detail).toBe("Older producer.");
     expect(describeActivity({ type: "call_logged", actor_type: "user", created_at: at, payload: { summary: "Discussed classes", notes: "long notes" } }).detail).toBe("Discussed classes");
   });
+
+  it("words a consult-details review by mark and basis, naming a correction", () => {
+    const at = "2026-10-09T00:00:00Z";
+    const r = describeActivity({
+      type: "lead_updated",
+      actor_type: "user",
+      created_at: at,
+      payload: { change: "consult_details", summary: "Reviewed consult details: 2 marks", marks: [{ mark: "SANKOFA", filing_basis: "1b", corrected: true }, { mark: "KENTE", filing_basis: "unknown", corrected: false }] },
+    });
+    expect(r).toMatchObject({ title: "Consult details reviewed", detail: "SANKOFA §1(b) (corrected) · KENTE basis unknown" });
+    // an ordinary lead edit keeps its wording
+    expect(describeActivity({ type: "lead_updated", actor_type: "user", created_at: at, payload: { fields: ["phone"] } })).toMatchObject({ title: "Details updated", detail: "phone" });
+  });
+
+  it("says what a new matter took from the reviewed consult, and why it took nothing when that matters", () => {
+    const at = "2026-10-09T00:00:00Z";
+    const opened = (consult_details?: unknown) => describeActivity({ type: "matter_opened", actor_type: "system", created_at: at, payload: { matter_number: "TM-2026-0004", consult_details } });
+    expect(opened({ carried: ["filing_basis", "international_classes"], skipped: null }).detail).toBe("TM-2026-0004 · from the reviewed consult: filing basis, international classes");
+    expect(opened({ carried: [], skipped: "not_reviewed" }).detail).toBe("TM-2026-0004 · consult details not reviewed, so not carried");
+    expect(opened({ carried: [], skipped: "unavailable" }).detail).toMatch(/couldn't be read, so not carried/);
+    expect(opened({ carried: [], skipped: "ambiguous_marks" }).detail).toMatch(/set the filing details by hand/);
+    expect(opened({ carried: [], skipped: "mark_mismatch" }).detail).toMatch(/no reviewed mark matches/);
+    expect(opened().detail).toBe("TM-2026-0004");
+  });
 });
