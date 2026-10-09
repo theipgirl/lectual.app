@@ -89,6 +89,9 @@ export type BuilderProps = {
   eventsError: boolean;
   termsAttached: boolean;
   matter: { href: string; number: string } | null;
+  /** The pre-filled engagement letter for this signed quote (Document Center),
+   * or null when the quote isn't signed to a matter or the firm has no Document Center. */
+  letterHref?: string | null;
 };
 
 type Target = { kind: "package"; name: string } | { kind: "common" };
@@ -696,6 +699,11 @@ export function QuoteBuilder(props: BuilderProps) {
                 {props.matter && (
                   <p>
                     Matter <Link href={props.matter.href}>{props.matter.number}</Link> opened automatically.
+                  </p>
+                )}
+                {props.letterHref && (
+                  <p>
+                    <Link href={props.letterHref}>Draft engagement letter</Link>, pre-filled from this signed copy.
                   </p>
                 )}
               </div>
