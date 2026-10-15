@@ -35,6 +35,7 @@ import { listLawPayMappings } from "@/lib/payments/accounts";
 import { lawPayDeploymentMode } from "@/lib/payments/lawpay-config";
 import { formatCents } from "@/lib/quotes/money";
 import { getFirmTimeZone } from "@/lib/org/profile";
+import { orgHasModule } from "@/lib/org/modules";
 import "../quotes.css";
 
 export const dynamic = "force-dynamic";
@@ -108,7 +109,7 @@ export default async function QuoteBuilderPage({ params }: { params: Promise<{ i
   // Secondary reads, each best-effort: none is why this page exists, so a
   // failure degrades its own part. The events read says so out loud — "no
   // activity" and "couldn't read activity" differ.
-  const [eventsRead, serviceItems, clients, origin, matter, paymentsRead, lawpay, mappings, tz] = await Promise.all([
+  const [eventsRead, serviceItems, clients, origin, matter, paymentsRead, lawpay, mappings, tz, hasDocumentCenter] = await Promise.all([
     listQuoteEvents(quote.id).then(
       (events): { events: QuoteEventRow[]; error: boolean } => ({ events, error: false }),
       () => ({ events: [], error: true }),
@@ -121,6 +122,7 @@ export default async function QuoteBuilderPage({ params }: { params: Promise<{ i
     getLawPayConnection(),
     listLawPayMappings(),
     getFirmTimeZone(),
+    orgHasModule("document-center"),
   ]);
   const client = clients.get(quote.id) ?? null;
   const defaultMark = await quoteDefaultMark(quote);
@@ -188,6 +190,13 @@ export default async function QuoteBuilderPage({ params }: { params: Promise<{ i
         eventsError={eventsRead.error}
         termsAttached={Boolean((snapshot ? snapshot.quote?.terms_body : quote.terms_body)?.trim())}
         matter={matter}
+        // The letter form pre-fills from the signed copy, so the link is only for a quote that is
+        // signed AND opened a matter, in a firm that has the Document Center (the page 404s without it).
+        letterHref={
+          effective === "accepted" && quote.matter_id && hasDocumentCenter
+            ? `/dashboard/documents/new/${quote.matter_id}/loe/?quote=${encodeURIComponent(quote.id)}`
+            : null
+        }
       />
 
       <PaymentsPanel

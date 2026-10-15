@@ -24,6 +24,7 @@ import VoiceNoteRecorder from "@/components/voice/VoiceNoteRecorder";
 import { FilingFollowUpCard, LitigationForm, WelcomeEmailCard } from "@/components/matters/MatterExtras";
 import { addVoiceNoteAction } from "./actions";
 import { orgHasModule } from "@/lib/org/modules";
+import { loadSignedQuotesForMatter } from "@/lib/documents/loe-prefill-load";
 import { getLitigationDetail } from "@/lib/matters/litigation";
 import { toCourtDateTimeLocal } from "@/lib/matters/court-time";
 import { voiceNotePlaybackUrls } from "@/lib/voice/notes";
@@ -82,14 +83,19 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
     matter.type === "LIT" && hasLitigation ? getLitigationDetail(matter.id) : Promise.resolve(null),
   ]);
   const canSendIntake = canSendIntakeRequest(session.role);
-  const [voiceUrls, intakeRequests, origin, meetings] = await Promise.all([
+  const canWrite = MATTER_WRITE_ROLES.includes(session.role);
+  const [voiceUrls, intakeRequests, origin, meetings, signedQuotes] = await Promise.all([
     voiceNotePlaybackUrls(activity),
     // Intake questions (0079): a failed read says so on the card; it never
     // reads as "no links sent".
     listMatterIntakeRequests(matter.id),
     intakeOrigin(),
     meetingsFor({ matterId: matter.id }),
+    // Only to decide whether to offer the pre-filled engagement letter, so only for someone who
+    // could draft it. A failed read offers nothing extra; "Draft a letter" is still there.
+    hasDocumentCenter && canWrite ? loadSignedQuotesForMatter(matter.id) : Promise.resolve(null),
   ]);
+  const hasSignedQuote = signedQuotes?.status === "ok" && signedQuotes.quotes.length > 0;
 
   // Monthly status updates: only for a mark awaiting registration, and only
   // one queue round trip for those matters.
@@ -101,7 +107,6 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
   const welcome = activity.find((a) => (a.type as string) === "welcome_email");
   const welcomeQueueId = (welcome?.payload as { queueItemId?: string } | null)?.queueItemId ?? null;
 
-  const canWrite = MATTER_WRITE_ROLES.includes(session.role);
   const canConfirm = (DEADLINE_CONFIRM_ROLES as readonly string[]).includes(session.role);
   const openTasks = tasks.filter((t) => t.status === "open");
   const openDeadlines = deadlines.filter((d) => d.status === "open");
@@ -401,9 +406,16 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
               <span>{matter.package_name ?? "—"}</span>
             </div>
             {hasDocumentCenter && canWrite && (
-              <Link href={`/dashboard/documents/new/${matter.id}/`} className="lx-btn lx-btn-sec lx-btn-sm" style={{ justifySelf: "start" }}>
-                Draft a letter
-              </Link>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {hasSignedQuote && (
+                  <Link href={`/dashboard/documents/new/${matter.id}/loe/`} className="lx-btn lx-btn-pri lx-btn-sm">
+                    Draft engagement letter
+                  </Link>
+                )}
+                <Link href={`/dashboard/documents/new/${matter.id}/`} className="lx-btn lx-btn-sec lx-btn-sm">
+                  Draft a letter
+                </Link>
+              </div>
             )}
             <div className="lx-meta">
               <span>Came from</span>

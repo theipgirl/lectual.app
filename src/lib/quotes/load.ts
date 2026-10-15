@@ -63,7 +63,8 @@ export type QuoteDetailLoad = {
 
 type PostgrestLikeError = { code?: string; message?: string } | null | undefined;
 
-function isMissingTableError(error: PostgrestLikeError): boolean {
+/** True for "the table is not in this database" (PGRST205 / 42P01), judged on the CODE. */
+export function isMissingTableError(error: PostgrestLikeError): boolean {
   if (!error) return false;
   if (error.code === "PGRST205" || error.code === "42P01") return true;
   return /schema cache|relation .* does not exist|does not exist/i.test(error.message ?? "");

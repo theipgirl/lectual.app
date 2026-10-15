@@ -1,7 +1,10 @@
-// Ported from lectual (Document Center form); logic unchanged, restyled onto lx tokens.
+// Ported from lectual (Document Center form); restyled onto lx tokens. lectual.app adds the
+// signed-quote pre-fill: every pre-filled field is an ordinary editable input, the template
+// choice is never pre-selected, and the submit does not clear what was typed on an error.
 "use client";
 
-import { useActionState, useState } from "react";
+import { startTransition, useActionState, useState } from "react";
+import type { LoePrefill } from "@/lib/documents/loe-prefill";
 import { generateLoeAction, type LoeState } from "../actions";
 
 const buttonBase: React.CSSProperties = {
@@ -26,22 +29,46 @@ const tabStyle = (active: boolean): React.CSSProperties => ({
   cursor: "pointer",
 });
 
+/** A small "where this came from" tag on a label, shown only when a field is pre-filled. */
+function From({ what }: { what: string | null }) {
+  if (!what) return null;
+  return <span style={{ textTransform: "none", letterSpacing: 0, fontWeight: 400 }}> · from {what}</span>;
+}
+
 export default function LoeForm({
   matterId,
   defaultMarkText,
   defaultPackage,
+  prefill,
+  defaultClientName,
+  initialKind,
 }: {
   matterId: string;
   defaultMarkText?: string | null;
   defaultPackage?: string | null;
+  /** The signed quote's figures. Absent: the blank form this has always been. */
+  prefill?: LoePrefill | null;
+  defaultClientName?: string;
+  initialKind?: "trademark" | "general";
 }) {
   const [state, formAction, pending] = useActionState<LoeState, FormData>(generateLoeAction, {});
-  const [kind, setKind] = useState<"trademark" | "general">("trademark");
+  const [kind, setKind] = useState<"trademark" | "general">(initialKind ?? "trademark");
+  const quote = prefill ? "the signed quote" : null;
+
+  // Submitted through a transition rather than the form's `action`, so React does
+  // not reset the fields when the action returns: an error ("Select a template")
+  // must not throw away a dozen pre-filled and hand-edited values.
+  function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    startTransition(() => formAction(data));
+  }
 
   return (
-    <form action={formAction} style={{ display: "grid", gap: 16, maxWidth: 720 }}>
+    <form onSubmit={onSubmit} style={{ display: "grid", gap: 16, maxWidth: 720 }}>
       <input type="hidden" name="matterId" value={matterId} />
       <input type="hidden" name="kind" value={kind} />
+      {prefill && <input type="hidden" name="quoteId" value={prefill.quoteId} />}
 
       <div style={{ display: "flex", gap: 8 }}>
         <button type="button" style={tabStyle(kind === "trademark")} onClick={() => setKind("trademark")}>
@@ -56,9 +83,9 @@ export default function LoeForm({
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10 }}>
           <label className="lx-field">
             <span className="lx-label" style={{ fontSize: 10 }}>
-              Client name
+              Client name{defaultClientName ? <From what="the matter's client record" /> : null}
             </span>
-            <input type="text" name="clientName" required className="lx-input" />
+            <input type="text" name="clientName" required defaultValue={defaultClientName ?? ""} className="lx-input" />
           </label>
           <label className="lx-field">
             <span className="lx-label" style={{ fontSize: 10 }}>
@@ -76,7 +103,7 @@ export default function LoeForm({
               </legend>
               <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5 }}>
                 <input type="radio" name="variant" value="current" required />
-                Current (default for new clients)
+                Current
               </label>
               <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5 }}>
                 <input type="radio" name="variant" value="legacy" required />
@@ -87,62 +114,75 @@ export default function LoeForm({
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
               <label className="lx-field">
                 <span className="lx-label" style={{ fontSize: 10 }}>
-                  Mark
+                  Mark{prefill?.markFrom ? <From what={prefill.markFrom === "signed terms" ? "the signed terms" : "the matter's file"} /> : null}
                 </span>
-                <input type="text" name="markText" required defaultValue={defaultMarkText ?? ""} className="lx-input" />
+                <input type="text" name="markText" required defaultValue={prefill ? prefill.markText : (defaultMarkText ?? "")} className="lx-input" />
               </label>
               <label className="lx-field">
                 <span className="lx-label" style={{ fontSize: 10 }}>
-                  Package
+                  Package<From what={prefill?.packageName ? quote : null} />
                 </span>
                 <input
                   type="text"
                   name="packageName"
                   required
-                  defaultValue={defaultPackage ?? ""}
+                  defaultValue={prefill ? prefill.packageName : (defaultPackage ?? "")}
                   placeholder="ESSENTIAL / ENHANCED / CONCIERGE"
                   className="lx-input"
                 />
               </label>
               <label className="lx-field">
                 <span className="lx-label" style={{ fontSize: 10 }}>
-                  Class(es) purchased (count)
+                  Class(es) purchased (count)<From what={prefill?.classCount ? quote : null} />
                 </span>
-                <input type="number" name="classCount" min={1} required className="lx-input" />
+                <input type="number" name="classCount" min={1} required defaultValue={prefill?.classCount ?? ""} className="lx-input" />
               </label>
             </div>
 
             <label className="lx-field">
               <span className="lx-label" style={{ fontSize: 10 }}>
-                Class selected — description(s), verbatim from the pricing email
+                Class selected — description(s), verbatim from the pricing email<From what={prefill?.classSelected ? "the matter's file" : null} />
               </span>
-              <input type="text" name="classSelected" required className="lx-input" />
+              <input type="text" name="classSelected" required defaultValue={prefill?.classSelected ?? ""} className="lx-input" />
             </label>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10 }}>
               <label className="lx-field">
                 <span className="lx-label" style={{ fontSize: 10 }}>
-                  Amount paid — verbatim from the pricing email
+                  Amount paid — verbatim from the pricing email<From what={quote} />
                 </span>
-                <input type="text" name="amountPaid" required placeholder="$2,525" className="lx-input" />
+                <input type="text" name="amountPaid" required defaultValue={prefill?.amountPaid ?? ""} placeholder="$2,525" className="lx-input" />
               </label>
               <label className="lx-field">
                 <span className="lx-label" style={{ fontSize: 10 }}>
-                  Discount math shown (optional)
+                  Discount math shown (optional)<From what={prefill?.amountPaidMath ? quote : null} />
                 </span>
-                <input type="text" name="amountPaidMath" placeholder="$2,775 − $250 = $2,525" className="lx-input" />
+                <input type="text" name="amountPaidMath" defaultValue={prefill?.amountPaidMath ?? ""} placeholder="$2,775 − $250 = $2,525" className="lx-input" />
               </label>
             </div>
 
+            {prefill && (
+              <label className="lx-field">
+                <span className="lx-label" style={{ fontSize: 10 }}>
+                  Government filing fees<From what={quote} />
+                </span>
+                <input type="text" name="govFeesText" defaultValue={prefill.govFeesText} className="lx-input" />
+              </label>
+            )}
+
             <label className="lx-field">
               <span className="lx-label" style={{ fontSize: 10 }}>
-                Package benefit rows kept for this chosen package (one per line)
+                {prefill
+                  ? "Chart rows — the lines the client signed for (one per line)"
+                  : "Package benefit rows kept for this chosen package (one per line)"}
+                <From what={prefill?.benefitRowsText ? quote : null} />
               </span>
               <textarea
                 name="benefitRowsText"
                 rows={6}
                 className="lx-input"
                 style={{ resize: "vertical", fontFamily: "inherit" }}
+                defaultValue={prefill?.benefitRowsText ?? ""}
                 placeholder={"Preliminary Consultation Strategy Call ($450) — ✓\nComprehensive Trademark Search Report ($675 each) — 1 included"}
               />
             </label>
@@ -152,15 +192,22 @@ export default function LoeForm({
             <label className="lx-field">
               <span className="lx-label" style={{ fontSize: 10 }}>
                 Scope — from the proposal email / consult notes (Claude turns this into bullet
-                points)
+                points)<From what={prefill?.scopeDescription ? `${quote}'s lines` : null} />
               </span>
-              <textarea name="scopeDescription" rows={5} required className="lx-input" style={{ resize: "vertical", fontFamily: "inherit" }} />
+              <textarea
+                name="scopeDescription"
+                rows={5}
+                required
+                defaultValue={prefill?.scopeDescription ?? ""}
+                className="lx-input"
+                style={{ resize: "vertical", fontFamily: "inherit" }}
+              />
             </label>
             <label className="lx-field">
               <span className="lx-label" style={{ fontSize: 10 }}>
-                Fee structure — exactly as stated in the proposal
+                Fee structure — exactly as stated in the proposal<From what={quote} />
               </span>
-              <input type="text" name="feeStructure" required placeholder="hourly at $450/hr" className="lx-input" />
+              <input type="text" name="feeStructure" required defaultValue={prefill?.feeStructure ?? ""} placeholder="hourly at $450/hr" className="lx-input" />
             </label>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
               <label className="lx-field">
@@ -171,9 +218,9 @@ export default function LoeForm({
               </label>
               <label className="lx-field">
                 <span className="lx-label" style={{ fontSize: 10 }}>
-                  Quoted amount the % applies to (optional)
+                  Quoted amount the % applies to (optional)<From what={prefill?.quotedAmount ? quote : null} />
                 </span>
-                <input type="number" name="quotedAmount" min={0} step="0.01" className="lx-input" />
+                <input type="number" name="quotedAmount" min={0} step="0.01" defaultValue={prefill?.quotedAmount ?? ""} className="lx-input" />
               </label>
             </div>
             <label className="lx-field">
