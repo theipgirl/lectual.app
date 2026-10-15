@@ -129,6 +129,37 @@ export function formatSignedOn(value: string | null | undefined, timeZone: strin
 
 const BUCKET_ORDER: Record<QuoteChargeAt, number> = { signing: 0, filing: 1, not_charged: 2 };
 
+/* ─────────────────────────── class labels in goods ─────────────────────── */
+
+/**
+ * The class number(s) a line of goods text opens with: "Class 25:", "Class 25 —",
+ * "Class 25 -", "Classes 25, 35:" or "25:", in any case. A bare number counts only
+ * with its colon, so "24-hour fitness classes" stays goods text, not class 24.
+ */
+const LEADING_CLASS_LABEL = /^\s*(?:class(?:es)?\s*(\d{1,2}(?:\s*(?:,|&|and)\s*\d{1,2})*)(?!\d)|(\d{1,2})\s*:)/i;
+
+function classesLabelledAtStart(line: string): number[] {
+  const match = LEADING_CLASS_LABEL.exec(line);
+  if (!match) return [];
+  return (match[1] ?? match[2]).match(/\d+/g)?.map(Number) ?? [];
+}
+
+/**
+ * Whether the goods text already names its classes itself, so a "Class 25 — "
+ * prefix would only say it twice. That is so when the text opens with a class
+ * label and every class the matter lists is labelled at the start of some line
+ * (the matter's own "Class 25: …\nClass 35: …" shape). A matter class the goods
+ * leave unlabelled keeps the prefix: the prefix is the only place that number
+ * would appear in the letter.
+ */
+function goodsNameTheirClasses(goods: string, classes: readonly number[]): boolean {
+  if (classes.length === 0) return false;
+  const lines = goods.split(/\r?\n/);
+  if (classesLabelledAtStart(lines[0]).length === 0) return false;
+  const labelled = new Set(lines.flatMap(classesLabelledAtStart));
+  return classes.every((n) => labelled.has(n));
+}
+
 /* ───────────────────────────── the chart rows ──────────────────────────── */
 
 /** One chart row for a priced line, timed by when it is charged. */
@@ -292,7 +323,16 @@ export function buildLoePrefill(input: {
   const classList = formatInternationalClasses(matterClasses);
   const goods = matter.goods_services?.trim() || "";
   const classLabel = matterClasses.length === 1 ? "Class" : "Classes";
-  const classSelected = classList && goods ? `${classLabel} ${classList} — ${goods}` : classList ? `${classLabel} ${classList}` : goods;
+  // The goods text is verbatim. When it already opens with its own class label
+  // ("Class 25: Clothing…") the label is not added a second time.
+  const classSelected =
+    classList && goods
+      ? goodsNameTheirClasses(goods, matterClasses)
+        ? goods
+        : `${classLabel} ${classList} — ${goods}`
+      : classList
+        ? `${classLabel} ${classList}`
+        : goods;
   if (!classList || !goods) {
     checks.push(
       !classList && !goods

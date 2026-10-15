@@ -199,6 +199,64 @@ describe("buildLoePrefill — classes and goods come from the matter's file", ()
     expect(build(snapshotOf(enhancedLines()), { ...MATTER, international_classes: [25] }).classSelected).toMatch(/^Class 25 — /);
   });
 
+  describe("does not say the class twice when the goods already open with it", () => {
+    const classSelected = (international_classes: number[], goods_services: string) =>
+      build(snapshotOf(enhancedLines()), { ...MATTER, international_classes, goods_services }).classSelected;
+
+    it("the matter's own 'Class 25: …' goods (the reported case)", () => {
+      const goods = "Class 25: Clothing, namely t-shirts and leggings";
+      expect(classSelected([25], goods)).toBe(goods);
+    });
+
+    it.each([
+      "Class 25: Clothing, namely t-shirts and leggings",
+      "Class 25 — Clothing, namely t-shirts and leggings",
+      "Class 25 – Clothing, namely t-shirts and leggings",
+      "Class 25 - Clothing, namely t-shirts and leggings",
+      "Class 25- Clothing, namely t-shirts and leggings",
+      "25: Clothing, namely t-shirts and leggings",
+      "class 25: Clothing, namely t-shirts and leggings",
+      "CLASS 25: Clothing, namely t-shirts and leggings",
+      "  Class 25: Clothing, namely t-shirts and leggings  ",
+    ])("%j opens with its class, so it is used as it stands", (goods) => {
+      // The goods text is verbatim: only the surrounding whitespace the form always trimmed goes.
+      expect(classSelected([25], goods)).toBe(goods.trim());
+    });
+
+    it("several classes, each labelled on its own line, are not prefixed either", () => {
+      const goods = "Class 25: Clothing, namely t-shirts\nClass 35: Retail store services";
+      expect(classSelected([25, 35], goods)).toBe(goods);
+      expect(classSelected([25, 35], "Classes 25, 35: Clothing; retail store services")).toBe("Classes 25, 35: Clothing; retail store services");
+    });
+
+    it("keeps the existing format when the goods do not open with a class label", () => {
+      expect(classSelected([25], "Clothing, namely t-shirts and leggings")).toBe("Class 25 — Clothing, namely t-shirts and leggings");
+      expect(classSelected([25, 35], "Clothing; retail store services")).toBe("Classes 25, 35 — Clothing; retail store services");
+    });
+
+    it("a number that is part of the goods is not a class label", () => {
+      expect(classSelected([25], "25-piece apparel sets")).toBe("Class 25 — 25-piece apparel sets");
+      expect(classSelected([24], "24-hour fitness classes")).toBe("Class 24 — 24-hour fitness classes");
+      expect(classSelected([25], "Class 250 apparel")).toBe("Class 25 — Class 250 apparel");
+      expect(classSelected([25], "Classic apparel")).toBe("Class 25 — Classic apparel");
+    });
+
+    it("keeps the prefix when the goods open with a different class than the matter lists", () => {
+      expect(classSelected([25], "Class 35: Retail store services")).toBe("Class 25 — Class 35: Retail store services");
+    });
+
+    it("keeps the prefix when it is the only place a listed class would appear", () => {
+      expect(classSelected([25, 35], "Class 25: Clothing, namely t-shirts")).toBe("Classes 25, 35 — Class 25: Clothing, namely t-shirts");
+    });
+
+    it("never changes the goods text itself", () => {
+      const goods = "Class 25: Clothing, namely t-shirts and leggings";
+      const p = build(snapshotOf(enhancedLines()), { ...MATTER, international_classes: [25], goods_services: goods });
+      expect(p.classSelected).toContain(goods);
+      expect(p.classSelected.match(/Class 25/g)).toHaveLength(1);
+    });
+  });
+
   it("leaves them empty and flagged when the matter has neither, rather than inventing any", () => {
     const p = build(snapshotOf(enhancedLines()), { ...MATTER, international_classes: null, goods_services: null });
     expect(p.classSelected).toBe("");

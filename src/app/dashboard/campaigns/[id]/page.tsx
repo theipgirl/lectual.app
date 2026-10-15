@@ -4,6 +4,7 @@ import { currentRole } from "@/lib/auth/current-role";
 import {
   AUTOMATION_ADMIN_ROLES,
   AUTOMATION_STAFF_ROLES,
+  findClientLeads,
   getSequence,
   listEnrollments,
   listSteps,
@@ -97,8 +98,22 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
   const leadById = new Map(leadsRead.leads.map((lead) => [lead.id, lead]));
 
   const alreadyEnrolledLeadIds = new Set(enrollments.map((e) => e.lead_id));
-  const leadOptions = leadsRead.leads
-    .filter((lead) => !alreadyEnrolledLeadIds.has(lead.id))
+  const notEnrolled = leadsRead.leads.filter((lead) => !alreadyEnrolledLeadIds.has(lead.id));
+
+  // The picker also leaves out a lead who is already a client (signed, paid, a
+  // matter opened, or a won stage), by the same stop facts `enrollLead` refuses
+  // them on. One batched read for the whole list, and only when the picker is
+  // going to be drawn. It is a courtesy: `enrollLead` stays the guard, so if the
+  // facts can't be read the picker still lists them and says so, rather than
+  // pretending nobody is a client.
+  const pickerShown = canOperate && !leadsFailed && !enrollmentsRead.error;
+  const clientsRead =
+    pickerShown && notEnrolled.length > 0
+      ? await findClientLeads(notEnrolled.map((lead) => lead.id)).catch(() => ({ status: "unavailable" as const, error: "read failed" }))
+      : null;
+  const clientsUnavailable = clientsRead?.status === "unavailable";
+  const leadOptions = notEnrolled
+    .filter((lead) => !(clientsRead?.status === "ok" && clientsRead.clients.has(lead.id)))
     .map((lead) => ({ id: lead.id, label: `${leadDisplayName(lead)} — ${lead.email || "no email"}`, hasEmail: !!lead.email }));
 
   const now = new Date();
@@ -210,6 +225,12 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
           ) : (
             <div style={{ padding: "0 18px 14px" }}>
               <EnrollLeadForm sequenceId={sequence.id} leads={leadOptions} />
+              {clientsUnavailable && (
+                <p className="lx-note" style={{ margin: "8px 0 0" }}>
+                  Couldn&apos;t check which leads are already clients, so this list may include some. Enrolling one of them will be
+                  refused.
+                </p>
+              )}
             </div>
           ))}
         {!sequence.active && enrollments.length > 0 && (

@@ -44,7 +44,7 @@ const { recordManualPayment, reconcilePendingPayment } = await import("@/lib/pay
 const { moveLeadStage } = await import("@/lib/pipeline/leads");
 const { createMatter } = await import("@/lib/matters/matters");
 const { applyRun } = await import("@/lib/mailbox/apply");
-const { enrollLead, stopEnrollment } = await import("@/lib/automation/drips");
+const { enrollLead, findClientLeads, stopEnrollment } = await import("@/lib/automation/drips");
 
 function baseTables(): Record<string, Row[]> {
   return {
@@ -229,4 +229,140 @@ describe("enrolling refuses a lead who is already a client — and says why", ()
     db.unique.crm_drip_enrollment = [["lead_id", "sequence_id"]];
     await expect(enrollLead("lead-2", "seq-1")).rejects.toThrow("Sequence stopped — replied, Oct 4");
   });
+});
+
+describe("the enroll picker leaves out clients — by the same rule enrollLead refuses them on", () => {
+  const lead = (id: string, over: Row = {}): Row => ({
+    id,
+    org_id: ORG,
+    first_name: id,
+    last_name: "Lead",
+    business_name: null,
+    email: `${id}@picker.example`,
+    current_stage_id: "st-open",
+    stage_entered_at: "2026-09-30T12:00:00Z",
+    last_inbound_at: null,
+    ...over,
+  });
+
+  /** One lead per way of being a client, one per near miss, and a plain open lead. */
+  function pickerFirm() {
+    db.tables.crm_lead = [
+      lead("l-open"),
+      lead("l-signed"),
+      lead("l-paid"),
+      lead("l-matter"),
+      lead("l-won", { current_stage_id: "st-won", stage_entered_at: "2026-10-02T08:00:00Z" }),
+      lead("l-dupe-a", { email: "pat@dupe.example" }),
+      lead("l-dupe-b", { email: "pat@dupe.example" }),
+      lead("l-dupe-case", { email: "PAT@dupe.example" }),
+      lead("l-near", { last_inbound_at: "2026-10-04T10:00:00Z" }),
+      lead("l-elsewhere", { email: "sam@shared.example" }),
+      lead("l-sam-other-firm", { org_id: OTHER, email: "sam@shared.example" }),
+    ];
+    db.tables.crm_quote = [
+      { id: "q-signed", org_id: ORG, lead_id: "l-signed", status: "accepted", accepted_at: "2026-10-03T21:10:00Z" },
+      { id: "q-paid", org_id: ORG, lead_id: "l-paid", status: "sent", accepted_at: null },
+      { id: "q-dupe-b", org_id: ORG, lead_id: "l-dupe-b", status: "accepted", accepted_at: "2026-10-03T21:10:00Z" },
+      // Unsigned, with a payment that did not go through, and a quote another firm signed.
+      { id: "q-near", org_id: ORG, lead_id: "l-near", status: "sent", accepted_at: null },
+      { id: "q-sam", org_id: OTHER, lead_id: "l-sam-other-firm", status: "accepted", accepted_at: "2026-10-03T21:10:00Z" },
+    ];
+    db.tables.crm_payment = [
+      { id: "p-paid", org_id: ORG, quote_id: "q-paid", matter_id: null, status: "succeeded", occurred_at: "2026-10-02T03:00:00Z" },
+      { id: "p-near", org_id: ORG, quote_id: "q-near", matter_id: null, status: "failed", occurred_at: "2026-10-02T03:00:00Z" },
+    ];
+    db.tables.crm_matter = [{ id: "m-1", org_id: ORG, lead_id: "l-matter", created_at: "2026-10-05T09:00:00Z" }];
+  }
+
+  const allIds = () => db.tables.crm_lead.filter((l) => l.org_id === ORG).map((l) => l.id as string);
+
+  it("names every lead enrollLead would refuse, with the fact it refuses on", async () => {
+    pickerFirm();
+    const read = await findClientLeads(allIds());
+    expect(read.status).toBe("ok");
+    if (read.status !== "ok") return;
+    expect(Object.fromEntries(read.clients)).toEqual({
+      "l-signed": { reason: "signed", at: "2026-10-03T21:10:00Z" },
+      "l-paid": { reason: "paid", at: "2026-10-02T03:00:00Z" },
+      "l-matter": { reason: "matter_opened", at: "2026-10-05T09:00:00Z" },
+      "l-won": { reason: "client", at: "2026-10-02T08:00:00Z" },
+      // One person on two lead rows: the signature on the other row counts (same address, exactly).
+      "l-dupe-a": { reason: "signed", at: "2026-10-03T21:10:00Z" },
+      "l-dupe-b": { reason: "signed", at: "2026-10-03T21:10:00Z" },
+      // The same address typed in capitals reaches the lower-case rows (its exact variants), as it does for enrollLead.
+      "l-dupe-case": { reason: "signed", at: "2026-10-03T21:10:00Z" },
+    });
+  });
+
+  it("agrees with enrollLead on every lead: listed as a client exactly when enrolling is refused for that", async () => {
+    pickerFirm();
+    const read = await findClientLeads(allIds());
+    if (read.status !== "ok") throw new Error("expected an ok read");
+    for (const id of allIds()) {
+      const refused = await enrollLead(id, "seq-1").then(
+        () => false,
+        (err: Error) => {
+          expect(err.message).toMatch(/is already a client/);
+          return true;
+        },
+      );
+      expect(read.clients.has(id), id).toBe(refused);
+    }
+  });
+
+  it("a reply, a failed payment, an unsigned quote, or another firm's lead with the same address is not a client", async () => {
+    pickerFirm();
+    const read = await findClientLeads(["l-open", "l-near", "l-elsewhere"]);
+    expect(read).toEqual({ status: "ok", clients: new Map() });
+  });
+
+  it("is a fixed number of reads however many leads there are — never one per lead", async () => {
+    pickerFirm();
+    db.queryCount.value = 0;
+    await findClientLeads(allIds());
+    const small = db.queryCount.value;
+    expect(small).toBeLessThanOrEqual(8);
+
+    const many = Array.from({ length: 40 }, (_, i) => lead(`l-bulk-${i}`));
+    db.tables.crm_lead.push(...many);
+    db.queryCount.value = 0;
+    await findClientLeads(allIds());
+    expect(db.queryCount.value).toBe(small);
+
+    // Past one slice of ids the reads are sliced, still nowhere near one per lead.
+    db.tables.crm_lead.push(...Array.from({ length: 200 }, (_, i) => lead(`l-more-${i}`)));
+    db.queryCount.value = 0;
+    await findClientLeads(allIds());
+    expect(db.queryCount.value).toBeLessThanOrEqual(small * 4);
+    expect(db.queryCount.value).toBeLessThan(allIds().length / 10);
+  });
+
+  it("slicing loses nobody: a client past the first slice is still found", async () => {
+    pickerFirm();
+    db.tables.crm_lead.push(...Array.from({ length: 200 }, (_, i) => lead(`l-more-${i}`)));
+    db.tables.crm_quote.push({ id: "q-late", org_id: ORG, lead_id: "l-more-199", status: "accepted", accepted_at: "2026-10-06T00:00:00Z" });
+    const read = await findClientLeads([...allIds().filter((id) => id !== "l-more-199"), "l-more-199"]);
+    if (read.status !== "ok") throw new Error("expected an ok read");
+    expect(read.clients.get("l-more-199")).toEqual({ reason: "signed", at: "2026-10-06T00:00:00Z" });
+    expect(read.clients.size).toBe(8);
+  });
+
+  it("asks about nothing, reads nothing", async () => {
+    pickerFirm();
+    db.queryCount.value = 0;
+    expect(await findClientLeads([])).toEqual({ status: "ok", clients: new Map() });
+    expect(db.queryCount.value).toBe(0);
+  });
+
+  it.each(["crm_lead", "crm_quote", "crm_matter", "crm_payment", "crm_stage"])(
+    "a failed %s read is unavailable, never 'no clients'",
+    async (table) => {
+      pickerFirm();
+      db.failTable = table;
+      const read = await findClientLeads(allIds());
+      expect(read.status).toBe("unavailable");
+      expect(read).not.toHaveProperty("clients");
+    },
+  );
 });

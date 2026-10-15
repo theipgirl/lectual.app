@@ -197,6 +197,51 @@ describe("advanceEnrollment", () => {
   });
 });
 
+// ── Why a non-active enrollment won't run: "resume it first" is only true of paused ──
+describe("advanceEnrollment on an enrollment that isn't active", () => {
+  async function refusal(patch: Row): Promise<string> {
+    Object.assign(enrollment(), patch);
+    const err = await advanceEnrollment("enr-1").then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(Error);
+    // Whatever the message says, the refusal itself is unchanged: nothing ran, nothing moved.
+    expect(createDraft).not.toHaveBeenCalled();
+    expect(enrollment().current_step).toBe(0);
+    return (err as Error).message;
+  }
+
+  it("a paused enrollment keeps the resume hint", async () => {
+    const message = await refusal({ status: "paused" });
+    expect(message).toMatch(/paused/);
+    expect(message).toMatch(/resume it first/);
+  });
+
+  it("a stopped enrollment says it was stopped and can't be restarted, naming the reason", async () => {
+    const message = await refusal({ status: "stopped", stop_reason: "signed" });
+    expect(message).toBe("This sequence was stopped (signed quote) and can't be restarted.");
+    expect(message).not.toMatch(/resume/i);
+  });
+
+  it("a stopped enrollment with no recorded reason (or one we don't know) still says so, without inventing one", async () => {
+    expect(await refusal({ status: "stopped", stop_reason: null })).toBe("This sequence was stopped and can't be restarted.");
+    expect(await refusal({ status: "stopped", stop_reason: "something-new" })).toBe("This sequence was stopped and can't be restarted.");
+  });
+
+  it("a completed enrollment says it's completed, with no resume hint", async () => {
+    const message = await refusal({ status: "completed" });
+    expect(message).toMatch(/completed/);
+    expect(message).not.toMatch(/resume/i);
+  });
+
+  it("a cancelled enrollment says it was cancelled, with no resume hint", async () => {
+    const message = await refusal({ status: "cancelled" });
+    expect(message).toMatch(/cancelled/);
+    expect(message).not.toMatch(/resume/i);
+  });
+});
+
 // ── The guard (intake SOP §2.5: "check payment state before sending") ────────
 describe("advanceEnrollment's stop guard", () => {
   function stopActivity() {

@@ -6,7 +6,7 @@ import { listSteps, type DripEnrollment, type DripStep } from "@/lib/automation/
 import { activeQueueOrgKey } from "@/lib/queue/org";
 import { createDraft } from "@/lib/queue/api";
 import { addDelay, leadDisplayName, leadTemplateVars, renderTemplate } from "./steps";
-import { STOP_REASON_LABEL, stopFor, type StopDecision } from "./stops";
+import { STOP_REASON_LABEL, isStopReason, stopFor, type StopDecision } from "./stops";
 import { loadStopFactsForPerson } from "./stop-facts";
 import { stopLeadSequences } from "./stop";
 import { sessionUserId } from "./stop-staff";
@@ -115,6 +115,29 @@ async function claimStep(
 
 const ALREADY_RAN = "This step was just run (or the enrollment changed) — refresh to see where it is now.";
 
+/**
+ * Why a step can't run on an enrollment that isn't active. Only `paused` can be
+ * resumed: a stopped sequence is final (0085's trigger refuses to restart it),
+ * and a completed or cancelled one has nothing left to run. So "resume it
+ * first" is said for a paused enrollment and nowhere else.
+ */
+function notActiveMessage(enrollment: Pick<DripEnrollment, "status" | "stop_reason">): string {
+  switch (enrollment.status) {
+    case "paused":
+      return "This enrollment is paused, not active — resume it first.";
+    case "stopped": {
+      const reason = isStopReason(enrollment.stop_reason) ? STOP_REASON_LABEL[enrollment.stop_reason] : null;
+      return `This sequence was stopped${reason ? ` (${reason})` : ""} and can't be restarted.`;
+    }
+    case "completed":
+      return "This enrollment is already completed — every step has run.";
+    case "cancelled":
+      return "This enrollment was cancelled, so there is nothing to run.";
+    default:
+      return `This enrollment is ${enrollment.status}, not active.`;
+  }
+}
+
 export async function advanceEnrollment(enrollmentId: string): Promise<AdvanceResult> {
   const supabase = await getScopedClient();
   await requireAutomationStaffRole(supabase);
@@ -122,9 +145,7 @@ export async function advanceEnrollment(enrollmentId: string): Promise<AdvanceRe
 
   const enrollment = await loadEnrollment(supabase, enrollmentId);
   if (enrollment.status !== "active") {
-    throw new CampaignAdvanceError(
-      `This enrollment is ${enrollment.status}, not active — resume it first.`,
-    );
+    throw new CampaignAdvanceError(notActiveMessage(enrollment));
   }
 
   // A paused campaign runs nothing. The sequence is read through the scoped

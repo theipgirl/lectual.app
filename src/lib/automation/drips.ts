@@ -3,7 +3,7 @@ import type { Database } from "@/lib/db/types";
 import { requireAutomationAdminRole, requireAutomationStaffRole, currentOrgId } from "./rules";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { clientFact, enrollRefusal, stopLine, type StopReason } from "@/lib/campaigns/stops";
-import { loadStopFactsForPerson } from "@/lib/campaigns/stop-facts";
+import { loadClientLeads, loadStopFactsForPerson, type ClientLeadsRead } from "@/lib/campaigns/stop-facts";
 import { stopLeadSequences } from "@/lib/campaigns/stop";
 import { sessionUserId } from "@/lib/campaigns/stop-staff";
 import type { StopDb } from "@/lib/campaigns/stop-db";
@@ -227,6 +227,19 @@ export async function listEnrollments(filter: EnrollmentFilter = {}): Promise<Dr
   const { data, error } = await query.order("enrolled_at", { ascending: false });
   if (error) throw error;
   return data ?? [];
+}
+
+/**
+ * Which of these leads `enrollLead` would refuse as already a client, for a whole
+ * list in one batched read (the campaign page's "Enroll a lead" picker leaves them
+ * out). The verdict is the same one `enrollLead` reaches, from the same stop facts
+ * — see `loadClientLeads`. Not role-gated (a read, RLS-scoped); this is only a
+ * convenience for the picker and `enrollLead` stays the guard. A failed read is
+ * `unavailable`, never "no clients".
+ */
+export async function findClientLeads(leadIds: readonly string[]): Promise<ClientLeadsRead> {
+  const supabase = await getScopedClient();
+  return loadClientLeads(supabase as unknown as StopDb, { leadIds });
 }
 
 /**
