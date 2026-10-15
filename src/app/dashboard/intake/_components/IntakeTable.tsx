@@ -10,6 +10,8 @@ import type { IntakeTime } from "@/lib/time";
 import TimeChip from "@/components/intake/TimeChip";
 import OwnerCell from "./OwnerCell";
 import TemperatureCell from "./TemperatureCell";
+import LaneCell from "./LaneCell";
+import type { Lane } from "@/lib/leads/lane";
 import {
   NEXT,
   NEXT_HOT,
@@ -21,15 +23,16 @@ import {
 } from "./styles";
 
 /** The canvas's column widths, verbatim. The checkbox column is omitted (§11). */
-const GRID = "2.1fr 1.15fr .8fr .95fr 64px 1.15fr 1.5fr";
+const GRID = "2.1fr 1.15fr .8fr 1.25fr .95fr 64px 1.15fr 1.5fr";
 
 /** Below this the columns would be unreadable, so the table scrolls instead. */
-const MIN_TABLE_WIDTH = 880;
+const MIN_TABLE_WIDTH = 1000;
 
 const COLUMNS: Array<{ key: SortKey; label: string }> = [
   { key: "lead", label: "Lead" },
   { key: "stage", label: "Stage" },
   { key: "temp", label: "Temp" },
+  { key: "lane", label: "Lane" },
   { key: "source", label: "Source" },
   { key: "owner", label: "Owner" },
   { key: "lastTouch", label: "Last touch" },
@@ -64,6 +67,7 @@ export default function IntakeTable({
   time,
   onSort,
   onSetTemperature,
+  onSetLane,
   onAssign,
 }: {
   rows: IntakeRow[];
@@ -79,6 +83,7 @@ export default function IntakeTable({
   time: IntakeTime | null;
   onSort: (key: SortKey) => void;
   onSetTemperature: (leadId: string, level: Temperature | null) => void;
+  onSetLane: (leadId: string, lane: Lane | null) => void;
   onAssign: (leadId: string, userId: string | null) => void;
 }) {
   const router = useRouter();
@@ -202,6 +207,8 @@ export default function IntakeTable({
                     pending={pending}
                     onSet={(level) => onSetTemperature(lead.id, level)}
                   />
+
+                  <LaneCell leadName={name} lane={row.lane} pending={pending} onSet={(lane) => onSetLane(lead.id, lane)} />
 
                   <div
                     style={{ ...ellipsis, fontSize: 12.5, color: "var(--ink2)" }}

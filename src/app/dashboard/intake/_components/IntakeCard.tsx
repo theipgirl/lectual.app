@@ -15,6 +15,7 @@ import {
   touchStampFor,
 } from "@/lib/intake/views";
 import Popover, { PopoverItem } from "./Popover";
+import { LANE_LABEL, suggestionLine } from "@/lib/leads/lane";
 import {
   NEXT,
   NEXT_HOT,
@@ -195,6 +196,21 @@ export default function IntakeCard({
       <div className="intake-mono" style={{ ...ellipsis, fontSize: 10.5, color: "var(--mute)" }}>
         {mark}
       </div>
+
+      {/* SOP Stage 2: the lane a person set reads as a fact; triage's reads
+          as a suggestion, in words, with its reason. */}
+      {row.lane.lane ? (
+        <div style={{ ...ellipsis, fontSize: 11, color: "var(--ink2)" }} title="Lane set by a person">
+          Lane: {LANE_LABEL[row.lane.lane]}
+        </div>
+      ) : row.lane.suggested ? (
+        <div
+          style={{ ...ellipsis, fontSize: 11, color: "var(--mute)", fontStyle: "italic" }}
+          title={suggestionLine(row.lane) ?? undefined}
+        >
+          {suggestionLine(row.lane)}
+        </div>
+      ) : null}
 
       {variant === "owner" && (
         <div style={{ ...(step.urgent ? NEXT_HOT : NEXT), fontSize: 12, textWrap: "pretty" }}>

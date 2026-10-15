@@ -9,6 +9,9 @@ import { activeQueueOrgKey } from "@/lib/queue/org";
 import { QUEUE_APPROVE_ROLES, QUEUE_EDIT_ROLES, resolveQueueRole } from "@/lib/queue/roles";
 import { draftInMyMailbox } from "@/lib/mailbox/my-mailbox";
 import type { Role } from "@/lib/auth/roles";
+import { checkDraftStaleness, stalenessRequiresConfirm } from "@/lib/queue/stale";
+import { staleWarning } from "@/components/queue/stale-warning";
+import { getFirmTimeZone } from "@/lib/org/profile";
 
 export type ReviewState = { error?: string };
 
@@ -69,9 +72,29 @@ export async function reviewQueueAction(_prev: ReviewState, formData: FormData):
     }
 
     if (intent === "approve") {
+      // The stale-draft check runs again HERE, server-side: the page's
+      // checkbox is a courtesy, and a hand-posted form must not skip it. A
+      // client who signed or paid since this was queued (or a check that
+      // couldn't run) needs the approver's explicit confirm, and the approval
+      // note records that they gave it. Never an automatic reject.
+      const before = await getQueueItem(qKey, id);
+      const stale = await checkDraftStaleness(before);
+      const confirmed = formData.get("confirm_stale") === "yes";
+      if (stalenessRequiresConfirm(stale) && !confirmed) {
+        const warning = staleWarning(stale, await getFirmTimeZone());
+        return {
+          error: `${warning?.headline ?? "This client's status changed since the draft was queued"}. Tick the confirmation box to approve it anyway, or reject it.`,
+        };
+      }
+      const staleNote =
+        stalenessRequiresConfirm(stale) && confirmed
+          ? `Approved after a stale-draft warning: ${staleWarning(stale, await getFirmTimeZone())?.headline ?? "status changed"}.`
+          : null;
+      const approvalNote = [note, staleNote].filter(Boolean).join("\n") || null;
+
       if (editedBody) await saveQueueEdit(qKey, id, editedBody);
       const item = await getQueueItem(qKey, id);
-      const resolved = await resolveQueueItem({ orgKey: qKey, id, action: "approve", resolvedBy, ...(note ? { note } : {}) });
+      const resolved = await resolveQueueItem({ orgKey: qKey, id, action: "approve", resolvedBy, ...(approvalNote ? { note: approvalNote } : {}) });
       sendStatus = resolved.send;
 
       // No channel on the queue side: draft it in the approver's own mailbox.

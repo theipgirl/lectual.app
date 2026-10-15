@@ -5,6 +5,7 @@ import { CAN_WRITE_LEAD, resolveCurrentRole, type Lead } from "@/lib/pipeline/le
 import { LeadWriteError, forbiddenLeadWrite } from "@/lib/pipeline/errors";
 import { intakeStageIds } from "./scope";
 import type { Temperature } from "./temperature";
+import { suggestedLane, type Lane } from "@/lib/leads/lane";
 
 /**
  * Server-side reads/writes for the intake dashboard (blueprint §7).
@@ -133,6 +134,80 @@ export async function setTemperature(leadId: string, level: Temperature | null):
       from,
       to: level,
       summary: level ? `Temperature set to ${level}` : "Temperature override cleared",
+    },
+  });
+
+  return updated;
+}
+
+/**
+ * Sets (or clears, with null) the lead's routing LANE — the person's call
+ * that overrides the triage agent's suggestion (intake SOP Stage 2: "Taylor
+ * can override"). Distinct from setTemperature above: temperature is the
+ * board's activity-derived heat; the lane decides the next step.
+ *
+ * Who and when are stamped by the database from the session (lectual 0085's
+ * crm_lead_lane_guard), and the trigger refuses a write without a session,
+ * which is what keeps the triage agent from ever setting it. The timeline row
+ * records who, from → to, and what triage had suggested, so an override reads
+ * as an override.
+ */
+export async function setLane(leadId: string, lane: Lane | null): Promise<Lead> {
+  if (!leadId) throw new LeadWriteError("Missing lead.");
+
+  const supabase = await getScopedClient();
+  const role = await resolveCurrentRole(supabase);
+  if (!CAN_WRITE_LEAD.includes(role)) {
+    throw forbiddenLeadWrite(role, "set a lead's lane");
+  }
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+  if (userError) throw userError;
+
+  const { data: before, error: beforeError } = await supabase
+    .from("crm_lead")
+    .select("lane, ai_summary")
+    .eq("id", leadId)
+    .maybeSingle();
+  if (beforeError) throw beforeError;
+  if (!before) throw new LeadWriteError("That lead no longer exists.");
+  const from = before.lane ?? null;
+  if (from === lane) {
+    const { data: unchanged, error } = await supabase.from("crm_lead").select("*").eq("id", leadId).single();
+    if (error) throw error;
+    return unchanged;
+  }
+
+  const { data, error } = await supabase
+    .from("crm_lead")
+    .update({ lane, updated_at: new Date().toISOString() })
+    .eq("id", leadId)
+    .select("*");
+  if (error) throw error;
+  const updated = (data ?? [])[0];
+  if (!updated) {
+    throw new LeadWriteError("That lead no longer exists, or isn't visible to your firm.");
+  }
+
+  const meta = (user?.user_metadata ?? {}) as Record<string, unknown>;
+  const by =
+    (typeof meta.full_name === "string" && meta.full_name.trim()) ||
+    (typeof meta.name === "string" && meta.name.trim()) ||
+    user?.email ||
+    null;
+  await logActivitySafe({
+    type: "lead_updated",
+    leadId,
+    payload: {
+      field: "lane",
+      from,
+      to: lane,
+      suggested: suggestedLane(before.ai_summary),
+      by,
+      summary: lane ? `Lane set to ${lane}` : "Lane cleared",
     },
   });
 

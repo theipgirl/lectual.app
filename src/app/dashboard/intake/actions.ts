@@ -5,7 +5,8 @@ import { getScopedClient } from "@/lib/db/scoped-client";
 import { assignLead, moveLeadStage } from "@/lib/pipeline";
 import { CAN_WRITE_LEAD, resolveCurrentRole } from "@/lib/pipeline/leads";
 import { forbiddenLeadWrite } from "@/lib/pipeline/errors";
-import { setTemperature } from "@/lib/intake/leads";
+import { setLane, setTemperature } from "@/lib/intake/leads";
+import { isLane, type Lane } from "@/lib/leads/lane";
 import type { Temperature } from "@/lib/intake";
 // Pure helpers, shared with the pipeline page rather than re-implemented:
 // only a LeadWriteError's message is ever allowed through to a firm user's
@@ -112,6 +113,26 @@ export async function moveStageAction(
     await moveLeadStage(leadId, stageId);
   } catch (err) {
     return { ok: false, error: friendlyMoveStageError(err) };
+  }
+
+  revalidatePath("/dashboard/intake/");
+  revalidatePath(`/dashboard/leads/${leadId}`);
+  return { ok: true };
+}
+
+/**
+ * Sets or clears a lead's routing lane — the person's override of the triage
+ * suggestion (intake SOP Stage 2). The data layer re-checks the role, and the
+ * database stamps who and when from the session.
+ */
+export async function setLaneAction(leadId: string, lane: Lane | null): Promise<IntakeActionResult> {
+  if (!leadId) return { ok: false, error: "Missing lead." };
+  if (lane !== null && !isLane(lane)) return { ok: false, error: "That isn't a lane." };
+
+  try {
+    await setLane(leadId, lane);
+  } catch (err) {
+    return { ok: false, error: friendlyLeadWriteError(err, "Couldn't set this lead's lane.") };
   }
 
   revalidatePath("/dashboard/intake/");

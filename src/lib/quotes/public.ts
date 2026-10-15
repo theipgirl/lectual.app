@@ -15,6 +15,8 @@ import { applyClientChoice, isOfferIntact, offeredLines, readClientChoice, type 
 import { advanceLeadForAcceptedQuote, openMatterForAcceptedQuote, type MatterOpenResult } from "./accept-matter";
 import { effectiveQuoteStatus } from "./status";
 import { resolveTimeZone } from "@/lib/org/profile-rules";
+import { stopSequencesForQuote } from "@/lib/campaigns/stop";
+import type { StopDb } from "@/lib/campaigns/stop-db";
 
 /**
  * The `/q/[token]` read and write path — the ONLY service-role code in the
@@ -63,6 +65,9 @@ import { resolveTimeZone } from "@/lib/org/profile-rules";
  *                          5. the matter auto-open in `accept-matter.ts`: at most
  *                             one `crm_matter`, the `crm_quote.matter_id` link,
  *                             one `crm_quote_event` and one `crm_activity` row.
+ *                          Before 5, the sequence stop (campaigns/stop.ts):
+ *                             the quote's lead's running enrollments set to
+ *                             `stopped` / `signed`, one `drip_stopped` row each.
  *   DECLINING              6. one conditional update on `crm_quote`, and
  *                          7. one `declined` event.
  * Nothing else. Every one of them is fenced by the id and org_id read off the
@@ -1293,6 +1298,20 @@ export async function acceptPublicQuote(
         console.error(`[quotes] failed to record the client's choice on the lines quote=${quoteId}`, err);
       }
     }
+
+    // SOP rule 1 and Stage 7: "Signed and paid must halt every sequence the
+    // client is enrolled in." The signature is the first of those two facts,
+    // so every running sequence for this quote's lead (and its contact) stops
+    // HERE, the moment the signature is durable — before the matter opens, so
+    // a slow follow-on can't leave a nudge queued behind a signed client.
+    // Fenced on the quote's own (id, org_id); stop.ts never throws, so this
+    // cannot fail the signature.
+    await stopSequencesForQuote(client as unknown as StopDb, { quoteId, orgId }, {
+      reason: "signed",
+      actor: { type: "system" },
+      factAt: acceptedAt,
+      now,
+    });
 
     // "Matter opens automatically" — best-effort, idempotent, and unable to
     // undo anything above (accept-matter.ts never throws).

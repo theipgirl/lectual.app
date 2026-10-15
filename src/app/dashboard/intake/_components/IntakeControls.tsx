@@ -8,6 +8,7 @@ import type { ReplyState } from "@/lib/intake/reply";
 import {
   UNASSIGNED_OWNER,
   type IntakeFilters,
+  type LaneFilter,
   type IntakeGroup,
   type IntakeView,
 } from "@/lib/intake/rows";
@@ -55,6 +56,14 @@ const TEMP_OPTIONS: Array<{ value: Temperature; label: string }> = [
   { value: "hot", label: "Hot" },
   { value: "warm", label: "Warm" },
   { value: "cold", label: "Cold" },
+];
+
+const LANE_OPTIONS: Array<{ value: LaneFilter; label: string }> = [
+  { value: "hot", label: "Hot" },
+  { value: "warm", label: "Warm" },
+  { value: "cold", label: "Cold" },
+  { value: "suggested", label: "Suggested, not reviewed" },
+  { value: "none", label: "No lane" },
 ];
 
 function Divider() {
@@ -406,6 +415,50 @@ export default function IntakeControls({
                 onSelect={() => {
                   close();
                   onFilters({ ...filters, temp: option.value });
+                }}
+              >
+                {option.label}
+              </PopoverItem>
+            ))}
+          </>
+        )}
+      </Popover>
+
+      <Popover
+        label="Filter by lane"
+        width={210}
+        trigger={({ onClick, ref, ...aria }) => (
+          <button
+            {...aria}
+            ref={ref}
+            type="button"
+            onClick={onClick}
+            style={filterChip(filters.lane !== null)}
+            title="Hot / Warm / Cold match the lane a person set, or triage's suggestion where nobody has yet."
+          >
+            {filters.lane ? `Lane: ${LANE_OPTIONS.find((o) => o.value === filters.lane)?.label ?? filters.lane}` : "Lane"}
+          </button>
+        )}
+      >
+        {(close) => (
+          <>
+            <PopoverItem
+              muted
+              checked={filters.lane === null}
+              onSelect={() => {
+                close();
+                onFilters({ ...filters, lane: null });
+              }}
+            >
+              Any lane
+            </PopoverItem>
+            {LANE_OPTIONS.map((option) => (
+              <PopoverItem
+                key={option.value}
+                checked={filters.lane === option.value}
+                onSelect={() => {
+                  close();
+                  onFilters({ ...filters, lane: option.value });
                 }}
               >
                 {option.label}

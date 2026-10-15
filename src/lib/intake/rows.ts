@@ -6,6 +6,7 @@ import type { MemberIdentity } from "@/lib/members/directory";
 import { deriveTemperature, lastTouchAt, type Temperature, type TemperatureResult } from "./temperature";
 import { replyState, type ReplyState } from "./reply";
 import { REFERRAL_SOURCES } from "./referral-source";
+import { LANE_RANK, laneView, type Lane, type LaneView } from "@/lib/leads/lane";
 
 /**
  * Pure view-model for /intake (blueprint §7, re-homed by §11): row building,
@@ -33,6 +34,8 @@ export type IntakeRow = {
   /** The lead's stage row, or null when the stage is missing from the list. */
   stage: Stage | null;
   temperature: TemperatureResult;
+  /** The routing lane: a person's, and the triage suggestion beside it (SOP Stage 2). */
+  lane: LaneView;
   reply: ReplyState;
   /** greatest(last_activity_at, last_outbound_at, last_inbound_at), or null. */
   lastTouchAt: string | null;
@@ -48,10 +51,20 @@ export type IntakeRow = {
 /** Special `owner` filter value meaning "nobody is on the hook for this one". */
 export const UNASSIGNED_OWNER = "unassigned";
 
+/**
+ * Lane filter values. hot / warm / cold match the lane routing goes by (a
+ * person's, else the suggestion); `suggested` is "triage suggested one and
+ * nobody has reviewed it" — the hot-lane sample the SOP asks Taylor to check
+ * by hand; `none` is no lane and no suggestion.
+ */
+export type LaneFilter = Lane | "suggested" | "none";
+export const LANE_FILTERS: readonly LaneFilter[] = ["hot", "warm", "cold", "suggested", "none"];
+
 export type IntakeFilters = {
   /** Canonical referral buckets (§4.2). Empty = no source filter. */
   source: string[];
   temp: Temperature | null;
+  lane: LaneFilter | null;
   /** A member user id, or UNASSIGNED_OWNER. */
   owner: string | null;
   /** A crm_stage id. */
@@ -64,6 +77,7 @@ export type IntakeFilters = {
 export const EMPTY_INTAKE_FILTERS: IntakeFilters = {
   source: [],
   temp: null,
+  lane: null,
   owner: null,
   stage: null,
   reply: null,
@@ -104,6 +118,7 @@ export function parseIntakeFilters(params: IntakeSearchParams): IntakeFilters {
   const source = allValues(params.source).filter((value) => known.has(value));
 
   const temp = firstValue(params.temp) as Temperature;
+  const lane = firstValue(params.lane) as LaneFilter;
   const reply = firstValue(params.reply) as ReplyState;
   const owner = firstValue(params.owner);
   const stage = firstValue(params.stage);
@@ -111,6 +126,7 @@ export function parseIntakeFilters(params: IntakeSearchParams): IntakeFilters {
   return {
     source,
     temp: TEMPERATURES.includes(temp) ? temp : null,
+    lane: LANE_FILTERS.includes(lane) ? lane : null,
     owner: owner === "" ? null : owner,
     stage: stage === "" ? null : stage,
     reply: REPLY_STATES.includes(reply) ? reply : null,
@@ -127,6 +143,7 @@ export function filtersToQueryString(filters: IntakeFilters): string {
   const params = new URLSearchParams();
   for (const source of filters.source) params.append("source", source);
   if (filters.temp) params.set("temp", filters.temp);
+  if (filters.lane) params.set("lane", filters.lane);
   if (filters.owner) params.set("owner", filters.owner);
   if (filters.stage) params.set("stage", filters.stage);
   if (filters.reply) params.set("reply", filters.reply);
@@ -237,6 +254,7 @@ export function buildIntakeRows(input: BuildIntakeRowsInput): IntakeRow[] {
       lead,
       stage,
       temperature: deriveTemperature(lead, stages, now),
+      lane: laneView(lead),
       reply: replyState(lead),
       lastTouchAt: lastTouchAt(lead),
       daysInStage,
@@ -288,6 +306,7 @@ export function applyFilters(rows: IntakeRow[], filters: IntakeFilters): IntakeR
       }
     }
     if (filters.temp && row.temperature.level !== filters.temp) return false;
+    if (filters.lane && !matchesLane(row.lane, filters.lane)) return false;
     if (filters.owner) {
       if (filters.owner === UNASSIGNED_OWNER) {
         if (row.lead.assigned_to) return false;
@@ -302,10 +321,18 @@ export function applyFilters(rows: IntakeRow[], filters: IntakeFilters): IntakeR
   });
 }
 
+/** Pure — whether a row's lane matches the Lane filter (see LaneFilter). */
+export function matchesLane(lane: LaneView, filter: LaneFilter): boolean {
+  if (filter === "suggested") return lane.source === "suggestion";
+  if (filter === "none") return lane.effective === null;
+  return lane.effective === filter;
+}
+
 export type SortKey =
   | "lead"
   | "stage"
   | "temp"
+  | "lane"
   | "source"
   | "owner"
   | "nurture"
@@ -360,6 +387,8 @@ function sortValue(row: IntakeRow, key: SortKey): string | number | null {
       return row.stage?.order_index ?? null;
     case "temp":
       return TEMP_RANK[row.temperature.level];
+    case "lane":
+      return row.lane.effective ? LANE_RANK[row.lane.effective] : null;
     case "source":
       return row.lead.referral_source?.toLowerCase() ?? null;
     case "owner":

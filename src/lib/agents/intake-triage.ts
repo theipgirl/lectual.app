@@ -9,10 +9,17 @@ import type { AgentContext, AgentResult } from "./types";
  *
  * By autonomy level:
  *   suggest  an `ai_insight` timeline entry only
- *   draft    + the reason and red flags on the lead's AI fields (ai_summary,
- *            ai_red_flags) — fields that exist to hold the AI's view
- *   act      + the lead's temperature, but ONLY when no person has set one.
- *            A human's call is never overwritten.
+ *   draft    + the suggested lane and reason, and red flags, on the lead's AI
+ *            fields (ai_summary "HOT — reason", ai_red_flags) — fields that
+ *            exist to hold the AI's view
+ *   act      the same as draft. It used to also write the lead's
+ *            `temperature` (with temperature_set_by NULL), which the intake
+ *            board renders as a call someone made — exactly the failure RPB's
+ *            SOP names: "a routing suggestion once rendered as an assignment
+ *            status on the dashboard and read as fact". Routing is a
+ *            SUGGESTION (SOP Stage 2), so triage never writes the lane or the
+ *            temperature; a person sets the lane (crm_lead.lane, lectual
+ *            0085, whose trigger refuses a write without a session anyway).
  * Every mode marks the lead scored (ai_enriched_at) so it isn't re-scored
  * every run, and a hot lead gets a BRIEFING in the queue when the firm has one.
  */
@@ -68,6 +75,21 @@ export function triagePrompt(lead: LeadRow): string {
   return `Triage this lead.\n\n<lead>\n${lines.join("\n")}\n</lead>`;
 }
 
+/**
+ * The lead columns one triage result may write. Pure, so the rule "a
+ * suggestion never becomes the lane" is pinned by a test: the keys are
+ * ai_enriched_at, and (draft / act) ai_summary + ai_red_flags. Never `lane`,
+ * `lane_set_*`, `temperature` or `temperature_set_*`, at any autonomy.
+ */
+export function triageLeadUpdate(output: Triage, autonomy: AgentContext["autonomy"], nowIso: string): Record<string, unknown> {
+  const update: Record<string, unknown> = { ai_enriched_at: nowIso };
+  if (autonomy !== "suggest") {
+    update.ai_summary = `${output.lane.toUpperCase()} — ${output.reason}`;
+    update.ai_red_flags = output.red_flags.slice(0, 5);
+  }
+  return update;
+}
+
 export async function runIntakeTriage(ctx: AgentContext): Promise<AgentResult> {
   const { admin, orgId, autonomy, llm } = ctx;
 
@@ -89,17 +111,7 @@ export async function runIntakeTriage(ctx: AgentContext): Promise<AgentResult> {
     const { output } = await llm({ system: SYSTEM, user: triagePrompt(lead), schema: TriageSchema, effort: "low", maxTokens: 4000 });
     const nowIso = new Date(ctx.now()).toISOString();
 
-    const update: Record<string, unknown> = { ai_enriched_at: nowIso };
-    if (autonomy !== "suggest") {
-      update.ai_summary = `${output.lane.toUpperCase()} — ${output.reason}`;
-      update.ai_red_flags = output.red_flags.slice(0, 5);
-    }
-    const setTemperature = autonomy === "act" && !lead.temperature;
-    if (setTemperature) {
-      update.temperature = output.lane;
-      update.temperature_set_at = nowIso;
-      // temperature_set_by stays null: no person made this call.
-    }
+    const update = triageLeadUpdate(output, autonomy, nowIso);
     const { error: upErr } = await admin.from("crm_lead").update(update).eq("id", lead.id).eq("org_id", orgId);
     if (upErr) throw new Error(`lead update failed: ${upErr.message}`);
 
@@ -119,7 +131,8 @@ export async function runIntakeTriage(ctx: AgentContext): Promise<AgentResult> {
         practice_fit: output.practice_fit,
         reason: output.reason,
         red_flags: output.red_flags.slice(0, 5),
-        applied: { temperature: setTemperature, summary: autonomy !== "suggest" },
+        // A suggestion only: never the lane, never the temperature.
+        applied: { lane: false, temperature: false, summary: autonomy !== "suggest" },
       },
     });
     if (actErr) throw new Error(`activity insert failed: ${actErr.message}`);

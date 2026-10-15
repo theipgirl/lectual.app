@@ -17,6 +17,14 @@ import { addVoiceNoteAction } from "./actions";
 import { meetingsFor } from "@/lib/meetings/read";
 import { LinkedMeetings } from "@/components/meetings/LinkedMeetings";
 import { ConsultDetailsSection } from "@/components/leads/ConsultDetailsSection";
+import { LaneCard } from "@/components/leads/LaneCard";
+import { SequencesCard, type SequenceRow } from "@/components/leads/SequencesCard";
+import { laneView, nextStepForLane } from "@/lib/leads/lane";
+import { getFirmTimeZone, getLaneLinks } from "@/lib/org/profile";
+import { listLeadEnrollments } from "@/lib/automation/drips";
+import { AUTOMATION_STAFF_ROLES } from "@/lib/automation/rules";
+import { enrollmentStatusLabel, enrollmentStatusTone } from "@/lib/campaigns/steps";
+import { shortDate, stopLine } from "@/lib/campaigns/stops";
 
 export default async function LeadPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -46,6 +54,31 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   ]);
   const rows = activity ?? [];
   const voiceUrls = await voiceNotePlaybackUrls(rows);
+
+  // Lane + next step (SOP Stage 2) and the lead's sequences (SOP rule 1).
+  const [{ links, failed: linksFailed }, tz, enrollments] = await Promise.all([
+    getLaneLinks(),
+    getFirmTimeZone(),
+    listLeadEnrollments(id).catch(() => null),
+  ]);
+  const lane = laneView(lead);
+  const nextStep = nextStepForLane(lane.effective, links);
+  const nurture =
+    enrollments && links.nurtureSequenceId ? enrollments.find((e) => e.sequence_id === links.nurtureSequenceId) : undefined;
+  const setter = lane.setBy ? members.find((m) => m.userId === lane.setBy) : undefined;
+  const sequenceRows: SequenceRow[] | null = enrollments
+    ? enrollments.map((e) => ({
+        id: e.id,
+        sequenceId: e.sequence_id,
+        sequenceName: e.sequence_name,
+        status: e.status,
+        statusLabel: enrollmentStatusLabel(e.status),
+        statusTone: enrollmentStatusTone(e.status),
+        step: e.status === "active" || e.status === "paused" ? `next: step ${e.current_step + 1}` : "",
+        stopLine: e.status === "stopped" ? stopLine({ reason: e.stop_reason, at: e.stopped_at }, tz) : null,
+      }))
+    : null;
+  const canOperate = AUTOMATION_STAFF_ROLES.includes(session.role);
   const proposals = pendingProposals(rows);
   const canWrite = CAN_WRITE_LEAD.includes(session.role);
   const name = `${lead.first_name} ${lead.last_name}`.trim() || lead.email;
@@ -96,21 +129,29 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             </section>
           )}
 
-          {lead.ai_summary && (
+          <LaneCard
+            leadId={lead.id}
+            view={lane}
+            setByName={setter ? (setter.displayName ?? setter.email ?? null) : null}
+            setOn={lane.setAt ? shortDate(lane.setAt, tz) : null}
+            redFlags={lead.ai_red_flags}
+            nextStep={nextStep}
+            nextStepIsSuggested={lane.source === "suggestion"}
+            nurtureStatus={nurture ? enrollmentStatusLabel(nurture.status) : null}
+            linksFailed={linksFailed}
+            canWrite={canWrite}
+          />
+          {lead.ai_summary && !lane.suggested && (
+            // A triage summary that carries no lane (an older format) is still shown, as the agent's words.
             <section className="lx-card" style={{ padding: 18 }}>
               <div className="lx-label" style={{ marginBottom: 6 }}>
                 Triage agent
               </div>
               <p style={{ margin: 0, color: "var(--body)", lineHeight: 1.55 }}>{lead.ai_summary}</p>
-              {lead.ai_red_flags.length > 0 && (
-                <ul className="lx-flags">
-                  {lead.ai_red_flags.map((f) => (
-                    <li key={f}>{f}</li>
-                  ))}
-                </ul>
-              )}
             </section>
           )}
+
+          <SequencesCard leadId={lead.id} rows={sequenceRows} canOperate={canOperate} />
 
           {canWrite && hasAgentToolkit && (
             <details className="lx-card lx-disclosure">

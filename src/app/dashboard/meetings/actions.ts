@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getScopedClient } from "@/lib/db/scoped-client";
+import { stopLeadSequencesAsStaff } from "@/lib/campaigns/stop-staff";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { CAN_WRITE_LEAD } from "@/lib/pipeline/leads";
 import { orgHasModule } from "@/lib/org/modules";
@@ -48,9 +49,22 @@ export async function linkMeetingAction(_prev: ActionState, formData: FormData):
     .from("crm_meeting")
     .update({ lead_id: leadId, matter_id: matterId, link_source: leadId || matterId ? "staff" : null })
     .eq("id", meetingId)
-    .select("id");
+    .select("id, started_at");
   if (error) return { error: error.code === "23503" ? "That lead or matter isn't in your firm." : "Couldn't save the link. Try again shortly." };
   if (!data?.length) return { error: "Meeting not found." };
+  // SOP Stage 3: a call with the lead ends the sequences that were running
+  // before it. A recorded meeting is a call that HAPPENED — the closest
+  // lead-linked signal to "booked" this product has.
+  const startedAt = data[0].started_at as string | null;
+  if (leadId && startedAt) {
+    await stopLeadSequencesAsStaff({
+      leadIds: [leadId],
+      reason: "booked",
+      factAt: startedAt,
+      enrolledBefore: startedAt,
+      evidence: { meeting_id: meetingId },
+    });
+  }
   revalidatePath(`/dashboard/meetings/${meetingId}/`);
   revalidatePath("/dashboard/meetings/");
   if (leadId) revalidatePath(`/dashboard/leads/${leadId}/`);

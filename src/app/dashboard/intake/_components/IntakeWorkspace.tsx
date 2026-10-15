@@ -21,7 +21,8 @@ import {
 import { topBarCounts, topBarLine } from "@/lib/intake/views";
 import type { IntakeTime } from "@/lib/time";
 import { IntakeTopBar } from "@/components/intake/IntakeTopBar";
-import { assignLeadAction, moveStageAction, setTemperatureAction } from "../actions";
+import { assignLeadAction, moveStageAction, setLaneAction, setTemperatureAction } from "../actions";
+import { laneView, type Lane } from "@/lib/leads/lane";
 import AddLeadDialog from "./AddLeadDialog";
 import IntakeBoard from "./IntakeBoard";
 import IntakeControls from "./IntakeControls";
@@ -30,7 +31,7 @@ import { ImportIcon } from "./icons";
 import { OUTLINE_BUTTON } from "./styles";
 
 /** Columns whose interesting end is the HIGH one, so they open descending. */
-const DESC_FIRST: ReadonlySet<SortKey> = new Set<SortKey>(["temp", "reply", "lastTouch", "age", "nurture"]);
+const DESC_FIRST: ReadonlySet<SortKey> = new Set<SortKey>(["temp", "lane", "reply", "lastTouch", "age", "nurture"]);
 
 /** How long the URL lags the controls, so typing in Search isn't one push per key. */
 const URL_SYNC_DELAY_MS = 300;
@@ -181,6 +182,22 @@ export default function IntakeWorkspace({
     [runWrite, stages, now],
   );
 
+  const setLane = useCallback(
+    (leadId: string, lane: Lane | null) => {
+      runWrite(
+        leadId,
+        (row) => {
+          // Optimistic: the person's lane changes; the suggestion beside it
+          // never does (triage owns that, and only that).
+          const lead = { ...row.lead, lane, lane_set_by: lane ? (row.lead.lane_set_by ?? "you") : null, lane_set_at: lane ? nowIso : null };
+          return { ...row, lead, lane: laneView(lead) };
+        },
+        () => setLaneAction(leadId, lane),
+      );
+    },
+    [runWrite, nowIso],
+  );
+
   const assign = useCallback(
     (leadId: string, userId: string | null) => {
       runWrite(
@@ -296,6 +313,7 @@ export default function IntakeWorkspace({
             time={time}
             onSort={toggleSort}
             onSetTemperature={setTemperature}
+            onSetLane={setLane}
             onAssign={assign}
           />
         )}

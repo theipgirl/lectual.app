@@ -149,6 +149,7 @@ describe("parseIntakeFilters", () => {
         q: "  ada  ",
       }),
     ).toEqual({
+      lane: null,
       source: [],
       temp: "hot",
       owner: "user-1",
@@ -171,6 +172,7 @@ describe("filtersToQueryString", () => {
       owner: UNASSIGNED_OWNER,
       stage: "s3",
       reply: "awaiting" as const,
+      lane: "suggested" as const,
       q: "acme",
     };
     const parsed = parseIntakeFilters(

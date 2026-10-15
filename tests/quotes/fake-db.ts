@@ -27,6 +27,7 @@ type Filter =
   | { kind: "eq"; column: string; value: unknown }
   | { kind: "in"; column: string; values: readonly unknown[] }
   | { kind: "is"; column: string; value: null }
+  | { kind: "lt"; column: string; value: string }
   | { kind: "or"; expr: string };
 
 type Tables = Record<string, Row[]>;
@@ -126,6 +127,15 @@ class FakeQuery {
     this.singleMode = true;
     return this;
   }
+  /** Same as maybeSingle here (the stop code and the staff paths use both). */
+  single() {
+    this.singleMode = true;
+    return this;
+  }
+  lt(column: string, value: string) {
+    this.filters.push({ kind: "lt", column, value });
+    return this;
+  }
 
   then<TResult1, TResult2 = never>(
     onfulfilled?: ((value: PublicDbResult) => TResult1 | PromiseLike<TResult1>) | null,
@@ -166,7 +176,8 @@ class FakeQuery {
         rows.push(stored);
         added.push(stored);
       }
-      return { data: this.columns ? added.map((row) => this.project(row)) : null, error: null };
+      const projected = this.columns ? added.map((row) => this.project(row)) : null;
+      return { data: projected && this.singleMode ? (projected[0] ?? null) : projected, error: null };
     }
 
     const matched = rows.filter((row) => this.matches(row));
@@ -200,7 +211,9 @@ class FakeQuery {
    * must not come back, so a test asserting "no org_id in the payload" is
    * asserting something real. */
   private project(row: Row): Row {
-    if (!this.columns) return { ...row };
+    // `*` is the staff paths' select (the public route never sends it, and
+    // public.test.ts asserts so from `selects`).
+    if (!this.columns || this.columns.includes("*")) return { ...row };
     const out: Row = {};
     for (const column of this.columns) out[column] = row[column];
     return out;
@@ -215,6 +228,8 @@ class FakeQuery {
           return filter.values.includes(row[filter.column]);
         case "is":
           return row[filter.column] === null || row[filter.column] === undefined;
+        case "lt":
+          return typeof row[filter.column] === "string" && Date.parse(row[filter.column] as string) < Date.parse(filter.value);
         case "or":
           return filter.expr.split(",").some((term) => this.matchesTerm(row, term));
       }

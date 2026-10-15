@@ -4,6 +4,7 @@ import type { Role } from "@/lib/auth/roles";
 import { ROLES } from "@/lib/auth/roles";
 import { ensureMatterForLead, logActivitySafe } from "@/lib/matters";
 import { runRules } from "@/lib/automation";
+import { stopLeadSequencesAsStaff } from "@/lib/campaigns/stop-staff";
 import {
   diffLeadColumns,
   validateLeadEdit,
@@ -358,6 +359,15 @@ export async function moveLeadStage(id: string, stageId: string): Promise<Lead> 
       .eq("id", stageId)
       .maybeSingle();
     if (destStage?.category === "won") {
+      // SOP Stage 3/7: a lead who is now a client leaves every sequence, at
+      // the moment the move is recorded. Before the matter handoff, which can
+      // throw; stopLeadSequencesAsStaff never does.
+      await stopLeadSequencesAsStaff({
+        leadIds: [id],
+        reason: "client",
+        factAt: now,
+        evidence: { stage_id: stageId, stage_name: stageNames[stageId] ?? null },
+      });
       await ensureMatterForLead(id);
     }
   } catch {

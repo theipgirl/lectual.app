@@ -8,6 +8,8 @@ import { QueueUnavailable } from "@/components/queue/QueueUnavailable";
 import { ReviewPanel } from "@/components/queue/ReviewPanel";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { STATUS_PILL, agentLabel, fmtWhen, isUnconfiguredError, outcomeText, typeLabel } from "@/components/queue/format";
+import { checkDraftStaleness, type StaleCheck } from "@/lib/queue/stale";
+import { staleWarning } from "@/components/queue/stale-warning";
 
 function Meta({ label, value }: { label: string; value: React.ReactNode }) {
   if (!value) return null;
@@ -67,6 +69,12 @@ export default async function QueueItemPage({
   const outcome = outcomeText(justResolved, send);
   const resolved = item.status !== "pending";
 
+  // SOP §2.5: has this client signed, paid or become a client since the
+  // draft was queued? Never auto-rejects — a person decides, with the fact in
+  // front of them, and the action re-checks before it approves.
+  const stale = resolved ? ({ status: "not_applicable" } as StaleCheck) : await checkDraftStaleness(item);
+  const warning = staleWarning(stale, tz);
+
   return (
     <>
       {back}
@@ -85,6 +93,25 @@ export default async function QueueItemPage({
               {item.headline}
             </h1>
           </div>
+          {warning && (
+            <div
+              role="alert"
+              className={`lx-banner ${stale.status === "stale" ? "lx-banner-risk" : "lx-banner-warn"}`}
+              style={{ display: "grid", gap: 6 }}
+            >
+              <strong style={{ fontSize: 16 }}>{warning.headline}</strong>
+              <span>{warning.detail}</span>
+              {stale.status !== "unavailable" && "leadIds" in stale && stale.leadIds[0] && (
+                <Link href={`/dashboard/leads/${stale.leadIds[0]}/`}>Open {stale.leadName ?? "the lead"}</Link>
+              )}
+            </div>
+          )}
+          {stale.status === "unlinked" && (
+            <p className="lx-note" style={{ margin: 0 }}>
+              This draft isn&apos;t linked to a lead, so Lectual couldn&apos;t check whether the client has signed or paid since it
+              was queued. Check before approving.
+            </p>
+          )}
           <section className="lx-card" style={{ padding: 20 }}>
             {resolved ? (
               <>
@@ -94,7 +121,13 @@ export default async function QueueItemPage({
                 <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.6, color: "var(--body)" }}>{item.final_body ?? item.draft_body}</div>
               </>
             ) : (
-              <ReviewPanel id={item.id} initialBody={item.final_body ?? item.draft_body} canApprove={approveRole !== null} canEdit={editRole !== null} />
+              <ReviewPanel
+                id={item.id}
+                initialBody={item.final_body ?? item.draft_body}
+                canApprove={approveRole !== null}
+                canEdit={editRole !== null}
+                confirmStale={warning ? warning.confirm : null}
+              />
             )}
           </section>
         </div>

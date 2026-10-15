@@ -3,11 +3,14 @@
  * Payloads are written by many producers (sync, agents, people, lectual's
  * importers), so every field is read defensively.
  */
+import { STOP_REASON_LABEL, isStopReason } from "@/lib/campaigns/stops";
+
 type Row = { type: string; actor_type: string | null; created_at: string; payload: unknown };
 
 export type Described = { title: string; detail: string | null; tone: "mail" | "ai" | "note" | "system"; link: string | null };
 
 const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+const cap = (v: string) => v.charAt(0).toUpperCase() + v.slice(1);
 
 const AI_SOURCES: Record<string, string> = {
   "intake-triage": "Intake triage",
@@ -99,7 +102,32 @@ export function describeActivity(row: Row): Described {
       return { title: "Lead assigned", detail: null, tone: "system", link: null };
     case "lead_updated":
       if (str(p.change) === "consult_details") return { title: "Consult details reviewed", detail: consultReviewDetail(p), tone: "system", link: null };
+      if (str(p.field) === "lane") {
+        // setLane (src/lib/intake/leads.ts): who, from → to, and what triage had suggested.
+        const to = str(p.to);
+        const from = str(p.from);
+        const parts = [
+          str(p.by) ? `by ${str(p.by)}` : null,
+          from ? `was ${cap(from)}` : "was not set",
+          str(p.suggested) ? `triage suggested ${cap(str(p.suggested) as string)}` : null,
+        ];
+        return { title: to ? `Lane set to ${cap(to)}` : "Lane cleared", detail: parts.filter(Boolean).join(" · "), tone: "note", link: null };
+      }
       return { title: "Details updated", detail: Array.isArray(p.fields) ? (p.fields as string[]).join(", ") : null, tone: "system", link: null };
+    case "drip_enrolled":
+      return { title: `Enrolled in ${str(p.sequence_name) ?? "a campaign"}`, detail: null, tone: "system", link: null };
+    case "drip_stopped": {
+      // stopLeadSequences (src/lib/campaigns/stop.ts): the reason is the point.
+      const reason = isStopReason(p.reason) ? STOP_REASON_LABEL[p.reason] : null;
+      const campaign = str(p.sequence_name);
+      const how = p.by_hand === true ? "stopped by a person" : str(p.detected_by) === "advance_guard" ? "caught before a step ran" : null;
+      return {
+        title: `Sequence stopped — ${reason ?? "stopped"}`,
+        detail: [campaign, how].filter(Boolean).join(" · ") || null,
+        tone: "system",
+        link: null,
+      };
+    }
     case "matter_opened":
       return { title: "Matter opened", detail: [str(p.matter_number), carriedDetail(p)].filter(Boolean).join(" · ") || null, tone: "system", link: null };
     case "matter_updated":

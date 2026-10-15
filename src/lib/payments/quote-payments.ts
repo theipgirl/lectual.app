@@ -4,6 +4,9 @@ import { getScopedClient } from "@/lib/db/scoped-client";
 import { formatCents } from "@/lib/quotes/money";
 import { PURPOSE_LABEL, checkManualPayment, type ManualPaymentInput } from "./manual";
 import type { PaymentAccountKind, PaymentPurpose, PaymentStatus } from "./types";
+import { stopSequencesForQuote } from "@/lib/campaigns/stop";
+import { sessionUserId } from "@/lib/campaigns/stop-staff";
+import type { StopDb } from "@/lib/campaigns/stop-db";
 
 /**
  * The quote builder's payments panel: reading a quote's payments and recording
@@ -100,6 +103,15 @@ export async function recordManualPayment(input: ManualPaymentInput & { quoteId:
       payload,
     });
   }
+  // SOP §2.5: money received stops every sequence for this client, at the
+  // moment it is recorded. Through the caller's scoped client, fenced on the
+  // quote's own org; never throws, so the recorded payment stands regardless.
+  await stopSequencesForQuote(supabase as unknown as StopDb, { quoteId: quote.id, orgId: quote.org_id }, {
+    reason: "paid",
+    actor: { type: "user", id: input.userId },
+    factAt: p.occurredAt ?? new Date().toISOString(),
+    evidence: { provider: "manual" },
+  });
   return { ok: true };
 }
 
@@ -120,8 +132,17 @@ export async function reconcilePendingPayment(input: { paymentId: string; outcom
     .eq("id", input.paymentId)
     .eq("status", "pending")
     .eq("provider", "lawpay")
-    .select("id");
+    .select("id, org_id, quote_id");
   if (error) return { ok: false, reason: error.code === "42501" ? "Only owners and admins can resolve a payment." : "Couldn't update the payment." };
   if (!data?.length) return { ok: false, reason: "That payment isn't waiting to be checked any more, or you can't change it." };
+  // Confirmed taken: the same stop a recorded payment makes (SOP §2.5).
+  const settled = data[0];
+  if (input.outcome === "succeeded" && settled.quote_id) {
+    await stopSequencesForQuote(supabase as unknown as StopDb, { quoteId: settled.quote_id, orgId: settled.org_id }, {
+      reason: "paid",
+      actor: { type: "user", id: await sessionUserId(supabase) },
+      evidence: { provider: "lawpay", payment_id: settled.id, reconciled: true },
+    });
+  }
   return { ok: true };
 }

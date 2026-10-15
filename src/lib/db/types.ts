@@ -1728,6 +1728,11 @@ export type Database = {
           org_id: string
           sequence_id: string
           status: Database["public"]["Enums"]["crm_drip_enrollment_status"]
+          // lectual 0085: the recorded stop. stopped_at / stopped_by are
+          // stamped by the crm_drip_enrollment_stop_guard trigger.
+          stop_reason: string | null
+          stopped_at: string | null
+          stopped_by: string | null
         }
         Insert: {
           completed_at?: string | null
@@ -1739,6 +1744,9 @@ export type Database = {
           org_id: string
           sequence_id: string
           status?: Database["public"]["Enums"]["crm_drip_enrollment_status"]
+          stop_reason?: string | null
+          stopped_at?: string | null
+          stopped_by?: string | null
         }
         Update: {
           completed_at?: string | null
@@ -1750,6 +1758,9 @@ export type Database = {
           org_id?: string
           sequence_id?: string
           status?: Database["public"]["Enums"]["crm_drip_enrollment_status"]
+          stop_reason?: string | null
+          stopped_at?: string | null
+          stopped_by?: string | null
         }
         Relationships: [
           {
@@ -2036,6 +2047,11 @@ export type Database = {
           urgency_band: Database["public"]["Enums"]["crm_urgency_band"]
           value_band: Database["public"]["Enums"]["crm_value_band"]
           website: string | null
+          // lectual 0085: the routing lane a PERSON set (stamped by the
+          // crm_lead_lane_guard trigger, which refuses a sessionless write).
+          lane: Database["public"]["Enums"]["crm_lead_temperature"] | null
+          lane_set_at: string | null
+          lane_set_by: string | null
         }
         Insert: {
           ai_enriched_at?: string | null
@@ -2073,6 +2089,9 @@ export type Database = {
           urgency_band?: Database["public"]["Enums"]["crm_urgency_band"]
           value_band?: Database["public"]["Enums"]["crm_value_band"]
           website?: string | null
+          lane?: Database["public"]["Enums"]["crm_lead_temperature"] | null
+          lane_set_at?: string | null
+          lane_set_by?: string | null
         }
         Update: {
           ai_enriched_at?: string | null
@@ -2110,6 +2129,9 @@ export type Database = {
           urgency_band?: Database["public"]["Enums"]["crm_urgency_band"]
           value_band?: Database["public"]["Enums"]["crm_value_band"]
           website?: string | null
+          lane?: Database["public"]["Enums"]["crm_lead_temperature"] | null
+          lane_set_at?: string | null
+          lane_set_by?: string | null
         }
         Relationships: [
           {
@@ -2749,6 +2771,10 @@ export type Database = {
           time_zone: string
           updated_at: string
           updated_by: string | null
+          // lectual 0085: where each lane's next step points.
+          strategy_session_url: string | null
+          discovery_call_url: string | null
+          nurture_sequence_id: string | null
         }
         Insert: {
           display_name?: string | null
@@ -2757,6 +2783,9 @@ export type Database = {
           time_zone?: string
           updated_at?: string
           updated_by?: string | null
+          strategy_session_url?: string | null
+          discovery_call_url?: string | null
+          nurture_sequence_id?: string | null
         }
         Update: {
           display_name?: string | null
@@ -2765,6 +2794,9 @@ export type Database = {
           time_zone?: string
           updated_at?: string
           updated_by?: string | null
+          strategy_session_url?: string | null
+          discovery_call_url?: string | null
+          nurture_sequence_id?: string | null
         }
         Relationships: [
           {
@@ -3840,6 +3872,9 @@ export type Database = {
         | "time_logged"
         // 0080: the client proposal page took (or could not confirm) a signing payment.
         | "quote_payment"
+        // 0085: a lead entered / left a campaign (the stop names its reason).
+        | "drip_enrolled"
+        | "drip_stopped"
       crm_actor_type: "user" | "system" | "ai" | "automation" | "pathset"
       crm_ai_enrichment_layer: "layer1" | "layer2" | "layer3"
       crm_ai_enrichment_type:
@@ -3902,6 +3937,8 @@ export type Database = {
         | "paused"
         | "completed"
         | "cancelled"
+        // 0085: halted because a stop fact was recorded (see stop_reason).
+        | "stopped"
       crm_drip_step_type: "email" | "task" | "wait" | "condition"
       crm_filing_basis: "1a" | "1b" | "44d" | "44e" | "66a"
       crm_lead_temperature: "hot" | "warm" | "cold"
@@ -4092,6 +4129,8 @@ export const Constants = {
         "queue_resolved",
         "time_logged",
         "quote_payment",
+        "drip_enrolled",
+        "drip_stopped",
       ],
       crm_actor_type: ["user", "system", "ai", "automation", "pathset"],
       crm_ai_enrichment_layer: ["layer1", "layer2", "layer3"],
@@ -4160,6 +4199,7 @@ export const Constants = {
         "paused",
         "completed",
         "cancelled",
+        "stopped",
       ],
       crm_drip_step_type: ["email", "task", "wait", "condition"],
       crm_filing_basis: ["1a", "1b", "44d", "44e", "66a"],

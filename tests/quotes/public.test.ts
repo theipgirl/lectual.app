@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   PUBLIC_ORG_COLUMNS,
@@ -1605,5 +1605,97 @@ describe("acceptance opens the matter — and nothing about that can undo it", (
     const result = await signAsClient({ token: TOKEN, name: "Dana Reyes", choice: pick("Standard"), ip: null, userAgent: null }, NOW, db);
     expect(result.ok && result.matter).toEqual({ status: "skipped", reason: "has_matter" });
     expect(db.tables.crm_matter ?? []).toEqual([]);
+  });
+});
+
+/* ──────────── signing stops the client's sequences (intake SOP Stage 7) ──────────── */
+
+describe("signing stops every sequence the client is in — SOP Stage 7", () => {
+  const OTHER_ORG = "99999999-9999-9999-9999-999999999999";
+
+  function withSequences(db: FakeDb): FakeDb {
+    db.tables.crm_lead = [
+      { id: "lead-1", org_id: ORG_ID, email: "dana@acme.example", current_stage_id: null },
+      // The same person, entered twice, and the quote contact's address.
+      { id: "lead-dup", org_id: ORG_ID, email: "dana@acme.example", current_stage_id: null },
+      { id: "lead-ops", org_id: ORG_ID, email: "ops@acme.example", current_stage_id: null },
+      { id: "lead-unrelated", org_id: ORG_ID, email: "someone@else.example", current_stage_id: null },
+      // Another firm's lead with the same address: never touched.
+      { id: "lead-elsewhere", org_id: OTHER_ORG, email: "dana@acme.example", current_stage_id: null },
+    ];
+    db.tables.crm_contact = [{ id: "contact-1", org_id: ORG_ID, email: "ops@acme.example" }];
+    db.tables.crm_drip_sequence = [
+      { id: "seq-1", org_id: ORG_ID, name: "UGW nurture" },
+      { id: "seq-x", org_id: OTHER_ORG, name: "Their nurture" },
+    ];
+    db.tables.crm_drip_enrollment = [
+      { id: "e-active", org_id: ORG_ID, lead_id: "lead-1", sequence_id: "seq-1", status: "active" },
+      { id: "e-dup", org_id: ORG_ID, lead_id: "lead-dup", sequence_id: "seq-1", status: "paused" },
+      { id: "e-contact", org_id: ORG_ID, lead_id: "lead-ops", sequence_id: "seq-1", status: "active" },
+      { id: "e-done", org_id: ORG_ID, lead_id: "lead-1", sequence_id: "seq-2", status: "completed" },
+      { id: "e-unrelated", org_id: ORG_ID, lead_id: "lead-unrelated", sequence_id: "seq-1", status: "active" },
+      { id: "e-elsewhere", org_id: OTHER_ORG, lead_id: "lead-elsewhere", sequence_id: "seq-x", status: "active" },
+    ];
+    db.tables.crm_activity = [];
+    return db;
+  }
+
+  const status = (db: FakeDb, id: string) => db.tables.crm_drip_enrollment.find((e) => e.id === id);
+
+  it("stops the quote's lead (and its contact) the moment the signature lands, and says why", async () => {
+    const db = withSequences(makeDb({ lead_id: "lead-1", contact_id: "contact-1" }));
+    const result = await signAsClient(
+      { token: TOKEN, name: "Dana Reyes", email: "dana@example.test", choice: pick("Standard"), ip: null, userAgent: null },
+      NOW,
+      db,
+    );
+    expect(result.ok).toBe(true);
+
+    for (const id of ["e-active", "e-dup", "e-contact"]) {
+      expect(status(db, id), id).toMatchObject({ status: "stopped", stop_reason: "signed", stopped_at: NOW.toISOString() });
+    }
+    // Finished, unrelated and other-firm enrollments are untouched.
+    expect(status(db, "e-done")!.status).toBe("completed");
+    expect(status(db, "e-unrelated")!.status).toBe("active");
+    expect(status(db, "e-elsewhere")!.status).toBe("active");
+
+    const stops = db.tables.crm_activity.filter((a) => a.type === "drip_stopped");
+    expect(stops).toHaveLength(3);
+    for (const a of stops) {
+      expect(a).toMatchObject({
+        org_id: ORG_ID,
+        actor_type: "system",
+        payload: expect.objectContaining({ reason: "signed", quote_id: QUOTE_ID, sequence_name: "UGW nurture" }),
+      });
+    }
+    // Every enrollment write is fenced on the quote's own org.
+    for (const w of db.writes.filter((w) => w.table === "crm_drip_enrollment")) {
+      expect(w.filters).toContainEqual({ kind: "eq", column: "org_id", value: ORG_ID });
+    }
+  });
+
+  it("a refused signature stops nothing", async () => {
+    const db = withSequences(makeDb({ lead_id: "lead-1", expires_at: "2026-09-08T23:59:00.000Z" }));
+    const result = await signAsClient({ token: TOKEN, name: "Dana Reyes", email: "", ip: null, userAgent: null }, NOW, db);
+    expect(result.ok).toBe(false);
+    expect(status(db, "e-active")!.status).toBe("active");
+  });
+
+  it("a failed stop never fails the signature", async () => {
+    const db = withSequences(makeDb({ lead_id: "lead-1" }));
+    db.tables.crm_drip_enrollment = undefined as unknown as Row[];
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const original = db.from.bind(db);
+    db.from = ((table: string) => {
+      if (table === "crm_drip_enrollment") throw new Error("boom");
+      return original(table);
+    }) as typeof db.from;
+    const result = await signAsClient(
+      { token: TOKEN, name: "Dana Reyes", email: "", choice: pick("Standard"), ip: null, userAgent: null },
+      NOW,
+      db,
+    );
+    expect(result.ok).toBe(true);
+    spy.mockRestore();
   });
 });

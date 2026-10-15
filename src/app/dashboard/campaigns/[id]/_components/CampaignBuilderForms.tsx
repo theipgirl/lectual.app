@@ -4,11 +4,11 @@ import { useActionState } from "react";
 import {
   addStepAction,
   advanceEnrollmentAction,
-  cancelEnrollmentAction,
   deleteStepAction,
   enrollLeadAction,
   pauseEnrollmentAction,
   resumeEnrollmentAction,
+  stopEnrollmentAction,
   toggleSequenceAction,
   updateSequenceDetailsAction,
 } from "@/app/dashboard/campaigns/[id]/actions";
@@ -190,7 +190,7 @@ export function EnrollmentActions({
 }: {
   sequenceId: string;
   enrollmentId: string;
-  status: "active" | "paused" | "completed" | "cancelled";
+  status: "active" | "paused" | "completed" | "cancelled" | "stopped";
   hasMoreSteps: boolean;
   /** False while the campaign is paused (the action refuses too) or its steps couldn't be read. */
   canRun: boolean;
@@ -198,7 +198,7 @@ export function EnrollmentActions({
   const [advanceState, advanceAction, advancing] = useActionState<ActionState, FormData>(advanceEnrollmentAction, {});
   const [pauseState, pauseFormAction, pausing] = useActionState<ActionState, FormData>(pauseEnrollmentAction, {});
   const [resumeState, resumeFormAction, resuming] = useActionState<ActionState, FormData>(resumeEnrollmentAction, {});
-  const [cancelState, cancelFormAction, cancelling] = useActionState<ActionState, FormData>(cancelEnrollmentAction, {});
+  const [stopState, stopFormAction, stopping] = useActionState<ActionState, FormData>(stopEnrollmentAction, {});
 
   const hidden = { sequenceId, enrollmentId };
   return (
@@ -232,10 +232,15 @@ export function EnrollmentActions({
           </form>
         )}
         {(status === "active" || status === "paused") && (
-          <form action={cancelFormAction}>
+          <form action={stopFormAction}>
             <Hidden values={hidden} />
-            <button type="submit" className="lx-btn lx-btn-ghost lx-btn-sm" disabled={cancelling}>
-              {cancelling ? "…" : "Cancel"}
+            <button
+              type="submit"
+              className="lx-btn lx-btn-ghost lx-btn-sm"
+              disabled={stopping}
+              title="Stop this sequence for this lead. It's recorded with your name, and can't be restarted."
+            >
+              {stopping ? "…" : "Stop"}
             </button>
           </form>
         )}
@@ -243,7 +248,7 @@ export function EnrollmentActions({
       <Err state={advanceState} />
       <Err state={pauseState} />
       <Err state={resumeState} />
-      <Err state={cancelState} />
+      <Err state={stopState} />
     </div>
   );
 }
