@@ -20,7 +20,7 @@ export const AGENT_DEFS: Record<AgentId, { name: string; reads: string; descript
     name: "Intake triage",
     reads: "New leads",
     description:
-      "Scores each new lead for readiness, value, urgency and practice fit, sets a lane, and writes the reason on the card. Hot leads get a briefing in the queue.",
+      "Scores each new lead for readiness, value, urgency and practice fit, suggests a lane with the reason on the card (a person sets the lane). Hot leads get a briefing in the queue.",
     defaultAutonomy: "draft",
   },
   "post-consult": {

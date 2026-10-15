@@ -53,6 +53,11 @@ describe("staleSince — the approval-time warning rule", () => {
   it("a client fact from BEFORE the draft doesn't make it stale (it was written knowing that)", () => {
     expect(staleSince(facts({ signedAt: "2026-10-01T00:00:00Z" }), QUEUED)).toEqual([]);
   });
+  it("uses the NEWEST of each client fact: a second payment after the draft is news", () => {
+    expect(
+      staleSince(facts({ paidAt: "2026-09-01T00:00:00Z", paidLatestAt: "2026-10-04T02:00:00Z" }), QUEUED),
+    ).toEqual([{ reason: "paid", at: "2026-10-04T02:00:00Z" }]);
+  });
   it("a reply since isn't a stale-draft fact — a follow-up often answers one", () => {
     expect(staleSince(facts({ lastInboundAt: "2026-10-04T00:00:00Z" }), QUEUED)).toEqual([]);
   });

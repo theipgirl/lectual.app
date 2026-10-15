@@ -43,7 +43,7 @@ export async function loadStopFacts(db: StopDb, input: { leadId: string; orgId?:
       stageId
         ? read(fence(db.from("crm_stage").select("id, category").eq("id", stageId)).maybeSingle(), "stage")
         : Promise.resolve(null),
-      read(fence(db.from("crm_quote").select("id, status, accepted_at").eq("lead_id", leadId)), "quote"),
+      read(fence(db.from("crm_quote").select("id, accepted_at").eq("lead_id", leadId)), "quote"),
       read(fence(db.from("crm_matter").select("id, created_at").eq("lead_id", leadId)), "matter"),
       read(fence(db.from("crm_meeting").select("id, started_at").eq("lead_id", leadId)), "meeting"),
     ]);
@@ -76,15 +76,24 @@ export async function loadStopFacts(db: StopDb, input: { leadId: string; orgId?:
     }
 
     const won = (stage as Record<string, unknown> | null)?.category === "won";
+    // Signed = accepted_at is set, whatever the status column says now. An
+    // accepted quote is immutable, but a status-only filter would read a
+    // signature as "unsigned" the day anything relabels that row.
+    const signed = quoteRows.map((q) => str(q.accepted_at));
+    const paid = payments.map((p) => str(p.occurred_at));
+    const opened = matterRows.map((m) => str(m.created_at));
     return {
       status: "ok",
       facts: {
-        signedAt: earliest(quoteRows.filter((q) => q.status === "accepted").map((q) => str(q.accepted_at))),
-        paidAt: earliest(payments.map((p) => str(p.occurred_at))),
-        matterOpenedAt: earliest(matterRows.map((m) => str(m.created_at))),
+        signedAt: earliest(signed),
+        paidAt: earliest(paid),
+        matterOpenedAt: earliest(opened),
         wonAt: won ? (str(lead.stage_entered_at) ?? new Date(0).toISOString()) : null,
         lastInboundAt: str(lead.last_inbound_at),
         lastMeetingAt: latest(rowsOf(meetings).map((m) => str(m.started_at))),
+        signedLatestAt: latest(signed),
+        paidLatestAt: latest(paid),
+        matterOpenedLatestAt: latest(opened),
       },
     };
   } catch (err) {
@@ -110,6 +119,51 @@ export async function loadStopFactsForLeads(
       wonAt: earliest(all.map((f) => f.wonAt)),
       lastInboundAt: latest(all.map((f) => f.lastInboundAt)),
       lastMeetingAt: latest(all.map((f) => f.lastMeetingAt)),
+      signedLatestAt: latest(all.map((f) => f.signedLatestAt ?? f.signedAt)),
+      paidLatestAt: latest(all.map((f) => f.paidLatestAt ?? f.paidAt)),
+      matterOpenedLatestAt: latest(all.map((f) => f.matterOpenedLatestAt ?? f.matterOpenedAt)),
     },
   };
+}
+
+/** Exact address variants (no LIKE pattern, so nothing in an address is a wildcard). */
+function emailVariants(email: string | null): string[] {
+  const e = email?.trim();
+  if (!e || !e.includes("@") || e.toLowerCase().endsWith(".invalid")) return [];
+  return [...new Set([e, e.toLowerCase()])];
+}
+
+/**
+ * Facts for the PERSON behind one lead row: that lead plus every other lead
+ * in the same firm with exactly the same address. One person is often two
+ * lead rows (a form submission and an import, a second inquiry), and the
+ * quote they signed or the payment they made can sit on the other row. The
+ * signing path already stops every same-address lead; this is the same
+ * reach for advance()'s guard and for enrolling, so a stop that failed to
+ * write, or a fact recorded somewhere that never called the stop (lectual's
+ * own dashboard, an import), still can't let the duplicate row be nudged.
+ *
+ * Fenced on the lead row's own org_id (read first, through whichever client
+ * the caller holds), so a service-role caller can't reach across firms and a
+ * scoped caller is bounded by RLS as well. A failed read is `unavailable`.
+ */
+export async function loadStopFactsForPerson(db: StopDb, input: { leadId: string; orgId?: string | null }): Promise<FactsRead> {
+  try {
+    const first = db.from("crm_lead").select("id, org_id, email").eq("id", input.leadId);
+    const { data, error } = await (input.orgId ? first.eq("org_id", input.orgId) : first).maybeSingle();
+    if (error) return { status: "unavailable", error: "lead read failed" };
+    const lead = data as Record<string, unknown> | null;
+    const orgId = str(lead?.org_id);
+    if (!lead || !orgId) return { status: "unavailable", error: "lead not visible" };
+    const ids = new Set<string>([input.leadId]);
+    const emails = emailVariants(str(lead.email));
+    if (emails.length > 0) {
+      const { data: same, error: sameError } = await db.from("crm_lead").select("id").eq("org_id", orgId).in("email", emails);
+      if (sameError) return { status: "unavailable", error: "lead read failed" };
+      for (const row of rowsOf(same)) if (str(row.id)) ids.add(row.id as string);
+    }
+    return await loadStopFactsForLeads(db, { leadIds: [...ids], orgId });
+  } catch (err) {
+    return { status: "unavailable", error: err instanceof Error ? err.message : String(err) };
+  }
 }

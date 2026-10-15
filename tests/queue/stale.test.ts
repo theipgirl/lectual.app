@@ -105,6 +105,31 @@ describe("checkDraftStaleness", () => {
     expect(staleWarning(check)).toBeNull();
   });
 
+  it("a signature between the drafter's check and the draft reaching the queue is still 'since' (the race)", async () => {
+    // The campaign step read the facts at 13:59:58, the client signed at
+    // 13:59:59, and the queue stamped the draft 14:00:00.
+    db.tables.crm_activity[0].payload = { queueItemId: "q-item-1", facts_checked_at: "2026-10-03T13:59:58Z" };
+    db.tables.crm_quote[0].accepted_at = "2026-10-03T13:59:59Z";
+    const check = await checkDraftStaleness(item());
+    expect(check.status).toBe("stale");
+    expect(stalenessRequiresConfirm(check)).toBe(true);
+  });
+
+  it("a SECOND signature after the draft is stale even though the first came before it", async () => {
+    db.tables.crm_quote[0].accepted_at = "2026-09-20T00:00:00Z";
+    db.tables.crm_quote.push({ id: "q-2", org_id: ORG, lead_id: "lead-1", status: "accepted", accepted_at: "2026-10-04T09:00:00Z" });
+    const check = await checkDraftStaleness(item());
+    expect(check).toMatchObject({ status: "stale", facts: [{ reason: "signed", at: "2026-10-04T09:00:00Z" }] });
+  });
+
+  it("checks the person: a payment on a same-address duplicate lead row makes the draft stale", async () => {
+    db.tables.crm_quote = [{ id: "q-9", org_id: ORG, lead_id: "lead-9", status: "accepted", accepted_at: "2026-09-01T00:00:00Z" }];
+    db.tables.crm_lead.push({ id: "lead-9", org_id: ORG, email: "dana@acme.example", current_stage_id: "st-open", stage_entered_at: "2026-09-01T00:00:00Z", last_inbound_at: null });
+    db.tables.crm_payment = [{ id: "p-9", org_id: ORG, quote_id: "q-9", matter_id: null, status: "succeeded", occurred_at: "2026-10-04T02:00:00Z" }];
+    const check = await checkDraftStaleness(item());
+    expect(check).toMatchObject({ status: "stale", linkedBy: "draft", facts: [{ reason: "paid" }] });
+  });
+
   it("falls back to the recipient's exact address when no drafter linked the item", async () => {
     db.tables.crm_activity = [];
     const check = await checkDraftStaleness(item());

@@ -77,6 +77,16 @@ export type StopFacts = {
   lastInboundAt: string | null;
   /** Newest started_at of an imported meeting linked to the lead. */
   lastMeetingAt: string | null;
+  /**
+   * The NEWEST instant of each client fact (a second quote signed, a later
+   * payment, another matter). The fields above are the earliest, which is what
+   * "is this a client?" needs; "has anything happened since this draft was
+   * queued?" needs the newest, or a second signature after the draft is
+   * missed because the first came before it. Absent = same as the earliest.
+   */
+  signedLatestAt?: string | null;
+  paidLatestAt?: string | null;
+  matterOpenedLatestAt?: string | null;
 };
 
 export const NO_FACTS: StopFacts = {
@@ -142,9 +152,9 @@ export function staleSince(facts: StopFacts, queuedAt: string): StopDecision[] {
     const t = ms(at);
     if (t !== null && t > since) out.push({ reason, at: at as string });
   };
-  add("signed", facts.signedAt);
-  add("paid", facts.paidAt);
-  add("matter_opened", facts.matterOpenedAt);
+  add("signed", facts.signedLatestAt ?? facts.signedAt);
+  add("paid", facts.paidLatestAt ?? facts.paidAt);
+  add("matter_opened", facts.matterOpenedLatestAt ?? facts.matterOpenedAt);
   add("client", facts.wonAt);
   return out;
 }

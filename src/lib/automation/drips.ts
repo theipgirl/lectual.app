@@ -3,7 +3,7 @@ import type { Database } from "@/lib/db/types";
 import { requireAutomationAdminRole, requireAutomationStaffRole, currentOrgId } from "./rules";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { clientFact, enrollRefusal, stopLine, type StopReason } from "@/lib/campaigns/stops";
-import { loadStopFacts } from "@/lib/campaigns/stop-facts";
+import { loadStopFactsForPerson } from "@/lib/campaigns/stop-facts";
 import { stopLeadSequences } from "@/lib/campaigns/stop";
 import { sessionUserId } from "@/lib/campaigns/stop-staff";
 import type { StopDb } from "@/lib/campaigns/stop-db";
@@ -239,7 +239,8 @@ export async function listEnrollments(filter: EnrollmentFilter = {}): Promise<Dr
  *
  * REFUSES A CLIENT (intake SOP Stage 3: "is already a client" is a stop). A
  * lead with a signed quote, a recorded payment, a matter or a won stage is
- * not enrolled, and the refusal names the fact and its date. If those facts
+ * not enrolled (nor is one whose same-address duplicate lead row is), and
+ * the refusal names the fact and its date. If those facts
  * can't be read, nothing is enrolled either — the same fail-closed rule the
  * advance() guard follows.
  */
@@ -254,7 +255,7 @@ export async function enrollLead(leadId: string, sequenceId: string): Promise<Dr
     .single();
   if (leadError) throw leadError;
 
-  const facts = await loadStopFacts(supabase as unknown as StopDb, { leadId });
+  const facts = await loadStopFactsForPerson(supabase as unknown as StopDb, { leadId });
   if (facts.status !== "ok") {
     throw new Error("Couldn't confirm this lead isn't already a client, so nothing was enrolled. Try again shortly.");
   }

@@ -7,7 +7,7 @@ import { activeQueueOrgKey } from "@/lib/queue/org";
 import { createDraft } from "@/lib/queue/api";
 import { addDelay, leadDisplayName, leadTemplateVars, renderTemplate } from "./steps";
 import { STOP_REASON_LABEL, stopFor, type StopDecision } from "./stops";
-import { loadStopFacts } from "./stop-facts";
+import { loadStopFactsForPerson } from "./stop-facts";
 import { stopLeadSequences } from "./stop";
 import { sessionUserId } from "./stop-staff";
 import type { StopDb } from "./stop-db";
@@ -151,7 +151,14 @@ export async function advanceEnrollment(enrollmentId: string): Promise<AdvanceRe
   // path that recorded the fact never called the stop (a Lawmatics import,
   // lectual's own dashboard, a stop that failed to write). A failed read
   // drafts nothing: "we couldn't check" is never "they haven't paid".
-  const factsRead = await loadStopFacts(supabase as unknown as StopDb, { leadId: enrollment.lead_id });
+  //
+  // The facts are the PERSON's (every same-address lead row in the firm), and
+  // the instant they were read is recorded on the draft's timeline row: a
+  // signature landing between this read and the draft reaching the queue is
+  // then still "since" for the approval-time warning (src/lib/queue/stale.ts),
+  // instead of looking older than the draft.
+  const factsCheckedAt = new Date().toISOString();
+  const factsRead = await loadStopFactsForPerson(supabase as unknown as StopDb, { leadId: enrollment.lead_id });
   if (factsRead.status !== "ok") {
     throw new CampaignAdvanceError(
       "Couldn't confirm this lead hasn't signed, paid or replied, so nothing was drafted. Try again shortly.",
@@ -300,7 +307,13 @@ export async function advanceEnrollment(enrollmentId: string): Promise<AdvanceRe
       lead_id: lead.id,
       type: "queue_drafted",
       actor_type: "automation",
-      payload: { queueItemId, sequenceId: enrollment.sequence_id, stepIndex: index, agent: "campaign" },
+      payload: {
+        queueItemId,
+        sequenceId: enrollment.sequence_id,
+        stepIndex: index,
+        agent: "campaign",
+        facts_checked_at: factsCheckedAt,
+      },
     });
     if (error) console.error("[campaigns] failed to log queue_drafted activity:", error);
   }

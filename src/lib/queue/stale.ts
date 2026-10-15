@@ -2,8 +2,8 @@ import "server-only";
 
 import { getScopedClient } from "@/lib/db/scoped-client";
 import type { QueueItem } from "./api";
-import { loadStopFactsForLeads } from "@/lib/campaigns/stop-facts";
-import { staleSince, type StopDecision } from "@/lib/campaigns/stops";
+import { loadStopFactsForLeads, loadStopFactsForPerson } from "@/lib/campaigns/stop-facts";
+import { earliest, staleSince, type StopDecision } from "@/lib/campaigns/stops";
 import { rowsOf, str, type StopDb } from "@/lib/campaigns/stop-db";
 
 /**
@@ -73,19 +73,26 @@ function leadName(row: Record<string, unknown> | undefined): string | null {
 async function resolveLeads(
   db: StopDb,
   item: Pick<QueueItem, "id" | "matter_id" | "recipient">,
-): Promise<{ leadIds: string[]; linkedBy: StaleLinkedBy } | null | "failed"> {
+): Promise<{ leadIds: string[]; linkedBy: StaleLinkedBy; factsCheckedAt?: string | null } | null | "failed"> {
   if (QUEUE_ID.test(item.id)) {
     // Two reads rather than one `.or()` over JSON paths: each is a plain
     // equality PostgREST cannot misparse, and the id is shape-checked anyway.
     for (const key of ["queueItemId", "queue_id"]) {
       const { data, error } = await db
         .from("crm_activity")
-        .select("lead_id")
+        .select("lead_id, payload")
         .eq("type", "queue_drafted")
         .eq(`payload->>${key}`, item.id);
       if (error) return "failed";
-      const ids = rowsOf(data).map((r) => str(r.lead_id)).filter((v): v is string => !!v);
-      if (ids.length > 0) return { leadIds: [...new Set(ids)], linkedBy: "draft" };
+      const rows = rowsOf(data);
+      const ids = rows.map((r) => str(r.lead_id)).filter((v): v is string => !!v);
+      // When the drafter checked the lead's facts (campaign steps record it):
+      // anything recorded after THAT instant is news to the draft, even if
+      // it landed before the queue stamped created_at.
+      const checked = earliest(
+        rows.map((r) => str((r.payload as Record<string, unknown> | null | undefined)?.facts_checked_at)),
+      );
+      if (ids.length > 0) return { leadIds: [...new Set(ids)], linkedBy: "draft", factsCheckedAt: checked };
     }
   }
   if (item.matter_id && UUID.test(item.matter_id)) {
@@ -130,9 +137,17 @@ export async function checkDraftStaleness(item: QueueItem, db?: StopDb): Promise
     name = null;
   }
 
-  const facts = await loadStopFactsForLeads(client, { leadIds: resolved.leadIds });
+  // One linked lead row stands for its person: every same-address lead in the
+  // firm is checked too (the signature can sit on the duplicate row).
+  const facts =
+    resolved.leadIds.length === 1
+      ? await loadStopFactsForPerson(client, { leadId: resolved.leadIds[0] })
+      : await loadStopFactsForLeads(client, { leadIds: resolved.leadIds });
   if (facts.status !== "ok") return { status: "unavailable", leadIds: resolved.leadIds, leadName: name, linkedBy: resolved.linkedBy };
-  const since = staleSince(facts.facts, item.created_at);
+  // "Since" is the earlier of the queue's own timestamp and the moment the
+  // drafter last read the facts: a client who signs between the drafter's
+  // check and the draft landing in the queue must still trip the warning.
+  const since = staleSince(facts.facts, earliest([item.created_at, resolved.factsCheckedAt]) ?? item.created_at);
   if (since.length === 0) return { status: "clear", leadIds: resolved.leadIds, leadName: name, linkedBy: resolved.linkedBy };
   return { status: "stale", leadIds: resolved.leadIds, leadName: name, linkedBy: resolved.linkedBy, facts: since };
 }

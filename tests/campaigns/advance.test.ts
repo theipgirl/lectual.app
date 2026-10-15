@@ -270,6 +270,52 @@ describe("advanceEnrollment's stop guard", () => {
     expect(enrollment()).toMatchObject({ status: "active", current_step: 0 });
   });
 
+  it("reads the PERSON: a signature on a same-address duplicate lead row stops this one too", async () => {
+    db.tables.crm_lead.push({
+      id: "lead-2",
+      org_id: "org-1",
+      first_name: "Dana",
+      last_name: "Reyes",
+      business_name: null,
+      email: "dana@example.com",
+      current_stage_id: "stage-open",
+      stage_entered_at: "2026-09-30T12:00:00Z",
+      last_inbound_at: null,
+    });
+    db.tables.crm_quote.push({ id: "q-2", org_id: "org-1", lead_id: "lead-2", status: "accepted", accepted_at: "2026-10-03T21:10:00Z" });
+    const result = await advanceEnrollment("enr-1");
+    expect(createDraft).not.toHaveBeenCalled();
+    expect(result.stopped).toEqual({ reason: "signed", at: "2026-10-03T21:10:00Z" });
+    expect(enrollment()).toMatchObject({ status: "stopped", stop_reason: "signed" });
+  });
+
+  it("a same-address lead in ANOTHER firm is not read and does not stop this one", async () => {
+    db.tables.crm_lead.push({
+      id: "lead-x",
+      org_id: "org-2",
+      email: "dana@example.com",
+      current_stage_id: "stage-open",
+      stage_entered_at: "2026-09-30T12:00:00Z",
+      last_inbound_at: null,
+    });
+    db.tables.crm_quote.push({ id: "q-x", org_id: "org-2", lead_id: "lead-x", status: "accepted", accepted_at: "2026-10-03T21:10:00Z" });
+    const result = await advanceEnrollment("enr-1");
+    expect(result.stopped).toBeUndefined();
+    expect(createDraft).toHaveBeenCalledTimes(1);
+  });
+
+  it("counts a quote with accepted_at as signed whatever its status column says", async () => {
+    db.tables.crm_quote.push({ id: "q-1", org_id: "org-1", lead_id: "lead-1", status: "expired", accepted_at: "2026-10-03T21:10:00Z" });
+    expect((await advanceEnrollment("enr-1")).stopped?.reason).toBe("signed");
+    expect(createDraft).not.toHaveBeenCalled();
+  });
+
+  it("records when it checked the facts on the draft's timeline row (for the approval warning)", async () => {
+    await advanceEnrollment("enr-1");
+    const drafted = (db.tables.crm_activity ?? []).find((a) => a.type === "queue_drafted");
+    expect(drafted?.payload).toMatchObject({ queueItemId: "queue-1", facts_checked_at: expect.any(String) });
+  });
+
   it("a further advance after a stop drafts nothing", async () => {
     db.tables.crm_quote.push({ id: "q-1", org_id: "org-1", lead_id: "lead-1", status: "accepted", accepted_at: "2026-10-03T21:10:00Z" });
     await advanceEnrollment("enr-1");
