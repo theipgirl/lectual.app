@@ -16,6 +16,7 @@ import { voiceNotePlaybackUrls } from "@/lib/voice/notes";
 import { addVoiceNoteAction } from "./actions";
 import { meetingsFor } from "@/lib/meetings/read";
 import { LinkedMeetings } from "@/components/meetings/LinkedMeetings";
+import { ConsultDetailsSection } from "@/components/leads/ConsultDetailsSection";
 
 export default async function LeadPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -127,6 +128,8 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           )}
 
           <LinkedMeetings read={meetings} />
+
+          <ConsultDetailsSection leadId={lead.id} canWrite={canWrite} />
 
           <section className="lx-card" style={{ padding: 18 }}>
             <h2 className="lx-h2" style={{ fontSize: 23, marginBottom: 10 }}>

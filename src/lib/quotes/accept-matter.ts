@@ -6,6 +6,7 @@ import "server-only";
 import type { PublicQuotesDb } from "./public";
 import { firmCivilDate } from "./firm-time";
 import { nextMatterNumber } from "@/lib/matters/numbering";
+import { carryPayload, consultCarryForLead } from "@/lib/consult/store";
 
 export { nextMatterNumber };
 
@@ -40,6 +41,13 @@ export { nextMatterNumber };
  * `${type}-${year}-${count + 1}` as `createMatter` generates it. It adds what
  * the quote knows — the package taken — and places the matter on the firm's
  * first open docket stage when the firm has one.
+ *
+ * It also carries the lead's REVIEWED consult details onto the matter's own
+ * filing columns (basis, classes, goods/services, and the mark when the quote
+ * named none) — see `consultCarryForLead`. Only what a person reviewed, only for
+ * the mark being filed, and `unknown` carries nothing. The read is fenced by
+ * the same org as every other read here; if it fails the matter still opens,
+ * and the timeline row says the details were not carried.
  */
 
 export type MatterOpenResult =
@@ -113,6 +121,7 @@ export async function openMatterForAcceptedQuote(
     const markText = markFromTerms(str(quote.terms_body)) ?? str(lead.mark_text);
     const referralSource = str(lead.referral_source);
     const stamp = context.now.toISOString();
+    const carry = await consultCarryForLead(db, { leadId, orgId, preferredMark: markText, matterType: type });
 
     let matter: { id: string; matterNumber: string } | null = null;
     for (let attempt = 0; attempt < NUMBER_ATTEMPTS && !matter; attempt += 1) {
@@ -125,7 +134,10 @@ export async function openMatterForAcceptedQuote(
           lead_id: leadId,
           title,
           package_name: context.packageName,
-          mark_text: markText,
+          mark_text: markText ?? carry.fields.markText ?? null,
+          ...(carry.fields.filingBasis ? { filing_basis: carry.fields.filingBasis } : {}),
+          ...(carry.fields.internationalClasses ? { international_classes: carry.fields.internationalClasses } : {}),
+          ...(carry.fields.goodsServices ? { goods_services: carry.fields.goodsServices } : {}),
           referral_source: referralSource,
           matter_number: matterNumber,
           status: "open",
@@ -175,7 +187,7 @@ export async function openMatterForAcceptedQuote(
       matter_id: matter.id,
       type: "matter_opened",
       actor_type: "system",
-      payload: { matter_number: matter.matterNumber, auto: true, source: "quote_accepted", quote_id: quoteId },
+      payload: { matter_number: matter.matterNumber, auto: true, source: "quote_accepted", quote_id: quoteId, ...carryPayload(carry) },
     });
     if (activityError) console.error(`[quotes] matter opened but its activity row failed quote=${quoteId}`, activityError);
 

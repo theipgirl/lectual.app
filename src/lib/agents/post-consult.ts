@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { ConsultDetailsExtractSchema } from "@/lib/consult/details";
+import { saveExtraction, type ConsultDb } from "@/lib/consult/store";
 import { AGENT_POLICY } from "./policy";
 import type { AgentContext, AgentResult } from "./types";
 
@@ -18,6 +20,13 @@ import type { AgentContext, AgentResult } from "./types";
  * Fixes two things the lectual version of this flow did (post-consult-branch.ts):
  * drafts landed in crm_post_consult_action where no one reviewed them, and a
  * setting could mark an email "sent" that was never sent.
+ *
+ * The same call also returns `consult_details` (src/lib/consult/details.ts):
+ * per mark, what the call said about word vs design, classes with goods/services
+ * and the filing basis (1a in use / 1b intent to use / unknown), plus the package
+ * and any discount discussed. It is extraction of what was said, never advice,
+ * and it is stored on the consult note for a person to review on the lead page
+ * before anything relies on it. Saving it never blocks or undoes the draft.
  */
 
 export const CONSULT_BATCH = 10;
@@ -29,10 +38,20 @@ export const FollowUpSchema = z.object({
     .string()
     .describe("Plain-text email from the attorney to the client. Warm, specific to the call, ends with one clear next step."),
   internal_summary: z.string().describe("Two or three sentences for the attorney reviewing the draft: what was discussed and what to check"),
+  consult_details: ConsultDetailsExtractSchema.describe(
+    "A record of what the notes say about each mark, for the attorney to check. Extraction only: it is never put in the email",
+  ),
 });
 export type FollowUp = z.infer<typeof FollowUpSchema>;
 
 const TASK = `Your job: draft the follow-up email an IP attorney sends after a consultation with a prospective client, using only the consult notes you are given. Thank them, recap what was discussed in plain language, restate the next step from the notes, and invite questions. Do not add legal analysis that is not in the notes, do not quote a price unless the notes contain it, and do not promise an outcome. Also write a short internal summary for the attorney.`;
+
+/**
+ * The extraction half of the same call. Worded as reporting, because the filing
+ * basis is the attorney's determination (SOP §4) and the software must not make
+ * it: a basis is only ever what the notes say, with the words that say it.
+ */
+const EXTRACTION_TASK = `Also fill in consult_details: a record of what the notes say about each mark, for the attorney to check. This is extraction, not advice. For each mark discussed give the mark text; whether it was described as a word mark or a design mark (unknown if the notes do not say); and each class with its goods or services as the notes state them, giving a class number only if the notes give one. For filing_basis answer 1a only if the notes say the mark is already in use in commerce, 1b only if they say it is not yet in use and the client intends to use it, and otherwise unknown, and copy the exact words from the notes that state it into basis_evidence (a short verbatim quote, not a paraphrase: a basis whose quote is not found word for word in the notes is recorded as unknown). Never infer a basis from the kind of business, from what would be typical, or from anything else, and never choose classes, a package or a discount yourself. Give first_use_date only if a complete date is stated, and a class number only if the notes give that number. Report the package and any discount only as the notes put them. Do not mention the filing basis in the email.`;
 
 /**
  * The firm's own sign-off (Settings → Firm profile, lectual 0078) when it has
@@ -43,7 +62,7 @@ export function followUpSystem(signOff: string | null): string {
   const ending = signOff
     ? `End the email with exactly this sign-off, unchanged:\n<sign_off>\n${signOff}\n</sign_off>`
     : `Sign off with "[Attorney name]" as a placeholder; the attorney edits and sends it.`;
-  return `${AGENT_POLICY}\n\n${TASK} ${ending}`;
+  return `${AGENT_POLICY}\n\n${TASK} ${EXTRACTION_TASK} ${ending}`;
 }
 
 type ConsultNotes = {
@@ -137,9 +156,12 @@ export async function runPostConsult(ctx: AgentContext): Promise<AgentResult> {
       continue;
     }
 
+    // The prompt is also what the extraction is checked against: a basis is kept
+    // only if its quoted evidence is really in these notes.
+    const prompt = followUpPrompt(lead, (note.notes ?? {}) as ConsultNotes);
     const { output } = await llm({
       system,
-      user: followUpPrompt(lead, (note.notes ?? {}) as ConsultNotes),
+      user: prompt,
       schema: FollowUpSchema,
       effort: "high",
       maxTokens: 8000,
@@ -159,13 +181,26 @@ export async function runPostConsult(ctx: AgentContext): Promise<AgentResult> {
     });
     drafted += 1;
 
+    // The draft is already queued, so nothing here may fail the run (a thrown
+    // error would skip the activity row below and the note would be drafted
+    // again). The extraction goes on the very note this draft came from, fenced
+    // by the org that note was read under.
+    const detailsSaved = await saveExtraction(admin as unknown as ConsultDb, {
+      orgId,
+      noteId: note.id as string,
+      extraction: output.consult_details,
+      source: "post-consult-agent",
+      sourceText: prompt,
+      now: new Date(ctx.now()),
+    });
+
     const { error: e } = await admin.from("crm_activity").insert({
       org_id: orgId,
       lead_id: lead.id,
       type: "queue_drafted",
       actor_id: null,
       actor_type: "ai",
-      payload: { source: "post-consult", consult_note_id: note.id, queue_id: queueId, subject: output.subject },
+      payload: { source: "post-consult", consult_note_id: note.id, queue_id: queueId, subject: output.subject, consult_details: detailsSaved },
     });
     if (e) throw new Error(`activity insert failed: ${e.message}`);
   }

@@ -37,6 +37,35 @@ function matterChangeDetail(p: Record<string, unknown>): string | null {
   return null;
 }
 
+const BASIS_WORDS: Record<string, string> = { "1a": "§1(a)", "1b": "§1(b)", unknown: "basis unknown" };
+
+/** "SANKOFA §1(b) · ACME basis unknown": the marks a review confirmed, with the basis each was left at. */
+function consultReviewDetail(p: Record<string, unknown>): string | null {
+  const marks = Array.isArray(p.marks) ? (p.marks as Record<string, unknown>[]) : [];
+  const parts = marks
+    .map((m) => [str(m.mark), BASIS_WORDS[str(m.filing_basis) ?? ""], m.corrected === true ? "(corrected)" : null].filter(Boolean).join(" "))
+    .filter(Boolean);
+  return parts.length ? parts.join(" · ") : str(p.summary);
+}
+
+/** What a newly opened matter took from the reviewed consult, or why it took nothing worth saying. */
+function carriedDetail(p: Record<string, unknown>): string | null {
+  const c = p.consult_details;
+  if (!c || typeof c !== "object") return null;
+  const carried = Array.isArray((c as Record<string, unknown>).carried) ? ((c as Record<string, unknown>).carried as string[]) : [];
+  if (carried.length > 0) return `from the reviewed consult: ${carried.join(", ").replaceAll("_", " ")}`;
+  const skipped = str((c as Record<string, unknown>).skipped);
+  const WHY: Record<string, string | undefined> = {
+    not_reviewed: "consult details not reviewed, so not carried",
+    unavailable: "consult details couldn't be read, so not carried",
+    unreadable: "consult details couldn't be read, so not carried",
+    ambiguous_marks: "several marks, none chosen — set the filing details by hand",
+    mark_mismatch: "no reviewed mark matches this one — set the filing details by hand",
+    not_trademark: "consult details are trademark filing details, so not carried onto this matter",
+  };
+  return (skipped && WHY[skipped]) || null;
+}
+
 export function describeActivity(row: Row): Described {
   const p = (row.payload ?? {}) as Record<string, unknown>;
   switch (row.type) {
@@ -69,9 +98,10 @@ export function describeActivity(row: Row): Described {
     case "lead_assigned":
       return { title: "Lead assigned", detail: null, tone: "system", link: null };
     case "lead_updated":
+      if (str(p.change) === "consult_details") return { title: "Consult details reviewed", detail: consultReviewDetail(p), tone: "system", link: null };
       return { title: "Details updated", detail: Array.isArray(p.fields) ? (p.fields as string[]).join(", ") : null, tone: "system", link: null };
     case "matter_opened":
-      return { title: "Matter opened", detail: str(p.matter_number), tone: "system", link: null };
+      return { title: "Matter opened", detail: [str(p.matter_number), carriedDetail(p)].filter(Boolean).join(" · ") || null, tone: "system", link: null };
     case "matter_updated":
       return { title: MATTER_CHANGE[str(p.change) ?? ""] ?? "Matter updated", detail: matterChangeDetail(p), tone: "system", link: null };
     case "quote_payment":
