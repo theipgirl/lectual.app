@@ -1,0 +1,124 @@
+/*
+ * AI copilot (/dashboard/copilot/) — a chat panel on the existing design
+ * system. Reuses the app's tokens and lx-* controls; only the thread/bubble
+ * layout below is new, under a cpl- prefix.
+ */
+
+.cpl-panel {
+  display: flex;
+  flex-direction: column;
+  height: min(720px, calc(100dvh - 260px));
+  min-height: 420px;
+  overflow: hidden;
+}
+
+.cpl-thread {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cpl-empty {
+  margin: auto 0;
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}
+
+.cpl-prompts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cpl-exchange {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cpl-bubble {
+  border-radius: 14px;
+  padding: 12px 15px;
+  font-size: 14.5px;
+  line-height: 1.55;
+  max-width: 78%;
+}
+
+.cpl-bubble-user {
+  align-self: flex-end;
+  background: var(--ox);
+  color: var(--cream);
+  border-radius: 14px 14px 3px 14px;
+}
+
+.cpl-bubble-copilot {
+  align-self: flex-start;
+  background: var(--well);
+  color: var(--ink);
+  border-radius: 14px 14px 14px 3px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 88%;
+}
+
+.cpl-thinking {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.cpl-bubble-error {
+  background: rgba(142, 39, 51, 0.09);
+  color: var(--wine);
+}
+
+.cpl-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.cpl-cites {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cpl-cite {
+  text-decoration: none;
+}
+.cpl-cite:hover {
+  background: var(--card);
+  text-decoration: none;
+}
+
+.cpl-composer {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--line);
+  background: var(--card);
+}
+
+.cpl-composer .lx-input {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .cpl-bubble {
+    max-width: 92%;
+  }
+  .cpl-panel {
+    height: min(640px, calc(100dvh - 220px));
+  }
+}

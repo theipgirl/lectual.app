@@ -1,0 +1,51 @@
+
+> lectual-app@0.1.0 build /home/user/lectual.app
+> next build
+
+▲ Next.js 16.2.7 (Turbopack)
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 11.8s
+  Running TypeScript ...
+  Finished TypeScript in 12.6s ...
+  Collecting page data using 3 workers ...
+  Generating static pages using 3 workers (0/15) ...
+  Generating static pages using 3 workers (3/15) 
+  Generating static pages using 3 workers (7/15) 
+  Generating static pages using 3 workers (11/15) 
+✓ Generating static pages using 3 workers (15/15) in 321ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/cron/agents
+├ ƒ /api/cron/mailbox-sync
+├ ƒ /api/mailbox/callback/[provider]
+├ ƒ /api/mailbox/connect/[provider]
+├ ƒ /auth/callback
+├ ƒ /dashboard
+├ ƒ /dashboard/[section]
+├ ƒ /dashboard/agents
+├ ƒ /dashboard/calendar
+├ ƒ /dashboard/documents
+├ ƒ /dashboard/documents/[id]/download
+├ ƒ /dashboard/leads
+├ ƒ /dashboard/leads/[id]
+├ ƒ /dashboard/mail
+├ ƒ /dashboard/matters
+├ ƒ /dashboard/matters/[id]
+├ ƒ /dashboard/queue
+├ ƒ /dashboard/queue/[id]
+├ ƒ /dashboard/settings
+├ ƒ /dashboard/settings/integrations
+├ ƒ /dashboard/settings/mailboxes
+├ ○ /icon.png
+└ ƒ /sign-in
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

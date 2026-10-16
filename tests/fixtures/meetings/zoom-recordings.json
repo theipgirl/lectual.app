@@ -1,0 +1,40 @@
+{
+  "from": "2025-03-01",
+  "to": "2025-03-30",
+  "page_count": 1,
+  "page_size": 30,
+  "total_records": 2,
+  "next_page_token": "",
+  "meetings": [
+    {
+      "uuid": "4444AAAiAAAAAiAiAiiAii==",
+      "id": 85746065432,
+      "account_id": "Cx3wERazSgup7ZWRHQM8-w",
+      "host_id": "z8yCxjabcdEFGHfp8uQ",
+      "topic": "Trademark consult — MarkRight",
+      "type": 2,
+      "start_time": "2025-03-05T15:00:00Z",
+      "timezone": "America/New_York",
+      "duration": 45,
+      "total_size": 529758,
+      "recording_count": 3,
+      "share_url": "https://example.zoom.us/rec/share/abc",
+      "host_email": "atty@firm.example",
+      "recording_files": [
+        { "id": "a1", "file_type": "MP4", "status": "completed", "download_url": "https://example.zoom.us/rec/download/mp4", "recording_type": "shared_screen_with_speaker_view" },
+        { "id": "a2", "file_type": "TRANSCRIPT", "status": "completed", "download_url": "https://example.zoom.us/rec/download/vtt", "recording_type": "audio_transcript" }
+      ]
+    },
+    {
+      "uuid": "5555BBBiBBBBBiBiBiiBii==",
+      "id": 85746065433,
+      "topic": "Internal sync",
+      "start_time": "2025-03-06T15:00:00Z",
+      "duration": 20,
+      "host_email": "atty@firm.example",
+      "recording_files": [
+        { "id": "b1", "file_type": "TRANSCRIPT", "status": "completed", "download_url": "https://attacker.example/steal", "recording_type": "audio_transcript" }
+      ]
+    }
+  ]
+}

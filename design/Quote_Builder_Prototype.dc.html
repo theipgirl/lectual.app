@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300..700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+--ink:#2A1216;--ink2:#4A2A2E;--mute:#7A5A5E;--ground:#F6F0E3;--surface:#FFFDF7;--surface2:#F1E8D8;
+--line:rgba(42,18,22,.13);--ox:#6A1F2B;--burg:#8E2733;--blush:#EFD9DC;--cream:#FDF7EB;
+--ok:#43602F;--warn:#7C5312;--crit:#8E2733;
+--okbg:rgba(67,96,47,.12);--warnbg:rgba(124,83,18,.12);--critbg:rgba(142,39,51,.12);--oxbg:rgba(106,31,43,.1);
+--shadow:0 1px 2px rgba(20,4,8,.05),0 12px 28px -22px rgba(20,4,8,.4);
+}
+@media (prefers-color-scheme:dark){
+:root{--ink:#F7EFE2;--ink2:#DCC9C6;--mute:#A98E8E;--ground:#1A0A0E;--surface:#23100F;--surface2:#2C1518;
+--line:rgba(247,239,226,.15);--ox:#E3A9AE;--burg:#D98A93;--blush:#6A1F2B;--cream:#23100F;
+--ok:#9CC182;--warn:#E0B36A;--crit:#E8929B;
+--okbg:rgba(156,193,130,.12);--warnbg:rgba(224,179,106,.12);--critbg:rgba(232,146,155,.12);--oxbg:rgba(227,169,174,.1);}
+}
+[data-theme="light"]{
+--ink:#2A1216;--ink2:#4A2A2E;--mute:#7A5A5E;--ground:#F6F0E3;--surface:#FFFDF7;--surface2:#F1E8D8;
+--line:rgba(42,18,22,.13);--ox:#6A1F2B;--burg:#8E2733;--blush:#EFD9DC;--cream:#FDF7EB;
+--ok:#43602F;--warn:#7C5312;--crit:#8E2733;
+--okbg:rgba(67,96,47,.12);--warnbg:rgba(124,83,18,.12);--critbg:rgba(142,39,51,.12);--oxbg:rgba(106,31,43,.1);
+--shadow:0 1px 2px rgba(20,4,8,.05),0 12px 28px -22px rgba(20,4,8,.4);
+}
+[data-theme="dark"]{
+--ink:#F7EFE2;--ink2:#DCC9C6;--mute:#A98E8E;--ground:#1A0A0E;--surface:#23100F;--surface2:#2C1518;
+--line:rgba(247,239,226,.15);--ox:#E3A9AE;--burg:#D98A93;--blush:#6A1F2B;--cream:#23100F;
+--ok:#9CC182;--warn:#E0B36A;--crit:#E8929B;
+--okbg:rgba(156,193,130,.12);--warnbg:rgba(224,179,106,.12);--critbg:rgba(232,146,155,.12);--oxbg:rgba(227,169,174,.1);
+}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:Geist,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:var(--burg);text-decoration:none}
+a:hover{color:var(--ox);text-decoration:underline}
+input{font:inherit;color:inherit}
+input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+input[type=number]{-moz-appearance:textfield}
+</style>
+</helmet>
+
+<div data-theme="{{ theme }}" style="min-height:100vh;box-sizing:border-box;padding:24px;background:var(--ground);color:var(--ink);display:flex;flex-direction:column;gap:16px">
+
+  <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap">
+    <div style="font-family:'Instrument Serif',serif;font-size:26px">Quote builder → client link</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.17em;text-transform:uppercase;color:var(--mute)">working prototype · edit the quote, send it, sign it</div>
+    <div style="flex:1"></div>
+    <div onClick="{{ reset }}" style="height:32px;padding:0 13px;border-radius:8px;border:1px solid var(--line);color:var(--ink2);display:flex;align-items:center;font-size:12.5px;cursor:pointer;background:var(--surface)" style-hover="border-color:var(--ox);color:var(--ox)">Reset prototype</div>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start">
+
+    <div style="position:relative;width:1240px;height:1010px;border-radius:20px;overflow:hidden;border:1px solid var(--line);background:var(--ground);box-shadow:var(--shadow)">
+
+      <div style="position:absolute;left:0;right:0;top:0;height:78px;display:flex;align-items:center;gap:20px;padding:0 26px;box-sizing:border-box;border-bottom:1px solid var(--line)">
+        <img src="assets/rpb-logo-oxblood.png" alt="RPB Law Firm" style="height:36px;width:auto;display:{{ logoLight }}">
+        <img src="assets/rpb-logo-gold.png" alt="RPB Law Firm" style="height:25px;width:auto;display:{{ logoDark }}">
+        <div style="width:1px;height:32px;background:var(--line)"></div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.17em;text-transform:uppercase;color:var(--mute)">Quotes &amp; proposals · qt-208</div>
+        <div style="flex:1"></div>
+        <div onClick="{{ copyLink }}" style="height:34px;padding:0 15px;border-radius:9px;border:1px solid var(--line);color:var(--ink2);display:flex;align-items:center;font-size:13px;cursor:pointer;background:var(--surface)" style-hover="border-color:var(--ox);color:var(--ox)">Copy client link</div>
+        <div onClick="{{ send }}" style="height:34px;padding:0 15px;border-radius:9px;display:flex;align-items:center;font-size:13px;font-weight:500;{{ sendStyle }}">{{ sendLabel }}</div>
+      </div>
+
+      <dc-import name="Rail" active="Quotes &amp; proposals" style="position:absolute;left:16px;top:78px;bottom:20px;z-index:6" hint-size="62px,890px"></dc-import>
+
+      <div style="position:absolute;left:94px;right:20px;top:94px;bottom:20px;overflow:auto">
+
+    <div data-screen-label="Quote builder" style="width:100%;box-sizing:border-box;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:var(--shadow)">
+
+      <div style="display:flex;align-items:center;gap:13px;flex-wrap:wrap;padding:16px 20px;border-bottom:1px solid var(--line)">
+        <div style="font-family:'Instrument Serif',serif;font-size:19px">Two-class filing + watch — HALCYON ROWE</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;padding:4px 8px;border-radius:5px;{{ statusPillStyle }}">{{ statusLabel }}</div>
+        <div style="flex:1"></div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--mute)">Expires Sep 18 · 7 days</div>
+      </div>
+
+      <div style="display:flex;flex-wrap:wrap">
+
+        <div style="flex:1 1 400px;min-width:0;padding:20px;display:flex;flex-direction:column;gap:16px">
+
+          <div style="display:flex;flex-direction:column;gap:9px">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.17em;text-transform:uppercase;color:var(--mute)">Packages offered to the client</div>
+            <div style="display:flex;gap:9px;flex-wrap:wrap">
+              <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="2">
+                <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;cursor:pointer;{{ t.tabStyle }}" onClick="{{ t.onSelect }}">
+                  <div style="display:flex;flex-direction:column;gap:2px">
+                    <div style="font-size:13.5px;font-weight:500">{{ t.name }}</div>
+                    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--mute)">{{ t.signing }} + {{ t.filing }} at filing</div>
+                  </div>
+                  <div onClick="{{ t.onToggle }}" title="Offer this package to the client" style="width:34px;height:20px;border-radius:999px;flex:0 0 auto;position:relative;cursor:pointer;{{ t.switchStyle }}">
+                    <div style="position:absolute;top:2px;width:16px;height:16px;border-radius:999px;background:var(--surface);box-shadow:0 1px 2px rgba(20,4,8,.25);{{ t.knobStyle }}"></div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden">
+            <div style="display:grid;grid-template-columns:1fr 104px 104px 30px;gap:12px;padding:9px 14px;background:var(--surface2);border-bottom:1px solid var(--line);font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.17em;text-transform:uppercase;color:var(--mute)">
+              <div>Line · {{ editingName }}</div><div style="text-align:right">Amount</div><div style="text-align:right">Charged</div><div></div>
+            </div>
+            <sc-for list="{{ lines }}" as="l" hint-placeholder-count="6">
+              <div style="display:grid;grid-template-columns:1fr 104px 104px 30px;gap:12px;align-items:center;padding:9px 14px;border-bottom:1px solid var(--line)">
+                <input value="{{ l.label }}" onChange="{{ l.onLabel }}" disabled="{{ l.locked }}" style="border:1px solid transparent;border-radius:7px;background:transparent;padding:5px 7px;font-size:13.5px;min-width:0;outline:none" style-focus="border-color:var(--ox);background:var(--surface2)">
+                <div style="display:flex;align-items:center;justify-content:flex-end;gap:1px">
+                  <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--mute)">$</span>
+                  <input type="number" value="{{ l.amount }}" onChange="{{ l.onAmount }}" disabled="{{ l.locked }}" style="border:1px solid transparent;border-radius:7px;background:transparent;padding:5px 4px;width:74px;text-align:right;font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;font-size:13px;outline:none" style-focus="border-color:var(--ox);background:var(--surface2)">
+                </div>
+                <div style="text-align:right"><span onClick="{{ l.onWhen }}" title="{{ l.whenHint }}" style="font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;padding:4px 7px;border-radius:5px;{{ l.whenStyle }}">{{ l.when }}</span></div>
+                <div onClick="{{ l.onRemove }}" title="Remove line" style="width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--mute)" style-hover="background:var(--critbg);color:var(--crit)">
+                  <div style="width:10px;height:1.5px;background:currentColor"></div>
+                </div>
+              </div>
+            </sc-for>
+            <div style="padding:10px 14px;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--mute)">Add a line from the service library →</div>
+          </div>
+
+          <div style="display:flex;gap:12px;padding:13px 15px;border-radius:9px;background:var(--warnbg);border:1px solid var(--warn)">
+            <div style="width:20px;height:20px;border-radius:999px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;background:var(--warn);color:var(--cream);font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500">!</div>
+            <div style="font-size:13px;line-height:1.5;color:var(--ink2);max-width:70ch">{{ govNotice }}</div>
+          </div>
+
+          <div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.17em;text-transform:uppercase;color:var(--mute)">Optional add-ons · client chooses</div>
+            <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">
+              <sc-for list="{{ addons }}" as="a" hint-placeholder-count="2">
+                <div style="flex:1 1 200px;padding:13px;border-radius:12px;background:var(--surface);{{ a.cardStyle }}">
+                  <div style="display:flex;align-items:flex-start;gap:9px">
+                    <div style="flex:1;min-width:0;font-size:13.5px;font-weight:500">{{ a.label }}</div>
+                    <div onClick="{{ a.onToggle }}" title="Offer this add-on" style="width:34px;height:20px;border-radius:999px;flex:0 0 auto;position:relative;cursor:pointer;{{ a.switchStyle }}">
+                      <div style="position:absolute;top:2px;width:16px;height:16px;border-radius:999px;background:var(--surface);box-shadow:0 1px 2px rgba(20,4,8,.25);{{ a.knobStyle }}"></div>
+                    </div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:1px;margin-top:6px">
+                    <span style="font-family:'JetBrains Mono',monospace;font-size:15px;color:var(--mute)">$</span>
+                    <input type="number" value="{{ a.amount }}" onChange="{{ a.onAmount }}" disabled="{{ a.locked }}" style="border:1px solid transparent;border-radius:7px;background:transparent;padding:3px 4px;width:78px;font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;font-size:15px;outline:none" style-focus="border-color:var(--ox);background:var(--surface2)">
+                  </div>
+                  <div style="font-size:12.5px;color:var(--mute);margin-top:3px">{{ a.offerLabel }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+
+        <div style="flex:0 0 214px;border-left:1px solid var(--line);padding:20px 16px;box-sizing:border-box">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.17em;text-transform:uppercase;color:var(--mute)">Service library</div>
+          <div style="display:flex;flex-direction:column;gap:7px;margin-top:12px">
+            <sc-for list="{{ library }}" as="s" hint-placeholder-count="5">
+              <div onClick="{{ s.onAdd }}" style="padding:10px 11px;border:1px solid var(--line);border-radius:9px;font-size:12.5px;cursor:pointer;display:flex;gap:8px;align-items:baseline;{{ s.style }}" style-hover="border-color:var(--ox);background:var(--oxbg)">
+                <div style="flex:1;min-width:0">{{ s.label }}</div>
+                <div style="font-family:'JetBrains Mono',monospace;color:var(--mute)">{{ s.price }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--mute);margin-top:13px;line-height:1.5">Click to add to {{ editingName }}.</div>
+        </div>
+
+        <div style="flex:1 1 280px;min-width:0;border-left:1px solid var(--line);background:var(--surface2);padding:20px;display:flex;flex-direction:column;gap:16px">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.17em;text-transform:uppercase;color:var(--mute)">Totals · {{ editingName }}</div>
+          <div>
+            <div style="font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;font-size:34px;line-height:1;font-weight:500">{{ signingTotal }}</div>
+            <div style="font-size:13px;color:var(--ink2);margin-top:6px">Due at signing</div>
+            <div style="font-size:12.5px;color:var(--mute);margin-top:2px">Legal fees. Charged when the client signs.</div>
+          </div>
+          <div style="height:1px;background:var(--line)"></div>
+          <div>
+            <div style="font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;font-size:26px;line-height:1;font-weight:500;color:var(--warn)">{{ filingTotal }}</div>
+            <div style="font-size:13px;color:var(--ink2);margin-top:6px">Due at filing (USPTO)</div>
+            <div style="font-size:12.5px;color:var(--mute);margin-top:2px">Government fees. Collected when the applications are filed.</div>
+          </div>
+          <sc-if value="{{ showCombined }}" hint-placeholder-val="{{ true }}">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:12.5px;color:var(--mute);border-top:1px solid var(--line);padding-top:14px">Full project cost {{ combinedTotal }}</div>
+          </sc-if>
+          <sc-if value="{{ isAccepted }}" hint-placeholder-val="{{ false }}">
+            <div style="border:1px solid var(--ok);background:var(--okbg);border-radius:10px;padding:13px">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ok)">Accepted · frozen</div>
+              <div style="font-size:13px;color:var(--ink2);margin-top:7px;line-height:1.5">{{ acceptedSummary }}</div>
+            </div>
+          </sc-if>
+          <div style="flex:1"></div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--mute);line-height:1.5">Terms: net 0 at signing · engagement letter attached on acceptance</div>
+            <div onClick="{{ send }}" style="height:42px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:500;{{ sendStyle }}">{{ sendLabel }}</div>
+            <div onClick="{{ copyLink }}" style="height:42px;border-radius:9px;border:1px solid var(--line);color:var(--ink2);display:flex;align-items:center;justify-content:center;font-size:13.5px;cursor:pointer;background:var(--surface)" style-hover="border-color:var(--ox);color:var(--ox)">Copy client link</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="border-top:1px solid var(--line);padding:14px 20px;display:flex;flex-direction:column;gap:7px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.17em;text-transform:uppercase;color:var(--mute)">Activity</div>
+        <sc-for list="{{ events }}" as="e" hint-placeholder-count="2">
+          <div style="display:flex;gap:12px;align-items:baseline">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--mute);flex:0 0 128px">{{ e.time }}</div>
+            <div style="font-size:13px;color:var(--ink2)">{{ e.text }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+      </div>
+    </div>
+
+    <div data-screen-label="Client link" style="flex:0 0 430px;display:flex;flex-direction:column;gap:9px">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.17em;text-transform:uppercase;color:var(--mute)">Client link · /q/{{ token }}</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--mute)">{{ clientStateLabel }}</div>
+      </div>
+
+      <div style="width:430px;height:860px;border-radius:20px;overflow:hidden;border:1px solid var(--line);background:var(--surface);box-shadow:var(--shadow);display:flex;flex-direction:column">
+
+        <div style="background:var(--ox);color:var(--cream);padding:20px 22px 18px;flex:0 0 auto">
+          <div style="font-family:'Instrument Serif',serif;font-size:20px">Rebecca P. Beliard, Esq.</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.17em;text-transform:uppercase;opacity:.8;margin-top:6px">{{ clientHeaderNote }}</div>
+        </div>
+
+        <sc-if value="{{ clientLocked }}" hint-placeholder-val="{{ false }}">
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:13px;padding:34px">
+            <div style="width:52px;height:52px;border-radius:999px;background:var(--surface2);display:flex;align-items:center;justify-content:center"><div style="width:14px;height:2px;background:var(--mute)"></div></div>
+            <div style="font-family:'Instrument Serif',serif;font-size:26px;line-height:1.15">This link isn't available.</div>
+            <div style="font-size:13.5px;color:var(--ink2);max-width:34ch;line-height:1.55">If you think it should be, reply to the email it came from and we'll send a new one.</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--mute);max-width:34ch;line-height:1.5;margin-top:8px">Until the quote is sent, the token resolves to nothing — same page an expired or withdrawn link gets.</div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ clientLive }}" hint-placeholder-val="{{ true }}">
+          <div style="flex:1;min-height:0;overflow:auto;padding:22px;display:flex;flex-direction:column;gap:17px">
+            <div>
+              <div style="font-family:'Instrument Serif',serif;font-size:26px;line-height:1.15;text-wrap:balance">Trademark filing for HALCYON ROWE</div>
+              <div style="font-size:13.5px;color:var(--ink2);line-height:1.55;margin-top:9px">Thank you for the call on Tuesday. Here is what I recommend for the two classes we discussed, and what it costs.</div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <sc-for list="{{ clientPkgs }}" as="p" hint-placeholder-count="2">
+                <div onClick="{{ p.onPick }}" style="border-radius:13px;padding:15px;cursor:pointer;{{ p.style }}">
+                  <div style="display:flex;align-items:baseline;gap:9px">
+                    <div style="font-size:15px;font-weight:500;flex:1">{{ p.name }}</div>
+                    <div style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:500">{{ p.price }}</div>
+                  </div>
+                  <div style="font-size:12.5px;color:var(--ink2);margin-top:6px;line-height:1.5">{{ p.blurb }}</div>
+                </div>
+              </sc-for>
+            </div>
+
+            <sc-if value="{{ hasClientAddons }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-direction:column;gap:9px">
+                <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.17em;text-transform:uppercase;color:var(--mute)">Optional, add if you want it</div>
+                <sc-for list="{{ clientAddons }}" as="a" hint-placeholder-count="1">
+                  <div onClick="{{ a.onToggle }}" style="display:flex;align-items:center;gap:11px;padding:13px;border-radius:12px;cursor:pointer;{{ a.style }}">
+                    <div style="width:20px;height:20px;border-radius:5px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;{{ a.boxStyle }}">
+                      <div style="width:9px;height:9px;border-radius:2px;{{ a.dotStyle }}"></div>
+                    </div>
+                    <div style="flex:1;font-size:13.5px">{{ a.label }}</div>
+                    <div style="font-family:'JetBrains Mono',monospace;font-size:13.5px">{{ a.price }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+
+            <div style="border-top:1px solid var(--line);padding-top:15px">
+              <div style="font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;font-size:32px;line-height:1;font-weight:500;{{ dueTodayStyle }}">{{ dueToday }}</div>
+              <div style="font-size:13.5px;color:var(--ink2);margin-top:6px">Due today</div>
+              <div style="font-size:12.5px;color:var(--mute);margin-top:4px;line-height:1.5">{{ dueTodayNote }}</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;font-size:20px;font-weight:500;color:var(--warn);margin-top:15px">{{ dueLater }}</div>
+              <div style="font-size:13px;color:var(--warn);margin-top:4px">Due later, at filing</div>
+              <div style="font-size:12.5px;color:var(--mute);margin-top:4px;line-height:1.5">USPTO government fees. Quoted now, collected when the applications are filed — not today.</div>
+            </div>
+
+            <div style="flex:1"></div>
+
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <sc-if value="{{ needsName }}" hint-placeholder-val="{{ true }}">
+                <div style="padding:12px 14px;border:1px solid var(--line);border-radius:9px;background:var(--surface2)">
+                  <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.17em;text-transform:uppercase;color:var(--mute)">Type your full name to sign</div>
+                  <input value="{{ signName }}" onChange="{{ onSignName }}" placeholder="Nadia Petra" style="border:0;background:transparent;outline:none;width:100%;font-family:'Instrument Serif',serif;font-size:21px;margin-top:6px;padding:0">
+                </div>
+              </sc-if>
+              <div onClick="{{ accept }}" style="height:50px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:500;{{ acceptStyle }}">Accept and sign</div>
+              <div style="font-size:12px;color:var(--mute);line-height:1.5;text-align:center">{{ acceptHint }}</div>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ clientAccepted }}" hint-placeholder-val="{{ false }}">
+          <div style="flex:1;min-height:0;overflow:auto;padding:22px;display:flex;flex-direction:column;gap:17px">
+            <div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;padding:4px 8px;border-radius:5px;background:var(--okbg);color:var(--ok);display:inline-block">Accepted</div>
+              <div style="font-family:'Instrument Serif',serif;font-size:26px;line-height:1.15;margin-top:11px">{{ acceptedTitle }}</div>
+              <div style="font-size:13px;color:var(--mute);line-height:1.55;margin-top:9px">A frozen snapshot of what you agreed to. Later edits by the firm can't change it.</div>
+            </div>
+            <div style="border-top:1px solid var(--line);padding-top:15px">
+              <div style="font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;font-size:28px;line-height:1;font-weight:500">{{ acceptedSigning }}</div>
+              <div style="font-size:13.5px;color:var(--ink2);margin-top:6px">Charged at signing · {{ acceptedDate }}</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;font-size:20px;font-weight:500;color:var(--warn);margin-top:15px">{{ acceptedFiling }}</div>
+              <div style="font-size:13px;color:var(--warn);margin-top:4px">Due at filing · not yet charged</div>
+            </div>
+            <div style="border-top:1px solid var(--line);padding-top:15px">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.17em;text-transform:uppercase;color:var(--mute)">What you agreed to</div>
+              <div style="display:flex;flex-direction:column;gap:6px;margin-top:9px">
+                <sc-for list="{{ acceptedLines }}" as="l" hint-placeholder-count="3">
+                  <div style="display:flex;gap:12px;align-items:baseline">
+                    <div style="flex:1;min-width:0;font-size:13px;color:var(--ink2)">{{ l.label }}</div>
+                    <div style="font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;font-size:13px">{{ l.amount }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="border-top:1px solid var(--line);padding-top:15px">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.17em;text-transform:uppercase;color:var(--mute)">Signed by</div>
+              <div style="font-family:'Instrument Serif',serif;font-style:italic;font-size:23px;margin-top:7px">{{ signedName }}</div>
+            </div>
+            <div style="flex:1"></div>
+            <div onClick="{{ download }}" style="height:50px;border-radius:9px;border:1px solid var(--ox);color:var(--ox);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:500;cursor:pointer" style-hover="background:var(--oxbg)">Download signed copy (PDF)</div>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+
+  <sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--ink);color:var(--ground);padding:11px 17px;border-radius:9px;font-size:13px;box-shadow:0 12px 30px -14px rgba(20,4,8,.6);z-index:40">{{ toast }}</div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;,&quot;section&quot;:&quot;Prototype state&quot;},&quot;initialStatus&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;draft&quot;,&quot;sent&quot;],&quot;default&quot;:&quot;draft&quot;,&quot;tsType&quot;:&quot;'draft'|'sent'&quot;,&quot;section&quot;:&quot;Prototype state&quot;},&quot;requireTypedName&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Client link&quot;},&quot;showCombinedTotal&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Builder&quot;},&quot;govFeesLocked&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Builder&quot;}}">
+class Component extends DCLogic {
+  state = this.initialState();
+
+  initialState() {
+    const sent = (this.props && this.props.initialStatus) === 'sent';
+    return {
+      status: sent ? 'sent' : 'draft',
+      editPkg: 'full',
+      pkgs: [
+        { id: 'full', name: 'Full prosecution', offered: true,
+          blurb: 'Clearance search, both filings, and every office action through registration.',
+          lines: [
+            { id: 1, label: 'Clearance search, two classes', kind: 'legal', amount: 1450 },
+            { id: 2, label: 'Filing, class 25', kind: 'legal', amount: 900 },
+            { id: 3, label: 'Filing, class 35', kind: 'legal', amount: 900 },
+            { id: 4, label: 'Office action response allowance', kind: 'legal', amount: 950 },
+            { id: 5, label: 'USPTO fee, class 25', kind: 'gov', amount: 350 },
+            { id: 6, label: 'USPTO fee, class 35', kind: 'gov', amount: 350 }
+          ] },
+        { id: 'filing', name: 'Filing only', offered: true,
+          blurb: 'Clearance search and both filings. Office actions quoted separately if they arrive.',
+          lines: [
+            { id: 11, label: 'Clearance search, two classes', kind: 'legal', amount: 950 },
+            { id: 12, label: 'Filing, class 25', kind: 'legal', amount: 900 },
+            { id: 13, label: 'Filing, class 35', kind: 'legal', amount: 900 },
+            { id: 14, label: 'USPTO fee, class 25', kind: 'gov', amount: 350 },
+            { id: 15, label: 'USPTO fee, class 35', kind: 'gov', amount: 350 }
+          ] }
+      ],
+      addons: [
+        { id: 'a1', label: 'Watch service, 12 months', amount: 600, offered: true },
+        { id: 'a2', label: 'Design mark drawing', amount: 250, offered: false }
+      ],
+      pick: null,
+      chosenAddons: [],
+      signName: '',
+      signedAt: null,
+      snapshot: null,
+      opened: false,
+      events: sent
+        ? [{ time: 'Sep 10, 4:02 PM', text: 'Draft created by Rebecca' }, { time: 'Sep 11, 9:20 AM', text: 'Sent to nadia@halcyonrowe.com' }]
+        : [{ time: 'Sep 10, 4:02 PM', text: 'Draft created by Rebecca' }],
+      toast: null,
+      nextId: 100
+    };
+  }
+
+  money(n) { return '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  short(n) { return '$' + Number(n || 0).toLocaleString('en-US'); }
+  now() { return new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); }
+  stamp(text) { this.setState(s => ({ events: s.events.concat([{ time: 'Sep 11, ' + this.now(), text }]) })); }
+
+  note(msg) {
+    clearTimeout(this._t);
+    this.setState({ toast: msg });
+    this._t = setTimeout(() => this.setState({ toast: null }), 2200);
+  }
+  componentWillUnmount() { clearTimeout(this._t); }
+
+  totals(pkg) {
+    let signing = 0, filing = 0;
+    pkg.lines.forEach(l => { if (l.kind === 'gov') filing += Number(l.amount) || 0; else signing += Number(l.amount) || 0; });
+    return { signing, filing };
+  }
+
+  patchLine(pid, id, patch) {
+    this.setState(s => ({ pkgs: s.pkgs.map(p => p.id !== pid ? p : { ...p, lines: p.lines.map(l => l.id !== id ? l : { ...l, ...patch }) }) }));
+  }
+  removeLine(pid, id) {
+    this.setState(s => ({ pkgs: s.pkgs.map(p => p.id !== pid ? p : { ...p, lines: p.lines.filter(l => l.id !== id) }) }));
+  }
+  addLine(item) {
+    const pid = this.state.editPkg;
+    this.setState(s => ({
+      nextId: s.nextId + 1,
+      pkgs: s.pkgs.map(p => p.id !== pid ? p : { ...p, lines: p.lines.concat([{ id: s.nextId, label: item.label, kind: item.kind, amount: item.amount }]) })
+    }));
+    this.note(item.label + ' added');
+  }
+  toggleOffer(pid) {
+    const offered = this.state.pkgs.filter(p => p.offered);
+    const target = this.state.pkgs.find(p => p.id === pid);
+    if (target.offered && offered.length === 1) { this.note('At least one package has to be offered'); return; }
+    this.setState(s => ({ pkgs: s.pkgs.map(p => p.id !== pid ? p : { ...p, offered: !p.offered }), pick: s.pick === pid ? null : s.pick }));
+  }
+
+  send() {
+    if (this.state.status !== 'draft') { this.note('Already sent — the link is live'); return; }
+    this.setState({ status: 'sent' });
+    this.stamp('Sent to nadia@halcyonrowe.com');
+    this.note('Quote sent. The client link is live.');
+  }
+  copyLink() { this.note('Link copied — rpb.law/q/7f3a9c21'); }
+
+  clientOpen() {
+    if (this.state.opened) return;
+    this.setState({ opened: true });
+    this.stamp('Client opened the link');
+  }
+  pickPkg(id) { this.clientOpen(); this.setState({ pick: id }); }
+  toggleAddon(id) {
+    this.clientOpen();
+    this.setState(s => ({ chosenAddons: s.chosenAddons.indexOf(id) > -1 ? s.chosenAddons.filter(x => x !== id) : s.chosenAddons.concat([id]) }));
+  }
+
+  accept() {
+    const s = this.state;
+    const needName = this.props.requireTypedName !== false;
+    if (!s.pick) { this.note('Choose a package first'); return; }
+    if (needName && s.signName.trim().length < 3) { this.note('Type your full name to sign'); return; }
+    const pkg = s.pkgs.find(p => p.id === s.pick);
+    const t = this.totals(pkg);
+    const chosen = s.addons.filter(a => a.offered && s.chosenAddons.indexOf(a.id) > -1);
+    const addonSum = chosen.reduce((n, a) => n + (Number(a.amount) || 0), 0);
+    const lines = pkg.lines.filter(l => l.kind === 'legal').map(l => ({ label: l.label, amount: l.amount }))
+      .concat(chosen.map(a => ({ label: a.label, amount: a.amount })))
+      .concat(pkg.lines.filter(l => l.kind === 'gov').map(l => ({ label: l.label + ' (at filing)', amount: l.amount })));
+    this.setState({
+      status: 'accepted',
+      signedAt: new Date().toLocaleString('en-US', { month: 'short', day: 'numeric' }),
+      snapshot: { pkgName: pkg.name, signing: t.signing + addonSum, filing: t.filing, lines, name: (s.signName.trim() || 'Nadia Petra') }
+    });
+    this.stamp('Accepted and signed — ' + pkg.name);
+    this.note('Signed. Matter opens automatically.');
+  }
+
+  reset() { clearTimeout(this._t); this.setState(this.initialState()); }
+
+  renderVals() {
+    const s = this.state, P = this.props;
+    const locked = s.status === 'accepted';
+    const govLocked = P.govFeesLocked !== false;
+    const pkg = s.pkgs.find(p => p.id === s.editPkg) || s.pkgs[0];
+    const t = this.totals(pkg);
+
+    const statusMap = {
+      draft: ['Draft', 'background:var(--surface2);color:var(--mute)'],
+      sent: ['Sent', 'background:var(--oxbg);color:var(--ox)'],
+      accepted: ['Accepted', 'background:var(--okbg);color:var(--ok)']
+    };
+
+    const tabs = s.pkgs.map(p => {
+      const tt = this.totals(p);
+      const on = p.id === s.editPkg;
+      return {
+        name: p.name, signing: this.short(tt.signing), filing: this.short(tt.filing),
+        tabStyle: on ? 'border:1px solid var(--ox);background:var(--oxbg)' : 'border:1px solid var(--line);background:var(--surface)',
+        switchStyle: p.offered ? 'background:var(--ox)' : 'background:var(--line)',
+        knobStyle: p.offered ? 'left:16px' : 'left:2px',
+        onSelect: () => this.setState({ editPkg: p.id }),
+        onToggle: e => { e.stopPropagation(); this.toggleOffer(p.id); }
+      };
+    });
+
+    const lines = pkg.lines.map(l => {
+      const gov = l.kind === 'gov';
+      return {
+        label: l.label, amount: l.amount, locked,
+        when: gov ? 'At filing' : 'At signing',
+        whenStyle: gov ? 'background:var(--warnbg);color:var(--warn);cursor:' + (govLocked ? 'not-allowed' : 'pointer')
+                       : 'background:var(--surface2);color:var(--mute)',
+        whenHint: gov ? (govLocked ? 'Government fees are fixed to filing' : 'Click to move this fee to signing') : 'Legal fees are charged at signing',
+        onWhen: gov && !govLocked && !locked
+          ? () => { this.patchLine(pkg.id, l.id, { kind: 'legal' }); this.note('Moved to signing — override recorded'); }
+          : () => this.note(gov ? 'Government fees can only be charged at filing' : 'Legal fees are charged at signing'),
+        onLabel: e => this.patchLine(pkg.id, l.id, { label: e.target.value }),
+        onAmount: e => this.patchLine(pkg.id, l.id, { amount: e.target.value === '' ? 0 : Number(e.target.value) }),
+        onRemove: () => { if (locked) { this.note('Accepted quotes are frozen'); return; } this.removeLine(pkg.id, l.id); }
+      };
+    });
+
+    const library = [
+      { label: 'Clearance search', amount: 1450, kind: 'legal' },
+      { label: 'Filing, per class', amount: 900, kind: 'legal' },
+      { label: 'Office action response', amount: 1200, kind: 'legal' },
+      { label: 'Statement of use', amount: 650, kind: 'legal' },
+      { label: 'USPTO fee, per class', amount: 350, kind: 'gov' }
+    ].map(item => ({
+      label: item.label, price: this.short(item.amount),
+      style: item.kind === 'gov' ? 'color:var(--warn)' : '',
+      onAdd: () => { if (locked) { this.note('Accepted quotes are frozen'); return; } this.addLine(item); }
+    }));
+
+    const addons = s.addons.map(a => ({
+      label: a.label, amount: a.amount, locked,
+      offerLabel: a.offered ? 'At signing · offered' : 'Not offered',
+      cardStyle: a.offered ? 'border:1px solid var(--ox)' : 'border:1px solid var(--line);opacity:.6',
+      switchStyle: a.offered ? 'background:var(--ox)' : 'background:var(--line)',
+      knobStyle: a.offered ? 'left:16px' : 'left:2px',
+      onToggle: () => this.setState(st => ({ addons: st.addons.map(x => x.id !== a.id ? x : { ...x, offered: !x.offered }), chosenAddons: st.chosenAddons.filter(id => id !== a.id) })),
+      onAmount: e => this.setState(st => ({ addons: st.addons.map(x => x.id !== a.id ? x : { ...x, amount: e.target.value === '' ? 0 : Number(e.target.value) }) }))
+    }));
+
+    const offeredPkgs = s.pkgs.filter(p => p.offered);
+    const clientPkgs = offeredPkgs.map(p => {
+      const tt = this.totals(p);
+      const on = s.pick === p.id;
+      return {
+        name: p.name, blurb: p.blurb, price: this.short(tt.signing),
+        style: on ? 'border:1px solid var(--ox);background:var(--blush)' : 'border:1px solid var(--line);background:var(--surface)',
+        onPick: () => this.pickPkg(p.id)
+      };
+    });
+
+    const offeredAddons = s.addons.filter(a => a.offered);
+    const clientAddons = offeredAddons.map(a => {
+      const on = s.chosenAddons.indexOf(a.id) > -1;
+      return {
+        label: a.label, price: this.short(a.amount),
+        style: on ? 'border:1px solid var(--ox);background:var(--blush)' : 'border:1px solid var(--line);background:var(--surface)',
+        boxStyle: on ? 'background:var(--ox);border:1px solid var(--ox)' : 'border:1px solid var(--line)',
+        dotStyle: on ? 'background:var(--cream)' : 'background:transparent',
+        onToggle: () => this.toggleAddon(a.id)
+      };
+    });
+
+    const picked = s.pkgs.find(p => p.id === s.pick);
+    const pt = picked ? this.totals(picked) : { signing: 0, filing: 0 };
+    const addonSum = s.addons.filter(a => a.offered && s.chosenAddons.indexOf(a.id) > -1).reduce((n, a) => n + (Number(a.amount) || 0), 0);
+    const needName = P.requireTypedName !== false;
+    const canAccept = !!picked && (!needName || s.signName.trim().length >= 3);
+    const snap = s.snapshot || { pkgName: '', signing: 0, filing: 0, lines: [], name: '' };
+
+    const theme = P.theme === 'dark' ? 'dark' : 'light';
+
+    return {
+      theme,
+      logoLight: theme === 'dark' ? 'none' : 'block',
+      logoDark: theme === 'dark' ? 'block' : 'none',
+      reset: () => this.reset(),
+      send: () => this.send(),
+      copyLink: () => this.copyLink(),
+      accept: () => this.accept(),
+      download: () => this.note('Signed PDF downloaded'),
+      statusLabel: statusMap[s.status][0],
+      statusPillStyle: statusMap[s.status][1],
+      editingName: pkg.name,
+      tabs, lines, library, addons,
+      govNotice: govLocked
+        ? 'Government fees can only be charged at filing. The charge schedule on those lines is fixed — clicking the pill tells you so.'
+        : 'Override is on: clicking a filing pill moves that government fee to signing and records the override.',
+      signingTotal: this.money(t.signing),
+      filingTotal: this.money(t.filing),
+      combinedTotal: this.money(t.signing + t.filing),
+      showCombined: P.showCombinedTotal !== false,
+      isAccepted: locked,
+      acceptedSummary: locked ? snap.name + ' accepted ' + snap.pkgName + ' — ' + this.money(snap.signing) + ' charged at signing, ' + this.money(snap.filing) + ' held for filing. This quote is now read-only.' : '',
+      sendLabel: s.status === 'draft' ? 'Send to client' : (locked ? 'Accepted · matter open' : 'Sent · awaiting client'),
+      sendStyle: s.status === 'draft'
+        ? 'background:var(--ox);color:var(--cream);cursor:pointer'
+        : 'background:var(--surface);border:1px solid var(--line);color:var(--mute);cursor:default',
+      events: s.events.slice().reverse(),
+      token: '7f3a9c21',
+      clientStateLabel: s.status === 'draft' ? 'not sent yet' : (locked ? 'accepted' : 'live'),
+      clientLocked: s.status === 'draft',
+      clientLive: s.status === 'sent',
+      clientAccepted: locked,
+      clientHeaderNote: locked ? 'Signed ' + (s.signedAt || '') + ' · ' + this.now() + ' ET' : 'Sent to you by link. No account, no login.',
+      clientPkgs, clientAddons,
+      hasClientAddons: offeredAddons.length > 0,
+      dueToday: picked ? this.money(pt.signing + addonSum) : '—',
+      dueTodayStyle: picked ? '' : 'color:var(--mute)',
+      dueTodayNote: picked ? 'Legal fees for ' + picked.name + '. Charged when you sign.' : 'Choose a package above before accepting.',
+      dueLater: this.money(pt.filing),
+      needsName: needName,
+      signName: s.signName,
+      onSignName: e => { this.clientOpen(); this.setState({ signName: e.target.value }); },
+      acceptStyle: canAccept
+        ? 'background:var(--ox);color:var(--cream);cursor:pointer'
+        : 'background:var(--surface2);border:1px solid var(--line);color:var(--mute);cursor:pointer',
+      acceptHint: canAccept ? 'Card details are collected on the next screen.' : (picked ? 'Type your full name to enable signing.' : 'Pick a package to see what is due today.'),
+      acceptedTitle: snap.pkgName + ' — HALCYON ROWE',
+      acceptedSigning: this.money(snap.signing),
+      acceptedFiling: this.money(snap.filing),
+      acceptedDate: s.signedAt || '',
+      acceptedLines: snap.lines.map(l => ({ label: l.label, amount: this.money(l.amount) })),
+      signedName: snap.name,
+      toast: s.toast || '',
+      hasToast: !!s.toast
+    };
+  }
+}
+
+</script>
+</body>
+</html>
