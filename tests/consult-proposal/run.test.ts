@@ -342,6 +342,81 @@ describe("runConsultProposal", () => {
   });
 });
 
+describe("runConsultProposal failure handling", () => {
+  function logged(spy: { mock: { calls: unknown[][] } }): Array<Record<string, unknown>> {
+    return spy.mock.calls.map((c: unknown[]) => JSON.parse(String(c[0])) as Record<string, unknown>).filter((l: Record<string, unknown>) => l.event === "consult_proposal_failed");
+  }
+
+  it("a throw while reading the settings is logged with its stage and refused with a sentence, never rethrown", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const t = setup();
+    const base = handler();
+    const db = fakeAdmin((q) => {
+      if (q.table === "client_proposal_setting") throw new Error("connect ECONNRESET for sevetri@example.com");
+      return base(q);
+    });
+    const r = await runConsultProposal({ ...t.input, db: db.client as unknown as SupabaseClient });
+    expect(r).toMatchObject({ ok: false, reason: "unavailable" });
+    if (!r.ok) expect(r.message).toMatch(/nothing was sent/i);
+    const [line] = logged(spy);
+    expect(line).toMatchObject({ event: "consult_proposal_failed", stage: "settings", name: "Error" });
+    expect(JSON.stringify(line)).not.toContain("sevetri@example.com");
+    spy.mockRestore();
+  });
+
+  it("an origin the email rules refuse (http) withdraws the proposal and says why, naming the address", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const t = setup({}, { origin: "http://app.example.com" });
+    const r = await runConsultProposal(t.input);
+    expect(r).toMatchObject({ ok: false, reason: "unavailable" });
+    if (!r.ok) {
+      expect(r.message).toMatch(/must start with https/i);
+      expect(r.message).toContain("http://app.example.com");
+      expect(r.message).toMatch(/nothing was sent/i);
+    }
+    expect(writes(t.db.log, "client_proposal", "update")[0].values).toEqual({ status: "withdrawn" });
+    expect(t.createDraft).not.toHaveBeenCalled();
+    expect(logged(spy)[0]).toMatchObject({ stage: "email", name: "ProposalEmailError" });
+    spy.mockRestore();
+  });
+
+  it("a queue HTTP rejection says the queue didn't accept the draft, with the status", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const t = setup();
+    (t.input.createDraft as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("Queue API 401: Unauthorized"));
+    const r = await runConsultProposal(t.input);
+    expect(r).toMatchObject({ ok: false, reason: "queue_failed" });
+    if (!r.ok) expect(r.message).toMatch(/approval queue didn't accept the draft \(it answered HTTP 401\)/);
+    expect(logged(spy)[0]).toMatchObject({ stage: "queue" });
+    expect(writes(t.db.log, "client_proposal", "update")[0].values).toEqual({ status: "withdrawn" });
+    spy.mockRestore();
+  });
+
+  it("a throw while writing the marker withdraws the proposal instead of leaving it live", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const t = setup();
+    const base = handler();
+    const db = fakeAdmin((q) => {
+      if (q.table === "crm_activity" && q.action === "insert") throw new Error("socket hang up");
+      return base(q);
+    });
+    const r = await runConsultProposal({ ...t.input, db: db.client as unknown as SupabaseClient });
+    expect(r).toMatchObject({ ok: false, reason: "link_failed" });
+    expect(writes(db.log, "client_proposal", "update")[0].values).toEqual({ status: "withdrawn" });
+    expect(logged(spy).every((l) => l.stage === "marker")).toBe(true);
+    spy.mockRestore();
+  });
+
+  it("a proposal that can't be saved logs the insert stage and says so", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const t = setup({ proposalInsertFails: true });
+    const r = await runConsultProposal(t.input);
+    if (!r.ok) expect(r.message).toMatch(/step: insert/);
+    expect(logged(spy)[0]).toMatchObject({ stage: "insert" });
+    spy.mockRestore();
+  });
+});
+
 describe("queueSummary", () => {
   const url = "https://app.example.com/dashboard/proposals/p-1/";
   const issues = [{ path: "names.0", level: "error" as const, message: "Add a class." }];

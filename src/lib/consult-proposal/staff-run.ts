@@ -6,6 +6,7 @@ import { getScopedClient } from "@/lib/db/scoped-client";
 import { createDraft } from "@/lib/queue/api";
 import { activeQueueOrgKey } from "@/lib/queue/org";
 import { getSiteOrigin } from "@/lib/site-origin";
+import { describeConsultFailure, logConsultFailure } from "./failure";
 import { runConsultProposal } from "./run";
 import type { ConsultLead, ConsultSource } from "./types";
 
@@ -26,15 +27,22 @@ export async function draftProposalForStaff(args: {
   lead: ConsultLead;
   matterId: string | null;
 }): Promise<StaffDraftResult> {
-  const orgKey = await activeQueueOrgKey();
-  if (!orgKey) return { ok: false, error: "No approval queue is connected for your firm, so nothing was drafted." };
-  if (!aiConfigured()) return { ok: false, error: "Drafting isn't set up on this deployment yet." };
-
+  // Everything here can throw (a missing server env var, a cookie read, a header
+  // read), so all of it is inside one guard that names the stage and logs it.
+  // `runConsultProposal` never throws; it logs and refuses on its own.
+  let origin: string | null = null;
   let result: Awaited<ReturnType<typeof runConsultProposal>>;
   try {
+    const orgKey = await activeQueueOrgKey();
+    if (!orgKey) return { ok: false, error: "No approval queue is connected for your firm, so nothing was drafted." };
+    if (!aiConfigured()) return { ok: false, error: "Drafting isn't set up on this deployment yet." };
+
+    const db = await getScopedClient();
+    const admin = getAdminClient();
+    origin = await getSiteOrigin();
     result = await runConsultProposal({
-      db: await getScopedClient(),
-      admin: getAdminClient(),
+      db,
+      admin,
       orgId: args.orgId,
       actorUserId: args.userId,
       source: args.source,
@@ -43,10 +51,11 @@ export async function draftProposalForStaff(args: {
       llm: callClaude,
       createDraft,
       queueOrgKey: orgKey,
-      origin: await getSiteOrigin(),
+      origin,
     });
-  } catch {
-    return { ok: false, error: "The proposal couldn't be drafted. Nothing was sent. Try again shortly." };
+  } catch (err) {
+    logConsultFailure("env", err);
+    return { ok: false, error: describeConsultFailure("env", err, { origin }) };
   }
   if (!result.ok) return { ok: false, error: result.message };
 

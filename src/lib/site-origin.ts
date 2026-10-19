@@ -1,6 +1,7 @@
 import "server-only";
 import { headers } from "next/headers";
 import { env } from "@/lib/env";
+import { resolveSiteOrigin } from "@/lib/site-origin-resolve";
 
 /**
  * The origin to build magic-link redirects against.
@@ -18,15 +19,22 @@ import { env } from "@/lib/env";
  */
 export async function getSiteOrigin(): Promise<string> {
   const hdrs = await headers();
-
-  const origin = hdrs.get("origin");
-  if (origin) return origin.replace(/\/$/, "");
-
-  const host = hdrs.get("x-forwarded-host") ?? hdrs.get("host");
-  if (host) {
-    const proto = hdrs.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-    return `${proto}://${host}`;
-  }
-
-  return env.SITE_URL?.replace(/\/$/, "") ?? "http://localhost:3000";
+  // Optional deployment hints: read through a guard, never a reason to throw.
+  const read = (get: () => string | undefined): string | null => {
+    try {
+      return get() ?? null;
+    } catch {
+      return null;
+    }
+  };
+  // Pure rules (https only for a deployed host, "null" origins ignored) live in site-origin-resolve.ts.
+  return resolveSiteOrigin({
+    origin: hdrs.get("origin"),
+    forwardedHost: hdrs.get("x-forwarded-host"),
+    host: hdrs.get("host"),
+    forwardedProto: hdrs.get("x-forwarded-proto"),
+    siteUrl: read(() => env.SITE_URL),
+    vercelProductionHost: read(() => env.VERCEL_PROJECT_PRODUCTION_URL),
+    vercelHost: read(() => env.VERCEL_URL),
+  });
 }

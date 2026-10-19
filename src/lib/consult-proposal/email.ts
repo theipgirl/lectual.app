@@ -114,7 +114,17 @@ export function proposalLinkTitle(clientFullName: string): string {
   return name ? `${name} Trademark Proposal` : "Your Trademark Proposal";
 }
 
-export class ProposalEmailError extends Error {}
+/** Which rule a refused link or sign-off broke, so a caller can say so without parsing the message. */
+export type ProposalEmailRule = "invalid_url" | "claude_link" | "not_https" | "credentials" | "no_sign_off";
+
+export class ProposalEmailError extends Error {
+  readonly rule: ProposalEmailRule;
+  constructor(message: string, rule: ProposalEmailRule) {
+    super(message);
+    this.name = "ProposalEmailError";
+    this.rule = rule;
+  }
+}
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
@@ -127,17 +137,17 @@ export function checkProposalUrl(value: string): string {
   try {
     url = new URL(value.trim());
   } catch {
-    throw new ProposalEmailError("The proposal link is not a valid address.");
+    throw new ProposalEmailError("The proposal link is not a valid address.", "invalid_url");
   }
   const host = url.hostname.toLowerCase();
   if (host === "claude.ai" || host.endsWith(".claude.ai")) {
-    throw new ProposalEmailError("The proposal link must be the firm's proposal page, never a claude.ai link.");
+    throw new ProposalEmailError("The proposal link must be the firm's proposal page, never a claude.ai link.", "claude_link");
   }
   const local = LOCAL_HOSTS.has(host);
   if (url.protocol !== "https:" && !(url.protocol === "http:" && local)) {
-    throw new ProposalEmailError("The proposal link must be an https:// address.");
+    throw new ProposalEmailError("The proposal link must be an https:// address.", "not_https");
   }
-  if (url.username || url.password) throw new ProposalEmailError("The proposal link must not carry credentials.");
+  if (url.username || url.password) throw new ProposalEmailError("The proposal link must not carry credentials.", "credentials");
   return url.toString();
 }
 
@@ -187,7 +197,7 @@ export function renderProposalEmail(
   const url = checkProposalUrl(opts.proposalUrl);
   // The template already says "Best,": a sign-off that brings its own is cut back to the name.
   const signOff = opts.signOff.replace(/\r\n?/g, "\n").replace(/^\s*best(?:\s+regards)?\s*,?\s*\n+/i, "").trim();
-  if (!signOff) throw new ProposalEmailError("The email needs the firm's sign-off.");
+  if (!signOff) throw new ProposalEmailError("The email needs the firm's sign-off.", "no_sign_off");
 
   let template = isUsableEmailTemplate(opts.template) ? opts.template : DEFAULT_PROPOSAL_EMAIL_TEMPLATE;
   template = template.replace(/\r\n?/g, "\n");

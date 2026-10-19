@@ -10,6 +10,7 @@ import { standardProposalPricing } from "@/lib/proposals/types";
 import type { ValidationIssue } from "@/lib/proposals/validate";
 import { draftProposalFromConsult } from "./draft";
 import { renderProposalEmail } from "./email";
+import { describeConsultFailure, logConsultFailure, type ConsultStage } from "./failure";
 import { CONSULT_PROPOSAL_SOURCE, firmSignatureName, firmTeamSignOff, pasteHash } from "./shared";
 import { MAX_PASTED_TRANSCRIPT_CHARS, type ConsultLead, type ConsultSource } from "./types";
 
@@ -132,11 +133,38 @@ async function alreadyHandled(input: ConsultProposalRunInput, meetingId: string 
     .eq("payload->>source", CONSULT_PROPOSAL_SOURCE);
   q = meetingId ? q.eq("payload->>meeting_id", meetingId) : q.eq("payload->>paste_sha256", hash as string);
   const { data, error } = await q.limit(1);
-  if (error) return "failed";
+  if (error) {
+    logDbError("check", error);
+    return "failed";
+  }
   return (data ?? []).length > 0;
 }
 
+/** Where the run is, so a throw can be named and any half-made proposal withdrawn. */
+type Progress = { stage: ConsultStage; proposalId: string | null };
+
+/**
+ * Never throws. An unexpected throw at any stage is logged (stage, error name
+ * and a scrubbed message; see failure.ts), any proposal already saved is
+ * withdrawn, and the caller gets a refusal that says what failed.
+ */
 export async function runConsultProposal(input: ConsultProposalRunInput): Promise<ConsultProposalResult> {
+  const progress: Progress = { stage: "check", proposalId: null };
+  try {
+    return await runStages(input, progress);
+  } catch (err) {
+    logConsultFailure(progress.stage, err);
+    if (progress.proposalId) await withdrawQuietly(input.db, input.orgId, progress.proposalId);
+    return refuse("unavailable", describeConsultFailure(progress.stage, err, { origin: input.origin }));
+  }
+}
+
+/** A database error the caller gets as a value (not a throw): log it under its stage. */
+function logDbError(stage: ConsultStage, error: unknown): void {
+  logConsultFailure(stage, error);
+}
+
+async function runStages(input: ConsultProposalRunInput, progress: Progress): Promise<ConsultProposalResult> {
   const { db, admin, orgId, source, lead } = input;
   const now = input.now ?? Date.now;
   const meetingId = source.kind === "meeting" ? source.meetingId : null;
@@ -149,6 +177,7 @@ export async function runConsultProposal(input: ConsultProposalRunInput): Promis
   }
   const hash = source.kind === "pasted" ? pasteHash(source.text) : null;
 
+  progress.stage = "check";
   const handled = await alreadyHandled(input, meetingId, hash);
   if (handled === "failed") return refuse("unavailable", "Couldn't check for an earlier draft. Nothing was drafted. Try again shortly.");
   if (handled) return refuse("already_drafted", "A proposal and email for this call have already been drafted. Find them in the approval queue.");
@@ -156,11 +185,13 @@ export async function runConsultProposal(input: ConsultProposalRunInput): Promis
   // The firm's standard prices and its approvers. No settings or nobody to
   // approve = nothing is drafted: a proposal no one is allowed to approve is a
   // dead end, and prices are never invented.
+  progress.stage = "settings";
   const { data: setting, error: settingErr } = await db
     .from("client_proposal_setting")
     .select("approver_user_ids, default_pay_url, pricing")
     .eq("org_id", orgId)
     .maybeSingle();
+  if (settingErr) logDbError("settings", settingErr);
   if (settingErr) return refuse("unavailable", "Couldn't read the proposal settings. Nothing was drafted. Try again shortly.");
   if (!setting) return refuse("no_settings", "Your firm hasn't set up its proposal prices yet (Settings, then Client proposals), so nothing was drafted.");
   const approvers = (setting as Row).approver_user_ids;
@@ -182,6 +213,7 @@ export async function runConsultProposal(input: ConsultProposalRunInput): Promis
   }
   const firmName = firmSignatureName(orgName, firmSlug) as string;
 
+  progress.stage = "draft";
   let draft: Awaited<ReturnType<typeof draftProposalFromConsult>>;
   try {
     draft = await draftProposalFromConsult({
@@ -193,7 +225,8 @@ export async function runConsultProposal(input: ConsultProposalRunInput): Promis
       today: firmCivilDate(new Date(now()), tz),
       llm: input.llm,
     });
-  } catch {
+  } catch (err) {
+    logConsultFailure("draft", err);
     return refuse("ai_failed", "The proposal couldn't be written. Nothing was drafted. Try again shortly.");
   }
   if (!draft.ok) {
@@ -223,6 +256,7 @@ export async function runConsultProposal(input: ConsultProposalRunInput): Promis
 
   // 1. The proposal: a DRAFT, source 'agent'. Not visible to the client; it
   //    needs a named approver and then "Mark as sent" before its link works.
+  progress.stage = "insert";
   let proposal: Awaited<ReturnType<typeof insertAgentProposal>>;
   try {
     proposal = await insertAgentProposal(db as unknown as ProposalsDbClient, {
@@ -237,11 +271,14 @@ export async function runConsultProposal(input: ConsultProposalRunInput): Promis
       expiresOn: draft.expiresOn,
       payUrl: draft.payUrl,
     });
-  } catch {
-    return refuse("proposal_failed", "The proposal couldn't be saved. Nothing was drafted. Try again shortly.", draft.costUsd);
+  } catch (err) {
+    logConsultFailure("insert", err);
+    return refuse("proposal_failed", `${describeConsultFailure("insert", err)}`, draft.costUsd);
   }
+  progress.proposalId = proposal.id;
 
   // 2. What the agent relied on, for the approver (best effort; the notes are also on the queue item).
+  progress.stage = "event";
   await recordConsultDraftEvent(admin as unknown as ProposalsDbClient, proposal, {
     source: CONSULT_PROPOSAL_SOURCE,
     evidence: draft.evidence,
@@ -250,6 +287,7 @@ export async function runConsultProposal(input: ConsultProposalRunInput): Promis
   });
 
   // 3. The email, with the client link, into the approval queue.
+  progress.stage = "email";
   const origin = input.origin.replace(/\/$/, "");
   const proposalUrl = `${origin}/p/${proposal.public_token}/`;
   const staffUrl = `${origin}/dashboard/proposals/${proposal.id}/`;
@@ -257,16 +295,14 @@ export async function runConsultProposal(input: ConsultProposalRunInput): Promis
   try {
     email = renderProposalEmail(draft, { proposalUrl, signOff: teamSignOff });
   } catch (err) {
+    logConsultFailure("email", err);
     await withdrawQuietly(db, orgId, proposal.id);
-    return refuse(
-      "unavailable",
-      `The email couldn't be written (${err instanceof Error ? err.message : "unknown problem"}), so the proposal was withdrawn and nothing is waiting.`,
-      draft.costUsd,
-    );
+    return refuse("unavailable", `${describeConsultFailure("email", err, { origin })}`, draft.costUsd);
   }
   const testPrefix = input.testPrefix ?? (process.env.VERCEL_ENV === "production" ? "" : "[TEST] ");
   const summary = queueSummary(draft.reviewerNotes, staffUrl, draft.issues);
 
+  progress.stage = "queue";
   let queueId: string;
   try {
     ({ id: queueId } = await input.createDraft({
@@ -281,11 +317,13 @@ export async function runConsultProposal(input: ConsultProposalRunInput): Promis
       draftBody: email.body,
       ...(input.matterId ? { matterId: input.matterId } : {}),
     }));
-  } catch {
+  } catch (err) {
+    logConsultFailure("queue", err);
     await withdrawQuietly(db, orgId, proposal.id);
-    return refuse("queue_failed", "The email couldn't be queued, so the proposal was withdrawn and nothing is waiting. Try again shortly.", draft.costUsd);
+    return refuse("queue_failed", describeConsultFailure("queue", err), draft.costUsd);
   }
 
+  progress.stage = "marker";
   // 4. The marker: idempotency AND the approve gate's only way to find the proposal.
   const marker = {
     org_id: orgId,
@@ -305,8 +343,13 @@ export async function runConsultProposal(input: ConsultProposalRunInput): Promis
   };
   let written = false;
   for (let attempt = 0; attempt < 2 && !written; attempt += 1) {
-    const { error } = await db.from("crm_activity").insert(marker);
-    written = !error;
+    try {
+      const { error } = await db.from("crm_activity").insert(marker);
+      if (error) logDbError("marker", error);
+      written = !error;
+    } catch (err) {
+      logConsultFailure("marker", err);
+    }
   }
   if (!written) {
     // Without the marker the approve gate can't find this proposal. Kill the

@@ -63,6 +63,10 @@ const fieldSchemas = {
   // Must match the Zoom app's registered redirect exactly. Unset = derived
   // from the request origin: <origin>/api/meetings/zoom/callback/.
   ZOOM_OAUTH_REDIRECT_URI: z.string().optional(),
+  // Set by Vercel itself (host only, no scheme). Last-resort site address when
+  // a call has no request and SITE_URL is unset; see src/lib/site-origin.ts.
+  VERCEL_PROJECT_PRODUCTION_URL: z.string().optional(),
+  VERCEL_URL: z.string().optional(),
 } as const;
 
 type FieldSchemas = typeof fieldSchemas;
@@ -70,9 +74,27 @@ type Env = { [K in keyof FieldSchemas]: z.infer<FieldSchemas[K]> };
 
 const cache = {} as Partial<Env>;
 
+/**
+ * A required variable that is unset or malformed. Carries the variable's NAME
+ * (never its value) so a failure says which one, where a bare ZodError only
+ * says "expected string, received undefined".
+ */
+export class EnvVarError extends Error {
+  readonly key: string;
+  constructor(key: string, readonly reason: "missing" | "invalid") {
+    super(`Environment variable ${key} is ${reason === "missing" ? "not set" : "invalid"}.`);
+    this.name = "EnvVarError";
+    this.key = key;
+  }
+}
+
 function getField<K extends keyof FieldSchemas>(key: K): Env[K] {
   if (!(key in cache)) {
-    cache[key] = fieldSchemas[key].parse(process.env[key]) as Env[K];
+    const parsed = fieldSchemas[key].safeParse(process.env[key]);
+    if (!parsed.success) {
+      throw new EnvVarError(key, process.env[key] === undefined || process.env[key] === "" ? "missing" : "invalid");
+    }
+    cache[key] = parsed.data as Env[K];
   }
   return cache[key] as Env[K];
 }
