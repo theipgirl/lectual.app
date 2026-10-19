@@ -1,5 +1,6 @@
 import "server-only";
 
+import { createHash, randomBytes } from "node:crypto";
 import { getAdminClient } from "@/lib/db/admin";
 import type { Database, Json } from "@/lib/db/types";
 import { aiConfigured, askClaude } from "@/lib/ai/claude";
@@ -8,9 +9,16 @@ import { publicPackages, type LibraryItem } from "./packages";
 import {
   answersNote,
   firstOpenIntakeStageId,
+  inferPracticeArea,
   leadFromSubmission,
+  markFromAnswer,
+  RESUME_TOKEN_SHAPE,
+  type ValidatedStart,
   type ValidatedSubmission,
 } from "./public-submit";
+import { PACKS } from "./config";
+import { leadSourceLabel } from "./details";
+import { parseContact } from "./submission";
 import { buildScreeningPrompt, parseScreening, SCREENING_SYSTEM } from "./screening";
 import { isRequestTokenShape } from "./request-token";
 import { isMissingTableError } from "./store";
@@ -62,13 +70,16 @@ function db(): Admin {
 
 type PgError = { code?: string; message?: string } | null | undefined;
 
-const FORM_COLUMNS = "id, org_id, slug, status, config, allowed_domains, receives_referrals";
+const FORM_COLUMNS = "id, org_id, name, slug, source_tag, status, config, allowed_domains, receives_referrals";
 
 /** Server-side only. Never pass this to a client component. */
 export type IntakeHandle = {
   formId: string;
   orgId: string;
   slug: string;
+  /** Staff's name for this intake and the tag its leads carry (0093). */
+  name: string;
+  sourceTag: string | null;
   config: IntakeFormConfig;
   orgName: string;
   receivesReferrals: boolean;
@@ -76,6 +87,7 @@ export type IntakeHandle = {
 
 export type PublicIntakeRead =
   | { status: "ok"; handle: IntakeHandle; view: PublicIntakeConfig; packages: { name: string; price: string; includes: string }[] }
+  | { status: "moved"; slug: string }
   | { status: "not_found" }
   | { status: "unconfigured" }
   | { status: "unavailable" };
@@ -88,9 +100,35 @@ async function orgName(admin: Admin, orgId: string): Promise<string | null> {
   return data?.name ?? null;
 }
 
+/**
+ * A link name the intake had before it was renamed (0093's alias table):
+ * where it lives now, if that intake is live. Printed QR codes keep working.
+ * The same rules as the slug read: exact match, live only, nothing else.
+ */
+async function movedTo(admin: Admin, slug: string): Promise<string | null> {
+  const { data: alias, error } = await admin
+    .from("crm_intake_form_slug_alias")
+    .select("form_id, org_id")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (error || !alias) return null;
+  const { data: form } = await admin
+    .from("crm_intake_form")
+    .select("slug")
+    .eq("id", alias.form_id)
+    .eq("org_id", alias.org_id)
+    .eq("status", "live")
+    .maybeSingle();
+  return form && form.slug !== slug ? form.slug : null;
+}
+
 /** The handle alone (for actions): the live form by slug, config parsed. */
 export async function readIntakeHandle(slug: string): Promise<
-  { status: "ok"; handle: IntakeHandle } | { status: "not_found" } | { status: "unconfigured" } | { status: "unavailable" }
+  | { status: "ok"; handle: IntakeHandle }
+  | { status: "moved"; slug: string }
+  | { status: "not_found" }
+  | { status: "unconfigured" }
+  | { status: "unavailable" }
 > {
   if (!SLUG_SHAPE.test(slug)) return { status: "not_found" };
   try {
@@ -102,7 +140,10 @@ export async function readIntakeHandle(slug: string): Promise<
       .eq("status", "live")
       .maybeSingle();
     if (error) return isMissingTableError(error) ? { status: "unconfigured" } : { status: "unavailable" };
-    if (!data) return { status: "not_found" };
+    if (!data) {
+      const now = await movedTo(admin, slug);
+      return now ? { status: "moved", slug: now } : { status: "not_found" };
+    }
     const name = await orgName(admin, data.org_id);
     if (!name) return { status: "not_found" };
     return {
@@ -111,6 +152,8 @@ export async function readIntakeHandle(slug: string): Promise<
         formId: data.id,
         orgId: data.org_id,
         slug: data.slug,
+        name: data.name,
+        sourceTag: data.source_tag,
         config: parseIntakeConfig(data.config),
         orgName: name,
         receivesReferrals: data.receives_referrals,
@@ -221,7 +264,7 @@ export async function submitPublicIntake(
 
   let leadId: string | null = null;
   try {
-    leadId = await createIntakeLead(admin, handle, sub, ctx.sourceHost, nowIso);
+    leadId = await createIntakeLead(admin, handle, sub, ctx.sourceHost, nowIso, "complete");
     if (leadId) {
       const { error: linkErr } = await admin
         .from("crm_intake_submission")
@@ -242,6 +285,7 @@ async function createIntakeLead(
   sub: ValidatedSubmission,
   sourceHost: string | null,
   nowIso: string,
+  stage: "started" | "complete",
 ): Promise<string | null> {
   const { data: stages, error: stageErr } = await admin
     .from("crm_stage")
@@ -251,7 +295,8 @@ async function createIntakeLead(
   const stageId = firstOpenIntakeStageId((stages ?? []) as Stage[]);
   if (!stageId) return null;
 
-  const fields = leadFromSubmission(sub, handle.config, sourceHost);
+  const source = leadSourceLabel(handle.name, handle.sourceTag);
+  const fields = leadFromSubmission(sub, handle.config, sourceHost, source);
   const { data: lead, error } = await admin
     .from("crm_lead")
     .insert({
@@ -274,7 +319,7 @@ async function createIntakeLead(
       type: "lead_created" as ActivityType,
       actor_id: null,
       actor_type: "system" as const,
-      payload: { summary: sub.contact.name, email: sub.contact.email, stage_id: stageId, source: "Intake form", mode: sub.mode },
+      payload: { summary: sub.contact.name, email: sub.contact.email, stage_id: stageId, source: "Intake form", intake: source, mode: sub.mode },
     },
     {
       org_id: handle.orgId,
@@ -283,7 +328,13 @@ async function createIntakeLead(
       actor_id: null,
       actor_type: "system" as const,
       payload: {
-        note: answersNote(`Intake form (${sub.mode === "conversation" ? "chat" : "form"}${sourceHost ? ` on ${sourceHost}` : ""})`, sub.answers, sub.contact),
+        note: answersNote(
+          `${stage === "started" ? "Started" : "Intake"}: ${source} (${sub.mode === "conversation" ? "chat" : "form"}${sourceHost ? ` on ${sourceHost}` : ""})${
+            stage === "started" ? " · contact details only so far" : ""
+          }`,
+          sub.answers,
+          sub.contact,
+        ),
         source: "intake-form",
       },
     },
@@ -291,6 +342,159 @@ async function createIntakeLead(
   const { error: actErr } = await admin.from("crm_activity").insert(activity);
   if (actErr) console.error("[intake] lead timeline write failed", actErr.code);
   return lead.id;
+}
+
+// ── contact-first (0093) ─────────────────────────────────────────────────────
+
+/**
+ * The browser keeps a random token between the contact step and the answers
+ * step; the row keeps only its sha256. Whoever holds the token can add the
+ * answers to that one row, once — nothing else.
+ */
+function resumeHash(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+export type StartOutcome = { ok: true; submissionId: string; token: string; leadId: string | null } | { ok: false };
+
+/**
+ * The contact step: files the person (contact + consent) as an unfinished
+ * submission (`submitted_at` null) and creates their lead now, so walking away
+ * before the questions still leaves the firm someone to follow up.
+ */
+export async function startPublicIntake(
+  handle: IntakeHandle,
+  start: ValidatedStart,
+  ctx: { sourceHost: string | null; startedAt: number; now: Date },
+): Promise<StartOutcome> {
+  const admin = db();
+  const nowIso = ctx.now.toISOString();
+  const token = randomBytes(32).toString("base64url");
+  const { data: row, error } = await admin
+    .from("crm_intake_submission")
+    .insert({
+      org_id: handle.orgId,
+      form_id: handle.formId,
+      mode: start.mode,
+      contact: start.contact as unknown as Json,
+      answers: [] as unknown as Json,
+      source_host: ctx.sourceHost,
+      started_at: new Date(Math.min(ctx.startedAt, ctx.now.getTime())).toISOString(),
+      submitted_at: null,
+      last_active_at: nowIso,
+      resume_hash: resumeHash(token),
+    })
+    .select("id")
+    .single();
+  if (error || !row) {
+    console.error("[intake] start insert failed", error?.code ?? "unknown");
+    return { ok: false };
+  }
+
+  let leadId: string | null = null;
+  try {
+    leadId = await createIntakeLead(admin, handle, { mode: start.mode, contact: start.contact, answers: [] }, ctx.sourceHost, nowIso, "started");
+    if (leadId) {
+      const { error: linkErr } = await admin
+        .from("crm_intake_submission")
+        .update({ lead_id: leadId })
+        .eq("id", row.id)
+        .eq("org_id", handle.orgId);
+      if (linkErr) console.error("[intake] lead link failed", linkErr.code);
+    }
+  } catch (e) {
+    console.error("[intake] lead creation failed", (e as PgError)?.code ?? "unknown");
+  }
+  return { ok: true, submissionId: row.id, token, leadId };
+}
+
+export type CompleteOutcome =
+  | { ok: true; submissionId: string; submission: ValidatedSubmission; alreadyDone: boolean }
+  | { ok: false; reason: "not_found" | "failed" };
+
+/**
+ * The answers step: adds the answers to the row the token was issued for, on
+ * this form, if it isn't finished yet. Fenced on org_id + form_id read from
+ * the live form, never on anything the browser sent but the token.
+ */
+export async function completeStartedIntake(
+  handle: IntakeHandle,
+  token: string,
+  answers: ValidatedSubmission["answers"],
+  mode: ValidatedSubmission["mode"],
+  now: Date,
+): Promise<CompleteOutcome> {
+  if (!RESUME_TOKEN_SHAPE.test(token)) return { ok: false, reason: "not_found" };
+  const admin = db();
+  const hash = resumeHash(token);
+  const nowIso = now.toISOString();
+  const { data, error } = await admin
+    .from("crm_intake_submission")
+    .update({ answers: answers as unknown as Json, mode, submitted_at: nowIso, last_active_at: nowIso })
+    .eq("org_id", handle.orgId)
+    .eq("form_id", handle.formId)
+    .eq("resume_hash", hash)
+    .is("submitted_at", null)
+    .select("id, lead_id, contact, source_host")
+    .maybeSingle();
+  if (error) {
+    console.error("[intake] completion failed", error.code);
+    return { ok: false, reason: "failed" };
+  }
+  if (!data) {
+    // A second Submit (double click, retry after a dropped response) finds it done.
+    const { data: done } = await admin
+      .from("crm_intake_submission")
+      .select("id, contact")
+      .eq("org_id", handle.orgId)
+      .eq("form_id", handle.formId)
+      .eq("resume_hash", hash)
+      .not("submitted_at", "is", null)
+      .maybeSingle();
+    if (!done) return { ok: false, reason: "not_found" };
+    return { ok: true, submissionId: done.id, submission: { mode, contact: parseContact(done.contact), answers }, alreadyDone: true };
+  }
+
+  const contact = parseContact(data.contact);
+  const submission: ValidatedSubmission = { mode, contact, answers };
+  if (data.lead_id) {
+    const source = leadSourceLabel(handle.name, handle.sourceTag);
+    const how = mode === "conversation" ? "chat" : "form";
+    const { error: actErr } = await admin.from("crm_activity").insert({
+      org_id: handle.orgId,
+      lead_id: data.lead_id,
+      type: "note" as ActivityType,
+      actor_id: null,
+      actor_type: "system" as const,
+      payload: {
+        note: answersNote(`Intake finished: ${source} (${how}${data.source_host ? ` on ${data.source_host}` : ""})`, answers),
+        source: "intake-form",
+      },
+    });
+    if (actErr) console.error("[intake] lead timeline write failed", actErr.code);
+    // What the answers make obvious, only where the lead has nothing yet.
+    const practice = inferPracticeArea(handle.config, answers);
+    if (practice) {
+      const { error: paErr } = await admin
+        .from("crm_lead")
+        .update({ practice_area: practice })
+        .eq("id", data.lead_id)
+        .eq("org_id", handle.orgId)
+        .is("practice_area", null);
+      if (paErr) console.error("[intake] practice area update failed", paErr.code);
+      const mark = practice === "Trademark" ? markFromAnswer(answers.find((a) => a.question === PACKS.Trademark[0])?.answer) : null;
+      if (mark) {
+        const { error: markErr } = await admin
+          .from("crm_lead")
+          .update({ mark_text: mark })
+          .eq("id", data.lead_id)
+          .eq("org_id", handle.orgId)
+          .is("mark_text", null);
+        if (markErr) console.error("[intake] mark update failed", markErr.code);
+      }
+    }
+  }
+  return { ok: true, submissionId: data.id, submission, alreadyDone: false };
 }
 
 /** Screened intakes per form per hour; see screenSubmission. */

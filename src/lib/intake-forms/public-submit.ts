@@ -149,6 +149,32 @@ export function validatePublicSubmission(raw: unknown, questions: readonly Quest
   return { ok: true, value: { mode, contact: c.contact, answers: a.answers } };
 }
 
+/**
+ * The contact step of a contact-first intake (0093): who they are and their
+ * consent, before any question. Filing this first means someone who stops
+ * halfway is still a lead the firm can follow up.
+ */
+export type ValidatedStart = { mode: SubmissionMode; contact: IntakeContact };
+
+export function validatePublicStart(
+  raw: unknown,
+): { ok: true; value: ValidatedStart } | { ok: false; errors: string[]; fields: string[] } {
+  if (!isRec(raw)) return { ok: false, errors: ["We couldn't read what you sent. Please try again."], fields: [] };
+  const mode: SubmissionMode = raw.mode === "conversation" ? "conversation" : "form";
+  const c = validateContact(raw.contact);
+  const errors = [...c.errors];
+  const fields = [...c.fields];
+  if (raw.consent !== true) {
+    errors.push("Please confirm we may contact you about your inquiry.");
+    fields.push("consent");
+  }
+  if (errors.length) return { ok: false, errors, fields };
+  return { ok: true, value: { mode, contact: c.contact } };
+}
+
+/** The resume token the browser holds between the contact and answers steps. */
+export const RESUME_TOKEN_SHAPE = /^[A-Za-z0-9_-]{43}$/;
+
 // ── lead mapping ─────────────────────────────────────────────────────────────
 
 /** "Jane Q. Doe" → ["Jane", "Q. Doe"]; one word is a first name. */
@@ -216,10 +242,15 @@ export type LeadFields = {
 
 export const INTAKE_REFERRAL_SOURCE = "Intake form";
 
+/**
+ * `source` is where the lead came from in the firm's own words: the intake's
+ * source tag ("UGW 2026") or its name (0093), and leads the referral detail.
+ */
 export function leadFromSubmission(
   sub: ValidatedSubmission,
   config: Pick<IntakeFormConfig, "questions" | "packs">,
   sourceHost: string | null,
+  source?: string | null,
 ): LeadFields {
   const { first, last } = splitName(sub.contact.name);
   const practice = inferPracticeArea(config, sub.answers);
@@ -234,7 +265,7 @@ export function leadFromSubmission(
     practice_area: practice,
     mark_text: practice === "Trademark" ? markFromAnswer(markAnswer) : null,
     referral_source: INTAKE_REFERRAL_SOURCE,
-    referral_detail: sourceHost ? `${how} on ${sourceHost}` : how,
+    referral_detail: [source?.trim() || null, sourceHost ? `${how} on ${sourceHost}` : how].filter(Boolean).join(" · "),
   };
 }
 

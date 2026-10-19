@@ -21,8 +21,10 @@ import {
 import { checklistComplete, goLiveChecklist, type ChecklistSection } from "@/lib/intake-forms/checklist";
 import { intakeEmbedSnippet, intakePublicUrl } from "@/lib/intake-forms/links";
 import type { IntakeFormRecord } from "@/lib/intake-forms/store";
+import { DETAIL_LIMITS, type IntakeDetails } from "@/lib/intake-forms/details";
 import { saveIntakeFormAction } from "../actions";
 import { IntakePreview } from "./IntakePreview";
+import { IntakeQrButton } from "./IntakeQr";
 
 /**
  * Intake → Forms (design/Intake_Forms.dc.html): the header, the two tabs,
@@ -55,7 +57,9 @@ type Props = {
   performance: ReactNode;
 };
 
-type Snapshot = { config: IntakeFormConfig; domains: string[] };
+type Snapshot = { config: IntakeFormConfig; domains: string[]; details: IntakeDetails };
+
+const detailsOf = (f: IntakeFormRecord): IntakeDetails => ({ name: f.name, slug: f.slug, sourceTag: f.sourceTag });
 
 const LOCK = (
   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -120,7 +124,8 @@ export function IntakeFormsWorkspace(props: Props) {
   const { form, canEdit } = props;
   const [config, setConfig] = useState<IntakeFormConfig>(form.config);
   const [domains, setDomains] = useState<string[]>(form.allowedDomains);
-  const [saved, setSaved] = useState<Snapshot>({ config: form.config, domains: form.allowedDomains });
+  const [details, setDetails] = useState<IntakeDetails>(() => detailsOf(form));
+  const [saved, setSaved] = useState<Snapshot>({ config: form.config, domains: form.allowedDomains, details: detailsOf(form) });
   const [status, setStatus] = useState(form.status);
   const [saving, startSaving] = useTransition();
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -136,12 +141,13 @@ export function IntakeFormsWorkspace(props: Props) {
   const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const dirty = useMemo(
-    () => JSON.stringify({ config, domains }) !== JSON.stringify({ config: saved.config, domains: saved.domains }),
-    [config, domains, saved],
+    () => JSON.stringify({ config, domains, details }) !== JSON.stringify({ config: saved.config, domains: saved.domains, details: saved.details }),
+    [config, domains, details, saved],
   );
 
-  const publicUrl = intakePublicUrl(props.origin, form.slug);
-  const embed = intakeEmbedSnippet(props.origin, form.slug);
+  // The link as saved: an unsaved rename isn't live yet.
+  const publicUrl = intakePublicUrl(props.origin, saved.details.slug);
+  const embed = intakeEmbedSnippet(props.origin, saved.details.slug);
   const items = goLiveChecklist(config, { receivesReferrals: form.receivesReferrals, agreementSigned: form.agreementSignedAt !== null });
   const done = items.filter((i) => i.ok).length;
   const allDone = checklistComplete(items);
@@ -200,15 +206,16 @@ export function IntakeFormsWorkspace(props: Props) {
     if (!canEdit || saving) return;
     setSaveError(null);
     startSaving(async () => {
-      const res = await saveIntakeFormAction({ config, allowedDomains: domains });
+      const res = await saveIntakeFormAction({ id: form.id, config, allowedDomains: domains, details });
       if (!res.ok) {
         setSaveError(res.error);
         flash("Not saved");
         return;
       }
-      const next = { config: res.form.config, domains: res.form.allowedDomains };
+      const next = { config: res.form.config, domains: res.form.allowedDomains, details: detailsOf(res.form) };
       setConfig(next.config);
       setDomains(next.domains);
+      setDetails(next.details);
       setSaved(next);
       setStatus(res.form.status);
       setShowErrors(res.remaining > 0);
@@ -219,6 +226,7 @@ export function IntakeFormsWorkspace(props: Props) {
   const discard = () => {
     setConfig(saved.config);
     setDomains(saved.domains);
+    setDetails(saved.details);
     setShowErrors(false);
     setSaveError(null);
     setMenu(null);
@@ -268,7 +276,9 @@ export function IntakeFormsWorkspace(props: Props) {
   const setColor = (k: keyof IntakeColors, v: string) => edit((c) => ({ colors: { ...c.colors, [k]: v } }));
 
   const live = status === "live";
-  const tabHref = (t: "setup" | "performance") => (t === "setup" ? "/dashboard/forms/" : `/dashboard/forms/?tab=performance&range=${props.range}`);
+  const archived = status === "archived";
+  const base = `/dashboard/forms/?form=${encodeURIComponent(form.id)}`;
+  const tabHref = (t: "setup" | "performance") => (t === "setup" ? base : `${base}&tab=performance&range=${props.range}`);
   const firmDisplay = config.firmName.trim() || props.orgName;
   const agreementSigned = form.agreementSignedAt !== null;
 
@@ -276,15 +286,20 @@ export function IntakeFormsWorkspace(props: Props) {
     <div className="ifm-root">
       <div className="lx-page-head ifm-head">
         <div style={{ flex: 1, minWidth: 240 }}>
-          <div className="lx-label">Intake</div>
-          <h1 className="lx-h1">Intake forms</h1>
-          <p className="lx-sub">Your public intake, how it looks, and where it lives.</p>
+          <Link href="/dashboard/forms/" className="ifm-back">
+            ← All intakes
+          </Link>
+          <h1 className="lx-h1">{saved.details.name}</h1>
+          <p className="lx-sub">
+            {saved.details.sourceTag ? `Leads from it are tagged “${saved.details.sourceTag}”.` : "How it looks, what it asks, and where it lives."}
+          </p>
         </div>
         <div className="ifm-head-actions">
           <span className={`ifm-status${live ? " live" : ""}`}>
             <i />
-            {live ? "Live" : "Draft"}
+            {live ? "Live" : archived ? "Archived" : "Draft"}
           </span>
+          <IntakeQrButton url={publicUrl} name={saved.details.name} slug={saved.details.slug} />
           <button type="button" className="lx-btn lx-btn-sec" onClick={() => copy(publicUrl, "Link copied")}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />
@@ -328,7 +343,69 @@ export function IntakeFormsWorkspace(props: Props) {
               </div>
             )}
 
-            {allDone ? (
+            <section id="ifm-sec-details" className="ifm-card">
+              <h2 className="ifm-title">Name, link and source</h2>
+              <label className="ifm-field">
+                <span className="ifm-field-head">
+                  <span className="ifm-field-label" style={{ flex: 1 }}>
+                    Name
+                  </span>
+                  <Counter n={details.name.length} max={DETAIL_LIMITS.name} />
+                </span>
+                <input
+                  className="ifm-input"
+                  value={details.name}
+                  maxLength={DETAIL_LIMITS.name}
+                  placeholder="e.g. UGW 2026 booth"
+                  onChange={(e) => setDetails((d) => ({ ...d, name: e.target.value }))}
+                />
+                <span className="ifm-help">Only your firm sees this name.</span>
+              </label>
+              <label className="ifm-field">
+                <span className="ifm-field-label">Link</span>
+                <span className="ifm-slug">
+                  <span className="ifm-slug-prefix">{`${props.origin.replace(/^https?:\/\//, "").replace(/\/+$/, "")}/i/`}</span>
+                  <input
+                    className="ifm-input ifm-slug-input"
+                    value={details.slug}
+                    maxLength={60}
+                    spellCheck={false}
+                    autoCapitalize="off"
+                    aria-label="Link name"
+                    onChange={(e) =>
+                      setDetails((d) => ({ ...d, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+/, "") }))
+                    }
+                  />
+                </span>
+                <span className="ifm-help">
+                  {details.slug !== saved.details.slug
+                    ? `Saving moves the link. The old one (/i/${saved.details.slug}) keeps working, so printed QR codes still land here.`
+                    : "Letters, numbers and hyphens, like ugw-2026."}
+                </span>
+              </label>
+              <label className="ifm-field">
+                <span className="ifm-field-head">
+                  <span className="ifm-field-label" style={{ flex: 1 }}>
+                    Source tag
+                  </span>
+                  <Counter n={(details.sourceTag ?? "").length} max={DETAIL_LIMITS.sourceTag} />
+                </span>
+                <input
+                  className="ifm-input"
+                  value={details.sourceTag ?? ""}
+                  maxLength={DETAIL_LIMITS.sourceTag}
+                  placeholder="e.g. UGW 2026"
+                  onChange={(e) => setDetails((d) => ({ ...d, sourceTag: e.target.value || null }))}
+                />
+                <span className="ifm-help">Every lead from this intake shows this as its source, so you know which event or page they came from.</span>
+              </label>
+            </section>
+
+            {archived ? (
+              <div className="lx-banner lx-banner-mute" style={{ fontSize: 14 }}>
+                Archived: the link doesn&apos;t take new people. Its leads and numbers are kept. Restore it from All intakes.
+              </div>
+            ) : allDone ? (
               <div className="ifm-live-banner">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                   <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6" />

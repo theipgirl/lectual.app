@@ -81,6 +81,8 @@ export type SubmissionListRow = {
   fit: string;
   status: string;
   started_at: string;
+  /** Null = gave contact details but never sent answers (contact-first, 0093). */
+  submitted_at?: string | null;
   last_active_at: string;
 };
 
@@ -96,6 +98,7 @@ export type IntakeTableRow = {
   status: string;
   statusKey: string;
   last: string;
+  finished: boolean;
 };
 
 /** "Sep 25, 8:04 AM", on the firm's clock (Vercel runs UTC; the firm doesn't). */
@@ -126,6 +129,7 @@ export function intakeTableRows(rows: SubmissionListRow[], now = Date.now(), tz:
       status: submissionStatusLabel(r.status),
       statusKey: r.status,
       last: relativeTime(r.last_active_at, now),
+      finished: r.submitted_at !== null,
     };
   });
 }
@@ -161,4 +165,72 @@ export function intakeDetail(r: SubmissionDetailRow, tz: string = FIRM_TIME_ZONE
     why: r.screening_note?.trim() || "Not screened yet.",
     answers: [{ q: "Contact", a: contactLine }, ...answers.map((a) => ({ q: a.question || "Question", a: a.answer || "—" }))],
   };
+}
+
+// ── per-intake numbers (0093, contact-first) ─────────────────────────────────
+
+/**
+ * Since 0093 a person is filed at the contact step, before any question, so
+ * the submissions themselves say how an intake is doing:
+ *   captured    — people who gave their details (every row);
+ *   completed   — of those, who also sent their answers (`submitted_at`);
+ *   unfinished  — captured but not completed: still leads, worth a follow-up;
+ *   median time — from opening the page to sending, over completed ones.
+ * Rows from before 0093 were only ever written on completion; they count as
+ * captured and completed, which is what happened.
+ */
+export type StatRow = { form_id?: string; started_at: string; submitted_at: string | null };
+
+export type SubmissionStats = {
+  captured: number;
+  completed: number;
+  unfinished: number;
+  /** "54.5%", or "—". */
+  completionRate: string;
+  /** Milliseconds, or null when nothing completed. */
+  medianMs: number | null;
+};
+
+export function submissionStats(rows: readonly StatRow[]): SubmissionStats {
+  const durations: number[] = [];
+  let completed = 0;
+  for (const r of rows) {
+    if (!r.submitted_at) continue;
+    completed++;
+    const ms = Date.parse(r.submitted_at) - Date.parse(r.started_at);
+    if (Number.isFinite(ms) && ms >= 0) durations.push(ms);
+  }
+  durations.sort((a, b) => a - b);
+  const mid = durations.length >> 1;
+  const medianMs = durations.length === 0 ? null : durations.length % 2 ? durations[mid] : Math.round((durations[mid - 1] + durations[mid]) / 2);
+  return {
+    captured: rows.length,
+    completed,
+    unfinished: rows.length - completed,
+    completionRate: percent(completed, rows.length),
+    medianMs,
+  };
+}
+
+/** Stats for each intake, keyed by form id (intakes with no rows are absent). */
+export function statsByForm(rows: readonly StatRow[]): Map<string, SubmissionStats> {
+  const groups = new Map<string, StatRow[]>();
+  for (const r of rows) {
+    if (!r.form_id) continue;
+    const g = groups.get(r.form_id);
+    if (g) g.push(r);
+    else groups.set(r.form_id, [r]);
+  }
+  return new Map([...groups].map(([id, g]) => [id, submissionStats(g)]));
+}
+
+/** "45 sec", "3 min", "1 hr 12 min", or "—". */
+export function formatDuration(ms: number | null): string {
+  if (ms === null || !Number.isFinite(ms)) return "—";
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s} sec`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  return m % 60 ? `${h} hr ${m % 60} min` : `${h} hr`;
 }

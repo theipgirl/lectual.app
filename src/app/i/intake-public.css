@@ -390,3 +390,10 @@ textarea.ipub-input {
     max-width: 90%;
   }
 }
+
+/* Contact first (0093): the line between the contact step and the questions. */
+.ipub-step-note {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, currentColor 6%, transparent);
+}

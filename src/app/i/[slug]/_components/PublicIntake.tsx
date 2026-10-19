@@ -5,7 +5,7 @@ import type { PublicIntakeConfig } from "@/lib/intake-forms/config";
 import type { IntakeMode } from "@/lib/intake-forms/config";
 import { HONEYPOT_FIELD, SUBMIT_LIMITS } from "@/lib/intake-forms/public-submit";
 import { isEmailAddress } from "@/lib/members/email";
-import { recordIntakeEventAction, submitIntakeAction } from "../actions";
+import { recordIntakeEventAction, startIntakeAction, submitIntakeAction } from "../actions";
 import { IntakeDisclaimer } from "./IntakeShell";
 
 /**
@@ -20,7 +20,12 @@ import { IntakeDisclaimer } from "./IntakeShell";
  * for the firm's eyes only.
  *
  * `view` is `publicConfig()` — the only part of the firm's setup that reaches
- * a browser. Nothing is sent anywhere until Submit.
+ * a browser.
+ *
+ * CONTACT FIRST (0093): name, email and consent come before any question, and
+ * Continue files them, so someone who stops halfway is still someone the firm
+ * can follow up. The server hands back a token that ties Submit to that same
+ * record. Until Continue, nothing is sent.
  */
 
 type Pkg = { name: string; price: string; includes: string };
@@ -39,6 +44,9 @@ export function PublicIntake(props: { slug: string; view: PublicIntakeConfig; pa
   const [error, setError] = useState<string | null>(null);
   const [badFields, setBadFields] = useState<string[]>([]);
   const [closing, setClosing] = useState<string | null>(null);
+  // Contact step done (the person is filed); `token` ties Submit to that row.
+  const [started, setStarted] = useState(false);
+  const [token, setToken] = useState("");
   const [pending, startTransition] = useTransition();
   const root = useRef<HTMLDivElement>(null);
   const sent = useRef(new Set<string>());
@@ -91,6 +99,25 @@ export function PublicIntake(props: { slug: string; view: PublicIntakeConfig; pa
     "--ipub-dark-acc": view.colors.darkAcc,
   } as CSSProperties;
 
+  const begin = () => {
+    setError(null);
+    setBadFields([]);
+    startTransition(async () => {
+      try {
+        const res = await startIntakeAction(slug, { mode, contact, consent, honeypot, stamp: props.stamp });
+        if (res.ok) {
+          setToken(res.token);
+          setStarted(true);
+        } else {
+          setError(res.error);
+          setBadFields(res.fields ?? []);
+        }
+      } catch {
+        setError("We couldn't save your details just now. Please check your connection and try again.");
+      }
+    });
+  };
+
   const submit = () => {
     setError(null);
     setBadFields([]);
@@ -103,6 +130,7 @@ export function PublicIntake(props: { slug: string; view: PublicIntakeConfig; pa
           consent,
           honeypot,
           stamp: props.stamp,
+          token,
         });
         if (res.ok) {
           setClosing(res.closing);
@@ -154,18 +182,31 @@ export function PublicIntake(props: { slug: string; view: PublicIntakeConfig; pa
     </div>
   );
 
-  const consentBlock = (
+  const errorLine = error && (
+    <p className="ipub-error" role="alert">
+      {error}
+    </p>
+  );
+
+  // The contact step's end: consent, then Continue (files the person).
+  const beginBlock = (
     <>
       <p className="ipub-small">{view.disclaimer}</p>
       <label className={`ipub-consent${badFields.includes("consent") ? " bad" : ""}`}>
         <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
         <span>{view.consent}</span>
       </label>
-      {error && (
-        <p className="ipub-error" role="alert">
-          {error}
-        </p>
-      )}
+      {errorLine}
+      <button type="button" className="ipub-submit" onClick={begin} disabled={pending}>
+        {pending ? "Saving…" : "Continue"}
+      </button>
+    </>
+  );
+
+  // The end of the questions: send the answers.
+  const finalBlock = (
+    <>
+      {errorLine}
       <button type="button" className="ipub-submit" onClick={submit} disabled={pending}>
         {pending ? "Sending…" : "Submit"}
       </button>
@@ -175,7 +216,7 @@ export function PublicIntake(props: { slug: string; view: PublicIntakeConfig; pa
   const foot = (switchLabel: string, to: IntakeMode) => (
     <div className="ipub-foot">
       {!closing && (
-        <button type="button" className="ipub-link" onClick={() => setMode(to)}>
+        <button type="button" className="ipub-link" onClick={() => setMode(to)} disabled={pending}>
           {switchLabel}
         </button>
       )}
@@ -195,7 +236,9 @@ export function PublicIntake(props: { slug: string; view: PublicIntakeConfig; pa
             valueOf={valueOf}
             setValue={setValue}
             pkgList={pkgList}
-            consentBlock={consentBlock}
+            beginBlock={beginBlock}
+            finalBlock={finalBlock}
+            started={started}
             closing={closing}
             error={error}
           />
@@ -210,11 +253,12 @@ export function PublicIntake(props: { slug: string; view: PublicIntakeConfig; pa
             className="ipub-body ipub-form"
             onSubmit={(e) => {
               e.preventDefault();
-              submit();
+              if (started) submit();
+              else begin();
             }}
             noValidate
           >
-            {view.contactFields.map((f) => (
+            {!started && view.contactFields.map((f) => (
               <label key={f.key} className="ipub-field">
                 <span className="ipub-label">
                   {f.label}
@@ -232,7 +276,12 @@ export function PublicIntake(props: { slug: string; view: PublicIntakeConfig; pa
                 />
               </label>
             ))}
-            {view.questions.map((q) => (
+            {started && (
+              <p className="ipub-small ipub-step-note">
+                Thanks{contact.name.trim() ? `, ${contact.name.trim().split(/\s+/)[0]}` : ""}. We have your details. Now a few questions.
+              </p>
+            )}
+            {started && view.questions.map((q) => (
               <label key={q.id} className="ipub-field">
                 <span className="ipub-label">
                   {q.text}
@@ -249,14 +298,14 @@ export function PublicIntake(props: { slug: string; view: PublicIntakeConfig; pa
                 />
               </label>
             ))}
-            {pkgList && (
+            {started && pkgList && (
               <div className="ipub-field">
                 <span className="ipub-label">Flat-fee packages</span>
                 {pkgList}
               </div>
             )}
             {honeypotField}
-            {consentBlock}
+            {started ? finalBlock : beginBlock}
           </form>
         )}
         {mode === "conversation" && honeypotField}
@@ -273,11 +322,14 @@ function Conversation(props: {
   valueOf: (s: Step) => string;
   setValue: (key: string, kind: Step["kind"], v: string) => void;
   pkgList: React.ReactNode;
-  consentBlock: React.ReactNode;
+  beginBlock: React.ReactNode;
+  finalBlock: React.ReactNode;
+  started: boolean;
   closing: string | null;
   error: string | null;
 }) {
   const { steps, valueOf } = props;
+  const contactCount = steps.filter((s) => s.kind === "contact").length;
   // Resume where the answers stop (e.g. after "Chat instead").
   const firstOpen = () => {
     const i = steps.findIndex((s) => s.required && !valueOf(s).trim());
@@ -294,6 +346,8 @@ function Conversation(props: {
   }, [step, props.closing, props.error]);
 
   const current = step < steps.length ? steps[step] : null;
+  // Contact first: the questions wait until the person's details are filed.
+  const gated = !props.started && step >= contactCount;
 
   const advance = (value: string) => {
     if (!current) return;
@@ -320,7 +374,7 @@ function Conversation(props: {
     const v = valueOf(s).trim();
     thread.push({ who: "you", text: v || "Skipped" });
   });
-  if (current) thread.push({ who: "bot", text: current.prompt });
+  if (current && !gated) thread.push({ who: "bot", text: current.prompt });
 
   return (
     <>
@@ -330,7 +384,13 @@ function Conversation(props: {
             {m.text}
           </div>
         ))}
-        {!current && !props.closing && (
+        {gated && !props.closing && (
+          <>
+            <div className="ipub-bubble bot">Thanks. Before the questions, please confirm we may contact you.</div>
+            <div className="ipub-final">{props.beginBlock}</div>
+          </>
+        )}
+        {!current && !gated && !props.closing && (
           <>
             {props.pkgList && (
               <>
@@ -338,8 +398,8 @@ function Conversation(props: {
                 {props.pkgList}
               </>
             )}
-            <div className="ipub-bubble bot">That&rsquo;s everything. Please confirm below and send it to us.</div>
-            <div className="ipub-final">{props.consentBlock}</div>
+            <div className="ipub-bubble bot">That&rsquo;s everything. Send it to us below.</div>
+            <div className="ipub-final">{props.finalBlock}</div>
           </>
         )}
         {props.closing && (
@@ -349,7 +409,7 @@ function Conversation(props: {
         )}
         <div ref={endRef} />
       </div>
-      {current && !props.closing && (
+      {current && !gated && !props.closing && (
         <div className="ipub-composer-wrap">
           {hint && <p className="ipub-error">{hint}</p>}
           <div className="ipub-composer">

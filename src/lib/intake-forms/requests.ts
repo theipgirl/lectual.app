@@ -45,6 +45,21 @@ async function requireSenderRole(): Promise<void> {
   }
 }
 
+/**
+ * The questions a matter request sends come from the firm's MAIN intake: its
+ * oldest one that isn't archived (0093 lets a firm keep one per event). Event
+ * intakes are for prospects; this one is the firm's standing setup.
+ */
+function mainIntakeForm<C extends "config" | "id, config">(supabase: Awaited<ReturnType<typeof getScopedClient>>, columns: C) {
+  return supabase
+    .from("crm_intake_form")
+    .select(columns)
+    .neq("status", "archived")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+}
+
 /** The matter's requests, newest first, and whether the firm has questions to send. */
 export async function listMatterIntakeRequests(matterId: string): Promise<IntakeRequestsLoad> {
   try {
@@ -56,7 +71,7 @@ export async function listMatterIntakeRequests(matterId: string): Promise<Intake
         .eq("matter_id", matterId)
         .order("sent_at", { ascending: false })
         .limit(20),
-      supabase.from("crm_intake_form").select("config").maybeSingle(),
+      mainIntakeForm(supabase, "config"),
     ]);
     if (reqs.error) return isMissingTableError(reqs.error) ? { status: "unconfigured" } : { status: "unavailable" };
     if (form.error) return isMissingTableError(form.error) ? { status: "unconfigured" } : { status: "unavailable" };
@@ -87,7 +102,7 @@ export async function createMatterIntakeRequest(matterId: string): Promise<strin
   if (matterErr) throw matterErr;
   if (!matter) throw new IntakeRequestError("That matter isn't available.");
 
-  const { data: form, error: formErr } = await supabase.from("crm_intake_form").select("id, config").maybeSingle();
+  const { data: form, error: formErr } = await mainIntakeForm(supabase, "id, config");
   if (formErr) throw formErr;
   if (!form || !parseIntakeConfig(form.config).questions.some((q) => q.text.trim())) {
     throw new IntakeRequestError("Set up your intake questions in Intake → Forms first.");
