@@ -225,7 +225,7 @@ function PayForm({ token, state, firmName }: { token: string; state: Extract<Pub
       <Panel tone="warn" heading="We're confirming your payment">
         <p className="qp-pay-body">
           Your signature is recorded. We didn&rsquo;t get a clear answer from the payment provider, so {firmName} is checking whether the payment
-          went through. <strong>Please don&rsquo;t try again</strong> — they&rsquo;ll be in touch either way.
+          went through. <strong>Please don&rsquo;t try again</strong>{" "}— they&rsquo;ll be in touch either way.
         </p>
       </Panel>
     );

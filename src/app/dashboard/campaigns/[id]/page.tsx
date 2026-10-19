@@ -212,7 +212,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
         <header className="lx-band-head">
           <h2 className="lx-h2">Enrolled</h2>
           <span className="lx-note">
-            {enrollmentsRead.error ? "—" : `${enrollments.length} lead${enrollments.length === 1 ? "" : "s"}`} · this is also this
+            {enrollmentsRead.error ? "—" : `${enrollments.length} lead${enrollments.length === 1 ? "" : "s"}`}{" "}· this is also this
             campaign&apos;s activity
           </span>
         </header>

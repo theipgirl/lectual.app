@@ -227,7 +227,7 @@ export default async function TodayPage() {
             </div>
             {needs.items.length > 0 && needs.unavailable.length > 0 && (
               <p className="lx-note" style={{ margin: 0, color: "var(--warn)" }}>
-                {needs.unavailable.join(", ")} couldn&apos;t be read, so this list may be missing items.
+                {needs.unavailable.join(", ")}{" "}couldn&apos;t be read, so this list may be missing items.
               </p>
             )}
             {needs.items.length === 0 ? (

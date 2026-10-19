@@ -74,6 +74,15 @@ See `PORTED_FROM.md`. When changing a ported file, consider whether `lectual` ne
   mismatched mark, carry nothing, and the `matter_opened` timeline row says what was or wasn't carried.
 - Reads are three-state: details / none / couldn't be loaded. Unreadable saved details are reported, not hidden.
 
+## JSX text spacing: keep the `{" "}`
+Next 16.2.7's compiler DROPS the leading space of JSX text that contains an HTML entity
+(`&apos;`, `&amp;`, `&rsquo;`…) and runs onto another line, even if that is only the line
+break before the closing tag: `{email} is signed in, but isn&apos;t…` rendered as
+"…gmail.comis signed in", and Today's "couldn't be read" warning lost its space the same
+way. An explicit `{" "}` survives,
+so never "tidy" one away. The `lectual/no-glued-jsx-text` lint rule (`eslint-rules/`) catches
+this and plain-JSX line-break glue (`{name}↵word`); `pnpm lint --fix` writes the `{" "}`.
+
 ## Commands
 `pnpm build` · `pnpm lint` · `pnpm test`. Env: copy `.env.example` to `.env.local` and fill it in
 from lectual-dev.

@@ -1,10 +1,18 @@
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
+import noGluedJsxText from "./eslint-rules/no-glued-jsx-text.mjs";
 
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  // Text that renders glued to the value beside it ("…gmail.comis signed in").
+  // Includes a Next 16 compiler bug that silently drops a space. See the rule's
+  // header and tests/lint/no-glued-jsx-text.test.ts.
+  {
+    plugins: { lectual: { rules: { "no-glued-jsx-text": noGluedJsxText } } },
+    rules: { "lectual/no-glued-jsx-text": "error" },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

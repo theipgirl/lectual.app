@@ -83,7 +83,7 @@ export default async function MeetingPage({ params }: { params: Promise<{ id: st
               <p className="lx-summary">{m.summary}</p>
             ) : (
               <p className="lx-note" style={{ margin: 0 }}>
-                {PROVIDER_LABEL[m.provider]} didn&apos;t provide a summary for this meeting.
+                {PROVIDER_LABEL[m.provider]}{" "}didn&apos;t provide a summary for this meeting.
               </p>
             )}
           </section>

@@ -56,7 +56,7 @@ export default function CopilotPage() {
       <div className="lx-upl">
         <span aria-hidden="true">§</span>
         <div>
-          <b style={{ color: "var(--ox)" }}>The one rule.</b> This copilot only reports what is
+          <b style={{ color: "var(--ox)" }}>The one rule.</b>{" "}This copilot only reports what is
           already in the firm&apos;s own records — it never gives legal analysis, an opinion, or a
           recommendation. A question that calls for legal judgment is declined here and belongs
           with the attorney of record.

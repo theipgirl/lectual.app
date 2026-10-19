@@ -29,7 +29,7 @@ export function NoFirmAccess({ email }: { email: string | null | undefined }) {
           No firm access yet
         </h1>
         <p style={{ margin: 0, color: "var(--body)", lineHeight: 1.6 }}>
-          {email ?? "This account"} is signed in, but isn&apos;t a member of a Lectual firm
+          {email ?? "This account"}{" "}is signed in, but isn&apos;t a member of a Lectual firm
           workspace. Ask your firm admin to add this email, or sign in with an account that
           already belongs to one.
         </p>

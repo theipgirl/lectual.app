@@ -148,7 +148,7 @@ export default async function Page({
 
       {choice.mode === "unreadable" && chosen && (
         <div role="alert" className="lx-banner lx-banner-warn">
-          Signed quote <b>{chosen.reference}</b> has no readable signed copy stored, so nothing can be pre-filled from it. The letter is never built from the
+          Signed quote <b>{chosen.reference}</b>{" "}has no readable signed copy stored, so nothing can be pre-filled from it. The letter is never built from the
           quote&apos;s current lines. Fill it in by hand below
           {canOpenQuote ? (
             <>
