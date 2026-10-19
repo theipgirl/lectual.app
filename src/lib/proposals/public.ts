@@ -234,6 +234,52 @@ export function buildAcceptedSnapshot(input: {
   };
 }
 
+/* ─────────────────────────── the content allowlist ──────────────────────── */
+
+function pick(source: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const k of keys) if (source[k] !== undefined) out[k] = source[k];
+  return out;
+}
+
+function objects(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value) ? value.filter(isObject) : [];
+}
+
+/**
+ * `content` reduced to the keys `ProposalContent` defines, at every level.
+ * The content column is jsonb that a person or an agent wrote, and the whole
+ * of it is serialised into the client's HTML, so an extra key is published to
+ * whoever holds the link. The static builder this replaces stripped the spec's
+ * `private` block (matter id, client email) before rendering; an agent porting
+ * a spec in that shape would otherwise carry it straight onto the page. This is
+ * the column allowlist's rule applied inside the document. Values are not
+ * coerced: pricing and validation already cope with odd ones.
+ */
+export function publicContent(raw: unknown): ProposalContent {
+  const c = isObject(raw) ? raw : {};
+  const out = pick(c, ["greeting", "recommendation", "office_action_note"]);
+  out.client = pick(isObject(c.client) ? c.client : {}, ["first_name", "full_name", "company"]);
+  out.pricing = pick(isObject(c.pricing) ? c.pricing : {}, [
+    "package",
+    "base_cents",
+    "included_classes",
+    "per_class_cents",
+    "second_mark_discount_pct",
+    "gov_per_class_cents",
+  ]);
+  out.names = objects(c.names).map((nm) => {
+    const name = pick(nm, ["id", "name", "what", "note"]);
+    if (isObject(nm.price_override)) name.price_override = pick(nm.price_override, ["base_cents", "per_class_cents"]);
+    name.marks = objects(nm.marks).map((m) => pick(m, ["id", "kind", "desc", "preselected"]));
+    name.classes = objects(nm.classes).map((cl) => pick(cl, ["id", "label", "preselected"]));
+    return name;
+  });
+  out.adjustments = objects(c.adjustments).map((a) => pick(a, ["id", "label", "kind", "value"]));
+  out.includes = objects(c.includes).map((r) => pick(r, ["label", "value", "included", "note", "highlight"]));
+  return out as unknown as ProposalContent;
+}
+
 function isNoRowsError(error: PublicDbError): boolean {
   return error?.code === "PGRST116";
 }
@@ -329,7 +375,9 @@ export async function readPublicProposal(
       return { status: "closed", reason: "expired", firm };
     }
     if (!isObject(row.content)) return { status: "unavailable" };
-    const content = row.content as unknown as ProposalContent;
+    // Allowlisted, like the columns: this is what the browser receives, and
+    // (on acceptance) what the snapshot records the client was shown.
+    const content = publicContent(row.content);
 
     const snapshot = isObject(row.accepted_snapshot) ? (row.accepted_snapshot as unknown as AcceptedSnapshot) : null;
     const accepted = storedStatus === "accepted";
@@ -339,7 +387,7 @@ export async function readPublicProposal(
       version: typeof row.version === "number" ? row.version : 1,
       title: readString(row.title) ?? "Trademark Proposal",
       clientName: readString(row.client_name) ?? "",
-      content: accepted && snapshot?.content ? snapshot.content : content,
+      content: accepted && isObject(snapshot?.content) ? publicContent(snapshot.content) : content,
       expiresOn,
       acceptedAt: asNullableString(row.accepted_at),
       acceptedSelection: accepted && isObject(row.accepted_selection) ? (row.accepted_selection as Selection) : null,

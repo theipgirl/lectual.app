@@ -255,6 +255,22 @@ describe("readPublicProposal", () => {
     expect(r.handle).toEqual({ proposalId: "prop-2", orgId: "org-1", familyId: "prop-1", version: 2, storedStatus: "sent" });
   });
 
+  it("drops content keys ProposalContent does not define (the old spec's `private` block)", async () => {
+    const content = sevetri() as unknown as Record<string, unknown>;
+    content.private = { matter_id: "matter-9", client_email: "sevetri@example.com" };
+    (content.client as Record<string, unknown>).email = "sevetri@example.com";
+    const names = content.names as Array<Record<string, unknown>>;
+    names[0].internal_note = "price-sensitive";
+    (names[0].marks as Array<Record<string, unknown>>)[0].serial = "98765432";
+    const { db } = world({ proposal: { content } });
+    const r = await readPublicProposal(TOKEN, NOW, db);
+    if (r.status !== "ok") throw new Error(`expected ok, got ${r.status}`);
+    const wire = JSON.stringify(r.view);
+    for (const leak of ["matter-9", "sevetri@example.com", "price-sensitive", "98765432", "private"]) expect(wire).not.toContain(leak);
+    // Everything the page renders survives, and prices the same.
+    expect(r.view.content).toEqual(sevetri());
+  });
+
   it("shows the live version when a newer draft exists, and an older version is superseded", async () => {
     const { db } = world({
       extra: [
