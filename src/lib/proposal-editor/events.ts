@@ -160,6 +160,38 @@ export function actorName(event: Pick<ProposalEventRow, "actor" | "actor_user_id
   }
 }
 
+/** The consult agent's own 'edited' event (src/lib/proposals/agent-create.ts). */
+const CONSULT_SOURCE = "consult-proposal";
+const MAX_EVIDENCE_LINES = 12;
+
+function str(v: unknown): string | null {
+  return typeof v === "string" && v.trim() ? v.trim() : null;
+}
+
+/**
+ * "Created by the consult agent from <the meeting | a pasted transcript>", with
+ * the quotes it relied on and the reviewer notes it left. Total: every part of
+ * the payload is optional and checked, so an event written by an older or newer
+ * build reads as a shorter sentence, never an exception.
+ */
+function describeConsultDraft(p: Record<string, unknown>, base: Pick<EventLine, "id" | "version" | "at">): EventLine {
+  const title = str(p.meeting_title);
+  const from = title ? `the meeting “${clip(title, 80)}”` : p.meeting_id ? "a recorded meeting" : "a pasted transcript";
+  const details: string[] = [];
+  const notes = str(p.notes);
+  if (notes) details.push(`Notes for the reviewer: ${clip(notes, 900)}`);
+  const evidence = Array.isArray(p.evidence) ? p.evidence : [];
+  const items = evidence
+    .filter((e): e is Record<string, unknown> => !!e && typeof e === "object")
+    .map((e) => ({ quote: str(e.quote), verified: e.verified === true }))
+    .filter((e): e is { quote: string; verified: boolean } => e.quote !== null);
+  for (const e of items.slice(0, MAX_EVIDENCE_LINES)) {
+    details.push(e.verified ? `From the call: “${clip(e.quote, 160)}”` : `Not found word for word in the call, so check it: “${clip(e.quote, 160)}”`);
+  }
+  if (items.length > MAX_EVIDENCE_LINES) details.push(`And ${items.length - MAX_EVIDENCE_LINES} more quotes from the call.`);
+  return { ...base, who: "The consult agent", what: `drafted this proposal from ${from}`, details };
+}
+
 export function describeProposalEvent(event: ProposalEventRow, ctx: EventContext): EventLine {
   const who = actorName(event, ctx.names);
   const p = event.payload && typeof event.payload === "object" ? event.payload : {};
@@ -202,6 +234,7 @@ export function describeProposalEvent(event: ProposalEventRow, ctx: EventContext
       };
     }
     case "edited": {
+      if (event.actor === "agent" && p.source === CONSULT_SOURCE) return describeConsultDraft(p, base);
       const changes = Array.isArray(p.changes) ? p.changes.filter(isChange) : [];
       const sentences = changes.map(describeChange);
       const details: string[] = [];
