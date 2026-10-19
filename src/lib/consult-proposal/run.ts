@@ -106,6 +106,18 @@ function issueLines(issues: readonly ValidationIssue[]): string {
   return `The automatic check found ${issues.length} thing${issues.length === 1 ? "" : "s"} to look at:\n${rows.join("\n")}`;
 }
 
+/**
+ * The queue item's summary: the reviewer notes, then the proposal's staff link
+ * and the validation result. The notes (up to 12k) are what gets shortened to
+ * fit, never the link or the issues the approver needs.
+ */
+export function queueSummary(notes: string, staffUrl: string, issues: readonly ValidationIssue[]): string {
+  const tail = `\n\nProposal (review, edit, approve): ${staffUrl}\n\n${issueLines(issues)}`.slice(0, SUMMARY_CAP / 2);
+  const room = SUMMARY_CAP - tail.length;
+  const head = notes.length <= room ? notes : `${notes.slice(0, room - 20)}\n[notes shortened]`;
+  return head + tail;
+}
+
 type Row = Record<string, unknown>;
 
 /** Whether this call has already been handled. A failed read counts as handled: never draft twice on a guess. */
@@ -248,7 +260,7 @@ export async function runConsultProposal(input: ConsultProposalRunInput): Promis
     );
   }
   const testPrefix = input.testPrefix ?? (process.env.VERCEL_ENV === "production" ? "" : "[TEST] ");
-  const summary = [draft.reviewerNotes, `Proposal (review, edit, approve): ${staffUrl}`, issueLines(draft.issues)].join("\n\n").slice(0, SUMMARY_CAP);
+  const summary = queueSummary(draft.reviewerNotes, staffUrl, draft.issues);
 
   let queueId: string;
   try {

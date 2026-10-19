@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { runConsultProposal, type ConsultProposalRunInput } from "@/lib/consult-proposal/run";
+import { queueSummary, runConsultProposal, type ConsultProposalRunInput } from "@/lib/consult-proposal/run";
 import { pasteHash } from "@/lib/consult-proposal/shared";
 import { NOW, ORG, assertOrgFenced, fakeLlm, writes } from "../agents/helpers";
 import { fakeAdmin, filterValue, type Handler, type Recorded } from "../mailbox/fake-db";
@@ -311,5 +311,22 @@ describe("runConsultProposal", () => {
     expect(content.pricing.base_cents).toBe(495_000);
     expect(content.names.every((n) => n.price_override === undefined)).toBe(true);
     expect(content.adjustments).toEqual([]);
+  });
+});
+
+describe("queueSummary", () => {
+  const url = "https://app.example.com/dashboard/proposals/p-1/";
+  const issues = [{ path: "names.0", level: "error" as const, message: "Add a class." }];
+
+  it("is the notes, then the staff link, then the check result", () => {
+    expect(queueSummary("Notes.", url, [])).toBe(`Notes.\n\nProposal (review, edit, approve): ${url}\n\nNo rule problems found by the automatic check.`);
+  });
+
+  it("shortens long reviewer notes, never the staff link or the issues", () => {
+    const s = queueSummary("x".repeat(12_000), url, issues);
+    expect(s.length).toBeLessThanOrEqual(8000);
+    expect(s).toContain("[notes shortened]");
+    expect(s).toContain(`Proposal (review, edit, approve): ${url}`);
+    expect(s.endsWith("- Fix: Add a class.")).toBe(true);
   });
 });
