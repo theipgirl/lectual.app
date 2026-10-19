@@ -5,6 +5,9 @@ import type { Stage } from "@/lib/pipeline";
 import type { MemberIdentity } from "@/lib/members/directory";
 import type { IntakeRow } from "@/lib/intake/rows";
 import type { IntakeTime } from "@/lib/time";
+import type { ReferralSource } from "@/lib/intake";
+import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
+import { pendingFor } from "@/lib/intake/needs-rebecca";
 import TimeChip from "@/components/intake/TimeChip";
 import {
   initialsOf,
@@ -15,6 +18,8 @@ import {
   touchStampFor,
 } from "@/lib/intake/views";
 import Popover, { PopoverItem } from "./Popover";
+import NeedsRebeccaBadge from "./NeedsRebeccaBadge";
+import SourceCell from "./SourceCell";
 import { LANE_LABEL, suggestionLine } from "@/lib/leads/lane";
 import {
   NEXT,
@@ -57,8 +62,10 @@ export default function IntakeCard({
   pending,
   error,
   time,
+  pendingApprovals,
   onMoveStage,
   onAssign,
+  onSetSource,
 }: {
   row: IntakeRow;
   /** 10b shows the owner chip; 10c shows the next step and the stage pill. */
@@ -70,8 +77,11 @@ export default function IntakeCard({
   error?: string;
   /** This week's time per lead, or null when that read failed (§13.1). */
   time: IntakeTime | null;
+  /** Absent = nothing to show; see needs-rebecca.ts for the three states. */
+  pendingApprovals?: LeadPendingApprovals;
   onMoveStage: (leadId: string, stageId: string) => void;
   onAssign: (leadId: string, userId: string | null) => void;
+  onSetSource: (leadId: string, source: ReferralSource | null) => void;
 }) {
   const lead = row.lead;
   const name = `${lead.first_name} ${lead.last_name}`.trim() || lead.email;
@@ -80,6 +90,7 @@ export default function IntakeCard({
   const step = nextStepFor(row, now);
   const dot = TEMP_DOT[row.temperature.level] ?? TEMP_DOT_NONE;
   const ownerName = row.owner ? memberLabel(row.owner) : null;
+  const pendingDrafts = pendingFor(pendingApprovals, lead.id);
 
   const menu = (
     <Popover
@@ -193,9 +204,25 @@ export default function IntakeCard({
         />
       </div>
 
-      <div className="intake-mono" style={{ ...ellipsis, fontSize: 10.5, color: "var(--mute)" }}>
-        {mark}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+        <div className="intake-mono" style={{ ...ellipsis, fontSize: 10.5, color: "var(--mute)", flex: 1 }}>
+          {mark}
+        </div>
+        <SourceCell
+          leadName={name}
+          source={lead.referral_source}
+          detail={lead.referral_detail}
+          pending={pending}
+          compact
+          onSet={(source) => onSetSource(lead.id, source)}
+        />
       </div>
+
+      {pendingDrafts.length > 0 && (
+        <div>
+          <NeedsRebeccaBadge pending={pendingDrafts} />
+        </div>
+      )}
 
       {/* SOP Stage 2: the lane a person set reads as a fact; triage's reads
           as a suggestion, in words, with its reason. */}
