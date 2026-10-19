@@ -1,0 +1,322 @@
+import "server-only";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { StructuredCall } from "@/lib/ai/claude";
+import type { NewQueueDraft } from "@/lib/queue/api";
+import { firmCivilDate } from "@/lib/quotes/firm-time";
+import { resolveTimeZone } from "@/lib/org/profile-rules";
+import { insertAgentProposal, recordConsultDraftEvent } from "@/lib/proposals/agent-create";
+import type { ProposalsDbClient } from "@/lib/proposals/store";
+import { standardProposalPricing } from "@/lib/proposals/types";
+import type { ValidationIssue } from "@/lib/proposals/validate";
+import { draftProposalFromConsult } from "./draft";
+import { renderProposalEmail } from "./email";
+import { CONSULT_PROPOSAL_SOURCE, pasteHash } from "./shared";
+import { MAX_PASTED_TRANSCRIPT_CHARS, type ConsultLead, type ConsultSource } from "./types";
+
+/**
+ * One consult -> one DRAFT proposal + one approval-queue email, tied together.
+ *
+ * Called by the "Draft proposal + email" buttons (the caller's scoped client as
+ * `db`) and by the post-consult cron (the service-role client as `db`). Either
+ * way every statement here names the firm (`org_id`), and nothing leaves the
+ * building: the proposal is a draft nobody can see until a named approver
+ * approves it and it is marked sent, and the email waits in the approval queue
+ * (where approving it only creates a mailbox DRAFT for a person to send).
+ *
+ * `admin` is always the service-role client, used for exactly one write the
+ * staff policies refuse: the agent's evidence event (0089 lets a person insert
+ * only `actor = 'staff'` events as themselves).
+ *
+ * ── IDEMPOTENT ──────────────────────────────────────────────────────────────
+ * A `queue_drafted` timeline row (payload.source 'consult-proposal') marks a
+ * meeting (`meeting_id`) or a pasted transcript (`paste_sha256`) as done. The
+ * same marker is what the queue's approve gate uses to find the proposal.
+ * The cron also records a call that holds nothing to draft as an `ai_insight`
+ * so it is not read again every day (`skipDecided`).
+ */
+
+export type ConsultProposalRunInput = {
+  /** The caller's scoped client (buttons) or the admin client (cron). Fenced on orgId either way. */
+  db: SupabaseClient;
+  /** Service-role client: the evidence event only. */
+  admin: SupabaseClient;
+  orgId: string;
+  /** The person who pressed the button; null for the cron. */
+  actorUserId: string | null;
+  source: ConsultSource;
+  lead: ConsultLead;
+  matterId: string | null;
+  llm: StructuredCall;
+  createDraft: (input: NewQueueDraft) => Promise<{ id: string }>;
+  queueOrgKey: string | null;
+  /** https://app.example.com — the client link and the staff link are built on it. */
+  origin: string | null;
+  now?: () => number;
+  /** Default: "[TEST] " unless VERCEL_ENV is production. */
+  testPrefix?: string;
+  /** The cron: also treat an earlier "nothing to draft" decision as done. */
+  skipDecided?: boolean;
+};
+
+export type ConsultProposalRefusal =
+  | "no_queue"
+  | "no_origin"
+  | "no_material"
+  | "too_long"
+  | "already_drafted"
+  | "no_settings"
+  | "no_approvers"
+  | "no_recommendation"
+  | "not_trademark"
+  | "ai_failed"
+  | "proposal_failed"
+  | "queue_failed"
+  | "link_failed"
+  | "unavailable";
+
+export type ConsultProposalResult =
+  | {
+      ok: true;
+      proposalId: string;
+      queueId: string;
+      clientName: string;
+      errorCount: number;
+      warningCount: number;
+      costUsd: number | null;
+    }
+  | { ok: false; reason: ConsultProposalRefusal; message: string; costUsd: number | null };
+
+const SUMMARY_CAP = 8000;
+
+const refuse = (reason: ConsultProposalRefusal, message: string, costUsd: number | null = null): ConsultProposalResult => ({
+  ok: false,
+  reason,
+  message,
+  costUsd,
+});
+
+function sourceHasMaterial(source: ConsultSource): boolean {
+  if (source.kind === "pasted") return source.text.trim().length > 0;
+  return Boolean(source.summary?.trim()) || (source.transcript?.length ?? 0) > 0;
+}
+
+function issueLines(issues: readonly ValidationIssue[]): string {
+  if (issues.length === 0) return "No rule problems found by the automatic check.";
+  const rows = issues.map((i) => `- ${i.level === "error" ? "Fix" : "Check"}: ${i.message}`);
+  return `The automatic check found ${issues.length} thing${issues.length === 1 ? "" : "s"} to look at:\n${rows.join("\n")}`;
+}
+
+type Row = Record<string, unknown>;
+
+/** Whether this call has already been handled. A failed read counts as handled: never draft twice on a guess. */
+async function alreadyHandled(input: ConsultProposalRunInput, meetingId: string | null, hash: string | null): Promise<boolean | "failed"> {
+  const types = input.skipDecided ? ["queue_drafted", "ai_insight"] : ["queue_drafted"];
+  let q = input.db
+    .from("crm_activity")
+    .select("id")
+    .eq("org_id", input.orgId)
+    .in("type", types)
+    .eq("payload->>source", CONSULT_PROPOSAL_SOURCE);
+  q = meetingId ? q.eq("payload->>meeting_id", meetingId) : q.eq("payload->>paste_sha256", hash as string);
+  const { data, error } = await q.limit(1);
+  if (error) return "failed";
+  return (data ?? []).length > 0;
+}
+
+export async function runConsultProposal(input: ConsultProposalRunInput): Promise<ConsultProposalResult> {
+  const { db, admin, orgId, source, lead } = input;
+  const now = input.now ?? Date.now;
+  const meetingId = source.kind === "meeting" ? source.meetingId : null;
+
+  if (!input.queueOrgKey) return refuse("no_queue", "No approval queue is connected for your firm, so nothing was drafted.");
+  if (!input.origin) return refuse("no_origin", "The site address isn't known here, so the proposal link couldn't be built. Nothing was drafted.");
+  if (!sourceHasMaterial(source)) return refuse("no_material", "There is no summary or transcript to draft from.");
+  if (source.kind === "pasted" && source.text.length > MAX_PASTED_TRANSCRIPT_CHARS) {
+    return refuse("too_long", `That transcript is too long. The most that can be pasted is ${MAX_PASTED_TRANSCRIPT_CHARS.toLocaleString("en-US")} characters.`);
+  }
+  const hash = source.kind === "pasted" ? pasteHash(source.text) : null;
+
+  const handled = await alreadyHandled(input, meetingId, hash);
+  if (handled === "failed") return refuse("unavailable", "Couldn't check for an earlier draft. Nothing was drafted. Try again shortly.");
+  if (handled) return refuse("already_drafted", "A proposal and email for this call have already been drafted. Find them in the approval queue.");
+
+  // The firm's standard prices and its approvers. No settings or nobody to
+  // approve = nothing is drafted: a proposal no one is allowed to approve is a
+  // dead end, and prices are never invented.
+  const { data: setting, error: settingErr } = await db
+    .from("client_proposal_setting")
+    .select("approver_user_ids, default_pay_url, pricing")
+    .eq("org_id", orgId)
+    .maybeSingle();
+  if (settingErr) return refuse("unavailable", "Couldn't read the proposal settings. Nothing was drafted. Try again shortly.");
+  if (!setting) return refuse("no_settings", "Your firm hasn't set up its proposal prices yet (Settings, then Client proposals), so nothing was drafted.");
+  const approvers = (setting as Row).approver_user_ids;
+  if (!Array.isArray(approvers) || approvers.length === 0) {
+    return refuse("no_approvers", "Your firm hasn't named a proposal approver yet (Settings, then Client proposals), so nothing was drafted.");
+  }
+
+  const [{ data: org }, { data: profile }] = await Promise.all([
+    db.from("crm_org").select("name, slug").eq("id", orgId).maybeSingle(),
+    db.from("crm_org_profile").select("time_zone, email_signature").eq("org_id", orgId).maybeSingle(),
+  ]);
+  const firmName = ((org as Row | null)?.name as string | undefined)?.trim() || "Your";
+  const firmSlug = ((org as Row | null)?.slug as string | undefined) ?? "";
+  const signature = ((profile as Row | null)?.email_signature as string | null | undefined)?.trim() || null;
+  const tz = resolveTimeZone((profile as Row | null)?.time_zone as string | undefined);
+  const teamSignOff = signature ?? `The ${firmName} Team`;
+
+  let draft: Awaited<ReturnType<typeof draftProposalFromConsult>>;
+  try {
+    draft = await draftProposalFromConsult({
+      source,
+      lead,
+      firm: { name: firmName, slug: firmSlug, teamSignOff },
+      pricing: standardProposalPricing((setting as Row).pricing),
+      defaultPayUrl: ((setting as Row).default_pay_url as string | null) ?? null,
+      today: firmCivilDate(new Date(now()), tz),
+      llm: input.llm,
+    });
+  } catch {
+    return refuse("ai_failed", "The proposal couldn't be written. Nothing was drafted. Try again shortly.");
+  }
+  if (!draft.ok) {
+    if (draft.reason !== "ai_failed" && input.skipDecided) {
+      // Don't read this call again tomorrow. Timeline-visible, never an error.
+      await db.from("crm_activity").insert({
+        org_id: orgId,
+        lead_id: lead.id,
+        matter_id: input.matterId,
+        type: "ai_insight",
+        actor_id: input.actorUserId,
+        actor_type: input.actorUserId ? "user" : "ai",
+        payload: {
+          source: CONSULT_PROPOSAL_SOURCE,
+          outcome: draft.reason,
+          meeting_id: meetingId,
+          paste_sha256: hash,
+          summary: `The consult agent read this call and drafted no proposal: ${draft.message}`,
+        },
+      });
+    }
+    return refuse(draft.reason, draft.message, draft.costUsd);
+  }
+
+  const clientName = draft.clientName;
+  const hasRealAddress = Boolean(lead.email && !lead.email.toLowerCase().endsWith(".invalid"));
+
+  // 1. The proposal: a DRAFT, source 'agent'. Not visible to the client; it
+  //    needs a named approver and then "Mark as sent" before its link works.
+  let proposal: Awaited<ReturnType<typeof insertAgentProposal>>;
+  try {
+    proposal = await insertAgentProposal(db as unknown as ProposalsDbClient, {
+      orgId,
+      createdBy: input.actorUserId,
+      clientName,
+      clientEmail: hasRealAddress ? draft.clientEmail : null,
+      title: draft.title,
+      content: draft.content,
+      leadId: lead.id,
+      matterId: input.matterId,
+      expiresOn: draft.expiresOn,
+      payUrl: draft.payUrl,
+    });
+  } catch {
+    return refuse("proposal_failed", "The proposal couldn't be saved. Nothing was drafted. Try again shortly.", draft.costUsd);
+  }
+
+  // 2. What the agent relied on, for the approver (best effort; the notes are also on the queue item).
+  await recordConsultDraftEvent(admin as unknown as ProposalsDbClient, proposal, {
+    source: CONSULT_PROPOSAL_SOURCE,
+    evidence: draft.evidence,
+    notes: draft.reviewerNotes,
+    ...(source.kind === "meeting" ? { meeting_id: source.meetingId, meeting_title: source.title } : {}),
+  });
+
+  // 3. The email, with the client link, into the approval queue.
+  const origin = input.origin.replace(/\/$/, "");
+  const proposalUrl = `${origin}/p/${proposal.public_token}/`;
+  const staffUrl = `${origin}/dashboard/proposals/${proposal.id}/`;
+  let email: { subject: string; body: string };
+  try {
+    email = renderProposalEmail(draft, { proposalUrl, signOff: teamSignOff });
+  } catch (err) {
+    await withdrawQuietly(db, orgId, proposal.id);
+    return refuse(
+      "unavailable",
+      `The email couldn't be written (${err instanceof Error ? err.message : "unknown problem"}), so the proposal was withdrawn and nothing is waiting.`,
+      draft.costUsd,
+    );
+  }
+  const testPrefix = input.testPrefix ?? (process.env.VERCEL_ENV === "production" ? "" : "[TEST] ");
+  const summary = [draft.reviewerNotes, `Proposal (review, edit, approve): ${staffUrl}`, issueLines(draft.issues)].join("\n\n").slice(0, SUMMARY_CAP);
+
+  let queueId: string;
+  try {
+    ({ id: queueId } = await input.createDraft({
+      orgKey: input.queueOrgKey,
+      agent: "post-consult",
+      type: "CLIENT_EMAIL",
+      headline: `${testPrefix}Proposal + follow-up — ${clientName}`.slice(0, 200),
+      summary,
+      clientName,
+      recipient: hasRealAddress ? (lead.email as string) : undefined,
+      subject: `${testPrefix}${email.subject}`,
+      draftBody: email.body,
+      ...(input.matterId ? { matterId: input.matterId } : {}),
+    }));
+  } catch {
+    await withdrawQuietly(db, orgId, proposal.id);
+    return refuse("queue_failed", "The email couldn't be queued, so the proposal was withdrawn and nothing is waiting. Try again shortly.", draft.costUsd);
+  }
+
+  // 4. The marker: idempotency AND the approve gate's only way to find the proposal.
+  const marker = {
+    org_id: orgId,
+    lead_id: lead.id,
+    matter_id: input.matterId,
+    type: "queue_drafted",
+    actor_id: input.actorUserId,
+    actor_type: input.actorUserId ? "user" : "ai",
+    payload: {
+      source: CONSULT_PROPOSAL_SOURCE,
+      proposal_id: proposal.id,
+      queue_id: queueId,
+      subject: email.subject,
+      ...(meetingId ? { meeting_id: meetingId } : {}),
+      ...(hash ? { paste_sha256: hash } : {}),
+    },
+  };
+  let written = false;
+  for (let attempt = 0; attempt < 2 && !written; attempt += 1) {
+    const { error } = await db.from("crm_activity").insert(marker);
+    written = !error;
+  }
+  if (!written) {
+    // Without the marker the approve gate can't find this proposal. Kill the
+    // client link (a withdrawn proposal's link stops working) and say so.
+    await withdrawQuietly(db, orgId, proposal.id);
+    return refuse(
+      "link_failed",
+      "The proposal and email were drafted but couldn't be linked, so the proposal was withdrawn. Reject the email now waiting in the approval queue.",
+      draft.costUsd,
+    );
+  }
+
+  return {
+    ok: true,
+    proposalId: proposal.id,
+    queueId,
+    clientName,
+    errorCount: draft.issues.filter((i) => i.level === "error").length,
+    warningCount: draft.issues.filter((i) => i.level === "warning").length,
+    costUsd: draft.costUsd,
+  };
+}
+
+async function withdrawQuietly(db: SupabaseClient, orgId: string, proposalId: string): Promise<void> {
+  try {
+    await db.from("client_proposal").update({ status: "withdrawn" }).eq("id", proposalId).eq("org_id", orgId);
+  } catch {
+    // The proposal is a draft nobody can see; leaving it is harmless.
+  }
+}

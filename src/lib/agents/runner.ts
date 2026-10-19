@@ -50,6 +50,7 @@ export type RunnerDeps = {
   mailbox?: SyncDeps;
   fetchImpl?: typeof fetch;
   now?: () => number;
+  siteOrigin?: () => Promise<string | null>;
 };
 
 export type RunOutcome = {
@@ -133,6 +134,7 @@ export async function runOneAgent(
     queueOrgKey: (org?.queue_org_key as string | null) ?? null,
     createDraft: deps.createDraft,
     now,
+    siteOrigin: deps.siteOrigin,
     fetchImpl: deps.fetchImpl,
     mailbox: deps.mailbox,
   };

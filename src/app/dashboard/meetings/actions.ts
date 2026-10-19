@@ -13,6 +13,9 @@ import { FollowUpSchema, followUpSystem } from "@/lib/agents/post-consult";
 import { getMeeting } from "@/lib/meetings/read";
 import { hasMaterial, meetingFollowUpPrompt } from "@/lib/meetings/follow-up";
 import { saveMeetingExtraction, type ConsultDb } from "@/lib/consult/store";
+import { gateStaffAction } from "@/app/dashboard/proposals/gate";
+import { draftProposalForStaff } from "@/lib/consult-proposal/staff-run";
+import { meetingSource } from "@/lib/consult-proposal/shared";
 
 /**
  * Meeting actions. Each is its own POST entry point, so each re-checks the
@@ -21,7 +24,7 @@ import { saveMeetingExtraction, type ConsultDb } from "@/lib/consult/store";
  * refuse a lead or matter from another firm.
  */
 
-export type ActionState = { ok?: boolean; error?: string; notice?: string };
+export type ActionState = { ok?: boolean; error?: string; notice?: string; /** Where to look at what was made. */ href?: string };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -191,4 +194,61 @@ export async function draftFollowUpAction(_prev: ActionState, formData: FormData
         ? " The consult details couldn't be saved; you can enter them on the lead."
         : "";
   return { ok: true, notice: base + extra };
+}
+
+/**
+ * Drafts a client PROPOSAL and its email from a recorded call: the proposal as
+ * a draft for a named approver to review, the email in the approval queue.
+ * Never sends, and nothing is visible to the client until the proposal is
+ * approved and marked sent.
+ *
+ * Gated like "Draft follow-up" (staff, the `agents` module, an approval queue,
+ * a lead to write to) plus the `proposals` module and the proposal staff
+ * roles. One draft per meeting (the marker the approve gate also uses).
+ */
+export async function draftProposalAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await staffSession();
+  if (!session) return { error: "Your role can't draft client email." };
+  const refused = await gateStaffAction();
+  if (refused) return { error: refused.error };
+  if (!(await orgHasModule("agents"))) return { error: "Drafting isn't turned on for your firm." };
+  const meetingId = idOrNull(formData.get("meetingId"));
+  if (!meetingId || meetingId === "bad") return { error: "Meeting not found." };
+
+  const read = await getMeeting(meetingId);
+  if (read.status !== "ok") return { error: "Couldn't load the meeting. Try again shortly." };
+  const meeting = read.meeting;
+  if (!meeting) return { error: "Meeting not found." };
+  if (!hasMaterial(meeting)) return { error: "This meeting has no summary or transcript yet, so there's nothing to draft from." };
+
+  const supabase = await getScopedClient();
+  let leadId = meeting.lead_id;
+  if (!leadId && meeting.matter_id) {
+    const { data: matter } = await supabase.from("crm_matter").select("lead_id").eq("id", meeting.matter_id).maybeSingle();
+    leadId = (matter?.lead_id as string | null | undefined) ?? null;
+  }
+  if (!leadId) return { error: "Link this meeting to a lead (or a matter with a client) first, so the draft has someone to go to." };
+  const { data: lead } = await supabase
+    .from("crm_lead")
+    .select("id, first_name, last_name, business_name, email")
+    .eq("id", leadId)
+    .maybeSingle();
+  if (!lead) return { error: "The linked lead couldn't be read." };
+
+  const done = await draftProposalForStaff({
+    orgId: session.org.id,
+    userId: session.user.id,
+    source: meetingSource({
+      id: meeting.id,
+      title: meeting.title,
+      started_at: meeting.started_at,
+      summary: meeting.summary,
+      transcript: meeting.transcript,
+    }),
+    lead: { id: lead.id, firstName: lead.first_name, lastName: lead.last_name, email: lead.email, businessName: lead.business_name },
+    matterId: meeting.matter_id,
+  });
+  if (!done.ok) return { error: done.error };
+  revalidatePath(`/dashboard/meetings/${meeting.id}/`);
+  return { ok: true, notice: done.notice, href: done.href };
 }

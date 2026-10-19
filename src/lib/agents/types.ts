@@ -48,6 +48,12 @@ export type AgentContext = {
   queueOrgKey: string | null;
   createDraft: (input: NewQueueDraft) => Promise<{ id: string }>;
   now: () => number;
+  /**
+   * The site's public origin ("https://app.example.com"), for the links the
+   * post-consult agent puts in client email. Null/absent = unknown: the agent
+   * then drafts no proposal (it never guesses a host for a client-facing link).
+   */
+  siteOrigin?: () => Promise<string | null>;
   /** For email-intel's body fetch; injected so tests stay offline. */
   fetchImpl?: typeof fetch;
   /** Mailbox deps for email-intel (root key + provider credentials). */

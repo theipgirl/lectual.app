@@ -12,6 +12,11 @@ import { Timeline } from "@/components/timeline/Timeline";
 import VoiceNoteRecorder from "@/components/voice/VoiceNoteRecorder";
 import { listTags, tagsForLead } from "@/lib/pipeline/tags";
 import { orgHasModule } from "@/lib/org/modules";
+import { aiConfigured } from "@/lib/ai/claude";
+import { listProposals } from "@/lib/proposals/store";
+import { PROPOSAL_STAFF_WRITE_ROLES } from "@/lib/proposals/types";
+import { MAX_PASTED_TRANSCRIPT_CHARS } from "@/lib/consult-proposal/types";
+import { LeadProposalsCard } from "@/components/leads/LeadProposalsCard";
 import { voiceNotePlaybackUrls } from "@/lib/voice/notes";
 import { addVoiceNoteAction } from "./actions";
 import { meetingsFor } from "@/lib/meetings/read";
@@ -36,8 +41,9 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   if (!lead) notFound();
 
   const supabase = await getScopedClient();
-  const [hasAgentToolkit, applied, catalog, meetings] = await Promise.all([
+  const [hasAgentToolkit, hasProposals, applied, catalog, meetings] = await Promise.all([
     orgHasModule("agent-toolkit"),
+    orgHasModule("proposals"),
     tagsForLead(id).catch(() => []),
     listTags().catch(() => []),
     meetingsFor({ leadId: id }),
@@ -52,6 +58,11 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
       .order("created_at", { ascending: false })
       .limit(100),
   ]);
+  const proposalRead = hasProposals
+    ? await listProposals({ leadId: id })
+        .then((proposals) => ({ status: "ok" as const, proposals }))
+        .catch(() => ({ status: "unavailable" as const }))
+    : null;
   const rows = activity ?? [];
   const voiceUrls = await voiceNotePlaybackUrls(rows);
 
@@ -169,6 +180,16 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           )}
 
           <LinkedMeetings read={meetings} />
+
+          {proposalRead && (
+            <LeadProposalsCard
+              leadId={lead.id}
+              read={proposalRead}
+              canWrite={canWrite && PROPOSAL_STAFF_WRITE_ROLES.includes(session.role)}
+              canDraft={aiConfigured()}
+              maxChars={MAX_PASTED_TRANSCRIPT_CHARS}
+            />
+          )}
 
           <ConsultDetailsSection leadId={lead.id} canWrite={canWrite} />
 

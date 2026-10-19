@@ -4,6 +4,7 @@ import { isCurrentUserApprover, offerTotals, proposalsDb, sendProposal } from "@
 import { ProposalError } from "@/lib/proposals/errors";
 import type { ProposalContent, ProposalStatus } from "@/lib/proposals/types";
 import { validateContent } from "@/lib/proposals/validate";
+import { CONSULT_PROPOSAL_SOURCE } from "./shared";
 
 /**
  * The link between an approval-queue item and the proposal the consult agent
@@ -24,7 +25,7 @@ import { validateContent } from "@/lib/proposals/validate";
  * (a server action re-checks everything; the panel on the page is a courtesy).
  */
 
-export const CONSULT_PROPOSAL_SOURCE = "consult-proposal";
+export { CONSULT_PROPOSAL_SOURCE };
 
 /** Queue ids are the queue service's own; only this shape is ever put in a filter string. */
 const QUEUE_ID = /^[A-Za-z0-9_-]{1,100}$/;

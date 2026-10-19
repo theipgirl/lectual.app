@@ -8,7 +8,7 @@ import { orgHasModule } from "@/lib/org/modules";
 import { relativeTime } from "@/lib/relative-time";
 import { formatDuration, formatWhen, getMeeting, linkLabels } from "@/lib/meetings/read";
 import { PROVIDER_LABEL } from "@/lib/meetings/types";
-import { DraftFollowUpButton, LinkMeetingForm } from "@/components/meetings/MeetingForms";
+import { DraftFollowUpButton, DraftProposalButton, LinkMeetingForm } from "@/components/meetings/MeetingForms";
 
 export const dynamic = "force-dynamic";
 
@@ -40,8 +40,9 @@ export default async function MeetingPage({ params }: { params: Promise<{ id: st
   if (!m) notFound();
 
   const canWrite = CAN_WRITE_LEAD.includes(session.role);
-  const [hasAgents, leads, matters, labels] = await Promise.all([
+  const [hasAgents, hasProposals, leads, matters, labels] = await Promise.all([
     orgHasModule("agents"),
+    orgHasModule("proposals"),
     canWrite ? listLeads().catch(() => []) : Promise.resolve([]),
     canWrite ? listMatters().catch(() => []) : Promise.resolve([]),
     linkLabels(
@@ -146,6 +147,7 @@ export default async function MeetingPage({ params }: { params: Promise<{ id: st
             <>
               <div className="lx-label">Follow-up</div>
               <DraftFollowUpButton meetingId={m.id} />
+              {hasProposals && <DraftProposalButton meetingId={m.id} />}
             </>
           )}
 

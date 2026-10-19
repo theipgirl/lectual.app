@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { ConsultDetailsExtractSchema } from "@/lib/consult/details";
 import { saveExtraction, type ConsultDb } from "@/lib/consult/store";
+import { runConsultProposal } from "@/lib/consult-proposal/run";
+import { CONSULT_PROPOSAL_SOURCE, meetingSource } from "@/lib/consult-proposal/shared";
 import { AGENT_POLICY } from "./policy";
 import type { AgentContext, AgentResult } from "./types";
 
@@ -30,6 +32,8 @@ import type { AgentContext, AgentResult } from "./types";
  */
 
 export const CONSULT_BATCH = 10;
+/** Recorded calls turned into a proposal + email per run (each is one long model call). */
+export const PROPOSAL_MEETING_BATCH = 5;
 const LOOKBACK_DAYS = 14;
 
 export const FollowUpSchema = z.object({
@@ -92,7 +96,131 @@ export function followUpPrompt(lead: { first_name: string; business_name: string
   ].join("\n");
 }
 
+/**
+ * The agent's two jobs: the follow-up email from the notetaker's consult notes
+ * (below), and, for firms that hold the `proposals` module, a proposal + email
+ * from a recorded call (`runMeetingProposals`). The second only runs at
+ * autonomy draft/act, only with an approval queue, and never changes the first.
+ */
 export async function runPostConsult(ctx: AgentContext): Promise<AgentResult> {
+  const notes = await runConsultNotes(ctx);
+  if (ctx.autonomy === "suggest" || !ctx.queueOrgKey) return notes;
+
+  let props: AgentResult;
+  try {
+    props = await runMeetingProposals(ctx);
+  } catch (err) {
+    // The notes path has already queued its drafts; a failure here must not hide that.
+    props = { itemsIn: 0, draftsOut: 0, summary: `Proposal drafting from recorded calls failed: ${err instanceof Error ? err.message : String(err)}`.slice(0, 300) };
+  }
+  if (props.itemsIn === 0 && !props.summary) return notes;
+  return {
+    itemsIn: notes.itemsIn + props.itemsIn,
+    draftsOut: notes.draftsOut + props.draftsOut,
+    summary: [notes.summary, props.summary].filter(Boolean).join(" "),
+    ...(notes.skipped ? { skipped: true } : {}),
+  };
+}
+
+/**
+ * Recorded calls (Fathom/Zoom, already linked to a lead) from the last
+ * LOOKBACK_DAYS that have a summary or transcript, no marker yet, in a firm
+ * that holds `proposals` and has set its prices and approvers: each becomes a
+ * DRAFT proposal plus one approval-queue email (src/lib/consult-proposal/run.ts).
+ * Nothing is sent and nothing is visible to the client; every statement is
+ * fenced on the firm's org_id.
+ */
+async function runMeetingProposals(ctx: AgentContext): Promise<AgentResult> {
+  const none: AgentResult = { itemsIn: 0, draftsOut: 0, summary: "" };
+  const { admin, orgId } = ctx;
+
+  // crm_org is keyed by `id` (it IS the org), the one table fenced that way.
+  const { data: org, error: orgErr } = await admin.from("crm_org").select("modules").eq("id", orgId).maybeSingle();
+  if (orgErr) throw new Error(`org read failed: ${orgErr.message}`);
+  if (!((org?.modules as string[] | null | undefined) ?? []).includes("proposals")) return none;
+
+  const { data: setting, error: settingErr } = await admin
+    .from("client_proposal_setting")
+    .select("approver_user_ids")
+    .eq("org_id", orgId)
+    .maybeSingle();
+  if (settingErr) throw new Error(`proposal settings read failed: ${settingErr.message}`);
+  const approvers = (setting?.approver_user_ids as string[] | null | undefined) ?? [];
+  if (!setting || approvers.length === 0) return none;
+
+  const origin = ctx.siteOrigin ? await ctx.siteOrigin() : null;
+  if (!origin) return { ...none, summary: "No site address is known, so no proposals were drafted from recorded calls." };
+
+  const since = new Date(ctx.now() - LOOKBACK_DAYS * 86_400_000).toISOString();
+  const { data: meetings, error } = await admin
+    .from("crm_meeting")
+    .select("id, title, started_at, lead_id, matter_id, summary, transcript_first:transcript->0")
+    .eq("org_id", orgId)
+    .not("lead_id", "is", null)
+    .gte("started_at", since)
+    .order("started_at", { ascending: true })
+    .limit(PROPOSAL_MEETING_BATCH * 4);
+  if (error) throw new Error(`meeting read failed: ${error.message}`);
+  const withMaterial = (meetings ?? []).filter((m) => Boolean((m.summary as string | null)?.trim()) || m.transcript_first != null);
+  if (withMaterial.length === 0) return none;
+
+  const { data: done, error: doneErr } = await admin
+    .from("crm_activity")
+    .select("payload")
+    .eq("org_id", orgId)
+    .in("type", ["queue_drafted", "ai_insight"])
+    .eq("payload->>source", CONSULT_PROPOSAL_SOURCE)
+    .in("payload->>meeting_id", withMaterial.map((m) => m.id));
+  if (doneErr) throw new Error(`activity read failed: ${doneErr.message}`);
+  const handled = new Set((done ?? []).map((d) => (d.payload as Record<string, string>).meeting_id));
+  const todo = withMaterial.filter((m) => !handled.has(m.id as string)).slice(0, PROPOSAL_MEETING_BATCH);
+  if (todo.length === 0) return none;
+
+  let drafted = 0;
+  const problems: string[] = [];
+  for (const m of todo) {
+    const [{ data: lead }, { data: full }] = await Promise.all([
+      admin.from("crm_lead").select("id, first_name, last_name, business_name, email").eq("id", m.lead_id as string).eq("org_id", orgId).maybeSingle(),
+      admin.from("crm_meeting").select("transcript").eq("id", m.id as string).eq("org_id", orgId).maybeSingle(),
+    ]);
+    if (!lead) continue;
+    const result = await runConsultProposal({
+      db: admin,
+      admin,
+      orgId,
+      actorUserId: null,
+      source: meetingSource({
+        id: m.id as string,
+        title: m.title as string | null,
+        started_at: m.started_at as string | null,
+        summary: m.summary as string | null,
+        transcript: full?.transcript ?? null,
+      }),
+      lead: {
+        id: lead.id as string,
+        firstName: lead.first_name as string | null,
+        lastName: lead.last_name as string | null,
+        email: lead.email as string | null,
+        businessName: lead.business_name as string | null,
+      },
+      matterId: (m.matter_id as string | null) ?? null,
+      llm: ctx.llm,
+      createDraft: ctx.createDraft,
+      queueOrgKey: ctx.queueOrgKey,
+      origin,
+      now: ctx.now,
+      skipDecided: true,
+    });
+    if (result.ok) drafted += 1;
+    else if (result.reason !== "no_recommendation" && result.reason !== "not_trademark" && result.reason !== "already_drafted") problems.push(result.reason);
+  }
+
+  const parts = [`${drafted} proposal(s) with email drafted for approval from ${todo.length} recorded call(s).`];
+  if (problems.length > 0) parts.push(`${problems.length} could not be drafted (${[...new Set(problems)].join(", ")}).`);
+  return { itemsIn: todo.length, draftsOut: drafted, summary: parts.join(" ") };
+}
+
+async function runConsultNotes(ctx: AgentContext): Promise<AgentResult> {
   const { admin, orgId, autonomy, llm } = ctx;
   if (autonomy !== "suggest" && !ctx.queueOrgKey) {
     return { itemsIn: 0, draftsOut: 0, summary: "No approval queue is connected for this firm, so no client email was drafted.", skipped: true };

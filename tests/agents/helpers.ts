@@ -41,6 +41,8 @@ export function assertOrgFenced(log: Recorded[], orgId = ORG) {
     const f = filterValue(q, "org_id");
     const ok =
       f === orgId ||
+      // crm_org IS the org: it is keyed (and fenced) by its own id.
+      (q.table === "crm_org" && q.action === "select" && filterValue(q, "id") === orgId) ||
       (q.action === "insert" && [q.values].flat().every((v) => (v as { org_id?: string }).org_id === orgId));
     if (!ok) throw new Error(`${q.action} ${q.table} is not fenced to the firm`);
   }

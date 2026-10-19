@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
-import { draftFollowUpAction, linkMeetingAction, type ActionState } from "@/app/dashboard/meetings/actions";
+import { draftFollowUpAction, draftProposalAction, linkMeetingAction, type ActionState } from "@/app/dashboard/meetings/actions";
 import {
   connectFathomAction,
   disconnectMeetingSourceAction,
@@ -108,6 +109,28 @@ export function DraftFollowUpButton({ meetingId }: { meetingId: string }) {
         Written from this meeting into the approval queue. Nothing is sent until an attorney edits and approves it.
       </p>
       <Result state={state} />
+    </form>
+  );
+}
+
+/** Drafts a proposal (for a named approver) and its email (for the approval queue) from this call. Never sends. */
+export function DraftProposalButton({ meetingId }: { meetingId: string }) {
+  const [state, action, pending] = useActionState<ActionState, FormData>(draftProposalAction, {});
+  return (
+    <form action={action} style={{ display: "grid", gap: 8 }}>
+      <input type="hidden" name="meetingId" value={meetingId} />
+      <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending || state.ok}>
+        {pending ? "Drafting…" : state.ok ? "Drafted" : "Draft proposal + email"}
+      </button>
+      <p className="lx-note" style={{ margin: 0 }}>
+        Reads the call and drafts the client proposal from what was recommended, plus the email with its link. The proposal needs a named approver, then the email waits in the approval queue. Nothing is sent.
+      </p>
+      <Result state={state} />
+      {state.ok && state.href && (
+        <p className="lx-note" style={{ margin: 0 }}>
+          <Link href={state.href}>Open the proposal</Link>
+        </p>
+      )}
     </form>
   );
 }
