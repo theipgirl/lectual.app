@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { PROPOSAL_MEETING_BATCH, runPostConsult } from "@/lib/agents/post-consult";
+import { PROPOSAL_MEETING_BATCH, PROPOSAL_SCAN_LIMIT, PROPOSAL_TIME_BUDGET_MS, runPostConsult } from "@/lib/agents/post-consult";
 import { ORG, agentCtx, assertOrgFenced, fakeLlm, writes } from "../agents/helpers";
 import { filterValue, type Recorded } from "../mailbox/fake-db";
 
@@ -109,6 +109,33 @@ describe("post-consult: recorded calls become proposals", () => {
     expect(filterValue(read, "org_id")).toBe(ORG);
     expect(read.filters.some((f) => f.op === "not" && f.column === "lead_id")).toBe(true);
     expect(read.filters.some((f) => f.op === "gte" && f.column === "started_at")).toBe(true);
+  });
+
+  it("looks at the newest calls first, over a window wider than one batch", async () => {
+    const t = setup();
+    await runPostConsult(t.ctx);
+    const read = t.log.find((q) => q.table === "crm_meeting" && q.columns?.includes("transcript_first"))!;
+    expect(read.order).toEqual({ column: "started_at", ascending: false });
+    expect(read.limit).toBe(PROPOSAL_SCAN_LIMIT);
+    expect(PROPOSAL_SCAN_LIMIT).toBeGreaterThan(PROPOSAL_MEETING_BATCH * 4);
+  });
+
+  it("starts no new proposal once the run's time budget is spent; the rest wait for the next run", async () => {
+    const t = setup({ meetings: meetings(5) });
+    let clock = 1_000_000;
+    t.ctx.now = () => clock;
+    const inner = t.ctx.llm;
+    // each model call takes 70 seconds
+    t.ctx.llm = (async (req: Parameters<typeof inner>[0]) => {
+      clock += 70_000;
+      return inner(req);
+    }) as typeof inner;
+    const r = await runPostConsult(t.ctx);
+    // starts at 0s and 70s; at 140s the budget is spent
+    expect(PROPOSAL_TIME_BUDGET_MS).toBe(120_000);
+    expect(r).toMatchObject({ itemsIn: 2, draftsOut: 2 });
+    expect(r.summary).toContain("3 left for the next run (time limit)");
+    expect(t.createDraft).toHaveBeenCalledTimes(2);
   });
 
   it("every statement it makes is fenced to the firm", async () => {

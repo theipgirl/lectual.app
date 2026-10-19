@@ -34,6 +34,16 @@ import type { AgentContext, AgentResult } from "./types";
 export const CONSULT_BATCH = 10;
 /** Recorded calls turned into a proposal + email per run (each is one long model call). */
 export const PROPOSAL_MEETING_BATCH = 5;
+/** Recent linked calls looked at per run, newest first, to find the ones not drafted yet. */
+export const PROPOSAL_SCAN_LIMIT = 50;
+/**
+ * No new proposal is STARTED once this much of the run has gone (measured from
+ * the start of the post-consult run, notes path included). One high-effort call
+ * can take a minute or two, and /api/cron/agents stops at 300s: a run killed
+ * between the proposal insert and its marker would leave an unlinked queue item
+ * and draft the call again next time. What is left is picked up on the next run.
+ */
+export const PROPOSAL_TIME_BUDGET_MS = 120_000;
 const LOOKBACK_DAYS = 14;
 
 export const FollowUpSchema = z.object({
@@ -103,12 +113,13 @@ export function followUpPrompt(lead: { first_name: string; business_name: string
  * autonomy draft/act, only with an approval queue, and never changes the first.
  */
 export async function runPostConsult(ctx: AgentContext): Promise<AgentResult> {
+  const startedAt = ctx.now();
   const notes = await runConsultNotes(ctx);
   if (ctx.autonomy === "suggest" || !ctx.queueOrgKey) return notes;
 
   let props: AgentResult;
   try {
-    props = await runMeetingProposals(ctx);
+    props = await runMeetingProposals(ctx, startedAt);
   } catch (err) {
     // The notes path has already queued its drafts; a failure here must not hide that.
     props = { itemsIn: 0, draftsOut: 0, summary: `Proposal drafting from recorded calls failed: ${err instanceof Error ? err.message : String(err)}`.slice(0, 300) };
@@ -130,7 +141,7 @@ export async function runPostConsult(ctx: AgentContext): Promise<AgentResult> {
  * Nothing is sent and nothing is visible to the client; every statement is
  * fenced on the firm's org_id.
  */
-async function runMeetingProposals(ctx: AgentContext): Promise<AgentResult> {
+async function runMeetingProposals(ctx: AgentContext, startedAt: number): Promise<AgentResult> {
   const none: AgentResult = { itemsIn: 0, draftsOut: 0, summary: "" };
   const { admin, orgId } = ctx;
 
@@ -158,8 +169,10 @@ async function runMeetingProposals(ctx: AgentContext): Promise<AgentResult> {
     .eq("org_id", orgId)
     .not("lead_id", "is", null)
     .gte("started_at", since)
-    .order("started_at", { ascending: true })
-    .limit(PROPOSAL_MEETING_BATCH * 4);
+    // Newest first: a proposal matters most right after the call, and with the
+    // oldest first a busy firm's window filled up with calls already drafted.
+    .order("started_at", { ascending: false })
+    .limit(PROPOSAL_SCAN_LIMIT);
   if (error) throw new Error(`meeting read failed: ${error.message}`);
   const withMaterial = (meetings ?? []).filter((m) => Boolean((m.summary as string | null)?.trim()) || m.transcript_first != null);
   if (withMaterial.length === 0) return none;
@@ -177,8 +190,15 @@ async function runMeetingProposals(ctx: AgentContext): Promise<AgentResult> {
   if (todo.length === 0) return none;
 
   let drafted = 0;
+  let read = 0;
+  let deferred = 0;
   const problems: string[] = [];
   for (const m of todo) {
+    if (ctx.now() - startedAt >= PROPOSAL_TIME_BUDGET_MS) {
+      deferred = todo.length - read;
+      break;
+    }
+    read += 1;
     const [{ data: lead }, { data: full }] = await Promise.all([
       admin.from("crm_lead").select("id, first_name, last_name, business_name, email").eq("id", m.lead_id as string).eq("org_id", orgId).maybeSingle(),
       admin.from("crm_meeting").select("transcript").eq("id", m.id as string).eq("org_id", orgId).maybeSingle(),
@@ -215,9 +235,10 @@ async function runMeetingProposals(ctx: AgentContext): Promise<AgentResult> {
     else if (result.reason !== "no_recommendation" && result.reason !== "not_trademark" && result.reason !== "already_drafted") problems.push(result.reason);
   }
 
-  const parts = [`${drafted} proposal(s) with email drafted for approval from ${todo.length} recorded call(s).`];
+  const parts = [`${drafted} proposal(s) with email drafted for approval from ${read} recorded call(s).`];
   if (problems.length > 0) parts.push(`${problems.length} could not be drafted (${[...new Set(problems)].join(", ")}).`);
-  return { itemsIn: todo.length, draftsOut: drafted, summary: parts.join(" ") };
+  if (deferred > 0) parts.push(`${deferred} left for the next run (time limit).`);
+  return { itemsIn: read, draftsOut: drafted, summary: parts.join(" ") };
 }
 
 async function runConsultNotes(ctx: AgentContext): Promise<AgentResult> {

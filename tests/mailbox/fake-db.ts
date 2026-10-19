@@ -10,6 +10,9 @@ export type Recorded = {
   values?: unknown;
   filters: Filter[];
   columns?: string;
+  /** The last .order() / .limit() on the query, for tests that care which rows are asked for. */
+  order?: { column: string; ascending: boolean };
+  limit?: number;
 };
 
 type Result = { data: unknown; error: { message: string; code?: string } | null };
@@ -36,9 +39,12 @@ class Query implements PromiseLike<Result> {
   gte(column: string, value: unknown) { this.rec.filters.push({ op: "gte", column, value }); return this; }
   lt(column: string, value: unknown) { this.rec.filters.push({ op: "lt", column, value }); return this; }
   upsert(values: unknown) { this.rec.action = "insert"; this.rec.values = values; return this; }
-  limit() { return this; }
+  limit(n?: number) { if (typeof n === "number") this.rec.limit = n; return this; }
   range() { return this; }
-  order() { return this; }
+  order(column?: string, opts?: { ascending?: boolean }) {
+    if (typeof column === "string") this.rec.order = { column, ascending: opts?.ascending ?? true };
+    return this;
+  }
   maybeSingle() { this.isSingle = true; return this; }
   single() { this.isSingle = true; return this; }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
