@@ -86,9 +86,12 @@ export function ProposalDocument(props: ProposalDocumentProps) {
 
   const selection = useMemo<Selection>(() => {
     const merged: Selection = { ...defaultSelection(content), ...(initialSelection ?? {}) };
-    if (!readOnly) Object.assign(merged, overrides);
+    // Kept after a live acceptance (toggle() is off by then): the receipt must
+    // show what the client ticked and accepted, not the firm's pre-ticked offer.
+    // Only a server-rendered receipt starts from `initialSelection` alone.
+    if (mode !== "accepted") Object.assign(merged, overrides);
     return normalizeSelection(content, merged);
-  }, [content, initialSelection, overrides, readOnly]);
+  }, [content, initialSelection, overrides, mode]);
 
   const quote = useMemo<ProposalQuote>(
     () => (mode === "accepted" && acceptedQuote ? acceptedQuote : quoteProposal(content, selection)),
@@ -448,7 +451,8 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                       </p>
                     ) : null}
                     <p className="cp-paynote">
-                      You&rsquo;ll pay <b className="cp-num">{money(quote.legal_total_cents)}</b> through our secure client
+                      You&rsquo;ll pay <b className="cp-num">{money(quote.legal_total_cents)}</b>{" "}
+                      through our secure client
                       portal. Once it&rsquo;s received, we&rsquo;ll send your engagement agreement for review and signature.
                     </p>
                   </>
