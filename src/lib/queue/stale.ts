@@ -5,6 +5,7 @@ import type { QueueItem } from "./api";
 import { loadStopFactsForLeads, loadStopFactsForPerson } from "@/lib/campaigns/stop-facts";
 import { earliest, staleSince, type StopDecision } from "@/lib/campaigns/stops";
 import { rowsOf, str, type StopDb } from "@/lib/campaigns/stop-db";
+import { DRAFT_PAYLOAD_KEYS, MAX_RECIPIENT_LEADS, QUEUE_ID, UUID, recipientAddresses } from "./link-rules";
 
 /**
  * The approval-time warning (intake SOP §2.5): a client email queued on
@@ -50,10 +51,6 @@ export type StaleCheck =
   /** The lead was found but its facts couldn't be read: fail closed, confirm required. */
   | { status: "unavailable"; leadIds: string[]; leadName: string | null; linkedBy: StaleLinkedBy };
 
-/** Queue ids are the queue service's own; anything outside this shape is never put in a filter string. */
-const QUEUE_ID = /^[A-Za-z0-9_-]{1,100}$/;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 /** Client-facing = a CLIENT_EMAIL, or any draft addressed to someone. */
 export function isClientFacing(item: Pick<QueueItem, "type" | "recipient">): boolean {
   return item.type === "CLIENT_EMAIL" || !!item.recipient?.trim();
@@ -77,7 +74,7 @@ async function resolveLeads(
   if (QUEUE_ID.test(item.id)) {
     // Two reads rather than one `.or()` over JSON paths: each is a plain
     // equality PostgREST cannot misparse, and the id is shape-checked anyway.
-    for (const key of ["queueItemId", "queue_id"]) {
+    for (const key of DRAFT_PAYLOAD_KEYS) {
       const { data, error } = await db
         .from("crm_activity")
         .select("lead_id, payload")
@@ -101,14 +98,11 @@ async function resolveLeads(
     const leadId = str((data as Record<string, unknown> | null)?.lead_id);
     if (leadId) return { leadIds: [leadId], linkedBy: "matter" };
   }
-  const recipient = item.recipient?.trim();
-  if (recipient && recipient.includes("@")) {
-    const { data, error } = await db
-      .from("crm_lead")
-      .select("id")
-      .in("email", [...new Set([recipient, recipient.toLowerCase()])]);
+  const addresses = recipientAddresses(item.recipient);
+  if (addresses) {
+    const { data, error } = await db.from("crm_lead").select("id").in("email", addresses);
     if (error) return "failed";
-    const ids = rowsOf(data).map((r) => str(r.id)).filter((v): v is string => !!v).slice(0, 5);
+    const ids = rowsOf(data).map((r) => str(r.id)).filter((v): v is string => !!v).slice(0, MAX_RECIPIENT_LEADS);
     if (ids.length > 0) return { leadIds: ids, linkedBy: "recipient" };
   }
   return null;
