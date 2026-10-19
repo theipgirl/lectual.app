@@ -155,8 +155,22 @@ describe("parseIntakeFilters", () => {
       owner: "user-1",
       stage: "s2",
       reply: "replied",
+      needsRebecca: false,
       q: "ada",
     });
+  });
+});
+
+describe("needsRebecca filter param", () => {
+  it("parses ?needs=rebecca and ignores any other value", () => {
+    expect(parseIntakeFilters({ needs: "rebecca" }).needsRebecca).toBe(true);
+    expect(parseIntakeFilters({ needs: "everyone" }).needsRebecca).toBe(false);
+    expect(parseIntakeFilters({}).needsRebecca).toBe(false);
+  });
+
+  it("serialises only when on", () => {
+    expect(filtersToQueryString({ ...EMPTY_INTAKE_FILTERS, needsRebecca: true })).toBe("needs=rebecca");
+    expect(filtersToQueryString(EMPTY_INTAKE_FILTERS)).toBe("");
   });
 });
 
@@ -173,6 +187,7 @@ describe("filtersToQueryString", () => {
       stage: "s3",
       reply: "awaiting" as const,
       lane: "suggested" as const,
+      needsRebecca: true,
       q: "acme",
     };
     const parsed = parseIntakeFilters(

@@ -70,6 +70,13 @@ export type IntakeFilters = {
   /** A crm_stage id. */
   stage: string | null;
   reply: ReplyState | null;
+  /**
+   * Only leads with a queued draft waiting on Rebecca. It is a flag here and
+   * NOT applied by applyFilters: the approval queue is a separate read the
+   * workspace holds, and applying it needs that read to have succeeded (see
+   * needs-rebecca.ts — an unreachable queue must never filter to "nobody").
+   */
+  needsRebecca: boolean;
   /** Free text over name / business / email / mark / referral detail / note. */
   q: string;
 };
@@ -81,6 +88,7 @@ export const EMPTY_INTAKE_FILTERS: IntakeFilters = {
   owner: null,
   stage: null,
   reply: null,
+  needsRebecca: false,
   q: "",
 };
 
@@ -130,6 +138,7 @@ export function parseIntakeFilters(params: IntakeSearchParams): IntakeFilters {
     owner: owner === "" ? null : owner,
     stage: stage === "" ? null : stage,
     reply: REPLY_STATES.includes(reply) ? reply : null,
+    needsRebecca: firstValue(params.needs) === "rebecca",
     q: firstValue(params.q),
   };
 }
@@ -147,6 +156,7 @@ export function filtersToQueryString(filters: IntakeFilters): string {
   if (filters.owner) params.set("owner", filters.owner);
   if (filters.stage) params.set("stage", filters.stage);
   if (filters.reply) params.set("reply", filters.reply);
+  if (filters.needsRebecca) params.set("needs", "rebecca");
   if (filters.q.trim()) params.set("q", filters.q.trim());
   return params.toString();
 }

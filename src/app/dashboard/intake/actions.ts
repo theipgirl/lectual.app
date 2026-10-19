@@ -5,9 +5,9 @@ import { getScopedClient } from "@/lib/db/scoped-client";
 import { assignLead, moveLeadStage } from "@/lib/pipeline";
 import { CAN_WRITE_LEAD, resolveCurrentRole } from "@/lib/pipeline/leads";
 import { forbiddenLeadWrite } from "@/lib/pipeline/errors";
-import { setLane, setTemperature } from "@/lib/intake/leads";
+import { setLane, setReferralSource, setTemperature } from "@/lib/intake/leads";
 import { isLane, type Lane } from "@/lib/leads/lane";
-import type { Temperature } from "@/lib/intake";
+import { isReferralSource, type ReferralSource, type Temperature } from "@/lib/intake";
 // Pure helpers, shared with the pipeline page rather than re-implemented:
 // only a LeadWriteError's message is ever allowed through to a firm user's
 // screen, so a raw RLS/Postgres string can't leak from this surface either.
@@ -133,6 +133,32 @@ export async function setLaneAction(leadId: string, lane: Lane | null): Promise<
     await setLane(leadId, lane);
   } catch (err) {
     return { ok: false, error: friendlyLeadWriteError(err, "Couldn't set this lead's lane.") };
+  }
+
+  revalidatePath("/dashboard/intake/");
+  revalidatePath(`/dashboard/leads/${leadId}`);
+  return { ok: true };
+}
+
+/**
+ * Sets or clears a lead's referral source from the card or the table row. The
+ * value is checked against REFERRAL_SOURCES here (it arrives as an unchecked
+ * string over the action boundary) and again in the data layer, which also
+ * re-checks the caller's role and writes the timeline row.
+ */
+export async function setSourceAction(
+  leadId: string,
+  source: ReferralSource | null,
+): Promise<IntakeActionResult> {
+  if (!leadId) return { ok: false, error: "Missing lead." };
+  if (source !== null && !isReferralSource(source)) {
+    return { ok: false, error: "That isn't one of the sources." };
+  }
+
+  try {
+    await setReferralSource(leadId, source);
+  } catch (err) {
+    return { ok: false, error: friendlyLeadWriteError(err, "Couldn't update this lead's source.") };
   }
 
   revalidatePath("/dashboard/intake/");
