@@ -28,6 +28,7 @@ import {
   PricingForm,
   type NameValues,
 } from "@/components/proposal-editor/Sections";
+import { GOES_LIVE_ON_APPROVAL, proposalSendBlock } from "@/lib/consult-proposal/link";
 import { requireProposalsModule } from "../gate";
 import "../proposals.css";
 
@@ -121,6 +122,11 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
   const latest = versions[0];
   const newer = latest && latest.version > proposal.version ? latest : null;
 
+  // A consult-agent proposal goes live by approving its email in the queue, so
+  // "Mark as sent" is replaced by a note while that email is pending (or unreadable).
+  const sendBlock =
+    canWrite && proposal.status === "approved" && proposal.source === "agent" ? await proposalSendBlock(proposal.id) : ({ blocked: false } as const);
+
   const clientUrl = proposal.status === "approved" || proposal.status === "sent" ? `${origin}/p/${proposal.public_token}/` : null;
 
   const readOnlyNote = readOnlyText(proposal, canWrite, approverNames);
@@ -177,6 +183,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
         blockingErrors={errors}
         approverNames={approverNames}
         clientUrl={clientUrl}
+        queueNote={sendBlock.blocked ? { text: GOES_LIVE_ON_APPROVAL, queueId: sendBlock.queueId } : null}
       />
 
       {readOnlyNote && (

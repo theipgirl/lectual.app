@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import type { ProposalStatus } from "@/lib/proposals/types";
 import { joinOr } from "@/lib/proposal-editor/labels";
@@ -21,6 +22,7 @@ export function Lifecycle({
   blockingErrors,
   approverNames,
   clientUrl,
+  queueNote = null,
 }: {
   proposalId: string;
   status: ProposalStatus;
@@ -32,6 +34,8 @@ export function Lifecycle({
   approverNames: string[];
   /** `/p/<token>` on this app's origin; only passed for approved / sent versions. */
   clientUrl: string | null;
+  /** Set when this proposal's email is still pending in the approval queue (or can't be read): shown instead of "Mark as sent". */
+  queueNote?: { text: string; queueId: string | null } | null;
 }) {
   const hidden = <input type="hidden" name="proposalId" value={proposalId} />;
   const approvers = approverNames.length > 0 ? joinOr(approverNames) : "a named approver";
@@ -55,7 +59,16 @@ export function Lifecycle({
         <span className="lx-note">Waiting for {approvers} to approve it.</span>
       )}
 
-      {canWrite && status === "approved" && (
+      {canWrite && status === "approved" && queueNote && (
+        <span className="lx-note" role="note">
+          {queueNote.text}{" "}
+          <Link href={queueNote.queueId ? `/dashboard/queue/${queueNote.queueId}/` : "/dashboard/queue/"}>
+            {queueNote.queueId ? "Open the queue item" : "Open the approval queue"}
+          </Link>
+          .
+        </span>
+      )}
+      {canWrite && status === "approved" && !queueNote && (
         <ActionForm action={sendAction} className="pe-act">
           {({ state, pending }) => (
             <>

@@ -62,6 +62,8 @@ type Opts = {
   activityReadFails?: boolean;
   markerFails?: number;
   proposalInsertFails?: boolean;
+  org?: { name: string | null; slug: string | null };
+  signature?: string | null;
 };
 
 function handler(o: Opts = {}): Handler {
@@ -83,8 +85,8 @@ function handler(o: Opts = {}): Handler {
       const setting = o.setting === undefined ? { approver_user_ids: ["rebecca"], default_pay_url: "https://pay.example.com/form", pricing: {} } : o.setting;
       return { data: setting, error: null };
     }
-    if (q.table === "crm_org") return { data: { name: "RPB Law", slug: "rpb-law" }, error: null };
-    if (q.table === "crm_org_profile") return { data: { time_zone: "America/New_York", email_signature: null }, error: null };
+    if (q.table === "crm_org") return { data: o.org ?? { name: "RPB Law", slug: "rpb-law" }, error: null };
+    if (q.table === "crm_org_profile") return { data: { time_zone: "America/New_York", email_signature: o.signature ?? null }, error: null };
     if (q.table === "client_proposal" && q.action === "insert") {
       if (o.proposalInsertFails) return { data: null, error: { message: "boom" } };
       return { data: { ...(q.values as object), public_token: TOKEN }, error: null };
@@ -233,6 +235,32 @@ describe("runConsultProposal", () => {
       expect(writes(t.db.log, "client_proposal", "insert")).toHaveLength(0);
       assertOrgFenced(t.db.log);
     }
+  });
+
+  it("signs the email 'Best,' + 'The <Firm> Team' from the org name, never the profile's email_signature", async () => {
+    const t = setup({ org: { name: "RPB Law (dev)", slug: "rpb-law-dev" }, signature: "Rebecca Bunch\nPartner" });
+    const r = await runConsultProposal(t.input);
+    expect(r.ok).toBe(true);
+    const body = String((t.createDraft.mock.calls[0] as unknown as [Record<string, unknown>])[0].draftBody);
+    expect(body.endsWith("Best,\nThe RPB Law Team")).toBe(true);
+    expect(body.match(/Best,/g)).toHaveLength(1);
+    expect(body).not.toContain("Rebecca Bunch");
+  });
+
+  it("falls back to the humanised org slug when the name is empty", async () => {
+    const t = setup({ org: { name: "  ", slug: "rpb-law" } });
+    expect((await runConsultProposal(t.input)).ok).toBe(true);
+    const body = String((t.createDraft.mock.calls[0] as unknown as [Record<string, unknown>])[0].draftBody);
+    expect(body.endsWith("Best,\nThe Rpb Law Team")).toBe(true);
+  });
+
+  it("refuses to draft when the firm has neither a name nor a slug (never 'The Team')", async () => {
+    const t = setup({ org: { name: "", slug: "" } });
+    const r = await runConsultProposal(t.input);
+    expect(r).toMatchObject({ ok: false, reason: "no_firm_name" });
+    expect(t.calls).toHaveLength(0);
+    expect(t.createDraft).not.toHaveBeenCalled();
+    expect(writes(t.db.log, "client_proposal", "insert")).toHaveLength(0);
   });
 
   it("refuses without an approval queue or a site address", async () => {

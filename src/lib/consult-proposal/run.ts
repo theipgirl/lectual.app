@@ -10,7 +10,7 @@ import { standardProposalPricing } from "@/lib/proposals/types";
 import type { ValidationIssue } from "@/lib/proposals/validate";
 import { draftProposalFromConsult } from "./draft";
 import { renderProposalEmail } from "./email";
-import { CONSULT_PROPOSAL_SOURCE, pasteHash } from "./shared";
+import { CONSULT_PROPOSAL_SOURCE, firmSignatureName, firmTeamSignOff, pasteHash } from "./shared";
 import { MAX_PASTED_TRANSCRIPT_CHARS, type ConsultLead, type ConsultSource } from "./types";
 
 /**
@@ -66,6 +66,7 @@ export type ConsultProposalRefusal =
   | "already_drafted"
   | "no_settings"
   | "no_approvers"
+  | "no_firm_name"
   | "no_recommendation"
   | "not_trademark"
   | "ai_failed"
@@ -169,13 +170,17 @@ export async function runConsultProposal(input: ConsultProposalRunInput): Promis
 
   const [{ data: org }, { data: profile }] = await Promise.all([
     db.from("crm_org").select("name, slug").eq("id", orgId).maybeSingle(),
-    db.from("crm_org_profile").select("time_zone, email_signature").eq("org_id", orgId).maybeSingle(),
+    db.from("crm_org_profile").select("time_zone").eq("org_id", orgId).maybeSingle(),
   ]);
-  const firmName = ((org as Row | null)?.name as string | undefined)?.trim() || "Your";
+  const orgName = ((org as Row | null)?.name as string | undefined) ?? "";
   const firmSlug = ((org as Row | null)?.slug as string | undefined) ?? "";
-  const signature = ((profile as Row | null)?.email_signature as string | null | undefined)?.trim() || null;
   const tz = resolveTimeZone((profile as Row | null)?.time_zone as string | undefined);
-  const teamSignOff = signature ?? `The ${firmName} Team`;
+  // Always "The <Firm> Team": never the org's email_signature (a personal block).
+  const teamSignOff = firmTeamSignOff(orgName, firmSlug);
+  if (!teamSignOff) {
+    return refuse("no_firm_name", "Your firm has no name set (Settings, then Firm), so the email can't be signed. Nothing was drafted.");
+  }
+  const firmName = firmSignatureName(orgName, firmSlug) as string;
 
   let draft: Awaited<ReturnType<typeof draftProposalFromConsult>>;
   try {

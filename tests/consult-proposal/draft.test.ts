@@ -255,6 +255,40 @@ describe("class numbers never reach the client", () => {
     expect(d.reviewerNotes).toContain("its label was only a class number");
   });
 
+  it("strips spelled-out class numbers the same way", async () => {
+    const out = sevetriOutput();
+    out.brands[0].classes[0].label = "Class Nine: Cloud-Based Software as a Service (SaaS)";
+    out.brands[0].classes[1].label = "Consulting & Professional Services (Class Forty-Two)";
+    out.brands[1].classes[0].label = "International Class Thirty-Five Charitable Services";
+    const d = expectOk(await draftProposalFromConsult(draftInput(fakeLlm(out).llm)));
+    const labels = d.content.names.flatMap((n) => n.classes.map((c) => c.label));
+    expect(labels).toEqual([
+      "Cloud-Based Software as a Service (SaaS)",
+      "Consulting & Professional Services",
+      "Charitable Services",
+      "Educational Workshops & AI Upskilling Programs",
+    ]);
+    expect(d.issues).toEqual([]);
+    expect(d.reviewerNotes).toContain("Removed a class number from");
+  });
+
+  it("drops a class whose label was only a spelled-out class number", async () => {
+    const out = sevetriOutput();
+    out.brands[0].classes[1].label = "Class Thirty Five";
+    const d = expectOk(await draftProposalFromConsult(draftInput(fakeLlm(out).llm)));
+    expect(d.content.names[0].classes.map((c) => c.label)).toEqual(["Cloud-Based Software as a Service (SaaS)"]);
+    expect(d.reviewerNotes).toContain("its label was only a class number");
+  });
+
+  it("stripClassNumbers handles spelled-out numbers and leaves ordinary words alone", () => {
+    expect(stripClassNumbers("Clothing (Class Twenty-Five)").text).toBe("Clothing");
+    expect(stripClassNumbers("Classes nine and forty two software").text).toBe("software");
+    expect(stripClassNumbers("International Class Nine").text).toBe("");
+    expect(stripClassNumbers("class FORTY-TWO Consulting").text).toBe("Consulting");
+    expect(stripClassNumbers("World-class one-of-a-kind design")).toEqual({ text: "World-class one-of-a-kind design", stripped: false });
+    expect(stripClassNumbers("Upper class oneness coaching").stripped).toBe(false);
+  });
+
   it("stripClassNumbers handles the usual shapes", () => {
     expect(stripClassNumbers("Clothing (Class 25)").text).toBe("Clothing");
     expect(stripClassNumbers("IC 009 Downloadable software").text).toBe("Downloadable software");

@@ -185,7 +185,8 @@ export function renderProposalEmail(
   opts: RenderProposalEmailOptions,
 ): { subject: string; body: string } {
   const url = checkProposalUrl(opts.proposalUrl);
-  const signOff = opts.signOff.trim();
+  // The template already says "Best,": a sign-off that brings its own is cut back to the name.
+  const signOff = opts.signOff.replace(/\r\n?/g, "\n").replace(/^\s*best(?:\s+regards)?\s*,?\s*\n+/i, "").trim();
   if (!signOff) throw new ProposalEmailError("The email needs the firm's sign-off.");
 
   let template = isUsableEmailTemplate(opts.template) ? opts.template : DEFAULT_PROPOSAL_EMAIL_TEMPLATE;
@@ -214,6 +215,8 @@ export function renderProposalEmail(
     )
     .replace(/[ \t]+$/gm, "")
     .replace(/\n{3,}/g, "\n\n")
+    // Never "Best," twice (a firm template that also writes its own closing).
+    .replace(/^(Best,[ \t]*\n)(?:[ \t]*\n)*(?=Best,[ \t]*(?:\n|$))/gm, "")
     .trim();
 
   return { subject: draft.email.subject.replace(/\s+/g, " ").trim(), body };

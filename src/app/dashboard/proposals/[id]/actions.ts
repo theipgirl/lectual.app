@@ -15,6 +15,7 @@ import {
   type UpdateProposalInput,
 } from "@/lib/proposals/store";
 import type { ProposalContent, ProposalRow } from "@/lib/proposals/types";
+import { GOES_LIVE_ON_APPROVAL, proposalSendBlock } from "@/lib/consult-proposal/link";
 import {
   newBrandName,
   parseAdjustments,
@@ -174,7 +175,27 @@ export async function unapproveAction(_prev: ActionState, formData: FormData): P
 
 /** Marks the version sent (the client link starts working). Nothing is emailed from here. */
 export async function sendAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const refused = await gateStaffAction();
+  if (refused) return refused;
+  // A proposal the consult agent drafted goes live only when its email is
+  // approved in the queue (fails closed). The button is hidden for it, but a
+  // hand-posted form must not get around that.
+  const blocked = await consultSendRefusal(field(formData, "proposalId"));
+  if (blocked) return { error: blocked };
   return lifecycle(formData, sendProposal, "Marked as sent. The client link is live.", "Couldn't mark this proposal as sent.");
+}
+
+async function consultSendRefusal(id: string): Promise<string | null> {
+  let proposal: ProposalRow | null;
+  try {
+    proposal = (await getProposal(id))?.proposal ?? null;
+  } catch {
+    return GOES_LIVE_ON_APPROVAL;
+  }
+  // Only the consult agent's proposals have a queue email; a missing one falls through to the store's own "not found".
+  if (!proposal || proposal.source !== "agent") return null;
+  const block = await proposalSendBlock(id);
+  return block.blocked ? GOES_LIVE_ON_APPROVAL : null;
 }
 
 export async function withdrawAction(_prev: ActionState, formData: FormData): Promise<ActionState> {

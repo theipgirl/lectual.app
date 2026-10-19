@@ -9,6 +9,7 @@ import {
   renderProposalEmail,
   type RenderableProposalDraft,
 } from "@/lib/consult-proposal/email";
+import { firmTeamSignOff } from "@/lib/consult-proposal/shared";
 import { fakeLlm } from "../agents/helpers";
 import { draftInput, sevetriOutput } from "./fixture";
 
@@ -46,6 +47,35 @@ If you have any questions about the proposal, our recommendations, or next steps
 
 Best,
 The RPB Law Team`;
+
+describe("the sign-off", () => {
+  it("never duplicates 'Best,' whether the sign-off or the template brings its own", async () => {
+    const d = await sevetriDraft();
+    const a = renderProposalEmail(d, { ...opts, signOff: "Best,\nThe RPB Law Team" }).body;
+    expect(a).toBe(SEVETRI_BODY);
+    const custom = "Hi {first_name},\n\n{reasoning}\n\n{proposal_title}\n{proposal_url}\n\nBest,\n{sign_off}";
+    const b = renderProposalEmail(d, { ...opts, template: custom }).body;
+    expect(b.match(/Best,/g)).toHaveLength(1);
+    const doubled = "Hi {first_name},\n\n{proposal_title}\n{proposal_url}\n\nBest,\n\nBest,\n{sign_off}";
+    expect(renderProposalEmail(d, { ...opts, template: doubled }).body.match(/Best,/g)).toHaveLength(1);
+  });
+});
+
+describe("firmTeamSignOff", () => {
+  it("is 'The <Firm> Team', dropping one trailing parenthetical", () => {
+    expect(firmTeamSignOff("RPB Law", "rpb-law")).toBe("The RPB Law Team");
+    expect(firmTeamSignOff("RPB Law (dev)", "rpb-law-dev")).toBe("The RPB Law Team");
+    expect(firmTeamSignOff("  RPB   Law  ", null)).toBe("The RPB Law Team");
+    expect(firmTeamSignOff("Acme (A) (dev)", null)).toBe("The Acme (A) Team");
+    expect(firmTeamSignOff("The Hartwell Team", null)).toBe("The Hartwell Team");
+  });
+  it("humanises the slug when the name is empty, and gives null when there is nothing", () => {
+    expect(firmTeamSignOff("", "rpb-law")).toBe("The Rpb Law Team");
+    expect(firmTeamSignOff("(dev)", "hartwell_ip")).toBe("The Hartwell Ip Team");
+    expect(firmTeamSignOff(null, null)).toBeNull();
+    expect(firmTeamSignOff(" ", "")).toBeNull();
+  });
+});
 
 describe("renderProposalEmail", () => {
   it("renders the Sevetri email exactly", async () => {

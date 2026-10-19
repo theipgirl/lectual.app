@@ -44,3 +44,29 @@ export function meetingSource(m: {
     transcript: turns.length > 0 ? turns : null,
   };
 }
+
+/**
+ * The firm's name as it is signed: the org's display name with ONE trailing
+ * parenthetical dropped ("RPB Law (dev)" -> "RPB Law"). When the name is empty,
+ * the org slug humanised ("rpb-law" -> "Rpb Law"). Null when there is neither.
+ */
+export function firmSignatureName(name: string | null | undefined, slug: string | null | undefined): string | null {
+  const clean = (v: string) => v.replace(/\s+/g, " ").trim();
+  const fromName = clean((name ?? "").replace(/\s*\([^()]*\)\s*$/, ""));
+  if (fromName) return fromName;
+  const fromSlug = clean((slug ?? "").replace(/[-_]+/g, " ")).replace(/\b[a-z]/g, (c) => c.toUpperCase());
+  return fromSlug || null;
+}
+
+/**
+ * The sign-off line of the proposal email: always "The <Firm> Team" (Rebecca's
+ * rule: signed by the firm team, never a personal block, never the org's
+ * email_signature). Null when the firm has no usable name at all: the caller
+ * must refuse to draft rather than sign it "The Team".
+ */
+export function firmTeamSignOff(name: string | null | undefined, slug: string | null | undefined): string | null {
+  const firm = firmSignatureName(name, slug);
+  if (!firm) return null;
+  const bare = firm.replace(/^the\s+/i, "").replace(/\s+team$/i, "").trim() || firm;
+  return `The ${bare} Team`;
+}

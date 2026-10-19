@@ -1,5 +1,7 @@
 import "server-only";
 import { getScopedClient } from "@/lib/db/scoped-client";
+import { getQueueItem } from "@/lib/queue/api";
+import { activeQueueOrgKey } from "@/lib/queue/org";
 import { isCurrentUserApprover, offerTotals, proposalsDb, sendProposal } from "@/lib/proposals/store";
 import { ProposalError } from "@/lib/proposals/errors";
 import type { ProposalContent, ProposalStatus } from "@/lib/proposals/types";
@@ -186,5 +188,56 @@ export async function makeProposalLive(proposalId: string): Promise<{ ok: true }
     if (again.status === "ok" && again.proposal.status === "sent") return { ok: true };
     const message = err instanceof ProposalError ? err.message : "the database could not be reached";
     return { ok: false, error: message };
+  }
+}
+
+/* ── "Mark as sent" for a proposal the consult agent drafted ────────────────── */
+
+export const GOES_LIVE_ON_APPROVAL = "This proposal goes live when Rebecca approves its email in the approval queue.";
+
+/**
+ * May "Mark as sent" be used on this proposal? Not while the consult agent's
+ * email for it is still waiting in the approval queue: the go-live for those
+ * happens only by approving that email (`reviewQueueAction`), so the link
+ * can't go live before the email that carries it was reviewed. A rejected
+ * email frees the proposal (staff may share the link by hand, as for any
+ * proposal); an approved one means it already went live.
+ *
+ * Fails CLOSED: a marker, queue or item that cannot be read blocks it. The
+ * caller passes only proposals with `source === 'agent'` (no other proposal
+ * has a marker), so an ordinary proposal never pays for this lookup.
+ * `queueId` is null when the item is not known (the marker was unreadable).
+ */
+export type SendBlock = { blocked: false } | { blocked: true; queueId: string | null; reason: "pending" | "unreadable" };
+
+export async function proposalSendBlock(proposalId: string): Promise<SendBlock> {
+  if (!UUID.test(proposalId)) return { blocked: false };
+  let queueId: string;
+  try {
+    const supabase = await getScopedClient();
+    const { data, error } = await supabase
+      .from("crm_activity")
+      .select("payload")
+      .eq("type", "queue_drafted")
+      .eq("payload->>source", CONSULT_PROPOSAL_SOURCE)
+      .eq("payload->>proposal_id", proposalId)
+      .limit(1);
+    if (error) return { blocked: true, queueId: null, reason: "unreadable" };
+    const row = (data ?? [])[0] as { payload?: Record<string, unknown> | null } | undefined;
+    if (!row) return { blocked: false };
+    const id = row.payload?.queue_id;
+    if (typeof id !== "string" || !QUEUE_ID.test(id)) return { blocked: true, queueId: null, reason: "unreadable" };
+    queueId = id;
+  } catch {
+    return { blocked: true, queueId: null, reason: "unreadable" };
+  }
+  try {
+    const orgKey = await activeQueueOrgKey();
+    if (!orgKey) return { blocked: true, queueId, reason: "unreadable" };
+    const item = await getQueueItem(orgKey, queueId);
+    if (item.status === "pending") return { blocked: true, queueId, reason: "pending" };
+    return { blocked: false };
+  } catch {
+    return { blocked: true, queueId, reason: "unreadable" };
   }
 }
