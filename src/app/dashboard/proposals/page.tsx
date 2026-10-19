@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
  * never renders as "No proposals yet".
  *
  * Gate: the `proposals` module (notFound when off, so one firm cannot learn
- * what another has). Reading is for the whole firm (0086's select policy is
+ * what another has). Reading is for the whole firm (0089's select policy is
  * org members); starting a proposal is for the staff roles, and the action
  * re-checks that.
  */

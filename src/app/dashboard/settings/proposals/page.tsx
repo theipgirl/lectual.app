@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
  * proposal starts from (`client_proposal_setting`).
  *
  * Gate: the `proposals` module (notFound when off), then owner / admin /
- * senior_admin (0086's insert/update policy). The role refusal is an in-firm
+ * senior_admin (0089's insert/update policy). The role refusal is an in-firm
  * explanation; the save action re-checks both, and RLS is the boundary.
  */
 export default async function ProposalSettingsPage() {

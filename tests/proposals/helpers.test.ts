@@ -200,7 +200,7 @@ describe("generateProposalToken and isWellFormedProposalToken", () => {
 });
 
 describe("lifecycle vocabulary", () => {
-  it("allows exactly the moves the 0086 trigger allows", () => {
+  it("allows exactly the moves the 0089 trigger allows", () => {
     const allowed = [
       ["draft", "approved"],
       ["approved", "draft"],

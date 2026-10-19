@@ -39,7 +39,7 @@ export const dynamic = "force-dynamic";
  * ── GATES ───────────────────────────────────────────────────────────────────
  * The `proposals` module first (notFound when off), then the row itself: a
  * wrong id or another firm's is `notFound()` (RLS makes those the same). Anyone
- * in the firm can open it; `canWrite` (the staff roles, mirroring 0086's RLS)
+ * in the firm can open it; `canWrite` (the staff roles, mirroring 0089's RLS)
  * decides whether the forms are live, and every action re-checks it.
  *
  * ── WHAT IS EDITABLE ────────────────────────────────────────────────────────

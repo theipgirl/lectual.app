@@ -9,7 +9,7 @@
  * `src/lib/quotes` models one package plus add-ons plus a typed signature. RPB
  * sells brand names x marks x classes, with a second-mark discount, "accept"
  * (not "sign") followed by a payment form, and the engagement letter only after
- * payment. The table is lectual's 0086 `client_proposal`; this file mirrors its
+ * payment. The table is lectual's 0089 `client_proposal`; this file mirrors its
  * columns by hand (the generated `Database` type has no such table until the
  * migration is applied somewhere types can be regenerated from).
  *
@@ -30,7 +30,7 @@
 import type { Role } from "@/lib/auth/roles";
 
 /* ─────────────────────────── role gates ──────────────────────────────────
- * Mirror the RLS policy role lists in 0086, verbatim. RLS is the real
+ * Mirror the RLS policy role lists in 0089, verbatim. RLS is the real
  * boundary; these are the friendly app-layer refusal.
  */
 
@@ -97,7 +97,7 @@ export function isProposalEditable(status: string): boolean {
 }
 
 /**
- * The status moves the 0086 trigger allows. accepted / superseded / withdrawn
+ * The status moves the 0089 trigger allows. accepted / superseded / withdrawn
  * are terminal. `approved` is reachable only by a named approver and `accepted`
  * only by the service role; this table says what is possible, not who may.
  */
@@ -465,7 +465,7 @@ export function standardProposalPricing(setting: unknown): {
 
 /**
  * The shape a real `client_proposal.public_token` has: unpadded base64url,
- * 32..64 characters (0086's check; 32 random bytes is 43). Checked before any
+ * 32..64 characters (0089's check; 32 random bytes is 43). Checked before any
  * query so token-guessing traffic is free to refuse and only `[A-Za-z0-9_-]`
  * ever reaches PostgREST's filter parser.
  */

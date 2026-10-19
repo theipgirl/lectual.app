@@ -17,7 +17,7 @@ import { NOT_ALLOWED, type ActionState } from "./errors";
  * The role refusal is an in-firm sentence, because naming the roles that may
  * write discloses nothing a colleague could not ask.
  *
- * The role lists are the friendly refusal that mirrors 0086's RLS. RLS (and,
+ * The role lists are the friendly refusal that mirrors 0089's RLS. RLS (and,
  * for approval, the trigger) is the real boundary.
  */
 

@@ -14,7 +14,7 @@ import { gateAdminAction } from "../../proposals/gate";
  *
  * Its own POST entry point: the module gate (notFound) and the owner / admin /
  * senior_admin gate run first, and `saveProposalSettings` re-checks the role
- * and validates the input again; 0086's RLS is the boundary underneath.
+ * and validates the input again; 0089's RLS is the boundary underneath.
  *
  * Approvers are picked from the firm's own member directory, and an id that is
  * not on it is refused here: the database holds a bare uuid[] with no

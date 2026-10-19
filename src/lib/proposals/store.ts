@@ -32,10 +32,10 @@ import { MAX_CONTENT_BYTES, hasErrors, isCivilDate, isPlausibleEmail, validateCo
  * function, so each query carries the caller's `active_org_id` and RLS is the
  * real boundary. `org_id` on an INSERT is read from `current_org_id()`, never
  * from caller input. The role checks below are the friendly refusal that
- * mirrors the 0086 policy lists; they are not the boundary.
+ * mirrors the 0089 policy lists; they are not the boundary.
  *
  * ── WHAT THE DATABASE DOES, SO THIS FILE DOES NOT ───────────────────────────
- * The 0086 BEFORE UPDATE trigger owns the lifecycle: it freezes sent / accepted
+ * The 0089 BEFORE UPDATE trigger owns the lifecycle: it freezes sent / accepted
  * / superseded / withdrawn rows, silently returns an edited APPROVED row to
  * draft, allows only the legal status moves, lets only a named approver reach
  * `approved` (stamping approved_by / approved_at), and stamps updated_at /
@@ -59,7 +59,7 @@ import { MAX_CONTENT_BYTES, hasErrors, isCivilDate, isPlausibleEmail, validateCo
  * transaction as the status change, so they cannot be missing.
  *
  * ── THE `ProposalsDbClient` CAST ────────────────────────────────────────────
- * The generated `Database` type has no 0086 tables until a project they are
+ * The generated `Database` type has no 0089 tables until a project they are
  * applied to can regenerate it. `proposalsDb()` casts the SAME connection to a
  * narrow structural interface once, as `quotesDb()` does.
  */
@@ -89,7 +89,7 @@ export interface ProposalsDbClient {
   rpc(fn: string, args?: Record<string, unknown>): PromiseLike<ProposalsDbResult<unknown>>;
 }
 
-/** The caller's own RLS-scoped client, seen through the 0086 table shapes. */
+/** The caller's own RLS-scoped client, seen through the 0089 table shapes. */
 export function proposalsDb(supabase: ScopedClient): ProposalsDbClient {
   return supabase as unknown as ProposalsDbClient;
 }
@@ -165,7 +165,7 @@ async function requireRole(supabase: ScopedClient, allowed: Role[], what: string
   return data;
 }
 
-/** Staff roles from the 0086 insert/update policies. Re-checked on every call. */
+/** Staff roles from the 0089 insert/update policies. Re-checked on every call. */
 export function requireProposalWriteRole(supabase: ScopedClient): Promise<Role> {
   return requireRole(supabase, PROPOSAL_STAFF_WRITE_ROLES, "write proposals");
 }
@@ -192,7 +192,7 @@ async function currentUserId(supabase: ScopedClient): Promise<string | null> {
 /* ─────────────────────────── public token ────────────────────────────────── */
 
 /**
- * 32 random bytes as unpadded base64url: 43 characters, inside 0086's 32..64
+ * 32 random bytes as unpadded base64url: 43 characters, inside 0089's 32..64
  * check. Generated here, server-side, only; one token is shared by every
  * version of a family, so a client's link keeps working across revisions.
  */

@@ -58,7 +58,7 @@ import { getScopedClient } from "@/lib/db/scoped-client";
  *                      is opt-in like everything else here.
  *  - `agents`          In-app scheduled agents (email intel, intake triage,
  *                      post-consult drafter) that draft into the queue.
- *  - `proposals`       Client trademark proposals (lectual 0086
+ *  - `proposals`       Client trademark proposals (lectual 0089
  *                      `client_proposal`): brand names x marks x classes, a
  *                      named approver, a public `/p/<token>` page. The pricing
  *                      defaults and the page's wording are RPB Law's, so it is

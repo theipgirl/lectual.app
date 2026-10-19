@@ -47,7 +47,7 @@ import { isCivilDate } from "./validate";
  *   ACCEPTING          one conditional update (`status = 'sent'` -> accepted,
  *                      with `accepted_selection` and `accepted_snapshot`) that
  *                      cannot fire twice, then a best-effort firm notice.
- * The `accepted` EVENT is written by the 0086 trigger in the same transaction
+ * The `accepted` EVENT is written by the 0089 trigger in the same transaction
  * as the status change (it knows the actor), so it is not written here: a
  * second one would double every acceptance in the firm's log.
  *
@@ -527,7 +527,7 @@ function refuse(reason: AcceptRefusal): AcceptResult {
  * click, two tabs, or a staff withdrawal in between cannot produce two
  * acceptances or accept a proposal that is no longer on offer.
  *
- * `accepted_at` is stamped by the 0086 trigger (the service role may not set
+ * `accepted_at` is stamped by the 0089 trigger (the service role may not set
  * it directly); the snapshot carries the instant this request ran, and the two
  * differ by milliseconds.
  */
