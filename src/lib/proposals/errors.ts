@@ -1,0 +1,73 @@
+/**
+ * Proposal errors a person can read.
+ *
+ * Pure. The store throws `ProposalError` for every refusal it makes itself and
+ * converts database errors with `friendlyProposalError`, so no raw Postgres or
+ * PostgREST message (which names tables, constraints and trigger internals)
+ * ever reaches a screen. Callers branch on `code`, never on message text.
+ */
+
+import type { ValidationIssue } from "./validate";
+
+export type ProposalErrorCode =
+  /** The content or a column failed a firm rule; `issues` says which. */
+  | "validation"
+  /** Wrong role, or not one of the firm's named approvers. */
+  | "forbidden"
+  | "not_found"
+  /** The version is sent / accepted / superseded / withdrawn: change it by revising. */
+  | "frozen"
+  /** The row moved under the caller (status changed, another draft exists, version taken). */
+  | "conflict"
+  /** Anything else the database refused or could not do. */
+  | "unavailable";
+
+export class ProposalError extends Error {
+  readonly code: ProposalErrorCode;
+  readonly issues: ValidationIssue[];
+  constructor(code: ProposalErrorCode, message: string, issues: ValidationIssue[] = []) {
+    super(message);
+    this.name = "ProposalError";
+    this.code = code;
+    this.issues = issues;
+  }
+}
+
+type DbErrorLike = { code?: string; message?: string } | null | undefined;
+
+/**
+ * Turn whatever the database said into a `ProposalError` with a sentence a
+ * person can act on. Matches Postgres SQLSTATE codes first, then a few
+ * keywords from the lifecycle trigger's messages; anything unrecognised becomes
+ * a generic "could not" that never repeats the original text.
+ */
+export function friendlyProposalError(error: DbErrorLike, doing = "save the proposal"): ProposalError {
+  const code = error?.code ?? "";
+  const message = (error?.message ?? "").toLowerCase();
+
+  if (code === "42501" || message.includes("row-level security") || message.includes("permission denied")) {
+    return new ProposalError("forbidden", `You don't have permission to ${doing}.`);
+  }
+  if (message.includes("approver")) {
+    return new ProposalError("forbidden", "Only the firm's named approvers can approve a proposal.");
+  }
+  if (message.includes("service role") || message.includes("service_role")) {
+    return new ProposalError("forbidden", "Only the client can accept a proposal, from their own link.");
+  }
+  if (message.includes("frozen") || message.includes("immutable") || message.includes("cannot be edited") || message.includes("can no longer")) {
+    return new ProposalError("frozen", "This version has already gone out and can't be changed. Create a revision instead.");
+  }
+  if (message.includes("transition")) {
+    return new ProposalError("conflict", "This proposal can't move to that status from where it is now. Refresh and check its status.");
+  }
+  if (code === "23505") {
+    return new ProposalError("conflict", "Someone else changed this proposal at the same time (for example, another draft of it already exists). Refresh and try again.");
+  }
+  if (code === "23503") {
+    return new ProposalError("validation", "The linked lead or matter isn't one of this firm's records.");
+  }
+  if (code === "23514" || code === "22001" || code === "22P02") {
+    return new ProposalError("validation", "One of the fields is out of range or the wrong shape. Check the dates, links and lengths.");
+  }
+  return new ProposalError("unavailable", `Couldn't ${doing}. Try again, and tell us if it keeps happening.`);
+}

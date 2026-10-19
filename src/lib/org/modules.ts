@@ -58,6 +58,11 @@ import { getScopedClient } from "@/lib/db/scoped-client";
  *                      is opt-in like everything else here.
  *  - `agents`          In-app scheduled agents (email intel, intake triage,
  *                      post-consult drafter) that draft into the queue.
+ *  - `proposals`       Client trademark proposals (lectual 0086
+ *                      `client_proposal`): brand names x marks x classes, a
+ *                      named approver, a public `/p/<token>` page. The pricing
+ *                      defaults and the page's wording are RPB Law's, so it is
+ *                      opt-in per firm.
  */
 export type OrgModule =
   | "litigation"
@@ -66,7 +71,8 @@ export type OrgModule =
   | "document-center"
   | "lawmatics-import"
   | "mailbox"
-  | "agents";
+  | "agents"
+  | "proposals";
 
 /**
  * Modules on the caller's ACTIVE org. Read through the RLS-scoped client, so

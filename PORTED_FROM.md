@@ -51,7 +51,7 @@ Source commit: `610c206` (main, 2026-09-25). Copy, don't import: when a ported f
 | queue approve → `generateApprovedDocument` | `src/app/(firm)/dashboard/queue/actions.ts` | same best-effort post-approve hook |
 | `tsconfig.json`, `eslint.config.mjs`, `postcss.config.mjs`, `pnpm-workspace.yaml` | same paths | lint ignores `design/` |
 
-New in this repo: Settings → Firm profile (`src/lib/org/profile*.ts`, lectual 0078) and Modules, `src/lib/lawmatics/connection.ts` and the Lawmatics import UI (`src/components/lawmatics/*`), `src/lib/matters/worklist.ts` (the design's whose-move-is-it bands), `src/lib/mailbox/*` (except the apply port above), `src/lib/nav.ts`, `src/lib/fonts`, `src/components/shell/*`, `src/app/dashboard/*`,
+New in this repo: `src/lib/proposals/*` (client trademark proposals, lectual 0086 `client_proposal`; modelled on `src/lib/quotes/*` but not the quote engine), Settings → Firm profile (`src/lib/org/profile*.ts`, lectual 0078) and Modules, `src/lib/lawmatics/connection.ts` and the Lawmatics import UI (`src/components/lawmatics/*`), `src/lib/matters/worklist.ts` (the design's whose-move-is-it bands), `src/lib/mailbox/*` (except the apply port above), `src/lib/nav.ts`, `src/lib/fonts`, `src/components/shell/*`, `src/app/dashboard/*`,
 `src/app/globals.css` (design tokens).
 
 ## Intake (table, board by stage, board by owner)
