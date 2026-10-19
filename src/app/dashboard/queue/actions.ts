@@ -102,24 +102,26 @@ export async function reviewQueueAction(_prev: ReviewState, formData: FormData):
 
       if (editedBody) await saveQueueEdit(qKey, id, editedBody);
       const item = await getQueueItem(qKey, id);
-      const resolved = await resolveQueueItem({ orgKey: qKey, id, action: "approve", resolvedBy, ...(approvalNote ? { note: approvalNote } : {}) });
-      sendStatus = resolved.send;
 
-      // The proposal link goes live now, BEFORE a mailbox draft exists, so the
-      // link in the email works as soon as a person opens the draft. If it
-      // can't be made live, no draft is created: an email pointing at a dead
-      // link is worse than a delay. The queue item is already approved, so the
-      // message says what to do.
+      // The proposal link goes live now, BEFORE the queue item is resolved:
+      // resolving can itself create the mailbox draft (the queue service's
+      // own Outlook channel, send = "drafted"), so this is the only point that
+      // comes before EVERY mailbox draft. If the link can't be made live,
+      // nothing is approved and no draft exists anywhere: an email pointing at
+      // a dead link is worse than a delay. (If the resolve below then fails,
+      // the link is live with no email yet; approving again finds the
+      // proposal sent and goes straight on.)
       if (gate.proposal && gate.proposal.status === "approved") {
         const live = await makeProposalLive(gate.proposal.id);
         if (!live.ok) {
-          revalidatePath("/dashboard/queue/");
-          revalidatePath(`/dashboard/queue/${id}/`);
           return {
-            error: `The email was approved, but the proposal link could not be made live (${live.error}) so no mailbox draft was created. Open the proposal and use "Mark as sent", then copy the email text from this page.`,
+            error: `The proposal link could not be made live (${live.error}), so nothing was approved and no mailbox draft was created. Open the proposal, check it is still approved, and try again.`,
           };
         }
       }
+
+      const resolved = await resolveQueueItem({ orgKey: qKey, id, action: "approve", resolvedBy, ...(approvalNote ? { note: approvalNote } : {}) });
+      sendStatus = resolved.send;
 
       // No channel on the queue side: draft it in the approver's own mailbox.
       if (item.type === "CLIENT_EMAIL" && sendStatus !== "drafted" && sendStatus !== "sent") {

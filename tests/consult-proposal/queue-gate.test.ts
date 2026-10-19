@@ -169,11 +169,23 @@ describe("approving a consult-agent email", () => {
     expect(resolveQueueItem).not.toHaveBeenCalled();
   });
 
-  it("with an approved proposal: approves, makes the link live (sendProposal) BEFORE the mailbox draft", async () => {
+  it("with an approved proposal: makes the link live (sendProposal) BEFORE resolving, so before any mailbox draft", async () => {
     const r = await approve();
     expect(r.redirected).toContain(`/dashboard/queue/${QUEUE_ID}/?resolved=approve`);
     expect(sendProposal).toHaveBeenCalledWith(PROPOSAL_ID);
-    expect(calls).toEqual(["resolve", "send", "mailbox"]);
+    // resolve may itself create the draft (the queue service's Outlook channel), so the link goes live first
+    expect(calls).toEqual(["send", "resolve", "mailbox"]);
+  });
+
+  it("when the queue service drafts the email itself on resolve, the link is already live", async () => {
+    vi.mocked(resolveQueueItem).mockImplementationOnce(async () => {
+      calls.push("resolve");
+      return { status: "approved", send: "drafted" };
+    });
+    const r = await approve();
+    expect(r.redirected).toContain("send=drafted");
+    expect(calls).toEqual(["send", "resolve"]);
+    expect(draftInMyMailbox).not.toHaveBeenCalled();
   });
 
   it("an already-sent proposal is not sent again, and the draft is still made", async () => {
@@ -183,11 +195,26 @@ describe("approving a consult-agent email", () => {
     expect(calls).toEqual(["resolve", "mailbox"]);
   });
 
-  it("if the link can't be made live, no mailbox draft is created and the error says what to do", async () => {
+  it("if the link can't be made live, nothing is approved and no mailbox draft is created anywhere", async () => {
     sendFails.value = true;
     const r = await approve();
     expect(r.error).toMatch(/could not be made live/);
-    expect(r.error).toMatch(/no mailbox draft was created/);
+    expect(r.error).toMatch(/nothing was approved and no mailbox draft was created/);
+    expect(resolveQueueItem).not.toHaveBeenCalled();
+    expect(draftInMyMailbox).not.toHaveBeenCalled();
+  });
+
+  it("a proposal edited after approval (back to draft) between the gate and going live: nothing is approved", async () => {
+    // The gate read "approved"; by the time it is made live, an edit has returned it to draft and the send is refused.
+    sendFails.value = true;
+    vi.mocked(sendProposal).mockImplementationOnce(async () => {
+      calls.push("send");
+      state.proposal = proposalRow("draft");
+      throw new Error("Only an approved version can be marked as sent. Approve it first.");
+    });
+    const r = await approve();
+    expect(r.error).toMatch(/could not be made live/);
+    expect(resolveQueueItem).not.toHaveBeenCalled();
     expect(draftInMyMailbox).not.toHaveBeenCalled();
   });
 
