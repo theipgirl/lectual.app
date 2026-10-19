@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ProposalListItem } from "@/lib/proposals/store";
 import { statusLabel, statusTone } from "@/lib/proposal-editor/labels";
 import { formatCents } from "@/lib/quotes/money";
+import { DRAFT_BLOCK_NOTE, type DraftBlock } from "@/lib/consult-proposal/draft-availability";
 import { ProposalFromTranscript } from "./ProposalFromTranscript";
 
 /**
@@ -13,14 +14,14 @@ export function LeadProposalsCard({
   leadId,
   read,
   canWrite,
-  canDraft,
+  draftBlock,
   maxChars,
 }: {
   leadId: string;
   read: { status: "ok"; proposals: ProposalListItem[] } | { status: "unavailable" };
   canWrite: boolean;
-  /** The model is configured: the paste form is offered. */
-  canDraft: boolean;
+  /** Why drafting is unavailable (null: the paste form is offered). Only shown to people who can write proposals. */
+  draftBlock: DraftBlock | null;
   maxChars: number;
 }) {
   return (
@@ -53,7 +54,18 @@ export function LeadProposalsCard({
           ))}
         </ul>
       )}
-      {canWrite && canDraft && (
+      {canWrite && draftBlock && (
+        <p className="lx-note" style={{ margin: 0 }} data-draft-block={draftBlock}>
+          {DRAFT_BLOCK_NOTE[draftBlock]}
+          {draftBlock === "no-settings" && (
+            <>
+              {" "}
+              <Link href="/dashboard/settings/proposals/">Open the settings</Link>
+            </>
+          )}
+        </p>
+      )}
+      {canWrite && !draftBlock && (
         <details className="lx-disclosure">
           <summary>Draft from a transcript</summary>
           <div style={{ padding: "12px 0 0" }}>

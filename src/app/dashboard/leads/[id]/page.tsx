@@ -12,7 +12,7 @@ import { Timeline } from "@/components/timeline/Timeline";
 import VoiceNoteRecorder from "@/components/voice/VoiceNoteRecorder";
 import { listTags, tagsForLead } from "@/lib/pipeline/tags";
 import { orgHasModule } from "@/lib/org/modules";
-import { aiConfigured } from "@/lib/ai/claude";
+import { loadDraftBlock } from "@/lib/consult-proposal/draft-gate";
 import { listProposals } from "@/lib/proposals/store";
 import { PROPOSAL_STAFF_WRITE_ROLES } from "@/lib/proposals/types";
 import { MAX_PASTED_TRANSCRIPT_CHARS } from "@/lib/consult-proposal/types";
@@ -63,6 +63,8 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
         .then((proposals) => ({ status: "ok" as const, proposals }))
         .catch(() => ({ status: "unavailable" as const }))
     : null;
+  const proposalCanWrite = CAN_WRITE_LEAD.includes(session.role) && PROPOSAL_STAFF_WRITE_ROLES.includes(session.role);
+  const draftBlock = proposalRead && proposalCanWrite ? await loadDraftBlock() : null;
   const rows = activity ?? [];
   const voiceUrls = await voiceNotePlaybackUrls(rows);
 
@@ -185,8 +187,8 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             <LeadProposalsCard
               leadId={lead.id}
               read={proposalRead}
-              canWrite={canWrite && PROPOSAL_STAFF_WRITE_ROLES.includes(session.role)}
-              canDraft={aiConfigured()}
+              canWrite={proposalCanWrite}
+              draftBlock={draftBlock}
               maxChars={MAX_PASTED_TRANSCRIPT_CHARS}
             />
           )}
