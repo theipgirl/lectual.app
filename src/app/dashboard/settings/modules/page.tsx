@@ -14,6 +14,7 @@ const MODULES: Array<{ key: OrgModule; name: string; what: string }> = [
   { key: "agents", name: "Agents", what: "Scheduled agents that triage intake, pull client details from email and draft post-consult follow-ups into the approval queue." },
   { key: "document-center", name: "Document Center", what: "Generate engagement and opinion letters from your firm's templates, into the approval queue." },
   { key: "agent-toolkit", name: "Agent toolkit", what: "Welcome emails and filing follow-ups on matters, written in your firm's voice." },
+  { key: "proposals", name: "Client proposals", what: "The trademark proposal a client reviews and accepts after their strategy call: brand names, marks and classes, approved by a named approver before it is sent." },
   { key: "litigation", name: "Litigation", what: "Litigation matters, with court case numbers, hearings and case details." },
 ];
 

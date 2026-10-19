@@ -10,6 +10,7 @@ const TABS: Tab[] = [
   { label: "Team & roles", href: "/dashboard/settings/team/" },
   { label: "Firm profile", href: "/dashboard/settings/firm/" },
   { label: "Service library", href: "/dashboard/settings/services/" },
+  { label: "Client proposals", href: "/dashboard/settings/proposals/", module: "proposals" },
   { label: "Modules", href: "/dashboard/settings/modules/" },
 ];
 
