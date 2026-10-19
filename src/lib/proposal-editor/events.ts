@@ -172,7 +172,13 @@ export function describeProposalEvent(event: ProposalEventRow, ctx: EventContext
     case "approved":
       return { ...base, what: "approved it", details: [] };
     case "unapproved":
-      return { ...base, what: "sent it back to draft", details: [] };
+      // 0089's client_proposal_log_status: {from, to, version, reason?}. The
+      // reason is set when an edit (not the Back-to-draft button) did it.
+      return {
+        ...base,
+        what: p.reason === "edited_after_approval" ? "edited it after approval, so it went back to draft" : "sent it back to draft",
+        details: [],
+      };
     case "sent":
       return { ...base, what: "marked it as sent. The client link is live (nothing was emailed from here)", details: [] };
     case "viewed":
@@ -181,10 +187,11 @@ export function describeProposalEvent(event: ProposalEventRow, ctx: EventContext
       return { ...base, what: "accepted the proposal", details: [] };
     case "withdrawn":
       return { ...base, what: "withdrew it", details: [] };
-    case "superseded": {
-      const by = num(p.version) ?? num(p.superseded_by_version);
-      return { ...base, what: by ? `replaced this version with version ${by}` : "replaced this version with a newer one", details: [] };
-    }
+    case "superseded":
+      // The trigger's payload is {from, to, version}, and `version` is the
+      // SUPERSEDED row's own number, not the one that replaced it: sending a
+      // newer version is what supersedes this one.
+      return { ...base, what: "sent a newer version, which replaced this one", details: [] };
     case "revised": {
       const from = num(p.from_version);
       const to = num(p.version);

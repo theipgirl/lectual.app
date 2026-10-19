@@ -110,6 +110,19 @@ describe("the other events", () => {
     const versions = new Map([["p1", 2]]);
     expect(describeProposalEvent(event({ type: "created" }), { names, versions }).what).toBe("created version 2");
     expect(describeProposalEvent(event({ type: "revised", payload: { from_version: 1, version: 2 } }), { names }).what).toBe("started version 2 from version 1");
+  });
+
+  it("reads the trigger's status payloads ({from, to, version, reason?})", () => {
+    // superseded: `version` is the replaced row's own number, never the newer one.
+    const sup = describeProposalEvent(event({ type: "superseded", payload: { from: "sent", to: "superseded", version: 1 } }), { names });
+    expect(sup.what).toBe("sent a newer version, which replaced this one");
+    expect(sup.what).not.toMatch(/version 1/);
+    expect(
+      describeProposalEvent(event({ type: "unapproved", payload: { from: "approved", to: "draft", version: 1, reason: "edited_after_approval" } }), { names }).what,
+    ).toBe("edited it after approval, so it went back to draft");
+    expect(describeProposalEvent(event({ type: "unapproved", payload: { from: "approved", to: "draft", version: 1 } }), { names }).what).toBe(
+      "sent it back to draft",
+    );
     expect(describeProposalEvent(event({ type: "sent" }), { names }).what).toContain("nothing was emailed");
   });
 });
