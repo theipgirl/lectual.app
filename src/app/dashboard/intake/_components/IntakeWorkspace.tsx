@@ -4,7 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import Link from "next/link";
 import type { Stage } from "@/lib/pipeline";
 import type { MemberIdentity } from "@/lib/members/directory";
-import { deriveTemperature, type Temperature } from "@/lib/intake";
+import { deriveTemperature, type ReferralSource, type Temperature } from "@/lib/intake";
+import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
+import { approvalsShown, filterNeedsRebecca, leadsNeedingApproval } from "@/lib/intake/needs-rebecca";
 import {
   DEFAULT_SORT,
   applyFilters,
@@ -21,7 +23,13 @@ import {
 import { topBarCounts, topBarLine } from "@/lib/intake/views";
 import type { IntakeTime } from "@/lib/time";
 import { IntakeTopBar } from "@/components/intake/IntakeTopBar";
-import { assignLeadAction, moveStageAction, setLaneAction, setTemperatureAction } from "../actions";
+import {
+  assignLeadAction,
+  moveStageAction,
+  setLaneAction,
+  setSourceAction,
+  setTemperatureAction,
+} from "../actions";
 import { laneView, type Lane } from "@/lib/leads/lane";
 import AddLeadDialog from "./AddLeadDialog";
 import IntakeBoard from "./IntakeBoard";
@@ -71,6 +79,7 @@ export default function IntakeWorkspace({
   initialFilters,
   initialViewState,
   time,
+  pendingApprovals,
   now: nowIso,
 }: {
   rows: IntakeRow[];
@@ -89,6 +98,13 @@ export default function IntakeWorkspace({
    * chips then show an em dash rather than a confident "0m".
    */
   time: IntakeTime | null;
+  /**
+   * Drafts waiting in the approval queue, by lead. OPTIONAL and a pass-through
+   * prop like `time`: absent renders nothing at all (not "zero"), `unavailable`
+   * renders a notice, and only `ok` badges rows and enables the filter. See
+   * src/lib/intake/needs-rebecca.ts.
+   */
+  pendingApprovals?: LeadPendingApprovals;
   /** The server's render clock, so "Next step" says the same thing on both sides. */
   now: string;
 }) {
@@ -101,7 +117,13 @@ export default function IntakeWorkspace({
   const [, startTransition] = useTransition();
 
   const now = useMemo(() => new Date(nowIso), [nowIso]);
-  const href = intakeHref(filters, viewState);
+  // A bookmarked `needs=rebecca` is ignored while the queue isn't readable, and
+  // its chip is hidden then, so it stays out of the URL (and "Save this view")
+  // rather than riding along as a filter nobody can see or turn off.
+  const href = intakeHref(
+    approvalsShown(pendingApprovals) ? filters : { ...filters, needsRebecca: false },
+    viewState,
+  );
 
   // The URL is a mirror of the state, never its source after first render:
   // filtering happens locally against rows already in the browser, and the
@@ -126,7 +148,17 @@ export default function IntakeWorkspace({
     return () => clearTimeout(timer);
   }, [href]);
 
-  const filtered = useMemo(() => applyFilters(rows, filters), [rows, filters]);
+  const filtered = useMemo(
+    () => filterNeedsRebecca(applyFilters(rows, filters), pendingApprovals, filters.needsRebecca),
+    [rows, filters, pendingApprovals],
+  );
+  // The toggle is offered only when the queue was actually read; the count is
+  // over leads in this list, not queue rows for leads that aren't in intake.
+  const needsRebeccaCount = useMemo(() => {
+    if (!approvalsShown(pendingApprovals)) return null;
+    const needing = leadsNeedingApproval(pendingApprovals);
+    return rows.filter((row) => needing.has(row.lead.id)).length;
+  }, [rows, pendingApprovals]);
   const sorted = useMemo(() => sortRows(filtered, sort.key, sort.dir), [filtered, sort]);
   const counts = useMemo(() => topBarCounts(filtered), [filtered]);
 
@@ -213,6 +245,17 @@ export default function IntakeWorkspace({
     [runWrite, members],
   );
 
+  const setSource = useCallback(
+    (leadId: string, source: ReferralSource | null) => {
+      runWrite(
+        leadId,
+        (row) => ({ ...row, lead: { ...row.lead, referral_source: source } }),
+        () => setSourceAction(leadId, source),
+      );
+    },
+    [runWrite],
+  );
+
   const moveStage = useCallback(
     (leadId: string, stageId: string) => {
       runWrite(
@@ -223,7 +266,7 @@ export default function IntakeWorkspace({
             ...row,
             lead,
             stage: stages.find((stage) => stage.id === stageId) ?? null,
-            // Temperature rule 2 keys on the stage, so it has to be re-derived
+            // Temperature rule 2 (nurture stage) keys on the stage, so it has to be re-derived
             // with the lead's new home or the card would carry the old answer.
             temperature: deriveTemperature(lead, stages, now),
           };
@@ -281,11 +324,28 @@ export default function IntakeWorkspace({
           stages={intakeStages}
           members={members}
           visibleCount={filtered.length}
+          needsRebeccaCount={needsRebeccaCount}
           currentHref={href}
           onFilters={setFilters}
           onView={(view: IntakeView) => setViewState((state) => ({ ...state, view }))}
           onGroup={(group: IntakeGroup) => setViewState((state) => ({ ...state, group }))}
         />
+
+        {pendingApprovals?.status === "unavailable" && (
+          <p
+            role="status"
+            style={{
+              margin: 0,
+              fontSize: 12,
+              color: "var(--ink2)",
+              background: "var(--warnbg)",
+              borderRadius: 6,
+              padding: "6px 10px",
+            }}
+          >
+            Couldn&rsquo;t reach the approval queue — approvals not shown.
+          </p>
+        )}
 
         {board ? (
           <IntakeBoard
@@ -297,8 +357,10 @@ export default function IntakeWorkspace({
             pendingLeadId={pendingId}
             errors={errors}
             time={time}
+            pendingApprovals={pendingApprovals}
             onMoveStage={moveStage}
             onAssign={assign}
+            onSetSource={setSource}
           />
         ) : (
           <IntakeTable
@@ -311,10 +373,12 @@ export default function IntakeWorkspace({
             pendingLeadId={pendingId}
             errors={errors}
             time={time}
+            pendingApprovals={pendingApprovals}
             onSort={toggleSort}
             onSetTemperature={setTemperature}
             onSetLane={setLane}
             onAssign={assign}
+            onSetSource={setSource}
           />
         )}
       </div>

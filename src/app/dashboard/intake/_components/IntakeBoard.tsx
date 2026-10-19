@@ -5,6 +5,8 @@ import type { Stage } from "@/lib/pipeline";
 import type { MemberIdentity } from "@/lib/members/directory";
 import type { IntakeRow } from "@/lib/intake/rows";
 import type { IntakeTime } from "@/lib/time";
+import type { ReferralSource } from "@/lib/intake";
+import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
 import { ownerColumns, stageColumns } from "@/lib/intake/views";
 import IntakeCard from "./IntakeCard";
 import { CHIP_COUNT, ownerAvatar, ownerAvatarFor } from "./styles";
@@ -52,8 +54,10 @@ export default function IntakeBoard({
   pendingLeadId,
   errors,
   time,
+  pendingApprovals,
   onMoveStage,
   onAssign,
+  onSetSource,
 }: {
   group: "stage" | "owner";
   rows: IntakeRow[];
@@ -65,8 +69,10 @@ export default function IntakeBoard({
   errors: Record<string, string>;
   /** This week's time per lead, or null when that read failed (§13.1). */
   time: IntakeTime | null;
+  pendingApprovals?: LeadPendingApprovals;
   onMoveStage: (leadId: string, stageId: string) => void;
   onAssign: (leadId: string, userId: string | null) => void;
+  onSetSource: (leadId: string, source: ReferralSource | null) => void;
 }) {
   const [dragOver, setDragOver] = useState<string | null>(null);
 
@@ -190,8 +196,10 @@ export default function IntakeBoard({
                   pending={pendingLeadId === row.lead.id}
                   error={errors[row.lead.id] || undefined}
                   time={time}
+                  pendingApprovals={pendingApprovals}
                   onMoveStage={onMoveStage}
                   onAssign={onAssign}
+                  onSetSource={onSetSource}
                 />
               ))}
 

@@ -86,6 +86,7 @@ export default function IntakeControls({
   stages,
   members,
   visibleCount,
+  needsRebeccaCount,
   currentHref,
   onFilters,
   onView,
@@ -99,6 +100,11 @@ export default function IntakeControls({
   members: MemberIdentity[];
   /** Rows after filtering, for the Stage chip's count. */
   visibleCount: number;
+  /**
+   * Leads in this list with a draft waiting on Rebecca. null/undefined = the
+   * approval queue wasn't read, so the toggle is not offered at all.
+   */
+  needsRebeccaCount?: number | null;
   /** The link "Save this view" copies. */
   currentHref: string;
   onFilters: (next: IntakeFilters) => void;
@@ -467,6 +473,19 @@ export default function IntakeControls({
           </>
         )}
       </Popover>
+
+      {needsRebeccaCount != null && (
+        <button
+          type="button"
+          style={filterChip(filters.needsRebecca)}
+          aria-pressed={filters.needsRebecca}
+          title="Show only leads with a draft waiting for Rebecca's review in the approval queue."
+          onClick={() => onFilters({ ...filters, needsRebecca: !filters.needsRebecca })}
+        >
+          Needs Rebecca
+          <span style={CHIP_COUNT}>{needsRebeccaCount}</span>
+        </button>
+      )}
 
       {filters.reply !== null && (
         <button

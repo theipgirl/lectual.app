@@ -18,6 +18,15 @@ export const REFERRAL_SOURCES = [
 
 export type ReferralSource = (typeof REFERRAL_SOURCES)[number];
 
+/**
+ * Runtime guard for the bucket list. The Source menu's value crosses the
+ * server-action boundary as an unchecked string, so the action validates it
+ * here rather than trusting the TypeScript type on the other side.
+ */
+export function isReferralSource(value: unknown): value is ReferralSource {
+  return typeof value === "string" && (REFERRAL_SOURCES as readonly string[]).includes(value);
+}
+
 export type ReferralClassification = {
   source: ReferralSource;
   detail: string | null;

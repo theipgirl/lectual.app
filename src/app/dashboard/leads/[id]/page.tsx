@@ -23,6 +23,9 @@ import { meetingsFor } from "@/lib/meetings/read";
 import { LinkedMeetings } from "@/components/meetings/LinkedMeetings";
 import { ConsultDetailsSection } from "@/components/leads/ConsultDetailsSection";
 import { LaneCard } from "@/components/leads/LaneCard";
+import { WaitingOnRebecca } from "@/components/leads/WaitingOnRebecca";
+import { loadPendingApprovalsByLead } from "@/lib/queue/lead-pending";
+import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
 import { SequencesCard, type SequenceRow } from "@/components/leads/SequencesCard";
 import { laneView, nextStepForLane } from "@/lib/leads/lane";
 import { getFirmTimeZone, getLaneLinks } from "@/lib/org/profile";
@@ -69,10 +72,12 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const voiceUrls = await voiceNotePlaybackUrls(rows);
 
   // Lane + next step (SOP Stage 2) and the lead's sequences (SOP rule 1).
-  const [{ links, failed: linksFailed }, tz, enrollments] = await Promise.all([
+  const [{ links, failed: linksFailed }, tz, enrollments, approvals] = await Promise.all([
     getLaneLinks(),
     getFirmTimeZone(),
     listLeadEnrollments(id).catch(() => null),
+    // Never throws on an outage (it says `unavailable`); the catch is for the unexpected.
+    loadPendingApprovalsByLead().catch((): LeadPendingApprovals => ({ status: "unavailable" })),
   ]);
   const lane = laneView(lead);
   const nextStep = nextStepForLane(lane.effective, links);
@@ -92,6 +97,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
       }))
     : null;
   const canOperate = AUTOMATION_STAFF_ROLES.includes(session.role);
+  const renderedAt = new Date().getTime();
   const proposals = pendingProposals(rows);
   const canWrite = CAN_WRITE_LEAD.includes(session.role);
   const name = `${lead.first_name} ${lead.last_name}`.trim() || lead.email;
@@ -165,6 +171,8 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           )}
 
           <SequencesCard leadId={lead.id} rows={sequenceRows} canOperate={canOperate} />
+
+          <WaitingOnRebecca leadId={lead.id} approvals={approvals} now={renderedAt} />
 
           {canWrite && hasAgentToolkit && (
             <details className="lx-card lx-disclosure">
