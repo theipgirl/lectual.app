@@ -260,6 +260,16 @@ describe("class numbers never reach the client", () => {
     expect(stripClassNumbers("IC 009 Downloadable software").text).toBe("Downloadable software");
     expect(stripClassNumbers("Classes 9 and 42 software").text).toBe("software");
     expect(stripClassNumbers("Restaurant Services")).toEqual({ text: "Restaurant Services", stripped: false });
+    // ranges, bare bracketed numbers, "Cl." and a trailing number leave no digit behind
+    expect(stripClassNumbers("Classes 9-42 software").text).toBe("software");
+    expect(stripClassNumbers("Classes 9 to 42 software").text).toBe("software");
+    expect(stripClassNumbers("Software (9)").text).toBe("Software");
+    expect(stripClassNumbers("Software (Nos. 9, 42)").text).not.toMatch(/\d/);
+    expect(stripClassNumbers("Cl. 9 Software").text).toBe("Software");
+    expect(stripClassNumbers("Software - 009")).toEqual({ text: "Software", stripped: true });
+    // ordinary digits in a label stay
+    expect(stripClassNumbers("3D Printing Services").text).toBe("3D Printing Services");
+    expect(stripClassNumbers("Web3 Consulting (B2B)").text).toBe("Web3 Consulting (B2B)");
   });
 
   it("drops a client-facing description that carries a price or a link", async () => {

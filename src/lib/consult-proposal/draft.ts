@@ -418,11 +418,18 @@ export function percentsInQuote(text: string): number[] {
 
 /* ─────────────────────────── client-facing text ──────────────────────────── */
 
+/** "9, 35 and 42", "9-42", "9 to 42": the rest of a list or range of class numbers. */
+const MORE_NUMBERS = String.raw`(?:\s*(?:,|and|&|or|to|through|-|–|—)\s*\d+)*`;
+
 const CLASS_NUMBER_PATTERNS: readonly RegExp[] = [
-  /\(?\s*\b(?:international|intl\.?)\s+class(?:es)?\s*(?:no\.?|number|#)?\s*\d+(?:\s*(?:,|and|&|or)\s*\d+)*\s*\)?/gi,
-  /\(?\s*\bIC\s*[-#]?\s*\d+(?:\s*(?:,|and|&|or)\s*\d+)*\s*\)?/gi,
-  /\(?\s*\bclass(?:es)?\s*(?:no\.?|number|#)?\s*\d+(?:\s*(?:,|and|&|or)\s*\d+)*\s*\)?/gi,
+  new RegExp(String.raw`\(?\s*\b(?:international|intl\.?)\s+class(?:es)?\s*(?:no\.?|number|#)?\s*\d+${MORE_NUMBERS}\s*\)?`, "gi"),
+  new RegExp(String.raw`\(?\s*\bIC\s*[-#]?\s*\d+${MORE_NUMBERS}\s*\)?`, "gi"),
+  new RegExp(String.raw`\(?\s*\b(?:class(?:es)?|cl\.?)\s*(?:no\.?|number|#)?\s*\d+${MORE_NUMBERS}\s*\)?`, "gi"),
+  // a bare number in brackets, "Software (9)": on a class label that is a class number
+  new RegExp(String.raw`\(\s*(?:nos?\.?|#)?\s*\d{1,3}${MORE_NUMBERS}\s*\)`, "gi"),
   /^\s*\d{1,3}\s*[:\-–—.)]\s*/,
+  // "Software - 009" / "Software: 9"
+  /\s*[:\-–—]\s*\d{1,3}\s*$/,
 ];
 
 /** A class label never carries a number: strip every form of one. */
