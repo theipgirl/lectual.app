@@ -12,6 +12,7 @@ import type { Role } from "@/lib/auth/roles";
 import { checkDraftStaleness, stalenessRequiresConfirm } from "@/lib/queue/stale";
 import { staleWarning } from "@/components/queue/stale-warning";
 import { getFirmTimeZone } from "@/lib/org/profile";
+import { gateLinkedProposal, makeProposalLive } from "@/lib/consult-proposal/link";
 
 export type ReviewState = { error?: string };
 
@@ -72,6 +73,13 @@ export async function reviewQueueAction(_prev: ReviewState, formData: FormData):
     }
 
     if (intent === "approve") {
+      // An email that carries a proposal link (the consult agent's) needs a
+      // named proposal approver AND an approved proposal. Checked first, and
+      // again on every submit: the panel on the page is a courtesy. Fails
+      // closed when the link can't be read.
+      const gate = await gateLinkedProposal(id);
+      if (!gate.ok) return { error: gate.error };
+
       // The stale-draft check runs again HERE, server-side: the page's
       // checkbox is a courtesy, and a hand-posted form must not skip it. A
       // client who signed or paid since this was queued (or a check that
@@ -96,6 +104,22 @@ export async function reviewQueueAction(_prev: ReviewState, formData: FormData):
       const item = await getQueueItem(qKey, id);
       const resolved = await resolveQueueItem({ orgKey: qKey, id, action: "approve", resolvedBy, ...(approvalNote ? { note: approvalNote } : {}) });
       sendStatus = resolved.send;
+
+      // The proposal link goes live now, BEFORE a mailbox draft exists, so the
+      // link in the email works as soon as a person opens the draft. If it
+      // can't be made live, no draft is created: an email pointing at a dead
+      // link is worse than a delay. The queue item is already approved, so the
+      // message says what to do.
+      if (gate.proposal && gate.proposal.status === "approved") {
+        const live = await makeProposalLive(gate.proposal.id);
+        if (!live.ok) {
+          revalidatePath("/dashboard/queue/");
+          revalidatePath(`/dashboard/queue/${id}/`);
+          return {
+            error: `The email was approved, but the proposal link could not be made live (${live.error}) so no mailbox draft was created. Open the proposal and use "Mark as sent", then copy the email text from this page.`,
+          };
+        }
+      }
 
       // No channel on the queue side: draft it in the approver's own mailbox.
       if (item.type === "CLIENT_EMAIL" && sendStatus !== "drafted" && sendStatus !== "sent") {

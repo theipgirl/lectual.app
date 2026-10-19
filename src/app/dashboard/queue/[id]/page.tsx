@@ -10,6 +10,8 @@ import { getFirmTimeZone } from "@/lib/org/profile";
 import { STATUS_PILL, agentLabel, fmtWhen, isUnconfiguredError, outcomeText, typeLabel } from "@/components/queue/format";
 import { checkDraftStaleness, type StaleCheck } from "@/lib/queue/stale";
 import { staleWarning } from "@/components/queue/stale-warning";
+import { LinkedProposalPanel } from "@/components/queue/LinkedProposalPanel";
+import { loadLinkedPanel } from "@/lib/consult-proposal/link";
 
 function Meta({ label, value }: { label: string; value: React.ReactNode }) {
   if (!value) return null;
@@ -74,6 +76,8 @@ export default async function QueueItemPage({
   // front of them, and the action re-checks before it approves.
   const stale = resolved ? ({ status: "not_applicable" } as StaleCheck) : await checkDraftStaleness(item);
   const warning = staleWarning(stale, tz);
+  // The proposal the consult agent drafted with this email, if any.
+  const linkedProposal = await loadLinkedPanel(item.id);
 
   return (
     <>
@@ -148,6 +152,7 @@ export default async function QueueItemPage({
               <Meta label="Note" value={item.resolution_note} />
             </>
           )}
+          <LinkedProposalPanel panel={linkedProposal} pending={!resolved} />
           {item.summary && (
             <div>
               <div className="lx-label" style={{ fontSize: 11, marginBottom: 4 }}>
