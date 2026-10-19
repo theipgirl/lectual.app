@@ -8,7 +8,7 @@ import {
   validateSettingInput,
   type ValidationIssue,
 } from "@/lib/proposals/validate";
-import type { ProposalContent } from "@/lib/proposals/types";
+import { DEFAULT_OFFICE_ACTION_NOTE, DEFAULT_PROPOSAL_INCLUDES, type ProposalContent } from "@/lib/proposals/types";
 import { sevetri } from "./fixture";
 
 const errors = (issues: ValidationIssue[]) => issues.filter((i) => i.level === "error");
@@ -105,10 +105,31 @@ describe("validateContent: International Class numbers are never client-facing",
     }
   });
 
-  it("a bare 'Class 9' is a warning, not a blocker (it may be a counting label for a 9th class)", () => {
-    const issues = validateContent({ ...sevetri(), recommendation: "Your Class 4 filing." });
-    expect(errors(issues)).toEqual([]);
-    expect(warnings(issues)).toHaveLength(1);
+  it.each([4, 5, 6, 7, 8, 9])("'Class %i' is an error: past 3 it reads as an International Class number", (n) => {
+    const issues = validateContent({ ...sevetri(), recommendation: `Your Class ${n} filing.` });
+    expect(errors(issues).map((i) => i.path)).toEqual(["recommendation"]);
+    expect(errors(issues)[0].message).toContain(`Class ${n}`);
+  });
+
+  it("'Class 0', and a list that reaches past 3, are errors; a list within 1..3 only warns", () => {
+    expect(errors(validateContent({ ...sevetri(), recommendation: "Your Class 0 filing." }))).toHaveLength(1);
+    expect(errors(validateContent({ ...sevetri(), recommendation: "Classes 1, 2 and 5 are covered." }))).toHaveLength(1);
+    expect(errors(validateContent({ ...sevetri(), recommendation: "Class 2 and Class 7 are covered." }))).toHaveLength(1);
+    const ok = validateContent({ ...sevetri(), recommendation: "Classes 1, 2 and 3 are covered." });
+    expect(errors(ok)).toEqual([]);
+    expect(warnings(ok)).toHaveLength(1);
+  });
+
+  it("checks class numbers in the settings' standard includes and note too", () => {
+    const issues = validateSettingInput({
+      approver_user_ids: [],
+      default_pay_url: null,
+      notify_email: null,
+      pricing: { office_action_note: "Class 5 office actions", includes: [{ label: "Filing", included: "Class 6" }] },
+    });
+    const paths = errors(issues).map((i) => i.path);
+    expect(paths).toContain("pricing.office_action_note");
+    expect(paths).toContain("pricing.includes[0].included");
   });
 });
 
@@ -144,6 +165,134 @@ describe("validateContent: the substantive office action response is never in a 
   it("is exported as a predicate", () => {
     expect(offersSubstantiveOfficeActionResponse("Substantive Office Action Response")).toBe(true);
     expect(offersSubstantiveOfficeActionResponse("Substantive Office Action Legal Strategy Review")).toBe(false);
+  });
+});
+
+describe("validateContent: the office action response, in any client-facing text", () => {
+  const fieldCases: Array<[string, (c: ProposalContent, text: string) => void, string]> = [
+    ["office_action_note", (c, t) => (c.office_action_note = t), "office_action_note"],
+    ["recommendation", (c, t) => (c.recommendation = t), "recommendation"],
+    ["greeting", (c, t) => (c.greeting = t), "greeting"],
+    ["names[].note", (c, t) => (c.names[0].note = t), "names[0].note"],
+    ["names[].what", (c, t) => (c.names[0].what = t), "names[0].what"],
+    ["marks[].desc", (c, t) => (c.names[0].marks[0].desc = t), "names[0].marks[0].desc"],
+    ["includes[].note", (c, t) => c.includes.push({ label: "Extras", included: "✓", note: t }), "includes[*]"],
+    ["includes[].value", (c, t) => c.includes.push({ label: "Extras", value: t, included: "✓" }), "includes[*]"],
+    ["includes[].included", (c, t) => c.includes.push({ label: "Extras", included: t }), "includes[*]"],
+  ];
+  const run = (set: (c: ProposalContent, text: string) => void, text: string, path: string) => {
+    const c = sevetri();
+    set(c, text);
+    const target = path.endsWith("[*]") ? `includes[${c.includes.length - 1}].label` : path;
+    return at(validateContent(c), target).filter((i) => i.level === "error");
+  };
+
+  it.each(fieldCases)("errors when %s offers the substantive response", (_n, set, path) => {
+    expect(run(set, "Your package includes the substantive office action response.", path)).toHaveLength(1);
+  });
+
+  it.each(fieldCases)("allows %s saying the response is quoted separately", (_n, set, path) => {
+    expect(run(set, "The response itself is quoted separately.", path)).toEqual([]);
+    expect(run(set, "The substantive office action response is not included in your package.", path)).toEqual([]);
+  });
+
+  it.each([
+    "Your package includes the substantive office action response.",
+    "We will file the response to any substantive office action for you.",
+    "Includes unlimited substantive office action responses.",
+    "Substantive office action responses are not charged separately.",
+    "We respond to every substantive office action at no extra cost.",
+    "If a substantive office action is issued, your package includes Rebecca's strategy review and response.",
+    "Includes non-substantive responses and the substantive office action response.",
+    "Your retainer covers office action responses.",
+    "A substantive response is included.",
+  ])("errors on %j", (text) => {
+    expect(offersSubstantiveOfficeActionResponse(text)).toBe(true);
+    expect(errors(validateContent({ ...sevetri(), recommendation: text })).map((i) => i.path)).toContain("recommendation");
+  });
+
+  it.each([
+    DEFAULT_OFFICE_ACTION_NOTE,
+    "The response itself is quoted separately, and we will get your approval before any work begins.",
+    "The substantive office action response is not included in your package.",
+    "Your package does not include the response to a substantive office action.",
+    "The response to a substantive office action isn't part of this package; it is quoted separately.",
+    "Responses to substantive office actions are billed separately.",
+    "We will prepare a separate quote for the substantive office action response.",
+    "Everything except the substantive office action response is included.",
+    "Rebecca's strategy review is included. The response itself is not.",
+    "Unlimited non-substantive office action responses are included.",
+    "Non-substantive responses to office actions are included.",
+    "Your package includes a substantive office action legal strategy review.",
+  ])("allows %j", (text) => {
+    expect(offersSubstantiveOfficeActionResponse(text)).toBe(false);
+    expect(errors(validateContent({ ...sevetri(), office_action_note: text }))).toEqual([]);
+  });
+
+  it("the shipped defaults (note and includes table) are clean", () => {
+    const c = sevetri();
+    c.office_action_note = DEFAULT_OFFICE_ACTION_NOTE;
+    c.includes = DEFAULT_PROPOSAL_INCLUDES.map((r) => ({ ...r }));
+    expect(validateContent(c)).toEqual([]);
+  });
+
+  it("an includes row is judged whole: a row that says 'Not included' is allowed, one that gives it away is not", () => {
+    const row = (included: string, note?: string) => {
+      const c = sevetri();
+      c.includes.push({ label: "Substantive Office Action Response", value: "$900 each", included, note });
+      return at(validateContent(c), `includes[${c.includes.length - 1}].label`);
+    };
+    expect(row("Not included")).toEqual([]);
+    expect(row("—", "Quoted separately")).toEqual([]);
+    expect(row("✓")).toHaveLength(1);
+    expect(row("Unlimited", "Not included")).toHaveLength(1);
+  });
+
+  it("the settings' includes list and note get the same judgement", () => {
+    const base = { approver_user_ids: [], default_pay_url: null, notify_email: null };
+    const bad = validateSettingInput({
+      ...base,
+      pricing: { office_action_note: "We include the substantive office action response.", includes: [{ label: "Substantive Office Action Response", included: "✓" }] },
+    });
+    const paths = errors(bad).map((i) => i.path);
+    expect(paths).toContain("pricing.office_action_note");
+    expect(paths).toContain("pricing.includes[0].label");
+    const good = validateSettingInput({
+      ...base,
+      pricing: { office_action_note: DEFAULT_OFFICE_ACTION_NOTE, includes: DEFAULT_PROPOSAL_INCLUDES },
+    });
+    expect(errors(good)).toEqual([]);
+  });
+});
+
+describe("validateContent: at most 3 classes per brand name", () => {
+  const withClasses = (n: number): ProposalContent => {
+    const c = sevetri();
+    c.names[0].classes = Array.from({ length: n }, (_, i) => ({ id: `cx${i}`, label: `Thing ${i}`, preselected: true }));
+    return c;
+  };
+
+  it("3 is fine, 4 is an error on that brand", () => {
+    expect(errors(validateContent(withClasses(3)))).toEqual([]);
+    const issues = errors(validateContent(withClasses(4)));
+    expect(issues.map((i) => i.path)).toEqual(["names[0].classes"]);
+    expect(issues[0].message).toMatch(/at most 3 classes per brand/);
+  });
+
+  it("names the brand that is over, not the others", () => {
+    const c = sevetri();
+    c.names[1].classes = withClasses(5).names[0].classes.map((x) => ({ ...x, id: `y${x.id}` }));
+    expect(errors(validateContent(c)).map((i) => i.path)).toEqual(["names[1].classes"]);
+  });
+
+  it("does not depend on included_classes (default 3; a higher one is reported, not forced)", () => {
+    const c = withClasses(3);
+    c.pricing.included_classes = 5;
+    expect(errors(validateContent(c))).toEqual([]);
+  });
+
+  it("blocks approval", () => {
+    expect(hasErrors(validateContent(withClasses(4), READY))).toBe(true);
   });
 });
 

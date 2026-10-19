@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 
 import {
+  PUBLIC_ORG_COLUMNS,
   PUBLIC_PROPOSAL_COLUMNS,
   VIEW_EVENT_WINDOW_MS,
   acceptPublicProposal,
@@ -185,7 +186,7 @@ function fakeDb(tables: Record<string, Row[]>) {
 const TOKEN = "T".repeat(43);
 const NOW = new Date("2026-10-20T15:00:00.000Z");
 
-function world(over: { proposal?: Row; extra?: Row[] } = {}) {
+function world(over: { proposal?: Row; extra?: Row[]; org?: Row } = {}) {
   const proposal: Row = {
     id: "prop-2",
     org_id: "org-1",
@@ -207,7 +208,7 @@ function world(over: { proposal?: Row; extra?: Row[] } = {}) {
   };
   return fakeDb({
     client_proposal: [proposal, ...(over.extra ?? [])],
-    crm_org: [{ id: "org-1", name: "RPB Law Firm", slug: "rpb-law" }],
+    crm_org: [{ id: "org-1", name: "RPB Law Firm", slug: "rpb-law", modules: ["agents", "proposals"], ...over.org }],
     crm_org_profile: [{ org_id: "org-1", time_zone: "America/New_York" }],
     client_proposal_event: [],
   });
@@ -303,6 +304,39 @@ describe("readPublicProposal", () => {
     expect(await readPublicProposal(TOKEN, NOW, db)).toMatchObject({ status: "closed", reason: "withdrawn" });
   });
 
+  it.each([
+    ["the proposals module is off", ["agents"]],
+    ["the module list is empty", []],
+    ["the module list is unreadable", null],
+  ])("fails closed when %s", async (_n, modules) => {
+    const { db } = world({ org: { modules } });
+    const r = await readPublicProposal(TOKEN, NOW, db);
+    expect(r).toMatchObject({ status: "closed", reason: "module_off" });
+    // Nothing of the proposal travels with a closed answer.
+    expect(JSON.stringify(r)).not.toContain("Sevetri");
+  });
+
+  it("module-off closes a sent, an accepted and a withdrawn family alike", async () => {
+    for (const status of ["sent", "accepted", "withdrawn"]) {
+      const { db } = world({ proposal: { status }, org: { modules: [] } });
+      expect(await readPublicProposal(TOKEN, NOW, db)).toMatchObject({ status: "closed", reason: "module_off" });
+    }
+  });
+
+  it("module-off does not confuse a draft-only family: still not_found", async () => {
+    const { db } = world({ proposal: { status: "draft" }, org: { modules: [] } });
+    expect(await readPublicProposal(TOKEN, NOW, db)).toEqual({ status: "not_found" });
+  });
+
+  it("reads modules from the org row it already reads, and never exposes them", async () => {
+    const { db, calls } = world();
+    const r = await readPublicProposal(TOKEN, NOW, db);
+    const orgRead = calls.find((c) => c.table === "crm_org")!;
+    expect(orgRead.columns).toBe(PUBLIC_ORG_COLUMNS.join(", "));
+    expect(orgRead.filters).toEqual([["id", "org-1"]]);
+    expect(JSON.stringify(r)).not.toContain("agents");
+  });
+
   it("an accepted proposal is a receipt and never reads as expired", async () => {
     const content = sevetri();
     const selection = defaultSelection(content);
@@ -382,6 +416,15 @@ describe("acceptPublicProposal", () => {
     const { db, tables } = world();
     await acceptPublicProposal(TOKEN, selection(["p-word", "p-c1"]), NOW, db);
     expect(tables.client_proposal_event).toEqual([]);
+  });
+
+  it("refuses, and writes nothing, when the firm's proposals module is off", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    const { db, calls, tables } = world({ org: { modules: ["agents"] } });
+    const r = await acceptPublicProposal(TOKEN, selection(["p-word", "p-c1"]), NOW, db);
+    expect(r).toMatchObject({ ok: false, reason: "closed" });
+    expect(calls.some((c) => c.op === "update")).toBe(false);
+    expect(tables.client_proposal[0].status).toBe("sent");
   });
 
   it("two clicks accept once: the second finds it already resolved", async () => {

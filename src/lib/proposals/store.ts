@@ -518,6 +518,20 @@ export type UpdateProposalInput = {
   matterId?: string | null;
 };
 
+/** What a save is allowed to overwrite: exactly the version of the row the editor rendered. */
+export type UpdateProposalOptions = {
+  /**
+   * `updated_at` of the row as the editor rendered it. The write is fenced on
+   * it (`.eq('updated_at', ...)`): if anyone saved, approved, un-approved or
+   * sent the row since, zero rows change and the save is refused rather than
+   * silently overwriting their work.
+   */
+  expectedUpdatedAt: string;
+};
+
+export const PROPOSAL_SAVE_CONFLICT =
+  "Someone else saved this proposal while you were editing. Reload to see their changes.";
+
 /**
  * Edit a draft or approved version. Editing an APPROVED row sends it back to
  * draft (the trigger does that; the returned row shows it) and it needs
@@ -526,9 +540,23 @@ export type UpdateProposalInput = {
  *
  * Writes an `edited` event naming the fields, the field-level changes, and the
  * legal total before and after. A call that changes nothing writes nothing.
+ *
+ * Optimistic concurrency: `expectedUpdatedAt` is required. A stale value is a
+ * `conflict` ProposalError (PROPOSAL_SAVE_CONFLICT), checked up front against
+ * the row just read and again as the write's own fence, so two saves racing
+ * from the same page cannot both land.
  */
-export async function updateProposal(id: string, patch: UpdateProposalInput): Promise<ProposalRow> {
+export async function updateProposal(
+  id: string,
+  patch: UpdateProposalInput,
+  options: UpdateProposalOptions,
+): Promise<ProposalRow> {
   checkDraftColumns(patch);
+  const expected = typeof options?.expectedUpdatedAt === "string" ? options.expectedUpdatedAt.trim() : "";
+  if (!expected || Number.isNaN(Date.parse(expected))) {
+    // No usable version to fence on: refuse, never fall back to an unfenced write.
+    throw new ProposalError("conflict", PROPOSAL_SAVE_CONFLICT);
+  }
 
   const supabase = await getScopedClient();
   await requireProposalWriteRole(supabase);
@@ -536,6 +564,11 @@ export async function updateProposal(id: string, patch: UpdateProposalInput): Pr
   const userId = await currentUserId(supabase);
 
   const current = await loadRow(db, id);
+  // Same instant, whatever the timestamp's spelling; the write below is the
+  // exact fence. Checked before "frozen" so the person is told to reload.
+  if (Date.parse(current.updated_at) !== Date.parse(expected)) {
+    throw new ProposalError("conflict", PROPOSAL_SAVE_CONFLICT);
+  }
   if (!isProposalEditable(current.status)) {
     throw new ProposalError(
       "frozen",
@@ -569,10 +602,13 @@ export async function updateProposal(id: string, patch: UpdateProposalInput): Pr
     // in flight), zero rows change and the caller is told, rather than an edit
     // landing on a version the client may already be reading.
     .eq("status", current.status)
+    // The optimistic-concurrency fence: the row must still be the one the
+    // editor rendered. The 0089 trigger stamps updated_at on every change.
+    .eq("updated_at", expected)
     .select(PROPOSAL_COLUMNS)
     .maybeSingle();
   if (error) throw friendlyProposalError(error, "save the proposal");
-  if (!data) throw new ProposalError("conflict", "This proposal changed while you were editing it. Refresh and try again.");
+  if (!data) throw new ProposalError("conflict", PROPOSAL_SAVE_CONFLICT);
   const updated = data as ProposalRow;
 
   const payload: ProposalEditedPayload = {

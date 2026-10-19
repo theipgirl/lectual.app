@@ -121,8 +121,15 @@ export const PUBLIC_PROPOSAL_COLUMNS = [
   "accepted_snapshot",
 ] as const;
 
-/** The firm's display identity: its name, and the slug the page picks branding by. */
-export const PUBLIC_ORG_COLUMNS = ["name", "slug"] as const;
+/**
+ * The firm's display identity (its name, and the slug the page picks branding
+ * by) plus `modules`, read ONLY to fail closed when the firm's proposals module
+ * is off. `modules` never reaches `PublicProposalFirm` or the view.
+ */
+export const PUBLIC_ORG_COLUMNS = ["name", "slug", "modules"] as const;
+
+/** The `crm_org.modules` entry that switches client proposals on for a firm. */
+export const PROPOSALS_MODULE = "proposals";
 
 /** From the firm's profile: only the clock its dates are shown on. */
 export const PUBLIC_PROFILE_COLUMNS = ["time_zone"] as const;
@@ -176,7 +183,8 @@ export type PublicProposalHandle = {
   storedStatus: ProposalStatus;
 };
 
-export type PublicProposalClosedReason = "expired" | "withdrawn";
+/** `module_off`: the firm's proposals module is off, so every link it ever issued is closed. */
+export type PublicProposalClosedReason = "expired" | "withdrawn" | "module_off";
 
 export type PublicProposalRead =
   | { status: "ok"; view: PublicProposalView; handle: PublicProposalHandle }
@@ -365,6 +373,18 @@ export async function readPublicProposal(
         profileResult.error || !isObject(profileResult.data) ? null : readString(profileResult.data.time_zone),
       ),
     };
+
+    // FAIL CLOSED when the firm's proposals module is off (or its module list
+    // is unreadable). The module is the firm's switch for the whole feature;
+    // turning it off must also stop the links already out, which the dashboard
+    // gate (it protects staff pages only) cannot do. Checked before anything
+    // else about the row is looked at, so a module-off firm's expired, accepted
+    // and withdrawn links all answer the same way: closed, which the page
+    // renders as the locked not-found page. Acceptance goes through this read,
+    // so it refuses too.
+    if (!Array.isArray(org?.modules) || !org.modules.includes(PROPOSALS_MODULE)) {
+      return { status: "closed", reason: "module_off", firm };
+    }
 
     if (picked.kind === "withdrawn") return { status: "closed", reason: "withdrawn", firm };
 

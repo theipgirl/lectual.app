@@ -24,7 +24,11 @@ import { newRowId, useRows } from "./rows";
  * read-only view.
  */
 
-type Common = { proposalId: string; editable: boolean; issues: ShownIssue[] };
+/**
+ * `updatedAt` is the row's `updated_at` as this page rendered it. Every editing
+ * form posts it back so the save can be refused if someone else saved first.
+ */
+type Common = { proposalId: string; updatedAt: string; editable: boolean; issues: ShownIssue[] };
 
 function Hidden({ values }: { values: Record<string, string> }) {
   return (
@@ -60,13 +64,13 @@ export type DetailsValues = {
   payUrl: string;
 };
 
-export function DetailsForm({ proposalId, editable, issues, values, defaultPayUrl }: Common & { values: DetailsValues; defaultPayUrl: string | null }) {
+export function DetailsForm({ proposalId, updatedAt, editable, issues, values, defaultPayUrl }: Common & { values: DetailsValues; defaultPayUrl: string | null }) {
   return (
     <Section title="Client and link" hint="Who this is for, when it stops being open, and where “Accept” sends them to pay.">
       <ActionForm action={saveDetailsAction}>
         {({ state, pending }) => (
           <fieldset className="pe-fieldset" disabled={!editable}>
-            <Hidden values={{ proposalId }} />
+            <Hidden values={{ proposalId, updatedAt }} />
             <div className="lx-form-grid">
               <label className="lx-field">
                 <span className="lx-label">Client full name</span>
@@ -108,13 +112,13 @@ export function DetailsForm({ proposalId, editable, issues, values, defaultPayUr
 
 /* ── message ────────────────────────────────────────────────────────────── */
 
-export function MessageForm({ proposalId, editable, issues, values }: Common & { values: { greeting: string; recommendation: string; officeActionNote: string } }) {
+export function MessageForm({ proposalId, updatedAt, editable, issues, values }: Common & { values: { greeting: string; recommendation: string; officeActionNote: string } }) {
   return (
     <Section title="Words the client reads" hint="Plain business language. Never an International Class number. “Class 1, 2, 3” counting labels are fine.">
       <ActionForm action={saveMessageAction}>
         {({ state, pending }) => (
           <fieldset className="pe-fieldset" disabled={!editable}>
-            <Hidden values={{ proposalId }} />
+            <Hidden values={{ proposalId, updatedAt }} />
             <label className="lx-field">
               <span className="lx-label">Greeting</span>
               <textarea className="lx-input" name="greeting" rows={3} maxLength={4000} defaultValue={values.greeting} />
@@ -141,7 +145,7 @@ export function MessageForm({ proposalId, editable, issues, values }: Common & {
 
 export type { PricingValues };
 
-export function PricingForm({ proposalId, editable, issues, values }: Common & { values: PricingValues }) {
+export function PricingForm({ proposalId, updatedAt, editable, issues, values }: Common & { values: PricingValues }) {
   return (
     <Section
       title="Package prices"
@@ -150,7 +154,7 @@ export function PricingForm({ proposalId, editable, issues, values }: Common & {
       <ActionForm action={savePricingAction}>
         {({ state, pending }) => (
           <fieldset className="pe-fieldset" disabled={!editable}>
-            <Hidden values={{ proposalId }} />
+            <Hidden values={{ proposalId, updatedAt }} />
             <PricingFields values={values} />
             <IssueList issues={issues} />
             <SaveRow editable={editable} state={state} pending={pending} label="Save prices" />
@@ -174,7 +178,7 @@ export type NameValues = {
   classes: { id: string; label: string; preselected: boolean }[];
 };
 
-export function NameCard({ proposalId, editable, issues, value, packageName }: Common & { value: NameValues; packageName: string }) {
+export function NameCard({ proposalId, updatedAt, editable, issues, value, packageName }: Common & { value: NameValues; packageName: string }) {
   const marks = useRows(value.marks);
   const classes = useRows(value.classes);
 
@@ -186,7 +190,7 @@ export function NameCard({ proposalId, editable, issues, value, packageName }: C
           <ActionForm action={removeNameAction} confirm={`Remove ${value.name || "this brand name"} and its marks and classes? Unsaved changes in this card are lost.`}>
             {({ state, pending }) => (
               <>
-                <Hidden values={{ proposalId, nameId: value.id }} />
+                <Hidden values={{ proposalId, updatedAt, nameId: value.id }} />
                 <button type="submit" className="lx-btn lx-btn-ghost lx-btn-sm" disabled={pending}>
                   Remove brand name
                 </button>
@@ -204,7 +208,7 @@ export function NameCard({ proposalId, editable, issues, value, packageName }: C
       <ActionForm action={saveNameAction}>
         {({ state, pending }) => (
           <fieldset className="pe-fieldset" disabled={!editable}>
-            <Hidden values={{ proposalId, nameId: value.id }} />
+            <Hidden values={{ proposalId, updatedAt, nameId: value.id }} />
             <div className="lx-form-grid">
               <label className="lx-field">
                 <span className="lx-label">Brand name</span>
@@ -324,14 +328,14 @@ export function NameCard({ proposalId, editable, issues, value, packageName }: C
   );
 }
 
-export function AddNameForm({ proposalId, editable }: { proposalId: string; editable: boolean }) {
+export function AddNameForm({ proposalId, updatedAt, editable }: { proposalId: string; updatedAt: string; editable: boolean }) {
   if (!editable) return null;
   return (
     <section className="lx-card pe-card">
       <ActionForm action={addNameAction}>
         {({ state, pending }) => (
           <div className="pe-add-name">
-            <Hidden values={{ proposalId }} />
+            <Hidden values={{ proposalId, updatedAt }} />
             <label className="lx-field" style={{ flex: 1, minWidth: 220 }}>
               <span className="lx-label">Add a brand name</span>
               <input className="lx-input" name="name" required maxLength={200} placeholder="e.g. Prosperall" />
@@ -358,14 +362,14 @@ export function AddNameForm({ proposalId, editable }: { proposalId: string; edit
 
 export type AdjustmentValue = { id: string; label: string; kind: "amount" | "percent"; value: string };
 
-export function AdjustmentsForm({ proposalId, editable, issues, value }: Common & { value: AdjustmentValue[] }) {
+export function AdjustmentsForm({ proposalId, updatedAt, editable, issues, value }: Common & { value: AdjustmentValue[] }) {
   const list = useRows(value);
   return (
     <Section title="Discounts and credits" hint="Taken off the legal fee only, never the USPTO fee. A consultation credit is a dollar amount; a referral discount might be a percent.">
       <ActionForm action={saveAdjustmentsAction}>
         {({ state, pending }) => (
           <fieldset className="pe-fieldset" disabled={!editable}>
-            <Hidden values={{ proposalId }} />
+            <Hidden values={{ proposalId, updatedAt }} />
             <div className="pe-rows">
               {list.rows.length === 0 && <p className="lx-note">No discounts or credits.</p>}
               {list.rows.map((a, i) => (
@@ -403,13 +407,13 @@ export function AdjustmentsForm({ proposalId, editable, issues, value }: Common 
 
 /* ── includes ───────────────────────────────────────────────────────────── */
 
-export function IncludesForm({ proposalId, editable, issues, initial }: Common & { initial: ProposalInclude[] }) {
+export function IncludesForm({ proposalId, updatedAt, editable, issues, initial }: Common & { initial: ProposalInclude[] }) {
   return (
     <Section title="What the package includes" hint="The table the client sees under the totals. The substantive office action response is never listed here; the strategy review is fine.">
       <ActionForm action={saveIncludesAction}>
         {({ state, pending }) => (
           <fieldset className="pe-fieldset" disabled={!editable}>
-            <Hidden values={{ proposalId }} />
+            <Hidden values={{ proposalId, updatedAt }} />
             <IncludesFields initial={initial} editable={editable} />
             <IssueList issues={issues} />
             <SaveRow editable={editable} state={state} pending={pending} label="Save included items" />

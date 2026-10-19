@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ProposalDocument } from "@/components/client-proposal/ProposalDocument";
 import { ProposalNotice } from "@/components/client-proposal/ProposalNotice";
 import { readPublicProposal, recordProposalViewed } from "@/lib/proposals/public";
+import { isSignedInFirmMember } from "@/lib/proposals/staff-view";
 import { acceptProposalAction } from "./actions";
 
 /**
@@ -23,6 +24,9 @@ import { acceptProposalAction } from "./actions";
  *    because we could not reach the database is the worst answer available.
  *  - accepted → the receipt (`mode="accepted"`) from the frozen snapshot.
  *  - sent and live → the interactive page; Accept calls `acceptProposalAction`.
+ *
+ * A signed-in member of the proposal's own firm opening the link is not counted
+ * as the client having viewed it (no `viewed` event); everyone else is.
  *
  * Only `PublicProposalView` crosses to the browser: no ids, no token (beyond the
  * one the visitor already holds, bound into the action), no client email.
@@ -50,10 +54,17 @@ export default async function PublicProposalPage({ params }: { params: Promise<{
 
   const { view } = read;
 
+  // A signed-in member of THIS proposal's firm is staff previewing their own
+  // link, not the client reading it: no `viewed` event. The check only reads
+  // the visitor's cookies (nothing is created for an anonymous client), and its
+  // answer stays on the server. See `staff-view.ts`.
+  //
   // Awaited (a dangling promise in a serverless function may be killed with the
   // response) and fully swallowed inside, so a broken audit table cannot take
   // down the page a client came to read.
-  await recordProposalViewed(read.handle, (await headers()).get("user-agent"), now);
+  if (!(await isSignedInFirmMember(read.handle.orgId))) {
+    await recordProposalViewed(read.handle, (await headers()).get("user-agent"), now);
+  }
 
   if (view.status === "accepted") {
     return (

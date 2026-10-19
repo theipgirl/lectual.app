@@ -141,7 +141,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
     }),
   );
 
-  const common = { proposalId: proposal.id, editable };
+  const common = { proposalId: proposal.id, updatedAt: proposal.updated_at, editable };
 
   return (
     <div className="pe-page">
@@ -251,7 +251,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
               packageName={content.pricing?.package ?? ""}
             />
           ))}
-          <AddNameForm proposalId={proposal.id} editable={editable} />
+          <AddNameForm proposalId={proposal.id} updatedAt={proposal.updated_at} editable={editable} />
 
           <AdjustmentsForm
             {...common}

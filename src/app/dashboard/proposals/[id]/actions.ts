@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import {
+  PROPOSAL_SAVE_CONFLICT,
   approveProposal,
   getProposal,
   reviseProposal,
@@ -45,6 +46,10 @@ import { gateStaffAction } from "../gate";
  * writes the `edited` event with what changed and the legal total before and
  * after. Nothing here stamps approval, timestamps or events.
  *
+ * Every section form posts the `updated_at` it was rendered with (`updatedAt`,
+ * hidden), and `updateProposal` refuses the save if the row has moved since:
+ * the person sees PROPOSAL_SAVE_CONFLICT instead of overwriting a colleague.
+ *
  * Pricing and validation are not reimplemented: the editor shows
  * `validateContent`'s issues beside each form, and `approveProposal` refuses
  * to approve while any is an error.
@@ -70,13 +75,17 @@ async function edit(
   const refused = await gateStaffAction();
   if (refused) return refused;
   const id = field(formData, "proposalId");
+  // The `updated_at` this page was rendered with. A form that did not send one
+  // (a stale tab from before this existed) is told to reload, never saved unfenced.
+  const expectedUpdatedAt = field(formData, "updatedAt");
+  if (!expectedUpdatedAt) return { error: PROPOSAL_SAVE_CONFLICT };
   try {
     const detail = await getProposal(id);
     if (!detail) return { error: "Proposal not found." };
     const current = detail.proposal;
     const built = build(current);
     if (!built.ok) return { error: built.error };
-    const updated = await updateProposal(id, built.value);
+    const updated = await updateProposal(id, built.value, { expectedUpdatedAt });
     revalidate(id);
     return {
       saved: true,
