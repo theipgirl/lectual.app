@@ -20,6 +20,7 @@ import {
 } from "@/lib/intake/rows";
 import { topBarCounts, topBarLine } from "@/lib/intake/views";
 import type { IntakeTime } from "@/lib/time";
+import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
 import { IntakeTopBar } from "@/components/intake/IntakeTopBar";
 import { assignLeadAction, moveStageAction, setLaneAction, setTemperatureAction } from "../actions";
 import { laneView, type Lane } from "@/lib/leads/lane";
@@ -91,6 +92,7 @@ export default function IntakeWorkspace({
   time: IntakeTime | null;
   /** The server's render clock, so "Next step" says the same thing on both sides. */
   now: string;
+  pendingApprovals?: LeadPendingApprovals; // rendered by builder A's badge work
 }) {
   const [rows, setRows] = useState(initialRows);
   const [filters, setFilters] = useState(initialFilters);

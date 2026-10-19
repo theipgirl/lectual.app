@@ -13,6 +13,8 @@ import {
   parseIntakeViewState,
   type IntakeSearchParams,
 } from "@/lib/intake/rows";
+import { loadPendingApprovalsByLead } from "@/lib/queue/lead-pending";
+import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
 import { IntakeTopBar } from "@/components/intake/IntakeTopBar";
 import IntakeWorkspace from "./_components/IntakeWorkspace";
 import "./intake.css";
@@ -115,6 +117,13 @@ export default async function IntakePage({
   // the factual reply state rather than taking the list down.
   const notesPromise: Promise<Activity[]> = leadActivitySince(sinceIso).catch(() => []);
 
+  // What is waiting on Rebecca, per lead. The loader reports an unreachable
+  // queue as `unavailable` (never as "nothing pending"); the catch is only for
+  // an unexpected throw, which must read the same way.
+  const approvalsPromise: Promise<LeadPendingApprovals> = loadPendingApprovalsByLead().catch(
+    (): LeadPendingApprovals => ({ status: "unavailable" }),
+  );
+
   let stages: Stage[] = [];
   let leads: Lead[] = [];
   let loadError: string | null = null;
@@ -128,7 +137,7 @@ export default async function IntakePage({
     loadError = err instanceof Error ? err.message : String(err);
   }
 
-  const [members, noteActivity] = await Promise.all([membersPromise, notesPromise]);
+  const [members, noteActivity, pendingApprovals] = await Promise.all([membersPromise, notesPromise, approvalsPromise]);
 
   if (loadError) {
     return (
@@ -216,6 +225,7 @@ export default async function IntakePage({
       initialViewState={viewState}
       time={time}
       now={now.toISOString()}
+      pendingApprovals={pendingApprovals}
     />
     </div>
   );
