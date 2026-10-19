@@ -122,6 +122,28 @@ describe("groupPendingByLead linking rules", () => {
     expect(Object.keys(out)).toEqual(["lead-draft"]);
   });
 
+  it("matches each item's own address only, never another item's casing", async () => {
+    // One batched read sees both items' addresses; the stale check looks at
+    // one item at a time, so an item must not borrow a sibling's casing.
+    const db = new FakeDb({
+      crm_activity: [],
+      crm_matter: [],
+      crm_lead: [{ id: "lead-jane", email: "Jane@X.example" }],
+    });
+    const out = await groupPendingByLead(asDb(db), [
+      item({ id: "q-lower", recipient: "jane@x.example" }),
+      item({ id: "q-mixed", recipient: "Jane@X.example" }),
+    ]);
+    expect(out["lead-jane"].map((a) => a.queueId)).toEqual(["q-mixed"]);
+  });
+
+  it("chunks large batches so the filter never outgrows the URL", async () => {
+    const db = new FakeDb({ crm_activity: [], crm_matter: [], crm_lead: [] });
+    const items = Array.from({ length: 250 }, (_, i) => item({ id: `q-${i}`, recipient: `p${i}@x.example` }));
+    const out = await groupPendingByLead(asDb(db), items);
+    expect(out).toEqual({});
+  });
+
   it("falls to the matter's lead, then to an exact recipient address", async () => {
     const m = "11111111-1111-4111-8111-111111111111";
     const db = new FakeDb({

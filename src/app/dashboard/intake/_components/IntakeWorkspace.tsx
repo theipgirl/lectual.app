@@ -117,7 +117,13 @@ export default function IntakeWorkspace({
   const [, startTransition] = useTransition();
 
   const now = useMemo(() => new Date(nowIso), [nowIso]);
-  const href = intakeHref(filters, viewState);
+  // A bookmarked `needs=rebecca` is ignored while the queue isn't readable, and
+  // its chip is hidden then, so it stays out of the URL (and "Save this view")
+  // rather than riding along as a filter nobody can see or turn off.
+  const href = intakeHref(
+    approvalsShown(pendingApprovals) ? filters : { ...filters, needsRebecca: false },
+    viewState,
+  );
 
   // The URL is a mirror of the state, never its source after first render:
   // filtering happens locally against rows already in the browser, and the

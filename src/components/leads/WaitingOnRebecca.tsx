@@ -42,7 +42,8 @@ export function WaitingOnRebecca({
         </p>
       ) : items.length === 0 ? (
         <p className="lx-note" style={{ margin: 0 }}>
-          Nothing waiting on Rebecca for this lead.
+          No queued drafts linked to this lead. A draft the queue can&apos;t tie to a lead still shows on the{" "}
+          <Link href="/dashboard/queue/">approval queue</Link>.
         </p>
       ) : (
         <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 10 }}>

@@ -29,6 +29,19 @@ import { isClientFacing } from "./stale";
 
 type Resolved = { leadIds: string[]; kind: string | null };
 
+/**
+ * Values per `.in(...)`. The filter rides in the GET URL, and a firm with a
+ * few hundred pending items would otherwise push it past PostgREST/proxy
+ * limits — the read would fail closed and every badge would vanish.
+ */
+const IN_CHUNK = 100;
+
+function chunks<T>(values: T[]): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < values.length; i += IN_CHUNK) out.push(values.slice(i, i + IN_CHUNK));
+  return out;
+}
+
 /** `payload.kind` the drafters stamp on their `queue_drafted` row. */
 function payloadKindOf(payload: unknown): string | null {
   return payload && typeof payload === "object" ? str((payload as Record<string, unknown>).kind) : null;
@@ -47,14 +60,18 @@ async function resolveBatch(db: StopDb, items: QueueItem[]): Promise<Map<string,
   for (const key of DRAFT_PAYLOAD_KEYS) {
     const open = draftIds.filter((id) => !resolved.has(id));
     if (open.length === 0) break;
-    const { data, error } = await db
-      .from("crm_activity")
-      .select("lead_id, payload")
-      .eq("type", "queue_drafted")
-      .in(`payload->>${key}`, open);
-    if (error) throw new Error(error.message ?? "queue_drafted read failed");
+    const rows: Record<string, unknown>[] = [];
+    for (const part of chunks(open)) {
+      const { data, error } = await db
+        .from("crm_activity")
+        .select("lead_id, payload")
+        .eq("type", "queue_drafted")
+        .in(`payload->>${key}`, part);
+      if (error) throw new Error(error.message ?? "queue_drafted read failed");
+      rows.push(...rowsOf(data));
+    }
     const byItem = new Map<string, Resolved>();
-    for (const row of rowsOf(data)) {
+    for (const row of rows) {
       const payload = row.payload as Record<string, unknown> | null | undefined;
       const id = str(payload?.[key]);
       const leadId = str(row.lead_id);
@@ -71,10 +88,14 @@ async function resolveBatch(db: StopDb, items: QueueItem[]): Promise<Map<string,
   const byMatter = items.filter((i) => !resolved.has(i.id) && i.matter_id && UUID.test(i.matter_id));
   if (byMatter.length > 0) {
     const matterIds = [...new Set(byMatter.map((i) => i.matter_id as string))];
-    const { data, error } = await db.from("crm_matter").select("id, lead_id").in("id", matterIds);
-    if (error) throw new Error(error.message ?? "crm_matter read failed");
+    const rows: Record<string, unknown>[] = [];
+    for (const part of chunks(matterIds)) {
+      const { data, error } = await db.from("crm_matter").select("id, lead_id").in("id", part);
+      if (error) throw new Error(error.message ?? "crm_matter read failed");
+      rows.push(...rowsOf(data));
+    }
     const leadOfMatter = new Map<string, string>();
-    for (const row of rowsOf(data)) {
+    for (const row of rows) {
       const id = str(row.id);
       const leadId = str(row.lead_id);
       if (id && leadId) leadOfMatter.set(id, leadId);
@@ -93,17 +114,24 @@ async function resolveBatch(db: StopDb, items: QueueItem[]): Promise<Map<string,
     .filter((x): x is { item: QueueItem; addresses: string[] } => x.addresses !== null);
   if (byRecipient.length > 0) {
     const all = [...new Set(byRecipient.flatMap((x) => x.addresses))];
-    const { data, error } = await db.from("crm_lead").select("id, email").in("email", all);
-    if (error) throw new Error(error.message ?? "crm_lead read failed");
+    const rows: Record<string, unknown>[] = [];
+    for (const part of chunks(all)) {
+      const { data, error } = await db.from("crm_lead").select("id, email").in("email", part);
+      if (error) throw new Error(error.message ?? "crm_lead read failed");
+      rows.push(...rowsOf(data));
+    }
+    // Keyed by the EXACT stored address, and each item looks up only its own
+    // address forms — the same match the stale check makes one item at a time.
+    // Lower-casing here would let one item borrow another item's casing.
     const leadsByEmail = new Map<string, string[]>();
-    for (const row of rowsOf(data)) {
+    for (const row of rows) {
       const id = str(row.id);
-      const email = str(row.email)?.toLowerCase();
+      const email = str(row.email);
       if (!id || !email) continue;
       leadsByEmail.set(email, [...(leadsByEmail.get(email) ?? []), id]);
     }
     for (const { item, addresses } of byRecipient) {
-      const ids = leadsByEmail.get(addresses[0].toLowerCase())?.slice(0, MAX_RECIPIENT_LEADS) ?? [];
+      const ids = [...new Set(addresses.flatMap((a) => leadsByEmail.get(a) ?? []))].slice(0, MAX_RECIPIENT_LEADS);
       if (ids.length > 0) resolved.set(item.id, { leadIds: ids, kind: null });
     }
   }

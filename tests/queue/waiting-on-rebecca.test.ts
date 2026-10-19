@@ -22,7 +22,8 @@ describe("WaitingOnRebecca", () => {
 
   it("says nothing is waiting only when the queue was read and had nothing for this lead", () => {
     const html = render({ status: "ok", byLead: { "lead-2": [{ queueId: "q-9", headline: "Other", kind: "other", createdAt: null }] } });
-    expect(html).toContain("Nothing waiting on Rebecca for this lead.");
+    expect(html).toContain("No queued drafts linked to this lead.");
+    expect(html).toContain("href=\"/dashboard/queue");
     expect(html).not.toContain("Other");
   });
 
