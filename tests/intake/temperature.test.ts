@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 import type { Stage, Lead } from "@/lib/pipeline";
-import { deriveTemperature, lastTouchAt } from "@/lib/intake";
+import {
+  COLD_NO_TOUCH_DAYS,
+  HOT_AFTER_EXCHANGE_DAYS,
+  deriveTemperature,
+  lastTouchAt,
+} from "@/lib/intake";
 
 const NOW = new Date("2026-09-14T12:00:00.000Z");
 
@@ -35,14 +40,12 @@ function daysBefore(n: number): string {
   return new Date(NOW.getTime() - n * 86_400_000).toISOString();
 }
 
-// s1 = first intake stage (order 1); s2 = a later intake stage with a 7-day
-// aging threshold; s3 = a nurture stage; s4 = a stage with NO aging threshold
-// set (falls back to the default 7).
+// s1/s2 = ordinary open stages; s3 = a nurture stage. Stage aging thresholds no
+// longer feed temperature (v2), so they are left at whatever the factory gives.
 const STAGES: Stage[] = [
-  stage({ id: "s1", order_index: 1, category: "open", aging_threshold_days: 7 }),
-  stage({ id: "s2", order_index: 2, category: "open", aging_threshold_days: 7 }),
-  stage({ id: "s3", order_index: 3, category: "nurture", aging_threshold_days: 30 }),
-  stage({ id: "s4", order_index: 4, category: "open", aging_threshold_days: null }),
+  stage({ id: "s1", order_index: 1, category: "open" }),
+  stage({ id: "s2", order_index: 2, category: "open" }),
+  stage({ id: "s3", order_index: 3, category: "nurture" }),
 ];
 
 describe("lastTouchAt", () => {
@@ -61,7 +64,7 @@ describe("lastTouchAt", () => {
   });
 });
 
-describe("deriveTemperature", () => {
+describe("deriveTemperature (v2)", () => {
   it("rule 0: a manual override always wins, even over a fresh reply", () => {
     const result = deriveTemperature(
       lead({ temperature: "cold", last_inbound_at: daysBefore(0) }),
@@ -71,128 +74,143 @@ describe("deriveTemperature", () => {
     expect(result).toEqual({ level: "cold", reason: "Manually set", overridden: true });
   });
 
-  it("rule 1: inbound reply within 7 days is hot, regardless of stage", () => {
+  it("rule 1: an unanswered client reply is hot, with the wait in the reason", () => {
+    const result = deriveTemperature(lead({ last_inbound_at: daysBefore(2) }), STAGES, NOW);
+    expect(result).toEqual({
+      level: "hot",
+      reason: "Replied 2 days ago — waiting on us",
+      overridden: false,
+    });
+  });
+
+  it("rule 1 has no time cap: a reply we never answered is still hot after 60 days", () => {
+    const result = deriveTemperature(lead({ last_inbound_at: daysBefore(60) }), STAGES, NOW);
+    expect(result.level).toBe("hot");
+    expect(result.reason).toBe("Replied 60 days ago — waiting on us");
+  });
+
+  it("rule 1: an inbound newer than our last outbound is unanswered", () => {
     const result = deriveTemperature(
-      lead({ current_stage_id: "s3", last_inbound_at: daysBefore(2) }),
+      lead({ last_inbound_at: daysBefore(1), last_outbound_at: daysBefore(5) }),
       STAGES,
       NOW,
     );
     expect(result.level).toBe("hot");
-    expect(result.overridden).toBe(false);
-    expect(result.reason).toMatch(/Replied/);
+    expect(result.reason).toMatch(/waiting on us/);
   });
 
-  it("rule 1 boundary: exactly 7 days ago still counts as hot", () => {
-    const result = deriveTemperature(lead({ last_inbound_at: daysBefore(7) }), STAGES, NOW);
-    expect(result.level).toBe("hot");
-  });
-
-  it("rule 2: not the first intake stage, touched within the stage's aging threshold -> hot", () => {
+  it("rule 1 beats a nurture stage (a reply in nurture is still waiting on us)", () => {
     const result = deriveTemperature(
-      lead({ current_stage_id: "s2", last_activity_at: daysBefore(3) }),
-      STAGES,
-      NOW,
-    );
-    expect(result.level).toBe("hot");
-    expect(result.overridden).toBe(false);
-  });
-
-  it("rule 2 does not apply to the first intake stage even if freshly touched", () => {
-    // s1 is the first intake stage; recent touch there should NOT trigger rule 2's
-    // "hot" — it falls through to rule 4 (warm) since it's not nurture/stale/never-touched.
-    const result = deriveTemperature(
-      lead({ current_stage_id: "s1", last_activity_at: daysBefore(1) }),
-      STAGES,
-      NOW,
-    );
-    expect(result.level).toBe("warm");
-  });
-
-  it("rule 2 uses the default aging threshold (7) when the stage has none set", () => {
-    const withinDefault = deriveTemperature(
-      lead({ current_stage_id: "s4", last_activity_at: daysBefore(6) }),
-      STAGES,
-      NOW,
-    );
-    expect(withinDefault.level).toBe("hot");
-
-    const pastDefault = deriveTemperature(
-      lead({ current_stage_id: "s4", last_activity_at: daysBefore(29) }),
-      STAGES,
-      NOW,
-    );
-    // 29 days: past the default-7 aging window (so rule 2 doesn't fire) but
-    // under the 30-day cold threshold (so rule 3 doesn't fire either) -> warm.
-    expect(pastDefault.level).toBe("warm");
-  });
-
-  it("rule 2 can still make a nurture stage hot when touched within ITS aging threshold (first match wins)", () => {
-    // s3 is nurture with a 30-day threshold and isn't the first intake stage,
-    // so a touch inside that window satisfies rule 2 before rule 3 is ever
-    // reached — "first match wins" is literal, rule order beats rule content.
-    const result = deriveTemperature(
-      lead({ current_stage_id: "s3", last_activity_at: daysBefore(1) }),
+      lead({ current_stage_id: "s3", last_inbound_at: daysBefore(20) }),
       STAGES,
       NOW,
     );
     expect(result.level).toBe("hot");
   });
 
-  it("rule 3: nurture-category stage past its own aging threshold is cold", () => {
-    // Touch is outside s3's 30-day aging window, so rule 2 does not fire and
-    // rule 3's nurture-category check does.
+  it("rule 1 stops applying once we respond", () => {
     const result = deriveTemperature(
-      lead({ current_stage_id: "s3", last_activity_at: daysBefore(31) }),
+      lead({ last_inbound_at: daysBefore(20), last_outbound_at: daysBefore(15) }),
       STAGES,
       NOW,
     );
+    // Answered, and the last touch (15d) is past the cold line.
     expect(result.level).toBe("cold");
-    // Both the nurture-category clause and the 30+-day clause of rule 3 match
-    // here; the nurture reason is the more informative one to surface.
-    expect(["Nurture stage", "No touch in 31 days"]).toContain(result.reason);
+  });
+
+  it("rule 2: nurture-category stage is cold even when freshly touched", () => {
+    const result = deriveTemperature(
+      lead({
+        current_stage_id: "s3",
+        last_inbound_at: daysBefore(2),
+        last_outbound_at: daysBefore(1),
+      }),
+      STAGES,
+      NOW,
+    );
+    expect(result).toEqual({ level: "cold", reason: "Nurture stage", overridden: false });
   });
 
   it("rule 3: never touched is cold", () => {
     const result = deriveTemperature(lead({ current_stage_id: "s1" }), STAGES, NOW);
-    expect(result.level).toBe("cold");
-    expect(result.reason).toBe("Never touched");
+    expect(result).toEqual({ level: "cold", reason: "Never touched", overridden: false });
   });
 
-  it("rule 3: no touch in 30+ days is cold", () => {
+  it("rule 4: we answered, and the exchange is within 3 days -> hot 'Active'", () => {
     const result = deriveTemperature(
-      lead({ current_stage_id: "s1", last_activity_at: daysBefore(31) }),
+      lead({ last_inbound_at: daysBefore(2), last_outbound_at: daysBefore(1) }),
       STAGES,
       NOW,
     );
-    expect(result.level).toBe("cold");
-    expect(result.reason).toMatch(/No touch in 31 days/);
+    expect(result.level).toBe("hot");
+    expect(result.reason).toBe("Active — touched 1 day ago");
   });
 
-  it("rule 3 boundary: exactly 30 days is cold", () => {
+  it("rule 4 boundary: exactly HOT_AFTER_EXCHANGE_DAYS still counts as hot", () => {
     const result = deriveTemperature(
-      lead({ current_stage_id: "s1", last_activity_at: daysBefore(30) }),
+      lead({ last_inbound_at: daysBefore(HOT_AFTER_EXCHANGE_DAYS + 2), last_outbound_at: daysBefore(HOT_AFTER_EXCHANGE_DAYS) }),
       STAGES,
       NOW,
     );
-    expect(result.level).toBe("cold");
+    expect(result.level).toBe("hot");
   });
 
-  it("rule 4: otherwise warm", () => {
+  it("rule 4 needs an inbound EVER: recent activity on a lead who never wrote is warm", () => {
     const result = deriveTemperature(
-      lead({ current_stage_id: "s1", last_activity_at: daysBefore(15) }),
+      lead({ last_activity_at: daysBefore(1), last_outbound_at: daysBefore(1) }),
       STAGES,
       NOW,
     );
     expect(result.level).toBe("warm");
+    expect(result.reason).toBe("Last touch 1 day ago");
+  });
+
+  it("rule 4 counts any touch (last_activity_at), not just email", () => {
+    const result = deriveTemperature(
+      lead({ last_inbound_at: daysBefore(8), last_outbound_at: daysBefore(7), last_activity_at: daysBefore(1) }),
+      STAGES,
+      NOW,
+    );
+    expect(result.level).toBe("hot");
+  });
+
+  it("rule 5: no touch in COLD_NO_TOUCH_DAYS is cold, boundary inclusive", () => {
+    const result = deriveTemperature(
+      lead({ last_activity_at: daysBefore(COLD_NO_TOUCH_DAYS) }),
+      STAGES,
+      NOW,
+    );
+    expect(result.level).toBe("cold");
+    expect(result.reason).toBe("No touch in 10 days");
+  });
+
+  it("rule 6: between the hot and cold lines is warm", () => {
+    const result = deriveTemperature(
+      lead({ last_inbound_at: daysBefore(9), last_outbound_at: daysBefore(6) }),
+      STAGES,
+      NOW,
+    );
+    expect(result.level).toBe("warm");
+    expect(result.reason).toBe("Last touch 6 days ago");
     expect(result.overridden).toBe(false);
   });
 
-  it("a tenant whose current stage isn't found in the stage list still resolves (no throw)", () => {
+  it("rule 6 just under the cold line is still warm", () => {
+    const result = deriveTemperature(lead({ last_activity_at: daysBefore(9) }), STAGES, NOW);
+    expect(result.level).toBe("warm");
+  });
+
+  it("a stage missing from the list still resolves (no throw)", () => {
     const result = deriveTemperature(
       lead({ current_stage_id: "missing-stage", last_activity_at: daysBefore(1) }),
       STAGES,
       NOW,
     );
     expect(["hot", "warm", "cold"]).toContain(result.level);
+  });
+
+  it("is deterministic: same inputs, same answer", () => {
+    const input = lead({ last_inbound_at: daysBefore(2), last_outbound_at: daysBefore(1) });
+    expect(deriveTemperature(input, STAGES, NOW)).toEqual(deriveTemperature(input, STAGES, NOW));
   });
 });
