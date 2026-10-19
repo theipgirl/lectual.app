@@ -36,29 +36,73 @@ export class ProposalError extends Error {
 type DbErrorLike = { code?: string; message?: string } | null | undefined;
 
 /**
+ * The lifecycle trigger's and `client_proposal_send`'s stable message prefixes
+ * (lectual 0089), each with what a person should read instead. Matched FIRST:
+ * several of these share a SQLSTATE (42501 for both "not an approver" and "only
+ * the service role accepts", 23514 for every refused move), so the code alone
+ * would collapse them into one generic sentence.
+ */
+const TRIGGER_MESSAGES: ReadonlyArray<readonly [prefix: string, code: ProposalErrorCode, message: string]> = [
+  ["client_proposal_not_approver", "forbidden", "Only the firm's named approvers can approve a proposal."],
+  ["client_proposal_accept_service_only", "forbidden", "Only the client can accept a proposal, from their own link."],
+  ["client_proposal_frozen", "frozen", "This version has already gone out and can't be changed. Create a revision instead."],
+  ["client_proposal_immutable", "frozen", "This version has already gone out and can't be changed. Create a revision instead."],
+  ["client_proposal_acceptance_final", "frozen", "The client's acceptance is a record and can't be changed."],
+  [
+    "client_proposal_edit_and_move",
+    "conflict",
+    "Save your changes and change the status in separate steps. Refresh and try again.",
+  ],
+  [
+    "client_proposal_bad_transition",
+    "conflict",
+    "This proposal can't move to that status from where it is now. Refresh and check its status.",
+  ],
+  ["client_proposal_approval_incomplete", "validation", "Set an expiry date and a pay link before approving."],
+  [
+    "client_proposal_send_not_approved",
+    "conflict",
+    "Only an approved version can be marked as sent. Refresh: it may have been edited back to draft.",
+  ],
+  [
+    "client_proposal_family_accepted",
+    "conflict",
+    "The client has already accepted a version of this proposal, so another version can't be sent.",
+  ],
+  ["client_proposal_not_found", "not_found", "Proposal not found."],
+];
+
+/**
  * Turn whatever the database said into a `ProposalError` with a sentence a
- * person can act on. Matches Postgres SQLSTATE codes first, then a few
- * keywords from the lifecycle trigger's messages; anything unrecognised becomes
- * a generic "could not" that never repeats the original text.
+ * person can act on. Matches the trigger's stable message prefixes first, then
+ * Postgres SQLSTATE codes and a few keywords; anything unrecognised becomes a
+ * generic "could not" that never repeats the original text.
  */
 export function friendlyProposalError(error: DbErrorLike, doing = "save the proposal"): ProposalError {
   const code = error?.code ?? "";
   const message = (error?.message ?? "").toLowerCase();
 
-  if (code === "42501" || message.includes("row-level security") || message.includes("permission denied")) {
-    return new ProposalError("forbidden", `You don't have permission to ${doing}.`);
+  for (const [prefix, kind, text] of TRIGGER_MESSAGES) {
+    if (message.includes(prefix)) return new ProposalError(kind, text);
   }
+
   if (message.includes("approver")) {
     return new ProposalError("forbidden", "Only the firm's named approvers can approve a proposal.");
   }
   if (message.includes("service role") || message.includes("service_role")) {
     return new ProposalError("forbidden", "Only the client can accept a proposal, from their own link.");
   }
+  if (code === "42501" || message.includes("row-level security") || message.includes("permission denied")) {
+    return new ProposalError("forbidden", `You don't have permission to ${doing}.`);
+  }
   if (message.includes("frozen") || message.includes("immutable") || message.includes("cannot be edited") || message.includes("can no longer")) {
     return new ProposalError("frozen", "This version has already gone out and can't be changed. Create a revision instead.");
   }
   if (message.includes("transition")) {
     return new ProposalError("conflict", "This proposal can't move to that status from where it is now. Refresh and check its status.");
+  }
+  if (code === "P0002") {
+    return new ProposalError("not_found", "Proposal not found.");
   }
   if (code === "23505") {
     return new ProposalError("conflict", "Someone else changed this proposal at the same time (for example, another draft of it already exists). Refresh and try again.");

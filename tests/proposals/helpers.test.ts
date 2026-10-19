@@ -290,4 +290,42 @@ describe("friendlyProposalError", () => {
   ])("%j is %s", (err, code) => {
     expect(friendlyProposalError(err as never).code).toBe(code);
   });
+
+  // The exact texts lectual 0089's trigger and client_proposal_send raise.
+  it.each([
+    [
+      "42501",
+      "client_proposal_not_approver: you are not one of this firm's proposal approvers",
+      "forbidden",
+      /named approvers/,
+    ],
+    [
+      "42501",
+      "client_proposal_accept_service_only: only the service role, recording the client's acceptance on the proposal page, can accept a proposal",
+      "forbidden",
+      /Only the client/,
+    ],
+    ["23514", "client_proposal_frozen: a sent proposal is frozen and cannot be edited; revise it as a new version", "frozen", /revision/],
+    ["23514", "client_proposal_bad_transition: sent -> draft is not allowed", "conflict", /can't move/],
+    [
+      "23514",
+      "client_proposal_edit_and_move: edit an approved proposal and make a status transition in separate steps",
+      "conflict",
+      /separate steps/,
+    ],
+    ["23514", "client_proposal_approval_incomplete: set an expiry date and a pay link before approving", "validation", /expiry date and a pay link/],
+    ["23514", "client_proposal_send_not_approved: only an approved proposal can be sent (this one is draft)", "conflict", /approved version/],
+    [
+      "23514",
+      "client_proposal_family_accepted: the client has already accepted a version of this proposal",
+      "conflict",
+      /already accepted/,
+    ],
+    ["P0002", "client_proposal_not_found: no proposal 00000000-0000-0000-0000-000000000000 in this firm", "not_found", /not found/],
+  ])("%s %s", (code, message, kind, text) => {
+    const e = friendlyProposalError({ code, message });
+    expect(e.code).toBe(kind);
+    expect(e.message).toMatch(text);
+    expect(e.message).not.toMatch(/client_proposal_/);
+  });
 });
