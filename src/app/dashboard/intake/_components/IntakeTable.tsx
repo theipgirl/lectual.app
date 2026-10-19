@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { MemberIdentity } from "@/lib/members/directory";
-import type { Temperature } from "@/lib/intake";
+import type { ReferralSource, Temperature } from "@/lib/intake";
+import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
+import { pendingFor } from "@/lib/intake/needs-rebecca";
 import type { IntakeRow, SortDir, SortKey } from "@/lib/intake/rows";
 import { nextStepFor, stageCodeFor, stageLabelFor, touchStampFor } from "@/lib/intake/views";
 import type { IntakeTime } from "@/lib/time";
@@ -11,6 +13,8 @@ import TimeChip from "@/components/intake/TimeChip";
 import OwnerCell from "./OwnerCell";
 import TemperatureCell from "./TemperatureCell";
 import LaneCell from "./LaneCell";
+import NeedsRebeccaBadge from "./NeedsRebeccaBadge";
+import SourceCell from "./SourceCell";
 import type { Lane } from "@/lib/leads/lane";
 import {
   NEXT,
@@ -65,10 +69,12 @@ export default function IntakeTable({
   pendingLeadId,
   errors,
   time,
+  pendingApprovals,
   onSort,
   onSetTemperature,
   onSetLane,
   onAssign,
+  onSetSource,
 }: {
   rows: IntakeRow[];
   /** Rows before filtering — the footer's "of M". */
@@ -81,10 +87,13 @@ export default function IntakeTable({
   errors: Record<string, string>;
   /** This week's time per lead, or null when that read failed (§13.1). */
   time: IntakeTime | null;
+  /** Absent = nothing to show; see needs-rebecca.ts for the three states. */
+  pendingApprovals?: LeadPendingApprovals;
   onSort: (key: SortKey) => void;
   onSetTemperature: (leadId: string, level: Temperature | null) => void;
   onSetLane: (leadId: string, lane: Lane | null) => void;
   onAssign: (leadId: string, userId: string | null) => void;
+  onSetSource: (leadId: string, source: ReferralSource | null) => void;
 }) {
   const router = useRouter();
 
@@ -145,6 +154,7 @@ export default function IntakeTable({
             const touch = touchStampFor(row);
             const error = errors[lead.id];
             const pending = pendingLeadId === lead.id;
+            const pendingDrafts = pendingFor(pendingApprovals, lead.id);
 
             return (
               <div key={lead.id}>
@@ -172,12 +182,15 @@ export default function IntakeTable({
                   }}
                 >
                   <div style={{ minWidth: 0 }}>
-                    <Link
-                      href={`/dashboard/leads/${lead.id}`}
-                      style={{ ...ellipsis, display: "block", color: "inherit" }}
-                    >
-                      {name}
-                    </Link>
+                    <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+                      <Link
+                        href={`/dashboard/leads/${lead.id}`}
+                        style={{ ...ellipsis, display: "block", color: "inherit" }}
+                      >
+                        {name}
+                      </Link>
+                      <NeedsRebeccaBadge pending={pendingDrafts} />
+                    </div>
                     <div
                       className="intake-mono"
                       style={{ ...ellipsis, fontSize: 11, color: "var(--mute)", marginTop: 2 }}
@@ -210,11 +223,14 @@ export default function IntakeTable({
 
                   <LaneCell leadName={name} lane={row.lane} pending={pending} onSet={(lane) => onSetLane(lead.id, lane)} />
 
-                  <div
-                    style={{ ...ellipsis, fontSize: 12.5, color: "var(--ink2)" }}
-                    title={lead.referral_detail?.trim() || undefined}
-                  >
-                    {lead.referral_source?.trim() || "—"}
+                  <div style={{ minWidth: 0, display: "flex" }}>
+                    <SourceCell
+                      leadName={name}
+                      source={lead.referral_source}
+                      detail={lead.referral_detail}
+                      pending={pending}
+                      onSet={(source) => onSetSource(lead.id, source)}
+                    />
                   </div>
 
                   <OwnerCell

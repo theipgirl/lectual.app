@@ -6,6 +6,7 @@ import { LeadWriteError, forbiddenLeadWrite } from "@/lib/pipeline/errors";
 import { intakeStageIds } from "./scope";
 import type { Temperature } from "./temperature";
 import { suggestedLane, type Lane } from "@/lib/leads/lane";
+import { isReferralSource, type ReferralSource } from "./referral-source";
 
 /**
  * Server-side reads/writes for the intake dashboard (blueprint §7).
@@ -208,6 +209,76 @@ export async function setLane(leadId: string, lane: Lane | null): Promise<Lead> 
       suggested: suggestedLane(before.ai_summary),
       by,
       summary: lane ? `Lane set to ${lane}` : "Lane cleared",
+    },
+  });
+
+  return updated;
+}
+
+/**
+ * Sets (or clears, with null) a lead's referral source — the staff correction
+ * for a source the importer bucketed wrong or couldn't know (Rebecca: sources
+ * are often missing from the sheet).
+ *
+ * The value must be one of REFERRAL_SOURCES; anything else is refused here as
+ * well as in the action, so no caller can write a free-text bucket that the
+ * Source filter would never match. `referral_detail` (the verbatim import text)
+ * is deliberately left alone: it is the record of what the sheet said, and the
+ * timeline row below records what a person changed the bucket from and to.
+ *
+ * Same gate as the other lead edits: CAN_WRITE_LEAD, re-resolved per call,
+ * mirroring crm_lead_update_staff. A change to the value it already holds is a
+ * no-op with no timeline row.
+ */
+export async function setReferralSource(
+  leadId: string,
+  source: ReferralSource | null,
+): Promise<Lead> {
+  if (!leadId) throw new LeadWriteError("Missing lead.");
+  if (source !== null && !isReferralSource(source)) {
+    throw new LeadWriteError("That isn't one of the sources.");
+  }
+
+  const supabase = await getScopedClient();
+  const role = await resolveCurrentRole(supabase);
+  if (!CAN_WRITE_LEAD.includes(role)) {
+    throw forbiddenLeadWrite(role, "set a lead's source");
+  }
+
+  const { data: before, error: beforeError } = await supabase
+    .from("crm_lead")
+    .select("referral_source")
+    .eq("id", leadId)
+    .maybeSingle();
+  if (beforeError) throw beforeError;
+  if (!before) throw new LeadWriteError("That lead no longer exists.");
+  const from = before.referral_source ?? null;
+  if (from === source) {
+    const { data: unchanged, error } = await supabase.from("crm_lead").select("*").eq("id", leadId).single();
+    if (error) throw error;
+    return unchanged;
+  }
+
+  const { data, error } = await supabase
+    .from("crm_lead")
+    .update({ referral_source: source, updated_at: new Date().toISOString() })
+    .eq("id", leadId)
+    .select("*");
+  if (error) throw error;
+  // Zero affected rows is not an error to PostgREST — see setTemperature.
+  const updated = (data ?? [])[0];
+  if (!updated) {
+    throw new LeadWriteError("That lead no longer exists, or isn't visible to your firm.");
+  }
+
+  await logActivitySafe({
+    type: "lead_updated",
+    leadId,
+    payload: {
+      field: "referral_source",
+      from,
+      to: source,
+      summary: source ? `Source set to ${source}` : "Source cleared",
     },
   });
 

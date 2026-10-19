@@ -155,8 +155,22 @@ describe("parseIntakeFilters", () => {
       owner: "user-1",
       stage: "s2",
       reply: "replied",
+      needsRebecca: false,
       q: "ada",
     });
+  });
+});
+
+describe("needsRebecca filter param", () => {
+  it("parses ?needs=rebecca and ignores any other value", () => {
+    expect(parseIntakeFilters({ needs: "rebecca" }).needsRebecca).toBe(true);
+    expect(parseIntakeFilters({ needs: "everyone" }).needsRebecca).toBe(false);
+    expect(parseIntakeFilters({}).needsRebecca).toBe(false);
+  });
+
+  it("serialises only when on", () => {
+    expect(filtersToQueryString({ ...EMPTY_INTAKE_FILTERS, needsRebecca: true })).toBe("needs=rebecca");
+    expect(filtersToQueryString(EMPTY_INTAKE_FILTERS)).toBe("");
   });
 });
 
@@ -173,6 +187,7 @@ describe("filtersToQueryString", () => {
       stage: "s3",
       reply: "awaiting" as const,
       lane: "suggested" as const,
+      needsRebecca: true,
       q: "acme",
     };
     const parsed = parseIntakeFilters(
@@ -341,14 +356,13 @@ describe("applyFilters", () => {
 // ── sortRows ────────────────────────────────────────────────────────────────
 describe("sortRows", () => {
   const rows = rowsFor([
-    // warm, touched 10 days ago
-    lead({ id: "warm", current_stage_id: "s1", last_activity_at: daysBefore(10), stage_entered_at: daysBefore(10) }),
+    // warm: touched 6 days ago (between the 3-day hot and 10-day cold lines)
+    lead({ id: "warm", current_stage_id: "s1", last_activity_at: daysBefore(6), stage_entered_at: daysBefore(10) }),
     // hot (replied yesterday), touched recently
     lead({ id: "hotRecent", current_stage_id: "s1", last_inbound_at: daysBefore(1), stage_entered_at: daysBefore(1) }),
     // hot override, never touched → longest awaiting of the two hots
     lead({ id: "hotNever", current_stage_id: "s1", temperature: "hot", stage_entered_at: daysBefore(40) }),
-    // cold: a nurture stage AND stale enough that rule 2's "active in stage"
-    // clause no longer rescues it (s3's threshold is 30 days).
+    // cold: a nurture stage, and untouched for 35 days besides.
     lead({ id: "cold", current_stage_id: "s3", last_activity_at: daysBefore(35), stage_entered_at: daysBefore(35) }),
   ]);
 
@@ -408,18 +422,18 @@ describe("computeIntakeKpis", () => {
         id: "c",
         current_stage_id: "s2",
         stage_entered_at: daysBefore(20),
-        last_activity_at: daysBefore(20),
+        last_activity_at: daysBefore(6),
         assigned_to: null,
       }),
     ]);
 
     expect(computeIntakeKpis(rows)).toEqual({
       hot: 1, // a replied yesterday
-      warm: 1, // c: 20 days quiet is past s2's window but short of the 30-day cold line
+      warm: 1, // c: touched 6 days ago, between the 3-day hot and 10-day cold lines
       cold: 1, // b sits on a nurture stage and hasn't been touched in 35 days
       awaitingUs: 1, // only a has a newer inbound than outbound
       unassigned: 1,
-      stale: 2, // c is 20 days into a 5-day stage, b 35 days into a 30-day one
+      stale: 2, // c is 20 days into a 5-day stage, b 35 days into a 30-day one (stale is stage aging, not temperature)
     });
   });
 
