@@ -72,7 +72,6 @@ export async function loadIposReport(period: ReportPeriod, opts: { hasAgents: bo
   const links: LinkTile[] = [
     { label: "AI copilot", sub: "Ask the firm brain a question", href: "/dashboard/copilot/", count: null },
     ...(opts.hasAgents ? [{ label: "Agents", sub: "Scheduled automations", href: "/dashboard/agents/", count: runs.status === "ok" ? runsInPeriod.length : null }] : []),
-    { label: "Skills", sub: "What the firm has taught its agents", href: "/dashboard/skills/", count: null },
     { label: "Firm brain", sub: "Voice, pricing and decisions agents draft from", href: "/dashboard/brain/", count: brainCount },
   ];
 

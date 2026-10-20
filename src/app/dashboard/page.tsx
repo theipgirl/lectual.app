@@ -10,6 +10,7 @@ import { BAND_COPY } from "@/lib/matters/worklist";
 import { formatCivilDate } from "@/lib/matters/ip-fields";
 import { laneOf, laneReason } from "@/lib/leads/lane";
 import { hourInZone } from "@/lib/today/priorities";
+import { greetingName, greetingSuffix } from "@/lib/today/greeting-name";
 import { buildNeedsYou, emptyNeedsYouNote, type NeedsYouItem } from "@/lib/today/needs-you";
 import { loadConnectionsNeedingReauth, loadDeadlinesClosedSince, loadOpenQuotes, loadUnreviewedSubmissions } from "@/lib/today/load-needs-you";
 import { civilInZone, deadlinesMetThisMonth, mattersOpenedThisMonth, monthQueryFloor, monthStartCivil } from "@/lib/today/outcomes";
@@ -198,7 +199,8 @@ export default async function TodayPage() {
             {session.org.name} · {dateLine}
           </div>
           <h1 className="lx-h1">
-            Good {greeting(hourInZone(now, tz))}, {session.displayName.split(" ")[0]}.
+            Good {greeting(hourInZone(now, tz))}
+            {greetingSuffix(greetingName({ userId: session.user.id, members, metadata: session.user.user_metadata, email: session.user.email }))}.
           </h1>
         </div>
       </div>

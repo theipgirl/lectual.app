@@ -73,3 +73,47 @@ describe("rail tree (design/Rail.dc.html)", () => {
     for (const e of groups.flat().filter((x) => x.kids.length)) expect(e.href).toMatch(/^\/dashboard\/reports\/[a-z]+\/$/);
   });
 });
+
+describe("unbuilt sections are hidden (built: false)", () => {
+  const UNBUILT = ["sms", "portals", "skills"];
+  const everything = ["mailbox", "agents", "proposals", "document-center", "agent-toolkit", "litigation"];
+  const railSlugs = (groups: ReturnType<typeof railGroups>) => groups.flat().flatMap((e) => [e.key, ...e.kids.map((k) => k.key)]);
+  const railLabels = (groups: ReturnType<typeof railGroups>) => groups.flat().flatMap((e) => [e.label, ...e.kids.map((k) => k.label)]);
+
+  it("flags exactly SMS, Client portals and Skills", () => {
+    expect(NAV.filter((n) => n.built === false).map((n) => n.slug)).toEqual(UNBUILT);
+  });
+
+  it("visibleNav never returns them, whatever modules the firm holds", () => {
+    const shown = visibleNav(everything, "owner").map((n) => n.slug);
+    for (const slug of UNBUILT) expect(shown).not.toContain(slug);
+    expect(shown).toContain("agents");
+  });
+
+  it("navItemAllowed refuses them for every role", () => {
+    for (const slug of UNBUILT) {
+      for (const role of ["owner", "viewer"] as const) expect(navItemAllowed(navItemBySlug(slug)!, everything, role)).toBe(false);
+    }
+  });
+
+  it("the rail drops them, for filtered input and for the full NAV", () => {
+    for (const input of [visibleNav(everything, "owner"), NAV]) {
+      const groups = railGroups(input, "/dashboard/");
+      for (const slug of UNBUILT) expect(railSlugs(groups)).not.toContain(slug);
+      const labels = railLabels(groups);
+      for (const label of ["SMS", "Client portals", "Skills"]) expect(labels).not.toContain(label);
+    }
+  });
+
+  it("keeps the parents and their other children", () => {
+    const groups = railGroups(visibleNav(everything, "owner"), "/dashboard/");
+    const find = (label: string) => groups.flat().find((e) => e.label === label)!;
+    expect(find("Communication").kids.map((k) => k.key)).toEqual(["mail", "meetings", "queue", "campaigns"]);
+    expect(find("Active matters").kids.map((k) => k.key)).toEqual(["matters", "pipeline", "documents"]);
+    expect(find("IP.OS").kids.map((k) => k.key)).toEqual(["copilot", "agents", "brain"]);
+  });
+
+  it("every unbuilt section is still listed in NAV so its URL stays a known 404", () => {
+    for (const slug of UNBUILT) expect(navItemBySlug(slug)).toBeDefined();
+  });
+});

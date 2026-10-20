@@ -115,7 +115,6 @@ export async function loadCommunicationReport(
     ...(opts.hasMailbox ? [{ label: "My Mail", sub: "Your Outlook or Gmail inbox", href: "/dashboard/mail/", count: null }] : []),
     { label: "Queue", sub: "Agent-triaged intake and drafts to approve", href: "/dashboard/queue/", count: queue.status === "ok" ? queue.items.length : null },
     { label: "Campaigns", sub: "Nurture and follow-up sequences", href: "/dashboard/campaigns/", count: drips.status === "ok" ? drips.rows.length : null },
-    { label: "SMS", sub: "Text conversations", href: "/dashboard/sms/", count: null },
   ];
 
   return {
