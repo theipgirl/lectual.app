@@ -41,8 +41,9 @@ describe("createDraft", () => {
     });
 
     expect(result).toEqual({ id: "q-99" });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0]!;
+    // createDraft first lists the pending queue (the near-duplicate check), then POSTs.
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const [url, init] = fetchMock.mock.calls[1]!;
     expect(url).toBe("https://lawmatics-mcp.example.com/api/queue");
     expect(init).toBeDefined();
     expect(init!.method).toBe("POST");
@@ -79,7 +80,7 @@ describe("createDraft", () => {
       proposedSendAt: "2026-08-24T12:00:00.000Z",
     });
 
-    const [, init] = fetchMock.mock.calls[0]!;
+    const [, init] = fetchMock.mock.calls[1]!;
     const body = JSON.parse(init!.body as string);
     expect(body).toMatchObject({
       recipient: "jane@example.com",
@@ -102,7 +103,7 @@ describe("createDraft", () => {
       draftBody: "b",
     });
 
-    const [, init] = fetchMock.mock.calls[0]!;
+    const [, init] = fetchMock.mock.calls[1]!;
     const body = JSON.parse(init!.body as string);
     expect(body).not.toHaveProperty("recipient");
     expect(body).not.toHaveProperty("subject");

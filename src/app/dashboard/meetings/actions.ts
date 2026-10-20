@@ -152,6 +152,7 @@ export async function draftFollowUpAction(_prev: ActionState, formData: FormData
       recipient: hasRealAddress ? lead.email : undefined,
       subject: output.subject,
       draftBody: output.body,
+      signOff,
       ...(meeting.matter_id ? { matterId: meeting.matter_id } : {}),
     });
     queueId = created.id;

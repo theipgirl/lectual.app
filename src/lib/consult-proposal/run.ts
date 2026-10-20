@@ -315,6 +315,7 @@ async function runStages(input: ConsultProposalRunInput, progress: Progress): Pr
       recipient: hasRealAddress ? (lead.email as string) : undefined,
       subject: `${testPrefix}${email.subject}`,
       draftBody: email.body,
+      teamSignOff,
       ...(input.matterId ? { matterId: input.matterId } : {}),
     }));
   } catch (err) {
