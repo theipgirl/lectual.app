@@ -110,6 +110,7 @@ export async function queuePrepConsultDrafts(input: PrepConsultFormInput): Promi
     draftBody: headsUp.draftBody,
     summary: headsUp.summary,
     clientName,
+    leadId: lead.id,
     // Internal to Rebecca — deliberately no recipient/subject; those are
     // meaningful only for the client-facing draft below.
   });
@@ -127,6 +128,7 @@ export async function queuePrepConsultDrafts(input: PrepConsultFormInput): Promi
     draftBody: clientPrep.draftBody,
     summary: clientPrep.summary,
     clientName,
+    leadId: lead.id,
     recipient: lead.email,
     subject: clientPrep.subject,
   });

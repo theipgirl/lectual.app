@@ -1,5 +1,6 @@
 import "server-only";
 import { env } from "@/lib/env";
+import { notifyApprovers } from "@/lib/notifications/approval";
 import { cleanDraftBody, enforceSignOff, isNearDuplicate, movedSummary, signOffSummary } from "./hygiene";
 
 /**
@@ -123,6 +124,11 @@ export type NewQueueDraft = {
    * handed another draft's id. Everyone else leaves it unset.
    */
   dedupe?: false;
+  /**
+   * The lead this draft is about, when the caller holds one. Used only to link the
+   * in-app approval alert; it is never sent to the queue service.
+   */
+  leadId?: string;
 };
 
 /** What createDraft returns. `deduped` means an equivalent draft was already waiting, so nothing was queued. */
@@ -160,7 +166,7 @@ export async function createDraft(input: NewQueueDraft): Promise<CreatedDraft> {
   const existing = input.dedupe === false ? null : await findNearDuplicate(input, draftBody);
   if (existing) return { id: existing, deduped: true };
 
-  return call(`/api/queue`, {
+  const created = await call<CreatedDraft>(`/api/queue`, {
     method: "POST",
     body: JSON.stringify({
       org_id: input.orgKey,
@@ -176,6 +182,39 @@ export async function createDraft(input: NewQueueDraft): Promise<CreatedDraft> {
       ...(input.proposedSendAt ? { proposed_send_at: input.proposedSendAt } : {}),
     }),
   });
+
+  if (typeof created?.id === "string") await alertApprovers(input, created.id);
+  return created;
+}
+
+/** The longest createDraft waits for the in-app approval alert before returning the id. */
+export const APPROVAL_ALERT_TIMEOUT_MS = 3000;
+
+/**
+ * Tells the approvers a draft is waiting. Awaited, because a promise left
+ * running can be cut off when a serverless response ends, but bounded and
+ * swallowed: the draft is already queued, and a slow or failed alert must
+ * neither delay nor fail the caller. The log names no person, draft or body.
+ */
+async function alertApprovers(input: NewQueueDraft, queueId: string): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      notifyApprovers({
+        queueId,
+        headline: input.headline,
+        leadId: input.leadId ?? null,
+        leadName: input.leadId ? (input.clientName ?? null) : null,
+      }),
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, APPROVAL_ALERT_TIMEOUT_MS);
+      }),
+    ]);
+  } catch {
+    console.warn("[queue] the approval alert was not raised");
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**

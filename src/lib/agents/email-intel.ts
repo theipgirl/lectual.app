@@ -206,6 +206,7 @@ export async function runEmailIntel(ctx: AgentContext): Promise<AgentResult> {
         type: "BRIEFING",
         headline: `${name || "A lead"} asked a legal question`,
         clientName: name || undefined,
+        leadId: lead.id,
         summary: output.legal_question,
         draftBody: `${name || "The client"} asked, by email: ${output.legal_question}\n\nThis needs an attorney's answer. Lectual has not replied.`,
       });

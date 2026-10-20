@@ -86,6 +86,7 @@ export async function generateWelcomeEmail(
     summary: built.summary,
     matterId: matter.id,
     clientName: clientOrEntityName,
+    ...(lead ? { leadId: lead.id } : {}),
   });
 
   // Written only now — after the queue POST has already succeeded — so a

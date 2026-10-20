@@ -312,6 +312,7 @@ async function runStages(input: ConsultProposalRunInput, progress: Progress): Pr
       headline: `${testPrefix}Proposal + follow-up — ${clientName}`.slice(0, 200),
       summary,
       clientName,
+      leadId: lead.id,
       recipient: hasRealAddress ? (lead.email as string) : undefined,
       subject: `${testPrefix}${email.subject}`,
       draftBody: email.body,

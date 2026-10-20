@@ -325,6 +325,7 @@ async function runConsultNotes(ctx: AgentContext): Promise<AgentResult> {
       headline: `Post-consult follow-up — ${name}`,
       summary: output.internal_summary,
       clientName: name,
+      leadId: lead.id,
       recipient: hasRealAddress ? lead.email : undefined,
       subject: output.subject,
       draftBody: output.body,

@@ -163,3 +163,64 @@ export async function markAllRead(): Promise<void> {
     .is("read_at", null);
   if (error) throw error;
 }
+
+/** Notifications per page on /dashboard/notifications/. */
+export const PAGE_SIZE = 50;
+/** Rows the top-bar popover shows. */
+export const BELL_ROWS = 10;
+
+export type NotificationPage = { rows: Notification[]; hasMore: boolean };
+
+/**
+ * One page of the caller's own notifications, newest first. Asks for one row
+ * more than `limit` to learn whether an older page exists. Throws on a query
+ * error, like listMine: the page maps a throw to "couldn't be loaded".
+ */
+export async function listMinePage({
+  unreadOnly = false,
+  offset = 0,
+  limit = PAGE_SIZE,
+}: { unreadOnly?: boolean; offset?: number; limit?: number } = {}): Promise<NotificationPage> {
+  const supabase = await getScopedClient();
+  let query = supabase.from("crm_notification").select("*");
+  if (unreadOnly) query = query.is("read_at", null);
+  const { data, error } = await query
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit);
+  if (error) throw error;
+  const rows = data ?? [];
+  return { rows: rows.slice(0, limit), hasMore: rows.length > limit };
+}
+
+/** A read that either worked or did not. `unavailable` is never an empty list or a 0. */
+export type Loaded<T> = { status: "ok"; data: T } | { status: "unavailable" };
+
+export type BellData = { count: Loaded<number>; list: Loaded<Notification[]> };
+
+/** Unread first (newest first), then read rows to fill the popover. */
+async function listForBell(): Promise<Notification[]> {
+  const unread = (await listMinePage({ unreadOnly: true, limit: BELL_ROWS })).rows;
+  if (unread.length >= BELL_ROWS) return unread;
+  const recent = (await listMinePage({ limit: BELL_ROWS })).rows;
+  const seen = new Set(unread.map((row) => row.id));
+  const read = recent.filter((row) => row.read_at !== null && !seen.has(row.id));
+  return [...unread, ...read].slice(0, BELL_ROWS);
+}
+
+async function attempt<T>(read: () => Promise<T>): Promise<Loaded<T>> {
+  try {
+    return { status: "ok", data: await read() };
+  } catch (err) {
+    console.warn(`[notifications] read failed: ${err instanceof Error ? err.message : String(err)}`);
+    return { status: "unavailable" };
+  }
+}
+
+/**
+ * What the top-bar bell needs, with the count and the list kept apart so one
+ * can fail without the other. Never throws: it runs inside the dashboard layout.
+ */
+export async function loadBell(): Promise<BellData> {
+  const [count, list] = await Promise.all([attempt(unreadCount), attempt(listForBell)]);
+  return { count, list };
+}
