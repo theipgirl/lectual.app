@@ -76,10 +76,11 @@ State checked 2026-09-29 (lectual-prod, read-only):
   `intake`-role member (not the person who logged it). The database allows only four notification
   kinds (`mentioned`, `assigned`, `lead_replied`, `time_running`), and a fifth needs a migration in
   `lectual`, so the row is `mentioned` with `payload.source = "consult_outcome"`, the `outcome`, and a
-  `preview` such as "No-show: Ana Ruiz". The bell is rendered by lectual and words `mentioned` as
-  "tagged you on <lead>", which misreads for an outcome. Follow-up for lectual: add a dedicated kind
-  (e.g. `consult_outcome`) and word it from `payload.outcome`; this repo then switches the `kind` in
-  `src/lib/pipeline/consult-outcome.ts`.
+  `preview` such as "No-show: Ana Ruiz". The bell now exists in this repo (top bar and
+  `/dashboard/notifications/`) and words the row from `payload.outcome`: "No-show logged on Ana Ruiz",
+  "Reschedule requested on Ana Ruiz", "Rebooked after no-show: Ana Ruiz". Follow-up for lectual: add a
+  dedicated kind; this repo then changes one line in `NOTIFICATION_KIND_FOR`
+  (`src/lib/notifications/kinds.ts`). See `docs/notifications.md`.
 - **"Pending approvals on Today" needs nothing.** Today's "Waiting on you" KPI already shows the
   pending queue count (three states: a failed queue read says so, never "0"). `src/app/dashboard/page.tsx`
   is unchanged for this.
