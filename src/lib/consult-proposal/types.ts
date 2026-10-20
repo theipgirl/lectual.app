@@ -31,6 +31,9 @@ export type ConsultSource =
 /** The most a pasted transcript may be (characters). */
 export const MAX_PASTED_TRANSCRIPT_CHARS = 200_000;
 
+/** The least a transcript may be (characters) for the agent to draft from it. Pasted and uploaded alike. */
+export const MIN_TRANSCRIPT_CHARS = 200;
+
 export type ConsultLead = {
   id: string;
   firstName: string | null;

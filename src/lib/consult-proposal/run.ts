@@ -48,7 +48,7 @@ export type ConsultProposalRunInput = {
   lead: ConsultLead;
   matterId: string | null;
   llm: StructuredCall;
-  createDraft: (input: NewQueueDraft) => Promise<{ id: string }>;
+  createDraft: (input: NewQueueDraft) => Promise<{ id: string; deduped?: boolean }>;
   queueOrgKey: string | null;
   /** https://app.example.com — the client link and the staff link are built on it. */
   origin: string | null;
@@ -305,7 +305,7 @@ async function runStages(input: ConsultProposalRunInput, progress: Progress): Pr
   progress.stage = "queue";
   let queueId: string;
   try {
-    ({ id: queueId } = await input.createDraft({
+    const queued = await input.createDraft({
       orgKey: input.queueOrgKey,
       agent: "post-consult",
       type: "CLIENT_EMAIL",
@@ -315,8 +315,22 @@ async function runStages(input: ConsultProposalRunInput, progress: Progress): Pr
       recipient: hasRealAddress ? (lead.email as string) : undefined,
       subject: `${testPrefix}${email.subject}`,
       draftBody: email.body,
+      teamSignOff,
       ...(input.matterId ? { matterId: input.matterId } : {}),
-    }));
+      // The marker below ties this proposal to the returned queue id, and the
+      // approve gate trusts it, so this must be our own item, never another's.
+      dedupe: false,
+    });
+    if (queued.deduped) {
+      // Belt and braces: a queue that handed back someone else's item anyway.
+      await withdrawQuietly(db, orgId, proposal.id);
+      return refuse(
+        "already_drafted",
+        "A proposal email for this client is already waiting in the approval queue. Review or reject that one first.",
+        draft.costUsd,
+      );
+    }
+    queueId = queued.id;
   } catch (err) {
     logConsultFailure("queue", err);
     await withdrawQuietly(db, orgId, proposal.id);

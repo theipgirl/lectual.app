@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { activeOrgModules, type OrgModule } from "@/lib/org/modules";
+import { listConnections } from "@/lib/mailbox/connections";
 
 export const dynamic = "force-dynamic";
 
@@ -18,8 +20,26 @@ const MODULES: Array<{ key: OrgModule; name: string; what: string }> = [
   { key: "litigation", name: "Litigation", what: "Litigation matters, with court case numbers, hearings and case details." },
 ];
 
+type ModuleStatus = { label: string; tone: "ok" | "warn" | "risk" | "mute" };
+
+/**
+ * A switched-on Mailboxes module with nothing connected is not a working one,
+ * and a failed read is neither "connected" nor "none". Counts only active
+ * connections the caller can see: the firm's mailboxes plus their own.
+ */
+async function mailboxStatus(enabled: boolean): Promise<ModuleStatus & { connected: number | null }> {
+  if (!enabled) return { label: "Off", tone: "mute", connected: null };
+  const result = await listConnections().catch(() => ({ ok: false as const, error: "unreadable" }));
+  if (!result.ok) return { label: "On · couldn't check connections", tone: "risk", connected: null };
+  const connected = result.connections.filter((c) => c.status === "active").length;
+  return connected > 0
+    ? { label: `On · ${connected} connected`, tone: "ok", connected }
+    : { label: "On · none connected", tone: "warn", connected };
+}
+
 export default async function ModulesPage() {
   const on = await activeOrgModules();
+  const mailbox = await mailboxStatus(on.includes("mailbox"));
   return (
     <>
       <div>
@@ -30,6 +50,7 @@ export default async function ModulesPage() {
       <section className="lx-card lx-int" aria-label="Modules">
         {MODULES.map((m) => {
           const enabled = on.includes(m.key);
+          const status: ModuleStatus = m.key === "mailbox" ? mailbox : { label: enabled ? "On" : "Off", tone: enabled ? "ok" : "mute" };
           return (
             <div key={m.key} className="lx-int-row">
               <div className="lx-int-summary">
@@ -38,8 +59,19 @@ export default async function ModulesPage() {
                   <span className="lx-note" style={{ display: "block" }}>
                     {m.what}
                   </span>
+                  {m.key === "mailbox" && enabled && (
+                    <span className="lx-note" style={{ display: "block" }}>
+                      Colleagues&apos; personal mailboxes are private to them, so this count is the firm&apos;s mailboxes plus your own.
+                      {mailbox.connected === 0 && (
+                        <>
+                          {" "}
+                          <Link href="/dashboard/settings/mailboxes/">Connect a mailbox</Link>
+                        </>
+                      )}
+                    </span>
+                  )}
                 </span>
-                <span className={`lx-pill ${enabled ? "lx-pill-ok" : "lx-pill-mute"}`}>{enabled ? "On" : "Off"}</span>
+                <span className={`lx-pill lx-pill-${status.tone}`}>{status.label}</span>
               </div>
             </div>
           );

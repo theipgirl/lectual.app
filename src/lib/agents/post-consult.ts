@@ -279,7 +279,8 @@ async function runConsultNotes(ctx: AgentContext): Promise<AgentResult> {
     .select("email_signature")
     .eq("org_id", orgId)
     .maybeSingle();
-  const system = followUpSystem((profile?.email_signature as string | null | undefined)?.trim() || null);
+  const signOff = (profile?.email_signature as string | null | undefined)?.trim() || null;
+  const system = followUpSystem(signOff);
 
   let drafted = 0;
   for (const note of todo) {
@@ -327,6 +328,7 @@ async function runConsultNotes(ctx: AgentContext): Promise<AgentResult> {
       recipient: hasRealAddress ? lead.email : undefined,
       subject: output.subject,
       draftBody: output.body,
+      signOff,
     });
     drafted += 1;
 

@@ -15,7 +15,11 @@ import { describeProposalEvent } from "@/lib/proposal-editor/events";
 import { describeIssuePath, groupIssues } from "@/lib/proposal-editor/issues";
 import { firstNameOf, joinOr, statusLabel, statusTone } from "@/lib/proposal-editor/labels";
 import { moneyInput } from "@/lib/proposal-editor/form";
+import { buildProposalCard } from "@/lib/proposals/card";
+import { loadConsultStrip } from "@/lib/proposals/consult-strip-load";
 import { ProposalDocument } from "@/components/client-proposal/ProposalDocument";
+import { ConsultStrip } from "@/components/proposal-editor/ConsultStrip";
+import { ProposalCard } from "@/components/proposal-editor/ProposalCard";
 import { IssueList, type ShownIssue } from "@/components/proposal-editor/ActionForm";
 import { Lifecycle } from "@/components/proposal-editor/Lifecycle";
 import {
@@ -86,13 +90,16 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
   const { proposal, versions, events } = detail;
   const content = proposal.content;
 
-  const [tz, members, settings, isApprover, origin] = await Promise.all([
+  const [tz, members, settings, isApprover, origin, consult] = await Promise.all([
     getFirmTimeZone(),
     listMemberDirectory().catch((): MemberIdentity[] => []),
     getProposalSettings().catch(() => null),
     isCurrentUserApprover(),
     getSiteOrigin(),
+    proposal.lead_id ? loadConsultStrip(proposal.lead_id) : Promise.resolve(null),
   ]);
+  // The family's events are already loaded, so the card needs no extra read.
+  const card = buildProposalCard(proposal, events);
 
   const nameOf = new Map<string, string>();
   for (const m of members) nameOf.set(m.userId, firstNameOf(m.displayName) ?? firstNameOf(m.email) ?? "A teammate");
@@ -197,6 +204,9 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
           )}
         </div>
       )}
+
+      <ProposalCard card={card} />
+      {consult && proposal.lead_id && <ConsultStrip state={consult} leadId={proposal.lead_id} tz={tz} />}
 
       {statusEditable && (errors > 0 || warnings > 0) && (
         <div className={`lx-banner ${errors > 0 ? "lx-banner-risk" : "lx-banner-mute"}`} role="status">

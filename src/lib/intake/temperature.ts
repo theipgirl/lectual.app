@@ -14,6 +14,25 @@ export type TemperatureResult = {
   level: Temperature;
   reason: string;
   overridden: boolean;
+  /**
+   * Set only by the "unbooked by day 10" rule. It is a SUGGESTION shown as text
+   * and a link: nothing here changes a stage or a lane (lanes are a person's act).
+   */
+  suggestion?: "long_term_nurture";
+};
+
+/**
+ * Recorded facts the lead row alone can't tell us, read by
+ * src/lib/intake/facts.ts. Every one is optional and absent means "not known":
+ * a failed read omits the whole object and the original rules run unchanged.
+ */
+export type TemperatureFacts = {
+  /** When the standard 3-email sequence completed with no inbound since enrolment. */
+  sequenceEndedNoReplyAt?: string | null;
+  /** The newest sign the lead is booked: a linked meeting, a booked_lss session, or a won stage. */
+  bookedAt?: string | null;
+  /** Earliest recorded outreach (email sent, call logged, or sequence enrolment). */
+  firstTouchAt?: string | null;
 };
 
 // PLACEHOLDERS: the 3 / 10 day numbers below are RPB's ops spec from the Fri 10/16
@@ -24,6 +43,8 @@ export type TemperatureResult = {
 export const HOT_AFTER_EXCHANGE_DAYS = 3;
 /** No touch for this long and the lead goes cold (SOP: day 10 -> Long-Term Nurture). */
 export const COLD_NO_TOUCH_DAYS = 10;
+/** A sequence counts as the firm's "standard" one when it has at least this many email steps (also a placeholder). */
+export const STANDARD_SEQUENCE_EMAIL_STEPS = 3;
 
 function daysAgo(iso: string, now: Date): number {
   return (now.getTime() - new Date(iso).getTime()) / 86_400_000;
@@ -34,6 +55,12 @@ function describeDays(days: number): string {
   if (rounded <= 0) return "today";
   if (rounded === 1) return "1 day ago";
   return `${rounded} days ago`;
+}
+
+/** True when `inbound` is a real time later than `since`. */
+function wroteAfter(inbound: string | null, since: string): boolean {
+  if (inbound == null) return false;
+  return new Date(inbound).getTime() > new Date(since).getTime();
 }
 
 /** Pure — greatest of the three touch timestamps a lead carries, or null if never touched. */
@@ -56,11 +83,17 @@ export function lastTouchAt(
  *      or we never wrote)                         -> hot, with NO time cap: it stays
  *      hot until we respond
  *   2. nurture-category stage                     -> cold
+ *   2a. (facts) the standard 3-email sequence ended with no reply -> cold
+ *   2b. (facts) first touch COLD_NO_TOUCH_DAYS or more ago and not booked -> cold,
+ *      with a Long-Term Nurture suggestion (never an automatic move)
  *   3. never touched                              -> cold
  *   4. last touch within HOT_AFTER_EXCHANGE_DAYS and the lead has written to us
  *      at some point                              -> hot
  *   5. no touch in COLD_NO_TOUCH_DAYS or more     -> cold
  *   6. otherwise                                  -> warm
+ *
+ * `facts` is optional. Without it (or with the fields absent) rules 2a and 2b are
+ * skipped and the result is exactly what it was before they existed.
  */
 export function deriveTemperature(
   lead: Pick<
@@ -69,6 +102,7 @@ export function deriveTemperature(
   >,
   stages: Stage[],
   now: Date,
+  facts?: TemperatureFacts,
 ): TemperatureResult {
   if (lead.temperature != null) {
     return { level: lead.temperature, reason: "Manually set", overridden: true };
@@ -87,6 +121,24 @@ export function deriveTemperature(
   const stage = stages.find((s) => s.id === lead.current_stage_id) ?? null;
   if (stage?.category === "nurture") {
     return { level: "cold", reason: "Nurture stage", overridden: false };
+  }
+
+  // Rule 2a. Ignored when the lead has written since: a stale fact must never turn a
+  // lead that replied cold (the loader checks this too; both guard the same hole).
+  const sequenceEnded = facts?.sequenceEndedNoReplyAt ?? null;
+  if (sequenceEnded != null && !wroteAfter(lead.last_inbound_at, sequenceEnded)) {
+    return { level: "cold", reason: "3-email sequence ended, no reply", overridden: false };
+  }
+
+  // Rule 2b. The suggestion is the point; where the lead goes is a person's call.
+  const firstTouch = facts?.firstTouchAt ?? null;
+  if (firstTouch != null && !facts?.bookedAt && daysAgo(firstTouch, now) >= COLD_NO_TOUCH_DAYS) {
+    return {
+      level: "cold",
+      reason: `Unbooked by day ${COLD_NO_TOUCH_DAYS} · Long-Term Nurture suggested`,
+      overridden: false,
+      suggestion: "long_term_nurture",
+    };
   }
 
   // Rule 3.

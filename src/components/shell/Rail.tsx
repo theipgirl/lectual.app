@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOutAction } from "@/lib/auth/actions";
 import { ICON, RAIL_PIN_COOKIE, isNavActive, navItemBySlug, railGroups, type NavItem } from "@/lib/nav";
+import { closeRailOnEscape, releaseRailFocus } from "@/lib/rail-behaviour";
 import type { QueueLoadStatus } from "@/lib/queue/load";
 
 type Props = {
@@ -48,6 +49,9 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
     document.cookie = `${RAIL_PIN_COOKIE}=${next ? "pinned" : "collapsed"}; path=/; max-age=31536000; samesite=lax`;
   }
 
+  // A mouse click must not leave focus in the rail (it would stay open), and Escape closes it.
+  const releaseFocus = () => releaseRailFocus(document.activeElement as HTMLElement | null);
+
   function countFor(key: string | null): string | null {
     if (!key) return null;
     if (key === "queue") {
@@ -64,13 +68,21 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
 
   return (
     <div className={`lx-rail-slot${pinned ? " is-pinned" : ""}`}>
-      <nav className={`lx-rail${pinned ? " is-pinned" : ""}`} aria-label="Sections">
+      <nav
+        className={`lx-rail${pinned ? " is-pinned" : ""}`}
+        aria-label="Sections"
+        onKeyDown={(e) => closeRailOnEscape(e.key, e.currentTarget, document.activeElement as HTMLElement | null)}
+      >
         <div className="lx-rail-headrow">
           <span className="lx-rail-kicker">Navigate</span>
           <button
             type="button"
             className={`lx-rail-pin${pinned ? " is-on" : ""}`}
-            onClick={togglePin}
+            onClick={(e) => {
+              togglePin();
+              // detail is 0 for a keyboard activation: that user keeps their place in the rail.
+              if (e.detail > 0) releaseFocus();
+            }}
             aria-pressed={pinned}
             aria-label={pinned ? "Unpin navigation" : "Pin navigation"}
             data-tip={pinned ? "Unpin navigation" : "Pin navigation"}
@@ -89,6 +101,7 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
                   <div key={entry.key} className="lx-rail-node">
                     <Link
                       href={entry.href}
+                      onClick={releaseFocus}
                       className={`lx-rail-item${entry.active ? " is-active" : entry.childActive ? " is-parent" : ""}`}
                       aria-current={entry.active ? "page" : undefined}
                       aria-label={count ? `${entry.label} (${count === "!" ? "couldn't reach the queue" : count})` : entry.label}
@@ -108,6 +121,7 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
                             <Link
                               key={kid.key}
                               href={kid.href}
+                              onClick={releaseFocus}
                               className={`lx-rail-kid${kid.active ? " is-active" : ""}`}
                               aria-current={kid.active ? "page" : undefined}
                             >
@@ -130,6 +144,7 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
 
         <Link
           href={settings.href}
+          onClick={releaseFocus}
           className={`lx-rail-item lx-rail-settings${settingsActive ? " is-active" : ""}`}
           aria-current={settingsActive ? "page" : undefined}
           aria-label="Settings"
@@ -147,7 +162,7 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
           <span className="lx-rail-label lx-rail-mewho">
             <span className="lx-rail-mename">{name}</span>
             <span className="lx-rail-meact">
-              <Link href="/dashboard/settings/firm/">Profile</Link> ·{" "}
+              <Link href="/dashboard/settings/firm/" onClick={releaseFocus}>Profile</Link> ·{" "}
               <form action={signOutAction} style={{ display: "inline" }}>
                 <button type="submit">Sign out</button>
               </form>

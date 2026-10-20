@@ -3,7 +3,13 @@ import type { Lead, Stage } from "@/lib/pipeline";
 // `import type` is erased at compile time, so nothing from it reaches the
 // client bundle this module is part of.
 import type { MemberIdentity } from "@/lib/members/directory";
-import { deriveTemperature, lastTouchAt, type Temperature, type TemperatureResult } from "./temperature";
+import {
+  deriveTemperature,
+  lastTouchAt,
+  type Temperature,
+  type TemperatureFacts,
+  type TemperatureResult,
+} from "./temperature";
 import { replyState, type ReplyState } from "./reply";
 import { REFERRAL_SOURCES } from "./referral-source";
 import { LANE_RANK, laneView, type Lane, type LaneView } from "@/lib/leads/lane";
@@ -34,6 +40,12 @@ export type IntakeRow = {
   /** The lead's stage row, or null when the stage is missing from the list. */
   stage: Stage | null;
   temperature: TemperatureResult;
+  /**
+   * The recorded facts `temperature` was derived with, kept so a client-side
+   * re-derivation (set temperature, move stage) reads the same ones. Absent when
+   * the facts read failed or the lead has none.
+   */
+  facts?: TemperatureFacts;
   /** The routing lane: a person's, and the triage suggestion beside it (SOP Stage 2). */
   lane: LaneView;
   reply: ReplyState;
@@ -232,6 +244,8 @@ export type BuildIntakeRowsInput = {
   members: MemberIdentity[];
   /** lead id → latest note text. Absent keys render "—"; see the page. */
   latestNoteByLeadId?: Record<string, string>;
+  /** lead id → recorded temperature facts. Omit entirely when the facts read failed. */
+  factsByLeadId?: Record<string, TemperatureFacts>;
   now: Date;
 };
 
@@ -251,7 +265,7 @@ function daysBetween(iso: string | null, now: Date): number | null {
  * strip and the row it counts can never disagree.
  */
 export function buildIntakeRows(input: BuildIntakeRowsInput): IntakeRow[] {
-  const { leads, stages, members, latestNoteByLeadId = {}, now } = input;
+  const { leads, stages, members, latestNoteByLeadId = {}, factsByLeadId = {}, now } = input;
   const stageById = new Map(stages.map((stage) => [stage.id, stage]));
   const memberById = new Map(members.map((member) => [member.userId, member]));
 
@@ -260,10 +274,14 @@ export function buildIntakeRows(input: BuildIntakeRowsInput): IntakeRow[] {
     const daysInStage = daysBetween(lead.stage_entered_at, now) ?? 0;
     const threshold = stage?.aging_threshold_days ?? null;
 
+    const facts = factsByLeadId[lead.id];
+
     return {
       lead,
       stage,
-      temperature: deriveTemperature(lead, stages, now),
+      temperature: deriveTemperature(lead, stages, now, facts),
+      // Only present when there are facts, so a row built without any is unchanged.
+      ...(facts ? { facts } : {}),
       lane: laneView(lead),
       reply: replyState(lead),
       lastTouchAt: lastTouchAt(lead),

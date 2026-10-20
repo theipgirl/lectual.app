@@ -68,3 +68,24 @@ State checked 2026-09-29 (lectual-prod, read-only):
 - Next morning: Today's "Overnight run" shows what the agents did; "Needs you" lists what
   is waiting on Rebecca.
 - Record the date and outcome in the changelog doc.
+
+## Known follow-ups
+
+- **Consult outcome notifications reuse `mentioned`.** Logging No-show / Asked to reschedule /
+  Rebooked after no-show on a lead raises an in-app notification for the lead's owner and every
+  `intake`-role member (not the person who logged it). The database allows only four notification
+  kinds (`mentioned`, `assigned`, `lead_replied`, `time_running`), and a fifth needs a migration in
+  `lectual`, so the row is `mentioned` with `payload.source = "consult_outcome"`, the `outcome`, and a
+  `preview` such as "No-show: Ana Ruiz". The bell is rendered by lectual and words `mentioned` as
+  "tagged you on <lead>", which misreads for an outcome. Follow-up for lectual: add a dedicated kind
+  (e.g. `consult_outcome`) and word it from `payload.outcome`; this repo then switches the `kind` in
+  `src/lib/pipeline/consult-outcome.ts`.
+- **"Pending approvals on Today" needs nothing.** Today's "Waiting on you" KPI already shows the
+  pending queue count (three states: a failed queue read says so, never "0"). `src/app/dashboard/page.tsx`
+  is unchanged for this.
+- **The day-10 and 3-email numbers are placeholders.** `COLD_NO_TOUCH_DAYS` (10) and
+  `STANDARD_SEQUENCE_EMAIL_STEPS` (3) in `src/lib/intake/temperature.ts` are RPB's ops spec from the
+  Fri 10/16 call; change them there once the real sequence spacing is confirmed. "Long-Term Nurture
+  suggested" is only a suggestion: it never moves a stage or sets a lane.
+- **First touch is recorded outreach, not lead creation.** The day-10 clock starts at the earliest sent
+  email, logged call or sequence enrolment on the lead. A lead with none has no clock, so no suggestion.

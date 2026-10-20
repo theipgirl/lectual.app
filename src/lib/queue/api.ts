@@ -1,5 +1,6 @@
 import "server-only";
 import { env } from "@/lib/env";
+import { cleanDraftBody, enforceSignOff, isNearDuplicate, movedSummary, signOffSummary } from "./hygiene";
 
 /**
  * Client for the lawmatics-mcp approval-queue API (app/api/queue/* there).
@@ -106,7 +107,26 @@ export type NewQueueDraft = {
   /** ISO datetime — "when we'd propose sending this," never a real
    * schedule; the queue never sends anything on its own. */
   proposedSendAt?: string;
+  /**
+   * The firm's configured sign-off (crm_org_profile.email_signature), for a
+   * CLIENT_EMAIL. When the email closes with anyone else's name, createDraft
+   * replaces the block with this. Callers that load the profile pass it; when
+   * it is absent the closing is left as written and the reviewer is flagged.
+   */
+  signOff?: string | null;
+  /** The firm team sign-off ("The <Firm> Team"), which the proposal email signs on purpose. Always accepted as written. */
+  teamSignOff?: string | null;
+  /**
+   * `false` skips the near-duplicate check, so the caller always gets its OWN
+   * queue item back. For a caller that links something to the returned id (the
+   * consult proposal marks which proposal an email carries) and so must never be
+   * handed another draft's id. Everyone else leaves it unset.
+   */
+  dedupe?: false;
 };
+
+/** What createDraft returns. `deduped` means an equivalent draft was already waiting, so nothing was queued. */
+export type CreatedDraft = { id: string; deduped?: boolean };
 
 /**
  * Queues a new draft — the dashboard-side twin of the Cowork skills' MCP
@@ -117,8 +137,29 @@ export type NewQueueDraft = {
  * generated content lands in the SAME approval queue as every other draft —
  * never a second storage/approval mechanism. Nothing sends: this only queues
  * text for review, exactly like every other draft type.
+ *
+ * Every caller passes through the hygiene below (src/lib/queue/hygiene.ts),
+ * which is why it lives here and not in the callers:
+ *   1. banner and worksheet lines are taken out of the body (and, for a client
+ *      email, bracketed instructions), and kept in the reviewer summary;
+ *   2. a client email's closing is checked against the firm's sign-off;
+ *   3. a draft that nearly repeats one already pending is not queued twice.
  */
-export async function createDraft(input: NewQueueDraft): Promise<{ id: string }> {
+export async function createDraft(input: NewQueueDraft): Promise<CreatedDraft> {
+  const isEmail = input.type === "CLIENT_EMAIL";
+  const cleaned = cleanDraftBody(input.draftBody, { placeholders: isEmail });
+  let draftBody = cleaned.body;
+  const notes = [input.summary?.trim() || null, movedSummary(cleaned.moved) || null];
+  if (isEmail) {
+    const signed = enforceSignOff(draftBody, { signOff: input.signOff, teamSignOff: input.teamSignOff });
+    draftBody = signed.body;
+    notes.push(signOffSummary(signed));
+  }
+  const summary = notes.filter(Boolean).join("\n\n");
+
+  const existing = input.dedupe === false ? null : await findNearDuplicate(input, draftBody);
+  if (existing) return { id: existing, deduped: true };
+
   return call(`/api/queue`, {
     method: "POST",
     body: JSON.stringify({
@@ -126,8 +167,8 @@ export async function createDraft(input: NewQueueDraft): Promise<{ id: string }>
       agent: input.agent,
       type: input.type,
       headline: input.headline,
-      draft_body: input.draftBody,
-      ...(input.summary ? { summary: input.summary } : {}),
+      draft_body: draftBody,
+      ...(summary ? { summary } : {}),
       ...(input.matterId ? { matter_id: input.matterId } : {}),
       ...(input.clientName ? { client_name: input.clientName } : {}),
       ...(input.recipient ? { recipient: input.recipient } : {}),
@@ -135,6 +176,41 @@ export async function createDraft(input: NewQueueDraft): Promise<{ id: string }>
       ...(input.proposedSendAt ? { proposed_send_at: input.proposedSendAt } : {}),
     }),
   });
+}
+
+/**
+ * The id of a pending draft in THIS firm's queue that `input` nearly repeats,
+ * or null. Fails open: if the pending list can't be read the draft is created
+ * anyway, because losing a draft is worse than approving one twice. The log
+ * line names the failure and never the draft.
+ */
+async function findNearDuplicate(input: NewQueueDraft, draftBody: string): Promise<string | null> {
+  try {
+    const { rows } = await call<{ rows?: QueueItem[] }>(`/api/queue?status=pending&org_id=${encodeURIComponent(input.orgKey)}`);
+    if (!Array.isArray(rows)) throw new Error("not a list");
+    const probe = {
+      type: input.type,
+      recipient: input.recipient,
+      clientName: input.clientName,
+      matterId: input.matterId,
+      createdAt: new Date(),
+      body: draftBody,
+    };
+    const match = rows.find((row) =>
+      isNearDuplicate(probe, {
+        type: row.type,
+        recipient: row.recipient,
+        clientName: row.client_name,
+        matterId: row.matter_id,
+        createdAt: row.created_at,
+        body: row.final_body ?? row.draft_body,
+      }),
+    );
+    return match?.id ?? null;
+  } catch {
+    console.error("[queue] near-duplicate check skipped: the pending list could not be read");
+    return null;
+  }
 }
 
 export async function getQueueItem(orgKey: string, id: string): Promise<QueueItem> {

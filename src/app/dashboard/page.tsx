@@ -10,6 +10,7 @@ import { BAND_COPY } from "@/lib/matters/worklist";
 import { formatCivilDate } from "@/lib/matters/ip-fields";
 import { laneOf, laneReason } from "@/lib/leads/lane";
 import { hourInZone } from "@/lib/today/priorities";
+import { greetingName, greetingSuffix } from "@/lib/today/greeting-name";
 import { buildNeedsYou, emptyNeedsYouNote, type NeedsYouItem } from "@/lib/today/needs-you";
 import { loadConnectionsNeedingReauth, loadDeadlinesClosedSince, loadOpenQuotes, loadUnreviewedSubmissions } from "@/lib/today/load-needs-you";
 import { civilInZone, deadlinesMetThisMonth, mattersOpenedThisMonth, monthQueryFloor, monthStartCivil } from "@/lib/today/outcomes";
@@ -27,7 +28,7 @@ import { buildRunDigest, type DigestRun } from "@/lib/agents/digest";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { leadDisplayName } from "@/lib/matters/client-name";
 import { civilDate } from "@/lib/matters/calendar-rows";
-import { deadlineKindLabel } from "@/lib/matters/deadline-rules";
+import { deadlineKindLabel, deadlineNeedsReview } from "@/lib/matters/deadline-rules";
 import { AutopilotControl } from "@/components/agents/AutopilotControl";
 import { RunDigestList } from "@/components/agents/RunDigestList";
 
@@ -136,7 +137,7 @@ export default async function TodayPage() {
     userId: session.user.id,
     now,
     deadlines:
-      deadlines?.map((d) => ({
+      deadlines?.filter((d) => !deadlineNeedsReview(d, civilDate(now))).map((d) => ({
         id: d.id,
         matterId: d.matter_id,
         name: d.title ?? deadlineKindLabel(d.kind),
@@ -198,7 +199,8 @@ export default async function TodayPage() {
             {session.org.name} · {dateLine}
           </div>
           <h1 className="lx-h1">
-            Good {greeting(hourInZone(now, tz))}, {session.displayName.split(" ")[0]}.
+            Good {greeting(hourInZone(now, tz))}
+            {greetingSuffix(greetingName({ userId: session.user.id, members, metadata: session.user.user_metadata, email: session.user.email }))}.
           </h1>
         </div>
       </div>

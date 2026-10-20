@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { orgHasModule } from "@/lib/org/modules";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { hasRole } from "@/lib/auth/roles";
 import { loadLinesForQuotes, loadQuotes } from "@/lib/quotes/load";
@@ -18,7 +20,9 @@ export const dynamic = "force-dynamic";
 
 /**
  * Quotes & proposals — the firm's proposals, filtered by status, over a
- * three-state read.
+ * three-state read. For a firm holding the `proposals` module this list
+ * redirects to /dashboard/proposals/; `/dashboard/quotes/[id]` and the public
+ * quote and signing routes are untouched.
  *
  * ── THE FILTER IS THE EFFECTIVE STATUS, NOT THE STORED ONE ──────────────────
  * `loadQuotes` does not know about expiry, so this page computes each quote's
@@ -50,6 +54,10 @@ export const dynamic = "force-dynamic";
  * packages offered (packages.ts's `offerHeadline`, add-ons excluded).
  */
 export default async function QuotesPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
+  // One proposals surface: a firm with Client proposals lands there. A firm without
+  // the module keeps this page (modules fail closed, and it may still need it).
+  // Runs before the role gate: the proposals page is readable by the whole firm.
+  if (await orgHasModule("proposals")) redirect("/dashboard/proposals/");
   const { status: statusRaw } = await searchParams;
   const session = await resolveFirmSession();
   if (session.kind !== "ok" || !hasRole(session.role, "attorney")) return <QuotesRestricted title="Quotes & proposals" />;

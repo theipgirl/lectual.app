@@ -78,6 +78,8 @@ async function queueBuiltDraft(args: {
       summary: args.summary,
       matterId: args.matterId,
       clientName: args.clientName,
+      // crm_document_draft.queue_item_id is unique (lectual 0045): this row must get its OWN queue item.
+      dedupe: false,
     });
     await attachQueueItemId(supabase, draft.id, queueItemId);
     return { draftId: draft.id, queueItemId };

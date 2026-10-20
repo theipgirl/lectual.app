@@ -9,6 +9,7 @@ import type { ReferralSource } from "@/lib/intake";
 import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
 import { pendingFor } from "@/lib/intake/needs-rebecca";
 import TimeChip from "@/components/intake/TimeChip";
+import { LtnSuggestion } from "@/components/intake/LtnSuggestion";
 import {
   initialsOf,
   memberLabel,
@@ -221,6 +222,12 @@ export default function IntakeCard({
       {pendingDrafts.length > 0 && (
         <div>
           <NeedsRebeccaBadge pending={pendingDrafts} />
+        </div>
+      )}
+
+      {row.temperature.suggestion && (
+        <div style={ellipsis}>
+          <LtnSuggestion suggestion={row.temperature.suggestion} leadId={lead.id} />
         </div>
       )}
 

@@ -5,6 +5,9 @@ import { resolveFirmSession } from "@/lib/firm/session";
 import { orgHasModule } from "@/lib/org/modules";
 import { aiConfigured } from "@/lib/ai/claude";
 import { AGENT_DEFS, AGENT_IDS, type AgentId, type Autonomy } from "@/lib/agents/types";
+import { agentReadiness, type ReadinessSource } from "@/lib/agents/readiness";
+import { listConnections } from "@/lib/mailbox/connections";
+import { loadActiveQueue } from "@/lib/queue/load";
 import { relativeTime } from "@/lib/relative-time";
 import { AgentControls } from "@/components/agents/AgentControls";
 import { AutopilotControl } from "@/components/agents/AutopilotControl";
@@ -63,7 +66,7 @@ export default async function AgentsPage() {
   const supabase = await getScopedClient();
   const now = new Date();
   const tz = await getFirmTimeZone();
-  const [{ data: settingRows }, { data: runRows, error: runsError }, monthRuns, autopilot, members] = await Promise.all([
+  const [{ data: settingRows, error: settingsError }, { data: runRows, error: runsError }, monthRuns, autopilot, members] = await Promise.all([
     supabase.from("agent_setting").select("agent, enabled, autonomy"),
     supabase
       .from("agent_run")
@@ -91,10 +94,34 @@ export default async function AgentsPage() {
     autopilot.status === "ok" && autopilot.state.pausedBy
       ? (members.find((m) => m.userId === autopilot.state.pausedBy)?.displayName ?? members.find((m) => m.userId === autopilot.state.pausedBy)?.email ?? null)
       : null;
+  // A failed settings read is not "everything is off": the cards and the header
+  // say the settings couldn't be read, and draw no On/Off claim at all.
+  const settingsKnown = !settingsError;
   const settings = new Map((settingRows ?? []).map((s) => [s.agent as AgentId, s]));
   const runs = (runRows ?? []) as RunRow[];
   const lastRun = (agent: AgentId) => runs.find((r) => r.agent === agent);
-  const onCount = AGENT_IDS.filter((a) => settings.get(a)?.enabled).length;
+  const isOn = (agent: AgentId) => Boolean(settings.get(agent)?.enabled);
+
+  // What a switched-on agent needs in order to do anything. Read only for the
+  // agents that are on, and only through the three-state loaders: a mailbox or
+  // queue that can't be reached is "unavailable", never "none".
+  const hasMailboxModule = await orgHasModule("mailbox");
+  const mailbox: ReadinessSource =
+    settingsKnown && isOn("email-intel") && hasMailboxModule
+      ? await listConnections().then(
+          (r) => (!r.ok ? "unavailable" : r.connections.some((c) => c.status === "active") ? "ok" : "none"),
+          () => "unavailable" as const,
+        )
+      : "ok";
+  const queueLoad = settingsKnown && isOn("post-consult") ? await loadActiveQueue() : null;
+  const queue: ReadinessSource = !queueLoad ? "ok" : queueLoad.status === "ok" ? "ok" : queueLoad.status === "unconfigured" ? "none" : "unavailable";
+  const ai = aiConfigured();
+  const readiness = new Map(
+    AGENT_IDS.map((a) => [a, agentReadiness({ agent: a, enabled: isOn(a), hasMailboxModule, mailbox, aiConfigured: ai, queue })]),
+  );
+  const enabledAgents = AGENT_IDS.filter(isOn);
+  const readyCount = enabledAgents.filter((a) => readiness.get(a)?.tone === "ok").length;
+  const blockedCount = enabledAgents.length - readyCount;
 
   return (
     <>
@@ -109,9 +136,17 @@ export default async function AgentsPage() {
           </p>
         </div>
         <div className="lx-note">
-          {onCount} of {AGENT_IDS.length} on
+          {settingsKnown
+            ? `${readyCount} of ${AGENT_IDS.length} on${blockedCount > 0 ? ` · ${blockedCount} on but blocked` : ""}`
+            : "Agent settings unavailable"}
         </div>
       </div>
+
+      {!settingsKnown && (
+        <div role="alert" className="lx-banner lx-banner-risk">
+          We couldn&apos;t read agent settings, so whether each agent is on or off isn&apos;t shown. Nothing has been switched off. Try again shortly.
+        </div>
+      )}
 
       {!aiConfigured() && (
         <div className="lx-banner lx-banner-mute">
@@ -159,9 +194,10 @@ export default async function AgentsPage() {
           const enabled = Boolean(s?.enabled);
           const autonomy = (s?.autonomy as Autonomy | undefined) ?? def.defaultAutonomy;
           const last = lastRun(agent);
+          const ready = readiness.get(agent)!;
           return (
-            <section key={agent} className={`lx-card lx-agent${enabled ? "" : " off"}`}>
-              <AgentControls agent={agent} name={def.name} enabled={enabled} autonomy={autonomy} canManage={canManage} />
+            <section key={agent} className={`lx-card lx-agent${!settingsKnown || enabled ? "" : " off"}`}>
+              {settingsKnown && <AgentControls agent={agent} name={def.name} enabled={enabled} autonomy={autonomy} canManage={canManage} />}
               <div className="lx-agent-head">
                 <div style={{ fontSize: 17, fontWeight: 600 }}>{def.name}</div>
                 <div className="lx-label" style={{ fontSize: 11, marginTop: 4 }}>
@@ -170,15 +206,27 @@ export default async function AgentsPage() {
               </div>
               <p className="lx-agent-desc">{def.description}</p>
               <div className="lx-agent-foot">
-                <span className="lx-note" style={{ flex: 1 }}>
-                  {!enabled ? "Off" : last ? `Ran ${relativeTime(last.started_at)}` : "On · not run yet"}
-                </span>
-                {enabled && last && (
+                {!settingsKnown ? (
+                  <span className="lx-note" style={{ flex: 1 }}>
+                    Settings couldn&apos;t be read
+                  </span>
+                ) : (
+                  <span className="lx-note" style={{ flex: 1 }} title={ready.reason}>
+                    {enabled && ready.tone === "ok" ? (last ? `Ran ${relativeTime(last.started_at)}` : "On · not run yet") : ready.label}
+                  </span>
+                )}
+                {enabled && ready.tone !== "ok" && <span className="lx-pill lx-pill-warn">Blocked</span>}
+                {settingsKnown && enabled && last && (
                   <span className={`lx-pill ${last.status === "error" ? "lx-pill-risk" : last.drafts_out ? "lx-pill-warn" : "lx-pill-ok"}`}>
                     {last.status === "error" ? "Failed" : last.drafts_out ? `${last.drafts_out} held` : `${last.items_in} read`}
                   </span>
                 )}
               </div>
+              {settingsKnown && ready.tone !== "ok" && ready.label !== "Off" && (
+                <p className="lx-note" style={{ margin: 0 }}>
+                  {ready.reason}
+                </p>
+              )}
             </section>
           );
         })}

@@ -451,3 +451,49 @@ export function daysUntil(dueDate: string, today: Date = new Date()): number | n
   const now = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
   return Math.round((due - now) / 86_400_000);
 }
+
+// ── "Needs review": phantom manual dates ─────────────────────────────────────
+
+/**
+ * An open, hand-entered, never-confirmed date this many days past due is far
+ * more likely to be stale data entry than a blown deadline. It leaves the live
+ * counts and waits in one "Needs review" list for an attorney to confirm, close
+ * or correct. Nothing is closed or edited on their behalf.
+ */
+export const NEEDS_REVIEW_PAST_DUE_DAYS = 180;
+
+export type DeadlineReviewFields = {
+  status: DeadlineStatus;
+  attorney_confirmed: boolean;
+  source: DeadlineSource;
+  /** Civil date, YYYY-MM-DD. */
+  due_date: string;
+};
+
+/**
+ * True only for an open, unconfirmed, manually entered deadline that is
+ * strictly more than NEEDS_REVIEW_PAST_DUE_DAYS civil days past `todayCivil`.
+ * A calculated date or one from an office notice is never moved aside: a blown
+ * real date must stay loud.
+ */
+export function deadlineNeedsReview(d: DeadlineReviewFields, todayCivil: string): boolean {
+  if (d.status !== "open" || d.attorney_confirmed || d.source !== "manual") return false;
+  const due = parseISODate(d.due_date);
+  const today = parseISODate(todayCivil);
+  if (!due || !today) return false;
+  const pastDue = (Date.UTC(today.y, today.m - 1, today.d) - Date.UTC(due.y, due.m - 1, due.d)) / 86_400_000;
+  return Math.round(pastDue) > NEEDS_REVIEW_PAST_DUE_DAYS;
+}
+
+/** Splits deadlines into the live ones and the needs-review ones, keeping order. */
+export function splitNeedsReview<T extends DeadlineReviewFields>(
+  deadlines: readonly T[],
+  now: Date = new Date(),
+): { live: T[]; needsReview: T[] } {
+  // Same local-time civil date calendar-rows.ts uses for "overdue".
+  const todayCivil = toISODate(now.getFullYear(), now.getMonth() + 1, now.getDate());
+  const live: T[] = [];
+  const needsReview: T[] = [];
+  for (const d of deadlines) (deadlineNeedsReview(d, todayCivil) ? needsReview : live).push(d);
+  return { live, needsReview };
+}

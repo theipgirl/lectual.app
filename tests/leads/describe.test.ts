@@ -72,3 +72,38 @@ describe("timeline wording", () => {
     expect(opened().detail).toBe("TM-2026-0004");
   });
 });
+
+describe("timeline wording: consult outcomes", () => {
+  const call = (payload: Record<string, unknown>) =>
+    describeActivity({ type: "call_logged", actor_type: "user", created_at: "2026-10-20T09:00:00Z", payload });
+
+  it("names the three outcomes and keeps the note as the detail", () => {
+    expect(call({ summary: "No-show", notes: null, consult_outcome: "no_show" })).toEqual({
+      title: "No-show",
+      detail: null,
+      tone: "note",
+      link: null,
+    });
+    expect(call({ summary: "x", notes: "Wants next week", consult_outcome: "reschedule_requested" })).toMatchObject({
+      title: "Asked to reschedule",
+      detail: "Wants next week",
+    });
+    expect(call({ summary: "x", notes: "Thu 3pm", consult_outcome: "rebooked_after_no_show" })).toMatchObject({
+      title: "Rebooked after no-show",
+      detail: "Thu 3pm",
+    });
+  });
+
+  it("a plain logged call still reads 'Call logged'", () => {
+    expect(call({ summary: "Spoke about classes", notes: "Spoke about classes" })).toMatchObject({
+      title: "Call logged",
+      detail: "Spoke about classes",
+    });
+  });
+
+  it("an unknown outcome value reads 'Call logged' and does not crash", () => {
+    expect(call({ summary: "Hm", consult_outcome: "ghosted" })).toMatchObject({ title: "Call logged", detail: "Hm" });
+    expect(call({ consult_outcome: 7 }).title).toBe("Call logged");
+    expect(describeActivity({ type: "call_logged", actor_type: null, created_at: "", payload: null }).title).toBe("Call logged");
+  });
+});

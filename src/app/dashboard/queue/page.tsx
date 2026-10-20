@@ -2,6 +2,7 @@ import Link from "next/link";
 import { loadActiveQueue } from "@/lib/queue/load";
 import { QueueUnavailable } from "@/components/queue/QueueUnavailable";
 import { getFirmTimeZone } from "@/lib/org/profile";
+import { markNearDuplicates } from "@/lib/queue/hygiene";
 import { STATUS_PILL, agentLabel, fmtWhen, parseQueueStatus, preview, typeLabel, type QueueStatus } from "@/components/queue/format";
 
 const TABS: { status: QueueStatus; label: string }[] = [
@@ -25,6 +26,8 @@ const EMPTY: Record<QueueStatus, { title: string; body: string }> = {
 export default async function QueuePage({ searchParams }: { searchParams: Promise<{ status?: string | string[] }> }) {
   const status = parseQueueStatus((await searchParams).status);
   const [load, tz] = await Promise.all([loadActiveQueue(status), getFirmTimeZone()]);
+  // Only what is still waiting can be approved twice.
+  const possibleDuplicates = status === "pending" && load.status === "ok" ? markNearDuplicates(load.items) : new Set<string>();
 
   return (
     <>
@@ -76,6 +79,11 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
                     <Link href={`/dashboard/queue/${item.id}/`} className="lx-rowlink">
                       {item.headline}
                     </Link>
+                    {possibleDuplicates.has(item.id) && (
+                      <span className="lx-pill lx-pill-warn" style={{ marginLeft: 8 }} title="Nearly identical to a draft that was queued minutes earlier">
+                        Possible duplicate
+                      </span>
+                    )}
                     <div className="lx-note">
                       {typeLabel(item.type)} · {preview(item, 90)}
                     </div>

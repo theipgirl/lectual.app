@@ -1,5 +1,6 @@
 import type { QueueItem } from "@/lib/queue/api";
 import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
+import { markdownToPlainText } from "@/lib/markdown";
 
 /** Presentation helpers for the queue (ported from lectual's queue/_components/format). */
 
@@ -20,8 +21,9 @@ export function fmtWhen(iso: string | null, tz: string = DEFAULT_TIME_ZONE): str
   return d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: tz });
 }
 
+/** One line of the body for the list: Markdown marks removed, so it reads as sentences. */
 export function preview(item: QueueItem, max = 160): string {
-  const flat = (item.final_body ?? item.draft_body ?? "").replace(/\s+/g, " ").trim();
+  const flat = markdownToPlainText(item.final_body ?? item.draft_body ?? "").replace(/\s+/g, " ").trim();
   return flat.length > max ? `${flat.slice(0, max)}…` : flat;
 }
 

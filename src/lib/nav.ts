@@ -2,9 +2,8 @@ import type { OrgModule } from "@/lib/org/modules";
 import { hasRole, type Role } from "@/lib/auth/roles";
 
 /**
- * Sections of the workspace. One flat list of PAGES, read by the rail, the
- * section label and the catch-all section page (to decide whether a door
- * exists at all). The rail's grouping lives in RAIL_TREE below and only ever
+ * Sections of the workspace. One flat list of PAGES, read by the rail and the
+ * section label. The rail's grouping lives in RAIL_TREE below and only ever
  * names slugs from this list. Hiding an entry is a courtesy; the page itself
  * re-checks `module` via orgHasModule() and calls notFound(). See AGENTS.md
  * "Gate the PAGE and the ACTION, not the nav".
@@ -25,6 +24,8 @@ export type NavItem = {
   also?: readonly string[];
   /** Build step that delivers the real page (docs/MVP-PLAN.md); 7 = after the MVP plan. */
   step: number;
+  /** `false` = designed but has no page yet: kept out of the rail and every list until it exists. */
+  built?: false;
 };
 
 /** Icons from design/Rail.dc.html. */
@@ -55,7 +56,7 @@ export const NAV: readonly NavItem[] = [
   { slug: "mail", label: "My Mail", href: "/dashboard/mail/", icon: ICON.env, module: "mailbox", step: 4 },
   { slug: "queue", label: "Queue", href: "/dashboard/queue/", icon: ICON.tray, step: 6 },
   { slug: "campaigns", label: "Campaigns", href: "/dashboard/campaigns/", icon: ICON.send, step: 6 },
-  { slug: "sms", label: "SMS", href: "/dashboard/sms/", icon: ICON.sms, step: 7 },
+  { slug: "sms", label: "SMS", href: "/dashboard/sms/", icon: ICON.sms, step: 7, built: false },
   // No module: each firm imports only from the Fathom / Zoom account it connected itself (lectual 0081).
   { slug: "meetings", label: "Meetings", href: "/dashboard/meetings/", icon: ICON.video, step: 7 },
   { slug: "calendar", label: "Calendar", href: "/dashboard/calendar/", icon: ICON.cal, step: 6 },
@@ -68,10 +69,10 @@ export const NAV: readonly NavItem[] = [
   { slug: "pipeline", label: "Pipeline", href: "/dashboard/pipeline/", icon: ICON.bars, step: 7 },
   { slug: "matters", label: "Matters", railLabel: "All matters", href: "/dashboard/matters/", icon: ICON.case, step: 6 },
   { slug: "documents", label: "Documents", href: "/dashboard/documents/", icon: ICON.file, step: 6 },
-  { slug: "portals", label: "Client portals", href: "/dashboard/portals/", icon: ICON.users, step: 6 },
+  { slug: "portals", label: "Client portals", href: "/dashboard/portals/", icon: ICON.users, step: 6, built: false },
   { slug: "copilot", label: "AI copilot", href: "/dashboard/copilot/", icon: ICON.spark, step: 7 },
   { slug: "agents", label: "Agents", href: "/dashboard/agents/", icon: ICON.bolt, module: "agents", step: 5 },
-  { slug: "skills", label: "Skills", href: "/dashboard/skills/", icon: ICON.cycle, step: 7 },
+  { slug: "skills", label: "Skills", href: "/dashboard/skills/", icon: ICON.cycle, step: 7, built: false },
   { slug: "brain", label: "Firm brain", href: "/dashboard/brain/", icon: ICON.globe, step: 7 },
   { slug: "settings", label: "Settings", href: "/dashboard/settings/", icon: ICON.sliders, step: 3 },
 ];
@@ -135,15 +136,18 @@ export function isReportKey(value: unknown): value is ReportKey {
  */
 export const RAIL_PIN_COOKIE = "lx_rail";
 
-/** Whether `item` exists for a firm holding `modules`, viewed by `role`. Fails closed. */
+/** Whether `item` exists for a firm holding `modules`, viewed by `role`. Fails closed; an unbuilt section never exists. */
 export function navItemAllowed(item: NavItem, modules: readonly string[], role: Role): boolean {
+  if (item.built === false) return false;
   if (item.module && !modules.includes(item.module)) return false;
   if (item.minRole && !hasRole(role, item.minRole)) return false;
   return true;
 }
 
 export function visibleNav(modules: readonly string[], role: Role): NavItem[] {
-  return NAV.filter((item) => navItemAllowed(item, modules, role));
+  const allowed = NAV.filter((item) => navItemAllowed(item, modules, role));
+  // One proposals surface: the older quotes entry steps aside once Client proposals is shown.
+  return allowed.some((item) => item.slug === "proposals") ? allowed.filter((item) => item.slug !== "quotes") : allowed;
 }
 
 export function navItemBySlug(slug: string): NavItem | undefined {
@@ -175,7 +179,7 @@ export type RailEntry = {
  * or its first counted child's.
  */
 export function railGroups(visible: readonly NavItem[], pathname: string): RailEntry[][] {
-  const bySlug = new Map(visible.map((item) => [item.slug, item]));
+  const bySlug = new Map(visible.filter((item) => item.built !== false).map((item) => [item.slug, item]));
   return RAIL_TREE.map((group) =>
     group.flatMap((node): RailEntry[] => {
       if ("slug" in node) {

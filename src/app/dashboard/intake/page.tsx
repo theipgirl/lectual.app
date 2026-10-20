@@ -2,6 +2,7 @@ import { listStages, type Stage } from "@/lib/pipeline";
 import type { Lead } from "@/lib/pipeline";
 import { listIntakeLeads } from "@/lib/intake/leads";
 import { intakeStages } from "@/lib/intake/scope";
+import { loadTemperatureFacts, type TemperatureFactsRead } from "@/lib/intake/facts";
 import { leadActivitySince, type Activity } from "@/lib/matters";
 import { listMemberDirectory, type MemberIdentity } from "@/lib/members/directory";
 import { listForLeads, runningForMe } from "@/lib/time/entries";
@@ -206,11 +207,18 @@ export default async function IntakePage({
     time = null;
   }
 
+  // Recorded facts for the sequence-cold and day-10 rules. `unavailable` (or a throw)
+  // builds the rows without them, so the existing rules run and nothing is guessed cold.
+  const factsRead: TemperatureFactsRead = await loadTemperatureFacts(leads, stages).catch(
+    (): TemperatureFactsRead => ({ status: "unavailable" }),
+  );
+
   const rows = buildIntakeRows({
     leads,
     stages,
     members,
     latestNoteByLeadId: latestNotesByLead(noteActivity),
+    factsByLeadId: factsRead.status === "ok" ? factsRead.byLead : undefined,
     now,
   });
 

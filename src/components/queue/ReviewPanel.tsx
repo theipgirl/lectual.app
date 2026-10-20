@@ -2,6 +2,9 @@
 
 import { useActionState, useState } from "react";
 import { reviewQueueAction, type ReviewState } from "@/app/dashboard/queue/actions";
+import { Markdown } from "@/components/markdown/Markdown";
+// The pure module only: this component ships to the browser.
+import { auditDraft, removeInternalNotes, type AuditContext } from "@/lib/queue/hygiene";
 
 /**
  * Edit / approve / reject for one pending item. `canApprove` / `canEdit` only
@@ -16,17 +19,53 @@ export function ReviewPanel(props: {
    * queued (or that couldn't be checked): Approve stays disabled until the
    * approver ticks this. The action refuses without it too. */
   confirmStale?: string | null;
+  /** What the checks below need (type, the firm's sign-off, member names). Absent = no checks drawn. */
+  audit?: AuditContext;
 }) {
-  const { id, initialBody, canApprove, canEdit, confirmStale } = props;
+  const { id, initialBody, canApprove, canEdit, confirmStale, audit } = props;
   const [state, action, pending] = useActionState<ReviewState, FormData>(reviewQueueAction, {});
   const [body, setBody] = useState(initialBody);
   const [staleConfirmed, setStaleConfirmed] = useState(false);
   const dirty = body !== initialBody;
   const approveBlocked = !!confirmStale && !staleConfirmed;
+  const issues = audit ? auditDraft(body, audit) : [];
+  const blocking = issues.some((i) => i.level === "error");
+  const cleaned = audit ? removeInternalNotes(body, audit.type) : null;
 
   return (
     <form action={action} className="lx-review">
       <input type="hidden" name="id" value={id} />
+      {issues.length > 0 && (
+        <div
+          role="alert"
+          aria-label="Checks on this draft"
+          className={`lx-banner ${blocking ? "lx-banner-risk" : "lx-banner-warn"}`}
+          style={{ display: "grid", gap: 8, margin: 0 }}
+        >
+          <strong style={{ fontSize: 16 }}>{blocking ? "Fix this before approving" : "Check this draft"}</strong>
+          <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 4 }}>
+            {issues.map((issue) => (
+              <li key={issue.code}>{issue.message}</li>
+            ))}
+          </ul>
+          {canEdit && cleaned && cleaned.moved.length > 0 && (
+            <div>
+              <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" onClick={() => setBody(cleaned.body)}>
+                Remove internal notes
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+      <section aria-labelledby="draft-preview-label" className="lx-voice" style={{ display: "grid", gap: 8 }}>
+        <div id="draft-preview-label" className="lx-label">
+          Preview
+        </div>
+        {body.trim() ? <Markdown text={body} /> : <p className="lx-note" style={{ margin: 0 }}>Nothing to preview yet.</p>}
+        <p className="lx-note" style={{ margin: 0 }}>
+          Preview of how this text reads. An email may show formatting marks as plain characters.
+        </p>
+      </section>
       <label htmlFor="body" className="lx-label">
         Draft {dirty && <span style={{ color: "var(--warn)" }}>· edited</span>}
       </label>

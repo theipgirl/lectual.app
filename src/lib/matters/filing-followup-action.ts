@@ -99,7 +99,7 @@ export async function queueMonthlyStatusUpdate(matterId: string): Promise<{ queu
   const clientName =
     lead?.business_name?.trim() || `${lead?.first_name ?? ""} ${lead?.last_name ?? ""}`.trim() || clientFirstName;
 
-  const { id: queueItemId } = await createDraft({
+  const { id: queueItemId, deduped } = await createDraft({
     orgKey,
     agent: "filing-followup",
     type: "CLIENT_EMAIL",
@@ -112,6 +112,14 @@ export async function queueMonthlyStatusUpdate(matterId: string): Promise<{ queu
     subject: built.subject,
     proposedSendAt: nextBusinessDay8amEt(new Date()),
   });
+
+  // The queue already held an equivalent update, so nothing new was queued. Say so
+  // rather than reporting a fresh queue item.
+  if (deduped) {
+    throw new DocumentFlowError(
+      `An equivalent status update is already waiting in the approval queue (item ${queueItemId}). Review or reject that one first.`,
+    );
+  }
 
   return { queueItemId };
 }

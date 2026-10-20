@@ -12,6 +12,7 @@ const state = vi.hoisted(() => ({ db: null as unknown, item: null as unknown, re
 
 vi.mock("@/lib/db/scoped-client", () => ({ getScopedClient: vi.fn(async () => state.db) }));
 vi.mock("@/lib/org/profile", () => ({ getFirmTimeZone: vi.fn(async () => "America/New_York") }));
+vi.mock("@/lib/queue/audit-context", () => ({ loadAuditContext: vi.fn(async () => ({ signOff: null, teamSignOff: null, memberNames: [] })) }));
 vi.mock("@/lib/queue/org", () => ({ activeQueueOrgKey: vi.fn(async () => "firm-key") }));
 vi.mock("@/lib/queue/roles", () => ({
   QUEUE_APPROVE_ROLES: ["owner"],

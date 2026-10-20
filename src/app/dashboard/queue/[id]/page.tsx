@@ -10,8 +10,10 @@ import { getFirmTimeZone } from "@/lib/org/profile";
 import { STATUS_PILL, agentLabel, fmtWhen, isUnconfiguredError, outcomeText, typeLabel } from "@/components/queue/format";
 import { checkDraftStaleness, type StaleCheck } from "@/lib/queue/stale";
 import { staleWarning } from "@/components/queue/stale-warning";
+import { Markdown } from "@/components/markdown/Markdown";
 import { LinkedProposalPanel } from "@/components/queue/LinkedProposalPanel";
 import { loadLinkedPanel } from "@/lib/consult-proposal/link";
+import { loadAuditContext } from "@/lib/queue/audit-context";
 
 function Meta({ label, value }: { label: string; value: React.ReactNode }) {
   if (!value) return null;
@@ -78,6 +80,8 @@ export default async function QueueItemPage({
   const warning = staleWarning(stale, tz);
   // The proposal the consult agent drafted with this email, if any.
   const linkedProposal = await loadLinkedPanel(item.id);
+  // Who signed it, and what is still left in it, is only worth checking while it can still be approved.
+  const auditContext = resolved ? null : await loadAuditContext();
 
   return (
     <>
@@ -122,7 +126,7 @@ export default async function QueueItemPage({
                 <div className="lx-label" style={{ marginBottom: 8 }}>
                   {item.final_body && item.final_body !== item.draft_body ? "Final, as approved" : "Draft"}
                 </div>
-                <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.6, color: "var(--body)" }}>{item.final_body ?? item.draft_body}</div>
+                <Markdown text={item.final_body ?? item.draft_body} />
               </>
             ) : (
               <ReviewPanel
@@ -131,6 +135,7 @@ export default async function QueueItemPage({
                 canApprove={approveRole !== null}
                 canEdit={editRole !== null}
                 confirmStale={warning ? warning.confirm : null}
+                audit={auditContext ? { type: item.type, ...auditContext } : undefined}
               />
             )}
           </section>

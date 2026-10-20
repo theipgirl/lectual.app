@@ -1,8 +1,8 @@
 import "server-only";
 
 import { getAdminClient } from "@/lib/db/admin";
-import { firmCivilDate } from "@/lib/quotes/firm-time";
 import { resolveTimeZone } from "@/lib/org/profile-rules";
+import { isProposalExpired } from "./expiry";
 import { normalizeSelection, quoteHasItems, quoteProposal } from "./pricing";
 import {
   isWellFormedProposalToken,
@@ -12,7 +12,6 @@ import {
   type ProposalStatus,
   type Selection,
 } from "./types";
-import { isCivilDate } from "./validate";
 
 /**
  * The `/p/[token]` read and write path — the ONLY service-role code in the
@@ -195,19 +194,7 @@ export type PublicProposalRead =
 
 /* ─────────────────────────── pure helpers ───────────────────────────────── */
 
-/**
- * Whether an offer has expired, by the FIRM's calendar. `expires_on` is a date,
- * not an instant: the offer is open through the end of that day in the firm's
- * zone, so a client opening the link on the evening of the last day still finds
- * it. Vercel runs UTC and the firm does not; comparing civil dates (not the
- * server's calendar fields) is what makes "October 26" mean October 26 in New
- * York. No expiry date means no expiry; an unreadable one is treated as none
- * (validation, not the client's page, is where that is reported).
- */
-export function isProposalExpired(expiresOn: string | null | undefined, now: Date, timeZone: string): boolean {
-  if (typeof expiresOn !== "string" || !isCivilDate(expiresOn)) return false;
-  return firmCivilDate(now, resolveTimeZone(timeZone)) > expiresOn;
-}
+export { isProposalExpired };
 
 /**
  * From a family's rows (every version shares one token), pick what the client
