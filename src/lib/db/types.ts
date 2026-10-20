@@ -22,10 +22,12 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          name: string
           org_id: string
           published_at: string | null
           receives_referrals: boolean
           slug: string
+          source_tag: string | null
           status: string
           updated_at: string
           updated_by: string | null
@@ -37,10 +39,12 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          name?: string
           org_id: string
           published_at?: string | null
           receives_referrals?: boolean
           slug: string
+          source_tag?: string | null
           status?: string
           updated_at?: string
           updated_by?: string | null
@@ -52,10 +56,12 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          name?: string
           org_id?: string
           published_at?: string | null
           receives_referrals?: boolean
           slug?: string
+          source_tag?: string | null
           status?: string
           updated_at?: string
           updated_by?: string | null
@@ -64,9 +70,38 @@ export type Database = {
           {
             foreignKeyName: "crm_intake_form_org_id_fkey"
             columns: ["org_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "crm_org"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_intake_form_slug_alias: {
+        Row: {
+          created_at: string
+          form_id: string
+          org_id: string
+          slug: string
+        }
+        Insert: {
+          created_at?: string
+          form_id: string
+          org_id: string
+          slug: string
+        }
+        Update: {
+          created_at?: string
+          form_id?: string
+          org_id?: string
+          slug?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_intake_form_slug_alias_form_fk"
+            columns: ["form_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_intake_form"
+            referencedColumns: ["id", "org_id"]
           },
         ]
       }
@@ -82,6 +117,7 @@ export type Database = {
           lead_id: string | null
           mode: string
           org_id: string
+          resume_hash: string | null
           screening_note: string | null
           source_host: string | null
           started_at: string
@@ -99,6 +135,7 @@ export type Database = {
           lead_id?: string | null
           mode: string
           org_id: string
+          resume_hash?: string | null
           screening_note?: string | null
           source_host?: string | null
           started_at?: string
@@ -116,6 +153,7 @@ export type Database = {
           lead_id?: string | null
           mode?: string
           org_id?: string
+          resume_hash?: string | null
           screening_note?: string | null
           source_host?: string | null
           started_at?: string

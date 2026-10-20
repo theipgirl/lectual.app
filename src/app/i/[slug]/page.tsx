@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { cache } from "react";
 import { headers } from "next/headers";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { readPublicIntake } from "@/lib/intake-forms/public";
 import { refererHost } from "@/lib/intake-forms/spam";
 import { renderStamp } from "@/lib/intake-forms/secrets";
@@ -51,6 +51,8 @@ export default async function PublicIntakePage({
 }) {
   const [{ slug }, sp] = await Promise.all([params, searchParams]);
   const r = await read(slug);
+  // A renamed link (0093): send printed QR codes and old links to where it lives now.
+  if (r.status === "moved") redirect(`/i/${r.slug}/${sp.embed === "1" ? "?embed=1" : ""}`);
   if (r.status === "not_found") notFound();
   if (r.status !== "ok") {
     return (

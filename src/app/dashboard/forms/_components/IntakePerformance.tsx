@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { RANGES, intakeDetail, intakeTableRows, type RangeDays } from "@/lib/intake-forms/performance";
-import { INTAKE_TABLE_LIMIT, loadFunnel, loadIntakeList, loadIntakeSubmission } from "@/lib/intake-forms/load-performance";
+import { RANGES, formatDuration, intakeDetail, intakeTableRows, submissionStats, type RangeDays } from "@/lib/intake-forms/performance";
+import { INTAKE_TABLE_LIMIT, loadFunnel, loadIntakeList, loadIntakeSubmission, loadSubmissionStatRows } from "@/lib/intake-forms/load-performance";
 import type { IntakeFormRecord } from "@/lib/intake-forms/store";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { IntakeStatusForm } from "./IntakeStatusForm";
@@ -23,8 +23,8 @@ const STATUS_TONE: Record<string, string> = {
   stopped: "mute",
 };
 
-function hrefFor(range: RangeDays, intake?: string) {
-  return `/dashboard/forms/?tab=performance&range=${range}${intake ? `&intake=${encodeURIComponent(intake)}` : ""}`;
+function hrefFor(formId: string, range: RangeDays, intake?: string) {
+  return `/dashboard/forms/?form=${encodeURIComponent(formId)}&tab=performance&range=${range}${intake ? `&intake=${encodeURIComponent(intake)}` : ""}`;
 }
 
 function Unreadable({ what, unconfigured }: { what: string; unconfigured: boolean }) {
@@ -48,12 +48,14 @@ export async function IntakePerformance({
   intakeId: string | null;
   canChangeStatus: boolean;
 }) {
-  const [funnel, list, detail, tz] = await Promise.all([
+  const [funnel, list, detail, tz, statRows] = await Promise.all([
     loadFunnel(form.id, range),
     loadIntakeList(form.id),
     intakeId ? loadIntakeSubmission(intakeId) : Promise.resolve(null),
     getFirmTimeZone(),
+    loadSubmissionStatRows(form.id, range),
   ]);
+  const stats = statRows.status === "ok" ? submissionStats(statRows.value.rows) : null;
 
   const nothingYet = !form.everSaved && funnel.status === "ok" && funnel.value.visited === 0 && list.status === "ok" && list.value.length === 0;
   const rows = list.status === "ok" ? intakeTableRows(list.value, undefined, tz) : [];
@@ -66,7 +68,7 @@ export async function IntakePerformance({
         </h2>
         <nav className="ifm-seg" aria-label="Date range">
           {RANGES.map((r) => (
-            <Link key={r} href={hrefFor(r)} scroll={false} className={range === r ? "on" : ""} aria-current={range === r ? "page" : undefined}>
+            <Link key={r} href={hrefFor(form.id, r)} scroll={false} className={range === r ? "on" : ""} aria-current={range === r ? "page" : undefined}>
               {r} days
             </Link>
           ))}
@@ -116,6 +118,28 @@ export async function IntakePerformance({
             <Unreadable what="Visit and start counts" unconfigured={funnel.status === "unconfigured"} />
           )}
 
+          {stats ? (
+            <div className="ifm-stats" role="group" aria-label="People who started this intake">
+              {[
+                { label: "Gave contact details", value: stats.captured.toLocaleString("en-US"), sub: "Asked first, before any question" },
+                { label: "Finished", value: stats.completed.toLocaleString("en-US"), sub: `${stats.completionRate} of those` },
+                { label: "Didn't finish", value: stats.unfinished.toLocaleString("en-US"), sub: "Still leads: worth a follow-up" },
+                { label: "Median time to finish", value: formatDuration(stats.medianMs), sub: "From opening the page to sending" },
+              ].map((k) => (
+                <div key={k.label} className="ifm-card ifm-kpi">
+                  <div className="ifm-field-label">{k.label}</div>
+                  <div className="ifm-kpi-value">{k.value}</div>
+                  <div className="ifm-help">{k.sub}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <Unreadable what="Completion numbers" unconfigured={statRows.status === "unconfigured"} />
+          )}
+          {statRows.status === "ok" && statRows.value.capped && (
+            <p className="ifm-help">Numbers cover the latest 5,000 people in this range.</p>
+          )}
+
           <div className="ifm-card ifm-table-card">
             <h2 className="ifm-title ifm-table-title">All intakes</h2>
             {list.status !== "ok" ? (
@@ -143,13 +167,16 @@ export async function IntakePerformance({
                     {rows.map((r) => (
                       <tr key={r.id} className={intakeId === r.id ? "sel" : undefined}>
                         <td className="pri">
-                          <Link href={hrefFor(range, r.id)} scroll={false} className="lx-rowlink">
+                          <Link href={hrefFor(form.id, range, r.id)} scroll={false} className="lx-rowlink">
                             {r.name}
                           </Link>
                           <div className="ifm-help">{r.company}</div>
                         </td>
                         <td>{r.started}</td>
-                        <td>{r.mode}</td>
+                        <td>
+                          {r.mode}
+                          {!r.finished && <span className="lx-pill lx-pill-warn ifm-unfinished">Didn&apos;t finish</span>}
+                        </td>
                         <td>
                           <span className={`ifm-badge ${FIT_TONE[r.fitKey] ?? "mute"}`}>{r.fit}</span>
                         </td>
@@ -172,7 +199,7 @@ export async function IntakePerformance({
         </>
       )}
 
-      {intakeId && detail && <IntakeDrawer detail={detail} tz={tz} closeHref={hrefFor(range)} canChangeStatus={canChangeStatus} />}
+      {intakeId && detail && <IntakeDrawer detail={detail} tz={tz} closeHref={hrefFor(form.id, range)} canChangeStatus={canChangeStatus} />}
     </div>
   );
 }

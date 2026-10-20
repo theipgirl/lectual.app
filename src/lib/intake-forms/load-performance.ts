@@ -1,7 +1,7 @@
 import "server-only";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { callerHasRole } from "@/lib/auth/current-role";
-import { buildFunnel, type Funnel, type FunnelEvent, type RangeDays, type SubmissionDetailRow, type SubmissionListRow } from "./performance";
+import { buildFunnel, type Funnel, type FunnelEvent, type RangeDays, type StatRow, type SubmissionDetailRow, type SubmissionListRow } from "./performance";
 import { isMissingTableError, IntakeFormError } from "./store";
 import { isSubmissionStatus } from "./submission";
 
@@ -48,6 +48,33 @@ export async function loadFunnel(formId: string, range: RangeDays, now = new Dat
   }
 }
 
+/** Rows behind the per-intake numbers; past this the page says they're capped. */
+export const STAT_ROW_LIMIT = 5000;
+
+/**
+ * The submissions behind the per-intake numbers, in the range: one intake's
+ * (`formId`) or all of the firm's (for the list). Three-state, never a zero
+ * standing in for a failed read.
+ */
+export async function loadSubmissionStatRows(
+  formId: string | null,
+  range: RangeDays,
+  now = new Date(),
+): Promise<Load<{ rows: StatRow[]; capped: boolean }>> {
+  try {
+    const supabase = await getScopedClient();
+    const since = new Date(now.getTime() - range * 86_400_000).toISOString();
+    let q = supabase.from("crm_intake_submission").select("form_id, started_at, submitted_at").gte("started_at", since);
+    if (formId) q = q.eq("form_id", formId);
+    const { data, error } = await q.order("started_at", { ascending: false }).limit(STAT_ROW_LIMIT);
+    if (error) return isMissingTableError(error) ? { status: "unconfigured" } : { status: "unavailable", error };
+    const rows = data ?? [];
+    return { status: "ok", value: { rows, capped: rows.length >= STAT_ROW_LIMIT } };
+  } catch (error) {
+    return { status: "unavailable", error };
+  }
+}
+
 export const INTAKE_TABLE_LIMIT = 200;
 
 /** The latest intakes, newest first. No answers: those load one at a time, for the drawer. */
@@ -56,7 +83,7 @@ export async function loadIntakeList(formId: string): Promise<Load<SubmissionLis
     const supabase = await getScopedClient();
     const { data, error } = await supabase
       .from("crm_intake_submission")
-      .select("id, mode, contact, fit, status, started_at, last_active_at")
+      .select("id, mode, contact, fit, status, started_at, submitted_at, last_active_at")
       .eq("form_id", formId)
       .order("started_at", { ascending: false })
       .limit(INTAKE_TABLE_LIMIT);

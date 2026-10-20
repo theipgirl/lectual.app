@@ -8,10 +8,11 @@ import { checklistComplete, checklistRemaining, goLiveChecklist } from "./checkl
 import { defaultIntakeConfig, parseIntakeConfig, validateAllowedDomains, validateIntakeConfig, type IntakeFormConfig } from "./config";
 import { isOfferablePackage, type LibraryItem } from "./packages";
 import { slugCandidates, slugFromFirmName } from "./slug";
+import { copyName, validateIntakeDetails } from "./details";
 
 /**
- * The firm's intake setup (`crm_intake_form`, lectual 0079), read and written
- * ONLY through the caller's scoped client. RLS scopes every statement to the
+ * The firm's intakes (`crm_intake_form`, lectual 0079; many per firm since
+ * 0093), read and written ONLY through the caller's scoped client. RLS scopes every statement to the
  * active org; nothing here filters by org_id or accepts one from a caller.
  *
  * ── WHO WRITES ──────────────────────────────────────────────────────────────
@@ -29,6 +30,13 @@ import { slugCandidates, slugFromFirmName } from "./slug";
  * columns, and writes `live` only when every item is done (the design's save:
  * `status: left ? "draft" : "live"`).
  *
+ * ── MANY INTAKES (0093) ─────────────────────────────────────────────────────
+ * One per event, campaign or page. Each has its own name, link (slug),
+ * source tag and numbers; duplicating copies the setup under a new link.
+ * Archived intakes are not served publicly and keep their leads. Renaming a
+ * link keeps the old one working (the database's alias trigger), and a link
+ * another intake once used is refused there with 23505.
+ *
  * ── THREE STATES ────────────────────────────────────────────────────────────
  * `unconfigured` is 0079 not applied to this environment (PostgREST
  * `PGRST205` / Postgres `42P01`); `unavailable` is anything else. Neither is
@@ -41,10 +49,14 @@ export function canEditIntakeForm(role: Role | null | undefined): boolean {
   return !!role && INTAKE_FORM_ADMIN_ROLES.includes(role);
 }
 
+export type IntakeFormStatus = "draft" | "live" | "archived";
+
 export type IntakeFormRecord = {
   id: string;
+  name: string;
   slug: string;
-  status: "draft" | "live";
+  sourceTag: string | null;
+  status: IntakeFormStatus;
   config: IntakeFormConfig;
   allowedDomains: string[];
   receivesReferrals: boolean;
@@ -52,8 +64,11 @@ export type IntakeFormRecord = {
   publishedAt: string | null;
   /** False until the first save (0079 leaves `updated_by` null on insert). */
   everSaved: boolean;
+  createdAt: string;
   updatedAt: string;
 };
+
+type Load<T> = { status: "ok"; value: T } | { status: "unconfigured" } | { status: "unavailable"; error?: unknown };
 
 export type IntakeFormLoad =
   | { status: "ok"; form: IntakeFormRecord | null }
@@ -64,11 +79,13 @@ export type IntakeFormLoad =
 export class IntakeFormError extends Error {}
 
 const COLUMNS =
-  "id, slug, status, config, allowed_domains, receives_referrals, agreement_signed_at, published_at, updated_by, updated_at";
+  "id, name, slug, source_tag, status, config, allowed_domains, receives_referrals, agreement_signed_at, published_at, updated_by, created_at, updated_at";
 
 type FormRow = {
   id: string;
+  name: string;
   slug: string;
+  source_tag: string | null;
   status: string;
   config: Json;
   allowed_domains: string[];
@@ -76,6 +93,7 @@ type FormRow = {
   agreement_signed_at: string | null;
   published_at: string | null;
   updated_by: string | null;
+  created_at: string;
   updated_at: string;
 };
 
@@ -86,26 +104,52 @@ export function isMissingTableError(error: PgError): boolean {
   return error.code === "PGRST205" || error.code === "42P01";
 }
 
+function isUniqueViolation(error: PgError): boolean {
+  return error?.code === "23505";
+}
+
+function toStatus(s: string): IntakeFormStatus {
+  return s === "live" ? "live" : s === "archived" ? "archived" : "draft";
+}
+
 function toRecord(row: FormRow): IntakeFormRecord {
   return {
     id: row.id,
+    name: row.name,
     slug: row.slug,
-    status: row.status === "live" ? "live" : "draft",
+    sourceTag: row.source_tag,
+    status: toStatus(row.status),
     config: parseIntakeConfig(row.config),
     allowedDomains: row.allowed_domains ?? [],
     receivesReferrals: row.receives_referrals,
     agreementSignedAt: row.agreement_signed_at,
     publishedAt: row.published_at,
     everSaved: row.updated_by !== null,
+    createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
 
-/** The firm's form, or `form: null` when it has none yet. Never writes. */
-export async function loadIntakeForm(): Promise<IntakeFormLoad> {
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Every intake the firm has, oldest first (the first is the firm's main intake). */
+export async function listIntakeForms(): Promise<Load<IntakeFormRecord[]>> {
   try {
     const supabase = await getScopedClient();
-    const { data, error } = await supabase.from("crm_intake_form").select(COLUMNS).maybeSingle();
+    const { data, error } = await supabase.from("crm_intake_form").select(COLUMNS).order("created_at", { ascending: true });
+    if (error) return isMissingTableError(error) ? { status: "unconfigured" } : { status: "unavailable", error };
+    return { status: "ok", value: (data as FormRow[]).map(toRecord) };
+  } catch (error) {
+    return { status: "unavailable", error };
+  }
+}
+
+/** One intake by id, or `form: null` when it isn't this firm's. Never writes. */
+export async function loadIntakeForm(id: string): Promise<IntakeFormLoad> {
+  if (!UUID.test(id)) return { status: "ok", form: null };
+  try {
+    const supabase = await getScopedClient();
+    const { data, error } = await supabase.from("crm_intake_form").select(COLUMNS).eq("id", id).maybeSingle();
     if (error) return isMissingTableError(error) ? { status: "unconfigured" } : { status: "unavailable", error };
     return { status: "ok", form: data ? toRecord(data as FormRow) : null };
   } catch (error) {
@@ -114,49 +158,139 @@ export async function loadIntakeForm(): Promise<IntakeFormLoad> {
 }
 
 /**
- * The setup page's read: the firm's form, creating the draft on an admin's
- * first visit (design: the page opens on a ready-to-edit draft, not an empty
- * state). Non-admins never create; they get `form: null` and are told an
- * admin sets it up.
- *
- * The new draft starts from the design's defaults with every current fee
- * package shown, and a slug from the firm's name — `-2`, `-3`… when another
- * firm already holds it (settled by the unique index; see slug.ts).
+ * The page's list read, creating the firm's first draft on an admin's first
+ * visit (design: the page opens on a ready-to-edit intake, not an empty state).
+ * Non-admins never create.
  */
-export async function loadOrCreateIntakeForm(orgName: string): Promise<IntakeFormLoad> {
-  const existing = await loadIntakeForm();
-  if (existing.status !== "ok" || existing.form) return existing;
+export async function listOrCreateIntakeForms(orgName: string): Promise<Load<IntakeFormRecord[]>> {
+  const existing = await listIntakeForms();
+  if (existing.status !== "ok" || existing.value.length > 0) return existing;
   if (!canEditIntakeForm(await currentRole())) return existing;
-
   try {
-    const supabase = await getScopedClient();
-    const [{ data: orgId, error: orgError }, { data: userData }] = await Promise.all([
-      supabase.rpc("current_org_id"),
-      supabase.auth.getUser(),
-    ]);
-    if (orgError || !orgId) return { status: "unavailable", error: orgError };
-
-    const packages = await loadIntakePackages();
-    const config = defaultIntakeConfig(packages.status === "ok" ? packages.items.map((i) => i.id) : []);
-
-    for (const slug of slugCandidates(slugFromFirmName(orgName))) {
-      const { data, error } = await supabase
-        .from("crm_intake_form")
-        .insert({ org_id: orgId, slug, status: "draft", config: config as unknown as Json, created_by: userData.user?.id ?? null })
-        .select(COLUMNS)
-        .single();
-      if (!error) return { status: "ok", form: toRecord(data as FormRow) };
-      if (error.code !== "23505") {
-        return isMissingTableError(error) ? { status: "unconfigured" } : { status: "unavailable", error };
-      }
-      // A unique violation on org_id means a second tab created it first: read that one.
-      if (/org_key|org_id/.test(`${error.message} ${error.details ?? ""}`)) return loadIntakeForm();
-      // Otherwise another firm holds this slug; try the next.
-    }
-    return { status: "unavailable", error: new Error("No free slug for this firm name.") };
+    await insertIntakeForm({ name: orgName.trim() ? `${orgName.trim()} intake` : "Intake", slugBase: slugFromFirmName(orgName), sourceTag: null });
   } catch (error) {
-    return { status: "unavailable", error };
+    if (error instanceof IntakeFormError) return { status: "unavailable", error };
+    return isMissingTableError(error as PgError) ? { status: "unconfigured" } : { status: "unavailable", error };
   }
+  return listIntakeForms();
+}
+
+async function requireAdmin(): Promise<void> {
+  if (!canEditIntakeForm(await currentRole())) {
+    throw new IntakeFormError("Only owners, admins and senior admins can change intakes.");
+  }
+}
+
+/**
+ * Inserts a new draft. Slug candidates are tried in order: another intake
+ * (any firm's, or a link name one used before) holding a candidate is a
+ * 23505 and the next is tried.
+ */
+async function insertIntakeForm(input: {
+  name: string;
+  slugBase: string;
+  sourceTag: string | null;
+  config?: IntakeFormConfig;
+  allowedDomains?: string[];
+}): Promise<IntakeFormRecord> {
+  const supabase = await getScopedClient();
+  const [{ data: orgId, error: orgError }, { data: userData }] = await Promise.all([
+    supabase.rpc("current_org_id"),
+    supabase.auth.getUser(),
+  ]);
+  if (orgError) throw orgError;
+  if (!orgId) throw new IntakeFormError("Your session has no firm. Reload the page and try again.");
+
+  let config = input.config;
+  if (!config) {
+    const packages = await loadIntakePackages();
+    config = defaultIntakeConfig(packages.status === "ok" ? packages.items.map((i) => i.id) : []);
+  }
+
+  for (const slug of slugCandidates(input.slugBase)) {
+    const { data, error } = await supabase
+      .from("crm_intake_form")
+      .insert({
+        org_id: orgId,
+        name: input.name,
+        slug,
+        source_tag: input.sourceTag,
+        status: "draft",
+        config: config as unknown as Json,
+        allowed_domains: input.allowedDomains ?? [],
+        created_by: userData.user?.id ?? null,
+      })
+      .select(COLUMNS)
+      .single();
+    if (!error) return toRecord(data as FormRow);
+    if (!isUniqueViolation(error)) throw error;
+  }
+  throw new IntakeFormError("Couldn't find a free link name. Try a different intake name.");
+}
+
+/** A new intake from the defaults, named by the person creating it. */
+export async function createIntakeForm(name: unknown): Promise<IntakeFormRecord> {
+  await requireAdmin();
+  const n = typeof name === "string" ? name.replace(/\s+/g, " ").trim() : "";
+  if (!n) throw new IntakeFormError("Give the new intake a name.");
+  if (n.length > 120) throw new IntakeFormError("Keep the name under 120 characters.");
+  return insertIntakeForm({ name: n, slugBase: slugFromFirmName(n), sourceTag: null });
+}
+
+/** A copy of an intake's setup (questions, look, fees, domains, tag) under a new link, as a draft. */
+export async function duplicateIntakeForm(id: string): Promise<IntakeFormRecord> {
+  await requireAdmin();
+  const src = await loadIntakeForm(id);
+  if (src.status !== "ok") throw new IntakeFormError("Couldn't read that intake. Nothing was copied; try again shortly.");
+  if (!src.form) throw new IntakeFormError("That intake isn't in your firm.");
+  const name = copyName(src.form.name);
+  return insertIntakeForm({
+    name,
+    slugBase: src.form.slug,
+    sourceTag: src.form.sourceTag,
+    config: src.form.config,
+    allowedDomains: src.form.allowedDomains,
+  });
+}
+
+async function readRow(id: string): Promise<FormRow> {
+  if (!UUID.test(id)) throw new IntakeFormError("That intake isn't in your firm.");
+  const supabase = await getScopedClient();
+  const { data, error } = await supabase.from("crm_intake_form").select(COLUMNS).eq("id", id).maybeSingle();
+  if (error) throw error;
+  if (!data) throw new IntakeFormError("That intake isn't in your firm.");
+  return data as FormRow;
+}
+
+function liveFor(row: FormRow, config: IntakeFormConfig): { live: boolean; remaining: number } {
+  const items = goLiveChecklist(config, {
+    receivesReferrals: row.receives_referrals,
+    agreementSigned: row.agreement_signed_at !== null,
+  });
+  return { live: checklistComplete(items), remaining: checklistRemaining(items) };
+}
+
+/**
+ * Archives an intake (its link stops answering; its leads and numbers stay)
+ * or brings it back, as live or draft by the same checklist a save uses.
+ */
+export async function setIntakeFormArchived(id: string, archived: boolean): Promise<IntakeFormRecord> {
+  await requireAdmin();
+  const row = await readRow(id);
+  const config = parseIntakeConfig(row.config);
+  const next = archived ? "archived" : liveFor(row, config).live ? "live" : "draft";
+  const supabase = await getScopedClient();
+  const { data: user } = await supabase.auth.getUser();
+  if (!user.user) throw new IntakeFormError("Your session has ended. Sign in again.");
+  const { data, error } = await supabase
+    .from("crm_intake_form")
+    .update({ status: next, updated_by: user.user.id, updated_at: new Date().toISOString() })
+    .eq("id", row.id)
+    .select(COLUMNS)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new IntakeFormError("Only owners, admins and senior admins can change intakes.");
+  return toRecord(data as FormRow);
 }
 
 export type IntakePackagesLoad = { status: "ok"; items: LibraryItem[] } | { status: "unavailable"; error?: unknown };
@@ -174,30 +308,27 @@ export async function loadIntakePackages(): Promise<IntakePackagesLoad> {
 export type SaveIntakeFormResult = { form: IntakeFormRecord; remaining: number };
 
 /**
- * Saves the editor's config and allowed domains. `input` is the browser's
- * payload and is validated here in full; status comes from the checklist.
+ * Saves one intake: its config, allowed domains, name, link name and source
+ * tag. `input` is the browser's payload and is validated here in full; status
+ * comes from the checklist (an archived intake stays archived).
  */
-export async function saveIntakeForm(input: { config: unknown; allowedDomains: unknown }): Promise<SaveIntakeFormResult> {
-  if (!canEditIntakeForm(await currentRole())) {
-    throw new IntakeFormError("Only owners, admins and senior admins can change the intake.");
-  }
+export async function saveIntakeForm(
+  id: string,
+  input: { config: unknown; allowedDomains: unknown; details: unknown },
+): Promise<SaveIntakeFormResult> {
+  await requireAdmin();
   const checked = validateIntakeConfig(input.config);
   if (!checked.ok) throw new IntakeFormError(checked.errors.join(" "));
   const domains = validateAllowedDomains(input.allowedDomains);
   if (!domains.ok) throw new IntakeFormError(domains.error);
+  const details = validateIntakeDetails(input.details);
+  if (!details.ok) throw new IntakeFormError(details.errors.join(" "));
 
-  const supabase = await getScopedClient();
-  const { data: current, error: readError } = await supabase.from("crm_intake_form").select(COLUMNS).maybeSingle();
-  if (readError) throw readError;
-  if (!current) throw new IntakeFormError("This firm's intake isn't set up yet. Reload the page and try again.");
-  const row = current as FormRow;
-
-  const items = goLiveChecklist(checked.config, {
-    receivesReferrals: row.receives_referrals,
-    agreementSigned: row.agreement_signed_at !== null,
-  });
-  const live = checklistComplete(items);
+  const row = await readRow(id);
+  const { live, remaining } = liveFor(row, checked.config);
+  const archived = row.status === "archived";
   const now = new Date().toISOString();
+  const supabase = await getScopedClient();
   const { data: user } = await supabase.auth.getUser();
   if (!user.user) throw new IntakeFormError("Your session has ended. Sign in again.");
 
@@ -206,17 +337,25 @@ export async function saveIntakeForm(input: { config: unknown; allowedDomains: u
     .update({
       config: checked.config as unknown as Json,
       allowed_domains: domains.domains,
-      status: live ? "live" : "draft",
+      name: details.value.name,
+      slug: details.value.slug,
+      source_tag: details.value.sourceTag,
+      status: archived ? "archived" : live ? "live" : "draft",
       // First time live is the publish date; it survives later drafts.
-      published_at: live ? (row.published_at ?? now) : row.published_at,
+      published_at: live && !archived ? (row.published_at ?? now) : row.published_at,
       updated_by: user.user.id,
       updated_at: now,
     })
     .eq("id", row.id)
     .select(COLUMNS)
     .maybeSingle();
-  if (error) throw error;
+  if (error) {
+    if (isUniqueViolation(error)) {
+      throw new IntakeFormError(`The link name "${details.value.slug}" is taken, or another intake used it before. Choose another.`);
+    }
+    throw error;
+  }
   // RLS filtered the update to nothing: the role changed under us.
-  if (!data) throw new IntakeFormError("Only owners, admins and senior admins can change the intake.");
-  return { form: toRecord(data as FormRow), remaining: checklistRemaining(items) };
+  if (!data) throw new IntakeFormError("Only owners, admins and senior admins can change intakes.");
+  return { form: toRecord(data as FormRow), remaining: archived ? 0 : remaining };
 }

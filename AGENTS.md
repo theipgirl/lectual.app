@@ -74,6 +74,21 @@ See `PORTED_FROM.md`. When changing a ported file, consider whether `lectual` ne
   mismatched mark, carry nothing, and the `matter_opened` timeline row says what was or wasn't carried.
 - Reads are three-state: details / none / couldn't be loaded. Unreadable saved details are reported, not hidden.
 
+## Intake forms: many per firm, contact first (lectual 0093)
+Intake → Forms keeps an intake per event, campaign or page (`/dashboard/forms/` lists them;
+`?form=<id>` edits one). Each has a name, a link (`/i/<slug>`), a source tag and its own numbers.
+- **Source tag** ("UGW 2026") goes on every lead from that intake (`referral_detail`) so the firm
+  knows where leads came from; Lawmatics tagging will read the same field.
+- **Renaming a link** keeps the old one working: lectual's alias trigger records it and `/i/<old>`
+  redirects. An old link name is never given to another intake. QR codes are made in the browser
+  (`IntakeQr.tsx`), from the saved link.
+- **Contact first:** name, email and consent come before any question. `startIntakeAction` files
+  the person (submission with `submitted_at` null + their lead) and returns a token; Submit adds the
+  answers to that row by the token's sha256. Someone who walks away is still a lead, and shows as
+  "Didn't finish". Never move contact details after the questions again.
+- Archived intakes don't answer publicly and keep their leads. Matter intake requests use the
+  firm's MAIN intake (oldest not archived).
+
 ## JSX text spacing: keep the `{" "}`
 Next 16.2.7's compiler DROPS the leading space of JSX text that contains an HTML entity
 (`&apos;`, `&amp;`, `&rsquo;`…) and runs onto another line, even if that is only the line
