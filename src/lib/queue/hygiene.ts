@@ -285,6 +285,8 @@ export type DraftProbe = {
   type: string;
   recipient?: string | null;
   clientName?: string | null;
+  /** Two drafts about different matters are never the same email, even with the same words. */
+  matterId?: string | null;
   createdAt: number | string | Date;
   body: string;
 };
@@ -321,6 +323,7 @@ function dice(a: Set<string>, b: Set<string>): number {
 
 function sameDraftPrepared(a: Prepared, b: Prepared): boolean {
   if (a.probe.type !== b.probe.type) return false;
+  if (a.probe.matterId && b.probe.matterId && a.probe.matterId !== b.probe.matterId) return false;
   if (a.recipient || b.recipient) {
     if (a.recipient !== b.recipient) return false;
   } else if (!a.client || a.client !== b.client) {
@@ -333,7 +336,8 @@ function sameDraftPrepared(a: Prepared, b: Prepared): boolean {
 /**
  * The same type and recipient (or client name, when there is no recipient),
  * created within 30 minutes, with bodies at least 90% alike once case,
- * punctuation and spacing are ignored. Symmetric. Never true on a guess: no
+ * punctuation and spacing are ignored. When both name a matter, it must be the
+ * same one (a client's two marks get near-identical emails). Symmetric. Never true on a guess: no
  * recipient and no client name on either side is false.
  */
 export function isNearDuplicate(a: DraftProbe, b: DraftProbe): boolean {
@@ -345,6 +349,7 @@ type DuplicateCandidate = {
   type: string;
   recipient: string | null;
   client_name: string | null;
+  matter_id?: string | null;
   created_at: string;
   draft_body: string;
   final_body: string | null;
@@ -362,6 +367,7 @@ export function markNearDuplicates(items: readonly DuplicateCandidate[]): Set<st
         type: item.type,
         recipient: item.recipient,
         clientName: item.client_name,
+        matterId: item.matter_id,
         createdAt: item.created_at,
         body: item.final_body ?? item.draft_body,
       }),

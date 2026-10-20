@@ -139,6 +139,23 @@ describe("generateOpinionLetter", () => {
     expect(result).toEqual({ draftId: "draft-1", queueItemId: "queue-1" });
   });
 
+  it("asks the queue for its own item (dedupe: false), because queue_item_id is unique per bookkeeping row", async () => {
+    baseMocks({ matter });
+    const { createDraft } = await import("@/lib/queue/api");
+    const { generateOpinionLetter } = await import("@/lib/documents/generate");
+
+    await generateOpinionLetter({
+      matterId: "matter-1",
+      upload: { bytes: new Uint8Array([1]), mime: "application/pdf", fileName: "report.pdf" },
+      markType: "word mark",
+      honorific: "",
+      entityName: "",
+    });
+
+    expect(createDraft).toHaveBeenCalledTimes(1);
+    expect(createDraft).toHaveBeenCalledWith(expect.objectContaining({ matterId: "matter-1", dedupe: false }));
+  });
+
   it("refuses when the matter has no mark on file", async () => {
     baseMocks({ matter: { ...matter, mark_text: null } });
     const { generateOpinionLetter } = await import("@/lib/documents/generate");

@@ -192,6 +192,7 @@ async function findNearDuplicate(input: NewQueueDraft, draftBody: string): Promi
       type: input.type,
       recipient: input.recipient,
       clientName: input.clientName,
+      matterId: input.matterId,
       createdAt: new Date(),
       body: draftBody,
     };
@@ -200,6 +201,7 @@ async function findNearDuplicate(input: NewQueueDraft, draftBody: string): Promi
         type: row.type,
         recipient: row.recipient,
         clientName: row.client_name,
+        matterId: row.matter_id,
         createdAt: row.created_at,
         body: row.final_body ?? row.draft_body,
       }),

@@ -10,7 +10,7 @@ const NOW = new Date("2026-10-20T12:00:00Z");
 const ORG = "rpb-law";
 const SIGN = "Rebecca P. Beliard, Esq.";
 
-type Row = { id: string; type: string; recipient: string | null; client_name: string | null; created_at: string; draft_body: string; final_body: string | null };
+type Row = { id: string; type: string; recipient: string | null; client_name: string | null; matter_id: string | null; created_at: string; draft_body: string; final_body: string | null };
 
 function mockEnv() {
   vi.doMock("@/lib/env", () => ({ env: { QUEUE_API_URL: "https://lawmatics-mcp.example.com", DASHBOARD_API_TOKEN: "secret-token" } }));
@@ -132,6 +132,24 @@ describe("createDraft hygiene (H5)", () => {
     const { createDraft } = await import("../../src/lib/queue/api");
     expect(await createDraft(email())).toEqual({ id: "q-new" });
     expect(posts(fetchMock)).toHaveLength(1);
+  });
+
+  it("still posts when the pending one has the same body but belongs to a different matter", async () => {
+    const row = { id: "q-existing", type: "CLIENT_EMAIL", recipient: "ana@example.com", client_name: "Ana Ruiz", matter_id: "matter-1", created_at: new Date(NOW.getTime() - 3 * 60_000).toISOString(), draft_body: EMAIL_BODY, final_body: null };
+    const fetchMock = router(listOf([row]));
+    vi.stubGlobal("fetch", fetchMock);
+    const { createDraft } = await import("../../src/lib/queue/api");
+    expect(await createDraft(email({ matterId: "matter-2" }))).toEqual({ id: "q-new" });
+    expect(posts(fetchMock)).toHaveLength(1);
+  });
+
+  it("still dedupes when the pending one is about the same matter", async () => {
+    const row = { id: "q-existing", type: "CLIENT_EMAIL", recipient: "ana@example.com", client_name: "Ana Ruiz", matter_id: "matter-1", created_at: new Date(NOW.getTime() - 3 * 60_000).toISOString(), draft_body: EMAIL_BODY, final_body: null };
+    const fetchMock = router(listOf([row]));
+    vi.stubGlobal("fetch", fetchMock);
+    const { createDraft } = await import("../../src/lib/queue/api");
+    expect(await createDraft(email({ matterId: "matter-1" }))).toEqual({ id: "q-existing", deduped: true });
+    expect(posts(fetchMock)).toHaveLength(0);
   });
 
   it("creates the draft anyway when the pending list rejects, and logs without the body or recipient", async () => {

@@ -27,7 +27,7 @@ function baseMocks(overrides: {
   lead?: unknown;
   orgKey?: string | null;
   listQueueImpl?: (org: string, status: string) => Promise<unknown[]>;
-  createDraftImpl?: () => Promise<{ id: string }>;
+  createDraftImpl?: () => Promise<{ id: string; deduped?: boolean }>;
 } = {}) {
   const requireMatterWriteRole = vi.fn(async () => "attorney");
   const getMatter = vi.fn(async () => (overrides.matter === undefined ? matterFixture() : overrides.matter));
@@ -117,6 +117,14 @@ describe("queueMonthlyStatusUpdate", () => {
 
     await expect(queueMonthlyStatusUpdate("matter-1")).rejects.toThrow(/already queued or approved/i);
     expect(createDraft).not.toHaveBeenCalled();
+  });
+
+  it("says so, and returns no queue item, when the queue already held an equivalent update", async () => {
+    const { createDraft } = baseMocks({ createDraftImpl: async () => ({ id: "existing", deduped: true }) });
+    const { queueMonthlyStatusUpdate } = await import("@/lib/matters/filing-followup-action");
+
+    await expect(queueMonthlyStatusUpdate("matter-1")).rejects.toThrow(/already waiting in the approval queue.*existing/i);
+    expect(createDraft).toHaveBeenCalledTimes(1);
   });
 
   it("advances to month 2 once month 1 is approved and enough time has passed", async () => {

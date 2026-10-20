@@ -309,6 +309,16 @@ describe("isNearDuplicate (H4)", () => {
     expect(isNearDuplicate(probe(), probe({ body: Array.from({ length: 120 }, (_, i) => `other${i}`).join(" ") }))).toBe(false);
   });
 
+  it("the same body for two different matters: false", () => {
+    expect(isNearDuplicate(probe({ matterId: "m-1" }), probe({ matterId: "m-2", createdAt: minutes(3) }))).toBe(false);
+  });
+
+  it("the same matter, or no matter on either side or on one side: unchanged", () => {
+    expect(isNearDuplicate(probe({ matterId: "m-1" }), probe({ matterId: "m-1", createdAt: minutes(3) }))).toBe(true);
+    expect(isNearDuplicate(probe(), probe({ createdAt: minutes(3) }))).toBe(true);
+    expect(isNearDuplicate(probe({ matterId: "m-1" }), probe({ matterId: null, createdAt: minutes(3) }))).toBe(true);
+  });
+
   it("no recipient on either side: judged on the client name and the other rules", () => {
     const a = probe({ recipient: null });
     expect(isNearDuplicate(a, probe({ recipient: undefined, createdAt: minutes(3) }))).toBe(true);
@@ -370,6 +380,11 @@ describe("markNearDuplicates (H10)", () => {
   it("marks the newer of two near-duplicates only", () => {
     expect([...markNearDuplicates([item("old", 0), item("new", 4)])]).toEqual(["new"]);
     expect([...markNearDuplicates([item("new", 4), item("old", 0)])]).toEqual(["new"]);
+  });
+
+  it("does not mark two near-identical drafts about different matters", () => {
+    expect(markNearDuplicates([item("a", 0, { matter_id: "m-1" }), item("b", 3, { matter_id: "m-2" })]).size).toBe(0);
+    expect([...markNearDuplicates([item("a", 0, { matter_id: "m-1" }), item("b", 3, { matter_id: "m-1" })])]).toEqual(["b"]);
   });
 
   it("marks nothing for unrelated items", () => {
