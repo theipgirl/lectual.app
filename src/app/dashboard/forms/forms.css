@@ -1488,7 +1488,7 @@ textarea.ifm-input {
 }
 .ifm-stats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 12px;
 }
 .ifm-unfinished {
@@ -1716,4 +1716,59 @@ textarea.ifm-input {
   .ifl-new {
     flex-basis: 100%;
   }
+}
+
+/* ── assessment intakes (0095) ─────────────────────────────────────────────── */
+.ifm-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--ink);
+}
+.ifm-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--ox);
+}
+.ifm-asm-list {
+  margin: 0;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.ifm-asm-q {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ifm-asm-sub {
+  font-size: 13px;
+  min-height: 34px;
+}
+.ifm-asm-preview {
+  align-self: start;
+  position: sticky;
+  top: 16px;
+  gap: 10px;
+}
+.ifm-asm-plist {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink);
+}
+.ifl-kind {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.ifl-new select {
+  flex: none;
+  width: auto;
 }

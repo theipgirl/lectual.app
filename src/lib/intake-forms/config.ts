@@ -28,6 +28,8 @@
  * never a copy that drifted, never an estimate. See `packages.ts`.
  */
 
+import { DEFAULT_ASSESSMENT, parseAssessmentSettings, publicAssessment, validateAssessmentSettings, type AssessmentSettings, type PublicAssessment } from "./assessment";
+
 export const IP_TYPES = ["Trademark", "Patent", "Copyright", "Trade secret"] as const;
 export type IpType = (typeof IP_TYPES)[number];
 
@@ -139,6 +141,8 @@ export type IntakeFormConfig = {
   theme: IntakeTheme;
   colors: IntakeColors;
   powered: boolean;
+  /** Assessment intakes only (lectual 0095): which card, the firm's wording, show the score. */
+  assessment: AssessmentSettings;
 };
 
 export const DEFAULT_COLORS: IntakeColors = {
@@ -181,6 +185,7 @@ export function defaultIntakeConfig(visiblePackageIds: string[] = []): IntakeFor
     theme: "auto",
     colors: { ...DEFAULT_COLORS },
     powered: true,
+    assessment: { ...DEFAULT_ASSESSMENT, wording: {} },
   };
 }
 
@@ -255,6 +260,7 @@ export function parseIntakeConfig(raw: unknown): IntakeFormConfig {
       darkAcc: isHexColor(colorsRaw.darkAcc) ? colorsRaw.darkAcc : DEFAULT_COLORS.darkAcc,
     },
     powered: bool(raw.powered, d.powered),
+    assessment: parseAssessmentSettings(raw.assessment),
   };
 }
 
@@ -317,6 +323,8 @@ export function validateIntakeConfig(raw: unknown): ConfigValidation {
   if (!isRec(c) || !["lightBg", "lightAcc", "darkBg", "darkAcc"].every((k) => isHexColor(c[k]))) {
     errors.push("Colors must be six-digit hex values like #6A1F2B.");
   }
+
+  errors.push(...validateAssessmentSettings(raw.assessment));
 
   if (errors.length) return { ok: false, errors: [...new Set(errors)] };
   const cleaned = parseIntakeConfig(raw);
@@ -453,6 +461,8 @@ export type PublicIntakeConfig = {
   theme: IntakeTheme;
   colors: IntakeColors;
   powered: boolean;
+  /** The assessment card, wording applied, without points (assessment intakes). */
+  assessment: PublicAssessment;
   /** Present only when the firm receives Lectual referrals. */
   referral: { office: string; disclosure: string } | null;
 };
@@ -484,6 +494,7 @@ export function publicConfig(
     theme: config.theme,
     colors: { ...config.colors },
     powered: config.powered,
+    assessment: publicAssessment(config.assessment),
     referral: ctx.receivesReferrals
       ? { office: config.office.trim(), disclosure: referralDisclosure(intro.firmName) }
       : null,

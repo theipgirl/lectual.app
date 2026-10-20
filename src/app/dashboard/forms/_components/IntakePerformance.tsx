@@ -13,7 +13,7 @@ import { IntakeStatusForm } from "./IntakeStatusForm";
  * intakes yet", and a funnel that couldn't load is not a row of zeros.
  */
 
-const FIT_TONE: Record<string, string> = { fit: "ok", non_fit: "risk", unscored: "mute" };
+const FIT_TONE: Record<string, string> = { fit: "ok", non_fit: "risk", unscored: "mute", hot: "risk", warm: "warn", cold: "mute" };
 const STATUS_TONE: Record<string, string> = {
   new: "ox",
   referred: "sand",
@@ -125,6 +125,15 @@ export async function IntakePerformance({
                 { label: "Finished", value: stats.completed.toLocaleString("en-US"), sub: `${stats.completionRate} of those` },
                 { label: "Didn't finish", value: stats.unfinished.toLocaleString("en-US"), sub: "Still leads: worth a follow-up" },
                 { label: "Median time to finish", value: formatDuration(stats.medianMs), sub: "From opening the page to sending" },
+                ...(form.kind === "assessment"
+                  ? [
+                      {
+                        label: "Hot · warm · cold",
+                        value: `${stats.temperatures.hot} · ${stats.temperatures.warm} · ${stats.temperatures.cold}`,
+                        sub: "Of those who finished. Only your firm sees this",
+                      },
+                    ]
+                  : []),
               ].map((k) => (
                 <div key={k.label} className="ifm-card ifm-kpi">
                   <div className="ifm-field-label">{k.label}</div>
@@ -158,7 +167,7 @@ export async function IntakePerformance({
                       <th>Name</th>
                       <th>Started</th>
                       <th>Mode</th>
-                      <th>Fit</th>
+                      <th>{form.kind === "assessment" ? "Heat · score" : "Fit"}</th>
                       <th>Status</th>
                       <th>Last active</th>
                     </tr>

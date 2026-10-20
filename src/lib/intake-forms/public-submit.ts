@@ -255,7 +255,7 @@ export function leadFromSubmission(
   const { first, last } = splitName(sub.contact.name);
   const practice = inferPracticeArea(config, sub.answers);
   const markAnswer = sub.answers.find((a) => a.question === MARK_QUESTION)?.answer ?? null;
-  const how = sub.mode === "conversation" ? "Chat" : "Form";
+  const how = sub.mode === "conversation" ? "Chat" : sub.mode === "assessment" ? "Assessment" : "Form";
   return {
     first_name: first,
     last_name: last,

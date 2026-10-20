@@ -70,6 +70,7 @@ export default async function IntakeFormsPage({
               slug: f.slug,
               url: intakePublicUrl(origin, f.slug),
               sourceTag: f.sourceTag,
+              kind: f.kind,
               status: f.status,
               stats: byForm
                 ? {

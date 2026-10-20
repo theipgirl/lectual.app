@@ -52,10 +52,10 @@ export async function saveIntakeFormAction(payload: {
 
 export type IntakeListResult = { ok: true; id: string } | { ok: false; error: string };
 
-/** "New intake": a draft from the defaults. */
-export async function createIntakeFormAction(name: unknown): Promise<IntakeListResult> {
+/** "New intake": a draft from the defaults, chat/form or assessment. */
+export async function createIntakeFormAction(name: unknown, kind: unknown = "intake"): Promise<IntakeListResult> {
   try {
-    const form = await createIntakeForm(name);
+    const form = await createIntakeForm(name, kind);
     revalidatePath("/dashboard/forms/");
     return { ok: true, id: form.id };
   } catch (err) {

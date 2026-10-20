@@ -49,7 +49,24 @@ describe("per-intake numbers", () => {
       { started_at: t(0), submitted_at: t(10) },
       { started_at: t(0), submitted_at: null },
     ]);
-    expect(s).toEqual({ captured: 4, completed: 3, unfinished: 1, completionRate: "75.0%", medianMs: 4 * 60_000 });
+    expect(s).toEqual({
+      captured: 4,
+      completed: 3,
+      unfinished: 1,
+      completionRate: "75.0%",
+      medianMs: 4 * 60_000,
+      temperatures: { hot: 0, warm: 0, cold: 0 },
+    });
+  });
+
+  it("counts an assessment's finished people by temperature", () => {
+    const s = submissionStats([
+      { started_at: t(0), submitted_at: t(1), temperature: "hot" },
+      { started_at: t(0), submitted_at: t(1), temperature: "hot" },
+      { started_at: t(0), submitted_at: t(1), temperature: "cold" },
+      { started_at: t(0), submitted_at: null, temperature: null },
+    ]);
+    expect(s.temperatures).toEqual({ hot: 2, warm: 0, cold: 1 });
   });
 
   it("averages the two middle times for an even count, and says — when nothing finished", () => {

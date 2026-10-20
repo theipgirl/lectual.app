@@ -21,7 +21,7 @@ export type SubmissionStatus = (typeof SUBMISSION_STATUSES)[number];
 export const SUBMISSION_FITS = ["fit", "non_fit", "unscored"] as const;
 export type SubmissionFit = (typeof SUBMISSION_FITS)[number];
 
-export const SUBMISSION_MODES = ["conversation", "form"] as const;
+export const SUBMISSION_MODES = ["conversation", "form", "assessment"] as const;
 export type SubmissionMode = (typeof SUBMISSION_MODES)[number];
 
 const STATUS_LABEL: Record<SubmissionStatus, string> = {
@@ -49,7 +49,7 @@ export function submissionFitLabel(f: string): string {
 
 /** The design's table says "Chat" for the conversation mode. */
 export function submissionModeLabel(m: string): string {
-  return m === "conversation" ? "Chat" : m === "form" ? "Form" : m;
+  return m === "conversation" ? "Chat" : m === "form" ? "Form" : m === "assessment" ? "Assessment" : m;
 }
 
 type Rec = Record<string, unknown>;

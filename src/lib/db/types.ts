@@ -22,6 +22,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          kind: string
           name: string
           org_id: string
           published_at: string | null
@@ -39,6 +40,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          kind?: string
           name?: string
           org_id: string
           published_at?: string | null
@@ -56,6 +58,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          kind?: string
           name?: string
           org_id?: string
           published_at?: string | null
@@ -107,6 +110,12 @@ export type Database = {
       }
       crm_intake_submission: {
         Row: {
+          band: string | null
+          lawmatics_contact_id: string | null
+          lawmatics_synced_at: string | null
+          lawmatics_tagged_at: string | null
+          score: number | null
+          temperature: string | null
           answers: Json
           contact: Json
           created_at: string
@@ -126,6 +135,12 @@ export type Database = {
         }
         Insert: {
           answers?: Json
+          band?: string | null
+          lawmatics_contact_id?: string | null
+          lawmatics_synced_at?: string | null
+          lawmatics_tagged_at?: string | null
+          score?: number | null
+          temperature?: string | null
           contact?: Json
           created_at?: string
           fit?: string
@@ -144,6 +159,12 @@ export type Database = {
         }
         Update: {
           answers?: Json
+          band?: string | null
+          lawmatics_contact_id?: string | null
+          lawmatics_synced_at?: string | null
+          lawmatics_tagged_at?: string | null
+          score?: number | null
+          temperature?: string | null
           contact?: Json
           created_at?: string
           fit?: string

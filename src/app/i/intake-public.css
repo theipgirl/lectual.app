@@ -397,3 +397,105 @@ textarea.ipub-input {
   border-radius: 10px;
   background: color-mix(in srgb, currentColor 6%, transparent);
 }
+
+/* ── the event assessment (0095) ─────────────────────────────────────────── */
+.ipub-asm-progress {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--ipub-line);
+  overflow: hidden;
+}
+.ipub-asm-progress i {
+  display: block;
+  height: 100%;
+  background: var(--ipub-acc);
+  transition: width 0.2s ease;
+}
+.ipub-asm-count {
+  font-size: 12.5px;
+  color: var(--ipub-mute);
+  font-variant-numeric: tabular-nums;
+}
+.ipub-asm-q {
+  margin: 0;
+  font-size: 20px;
+  line-height: 27px;
+  font-weight: 600;
+  text-wrap: pretty;
+}
+.ipub-asm-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ipub-asm-options.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+.ipub-asm-option {
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 1px solid var(--ipub-line);
+  border-radius: 10px;
+  background: var(--ipub-field);
+  color: var(--ipub-ink);
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+}
+.ipub-asm-option:hover {
+  border-color: var(--ipub-acc);
+}
+.ipub-asm-option.on {
+  border-color: var(--ipub-acc);
+  background: color-mix(in srgb, var(--ipub-acc) 12%, var(--ipub-field));
+  font-weight: 600;
+}
+.ipub-asm-option:focus-visible {
+  outline: 2px solid var(--ipub-acc);
+  outline-offset: 2px;
+}
+.ipub-asm-nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.ipub-asm-result {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--ipub-line);
+  border-radius: 12px;
+}
+.ipub-asm-score span {
+  font-size: 44px;
+  line-height: 48px;
+  font-weight: 700;
+  color: var(--ipub-acc);
+  font-variant-numeric: tabular-nums;
+}
+.ipub-asm-score small {
+  margin-left: 6px;
+  font-size: 15px;
+  color: var(--ipub-mute);
+}
+.ipub-asm-band {
+  font-size: 16px;
+  font-weight: 600;
+}
+.ipub-asm-gaps {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14.5px;
+  line-height: 21px;
+}
+.ipub-asm-next {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 21px;
+}
