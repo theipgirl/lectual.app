@@ -5,7 +5,8 @@ import { getFirmTimeZone } from "@/lib/org/profile";
 import { firmCivilDate } from "@/lib/quotes/firm-time";
 import { getProposalSettings } from "@/lib/proposals/store";
 import { PROPOSAL_STAFF_WRITE_ROLES } from "@/lib/proposals/types";
-import { loadPackageChoices } from "@/lib/proposals/packages";
+import { normalisePackages, packageOption, type PackageOption } from "@/lib/proposals/package-list";
+import type { ProposalSettingRow } from "@/lib/proposals/types";
 import { loadConsultStrip } from "@/lib/proposals/consult-strip-load";
 import { ConsultStrip } from "@/components/proposal-editor/ConsultStrip";
 import { NewProposalForm, type NewProposalDefaults } from "@/components/proposal-editor/NewProposalForm";
@@ -26,10 +27,12 @@ function defaultExpiry(tz: string): string {
  * New proposal. `?lead=<id>` pre-fills the client from the lead, and
  * `?matter=<id>` from the matter's lead and links the matter (the matter wins
  * when both are given). Both are read through the caller's own scoped client,
- * so a lead or matter from another firm is simply not found. The prices and
- * included items are NOT read here: the create action reads the firm's settings
- * itself (and re-reads a chosen service-library package), so the form cannot
- * carry prices. A linked lead's latest consult is shown above the form.
+ * so a lead or matter from another firm is simply not found. The package
+ * dropdown lists the firm's saved packages (name plus "$4,950 · 3 classes") and
+ * pre-fills the price fields in the browser; the create action re-reads the
+ * package by name itself, so a price the form carries is never trusted over the
+ * package. A failed settings read shows a note and no dropdown. A linked lead's
+ * latest consult is shown above the form.
  */
 export default async function NewProposalPage({ searchParams }: { searchParams: Promise<{ lead?: string; matter?: string }> }) {
   await requireProposalsModule();
@@ -54,7 +57,22 @@ export default async function NewProposalPage({ searchParams }: { searchParams: 
     );
   }
 
-  const [tz, settings, packages] = await Promise.all([getFirmTimeZone(), getProposalSettings().catch(() => null), loadPackageChoices()]);
+  // Three states: settings read (a row or none yet) or couldn't be read. A failed read offers no package and says so.
+  let settings: ProposalSettingRow | null = null;
+  let packages: PackageOption[] | null;
+  const [tz, settingsRead] = await Promise.all([
+    getFirmTimeZone(),
+    getProposalSettings().then(
+      (row) => ({ ok: true as const, row }),
+      () => ({ ok: false as const }),
+    ),
+  ]);
+  if (settingsRead.ok) {
+    settings = settingsRead.row;
+    packages = normalisePackages(settings?.pricing ?? {}).map(packageOption);
+  } else {
+    packages = null;
+  }
 
   const defaults: NewProposalDefaults = {
     leadId: "",
@@ -106,7 +124,7 @@ export default async function NewProposalPage({ searchParams }: { searchParams: 
         <div className="lx-label">Intake</div>
         <h1 className="lx-h1">New proposal</h1>
         <p className="lx-sub">
-          Starts as a draft with your firm&apos;s standard prices and included items. You can change anything on the next page before a named approver
+          Starts as a draft from one of your firm&apos;s packages and its included items. You can change anything on the next page before a named approver
           approves it.
         </p>
       </div>
@@ -128,7 +146,7 @@ export default async function NewProposalPage({ searchParams }: { searchParams: 
           {leadNote}
         </p>
       )}
-      <NewProposalForm defaults={defaults} hasSettings={settings !== null} packages={packages} />
+      <NewProposalForm defaults={defaults} hasSettings={settings !== null || !settingsRead.ok} packages={packages} />
     </div>
   );
 }

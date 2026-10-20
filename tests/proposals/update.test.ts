@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import { ProposalError } from "@/lib/proposals/errors";
+import type { ProposalContent } from "@/lib/proposals/types";
 import { sevetri } from "./fixture";
 
 /**
@@ -151,5 +152,26 @@ describe("updateProposal: optimistic concurrency", () => {
     table = [row({ status: "sent" })];
     const err = await updateProposal(ID, { title: "x" }, { expectedUpdatedAt: T0 }).catch((e) => e);
     expect(err).toMatchObject({ code: "frozen" });
+  });
+});
+
+describe("updateProposal keeps content.package_basis through a normal save (Sprint 6)", () => {
+  it("a content save that carries it stores it, and one made by the editor's own parsers keeps it", async () => {
+    const basis = { name: "Enhanced", edited: ["price"] };
+    table = [row({ content: { ...sevetri(), package_basis: basis } })];
+    const current = table[0].content as ProposalContent;
+    // The editor's own section parsers spread the current content, so the basis rides along.
+    const { parsePricing, parseMessage } = await import("@/lib/proposal-editor/form");
+    const form = new FormData();
+    for (const [k, v] of Object.entries({ package: "Enhanced", base: "3000", includedClasses: "2", perClass: "700", secondMarkPct: "15", govPerClass: "350" })) form.set(k, v);
+    const priced = parsePricing(form);
+    expect(priced.ok).toBe(true);
+    if (!priced.ok) return;
+    await updateProposal(ID, { content: { ...current, pricing: priced.value } }, { expectedUpdatedAt: T0 });
+    expect((table[0].content as ProposalContent).package_basis).toEqual(basis);
+    expect((table[0].content as ProposalContent).pricing.base_cents).toBe(300_000);
+
+    const message = parseMessage(new FormData(), table[0].content as ProposalContent);
+    expect(message.ok && message.value.package_basis).toEqual(basis);
   });
 });

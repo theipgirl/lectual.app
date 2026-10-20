@@ -54,22 +54,18 @@ The bell and the page keep "it loaded" and "it didn't" apart. A failed count sho
 load notifications"), never 0. A failed list says it couldn't be loaded. "You're all caught up" appears
 only when the read worked and found nothing.
 
-## Dedicated kinds (pending lectual migration)
+## Dedicated kinds (lectual 0094, applied)
 
-The `crm_notification_kind` enum has only `mentioned | assigned | lead_replied | time_running`. Consult
-outcomes and approval alerts are therefore written as `mentioned` with `payload.source` set to
-`consult_outcome` or `approval_needed`.
+The `crm_notification_kind` enum is `mentioned | assigned | lead_replied | time_running | consult_outcome |
+approval_needed` (lectual 0094, applied to lectual-dev and lectual-prod). Consult outcomes and approval
+alerts are written under their own kinds, from the `NOTIFICATION_KIND_FOR` map in
+`src/lib/notifications/kinds.ts`, which both producers read. They still carry `payload.source`, so a
+row reads the same whichever form it is in.
 
-To give them their own kinds:
-
-1. In `theipgirl/lectual`, add a migration that adds `consult_outcome` and `approval_needed` to
-   `crm_notification_kind` (apply it to lectual-dev and lectual-prod).
-2. Regenerate `src/lib/db/types.ts`.
-3. In `src/lib/notifications/kinds.ts`, change the value for each event in `NOTIFICATION_KIND_FOR`. That is
-   the whole change: both producers read their kind from the map.
-
-`describeNotification` already renders both forms, so rows written before and after the switch read the
-same. Do not write a value the enum lacks: the insert would be refused and the notification lost.
+Rows written before the switch are the old form: kind `mentioned` with `payload.source` set to
+`consult_outcome` or `approval_needed`. They stay as they are. `describeNotification` renders both forms
+to the same label, icon, sentence and link, so old and new rows sit side by side in the bell and on the
+page. Do not write a value the enum lacks: the insert would be refused and the notification lost.
 
 ## Where it is not
 

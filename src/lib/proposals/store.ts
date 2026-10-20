@@ -5,6 +5,7 @@ import { ROLES, type Role } from "@/lib/auth/roles";
 import { changedColumns, contentChanges, type EditableColumn } from "./diff";
 import { friendlyProposalError, ProposalError } from "./errors";
 import { defaultSelection, quoteProposal } from "./pricing";
+import { offeredPackages, type OfferedPackage } from "./segments";
 import {
   PROPOSAL_ADMIN_ROLES,
   PROPOSAL_STAFF_WRITE_ROLES,
@@ -16,6 +17,7 @@ import {
   type ProposalEventActor,
   type ProposalEventRow,
   type ProposalEventType,
+  type ProposalPackageBasis,
   type ProposalRow,
   type ProposalSettingRow,
   type ProposalSource,
@@ -145,6 +147,7 @@ const LIST_COLUMNS = [
   "sent_at",
   "accepted_at",
   "accepted_snapshot",
+  "created_at",
   "updated_at",
 ].join(", ");
 
@@ -345,7 +348,18 @@ export type ProposalListItem = {
   approved_at: string | null;
   sent_at: string | null;
   accepted_at: string | null;
+  created_at: string;
   updated_at: string;
+  /** Brand names in content order, for the list's title line. */
+  brands: string[];
+  /** The packages this offer names (see `offeredPackages`); none when the package name is blank. */
+  offered: OfferedPackage[];
+  /** Classes in the quote: the ones the client accepted, else the pre-ticked ones. */
+  class_count: number;
+  /** The package the client accepted, once accepted. */
+  signed_package: string | null;
+  /** The staff-only "edited from <package>" note (`content.package_basis`), or null. */
+  package_basis: ProposalPackageBasis | null;
   /** What the client pays now: the accepted total once accepted, else the firm's preselected offer. */
   legal_total_cents: number;
   /** USPTO fees, due at filing. */
@@ -381,7 +395,10 @@ export async function listProposals(options: ProposalListOptions = {}): Promise<
   if (error) throw friendlyProposalError(error, "load the proposals");
 
   const rows = (Array.isArray(data) ? data : []) as Array<
-    Omit<ProposalListItem, "legal_total_cents" | "gov_total_cents" | "blocking_issue"> & {
+    Omit<
+      ProposalListItem,
+      "legal_total_cents" | "gov_total_cents" | "blocking_issue" | "brands" | "offered" | "class_count" | "signed_package" | "package_basis"
+    > & {
       client_email: string | null;
       pay_url: string | null;
       content: ProposalContent;
@@ -398,9 +415,11 @@ export async function listProposals(options: ProposalListOptions = {}): Promise<
 
   return kept.map(({ content, accepted_snapshot, client_email, pay_url, ...rest }) => {
     const accepted = accepted_snapshot?.quote;
-    const totals = accepted
-      ? { legal_total_cents: accepted.legal_total_cents, gov_total_cents: accepted.gov_total_cents }
-      : offerTotals(content);
+    const quote = accepted ?? quoteProposal(content, defaultSelection(content));
+    const totals = { legal_total_cents: quote.legal_total_cents, gov_total_cents: quote.gov_total_cents };
+    const names = Array.isArray(content?.names) ? content.names : [];
+    const basis = content?.package_basis;
+    const signedPackage = accepted_snapshot?.content?.pricing?.package;
     // Only a row that can still be approved can be blocked from approval.
     const blocking_issue =
       rest.status === "draft" || rest.status === "approved"
@@ -408,9 +427,62 @@ export async function listProposals(options: ProposalListOptions = {}): Promise<
             (i) => i.level === "error",
           )?.message ?? null)
         : null;
-    return { ...rest, ...totals, blocking_issue };
+    return {
+      ...rest,
+      ...totals,
+      blocking_issue,
+      brands: names.map((n) => (typeof n?.name === "string" ? n.name.trim() : "")).filter(Boolean),
+      offered: offeredPackages(content),
+      class_count: (Array.isArray(quote.names) ? quote.names : []).reduce((n, nm) => n + (nm.classes?.length ?? 0), 0),
+      signed_package: typeof signedPackage === "string" && signedPackage.trim() ? signedPackage.trim() : null,
+      package_basis:
+        basis && typeof basis.name === "string" && Array.isArray(basis.edited) && basis.edited.length > 0
+          ? { name: basis.name, edited: basis.edited.filter((f): f is string => typeof f === "string") }
+          : null,
+    };
   });
 }
+
+/** The events a list's Last activity cell reads: not `viewed`, which a client's refreshes would let crowd out the rest. */
+const LAST_ACTIVITY_EVENT_TYPES = ["created", "edited", "revised", "approved", "unapproved", "sent", "accepted", "withdrawn", "superseded"] as const;
+const EVENT_ID_CHUNK = 50;
+
+/**
+ * The newest event of each listed proposal, keyed by proposal id (a proposal with no event is
+ * simply absent). Named columns, `in("proposal_id", ids)` in chunks so the request line stays
+ * short, newest first. THROWS when a read fails: the caller shows a derived line instead of
+ * guessing, it never treats a failure as "no activity".
+ */
+export async function listLatestProposalEvents(proposalIds: readonly string[]): Promise<Map<string, ProposalLatestEvent>> {
+  const out = new Map<string, ProposalLatestEvent>();
+  const ids = [...new Set(proposalIds)].filter((id) => UUID_PATTERN.test(id));
+  if (ids.length === 0) return out;
+  const supabase = await getScopedClient();
+  const db = proposalsDb(supabase);
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += EVENT_ID_CHUNK) chunks.push(ids.slice(i, i + EVENT_ID_CHUNK));
+  const reads = await Promise.all(
+    chunks.map((chunk) =>
+      db
+        .from("client_proposal_event")
+        .select("proposal_id, type, actor, actor_user_id, created_at")
+        .in("proposal_id", chunk)
+        .in("type", LAST_ACTIVITY_EVENT_TYPES)
+        .order("created_at", { ascending: false })
+        .limit(500),
+    ),
+  );
+  for (const { data, error } of reads) {
+    if (error) throw friendlyProposalError(error, "load the proposal activity");
+    for (const row of (Array.isArray(data) ? data : []) as Array<ProposalLatestEvent & { proposal_id: string }>) {
+      const seen = out.get(row.proposal_id);
+      if (!seen || row.created_at > seen.created_at) out.set(row.proposal_id, row);
+    }
+  }
+  return out;
+}
+
+export type ProposalLatestEvent = { type: string; actor: string; actor_user_id: string | null; created_at: string };
 
 export type ProposalVersionSummary = Pick<
   ProposalRow,

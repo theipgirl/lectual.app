@@ -71,16 +71,14 @@ State checked 2026-09-29 (lectual-prod, read-only):
 
 ## Known follow-ups
 
-- **Consult outcome notifications reuse `mentioned`.** Logging No-show / Asked to reschedule /
+- **Consult outcome notifications have their own kind.** Logging No-show / Asked to reschedule /
   Rebooked after no-show on a lead raises an in-app notification for the lead's owner and every
-  `intake`-role member (not the person who logged it). The database allows only four notification
-  kinds (`mentioned`, `assigned`, `lead_replied`, `time_running`), and a fifth needs a migration in
-  `lectual`, so the row is `mentioned` with `payload.source = "consult_outcome"`, the `outcome`, and a
-  `preview` such as "No-show: Ana Ruiz". The bell now exists in this repo (top bar and
-  `/dashboard/notifications/`) and words the row from `payload.outcome`: "No-show logged on Ana Ruiz",
-  "Reschedule requested on Ana Ruiz", "Rebooked after no-show: Ana Ruiz". Follow-up for lectual: add a
-  dedicated kind; this repo then changes one line in `NOTIFICATION_KIND_FOR`
-  (`src/lib/notifications/kinds.ts`). See `docs/notifications.md`.
+  `intake`-role member (not the person who logged it). Since lectual 0094 (applied to dev and prod)
+  the row is written as kind `consult_outcome`, with `payload.source = "consult_outcome"`, the
+  `outcome`, and a `preview` such as "No-show: Ana Ruiz". Rows written before the switch are kind
+  `mentioned` with the same payload; the bell and `/dashboard/notifications/` word both forms the same
+  way ("No-show logged on Ana Ruiz", "Reschedule requested on Ana Ruiz", "Rebooked after no-show: Ana
+  Ruiz"). See `docs/notifications.md`.
 - **"Pending approvals on Today" needs nothing.** Today's "Waiting on you" KPI already shows the
   pending queue count (three states: a failed queue read says so, never "0"). `src/app/dashboard/page.tsx`
   is unchanged for this.

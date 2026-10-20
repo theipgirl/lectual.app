@@ -54,6 +54,22 @@ describe("describeNotification sentences (F1)", () => {
     expect(describeNotification(row("consult_outcome", outcome)).icon).toBe("outcome");
   });
 
+  it("gives the old form (mentioned + source) and the dedicated kind the same label, icon, sentence and href", () => {
+    const outcome = { lead_name: "Ana Ruiz", outcome: "no_show" };
+    const approval = { queue_id: "q-1", headline: "Draft", lead_name: "Ana Ruiz" };
+    const pairs: Array<[string, unknown]> = [
+      ["consult_outcome", outcome],
+      ["approval_needed", approval],
+    ];
+    for (const [kind, payload] of pairs) {
+      const oldForm = describeNotification(row("mentioned", { ...(payload as object), source: kind }));
+      const newForm = describeNotification(row(kind, { ...(payload as object), source: kind }));
+      expect(newForm).toEqual(oldForm);
+      // The dedicated kind needs no `source` to read the same.
+      expect(describeNotification(row(kind, payload))).toEqual(oldForm);
+    }
+  });
+
   it("is neutral for an unknown kind, an unknown source and missing names, and never throws", () => {
     expect(sentence("brand_new_kind", { lead_name: "Ana Ruiz" })).toBe("Something changed on Ana Ruiz");
     expect(sentence("mentioned", { source: "from_the_future", lead_name: "Ana Ruiz" })).toBe("Something changed on Ana Ruiz");

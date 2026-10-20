@@ -84,7 +84,7 @@ describe("approval alerts from createDraft (F6)", () => {
     expect(new Set(["paralegal-1", "intake-1", "viewer-1", "actor"]).has(recipients[0])).toBe(false);
 
     for (const [arg] of notify.mock.calls) {
-      expect(arg.kind).toBe("mentioned");
+      expect(arg.kind).toBe("approval_needed");
       expect(arg.actorId).toBe("actor");
       expect(arg.leadId).toBe(LEAD);
       expect(arg.payload).toMatchObject({ source: "approval_needed", queue_id: "q-new", headline: "Follow up with Ana Ruiz" });

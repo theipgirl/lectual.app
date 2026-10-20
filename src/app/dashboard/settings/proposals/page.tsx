@@ -2,9 +2,11 @@ import { currentRole } from "@/lib/auth/current-role";
 import { listMemberDirectory, type MemberIdentity } from "@/lib/members/directory";
 import { getProposalSettings } from "@/lib/proposals/store";
 import { PROPOSAL_ADMIN_ROLES, standardProposalPricing } from "@/lib/proposals/types";
+import { normalisePackages } from "@/lib/proposals/package-list";
 import { moneyInput } from "@/lib/proposal-editor/form";
 import { firstNameOf } from "@/lib/proposal-editor/labels";
 import { SettingsForm } from "@/components/proposal-editor/SettingsForm";
+import { PackagePricesForm } from "@/components/proposal-editor/PackagePricesForm";
 import { requireProposalsModule } from "../../proposals/gate";
 import "../../proposals/proposals.css";
 
@@ -12,8 +14,9 @@ export const dynamic = "force-dynamic";
 
 /**
  * Proposal settings — who may approve, the default pay link, where acceptance
- * notices go, and the standard prices and "what's included" table a new
- * proposal starts from (`client_proposal_setting`).
+ * notices go, the firm's named packages and their prices (the "Package prices"
+ * card, its own form), and the "what's included" table a new proposal starts
+ * from (`client_proposal_setting`).
  *
  * Gate: the `proposals` module (notFound when off), then owner / admin /
  * senior_admin (0089's insert/update policy). The role refusal is an in-firm
@@ -29,7 +32,7 @@ export default async function ProposalSettingsPage() {
       <div className="lx-label">Settings</div>
       <h1 className="lx-h1">Client proposals</h1>
       <p className="lx-sub">
-        Who approves proposals, and the prices and included items a new proposal starts from. Nothing reaches a client until one of the named approvers has
+        Who approves proposals, the packages and prices a new proposal starts from, and the included items. Nothing reaches a client until one of the named approvers has
         approved it.
       </p>
     </div>
@@ -71,10 +74,10 @@ export default async function ProposalSettingsPage() {
     );
   }
 
-  // The form shows what a NEW proposal would start from: stored values where
+  // The forms show what a NEW proposal would start from: stored values where
   // they are well-formed, the RPB defaults otherwise.
   const standard = standardProposalPricing(settings?.pricing ?? {});
-  const p = standard.pricing;
+  const packages = normalisePackages(settings?.pricing ?? {});
 
   return (
     <>
@@ -84,6 +87,16 @@ export default async function ProposalSettingsPage() {
           Nothing is saved yet. The values below are the defaults a new proposal uses until you save. Name at least one approver, or no one can approve.
         </p>
       )}
+      <PackagePricesForm
+        packages={packages.map((p) => ({
+          package: p.package,
+          base: moneyInput(p.base_cents),
+          includedClasses: String(p.included_classes),
+          perClass: moneyInput(p.per_class_cents),
+          secondMarkPct: String(p.second_mark_discount_pct),
+          govPerClass: moneyInput(p.gov_per_class_cents),
+        }))}
+      />
       <SettingsForm
         members={members.map((m) => ({
           userId: m.userId,
@@ -95,14 +108,6 @@ export default async function ProposalSettingsPage() {
           approverUserIds: settings?.approver_user_ids ?? [],
           defaultPayUrl: settings?.default_pay_url ?? "",
           notifyEmail: settings?.notify_email ?? "",
-          pricing: {
-            package: p.package,
-            base: moneyInput(p.base_cents),
-            includedClasses: String(p.included_classes),
-            perClass: moneyInput(p.per_class_cents),
-            secondMarkPct: String(p.second_mark_discount_pct),
-            govPerClass: moneyInput(p.gov_per_class_cents),
-          },
           officeActionNote: standard.office_action_note,
           includes: standard.includes,
         }}

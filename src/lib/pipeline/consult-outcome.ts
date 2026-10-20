@@ -118,9 +118,9 @@ async function notifyFollowUp(args: {
     }
   }
 
-  // The kind comes from NOTIFICATION_KIND_FOR: `mentioned` today, because a dedicated one
-  // needs a migration in lectual (docs/notifications.md). `preview` carries the
-  // sentence so any renderer can show what happened.
+  // The kind comes from NOTIFICATION_KIND_FOR (the dedicated `consult_outcome`, lectual 0094).
+  // `source` is kept so rows read the same as the older `mentioned` form, and `preview`
+  // carries the sentence so any renderer can show what happened.
   const payload = { lead_name: leadName, preview: `${label}: ${leadName}`, source: "consult_outcome", outcome };
   for (const userId of recipients) {
     try {

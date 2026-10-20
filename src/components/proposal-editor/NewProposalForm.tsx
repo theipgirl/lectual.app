@@ -1,8 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { createProposalAction } from "@/app/dashboard/proposals/actions";
-import type { PackageChoicesRead } from "@/lib/proposals/packages";
-import { formatDollars } from "@/lib/proposal-editor/events";
+import type { PackageOption } from "@/lib/proposals/package-list";
 import { ActionForm, Outcome } from "./ActionForm";
 
 export type NewProposalDefaults = {
@@ -18,11 +18,24 @@ export type NewProposalDefaults = {
   payUrl: string;
 };
 
+/** The five numeric fields a package fills in, as the inputs hold them. */
+export type PackageFields = Pick<PackageOption, "base" | "includedClasses" | "perClass" | "secondMarkPct" | "govPerClass">;
+
+/** The values the five inputs take when `name` is picked; the current ones when it is not on the list. Pure, so it is tested without a DOM. */
+export function fieldsForPackage(options: readonly PackageOption[], name: string, current: PackageFields): PackageFields {
+  const o = options.find((x) => x.name === name);
+  return o ? { base: o.base, includedClasses: o.includedClasses, perClass: o.perClass, secondMarkPct: o.secondMarkPct, govPerClass: o.govPerClass } : current;
+}
+
 /**
- * "New proposal": who it is for, plus a first brand name. Prices, the included
- * items and the office action note come from the firm's settings on the server.
- * A package picked from the service library posts only its id; the server reads
- * the item itself and sets the package name and base price from it.
+ * "New proposal": who it is for, plus a first brand name, and which of the
+ * firm's packages it starts from. Choosing a package fills the five price
+ * fields in the browser; they stay editable for this proposal. The server
+ * re-reads the package by name and keeps only the fields that differ from it
+ * (and says so on the proposal: "Edited from <package>"). `packages` is null
+ * when the firm's settings couldn't be read: no dropdown is offered, and the
+ * server starts from the standard prices. The included items and the office
+ * action note always come from the firm's settings on the server.
  * On success the action redirects to the new draft's editor.
  */
 export function NewProposalForm({
@@ -32,8 +45,18 @@ export function NewProposalForm({
 }: {
   defaults: NewProposalDefaults;
   hasSettings: boolean;
-  packages: PackageChoicesRead;
+  packages: PackageOption[] | null;
 }) {
+  const options = packages ?? [];
+  const first = options[0];
+  const [chosen, setChosen] = useState(first?.name ?? "");
+  const [fields, setFields] = useState<PackageFields>(
+    first
+      ? { base: first.base, includedClasses: first.includedClasses, perClass: first.perClass, secondMarkPct: first.secondMarkPct, govPerClass: first.govPerClass }
+      : { base: "", includedClasses: "", perClass: "", secondMarkPct: "", govPerClass: "" },
+  );
+  const set = (key: keyof PackageFields) => (e: { target: { value: string } }) => setFields((f) => ({ ...f, [key]: e.target.value }));
+
   return (
     <ActionForm action={createProposalAction} className="lx-card pe-card">
       {({ state, pending }) => (
@@ -69,28 +92,57 @@ export function NewProposalForm({
               <span className="lx-label">First brand name (optional)</span>
               <input className="lx-input" name="brandName" maxLength={200} placeholder="e.g. Prosperall" />
             </label>
-            {packages.status === "ok" && packages.choices.length > 0 && (
-              <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
-                <span className="lx-label">Package from your service library</span>
-                <select className="lx-input" name="serviceItemId" defaultValue="">
-                  <option value="">Standard prices (from Settings)</option>
-                  {packages.choices.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.label} · {formatDollars(c.amountCents)}
-                    </option>
-                  ))}
-                </select>
-                <span className="lx-note">Sets the package name and its base price. Every other price stays your standard, and you can change all of it on the next page.</span>
-              </label>
+            {packages !== null && options.length > 0 && (
+              <>
+                <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
+                  <span className="lx-label">Package</span>
+                  <select
+                    className="lx-input"
+                    name="package"
+                    value={chosen}
+                    onChange={(e) => {
+                      setChosen(e.target.value);
+                      setFields((f) => fieldsForPackage(options, e.target.value, f));
+                    }}
+                  >
+                    {options.map((o) => (
+                      <option key={o.name} value={o.name}>
+                        {o.name} — {o.summary}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="lx-note">Fills in the prices below. You can change any of them for this proposal, and it will say it was edited from the package.</span>
+                </label>
+                <label className="lx-field">
+                  <span className="lx-label">Price with the included classes ($)</span>
+                  <input className="lx-input" name="base" inputMode="decimal" required value={fields.base} onChange={set("base")} />
+                </label>
+                <label className="lx-field">
+                  <span className="lx-label">Classes included</span>
+                  <input className="lx-input" name="includedClasses" inputMode="numeric" required value={fields.includedClasses} onChange={set("includedClasses")} />
+                </label>
+                <label className="lx-field">
+                  <span className="lx-label">Per class over / under ($)</span>
+                  <input className="lx-input" name="perClass" inputMode="decimal" required value={fields.perClass} onChange={set("perClass")} />
+                </label>
+                <label className="lx-field">
+                  <span className="lx-label">Second mark discount (%)</span>
+                  <input className="lx-input" name="secondMarkPct" inputMode="decimal" required value={fields.secondMarkPct} onChange={set("secondMarkPct")} />
+                </label>
+                <label className="lx-field">
+                  <span className="lx-label">USPTO fee per class per mark ($)</span>
+                  <input className="lx-input" name="govPerClass" inputMode="decimal" required value={fields.govPerClass} onChange={set("govPerClass")} />
+                </label>
+              </>
             )}
             <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
               <span className="lx-label">Pay link (https)</span>
               <input className="lx-input" name="payUrl" type="url" maxLength={2000} defaultValue={defaults.payUrl} />
             </label>
           </div>
-          {packages.status === "unavailable" && (
+          {packages === null && (
             <p className="lx-note" role="status" style={{ margin: "12px 0 0" }}>
-              The service library couldn&apos;t be loaded, so the standard prices will be used.
+              Your packages couldn&apos;t be loaded just now, so no package is offered and the standard prices will be used. You can change them on the next page.
             </p>
           )}
           {!hasSettings && (

@@ -17,9 +17,21 @@ describe("NOTIFICATION_KIND_FOR (F8)", () => {
     }
   });
 
-  it("writes consult outcomes and approval alerts as mentioned today", () => {
-    expect(NOTIFICATION_KIND_FOR.consult_outcome).toBe("mentioned");
-    expect(NOTIFICATION_KIND_FOR.approval_needed).toBe("mentioned");
+  it("writes consult outcomes and approval alerts under their dedicated kinds (lectual 0094)", () => {
+    expect(NOTIFICATION_KIND_FOR.consult_outcome).toBe("consult_outcome");
+    expect(NOTIFICATION_KIND_FOR.approval_needed).toBe("approval_needed");
+  });
+
+  it("lists exactly six kinds, in both the type union and the Constants array", () => {
+    const types = read("src/lib/db/types.ts");
+    const union = types.match(/crm_notification_kind:\s*((?:\|\s*"[a-z_]+"\s*)+)/);
+    expect(union).not.toBeNull();
+    const unionValues = [...union![1].matchAll(/"([a-z_]+)"/g)].map((m) => m[1]).sort();
+    const arr = types.match(/crm_notification_kind:\s*\[([^\]]*)\]/);
+    const arrayValues = [...arr![1].matchAll(/"([a-z_]+)"/g)].map((m) => m[1]).sort();
+    const six = ["approval_needed", "assigned", "consult_outcome", "lead_replied", "mentioned", "time_running"];
+    expect(unionValues).toEqual(six);
+    expect(arrayValues).toEqual(six);
   });
 
   it("covers the six events", () => {

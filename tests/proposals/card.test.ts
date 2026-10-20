@@ -172,3 +172,25 @@ describe("totality", () => {
     expect(() => renderToStaticMarkup(createElement(ProposalCard, { card }))).not.toThrow();
   });
 });
+
+describe("edited from a package (Sprint 6)", () => {
+  const edited = (basis: unknown) => buildProposalCard(row({ ...sevetri(), package_basis: basis } as unknown as ProposalContent), []);
+
+  it("shows 'Edited from <package>' and the changed fields when content.package_basis names some", () => {
+    const card = edited({ name: "Enhanced", edited: ["price", "classes included"] });
+    expect(card.editedFrom).toEqual({ name: "Enhanced", fields: ["price", "classes included"] });
+    const html = renderToStaticMarkup(createElement(ProposalCard, { card }));
+    expect(html).toContain("Edited from Enhanced");
+    expect(html).toContain("price, classes included");
+    expect(html.toLowerCase()).not.toContain("total");
+  });
+
+  it("is absent when nothing was changed, or when the basis is missing or malformed", () => {
+    expect(buildProposalCard(row(sevetri()), []).editedFrom).toBeNull();
+    expect(edited({ name: "Enhanced", edited: [] }).editedFrom).toBeNull();
+    for (const junk of ["x", 4, null, [], { edited: ["price"] }, { name: "A", edited: "price" }, { name: "A", edited: [1, null, "  "] }]) {
+      expect(edited(junk).editedFrom).toBeNull();
+    }
+    expect(renderToStaticMarkup(createElement(ProposalCard, { card: buildProposalCard(row(sevetri()), []) }))).not.toContain("Edited from");
+  });
+});

@@ -271,10 +271,14 @@ describe("a new proposal", () => {
 });
 
 describe("settings pricing", () => {
-  it("merges over what is stored, so an unknown key survives", () => {
+  // Sprint 6: the six price fields moved to the Package prices card (its own form and
+  // action), so this form keeps the stored prices and replaces only the includes table
+  // and the office-action note. The old assertion that it wrote base_cents from the form
+  // is changed deliberately; tests/proposals/package-list.test.ts covers the new rule.
+  it("merges over what is stored, so an unknown key and the stored prices survive", () => {
     const r = parseSettingsPricing(
-      fd({ package: "Concierge", base: "4950", includedClasses: "3", perClass: "825", secondMarkPct: "20", govPerClass: "350", officeActionNote: "", "inc.0.label": "A", "inc.0.included": "✓" }),
-      { legacy: "keep", office_action_note: "old" },
+      fd({ package: "Concierge", base: "1", officeActionNote: "", "inc.0.label": "A", "inc.0.included": "✓" }),
+      { legacy: "keep", office_action_note: "old", base_cents: 495000 },
     );
     expect(r.ok).toBe(true);
     if (r.ok) {

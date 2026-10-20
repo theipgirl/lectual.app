@@ -29,6 +29,7 @@
  */
 
 import { isMarkKind } from "./types";
+import { validatePackages } from "./package-list";
 
 export type ValidationLevel = "error" | "warning";
 export type ValidationIssue = { path: string; message: string; level: ValidationLevel };
@@ -460,6 +461,16 @@ export function validateSettingInput(input: SettingInput): ValidationIssue[] {
     const pct = p.second_mark_discount_pct;
     if (pct != null && (typeof pct !== "number" || !Number.isFinite(pct) || pct < 0 || pct > 100)) {
       err("pricing.second_mark_discount_pct", "The second-mark discount must be between 0 and 100 percent.");
+    }
+    if (p.packages != null) {
+      for (const issue of validatePackages(p.packages)) {
+        err(issue.index < 0 ? "pricing.packages" : `pricing.packages[${issue.index}]${issue.field ? `.${issue.field}` : ""}`, issue.message);
+      }
+      if (Array.isArray(p.packages)) {
+        p.packages.forEach((pkg, i) => {
+          if (isObj(pkg)) textIssues(`pricing.packages[${i}].package`, str(pkg.package), out);
+        });
+      }
     }
     if (p.includes != null) {
       if (!Array.isArray(p.includes)) err("pricing.includes", "The includes list must be a list.");

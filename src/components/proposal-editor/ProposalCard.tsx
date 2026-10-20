@@ -26,6 +26,11 @@ export function ProposalCard({ card }: { card: Card }) {
         </div>
         <div className="pe-pcard-meta">
           {card.package && <span className="lx-pill lx-pill-mute">{card.package}</span>}
+          {card.editedFrom && (
+            <span className="lx-pill lx-pill-warn" title={`Changed from the package: ${card.editedFrom.fields.join(", ")}`}>
+              Edited from {card.editedFrom.name}
+            </span>
+          )}
           <span className="lx-note">
             {card.expiresOn ? `Open until ${formatShortFirmDate(`${card.expiresOn}T12:00:00Z`, "UTC")}` : "No expiry date set"}
           </span>
@@ -47,6 +52,12 @@ export function ProposalCard({ card }: { card: Card }) {
             </li>
           ))}
         </ul>
+      )}
+
+      {card.editedFrom && (
+        <p className="lx-note" style={{ margin: 0 }}>
+          Started from the {card.editedFrom.name} package, then changed for this proposal: {card.editedFrom.fields.join(", ")}.
+        </p>
       )}
 
       <dl className="pe-pcard-fees">

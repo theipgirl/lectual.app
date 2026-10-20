@@ -42,6 +42,11 @@ export type ProposalCard = {
   client: string;
   company: string | null;
   package: string;
+  /**
+   * When the proposal started from a firm package and a number was then changed for
+   * this proposal ("Edited from Concierge", with the fields). Null when nothing was.
+   */
+  editedFrom: { name: string; fields: string[] } | null;
   brands: ProposalCardBrand[];
   /** The legal fee, due when the client accepts. */
   legalAtSigningCents: number;
@@ -98,6 +103,18 @@ function receiptsFrom(events: readonly ProposalEventRow[] | null): ProposalCardR
   };
 }
 
+/** `content.package_basis`, read defensively; null unless it names a package and at least one changed field. */
+function editedFromBasis(basis: unknown): ProposalCard["editedFrom"] {
+  const b = obj(basis);
+  const name = text(b.name);
+  const fields = arr<unknown>(b.edited)
+    .map(text)
+    .filter((f): f is string => f !== null)
+    .map((f) => clip(f, 60))
+    .slice(0, 8);
+  return name && fields.length > 0 ? { name: clip(name, 120), fields } : null;
+}
+
 /**
  * `events`: the proposal's event rows (any order), `[]` when it has none, or
  * `null` when they could not be read (the card then says so instead of
@@ -135,6 +152,7 @@ export function buildProposalCard(
     client: row.client_name,
     company: text(obj(content.client).company),
     package: packageName,
+    editedFrom: editedFromBasis(content.package_basis),
     brands,
     legalAtSigningCents: quote.legal_total_cents,
     usptoAtFilingCents: quote.gov_total_cents,
