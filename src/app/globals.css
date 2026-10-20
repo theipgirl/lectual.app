@@ -1000,7 +1000,7 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
 }
 
 /* ---- Rail (design/Rail.dc.html) ------------------------------------
-   62px glass column. It opens to 262px while hovered or focused (over the
+   62px glass column. It opens to 262px while hovered or keyboard-focused (over the
    page, the slot stays 94px) and stays open when pinned (the slot widens to
    294px so the page moves over). */
 .lx-rail-slot {
@@ -1030,12 +1030,14 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
   -webkit-backdrop-filter: blur(24px) saturate(1.1);
   backdrop-filter: blur(24px) saturate(1.1);
   box-shadow: 0 30px 70px -34px rgba(0, 0, 0, 0.75);
-  transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  /* The 0.14s delay applies to closing only: the open state below sets it to 0,
+     so brushing past the edge doesn't flicker but opening is immediate. */
+  transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1) 0.14s;
   overflow: hidden;
 }
 .lx-rail:hover,
-.lx-rail:focus-within,
-.lx-rail.is-pinned { width: 262px; }
+.lx-rail:has(:focus-visible),
+.lx-rail.is-pinned { width: 262px; transition-delay: 0s; }
 .lx-rail-headrow { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 1px; flex: 0 0 auto; }
 .lx-rail-kicker {
   flex: 1;
@@ -1169,20 +1171,20 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
 .lx-rail-meact a:hover,
 .lx-rail-meact button:hover { color: var(--cream); text-decoration: underline; }
 
-/* Collapsed: icons only. Open (hover, focus, pinned): labels, counts, children, pin. */
+/* Collapsed: icons only. Open (hover, keyboard focus, pinned): labels, counts, children, pin. */
 .lx-rail-kicker,
 .lx-rail-pin { opacity: 0; pointer-events: none; }
 .lx-rail:hover :is(.lx-rail-label, .lx-rail-count, .lx-rail-kicker),
-.lx-rail:focus-within :is(.lx-rail-label, .lx-rail-count, .lx-rail-kicker),
+.lx-rail:has(:focus-visible) :is(.lx-rail-label, .lx-rail-count, .lx-rail-kicker),
 .lx-rail.is-pinned :is(.lx-rail-label, .lx-rail-count, .lx-rail-kicker) { opacity: 1; }
 .lx-rail:hover .lx-rail-pin,
-.lx-rail:focus-within .lx-rail-pin,
+.lx-rail:has(:focus-visible) .lx-rail-pin,
 .lx-rail.is-pinned .lx-rail-pin { opacity: 1; pointer-events: auto; }
 .lx-rail:hover .lx-rail-kids,
-.lx-rail:focus-within .lx-rail-kids,
+.lx-rail:has(:focus-visible) .lx-rail-kids,
 .lx-rail.is-pinned .lx-rail-kids { display: flex; }
 .lx-rail:hover .lx-rail-dot,
-.lx-rail:focus-within .lx-rail-dot,
+.lx-rail:has(:focus-visible) .lx-rail-dot,
 .lx-rail.is-pinned .lx-rail-dot { display: none; }
 /* Pin tooltip, as in the design: a cream label to the pin's left. */
 .lx-rail-pin::after {
@@ -1210,7 +1212,7 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
   .lx-rail-slot.is-pinned { width: 0; }
   .lx-rail,
   .lx-rail:hover,
-  .lx-rail:focus-within,
+  .lx-rail:has(:focus-visible),
   .lx-rail.is-pinned {
     position: fixed;
     top: auto;
@@ -1256,3 +1258,29 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
 @media (max-width: 720px) {
   .lx-seg { grid-template-columns: 1fr; gap: 2px; }
 }
+
+/* Rendered Markdown (components/markdown): list spacing, table borders, headings. */
+.lx-md { line-height: 1.6; color: var(--body); overflow-wrap: anywhere; }
+.lx-md > * { margin: 0 0 10px; }
+.lx-md > :last-child { margin-bottom: 0; }
+.lx-md :is(h1, h2, h3, h4, h5, h6) { font-family: var(--serif); font-weight: 400; color: var(--ink); line-height: 1.25; margin: 14px 0 6px; }
+.lx-md > :is(h1, h2, h3, h4, h5, h6):first-child { margin-top: 0; }
+.lx-md h1 { font-size: 26px; }
+.lx-md h2 { font-size: 22px; }
+.lx-md :is(h3, h4, h5, h6) { font-size: 18px; }
+.lx-md :is(ul, ol) { margin: 0 0 10px; padding-left: 22px; }
+.lx-md ul { list-style: disc; }
+.lx-md ol { list-style: decimal; }
+.lx-md li + li { margin-top: 3px; }
+.lx-md li > :is(ul, ol) { margin: 3px 0 0; }
+.lx-md blockquote { margin: 0 0 10px; padding-left: 12px; border-left: 2px solid var(--line); color: var(--muted); }
+.lx-md blockquote > * { margin: 0 0 6px; }
+.lx-md hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
+.lx-md code { font-family: var(--mono); font-size: 0.92em; background: var(--well); border-radius: 4px; padding: 1px 4px; }
+.lx-md pre { background: var(--well); border: 1px solid var(--line-2); border-radius: 8px; padding: 10px 12px; overflow-x: auto; }
+.lx-md pre code { background: none; padding: 0; }
+.lx-md-scroll { overflow-x: auto; }
+.lx-md table { border-collapse: collapse; font-size: 14px; }
+.lx-md th,
+.lx-md td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; }
+.lx-md th { background: var(--well); color: var(--ink); font-weight: 600; }
