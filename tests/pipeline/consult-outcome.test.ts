@@ -112,12 +112,12 @@ describe("logConsultOutcome", () => {
     expect(payloads[1]).toEqual({ summary: "Rebooked after no-show", notes: "Thursday 3pm", consult_outcome: "rebooked_after_no_show" });
   });
 
-  it("notifies the owner and each intake member except the actor, once each, as `mentioned`", async () => {
+  it("notifies the owner and each intake member except the actor, once each, under the dedicated consult_outcome kind", async () => {
     await logConsultOutcome("lead-1", { outcome: "no_show" });
     expect(recipients()).toEqual([AMOR, DAWN, OWNER].sort());
     for (const [call] of notify.mock.calls) {
       expect(call).toMatchObject({
-        kind: "mentioned",
+        kind: "consult_outcome",
         leadId: "lead-1",
         activityId: "act-1",
         actorId: ACTOR,

@@ -3988,6 +3988,8 @@ export type Database = {
         | "assigned"
         | "lead_replied"
         | "time_running"
+        | "consult_outcome"
+        | "approval_needed"
       crm_role:
         | "owner"
         | "admin"
@@ -4248,6 +4250,8 @@ export const Constants = {
         "assigned",
         "lead_replied",
         "time_running",
+        "consult_outcome",
+        "approval_needed",
       ],
       crm_role: [
         "owner",
