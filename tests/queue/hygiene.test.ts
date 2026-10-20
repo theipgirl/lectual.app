@@ -428,6 +428,12 @@ describe("auditDraft (H9)", () => {
     expect(codes("Hi\n\nThanks,\nDawn")).toContain("other-signer:error");
   });
 
+  it("a colleague who shares the sign-off's surname is still an error, not just a warning", () => {
+    const c = { ...ctx, memberNames: ["Rebecca Beliard", "Dawn Beliard"] };
+    expect(codes("Hi\n\nBest,\nDawn Beliard", c)).toContain("other-signer:error");
+    expect(codes(`Hi${SIGNED}`, c)).toEqual([]);
+  });
+
   it("a block that is neither sign-off but names no member is a warning", () => {
     expect(codes("Hi\n\nBest,\nSomeone From Accounts")).toEqual(["unverified-signer:warning"]);
   });

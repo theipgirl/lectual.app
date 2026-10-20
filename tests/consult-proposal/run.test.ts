@@ -310,6 +310,30 @@ describe("runConsultProposal", () => {
     assertOrgFenced(t.db.log);
   });
 
+  it("asks the queue not to dedupe, so the marker can only ever name this proposal's own email", async () => {
+    const t = setup();
+    expect((await runConsultProposal(t.input)).ok).toBe(true);
+    const queued = (t.createDraft.mock.calls[0] as unknown as [Record<string, unknown>])[0];
+    expect(queued.dedupe).toBe(false);
+  });
+
+  it("if the queue hands back another proposal's item (deduped), no marker links to it and the new proposal is withdrawn", async () => {
+    const t = setup();
+    (t.input.createDraft as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ id: "existing", deduped: true });
+    const r = await runConsultProposal(t.input);
+    expect(r).toMatchObject({ ok: false, reason: "already_drafted" });
+    if (!r.ok) expect(r.message).toMatch(/already waiting in the approval queue/i);
+    const markers = writes(t.db.log, "crm_activity", "insert").filter(
+      (w) => (w.values as { payload?: { queue_id?: string } }).payload?.queue_id === "existing",
+    );
+    expect(markers).toHaveLength(0);
+    expect(writes(t.db.log, "crm_activity", "insert")).toHaveLength(0);
+    const [w] = writes(t.db.log, "client_proposal", "update");
+    expect(w.values).toEqual({ status: "withdrawn" });
+    expect(filterValue(w, "org_id")).toBe(ORG);
+    assertOrgFenced(t.db.log);
+  });
+
   it("if the marker can't be written (twice), the proposal is withdrawn so its link is dead, and the user is told to reject the email", async () => {
     const t = setup({ markerFails: 2 });
     const r = await runConsultProposal(t.input);

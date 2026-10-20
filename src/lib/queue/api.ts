@@ -116,6 +116,13 @@ export type NewQueueDraft = {
   signOff?: string | null;
   /** The firm team sign-off ("The <Firm> Team"), which the proposal email signs on purpose. Always accepted as written. */
   teamSignOff?: string | null;
+  /**
+   * `false` skips the near-duplicate check, so the caller always gets its OWN
+   * queue item back. For a caller that links something to the returned id (the
+   * consult proposal marks which proposal an email carries) and so must never be
+   * handed another draft's id. Everyone else leaves it unset.
+   */
+  dedupe?: false;
 };
 
 /** What createDraft returns. `deduped` means an equivalent draft was already waiting, so nothing was queued. */
@@ -150,7 +157,7 @@ export async function createDraft(input: NewQueueDraft): Promise<CreatedDraft> {
   }
   const summary = notes.filter(Boolean).join("\n\n");
 
-  const existing = await findNearDuplicate(input, draftBody);
+  const existing = input.dedupe === false ? null : await findNearDuplicate(input, draftBody);
   if (existing) return { id: existing, deduped: true };
 
   return call(`/api/queue`, {

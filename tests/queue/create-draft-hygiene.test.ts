@@ -100,6 +100,17 @@ describe("createDraft hygiene (H5)", () => {
     expect(posts(fetchMock)).toHaveLength(0);
   });
 
+  it("with dedupe: false it never reads the pending list and always posts its own item", async () => {
+    const earlier = new Date(NOW.getTime() - 3 * 60_000).toISOString();
+    const fetchMock = router(listOf([{ id: "q-existing", type: "CLIENT_EMAIL", recipient: "ana@example.com", client_name: "Ana Ruiz", created_at: earlier, draft_body: EMAIL_BODY, final_body: null }]));
+    vi.stubGlobal("fetch", fetchMock);
+    const { createDraft } = await import("../../src/lib/queue/api");
+    expect(await createDraft(email({ dedupe: false }))).toEqual({ id: "q-new" });
+    expect(posts(fetchMock)).toHaveLength(1);
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method !== "POST")).toHaveLength(0);
+    expect(posted(fetchMock)).not.toHaveProperty("dedupe");
+  });
+
   it("compares the cleaned body, so a banner doesn't hide a duplicate", async () => {
     const earlier = new Date(NOW.getTime() - 3 * 60_000).toISOString();
     const fetchMock = router(listOf([{ id: "q-existing", type: "CLIENT_EMAIL", recipient: "ana@example.com", client_name: "Ana Ruiz", created_at: earlier, draft_body: EMAIL_BODY, final_body: null }]));

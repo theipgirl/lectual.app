@@ -417,7 +417,8 @@ function membersNamedIn(block: string, memberNames: readonly string[], signOff: 
   const hits: string[] = [];
   for (const name of memberNames) {
     const words = wordsOf(name);
-    if (words.length === 0 || words.some((w) => signOffWords.has(w))) continue;
+    // Exempt only the member the sign-off IS (every word of their name is in it); a colleague who merely shares a surname is still flagged.
+    if (words.length === 0 || words.every((w) => signOffWords.has(w))) continue;
     // The full name, or the first name alone ("Best,\nDawn").
     if (words.every((w) => blockWords.has(w)) || (words[0].length >= 2 && blockWords.has(words[0]))) hits.push(name.trim());
   }

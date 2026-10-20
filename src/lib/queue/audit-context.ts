@@ -21,19 +21,20 @@ export type QueueAuditContext = {
 };
 
 export async function loadAuditContext(): Promise<QueueAuditContext> {
-  const supabase = await getScopedClient();
   const [profile, members, org] = await Promise.allSettled([
     getOrgProfile(),
     listMemberDirectory(),
-    supabase.from("crm_org").select("name, slug").maybeSingle(),
+    getScopedClient().then((supabase) => supabase.from("crm_org").select("name, slug").maybeSingle()),
   ]);
 
   const signOff = profile.status === "fulfilled" ? (profile.value?.email_signature?.trim() || null) : null;
   const orgRow = org.status === "fulfilled" && !org.value.error ? org.value.data : null;
-  const memberNames =
-    profile.status === "fulfilled" && members.status === "fulfilled"
+  // No identified member (the directory fell back to unidentified rows) means we couldn't check, not "nobody else".
+  const identified =
+    members.status === "fulfilled"
       ? members.value.flatMap((m) => (m.identified && m.displayName?.trim() ? [m.displayName.trim()] : []))
-      : null;
+      : [];
+  const memberNames = profile.status === "fulfilled" && identified.length > 0 ? identified : null;
 
   return {
     signOff,
