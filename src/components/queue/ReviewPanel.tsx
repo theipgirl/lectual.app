@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { reviewQueueAction, type ReviewState } from "@/app/dashboard/queue/actions";
+import { Markdown } from "@/components/markdown/Markdown";
 
 /**
  * Edit / approve / reject for one pending item. `canApprove` / `canEdit` only
@@ -27,6 +28,15 @@ export function ReviewPanel(props: {
   return (
     <form action={action} className="lx-review">
       <input type="hidden" name="id" value={id} />
+      <section aria-labelledby="draft-preview-label" className="lx-voice" style={{ display: "grid", gap: 8 }}>
+        <div id="draft-preview-label" className="lx-label">
+          Preview
+        </div>
+        {body.trim() ? <Markdown text={body} /> : <p className="lx-note" style={{ margin: 0 }}>Nothing to preview yet.</p>}
+        <p className="lx-note" style={{ margin: 0 }}>
+          Preview of how this text reads. An email may show formatting marks as plain characters.
+        </p>
+      </section>
       <label htmlFor="body" className="lx-label">
         Draft {dirty && <span style={{ color: "var(--warn)" }}>· edited</span>}
       </label>

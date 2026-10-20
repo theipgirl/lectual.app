@@ -10,6 +10,7 @@ import { getFirmTimeZone } from "@/lib/org/profile";
 import { STATUS_PILL, agentLabel, fmtWhen, isUnconfiguredError, outcomeText, typeLabel } from "@/components/queue/format";
 import { checkDraftStaleness, type StaleCheck } from "@/lib/queue/stale";
 import { staleWarning } from "@/components/queue/stale-warning";
+import { Markdown } from "@/components/markdown/Markdown";
 import { LinkedProposalPanel } from "@/components/queue/LinkedProposalPanel";
 import { loadLinkedPanel } from "@/lib/consult-proposal/link";
 
@@ -122,7 +123,7 @@ export default async function QueueItemPage({
                 <div className="lx-label" style={{ marginBottom: 8 }}>
                   {item.final_body && item.final_body !== item.draft_body ? "Final, as approved" : "Draft"}
                 </div>
-                <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.6, color: "var(--body)" }}>{item.final_body ?? item.draft_body}</div>
+                <Markdown text={item.final_body ?? item.draft_body} />
               </>
             ) : (
               <ReviewPanel

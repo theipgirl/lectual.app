@@ -2,10 +2,13 @@
 
 import { useActionState } from "react";
 import type { BrainEntry } from "@/lib/brain";
+import { markdownToPlainText } from "@/lib/markdown";
+import { Markdown } from "@/components/markdown/Markdown";
 import { updateBrainEntryAction, deleteBrainEntryAction, type ActionState } from "../actions";
 
+/** One plain-text line: the entry's Markdown marks are taken out so it reads as a sentence. */
 function preview(body: string, max = 160): string {
-  const trimmed = body.trim();
+  const trimmed = markdownToPlainText(body).replace(/\s+/g, " ").trim();
   if (trimmed.length <= max) return trimmed;
   return `${trimmed.slice(0, max).trimEnd()}…`;
 }
@@ -46,6 +49,13 @@ export default function EntryRow({ entry, canManage }: { entry: BrainEntry; canM
       </div>
 
       {entry.body && <p className="lx-brain-body">{preview(entry.body)}</p>}
+
+      {entry.body && (
+        <details className="lx-brain-full">
+          <summary>Read full entry</summary>
+          <Markdown text={entry.body} />
+        </details>
+      )}
 
       {canManage && (
         <details className="lx-brain-edit">

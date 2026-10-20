@@ -119,6 +119,41 @@ describe("BrainPage", () => {
     expect(html).toContain("Mark forbidden");
   });
 
+  it("renders entry Markdown as formatted content, with a plain-text preview and no literal marks", async () => {
+    mockSessionWithRole("paralegal");
+    mockBrainLib([entry({ body: "**bold**\n\n| A | B |\n|---|---|\n| 1 | 2 |" })], []);
+
+    const { default: BrainPage } = await import("../../src/app/dashboard/brain/page");
+    const html = renderToStaticMarkup(await BrainPage());
+
+    expect(html).toContain("<strong>bold</strong>");
+    expect(html).toContain("<table>");
+    expect(html).toContain("<th>A</th>");
+    expect(html).not.toContain("**");
+    expect(html).not.toContain("|---|");
+    // The collapsed line is plain text; the formatted entry sits inside the entry's <details>.
+    const preview = html.match(/<p class="lx-brain-body">([^<]*)<\/p>/);
+    expect(preview?.[1]).toContain("bold");
+    const details = html.slice(html.indexOf('<details class="lx-brain-full">'));
+    expect(details).toContain("Read full entry");
+    expect(details.indexOf("<table>")).toBeGreaterThan(0);
+  });
+
+  it("keeps the raw Markdown in the edit textarea for an admin", async () => {
+    mockSessionWithRole("owner");
+    mockBrainLib([entry({ body: "**bold**\n\n| A | B |\n|---|---|\n| 1 | 2 |" })], []);
+
+    const { default: BrainPage } = await import("../../src/app/dashboard/brain/page");
+    const html = renderToStaticMarkup(await BrainPage());
+
+    expect(html).toContain("<strong>bold</strong>");
+    expect(html).toMatch(/<textarea name="body"[^>]*>\*\*bold\*\*/);
+    // No literal ** anywhere outside a textarea.
+    const outside = html.replace(/<textarea[\s\S]*?<\/textarea>/g, "");
+    expect(outside).not.toContain("**");
+    expect(outside).not.toContain("|---|");
+  });
+
   it("shows an honest error card, not an empty list, when the read fails", async () => {
     mockSessionWithRole("owner");
     vi.doMock("@/lib/brain", () => ({
