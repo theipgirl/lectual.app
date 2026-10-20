@@ -28,7 +28,7 @@ import { buildRunDigest, type DigestRun } from "@/lib/agents/digest";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { leadDisplayName } from "@/lib/matters/client-name";
 import { civilDate } from "@/lib/matters/calendar-rows";
-import { deadlineKindLabel } from "@/lib/matters/deadline-rules";
+import { deadlineKindLabel, deadlineNeedsReview } from "@/lib/matters/deadline-rules";
 import { AutopilotControl } from "@/components/agents/AutopilotControl";
 import { RunDigestList } from "@/components/agents/RunDigestList";
 
@@ -137,7 +137,7 @@ export default async function TodayPage() {
     userId: session.user.id,
     now,
     deadlines:
-      deadlines?.map((d) => ({
+      deadlines?.filter((d) => !deadlineNeedsReview(d, civilDate(now))).map((d) => ({
         id: d.id,
         matterId: d.matter_id,
         name: d.title ?? deadlineKindLabel(d.kind),

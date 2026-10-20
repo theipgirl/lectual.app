@@ -1,4 +1,4 @@
-import { deadlineKindLabel } from "./deadline-rules";
+import { deadlineKindLabel, deadlineNeedsReview } from "./deadline-rules";
 import type { UpcomingDeadline } from "./deadlines";
 import type { Task } from "./tasks";
 
@@ -57,6 +57,11 @@ export type CalendarRow = {
  * rather than dropped — hiding a blown date would be the worst possible
  * kindness (see listUpcomingDeadlines). Tasks with no due_at are excluded
  * (they don't belong on a calendar).
+ *
+ * The one deadline kind left out is an old phantom: an unconfirmed manual date
+ * more than 180 days past due (deadlineNeedsReview). It is listed separately
+ * as "Needs review" rather than counted as overdue. Calculated and
+ * office-notice dates are never left out.
  */
 export function buildCalendarRows(
   deadlines: UpcomingDeadline[],
@@ -66,15 +71,17 @@ export function buildCalendarRows(
   const todayCivil = civilDate(now);
 
   const rows: CalendarRow[] = [
-    ...deadlines.map((d): CalendarRow => ({
-      key: `d-${d.id}`,
-      href: `/dashboard/matters/${d.matter_id}`,
-      name: d.title ?? deadlineKindLabel(d.kind),
-      detail: [d.matter_number, d.matter_title].filter(Boolean).join(" · ") || "Docket",
-      dueDate: d.due_date,
-      overdueDays: Math.max(0, civilDaysBetween(d.due_date, todayCivil)),
-      source: "deadline",
-    })),
+    ...deadlines
+      .filter((d) => !deadlineNeedsReview(d, todayCivil))
+      .map((d): CalendarRow => ({
+        key: `d-${d.id}`,
+        href: `/dashboard/matters/${d.matter_id}`,
+        name: d.title ?? deadlineKindLabel(d.kind),
+        detail: [d.matter_number, d.matter_title].filter(Boolean).join(" · ") || "Docket",
+        dueDate: d.due_date,
+        overdueDays: Math.max(0, civilDaysBetween(d.due_date, todayCivil)),
+        source: "deadline",
+      })),
     ...tasks
       .filter((t): t is Task & { due_at: string } => Boolean(t.due_at))
       .map((t): CalendarRow => {

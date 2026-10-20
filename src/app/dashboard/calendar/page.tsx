@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { listTasks, listUpcomingDeadlines } from "@/lib/matters";
-import { buildCalendarRows, civilDate, groupCalendarRows, type CalendarRow } from "@/lib/matters/calendar-rows";
+import { buildCalendarRows, civilDate, civilDaysBetween, groupCalendarRows, type CalendarRow } from "@/lib/matters/calendar-rows";
+import { NEEDS_REVIEW_PAST_DUE_DAYS, deadlineKindLabel, splitNeedsReview } from "@/lib/matters/deadline-rules";
+import type { UpcomingDeadline } from "@/lib/matters/deadlines";
 import { formatCivilDate } from "@/lib/matters/ip-fields";
 import { getOrgProfile } from "@/lib/org/profile";
 import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
@@ -143,9 +145,59 @@ function WeekView({ days }: { days: GridDay[] }) {
   );
 }
 
-function AgendaView({ rows, now, unconfirmed }: { rows: CalendarRow[]; now: Date; unconfirmed: Set<string> }) {
+/**
+ * Old unconfirmed manual dates, kept out of Overdue and every count. Nothing
+ * here edits or closes a date: confirming, closing and correcting stay on the
+ * matter, where the attorney-only actions are.
+ */
+function NeedsReviewBand({ deadlines, now }: { deadlines: UpcomingDeadline[]; now: Date }) {
+  const today = civilDate(now);
+  return (
+    <section className="lx-card lx-band" aria-labelledby="cal-needs-review">
+      <header className="lx-band-head">
+        <h2 id="cal-needs-review" className="lx-h2">
+          Needs review
+        </h2>
+        <span className="lx-note">{deadlines.length}</span>
+      </header>
+      <ul className="lx-list" style={{ padding: "0 18px 8px" }}>
+        {deadlines.map((d) => {
+          const days = civilDaysBetween(d.due_date, today);
+          return (
+            <li key={d.id} className="lx-task">
+              <span style={{ minWidth: 0 }}>
+                <Link href={`/dashboard/matters/${d.matter_id}`} className="lx-rowlink">
+                  {d.title ?? deadlineKindLabel(d.kind)}
+                </Link>
+                <span className="lx-note" style={{ display: "block" }}>
+                  {`${[d.matter_number, d.matter_title].filter(Boolean).join(" · ") || "Docket"} · due ${formatCivilDate(d.due_date)}`}
+                </span>
+                <span className="lx-note" style={{ display: "block" }}>
+                  {`Entered by hand, never confirmed, and more than ${NEEDS_REVIEW_PAST_DUE_DAYS} days past due. Confirm, close or correct it on the matter.`}
+                </span>
+              </span>
+              <span className="lx-pill lx-pill-mute">{`${days} days past due`}</span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+function AgendaView({
+  rows,
+  needsReview,
+  now,
+  unconfirmed,
+}: {
+  rows: CalendarRow[];
+  needsReview: UpcomingDeadline[];
+  now: Date;
+  unconfirmed: Set<string>;
+}) {
   const groups = groupCalendarRows(rows, now);
-  if (groups.length === 0) {
+  if (groups.length === 0 && needsReview.length === 0) {
     return (
       <div className="lx-card lx-empty-card">
         <h2 className="lx-h2" style={{ fontSize: 25 }}>Nothing on the docket or task list</h2>
@@ -187,6 +239,7 @@ function AgendaView({ rows, now, unconfirmed }: { rows: CalendarRow[]; now: Date
           </ul>
         </section>
       ))}
+      {needsReview.length > 0 && <NeedsReviewBand deadlines={needsReview} now={now} />}
     </>
   );
 }
@@ -225,6 +278,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const partialNote = failed.length ? `Couldn't load ${failed.join(" or ")}, so this calendar is incomplete. Try again shortly.` : null;
 
   const rows = buildCalendarRows(deadlines ?? [], tasks ?? [], now);
+  const { needsReview } = splitNeedsReview(deadlines ?? [], now);
   const unconfirmed = new Set((deadlines ?? []).filter((d) => !d.attorney_confirmed).map((d) => `d-${d.id}`));
   const items = [...rows.map((r) => rowToItem(r, unconfirmed)), ...(events ?? []).map((e) => eventToItem(e, timeZone))];
 
@@ -272,7 +326,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
 
       {view === "month" && <MonthView weeks={monthGrid(anchor, today, items)} />}
       {view === "week" && <WeekView days={weekGrid(anchor, today, items)} />}
-      {view === "agenda" && (deadlines !== null || tasks !== null) && <AgendaView rows={rows} now={now} unconfirmed={unconfirmed} />}
+      {view === "agenda" && (deadlines !== null || tasks !== null) && <AgendaView rows={rows} needsReview={needsReview} now={now} unconfirmed={unconfirmed} />}
 
       {view !== "agenda" && (
         <p className="lx-note" style={{ margin: 0 }}>
