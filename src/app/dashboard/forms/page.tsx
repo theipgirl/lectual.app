@@ -1,18 +1,23 @@
 import { notFound } from "next/navigation";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { hasRole } from "@/lib/auth/roles";
-import { canEditIntakeForm, loadIntakePackages, loadOrCreateIntakeForm } from "@/lib/intake-forms/store";
+import { canEditIntakeForm, listOrCreateIntakeForms, loadIntakeForm, loadIntakePackages } from "@/lib/intake-forms/store";
 import { intakePackages } from "@/lib/intake-forms/packages";
-import { parseRange } from "@/lib/intake-forms/performance";
+import { formatDuration, parseRange, statsByForm } from "@/lib/intake-forms/performance";
+import { loadSubmissionStatRows } from "@/lib/intake-forms/load-performance";
 import { intakeOrigin } from "@/lib/intake-forms/origin";
+import { intakePublicUrl } from "@/lib/intake-forms/links";
 import { IntakeFormsWorkspace } from "./_components/IntakeFormsWorkspace";
+import { IntakeList } from "./_components/IntakeList";
 import { IntakePerformance } from "./_components/IntakePerformance";
 import "./forms.css";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Intake → Forms: the firm's public intake — its setup (what it asks, how it
+ * Intake → Forms: the firm's public intakes (one per event, campaign or page
+ * since 0093). Without `?form=` it lists them with their links, QR codes and
+ * numbers; with `?form=<id>` it opens one intake's setup (what it asks, how it
  * looks, where it lives) and how it performs (design/Intake_Forms.dc.html).
  *
  * ── NO MODULE GATE, ON PURPOSE ──────────────────────────────────────────────
@@ -25,7 +30,7 @@ export const dynamic = "force-dynamic";
  * Everyone in the firm can see the setup and the Performance tab. Only
  * owner/admin/senior_admin can change the setup (read-only for the rest; the
  * save action re-checks). Anyone but a viewer can move an intake's status.
- * The first admin visit creates the draft row.
+ * The first admin visit creates the firm's first draft.
  *
  * ── THREE STATES ────────────────────────────────────────────────────────────
  * 0079 is applied on lectual-dev; an environment without it renders
@@ -35,7 +40,7 @@ export const dynamic = "force-dynamic";
 export default async function IntakeFormsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; range?: string; intake?: string }>;
+  searchParams: Promise<{ form?: string; tab?: string; range?: string; intake?: string }>;
 }) {
   const sp = await searchParams;
   const session = await resolveFirmSession({ signInNext: "/dashboard/forms/" });
@@ -45,37 +50,48 @@ export default async function IntakeFormsPage({
   const range = parseRange(sp.range);
   const canEdit = canEditIntakeForm(session.role);
 
-  const [load, pkgs, origin] = await Promise.all([loadOrCreateIntakeForm(session.org.name), loadIntakePackages(), intakeOrigin()]);
-
-  if (load.status !== "ok" || !load.form) {
-    return (
-      <>
-        <div className="lx-page-head">
-          <div style={{ flex: 1, minWidth: 240 }}>
-            <div className="lx-label">Intake</div>
-            <h1 className="lx-h1">Intake forms</h1>
-            <p className="lx-sub">Your public intake, how it looks, and where it lives.</p>
-          </div>
-        </div>
-        <div className="lx-card lx-empty-card">
-          <h2 className="lx-h2" style={{ fontSize: 25 }}>
-            {load.status === "unconfigured"
-              ? "Intake forms aren't set up in this environment"
-              : load.status === "unavailable"
-                ? "Your intake couldn't be loaded"
-                : "Your firm hasn't set up its intake yet"}
-          </h2>
-          <p className="lx-note" style={{ margin: 0 }}>
-            {load.status === "unconfigured"
-              ? "The intake tables (lectual migration 0079) are not in this database. Nothing is broken; it needs the migration."
-              : load.status === "unavailable"
-                ? "This is a problem reaching the database, not a missing intake. Nothing was changed. Try again shortly."
-                : "An owner, admin or senior admin sets it up here."}
-          </p>
-        </div>
-      </>
-    );
+  if (!sp.form) {
+    const [list, statRows, origin] = await Promise.all([
+      listOrCreateIntakeForms(session.org.name),
+      loadSubmissionStatRows(null, 30),
+      intakeOrigin(),
+    ]);
+    if (list.status === "ok" && list.value.length > 0) {
+      const byForm = statRows.status === "ok" ? statsByForm(statRows.value.rows) : null;
+      return (
+        <IntakeList
+          canEdit={canEdit}
+          statsFailed={statRows.status !== "ok"}
+          items={list.value.map((f) => {
+            const st = byForm?.get(f.id);
+            return {
+              id: f.id,
+              name: f.name,
+              slug: f.slug,
+              url: intakePublicUrl(origin, f.slug),
+              sourceTag: f.sourceTag,
+              status: f.status,
+              stats: byForm
+                ? {
+                    captured: st?.captured ?? 0,
+                    completed: st?.completed ?? 0,
+                    unfinished: st?.unfinished ?? 0,
+                    median: formatDuration(st?.medianMs ?? null),
+                    rate: st?.completionRate ?? "—",
+                  }
+                : null,
+            };
+          })}
+        />
+      );
+    }
+    return <IntakeEmpty status={list.status === "ok" ? "none" : list.status} />;
   }
+
+  const [load, pkgs, origin] = await Promise.all([loadIntakeForm(sp.form), loadIntakePackages(), intakeOrigin()]);
+  if (load.status === "ok" && !load.form) notFound();
+
+  if (load.status !== "ok" || !load.form) return <IntakeEmpty status={load.status === "ok" ? "none" : load.status} />;
 
   const form = load.form;
   const packages =
@@ -101,5 +117,36 @@ export default async function IntakeFormsPage({
         ) : null
       }
     />
+  );
+}
+
+/** No intakes to show: not set up here, unreachable, or none yet (and the caller can't create). */
+function IntakeEmpty({ status }: { status: "none" | "unconfigured" | "unavailable" }) {
+  return (
+      <>
+        <div className="lx-page-head">
+          <div style={{ flex: 1, minWidth: 240 }}>
+            <div className="lx-label">Intake</div>
+            <h1 className="lx-h1">Intake forms</h1>
+            <p className="lx-sub">Your public intake, how it looks, and where it lives.</p>
+          </div>
+        </div>
+        <div className="lx-card lx-empty-card">
+          <h2 className="lx-h2" style={{ fontSize: 25 }}>
+            {status === "unconfigured"
+              ? "Intake forms aren't set up in this environment"
+              : status === "unavailable"
+                ? "Your intake couldn't be loaded"
+                : "Your firm hasn't set up its intake yet"}
+          </h2>
+          <p className="lx-note" style={{ margin: 0 }}>
+            {status === "unconfigured"
+              ? "The intake tables (lectual migration 0079) are not in this database. Nothing is broken; it needs the migration."
+              : status === "unavailable"
+                ? "This is a problem reaching the database, not a missing intake. Nothing was changed. Try again shortly."
+                : "An owner, admin or senior admin sets it up here."}
+          </p>
+        </div>
+      </>
   );
 }
