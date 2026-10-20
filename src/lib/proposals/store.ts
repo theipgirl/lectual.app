@@ -132,10 +132,12 @@ const LIST_COLUMNS = [
   "family_id",
   "version",
   "client_name",
+  "client_email",
   "title",
   "status",
   "content",
   "expires_on",
+  "pay_url",
   "source",
   "lead_id",
   "matter_id",
@@ -348,6 +350,12 @@ export type ProposalListItem = {
   legal_total_cents: number;
   /** USPTO fees, due at filing. */
   gov_total_cents: number;
+  /**
+   * The first rule break that would refuse approval, for a draft or approved
+   * row; null when there is none (and for every other status). The list shows
+   * "Blocked" from it.
+   */
+  blocking_issue: string | null;
 };
 
 export type ProposalListOptions = {
@@ -373,7 +381,9 @@ export async function listProposals(options: ProposalListOptions = {}): Promise<
   if (error) throw friendlyProposalError(error, "load the proposals");
 
   const rows = (Array.isArray(data) ? data : []) as Array<
-    Omit<ProposalListItem, "legal_total_cents" | "gov_total_cents"> & {
+    Omit<ProposalListItem, "legal_total_cents" | "gov_total_cents" | "blocking_issue"> & {
+      client_email: string | null;
+      pay_url: string | null;
       content: ProposalContent;
       accepted_snapshot: AcceptedSnapshot | null;
     }
@@ -386,12 +396,19 @@ export async function listProposals(options: ProposalListOptions = {}): Promise<
     kept = rows.filter((r) => newest.get(r.family_id) === r.version);
   }
 
-  return kept.map(({ content, accepted_snapshot, ...rest }) => {
+  return kept.map(({ content, accepted_snapshot, client_email, pay_url, ...rest }) => {
     const accepted = accepted_snapshot?.quote;
     const totals = accepted
       ? { legal_total_cents: accepted.legal_total_cents, gov_total_cents: accepted.gov_total_cents }
       : offerTotals(content);
-    return { ...rest, ...totals };
+    // Only a row that can still be approved can be blocked from approval.
+    const blocking_issue =
+      rest.status === "draft" || rest.status === "approved"
+        ? (validateContent(content, { forApproval: true, title: rest.title, expires_on: rest.expires_on, pay_url, client_email }).find(
+            (i) => i.level === "error",
+          )?.message ?? null)
+        : null;
+    return { ...rest, ...totals, blocking_issue };
   });
 }
 

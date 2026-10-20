@@ -117,3 +117,25 @@ describe("unbuilt sections are hidden (built: false)", () => {
     for (const slug of UNBUILT) expect(navItemBySlug(slug)).toBeDefined();
   });
 });
+
+describe("one proposals surface (Sprint 3)", () => {
+  const rail = (modules: string[]) =>
+    railGroups(visibleNav(modules, "owner"), "/dashboard/")
+      .flat()
+      .flatMap((e) => [e.key, ...e.kids.map((k) => k.key)]);
+
+  it("hides the quotes entry whenever proposals is visible", () => {
+    const modules = ["mailbox", "agents", "proposals", "document-center", "agent-toolkit", "litigation"];
+    expect(visibleNav(modules, "owner").map((n) => n.slug)).not.toContain("quotes");
+    const keys = rail(modules);
+    expect(keys).not.toContain("quotes");
+    expect(keys).toContain("proposals");
+  });
+
+  it("keeps quotes for a firm without the proposals module, and proposals out of its rail", () => {
+    const keys = rail(["mailbox", "agents"]);
+    expect(keys).toContain("quotes");
+    expect(keys).not.toContain("proposals");
+    expect(visibleNav([], "owner").map((n) => n.slug)).toContain("quotes");
+  });
+});

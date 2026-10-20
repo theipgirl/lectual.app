@@ -1,11 +1,25 @@
 import Link from "next/link";
 import { currentRole } from "@/lib/auth/current-role";
+import { getFirmTimeZone } from "@/lib/org/profile";
+import { firmCivilDate } from "@/lib/quotes/firm-time";
 import { formatCents } from "@/lib/quotes/money";
 import { formatShortFirmDate } from "@/lib/quotes/labels";
 import { relativeTime } from "@/lib/relative-time";
+import { CAN_WRITE_LEAD } from "@/lib/pipeline/leads";
 import { listProposals, type ProposalListItem } from "@/lib/proposals/store";
-import { PROPOSAL_ADMIN_ROLES, PROPOSAL_STATUSES, PROPOSAL_STAFF_WRITE_ROLES, isProposalStatus } from "@/lib/proposals/types";
-import { statusLabel, statusTone } from "@/lib/proposal-editor/labels";
+import { PROPOSAL_ADMIN_ROLES, PROPOSAL_STAFF_WRITE_ROLES } from "@/lib/proposals/types";
+import {
+  PROPOSAL_DISPLAY_KEYS,
+  PROPOSAL_DISPLAY_LABEL,
+  parseDisplayFilter,
+  proposalDisplayStatus,
+  proposalDisplayTone,
+} from "@/lib/proposals/display-status";
+import { loadLeadOptions } from "@/lib/proposals/lead-options";
+import { loadDraftBlock } from "@/lib/consult-proposal/draft-gate";
+import { DRAFT_BLOCK_NOTE } from "@/lib/consult-proposal/draft-availability";
+import { MAX_PASTED_TRANSCRIPT_CHARS } from "@/lib/consult-proposal/types";
+import { TranscriptDraft } from "@/components/proposal-editor/TranscriptDraft";
 import { requireProposalsModule } from "./gate";
 import "./proposals.css";
 
@@ -16,6 +30,12 @@ export const dynamic = "force-dynamic";
  * three-state read: rows, empty, or "couldn't load". An unreachable database
  * never renders as "No proposals yet".
  *
+ * The statuses are the ones the firm uses (Draft / Sent / Accepted / Expired /
+ * Blocked, Closed under All), derived by `proposalDisplayStatus` from the stored
+ * status, the expiry date and the rule breaks that would block approval. Chip
+ * counts come from the unfiltered set. `?status=` takes the display keys; an
+ * older stored value (approved, withdrawn, superseded) is mapped onto them.
+ *
  * Gate: the `proposals` module (notFound when off, so one firm cannot learn
  * what another has). Reading is for the whole firm (0089's select policy is
  * org members); starting a proposal is for the staff roles, and the action
@@ -24,21 +44,26 @@ export const dynamic = "force-dynamic";
 export default async function ProposalsPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
   await requireProposalsModule();
   const { status: statusRaw } = await searchParams;
-  const status = isProposalStatus(statusRaw) ? statusRaw : undefined;
+  const status = parseDisplayFilter(statusRaw);
 
   const role = await currentRole();
   const canWrite = !!role && PROPOSAL_STAFF_WRITE_ROLES.includes(role);
+  const canDraftFromTranscript = canWrite && CAN_WRITE_LEAD.includes(role);
 
-  let all: ProposalListItem[] = [];
+  let listed: ProposalListItem[] = [];
   let failed = false;
   try {
-    all = await listProposals();
+    listed = await listProposals();
   } catch {
     failed = true;
   }
-  const rows = status ? all.filter((r) => r.status === status) : all;
+  const today = firmCivilDate(new Date(), await getFirmTimeZone());
+  const all = listed.map((r) => ({ row: r, display: proposalDisplayStatus(r, { today, issues: r.blocking_issue }) }));
+  const rows = status ? all.filter((r) => r.display.key === status) : all;
   const counts = new Map<string, number>();
-  for (const r of all) counts.set(r.status, (counts.get(r.status) ?? 0) + 1);
+  for (const r of all) counts.set(r.display.key, (counts.get(r.display.key) ?? 0) + 1);
+
+  const [leadsRead, draftBlock] = canDraftFromTranscript ? await Promise.all([loadLeadOptions(), loadDraftBlock()]) : [null, null];
 
   return (
     <>
@@ -65,18 +90,44 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
         </div>
       </div>
 
+      {canDraftFromTranscript && (
+        <details className="lx-card lx-disclosure">
+          <summary>Draft from a transcript</summary>
+          <div style={{ padding: "12px 18px 18px" }}>
+            {draftBlock ? (
+              <p className="lx-note" style={{ margin: 0 }} data-draft-block={draftBlock}>
+                {DRAFT_BLOCK_NOTE[draftBlock]}
+                {draftBlock === "no-settings" && (
+                  <>
+                    {" "}
+                    <Link href="/dashboard/settings/proposals/">Open the settings</Link>
+                  </>
+                )}
+              </p>
+            ) : leadsRead?.status === "ok" ? (
+              <TranscriptDraft leads={leadsRead.leads} maxChars={MAX_PASTED_TRANSCRIPT_CHARS} />
+            ) : (
+              <p className="lx-note" style={{ margin: 0 }}>
+                The leads couldn&apos;t be loaded just now, so this form isn&apos;t offered. This is a problem reaching the database, not an empty list. Try again shortly.
+              </p>
+            )}
+          </div>
+        </details>
+      )}
+
       {!failed && all.length > 0 && (
         <nav aria-label="Filter proposals by status" className="lx-chips">
           <Link href="/dashboard/proposals/" aria-current={!status ? "page" : undefined}>
             All
             <span className="lx-chip-count">{all.length}</span>
           </Link>
-          {PROPOSAL_STATUSES.map((s) => {
-            const count = counts.get(s) ?? 0;
-            if (count === 0 && status !== s) return null;
+          {PROPOSAL_DISPLAY_KEYS.map((key) => {
+            const count = counts.get(key) ?? 0;
+            // Closed is listed under All; it is a chip only while you are on it.
+            if (key === "closed" ? status !== "closed" : count === 0 && status !== key) return null;
             return (
-              <Link key={s} href={`/dashboard/proposals/?status=${s}`} aria-current={status === s ? "page" : undefined}>
-                {statusLabel(s)}
+              <Link key={key} href={`/dashboard/proposals/?status=${key}`} aria-current={status === key ? "page" : undefined}>
+                {PROPOSAL_DISPLAY_LABEL[key]}
                 <span className="lx-chip-count">{count}</span>
               </Link>
             );
@@ -121,7 +172,7 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
+              {rows.map(({ row: r, display }) => (
                 <tr key={r.id}>
                   <td className="pri wrap">
                     <Link href={`/dashboard/proposals/${r.id}/`} className="lx-rowlink">
@@ -131,7 +182,8 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
                   </td>
                   <td className="lx-num">v{r.version}</td>
                   <td>
-                    <span className={`lx-pill lx-pill-${statusTone(r.status)}`}>{statusLabel(r.status)}</span>
+                    <span className={`lx-pill lx-pill-${proposalDisplayTone(display.key)}`}>{display.label}</span>
+                    {display.sub && <div className="lx-note">{display.sub}</div>}
                   </td>
                   <td className="lx-num" style={{ textAlign: "right" }}>
                     {formatCents(r.legal_total_cents)}

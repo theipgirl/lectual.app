@@ -145,7 +145,9 @@ export function navItemAllowed(item: NavItem, modules: readonly string[], role: 
 }
 
 export function visibleNav(modules: readonly string[], role: Role): NavItem[] {
-  return NAV.filter((item) => navItemAllowed(item, modules, role));
+  const allowed = NAV.filter((item) => navItemAllowed(item, modules, role));
+  // One proposals surface: the older quotes entry steps aside once Client proposals is shown.
+  return allowed.some((item) => item.slug === "proposals") ? allowed.filter((item) => item.slug !== "quotes") : allowed;
 }
 
 export function navItemBySlug(slug: string): NavItem | undefined {
