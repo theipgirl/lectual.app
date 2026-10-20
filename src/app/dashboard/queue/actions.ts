@@ -13,6 +13,8 @@ import { checkDraftStaleness, stalenessRequiresConfirm } from "@/lib/queue/stale
 import { staleWarning } from "@/components/queue/stale-warning";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { gateLinkedProposal, makeProposalLive } from "@/lib/consult-proposal/link";
+import { approvalBlock, auditDraft } from "@/lib/queue/hygiene";
+import { loadAuditContext } from "@/lib/queue/audit-context";
 
 export type ReviewState = { error?: string };
 
@@ -86,6 +88,17 @@ export async function reviewQueueAction(_prev: ReviewState, formData: FormData):
       // couldn't run) needs the approver's explicit confirm, and the approval
       // note records that they gave it. Never an automatic reject.
       const before = await getQueueItem(qKey, id);
+
+      // What would actually go out: the edit in this form, else what is saved.
+      // Banner and worksheet text, an unresolved placeholder or another
+      // member's signature stop an approval of a client email. Checked before
+      // anything is saved or resolved, so a refused body is never stored as the
+      // final text. Reject and Save are never held up by it.
+      const blocked = approvalBlock(
+        auditDraft(editedBody ?? before.final_body ?? before.draft_body, { type: before.type, ...(await loadAuditContext()) }),
+      );
+      if (blocked) return { error: blocked };
+
       const stale = await checkDraftStaleness(before);
       const confirmed = formData.get("confirm_stale") === "yes";
       if (stalenessRequiresConfirm(stale) && !confirmed) {

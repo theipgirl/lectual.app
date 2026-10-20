@@ -46,6 +46,7 @@ vi.mock("next/navigation", () => ({
   },
 }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("@/lib/queue/audit-context", () => ({ loadAuditContext: vi.fn(async () => ({ signOff: null, teamSignOff: null, memberNames: [] })) }));
 vi.mock("@/lib/queue/org", () => ({ activeQueueOrgKey: async () => "rpb-law" }));
 vi.mock("@/lib/queue/roles", async (orig) => ({
   ...(await orig<typeof import("@/lib/queue/roles")>()),

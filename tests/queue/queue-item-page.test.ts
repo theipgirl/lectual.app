@@ -28,7 +28,14 @@ function item(overrides: Partial<QueueItem> = {}): QueueItem {
   };
 }
 
-async function render(row: QueueItem, roles: { approve: boolean; edit: boolean } = { approve: true, edit: true }) {
+const SIGN = "Rebecca P. Beliard, Esq.";
+const AUDIT = { signOff: SIGN, teamSignOff: "The RPB Law Team", memberNames: ["Rebecca Beliard", "Dawn Alvarez"] };
+
+async function render(
+  row: QueueItem,
+  roles: { approve: boolean; edit: boolean } = { approve: true, edit: true },
+  audit: { signOff: string | null; teamSignOff: string | null; memberNames: string[] | null } = AUDIT,
+) {
   vi.doMock("@/lib/queue/api", () => ({ getQueueItem: vi.fn(async () => row) }));
   vi.doMock("@/lib/queue/org", () => ({ activeQueueOrgKey: vi.fn(async () => "rpb") }));
   vi.doMock("@/lib/db/scoped-client", () => ({ getScopedClient: vi.fn(async () => ({})) }));
@@ -42,6 +49,7 @@ async function render(row: QueueItem, roles: { approve: boolean; edit: boolean }
   vi.doMock("@/lib/org/profile", () => ({ getFirmTimeZone: vi.fn(async () => "America/New_York") }));
   vi.doMock("@/lib/queue/stale", () => ({ checkDraftStaleness: vi.fn(async () => ({ status: "not_applicable" })) }));
   vi.doMock("@/lib/consult-proposal/link", () => ({ loadLinkedPanel: vi.fn(async () => ({ status: "none" })) }));
+  vi.doMock("@/lib/queue/audit-context", () => ({ loadAuditContext: vi.fn(async () => audit) }));
   vi.doMock("@/app/dashboard/queue/actions", () => ({ reviewQueueAction: vi.fn() }));
   const { default: Page } = await import("../../src/app/dashboard/queue/[id]/page");
   const element = await Page({ params: Promise.resolve({ id: row.id }), searchParams: Promise.resolve({}) });
@@ -105,5 +113,97 @@ describe("ReviewPanel preview follows the textarea (F8)", () => {
     expect(src).toContain("<Markdown text={body} />");
     expect(src).toContain("onChange={(e) => setBody(e.target.value)}");
     expect(src).toContain("className=\"lx-input lx-draft\"");
+  });
+});
+
+describe("queue item page: draft hygiene warnings (H8)", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  const pending = (body: string, over: Partial<QueueItem> = {}) =>
+    item({ status: "pending", draft_body: body, resolved_by: null, resolved_at: null, ...over });
+  const DIRTY = `⚠️ DRAFT — FOR ATTORNEY REVIEW. NOT SENT.\nHi Ana,\nHard Rule 2: no fees.\n\nBest,\n${SIGN}`;
+  const CLEAN = `Hi Ana,\n\nThanks for the call.\n\nBest,\n${SIGN}`;
+
+  it("a dirty pending client email shows the warnings and the Remove internal notes button, with the Preview and textarea", async () => {
+    const html = await render(pending(DIRTY));
+    expect(html).toContain("Fix this before approving");
+    expect(html).toContain("banner line");
+    expect(html).toContain("internal worksheet text");
+    expect(html).toContain("Remove internal notes");
+    expect(html).toContain(">Preview<");
+    expect(html).toContain("<textarea");
+  });
+
+  it("a clean body shows neither the warnings nor the button", async () => {
+    const html = await render(pending(CLEAN));
+    expect(html).not.toContain("Checks on this draft");
+    expect(html).not.toContain("Remove internal notes");
+  });
+
+  it("a viewer who can't edit sees the warnings but not the button", async () => {
+    const html = await render(pending(DIRTY), { approve: false, edit: false });
+    expect(html).toContain("Fix this before approving");
+    expect(html).not.toContain("Remove internal notes");
+  });
+
+  it("a resolved item shows no warnings and no button", async () => {
+    const html = await render(item({ draft_body: DIRTY }));
+    expect(html).not.toContain("Checks on this draft");
+    expect(html).not.toContain("Remove internal notes");
+  });
+
+  it("says so, as a warning, when the signer check could not run", async () => {
+    const html = await render(pending("Hi Ana,\n\nBest,\nDawn"), { approve: true, edit: true }, { ...AUDIT, memberNames: null });
+    expect(html).toContain("couldn&#x27;t check who signed this");
+    expect(html).toContain("Check this draft");
+    expect(html).not.toContain("Fix this before approving");
+  });
+
+  it("a body signed by another member is a blocking error naming them", async () => {
+    const html = await render(pending("Hi Ana,\n\nBest,\nDawn Alvarez"));
+    expect(html).toContain("Fix this before approving");
+    expect(html).toContain("signed by Dawn Alvarez");
+  });
+
+  it("Markdown marks in a client email are a warning, not a block", async () => {
+    const html = await render(pending(`Hi **Ana**,\n\nBest,\n${SIGN}`));
+    expect(html).toContain("Check this draft");
+    expect(html).not.toContain("Fix this before approving");
+    expect(html).toContain("formatting marks");
+    expect(html).not.toContain("Remove internal notes");
+  });
+
+  it("a Document Center letter with a fill-in shows a warning only, and no placeholder button", async () => {
+    const html = await render(pending("# Letter DRAFT\n\nClass(es): [confirm from the report]", { type: "OPINION_LETTER" }));
+    expect(html).toContain("Check this draft");
+    expect(html).not.toContain("Fix this before approving");
+    expect(html).not.toContain("Remove internal notes");
+  });
+});
+
+describe("ReviewPanel: Remove internal notes (H8)", () => {
+  it("replaces the text with the cleaned body, which makes it an edit", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync("src/components/queue/ReviewPanel.tsx", "utf8");
+    // The button writes the cleaned text into the same state the textarea reads...
+    expect(src).toContain("onClick={() => setBody(cleaned.body)}");
+    expect(src).toContain("const cleaned = audit ? removeInternalNotes(body, audit.type) : null;");
+    // ...and any difference from the saved text is an edit: the approve label and the posted field follow it.
+    expect(src).toContain("const dirty = body !== initialBody;");
+    expect(src).toContain('{pending ? "Working…" : dirty ? "Approve with edits" : "Approve"}');
+    expect(src).toContain('name={dirty ? "body" : undefined}');
+    // The browser bundle only gets the pure module.
+    expect(src).toContain('from "@/lib/queue/hygiene"');
+    expect(src).not.toMatch(/@\/lib\/queue\/audit-context|server-only/);
+  });
+
+  it("the cleaned text differs from a dirty draft, so the label becomes 'Approve with edits'", async () => {
+    const { removeInternalNotes } = await import("@/lib/queue/hygiene");
+    const dirty = "NOT SENT\nHi Ana,\n\nBest,\nRebecca";
+    const cleaned = removeInternalNotes(dirty, "CLIENT_EMAIL");
+    expect(cleaned.body).not.toBe(dirty);
+    expect(cleaned.moved).toHaveLength(1);
   });
 });

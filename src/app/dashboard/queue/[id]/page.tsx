@@ -13,6 +13,7 @@ import { staleWarning } from "@/components/queue/stale-warning";
 import { Markdown } from "@/components/markdown/Markdown";
 import { LinkedProposalPanel } from "@/components/queue/LinkedProposalPanel";
 import { loadLinkedPanel } from "@/lib/consult-proposal/link";
+import { loadAuditContext } from "@/lib/queue/audit-context";
 
 function Meta({ label, value }: { label: string; value: React.ReactNode }) {
   if (!value) return null;
@@ -79,6 +80,8 @@ export default async function QueueItemPage({
   const warning = staleWarning(stale, tz);
   // The proposal the consult agent drafted with this email, if any.
   const linkedProposal = await loadLinkedPanel(item.id);
+  // Who signed it, and what is still left in it, is only worth checking while it can still be approved.
+  const auditContext = resolved ? null : await loadAuditContext();
 
   return (
     <>
@@ -132,6 +135,7 @@ export default async function QueueItemPage({
                 canApprove={approveRole !== null}
                 canEdit={editRole !== null}
                 confirmStale={warning ? warning.confirm : null}
+                audit={auditContext ? { type: item.type, ...auditContext } : undefined}
               />
             )}
           </section>
