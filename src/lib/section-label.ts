@@ -9,11 +9,15 @@ export const FALLBACK_SECTION_LABEL = "Workspace";
  * through `NAV[].also`; unbuilt sections and unknown paths get the neutral label.
  */
 export function sectionLabelFor(pathname: string | null | undefined): string {
-  const path = !pathname ? "/dashboard/" : pathname.endsWith("/") ? pathname : `${pathname}/`;
+  // usePathname() has no query string, but a link copied from the address bar might.
+  const bare = pathname?.split(/[?#]/)[0];
+  const path = !bare ? "/dashboard/" : bare.endsWith("/") ? bare : `${bare}/`;
   if (!path.startsWith("/dashboard/")) return FALLBACK_SECTION_LABEL;
 
   const slug = path.slice("/dashboard/".length).split("/")[0];
   if (slug === "") return "Today";
+  // Reached from the bell, not the rail, so NAV does not know it.
+  if (slug === "notifications") return "Notifications";
   if (slug === "reports") {
     const key = path.slice("/dashboard/reports/".length).split("/")[0];
     return isReportKey(key) ? `${REPORTS[key].label} · Report` : "Report";

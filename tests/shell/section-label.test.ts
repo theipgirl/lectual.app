@@ -44,3 +44,14 @@ describe("sectionLabelFor (F17)", () => {
     expect(src).not.toContain("?? \"Today\"");
   });
 });
+
+describe("sectionLabelFor notifications (S5 F9)", () => {
+  it.each([
+    "/dashboard/notifications/",
+    "/dashboard/notifications",
+    "/dashboard/notifications/?tab=unread",
+    "/dashboard/notifications?tab=unread&page=2",
+  ])("%s -> Notifications", (pathname) => {
+    expect(sectionLabelFor(pathname)).toBe("Notifications");
+  });
+});
