@@ -6,6 +6,7 @@ import { periodDelta, unavailableMetric, type Metric } from "./metric";
 import { isInPeriod, isInPreviousPeriod, type ReportPeriod } from "./period";
 import { oldestFirst, type LinkTile, type WaitingItem } from "./waiting";
 import { relativeTime } from "@/lib/relative-time";
+import { loadActiveQueue, type QueueLoad } from "@/lib/queue/load";
 
 export type IposReport = {
   kpis: Metric[];
@@ -13,6 +14,15 @@ export type IposReport = {
   links: LinkTile[];
   banner: string | null;
 };
+
+/** Only `ok` shows a number; anything else says why there isn't one. */
+function waitingInQueueMetric(queue: QueueLoad): Metric {
+  if (queue.status === "ok") return { label: "Waiting in queue", value: queue.items.length, sub: "drafts waiting for a person to review" };
+  return unavailableMetric(
+    "Waiting in queue",
+    queue.status === "unconfigured" ? "No queue connected yet" : "Queue unreachable",
+  );
+}
 
 /**
  * IP.OS: the firm's automation layer — AI copilot, agents, skills and the
@@ -23,7 +33,7 @@ export type IposReport = {
 export async function loadIposReport(period: ReportPeriod, opts: { hasAgents: boolean }): Promise<IposReport> {
   const supabase = await getScopedClient();
 
-  const [runs, brainCount] = await Promise.all([
+  const [runs, settings, queue, brainCount] = await Promise.all([
     opts.hasAgents
       ? readRows(() =>
           supabase
@@ -32,6 +42,10 @@ export async function loadIposReport(period: ReportPeriod, opts: { hasAgents: bo
             .gte("started_at", period.prevStart.toISOString()),
         )
       : Promise.resolve({ status: "missing" as const, rows: [] as { agent: string; started_at: string; drafts_out: number; status: string; summary: string | null }[] }),
+    opts.hasAgents
+      ? readRows(() => supabase.from("agent_setting").select("agent, enabled"))
+      : Promise.resolve({ status: "missing" as const, rows: [] as { agent: string; enabled: boolean }[] }),
+    loadActiveQueue(),
     supabase
       .from("crm_firm_brain_entry")
       .select("id", { count: "exact", head: true })
@@ -50,6 +64,8 @@ export async function loadIposReport(period: ReportPeriod, opts: { hasAgents: bo
       ? unavailableMetric("Agent runs", runs.status === "missing" ? "Agent runs aren't recorded in this environment yet" : "Couldn't be read just now")
       : { label: "Agent runs", value: runsInPeriod.length, delta: periodDelta(runsInPeriod.length, prevRunsInPeriod.length), sub: "across every agent" };
 
+  const queueMetric = waitingInQueueMetric(queue);
+
   const draftsOut: Metric = !opts.hasAgents
     ? unavailableMetric("Drafts out", "Agents aren't turned on for this firm")
     : runs.status !== "ok"
@@ -57,7 +73,17 @@ export async function loadIposReport(period: ReportPeriod, opts: { hasAgents: bo
       : (() => {
           const current = runsInPeriod.reduce((sum, r) => sum + (r.drafts_out ?? 0), 0);
           const prev = prevRunsInPeriod.reduce((sum, r) => sum + (r.drafts_out ?? 0), 0);
-          return { label: "Drafts out", value: current, delta: periodDelta(current, prev), sub: "held for approval" };
+          // The queue also receives drafts from Cowork skills and staff actions;
+          // say so only when it holds more than the agents wrote in the period.
+          const queueHoldsMore = queue.status === "ok" && queue.items.length > current;
+          return {
+            label: "Drafts out",
+            value: current,
+            delta: periodDelta(current, prev),
+            sub: queueHoldsMore
+              ? "drafts written by Lectual's own agents in the period. The queue also receives drafts from Cowork skills and staff actions"
+              : "drafts written by Lectual's own agents in the period",
+          };
         })();
 
   const erroredRuns = runs.status === "ok" ? runs.rows.filter((r) => r.status === "error") : [];
@@ -71,12 +97,12 @@ export async function loadIposReport(period: ReportPeriod, opts: { hasAgents: bo
 
   const links: LinkTile[] = [
     { label: "AI copilot", sub: "Ask the firm brain a question", href: "/dashboard/copilot/", count: null },
-    ...(opts.hasAgents ? [{ label: "Agents", sub: "Scheduled automations", href: "/dashboard/agents/", count: runs.status === "ok" ? runsInPeriod.length : null }] : []),
+    ...(opts.hasAgents ? [{ label: "Agents", sub: "Scheduled automations", href: "/dashboard/agents/", count: settings.status === "ok" ? settings.rows.filter((s) => s.enabled).length : null }] : []),
     { label: "Firm brain", sub: "Voice, pricing and decisions agents draft from", href: "/dashboard/brain/", count: brainCount },
   ];
 
   return {
-    kpis: [runsMetric, draftsOut],
+    kpis: [runsMetric, draftsOut, queueMetric],
     waiting,
     links,
     banner: null,
