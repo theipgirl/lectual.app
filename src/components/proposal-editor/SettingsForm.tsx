@@ -4,7 +4,6 @@ import type { ProposalInclude } from "@/lib/proposals/types";
 import { saveProposalSettingsAction } from "@/app/dashboard/settings/proposals/actions";
 import { ActionForm, Outcome } from "./ActionForm";
 import { IncludesFields } from "./IncludesFields";
-import { PricingFields, type PricingValues } from "./PricingFields";
 
 export type SettingsMember = { userId: string; name: string; email: string | null; role: string };
 
@@ -12,12 +11,11 @@ export type SettingsValues = {
   approverUserIds: string[];
   defaultPayUrl: string;
   notifyEmail: string;
-  pricing: PricingValues;
   officeActionNote: string;
   includes: ProposalInclude[];
 };
 
-/** Approvers, links, standard prices and the standard includes table. Admins only (the action re-checks). */
+/** Approvers, links and the standard includes table. Admins only (the action re-checks). The package prices are their own card, `PackagePricesForm`. */
 export function SettingsForm({ members, values }: { members: SettingsMember[]; values: SettingsValues }) {
   return (
     <ActionForm action={saveProposalSettingsAction} className="pe-settings">
@@ -60,14 +58,6 @@ export function SettingsForm({ members, values }: { members: SettingsMember[]; v
                 <input className="lx-input" name="notifyEmail" type="email" maxLength={320} defaultValue={values.notifyEmail} />
               </label>
             </div>
-          </section>
-
-          <section className="lx-card pe-card">
-            <header className="pe-card-head">
-              <h2 className="pe-h">Standard prices</h2>
-              <p className="lx-note pe-hint">What every new proposal starts from. Changing these never changes a proposal that already exists.</p>
-            </header>
-            <PricingFields values={values.pricing} />
           </section>
 
           <section className="lx-card pe-card">

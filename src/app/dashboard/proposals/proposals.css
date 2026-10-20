@@ -75,6 +75,11 @@
   .pe-inc-row input[type="text"], .pe-inc-row input:not([type]) { grid-column: 1 / -1; }
 }
 
+/* ── package prices card ───────────────────────────────────── */
+.pe-pkg { padding: 12px 0 0; border-top: 1px solid var(--line-2); }
+.pe-pkg:first-of-type { border-top: 0; padding-top: 0; }
+.pe-pkg-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+
 /* ── side panel ────────────────────────────────────────────── */
 .pe-totals { padding: 14px 16px; display: grid; gap: 8px; }
 .pe-totals dl { margin: 0; display: grid; gap: 6px; }

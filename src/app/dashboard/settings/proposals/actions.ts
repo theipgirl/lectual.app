@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { getProposalSettings, saveProposalSettings } from "@/lib/proposals/store";
-import { parseSettingsPricing } from "@/lib/proposal-editor/form";
+import { parsePackageList, parseSettingsPricing } from "@/lib/proposal-editor/form";
+import { validatePackages, withPackages } from "@/lib/proposals/package-list";
 import { proposalActionError, type ActionState } from "../../proposals/errors";
 import { gateAdminAction } from "../../proposals/gate";
 
@@ -50,4 +51,42 @@ export async function saveProposalSettingsAction(_prev: ActionState, formData: F
   }
   revalidatePath("/dashboard/settings/proposals/");
   return { saved: true };
+}
+
+/**
+ * Save the firm's package prices: the named list of packages (the first is the
+ * default a new proposal starts from). A form of its own, because the card sits
+ * beside the settings form and has its own "Save prices" button.
+ *
+ * It writes ONLY the price list: the stored approvers, pay link, notify address,
+ * includes table and office-action note are read back and saved as they were, so
+ * saving prices can never change who may approve. `withPackages` also writes the
+ * flat price fields from the first package, which keeps an older reader working.
+ *
+ * Same gates as the settings form: the module, then owner / admin / senior_admin,
+ * re-checked by `saveProposalSettings`; RLS is the boundary underneath.
+ */
+export async function savePackagesAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const refused = await gateAdminAction();
+  if (refused) return refused;
+
+  const list = parsePackageList(formData);
+  if (!list.ok) return { error: list.error };
+  const problems = validatePackages(list.value);
+  if (problems.length > 0) return { error: problems[0].message };
+
+  try {
+    const existing = await getProposalSettings();
+    await saveProposalSettings({
+      approverUserIds: existing?.approver_user_ids ?? [],
+      defaultPayUrl: existing?.default_pay_url ?? null,
+      notifyEmail: existing?.notify_email ?? null,
+      pricing: withPackages(existing?.pricing ?? {}, list.value),
+    });
+  } catch (err) {
+    return proposalActionError(err, "Couldn't save the package prices.");
+  }
+  revalidatePath("/dashboard/settings/proposals/");
+  revalidatePath("/dashboard/proposals/new/");
+  return { saved: true, notice: "Saved. New proposals can now start from these packages." };
 }

@@ -32,6 +32,7 @@ import {
   type ProposalInclude,
   type ProposalMark,
   type ProposalName,
+  type ProposalPackageBasis,
   type ProposalPricing,
   type ProposalSettingPricing,
 } from "@/lib/proposals/types";
@@ -370,6 +371,8 @@ export function buildNewContent(input: {
   company?: string;
   brandName?: string;
   standard: StandardPricing;
+  /** The firm package this started from, and what was changed from it. Left out when nothing was. */
+  packageBasis?: ProposalPackageBasis | null;
   rand: () => string;
 }): ProposalContent {
   const company = input.company?.trim();
@@ -382,25 +385,107 @@ export function buildNewContent(input: {
     adjustments: [],
     includes: input.standard.includes.map((r) => ({ ...r })),
     office_action_note: input.standard.office_action_note,
+    ...(input.packageBasis && input.packageBasis.edited.length > 0 ? { package_basis: { name: input.packageBasis.name, edited: [...input.packageBasis.edited] } } : {}),
   };
+}
+
+/* ─────────────────────────── the package a proposal starts from ─────────── */
+
+/** The five numeric fields a New proposal form fills from the chosen package, and how they read when changed. */
+export const PACKAGE_OVERRIDE_FIELDS = [
+  { form: "base", key: "base_cents", label: "price" },
+  { form: "includedClasses", key: "included_classes", label: "classes included" },
+  { form: "perClass", key: "per_class_cents", label: "price per class" },
+  { form: "secondMarkPct", key: "second_mark_discount_pct", label: "second mark discount" },
+  { form: "govPerClass", key: "gov_per_class_cents", label: "USPTO fee per class" },
+] as const;
+
+/**
+ * The pricing for a proposal started from firm package `pkg`. The browser fills
+ * the five numeric fields from the package and the person may edit them; the
+ * server never trusts what came back as the package's value. A field that was
+ * not posted, or that equals the package's, takes the package's value from
+ * `pkg` (the firm's saved list, re-read by the caller). A field that differs is
+ * the person's change for THIS proposal: it is parsed like the editor's pricing
+ * form, kept, and named in `edited` so an approver can see it. The package name
+ * is always `pkg`'s: it cannot be renamed here.
+ */
+export function pricingFromPackage(form: FormData, pkg: ProposalPricing): Parsed<{ pricing: ProposalPricing; edited: string[] }> {
+  const pricing: ProposalPricing = { ...pkg };
+  const edited: string[] = [];
+  for (const f of PACKAGE_OVERRIDE_FIELDS) {
+    if (!form.has(f.form)) continue;
+    const raw = text(form, f.form);
+    const label = f.label.charAt(0).toUpperCase() + f.label.slice(1);
+    const parsed =
+      f.key === "included_classes"
+        ? parseCount(raw, label)
+        : f.key === "second_mark_discount_pct"
+          ? parsePercent(raw, label)
+          : parseMoney(raw, label);
+    if (!parsed.ok) return parsed;
+    if (parsed.value === pkg[f.key]) continue;
+    (pricing as Record<string, unknown>)[f.key] = parsed.value;
+    edited.push(f.label);
+  }
+  return ok({ pricing, edited });
 }
 
 /* ─────────────────────────── settings ───────────────────────────────────── */
 
 /**
- * The firm's standard prices, from the settings form, merged over what is
- * already stored (so a key this form does not know about survives a save).
+ * The main settings form's pricing: the "what's included" table and the office
+ * action note, merged over what is stored. The packages and their prices have
+ * their own card and action (`parsePackageList`), so this keeps the stored
+ * prices, the package list and any key it does not know exactly as they are.
  */
 export function parseSettingsPricing(form: FormData, existing: Record<string, unknown>): Parsed<ProposalSettingPricing & Record<string, unknown>> {
-  const pricing = parsePricing(form);
-  if (!pricing.ok) return pricing;
   const includes = parseIncludes(form);
   if (!includes.ok) return includes;
   const note = optionalText(form, "officeActionNote");
-  const next: Record<string, unknown> = { ...existing, ...pricing.value, includes: includes.value };
+  const next: Record<string, unknown> = { ...existing, includes: includes.value };
   if (note) next.office_action_note = note;
   else delete next.office_action_note;
   return ok(next as ProposalSettingPricing & Record<string, unknown>);
+}
+
+/** The field names the Package prices card posts for package `n` (`pkg.<n>.<field>`). */
+export const PACKAGE_FORM_FIELDS = ["package", "base", "includedClasses", "perClass", "secondMarkPct", "govPerClass"] as const;
+
+/**
+ * The Package prices card: `pkg.<n>.{package,base,includedClasses,perClass,secondMarkPct,govPerClass}`
+ * rows, in the order posted (the first is the default). Dollars in, whole cents
+ * out. A field that is not a number is refused naming its package; whether the
+ * LIST is acceptable (a name each, no duplicates, at least one) is
+ * `validatePackages`'s job, run by the caller.
+ */
+export function parsePackageList(form: FormData): Parsed<ProposalPricing[]> {
+  const rows = collectRows(form, "pkg", PACKAGE_FORM_FIELDS);
+  if (rows.length === 0) return fail("Keep at least one package.");
+  const out: ProposalPricing[] = [];
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const where = `Package ${i + 1}${row.package ? ` (${row.package})` : ""}`;
+    const base = parseMoney(row.base, `${where}, price with the included classes`);
+    if (!base.ok) return base;
+    const perClass = parseMoney(row.perClass, `${where}, per class over / under`);
+    if (!perClass.ok) return perClass;
+    const gov = parseMoney(row.govPerClass, `${where}, USPTO fee per class per mark`);
+    if (!gov.ok) return gov;
+    const included = parseCount(row.includedClasses, `${where}, classes included`);
+    if (!included.ok) return included;
+    const pct = parsePercent(row.secondMarkPct, `${where}, second mark discount`);
+    if (!pct.ok) return pct;
+    out.push({
+      package: row.package,
+      base_cents: base.value,
+      included_classes: included.value,
+      per_class_cents: perClass.value,
+      second_mark_discount_pct: pct.value,
+      gov_per_class_cents: gov.value,
+    });
+  }
+  return ok(out);
 }
 
 /** Cents as the text a money input is pre-filled with ("4950.00"); blank for none. */

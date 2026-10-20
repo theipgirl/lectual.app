@@ -28,6 +28,7 @@
  */
 
 import type { Role } from "@/lib/auth/roles";
+import { normalisePackages } from "./package-list";
 
 /* ─────────────────────────── role gates ──────────────────────────────────
  * Mirror the RLS policy role lists in 0089, verbatim. RLS is the real
@@ -192,6 +193,18 @@ export type ProposalInclude = {
   highlight?: boolean;
 };
 
+/**
+ * Staff-only note of which firm package a proposal started from and which of its
+ * numbers were then changed for this proposal ("Edited from Concierge"). It lives
+ * in the content jsonb because that is the one column that travels with the
+ * proposal, and it is NOT in `publicContent`'s allowlist, so it is never published.
+ */
+export type ProposalPackageBasis = {
+  name: string;
+  /** Plain labels of the fields changed from the package, e.g. "price", "classes included". */
+  edited: string[];
+};
+
 export type ProposalContent = {
   client: { first_name: string; full_name: string; company?: string };
   greeting: string;
@@ -201,6 +214,7 @@ export type ProposalContent = {
   adjustments: ProposalAdjustment[];
   includes: ProposalInclude[];
   office_action_note?: string;
+  package_basis?: ProposalPackageBasis;
 };
 
 /** Mark or class id -> ticked. */
@@ -368,19 +382,14 @@ export type ProposalQuote = {
  * to `DEFAULT_PROPOSAL_PRICING` / `DEFAULT_PROPOSAL_INCLUDES`.
  */
 export type ProposalSettingPricing = Partial<ProposalPricing> & {
+  /** The firm's named packages, first one the default. The flat fields above mirror it. */
+  packages?: ProposalPricing[];
   includes?: ProposalInclude[];
   office_action_note?: string;
 };
 
-/** RPB's Concierge package, from the Sevetri example, in cents. */
-export const DEFAULT_PROPOSAL_PRICING: ProposalPricing = {
-  package: "Concierge",
-  base_cents: 495_000,
-  included_classes: 3,
-  per_class_cents: 82_500,
-  second_mark_discount_pct: 20,
-  gov_per_class_cents: 35_000,
-};
+// Defined with the package list (pure, client-safe); re-exported so every existing import keeps working.
+export { DEFAULT_PROPOSAL_PRICING } from "./package-list";
 
 export const DEFAULT_OFFICE_ACTION_NOTE =
   "If a substantive office action is issued, your package includes Rebecca's strategy review. The response itself is quoted separately, and we will get your approval before any work begins.";
@@ -411,14 +420,10 @@ export const DEFAULT_PROPOSAL_INCLUDES: ProposalInclude[] = [
   { label: "Trademark Assignment Agreement", value: "$1,500", included: "✓" },
 ];
 
-function nonNegInt(value: unknown, fallback: number): number {
-  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : fallback;
-}
-
 /**
- * The pricing a NEW proposal starts from: the firm's `client_proposal_setting`
- * values where they are well-formed, the RPB defaults for anything missing or
- * unreadable. Total — a malformed jsonb never throws, it just falls back.
+ * The pricing a NEW proposal starts from: the firm's DEFAULT (first) package from
+ * `client_proposal_setting` where it is well-formed, the RPB defaults for anything
+ * missing or unreadable. Total — a malformed jsonb never throws, it just falls back.
  */
 export function standardProposalPricing(setting: unknown): {
   pricing: ProposalPricing;
@@ -428,20 +433,8 @@ export function standardProposalPricing(setting: unknown): {
   const raw = (setting && typeof setting === "object" && !Array.isArray(setting)
     ? setting
     : {}) as Record<string, unknown>;
-  const d = DEFAULT_PROPOSAL_PRICING;
-  const pct = raw.second_mark_discount_pct;
-  const pricing: ProposalPricing = {
-    package:
-      typeof raw.package === "string" && raw.package.trim() ? raw.package.trim() : d.package,
-    base_cents: nonNegInt(raw.base_cents, d.base_cents),
-    included_classes: nonNegInt(raw.included_classes, d.included_classes),
-    per_class_cents: nonNegInt(raw.per_class_cents, d.per_class_cents),
-    second_mark_discount_pct:
-      typeof pct === "number" && Number.isFinite(pct) && pct >= 0 && pct <= 100
-        ? pct
-        : d.second_mark_discount_pct,
-    gov_per_class_cents: nonNegInt(raw.gov_per_class_cents, d.gov_per_class_cents),
-  };
+  // The default package is the first of the firm's list (the flat fields when there is no list).
+  const pricing: ProposalPricing = normalisePackages(raw)[0];
   const includes = Array.isArray(raw.includes)
     ? (raw.includes as unknown[]).filter(
         (r): r is ProposalInclude =>

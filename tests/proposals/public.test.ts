@@ -9,6 +9,7 @@ import {
   coarseUserAgent,
   isProposalExpired,
   pickLiveRow,
+  publicContent,
   readPublicProposal,
   recordProposalViewed,
   type PublicProposalsDb,
@@ -548,5 +549,17 @@ describe("recordProposalViewed", () => {
       },
     };
     await expect(recordProposalViewed(handle, "x", NOW, failing)).resolves.toBeUndefined();
+  });
+});
+
+describe("publicContent never publishes the staff-only package basis (Sprint 6)", () => {
+  it("drops content.package_basis from the view the client receives", () => {
+    const content = { ...sevetri(), package_basis: { name: "Enhanced", edited: ["price"] } };
+    const out = publicContent(content) as unknown as Record<string, unknown>;
+    expect("package_basis" in out).toBe(false);
+    expect(JSON.stringify(out)).not.toContain("Enhanced");
+    expect(JSON.stringify(out)).not.toContain("edited");
+    // and the rest of the document is intact
+    expect(out.pricing).toEqual(sevetri().pricing);
   });
 });
