@@ -206,7 +206,7 @@ export default function IntakeWorkspace({
           const lead = { ...row.lead, temperature: level };
           // Clearing the override doesn't blank the chip — it falls back to the
           // derived value, which is exactly what the server will store too.
-          return { ...row, lead, temperature: deriveTemperature(lead, stages, now) };
+          return { ...row, lead, temperature: deriveTemperature(lead, stages, now, row.facts) };
         },
         () => setTemperatureAction(leadId, level),
       );
@@ -268,7 +268,7 @@ export default function IntakeWorkspace({
             stage: stages.find((stage) => stage.id === stageId) ?? null,
             // Temperature rule 2 (nurture stage) keys on the stage, so it has to be re-derived
             // with the lead's new home or the card would carry the old answer.
-            temperature: deriveTemperature(lead, stages, now),
+            temperature: deriveTemperature(lead, stages, now, row.facts),
           };
         },
         () => moveStageAction(leadId, stageId),

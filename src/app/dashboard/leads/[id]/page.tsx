@@ -3,6 +3,10 @@ import { notFound } from "next/navigation";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { CAN_WRITE_LEAD, getLead, listStages } from "@/lib/pipeline";
+import { deriveTemperature } from "@/lib/intake/temperature";
+import { loadTemperatureFacts, type TemperatureFactsRead } from "@/lib/intake/facts";
+import { ConsultOutcomeForm } from "@/components/leads/ConsultOutcomeForm";
+import { LeadTemperature } from "@/components/leads/LeadTemperature";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { pendingProposals } from "@/lib/agents/proposals";
 import { relativeTime } from "@/lib/relative-time";
@@ -72,13 +76,16 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const voiceUrls = await voiceNotePlaybackUrls(rows);
 
   // Lane + next step (SOP Stage 2) and the lead's sequences (SOP rule 1).
-  const [{ links, failed: linksFailed }, tz, enrollments, approvals] = await Promise.all([
+  const [{ links, failed: linksFailed }, tz, enrollments, approvals, factsRead] = await Promise.all([
     getLaneLinks(),
     getFirmTimeZone(),
     listLeadEnrollments(id).catch(() => null),
     // Never throws on an outage (it says `unavailable`); the catch is for the unexpected.
     loadPendingApprovalsByLead().catch((): LeadPendingApprovals => ({ status: "unavailable" })),
+    // The same facts the Intake board reads; a failed read leaves the existing rules, never a guessed "cold".
+    loadTemperatureFacts([lead], stages).catch((): TemperatureFactsRead => ({ status: "unavailable" })),
   ]);
+  const temperature = deriveTemperature(lead, stages, new Date(), factsRead.status === "ok" ? factsRead.byLead[lead.id] : undefined);
   const lane = laneView(lead);
   const nextStep = nextStepForLane(lane.effective, links);
   const nurture =
@@ -148,6 +155,8 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             </section>
           )}
 
+          <LeadTemperature leadId={lead.id} temperature={temperature} />
+
           <LaneCard
             leadId={lead.id}
             view={lane}
@@ -186,6 +195,12 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           {canWrite && (
             <section className="lx-card" style={{ padding: 18 }}>
               <NoteComposer leadId={lead.id} />
+            </section>
+          )}
+
+          {canWrite && (
+            <section className="lx-card" style={{ padding: 18 }}>
+              <ConsultOutcomeForm leadId={lead.id} />
             </section>
           )}
 

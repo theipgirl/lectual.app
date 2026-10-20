@@ -10,6 +10,7 @@ import type { IntakeRow, SortDir, SortKey } from "@/lib/intake/rows";
 import { nextStepFor, stageCodeFor, stageLabelFor, touchStampFor } from "@/lib/intake/views";
 import type { IntakeTime } from "@/lib/time";
 import TimeChip from "@/components/intake/TimeChip";
+import { LtnSuggestion } from "@/components/intake/LtnSuggestion";
 import OwnerCell from "./OwnerCell";
 import TemperatureCell from "./TemperatureCell";
 import LaneCell from "./LaneCell";
@@ -191,11 +192,15 @@ export default function IntakeTable({
                       </Link>
                       <NeedsRebeccaBadge pending={pendingDrafts} />
                     </div>
-                    <div
-                      className="intake-mono"
-                      style={{ ...ellipsis, fontSize: 11, color: "var(--mute)", marginTop: 2 }}
-                    >
-                      {lead.mark_text?.trim() || lead.business_name?.trim() || "—"}
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0, marginTop: 2 }}>
+                      <span
+                        className="intake-mono"
+                        style={{ ...ellipsis, fontSize: 11, color: "var(--mute)" }}
+                      >
+                        {lead.mark_text?.trim() || lead.business_name?.trim() || "—"}
+                      </span>
+                      {/* A suggestion, in the lead cell: the Temp column is too narrow for a sentence. */}
+                      <LtnSuggestion suggestion={row.temperature.suggestion} leadId={lead.id} />
                     </div>
                   </div>
 
