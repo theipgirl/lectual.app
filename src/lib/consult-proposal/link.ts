@@ -4,7 +4,8 @@ import { getQueueItem } from "@/lib/queue/api";
 import { activeQueueOrgKey } from "@/lib/queue/org";
 import { isCurrentUserApprover, offerTotals, proposalsDb, sendProposal } from "@/lib/proposals/store";
 import { ProposalError } from "@/lib/proposals/errors";
-import type { ProposalContent, ProposalStatus } from "@/lib/proposals/types";
+import { buildProposalCard, type ProposalCard } from "@/lib/proposals/card";
+import type { ProposalContent, ProposalEventRow, ProposalStatus } from "@/lib/proposals/types";
 import { validateContent } from "@/lib/proposals/validate";
 import { CONSULT_PROPOSAL_SOURCE } from "./shared";
 
@@ -73,12 +74,39 @@ export type LinkedProposalSummary = {
   /** Rule breaks that block approval. */
   errorCount: number;
   warningCount: number;
+  /**
+   * The proposal card (queue item page only). Its receipts say "couldn't be
+   * loaded" when the events could not be read, never "none". Absent when the
+   * caller didn't ask for it (the approve gate).
+   */
+  card?: ProposalCard;
 };
 
 type ProposalRead = { status: "ok"; proposal: LinkedProposalSummary } | { status: "missing" } | { status: "failed" };
 
-/** The linked proposal as the queue panel and the gate see it. */
-export async function readLinkedProposal(proposalId: string): Promise<ProposalRead> {
+const EVENT_COLUMNS = "id, org_id, proposal_id, family_id, type, actor, actor_user_id, payload, created_at";
+
+/** The consult agent's evidence event for one proposal, or null when it could not be read. */
+async function readConsultEvents(proposalId: string): Promise<ProposalEventRow[] | null> {
+  try {
+    const supabase = await getScopedClient();
+    const { data, error } = await proposalsDb(supabase)
+      .from("client_proposal_event")
+      .select(EVENT_COLUMNS)
+      .eq("proposal_id", proposalId)
+      .eq("type", "edited")
+      .eq("actor", "agent")
+      .order("created_at", { ascending: false })
+      .limit(5);
+    if (error || !Array.isArray(data)) return null;
+    return data as ProposalEventRow[];
+  } catch {
+    return null;
+  }
+}
+
+/** The linked proposal as the queue panel and the gate see it. `withCard` also reads the events the card's receipts need. */
+export async function readLinkedProposal(proposalId: string, opts: { withCard?: boolean } = {}): Promise<ProposalRead> {
   try {
     const supabase = await getScopedClient();
     const { data, error } = await proposalsDb(supabase)
@@ -107,6 +135,7 @@ export async function readLinkedProposal(proposalId: string): Promise<ProposalRe
       client_email: row.client_email,
     });
     const totals = offerTotals(row.content);
+    const card = opts.withCard ? buildProposalCard(row, await readConsultEvents(row.id)) : undefined;
     return {
       status: "ok",
       proposal: {
@@ -118,6 +147,7 @@ export async function readLinkedProposal(proposalId: string): Promise<ProposalRe
         govCents: totals.gov_total_cents,
         errorCount: issues.filter((i) => i.level === "error").length,
         warningCount: issues.filter((i) => i.level === "warning").length,
+        ...(card ? { card } : {}),
       },
     };
   } catch {
@@ -135,7 +165,7 @@ export async function loadLinkedPanel(queueId: string): Promise<LinkedPanel> {
   const found = await findProposalMarker(queueId);
   if (found.status === "none") return { status: "none" };
   if (found.status === "failed") return { status: "unavailable" };
-  const read = await readLinkedProposal(found.marker.proposalId);
+  const read = await readLinkedProposal(found.marker.proposalId, { withCard: true });
   return read.status === "ok" ? { status: "ok", proposal: read.proposal } : { status: "unavailable" };
 }
 

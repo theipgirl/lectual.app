@@ -116,3 +116,26 @@
 .pe-approvers { display: grid; gap: 8px; }
 .pe-approver { align-items: flex-start; white-space: normal; }
 .pe-approver input { margin-top: 2px; }
+
+/* ── proposal card + consult strip ─────────────────────────── */
+.pe-pcard { padding: 16px 18px; display: grid; gap: 12px; }
+.pe-pcard-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.pe-pcard-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pe-pcard-brands { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; font-size: 14px; color: var(--body); }
+.pe-pcard-brands li { display: grid; gap: 2px; padding-top: 10px; border-top: 1px solid var(--line-2); }
+.pe-pcard-brands li:first-child { padding-top: 0; border-top: 0; }
+.pe-pcard-brand { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; color: var(--ink); }
+.pe-pcard-fees { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.pe-pcard-fees > div { padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--well); }
+.pe-pcard-fees dt { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.13em; text-transform: uppercase; color: var(--muted); }
+.pe-pcard-fees dd { margin: 4px 0 0; font-size: 20px; color: var(--ink); }
+.pe-pcard-receipts { display: grid; gap: 6px; }
+.pe-pcard-receipts ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 13.5px; color: var(--body); }
+.pe-pcard-unverified { color: var(--warn); }
+.pe-consult { padding: 14px 16px; display: grid; gap: 8px; }
+.pe-consult-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pe-consult-marks { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: 14px; }
+.pe-consult-marks li { display: grid; gap: 2px; }
+@media (max-width: 760px) {
+  .pe-pcard-fees { grid-template-columns: minmax(0, 1fr); }
+}
