@@ -148,6 +148,7 @@ export async function runIntakeTriage(ctx: AgentContext): Promise<AgentResult> {
           headline: `Hot lead: ${name}`,
           summary: output.reason,
           clientName: name,
+          leadId: lead.id,
           draftBody: [
             `Lane: HOT (readiness ${output.readiness}/5, value ${output.value}, respond within ${output.urgency}).`,
             "",

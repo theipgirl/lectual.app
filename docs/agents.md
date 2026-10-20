@@ -9,6 +9,8 @@ to a client goes into the approval queue, and a person sends it.
 | **Intake triage** (`intake-triage.ts`) | Leads not yet scored (`ai_enriched_at` null). The model sees the email domain, never the full address. | An `ai_insight` entry. **draft** adds the reason and red flags to the lead's AI fields; **act** also sets temperature, but only if a person hasn't. A hot lead gets a queue `BRIEFING`. | low |
 | **Post-consult drafter** (`post-consult.ts`) | Consult notes from the last 14 days (`crm_consult_note.notes`). | A `CLIENT_EMAIL` follow-up plus an internal summary in the **approval queue**, logged as `queue_drafted`. With no queue connected it drafts nothing. **suggest** only flags the follow-up as due. | high |
 
+Queued drafts also raise an in-app approval alert for the firm's approvers; see `docs/notifications.md`.
+
 ## Guard rails
 - **Two switches:** a firm needs the `agents` module, and each agent needs an `agent_setting`
   row with `enabled = true` (no row means off). Only owner, admin and senior admin can change

@@ -293,6 +293,7 @@ export async function advanceEnrollment(enrollmentId: string): Promise<AdvanceRe
         recipient: emailDraft.recipient,
         subject: emailDraft.subject,
         clientName: emailDraft.clientName,
+        leadId: lead.id,
       });
       queueItemId = draft.id;
     } else if (step.type === "task") {

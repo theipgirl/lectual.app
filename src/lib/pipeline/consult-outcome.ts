@@ -2,6 +2,7 @@ import { getScopedClient } from "@/lib/db/scoped-client";
 import { logActivity } from "@/lib/matters";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { notify } from "@/lib/notifications";
+import { NOTIFICATION_KIND_FOR } from "@/lib/notifications/kinds";
 import { CAN_WRITE_LEAD, resolveCurrentRole } from "./leads";
 import { NOTE_MAX_LENGTH } from "./lead-input";
 import { LeadWriteError, forbiddenLeadWrite } from "./errors";
@@ -117,13 +118,13 @@ async function notifyFollowUp(args: {
     }
   }
 
-  // `mentioned` is the closest existing kind: a dedicated one needs a migration in
-  // lectual (docs/onboarding-rpb.md, "Known follow-ups"). `preview` carries the
+  // The kind comes from NOTIFICATION_KIND_FOR: `mentioned` today, because a dedicated one
+  // needs a migration in lectual (docs/notifications.md). `preview` carries the
   // sentence so any renderer can show what happened.
   const payload = { lead_name: leadName, preview: `${label}: ${leadName}`, source: "consult_outcome", outcome };
   for (const userId of recipients) {
     try {
-      await notify({ userId, kind: "mentioned", leadId, activityId, actorId, payload });
+      await notify({ userId, kind: NOTIFICATION_KIND_FOR.consult_outcome, leadId, activityId, actorId, payload });
     } catch (err) {
       console.warn(
         `[consult-outcome] a notification was not raised: ${err instanceof Error ? err.message : String(err)}`,

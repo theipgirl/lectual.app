@@ -1284,3 +1284,24 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
 .lx-md th,
 .lx-md td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; }
 .lx-md th { background: var(--well); color: var(--ink); font-weight: 600; }
+
+/* ── notifications: the top-bar bell and /dashboard/notifications ─── */
+.lx-bell { position: relative; }
+.lx-bell > summary { list-style: none; position: relative; width: 34px; height: 34px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--ox); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.lx-bell > summary::-webkit-details-marker { display: none; }
+.lx-bell > summary:hover { background: var(--well); }
+.lx-bell-badge { position: absolute; top: -5px; right: -5px; min-width: 18px; height: 18px; padding: 0 4px; box-sizing: border-box; border-radius: 999px; background: var(--ox); color: var(--cream); font-family: var(--mono); font-size: 11px; display: flex; align-items: center; justify-content: center; }
+.lx-bell-badge-warn { background: var(--warn); }
+.lx-bell-panel { position: absolute; right: 0; top: 44px; width: 380px; max-width: calc(100vw - 32px); z-index: 60; box-shadow: var(--shadow-lift); padding: 0; }
+.lx-bell-head, .lx-bell-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; }
+.lx-bell-head { border-bottom: 1px solid var(--line); }
+.lx-bell-foot { border-top: 1px solid var(--line); flex-wrap: wrap; font-size: 13.5px; }
+.lx-notif-list { list-style: none; margin: 0; padding: 0; max-height: 420px; overflow-y: auto; }
+.lx-notif-row { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: start; width: 100%; padding: 11px 14px; border: 0; border-bottom: 1px solid var(--line); background: none; text-align: left; color: var(--body); font: inherit; cursor: pointer; }
+.lx-notif-row:hover { background: var(--well); text-decoration: none; }
+.lx-notif-row[data-unread] .lx-notif-sentence { color: var(--ink); font-weight: 500; }
+.lx-notif-icon { color: var(--ox); padding-top: 2px; }
+.lx-notif-text { display: grid; gap: 2px; min-width: 0; }
+.lx-notif-sentence { overflow-wrap: anywhere; line-height: 1.4; }
+.lx-notif-meta { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.lx-notif-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--ox); display: inline-block; }

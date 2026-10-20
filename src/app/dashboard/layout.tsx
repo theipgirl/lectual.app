@@ -8,6 +8,7 @@ import { Rail } from "@/components/shell/Rail";
 import { loadRailCounts } from "@/lib/nav-counts";
 import { SectionLabel } from "@/components/shell/SectionLabel";
 import { AccountMenu } from "@/components/shell/AccountMenu";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { NoFirmAccess } from "@/components/shell/NoFirmAccess";
 
 export const metadata: Metadata = { title: "Lectual" };
@@ -66,6 +67,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <div className="lx-vr" />
         <SectionLabel />
         <div style={{ flex: 1 }} />
+        <NotificationBell />
         <AccountMenu
           initials={initialsOf(displayName)}
           name={displayName}

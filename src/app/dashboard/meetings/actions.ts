@@ -149,6 +149,7 @@ export async function draftFollowUpAction(_prev: ActionState, formData: FormData
       headline: `Follow-up — ${name} (${meeting.title})`.slice(0, 200),
       summary: output.internal_summary,
       clientName: name,
+      leadId: lead.id,
       recipient: hasRealAddress ? lead.email : undefined,
       subject: output.subject,
       draftBody: output.body,
