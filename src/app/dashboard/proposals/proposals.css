@@ -144,3 +144,80 @@
 @media (max-width: 760px) {
   .pe-pcard-fees { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ============================================================
+   QUOTES & PROPOSALS LIST — the .pq-* block. Existing tokens and
+   lx-* classes only: a segment column, the consults strip and the
+   seven-column table to design-proposals-page.webp.
+   ============================================================ */
+
+.pq-layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 24px; align-items: stretch; min-height: 100%; }
+.pq-main { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.pq-mono { font-family: var(--mono); font-size: 12.5px; color: var(--muted); }
+
+/* left column */
+.pq-side { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.pq-segs { display: grid; gap: 4px; }
+.pq-segs-label { padding: 2px 0 8px; }
+.pq-seg {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 11px 12px; border-radius: 9px; font-size: 14.5px; color: var(--body);
+}
+.pq-seg:hover { text-decoration: none; background: var(--well); color: var(--ink); }
+.pq-seg[aria-current="page"] { background: var(--ox); color: var(--cream); font-weight: 500; }
+.pq-count { font-family: var(--mono); font-size: 11.5px; opacity: 0.8; }
+.pq-out { display: grid; gap: 6px; padding-top: 6px; }
+.pq-out-figure { font-family: var(--mono); font-size: 26px; letter-spacing: 0.08em; color: var(--ink); }
+.pq-out .lx-note { margin: 0; }
+.pq-note { margin: auto 0 0; padding-top: 18px; }
+
+/* consults strip */
+.pq-consults { padding: 12px 14px; display: grid; gap: 10px; }
+.pq-paste > summary { list-style: none; cursor: pointer; }
+.pq-paste > summary::-webkit-details-marker { display: none; }
+.pq-consults-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 2px 2px 0; }
+.pq-consults-title { font-size: 16px; color: var(--ink); }
+.pq-paste-btn { margin-left: auto; }
+.pq-paste-body { padding: 12px 2px 4px; }
+.pq-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+.pq-dot[data-kind="connected"] { background: var(--ok); }
+.pq-dot[data-kind="reauth"], .pq-dot[data-kind="unavailable"] { background: var(--wine); }
+.pq-mono[data-status="reauth"], .pq-mono[data-status="unavailable"] { color: var(--wine); }
+.pq-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.pq-row {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 12px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--card);
+}
+.pq-row[data-state="transcribing"] { background: var(--paper); }
+.pq-row-main { display: grid; gap: 2px; flex: 1 1 280px; min-width: 0; }
+.pq-name { font-size: 15.5px; color: var(--ink); }
+.pq-co { margin-left: 8px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ox); }
+.pq-cta { display: grid; gap: 4px; justify-items: end; }
+.pq-cta-msg { margin: 0; max-width: 360px; text-align: right; }
+.pq-consults-empty { display: grid; gap: 4px; padding: 10px 4px; font-size: 14.5px; color: var(--body); }
+.pq-more { padding: 0 4px 2px; font-size: 14px; }
+
+/* table */
+.pq-table-card { overflow: hidden; display: flex; flex-direction: column; }
+.pq-table-scroll { overflow: auto; }
+.pq-tbl { min-width: 980px; }
+.pq-tbl th { background: var(--well); }
+.pq-tbl td { height: 56px; vertical-align: middle; }
+.pq-tbl td.wrap { min-width: 0; }
+.pq-tbl td:first-child { min-width: 280px; }
+.pq-money { text-align: right; font-family: var(--mono); letter-spacing: 0.04em; white-space: nowrap; }
+.pq-filing { color: var(--warn); }
+.pq-expires { white-space: nowrap; }
+.pq-activity { color: var(--ink); font-size: 14px; }
+.pq-sub { margin-top: 2px; font-weight: 400; }
+.pq-foot {
+  display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  padding: 12px 18px; border-top: 1px solid var(--line); font-family: var(--mono); font-size: 12.5px; color: var(--muted);
+}
+
+@media (max-width: 900px) {
+  .pq-layout { grid-template-columns: minmax(0, 1fr); }
+  .pq-segs { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .pq-segs-label { grid-column: 1 / -1; }
+  .pq-note { margin-top: 0; }
+}

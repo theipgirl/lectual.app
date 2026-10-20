@@ -189,6 +189,16 @@ describe("fieldsForPackage (what the dropdown's change handler sets)", () => {
   });
 });
 
+describe("the server action files stay server actions", () => {
+  it.each(["src/app/dashboard/proposals/actions.ts", "src/app/dashboard/proposals/transcript-actions.ts", "src/app/dashboard/settings/proposals/actions.ts"])(
+    "%s starts with the use server directive (a client form imports it)",
+    async (file) => {
+      const { readFileSync } = await import("node:fs");
+      expect(readFileSync(file, "utf8").trimStart().startsWith('"use server"')).toBe(true);
+    },
+  );
+});
+
 describe("createProposalAction", () => {
   beforeEach(() => vi.resetModules());
 

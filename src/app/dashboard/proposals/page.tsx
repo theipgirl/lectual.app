@@ -2,208 +2,220 @@ import Link from "next/link";
 import { currentRole } from "@/lib/auth/current-role";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { firmCivilDate } from "@/lib/quotes/firm-time";
-import { formatCents } from "@/lib/quotes/money";
-import { formatShortFirmDate } from "@/lib/quotes/labels";
-import { relativeTime } from "@/lib/relative-time";
+import { formatDollars } from "@/lib/proposal-editor/events";
+import { firstNameOf } from "@/lib/proposal-editor/labels";
+import { listMemberDirectory } from "@/lib/members/directory";
 import { CAN_WRITE_LEAD } from "@/lib/pipeline/leads";
-import { listProposals, type ProposalListItem } from "@/lib/proposals/store";
+import { getProposalSettings, listLatestProposalEvents, listProposals, type ProposalListItem } from "@/lib/proposals/store";
 import { PROPOSAL_ADMIN_ROLES, PROPOSAL_STAFF_WRITE_ROLES } from "@/lib/proposals/types";
+import { normalisePackages } from "@/lib/proposals/package-list";
+import { buildProposalRowView, type ProposalRowView } from "@/lib/proposals/list-rows";
+import type { ActivityEvent } from "@/lib/proposals/list-labels";
 import {
-  PROPOSAL_DISPLAY_KEYS,
-  PROPOSAL_DISPLAY_LABEL,
-  parseDisplayFilter,
-  proposalDisplayStatus,
-  proposalDisplayTone,
-} from "@/lib/proposals/display-status";
+  PROPOSAL_SEGMENTS,
+  SEGMENT_LABEL,
+  inSegment,
+  outWithClientsCents,
+  parseSegment,
+  type ProposalSegment,
+} from "@/lib/proposals/segments";
+import { loadConsultsStrip, type ConsultsStripData } from "@/lib/proposals/consults-load";
 import { loadLeadOptions } from "@/lib/proposals/lead-options";
 import { loadDraftBlock } from "@/lib/consult-proposal/draft-gate";
 import { DRAFT_BLOCK_NOTE } from "@/lib/consult-proposal/draft-availability";
 import { MAX_PASTED_TRANSCRIPT_CHARS } from "@/lib/consult-proposal/types";
 import { TranscriptDraft } from "@/components/proposal-editor/TranscriptDraft";
+import { ConsultsStrip } from "@/components/proposal-list/ConsultsStrip";
+import { ProposalsTable } from "@/components/proposal-list/ProposalsTable";
+import { SegmentColumn } from "@/components/proposal-list/SegmentColumn";
 import { requireProposalsModule } from "./gate";
 import "./proposals.css";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Client proposals — one row per client offer (its newest version), over a
- * three-state read: rows, empty, or "couldn't load". An unreachable database
- * never renders as "No proposals yet".
+ * Quotes & proposals — one row per client offer (its newest version), over a three-state
+ * read: rows, empty, or "couldn't load". An unreachable database never renders as "No
+ * proposals yet", an unreachable queue of proposals never as "$0.00".
  *
- * The statuses are the ones the firm uses (Draft / Sent / Accepted / Expired /
- * Blocked, Closed under All), derived by `proposalDisplayStatus` from the stored
- * status, the expiry date and the rule breaks that would block approval. Chip
- * counts come from the unfiltered set. `?status=` takes the display keys; an
- * older stored value (approved, withdrawn, superseded) is mapped onto them.
+ * The page follows the approved design: a left column of five segments (Everything, Out with a
+ * client, Drafts and blocked, Accepted, Expired; counts from the unfiltered set; `?segment=`),
+ * the "Out with clients" dollar tile (the cheapest offered package's legal fee per Sent
+ * proposal, never a USPTO fee), the consults strip (Zoom / Fathom imports and their next step)
+ * and a seven-column table with the legal fee at signing and the USPTO fees at filing as two
+ * separate figures. The statuses are the ones the firm uses, derived by `proposalDisplayStatus`.
+ * An older `?status=` link is mapped onto the matching segment.
  *
- * Gate: the `proposals` module (notFound when off, so one firm cannot learn
- * what another has). Reading is for the whole firm (0089's select policy is
- * org members); starting a proposal is for the staff roles, and the action
- * re-checks that.
+ * Reads that only decorate (the newest event per proposal, member names, the settings'
+ * figures) degrade on their own: a failed events read leaves every Last activity cell with a
+ * derived line, and a failed settings read drops the dollar figures from the subtitle,
+ * footer and note rather than inventing defaults.
+ *
+ * Gate: the `proposals` module (notFound when off, so one firm cannot learn what another has).
+ * Reading is for the whole firm (0089's select policy is org members); starting a proposal is
+ * for the staff roles, and the actions re-check that.
  */
-export default async function ProposalsPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
+export default async function ProposalsPage({ searchParams }: { searchParams: Promise<{ segment?: string; status?: string }> }) {
   await requireProposalsModule();
-  const { status: statusRaw } = await searchParams;
-  const status = parseDisplayFilter(statusRaw);
+  const sp = await searchParams;
+  const segment: ProposalSegment = parseSegment(sp.segment) ?? parseSegment(sp.status) ?? "everything";
 
   const role = await currentRole();
   const canWrite = !!role && PROPOSAL_STAFF_WRITE_ROLES.includes(role);
   const canDraftFromTranscript = canWrite && CAN_WRITE_LEAD.includes(role);
 
-  let listed: ProposalListItem[] = [];
-  let failed = false;
-  try {
-    listed = await listProposals();
-  } catch {
-    failed = true;
-  }
-  const today = firmCivilDate(new Date(), await getFirmTimeZone());
-  const all = listed.map((r) => ({ row: r, display: proposalDisplayStatus(r, { today, issues: r.blocking_issue }) }));
-  const rows = status ? all.filter((r) => r.display.key === status) : all;
-  const counts = new Map<string, number>();
-  for (const r of all) counts.set(r.display.key, (counts.get(r.display.key) ?? 0) + 1);
+  const nowDate = new Date();
+  const now = nowDate.getTime();
+  const [tz, listedRead, settingsRead] = await Promise.all([
+    getFirmTimeZone(),
+    listProposals().then(
+      (rows) => ({ ok: true as const, rows }),
+      () => ({ ok: false as const }),
+    ),
+    getProposalSettings().then(
+      (row) => ({ ok: true as const, row }),
+      () => ({ ok: false as const }),
+    ),
+  ]);
+  const listed: ProposalListItem[] = listedRead.ok ? listedRead.rows : [];
+  const failed = !listedRead.ok;
+  const today = firmCivilDate(nowDate, tz);
 
-  const [leadsRead, draftBlock] = canDraftFromTranscript ? await Promise.all([loadLeadOptions(), loadDraftBlock()]) : [null, null];
+  const [events, names, strip, leadsRead, draftBlock] = await Promise.all([
+    listedRead.ok && listed.length > 0 ? readEvents(listed) : Promise.resolve(new Map<string, ActivityEvent>() as ReadonlyMap<string, ActivityEvent> | "unavailable"),
+    readNames(),
+    loadStrip(listed, now, tz),
+    canDraftFromTranscript ? loadLeadOptions() : Promise.resolve(null),
+    canDraftFromTranscript ? loadDraftBlock() : Promise.resolve(null),
+  ]);
+
+  const all = listed.map((item) => ({ item, view: buildProposalRowView(item, { today, tz, now, events, names }) }));
+  const counts = failed
+    ? null
+    : (Object.fromEntries(PROPOSAL_SEGMENTS.map((s) => [s, all.filter((r) => inSegment(s, r.view.key)).length])) as Record<ProposalSegment, number>);
+  const out = outWithClientsCents(failed ? null : all.map((r) => ({ displayKey: r.view.key, offered: r.item.offered })));
+  const rows: ProposalRowView[] = all.filter((r) => inSegment(segment, r.view.key)).map((r) => r.view);
+
+  // The default package's figures, from the firm's own settings; none (never defaults) when they couldn't be read.
+  const packages = settingsRead.ok ? normalisePackages(settingsRead.row?.pricing ?? {}) : null;
+  const first = packages?.[0] ?? null;
+  const subtitle = `${packages ? `${packages.length} published ${packages.length === 1 ? "package" : "packages"}, priced` : "Published packages, priced"} per class. Legal fees fall due at signing, USPTO fees at filing, and the two never add into one number.`;
+  const note = first
+    ? `Legal fees and USPTO fees never add into one number. Every class past the package adds ${formatDollars(first.per_class_cents)} legal and ${formatDollars(first.gov_per_class_cents)} government.`
+    : "Legal fees and USPTO fees never add into one number.";
+  const footerRight = first
+    ? `Government filing fees are ${formatDollars(first.gov_per_class_cents)} per class, paid before the application goes in.`
+    : "Government filing fees are paid before the application goes in.";
+  const footerLeft = segment === "everything" ? `All ${all.length} proposals` : `${rows.length} of ${all.length} proposals`;
+
+  const paste = canDraftFromTranscript
+    ? draftBlock ? (
+        <p className="lx-note" style={{ margin: 0 }} data-draft-block={draftBlock}>
+          {DRAFT_BLOCK_NOTE[draftBlock]}
+          {draftBlock === "no-settings" && (
+            <>
+              {" "}
+              <Link href="/dashboard/settings/proposals/">Open the settings</Link>
+            </>
+          )}
+        </p>
+      ) : leadsRead?.status === "ok" ? (
+        <TranscriptDraft leads={leadsRead.leads} maxChars={MAX_PASTED_TRANSCRIPT_CHARS} />
+      ) : (
+        <p className="lx-note" style={{ margin: 0 }}>
+          The leads couldn&apos;t be loaded just now, so this form isn&apos;t offered. This is a problem reaching the database, not an empty list. Try again shortly.
+        </p>
+      )
+    : null;
 
   return (
-    <>
-      <div className="lx-page-head">
-        <div style={{ flex: 1, minWidth: 260 }}>
-          <div className="lx-label">Intake</div>
-          <h1 className="lx-h1">Client proposals</h1>
-          <p className="lx-sub">
-            The page a client reviews and accepts after their strategy call. Only a named approver can approve one, and nothing
-            reaches a client until it is marked as sent. Legal fees and USPTO fees are always shown separately.
-          </p>
-        </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {role && PROPOSAL_ADMIN_ROLES.includes(role) && (
-            <Link href="/dashboard/settings/proposals/" className="lx-btn lx-btn-sec">
-              Settings
-            </Link>
-          )}
-          {canWrite && (
-            <Link href="/dashboard/proposals/new/" className="lx-btn lx-btn-pri">
-              New proposal
-            </Link>
-          )}
-        </div>
-      </div>
+    <div className="pq-layout">
+      <SegmentColumn active={segment} counts={counts} out={out} note={note} />
 
-      {canDraftFromTranscript && (
-        <details className="lx-card lx-disclosure">
-          <summary>Draft from a transcript</summary>
-          <div style={{ padding: "12px 18px 18px" }}>
-            {draftBlock ? (
-              <p className="lx-note" style={{ margin: 0 }} data-draft-block={draftBlock}>
-                {DRAFT_BLOCK_NOTE[draftBlock]}
-                {draftBlock === "no-settings" && (
-                  <>
-                    {" "}
-                    <Link href="/dashboard/settings/proposals/">Open the settings</Link>
-                  </>
-                )}
-              </p>
-            ) : leadsRead?.status === "ok" ? (
-              <TranscriptDraft leads={leadsRead.leads} maxChars={MAX_PASTED_TRANSCRIPT_CHARS} />
-            ) : (
-              <p className="lx-note" style={{ margin: 0 }}>
-                The leads couldn&apos;t be loaded just now, so this form isn&apos;t offered. This is a problem reaching the database, not an empty list. Try again shortly.
-              </p>
+      <div className="pq-main">
+        <div className="lx-page-head">
+          <div style={{ flex: 1, minWidth: 260 }}>
+            <h1 className="lx-h1">Quotes &amp; proposals</h1>
+            <p className="lx-sub">{subtitle}</p>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {role && PROPOSAL_ADMIN_ROLES.includes(role) && (
+              <Link href="/dashboard/settings/proposals/" className="lx-btn lx-btn-sec">
+                Settings
+              </Link>
+            )}
+            {canWrite && (
+              <Link href="/dashboard/proposals/new/" className="lx-btn lx-btn-pri">
+                New proposal
+              </Link>
             )}
           </div>
-        </details>
-      )}
+        </div>
 
-      {!failed && all.length > 0 && (
-        <nav aria-label="Filter proposals by status" className="lx-chips">
-          <Link href="/dashboard/proposals/" aria-current={!status ? "page" : undefined}>
-            All
-            <span className="lx-chip-count">{all.length}</span>
-          </Link>
-          {PROPOSAL_DISPLAY_KEYS.map((key) => {
-            const count = counts.get(key) ?? 0;
-            // Closed is listed under All; it is a chip only while you are on it.
-            if (key === "closed" ? status !== "closed" : count === 0 && status !== key) return null;
-            return (
-              <Link key={key} href={`/dashboard/proposals/?status=${key}`} aria-current={status === key ? "page" : undefined}>
-                {PROPOSAL_DISPLAY_LABEL[key]}
-                <span className="lx-chip-count">{count}</span>
-              </Link>
-            );
-          })}
-        </nav>
-      )}
+        <ConsultsStrip data={strip} canDraft={canDraftFromTranscript} draftNote={draftBlock ? DRAFT_BLOCK_NOTE[draftBlock] : null} paste={paste} />
 
-      {failed ? (
-        <div className="lx-card lx-empty-card">
-          <h2 className="lx-h2" style={{ fontSize: 25 }}>
-            Proposals couldn&apos;t be loaded
-          </h2>
-          <p className="lx-note" style={{ margin: 0 }}>
-            This is a problem reaching the database, not an empty list. Try again shortly.
-          </p>
-        </div>
-      ) : rows.length === 0 ? (
-        <div className="lx-card lx-empty-card">
-          <h2 className="lx-h2" style={{ fontSize: 25 }}>
-            {all.length === 0 ? "No proposals yet" : "Nothing matches"}
-          </h2>
-          <p className="lx-note" style={{ margin: 0 }}>
-            {all.length === 0
-              ? canWrite
-                ? "Start one from a lead, or with New proposal. It stays a draft until a named approver approves it."
-                : "When one is started it will be listed here."
-              : "Every proposal is still here. Try another filter."}
-          </p>
-        </div>
-      ) : (
-        <div className="lx-card" style={{ overflow: "auto" }}>
-          <table className="lx-tbl" style={{ minWidth: 860 }}>
-            <thead>
-              <tr>
-                <th>Client</th>
-                <th>Version</th>
-                <th>Status</th>
-                <th style={{ textAlign: "right" }}>Legal fee</th>
-                <th style={{ textAlign: "right" }}>USPTO fees</th>
-                <th>Expires</th>
-                <th>Updated</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(({ row: r, display }) => (
-                <tr key={r.id}>
-                  <td className="pri wrap">
-                    <Link href={`/dashboard/proposals/${r.id}/`} className="lx-rowlink">
-                      {r.client_name}
-                    </Link>
-                    <div className="lx-note">{r.title}</div>
-                  </td>
-                  <td className="lx-num">v{r.version}</td>
-                  <td>
-                    <span className={`lx-pill lx-pill-${proposalDisplayTone(display.key)}`}>{display.label}</span>
-                    {display.sub && <div className="lx-note">{display.sub}</div>}
-                  </td>
-                  <td className="lx-num" style={{ textAlign: "right" }}>
-                    {formatCents(r.legal_total_cents)}
-                  </td>
-                  <td className="lx-num" style={{ textAlign: "right" }}>
-                    {formatCents(r.gov_total_cents)}
-                  </td>
-                  <td className="lx-num">{r.expires_on ? formatShortFirmDate(`${r.expires_on}T12:00:00Z`, "UTC") : <span className="lx-note">—</span>}</td>
-                  <td className="lx-num">{relativeTime(r.updated_at)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      {!failed && rows.length > 0 && (
-        <p className="lx-note" style={{ margin: 0 }}>
-          Fees are for the offer as first shown (what is pre-ticked); once accepted, the amounts the client chose.
-        </p>
-      )}
-    </>
+        {failed ? (
+          <div className="lx-card lx-empty-card">
+            <h2 className="lx-h2" style={{ fontSize: 25 }}>
+              Proposals couldn&apos;t be loaded
+            </h2>
+            <p className="lx-note" style={{ margin: 0 }}>
+              This is a problem reaching the database, not an empty list. Try again shortly.
+            </p>
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="lx-card lx-empty-card">
+            <h2 className="lx-h2" style={{ fontSize: 25 }}>
+              {all.length === 0 ? "No proposals yet" : "Nothing matches"}
+            </h2>
+            <p className="lx-note" style={{ margin: 0 }}>
+              {all.length === 0
+                ? canWrite
+                  ? "Start one from a consult above, a lead, or with New proposal. It stays a draft until a named approver approves it."
+                  : "When one is started it will be listed here."
+                : `Nothing is under ${SEGMENT_LABEL[segment]}. Every proposal is still under Everything.`}
+            </p>
+          </div>
+        ) : (
+          <ProposalsTable rows={rows} footerLeft={footerLeft} footerRight={footerRight} />
+        )}
+      </div>
+    </div>
   );
+}
+
+/** The newest event per proposal; "unavailable" when the read fails, so every cell falls back to a derived line. */
+async function readEvents(listed: ProposalListItem[]): Promise<ReadonlyMap<string, ActivityEvent> | "unavailable"> {
+  try {
+    return await listLatestProposalEvents(listed.map((r) => r.id));
+  } catch {
+    return "unavailable";
+  }
+}
+
+/** user id -> a first name, for "Edited 3h ago · Taylor". Best effort: a failed read drops names, never shows ids. */
+async function readNames(): Promise<ReadonlyMap<string, string>> {
+  const out = new Map<string, string>();
+  try {
+    for (const m of await listMemberDirectory()) {
+      const name = firstNameOf(m.displayName) ?? firstNameOf(m.email);
+      if (name) out.set(m.userId, name);
+    }
+  } catch {
+    /* names are cosmetic */
+  }
+  return out;
+}
+
+/** The consults strip's data. Never throws: an unexpected failure is the strip's own "couldn't load". */
+async function loadStrip(listed: ProposalListItem[], now: number, tz: string): Promise<ConsultsStripData> {
+  try {
+    return await loadConsultsStrip({
+      now,
+      tz,
+      proposals: listed.map((r) => ({ id: r.id, leadId: r.lead_id, createdAt: r.created_at, source: r.source })),
+    });
+  } catch {
+    return { header: { title: "Consults", status: { kind: "unavailable", text: "connection status couldn't be loaded" } }, meetings: { status: "unavailable" } };
+  }
 }
