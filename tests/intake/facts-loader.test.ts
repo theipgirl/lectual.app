@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import type { Lead, Stage } from "@/lib/pipeline";
-import { loadTemperatureFacts, type FactsDb } from "@/lib/intake/facts";
+import { loadTemperatureFacts, type FactsDb, type FactsQuery } from "@/lib/intake/facts";
 import { buildIntakeRows } from "@/lib/intake/rows";
 
 const NOW = new Date("2026-10-20T12:00:00.000Z");
@@ -17,7 +17,7 @@ function fakeDb(tables: Tables) {
       calls.push(`from:${table}`);
       const filters: Array<(r: Row) => boolean> = [];
       let slice: [number, number] | null = null;
-      const q: any = {
+      const q: FactsQuery = {
         select: () => (calls.push("select"), q),
         in: (col: string, vals: readonly unknown[]) => (calls.push("in"), filters.push((r) => vals.includes(r[col])), q),
         eq: (col: string, val: unknown) => (calls.push("eq"), filters.push((r) => r[col] === val), q),
@@ -31,7 +31,7 @@ function fakeDb(tables: Tables) {
           const data = slice ? rows.slice(slice[0], slice[1] + 1) : rows;
           return Promise.resolve({ data, error: null }).then(ok, bad);
         },
-      };
+      } as unknown as FactsQuery;
       return q;
     },
   };

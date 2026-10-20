@@ -4,6 +4,7 @@
  * importers), so every field is read defensively.
  */
 import { STOP_REASON_LABEL, isStopReason } from "@/lib/campaigns/stops";
+import { CONSULT_OUTCOME_LABEL, isConsultOutcome } from "@/lib/pipeline/consult-outcome-labels";
 
 type Row = { type: string; actor_type: string | null; created_at: string; payload: unknown };
 
@@ -80,6 +81,10 @@ export function describeActivity(row: Row): Described {
       // addNote (src/lib/pipeline/notes.ts) writes `note`; older producers wrote `body`/`text`.
       return { title: "Note", detail: str(p.note) ?? str(p.body) ?? str(p.text), tone: "note", link: null };
     case "call_logged":
+      // logConsultOutcome (src/lib/pipeline/consult-outcome.ts): the outcome is the title, the note the detail.
+      if (isConsultOutcome(p.consult_outcome)) {
+        return { title: CONSULT_OUTCOME_LABEL[p.consult_outcome], detail: str(p.notes) ?? str(p.body), tone: "note", link: null };
+      }
       return { title: "Call logged", detail: str(p.summary) ?? str(p.notes) ?? str(p.body), tone: "note", link: null };
     case "voice_note":
       return { title: "Voice note", detail: str(p.transcript), tone: "note", link: null };
