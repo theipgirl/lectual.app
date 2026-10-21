@@ -258,7 +258,9 @@ describe("updateMatterNotes role gating", () => {
     expect(result.id).toBe("matter-1");
 
     expect(mockFrom).toHaveBeenCalledWith("crm_matter");
-    const updateCall = state.queries[0].calls.find(([name]) => name === "update");
+    // Sprint 8: the notes are read first (to know whether they changed), so the update is not query 0.
+    const updateQuery = state.queries.find((q) => q.calls.some(([name]) => name === "update"));
+    const updateCall = updateQuery?.calls.find(([name]) => name === "update");
     expect(updateCall).toBeTruthy();
     const payload = updateCall![1][0] as Record<string, unknown>;
     expect(payload.notes).toBe("Client wants an expedited filing.");

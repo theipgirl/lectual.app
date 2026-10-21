@@ -245,9 +245,45 @@ export function diffLeadColumns(
 
 export const NOTE_MAX_LENGTH = 5000;
 
-/** Note/call/email-log kinds a human can write from the lead timeline composer. */
-export const NOTE_KINDS = ["note", "call_logged", "email_sent"] as const;
+/**
+ * Note/call/email-log/meeting kinds a human can write from a timeline composer
+ * (lead or matter). `meeting` has no activity type of its own (that would need a
+ * migration), so it is stored as a `note` row tagged `entry: "meeting"`; see
+ * noteEntry.
+ */
+export const NOTE_KINDS = ["note", "call_logged", "email_sent", "meeting"] as const;
 export type NoteKind = (typeof NOTE_KINDS)[number];
+
+/** The composer's four choices, in order. Both timeline composers read this one list. */
+export const NOTE_KIND_OPTIONS: ReadonlyArray<readonly [NoteKind, string]> = [
+  ["note", "Note"],
+  ["call_logged", "Call"],
+  ["email_sent", "Email (logged)"],
+  ["meeting", "Meeting"],
+];
+
+/**
+ * The activity row a validated entry becomes. Payload keys are the ones the
+ * timeline describer already reads per type, so each reads as one line:
+ * a call carries `summary` + `notes`, a logged email `subject` + `body` +
+ * `logged_manually`, a note `note`, and a meeting is a note with `entry: "meeting"`.
+ */
+export function noteEntry(
+  kind: NoteKind,
+  body: string,
+  subject: string | null,
+): { type: "note" | "call_logged" | "email_sent"; payload: Record<string, unknown> } {
+  switch (kind) {
+    case "call_logged":
+      return { type: "call_logged", payload: { summary: subject ?? body, notes: body } };
+    case "email_sent":
+      return { type: "email_sent", payload: { subject: subject ?? body.slice(0, 120), body, logged_manually: true } };
+    case "meeting":
+      return { type: "note", payload: { note: body, entry: "meeting" } };
+    default:
+      return { type: "note", payload: { note: body, ...(subject ? { subject } : {}) } };
+  }
+}
 
 export function isNoteKind(value: unknown): value is NoteKind {
   return typeof value === "string" && (NOTE_KINDS as readonly string[]).includes(value);

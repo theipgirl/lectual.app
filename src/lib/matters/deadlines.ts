@@ -1,7 +1,9 @@
 import { getScopedClient } from "@/lib/db/scoped-client";
 import type { Database } from "@/lib/db/types";
 import { requireMatterWriteRole } from "./matters";
-import { logActivity } from "./activity";
+import { logActivity, logActivitySafe } from "./activity";
+import { recordNotFoundError } from "./not-found";
+import { validateDeadlineEdit, type DeadlineEditInput } from "./deadline-edit";
 import {
   type DeadlineKind,
   type DeadlineSource,
@@ -41,6 +43,13 @@ export type MatterDeadline = Database["public"]["Tables"]["crm_matter_deadline"]
  * Rebecca P. Beliard, the founding attorney, holds the owner seat — hence both.
  */
 export const DEADLINE_CONFIRM_ROLES = ["owner", "attorney"] as const;
+
+/**
+ * Roles that may delete a docket entry: the same set crm_matter_deadline_delete_admin
+ * (the RLS delete policy) allows. The app adds a narrower rule on top: a
+ * CONFIRMED entry is never deleted, whoever asks (see deleteDeadline).
+ */
+export const DEADLINE_DELETE_ROLES = ["owner", "admin", "senior_admin"] as const;
 
 export type CreateDeadlineInput = {
   matterId: string;
@@ -246,9 +255,10 @@ export async function confirmDeadline(id: string): Promise<MatterDeadline> {
 }
 
 /**
- * Closes a docket entry out. Entries are never deleted from the app (delete is
- * admin-only at the RLS layer): the file keeps the record of what was due and
- * what happened to it.
+ * Closes a docket entry out (satisfied, waived or superseded). Closing keeps the
+ * record of what was due and what happened to it; the only way an entry leaves
+ * the docket is deleteDeadline, which is limited to owner/admin/senior_admin and
+ * never applies to a confirmed date.
  */
 export async function closeDeadline(
   id: string,
@@ -343,4 +353,153 @@ export async function extendDeadline(id: string, newDueDate: string): Promise<Ma
   });
 
   return data;
+}
+
+/**
+ * Edits an OPEN entry's due date and title. Staff-gated. The entry is read first
+ * through the scoped client (a missing or foreign id is "not found").
+ *
+ * Moving the date always clears the attorney confirmation (confirmed, confirmer,
+ * time) in the same write: a confirmation must not outlive the date it
+ * confirmed. A title-only edit leaves the confirmation alone. This is a
+ * correction, not a granted extension, so extensions_used is not touched.
+ */
+export async function updateDeadline(id: string, input: DeadlineEditInput): Promise<MatterDeadline> {
+  const supabase = await getScopedClient();
+  await requireMatterWriteRole(supabase);
+
+  const { data: current, error: readError } = await supabase
+    .from("crm_matter_deadline")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (readError) throw readError;
+  if (!current) throw recordNotFoundError("deadline");
+  if (current.status !== "open") {
+    throw new Error("Only an open deadline can be edited. Reopen it first.");
+  }
+
+  const checked = validateDeadlineEdit(input, current);
+  if (!checked.ok) throw new Error(checked.error);
+  if (checked.fields.length === 0) return current;
+
+  const { data, error } = await supabase
+    .from("crm_matter_deadline")
+    .update({
+      ...checked.patch,
+      ...(checked.dateMoved ? { attorney_confirmed: false, confirmed_by: null, confirmed_at: null } : {}),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error) throw error;
+
+  await logActivitySafe({
+    type: "matter_updated",
+    matterId: data.matter_id,
+    payload: {
+      change: "deadline_edited",
+      kind: data.kind,
+      due_date: data.due_date,
+      ...(checked.dateMoved ? { from: current.due_date } : {}),
+      confirmation_cleared: checked.dateMoved && current.attorney_confirmed,
+      title_changed: checked.patch.title !== undefined,
+    },
+  });
+  return data;
+}
+
+/**
+ * Puts a closed entry (satisfied, waived or superseded) back on the docket as
+ * open and clears the satisfied time. The date did not move, so the attorney
+ * confirmation stays as it was. Refuses an entry that is already open. If the
+ * matter already has another open entry of the same kind (0053's one-open-per-
+ * kind index), says so instead of surfacing the constraint.
+ */
+export async function reopenDeadline(id: string): Promise<MatterDeadline> {
+  const supabase = await getScopedClient();
+  await requireMatterWriteRole(supabase);
+
+  const { data: current, error: readError } = await supabase
+    .from("crm_matter_deadline")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (readError) throw readError;
+  if (!current) throw recordNotFoundError("deadline");
+  if (current.status === "open") throw new Error("This deadline is already open.");
+
+  const { data, error } = await supabase
+    .from("crm_matter_deadline")
+    .update({ status: "open", satisfied_at: null, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error) {
+    if ((error as { code?: string }).code === "23505") {
+      throw new Error(
+        `This matter already has another open "${deadlineKindLabel(current.kind)}" deadline. Close that one out or edit its date first.`,
+      );
+    }
+    throw error;
+  }
+
+  await logActivitySafe({
+    type: "matter_updated",
+    matterId: data.matter_id,
+    payload: { change: "deadline_reopened", kind: data.kind, from_status: current.status, due_date: data.due_date },
+  });
+  return data;
+}
+
+/**
+ * Removes a docket entry. Owner, admin or senior_admin only, and NEVER a
+ * confirmed entry: an attorney-confirmed date is part of the file's record and
+ * has to be reopened and re-handled, not erased. The entry is read first, so a
+ * missing or foreign id is "not found" and a refused delete leaves the row and
+ * logs nothing.
+ *
+ * The timeline row outlives the entry (activity is keyed to the matter, not to
+ * the deadline), so it records the kind, title and due date.
+ */
+export async function deleteDeadline(id: string): Promise<void> {
+  const supabase = await getScopedClient();
+  const { data: role, error: roleError } = await supabase.rpc("current_org_role");
+  if (roleError) throw roleError;
+  if (typeof role !== "string" || !(DEADLINE_DELETE_ROLES as readonly string[]).includes(role)) {
+    throw new Error("Only an owner or an admin can delete a deadline.");
+  }
+
+  const { data: current, error: readError } = await supabase
+    .from("crm_matter_deadline")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (readError) throw readError;
+  if (!current) throw recordNotFoundError("deadline");
+  if (current.attorney_confirmed) {
+    throw new Error("An attorney-confirmed deadline can't be deleted. Close it out instead.");
+  }
+
+  const { data: removed, error } = await supabase
+    .from("crm_matter_deadline")
+    .delete()
+    .eq("id", id)
+    .select("id");
+  if (error) throw error;
+  // RLS filters a delete it doesn't allow down to zero rows without an error.
+  if (!removed || removed.length === 0) throw new Error("That deadline couldn't be deleted.");
+
+  await logActivitySafe({
+    type: "matter_updated",
+    matterId: current.matter_id,
+    payload: {
+      change: "deadline_deleted",
+      kind: current.kind,
+      title: current.title,
+      due_date: current.due_date,
+      status: current.status,
+    },
+  });
 }

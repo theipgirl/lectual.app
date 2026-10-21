@@ -32,6 +32,13 @@ import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import { isMatterStatus } from "@/lib/matters/status";
 import { MATTER_TYPE_MODULE, isMatterType, requiresExplicitMatterNumber } from "@/lib/matters/matter-types";
 import { updateMatterStage } from "@/lib/matters/stages";
+import { updateMatterHeader } from "@/lib/matters/matters";
+import { addMatterNote } from "@/lib/matters/notes";
+import { DEADLINE_DELETE_ROLES, deleteDeadline, reopenDeadline, updateDeadline } from "@/lib/matters/deadlines";
+import { deleteTask, updateTask } from "@/lib/matters/tasks";
+import { addContactToMatter, linkContactToMatter, searchContacts, updateContact } from "@/lib/matters/contacts";
+import { contactLabel, type ContactFieldsInput } from "@/lib/matters/contact-input";
+import type { MatterHeaderInput } from "@/lib/matters/header-edit";
 import { blankToNull, isFilingBasis, parseCivilDate, parseInternationalClasses } from "@/lib/matters/ip-fields";
 import { isDeadlineKind, isDeadlineSource, isDeadlineStatus } from "@/lib/matters/deadline-rules";
 import { upsertLitigationDetail, type LitigationDetailInput } from "@/lib/matters/litigation";
@@ -63,6 +70,22 @@ export async function requireMatterWriteRole(): Promise<Role> {
 }
 
 export type ActionState = { error?: string; saved?: boolean };
+
+/** A save that also has something to tell the person ("Already linked to this matter."). */
+export type MessageActionState = ActionState & { message?: string };
+
+/** What the contact search panel needs about a match; nothing else about the contact leaves the server. */
+export type ContactHit = {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  companyName: string | null;
+  linked: boolean;
+};
+
+/** `searched` is false before the first search; a failed search is `error`, never an empty `hits`. */
+export type ContactSearchState = { error?: string; searched?: boolean; tooShort?: boolean; hits?: ContactHit[] };
 
 function revalidateMatter(matterId?: string) {
   if (matterId) revalidatePath(`/dashboard/matters/${matterId}/`);
@@ -547,4 +570,238 @@ export async function queueMonthlyStatusUpdateAction(
   revalidatePath(`/dashboard/matters/${matterId}/`);
   revalidatePath("/dashboard/team-status");
   return { queueItemId };
+}
+
+/** Reads only the contact fields the form posted, so one form can't blank another's. */
+function readContactFields(formData: FormData): ContactFieldsInput {
+  const input: ContactFieldsInput = {};
+  const map: Array<[keyof ContactFieldsInput, string]> = [
+    ["firstName", "firstName"],
+    ["lastName", "lastName"],
+    ["businessName", "businessName"],
+    ["email", "email"],
+    ["phone", "phone"],
+    ["companyName", "companyName"],
+  ];
+  for (const [key, field] of map) {
+    if (formData.has(field)) input[key] = String(formData.get(field) ?? "");
+  }
+  return input;
+}
+
+/**
+ * Edits the matter header: title, package, type and "Came from". Only the fields
+ * the form posted are considered; the data layer writes only those that changed
+ * and logs "Matter details updated". Litigation can't be changed to or from.
+ */
+export async function updateMatterHeaderAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const matterId = String(formData.get("matterId") ?? "");
+  if (!matterId) return { error: "Missing matter." };
+
+  const input: MatterHeaderInput = {};
+  if (formData.has("title")) input.title = String(formData.get("title") ?? "");
+  if (formData.has("packageName")) input.packageName = String(formData.get("packageName") ?? "");
+  if (formData.has("type")) input.type = String(formData.get("type") ?? "");
+  if (formData.has("referralSource")) input.referralSource = String(formData.get("referralSource") ?? "");
+
+  try {
+    await requireMatterWriteRole();
+    await updateMatterHeader(matterId, input);
+  } catch (err) {
+    return { error: friendlyMatterError(err, "Couldn't save these details.") };
+  }
+  revalidateMatter(matterId);
+  return { saved: true };
+}
+
+/** Searches this firm's contacts for the "Link or add contact" panel. A failed search says so. */
+export async function searchContactsAction(_prev: ContactSearchState, formData: FormData): Promise<ContactSearchState> {
+  const matterId = String(formData.get("matterId") ?? "");
+  if (!matterId) return { error: "Missing matter." };
+
+  try {
+    await requireMatterWriteRole();
+    const result = await searchContacts(matterId, String(formData.get("q") ?? ""));
+    if (result.status === "error") return { error: "Couldn't search contacts right now. Try again.", searched: true };
+    return {
+      searched: true,
+      tooShort: result.tooShort,
+      hits: result.contacts.map((c) => ({
+        id: c.id,
+        name: contactLabel(c),
+        email: c.email,
+        phone: c.phone,
+        companyName: c.company_name,
+        linked: c.linked,
+      })),
+    };
+  } catch (err) {
+    return { error: friendlyMatterError(err, "Couldn't search contacts right now. Try again.") };
+  }
+}
+
+/** Links an existing contact. Linking one that is already linked changes nothing and says so. */
+export async function linkContactAction(_prev: MessageActionState, formData: FormData): Promise<MessageActionState> {
+  const matterId = String(formData.get("matterId") ?? "");
+  const contactId = String(formData.get("contactId") ?? "");
+  if (!matterId || !contactId) return { error: "Choose a contact to link." };
+
+  let created: boolean;
+  try {
+    await requireMatterWriteRole();
+    ({ created } = await linkContactToMatter(matterId, contactId));
+  } catch (err) {
+    return { error: friendlyMatterError(err, "Couldn't link this contact.") };
+  }
+  revalidateMatter(matterId);
+  return { saved: true, message: created ? "Linked." : "Already linked to this matter." };
+}
+
+/** Adds a new contact and links it. A new contact with an existing email links that contact instead. */
+export async function addContactAction(_prev: MessageActionState, formData: FormData): Promise<MessageActionState> {
+  const matterId = String(formData.get("matterId") ?? "");
+  if (!matterId) return { error: "Missing matter." };
+
+  let message: string;
+  try {
+    await requireMatterWriteRole();
+    const added = await addContactToMatter(matterId, readContactFields(formData));
+    const who = contactLabel(added.contact);
+    message = added.contactCreated
+      ? `${who} was added and linked.`
+      : added.linkCreated
+        ? `${who} already has that email, so that contact was linked instead of adding a second one.`
+        : `${who} is already linked to this matter.`;
+  } catch (err) {
+    return { error: friendlyMatterError(err, "Couldn't add this contact.") };
+  }
+  revalidateMatter(matterId);
+  return { saved: true, message };
+}
+
+/** Edits a linked contact's name, email, phone and company. A contact is shared, so the change shows wherever it is linked. */
+export async function editContactAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const matterId = String(formData.get("matterId") ?? "");
+  const contactId = String(formData.get("contactId") ?? "");
+  if (!matterId || !contactId) return { error: "Missing contact." };
+
+  try {
+    await requireMatterWriteRole();
+    await updateContact(matterId, contactId, readContactFields(formData));
+  } catch (err) {
+    return { error: friendlyMatterError(err, "Couldn't save this contact.") };
+  }
+  revalidateMatter(matterId);
+  return { saved: true };
+}
+
+/**
+ * Logs a note, call, email or meeting on the matter's timeline. The row IS the
+ * mutation, so a failed insert reaches the person who typed it. Nothing is sent.
+ */
+export async function addMatterNoteAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const matterId = String(formData.get("matterId") ?? "");
+  if (!matterId) return { error: "Missing matter." };
+
+  try {
+    await requireMatterWriteRole();
+    await addMatterNote(matterId, {
+      kind: String(formData.get("kind") ?? "note"),
+      body: String(formData.get("body") ?? ""),
+      subject: String(formData.get("subject") ?? ""),
+    });
+  } catch (err) {
+    return { error: friendlyMatterError(err, "Couldn't add this to the timeline.") };
+  }
+  revalidatePath(`/dashboard/matters/${matterId}/`);
+  return { saved: true };
+}
+
+/** Edits an open deadline's date and title. Moving the date clears the attorney confirmation. */
+export async function updateDeadlineAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const deadlineId = String(formData.get("deadlineId") ?? "");
+  const matterId = String(formData.get("matterId") ?? "");
+  if (!deadlineId) return { error: "Missing deadline." };
+
+  try {
+    await requireMatterWriteRole();
+    await updateDeadline(deadlineId, {
+      ...(formData.has("dueDate") ? { dueDate: String(formData.get("dueDate") ?? "") } : {}),
+      ...(formData.has("title") ? { title: String(formData.get("title") ?? "") } : {}),
+    });
+  } catch (err) {
+    return { error: friendlyMatterError(err, "Couldn't save this deadline.") };
+  }
+  revalidateMatter(matterId);
+  return { saved: true };
+}
+
+/** Puts a closed deadline back on the docket as open. */
+export async function reopenDeadlineAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const deadlineId = String(formData.get("deadlineId") ?? "");
+  const matterId = String(formData.get("matterId") ?? "");
+  if (!deadlineId) return { error: "Missing deadline." };
+
+  try {
+    await requireMatterWriteRole();
+    await reopenDeadline(deadlineId);
+  } catch (err) {
+    return { error: friendlyMatterError(err, "Couldn't reopen this deadline.") };
+  }
+  revalidateMatter(matterId);
+  return {};
+}
+
+/** Deletes an unconfirmed deadline. Owner, admin and senior_admin only; the data layer checks again. */
+export async function deleteDeadlineAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const deadlineId = String(formData.get("deadlineId") ?? "");
+  const matterId = String(formData.get("matterId") ?? "");
+  if (!deadlineId) return { error: "Missing deadline." };
+
+  try {
+    const role = await requireMatterWriteRole();
+    if (!(DEADLINE_DELETE_ROLES as readonly string[]).includes(role)) {
+      return { error: "Only an owner or an admin can delete a deadline." };
+    }
+    await deleteDeadline(deadlineId);
+  } catch (err) {
+    return { error: friendlyMatterError(err, "Couldn't delete this deadline.") };
+  }
+  revalidateMatter(matterId);
+  return {};
+}
+
+/** Edits a task's title, due date and assignee. The timeline row goes to the task's own matter. */
+export async function updateTaskAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const taskId = String(formData.get("taskId") ?? "");
+  const matterId = String(formData.get("matterId") ?? "");
+  if (!taskId) return { error: "Missing task." };
+
+  try {
+    await requireMatterWriteRole();
+    await updateTask(taskId, {
+      ...(formData.has("title") ? { title: String(formData.get("title") ?? "") } : {}),
+      ...(formData.has("dueAt") ? { dueAt: String(formData.get("dueAt") ?? "") } : {}),
+      ...(formData.has("assigneeId") ? { assigneeId: String(formData.get("assigneeId") ?? "") } : {}),
+    });
+  } catch (err) {
+    return { error: friendlyMatterError(err, "Couldn't save this task.") };
+  }
+  if (matterId) revalidatePath(`/dashboard/matters/${matterId}/`);
+  return { saved: true };
+}
+
+export async function deleteTaskAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const taskId = String(formData.get("taskId") ?? "");
+  const matterId = String(formData.get("matterId") ?? "");
+  if (!taskId) return { error: "Missing task." };
+
+  try {
+    await requireMatterWriteRole();
+    await deleteTask(taskId);
+  } catch (err) {
+    return { error: friendlyMatterError(err, "Couldn't delete this task.") };
+  }
+  if (matterId) revalidatePath(`/dashboard/matters/${matterId}/`);
+  return {};
 }

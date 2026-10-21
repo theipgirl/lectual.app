@@ -68,7 +68,19 @@ export type ClientNameSource = "contact" | "lead" | "owner_name" | "none";
 export async function resolveMatterClientName(
   matter: Pick<MatterRow, "id" | "lead_id" | "owner_name">,
 ): Promise<{ name: string | null; source: ClientNameSource }> {
-  const contact = await primaryClientContact(matter.id);
+  return resolveMatterClientNameFrom(matter, await primaryClientContact(matter.id));
+}
+
+/**
+ * The same chain as resolveMatterClientName, for a caller that has already read
+ * the matter's client contact (the matter page reads its contacts once, with
+ * three states, and must not read them a second time here). `contact` is null
+ * when there is none or when the read failed; the caller decides what to say.
+ */
+export async function resolveMatterClientNameFrom(
+  matter: Pick<MatterRow, "lead_id" | "owner_name">,
+  contact: Pick<Contact, "business_name" | "first_name" | "last_name"> | null,
+): Promise<{ name: string | null; source: ClientNameSource }> {
   const contactName = contactDisplayName(contact);
   if (contactName) return { name: contactName, source: "contact" };
 

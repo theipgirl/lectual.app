@@ -1,6 +1,10 @@
 import { getScopedClient } from "@/lib/db/scoped-client";
 import type { Database } from "@/lib/db/types";
+import { listMemberDirectory } from "@/lib/members/directory";
 import { requireMatterWriteRole } from "./matters";
+import { logActivitySafe } from "./activity";
+import { recordNotFoundError } from "./not-found";
+import { validateTaskEdit, type TaskEditInput } from "./task-edit";
 
 export type Task = Database["public"]["Tables"]["crm_task"]["Row"];
 
@@ -114,4 +118,115 @@ export async function completeTask(id: string): Promise<Task> {
     .single();
   if (error) throw error;
   return data;
+}
+
+/**
+ * Where a task's timeline rows go: the task's own matter, else its lead. Taken
+ * from the task row we just read, never from an id the form posted.
+ */
+function taskActivityTarget(task: Pick<Task, "matter_id" | "lead_id">): { matterId: string } | { leadId: string } | null {
+  if (task.matter_id) return { matterId: task.matter_id };
+  if (task.lead_id) return { leadId: task.lead_id };
+  return null;
+}
+
+/**
+ * Edits a task's title, due date and assignee. Staff-gated. The task is read
+ * first through the scoped client (a missing or foreign id is "not found"), and
+ * only the changed columns are written.
+ *
+ * An assignee must be a member of this firm, checked against the member
+ * directory. If the directory can't be read the assignment is refused rather
+ * than allowed unchecked. Clearing the assignee needs no check.
+ *
+ * Logs "Task edited" (field names) for a title or date change and "Task
+ * assigned" (the new assignee's id, or none) for an assignee change.
+ */
+export async function updateTask(id: string, input: TaskEditInput): Promise<{ task: Task; fields: string[] }> {
+  const supabase = await getScopedClient();
+  await requireMatterWriteRole(supabase);
+
+  const { data: current, error: readError } = await supabase
+    .from("crm_task")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (readError) throw readError;
+  if (!current) throw recordNotFoundError("task");
+
+  const checked = validateTaskEdit(input, current);
+  if (!checked.ok) throw new Error(checked.error);
+  if (checked.fields.length === 0) return { task: current, fields: [] };
+
+  const newAssignee = checked.patch.assignee_id;
+  if (newAssignee) {
+    let members;
+    try {
+      members = await listMemberDirectory();
+    } catch {
+      throw new Error("Couldn't check the team list right now, so the task wasn't reassigned. Try again.");
+    }
+    if (!members.some((m) => m.userId === newAssignee)) {
+      throw new Error("That person isn't a member of your firm.");
+    }
+  }
+
+  const { data, error } = await supabase
+    .from("crm_task")
+    .update({ ...checked.patch, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error) throw error;
+
+  const target = taskActivityTarget(current);
+  if (target) {
+    const edited = checked.fields.filter((f) => f !== "assignee_id");
+    if (edited.length > 0) {
+      await logActivitySafe({
+        type: "matter_updated",
+        ...target,
+        payload: { change: "task_edited", task_id: id, fields: edited },
+      });
+    }
+    if (checked.patch.assignee_id !== undefined) {
+      await logActivitySafe({
+        type: "matter_updated",
+        ...target,
+        payload: { change: "task_assigned", task_id: id, title: data.title, assignee_id: newAssignee ?? null },
+      });
+    }
+  }
+  return { task: data, fields: checked.fields };
+}
+
+/**
+ * Deletes a task. Staff-gated; the task is read first (a missing or foreign id
+ * is "not found"). The timeline row records the title, since the task is gone.
+ */
+export async function deleteTask(id: string): Promise<void> {
+  const supabase = await getScopedClient();
+  await requireMatterWriteRole(supabase);
+
+  const { data: current, error: readError } = await supabase
+    .from("crm_task")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (readError) throw readError;
+  if (!current) throw recordNotFoundError("task");
+
+  const { data: removed, error } = await supabase.from("crm_task").delete().eq("id", id).select("id");
+  if (error) throw error;
+  // RLS filters a delete it doesn't allow down to zero rows without an error.
+  if (!removed || removed.length === 0) throw new Error("That task couldn't be deleted.");
+
+  const target = taskActivityTarget(current);
+  if (target) {
+    await logActivitySafe({
+      type: "matter_updated",
+      ...target,
+      payload: { change: "task_deleted", task_id: id, title: current.title },
+    });
+  }
 }

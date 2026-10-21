@@ -2,7 +2,9 @@ import { getScopedClient } from "@/lib/db/scoped-client";
 import { stopLeadSequencesAsStaff } from "@/lib/campaigns/stop-staff";
 import type { Database } from "@/lib/db/types";
 import { ROLES, type Role } from "@/lib/auth/roles";
-import { logActivity } from "./activity";
+import { logActivity, logActivitySafe } from "./activity";
+import { validateMatterHeader, type MatterHeaderInput } from "./header-edit";
+import { recordNotFoundError } from "./not-found";
 import { type MatterStatus, isMatterStatus } from "./status";
 import type { FilingBasis } from "./ip-fields";
 import { type MatterStage, listMatterStages } from "./stages";
@@ -392,10 +394,11 @@ export async function updateMatterStatus(id: string, status: MatterStatus): Prom
 
 /**
  * Updates a matter's free-text staff notes. Staff-role-gated (see
- * MATTER_WRITE_ROLES), stamps updated_at. No `logActivity()` call — mirrors
- * saveTeamStatusNote's (src/lib/matters/team-status-note.ts) precedent of
- * skipping activity logging for a frequent, low-signal free-text field; the
- * row itself is the record.
+ * MATTER_WRITE_ROLES), stamps updated_at, and — when the text actually changed
+ * — logs a "Notes updated" timeline row. The row says the notes changed and
+ * carries none of the text (the matter row is the record; staff notes are
+ * internal and are not copied into a feed other screens read). Saving the text
+ * that is already there logs nothing.
  *
  * `notes` is also the field the matters Lawmatics importer can backfill
  * (src/lib/lawmatics/matters-import-plan.ts), but only when it is currently
@@ -405,6 +408,14 @@ export async function updateMatterNotes(id: string, notes: string | null): Promi
   const supabase = await getScopedClient();
   await requireMatterWriteRole(supabase);
 
+  const { data: before, error: readError } = await supabase
+    .from("crm_matter")
+    .select("notes")
+    .eq("id", id)
+    .maybeSingle();
+  if (readError) throw readError;
+  if (!before) throw recordNotFoundError("matter");
+
   const { data, error } = await supabase
     .from("crm_matter")
     .update({ notes, updated_at: new Date().toISOString() })
@@ -412,7 +423,57 @@ export async function updateMatterNotes(id: string, notes: string | null): Promi
     .select("*")
     .single();
   if (error) throw error;
+
+  if ((before.notes ?? null) !== (notes ?? null)) {
+    await logActivitySafe({ type: "matter_updated", matterId: id, payload: { change: "notes" } });
+  }
   return data;
+}
+
+/**
+ * Edits the matter header: title, package, type and "Came from". Staff-gated,
+ * stamps updated_at. The matter is read first through the scoped client (another
+ * firm's id is "not found"), the posted values are checked against it, and ONLY
+ * the columns that changed are written, so a post that changes nothing writes
+ * nothing and logs nothing.
+ *
+ * The timeline row names the changed fields, not their values. The matter number
+ * is never touched: a TM matter changed to CR keeps its TM- number. Litigation
+ * is refused in both directions (see header-edit.ts).
+ */
+export async function updateMatterHeader(
+  id: string,
+  input: MatterHeaderInput,
+): Promise<{ matter: MatterRow; fields: string[] }> {
+  const supabase = await getScopedClient();
+  await requireMatterWriteRole(supabase);
+
+  const { data: current, error: readError } = await supabase
+    .from("crm_matter")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (readError) throw readError;
+  if (!current) throw recordNotFoundError("matter");
+
+  const checked = validateMatterHeader(input, current);
+  if (!checked.ok) throw new Error(checked.error);
+  if (checked.fields.length === 0) return { matter: current, fields: [] };
+
+  const { data, error } = await supabase
+    .from("crm_matter")
+    .update({ ...checked.changes, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error) throw error;
+
+  await logActivitySafe({
+    type: "matter_updated",
+    matterId: id,
+    payload: { change: "header", fields: checked.fields },
+  });
+  return { matter: data, fields: checked.fields };
 }
 
 /**

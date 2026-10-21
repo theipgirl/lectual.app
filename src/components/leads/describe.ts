@@ -30,13 +30,31 @@ const MATTER_CHANGE: Record<string, string> = {
   deadline_closed: "Deadline closed out",
   deadline_extended: "Deadline extended",
   litigation_detail: "Case details updated",
+  header: "Matter details updated",
+  contact_linked: "Contact linked",
+  contact_added: "Contact added",
+  contact_edited: "Contact edited",
+  deadline_edited: "Deadline edited",
+  deadline_reopened: "Deadline reopened",
+  deadline_deleted: "Deadline deleted",
+  task_edited: "Task edited",
+  task_assigned: "Task assigned",
+  task_deleted: "Task deleted",
 };
 
+// Column names the matter edits record, in the words a person would say.
+const FIELD_WORDS: Record<string, string> = { referral_source: "came from", due_at: "due date", assignee_id: "assignee" };
+
 function matterChangeDetail(p: Record<string, unknown>): string | null {
-  if (Array.isArray(p.fields)) return (p.fields as string[]).join(", ").replaceAll("_", " ");
+  if (Array.isArray(p.fields)) {
+    return (p.fields as string[]).map((f) => FIELD_WORDS[f] ?? f.replaceAll("_", " ")).join(", ");
+  }
+  // A reassigned task: the new assignee is an id (the row never copies a name), so say only the task and whether it was cleared.
+  if (str(p.change) === "task_assigned") return [str(p.title), p.assignee_id ? null : "unassigned"].filter(Boolean).join(" · ") || null;
   const due = str(p.due_date) ?? str(p.to);
   const kind = str(p.kind)?.replaceAll("_", " ") ?? null;
   if (kind || due) return [kind, due].filter(Boolean).join(" · ");
+  if (str(p.change) === "task_deleted") return str(p.title);
   if (str(p.from) && str(p.to)) return `${str(p.from)} → ${str(p.to)}`;
   return null;
 }
@@ -79,7 +97,8 @@ export function describeActivity(row: Row): Described {
       return { title: "Email sent", detail: str(p.subject) ?? str(p.body), tone: "mail", link: str(p.web_link) };
     case "note":
       // addNote (src/lib/pipeline/notes.ts) writes `note`; older producers wrote `body`/`text`.
-      return { title: "Note", detail: str(p.note) ?? str(p.body) ?? str(p.text), tone: "note", link: null };
+      // A meeting has no activity type of its own, so it is a `note` row tagged entry: "meeting".
+      return { title: str(p.entry) === "meeting" ? "Meeting" : "Note", detail: str(p.note) ?? str(p.body) ?? str(p.text), tone: "note", link: null };
     case "call_logged":
       // logConsultOutcome (src/lib/pipeline/consult-outcome.ts): the outcome is the title, the note the detail.
       if (isConsultOutcome(p.consult_outcome)) {
