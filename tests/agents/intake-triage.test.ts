@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { runIntakeTriage, triagePrompt, type Triage } from "@/lib/agents/intake-triage";
+import { runIntakeTriage, triagePrompt, type BoothAssessment, type Triage } from "@/lib/agents/intake-triage";
 import { agentCtx, assertOrgFenced, fakeLlm, writes } from "./helpers";
 import type { Recorded } from "../mailbox/fake-db";
 
@@ -69,5 +69,104 @@ describe("intake triage", () => {
     const prompt = triagePrompt(lead());
     expect(prompt).toContain("sankofabrew.example");
     expect(prompt).not.toContain("amara@");
+  });
+
+  it("labels the computed CRM score for what it is, not as an assessment score", () => {
+    const prompt = triagePrompt(lead());
+    expect(prompt).toContain("CRM qualification score");
+    expect(prompt).not.toContain("Assessment score:");
+  });
+
+  const booth: BoothAssessment = {
+    lead_id: "lead-1",
+    event_code: "story2profit-2026",
+    track: "business",
+    score: 13,
+    band: "exposed",
+    temperature: "hot",
+    gaps: ["Your name and logo are not federally registered."],
+    answers: { "104": "yes", "108": "under_150k", "109": "right_away" },
+    mark_name: "Breakthrough Unlocked",
+    mark_goods: "Speaking, coaching",
+    completed_at: "2026-10-21T01:16:41Z",
+  };
+
+  it("gives the model the booth assessment the person completed", () => {
+    const prompt = triagePrompt(lead({ mark_text: null }), booth);
+    expect(prompt).toContain("<booth_assessment>");
+    expect(prompt).toContain("Breakthrough Unlocked");
+    expect(prompt).toContain("Speaking, coaching");
+    expect(prompt).toContain("HOT");
+    expect(prompt).toContain("13/100 (exposed)");
+    expect(prompt).toContain("Your name and logo are not federally registered.");
+    expect(prompt).toContain("Right away");
+    expect(prompt).toContain("Under $150k");
+    expect(prompt).toMatch(/similar name.*Yes/i);
+  });
+
+  it("says plainly when there is no booth assessment", () => {
+    expect(triagePrompt(lead())).toContain("Booth assessment: (none)");
+  });
+
+  it("reads the lead's booth assessment, fenced to the firm, and passes it to the model", async () => {
+    const { llm, calls } = fakeLlm(hot);
+    const { ctx, log } = agentCtx(
+      (q) =>
+        q.table === "crm_lead" && q.action === "select"
+          ? { data: [lead({ mark_text: null })], error: null }
+          : q.table === "crm_booth_scorecard" && q.action === "select"
+            ? { data: [booth], error: null }
+            : undefined,
+      { autonomy: "draft", queue: false, llm },
+    );
+    await runIntakeTriage(ctx);
+    expect(log.some((q) => q.table === "crm_booth_scorecard" && q.action === "select")).toBe(true);
+    expect(calls[0].user).toContain("Breakthrough Unlocked");
+    assertOrgFenced(log);
+  });
+
+  it("re-scores a lead whose booth assessment arrived after its last triage", async () => {
+    const { llm } = fakeLlm(hot);
+    const scored = lead({ id: "lead-9", ai_enriched_at: "2026-10-20T13:29:26Z" });
+    const { ctx, log } = agentCtx(
+      (q) => {
+        if (q.table === "crm_lead" && q.action === "select") {
+          // First read: never-scored leads (none). Second read: the re-score candidates.
+          const isRescore = q.filters.some((f) => f.op === "in" && f.column === "id");
+          return { data: isRescore ? [scored] : [], error: null };
+        }
+        if (q.table === "crm_booth_scorecard" && q.action === "select") {
+          return { data: [{ ...booth, lead_id: "lead-9" }], error: null };
+        }
+        return undefined;
+      },
+      { autonomy: "draft", queue: false, llm },
+    );
+    const result = await runIntakeTriage(ctx);
+    expect(result.itemsIn).toBe(1);
+    expect(writes(log, "crm_lead", "update")[0].filters).toEqual(
+      expect.arrayContaining([expect.objectContaining({ column: "id", value: "lead-9" })]),
+    );
+    assertOrgFenced(log);
+  });
+
+  it("does not re-score a lead already triaged after its booth assessment", async () => {
+    const { llm, calls } = fakeLlm(hot);
+    const fresh = lead({ id: "lead-9", ai_enriched_at: "2026-10-21T13:29:39Z" });
+    const { ctx } = agentCtx(
+      (q) => {
+        if (q.table === "crm_lead" && q.action === "select") {
+          const isRescore = q.filters.some((f) => f.op === "in" && f.column === "id");
+          return { data: isRescore ? [fresh] : [], error: null };
+        }
+        if (q.table === "crm_booth_scorecard" && q.action === "select") {
+          return { data: [{ ...booth, lead_id: "lead-9" }], error: null };
+        }
+        return undefined;
+      },
+      { autonomy: "draft", queue: false, llm },
+    );
+    expect((await runIntakeTriage(ctx)).itemsIn).toBe(0);
+    expect(calls).toHaveLength(0);
   });
 });
