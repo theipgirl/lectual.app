@@ -198,6 +198,33 @@ and read or write nothing for a refused one. Nothing is written to Lawmatics, an
   and refuses the WHOLE apply, writing nothing, when a lead is missing or no longer in the stage the plan recorded.
   One request moves at most 200 leads.
 
+## Setup checklist (`/dashboard/setup`, no schema)
+A ten-item "get the firm set up" page for owner/admin/senior_admin, computed from real state. The page and
+the Today card only read; the "Set up" links go to pages that already exist and gate themselves.
+- **Pure rules:** `src/lib/setup/checklist.ts` (`setupChecklist(state)`), `roles.ts` (`canSeeSetup`, fails closed),
+  `routes.ts` (`SETUP_PATH`, shared by the Settings redirect and the Today card). `build.ts` reads each fact on its
+  own; `readers.ts` is the live set (scoped client only, no service role, no write); `load.ts` is `loadSetupState()`.
+- **The ten, and when each is done:** firm profile with a display name AND an email sign-off; more than one member;
+  a visible Microsoft mailbox connection `active` (`mailbox` module on; personal Outlook of a colleague is invisible
+  by RLS and doesn't count); Lawmatics `active`; at least one Fathom/Zoom source `active`; LawPay `active`; at least one
+  enabled agent setting (`agents` module on; no row means off); an intake form with status `live`; "Packages saved" =
+  an ACTIVE `legal_fee` item in the service library (`isOfferablePackage`, the intake form's own test, not the
+  proposals module's package prices); the AI key set on the deployment.
+- **Three states per item, never two:** done / to do / couldn't check. A read that failed (or an intake table that
+  can't be asked) is `couldnt-check`, never done and never to do, and no error text reaches the screen (the reading
+  keeps only "could not be read"). The module list is read by the loader itself so a failed read isn't "module off".
+  A module that is off is "to do" with a link to Settings → Modules, so the count is always N of 10.
+- **Settings redirect:** `/dashboard/settings` goes to the setup page for the admin tier until all ten are done (a
+  couldn't-check item counts as not done), then to Integrations as before. Every other role, signed out and an
+  unresolvable role go to Integrations without the loader running. The setup page's "Go to Integrations" link is the
+  escape for a firm whose remaining items are Lectual's to switch on (LawPay or Zoom not set up, no AI key, a module off).
+- **Today card:** `FinishSetupCard` (`src/components/setup/`) is its own async component with its own reads, so Today's
+  `page.tsx` only imports and places it. It renders nothing for other roles and when complete, and still shows (with
+  "N couldn't be checked") when reads fail.
+- **Integrations polish:** `src/components/integrations/` holds the one header (`IntegrationHeader`), status pill
+  (`StatusPill`, seven states each with its own label) and `HelpText` used by every card on Integrations and Meetings.
+  The Zoom card on Meetings says Zoom isn't switched on when `zoomSetup()` isn't ready (copy in `lib/integrations/copy.ts`).
+
 ## JSX text spacing: keep the `{" "}`
 Next 16.2.7's compiler DROPS the leading space of JSX text that contains an HTML entity
 (`&apos;`, `&amp;`, `&rsquo;`…) and runs onto another line, even if that is only the line
