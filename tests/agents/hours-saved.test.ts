@@ -85,3 +85,21 @@ describe("outcome metrics", () => {
     expect(deadlinesMetThisMonth(rows, now, "America/New_York")).toEqual({ met: 1, closed: 2 });
   });
 });
+
+describe("Hours saved (est.): the Stage Keeper (Sprint 16, F16)", () => {
+  it("counts leads placed (moves), not suggestion cards a person still has to accept", () => {
+    // 5 moves + 2 cards written: items_in 7, drafts_out 2.
+    const est = estimateHoursSaved([r("stage-keeper", "ok", 7, 2), r("stage-keeper", "error", 9, 0)], DEFAULT_MINUTES_PER_TASK);
+    expect(est.tasks["stage-keeper"]).toBe(5);
+    expect(est.hours).toBe(Math.round(((5 * DEFAULT_MINUTES_PER_TASK["stage-keeper"]) / 60) * 10) / 10);
+  });
+
+  it("has a default, a unit, and a minutes form entry", () => {
+    expect(DEFAULT_MINUTES_PER_TASK["stage-keeper"]).toBe(2);
+    expect(estimateAssumption(DEFAULT_MINUTES_PER_TASK)).toContain("2 min per lead placed");
+    const fd = new FormData();
+    fd.set("minutes-stage-keeper", "3");
+    expect(parseMinutesForm(fd)).toEqual({ ok: true, value: { "stage-keeper": 3 } });
+    expect(resolveMinutes({ "stage-keeper": 4 }).minutes["stage-keeper"]).toBe(4);
+  });
+});
