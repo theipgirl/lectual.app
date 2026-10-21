@@ -5,7 +5,7 @@ import type { Reading, SetupChecklist, SetupItem, SetupState } from "./types";
 type Verdict = Pick<SetupItem, "status" | "why"> & { href?: string };
 
 const done = (why: string): Verdict => ({ status: "done", why });
-const todo = (why: string, href?: string): Verdict => ({ status: "to-do", why, href });
+const notYet = (why: string, href?: string): Verdict => ({ status: "to-do", why, href });
 const unchecked = (what: string): Verdict => ({
   status: "couldnt-check",
   why: `We couldn't check ${what} just now. Try again shortly. This is not the same as "to do".`,
@@ -16,7 +16,7 @@ const RECONNECT = "needs reconnecting";
 /** The module gate shared by the Outlook and agent items: unreadable list, module off, or on. */
 function moduleGate(modules: Reading<string[]>, mod: string, what: string, off: string): Verdict | null {
   if (!modules.ok) return unchecked(what);
-  if (!modules.value.includes(mod)) return todo(off, MODULES_PATH);
+  if (!modules.value.includes(mod)) return notYet(off, MODULES_PATH);
   return null;
 }
 
@@ -25,15 +25,15 @@ function profileVerdict(r: SetupState["profile"]): Verdict {
   const name = r.value?.displayName?.trim();
   const signature = r.value?.emailSignature?.trim();
   if (name && signature) return done("Your firm name and email sign-off are saved.");
-  if (!name && !signature) return todo("Add your firm's display name and the sign-off that goes on client drafts.");
-  if (!name) return todo("Add your firm's display name.");
-  return todo("Add the email sign-off that goes on client drafts.");
+  if (!name && !signature) return notYet("Add your firm's display name and the sign-off that goes on client drafts.");
+  if (!name) return notYet("Add your firm's display name.");
+  return notYet("Add the email sign-off that goes on client drafts.");
 }
 
 function teamVerdict(r: SetupState["members"]): Verdict {
   if (!r.ok) return unchecked("your team");
   if (r.value.count > 1) return done(`${r.value.count} people are on your team.`);
-  return todo("Only you are on the team so far. Invite your colleagues.");
+  return notYet("Only you are on the team so far. Invite your colleagues.");
 }
 
 function outlookVerdict(modules: SetupState["modules"], r: SetupState["mailboxes"]): Verdict {
@@ -47,30 +47,30 @@ function outlookVerdict(modules: SetupState["modules"], r: SetupState["mailboxes
   if (!r.ok) return unchecked("your mailbox connections");
   const outlook = r.value.filter((c) => c.provider === "microsoft");
   if (outlook.some((c) => c.status === "active")) return done("An Outlook mailbox is connected, yours or a shared one.");
-  if (outlook.length > 0) return todo(`Your Outlook mailbox ${RECONNECT}.`, INTEGRATIONS_PATH);
-  if (r.value.length > 0) return todo("Only a Gmail mailbox is connected. Connect Outlook, yours or a shared one.", INTEGRATIONS_PATH);
-  return todo("No Outlook mailbox connected yet, yours or a shared one.", INTEGRATIONS_PATH);
+  if (outlook.length > 0) return notYet(`Your Outlook mailbox ${RECONNECT}.`, INTEGRATIONS_PATH);
+  if (r.value.length > 0) return notYet("Only a Gmail mailbox is connected. Connect Outlook, yours or a shared one.", INTEGRATIONS_PATH);
+  return notYet("No Outlook mailbox connected yet, yours or a shared one.", INTEGRATIONS_PATH);
 }
 
 function lawmaticsVerdict(r: SetupState["lawmatics"]): Verdict {
   if (!r.ok) return unchecked("your Lawmatics connection");
-  if (!r.value) return todo("Not connected yet. Add your Lawmatics token to bring over your contacts and matters.");
+  if (!r.value) return notYet("Not connected yet. Add your Lawmatics token to bring over your contacts and matters.");
   if (r.value.status === "active") return done("Lawmatics is connected.");
-  return todo(`Lawmatics stopped accepting your token. It ${RECONNECT}.`);
+  return notYet(`Lawmatics stopped accepting your token. It ${RECONNECT}.`);
 }
 
 function meetingsVerdict(r: SetupState["meetings"]): Verdict {
   if (!r.ok) return unchecked("your meeting connections");
   if (r.value.some((c) => c.status === "active")) return done("A meeting source (Fathom or Zoom) is connected.");
-  if (r.value.length > 0) return todo(`Your meeting source ${RECONNECT}.`);
-  return todo("Not connected yet. Connect Fathom or Zoom to bring in your consult recordings.");
+  if (r.value.length > 0) return notYet(`Your meeting source ${RECONNECT}.`);
+  return notYet("Not connected yet. Connect Fathom or Zoom to bring in your consult recordings.");
 }
 
 function lawpayVerdict(r: SetupState["lawpay"]): Verdict {
   if (!r.ok) return unchecked("your LawPay connection");
-  if (!r.value) return todo("Not connected yet. Sign in to your LawPay account so clients can pay by card at signing.");
+  if (!r.value) return notYet("Not connected yet. Sign in to your LawPay account so clients can pay by card at signing.");
   if (r.value.status === "active") return done("LawPay is connected.");
-  return todo(`LawPay stopped accepting your connection. It ${RECONNECT}.`);
+  return notYet(`LawPay stopped accepting your connection. It ${RECONNECT}.`);
 }
 
 function agentsVerdict(modules: SetupState["modules"], r: SetupState["agents"]): Verdict {
@@ -84,14 +84,14 @@ function agentsVerdict(modules: SetupState["modules"], r: SetupState["agents"]):
   if (!r.ok) return unchecked("your agent settings");
   const on = r.value.filter((a) => a.enabled).length;
   if (on > 0) return done(on === 1 ? "One agent is on." : `${on} agents are on.`);
-  return todo("No agent is switched on. Turn on at least one.");
+  return notYet("No agent is switched on. Turn on at least one.");
 }
 
 function intakeVerdict(r: SetupState["intakeForms"]): Verdict {
   if (!r.ok) return unchecked("your intake forms");
   if (r.value.some((f) => f.status === "live")) return done("An intake form is live.");
-  if (r.value.length > 0) return todo("Your intake form isn't live yet. Publish it to start taking leads.");
-  return todo("No intake form yet. Create one and publish it.");
+  if (r.value.length > 0) return notYet("Your intake form isn't live yet. Publish it to start taking leads.");
+  return notYet("No intake form yet. Create one and publish it.");
 }
 
 function packagesVerdict(r: SetupState["services"]): Verdict {
@@ -99,11 +99,11 @@ function packagesVerdict(r: SetupState["services"]): Verdict {
   if (r.value.some(isOfferablePackage)) {
     return done("Your service library has a fee package.");
   }
-  return todo("No fee package saved. Add at least one legal-fee item to your service library.");
+  return notYet("No fee package saved. Add at least one legal-fee item to your service library.");
 }
 
 function aiVerdict(configured: boolean): Verdict {
-  return configured ? done("The AI key is set on this deployment.") : todo("The AI key isn't set on this deployment. Lectual sets it.");
+  return configured ? done("The AI key is set on this deployment.") : notYet("The AI key isn't set on this deployment. Lectual sets it.");
 }
 
 type Spec = { id: SetupItem["id"]; label: string; href: string; verdict: (s: SetupState) => Verdict };

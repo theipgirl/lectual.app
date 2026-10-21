@@ -83,7 +83,7 @@
   gap: 14px;
   align-items: center;
   flex-wrap: wrap;
-  border-color: rgba(106, 31, 43, 0.28);
+  border-left: 4px solid var(--ox);
 }
 
 .su-card-main {
