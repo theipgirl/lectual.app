@@ -5,6 +5,7 @@ import { moveLeadStageAs } from "@/lib/pipeline/move-as";
 import type { StageOpt } from "@/lib/reconcile/types";
 import {
   AGENT_ACTOR,
+  REVIEW_SOURCE,
   SUGGESTION_KIND,
   SUGGESTION_SOURCE,
   consumedSignalKeys,
@@ -13,7 +14,7 @@ import {
   type ActivityRow,
   type SuggestionWhy,
 } from "@/lib/stage-keeper/moves";
-import { evidenceDateOf, evidenceOf, signalKeyFor, type KeeperSignal } from "@/lib/stage-keeper/signals";
+import { evidenceDateOf, evidenceOf, signalIdFor, signalKeyFor, type KeeperSignal } from "@/lib/stage-keeper/signals";
 import type { AgentContext, AgentResult } from "../types";
 import { parseStageMapping, type StageMapping } from "./mapping";
 import { targetStageFromSignals } from "./target";
@@ -70,6 +71,8 @@ export function isSensitiveTitle(title: string | null): boolean {
   return SENSITIVE_PHRASES.some((p) => folded.includes(p));
 }
 
+const isSensitiveSignal = (s: KeeperSignal): boolean => s.source !== "payment" && s.sensitive;
+
 // ── reads ────────────────────────────────────────────────────────────────────
 
 async function readStages(admin: SupabaseClient, orgId: string): Promise<StageOpt[]> {
@@ -90,26 +93,14 @@ async function readMapping(admin: SupabaseClient, orgId: string): Promise<StageM
 
 type MailRead = { signals: Map<string, KeeperSignal[]>; truncated: boolean };
 
-async function readMail(admin: SupabaseClient, orgId: string, sinceIso: string): Promise<MailRead> {
-  const { data, error } = await admin
-    .from("crm_activity")
-    .select("id, lead_id, type, created_at, payload")
-    .eq("org_id", orgId)
-    .in("type", ["email_sent", "email_received"])
-    .eq("payload->>source", "mailbox-sync")
-    .not("lead_id", "is", null)
-    .gte("created_at", sinceIso)
-    .order("created_at", { ascending: false })
-    .limit(MAIL_CAP);
-  if (error) throw new Error(`mail read failed: ${error.message}`);
-  const rows = (data ?? []) as ActivityRow[];
-  const signals = new Map<string, KeeperSignal[]>();
-  for (const row of rows) {
-    const p = (row.payload ?? {}) as Record<string, unknown>;
-    const messageId = text(p.message_id);
-    if (!row.lead_id || !messageId) continue;
-    const direction = p.direction === "outbound" ? "outbound" : p.direction === "inbound" ? "inbound" : row.type === "email_sent" ? "outbound" : "inbound";
-    const signal: KeeperSignal = {
+function mailSignal(row: ActivityRow): { leadId: string; signal: KeeperSignal } | null {
+  const p = (row.payload ?? {}) as Record<string, unknown>;
+  const messageId = text(p.message_id);
+  if (!row.lead_id || !messageId) return null;
+  const direction = p.direction === "outbound" ? "outbound" : p.direction === "inbound" ? "inbound" : row.type === "email_sent" ? "outbound" : "inbound";
+  return {
+    leadId: row.lead_id,
+    signal: {
       source: "mail",
       messageId,
       type: text(p.type) ?? "other",
@@ -117,8 +108,40 @@ async function readMail(admin: SupabaseClient, orgId: string, sinceIso: string):
       at: text(p.at) ?? row.created_at,
       subject: text(p.subject),
       sensitive: p.sensitive === true,
-    };
-    signals.set(row.lead_id, [...(signals.get(row.lead_id) ?? []), signal]);
+    },
+  };
+}
+
+/**
+ * The matched mail in the window, newest first up to a cap, PLUS every sensitive message in the
+ * window whatever the cap: "sensitive mail never moves anything" must not depend on how busy the
+ * inbox was, so those rows are asked for on their own.
+ */
+async function readMail(admin: SupabaseClient, orgId: string, sinceIso: string): Promise<MailRead> {
+  const base = () =>
+    admin
+      .from("crm_activity")
+      .select("id, lead_id, type, created_at, payload")
+      .eq("org_id", orgId)
+      .in("type", ["email_sent", "email_received"])
+      .eq("payload->>source", "mailbox-sync")
+      .not("lead_id", "is", null)
+      .gte("created_at", sinceIso);
+  const { data, error } = await base().order("created_at", { ascending: false }).limit(MAIL_CAP);
+  if (error) throw new Error(`mail read failed: ${error.message}`);
+  const { data: flagged, error: flaggedError } = await base().eq("payload->>sensitive", "true").order("created_at", { ascending: false }).limit(MAIL_CAP);
+  if (flaggedError) throw new Error(`mail read failed: ${flaggedError.message}`);
+
+  const rows = (data ?? []) as ActivityRow[];
+  const signals = new Map<string, KeeperSignal[]>();
+  const seen = new Set<string>();
+  for (const row of [...rows, ...((flagged ?? []) as ActivityRow[])]) {
+    const made = mailSignal(row);
+    if (!made || made.signal.source !== "mail") continue;
+    const key = `${made.leadId}:${made.signal.messageId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    signals.set(made.leadId, [...(signals.get(made.leadId) ?? []), made.signal]);
   }
   return { signals, truncated: rows.length >= MAIL_CAP };
 }
@@ -181,17 +204,32 @@ async function readHistory(admin: SupabaseClient, orgId: string, ids: readonly s
   const personMovedAt = new Map<string, number>();
   const pendingTo = new Map<string, Set<string>>();
   for (const batch of chunk(ids, CHUNK)) {
-    const { data, error } = await admin
+    const columns = "id, lead_id, type, actor_type, created_at, payload";
+    const changes = await admin
       .from("crm_activity")
-      .select("id, lead_id, type, actor_type, created_at, payload")
+      .select(columns)
       .eq("org_id", orgId)
       .in("lead_id", batch)
-      .in("type", ["stage_changed", "ai_insight"])
+      .eq("type", "stage_changed")
       .gte("created_at", sinceIso)
       .order("created_at", { ascending: false })
       .limit(HISTORY_CAP);
-    if (error) throw new Error(`timeline read failed: ${error.message}`);
-    const rows = (data ?? []) as ActivityRow[];
+    if (changes.error) throw new Error(`timeline read failed: ${changes.error.message}`);
+    // Only this agent's own suggestions and the decisions on them, not every insight other agents wrote.
+    const insights = await admin
+      .from("crm_activity")
+      .select(columns)
+      .eq("org_id", orgId)
+      .in("lead_id", batch)
+      .eq("type", "ai_insight")
+      .in("payload->>source", [SUGGESTION_SOURCE, REVIEW_SOURCE])
+      .gte("created_at", sinceIso)
+      .order("created_at", { ascending: false })
+      .limit(HISTORY_CAP);
+    if (insights.error) throw new Error(`timeline read failed: ${insights.error.message}`);
+    const rows = [...((changes.data ?? []) as ActivityRow[]), ...((insights.data ?? []) as ActivityRow[])];
+    // A used signal that fell off a cut-short read would be used again, so a cut-short read stops the run.
+    if ((changes.data ?? []).length >= HISTORY_CAP || (insights.data ?? []).length >= HISTORY_CAP) throw new Error("timeline read cut short");
 
     const decided = decidedSuggestionIds(rows);
     const perLead = new Map<string, ActivityRow[]>();
@@ -317,11 +355,12 @@ export async function runStageKeeper(ctx: AgentContext): Promise<AgentResult> {
     const consumed = history.consumed.get(lead.id) ?? new Set<string>();
     const all = signalsByLead.get(lead.id) ?? [];
     // Sensitive facts always count, even ones an earlier run already looked at.
-    const live = all.filter((s) => (s.source !== "payment" && s.sensitive) || !consumed.has(signalKeyFor(lead.id, s)));
+    const live = all.filter((s) => isSensitiveSignal(s) || !consumed.has(signalKeyFor(lead.id, s)));
     const target = targetStageFromSignals({ currentStageId: lead.current_stage_id }, live, stages, mapping, { now: nowMs });
 
     if (target.kind === "nothing") {
-      if (target.reason === "sensitive") counts.sensitive += 1;
+      // Counted only when the lead had something that would have placed it: a sensitive message on its own is just a note.
+      if (target.reason === "sensitive" && live.some((s) => signalIdFor(s) !== null)) counts.sensitive += 1;
       continue;
     }
 

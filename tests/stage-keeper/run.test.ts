@@ -526,3 +526,32 @@ describe("the brain mapping", () => {
   });
 });
 
+
+describe("guardrails that must not depend on how busy the inbox was", () => {
+  it("a sensitive message older than the newest rows the cap keeps still holds its lead back", async () => {
+    // 2,100 clear messages for one lead after the sensitive one: the newest-first read is full before it gets there.
+    const filler = Array.from({ length: 2100 }, (_, i) => mail(L.kwame, "follow-up", { id: `fill-${i}`, at: new Date(NOW - (i + 1) * 60_000).toISOString() }));
+    const sensitive = mail(L.amara, "other", { id: "old-sensitive", direction: "inbound", sensitive: true, at: daysAgo(20) });
+    const w = keeperWorld({
+      leads: [lead(L.amara, S.newPnc), lead(L.kwame, S.newPnc)],
+      activity: [...filler, sensitive, mail(L.amara, "loe-invoice", { id: "loe", at: new Date(NOW - 3_000_000).toISOString() })],
+    });
+    const result = await runStageKeeper(w.ctx("act").ctx);
+    expect(result.summary).toContain("Mail read cut short");
+    expect(leadOf(w, L.amara).current_stage_id).toBe(S.newPnc);
+  });
+
+  it("a timeline read that was cut short stops the run rather than risk using a signal twice", async () => {
+    const many = Array.from({ length: 2000 }, (_, i) => personMove(L.amara, 1, { id: `pm-${i}` }));
+    const w = keeperWorld({ leads: [lead(L.amara, S.newPnc)], activity: [mail(L.amara, "loe-invoice"), ...many] });
+    await expect(runStageKeeper(w.ctx("act").ctx)).rejects.toThrow(/timeline read cut short/);
+    expect(leadOf(w).current_stage_id).toBe(S.newPnc);
+  });
+
+  it("a lead whose only sensitive message has nothing to place is not counted as held back", async () => {
+    const w = keeperWorld({ leads: [lead(L.amara, S.newPnc)], activity: [mail(L.amara, "other", { direction: "inbound", sensitive: true })] });
+    const result = await runStageKeeper(w.ctx("act").ctx);
+    expect(result.summary).not.toContain("held back");
+    expect(result.itemsIn).toBe(0);
+  });
+});
