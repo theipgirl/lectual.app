@@ -1,38 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { Stage } from "@/lib/pipeline";
 import type { MemberIdentity } from "@/lib/members/directory";
-import { REFERRAL_SOURCES, type Temperature } from "@/lib/intake";
+import { REFERRAL_SOURCES } from "@/lib/intake";
 import type { ReplyState } from "@/lib/intake/reply";
 import {
   UNASSIGNED_OWNER,
   type IntakeFilters,
-  type LaneFilter,
   type IntakeGroup,
   type IntakeView,
+  type TempFilter,
 } from "@/lib/intake/rows";
 import { memberLabel, stageCodeFor, stageLabelFor } from "@/lib/intake/views";
 import Popover, { PopoverItem } from "./Popover";
-import { BoardIcon, SearchIcon, TableIcon } from "./icons";
-import {
-  CHIP_COUNT,
-  SEGMENT_WRAP,
-  filterChip,
-  groupPill,
-  segmentButton,
-} from "./styles";
-
-/** Off-screen but in the accessibility tree — no utility class exists for this
- * in intake.css, and one declaration is cheaper than a stylesheet edit. */
-const VISUALLY_HIDDEN: React.CSSProperties = {
-  position: "absolute",
-  width: 1,
-  height: 1,
-  overflow: "hidden",
-  clip: "rect(0 0 0 0)",
-  whiteSpace: "nowrap",
-};
+import { CHIP_COUNT, filterChip, groupPill } from "./styles";
 
 /** How long "Save this view" says "Copied" before going back to itself. */
 const COPIED_MS = 1500;
@@ -52,18 +34,12 @@ const REPLY_LABEL: Record<ReplyState, string> = {
   unknown: "No reply state",
 };
 
-const TEMP_OPTIONS: Array<{ value: Temperature; label: string }> = [
+/** One Temperature filter over the effective value: a person's lane, else the derived one. */
+const TEMP_OPTIONS: Array<{ value: TempFilter; label: string }> = [
   { value: "hot", label: "Hot" },
   { value: "warm", label: "Warm" },
   { value: "cold", label: "Cold" },
-];
-
-const LANE_OPTIONS: Array<{ value: LaneFilter; label: string }> = [
-  { value: "hot", label: "Hot" },
-  { value: "warm", label: "Warm" },
-  { value: "cold", label: "Cold" },
-  { value: "suggested", label: "Suggested, not reviewed" },
-  { value: "none", label: "No lane" },
+  { value: "none", label: "Not routed" },
 ];
 
 function Divider() {
@@ -71,8 +47,9 @@ function Divider() {
 }
 
 /**
- * The control row (canvas 10a/10b/10c): view toggle, group-by, search, four
- * filter chips, and "Save this view".
+ * The control row (canvas 10a/10b/10c): group-by (boards only), the filter
+ * chips, and "Save this view". The Table | Board toggle and the search box live
+ * in the page header, beside the same two controls on Matters.
  *
  * Holds no filter state of its own — the workspace owns it and mirrors it into
  * the URL, which is the whole point: every arrangement of this row is a link
@@ -89,7 +66,6 @@ export default function IntakeControls({
   needsRebeccaCount,
   currentHref,
   onFilters,
-  onView,
   onGroup,
 }: {
   filters: IntakeFilters;
@@ -108,33 +84,14 @@ export default function IntakeControls({
   /** The link "Save this view" copies. */
   currentHref: string;
   onFilters: (next: IntakeFilters) => void;
-  onView: (next: IntakeView) => void;
   onGroup: (next: IntakeGroup) => void;
 }) {
-  // The search box is local so typing stays instant; the workspace debounces
-  // the URL push and the filter itself. Re-synced when the filters change from
-  // somewhere else (a cleared chip, a back button).
-  const [query, setQuery] = useState(filters.q);
-  const lastPushed = useRef(filters.q);
-  useEffect(() => {
-    if (filters.q !== lastPushed.current) {
-      lastPushed.current = filters.q;
-      setQuery(filters.q);
-    }
-  }, [filters.q]);
-
   const [copied, setCopied] = useState(false);
   useEffect(() => {
     if (!copied) return;
     const timer = setTimeout(() => setCopied(false), COPIED_MS);
     return () => clearTimeout(timer);
   }, [copied]);
-
-  function commitQuery(value: string) {
-    setQuery(value);
-    lastPushed.current = value;
-    onFilters({ ...filters, q: value });
-  }
 
   const selectedStage = stages.find((stage) => stage.id === filters.stage) ?? null;
   const codes = stages.map(stageCodeFor);
@@ -167,27 +124,6 @@ export default function IntakeControls({
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-      <div style={SEGMENT_WRAP} role="group" aria-label="How to arrange the list">
-        <button
-          type="button"
-          style={segmentButton(view === "table")}
-          aria-pressed={view === "table"}
-          onClick={() => onView("table")}
-        >
-          <TableIcon />
-          Table
-        </button>
-        <button
-          type="button"
-          style={segmentButton(view === "board")}
-          aria-pressed={view === "board"}
-          onClick={() => onView("board")}
-        >
-          <BoardIcon />
-          Board
-        </button>
-      </div>
-
       {view === "board" && (
         <div style={{ display: "flex", alignItems: "center", gap: 8 }} role="group" aria-label="Group by">
           <span className="intake-eyebrow">Group by</span>
@@ -210,38 +146,7 @@ export default function IntakeControls({
         </div>
       )}
 
-      <Divider />
-
-      <label
-        style={{
-          ...filterChip(false),
-          color: "var(--mute)",
-          minWidth: 190,
-          cursor: "text",
-        }}
-      >
-        <SearchIcon />
-        {/* The placeholder is the visible label, so the accessible name is
-            carried here rather than by an aria-label a screen reader would
-            read on top of it. */}
-        <span style={VISUALLY_HIDDEN}>Search leads</span>
-        <input
-          type="search"
-          value={query}
-          placeholder="Name, mark, or note"
-          onChange={(event) => commitQuery(event.target.value)}
-          style={{
-            border: "none",
-            outline: "none",
-            background: "transparent",
-            font: "inherit",
-            fontSize: 12.5,
-            color: "var(--ink)",
-            minWidth: 0,
-            width: "100%",
-          }}
-        />
-      </label>
+      {view === "board" && <Divider />}
 
       <Popover
         label="Filter by stage"
@@ -395,10 +300,9 @@ export default function IntakeControls({
             type="button"
             onClick={onClick}
             style={filterChip(filters.temp !== null)}
+            title="Hot / Warm / Cold match the temperature a person set, or the suggested one where nobody has. Not routed is neither."
           >
-            {filters.temp
-              ? filters.temp[0].toUpperCase() + filters.temp.slice(1)
-              : "Temperature"}
+            {filters.temp ? (TEMP_OPTIONS.find((option) => option.value === filters.temp)?.label ?? "Temperature") : "Temperature"}
           </button>
         )}
       >
@@ -421,50 +325,6 @@ export default function IntakeControls({
                 onSelect={() => {
                   close();
                   onFilters({ ...filters, temp: option.value });
-                }}
-              >
-                {option.label}
-              </PopoverItem>
-            ))}
-          </>
-        )}
-      </Popover>
-
-      <Popover
-        label="Filter by lane"
-        width={210}
-        trigger={({ onClick, ref, ...aria }) => (
-          <button
-            {...aria}
-            ref={ref}
-            type="button"
-            onClick={onClick}
-            style={filterChip(filters.lane !== null)}
-            title="Hot / Warm / Cold match the lane a person set, or triage's suggestion where nobody has yet."
-          >
-            {filters.lane ? `Lane: ${LANE_OPTIONS.find((o) => o.value === filters.lane)?.label ?? filters.lane}` : "Lane"}
-          </button>
-        )}
-      >
-        {(close) => (
-          <>
-            <PopoverItem
-              muted
-              checked={filters.lane === null}
-              onSelect={() => {
-                close();
-                onFilters({ ...filters, lane: null });
-              }}
-            >
-              Any lane
-            </PopoverItem>
-            {LANE_OPTIONS.map((option) => (
-              <PopoverItem
-                key={option.value}
-                checked={filters.lane === option.value}
-                onSelect={() => {
-                  close();
-                  onFilters({ ...filters, lane: option.value });
                 }}
               >
                 {option.label}

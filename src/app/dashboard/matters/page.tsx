@@ -16,6 +16,7 @@ import {
   stageAge,
   type SegmentKey,
 } from "@/lib/matters/worklist";
+import { ViewToggle } from "@/components/ViewToggle";
 import { NewMatterForm } from "@/components/matters/MatterForms";
 import { MatterBoard } from "@/components/matters/MatterBoard";
 import { listMatterStages } from "@/lib/matters/stages";
@@ -91,19 +92,12 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
           <h1 className="lx-h1">Matters</h1>
           <p className="lx-sub">Every engaged matter, grouped by whose move it is. Longest in its stage first.</p>
         </div>
-        <nav className="lx-segs lx-view-toggle" aria-label="View">
-          <Link href={href({ view: null })} aria-current={!boardView ? "page" : undefined} className={!boardView ? "on" : undefined}>
-            List
-          </Link>
-          <Link href={href({ view: "board" })} aria-current={boardView ? "page" : undefined} className={boardView ? "on" : undefined}>
-            Board
-          </Link>
-        </nav>
         <form className="lx-search-form" role="search">
           {boardView && <input type="hidden" name="view" value="board" />}
           {seg !== "open" && <input type="hidden" name="seg" value={seg} />}
           <input className="lx-input" name="q" defaultValue={search} placeholder="Mark, number, owner or serial" aria-label="Search matters" />
         </form>
+        <ViewToggle value={boardView ? "board" : "table"} hrefFor={(next) => href({ view: next === "board" ? "board" : null })} />
       </div>
 
       <nav aria-label="Filter matters" className="lx-chips">

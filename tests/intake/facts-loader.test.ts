@@ -207,7 +207,7 @@ describe("buildIntakeRows with and without facts", () => {
 
   it("an unavailable read (no factsByLeadId) returns today's temperatures, with no invented cold", () => {
     const [row] = buildIntakeRows({ leads: [l], stages: st, members: [], now: NOW });
-    expect(row.temperature.level).toBe("warm");
+    expect(row.temperature.value).toBe("warm");
     expect(row.facts).toBeUndefined();
     expect("suggestion" in row.temperature).toBe(false);
   });

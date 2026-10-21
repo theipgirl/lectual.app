@@ -33,31 +33,6 @@ export function ImportIcon(props: IconProps) {
   );
 }
 
-export function TableIcon(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M4 6h16M4 12h16M4 18h16" />
-    </Svg>
-  );
-}
-
-export function BoardIcon(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M4 5h5v14H4zM15 5h5v9h-5z" />
-    </Svg>
-  );
-}
-
-export function SearchIcon(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <circle cx="11" cy="11" r="6" />
-      <path d="M16 16l4 4" />
-    </Svg>
-  );
-}
-
 export function ChevronIcon(props: IconProps) {
   return (
     <Svg {...props}>

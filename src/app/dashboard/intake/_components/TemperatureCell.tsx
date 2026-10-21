@@ -1,24 +1,23 @@
 "use client";
 
-import type { Temperature, TemperatureResult } from "@/lib/intake";
+import { LANES, LANE_LABEL, type Lane } from "@/lib/leads/lane";
+import { temperatureLabel, temperatureTitle, type EffectiveTemperature } from "@/lib/intake/effective-temperature";
 import Popover, { PopoverItem } from "./Popover";
 import { TEMP_NONE, TEMP_PILL } from "./styles";
 
-const OPTIONS: Array<{ level: Temperature | null; label: string }> = [
-  { level: "hot", label: "Hot" },
-  { level: "warm", label: "Warm" },
-  { level: "cold", label: "Cold" },
-  { level: null, label: "Clear override" },
-];
-
 /**
- * The Temp chip and its override menu (§4.3), carried over from Phase 1 in the
- * canvas's tokens.
+ * The one Temperature cell: the chip and the menu that sets it (intake SOP
+ * Stage 2).
  *
- * The chip's tooltip is the DERIVATION REASON, not a restatement of the level:
- * the whole point of deriving temperature is that the team can see *why*
- * someone went cold without asking anyone. An overridden chip says so, so a
- * human opinion is never mistaken for the machine's.
+ * A temperature a PERSON set is a solid chip. A derived one is a dashed chip
+ * that says "Suggested" in words, never the same chip in a different shade,
+ * because "a routing suggestion once rendered as an assignment status on the
+ * dashboard and read as fact". A lead with neither shows a dashed neutral
+ * "Not routed". The tooltip is the reason, so the team can see why someone
+ * went cold without asking anyone.
+ *
+ * Choosing Hot, Warm or Cold sets the person's lane (recorded on the timeline,
+ * who and from → to); Clear removes it and the derived value shows again.
  */
 export default function TemperatureCell({
   leadName,
@@ -27,57 +26,74 @@ export default function TemperatureCell({
   onSet,
 }: {
   leadName: string;
-  temperature: TemperatureResult;
+  temperature: EffectiveTemperature;
   pending: boolean;
-  onSet: (level: Temperature | null) => void;
+  onSet: (lane: Lane | null) => void;
 }) {
-  const style = TEMP_PILL[temperature.level] ?? TEMP_NONE;
-  const title = temperature.overridden ? `Set by hand — ${temperature.reason}` : temperature.reason;
+  const { value, source } = temperature;
+  const title = temperatureTitle(temperature);
+  const person = source === "person" && value !== null;
 
   return (
-    <Popover
-      label={`${leadName} is ${temperature.level}. ${title}. Change temperature`}
-      width={165}
-      trigger={({ onClick, ref, ...aria }) => (
-        <button
-          {...aria}
-          ref={ref}
-          type="button"
-          title={title}
-          disabled={pending}
-          onClick={onClick}
-          style={{
-            ...style,
-            border: `1px solid ${temperature.overridden ? "currentColor" : "transparent"}`,
-            textTransform: "uppercase",
-            letterSpacing: "0.06em",
-            lineHeight: 1.5,
-            cursor: pending ? "progress" : "pointer",
-            opacity: pending ? 0.6 : 1,
-          }}
-        >
-          {temperature.level}
-          {temperature.overridden ? " ·" : ""}
-        </button>
-      )}
-    >
-      {(close) => (
-        <>
-          {OPTIONS.map((option) => (
+    <div style={{ minWidth: 0, display: "flex" }}>
+      <Popover
+        label={`${leadName}: ${temperatureLabel(temperature)}. ${title.replace("\n", ". ")}. Set temperature`}
+        width={165}
+        trigger={({ onClick, ref, ...aria }) => (
+          <button
+            {...aria}
+            ref={ref}
+            type="button"
+            title={title}
+            disabled={pending}
+            onClick={onClick}
+            data-testid="temperature-cell"
+            style={{
+              ...(value ? TEMP_PILL[value] : TEMP_NONE),
+              ...(person
+                ? { border: "1px solid currentColor", textTransform: "uppercase", letterSpacing: "0.06em" }
+                : value
+                  ? { border: "1px dashed currentColor", background: "transparent", fontStyle: "italic" }
+                  : { border: "1px dashed var(--line)", background: "transparent", padding: "3px 7px", borderRadius: 5 }),
+              maxWidth: "100%",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              lineHeight: 1.5,
+              cursor: pending ? "progress" : "pointer",
+              opacity: pending ? 0.6 : 1,
+            }}
+          >
+            {temperatureLabel(temperature)}
+          </button>
+        )}
+      >
+        {(close) => (
+          <>
+            {LANES.map((lane) => (
+              <PopoverItem
+                key={lane}
+                checked={person && value === lane}
+                onSelect={() => {
+                  close();
+                  onSet(lane);
+                }}
+              >
+                {LANE_LABEL[lane]}
+              </PopoverItem>
+            ))}
             <PopoverItem
-              key={option.label}
-              checked={temperature.overridden && option.level === temperature.level}
-              muted={option.level === null}
+              muted
+              checked={false}
               onSelect={() => {
                 close();
-                onSet(option.level);
+                onSet(null);
               }}
             >
-              {option.label}
+              Clear
             </PopoverItem>
-          ))}
-        </>
-      )}
-    </Popover>
+          </>
+        )}
+      </Popover>
+    </div>
   );
 }

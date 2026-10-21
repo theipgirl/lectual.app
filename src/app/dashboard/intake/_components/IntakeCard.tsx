@@ -21,7 +21,7 @@ import {
 import Popover, { PopoverItem } from "./Popover";
 import NeedsRebeccaBadge from "./NeedsRebeccaBadge";
 import SourceCell from "./SourceCell";
-import { LANE_LABEL, suggestionLine } from "@/lib/leads/lane";
+import { temperatureLabel, temperatureTitle } from "@/lib/intake/effective-temperature";
 import {
   NEXT,
   NEXT_HOT,
@@ -29,8 +29,7 @@ import {
   OWNER_CHIP_NONE,
   STAGE_PILL,
   STAGE_WARN,
-  TEMP_DOT,
-  TEMP_DOT_NONE,
+  TEMP_PILL,
   TOUCH_IN_SMALL,
   TOUCH_OUT_SMALL,
 } from "./styles";
@@ -89,7 +88,7 @@ export default function IntakeCard({
   const mark = lead.mark_text?.trim() || lead.business_name?.trim() || "—";
   const touch = touchStampFor(row);
   const step = nextStepFor(row, now);
-  const dot = TEMP_DOT[row.temperature.level] ?? TEMP_DOT_NONE;
+  const temperature = row.temperature;
   const ownerName = row.owner ? memberLabel(row.owner) : null;
   const pendingDrafts = pendingFor(pendingApprovals, lead.id);
 
@@ -197,12 +196,6 @@ export default function IntakeCard({
         >
           {name}
         </Link>
-        <span style={{ flex: 1 }} />
-        <span
-          aria-hidden
-          style={dot}
-          title={`${row.temperature.level} — ${row.temperature.reason}`}
-        />
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
@@ -231,20 +224,21 @@ export default function IntakeCard({
         </div>
       )}
 
-      {/* SOP Stage 2: the lane a person set reads as a fact; triage's reads
-          as a suggestion, in words, with its reason. */}
-      {row.lane.lane ? (
-        <div style={{ ...ellipsis, fontSize: 11, color: "var(--ink2)" }} title="Lane set by a person">
-          Lane: {LANE_LABEL[row.lane.lane]}
-        </div>
-      ) : row.lane.suggested ? (
-        <div
-          style={{ ...ellipsis, fontSize: 11, color: "var(--mute)", fontStyle: "italic" }}
-          title={suggestionLine(row.lane) ?? undefined}
-        >
-          {suggestionLine(row.lane)}
-        </div>
-      ) : null}
+      {/* One temperature line. A person's reads as a fact, in its own colour; a
+          derived one reads as a suggestion, in words; with neither, "Not routed".
+          The reason is the tooltip. */}
+      <div
+        style={{
+          ...ellipsis,
+          fontSize: 11,
+          ...(temperature.source === "person" && temperature.value
+            ? { color: TEMP_PILL[temperature.value].color, fontWeight: 500 }
+            : { color: "var(--mute)", fontStyle: "italic" }),
+        }}
+        title={temperatureTitle(temperature)}
+      >
+        {temperatureLabel(temperature)}
+      </div>
 
       {variant === "owner" && (
         <div style={{ ...(step.urgent ? NEXT_HOT : NEXT), fontSize: 12, textWrap: "pretty" }}>

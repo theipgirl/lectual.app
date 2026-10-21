@@ -3,10 +3,9 @@ import { notFound } from "next/navigation";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { CAN_WRITE_LEAD, getLead, listStages } from "@/lib/pipeline";
-import { deriveTemperature } from "@/lib/intake/temperature";
+import { effectiveTemperature } from "@/lib/intake/effective-temperature";
 import { loadTemperatureFacts, type TemperatureFactsRead } from "@/lib/intake/facts";
 import { ConsultOutcomeForm } from "@/components/leads/ConsultOutcomeForm";
-import { LeadTemperature } from "@/components/leads/LeadTemperature";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { pendingProposals } from "@/lib/agents/proposals";
 import { relativeTime } from "@/lib/relative-time";
@@ -26,7 +25,7 @@ import { addVoiceNoteAction } from "./actions";
 import { meetingsFor } from "@/lib/meetings/read";
 import { LinkedMeetings } from "@/components/meetings/LinkedMeetings";
 import { ConsultDetailsSection } from "@/components/leads/ConsultDetailsSection";
-import { LaneCard } from "@/components/leads/LaneCard";
+import { TemperatureCard } from "@/components/leads/TemperatureCard";
 import { WaitingOnRebecca } from "@/components/leads/WaitingOnRebecca";
 import { loadPendingApprovalsByLead } from "@/lib/queue/lead-pending";
 import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
@@ -85,7 +84,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     // The same facts the Intake board reads; a failed read leaves the existing rules, never a guessed "cold".
     loadTemperatureFacts([lead], stages).catch((): TemperatureFactsRead => ({ status: "unavailable" })),
   ]);
-  const temperature = deriveTemperature(lead, stages, new Date(), factsRead.status === "ok" ? factsRead.byLead[lead.id] : undefined);
+  const temperature = effectiveTemperature(lead, stages, new Date(), factsRead.status === "ok" ? factsRead.byLead[lead.id] : undefined);
   const lane = laneView(lead);
   const nextStep = nextStepForLane(lane.effective, links);
   const nurture =
@@ -155,10 +154,9 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             </section>
           )}
 
-          <LeadTemperature leadId={lead.id} temperature={temperature} />
-
-          <LaneCard
+          <TemperatureCard
             leadId={lead.id}
+            temperature={temperature}
             view={lane}
             setByName={setter ? (setter.displayName ?? setter.email ?? null) : null}
             setOn={lane.setAt ? shortDate(lane.setAt, tz) : null}

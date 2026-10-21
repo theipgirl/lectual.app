@@ -100,3 +100,8 @@ export function temperatureLabel(temperature: Pick<EffectiveTemperature, "value"
   const level = LANE_LABEL[temperature.value];
   return temperature.source === "person" ? level : `Suggested: ${level}`;
 }
+
+/** The tooltip: why the chip says what it says, plus what the activity says now when a lane disagrees. */
+export function temperatureTitle(temperature: Pick<EffectiveTemperature, "reason" | "activityHint">): string {
+  return temperature.activityHint ? `${temperature.reason}\n${temperature.activityHint}` : temperature.reason;
+}
