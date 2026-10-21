@@ -4,8 +4,10 @@ import {
   authorizeUrl,
   exchangeCode,
   fetchAccountEmail,
+  hasCalendarScope,
   missingScopes,
   redirectUri,
+  refreshAccessToken,
   revokeToken,
 } from "@/lib/mailbox/providers";
 import { pkceChallenge } from "@/lib/mailbox/state";
@@ -132,5 +134,73 @@ describe("revocation", () => {
     await expect(revokeToken({ provider: "google", token: "rt", fetchImpl })).resolves.toBe(true);
     await expect(revokeToken({ provider: "microsoft", token: "rt", fetchImpl })).resolves.toBe(false);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("Calendars.Read (Sprint 15)", () => {
+  const authScopes = (provider: "google" | "microsoft") =>
+    new URL(authorizeUrl({ provider, clientId: "cid", redirectUri: "https://x/cb/", nonce: "n", verifier: "v".repeat(43) })).searchParams
+      .get("scope")!
+      .split(" ");
+
+  it("F10: the Microsoft authorize URL asks for Calendars.Read and still never Mail.Send; Google has no calendar scope", () => {
+    const ms = authScopes("microsoft");
+    expect(ms).toContain("Calendars.Read");
+    expect(ms).not.toContain("Mail.Send");
+    expect(ms.some((s) => /calendars\.readwrite/i.test(s))).toBe(false);
+    expect(authScopes("google").some((s) => /calendar/i.test(s))).toBe(false);
+  });
+
+  it("F10: a Microsoft exchange that returns only the mail scopes still connects (the calendar is not required)", async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({ access_token: "at", refresh_token: "rt", expires_in: 3600, scope: "openid email Mail.Read Mail.ReadWrite User.Read" }),
+    );
+    const t = await exchangeCode({ provider: "microsoft", creds, code: "c", verifier: "v", redirectUri: "https://x/cb/", fetchImpl, now: 0 });
+    expect(t.grantedScopes).not.toContain("Calendars.Read");
+    expect(missingScopes("microsoft", t.grantedScopes)).toEqual([]);
+  });
+
+  it("hasCalendarScope: Microsoft only, case-insensitive, with or without Graph's URL prefix", () => {
+    expect(hasCalendarScope("microsoft", ["Mail.Read", "Calendars.Read"])).toBe(true);
+    expect(hasCalendarScope("microsoft", ["https://graph.microsoft.com/Calendars.Read"])).toBe(true);
+    expect(hasCalendarScope("microsoft", ["calendars.READ"])).toBe(true);
+    expect(hasCalendarScope("microsoft", ["Mail.Read", "Mail.ReadWrite"])).toBe(false);
+    expect(hasCalendarScope("microsoft", ["Calendars.ReadWrite"])).toBe(false);
+    expect(hasCalendarScope("microsoft", [])).toBe(false);
+    expect(hasCalendarScope("microsoft", null)).toBe(false);
+    expect(hasCalendarScope("microsoft", undefined)).toBe(false);
+    expect(hasCalendarScope("google", ["Calendars.Read"])).toBe(false);
+  });
+
+  describe("F9: refresh asks only for what was granted", () => {
+    const refresh = async (grantedScopes: string[] | null | undefined) => {
+      const fetchImpl = vi.fn(async () => jsonResponse({ access_token: "at2", refresh_token: "rt2", expires_in: 3600 }));
+      const out = await refreshAccessToken({ provider: "microsoft", creds, refreshToken: "rt", grantedScopes, fetchImpl, now: 0 });
+      const [, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+      return { out, scope: new URLSearchParams(init.body as URLSearchParams).get("scope")!.split(" ") };
+    };
+
+    it("a mail-only connection's refresh does not request Calendars.Read, and still succeeds", async () => {
+      const { out, scope } = await refresh(["Mail.Read", "Mail.ReadWrite", "offline_access"]);
+      expect(scope).not.toContain("Calendars.Read");
+      expect(scope).toEqual(expect.arrayContaining(["Mail.Read", "Mail.ReadWrite", "offline_access"]));
+      expect(out).toMatchObject({ accessToken: "at2", refreshToken: "rt2" });
+    });
+
+    it("a connection that granted it asks for it", async () => {
+      expect((await refresh(["Mail.Read", "https://graph.microsoft.com/Calendars.Read"])).scope).toContain("Calendars.Read");
+    });
+
+    it("an unknown scope list is read as not granted", async () => {
+      expect((await refresh(null)).scope).not.toContain("Calendars.Read");
+      expect((await refresh(undefined)).scope).not.toContain("Calendars.Read");
+    });
+
+    it("Google's refresh sends no scope parameter at all", async () => {
+      const fetchImpl = vi.fn(async () => jsonResponse({ access_token: "g2", expires_in: 3600 }));
+      await refreshAccessToken({ provider: "google", creds, refreshToken: "rt", grantedScopes: [], fetchImpl, now: 0 });
+      const [, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+      expect(new URLSearchParams(init.body as URLSearchParams).has("scope")).toBe(false);
+    });
   });
 });

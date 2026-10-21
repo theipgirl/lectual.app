@@ -262,6 +262,35 @@ tool set (six reads) and the retrieval-only UPL system prompt are in `src/lib/ag
   in `src/app/dashboard/copilot/copilot.css`; the chat and launcher styles are in `src/components/copilot/copilot.css`,
   imported by the components so they load on every dashboard page.
 
+## Outlook calendar (lectual 0098, Sprint 15)
+The daily mailbox-sync cron also reads each connected Microsoft mailbox's Outlook calendar into `crm_calendar_event`,
+so the calendar page, the lead page ("Consult booked") and Today's Consults card can show consults. Google stays mail-only.
+There is no new cron (`vercel.json` is unchanged); the step is `syncOrgCalendars` in `src/lib/calendar/outlook-sync.ts`,
+called from `runMailboxSync` after each firm's mail, with its own `calendar-sync` `agent_run` row (counts only).
+- **Scope:** `Calendars.Read` is asked for at connect time but is NOT in the `required` list, so declining it still connects
+  the mailbox for mail. `hasCalendarScope()` (`providers.ts`) is the one definition; a connection whose stored `scopes` lack
+  it is skipped (no Graph call, counted as needing reconnect) and Integrations shows "Reconnect to read the calendar". Refresh
+  sends `Calendars.Read` only for a connection that granted it: Microsoft refuses an ungranted scope, which would look like a
+  dead token and take mail sync down. `freshAccessToken` keeps the caller's row current so the calendar step never replays a
+  refresh token the mail step just rotated.
+- **Stored, and never stored:** title, start, end, all-day, location, join URL, organizer, attendee addresses (lowercased, at most
+  50), `is_consult`, `lead_id`. `OutlookEventRow` (`outlook-parse.ts`) is an explicit allow-list with no field for the body.
+  `bodyPreview` is read only to find a Zoom or Teams link and dropped. Nothing (agent_run, cron JSON, logs) carries a title,
+  address, location or link. The upsert key is `org_id,source,external_id`; `org_id` comes from the connection row.
+- **Vanished events:** removed only after a COMPLETE read (page cap not reached, no page failed), and only rows with that
+  `org_id`, `source = 'outlook'`, that `mailbox_connection_id` and a start inside the read window. The vanished ids are
+  computed from a select first and deleted in small `in` chunks (a `not in` list of Graph's long ids would overflow the URL).
+  A cancelled event is not stored and counts as vanished.
+- **Consult and lead:** `is_consult` = title matches `strategy session|discovery call|consult|initial call`, OR a lead is linked and
+  the organizer is the address of a `mailbox_connection` in the same firm. `lead_id` is the one lead whose email matches an
+  attendee exactly (case-insensitive); none, or several (even one address on two leads), is null, never a guess.
+- **Three states everywhere** (`outlook-read.ts`, scoped client only): `ok` / `database-update-needed` / `unavailable`. A failed
+  read is never an empty calendar or "no consult booked". The Outlook reads on the three pages sit behind `orgHasModule("mailbox")`.
+- **Before 0098 is applied** the columns do not exist: the sync's first refused statement (42703 / PGRST204, or 23514 on the
+  `calendar-sync` agent_run insert) ends that firm's calendar step as `database-update-needed` with nothing written or deleted,
+  mail sync is untouched, and every reader says "until the database update". Apply 0098 to BOTH lectual-dev and lectual-prod
+  before the reads light up. Known limit: the same meeting on two connected mailboxes is stored (and shown) twice.
+
 ## JSX text spacing: keep the `{" "}`
 Next 16.2.7's compiler DROPS the leading space of JSX text that contains an HTML entity
 (`&apos;`, `&amp;`, `&rsquo;`…) and runs onto another line, even if that is only the line
