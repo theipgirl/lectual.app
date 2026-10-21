@@ -72,7 +72,8 @@ export function AssessmentBlocks({ results, who }: { results: AssessmentResults;
           {results.buckets.map((b) => (
             <div key={b.label} className="ifr-bucket">
               <b>{b.count.toLocaleString("en-US")}</b>
-              <i style={{ height: `${Math.max(pct(b.count, maxBucket), b.count > 0 ? 4 : 0)}%` }} />
+              {/* At most 70% of the column, so the count and the label above and below the bar always fit. */}
+              <i style={{ height: `${Math.max(Math.round(pct(b.count, maxBucket) * 0.7), b.count > 0 ? 4 : 0)}%` }} />
               <span>{b.label}</span>
             </div>
           ))}

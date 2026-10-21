@@ -100,6 +100,23 @@ Intake → Forms keeps an intake per event, campaign or page (`/dashboard/forms/
 - Archived intakes don't answer publicly and keep their leads. Matter intake requests use the
   firm's MAIN intake (oldest not archived).
 
+## Answers and Results (Sprint 9, no schema)
+- **Answers card** (`src/components/answers/AnswersCard.tsx`, loader `src/lib/answers/load-answers.ts`) is on the lead
+  page (after the temperature card) and the matter page (aside). Three sources read on their own (a lead's intake
+  submissions, a lead's `crm_booth_scorecard` rows, a matter's COMPLETED `crm_intake_request` rows); a failed one is
+  named on the card and never reads as "No intake or assessment answers yet." Temperature is staff-only and labelled.
+- **Intake-assessment gaps are not stored.** The submission keeps score/band/temperature and the answers as option
+  LABELS, so gaps are re-derived by matching labels back to the card and re-scoring (`reread-answers.ts`). It is exact for
+  answers the card produced; anything unmatched (or a score that no longer agrees) shows "Gaps unavailable", never a guess.
+  Booth rows store `gaps` at capture and those are used as they are. The booth row has no variant: it is read from the
+  answer ids (100 and over = Trademark & Copyright card).
+- **Results tab** (`?form=<id>&tab=results`) and **event page** (`?event=<code>`, booth data, read-only, default All time)
+  share the distribution blocks (`AssessmentBlocks.tsx`), fed by `AssessmentSample`s built from either source. Booth
+  answers are saved only when a card is finished, so drop-off by question says "not recorded" until partial answers exist.
+- **CSV** (`/dashboard/forms/export/`): a route handler is its own entry point, so it resolves the session and role
+  itself (401 signed out, 403 viewer/social_media or an unreadable role, 404 foreign id, 413 over 50,000 people, never a
+  header-only file on a failed read). Formula-leading cells get a `'` prefix. `src/lib/intake-forms/csv.ts` is pure.
+
 ## JSX text spacing: keep the `{" "}`
 Next 16.2.7's compiler DROPS the leading space of JSX text that contains an HTML entity
 (`&apos;`, `&amp;`, `&rsquo;`…) and runs onto another line, even if that is only the line
