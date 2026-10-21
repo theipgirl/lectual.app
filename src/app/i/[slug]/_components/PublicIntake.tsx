@@ -394,7 +394,7 @@ function Conversation(props: {
     inputRef.current?.focus();
   };
 
-  // A choice question: a single choice goes on with the tap; a multi choice goes on with Done.
+  // A choice question: a single choice goes on with a tap or Enter, or with Done; a multi choice goes on with Done.
   const advanceChoice = (labels: string[]) => {
     if (!current) return;
     if (current.required && labels.length === 0) {
@@ -408,12 +408,8 @@ function Conversation(props: {
 
   const onPick = (next: string[]) => {
     if (!current) return;
-    if (current.type === "multi") {
-      setPicked(next);
-      props.setValue(current.key, current.kind, next);
-      return;
-    }
-    advanceChoice(next);
+    setPicked(next);
+    props.setValue(current.key, current.kind, current.type === "multi" ? next : (next[0] ?? ""));
   };
 
   const thread = buildThread({
@@ -468,6 +464,7 @@ function Conversation(props: {
           onSend={() => advance(draft)}
           onSkip={() => (current.type === "text" ? advance("") : advanceChoice([]))}
           onPick={onPick}
+          onCommit={advanceChoice}
           onDone={() => advanceChoice(picked)}
         />
       )}

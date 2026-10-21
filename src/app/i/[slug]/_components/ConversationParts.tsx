@@ -73,11 +73,14 @@ export function ConversationInput(props: {
   onDraft: (v: string) => void;
   onSend: () => void;
   onSkip: () => void;
-  /** A choice was tapped: a single choice goes on with it; a multi choice only records it. */
+  /** A choice was selected (tap, arrow key or Space): recorded only, for single and multi alike. */
   onPick: (next: string[]) => void;
+  /** A single choice was confirmed by a tap or by Enter: the conversation goes on with it. */
+  onCommit: (next: string[]) => void;
+  /** The Done button: goes on with what is picked. */
   onDone: () => void;
 }) {
-  const { step, hint, draft, maxLength, picked, inputRef, onDraft, onSend, onSkip, onPick, onDone } = props;
+  const { step, hint, draft, maxLength, picked, inputRef, onDraft, onSend, onSkip, onPick, onCommit, onDone } = props;
   const hintLine = hint && <p className="ipub-error">{hint}</p>;
   if (step.type !== "text") {
     const multi = step.type === "multi";
@@ -92,21 +95,18 @@ export function ConversationInput(props: {
           label={step.prompt}
           layout="chat"
           onChange={onPick}
+          onCommit={multi ? undefined : onCommit}
         />
-        {(multi || !step.required) && (
-          <div className="ipub-choice-actions">
-            {!step.required && (
-              <button type="button" className="ipub-skip" onClick={onSkip}>
-                Skip
-              </button>
-            )}
-            {multi && (
-              <button type="button" className="ipub-submit" onClick={onDone}>
-                Done
-              </button>
-            )}
-          </div>
-        )}
+        <div className="ipub-choice-actions">
+          {!step.required && (
+            <button type="button" className="ipub-skip" onClick={onSkip}>
+              Skip
+            </button>
+          )}
+          <button type="button" className="ipub-submit" onClick={onDone}>
+            Done
+          </button>
+        </div>
       </div>
     );
   }

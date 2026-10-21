@@ -8,6 +8,7 @@ import { labelsOf } from "@/lib/intake-forms/choice";
 import { HONEYPOT_FIELD, SUBMIT_LIMITS } from "@/lib/intake-forms/public-submit";
 import { createStepTracker } from "@/lib/intake-forms/step-tracking";
 import { completeAssessmentAction, recordIntakeEventAction, recordIntakeStepAction, startIntakeAction } from "../actions";
+import { AssessmentNav } from "./AssessmentNav";
 import { ChoiceControl } from "./ChoiceControl";
 import { IntakeDisclaimer } from "./IntakeShell";
 
@@ -271,7 +272,8 @@ export function PublicAssessment(props: { slug: string; view: PublicIntakeConfig
             value={labelsOf(value)}
             label={current.question}
             disabled={pending}
-            onChange={(next) => (current.type === "multi" ? setAnswers({ ...answers, [current.key]: next }) : choose(current, next[0]))}
+            onChange={(next) => setAnswers({ ...answers, [current.key]: current.type === "multi" ? next : (next[0] ?? "") })}
+            onCommit={current.type === "multi" ? undefined : (next) => choose(current, next[0])}
           />
         ) : (
           <div className={`ipub-asm-options${current.grid ? " grid" : ""}`} role={current.type === "multi" ? "group" : "radiogroup"}>
@@ -297,25 +299,15 @@ export function PublicAssessment(props: { slug: string; view: PublicIntakeConfig
             {error}
           </p>
         )}
-        <div className="ipub-asm-nav">
-          {step > 0 && (
-            <button type="button" className="ipub-link" onClick={() => setStep(step - 1)} disabled={pending}>
-              Back
-            </button>
-          )}
-          <span style={{ flex: 1 }} />
-          {!current.required && (
-            <button type="button" className="ipub-link" onClick={() => advance(current, true)} disabled={pending}>
-              Skip
-            </button>
-          )}
-          {current.type !== "single" && (
-            <button type="button" className="ipub-submit" onClick={() => advance(current)} disabled={pending}>
-              {!lastStep ? "Next" : pending ? "Sending…" : "See my results"}
-            </button>
-          )}
-          {pending && current.type === "single" && <span className="ipub-small">Scoring…</span>}
-        </div>
+        <AssessmentNav
+          step={step}
+          lastStep={lastStep}
+          current={current}
+          pending={pending}
+          onBack={() => setStep(step - 1)}
+          onSkip={() => advance(current, true)}
+          onNext={() => advance(current)}
+        />
       </div>
     );
   }

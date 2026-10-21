@@ -6,6 +6,7 @@ import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { ChoiceControl } from "../../src/app/i/[slug]/_components/ChoiceControl";
 import { QuestionFields } from "../../src/app/i/[slug]/_components/QuestionFields";
 import { buildThread, ConversationInput, ThreadBubbles, type ChatStep } from "../../src/app/i/[slug]/_components/ConversationParts";
+import { AssessmentNav } from "../../src/app/i/[slug]/_components/AssessmentNav";
 import { RequestForm } from "../../src/app/r/[token]/_components/RequestForm";
 import { defaultIntakeConfig, publicConfig, validateIntakeConfig } from "@/lib/intake-forms/config";
 import { validateAnswers } from "@/lib/intake-forms/public-submit";
@@ -70,12 +71,75 @@ describe("the shared choice control", () => {
     const seen: string[][] = [];
     const single = ChoiceControl({ name: "g", type: "single", options: ["A", "B"], value: [], label: "q", onChange: (n) => seen.push(n) });
     const radios = findAll(single, (e) => e.type === "input" && (e.props as { type?: string }).type === "radio");
-    (radios[1].props as { onClick: () => void }).onClick();
+    (radios[1].props as { onClick: (e: { detail: number }) => void }).onClick({ detail: 1 });
     expect(seen).toEqual([["B"]]);
     const multi = ChoiceControl({ name: "g", type: "multi", options: ["A", "B", "C"], value: ["C"], label: "q", onChange: (n) => seen.push(n) });
     const boxes = findAll(multi, (e) => e.type === "input" && (e.props as { type?: string }).type === "checkbox");
     (boxes[0].props as { onChange: () => void }).onChange();
     expect(seen[1]).toEqual(["A", "C"]);
+  });
+});
+
+describe("a single choice selects on the keyboard and commits only on a tap or Enter (V4)", () => {
+  type Click = (e: { detail: number }) => void;
+  const radiosOf = (el: ReactElement) => findAll(el, (e) => e.type === "input" && (e.props as { type?: string }).type === "radio");
+
+  it("arrow keys and Space (a click with detail 0) only select; a tap (detail 1) commits once", () => {
+    const changed: string[][] = [];
+    const committed: string[][] = [];
+    const el = ChoiceControl({ name: "g", type: "single", options: ["A", "B", "C", "D"], value: [], label: "q", onChange: (n) => changed.push(n), onCommit: (n) => committed.push(n) });
+    const radios = radiosOf(el);
+    (radios[2].props as { onClick: Click }).onClick({ detail: 0 });
+    expect(changed).toEqual([["C"]]);
+    expect(committed).toEqual([]);
+    (radios[2].props as { onClick: Click }).onClick({ detail: 1 });
+    expect(committed).toEqual([["C"]]);
+  });
+
+  it("Enter on a radio selects and commits; other keys do nothing", () => {
+    const committed: string[][] = [];
+    const el = ChoiceControl({ name: "g", type: "single", options: ["A", "B"], value: [], label: "q", onChange: () => {}, onCommit: (n) => committed.push(n) });
+    const onKeyDown = (radiosOf(el)[1].props as { onKeyDown: (e: { key: string; preventDefault: () => void }) => void }).onKeyDown;
+    const preventDefault = vi.fn();
+    onKeyDown({ key: "ArrowDown", preventDefault });
+    onKeyDown({ key: " ", preventDefault });
+    expect(committed).toEqual([]);
+    onKeyDown({ key: "Enter", preventDefault });
+    expect(committed).toEqual([["B"]]);
+    expect(preventDefault).toHaveBeenCalledTimes(1);
+  });
+
+  it("without a commit handler (the plain form) Enter is left to the browser", () => {
+    const el = ChoiceControl({ name: "g", type: "single", options: ["A", "B"], value: [], label: "q", onChange: () => {} });
+    expect((radiosOf(el)[0].props as { onKeyDown?: unknown }).onKeyDown).toBeUndefined();
+  });
+
+  it("the conversation hands a keyboard selection to onPick and only a tap to onCommit, and has a Done control for a single choice", () => {
+    const onPick = vi.fn();
+    const onCommit = vi.fn();
+    const step: ChatStep = { key: "qs", prompt: "Used it?", required: true, kind: "question", type: "single", options: ["A", "B", "C"] };
+    const el = ConversationInput({ step, draft: "", maxLength: 10, hint: null, picked: [], onDraft: () => {}, onSend: () => {}, onSkip: () => {}, onPick, onCommit, onDone: () => {} }) as ReactElement;
+    const control = findAll(el, (e) => e.type === ChoiceControl)[0];
+    const props = control.props as Parameters<typeof ChoiceControl>[0];
+    const radios = radiosOf(ChoiceControl(props));
+    (radios[1].props as { onClick: Click }).onClick({ detail: 0 });
+    expect(onPick).toHaveBeenCalledWith(["B"]);
+    expect(onCommit).not.toHaveBeenCalled();
+    (radios[1].props as { onClick: Click }).onClick({ detail: 1 });
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onCommit).toHaveBeenCalledWith(["B"]);
+    expect(html(el)).toContain(">Done<");
+  });
+
+  it("a single-choice extra in the assessment has Next, and 'See my results' as the last question; a card single choice still has neither", () => {
+    const nav = (current: { type: "single" | "multi" | "text"; required: boolean; extra: boolean }, lastStep: boolean) =>
+      html(<AssessmentNav step={1} lastStep={lastStep} current={current} pending={false} onBack={() => {}} onSkip={() => {}} onNext={() => {}} />);
+    expect(nav({ type: "single", required: true, extra: true }, false)).toContain(">Next<");
+    expect(nav({ type: "single", required: true, extra: true }, true)).toContain(">See my results<");
+    const card = nav({ type: "single", required: true, extra: false }, false);
+    expect(card).not.toContain(">Next<");
+    expect(card).not.toContain("See my results");
+    expect(nav({ type: "multi", required: true, extra: false }, true)).toContain(">See my results<");
   });
 });
 
@@ -142,7 +206,7 @@ describe("the conversation's step (F5)", () => {
   const step = (over: Partial<ChatStep> = {}): ChatStep => ({ key: "qs", prompt: "Have you used it publicly?", required: true, kind: "question", type: "single", options: ["Yes", "No"], ...over });
   const input = (s: ChatStep, over: Record<string, unknown> = {}) =>
     html(
-      <ConversationInput step={s} draft="" maxLength={4000} hint={null} picked={[]} onDraft={() => {}} onSend={() => {}} onSkip={() => {}} onPick={() => {}} onDone={() => {}} {...over} />,
+      <ConversationInput step={s} draft="" maxLength={4000} hint={null} picked={[]} onDraft={() => {}} onSend={() => {}} onSkip={() => {}} onPick={() => {}} onCommit={() => {}} onDone={() => {}} {...over} />,
     );
 
   it("a single choice is one control per option and no text box", () => {
@@ -150,7 +214,7 @@ describe("the conversation's step (F5)", () => {
     expect(count(out, /type="radio"/g)).toBe(2);
     expect(out).not.toContain("<textarea");
     expect(out).not.toContain("ipub-composer\"");
-    expect(out).not.toContain("Done");
+    expect(out).toContain(">Done<");
     expect(out).not.toContain("Skip");
     expect(out).toContain("ipub-choice chat");
   });

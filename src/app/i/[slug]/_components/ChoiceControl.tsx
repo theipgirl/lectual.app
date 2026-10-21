@@ -20,6 +20,11 @@ export type ChoiceControlProps = {
   value: readonly string[];
   /** Called with the new chosen labels. Absent in the editor's preview, which only draws. */
   onChange?: (next: string[]) => void;
+  /**
+   * Single choice only: the person confirmed the option, by tapping or clicking it, or by pressing Enter on it.
+   * Arrow keys and Space only select (onChange), so a keyboard user can reach every option before going on.
+   */
+  onCommit?: (next: string[]) => void;
   /** The question, for the group's accessible name. */
   label: string;
   invalid?: boolean;
@@ -33,7 +38,7 @@ export type ChoiceControlProps = {
 const noop = () => {};
 
 export function ChoiceControl(props: ChoiceControlProps) {
-  const { name, type, options, value, onChange, label, invalid, disabled, layout = "form", scope = "public" } = props;
+  const { name, type, options, value, onChange, onCommit, label, invalid, disabled, layout = "form", scope = "public" } = props;
   const root = scope === "preview" ? "ifm-pv-choice" : "ipub-choice";
   const single = type === "single";
   return (
@@ -53,8 +58,26 @@ export function ChoiceControl(props: ChoiceControlProps) {
               value={o}
               checked={on}
               disabled={disabled}
-              // A radio's click fires for the option already chosen too (and for arrow keys), which "tap to go on" needs.
-              onClick={single && onChange ? () => onChange([o]) : undefined}
+              // A radio's click fires for the option already chosen too, which "tap to go on" needs. Arrow keys and
+              // Space also fire a click, but with detail 0: that only selects. A pointer click has detail > 0.
+              onClick={
+                single && (onChange || onCommit)
+                  ? (e) => {
+                      onChange?.([o]);
+                      if (e.detail > 0) onCommit?.([o]);
+                    }
+                  : undefined
+              }
+              onKeyDown={
+                single && onCommit
+                  ? (e) => {
+                      if (e.key !== "Enter") return;
+                      e.preventDefault();
+                      onChange?.([o]);
+                      onCommit([o]);
+                    }
+                  : undefined
+              }
               onChange={single ? noop : () => onChange?.(toggleLabel(options, value, o))}
             />
             <span>{o}</span>
