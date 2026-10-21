@@ -7,7 +7,9 @@ import type { SourceSignal } from "./types";
  * A lead stores `sheet_key` (owner + mark + status code, hashed). Matching tries the key exactly
  * first. Failing that it tries the same owner and mark under any other intake status code, because a
  * row that moved on the sheet has a new key (see `intakeCodeKeys`). One lead per sheet row and one
- * sheet row per lead: any other count is reported as ambiguous and never silently picked.
+ * sheet row per lead: any other count is reported as ambiguous and never silently picked. That includes
+ * two leads with different keys reaching the same row (the importer starts a new lead when a row's status
+ * code changes, so a stale lead and a current one can both name it): neither gets the row.
  */
 
 export type LeadKeyRef = { id: string; sheetKey: string | null };
@@ -61,6 +63,20 @@ export function matchSheetToLeads(entries: readonly SheetEntry[], leads: readonl
       ambiguousLeads += 1;
     } else if (candidates.length === 1) {
       byLead.set(lead.id, { kind: "entry", entry: candidates[0] });
+    }
+  }
+
+  // A row claimed by more than one lead (say the lead holding its current key and a stale duplicate that
+  // reaches it through another status code) belongs to none of them.
+  const claims = new Map<SheetEntry, string[]>();
+  for (const [leadId, match] of byLead) {
+    if (match.kind === "entry") pushTo(claims, match.entry, leadId);
+  }
+  for (const leadIds of claims.values()) {
+    if (leadIds.length < 2) continue;
+    for (const leadId of leadIds) {
+      byLead.set(leadId, { kind: "ambiguous", note: `${leadIds.length} leads match this sheet row` });
+      ambiguousLeads += 1;
     }
   }
 

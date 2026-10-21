@@ -145,6 +145,22 @@ describe("buildPlan: the summary", () => {
   });
 });
 
+describe("buildPlan: two leads for one sheet row", () => {
+  it("gives neither lead a proposal and says why", async () => {
+    // Amara's sheet row is at code 1. A stale duplicate keyed at another intake code reaches the same row.
+    const stale = lead("55555555-0000-4000-8000-000000000002", "Amara", "Stale", { sheetKey: key("Amara Nwosu", null, "2"), currentStageId: S.pnc });
+    const { view } = await run({ leads: [...LEADS, stale] });
+    expect(view.summary.ambiguousLeads).toBeGreaterThanOrEqual(2);
+    for (const id of [L.amara, stale.id]) {
+      const row = view.rows.find((r) => r.leadId === id)!;
+      expect(row.proposal.kind).toBe("no_proposal");
+      expect(row.proposal.confidence).toBe("no_evidence");
+      expect(row.sheet).toEqual({ kind: "none", note: "2 leads match this sheet row" });
+      expect(row.proposal.reasons.join(" ")).toContain("2 leads match this sheet row");
+    }
+  });
+});
+
 describe("buildPlan: a source that cannot be read", () => {
   it.each([
     ["not-connected", { status: "not-connected", reason: "Lawmatics isn't connected for your firm." }],

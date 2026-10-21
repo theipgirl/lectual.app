@@ -179,7 +179,9 @@ and read or write nothing for a refused one. Nothing is written to Lawmatics, an
   server-action body limit to 6 MB so the file reaches the action.
 - **Matching.** A lead matches a sheet row on `sheet_key`, exactly first. `sheetKeyFor` includes the status code, so
   a row that moved on the sheet has a new key; failing an exact hit the owner and mark are also tried under every
-  intake code 0 to 6. Two candidates either way is reported as ambiguous, never picked. Sheet rows with no lead are
+  intake code 0 to 6. Two candidates for one lead, two leads with one `sheet_key`, or two leads reaching one row
+  (a stale duplicate from an earlier status code plus the current lead) are all reported as ambiguous: none of those
+  leads gets a sheet stage or a proposal, and the summary counts them. Never picked. Sheet rows with no lead are
   listed, never created. A lead with no `sheet_key` has no sheet reading.
 - **Email is the stored mail, not mail.** The mailbox sync already classified each message it matched and wrote the
   type, `sensitive` and date onto the lead's `email_sent`/`email_received` timeline row. `src/lib/reconcile/email.ts`

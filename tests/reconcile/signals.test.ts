@@ -63,6 +63,18 @@ describe("matching a sheet row to a lead", () => {
     expect(m.withoutLead).toEqual([]);
   });
 
+  it("reports two leads that reach one sheet row, one by its current key and one by a stale status code", () => {
+    const e = entry({ owner: "Acme Inc", mark: "ACME", code: "3" });
+    const current = { id: "A", sheetKey: key("Acme Inc", "ACME", "1") };
+    const stale = { id: "B", sheetKey: key("Acme Inc", "ACME", "3") };
+    const m = matchSheetToLeads([e], [current, stale]);
+    expect(m.byLead.get("A")).toMatchObject({ kind: "ambiguous", note: "2 leads match this sheet row" });
+    expect(m.byLead.get("B")).toMatchObject({ kind: "ambiguous", note: "2 leads match this sheet row" });
+    expect([...m.byLead.values()].some((v) => v.kind === "entry")).toBe(false);
+    expect(m.ambiguousLeads).toBe(2);
+    expect(m.withoutLead).toEqual([]);
+  });
+
   it("reports a lead that matches two sheet rows (same owner and mark, two codes)", () => {
     const a = entry({ owner: "Amara Nwosu", code: "3", row: 2 });
     const b = entry({ owner: "Amara Nwosu", code: "4", row: 3 });
