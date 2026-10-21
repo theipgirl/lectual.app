@@ -75,7 +75,7 @@ export default function IntakeTable({
   time,
   pendingApprovals,
   onSort,
-  onSetTemperature,
+  onSetLane,
   onAssign,
   onSetSource,
 }: {
@@ -94,7 +94,7 @@ export default function IntakeTable({
   pendingApprovals?: LeadPendingApprovals;
   onSort: (key: SortKey) => void;
   /** Sets or clears the person's lane, which is the temperature the chip shows. */
-  onSetTemperature: (leadId: string, lane: Lane | null) => void;
+  onSetLane: (leadId: string, lane: Lane | null) => void;
   onAssign: (leadId: string, userId: string | null) => void;
   onSetSource: (leadId: string, source: ReferralSource | null) => void;
 }) {
@@ -225,7 +225,7 @@ export default function IntakeTable({
                     leadName={name}
                     temperature={row.temperature}
                     pending={pending}
-                    onSet={(lane) => onSetTemperature(lead.id, lane)}
+                    onSet={(lane) => onSetLane(lead.id, lane)}
                   />
 
                   <div style={{ minWidth: 0, display: "flex" }}>

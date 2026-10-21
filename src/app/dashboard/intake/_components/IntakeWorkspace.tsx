@@ -198,7 +198,7 @@ export default function IntakeWorkspace({
   // flips at once and is put back, with the action's sentence under the row, if
   // the write is refused. The derived value and its reason are recomputed, so
   // clearing falls back to exactly what the server will show.
-  const setTemperature = useCallback(
+  const setLane = useCallback(
     (leadId: string, lane: Lane | null) => {
       runWrite(
         leadId,
@@ -350,7 +350,7 @@ export default function IntakeWorkspace({
             time={time}
             pendingApprovals={pendingApprovals}
             onSort={toggleSort}
-            onSetTemperature={setTemperature}
+            onSetLane={setLane}
             onAssign={assign}
             onSetSource={setSource}
           />

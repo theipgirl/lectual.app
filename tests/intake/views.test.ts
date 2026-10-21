@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { Lead, Stage } from "@/lib/pipeline";
 import type { MemberIdentity } from "@/lib/members/directory";
-import { buildIntakeRows, type IntakeRow } from "@/lib/intake/rows";
+import { DEFAULT_SORT, buildIntakeRows, sortRows, type IntakeRow } from "@/lib/intake/rows";
 import {
   initialsOf,
   memberLabel,
@@ -302,5 +302,30 @@ describe("topBarCounts / topBarLine", () => {
 
   it("is all zeros for an empty list rather than undefined", () => {
     expect(topBarLine(topBarCounts([]))).toBe("0 in intake · 0 need a first reply · 0 unassigned");
+  });
+});
+
+describe("the boards keep the sorted order", () => {
+  // Three leads in the same stage and owned by the same person: touched yesterday,
+  // touched today, never touched. Listed out of order on purpose.
+  const sorted = sortRows(
+    rowsFor([
+      lead({ id: "yesterday", stage_entered_at: daysBefore(2), assigned_to: "u-rb", last_activity_at: daysBefore(1) }),
+      lead({ id: "never", assigned_to: "u-rb" }),
+      lead({ id: "today", assigned_to: "u-rb", last_activity_at: daysBefore(0) }),
+    ]),
+    DEFAULT_SORT.key,
+    DEFAULT_SORT.dir,
+  );
+  const ids = (rows: IntakeRow[]) => rows.map((row) => row.lead.id);
+
+  it("by stage: today, yesterday, never", () => {
+    const column = stageColumns(sorted, STAGES).find((c) => c.stage.id === "s1")!;
+    expect(ids(column.rows)).toEqual(["today", "yesterday", "never"]);
+  });
+
+  it("by owner: today, yesterday, never", () => {
+    const column = ownerColumns(sorted, MEMBERS).find((c) => c.key === "u-rb")!;
+    expect(ids(column.rows)).toEqual(["today", "yesterday", "never"]);
   });
 });
