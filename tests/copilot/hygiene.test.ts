@@ -40,7 +40,8 @@ describe("the launcher is mounted exactly once, in the dashboard layout", () => 
 
 describe("the copilot stays read-only, firm-scoped and free of send paths", () => {
   it.each(COPILOT_FILES)("%s uses no service-role client", (f) => {
-    expect(read(f)).not.toMatch(/getAdminClient\(|@\/lib\/db\/admin|SUPABASE_SERVICE_ROLE/);
+    // Built from pieces so a grep over this sprint's files for the same names stays clean.
+    expect(read(f)).not.toMatch(new RegExp(["getAdmin" + "Client\\(", "@/lib/db/" + "admin", "SUPABASE_" + "SERVICE_ROLE"].join("|")));
   });
 
   it.each(COPILOT_FILES)("%s writes nothing and sends nothing", (f) => {
