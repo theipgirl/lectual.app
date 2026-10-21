@@ -8,7 +8,7 @@ import { aiConfigured } from "@/lib/ai/claude";
 import { AGENT_DEFS, AGENT_IDS, type AgentId, type Autonomy } from "@/lib/agents/types";
 import { agentReadiness, type ReadinessSource } from "@/lib/agents/readiness";
 import { loadAgentMoves, type AgentMovesRead } from "@/lib/stage-keeper/read";
-import { readConsultReadiness } from "@/lib/stage-keeper/readiness-read";
+import { readCalendarProbe } from "@/lib/stage-keeper/readiness-read";
 import { AGENT_MOVES_TODAY_HREF } from "@/lib/stage-keeper/moves";
 import { listConnections } from "@/lib/mailbox/connections";
 import { loadActiveQueue } from "@/lib/queue/load";
@@ -112,22 +112,28 @@ export default async function AgentsPage() {
   // queue that can't be reached is "unavailable", never "none".
   const hasMailboxModule = await orgHasModule("mailbox");
   const mailbox: ReadinessSource =
-    settingsKnown && (isOn("email-intel") || isOn("stage-keeper")) && hasMailboxModule
+    settingsKnown && (isOn("email-intel") || isOn("stage-keeper") || isOn("inbox-summary")) && hasMailboxModule
       ? await listConnections().then(
           (r) => (!r.ok ? "unavailable" : r.connections.some((c) => c.status === "active") ? "ok" : "none"),
           () => "unavailable" as const,
         )
       : "ok";
-  // The Stage Keeper is ready with a mailbox OR readable consults, so it also asks for those.
-  const calendar: ReadinessSource =
-    settingsKnown && isOn("stage-keeper") && hasMailboxModule ? await readConsultReadiness() : "ok";
+  // One probe of the Outlook calendar serves three things: the Stage Keeper is ready with a mailbox OR readable
+  // consults, Consult prep needs consults, and a missing Outlook column means lectual 0098 is not applied, which
+  // is also what keeps the three newest agents from being switched on. Without the Mailboxes module the calendar
+  // is not read at all, so the database-update state is simply unknown there.
+  const probe = settingsKnown && hasMailboxModule ? await readCalendarProbe() : null;
+  const calendar: ReadinessSource = probe && (isOn("stage-keeper") || isOn("consult-prep")) ? probe.readiness : "ok";
+  const databaseUpdate = probe?.databaseUpdate ?? "unknown";
   // "N leads moved today" on its card: the same read, and the same set, as the Intake board's chips.
   const agentMoves: AgentMovesRead = await loadAgentMoves(now, tz);
-  const queueLoad = settingsKnown && isOn("post-consult") ? await loadActiveQueue() : null;
+  // Every agent that writes a queue draft needs the queue.
+  const writesToQueue = isOn("post-consult") || isOn("morning-brief") || isOn("consult-prep") || isOn("inbox-summary");
+  const queueLoad = settingsKnown && writesToQueue ? await loadActiveQueue() : null;
   const queue: ReadinessSource = !queueLoad ? "ok" : queueLoad.status === "ok" ? "ok" : queueLoad.status === "unconfigured" ? "none" : "unavailable";
   const ai = aiConfigured();
   const readiness = new Map(
-    AGENT_IDS.map((a) => [a, agentReadiness({ agent: a, enabled: isOn(a), hasMailboxModule, mailbox, aiConfigured: ai, queue, calendar })]),
+    AGENT_IDS.map((a) => [a, agentReadiness({ agent: a, enabled: isOn(a), hasMailboxModule, mailbox, aiConfigured: ai, queue, calendar, databaseUpdate })]),
   );
   const enabledAgents = AGENT_IDS.filter(isOn);
   const readyCount = enabledAgents.filter((a) => readiness.get(a)?.tone === "ok").length;

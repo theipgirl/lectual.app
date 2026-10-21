@@ -86,6 +86,22 @@ const FORBIDDEN_JUDGMENT_PATTERNS: Array<{ re: RegExp; label: string }> = [
   { re: /\brisk\s+(?:read|assessment|classification)\b/i, label: "a risk assessment" },
 ];
 
+/** True when the text carries anything the guard below would refuse. */
+export function hasJudgmentContent(text: string): boolean {
+  return FORBIDDEN_JUDGMENT_PATTERNS.some(({ re }) => re.test(text));
+}
+
+/**
+ * The same text with each refusable fragment replaced by "[omitted]". For text the system did not
+ * write but must still not repeat as its own wording (a lead's recorded mark or an email subject):
+ * the fragment is withheld rather than the whole value, and the guard then passes.
+ */
+export function scrubJudgmentContent(text: string): string {
+  let out = text;
+  for (const { re } of FORBIDDEN_JUDGMENT_PATTERNS) out = out.replace(new RegExp(re.source, `${re.flags.replace("g", "")}g`), "[omitted]");
+  return out;
+}
+
 export function assertNoJudgmentContent(text: string, where: string): void {
   for (const { re, label } of FORBIDDEN_JUDGMENT_PATTERNS) {
     if (re.test(text)) {

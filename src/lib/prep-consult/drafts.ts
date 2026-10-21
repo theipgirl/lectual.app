@@ -87,7 +87,20 @@ Session date/time (staff-entered, exactly as given — do not reformat or invent
 Zoom link: ${facts.zoomLink ?? "(not yet available)"}`;
 }
 
-async function runDraftPrompt(system: string, prompt: string, where: string): Promise<string> {
+/**
+ * A text generator the caller supplies instead of the global model helper. The in-app agent passes
+ * one that goes through its own model call (so the run's cost total sees it); the staff-invoked flow
+ * passes nothing and gets `askClaude`, exactly as before. Whatever the source, the text is checked by
+ * assertNoJudgmentContent before it is returned.
+ */
+export type DraftTextGenerator = (args: { system: string; prompt: string; maxTokens: number }) => Promise<string>;
+
+async function runDraftPrompt(system: string, prompt: string, where: string, generate?: DraftTextGenerator): Promise<string> {
+  if (generate) {
+    const text = (await generate({ system, prompt, maxTokens: 1024 })).trim();
+    assertNoJudgmentContent(text, where);
+    return text;
+  }
   const result = await askClaude({ system, prompt, maxTokens: 1024 });
   if ("skipped" in result) {
     throw new PrepConsultFlowError(
@@ -100,11 +113,12 @@ async function runDraftPrompt(system: string, prompt: string, where: string): Pr
 }
 
 /** Builds the internal booking heads-up (queued as type = BRIEFING — see generate.ts). */
-export async function buildHeadsUpDraft(facts: PrepConsultFacts): Promise<PrepConsultDraft> {
+export async function buildHeadsUpDraft(facts: PrepConsultFacts, generate?: DraftTextGenerator): Promise<PrepConsultDraft> {
   const draftBody = await runDraftPrompt(
     HEADS_UP_SYSTEM_PROMPT,
     `Facts (use exactly as given — never invent anything not listed here):\n${factsBlock(facts)}`,
     "consult heads-up",
+    generate,
   );
   return {
     headline: `Consult heads-up — ${facts.clientName} (${facts.practiceArea})`,
@@ -115,11 +129,12 @@ export async function buildHeadsUpDraft(facts: PrepConsultFacts): Promise<PrepCo
 }
 
 /** Builds the client-facing prep email (queued as type = CLIENT_EMAIL — see generate.ts). */
-export async function buildClientPrepDraft(facts: PrepConsultFacts): Promise<PrepConsultDraft> {
+export async function buildClientPrepDraft(facts: PrepConsultFacts, generate?: DraftTextGenerator): Promise<PrepConsultDraft> {
   const draftBody = await runDraftPrompt(
     CLIENT_PREP_SYSTEM_PROMPT,
     `Facts (use exactly as given — never invent anything not listed here):\n${factsBlock(facts)}`,
     "client-prep email",
+    generate,
   );
   return {
     headline: `Consult prep email DRAFT — ${facts.clientName} (${facts.practiceArea})`,

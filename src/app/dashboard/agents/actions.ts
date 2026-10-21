@@ -15,6 +15,13 @@ import { loadAutopilot } from "@/lib/agents/autopilot";
 export type AgentActionState = { ok?: boolean; error?: string; message?: string };
 
 const AUTONOMIES: readonly Autonomy[] = ["suggest", "draft", "act"];
+/** The agents the database's settings CHECK only accepts once lectual 0098 is applied, as the refusal names them. */
+const UPDATE_AGENT_NAME: Partial<Record<AgentId, string>> = {
+  "stage-keeper": "The Stage Keeper",
+  "morning-brief": "The Morning brief",
+  "consult-prep": "Consult prep",
+  "inbox-summary": "The Inbox summary",
+};
 const isAgent = (v: unknown): v is AgentId => typeof v === "string" && (AGENT_IDS as readonly string[]).includes(v);
 
 /**
@@ -50,10 +57,11 @@ export async function saveAgentSettingAction(_prev: AgentActionState, formData: 
     { onConflict: "org_id,agent" },
   );
   if (error) {
-    // The database's agent list (a CHECK) doesn't name the Stage Keeper until lectual 0098 is applied.
-    // Say that, not a raw Postgres message. Other agents' messages are unchanged.
-    if (agent === "stage-keeper" && (error.code === "23514" || /agent_setting_agent|check constraint/i.test(error.message ?? ""))) {
-      return { error: "The Stage Keeper isn't available until the database update (lectual 0098) is applied. Nothing was changed." };
+    // The database's agent list (a CHECK) doesn't name the Stage Keeper or the three newest agents until
+    // lectual 0098 is applied. Say that, not a raw Postgres message. Other agents' messages are unchanged.
+    const waitingOnUpdate = UPDATE_AGENT_NAME[agent];
+    if (waitingOnUpdate && (error.code === "23514" || /agent_setting_agent|check constraint/i.test(error.message ?? ""))) {
+      return { error: `${waitingOnUpdate} isn't available until the database update (lectual 0098) is applied. Nothing was changed.` };
     }
     return { error: `Couldn't save: ${error.message}` };
   }

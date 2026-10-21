@@ -131,7 +131,7 @@ describe("readiness and the header", () => {
   it("is ready without the AI key", async () => {
     const html = await render({ settings: [on("stage-keeper")], ai: false });
     expect(card(html, "Stage Keeper")).not.toContain("needs the AI key");
-    expect(html).toContain("1 of 4 on");
+    expect(html).toContain("1 of 7 on");
     expect(html).not.toContain("on but blocked");
   });
 

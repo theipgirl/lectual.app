@@ -42,9 +42,17 @@ export type FetchArgs = {
   fetchImpl?: typeof fetch;
   now?: number;
   maxMessages?: number;
+  /**
+   * A bounded, inbound-only read of the last `hours` of mail (newest first), for a caller that
+   * wants a look at recent mail rather than the sync's resumable stream (the inbox-summary
+   * agent). It ignores `cursor` and returns an empty `cursor`: it never reads or advances a
+   * connection's `sync_cursor`. Omitted, the default is exactly the 30-day lookback sync.
+   */
+  window?: { hours: number };
 };
 
 export function fetchNewMessages(provider: MailboxProvider, args: FetchArgs): Promise<FetchResult> {
+  if (args.window) return provider === "google" ? fetchGmailWindow(args, args.window.hours) : fetchGraphWindow(args, args.window.hours);
   return provider === "google" ? fetchGmail(args) : fetchGraph(args);
 }
 
@@ -256,6 +264,35 @@ async function fetchGmail(args: FetchArgs): Promise<FetchResult> {
   return { messages: messages.filter((m): m is ThreadMessage => m !== null), cursor, truncated, restarted };
 }
 
+/** A `window` read: the newest inbound mail of the last `hours`, capped, with no cursor to store. */
+async function fetchGmailWindow(args: FetchArgs, hours: number): Promise<FetchResult> {
+  const { accessToken, mailbox, fetchImpl = fetch, now = Date.now() } = args;
+  const cap = args.maxMessages ?? DEFAULT_MAX_MESSAGES;
+  const get = (url: string) => getJson(url, accessToken, fetchImpl);
+  const sinceSeconds = Math.floor((now - hours * 3_600_000) / 1000);
+  const q = encodeURIComponent(`after:${sinceSeconds} -in:chats -in:drafts -in:sent`);
+
+  const ids: string[] = [];
+  let pageToken: string | undefined;
+  do {
+    const res = await get(`${GMAIL}/messages?q=${q}&maxResults=100${pageToken ? `&pageToken=${pageToken}` : ""}`);
+    if (!res.ok) throw new ProviderError(`Gmail list failed (${res.status}).`, "fetch-failed");
+    const page = (await res.json()) as { messages?: { id: string }[]; nextPageToken?: string };
+    ids.push(...(page.messages ?? []).map((m) => m.id));
+    pageToken = page.nextPageToken;
+  } while (pageToken && ids.length < cap);
+  const truncated = Boolean(pageToken) || ids.length > cap;
+
+  const headers = ["From", "To", "Cc", "Subject", "Date"].map((h) => `metadataHeaders=${h}`).join("&");
+  const messages = await mapLimit(ids.slice(0, cap), 5, async (id) => {
+    const res = await get(`${GMAIL}/messages/${id}?format=metadata&${headers}`);
+    if (res.status === 404) return null; // deleted since it was listed
+    if (!res.ok) throw new ProviderError(`Gmail message read failed (${res.status}).`, "fetch-failed");
+    return gmailToThreadMessage((await res.json()) as GmailMessage, mailbox);
+  });
+  return { messages: messages.filter((m): m is ThreadMessage => m !== null && m.direction === "inbound"), cursor: "", truncated, restarted: false };
+}
+
 // ── Microsoft Graph ──────────────────────────────────────────────────────────
 
 const GRAPH = "https://graph.microsoft.com/v1.0/me/mailFolders";
@@ -383,6 +420,38 @@ async function fetchGraph(args: FetchArgs): Promise<FetchResult> {
   }
 
   return { messages, cursor: JSON.stringify(nextCursor), truncated, restarted };
+}
+
+/** A `window` read: the Inbox only, newest first, the last `hours`, capped, with no cursor to store. */
+async function fetchGraphWindow(args: FetchArgs, hours: number): Promise<FetchResult> {
+  const { accessToken, mailbox, fetchImpl = fetch, now = Date.now() } = args;
+  const cap = args.maxMessages ?? DEFAULT_MAX_MESSAGES;
+  const since = new Date(now - hours * 3_600_000).toISOString();
+  let url =
+    `${GRAPH}/inbox/messages?$select=${GRAPH_SELECT}` +
+    `&$filter=${encodeURIComponent(`receivedDateTime ge ${since}`)}&$orderby=${encodeURIComponent("receivedDateTime desc")}&$top=50`;
+  const messages: ThreadMessage[] = [];
+  let truncated = false;
+  for (;;) {
+    const res = await getJson(url, accessToken, fetchImpl);
+    if (!res.ok) throw new ProviderError(`Outlook inbox read failed (${res.status}).`, "fetch-failed");
+    const page = (await res.json()) as { value?: GraphMessage[]; "@odata.nextLink"?: string };
+    for (const m of page.value ?? []) {
+      const tm = graphToThreadMessage(m, "inbox", mailbox);
+      if (tm) messages.push(tm);
+    }
+    const next = page["@odata.nextLink"];
+    if (!next) break;
+    // Only ever follow a link back to Graph itself: a bearer token goes nowhere else.
+    if (!next.startsWith("https://graph.microsoft.com/")) throw new ProviderError("Outlook inbox read returned an unexpected link.", "fetch-failed");
+    if (messages.length >= cap) {
+      truncated = true;
+      break;
+    }
+    url = next;
+  }
+  if (messages.length > cap) truncated = true;
+  return { messages: messages.slice(0, cap), cursor: "", truncated, restarted: false };
 }
 
 // ── one message body, for the email-intel agent only ─────────────────────────

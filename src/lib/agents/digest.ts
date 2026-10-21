@@ -147,6 +147,26 @@ function lineFor(agent: AgentId, runs: DigestRun[]): DigestLine | null {
       if (drafts > 0) parts.push(`${plural(drafts, "suggestion", "suggestions")} waiting on the lead page`);
       return { agent, name, text: parts.join(" · "), tone: drafts > 0 ? "attention" : "ok", href: AGENT_MOVES_TODAY_HREF };
     }
+    case "morning-brief": {
+      // drafts_out is the brief itself plus every follow-up it queued.
+      const followUps = Math.max(0, drafts - ok.length);
+      const parts = [`wrote the morning brief${ok.length > 1 ? ` (${ok.length} runs)` : ""}`];
+      if (followUps > 0) parts.push(`${plural(followUps, "follow-up", "follow-ups")} drafted (in the Queue)`);
+      else if (items === 0) parts.push("nothing to report");
+      return { agent, name, text: parts.join(" · "), tone: followUps > 0 ? "attention" : items === 0 ? "quiet" : "ok", href: "/dashboard/queue/" };
+    }
+    case "consult-prep": {
+      if (items === 0) return { agent, name, text: "found no consults to prep", tone: "quiet", href: "/dashboard/agents/" };
+      return { agent, name, text: `prepped ${plural(items, "consult", "consults")} · ${plural(drafts, "draft", "drafts")} (in the Queue)`, tone: "attention", href: "/dashboard/queue/" };
+    }
+    case "inbox-summary": {
+      // drafts_out is the digest plus every reply draft left in Outlook; items_in is the messages sorted.
+      const replies = Math.max(0, drafts - ok.length);
+      if (items === 0 && replies === 0) return { agent, name, text: "found no new mail to summarise", tone: "quiet", href: "/dashboard/queue/" };
+      const parts = [`summarised the inbox (${plural(items, "message", "messages")})`];
+      if (replies > 0) parts.push(`${plural(replies, "reply draft", "reply drafts")} in Outlook`);
+      return { agent, name, text: parts.join(" · "), tone: replies > 0 ? "attention" : "ok", href: "/dashboard/queue/" };
+    }
   }
 }
 
