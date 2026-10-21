@@ -135,6 +135,29 @@ Intake → Forms keeps an intake per event, campaign or page (`/dashboard/forms/
   A person with no step events reads "not recorded" if they started before the form's first step event, else
   "Stopped before Q1".
 
+## Documents & files (lectual 0097)
+The "Documents & files" card is on the lead page (main column, just before the Timeline) and the matter
+page (aside). It lists the stored files (`crm_file`) and, on a matter, the generated letters
+(`crm_document_draft`, status "generated" only, and only for a firm with the `document-center` module). Internal
+only: nothing is shared with a client and there is no portal.
+- **Path rule:** `{org_id}/{lead|matter}/{parent_id}/{file_id}.{ext}` in the private `client-files` bucket
+  (`src/lib/files/rules.ts`). `requestUploadAction` reads the parent through the scoped client and takes `org_id` from
+  THAT ROW. There is no org argument and the file name is never part of the path. Upload is two steps with a direct
+  browser-to-storage `PUT` between them; `confirmUploadAction` rebuilds the path, checks the object is really there,
+  stores its real size, inserts the row (never `uploaded_by` or `contact_id`) and logs `file_uploaded`.
+- **The extension decides the type** (13 extensions to the bucket's 12 MIME types). The browser's MIME is advisory:
+  it is empty or odd for .msg, .eml and .heic, so it neither widens nor narrows what is accepted. The mapped MIME is
+  what is stored and what the upload must send as its content type.
+- **No service role and no module gate** for the files part: org-scoped table and storage policies, no global
+  credential. Downloads are a 60-second signed URL minted through the scoped client
+  (`/dashboard/files/[id]/download`; any member, a viewer included). Delete is the admin tier only
+  (owner/admin/senior_admin) and removes the object first, then the row; an object that is already gone counts as removed.
+- **Reads are not-set-up / unavailable aware.** Files report `ok` / `not-set-up` (table missing, judged on the error
+  code) / `unavailable`; letters report `ok` / `unavailable` on their own. "Nothing here yet" is shown only when every
+  read succeeded and found nothing. Errors shown to a person are fixed sentences (`FILE_MESSAGES`), never raw text.
+- `crm_file` and the `file_uploaded` activity type are hand-added in `src/lib/db/types.ts` and
+  `src/lib/matters/activity.ts` until the next codegen run.
+
 ## JSX text spacing: keep the `{" "}`
 Next 16.2.7's compiler DROPS the leading space of JSX text that contains an HTML entity
 (`&apos;`, `&amp;`, `&rsquo;`…) and runs onto another line, even if that is only the line
