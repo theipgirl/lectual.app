@@ -51,23 +51,23 @@ export function ChoiceControl(props: ChoiceControlProps) {
       {options.map((o) => {
         const on = value.includes(o);
         return (
-          <label key={o} className={`${root}-opt${on ? " on" : ""}`}>
+          <label
+            key={o}
+            className={`${root}-opt${on ? " on" : ""}`}
+            // The commit lives on the label: a tap or click on the option's text or padding reaches the radio as a click
+            // forwarded by the browser with detail 0, so only the label sees the pointer's own click (detail > 0).
+            // Arrow keys and Space click the radio itself and never reach here with a pointer, so they only select.
+            onClick={single && onCommit ? (e) => { if (e.detail > 0) onCommit([o]); } : undefined}
+          >
             <input
               type={single ? "radio" : "checkbox"}
               name={name}
               value={o}
               checked={on}
               disabled={disabled}
-              // A radio's click fires for the option already chosen too, which "tap to go on" needs. Arrow keys and
-              // Space also fire a click, but with detail 0: that only selects. A pointer click has detail > 0.
-              onClick={
-                single && (onChange || onCommit)
-                  ? (e) => {
-                      onChange?.([o]);
-                      if (e.detail > 0) onCommit?.([o]);
-                    }
-                  : undefined
-              }
+              // A radio's click fires for the option already chosen too, which "tap to go on" needs. It only selects:
+              // committing is the label's job (above), since a label click forwarded to the radio carries detail 0.
+              onClick={single && onChange ? () => onChange([o]) : undefined}
               onKeyDown={
                 single && onCommit
                   ? (e) => {

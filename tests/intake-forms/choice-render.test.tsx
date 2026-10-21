@@ -84,16 +84,31 @@ describe("a single choice selects on the keyboard and commits only on a tap or E
   type Click = (e: { detail: number }) => void;
   const radiosOf = (el: ReactElement) => findAll(el, (e) => e.type === "input" && (e.props as { type?: string }).type === "radio");
 
-  it("arrow keys and Space (a click with detail 0) only select; a tap (detail 1) commits once", () => {
+  const labelsOf = (el: ReactElement) => findAll(el, (e) => e.type === "label");
+
+  it("the radio's own click only selects; the label commits once on a pointer click (detail 1) and never on detail 0", () => {
     const changed: string[][] = [];
     const committed: string[][] = [];
     const el = ChoiceControl({ name: "g", type: "single", options: ["A", "B", "C", "D"], value: [], label: "q", onChange: (n) => changed.push(n), onCommit: (n) => committed.push(n) });
     const radios = radiosOf(el);
+    const labels = labelsOf(el);
+    // The radio: any click, detail 0 or 1, only selects.
     (radios[2].props as { onClick: Click }).onClick({ detail: 0 });
-    expect(changed).toEqual([["C"]]);
-    expect(committed).toEqual([]);
     (radios[2].props as { onClick: Click }).onClick({ detail: 1 });
+    expect(changed).toEqual([["C"], ["C"]]);
+    expect(committed).toEqual([]);
+    // The label: a browser forwards a label click to its radio with detail 0, so that one must not commit again.
+    (labels[2].props as { onClick: Click }).onClick({ detail: 0 });
+    expect(committed).toEqual([]);
+    (labels[2].props as { onClick: Click }).onClick({ detail: 1 });
     expect(committed).toEqual([["C"]]);
+  });
+
+  it("without a commit handler the label carries no click handler, and multi choice never commits", () => {
+    const plain = ChoiceControl({ name: "g", type: "single", options: ["A", "B"], value: [], label: "q", onChange: () => {} });
+    expect(labelsOf(plain).every((l) => (l.props as { onClick?: unknown }).onClick === undefined)).toBe(true);
+    const multi = ChoiceControl({ name: "g", type: "multi", options: ["A", "B"], value: [], label: "q", onChange: () => {}, onCommit: () => {} });
+    expect(labelsOf(multi).every((l) => (l.props as { onClick?: unknown }).onClick === undefined)).toBe(true);
   });
 
   it("Enter on a radio selects and commits; other keys do nothing", () => {
@@ -121,11 +136,15 @@ describe("a single choice selects on the keyboard and commits only on a tap or E
     const el = ConversationInput({ step, draft: "", maxLength: 10, hint: null, picked: [], onDraft: () => {}, onSend: () => {}, onSkip: () => {}, onPick, onCommit, onDone: () => {} }) as ReactElement;
     const control = findAll(el, (e) => e.type === ChoiceControl)[0];
     const props = control.props as Parameters<typeof ChoiceControl>[0];
-    const radios = radiosOf(ChoiceControl(props));
+    const control2 = ChoiceControl(props);
+    const radios = radiosOf(control2);
+    const labels = labelsOf(control2);
     (radios[1].props as { onClick: Click }).onClick({ detail: 0 });
     expect(onPick).toHaveBeenCalledWith(["B"]);
     expect(onCommit).not.toHaveBeenCalled();
-    (radios[1].props as { onClick: Click }).onClick({ detail: 1 });
+    (labels[1].props as { onClick: Click }).onClick({ detail: 0 });
+    expect(onCommit).not.toHaveBeenCalled();
+    (labels[1].props as { onClick: Click }).onClick({ detail: 1 });
     expect(onCommit).toHaveBeenCalledTimes(1);
     expect(onCommit).toHaveBeenCalledWith(["B"]);
     expect(html(el)).toContain(">Done<");
