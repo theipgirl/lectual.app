@@ -264,3 +264,22 @@ describe("states (F5)", () => {
     expect(html).not.toContain("dangerouslySetInnerHTML");
   });
 });
+
+describe("an assessment with the firm's own questions (Sprint 10 F14)", () => {
+  it("shows the extra answers as stored question and answer pairs, after the card's, with the same gap line as without them", () => {
+    const settings = { extras: [{ id: "qwhere", text: "Where did you hear about us?", required: true, type: "text" as const }] };
+    const withExtras = assessmentAnswers({ ...BUSINESS_ANSWERS, qwhere: "Booth 12" }, settings);
+    const plain = assessmentAnswers(BUSINESS_ANSWERS);
+    const row = (a: typeof plain) =>
+      submissionItem(
+        { id: "s9", form_id: "f2", mode: "assessment", answers: a.answerList, started_at: "2026-10-17T15:00:00Z", submitted_at: "2026-10-17T15:03:00Z", score: a.score.score, band: a.score.band, temperature: a.score.temperature },
+        assessForm,
+      );
+    const html = render({ submissions: ok([row(withExtras)]) });
+    expect(html).toContain("Where did you hear about us?");
+    expect(html.indexOf("Booth 12")).toBeGreaterThan(html.indexOf("How quickly are you looking to engage legal assistance?"));
+    expect(html).not.toContain("Gaps unavailable");
+    const gapLine = (h: string) => h.slice(h.indexOf("Gaps"), h.indexOf("Gaps") + 200);
+    expect(gapLine(html)).toBe(gapLine(render({ submissions: ok([row(plain)]) })));
+  });
+});

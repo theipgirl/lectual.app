@@ -338,3 +338,67 @@ describe("range behaviour on the CSV (D5)", () => {
     expect(parseCsv(await res.text()).length - 1).toBe(2300);
   });
 });
+
+describe("the firm's own assessment questions in the CSV (Sprint 10 F14, D2)", () => {
+  const extras = [
+    { id: "qwhere", text: "Where did you hear about us?", required: true, type: "text" as const },
+    { id: "qsell", text: "What do you sell?", required: false, type: "multi" as const, options: ["Goods", "Services, software"] },
+  ];
+  const settings = { extras, hidden: ["3"] };
+
+  function people() {
+    return [
+      { ...BUSINESS_ANSWERS, qwhere: "Booth 12", qsell: ["Services, software", "Goods"] },
+      { ...BUSINESS_ANSWERS, "1": "brand", qwhere: "A friend" },
+    ].map((raw, i) => {
+      const { "3": _drop, ...rest } = raw as Record<string, unknown>;
+      void _drop;
+      const a = assessmentAnswers(rest as Record<string, string>, settings);
+      return submissionRow(`x${i}`, {
+        form_id: ASSESSMENT_FORM_ID,
+        mode: "assessment",
+        answers: a.answerList,
+        score: a.score.score,
+        band: a.score.band,
+        temperature: a.score.temperature,
+        started_at: daysAgo(NOW, 2, i),
+        submitted_at: daysAgo(NOW, 2, i + 3),
+      });
+    });
+  }
+
+  it("has one column per extra question after the card's columns, and no team-size column", async () => {
+    const db = newDb({ crm_intake_form: [formRow(), assessmentFormRow(settings)], crm_intake_submission: people() });
+    const table = parseCsv(await (await get(db, `form=${ASSESSMENT_FORM_ID}&range=30`)).text());
+    expect(table[0]).toEqual([
+      "Name",
+      "Email",
+      "Started",
+      "Finished",
+      "Do you have a business, a personal brand, or both?",
+      "Have you formed an entity with the state?",
+      "What is your annual revenue?",
+      "Is your business name or logo federally registered?",
+      "Does your business own its intellectual property?",
+      "Is your revenue protected by contracts?",
+      "How quickly are you looking to engage legal assistance?",
+      "Where did you hear about us?",
+      "What do you sell?",
+    ]);
+    expect(table[0].join("|")).not.toContain("employees or independent contractors");
+    const first = table.find((r) => r[11] === "Booth 12");
+    // The multi answer's comma survives the quoting and comes back whole.
+    expect(first?.[12]).toBe("Goods, Services, software");
+    const second = table.find((r) => r[11] === "A friend");
+    expect(second?.[12]).toBe("");
+  });
+
+  it("puts a removed extra question after the live columns, as removed questions always are", async () => {
+    const rows = people();
+    // The firm removes "What do you sell?" after people answered it.
+    const db = newDb({ crm_intake_form: [formRow(), assessmentFormRow({ extras: [extras[0]], hidden: ["3"] })], crm_intake_submission: rows });
+    const table = parseCsv(await (await get(db, `form=${ASSESSMENT_FORM_ID}&range=30`)).text());
+    expect(table[0].slice(-2)).toEqual(["Where did you hear about us?", "What do you sell?"]);
+    expect(table.find((r) => r[11] === "Booth 12")?.[12]).toBe("Goods, Services, software");
+  });
+});

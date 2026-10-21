@@ -133,6 +133,8 @@ export function StepMedians({ state, range }: { state: Load<StepFunnelRead>; ran
 
 /** The "Stopped at" cell: nothing to say for someone who finished. */
 export function StoppedAtCell({ reading, state }: { reading: StoppedAt | undefined; state: "ok" | "unconfigured" | "unavailable" }) {
+  // Someone who finished has no stopping point, whatever state the step read is in.
+  if (reading?.kind === "finished") return <td className="ifm-stopped ifm-muted">—</td>;
   if (state === "unavailable") return <td className="ifm-stopped ifm-muted">Couldn&apos;t load</td>;
   if (state === "unconfigured") return <td className="ifm-stopped ifm-muted">not recorded</td>;
   const label = reading ? stoppedAtLabel(reading) : null;

@@ -142,3 +142,41 @@ describe("time to finish, split in two (Sprint 9, F11)", () => {
     expect(durationBetween(null, t(0))).toBeNull();
   });
 });
+
+// ── Sprint 10 F24: the visit/start/complete funnel never reads (or counts) step events ──
+
+describe("the funnel read leaves step events to their own loader (F24)", () => {
+  it("asks only for the funnel's kinds, so step events cannot use up its 50,000-event cap", async () => {
+    const { vi } = await import("vitest");
+    const calls: [string, ...unknown[]][] = [];
+    const builder: Record<string, unknown> = {};
+    for (const m of ["select", "eq", "in", "neq", "gte", "order"]) builder[m] = (...args: unknown[]) => (calls.push([m, ...args]), builder);
+    builder.range = async (...args: unknown[]) => (calls.push(["range", ...args]), { data: [{ kind: "visit", session_hash: "a" }], error: null });
+    vi.resetModules();
+    vi.doMock("@/lib/db/scoped-client", () => ({ getScopedClient: async () => ({ from: () => builder }) }));
+    const { loadFunnel, FUNNEL_KINDS } = await import("@/lib/intake-forms/load-performance");
+    const res = await loadFunnel("form-1", 30, new Date("2026-10-21T12:00:00Z"));
+    expect(res.status).toBe("ok");
+    const kinds = calls.find((c) => c[0] === "in" && c[1] === "kind");
+    expect(kinds?.[2]).toEqual(["visit", "start_conversation", "start_form", "start_assessment", "complete"]);
+    expect(kinds?.[2]).toEqual([...FUNNEL_KINDS]);
+    expect(kinds?.[2]).not.toContain("step");
+    // No other filter lets a step event in.
+    expect(calls.some((c) => c[0] === "eq" && c[1] === "kind")).toBe(false);
+    vi.doUnmock("@/lib/db/scoped-client");
+  });
+});
+
+describe("buildFunnel with step events mixed in (F24)", () => {
+  it("returns the same numbers as the same list without them", () => {
+    const base = [
+      { kind: "visit", session_hash: "a" },
+      { kind: "visit", session_hash: "b" },
+      { kind: "start_form", session_hash: "a" },
+      { kind: "complete", session_hash: "a" },
+    ];
+    const withSteps = [base[0], { kind: "step", session_hash: "a" }, base[1], { kind: "step", session_hash: "a" }, { kind: "step", session_hash: null }, base[2], base[3]];
+    expect(buildFunnel(withSteps)).toEqual(buildFunnel(base));
+    expect(buildFunnel(withSteps)).toMatchObject({ visited: 2, form: 1, started: 1, completed: 1 });
+  });
+});

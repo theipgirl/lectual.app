@@ -8,7 +8,7 @@ import {
   scoreAssessmentAnswers,
   validateAssessmentSettings,
 } from "@/lib/intake-forms/assessment";
-import { defaultIntakeConfig, parseIntakeConfig, validateIntakeConfig } from "@/lib/intake-forms/config";
+import { defaultIntakeConfig, parseIntakeConfig, publicConfig, validateIntakeConfig } from "@/lib/intake-forms/config";
 import { goLiveChecklist } from "@/lib/intake-forms/checklist";
 import { intakeTags } from "@/lib/intake-forms/lawmatics-sync";
 import { attachTags, createProspect, updateProspect, type FetchLike } from "@/lib/lawmatics/writes";
@@ -141,5 +141,100 @@ describe("Lawmatics", () => {
       throw new Error("network down");
     };
     expect(await createProspect("t", { firstName: "a", lastName: "b", email: "c@d.co" }, boom)).toMatchObject({ ok: false, retryable: true });
+  });
+});
+
+// ── Sprint 10: the firm's own questions and hidden card questions (F7, F11) ───
+
+describe("extra questions and hidden card questions on save (F11)", () => {
+  const text = { id: "qtext1", text: "Where did you hear about us?", required: false, type: "text" as const };
+  const single = { id: "qsingle1", text: "Do you have a logo?", required: true, type: "single" as const, options: ["Yes", "No"] };
+  const multi = { id: "qmulti1", text: "What do you sell?", required: false, type: "multi" as const, options: ["Goods", "Services", "Software, apps"] };
+  const settings = (over: Record<string, unknown> = {}) => ({ variant: "business", showScore: true, wording: {}, ...over });
+
+  it("validates, stores and parses back an assessment with three extras and a hidden question", () => {
+    const raw = settings({ extras: [text, single, multi], hidden: ["3"] });
+    expect(validateAssessmentSettings(raw)).toEqual([]);
+    const cfg = { ...defaultIntakeConfig(), assessment: raw };
+    const saved = validateIntakeConfig(JSON.parse(JSON.stringify(cfg)));
+    expect(saved.ok).toBe(true);
+    if (!saved.ok) return;
+    expect(saved.config.assessment).toEqual(raw);
+    expect(parseIntakeConfig(JSON.parse(JSON.stringify(saved.config))).assessment).toEqual(raw);
+  });
+
+  it("parses old settings as no extras and nothing hidden, with no new keys", () => {
+    const s = parseAssessmentSettings({ variant: "ip", showScore: false, wording: {} });
+    expect(s).toEqual({ variant: "ip", showScore: false, wording: {} });
+    expect("extras" in s || "hidden" in s).toBe(false);
+  });
+
+  it("refuses more than 10 extras", () => {
+    const eleven = Array.from({ length: 11 }, (_, i) => ({ ...text, id: `qx${i}` }));
+    expect(validateAssessmentSettings(settings({ extras: eleven }))).toContain("Keep your own questions to 10.");
+  });
+
+  it("refuses an extra id that is numeric, or duplicated, or unreadable", () => {
+    expect(validateAssessmentSettings(settings({ extras: [{ ...text, id: "7" }] }))).toContain("Your question 1 was not readable.");
+    expect(validateAssessmentSettings(settings({ extras: [{ ...text, id: "101" }] }))).toContain("Your question 1 was not readable.");
+    expect(validateAssessmentSettings(settings({ extras: [text, { ...single, id: text.id }] }))).toContain("Your question 2 is a duplicate.");
+    expect(validateAssessmentSettings(settings({ extras: [{ ...text, id: undefined }] }))).toContain("Your question 1 was not readable.");
+  });
+
+  it("refuses a choice extra with one option, an unknown type, or options on a text extra", () => {
+    expect(validateAssessmentSettings(settings({ extras: [{ ...single, options: ["Only"] }] }))).toContain("Your question 1 needs at least 2 options.");
+    expect(validateAssessmentSettings(settings({ extras: [{ ...text, type: "radio" }] })).join(" ")).toMatch(/type we don't know/);
+    expect(validateAssessmentSettings(settings({ extras: [{ ...text, options: ["a", "b"] }] }))).toContain("Your question 1 is a text question, so it can't have options.");
+  });
+
+  it("drops a blank scratch extra on read and does not judge it on save", () => {
+    const blank = { id: "qblank", text: "   ", required: false, type: "single" as const, options: [] };
+    expect(validateAssessmentSettings(settings({ extras: [blank, text] }))).toEqual([]);
+    expect(parseAssessmentSettings(settings({ extras: [blank, text] })).extras).toEqual([text]);
+  });
+
+  it("refuses to hide a scored question, an unscored one the score reads, or one that isn't on the card", () => {
+    for (const id of ["1", "2", "4", "5", "6", "7", "8"]) {
+      expect(validateAssessmentSettings(settings({ hidden: [id] })).join(" ")).toMatch(/That question affects the score and can't be hidden\./);
+    }
+    expect(validateAssessmentSettings(settings({ hidden: ["101"] }))).toContain("A hidden question isn't on this assessment.");
+    expect(validateAssessmentSettings(settings({ hidden: [3] }))).toContain("The hidden questions were not readable.");
+  });
+
+  it("refuses to hide anything on the Trademark & Copyright card", () => {
+    for (const id of ["101", "102", "103", "104", "105", "106", "107", "108", "109"]) {
+      expect(validateAssessmentSettings(settings({ variant: "ip", hidden: [id] })).join(" ")).toMatch(/can't be hidden/);
+    }
+  });
+
+  it("a changed card refuses or clears the old card's hidden list", () => {
+    // Saved with the other card's hidden id: refused. Read back: cleared.
+    expect(validateAssessmentSettings(settings({ variant: "ip", hidden: ["3"] }))).toContain("A hidden question isn't on this assessment.");
+    expect(parseAssessmentSettings(settings({ variant: "ip", hidden: ["3"] })).hidden).toBeUndefined();
+    expect(parseAssessmentSettings(settings({ hidden: ["3", "2", "999", 3] })).hidden).toEqual(["3"]);
+  });
+});
+
+describe("what reaches the browser, extended (F7)", () => {
+  const withExtras = { ...DEFAULT_ASSESSMENT, hidden: ["3"], extras: [{ id: "qx1", text: "Which event?", required: true, type: "single" as const, options: ["UGW", "Other"] }] };
+
+  it("sends the extras and the card without the hidden question", () => {
+    const pub = publicAssessment(withExtras);
+    expect(pub.business.some((q) => q.id === 3)).toBe(false);
+    expect(pub.brand.some((q) => q.id === 3)).toBe(false);
+    expect(pub.business.some((q) => q.id === 4)).toBe(true);
+    expect(pub.extras).toEqual([{ id: "qx1", text: "Which event?", required: true, type: "single", options: ["UGW", "Other"] }]);
+  });
+
+  it("still sends no points, categories, knows, fit criteria, pack or edited flags", () => {
+    const cfg = { ...defaultIntakeConfig(), knows: "SECRET-NOTES", fitText: "SECRET-FIT", assessment: withExtras };
+    const view = publicConfig(cfg, { orgName: "Hartwell", receivesReferrals: false });
+    const json = JSON.stringify(view);
+    expect(json).not.toMatch(/points|category|SECRET|"knows"|"fitIp"|"fitText"|"pack"|"edited"|"hidden"|temperature/);
+    expect(view.assessment.extras).toHaveLength(1);
+  });
+
+  it("sends an assessment with no extras an empty list", () => {
+    expect(publicAssessment(DEFAULT_ASSESSMENT).extras).toEqual([]);
   });
 });

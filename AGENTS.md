@@ -117,6 +117,24 @@ Intake → Forms keeps an intake per event, campaign or page (`/dashboard/forms/
   itself (401 signed out, 403 viewer/social_media or an unreadable role, 404 foreign id, 413 over 50,000 people, never a
   header-only file on a failed read). Formula-leading cells get a `'` prefix. `src/lib/intake-forms/csv.ts` is pure.
 
+## Choice questions, own assessment questions, step tracking (Sprint 10, lectual 0096)
+- **Choice questions** (`src/lib/intake-forms/choice.ts`): a question is text (no `type` key, as ever), `single` or `multi`
+  with 2 to 12 options of at most 120 characters. The browser sends LABELS; the server matches each against the stored
+  options. A multi answer is stored as its labels joined with ", " in option order, so nothing may split a stored answer
+  on commas. One `ChoiceControl` draws it everywhere (form, conversation, `/r/<token>`, assessment extras, editor preview).
+- **Assessment extras and hidden questions** (`assessment.ts`, `assessment-card/hideable.ts`): the firm's own questions
+  (max 10, letter-led ids like `qabc`) come after the card, are never scored and are stored in the same answer list; the
+  re-read sets them aside by id. A card question is hideable only if it is unscored AND nothing reads it (today: Brand &
+  Business team size only). `tests/intake-forms/assessment-extras.test.ts` proves the list both ways; a card change must
+  keep it true, or the score, the hot/warm/cold call and the Lawmatics tag would move.
+- **Step tracking**: `recordIntakeStepAction` (public, same service-role path as the other public writes) writes one `step`
+  event per person and question and saves sanitised `progress`. It never throws, shows nothing, and treats a database
+  without 0096 as "step data isn't recorded yet". Its rate limit is separate from the visit/start events. The visit/start
+  funnel read lists its kinds so step events cannot use up its cap; step reads live in `load-steps.ts`, three-state.
+- **Drop-off, medians, "Stopped at Q<n>"** come from one aggregation (`step-funnel.ts`) so Results and Performance agree.
+  A person with no step events reads "not recorded" if they started before the form's first step event, else
+  "Stopped before Q1".
+
 ## JSX text spacing: keep the `{" "}`
 Next 16.2.7's compiler DROPS the leading space of JSX text that contains an HTML entity
 (`&apos;`, `&amp;`, `&rsquo;`…) and runs onto another line, even if that is only the line

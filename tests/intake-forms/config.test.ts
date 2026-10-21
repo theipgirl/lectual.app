@@ -180,3 +180,139 @@ describe("publicConfig", () => {
     expect(p.referral?.disclosure).toMatch(/Lectual is not a law firm/);
   });
 });
+
+// ── Sprint 10: choice questions (F1, F2, F7) ─────────────────────────────────
+
+describe("choice questions on save (F1)", () => {
+  const base = () => JSON.parse(JSON.stringify(defaultIntakeConfig([UUID])));
+  const withQuestions = (questions: unknown[]) => ({ ...base(), questions });
+  const q = (over: Record<string, unknown> = {}) => ({ id: "qa", text: "Which do you have?", required: false, pack: null, edited: true, ...over });
+  const errorsFor = (questions: unknown[]) => {
+    const r = validateIntakeConfig(withQuestions(questions));
+    return r.ok ? [] : r.errors;
+  };
+
+  it("accepts a single and a multi question with 2 to 12 valid options", () => {
+    const twelve = Array.from({ length: 12 }, (_, i) => `Option ${i + 1}`);
+    const r = validateIntakeConfig(
+      withQuestions([q({ id: "qa", type: "single", options: ["Yes", "No"] }), q({ id: "qb", type: "multi", options: twelve }), q({ id: "qc", text: "Plain" })]),
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.config.questions[0]).toMatchObject({ type: "single", options: ["Yes", "No"] });
+    expect(r.config.questions[1].options).toEqual(twelve);
+  });
+
+  it("trims option labels it keeps", () => {
+    const r = validateIntakeConfig(withQuestions([q({ type: "single", options: ["  Yes ", "No"] })]));
+    expect(r.ok && r.config.questions[0].options).toEqual(["Yes", "No"]);
+  });
+
+  it.each([
+    ["fewer than 2 options", { type: "single", options: ["Only one"] }, /Question 1 needs at least 2 options\./],
+    ["no options at all", { type: "multi" }, /Question 1 needs at least 2 options\./],
+    ["more than 12 options", { type: "multi", options: Array.from({ length: 13 }, (_, i) => `O${i}`) }, /Question 1 can have at most 12 options\./],
+    ["an empty label", { type: "single", options: ["Yes", "  "] }, /Option 2 of Question 1 is empty\./],
+    ["a label over 120 characters", { type: "single", options: ["Yes", "x".repeat(121)] }, /Option 2 of Question 1 is longer than 120 characters\./],
+    ["a label with a line break", { type: "single", options: ["Yes", "No\nway"] }, /Option 2 of Question 1 must be on one line\./],
+    ["a duplicate label in another case", { type: "single", options: ["Yes", "yes"] }, /Question 1 lists "yes" more than once\./],
+    ["an unknown type", { type: "radio", options: ["a", "b"] }, /Question 1 has a type we don't know/],
+    ["options on a text question", { type: "text", options: ["a", "b"] }, /Question 1 is a text question, so it can't have options\./],
+    ["options on a question with no type", { options: ["a", "b"] }, /Question 1 is a text question, so it can't have options\./],
+    ["an option that is not text", { type: "single", options: ["Yes", 7] }, /Option 2 of Question 1 was not readable\./],
+  ])("refuses %s with a sentence naming the question", (_name, over, message) => {
+    const errors = errorsFor([q(over)]);
+    expect(errors.some((e) => message.test(e))).toBe(true);
+  });
+
+  it("names the right question when it is not the first", () => {
+    const errors = errorsFor([q({ id: "qa" }), q({ id: "qb" }), q({ id: "qc", type: "single", options: ["x"] })]);
+    expect(errors).toContain("Question 3 needs at least 2 options.");
+  });
+
+  it("an option at exactly 120 characters, and exactly 2 or 12 options, pass", () => {
+    expect(errorsFor([q({ type: "single", options: ["x".repeat(120), "y"] })])).toEqual([]);
+    expect(errorsFor([q({ type: "multi", options: Array.from({ length: 12 }, (_, i) => `O${i}`) })])).toEqual([]);
+  });
+
+  it("a blank scratch row is dropped without its options being judged", () => {
+    const r = validateIntakeConfig(withQuestions([q({ id: "qa", text: "  ", type: "single", options: ["", ""] }), q({ id: "qb" })]));
+    expect(r.ok && r.config.questions.map((x) => x.id)).toEqual(["qb"]);
+  });
+
+  it("the existing limits still apply: 40 questions and 200 characters", () => {
+    const many = Array.from({ length: 41 }, (_, i) => q({ id: `q${i}` }));
+    expect(errorsFor(many)).toContain(`Keep it to ${LIMITS.questions} questions.`);
+    expect(errorsFor([q({ text: "x".repeat(201) })])).toContain("Question 1 is longer than 200 characters.");
+  });
+
+  it("a save with only text questions and no type field still passes, and adds no keys", () => {
+    const r = validateIntakeConfig(withQuestions([q(), q({ id: "qb", text: "Another" })]));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    for (const x of r.config.questions) expect(Object.keys(x).sort()).toEqual(["edited", "id", "pack", "required", "text"]);
+  });
+});
+
+describe("choice questions on read (F2)", () => {
+  it("parses a question with no type as text, with the same fields as before", () => {
+    const c = parseIntakeConfig({ questions: [{ id: "a", text: "Q" }, { id: "b", text: "Q2", required: true, pack: "Patent", edited: true }] });
+    expect(c.questions).toEqual([
+      { id: "a", text: "Q", required: false, pack: null, edited: false },
+      { id: "b", text: "Q2", required: true, pack: "Patent", edited: true },
+    ]);
+    expect(parseIntakeConfig({}).questions.every((x) => !("type" in x) && !("options" in x))).toBe(true);
+  });
+
+  it("round-trips a choice question through save and parse, with its options in order", () => {
+    const cfg = {
+      ...defaultIntakeConfig([UUID]),
+      questions: [
+        { id: "qm", text: "Which?", required: true, pack: null, edited: true, type: "multi" as const, options: ["Word mark", "Logo", "Yes, I have one"] },
+      ],
+    };
+    const saved = validateIntakeConfig(JSON.parse(JSON.stringify(cfg)));
+    expect(saved.ok).toBe(true);
+    if (!saved.ok) return;
+    const reread = parseIntakeConfig(JSON.parse(JSON.stringify(saved.config)));
+    expect(reread.questions).toEqual(cfg.questions);
+  });
+
+  it("cuts over-long or surplus options on read, and drops the options of a text question", () => {
+    const c = parseIntakeConfig({
+      questions: [
+        { id: "a", text: "Q", type: "single", options: ["x".repeat(130), "x".repeat(130), ...Array.from({ length: 20 }, (_, i) => `o${i}`)] },
+        { id: "b", text: "T", type: "text", options: ["a", "b"] },
+        { id: "c", text: "Odd", type: "radio", options: ["a", "b"] },
+      ],
+    });
+    expect(c.questions[0].options).toHaveLength(12);
+    expect(c.questions[0].options?.[0]).toHaveLength(120);
+    expect(c.questions[1]).toEqual({ id: "b", text: "T", required: false, pack: null, edited: false });
+    expect(c.questions[2]).toEqual({ id: "c", text: "Odd", required: false, pack: null, edited: false });
+  });
+});
+
+describe("what a choice question sends to the browser (F7)", () => {
+  it("carries the type and the option labels, and nothing private", () => {
+    const config = {
+      ...defaultIntakeConfig([UUID]),
+      knows: "SECRET-NOTES",
+      fitText: "SECRET-FIT",
+      questions: [
+        { id: "qt", text: "Free", required: true, pack: "Trademark" as const, edited: false },
+        { id: "qs", text: "One", required: false, pack: null, edited: true, type: "single" as const, options: ["Yes", "No"] },
+        { id: "qm", text: "Many", required: false, pack: "Patent" as const, edited: true, type: "multi" as const, options: ["A", "B"] },
+      ],
+    };
+    const p = publicConfig(config, { orgName: "Hartwell IP", receivesReferrals: false });
+    expect(p.questions).toEqual([
+      { id: "qt", text: "Free", required: true },
+      { id: "qs", text: "One", required: false, type: "single", options: ["Yes", "No"] },
+      { id: "qm", text: "Many", required: false, type: "multi", options: ["A", "B"] },
+    ]);
+    const json = JSON.stringify(p);
+    expect(json).not.toContain("SECRET");
+    expect(json).not.toMatch(/"pack"|"edited"/);
+  });
+});
