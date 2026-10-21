@@ -11,6 +11,8 @@ import { pendingProposals } from "@/lib/agents/proposals";
 import { relativeTime } from "@/lib/relative-time";
 import { AssignSelect, EditLeadForm, NoteComposer, ProposalCard, StageSelect } from "@/components/leads/LeadForms";
 import { LeadTags, PrepConsult } from "@/components/leads/LeadExtras";
+import { LeadMattersLine } from "@/components/leads/LeadMatters";
+import { loadMattersForLead } from "@/lib/matters/for-lead";
 import { Timeline } from "@/components/timeline/Timeline";
 import VoiceNoteRecorder from "@/components/voice/VoiceNoteRecorder";
 import { listTags, tagsForLead } from "@/lib/pipeline/tags";
@@ -75,7 +77,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const voiceUrls = await voiceNotePlaybackUrls(rows);
 
   // Lane + next step (SOP Stage 2) and the lead's sequences (SOP rule 1).
-  const [{ links, failed: linksFailed }, tz, enrollments, approvals, factsRead] = await Promise.all([
+  const [{ links, failed: linksFailed }, tz, enrollments, approvals, factsRead, mattersRead] = await Promise.all([
     getLaneLinks(),
     getFirmTimeZone(),
     listLeadEnrollments(id).catch(() => null),
@@ -83,6 +85,8 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     loadPendingApprovalsByLead().catch((): LeadPendingApprovals => ({ status: "unavailable" })),
     // The same facts the Intake board reads; a failed read leaves the existing rules, never a guessed "cold".
     loadTemperatureFacts([lead], stages).catch((): TemperatureFactsRead => ({ status: "unavailable" })),
+    // Never throws (a failed read is `unavailable`), so it can't take the page down.
+    loadMattersForLead(lead.id),
   ]);
   const temperature = effectiveTemperature(lead, stages, new Date(), factsRead.status === "ok" ? factsRead.byLead[lead.id] : undefined);
   const lane = laneView(lead);
@@ -258,6 +262,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             <span>Came from</span>
             <span>{[lead.referral_source, lead.referral_detail].filter(Boolean).join(" — ") || "—"}</span>
           </div>
+          <LeadMattersLine read={mattersRead} />
         </aside>
       </div>
     </>

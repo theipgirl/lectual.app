@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, type ReactNode } from "react";
 import {
   assignMatterOwnerAction,
   closeDeadlineAction,
@@ -28,9 +28,9 @@ import {
   type DeadlineKind,
 } from "@/lib/matters/deadline-rules";
 
-type Action = (prev: ActionState, fd: FormData) => Promise<ActionState>;
+export type Action = (prev: ActionState, fd: FormData) => Promise<ActionState>;
 
-function Err({ state }: { state: ActionState }) {
+export function Err({ state }: { state: ActionState }) {
   return state.error ? (
     <p role="alert" className="lx-note" style={{ color: "var(--wine)", margin: 0 }}>
       {state.error}
@@ -38,7 +38,7 @@ function Err({ state }: { state: ActionState }) {
   ) : null;
 }
 
-function Field(props: { name: string; label: string; defaultValue?: string | null; type?: string; placeholder?: string; wide?: boolean }) {
+export function Field(props: { name: string; label: string; defaultValue?: string | null; type?: string; placeholder?: string; wide?: boolean }) {
   return (
     <label className="lx-field" style={props.wide ? { gridColumn: "1 / -1" } : undefined}>
       <span className="lx-label">{props.label}</span>
@@ -310,7 +310,7 @@ export function DeadlineComposer({ matterId, filingBasis }: { matterId: string; 
 }
 
 /** One button in its own form, so each gets its own pending and error state. */
-function RowButton({ action, hidden, label, tone = "ghost" }: { action: Action; hidden: Record<string, string>; label: string; tone?: "ghost" | "sec" }) {
+export function RowButton({ action, hidden, label, tone = "ghost" }: { action: Action; hidden: Record<string, string>; label: string; tone?: "ghost" | "sec" }) {
   const [state, formAction, pending] = useActionState<ActionState, FormData>(action, {});
   return (
     <form action={formAction} className="lx-inline-form">
@@ -325,7 +325,8 @@ function RowButton({ action, hidden, label, tone = "ghost" }: { action: Action; 
   );
 }
 
-export function DeadlineActions(props: { matterId: string; deadlineId: string; confirmed: boolean; canConfirm: boolean; extendable: boolean }) {
+/** `children` land at the end of the row: the page adds Edit and Delete there (MatterEdits.tsx). */
+export function DeadlineActions(props: { matterId: string; deadlineId: string; confirmed: boolean; canConfirm: boolean; extendable: boolean; children?: ReactNode }) {
   const [extending, setExtending] = useState(false);
   const [state, extend, pending] = useActionState<ActionState, FormData>(extendDeadlineAction, {});
   const ids = { matterId: props.matterId, deadlineId: props.deadlineId };
@@ -350,6 +351,7 @@ export function DeadlineActions(props: { matterId: string; deadlineId: string; c
             Extend…
           </button>
         ))}
+      {props.children}
     </div>
   );
 }

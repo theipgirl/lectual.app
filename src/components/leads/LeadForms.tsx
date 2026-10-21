@@ -14,6 +14,8 @@ import {
 } from "@/app/dashboard/leads/[id]/actions";
 import type { Proposal } from "@/lib/agents/proposals";
 import { FIELD_LABEL } from "@/lib/agents/proposals";
+// Pure module: the composer's four entry types, shared with the matter timeline composer.
+import { NOTE_KIND_OPTIONS } from "@/lib/pipeline/lead-input";
 
 function Err({ state }: { state: ActionState }) {
   return state.error ? (
@@ -153,11 +155,7 @@ export function NoteComposer({ leadId }: { leadId: string }) {
     <form action={action} style={{ display: "grid", gap: 8 }}>
       <input type="hidden" name="leadId" value={leadId} />
       <div className="lx-segs" role="radiogroup" aria-label="Entry type">
-        {[
-          ["note", "Note"],
-          ["call_logged", "Call"],
-          ["email_sent", "Email sent"],
-        ].map(([k, label]) => (
+        {NOTE_KIND_OPTIONS.map(([k, label]) => (
           <label key={k} className={kind === k ? "on" : undefined}>
             <input type="radio" name="kind" value={k} checked={kind === k} onChange={() => setKind(k)} className="lx-sr" />
             {label}

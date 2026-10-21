@@ -7,8 +7,10 @@ import {
   listMatterDeadlines,
   listMatterStages,
   listTasks,
-  resolveMatterClientName,
+  loadMatterContacts,
+  resolveMatterClientNameFrom,
   DEADLINE_CONFIRM_ROLES,
+  DEADLINE_DELETE_ROLES,
   MATTER_WRITE_ROLES,
 } from "@/lib/matters";
 import { listMemberDirectory } from "@/lib/members/directory";
@@ -41,6 +43,15 @@ import {
   TaskComposer,
   TaskDone,
 } from "@/components/matters/MatterForms";
+import {
+  ClientContactCard,
+  ClosedDeadlineActions,
+  DeadlineDelete,
+  DeadlineEdit,
+  HeaderEditForm,
+  MatterNoteComposer,
+  TaskControls,
+} from "@/components/matters/MatterEdits";
 import { IntakeRequestCard } from "@/components/matters/IntakeRequestCard";
 import { canSendIntakeRequest, listMatterIntakeRequests } from "@/lib/intake-forms/requests";
 import { intakeOrigin } from "@/lib/intake-forms/origin";
@@ -72,16 +83,20 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
     orgHasModule("document-center"),
   ]);
 
-  const [stages, tasks, activity, deadlines, client, members, litigation] = await Promise.all([
+  const [stages, tasks, activity, deadlines, contactsRead, members, litigation] = await Promise.all([
     // null = could not read, which is not the same as "this firm has none".
     listMatterStages().catch(() => null),
     listTasks({ matterId: matter.id }),
     activityForMatter(matter.id),
     listMatterDeadlines(matter.id),
-    resolveMatterClientName(matter),
-    listMemberDirectory().catch(() => []),
+    // Three states (linked / none / unavailable); a failed read never takes the page down.
+    loadMatterContacts(matter.id),
+    // null = could not read the team list, which is not the same as "no teammates".
+    listMemberDirectory().catch(() => null),
     matter.type === "LIT" && hasLitigation ? getLitigationDetail(matter.id) : Promise.resolve(null),
   ]);
+  const primaryContact = contactsRead.status === "linked" ? (contactsRead.contacts.find((c) => c.role === "client") ?? null) : null;
+  const client = await resolveMatterClientNameFrom(matter, primaryContact);
   const canSendIntake = canSendIntakeRequest(session.role);
   const canWrite = MATTER_WRITE_ROLES.includes(session.role);
   const [voiceUrls, intakeRequests, origin, meetings, signedQuotes] = await Promise.all([
@@ -108,13 +123,15 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
   const welcomeQueueId = (welcome?.payload as { queueItemId?: string } | null)?.queueItemId ?? null;
 
   const canConfirm = (DEADLINE_CONFIRM_ROLES as readonly string[]).includes(session.role);
+  const canDeleteDeadline = (DEADLINE_DELETE_ROLES as readonly string[]).includes(session.role);
   const openTasks = tasks.filter((t) => t.status === "open");
   const openDeadlines = deadlines.filter((d) => d.status === "open");
   const closedDeadlines = deadlines.filter((d) => d.status !== "open");
   const age = stageAge(matter);
   const band = BAND_COPY[bandOf(matter)];
-  const memberList = members.map((m) => ({ userId: m.userId, name: m.displayName ?? m.email ?? "Teammate" }));
+  const memberList = (members ?? []).map((m) => ({ userId: m.userId, name: m.displayName ?? m.email ?? "Teammate" }));
   const ownerName = matter.assigned_to ? memberList.find((m) => m.userId === matter.assigned_to)?.name ?? "Teammate" : "Unassigned";
+  const assigneeName = (userId: string) => memberList.find((m) => m.userId === userId)?.name ?? "a teammate";
 
   return (
     <>
@@ -134,12 +151,19 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
                 {client.source === "owner_name" ? " (from the tracker)" : ""}
               </>
             ) : (
-              "No client linked"
+              contactsRead.status === "unavailable" ? "Client contact couldn't be loaded" : "No client linked"
             )}
             {" · "}
             {band.label}
             {age.days !== null ? ` · ${age.days}d in stage` : ""}
+            {matter.referral_source ? ` · Came from ${matter.referral_source}` : ""}
           </p>
+          {canWrite && (
+            <HeaderEditForm
+              matterId={matter.id}
+              values={{ title: matter.title, packageName: matter.package_name, type: matter.type, referralSource: matter.referral_source }}
+            />
+          )}
         </div>
         {canWrite ? (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -207,7 +231,12 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
                           confirmed={d.attorney_confirmed}
                           canConfirm={canConfirm}
                           extendable={d.is_extendable && (d.max_extensions === null || d.extensions_used < d.max_extensions)}
-                        />
+                        >
+                          <DeadlineEdit matterId={matter.id} deadlineId={d.id} title={d.title} dueDate={d.due_date} confirmed={d.attorney_confirmed} />
+                          {canDeleteDeadline && !d.attorney_confirmed && (
+                            <DeadlineDelete matterId={matter.id} deadlineId={d.id} label={d.title ?? deadlineKindLabel(d.kind)} dueDate={formatCivilDate(d.due_date) ?? d.due_date} />
+                          )}
+                        </DeadlineActions>
                       )}
                     </li>
                   );
@@ -218,11 +247,26 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
               <details>
                 <summary className="lx-note">{closedDeadlines.length} closed out</summary>
                 <ul className="lx-list" style={{ marginTop: 8 }}>
-                  {closedDeadlines.map((d) => (
-                    <li key={d.id} className="lx-note">
-                      {d.title ?? deadlineKindLabel(d.kind)} · {formatCivilDate(d.due_date)} · {d.status}
-                    </li>
-                  ))}
+                  {closedDeadlines.map((d) => {
+                    const label = d.title ?? deadlineKindLabel(d.kind);
+                    const text = `${label} · ${formatCivilDate(d.due_date)} · ${d.status}`;
+                    return canWrite ? (
+                      <li key={d.id} className="lx-note" style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", justifyContent: "space-between" }}>
+                        <span>{text}</span>
+                        <ClosedDeadlineActions
+                          matterId={matter.id}
+                          deadlineId={d.id}
+                          label={label}
+                          dueDate={formatCivilDate(d.due_date) ?? d.due_date}
+                          canDelete={canDeleteDeadline && !d.attorney_confirmed}
+                        />
+                      </li>
+                    ) : (
+                      <li key={d.id} className="lx-note">
+                        {text}
+                      </li>
+                    );
+                  })}
                 </ul>
               </details>
             )}
@@ -336,7 +380,8 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
               Timeline
             </h2>
             {canWrite && (
-              <div style={{ marginBottom: 14 }}>
+              <div style={{ marginBottom: 14, display: "grid", gap: 14 }}>
+                <MatterNoteComposer matterId={matter.id} />
                 <VoiceNoteRecorder target={{ kind: "matter", id: matter.id }} action={addVoiceNoteAction} />
               </div>
             )}
@@ -345,6 +390,8 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
         </div>
 
         <aside className="lx-col lx-col-aside">
+          <ClientContactCard matterId={matter.id} read={contactsRead} canWrite={canWrite} />
+
           <section className="lx-card lx-aside">
             <div className="lx-label">Tasks</div>
             {openTasks.length === 0 ? (
@@ -352,12 +399,20 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
             ) : (
               <ul className="lx-list">
                 {openTasks.map((t) => (
-                  <li key={t.id} className="lx-task">
+                  <li key={t.id} className="lx-task" style={canWrite ? { flexWrap: "wrap" } : undefined}>
                     <span>
                       {t.title}
                       {t.due_at && <span className="lx-note" style={{ display: "block" }}>Due {formatCivilDate(t.due_at.slice(0, 10))}</span>}
+                      {t.assignee_id && <span className="lx-note" style={{ display: "block" }}>{`Assigned to ${assigneeName(t.assignee_id)}`}</span>}
                     </span>
                     {canWrite && <TaskDone matterId={matter.id} taskId={t.id} />}
+                    {canWrite && (
+                      <TaskControls
+                        matterId={matter.id}
+                        task={{ id: t.id, title: t.title, dueDate: t.due_at ? t.due_at.slice(0, 10) : null, assigneeId: t.assignee_id }}
+                        members={members === null ? null : memberList}
+                      />
+                    )}
                   </li>
                 ))}
               </ul>
