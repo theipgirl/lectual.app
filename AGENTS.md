@@ -291,6 +291,45 @@ called from `runMailboxSync` after each firm's mail, with its own `calendar-sync
   mail sync is untouched, and every reader says "until the database update". Apply 0098 to BOTH lectual-dev and lectual-prod
   before the reads light up. Known limit: the same meeting on two connected mailboxes is stored (and shown) twice.
 
+## Stage Keeper (Sprint 16, needs lectual 0098)
+`stage-keeper` is a rule-based agent (no model call, no AI key, no queue draft, nothing sent) that places leads on the Intake
+board from facts the firm already recorded: the mail the sync matched to leads (`email_sent` / `email_received` rows with their
+stored type, direction, date, subject and `sensitive` flag) and the Sprint 15 Outlook consults. `targetStageFromSignals`
+(`src/lib/agents/stage-keeper/target.ts`, pure) picks the furthest-forward stage the signals support; `run.ts` acts on it.
+- **Autonomy:** `act` moves the lead (default for the agent); `suggest` / `draft` write a suggestion card instead. A firm still has
+  to switch it on (no setting row means off), and it can only be saved once lectual 0098 is applied (the CHECK refuses it before).
+- **Mapping:** the firm brain `stage_mapping` entry keyed by signal id (`consult-scheduled`, `questionnaire-sent`,
+  `post-consult-sent`, `loe-invoice-sent`; stage name in `data.stage`, else the body), else the default names in `mapping.ts`
+  (the one table of stage names) through `resolveStage`. An entry naming a stage the firm lacks gives nothing: no fall-back.
+- **Never:** backwards or sideways; into a `won` / `lost` / `nurture` stage (those, and `welcome` / payment signals, become
+  suggestion cards a person accepts); a lead already in a `won` stage; a lead with any sensitive mail or consult title in the
+  30-day window; a lead a person moved in the last 7 days (a card instead); the hot / warm / cold routing columns; a send.
+- **`signal_key`** is `<lead id>:<mail|calendar>:<message or event id>`. An earlier agent move OR an earlier suggestion (pending,
+  accepted or dismissed) carrying it consumes it, so an undone or dismissed signal never returns. At most one action per lead per run.
+- **The move** is `moveLeadStageAs(actor, ...)` (`src/lib/pipeline/move-as.ts`). A person delegates to `moveLeadStage`; the agent
+  is service role, org-fenced, refuses non-`open` / non-forward / foreign destinations, and its update is conditional on the lead
+  still being in its from-stage. The `stage_changed` row has `actor_type = ai`, `payload.actor = "agent:stage-keeper"`
+  (`AGENT_ACTOR`, defined once in `src/lib/stage-keeper/moves.ts`) and an evidence object: mail is type, direction, date, subject;
+  a consult is title and start. Never an address, body, preview or location.
+- **Agent moves fire no automation rules and open no matter.** `runRules("stage_changed")` and the matter handoff run through the
+  signed-in client, which the cron does not have. It cannot enter a `won` stage, so the handoff is never needed; a firm rule keyed on
+  "moved to stage X" does not fire for an agent move.
+- **Suggestions are `ai_insight` rows** (`source: "stage-keeper"`, `kind: "stage_suggestion"`); a person's decision is a later
+  `ai_insight` row (`source: "stage-keeper-review"`, `suggestion_id`). Accept goes through `moveLeadStage` and refuses a stale card;
+  Dismiss changes nothing and does not touch last touch (`logActivity(..., { touchLead: false })`). Undo moves back through
+  `moveLeadStage` with the stage-entered date the agent recorded, and the move and its signal stay used.
+- **Where it runs:** right after the sync, in the mailbox-sync cron (`runStageKeeperAfterSync`, wrapped so it can never change the
+  route's response), on Run now, and in the agents cron (a second run is a no-op through `signal_key`). `vercel.json` is unchanged.
+  The same post-sync step bumps a lead's last touch to the end of a held (past, linked) consult, forward only, whether or not the
+  agent is on.
+- **Seeing it:** the Intake "Moved by agent" chip and `?agent=today|7d` filter, the lead timeline line with Undo, the suggestion
+  cards on the lead page, the Agents-page "N leads moved today", and the reconcile screen's "Email / calendar" source all read
+  `src/lib/stage-keeper/moves.ts`, so they cannot disagree. The move read is two-state (`ok` / `unavailable`); an unreadable list
+  is said out loud and never filters to "no leads".
+- **Before 0098 is applied:** the calendar half of the input, the held-consult bump and saving the setting say "not available until
+  the database update"; mail signals still work for a firm that managed to switch it on. A firm switching it on can see up to 30 days
+  of matched mail acted on in the first run (each move forward-only and undoable).
+
 ## JSX text spacing: keep the `{" "}`
 Next 16.2.7's compiler DROPS the leading space of JSX text that contains an HTML entity
 (`&apos;`, `&amp;`, `&rsquo;`…) and runs onto another line, even if that is only the line
