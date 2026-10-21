@@ -22,6 +22,10 @@ export type CalendarItem = {
   kind: "deadline" | "task" | "event";
   overdue: boolean;
   unconfirmed: boolean;
+  /** An Outlook event judged a consult: drawn with a visible "Consult" marker. */
+  consult?: boolean;
+  /** An https meeting link, drawn as a separate "Join" link beside the chip. */
+  joinUrl?: string | null;
 };
 
 export type GridDay = {

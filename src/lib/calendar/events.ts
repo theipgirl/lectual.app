@@ -15,8 +15,12 @@ export type CalendarEventRow = {
 };
 
 /**
- * Consults and meetings from crm_calendar_event (synced from Lawmatics) that
- * start inside [from, to], civil dates. Read through the RLS-scoped client.
+ * Events from crm_calendar_event that start inside [from, to], civil dates, with
+ * the base columns only: that is what the table had before lectual 0098, so
+ * this keeps working on a database that has not had it. The rows may come from
+ * Lawmatics or from a connected Outlook calendar (those are read again with
+ * their extra columns by listOutlookCalendarEvents, and the page merges the two
+ * by id). Read through the RLS-scoped client.
  * The window is padded a day each side so an event near midnight in the
  * firm's zone is not lost to the UTC boundary; the page places each one by
  * its zoned date. Throws on a failed read so the page can say so.

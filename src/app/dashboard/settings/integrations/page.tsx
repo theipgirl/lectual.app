@@ -10,7 +10,7 @@ import { getLawPayConnection } from "@/lib/payments/lawpay-connection";
 import { lawPaySetup } from "@/lib/payments/lawpay-config";
 import { listMeetingConnections } from "@/lib/meetings/connection";
 import Link from "next/link";
-import { PROVIDER_LABEL, PROVIDERS, isProvider, type MailboxProvider } from "@/lib/mailbox/providers";
+import { PROVIDER_LABEL, PROVIDERS, hasCalendarScope, isProvider, type MailboxProvider } from "@/lib/mailbox/providers";
 import { relativeTime } from "@/lib/relative-time";
 import { ProviderMark } from "@/components/mailbox/ProviderMark";
 import { DisconnectButton } from "@/components/mailbox/DisconnectButton";
@@ -74,6 +74,8 @@ function providerState(readOk: boolean, rows: MailboxConnection[]): IntegrationS
 }
 
 function MailboxRow({ c, canManage }: { c: MailboxConnection; canManage: boolean }) {
+  // Outlook only. A `reauth` row already shows "Reconnect", which fixes this too.
+  const needsCalendar = c.provider === "microsoft" && c.status === "active" && !hasCalendarScope(c.provider, c.scopes);
   return (
     <div className="lx-mbx">
       <div className="lx-prov">
@@ -88,6 +90,13 @@ function MailboxRow({ c, canManage }: { c: MailboxConnection; canManage: boolean
         {c.status !== "active" && c.last_error && (
           <div className="lx-note" style={{ color: "var(--wine)" }}>
             {c.last_error}
+          </div>
+        )}
+        {needsCalendar && (
+          <div className="lx-note" style={{ color: "var(--warn)" }}>
+            {canManage
+              ? "Mail keeps working. Consults from this calendar won't show in Lectual until you reconnect."
+              : "Reconnect to read the calendar: ask the mailbox's owner or an admin. Mail keeps working meanwhile."}
           </div>
         )}
       </div>
@@ -106,6 +115,11 @@ function MailboxRow({ c, canManage }: { c: MailboxConnection; canManage: boolean
           {c.status === "reauth" && (
             <a href={connectHref(c.provider, c.scope)} className="lx-btn lx-btn-pri lx-btn-sm">
               Reconnect
+            </a>
+          )}
+          {needsCalendar && (
+            <a href={connectHref(c.provider, c.scope)} className="lx-btn lx-btn-sec lx-btn-sm">
+              Reconnect to read the calendar
             </a>
           )}
           <DisconnectButton id={c.id} email={c.email} />
@@ -360,7 +374,8 @@ export default async function IntegrationsPage({
           <div className="lx-label">What we read</div>
           <p>
             The sender, recipients, subject, date and a short preview. Full bodies are read only by
-            the intel agent, for messages already matched to a client.
+            the intel agent, for messages already matched to a client. From an Outlook calendar: the
+            title, time, place, organizer and attendees of upcoming events, never the event notes.
           </p>
         </div>
         <div>

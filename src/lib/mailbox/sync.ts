@@ -4,6 +4,7 @@ import { openToken, sealToken } from "./crypto";
 import { fetchNewMessages } from "./fetch";
 import { matchMessageToMatter, type MatterContact, type MatterLink } from "./matter-match";
 import { applyRun, planActivities, type ApplyCounts } from "./apply";
+import { syncOrgCalendars, type OrgCalendarResult } from "@/lib/calendar/outlook-sync";
 import {
   ProviderError,
   refreshAccessToken,
@@ -37,6 +38,12 @@ export type ConnectionRow = {
   token_expires_at: string | null;
   sync_cursor: string | null;
   matched_count: number;
+  /**
+   * What the account consented to. Optional because the other readers of this
+   * type (My Mail, the email-intel agent) don't select it; a missing list is
+   * read as "Calendars.Read was never granted".
+   */
+  scopes?: string[] | null;
 };
 
 export type SyncDeps = {
@@ -65,6 +72,7 @@ export async function freshAccessToken(deps: SyncDeps, row: ConnectionRow): Prom
     provider: row.provider,
     creds,
     refreshToken: openToken(deps.root, row.refresh_token_enc),
+    grantedScopes: row.scopes,
     fetchImpl: deps.fetchImpl,
     now,
   });
@@ -81,6 +89,11 @@ export async function freshAccessToken(deps: SyncDeps, row: ConnectionRow): Prom
     .eq("id", row.id)
     .eq("org_id", row.org_id);
   if (error) throw new Error(`token store failed: ${error.message}`);
+  // Keep the caller's row current: the calendar step reuses this row after the
+  // mail step, and must not replay a refresh token this refresh just rotated.
+  row.access_token_enc = update.access_token_enc as string;
+  row.token_expires_at = refreshed.expiresAt;
+  if (update.refresh_token_enc) row.refresh_token_enc = update.refresh_token_enc as string;
   return refreshed.accessToken;
 }
 
@@ -207,6 +220,8 @@ export type RunSummary = {
   ok: number;
   failed: number;
   outcomes: ConnectionOutcome[];
+  /** The Outlook calendar step, one entry per firm that has a Microsoft mailbox. */
+  calendar: OrgCalendarResult[];
 };
 
 /** Every eligible connection, grouped by firm, with one agent_run row per firm. */
@@ -215,13 +230,13 @@ export async function runMailboxSync(deps: SyncDeps): Promise<RunSummary> {
   const { data: orgs, error: orgErr } = await admin.from("crm_org").select("id").contains("modules", ["mailbox"]);
   if (orgErr) throw new Error(`org read failed: ${orgErr.message}`);
   const orgIds = (orgs ?? []).map((o) => o.id as string);
-  const summary: RunSummary = { orgs: 0, connections: 0, ok: 0, failed: 0, outcomes: [] };
+  const summary: RunSummary = { orgs: 0, connections: 0, ok: 0, failed: 0, outcomes: [], calendar: [] };
   if (orgIds.length === 0) return summary;
 
   // `error` rows are retried; `reauth` rows wait for a person.
   const { data: rows, error } = await admin
     .from("mailbox_connection")
-    .select("id, org_id, provider, email, status, access_token_enc, refresh_token_enc, token_expires_at, sync_cursor, matched_count")
+    .select("id, org_id, provider, email, status, access_token_enc, refresh_token_enc, token_expires_at, sync_cursor, matched_count, scopes")
     .in("org_id", orgIds)
     .in("status", ["active", "error"]);
   if (error) throw new Error(`connection read failed: ${error.message}`);
@@ -279,6 +294,20 @@ export async function runMailboxSync(deps: SyncDeps): Promise<RunSummary> {
         .eq("id", run.id)
         .eq("org_id", orgId);
     }
+
+    // The calendar read rides on the same cron and the same tokens. It never
+    // throws and never changes the mail outcome above.
+    const mailDead = new Set(outcomes.filter((o) => !o.ok && o.status === "reauth").map((o) => o.id));
+    const calendar = await syncOrgCalendars(
+      {
+        admin,
+        fetchImpl: deps.fetchImpl,
+        now: deps.now?.() ?? Date.now(),
+        getAccessToken: (row) => freshAccessToken(deps, row),
+      },
+      { orgId, connections: conns, mailDead, leads: ctx ? ctx.leads : null },
+    ).catch(() => null);
+    if (calendar) summary.calendar.push(calendar);
   }
   return summary;
 }

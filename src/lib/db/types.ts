@@ -338,15 +338,23 @@ export type Database = {
       crm_calendar_event: {
         Row: {
           all_day: boolean
+          attendee_emails: string[] | null
           contact_name: string | null
           created_at: string
           ends_at: string | null
           event_type: string | null
+          external_id: string | null
           id: string
-          lawmatics_id: string
+          is_consult: boolean
+          join_url: string | null
+          lawmatics_id: string | null
+          lead_id: string | null
           location: string | null
+          mailbox_connection_id: string | null
           matter_id: string | null
           org_id: string
+          organizer_email: string | null
+          source: string
           starts_at: string
           synced_at: string
           title: string | null
@@ -354,15 +362,23 @@ export type Database = {
         }
         Insert: {
           all_day?: boolean
+          attendee_emails?: string[] | null
           contact_name?: string | null
           created_at?: string
           ends_at?: string | null
           event_type?: string | null
+          external_id?: string | null
           id?: string
-          lawmatics_id: string
+          is_consult?: boolean
+          join_url?: string | null
+          lawmatics_id?: string | null
+          lead_id?: string | null
           location?: string | null
+          mailbox_connection_id?: string | null
           matter_id?: string | null
           org_id: string
+          organizer_email?: string | null
+          source?: string
           starts_at: string
           synced_at?: string
           title?: string | null
@@ -370,21 +386,43 @@ export type Database = {
         }
         Update: {
           all_day?: boolean
+          attendee_emails?: string[] | null
           contact_name?: string | null
           created_at?: string
           ends_at?: string | null
           event_type?: string | null
+          external_id?: string | null
           id?: string
-          lawmatics_id?: string
+          is_consult?: boolean
+          join_url?: string | null
+          lawmatics_id?: string | null
+          lead_id?: string | null
           location?: string | null
+          mailbox_connection_id?: string | null
           matter_id?: string | null
           org_id?: string
+          organizer_email?: string | null
+          source?: string
           starts_at?: string
           synced_at?: string
           title?: string | null
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "crm_calendar_event_lead_fk"
+            columns: ["lead_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_lead"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "crm_calendar_event_mailbox_fk"
+            columns: ["mailbox_connection_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "mailbox_connection"
+            referencedColumns: ["id", "org_id"]
+          },
           {
             foreignKeyName: "crm_calendar_event_matter_fk"
             columns: ["matter_id", "org_id"]

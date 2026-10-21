@@ -34,6 +34,8 @@ import { LinkedMeetings } from "@/components/meetings/LinkedMeetings";
 import { ConsultDetailsSection } from "@/components/leads/ConsultDetailsSection";
 import { TemperatureCard } from "@/components/leads/TemperatureCard";
 import { WaitingOnRebecca } from "@/components/leads/WaitingOnRebecca";
+import { ConsultBookedView } from "@/components/calendar/ConsultBookedLine";
+import { loadBookedConsult } from "@/lib/calendar/outlook-read";
 import { loadPendingApprovalsByLead } from "@/lib/queue/lead-pending";
 import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
 import { SequencesCard, type SequenceRow } from "@/components/leads/SequencesCard";
@@ -54,9 +56,10 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   if (!lead) notFound();
 
   const supabase = await getScopedClient();
-  const [hasAgentToolkit, hasProposals, applied, catalog, meetings] = await Promise.all([
+  const [hasAgentToolkit, hasProposals, hasMailbox, applied, catalog, meetings] = await Promise.all([
     orgHasModule("agent-toolkit"),
     orgHasModule("proposals"),
+    orgHasModule("mailbox"),
     tagsForLead(id).catch(() => []),
     listTags().catch(() => []),
     meetingsFor({ leadId: id }),
@@ -82,7 +85,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const voiceUrls = await voiceNotePlaybackUrls(rows);
 
   // Lane + next step (SOP Stage 2) and the lead's sequences (SOP rule 1).
-  const [{ links, failed: linksFailed }, tz, enrollments, approvals, factsRead, mattersRead, answersRead, documentsRead] = await Promise.all([
+  const [{ links, failed: linksFailed }, tz, enrollments, approvals, factsRead, mattersRead, answersRead, documentsRead, consultRead] = await Promise.all([
     getLaneLinks(),
     getFirmTimeZone(),
     listLeadEnrollments(id).catch(() => null),
@@ -96,6 +99,8 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     loadLeadAnswers(lead.id),
     // Files stored on this lead. Never throws: a failed read is named on the card, not an empty list.
     loadDocumentsRead({ kind: "lead", id: lead.id }, { includeLetters: false }),
+    // Outlook consults exist only for a firm with the mailbox module: without it, no read. Never throws (three states).
+    hasMailbox ? loadBookedConsult(lead.id) : Promise.resolve(null),
   ]);
   const temperature = effectiveTemperature(lead, stages, new Date(), factsRead.status === "ok" ? factsRead.byLead[lead.id] : undefined);
   const lane = laneView(lead);
@@ -153,6 +158,8 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
 
       <div className="lx-split">
         <div className="lx-col">
+          {consultRead && <ConsultBookedView read={consultRead} timeZone={tz} />}
+
           {proposals.length > 0 && (
             <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }}>
               <div>

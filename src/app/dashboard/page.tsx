@@ -32,6 +32,7 @@ import { deadlineKindLabel, deadlineNeedsReview } from "@/lib/matters/deadline-r
 import { AutopilotControl } from "@/components/agents/AutopilotControl";
 import { RunDigestList } from "@/components/agents/RunDigestList";
 import { FinishSetupCard } from "@/components/setup/FinishSetupCard";
+import { TodayConsults } from "@/components/calendar/TodayConsults";
 
 export const dynamic = "force-dynamic";
 
@@ -268,6 +269,8 @@ export default async function TodayPage() {
               </p>
             )}
           </section>
+
+          <TodayConsults />
 
           <section className="lx-card" style={{ padding: 18, display: "grid", gap: 10 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>

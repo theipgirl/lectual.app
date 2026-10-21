@@ -19,7 +19,7 @@ import { revokeToken, type MailboxProvider, type MailboxScope, type TokenSet } f
  */
 
 const COLUMNS =
-  "id, org_id, user_id, scope, provider, email, label, status, last_synced_at, last_error, matched_count, created_at";
+  "id, org_id, user_id, scope, provider, email, label, status, scopes, last_synced_at, last_error, matched_count, created_at";
 
 export type MailboxConnection = {
   id: string;
@@ -30,6 +30,8 @@ export type MailboxConnection = {
   email: string;
   label: string | null;
   status: "active" | "reauth" | "error" | "revoked";
+  /** What the account consented to (not a secret); decides "Reconnect to read the calendar". */
+  scopes?: string[] | null;
   last_synced_at: string | null;
   last_error: string | null;
   matched_count: number;

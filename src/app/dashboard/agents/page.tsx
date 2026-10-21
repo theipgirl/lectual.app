@@ -46,6 +46,7 @@ type RunRow = {
 const RUN_AGENT_LABEL: Record<string, string> = {
   ...Object.fromEntries(AGENT_IDS.map((a) => [a, AGENT_DEFS[a].name])),
   "mailbox-sync": "Mailbox sync",
+  "calendar-sync": "Calendar sync",
 };
 const TRIGGER_LABEL: Record<string, string> = { cron: "Scheduled", manual: "Run now", webhook: "Webhook", event: "Event" };
 const STATUS_TONE: Record<string, string> = { ok: "#43602F", skipped: "#7C5312", error: "#8E2733", running: "#7A5A5E" };
