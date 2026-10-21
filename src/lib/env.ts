@@ -23,6 +23,8 @@ const fieldSchemas = {
   VERCEL_AI_GATEWAY_KEY: z.string().optional(),
   // Model for the in-app agents (src/lib/ai/claude.ts). Unset = claude-opus-5.
   AGENT_MODEL: z.string().optional(),
+  // Model for the matters copilot (src/lib/ai/claude.ts copilotModel()). Unset = claude-sonnet-5.
+  COPILOT_MODEL: z.string().optional(),
   // Mailbox OAuth (step 3). Optional until that step lands.
   GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),

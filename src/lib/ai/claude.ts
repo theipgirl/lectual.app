@@ -85,6 +85,13 @@ export function agentModel(): string {
   return env.AGENT_MODEL || DEFAULT_AGENT_MODEL;
 }
 
+export const DEFAULT_COPILOT_MODEL = "claude-sonnet-5";
+
+/** The model the matters copilot answers with: fast and cheap enough to stream a chat. */
+export function copilotModel(): string {
+  return env.COPILOT_MODEL || DEFAULT_COPILOT_MODEL;
+}
+
 let client: Anthropic | null = null;
 function getClient(): Anthropic {
   if (!env.ANTHROPIC_API_KEY) throw new AiNotConfiguredError();
@@ -206,6 +213,50 @@ export async function callClaudeWithTools(req: ToolTurnRequest): Promise<ToolTur
     messages: req.messages,
     tools: req.tools,
   });
+
+  const usage: Usage = {
+    inputTokens: response.usage.input_tokens,
+    outputTokens: response.usage.output_tokens,
+    cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
+    cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
+  };
+  return { content: response.content, model: response.model, usage, costUsd: costFor(response.model, usage) };
+}
+
+export type StreamToolTurnRequest = ToolTurnRequest & {
+  /** Called with each text delta as it arrives, before the turn has finished. */
+  onText?: (delta: string) => void;
+};
+
+/**
+ * `callClaudeWithTools` for a chat that streams: the same request posture
+ * (beta Messages, server-side fallback, cached system prompt), but over the
+ * SDK's streaming call so the first words of an answer can reach the browser
+ * while the model is still writing. Resolves to the same shape once the turn
+ * is complete, so the caller's tool loop is unchanged.
+ *
+ * Differences from `callClaudeWithTools`, all deliberate:
+ *  · The model is `copilotModel()`.
+ *  · The last tool definition carries a cache breakpoint, which caches the
+ *    whole tool list together with the system prompt in front of it.
+ *
+ * A refusal still comes back as ordinary text; a transport failure throws.
+ */
+export async function streamClaudeWithTools(req: StreamToolTurnRequest): Promise<ToolTurnResult> {
+  const tools = req.tools.map((tool, i) =>
+    i === req.tools.length - 1 ? { ...tool, cache_control: { type: "ephemeral" as const } } : tool,
+  );
+  const stream = getClient().beta.messages.stream({
+    model: copilotModel(),
+    max_tokens: req.maxTokens ?? 4096,
+    betas: ["server-side-fallback-2026-07-01"],
+    fallbacks: "default",
+    system: [{ type: "text", text: req.system, cache_control: { type: "ephemeral" } }],
+    messages: req.messages,
+    tools,
+  });
+  if (req.onText) stream.on("text", req.onText);
+  const response = await stream.finalMessage();
 
   const usage: Usage = {
     inputTokens: response.usage.input_tokens,
