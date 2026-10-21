@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { confirmUploadAction, requestUploadAction } from "@/app/dashboard/files/actions";
 import type { FileParentInput } from "@/lib/files/guard";
 import { FILE_MESSAGES, checkFileName, checkFileSize } from "@/lib/files/rules";
@@ -19,7 +18,6 @@ const NETWORK = "The upload didn't finish. Check your connection and try again."
  * storage path it could change.
  */
 export function UploadControl({ parent }: { parent: FileParentInput }) {
-  const router = useRouter();
   const [busyName, setBusyName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [inputKey, setInputKey] = useState(0);
@@ -45,7 +43,7 @@ export function UploadControl({ parent }: { parent: FileParentInput }) {
 
       const saved = await confirmUploadAction(parent, request.fileId, file.name);
       if (!saved.ok) return setError(saved.error);
-      router.refresh();
+      // confirmUploadAction revalidates this page, which refreshes the list.
     } catch {
       setError(FILE_MESSAGES.generic);
     } finally {

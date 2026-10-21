@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { deleteFileAction } from "@/app/dashboard/files/actions";
 
 /**
@@ -11,7 +10,6 @@ import { deleteFileAction } from "@/app/dashboard/files/actions";
  * straight away (used by the render tests).
  */
 export function DeleteFileButton({ fileId, name, defaultOpen = false }: { fileId: string; name: string; defaultOpen?: boolean }) {
-  const router = useRouter();
   const [open, setOpen] = useState(defaultOpen);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -30,8 +28,7 @@ export function DeleteFileButton({ fileId, name, defaultOpen = false }: { fileId
       try {
         const result = await deleteFileAction(fileId);
         if (!result.ok) return setError(result.error);
-        setOpen(false);
-        router.refresh();
+        setOpen(false); // deleteFileAction revalidates this page, which refreshes the list
       } catch {
         setError("Couldn't delete that file just now. Try again shortly.");
       }

@@ -137,7 +137,10 @@ export async function confirmUploadAction(parent: FileParentInput, fileId: strin
     });
     if (insertError) {
       // The unique path (or id) means this exact file is already on the record.
-      if (insertError.code === "23505") return { ok: true as const, fileId, alreadySaved: true as const };
+      if (insertError.code === "23505") {
+        revalidatePath(parentPath(target));
+        return { ok: true as const, fileId, alreadySaved: true as const };
+      }
       logFileFailure("save file row", insertError);
       // A staff role cannot delete in storage, so this can leave an unreferenced object. Best effort only.
       await bucket.remove([path]).catch((err: unknown) => logFileFailure("clean up object", err));
