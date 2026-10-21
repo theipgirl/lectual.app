@@ -28,6 +28,7 @@ export type TargetLead = { currentStageId: string };
 
 export type NothingReason =
   | "no-signals"
+  | "implies-nothing"
   | "sensitive"
   | "unknown-stage"
   | "already-client"
@@ -69,18 +70,23 @@ export function targetStageFromSignals(
   if (current.category === "won") return { kind: "nothing", reason: "already-client" };
 
   const candidates: Candidate[] = [];
+  let impliedAny = false;
   let resolvedAny = false;
   for (const signal of signals) {
     if (signal.source === "calendar" && options.now !== undefined && Date.parse(signal.startsAt) < options.now) continue;
     const signalId = signalIdFor(signal);
     if (!signalId) continue;
+    impliedAny = true;
     const stage = stageForSignal(signalId, stages, mapping);
     if (!stage) continue;
     resolvedAny = true;
     if (stage.orderIndex <= current.orderIndex) continue; // forward only
     candidates.push({ stage, signalId, signal, time: signalTime(signal) });
   }
-  if (candidates.length === 0) return { kind: "nothing", reason: resolvedAny ? "not-forward" : "unresolved" };
+  if (candidates.length === 0) {
+    // Say which: nothing the signals say places anybody, none of it names a stage this firm has, or it all points backwards.
+    return { kind: "nothing", reason: !impliedAny ? "implies-nothing" : resolvedAny ? "not-forward" : "unresolved" };
+  }
 
   const best = candidates.reduce((a, b) =>
     b.stage.orderIndex > a.stage.orderIndex || (b.stage.orderIndex === a.stage.orderIndex && b.time > a.time) ? b : a,

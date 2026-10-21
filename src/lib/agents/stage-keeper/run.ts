@@ -31,7 +31,7 @@ import { targetStageFromSignals } from "./target";
  * a welcome or payment signal) is a card in every mode, and a lead a person moved in the last
  * 7 days gets a card instead of a move: a person's placement wins.
  *
- * It is rule-based. It calls no model, queues no draft, sends nothing, and never sets a lane.
+ * It is rule-based. It calls no model, queues no draft, sends nothing, and never touches the hot / warm / cold routing a person sets.
  * Each signal is used once: an earlier move OR an earlier suggestion (pending, accepted or
  * dismissed) carrying the same `signal_key` consumes it, so an undone or dismissed signal
  * never comes back. At most one action per lead per run.

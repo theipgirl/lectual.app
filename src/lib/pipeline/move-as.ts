@@ -23,7 +23,7 @@ import type { Lead } from "./leads";
  *
  * It does not open a matter, stop a sequence or run an automation rule: those run through the
  * signed-in client, which the cron does not have, and it cannot reach a "won" stage anyway.
- * It never touches `lane`, `lane_set_by` or `lane_set_at`.
+ * It never touches the hot / warm / cold routing columns: only a person sets those.
  */
 
 export type PersonActor = { kind: "person" };
