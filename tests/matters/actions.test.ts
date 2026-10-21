@@ -59,6 +59,17 @@ const {
   assignMatterOwnerAction,
   createTaskAction,
   completeTaskAction,
+  updateMatterHeaderAction,
+  searchContactsAction,
+  linkContactAction,
+  addContactAction,
+  editContactAction,
+  addMatterNoteAction,
+  updateDeadlineAction,
+  reopenDeadlineAction,
+  deleteDeadlineAction,
+  updateTaskAction,
+  deleteTaskAction,
 } = await import("../../src/app/dashboard/matters/[id]/actions");
 const { MATTER_WRITE_ROLES } = await import("@/lib/matters/matters");
 
@@ -245,5 +256,42 @@ describe("module-gated matter actions refuse a firm without the module, before d
     f.set("caseNumber", "26-CC-011354");
     expect((await updateLitigationAction({}, f)).error).toMatch(/isn't available/);
     expect(mockRpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("Sprint 8 actions re-resolve the role first", () => {
+  // The mocked client here only answers rpc(): any read or write would throw, so a
+  // permission sentence proves the action stopped at the role check.
+  const fd = () => {
+    const f = new FormData();
+    for (const k of ["matterId", "contactId", "deadlineId", "taskId", "q", "body", "title"]) f.set(k, "x");
+    return f;
+  };
+  const actions = {
+    updateMatterHeaderAction,
+    searchContactsAction,
+    linkContactAction,
+    addContactAction,
+    editContactAction,
+    addMatterNoteAction,
+    updateDeadlineAction,
+    reopenDeadlineAction,
+    deleteDeadlineAction,
+    updateTaskAction,
+    deleteTaskAction,
+  };
+
+  for (const role of ["viewer", "social_media"]) {
+    it.each(Object.entries(actions))(`%s refuses ${role}`, async (_name, action) => {
+      state.role = role;
+      const result = await (action as (prev: object, fd: FormData) => Promise<{ error?: string }>)({}, fd());
+      expect(result.error).toMatch(/permission/i);
+    });
+  }
+
+  it("refuses an unresolved role the same way", async () => {
+    state.role = null;
+    expect((await updateTaskAction({}, fd())).error).toMatch(/permission/i);
+    expect((await deleteDeadlineAction({}, fd())).error).toMatch(/permission/i);
   });
 });
