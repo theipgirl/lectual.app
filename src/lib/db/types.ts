@@ -3283,6 +3283,101 @@ export type Database = {
       // convention as crm_document_draft above — shaped to match exactly what
       // codegen would produce; replace with the generated blocks on the next
       // real codegen run.
+      crm_booth_scorecard: {
+        Row: {
+          answers: Json
+          band: Database["public"]["Enums"]["crm_booth_band"] | null
+          captured_by: string | null
+          client_ref: string
+          completed_at: string | null
+          consent_at: string | null
+          consent_email: boolean
+          consent_sms: boolean
+          created_at: string
+          event_code: string
+          lawmatics_contact_id: string | null
+          lawmatics_synced_at: string | null
+          lawmatics_tagged_at: string | null
+          gaps: string[]
+          id: string
+          lead_id: string
+          mark_goods: string | null
+          mark_name: string | null
+          org_id: string
+          score: number | null
+          temperature: Database["public"]["Enums"]["crm_booth_temperature"] | null
+          ticket_code: string
+          track: Database["public"]["Enums"]["crm_booth_track"] | null
+        }
+        Insert: {
+          answers?: Json
+          band?: Database["public"]["Enums"]["crm_booth_band"] | null
+          captured_by?: string | null
+          client_ref: string
+          completed_at?: string | null
+          consent_at?: string | null
+          consent_email?: boolean
+          consent_sms?: boolean
+          created_at?: string
+          event_code: string
+          gaps?: string[]
+          id?: string
+          lawmatics_contact_id?: string | null
+          lawmatics_synced_at?: string | null
+          lawmatics_tagged_at?: string | null
+          lead_id: string
+          mark_goods?: string | null
+          mark_name?: string | null
+          org_id: string
+          score?: number | null
+          temperature?: Database["public"]["Enums"]["crm_booth_temperature"] | null
+          ticket_code: string
+          track?: Database["public"]["Enums"]["crm_booth_track"] | null
+        }
+        Update: {
+          answers?: Json
+          band?: Database["public"]["Enums"]["crm_booth_band"] | null
+          captured_by?: string | null
+          client_ref?: string
+          completed_at?: string | null
+          consent_at?: string | null
+          consent_email?: boolean
+          consent_sms?: boolean
+          created_at?: string
+          event_code?: string
+          gaps?: string[]
+          id?: string
+          lawmatics_contact_id?: string | null
+          lawmatics_synced_at?: string | null
+          lawmatics_tagged_at?: string | null
+          lead_id?: string
+          mark_goods?: string | null
+          mark_name?: string | null
+          org_id?: string
+          score?: number | null
+          temperature?:
+            | Database["public"]["Enums"]["crm_booth_temperature"]
+            | null
+          ticket_code?: string
+          track?: Database["public"]["Enums"]["crm_booth_track"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_booth_scorecard_lead_fk"
+            columns: ["lead_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_lead"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "crm_booth_scorecard_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_org"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crm_contact: {
         Row: {
           business_name: string | null
@@ -3934,6 +4029,11 @@ export type Database = {
         // 0085: a lead entered / left a campaign (the stop names its reason).
         | "drip_enrolled"
         | "drip_stopped"
+        // 0086: a booth capture, on the lead's timeline (summary + score in the payload).
+        | "booth_scorecard"
+      crm_booth_band: "exposed" | "partial" | "protected"
+      crm_booth_temperature: "hot" | "warm" | "cold"
+      crm_booth_track: "business" | "brand"
       crm_actor_type: "user" | "system" | "ai" | "automation" | "pathset"
       crm_ai_enrichment_layer: "layer1" | "layer2" | "layer3"
       crm_ai_enrichment_type:
@@ -4192,7 +4292,11 @@ export const Constants = {
         "quote_payment",
         "drip_enrolled",
         "drip_stopped",
+        "booth_scorecard",
       ],
+      crm_booth_band: ["exposed", "partial", "protected"],
+      crm_booth_temperature: ["hot", "warm", "cold"],
+      crm_booth_track: ["business", "brand"],
       crm_actor_type: ["user", "system", "ai", "automation", "pathset"],
       crm_ai_enrichment_layer: ["layer1", "layer2", "layer3"],
       crm_ai_enrichment_type: [

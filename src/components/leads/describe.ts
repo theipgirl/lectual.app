@@ -156,6 +156,14 @@ export function describeActivity(row: Row): Described {
       return { title: "Matter opened", detail: [str(p.matter_number), carriedDetail(p)].filter(Boolean).join(" · ") || null, tone: "system", link: null };
     case "matter_updated":
       return { title: MATTER_CHANGE[str(p.change) ?? ""] ?? "Matter updated", detail: matterChangeDetail(p), tone: "system", link: null };
+    case "booth_scorecard": {
+      // lectual's booth capture: `summary` reads "Booth scorecard — 72/100, WARM" once finished, or
+      // "Booth — contact captured, assessment not yet completed". The score is added only when the summary lacks it.
+      const summary = str(p.summary);
+      const score = typeof p.score === "number" && Number.isFinite(p.score) ? `${p.score}/100` : null;
+      const detail = score && !(summary ?? "").includes(score) ? [summary, score].filter(Boolean).join(" · ") : summary;
+      return { title: "Booth scorecard", detail, tone: "system", link: null };
+    }
     case "quote_payment":
       // Written by the client proposal page (src/lib/quotes/public-payment.ts)
       // and by a manual entry on the quote builder. `summary` is staff-facing.
