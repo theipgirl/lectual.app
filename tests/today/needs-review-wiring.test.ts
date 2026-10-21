@@ -20,9 +20,10 @@ describe("Today: the Needs-you deadlines skip needs-review dates (N5)", () => {
   });
 
   it("changes at most 4 lines of the page this sprint", () => {
+    // Bounded to this sprint's own commit (a8576f3): later sprints add their own few lines to the page.
     let numstat = "";
     try {
-      numstat = execSync("git diff 484f123 --numstat -- src/app/dashboard/page.tsx", { encoding: "utf8" }).trim();
+      numstat = execSync("git diff 484f123 a8576f3 --numstat -- src/app/dashboard/page.tsx", { encoding: "utf8" }).trim();
     } catch {
       return; // Sprint base not available (shallow clone): the gate run checks it.
     }
