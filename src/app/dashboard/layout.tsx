@@ -10,6 +10,8 @@ import { SectionLabel } from "@/components/shell/SectionLabel";
 import { AccountMenu } from "@/components/shell/AccountMenu";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { NoFirmAccess } from "@/components/shell/NoFirmAccess";
+import { CopilotLauncher } from "@/components/copilot/CopilotLauncher";
+import { aiConfigured } from "@/lib/ai/claude";
 
 export const metadata: Metadata = { title: "Lectual" };
 
@@ -92,6 +94,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <div className="lx-page">{children}</div>
         </div>
       </div>
+      <CopilotLauncher configured={aiConfigured()} />
     </div>
   );
 }

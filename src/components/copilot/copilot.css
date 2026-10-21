@@ -1,0 +1,408 @@
+/*
+ * The copilot chat (/dashboard/copilot/ and the drawer on every other
+ * dashboard page) and the floating launcher. Loaded by the components
+ * themselves, so it is on every dashboard page. Reuses the app's tokens;
+ * the page's hero palette (--cp-*) is defined once in
+ * src/app/dashboard/copilot/copilot.css and used here only inside `.cpl-page`.
+ */
+
+.cpl-root {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* ── thread ─────────────────────────────────────────────── */
+.cpl-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+}
+
+.cpl-empty {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}
+
+.cpl-prompts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+.cpl-empty .cpl-prompts {
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.cpl-exchange {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cpl-bubble {
+  border-radius: 14px;
+  padding: 12px 15px;
+  font-size: 14.5px;
+  line-height: 1.55;
+  max-width: 78%;
+}
+.cpl-bubble-user {
+  align-self: flex-end;
+  background: var(--ox);
+  color: var(--cream);
+  border-radius: 16px 16px 4px 16px;
+  overflow-wrap: anywhere;
+}
+.cpl-bubble-copilot {
+  align-self: flex-start;
+  background: var(--well);
+  color: var(--ink);
+  border-radius: 16px 16px 16px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 88%;
+  overflow-wrap: anywhere;
+}
+.cpl-bubble-error {
+  background: rgba(142, 39, 51, 0.09);
+  color: var(--wine);
+}
+
+.cpl-answer {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.cpl-status {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.cpl-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.cpl-cites {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.cpl-cite {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  padding: 4px 9px;
+  border-radius: 6px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  color: var(--ox);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.cpl-cite:hover {
+  background: var(--well);
+  text-decoration: none;
+}
+
+/* ── chips ──────────────────────────────────────────────── */
+.cpl-chip {
+  font: inherit;
+  font-size: 14px;
+  min-height: 38px;
+  padding: 0 16px;
+  border-radius: 11px;
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  text-align: left;
+}
+.cpl-chip:hover:not(:disabled) {
+  background: var(--well);
+}
+.cpl-chip:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* ── composer ───────────────────────────────────────────── */
+.cpl-rail {
+  flex: 0 0 auto;
+}
+.cpl-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px 9px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.cpl-composer:focus-within {
+  outline: 2px solid var(--ox);
+  outline-offset: 1px;
+}
+.cpl-input {
+  border: 0;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: 15.5px;
+  color: var(--ink);
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 2px 0;
+}
+.cpl-composer-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cpl-footnote {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.cpl-ghost {
+  font: inherit;
+  font-size: 14px;
+  height: 32px;
+  padding: 0 13px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cpl-ghost:hover:not(:disabled) {
+  background: var(--well);
+}
+.cpl-send {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  border: 0;
+  background: var(--ox);
+  color: var(--cream);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.cpl-send:hover:not(:disabled) {
+  background: var(--ox-hover);
+}
+.cpl-send:disabled,
+.cpl-ghost:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.cpl-chip:focus-visible,
+.cpl-ghost:focus-visible,
+.cpl-send:focus-visible,
+.cpl-cite:focus-visible {
+  outline: 2px solid var(--ox);
+  outline-offset: 2px;
+}
+
+/* ── the full page: dark glass on the hero (one scroll area: the page's) ── */
+.cpl-page .cpl-chip {
+  background: rgba(32, 8, 13, 0.72);
+  border-color: rgba(253, 247, 235, 0.1);
+  color: #f0e4dc;
+  white-space: nowrap;
+}
+.cpl-page .cpl-chip:hover:not(:disabled) {
+  background: rgba(48, 14, 20, 0.86);
+}
+.cpl-page .cpl-bubble-copilot {
+  background: rgba(30, 8, 13, 0.78);
+  border: 1px solid rgba(253, 247, 235, 0.1);
+  color: #f6ede4;
+}
+.cpl-page .cpl-label,
+.cpl-page .cpl-status {
+  color: rgba(246, 237, 228, 0.7);
+}
+.cpl-page .cpl-bubble-error {
+  background: rgba(60, 12, 20, 0.85);
+  color: #ffd9d4;
+}
+.cpl-page .cpl-cite {
+  background: rgba(253, 247, 235, 0.1);
+  border-color: transparent;
+  color: #e6c9c3;
+}
+.cpl-page .cpl-cite:hover {
+  background: rgba(253, 247, 235, 0.2);
+}
+.cpl-page .cpl-chip:focus-visible,
+.cpl-page .cpl-cite:focus-visible {
+  outline-color: #f6ede4;
+}
+.cpl-page .cpl-composer {
+  background: var(--cp-pill, #f6f0e3);
+  border: 5px solid var(--cp-rail, #3a1218);
+  border-radius: 18px;
+  color: #2a1216;
+}
+.cpl-page .cpl-input,
+.cpl-page .cpl-footnote {
+  color: #2a1216;
+}
+.cpl-page .cpl-footnote {
+  color: #7a5a5e;
+}
+.cpl-page .cpl-ghost {
+  color: #4a2a2e;
+  border-color: rgba(42, 18, 22, 0.18);
+}
+.cpl-page .cpl-composer:focus-within {
+  outline-color: #f6ede4;
+}
+.cpl-page .cpl-thread {
+  padding: 0;
+}
+
+/* The 640px ask pill on the landing state. */
+.cpl-pill {
+  width: 640px;
+  max-width: 100%;
+  padding: 18px 18px 12px;
+  gap: 16px;
+}
+.cpl-pill .cpl-input {
+  font-size: 17px;
+}
+
+/* ── the drawer's chat: the one inner scroll, because the drawer is fixed-height ── */
+.cpl-drawer-chat {
+  flex: 1;
+  min-height: 0;
+}
+.cpl-drawer-chat .cpl-thread {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+}
+.cpl-drawer-chat .cpl-bubble {
+  max-width: 92%;
+}
+.cpl-drawer-chat .cpl-rail {
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--line);
+}
+
+/* ── floating launcher + drawer ─────────────────────────── */
+.cpd-launcher {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 60;
+  width: 54px;
+  height: 54px;
+  border-radius: 999px;
+  border: 0;
+  background: var(--ox);
+  color: var(--cream);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 14px 30px -12px rgba(35, 8, 16, 0.6);
+}
+.cpd-launcher:hover {
+  background: var(--ox-hover);
+}
+.cpd-launcher:focus-visible,
+.cpd-close:focus-visible {
+  outline: 2px solid var(--ox);
+  outline-offset: 3px;
+}
+
+.cpd-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 61;
+  background: rgba(35, 8, 16, 0.28);
+}
+.cpd-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 62;
+  width: 420px;
+  max-width: 100vw;
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border-left: 1px solid var(--line);
+  box-shadow: -24px 0 50px -30px rgba(35, 8, 16, 0.5);
+}
+.cpd-scrim[hidden],
+.cpd-drawer[hidden] {
+  display: none;
+}
+.cpd-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.cpd-title {
+  flex: 1;
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ox);
+}
+.cpd-kbd {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.cpd-close {
+  font: inherit;
+  font-size: 14px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+.cpd-close:hover {
+  background: var(--well);
+}
+
+@media (max-width: 640px) {
+  .cpl-bubble {
+    max-width: 92%;
+  }
+  .cpl-pill {
+    padding: 14px 14px 10px;
+  }
+  .cpl-page .cpl-chip {
+    white-space: normal;
+  }
+}

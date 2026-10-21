@@ -1,8 +1,25 @@
 import { aiConfigured } from "@/lib/ai/claude";
+import { resolveFirmSession } from "@/lib/firm/session";
+import { getFirmTimeZone } from "@/lib/org/profile";
+import { listMemberDirectory } from "@/lib/members/directory";
+import { listMatters, listUpcomingDeadlines, summarizeDocket } from "@/lib/matters";
+import { loadActiveQueue } from "@/lib/queue/load";
+import { greetingName } from "@/lib/today/greeting-name";
+import { hourInZone } from "@/lib/today/priorities";
+import { copilotGreeting } from "@/lib/copilot/part-of-day";
+import { buildStatCards, type StatRead } from "@/lib/copilot/stats";
 import { CopilotChat } from "@/components/copilot/CopilotChat";
+import { StatCards } from "./stat-cards";
 import "./copilot.css";
 
 export const dynamic = "force-dynamic";
+
+const DEADLINE_WINDOW_DAYS = 14;
+
+/** A settled read as a stat: a number, or "couldn't load". Never a zero from a failure. */
+function statOf<T>(settled: PromiseSettledResult<T>, count: (value: T) => number): StatRead {
+  return settled.status === "fulfilled" ? { status: "ok", value: count(settled.value) } : { status: "unavailable" };
+}
 
 /**
  * AI copilot (/dashboard/copilot/) — read-only Q&A over the signed-in firm's
@@ -22,9 +39,53 @@ export const dynamic = "force-dynamic";
  * (AGENTS.md — a broken surface must never look like an empty or working
  * one). A per-question failure once the chat is live (a bad network call, a
  * model error) is shown inline in the thread instead, for the same reason.
+ *
+ * The four numbers on the landing state are each their own read (allSettled),
+ * so one dead source never blanks the others or the page, and a failed read
+ * says so instead of printing a zero.
  */
-export default function CopilotPage() {
+export default async function CopilotPage() {
   const configured = aiConfigured();
+  const session = configured ? await resolveFirmSession() : null;
+  if (configured && session?.kind !== "ok") return null; // the layout already handled this
+
+  let landing: React.ReactNode = null;
+  let greeting = "";
+  if (configured && session?.kind === "ok") {
+    const now = new Date();
+    const [tzS, membersS, mattersS, deadlinesS, queueS] = await Promise.allSettled([
+      getFirmTimeZone(),
+      listMemberDirectory(),
+      listMatters(),
+      listUpcomingDeadlines({ withinDays: DEADLINE_WINDOW_DAYS }),
+      loadActiveQueue(),
+    ]);
+    const tz = tzS.status === "fulfilled" ? tzS.value : "America/New_York";
+    const members = membersS.status === "fulfilled" ? membersS.value : [];
+    greeting = copilotGreeting(
+      hourInZone(now, tz),
+      greetingName({ userId: session.user.id, members, metadata: session.user.user_metadata, email: session.user.email }),
+    );
+
+    // loadActiveQueue never throws; a rejection would be a bug, shown as unavailable.
+    const queueRead: StatRead =
+      queueS.status !== "fulfilled" || queueS.value.status === "unavailable"
+        ? { status: "unavailable" }
+        : queueS.value.status === "unconfigured"
+          ? { status: "unconfigured" }
+          : { status: "ok", value: queueS.value.items.length };
+
+    landing = (
+      <StatCards
+        cards={buildStatCards({
+          open: statOf(mattersS, (m) => summarizeDocket(m, now).open),
+          stalled: statOf(mattersS, (m) => summarizeDocket(m, now).stalled.length),
+          deadlines: statOf(deadlinesS, (d) => d.length),
+          approvals: queueRead,
+        })}
+      />
+    );
+  }
 
   return (
     <>
@@ -40,7 +101,7 @@ export default function CopilotPage() {
       </div>
 
       {configured ? (
-        <CopilotChat />
+        <CopilotChat variant="page" greeting={greeting} stats={landing} />
       ) : (
         <div className="lx-card lx-empty-card">
           <h2 className="lx-h2" style={{ fontSize: 25 }}>

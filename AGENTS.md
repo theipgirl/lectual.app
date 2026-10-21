@@ -225,6 +225,43 @@ the Today card only read; the "Set up" links go to pages that already exist and 
   (`StatusPill`, seven states each with its own label) and `HelpText` used by every card on Integrations and Meetings.
   The Zoom card on Meetings says Zoom isn't switched on when `zoomSetup()` isn't ready (copy in `lib/integrations/copy.ts`).
 
+## Copilot (`/dashboard/copilot`, the floating drawer; no schema)
+Read-only Q&A over the firm's own matters, leads, deadlines and activity. It changes nothing and sends nothing; the
+tool set (six reads) and the retrieval-only UPL system prompt are in `src/lib/agents/matters-chat.ts`.
+- **The route streams.** `POST /api/matters-chat` answers Server-Sent Events: `tool` (status, in plain words),
+  `delta` (text as the model writes it), `context` (only when the drawer sent a lead or matter page: found /
+  not-found / unavailable), then one closing `final` (`answer`, `citations`, `declined`, `readFailed`) or `error` (a fixed
+  sentence, never raw error text). Everything that can be refused is still plain JSON BEFORE the stream opens, with the
+  old statuses (400, 422, 401, 403, 503). `final` carries the authoritative answer and the browser replaces what it
+  streamed with it: a short preface before a tool call can show for a moment. Wire format and parser: `src/lib/copilot/sse.ts`.
+- **Model:** `copilotModel()` in `src/lib/ai/claude.ts` = `env.COPILOT_MODEL || "claude-sonnet-5"`; nothing else reads
+  `COPILOT_MODEL`. The other agents still use `AGENT_MODEL`. `streamClaudeWithTools` sits beside the unchanged
+  `callClaudeWithTools`, with `cache_control` on the system block and on the last tool.
+- **Per question:** tool calls in one step run in parallel; `listMatters()` is read once (`search_matters` and
+  `list_stalled_matters` share it, and a failure is shared too, so both report it and `readFailed` is set); the last 10
+  turns are sent as `history` (text only, oldest dropped first to fit about 8k estimated tokens at 4 characters a token,
+  each turn clipped; `src/lib/copilot/history.ts`). A tool that throws hands the model a fixed sentence, not the message.
+- **The drawer** (`CopilotLauncher`, mounted once in the dashboard layout): a fixed bottom-right button and a right drawer
+  holding the same chat. Hidden on `/dashboard/copilot` and wherever `aiConfigured()` is false. Command-J (Ctrl-J
+  elsewhere) toggles, Esc closes, Tab wraps inside it, focus goes to its input on open and back to the button on close.
+  Once opened it stays mounted (hidden) so a thread survives closing it. Decisions are pure and tested in
+  `src/lib/copilot/launcher.ts`.
+- **Page context is never trusted for data.** The browser sends the pathname (and the id it parsed); the server parses
+  the pathname AGAIN (`parseCopilotContext`: only `/dashboard/leads/<uuid>` and `/dashboard/matters/<uuid>`, with any sub-path),
+  ignores a client id that disagrees, and re-reads the record through `getLead` / `getMatter` (scoped client, RLS).
+  Another firm's id reads as null, same as a missing one: a `not-found` status, no record data in the prompt, and the
+  answer still streams. The record's fields enter the user turn as a block marked as data, never instructions.
+- **Cost is logged, not stored.** One `[copilot] org=… model=… in=… out=… cacheRead=… cacheWrite=… costUsd=…` line per
+  answer (`src/lib/agents/copilot-cost.ts`), org id from the session, tokens summed over the steps, price from the
+  `claude-sonnet-5` table entry; never the question, answer or any record field. It is not in `agent_run`: that table's
+  agent CHECK has no `copilot` until lectual migration 0098 is applied, and a signed-in role cannot write it (the
+  service-role client is off limits here). Point `logCopilotCost` at it once 0098 is on. Never shown to firms as credits.
+- **Landing page:** an async server page. The four glass cards (open matters, stalled matters, deadlines in the next 14
+  days including overdue, approvals waiting) are separate reads; a failed read is a dash and "Couldn't load", never 0, and an
+  unconnected queue says so (`src/lib/copilot/stats.ts`, queue only through `loadActiveQueue`). The hero palette lives once,
+  in `src/app/dashboard/copilot/copilot.css`; the chat and launcher styles are in `src/components/copilot/copilot.css`,
+  imported by the components so they load on every dashboard page.
+
 ## JSX text spacing: keep the `{" "}`
 Next 16.2.7's compiler DROPS the leading space of JSX text that contains an HTML entity
 (`&apos;`, `&amp;`, `&rsquo;`…) and runs onto another line, even if that is only the line
