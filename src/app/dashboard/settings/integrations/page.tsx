@@ -14,13 +14,9 @@ import { PROVIDER_LABEL, PROVIDERS, isProvider, type MailboxProvider } from "@/l
 import { relativeTime } from "@/lib/relative-time";
 import { ProviderMark } from "@/components/mailbox/ProviderMark";
 import { DisconnectButton } from "@/components/mailbox/DisconnectButton";
-
-const STATUS: Record<MailboxConnection["status"], { label: string; tone: string }> = {
-  active: { label: "Syncing", tone: "lx-pill-ok" },
-  reauth: { label: "Reconnect", tone: "lx-pill-risk" },
-  error: { label: "Sync failing", tone: "lx-pill-warn" },
-  revoked: { label: "Disconnected", tone: "lx-pill-mute" },
-};
+import { IntegrationHeader } from "@/components/integrations/IntegrationHeader";
+import { ModeBadge, StatusPill } from "@/components/integrations/StatusPill";
+import { stateForStatus, type IntegrationState } from "@/components/integrations/states";
 
 /** Shown so the section has its full shape; none of these connect to anything yet. */
 const SOON = [
@@ -69,8 +65,15 @@ function ConnectButton(props: {
   );
 }
 
+/** A provider row's state from the connections the caller can see. A failed read is "couldn't check", never "not connected". */
+function providerState(readOk: boolean, rows: MailboxConnection[]): IntegrationState {
+  if (!readOk) return "couldnt-check";
+  if (rows.some((c) => c.status === "reauth")) return "reconnect";
+  if (rows.some((c) => c.status === "error")) return "needs-attention";
+  return rows.some((c) => c.status === "active") ? "connected" : "not-connected";
+}
+
 function MailboxRow({ c, canManage }: { c: MailboxConnection; canManage: boolean }) {
-  const status = STATUS[c.status];
   return (
     <div className="lx-mbx">
       <div className="lx-prov">
@@ -93,7 +96,7 @@ function MailboxRow({ c, canManage }: { c: MailboxConnection; canManage: boolean
         <div className="lx-note">matched to clients</div>
       </div>
       <div style={{ textAlign: "right", minWidth: 92 }}>
-        <span className={`lx-pill ${status.tone}`}>{status.label}</span>
+        <StatusPill state={stateForStatus(c.status)} />
         <div className="lx-note" style={{ marginTop: 4 }}>
           {c.last_synced_at ? relativeTime(c.last_synced_at) : "first sync pending"}
         </div>
@@ -140,6 +143,24 @@ export default async function IntegrationsPage({
 
   const errorText = outcomeMessage(error);
   const nothingConfigured = !connectable.google && !connectable.microsoft;
+
+  const lawmaticsState: IntegrationState = !lawmatics.ok ? "couldnt-check" : !lm ? "not-connected" : lm.status === "active" ? "connected" : "reconnect";
+  const lawpayState: IntegrationState = !lawpay.ok
+    ? "couldnt-check"
+    : lp
+      ? lp.status === "active"
+        ? "connected"
+        : "reconnect"
+      : lawpayReady
+        ? "not-connected"
+        : "not-available";
+  const meetingsState: IntegrationState = !meetingConns.ok
+    ? "couldnt-check"
+    : meetingSources.length === 0
+      ? "not-connected"
+      : meetingsNeedAttention
+        ? "reconnect"
+        : "connected";
 
   const byProvider = (p: MailboxProvider) => (list.ok ? list.connections.filter((c) => c.provider === p) : []);
 
@@ -210,31 +231,34 @@ export default async function IntegrationsPage({
       )}
 
       <section className="lx-int-import" aria-labelledby="lawmatics-title">
-        <div style={{ flex: 1, minWidth: 240 }}>
-          <h2 id="lawmatics-title" className="lx-h2" style={{ fontSize: 27 }}>
-            Import from Lawmatics
-          </h2>
-          <p className="lx-sub" style={{ margin: "4px 0 0" }}>
-            {lm?.status === "active"
-              ? `Connected${lm.last_import_at ? ` · last import ${relativeTime(lm.last_import_at)}` : ""}. Bring over contacts and matters, and re-run it any time to pick up changes.`
-              : lm
-                ? "Lawmatics stopped accepting your firm's token. Reconnect to keep importing."
-                : "Bring over your contacts and matters, and re-run it any time while you move over."}
-          </p>
-        </div>
-        {lm && lm.status !== "active" && <span className="lx-pill lx-pill-risk">Reconnect</span>}
-        <Link href="/dashboard/settings/integrations/lawmatics/" className={`lx-btn ${lm?.status === "active" ? "lx-btn-sec" : "lx-btn-pri"}`}>
-          {lm?.status === "active" ? "Open Lawmatics import" : lm ? "Reconnect" : "Connect Lawmatics"}
-        </Link>
+        <IntegrationHeader
+          id="lawmatics-title"
+          title="Import from Lawmatics"
+          state={lawmaticsState}
+          help={
+            !lawmatics.ok
+              ? "We couldn't check your Lawmatics connection just now."
+              : lm?.status === "active"
+                ? `Connected${lm.last_import_at ? ` · last import ${relativeTime(lm.last_import_at)}` : ""}. Bring over contacts and matters, and re-run it any time to pick up changes.`
+                : lm
+                  ? "Lawmatics stopped accepting your firm's token. Reconnect to keep importing."
+                  : "Bring over your contacts and matters, and re-run it any time while you move over."
+          }
+        >
+          <Link href="/dashboard/settings/integrations/lawmatics/" className={`lx-btn ${lm?.status === "active" ? "lx-btn-sec" : "lx-btn-pri"}`}>
+            {lm?.status === "active" ? "Open Lawmatics import" : lm ? "Reconnect" : "Connect Lawmatics"}
+          </Link>
+        </IntegrationHeader>
       </section>
 
       <section className="lx-int-import" aria-labelledby="lawpay-title">
-        <div style={{ flex: 1, minWidth: 240 }}>
-          <h2 id="lawpay-title" className="lx-h2" style={{ fontSize: 27 }}>
-            LawPay
-          </h2>
-          <p className="lx-sub" style={{ margin: "4px 0 0" }}>
-            {!lawpay.ok
+        <IntegrationHeader
+          id="lawpay-title"
+          title="LawPay"
+          state={lawpayState}
+          badge={lp ? <ModeBadge live={lp.mode === "live"} /> : null}
+          help={
+            !lawpay.ok
               ? "We couldn't check your LawPay connection just now."
               : lp?.status === "active"
                 ? `Connected${lp.display_hint ? ` · ${lp.display_hint}` : ""} · ${lp.mode === "live" ? "live" : "test"} mode. Clients pay the amount due at signing by card, into your operating account.`
@@ -242,33 +266,32 @@ export default async function IntegrationsPage({
                   ? "LawPay stopped accepting your firm's connection. Reconnect to take card payments again."
                   : lawpayReady
                     ? "Sign in to your firm's LawPay account so clients can pay the amount due at signing by card."
-                    : "Not available yet — Lectual's LawPay sign-in isn't set up on this deployment. Payments can be recorded by hand on each quote."}
-          </p>
-        </div>
-        {lp && lp.status !== "active" && <span className="lx-pill lx-pill-risk">Reconnect</span>}
-        {lp && <span className={`lx-pill ${lp.mode === "live" ? "lx-pill-ox" : "lx-pill-warn"}`}>{lp.mode === "live" ? "Live" : "Test"}</span>}
-        <Link href="/dashboard/settings/integrations/lawpay/" className={`lx-btn ${lp?.status === "active" || !lawpayReady ? "lx-btn-sec" : "lx-btn-pri"}`}>
-          {lp?.status === "active" ? "Manage LawPay" : lp ? "Reconnect" : lawpayReady ? "Connect LawPay" : "About LawPay"}
-        </Link>
+                    : "Not available yet — Lectual's LawPay sign-in isn't set up on this deployment. Payments can be recorded by hand on each quote."
+          }
+        >
+          <Link href="/dashboard/settings/integrations/lawpay/" className={`lx-btn ${lp?.status === "active" || !lawpayReady ? "lx-btn-sec" : "lx-btn-pri"}`}>
+            {lp?.status === "active" ? "Manage LawPay" : lp ? "Reconnect" : lawpayReady ? "Connect LawPay" : "About LawPay"}
+          </Link>
+        </IntegrationHeader>
       </section>
 
       <section className="lx-int-import" aria-labelledby="meetings-title">
-        <div style={{ flex: 1, minWidth: 240 }}>
-          <h2 id="meetings-title" className="lx-h2" style={{ fontSize: 27 }}>
-            Meetings
-          </h2>
-          <p className="lx-sub" style={{ margin: "4px 0 0" }}>
-            {!meetingConns.ok
+        <IntegrationHeader
+          id="meetings-title"
+          title="Meetings"
+          state={meetingsState}
+          help={
+            !meetingConns.ok
               ? "We couldn't check your meeting connections just now."
               : meetingSources.length > 0
                 ? `Connected: ${meetingSources.map((c) => (c.provider === "fathom" ? "Fathom" : "Zoom")).join(" and ")}. Consult recordings, summaries and transcripts land in Meetings.`
-                : "Connect Fathom or Zoom to bring consult recordings, summaries and transcripts into Meetings."}
-          </p>
-        </div>
-        {meetingsNeedAttention && <span className="lx-pill lx-pill-risk">Reconnect</span>}
-        <Link href="/dashboard/settings/integrations/meetings/" className={`lx-btn ${meetingSources.length > 0 ? "lx-btn-sec" : "lx-btn-pri"}`}>
-          {meetingSources.length > 0 ? "Manage meetings" : "Connect Fathom or Zoom"}
-        </Link>
+                : "Connect Fathom or Zoom to bring consult recordings, summaries and transcripts into Meetings."
+          }
+        >
+          <Link href="/dashboard/settings/integrations/meetings/" className={`lx-btn ${meetingSources.length > 0 ? "lx-btn-sec" : "lx-btn-pri"}`}>
+            {meetingSources.length > 0 ? "Manage meetings" : "Connect Fathom or Zoom"}
+          </Link>
+        </IntegrationHeader>
       </section>
 
       <section className="lx-card lx-int" aria-label="Services">
@@ -279,17 +302,13 @@ export default async function IntegrationsPage({
           return (
             <details key={p} className="lx-int-row" open={rows.length > 0}>
               <summary>
-                <span className="lx-int-icon">
-                  <ProviderMark provider={p} size={24} />
-                </span>
-                <span style={{ flex: 1, minWidth: 0 }}>
-                  <span className="lx-int-name">{p === "google" ? "Google Workspace" : "Microsoft 365"}</span>
-                  <span className="lx-note" style={{ display: "block" }}>
-                    {p === "google" ? "Gmail" : "Outlook"}
-                    {rows.length > 0 ? ` · ${rows.length} connected` : ""}
-                  </span>
-                </span>
-                {rows.some((c) => c.status === "reauth") && <span className="lx-pill lx-pill-risk">Reconnect</span>}
+                <IntegrationHeader
+                  size="row"
+                  title={p === "google" ? "Google Workspace" : "Microsoft 365"}
+                  state={providerState(list.ok, rows)}
+                  icon={<ProviderMark provider={p} size={24} />}
+                  help={`${p === "google" ? "Gmail" : "Outlook"}${rows.length > 0 ? ` · ${rows.length} connected` : ""}`}
+                />
                 <span className="lx-int-chev" aria-hidden="true">›</span>
               </summary>
               <div className="lx-int-body">
@@ -319,18 +338,17 @@ export default async function IntegrationsPage({
         {SOON.map((x) => (
           <div key={x.name} className="lx-int-row lx-int-soon">
             <div className="lx-int-summary">
-              <span className="lx-int-icon" aria-hidden="true">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                  <path d={x.icon} />
-                </svg>
-              </span>
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span className="lx-int-name">{x.name}</span>
-                <span className="lx-note" style={{ display: "block" }}>
-                  {x.sub}
-                </span>
-              </span>
-              <span className="lx-pill lx-pill-mute">Coming soon</span>
+              <IntegrationHeader
+                size="row"
+                title={x.name}
+                state="coming-soon"
+                help={x.sub}
+                icon={
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                    <path d={x.icon} />
+                  </svg>
+                }
+              />
             </div>
           </div>
         ))}

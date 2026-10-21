@@ -1,0 +1,98 @@
+/* Setup checklist and the Today card: what the shared lx- classes don't cover. Tokens only. */
+
+.su-wrap {
+  display: grid;
+  gap: 16px;
+}
+
+.su-summary {
+  padding: 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.su-count {
+  font-family: var(--serif);
+  font-size: 27px;
+  line-height: 1.15;
+  color: var(--ink);
+  margin: 0;
+}
+
+.su-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--well);
+  overflow: hidden;
+}
+
+.su-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--ok);
+}
+
+.su-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 18px;
+}
+
+.su-item {
+  display: grid;
+  grid-template-columns: 28px 118px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 0;
+}
+
+.su-item + .su-item {
+  border-top: 1px solid var(--line-2);
+}
+
+.su-num {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.su-label {
+  color: var(--ink);
+  font-weight: 500;
+  font-size: 15.5px;
+}
+
+.su-why {
+  margin: 2px 0 0;
+}
+
+@media (max-width: 720px) {
+  .su-item {
+    grid-template-columns: 24px minmax(0, 1fr);
+  }
+  .su-item > .su-state,
+  .su-item > .su-action {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
+.su-card {
+  padding: 16px 18px;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+  border-color: rgba(106, 31, 43, 0.28);
+}
+
+.su-card-main {
+  flex: 1;
+  min-width: 240px;
+  display: grid;
+  gap: 4px;
+}
+
+.su-card-title {
+  font-size: 25px;
+}

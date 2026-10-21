@@ -31,6 +31,7 @@ import { civilDate } from "@/lib/matters/calendar-rows";
 import { deadlineKindLabel, deadlineNeedsReview } from "@/lib/matters/deadline-rules";
 import { AutopilotControl } from "@/components/agents/AutopilotControl";
 import { RunDigestList } from "@/components/agents/RunDigestList";
+import { FinishSetupCard } from "@/components/setup/FinishSetupCard";
 
 export const dynamic = "force-dynamic";
 
@@ -217,6 +218,8 @@ export default async function TodayPage() {
           We couldn&apos;t reach the approval queue, so we don&apos;t know what&apos;s waiting. This is not an empty queue. Check again shortly.
         </p>
       )}
+
+      <FinishSetupCard role={session.role} />
 
       <div className="lx-split">
         <div className="lx-col">

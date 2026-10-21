@@ -1,0 +1,63 @@
+/* The shared integration header, status pill and help text. Tokens only. */
+
+.lxi-head {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.lxi-main {
+  flex: 1;
+  min-width: 220px;
+}
+
+.lxi-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+
+.lxi-title {
+  font-size: 27px;
+}
+
+.lxi-title-row-size {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.lxi-help {
+  margin: 4px 0 0;
+}
+
+.lxi-help-problem {
+  color: var(--wine);
+}
+
+.lxi-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.lxi-card {
+  padding: 18px;
+  display: grid;
+  gap: 12px;
+}
+
+.lxi-card .lxi-title {
+  font-size: 23px;
+}
+
+.lxi-card .lxi-help {
+  margin: 0;
+}
