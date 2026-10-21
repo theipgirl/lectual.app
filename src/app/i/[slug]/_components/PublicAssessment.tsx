@@ -30,6 +30,35 @@ type Answers = AssessmentAnswers;
 
 const RESIZE_MESSAGE = "lectual-intake:resize";
 
+/**
+ * One of the firm's own (extra) choice questions. Hook-free, so a test can read its element tree. The control is
+ * keyed by the question: two extras in a row with the same option text (Yes / No) must get fresh DOM nodes, or a
+ * click still on its way from the last question lands on the new question's option and answers it.
+ */
+export function AssessmentExtraChoice(props: {
+  question: AskedQuestion;
+  value: Answers[string] | undefined;
+  disabled: boolean;
+  onAnswer: (next: string[]) => void;
+  onCommit: (next: string[]) => void;
+}) {
+  const { question, value, disabled, onAnswer, onCommit } = props;
+  const multi = question.type === "multi";
+  return (
+    <ChoiceControl
+      key={question.key}
+      name={`asm-${question.key}`}
+      type={multi ? "multi" : "single"}
+      options={question.options.map((o) => o.label)}
+      value={labelsOf(value)}
+      label={question.question}
+      disabled={disabled}
+      onChange={onAnswer}
+      onCommit={multi ? undefined : onCommit}
+    />
+  );
+}
+
 export function PublicAssessment(props: { slug: string; view: PublicIntakeConfig; stamp: string; embed: boolean }) {
   const { view, slug } = props;
   const card = view.assessment;
@@ -265,15 +294,12 @@ export function PublicAssessment(props: { slug: string; view: PublicIntakeConfig
             onChange={(e) => setAnswers({ ...answers, [current.key]: e.target.value })}
           />
         ) : current.extra ? (
-          <ChoiceControl
-            name={`asm-${current.key}`}
-            type={current.type === "multi" ? "multi" : "single"}
-            options={current.options.map((o) => o.label)}
-            value={labelsOf(value)}
-            label={current.question}
+          <AssessmentExtraChoice
+            question={current}
+            value={value}
             disabled={pending}
-            onChange={(next) => setAnswers({ ...answers, [current.key]: current.type === "multi" ? next : (next[0] ?? "") })}
-            onCommit={current.type === "multi" ? undefined : (next) => choose(current, next[0])}
+            onAnswer={(next) => setAnswers({ ...answers, [current.key]: current.type === "multi" ? next : (next[0] ?? "") })}
+            onCommit={(next) => choose(current, next[0])}
           />
         ) : (
           <div className={`ipub-asm-options${current.grid ? " grid" : ""}`} role={current.type === "multi" ? "group" : "radiogroup"}>

@@ -6,6 +6,8 @@ import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { ChoiceControl } from "../../src/app/i/[slug]/_components/ChoiceControl";
 import { QuestionFields } from "../../src/app/i/[slug]/_components/QuestionFields";
 import { buildThread, ConversationInput, ThreadBubbles, type ChatStep } from "../../src/app/i/[slug]/_components/ConversationParts";
+import { AssessmentExtraChoice } from "../../src/app/i/[slug]/_components/PublicAssessment";
+import type { AskedQuestion } from "@/lib/intake-forms/assessment-asked";
 import { AssessmentNav } from "../../src/app/i/[slug]/_components/AssessmentNav";
 import { RequestForm } from "../../src/app/r/[token]/_components/RequestForm";
 import { defaultIntakeConfig, publicConfig, validateIntakeConfig } from "@/lib/intake-forms/config";
@@ -81,7 +83,8 @@ describe("the shared choice control", () => {
 });
 
 describe("a single choice selects on the keyboard and commits only on a tap or Enter (V4)", () => {
-  type Click = (e: { detail: number }) => void;
+  type Click = (e: { detail: number; target?: { tagName: string }; preventDefault?: () => void }) => void;
+  const pointer = (tagName: string) => ({ detail: 1, target: { tagName }, preventDefault: vi.fn() });
   const radiosOf = (el: ReactElement) => findAll(el, (e) => e.type === "input" && (e.props as { type?: string }).type === "radio");
 
   const labelsOf = (el: ReactElement) => findAll(el, (e) => e.type === "label");
@@ -100,8 +103,52 @@ describe("a single choice selects on the keyboard and commits only on a tap or E
     // The label: a browser forwards a label click to its radio with detail 0, so that one must not commit again.
     (labels[2].props as { onClick: Click }).onClick({ detail: 0 });
     expect(committed).toEqual([]);
-    (labels[2].props as { onClick: Click }).onClick({ detail: 1 });
+    (labels[2].props as { onClick: Click }).onClick(pointer("SPAN"));
     expect(committed).toEqual([["C"]]);
+  });
+
+  it("a pointer click on the label's text selects and commits, and cancels the click the browser would forward to the radio; a click on the radio itself is left alone", () => {
+    const changed: string[][] = [];
+    const committed: string[][] = [];
+    const el = ChoiceControl({ name: "g", type: "single", options: ["A", "B"], value: [], label: "q", onChange: (n) => changed.push(n), onCommit: (n) => committed.push(n) });
+    const label = labelsOf(el)[1].props as { onClick: Click };
+    const onText = pointer("SPAN");
+    label.onClick(onText);
+    expect(onText.preventDefault).toHaveBeenCalledTimes(1);
+    expect(changed).toEqual([["B"]]);
+    expect(committed).toEqual([["B"]]);
+    // The radio circle: the radio's own onClick selects, the label (bubbled to) commits once, nothing is cancelled.
+    const onRadio = pointer("INPUT");
+    label.onClick(onRadio);
+    expect(onRadio.preventDefault).not.toHaveBeenCalled();
+    expect(committed).toEqual([["B"], ["B"]]);
+    // A forwarded click (detail 0) neither selects nor commits nor cancels.
+    const forwarded = { detail: 0, target: { tagName: "INPUT" }, preventDefault: vi.fn() };
+    label.onClick(forwarded);
+    expect(forwarded.preventDefault).not.toHaveBeenCalled();
+    expect(committed).toHaveLength(2);
+  });
+
+  it("each question gets its own control: the conversation's and the assessment extra's ChoiceControl are keyed by the question", () => {
+    // Two Yes/No questions in a row share option text. Unkeyed, React reuses the first one's label and radio nodes for
+    // the second, and the browser's forwarded click (after the re-render) answers the second question too.
+    const base = { prompt: "Q", required: true, kind: "question" as const, type: "single" as const, options: ["Yes", "No"] };
+    for (const key of ["qa", "qb"]) {
+      const el = ConversationInput({ step: { ...base, key }, draft: "", maxLength: 10, hint: null, picked: [], onDraft: () => {}, onSend: () => {}, onSkip: () => {}, onPick: () => {}, onCommit: () => {}, onDone: () => {} }) as ReactElement;
+      const control = findAll(el, (e) => e.type === ChoiceControl)[0];
+      expect(control.key).toBe(key);
+    }
+    for (const key of ["qx1", "qx2"]) {
+      const el = AssessmentExtraChoice({
+        question: { key, question: "Q", subtext: "", type: "single", required: true, extra: true, grid: false, options: [{ value: "Yes", label: "Yes" }, { value: "No", label: "No" }] } satisfies AskedQuestion,
+        value: undefined,
+        disabled: false,
+        onAnswer: () => {},
+        onCommit: () => {},
+      }) as ReactElement;
+      expect(el.type).toBe(ChoiceControl);
+      expect(el.key).toBe(key);
+    }
   });
 
   it("without a commit handler the label carries no click handler, and multi choice never commits", () => {
@@ -144,7 +191,7 @@ describe("a single choice selects on the keyboard and commits only on a tap or E
     expect(onCommit).not.toHaveBeenCalled();
     (labels[1].props as { onClick: Click }).onClick({ detail: 0 });
     expect(onCommit).not.toHaveBeenCalled();
-    (labels[1].props as { onClick: Click }).onClick({ detail: 1 });
+    (labels[1].props as { onClick: Click }).onClick(pointer("SPAN"));
     expect(onCommit).toHaveBeenCalledTimes(1);
     expect(onCommit).toHaveBeenCalledWith(["B"]);
     expect(html(el)).toContain(">Done<");

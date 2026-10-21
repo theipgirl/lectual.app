@@ -88,6 +88,9 @@ export function ConversationInput(props: {
       <div className="ipub-composer-wrap">
         {hintLine}
         <ChoiceControl
+          // A fresh control per question: same-text options (Yes / No twice in a row) must not reuse the last
+          // question's DOM nodes, or a click still on its way lands on the new question's option.
+          key={step.key}
           name={`chat-${step.key}`}
           type={multi ? "multi" : "single"}
           options={step.options}

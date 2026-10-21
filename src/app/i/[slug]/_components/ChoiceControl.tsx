@@ -57,7 +57,19 @@ export function ChoiceControl(props: ChoiceControlProps) {
             // The commit lives on the label: a tap or click on the option's text or padding reaches the radio as a click
             // forwarded by the browser with detail 0, so only the label sees the pointer's own click (detail > 0).
             // Arrow keys and Space click the radio itself and never reach here with a pointer, so they only select.
-            onClick={single && onCommit ? (e) => { if (e.detail > 0) onCommit([o]); } : undefined}
+            // Committing re-renders the next question before the browser runs the label's activation, and a forwarded
+            // click would then land on a same-text radio of that next question. So a pointer click that did not hit the
+            // radio itself is cancelled here (no forwarded click) and selects directly instead.
+            onClick={
+              single && onCommit
+                ? (e) => {
+                    if (e.detail <= 0) return;
+                    if ((e.target as HTMLElement).tagName !== "INPUT") e.preventDefault();
+                    onChange?.([o]);
+                    onCommit([o]);
+                  }
+                : undefined
+            }
           >
             <input
               type={single ? "radio" : "checkbox"}
