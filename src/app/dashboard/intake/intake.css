@@ -129,6 +129,38 @@
   border-radius: 6px;
 }
 
+/* ---- Table | Board toggle, controlled mode ------------------------- */
+
+/* The shared <ViewToggle> draws anchors on Matters and buttons here. The
+   design's .lx-view-toggle rules style anchors only, and that file is the
+   design session's, so the button twin lives here and reproduces the same
+   pill, hover and "on" look from the same tokens: no new colour or face. */
+.intake-root .lx-view-toggle button {
+  height: 32px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  font: inherit;
+  font-size: 14px;
+  color: var(--body);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.intake-root .lx-view-toggle button:hover {
+  color: var(--ink);
+}
+
+.intake-root .lx-view-toggle button.on {
+  background: var(--card);
+  color: var(--ink);
+  font-weight: 500;
+  box-shadow: 0 1px 2px rgba(20, 4, 8, 0.08);
+}
+
 /* The status line the intake top bar carried ("25 in intake · 6 need a
    first reply · 3 unassigned"), now the first line of the page. */
 .intake-statusline {

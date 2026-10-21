@@ -28,6 +28,9 @@
  * never a copy that drifted, never an estimate. See `packages.ts`.
  */
 
+import { choiceFields, validateChoiceFields, type QuestionType } from "./choice";
+import { DEFAULT_ASSESSMENT, parseAssessmentSettings, publicAssessment, validateAssessmentSettings, type AssessmentSettings, type PublicAssessment } from "./assessment";
+
 export const IP_TYPES = ["Trademark", "Patent", "Copyright", "Trade secret"] as const;
 export type IpType = (typeof IP_TYPES)[number];
 
@@ -108,6 +111,10 @@ export type IntakeQuestion = {
   pack: IpType | null;
   /** Edited questions survive their pack being switched off. */
   edited: boolean;
+  /** Absent means free text, as every question before Sprint 10 (see choice.ts). */
+  type?: QuestionType;
+  /** Option labels (2 to 12) for a single or multi choice; absent on a text question. */
+  options?: string[];
 };
 
 export type IntakeColors = { lightBg: string; lightAcc: string; darkBg: string; darkAcc: string };
@@ -139,6 +146,8 @@ export type IntakeFormConfig = {
   theme: IntakeTheme;
   colors: IntakeColors;
   powered: boolean;
+  /** Assessment intakes only (lectual 0095): which card, the firm's wording, show the score. */
+  assessment: AssessmentSettings;
 };
 
 export const DEFAULT_COLORS: IntakeColors = {
@@ -181,6 +190,7 @@ export function defaultIntakeConfig(visiblePackageIds: string[] = []): IntakeFor
     theme: "auto",
     colors: { ...DEFAULT_COLORS },
     powered: true,
+    assessment: { ...DEFAULT_ASSESSMENT, wording: {} },
   };
 }
 
@@ -223,6 +233,7 @@ export function parseIntakeConfig(raw: unknown): IntakeFormConfig {
           required: bool(q.required, false),
           pack: oneOf<IpType | "">(q.pack, IP_TYPES, "") || null,
           edited: bool(q.edited, false),
+          ...choiceFields(q),
         }))
         .filter((q) => (seen.has(q.id) ? false : (seen.add(q.id), true)))
         .slice(0, LIMITS.questions)
@@ -255,6 +266,7 @@ export function parseIntakeConfig(raw: unknown): IntakeFormConfig {
       darkAcc: isHexColor(colorsRaw.darkAcc) ? colorsRaw.darkAcc : DEFAULT_COLORS.darkAcc,
     },
     powered: bool(raw.powered, d.powered),
+    assessment: parseAssessmentSettings(raw.assessment),
   };
 }
 
@@ -303,6 +315,8 @@ export function validateIntakeConfig(raw: unknown): ConfigValidation {
       ids.add(q.id);
       if (q.text.length > LIMITS.question) errors.push(`Question ${i + 1} is longer than ${LIMITS.question} characters.`);
       if (q.pack !== null && q.pack !== undefined && !(IP_TYPES as readonly unknown[]).includes(q.pack)) errors.push(`Question ${i + 1} names an unknown pack.`);
+      // A blank row is editor scratch and is dropped on save, so its options are not checked.
+      if (q.text.trim()) errors.push(...validateChoiceFields(q, `Question ${i + 1}`));
     });
   }
   for (const [k, list] of [["packs", IP_TYPES], ["fitIp", IP_TYPES], ["fitJur", JURS]] as const) {
@@ -317,6 +331,8 @@ export function validateIntakeConfig(raw: unknown): ConfigValidation {
   if (!isRec(c) || !["lightBg", "lightAcc", "darkBg", "darkAcc"].every((k) => isHexColor(c[k]))) {
     errors.push("Colors must be six-digit hex values like #6A1F2B.");
   }
+
+  errors.push(...validateAssessmentSettings(raw.assessment));
 
   if (errors.length) return { ok: false, errors: [...new Set(errors)] };
   const cleaned = parseIntakeConfig(raw);
@@ -447,12 +463,15 @@ export type PublicIntakeConfig = {
   disclaimer: string;
   consent: string;
   contactFields: typeof CONTACT_FIELDS;
-  questions: { id: string; text: string; required: boolean }[];
+  /** `type` and `options` are present only on a choice question; a text question is `{id, text, required}`. */
+  questions: { id: string; text: string; required: boolean; type?: QuestionType; options?: string[] }[];
   feesOn: boolean;
   closing: string;
   theme: IntakeTheme;
   colors: IntakeColors;
   powered: boolean;
+  /** The assessment card, wording applied, without points (assessment intakes). */
+  assessment: PublicAssessment;
   /** Present only when the firm receives Lectual referrals. */
   referral: { office: string; disclosure: string } | null;
 };
@@ -478,12 +497,13 @@ export function publicConfig(
     contactFields: CONTACT_FIELDS,
     questions: config.questions
       .filter((q) => q.text.trim())
-      .map((q) => ({ id: q.id, text: q.text.trim(), required: q.required })),
+      .map((q) => ({ id: q.id, text: q.text.trim(), required: q.required, ...choiceFields(q) })),
     feesOn: config.feesOn,
     closing: config.closing.trim() || DEFAULT_CLOSING,
     theme: config.theme,
     colors: { ...config.colors },
     powered: config.powered,
+    assessment: publicAssessment(config.assessment),
     referral: ctx.receivesReferrals
       ? { office: config.office.trim(), disclosure: referralDisclosure(intro.firmName) }
       : null,

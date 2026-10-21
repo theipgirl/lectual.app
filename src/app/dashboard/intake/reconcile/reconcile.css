@@ -1,0 +1,163 @@
+/* Stage reconciliation: the few things the shared lx- classes don't cover. Tokens only. */
+
+.rc-wrap {
+  display: grid;
+  gap: 16px;
+}
+
+.rc-scroll {
+  overflow-x: auto;
+}
+
+.rc-tbl {
+  min-width: 1040px;
+}
+
+.rc-tbl td {
+  white-space: normal;
+  vertical-align: top;
+  height: auto;
+  min-width: 120px;
+}
+
+.rc-tbl td.rc-name {
+  min-width: 170px;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.rc-tbl td.rc-actions {
+  min-width: 230px;
+}
+
+.rc-cell {
+  display: grid;
+  gap: 2px;
+}
+
+.rc-cell small {
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.rc-state {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.rc-state-unavailable {
+  color: var(--wine);
+}
+
+.rc-state-none {
+  color: var(--muted);
+}
+
+.rc-state-unmapped {
+  color: var(--warn);
+}
+
+.rc-state-matter {
+  color: var(--ox);
+}
+
+.rc-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.rc-select {
+  height: 32px;
+  max-width: 190px;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 0 8px;
+}
+
+.rc-chosen {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--ok);
+}
+
+.rc-reasons {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.rc-reasons summary {
+  cursor: pointer;
+  color: var(--ox);
+}
+
+.rc-reasons ul {
+  margin: 6px 0 0;
+  padding-left: 16px;
+  display: grid;
+  gap: 3px;
+}
+
+.rc-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  align-items: center;
+  padding: 12px 16px;
+  font-size: 14px;
+  color: var(--body);
+}
+
+.rc-strip b {
+  color: var(--ink);
+}
+
+.rc-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+}
+
+.rc-bar-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.rc-file {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.rc-lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+  font-size: 14.5px;
+  color: var(--body);
+}
+
+.rc-out {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}

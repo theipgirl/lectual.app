@@ -25,6 +25,9 @@ import { DETAIL_LIMITS, type IntakeDetails } from "@/lib/intake-forms/details";
 import { saveIntakeFormAction } from "../actions";
 import { IntakePreview } from "./IntakePreview";
 import { IntakeQrButton } from "./IntakeQr";
+import { AssessmentPreview, AssessmentSettingsCard } from "./AssessmentSettings";
+import { OptionsEditor, QuestionTypeSelect } from "./ChoiceEditor";
+import { isChoice, questionType } from "@/lib/intake-forms/choice";
 
 /**
  * Intake → Forms (design/Intake_Forms.dc.html): the header, the two tabs,
@@ -36,9 +39,10 @@ import { IntakeQrButton } from "./IntakeQr";
  * answers with the stored form, which becomes the new "saved" snapshot that
  * Discard returns to.
  *
- * The Performance tab is rendered on the server and handed in as `performance`,
- * so switching tabs (a soft navigation to `?tab=performance`) keeps unsaved
- * edits: this component stays mounted and its state with it.
+ * The Performance and Results tabs are rendered on the server and handed in as
+ * `performance` and `results`, so switching tabs (a soft navigation to
+ * `?tab=performance` or `?tab=results`) keeps unsaved edits: this component
+ * stays mounted and its state with it.
  *
  * Read-only for everyone below senior_admin: every control sits in a disabled
  * <fieldset>, and the Save action refuses them regardless.
@@ -52,9 +56,10 @@ type Props = {
   packages: { status: "ok"; items: WorkspacePackage[] } | { status: "unavailable" };
   origin: string;
   canEdit: boolean;
-  tab: "setup" | "performance";
+  tab: "setup" | "performance" | "results";
   range: number;
   performance: ReactNode;
+  results: ReactNode;
 };
 
 type Snapshot = { config: IntakeFormConfig; domains: string[]; details: IntakeDetails };
@@ -148,7 +153,12 @@ export function IntakeFormsWorkspace(props: Props) {
   // The link as saved: an unsaved rename isn't live yet.
   const publicUrl = intakePublicUrl(props.origin, saved.details.slug);
   const embed = intakeEmbedSnippet(props.origin, saved.details.slug);
-  const items = goLiveChecklist(config, { receivesReferrals: form.receivesReferrals, agreementSigned: form.agreementSignedAt !== null });
+  const isAssessment = form.kind === "assessment";
+  const items = goLiveChecklist(config, {
+    receivesReferrals: form.receivesReferrals,
+    agreementSigned: form.agreementSignedAt !== null,
+    kind: form.kind,
+  });
   const done = items.filter((i) => i.ok).length;
   const allDone = checklistComplete(items);
   const err = (key: string) => showErrors && items.some((i) => i.key === key && !i.ok);
@@ -278,7 +288,7 @@ export function IntakeFormsWorkspace(props: Props) {
   const live = status === "live";
   const archived = status === "archived";
   const base = `/dashboard/forms/?form=${encodeURIComponent(form.id)}`;
-  const tabHref = (t: "setup" | "performance") => (t === "setup" ? base : `${base}&tab=performance&range=${props.range}`);
+  const tabHref = (t: "setup" | "performance" | "results") => (t === "setup" ? base : `${base}&tab=${t}&range=${props.range}`);
   const firmDisplay = config.firmName.trim() || props.orgName;
   const agreementSigned = form.agreementSignedAt !== null;
 
@@ -325,10 +335,15 @@ export function IntakeFormsWorkspace(props: Props) {
         <Link href={tabHref("performance")} scroll={false} aria-current={props.tab === "performance" ? "page" : undefined}>
           Performance
         </Link>
+        <Link href={tabHref("results")} scroll={false} aria-current={props.tab === "results" ? "page" : undefined}>
+          Results
+        </Link>
       </nav>
 
       {props.tab === "performance" ? (
         props.performance
+      ) : props.tab === "results" ? (
+        props.results
       ) : (
         <div className="ifm-setup">
           <fieldset className="ifm-editor" disabled={!canEdit}>
@@ -457,6 +472,10 @@ export function IntakeFormsWorkspace(props: Props) {
               </div>
             )}
 
+            {isAssessment ? (
+              <AssessmentSettingsCard settings={config.assessment} onChange={(assessment) => edit({ assessment })} />
+            ) : (
+              <>
             <section id="ifm-sec-mode" className="ifm-card">
               <h2 className="ifm-title">What visitors see first</h2>
               <div className="ifm-modes">
@@ -520,6 +539,9 @@ export function IntakeFormsWorkspace(props: Props) {
               </label>
             </section>
 
+              </>
+            )}
+
             <section id="ifm-sec-intro" className="ifm-card">
               <h2 className="ifm-title">Introduction</h2>
               <div className="ifm-grid2">
@@ -543,6 +565,8 @@ export function IntakeFormsWorkspace(props: Props) {
               <p className="ifm-help">Leave blank to use the standard wording.</p>
             </section>
 
+            {!isAssessment && (
+              <>
             <section id="ifm-sec-questions" className="ifm-card">
               <h2 className="ifm-title">Questions</h2>
               <div className="ifm-contact">
@@ -573,7 +597,7 @@ export function IntakeFormsWorkspace(props: Props) {
                   {config.questions.map((q, i) => (
                     <li
                       key={q.id}
-                      className={`ifm-q${justAdded.has(q.id) ? " added" : ""}${drag === q.id ? " dragging" : ""}${over === q.id && drag && drag !== q.id ? " over" : ""}`}
+                      className={`ifm-q${isChoice(q) ? " has-options" : ""}${justAdded.has(q.id) ? " added" : ""}${drag === q.id ? " dragging" : ""}${over === q.id && drag && drag !== q.id ? " over" : ""}`}
                       draggable={canEdit}
                       onDragStart={(e) => {
                         e.dataTransfer.effectAllowed = "move";
@@ -614,6 +638,12 @@ export function IntakeFormsWorkspace(props: Props) {
                         aria-label={`Question ${i + 1}`}
                         onChange={(e) => editQ(q.id, { text: e.target.value, edited: true })}
                       />
+                      <QuestionTypeSelect
+                        type={questionType(q)}
+                        label={`Question ${i + 1}`}
+                        disabled={!canEdit}
+                        onChange={(fields) => edit((c) => ({ questions: c.questions.map((x) => (x.id === q.id ? { id: x.id, text: x.text, required: x.required, pack: x.pack, edited: true, ...fields } : x)) }))}
+                      />
                       {q.pack && <span className="ifm-q-pack">{q.pack}</span>}
                       <span className="ifm-q-req">
                         <span className="ifm-help">Required</span>
@@ -641,6 +671,11 @@ export function IntakeFormsWorkspace(props: Props) {
                           </span>
                         )}
                       </span>
+                      {isChoice(q) && (
+                        <div className="ifm-q-options">
+                          <OptionsEditor options={q.options ?? []} label={`Question ${i + 1}`} disabled={!canEdit} onChange={(options) => editQ(q.id, { options, edited: true })} />
+                        </div>
+                      )}
                     </li>
                   ))}
                 </ol>
@@ -719,8 +754,12 @@ export function IntakeFormsWorkspace(props: Props) {
               )}
             </section>
 
+              </>
+            )}
+
             <section id="ifm-sec-screening" className="ifm-card">
-              <h2 className="ifm-title">Screening</h2>
+              <h2 className="ifm-title">{isAssessment ? "After they finish" : "Screening"}</h2>
+              {!isAssessment && (
               <div className="ifm-field">
                 <span className="ifm-field-head">
                   <span className="ifm-field-label">Fit criteria</span>
@@ -760,6 +799,7 @@ export function IntakeFormsWorkspace(props: Props) {
                 {err("fit") && <span className="ifm-err">Describe who you take on, so intakes can be screened.</span>}
                 <span className="ifm-help">Prospects are screened against this and never see it.</span>
               </div>
+              )}
               <label className="ifm-field">
                 <span className="ifm-field-head">
                   <span className="ifm-field-label" style={{ flex: 1 }}>
@@ -905,7 +945,11 @@ export function IntakeFormsWorkspace(props: Props) {
             </section>
           </fieldset>
 
-          <IntakePreview config={config} orgName={props.orgName} packages={config.feesOn ? visiblePkgs : []} theme={pvTheme} onTheme={setPvTheme} />
+          {isAssessment ? (
+            <AssessmentPreview settings={config.assessment} />
+          ) : (
+            <IntakePreview config={config} orgName={props.orgName} packages={config.feesOn ? visiblePkgs : []} theme={pvTheme} onTheme={setPvTheme} />
+          )}
         </div>
       )}
 

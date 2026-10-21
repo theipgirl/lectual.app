@@ -1,5 +1,6 @@
 import { getScopedClient } from "@/lib/db/scoped-client";
 import type { Database, Json } from "@/lib/db/types";
+import { bumpLeadLastTouch } from "@/lib/leads/touch";
 
 export type Activity = Database["public"]["Tables"]["crm_activity"]["Row"];
 
@@ -25,12 +26,21 @@ export type ActivityType0045 = (typeof ACTIVITY_TYPES_0045)[number];
 export const ACTIVITY_TYPES_0047 = ["welcome_email"] as const;
 export type ActivityType0047 = (typeof ACTIVITY_TYPES_0047)[number];
 
+/**
+ * Added by lectual 0097_client_files.sql (a file stored on a lead or matter). Hand-added
+ * with the other widenings: the next codegen run folds it into `crm_activity_type` and
+ * this becomes a no-op.
+ */
+export const ACTIVITY_TYPES_0097 = ["file_uploaded"] as const;
+export type ActivityType0097 = (typeof ACTIVITY_TYPES_0097)[number];
+
 export type ActivityType =
   | Activity["type"]
   | ActivityType0033
   | ActivityType0036
   | ActivityType0045
-  | ActivityType0047;
+  | ActivityType0047
+  | ActivityType0097;
 
 export type LogActivityInput = {
   type: ActivityType;
@@ -51,6 +61,10 @@ export type LogActivityInput = {
  * or matter row so the denormalized column used directly by RLS can never
  * drift from the parent's real org. actor_id comes from the signed-in
  * caller's own session (supabase.auth.getUser()), never from the input.
+ *
+ * A row that carries a lead id also stamps that lead's last touch (see
+ * bumpLeadLastTouch). That is what makes a note, a voice note and every other
+ * timeline entry count as a touch: they all write through here.
  *
  * Not role-gated at the app layer: crm_activity_insert_staff RLS (staff
  * roles only) is the real boundary, and logActivity is called on behalf of
@@ -101,6 +115,11 @@ export async function logActivity(input: LogActivityInput): Promise<void> {
     payload: (input.payload ?? {}) as Json,
   });
   if (error) throw error;
+
+  // Anything written to a lead's timeline counts as a touch, so the Intake list's
+  // last-touch sort sees it. Best-effort: it never fails or changes this write. A
+  // matter-only row touches no lead.
+  if (input.leadId) await bumpLeadLastTouch(supabase, input.leadId, orgId);
 }
 
 /**

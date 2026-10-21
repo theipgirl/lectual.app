@@ -83,8 +83,13 @@ export type SubmissionListRow = {
   started_at: string;
   /** Null = gave contact details but never sent answers (contact-first, 0093). */
   submitted_at?: string | null;
+  /** Assessments only (0095): the server's score and the staff-only temperature. */
+  score?: number | null;
+  temperature?: string | null;
   last_active_at: string;
 };
+
+const TEMPERATURE_WORD: Record<string, string> = { hot: "Hot", warm: "Warm", cold: "Cold" };
 
 export type IntakeTableRow = {
   id: string;
@@ -124,8 +129,9 @@ export function intakeTableRows(rows: SubmissionListRow[], now = Date.now(), tz:
       email: c.email,
       started: formatIntakeTime(r.started_at, tz),
       mode: submissionModeLabel(r.mode),
-      fit: submissionFitLabel(r.fit),
-      fitKey: r.fit,
+      // An assessment is scored, not screened: show its temperature and score instead.
+      fit: r.temperature ? `${TEMPERATURE_WORD[r.temperature] ?? r.temperature}${typeof r.score === "number" ? ` · ${r.score}` : ""}` : submissionFitLabel(r.fit),
+      fitKey: r.temperature ?? r.fit,
       status: submissionStatusLabel(r.status),
       statusKey: r.status,
       last: relativeTime(r.last_active_at, now),
@@ -179,7 +185,14 @@ export function intakeDetail(r: SubmissionDetailRow, tz: string = FIRM_TIME_ZONE
  * Rows from before 0093 were only ever written on completion; they count as
  * captured and completed, which is what happened.
  */
-export type StatRow = { form_id?: string; started_at: string; submitted_at: string | null };
+export type StatRow = {
+  form_id?: string;
+  started_at: string;
+  /** When the person gave contact details (the row's insert). Optional so older callers keep working. */
+  created_at?: string;
+  submitted_at: string | null;
+  temperature?: string | null;
+};
 
 export type SubmissionStats = {
   captured: number;
@@ -189,27 +202,72 @@ export type SubmissionStats = {
   completionRate: string;
   /** Milliseconds, or null when nothing completed. */
   medianMs: number | null;
+  /** Assessments: how many finished people were hot, warm, cold. */
+  temperatures: { hot: number; warm: number; cold: number };
 };
+
+/** The middle of the durations (mean of the two middle ones when even), rounded to a millisecond; null for none. */
+export function medianOf(values: readonly number[]): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = sorted.length >> 1;
+  return sorted.length % 2 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+}
+
+/** `to − from` in ms, or null when either is unparseable or the result is negative. */
+export function durationBetween(from: string | null | undefined, to: string | null | undefined): number | null {
+  if (!from || !to) return null;
+  const ms = Date.parse(to) - Date.parse(from);
+  return Number.isFinite(ms) && ms >= 0 ? ms : null;
+}
 
 export function submissionStats(rows: readonly StatRow[]): SubmissionStats {
   const durations: number[] = [];
+  const temperatures = { hot: 0, warm: 0, cold: 0 };
   let completed = 0;
   for (const r of rows) {
     if (!r.submitted_at) continue;
     completed++;
-    const ms = Date.parse(r.submitted_at) - Date.parse(r.started_at);
-    if (Number.isFinite(ms) && ms >= 0) durations.push(ms);
+    if (r.temperature === "hot" || r.temperature === "warm" || r.temperature === "cold") temperatures[r.temperature]++;
+    const ms = durationBetween(r.started_at, r.submitted_at);
+    if (ms !== null) durations.push(ms);
   }
-  durations.sort((a, b) => a - b);
-  const mid = durations.length >> 1;
-  const medianMs = durations.length === 0 ? null : durations.length % 2 ? durations[mid] : Math.round((durations[mid - 1] + durations[mid]) / 2);
+  const medianMs = medianOf(durations);
   return {
     captured: rows.length,
     completed,
     unfinished: rows.length - completed,
     completionRate: percent(completed, rows.length),
     medianMs,
+    temperatures,
   };
+}
+
+export type TimingSplit = {
+  /** Page opened → contact details given (`created_at − started_at`), over everyone who gave details. */
+  medianToContactMs: number | null;
+  /** Contact details given → answers sent (`submitted_at − created_at`), over people who finished. */
+  medianContactToFinishMs: number | null;
+};
+
+/**
+ * Where the time to finish goes. Since 0093 the row is inserted at the
+ * contact step (`created_at`), so the whole time splits in two. Rows from
+ * before 0093 were written only at completion: for them the first part is
+ * the whole time and the second is about zero, which is what happened, so
+ * nothing is adjusted. Negative or unparseable durations are ignored.
+ */
+export function timingSplit(rows: readonly StatRow[]): TimingSplit {
+  const toContact: number[] = [];
+  const contactToFinish: number[] = [];
+  for (const r of rows) {
+    const gap = durationBetween(r.started_at, r.created_at);
+    if (gap !== null) toContact.push(gap);
+    if (!r.submitted_at) continue;
+    const finish = durationBetween(r.created_at, r.submitted_at);
+    if (finish !== null) contactToFinish.push(finish);
+  }
+  return { medianToContactMs: medianOf(toContact), medianContactToFinishMs: medianOf(contactToFinish) };
 }
 
 /** Stats for each intake, keyed by form id (intakes with no rows are absent). */

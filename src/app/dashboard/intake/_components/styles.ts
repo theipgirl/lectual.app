@@ -40,29 +40,11 @@ export const TEMP_PILL: Record<Temperature, CSSProperties> = {
   cold: pill("var(--oxbg)", "var(--ox)", 10.5),
 };
 
-/** No derivation was possible — an em-dash, never a guessed level. */
+/** Not routed: no lane and nothing to derive from — never a guessed level. */
 export const TEMP_NONE: CSSProperties = {
   fontFamily: MONO,
   fontSize: 11.5,
   color: "var(--mute)",
-};
-
-function dot(background: string, extra?: CSSProperties): CSSProperties {
-  return { width: 7, height: 7, borderRadius: 999, background, flex: "0 0 auto", ...extra };
-}
-
-export const TEMP_DOT: Record<Temperature, CSSProperties> = {
-  hot: dot("var(--crit)"),
-  warm: dot("var(--warn)"),
-  cold: dot("var(--ox)", { opacity: 0.4 }),
-};
-
-export const TEMP_DOT_NONE: CSSProperties = {
-  width: 7,
-  height: 7,
-  borderRadius: 999,
-  border: "1px solid var(--line)",
-  flex: "0 0 auto",
 };
 
 export const OWNER_TEXT: CSSProperties = { fontFamily: MONO, fontSize: 11.5, color: "var(--ink2)" };
@@ -144,34 +126,7 @@ export function ownerAvatarFor(index: number): CSSProperties {
   return ownerAvatar(AVATAR_CYCLE[index % AVATAR_CYCLE.length]);
 }
 
-/** The pill-shaped "Group by" toggle and the segmented Table/Board control. */
-export const SEGMENT_WRAP: CSSProperties = {
-  display: "flex",
-  padding: 3,
-  borderRadius: 10,
-  background: "var(--surface2)",
-  gap: 2,
-};
-
-export function segmentButton(active: boolean): CSSProperties {
-  return {
-    height: 30,
-    padding: "0 14px",
-    borderRadius: 8,
-    border: "none",
-    background: active ? "var(--surface)" : "transparent",
-    color: active ? "var(--ink)" : "var(--ink2)",
-    fontSize: 12.5,
-    fontWeight: active ? 500 : 400,
-    fontFamily: "inherit",
-    display: "flex",
-    alignItems: "center",
-    gap: 7,
-    cursor: "pointer",
-    boxShadow: active ? "0 1px 2px rgba(20,4,8,.08)" : "none",
-  };
-}
-
+/** The pill-shaped "Group by" toggle. */
 export function groupPill(active: boolean): CSSProperties {
   return {
     height: 30,

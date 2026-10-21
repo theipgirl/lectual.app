@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { stopLeadSequencesAsStaff } from "@/lib/campaigns/stop-staff";
+import { bumpLeadLastTouch } from "@/lib/leads/touch";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { CAN_WRITE_LEAD } from "@/lib/pipeline/leads";
 import { orgHasModule } from "@/lib/org/modules";
@@ -52,9 +53,12 @@ export async function linkMeetingAction(_prev: ActionState, formData: FormData):
     .from("crm_meeting")
     .update({ lead_id: leadId, matter_id: matterId, link_source: leadId || matterId ? "staff" : null })
     .eq("id", meetingId)
-    .select("id, started_at");
+    .select("id, started_at, org_id");
   if (error) return { error: error.code === "23503" ? "That lead or matter isn't in your firm." : "Couldn't save the link. Try again shortly." };
   if (!data?.length) return { error: "Meeting not found." };
+  // A meeting linked to a lead is a touch on it: the Intake list sorts by the last thing that
+  // happened. Best-effort, so a bump that can't land never turns a saved link into an error.
+  if (leadId) await bumpLeadLastTouch(supabase, leadId, data[0].org_id);
   // SOP Stage 3: a call with the lead ends the sequences that were running
   // before it. A recorded meeting is a call that HAPPENED — the closest
   // lead-linked signal to "booked" this product has.

@@ -17,9 +17,10 @@
  * ("Suggested: Hot — reason"), including when a person has set a different
  * lane, so the disagreement is visible rather than overwritten.
  *
- * NOT crm_lead.temperature: that is the intake board's activity-derived
- * temperature with its own override, and the sheet importer and (formerly) the
- * triage agent wrote it too — so it can't say who routed the lead.
+ * The lane IS the lead's temperature on screen (src/lib/intake/effective-temperature.ts
+ * merges it with the activity rules). It is NOT crm_lead.temperature: that old
+ * override was also written by the sheet importer and (formerly) the triage
+ * agent, so it can't say who routed the lead, and nothing reads it any more.
  */
 export type Lane = "hot" | "warm" | "cold";
 export const LANES: readonly Lane[] = ["hot", "warm", "cold"];

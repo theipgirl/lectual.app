@@ -25,6 +25,11 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: unknown }> {
     this.calls.push(["insert", a]);
     return this;
   }
+  update(...a: unknown[]) {
+    if (state.updateThrows) throw new Error("update blew up");
+    this.calls.push(["update", a]);
+    return this;
+  }
   single() {
     return Promise.resolve(this.result);
   }
@@ -51,6 +56,8 @@ const state = vi.hoisted(() => ({
   queries: [] as FakeQuery[],
   fromTables: [] as string[],
   user: { id: "user-1" } as { id: string } | null,
+  /** Makes the bump's update() throw instead of returning a result. */
+  updateThrows: false,
 }));
 
 const mockFrom = vi.fn((table: string) => {
@@ -88,6 +95,7 @@ beforeEach(() => {
   state.queries = [];
   state.fromTables = [];
   state.user = { id: "user-1" };
+  state.updateThrows = false;
 });
 
 function lastInsertQuery(): FakeQuery {
@@ -168,6 +176,7 @@ describe("append-only: no update/delete exported", () => {
         "ACTIVITY_TYPES_0036",
         "ACTIVITY_TYPES_0045",
         "ACTIVITY_TYPES_0047",
+        "ACTIVITY_TYPES_0097",
         "activityForLead",
         "activityForMatter",
         "hasMatterActivityType",
@@ -295,5 +304,100 @@ describe("logActivitySafe", () => {
       { data: null, error: { message: "insert failed" } },
     ];
     await expect(logActivity({ type: "note", leadId: "lead-1" })).rejects.toBeTruthy();
+  });
+});
+
+/**
+ * The last-touch bump: a row written to a lead's timeline stamps that lead's
+ * last_activity_at (the Intake list's default sort), best-effort.
+ */
+describe("last-touch bump", () => {
+  function leadUpdates(): FakeQuery[] {
+    return state.queries.filter(
+      (q, i) => state.fromTables[i] === "crm_lead" && q.calls.some(([name]) => name === "update"),
+    );
+  }
+
+  it("issues one crm_lead update setting last_activity_at for that lead, in the same org", async () => {
+    state.queue = [
+      { data: { org_id: "org-1" }, error: null },
+      { data: null, error: null },
+      { data: null, error: null },
+    ];
+
+    await logActivity({ type: "note", leadId: "lead-1" });
+
+    const updates = leadUpdates();
+    expect(updates).toHaveLength(1);
+    const [, args] = updates[0].calls.find(([name]) => name === "update")!;
+    const patch = args[0] as Record<string, unknown>;
+    expect(Object.keys(patch)).toEqual(["last_activity_at"]);
+    expect(Number.isNaN(Date.parse(String(patch.last_activity_at)))).toBe(false);
+    expect(updates[0].calls).toContainEqual(["eq", ["id", "lead-1"]]);
+    expect(updates[0].calls).toContainEqual(["eq", ["org_id", "org-1"]]);
+  });
+
+  it("bumps after the insert, never before it", async () => {
+    state.queue = [
+      { data: { org_id: "org-1" }, error: null },
+      { data: null, error: null },
+      { data: null, error: null },
+    ];
+    await logActivity({ type: "note", leadId: "lead-1" });
+    const order = state.queries.map((q) => q.calls.map(([name]) => name).find((n) => n === "insert" || n === "update") ?? "read");
+    expect(order).toEqual(["read", "insert", "update"]);
+  });
+
+  it("issues none for a matter-only row", async () => {
+    state.queue = [
+      { data: { org_id: "org-2" }, error: null },
+      { data: null, error: null },
+    ];
+    await logActivity({ type: "matter_opened", matterId: "matter-1" });
+    expect(leadUpdates()).toHaveLength(0);
+    expect(state.fromTables).toEqual(["crm_matter", "crm_activity"]);
+  });
+
+  it("still resolves when the update returns an error, and logs it with the [touch] prefix", async () => {
+    state.queue = [
+      { data: { org_id: "org-1" }, error: null },
+      { data: null, error: null },
+      { data: null, error: { message: "rls said no" } },
+    ];
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(logActivity({ type: "note", leadId: "lead-1" })).resolves.toBeUndefined();
+    expect(String(spy.mock.calls[0][0])).toContain("[touch]");
+    spy.mockRestore();
+  });
+
+  it("still resolves when the update throws", async () => {
+    state.queue = [
+      { data: { org_id: "org-1" }, error: null },
+      { data: null, error: null },
+    ];
+    state.updateThrows = true;
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(logActivity({ type: "note", leadId: "lead-1" })).resolves.toBeUndefined();
+    expect(String(spy.mock.calls[0][0])).toContain("[touch]");
+    spy.mockRestore();
+  });
+
+  it("leaves an insert error as a throw, and does not bump", async () => {
+    state.queue = [
+      { data: { org_id: "org-1" }, error: null },
+      { data: null, error: { message: "insert failed" } },
+    ];
+    await expect(logActivity({ type: "note", leadId: "lead-1" })).rejects.toBeTruthy();
+    expect(leadUpdates()).toHaveLength(0);
+  });
+
+  it("is reached through logActivitySafe too", async () => {
+    state.queue = [
+      { data: { org_id: "org-1" }, error: null },
+      { data: null, error: null },
+      { data: null, error: null },
+    ];
+    await logActivitySafe({ type: "lead_updated", leadId: "lead-1" });
+    expect(leadUpdates()).toHaveLength(1);
   });
 });

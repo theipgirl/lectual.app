@@ -4,42 +4,34 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import Link from "next/link";
 import type { Stage } from "@/lib/pipeline";
 import type { MemberIdentity } from "@/lib/members/directory";
-import { deriveTemperature, type ReferralSource, type Temperature } from "@/lib/intake";
+import type { ReferralSource } from "@/lib/intake";
+import { effectiveTemperature } from "@/lib/intake/effective-temperature";
 import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
 import { approvalsShown, filterNeedsRebecca, leadsNeedingApproval } from "@/lib/intake/needs-rebecca";
 import {
-  DEFAULT_SORT,
   applyFilters,
   intakeHref,
+  naturalDir,
   sortRows,
   type IntakeFilters,
   type IntakeGroup,
   type IntakeRow,
-  type IntakeView,
   type IntakeViewState,
-  type SortDir,
   type SortKey,
 } from "@/lib/intake/rows";
 import { topBarCounts, topBarLine } from "@/lib/intake/views";
 import type { IntakeTime } from "@/lib/time";
 import { IntakeTopBar } from "@/components/intake/IntakeTopBar";
-import {
-  assignLeadAction,
-  moveStageAction,
-  setLaneAction,
-  setSourceAction,
-  setTemperatureAction,
-} from "../actions";
-import { laneView, type Lane } from "@/lib/leads/lane";
+import { ViewToggle } from "@/components/ViewToggle";
+import { assignLeadAction, moveStageAction, setLaneAction, setSourceAction } from "../actions";
+import type { Lane } from "@/lib/leads/lane";
 import AddLeadDialog from "./AddLeadDialog";
 import IntakeBoard from "./IntakeBoard";
 import IntakeControls from "./IntakeControls";
+import IntakeSearch from "./IntakeSearch";
 import IntakeTable from "./IntakeTable";
 import { ImportIcon } from "./icons";
 import { OUTLINE_BUTTON } from "./styles";
-
-/** Columns whose interesting end is the HIGH one, so they open descending. */
-const DESC_FIRST: ReadonlySet<SortKey> = new Set<SortKey>(["temp", "lane", "reply", "lastTouch", "age", "nurture"]);
 
 /** How long the URL lags the controls, so typing in Search isn't one push per key. */
 const URL_SYNC_DELAY_MS = 300;
@@ -57,10 +49,10 @@ const SUBLINE: Record<string, string> = {
 /**
  * Client orchestrator for /intake (blueprint §11) — three views of one list.
  *
- * Owns four things and nothing else: the filters (mirrored into the URL so
- * `?source=UGW` and `?view=board&group=owner` are bookmarkable Monday views),
- * the view/grouping, the sort, and the optimistic write flow the temperature
- * chip, the owner menu and both board drops share.
+ * Owns four things and nothing else: the filters, the view/grouping and the sort
+ * (all mirrored into the URL so `?source=UGW`, `?view=board&group=owner` and
+ * `?sort=lead&dir=asc` are bookmarkable Monday views), and the optimistic write
+ * flow the temperature chip, the owner menu and both board drops share.
  *
  * Presentation only — every row it renders was fetched and RLS-scoped by the
  * server component, and every write goes back through a server action that
@@ -80,6 +72,7 @@ export default function IntakeWorkspace({
   initialViewState,
   time,
   pendingApprovals,
+  showReconcile = false,
   now: nowIso,
 }: {
   rows: IntakeRow[];
@@ -105,13 +98,14 @@ export default function IntakeWorkspace({
    * src/lib/intake/needs-rebecca.ts.
    */
   pendingApprovals?: LeadPendingApprovals;
+  /** Owner, admin and senior admin only: a link to the stage reconciliation screen. */
+  showReconcile?: boolean;
   /** The server's render clock, so "Next step" says the same thing on both sides. */
   now: string;
 }) {
   const [rows, setRows] = useState(initialRows);
   const [filters, setFilters] = useState(initialFilters);
   const [viewState, setViewState] = useState(initialViewState);
-  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>(DEFAULT_SORT);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [, startTransition] = useTransition();
@@ -159,15 +153,20 @@ export default function IntakeWorkspace({
     const needing = leadsNeedingApproval(pendingApprovals);
     return rows.filter((row) => needing.has(row.lead.id)).length;
   }, [rows, pendingApprovals]);
+  const { sort } = viewState;
   const sorted = useMemo(() => sortRows(filtered, sort.key, sort.dir), [filtered, sort]);
   const counts = useMemo(() => topBarCounts(filtered), [filtered]);
 
+  // The sort rides in the view state, so it lands in the URL (and in "Save this
+  // view") by the same debounced rewrite as the filters.
   function toggleSort(key: SortKey) {
-    setSort((current) =>
-      current.key === key
-        ? { key, dir: current.dir === "asc" ? "desc" : "asc" }
-        : { key, dir: DESC_FIRST.has(key) ? "desc" : "asc" },
-    );
+    setViewState((state) => ({
+      ...state,
+      sort:
+        state.sort.key === key
+          ? { key, dir: state.sort.dir === "asc" ? "desc" : "asc" }
+          : { key, dir: naturalDir(key) },
+    }));
   }
 
   /**
@@ -198,36 +197,27 @@ export default function IntakeWorkspace({
     [rows],
   );
 
-  const setTemperature = useCallback(
-    (leadId: string, level: Temperature | null) => {
-      runWrite(
-        leadId,
-        (row) => {
-          const lead = { ...row.lead, temperature: level };
-          // Clearing the override doesn't blank the chip — it falls back to the
-          // derived value, which is exactly what the server will store too.
-          return { ...row, lead, temperature: deriveTemperature(lead, stages, now, row.facts) };
-        },
-        () => setTemperatureAction(leadId, level),
-      );
-    },
-    [runWrite, stages, now],
-  );
-
+  // The Temperature chip's one write: set or clear the person's lane. The chip
+  // flips at once and is put back, with the action's sentence under the row, if
+  // the write is refused. The derived value and its reason are recomputed, so
+  // clearing falls back to exactly what the server will show.
   const setLane = useCallback(
     (leadId: string, lane: Lane | null) => {
       runWrite(
         leadId,
         (row) => {
-          // Optimistic: the person's lane changes; the suggestion beside it
-          // never does (triage owns that, and only that).
-          const lead = { ...row.lead, lane, lane_set_by: lane ? (row.lead.lane_set_by ?? "you") : null, lane_set_at: lane ? nowIso : null };
-          return { ...row, lead, lane: laneView(lead) };
+          const lead = {
+            ...row.lead,
+            lane,
+            lane_set_by: lane ? (row.lead.lane_set_by ?? "you") : null,
+            lane_set_at: lane ? nowIso : null,
+          };
+          return { ...row, lead, temperature: effectiveTemperature(lead, stages, now, row.facts) };
         },
         () => setLaneAction(leadId, lane),
       );
     },
-    [runWrite, nowIso],
+    [runWrite, stages, now, nowIso],
   );
 
   const assign = useCallback(
@@ -268,7 +258,7 @@ export default function IntakeWorkspace({
             stage: stages.find((stage) => stage.id === stageId) ?? null,
             // Temperature rule 2 (nurture stage) keys on the stage, so it has to be re-derived
             // with the lead's new home or the card would carry the old answer.
-            temperature: deriveTemperature(lead, stages, now, row.facts),
+            temperature: effectiveTemperature(lead, stages, now, row.facts),
           };
         },
         () => moveStageAction(leadId, stageId),
@@ -291,30 +281,24 @@ export default function IntakeWorkspace({
       </IntakeTopBar>
 
       <div className="intake-content">
-        <div style={{ display: "flex", alignItems: "flex-end", gap: 20, flexWrap: "wrap" }}>
-          <div style={{ flex: 1, minWidth: 240 }}>
-            <h1 className="intake-serif" style={{ margin: 0, fontSize: 36, lineHeight: 1.05 }}>
-              Leads
-            </h1>
-            <p
-              style={{
-                margin: "7px 0 0",
-                fontSize: 13,
-                color: "var(--ink2)",
-                maxWidth: "68ch",
-                lineHeight: 1.55,
-              }}
-            >
-              {subline}
-            </p>
+        <div className="lx-page-head">
+          <div style={{ flex: 1, minWidth: 260 }}>
+            <div className="lx-label">Intake</div>
+            <h1 className="lx-h1">Leads</h1>
+            <p className="lx-sub">{subline}</p>
           </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Link href="/dashboard/settings/integrations/lawmatics/" style={OUTLINE_BUTTON}>
-              <ImportIcon />
-              Import
+          <IntakeSearch value={filters.q} onChange={(q) => setFilters((current) => ({ ...current, q }))} />
+          <ViewToggle value={viewState.view} onChange={(view) => setViewState((state) => ({ ...state, view }))} />
+          {showReconcile && (
+            <Link href="/dashboard/intake/reconcile/" style={OUTLINE_BUTTON}>
+              Reconcile stages
             </Link>
-            <AddLeadDialog stages={intakeStages} members={members} />
-          </div>
+          )}
+          <Link href="/dashboard/settings/integrations/lawmatics/" style={OUTLINE_BUTTON}>
+            <ImportIcon />
+            Import
+          </Link>
+          <AddLeadDialog stages={intakeStages} members={members} />
         </div>
 
         <IntakeControls
@@ -327,7 +311,6 @@ export default function IntakeWorkspace({
           needsRebeccaCount={needsRebeccaCount}
           currentHref={href}
           onFilters={setFilters}
-          onView={(view: IntakeView) => setViewState((state) => ({ ...state, view }))}
           onGroup={(group: IntakeGroup) => setViewState((state) => ({ ...state, group }))}
         />
 
@@ -375,7 +358,6 @@ export default function IntakeWorkspace({
             time={time}
             pendingApprovals={pendingApprovals}
             onSort={toggleSort}
-            onSetTemperature={setTemperature}
             onSetLane={setLane}
             onAssign={assign}
             onSetSource={setSource}

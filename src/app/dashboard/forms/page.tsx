@@ -10,6 +10,12 @@ import { intakePublicUrl } from "@/lib/intake-forms/links";
 import { IntakeFormsWorkspace } from "./_components/IntakeFormsWorkspace";
 import { IntakeList } from "./_components/IntakeList";
 import { IntakePerformance } from "./_components/IntakePerformance";
+import { IntakeResults } from "./_components/IntakeResults";
+import { EventAssessments } from "./_components/EventAssessments";
+import { EventPage } from "./_components/EventPage";
+import { loadBoothEventList } from "@/lib/intake-forms/load-results";
+import { parseEventRange } from "@/lib/intake-forms/booth-results";
+import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import "./forms.css";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +38,13 @@ export const dynamic = "force-dynamic";
  * save action re-checks). Anyone but a viewer can move an intake's status.
  * The first admin visit creates the firm's first draft.
  *
+ * ── RESULTS AND EVENTS ─────────────────────────────────────────────────────
+ * `?form=<id>&tab=results` lists an intake's answers per question (or an
+ * assessment's distributions). `?event=<code>` opens one booth event, read-only.
+ * The list's "Event assessments" rows come from `crm_booth_scorecard`. Both are
+ * visible to every member; the CSV export, the one thing that moves answers
+ * out of the app, is for staff roles and re-checks the caller itself.
+ *
  * ── THREE STATES ────────────────────────────────────────────────────────────
  * 0079 is applied on lectual-dev; an environment without it renders
  * "not set up in this environment", and an unreachable read says so — never
@@ -40,49 +53,60 @@ export const dynamic = "force-dynamic";
 export default async function IntakeFormsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ form?: string; tab?: string; range?: string; intake?: string }>;
+  searchParams: Promise<{ form?: string; tab?: string; range?: string; intake?: string; event?: string }>;
 }) {
   const sp = await searchParams;
   const session = await resolveFirmSession({ signInNext: "/dashboard/forms/" });
   if (session.kind !== "ok") notFound();
 
-  const tab = sp.tab === "performance" ? "performance" : "setup";
+  const tab = sp.tab === "performance" ? "performance" : sp.tab === "results" ? "results" : "setup";
   const range = parseRange(sp.range);
   const canEdit = canEditIntakeForm(session.role);
 
+  if (!sp.form && sp.event !== undefined) {
+    // One booth event. A code that is empty, or longer than any real one, is no event.
+    if (typeof sp.event !== "string" || sp.event.length === 0 || sp.event.length > 120) notFound();
+    return <EventPage code={sp.event} range={parseEventRange(sp.range)} />;
+  }
+
   if (!sp.form) {
-    const [list, statRows, origin] = await Promise.all([
+    const [list, statRows, origin, events] = await Promise.all([
       listOrCreateIntakeForms(session.org.name),
       loadSubmissionStatRows(null, 30),
       intakeOrigin(),
+      loadBoothEventList(),
     ]);
     if (list.status === "ok" && list.value.length > 0) {
       const byForm = statRows.status === "ok" ? statsByForm(statRows.value.rows) : null;
       return (
-        <IntakeList
-          canEdit={canEdit}
-          statsFailed={statRows.status !== "ok"}
-          items={list.value.map((f) => {
-            const st = byForm?.get(f.id);
-            return {
-              id: f.id,
-              name: f.name,
-              slug: f.slug,
-              url: intakePublicUrl(origin, f.slug),
-              sourceTag: f.sourceTag,
-              status: f.status,
-              stats: byForm
-                ? {
-                    captured: st?.captured ?? 0,
-                    completed: st?.completed ?? 0,
-                    unfinished: st?.unfinished ?? 0,
-                    median: formatDuration(st?.medianMs ?? null),
-                    rate: st?.completionRate ?? "—",
-                  }
-                : null,
-            };
-          })}
-        />
+        <>
+          <IntakeList
+            canEdit={canEdit}
+            statsFailed={statRows.status !== "ok"}
+            items={list.value.map((f) => {
+              const st = byForm?.get(f.id);
+              return {
+                id: f.id,
+                name: f.name,
+                slug: f.slug,
+                url: intakePublicUrl(origin, f.slug),
+                sourceTag: f.sourceTag,
+                kind: f.kind,
+                status: f.status,
+                stats: byForm
+                  ? {
+                      captured: st?.captured ?? 0,
+                      completed: st?.completed ?? 0,
+                      unfinished: st?.unfinished ?? 0,
+                      median: formatDuration(st?.medianMs ?? null),
+                      rate: st?.completionRate ?? "—",
+                    }
+                  : null,
+              };
+            })}
+          />
+          <EventAssessments read={events} />
+        </>
       );
     }
     return <IntakeEmpty status={list.status === "ok" ? "none" : list.status} />;
@@ -114,6 +138,17 @@ export default async function IntakeFormsPage({
       performance={
         tab === "performance" ? (
           <IntakePerformance form={form} range={range} intakeId={sp.intake ?? null} canChangeStatus={hasRole(session.role, "clerk")} />
+        ) : null
+      }
+      results={
+        tab === "results" ? (
+          <IntakeResults
+            form={form}
+            range={range}
+            intakeId={sp.intake ?? null}
+            canChangeStatus={hasRole(session.role, "clerk")}
+            canExport={MATTER_WRITE_ROLES.includes(session.role)}
+          />
         ) : null
       }
     />

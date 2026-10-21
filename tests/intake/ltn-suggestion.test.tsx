@@ -4,13 +4,19 @@ import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { Lead, Stage } from "@/lib/pipeline";
 import { LtnSuggestion } from "@/components/intake/LtnSuggestion";
-import { LeadTemperature } from "@/components/leads/LeadTemperature";
+import { TemperatureCard } from "@/components/leads/TemperatureCard";
 import IntakeCard from "@/app/dashboard/intake/_components/IntakeCard";
 import { buildIntakeRows } from "@/lib/intake/rows";
-import { deriveTemperature } from "@/lib/intake/temperature";
+import { effectiveTemperature } from "@/lib/intake/effective-temperature";
+import { laneView } from "@/lib/leads/lane";
 
 // IntakeCard's time chip reads the app router; a server render has none mounted.
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push() {}, refresh() {} }) }));
+// The lead page card posts to server actions; a static render only needs their names.
+vi.mock("@/app/dashboard/leads/[id]/sequence-actions", () => ({
+  setLeadLaneAction: vi.fn(),
+  addToNurtureAction: vi.fn(),
+}));
 
 const root = path.resolve(__dirname, "../..");
 const read = (rel: string) => readFileSync(path.join(root, rel), "utf8");
@@ -41,14 +47,38 @@ describe("LtnSuggestion", () => {
   });
 });
 
-describe("LeadTemperature (lead page)", () => {
+describe("TemperatureCard (lead page)", () => {
   const stages = [{ id: "s1", category: "open" }] as Stage[];
-  const lead = { temperature: null, current_stage_id: "s1", last_activity_at: null, last_outbound_at: daysBefore(2), last_inbound_at: null };
+  const lead = {
+    temperature: null,
+    current_stage_id: "s1",
+    last_activity_at: null,
+    last_outbound_at: daysBefore(2),
+    last_inbound_at: null,
+    ai_summary: null,
+    lane: null,
+    lane_set_at: null,
+  };
+  const card = (facts: Parameters<typeof effectiveTemperature>[3]) =>
+    renderToStaticMarkup(
+      <TemperatureCard
+        leadId="L1"
+        temperature={effectiveTemperature(lead, stages, NOW, facts)}
+        view={laneView(lead)}
+        setByName={null}
+        setOn={null}
+        redFlags={[]}
+        nextStep={null}
+        nextStepIsSuggested={false}
+        nurtureStatus={null}
+        linksFailed={false}
+        canWrite={false}
+      />,
+    );
 
   it("shows the temperature, its reason and the suggestion", () => {
-    const t = deriveTemperature(lead, stages, NOW, { firstTouchAt: daysBefore(11) });
-    const html = renderToStaticMarkup(<LeadTemperature leadId="L1" temperature={t} />);
-    expect(html).toContain("Cold");
+    const html = card({ firstTouchAt: daysBefore(11) });
+    expect(html).toContain("Suggested: Cold");
     expect(html).toContain("Unbooked by day 10");
     expect(html).toContain("Long-Term Nurture suggested");
     // Said once, not twice.
@@ -56,8 +86,7 @@ describe("LeadTemperature (lead page)", () => {
   });
 
   it("shows the sequence reason with no suggestion", () => {
-    const t = deriveTemperature(lead, stages, NOW, { sequenceEndedNoReplyAt: daysBefore(1) });
-    const html = renderToStaticMarkup(<LeadTemperature leadId="L1" temperature={t} />);
+    const html = card({ sequenceEndedNoReplyAt: daysBefore(1) });
     expect(html).toContain("3-email sequence ended, no reply");
     expect(html).not.toContain("Long-Term Nurture");
   });
@@ -67,8 +96,8 @@ describe("where the suggestion is shown", () => {
   it("the card, the table and the lead page each use the component", () => {
     expect(read("src/app/dashboard/intake/_components/IntakeCard.tsx")).toContain("<LtnSuggestion");
     expect(read("src/app/dashboard/intake/_components/IntakeTable.tsx")).toContain("<LtnSuggestion");
-    expect(read("src/components/leads/LeadTemperature.tsx")).toContain("<LtnSuggestion");
-    expect(read("src/app/dashboard/leads/[id]/page.tsx")).toContain("<LeadTemperature");
+    expect(read("src/components/leads/TemperatureCard.tsx")).toContain("<LtnSuggestion");
+    expect(read("src/app/dashboard/leads/[id]/page.tsx")).toContain("<TemperatureCard");
   });
 
   it("an intake card for a day-10 lead renders the suggestion", () => {
@@ -117,7 +146,7 @@ describe("the temperature code never writes", () => {
     "src/lib/intake/temperature.ts",
     "src/lib/intake/facts.ts",
     "src/components/intake/LtnSuggestion.tsx",
-    "src/components/leads/LeadTemperature.tsx",
+    "src/lib/intake/effective-temperature.ts",
     "src/lib/intake/rows.ts",
   ];
   for (const file of files) {

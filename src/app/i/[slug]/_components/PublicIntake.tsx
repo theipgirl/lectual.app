@@ -1,12 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition, type CSSProperties } from "react";
+import { answerText, labelsOf, questionType, type AnswerValue } from "@/lib/intake-forms/choice";
+import { createStepTracker } from "@/lib/intake-forms/step-tracking";
 import type { PublicIntakeConfig } from "@/lib/intake-forms/config";
 import type { IntakeMode } from "@/lib/intake-forms/config";
 import { HONEYPOT_FIELD, SUBMIT_LIMITS } from "@/lib/intake-forms/public-submit";
 import { isEmailAddress } from "@/lib/members/email";
-import { recordIntakeEventAction, startIntakeAction, submitIntakeAction } from "../actions";
+import { recordIntakeEventAction, recordIntakeStepAction, startIntakeAction, submitIntakeAction } from "../actions";
 import { IntakeDisclaimer } from "./IntakeShell";
+import { buildThread, ConversationInput, ThreadBubbles, type ChatStep } from "./ConversationParts";
+import { QuestionFields } from "./QuestionFields";
 
 /**
  * The prospect's side of a firm's intake: Form (everything on one page) or
@@ -30,7 +34,7 @@ import { IntakeDisclaimer } from "./IntakeShell";
 
 type Pkg = { name: string; price: string; includes: string };
 type Contact = { name: string; email: string; phone: string; company: string };
-type Step = { key: string; prompt: string; required: boolean; kind: "contact" | "question"; long: boolean };
+type Step = ChatStep;
 
 const RESIZE_MESSAGE = "lectual-intake:resize";
 
@@ -38,7 +42,7 @@ export function PublicIntake(props: { slug: string; view: PublicIntakeConfig; pa
   const { view, packages, slug } = props;
   const [mode, setMode] = useState<IntakeMode>(view.mode);
   const [contact, setContact] = useState<Contact>({ name: "", email: "", phone: "", company: "" });
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [answers, setAnswers] = useState<Record<string, AnswerValue>>({});
   const [consent, setConsent] = useState(false);
   const [honeypot, setHoneypot] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +54,10 @@ export function PublicIntake(props: { slug: string; view: PublicIntakeConfig; pa
   const [pending, startTransition] = useTransition();
   const root = useRef<HTMLDivElement>(null);
   const sent = useRef(new Set<string>());
+  // Per-step tracking (0096): which question was reached, plus the answers so far. Fire and forget.
+  const [stepTracker] = useState(() => createStepTracker((call) => recordIntakeStepAction(slug, call)));
+  const trackStep = (questionId: string, index: number) =>
+    stepTracker.track({ token, stepIndex: index, questionId, progress: answers });
 
   const track = (kind: "visit" | "start_conversation" | "start_form") => {
     if (sent.current.has(kind)) return;
@@ -76,19 +84,28 @@ export function PublicIntake(props: { slug: string; view: PublicIntakeConfig; pa
 
   const steps: Step[] = useMemo(
     () => [
-      { key: "name", prompt: "First, what's your full name?", required: true, kind: "contact", long: false },
-      { key: "email", prompt: "What email should we reply to?", required: true, kind: "contact", long: false },
-      { key: "phone", prompt: "A phone number? This one's optional.", required: false, kind: "contact", long: false },
-      { key: "company", prompt: "And your company, if you have one? Also optional.", required: false, kind: "contact", long: false },
-      ...view.questions.map((q) => ({ key: q.id, prompt: q.text, required: q.required, kind: "question" as const, long: true })),
+      { key: "name", prompt: "First, what's your full name?", required: true, kind: "contact", type: "text", options: [] },
+      { key: "email", prompt: "What email should we reply to?", required: true, kind: "contact", type: "text", options: [] },
+      { key: "phone", prompt: "A phone number? This one's optional.", required: false, kind: "contact", type: "text", options: [] },
+      { key: "company", prompt: "And your company, if you have one? Also optional.", required: false, kind: "contact", type: "text", options: [] },
+      ...view.questions.map((q) => ({
+        key: q.id,
+        prompt: q.text,
+        required: q.required,
+        kind: "question" as const,
+        type: questionType(q),
+        options: q.options ?? [],
+      })),
     ],
     [view.questions],
   );
 
-  const valueOf = (s: Step): string => (s.kind === "contact" ? contact[s.key as keyof Contact] : (answers[s.key] ?? ""));
-  const setValue = (key: string, kind: Step["kind"], v: string) => {
+  // An answer as one line of text; a multi choice's labels are joined for the thread.
+  const valueOf = (s: Step): string => (s.kind === "contact" ? contact[s.key as keyof Contact] : answerText(answers[s.key]));
+  const listOf = (s: Step): string[] => (s.kind === "contact" ? [] : labelsOf(answers[s.key]));
+  const setValue = (key: string, kind: Step["kind"], v: AnswerValue) => {
     track(mode === "conversation" ? "start_conversation" : "start_form");
-    if (kind === "contact") setContact((c) => ({ ...c, [key]: v }));
+    if (kind === "contact") setContact((c) => ({ ...c, [key]: answerText(v) }));
     else setAnswers((a) => ({ ...a, [key]: v }));
   };
 
@@ -234,7 +251,9 @@ export function PublicIntake(props: { slug: string; view: PublicIntakeConfig; pa
             view={view}
             steps={steps}
             valueOf={valueOf}
+            listOf={listOf}
             setValue={setValue}
+            onStep={trackStep}
             pkgList={pkgList}
             beginBlock={beginBlock}
             finalBlock={finalBlock}
@@ -281,23 +300,16 @@ export function PublicIntake(props: { slug: string; view: PublicIntakeConfig; pa
                 Thanks{contact.name.trim() ? `, ${contact.name.trim().split(/\s+/)[0]}` : ""}. We have your details. Now a few questions.
               </p>
             )}
-            {started && view.questions.map((q) => (
-              <label key={q.id} className="ipub-field">
-                <span className="ipub-label">
-                  {q.text}
-                  {q.required && <span className="ipub-req"> *</span>}
-                </span>
-                <textarea
-                  className="ipub-input"
-                  rows={3}
-                  maxLength={SUBMIT_LIMITS.answer}
-                  required={q.required}
-                  aria-invalid={badFields.includes(q.id) || undefined}
-                  value={answers[q.id] ?? ""}
-                  onChange={(e) => setValue(q.id, "question", e.target.value)}
-                />
-              </label>
-            ))}
+            {started && (
+              <QuestionFields
+                questions={view.questions}
+                answers={answers}
+                badFields={badFields}
+                idPrefix="form"
+                onTouch={(id, i) => trackStep(id, i)}
+                onChange={(id, v) => setValue(id, "question", v)}
+              />
+            )}
             {started && pkgList && (
               <div className="ipub-field">
                 <span className="ipub-label">Flat-fee packages</span>
@@ -320,7 +332,10 @@ function Conversation(props: {
   view: PublicIntakeConfig;
   steps: Step[];
   valueOf: (s: Step) => string;
-  setValue: (key: string, kind: Step["kind"], v: string) => void;
+  listOf: (s: Step) => string[];
+  setValue: (key: string, kind: Step["kind"], v: AnswerValue) => void;
+  /** A question was shown: its position among the questions (contact steps don't count) and id. */
+  onStep: (questionId: string, index: number) => void;
   pkgList: React.ReactNode;
   beginBlock: React.ReactNode;
   finalBlock: React.ReactNode;
@@ -337,6 +352,7 @@ function Conversation(props: {
   };
   const [step, setStep] = useState(firstOpen);
   const [draft, setDraft] = useState(() => (step < steps.length ? valueOf(steps[step]) : ""));
+  const [picked, setPicked] = useState<string[]>(() => (step < steps.length ? props.listOf(steps[step]) : []));
   const [hint, setHint] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -348,6 +364,18 @@ function Conversation(props: {
   const current = step < steps.length ? steps[step] : null;
   // Contact first: the questions wait until the person's details are filed.
   const gated = !props.started && step >= contactCount;
+
+  // Reaching a question records a step (once per question per page load; the tracker dedupes).
+  useEffect(() => {
+    if (current && current.kind === "question" && !gated && props.started) props.onStep(current.key, step - contactCount);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, gated, props.started]);
+
+  const goTo = (next: number) => {
+    setStep(next);
+    setDraft(next < steps.length ? valueOf(steps[next]) : "");
+    setPicked(next < steps.length ? props.listOf(steps[next]) : []);
+  };
 
   const advance = (value: string) => {
     if (!current) return;
@@ -362,28 +390,40 @@ function Conversation(props: {
     }
     props.setValue(current.key, current.kind, v);
     setHint(null);
-    const next = step + 1;
-    setStep(next);
-    setDraft(next < steps.length ? valueOf(steps[next]) : "");
+    goTo(step + 1);
     inputRef.current?.focus();
   };
 
-  const thread: { who: "bot" | "you"; text: string }[] = [{ who: "bot", text: props.view.opening }];
-  steps.slice(0, step).forEach((s) => {
-    thread.push({ who: "bot", text: s.prompt });
-    const v = valueOf(s).trim();
-    thread.push({ who: "you", text: v || "Skipped" });
+  // A choice question: a single choice goes on with a tap or Enter, or with Done; a multi choice goes on with Done.
+  const advanceChoice = (labels: string[]) => {
+    if (!current) return;
+    if (current.required && labels.length === 0) {
+      setHint("Choose at least one to continue.");
+      return;
+    }
+    props.setValue(current.key, current.kind, current.type === "multi" ? labels : (labels[0] ?? ""));
+    setHint(null);
+    goTo(step + 1);
+  };
+
+  const onPick = (next: string[]) => {
+    if (!current) return;
+    setPicked(next);
+    props.setValue(current.key, current.kind, current.type === "multi" ? next : (next[0] ?? ""));
+  };
+
+  const thread = buildThread({
+    opening: props.view.opening,
+    steps,
+    answered: step,
+    textOf: valueOf,
+    current: current && !gated ? current : null,
   });
-  if (current && !gated) thread.push({ who: "bot", text: current.prompt });
 
   return (
     <>
       <div className="ipub-thread" aria-live="polite">
-        {thread.map((m, i) => (
-          <div key={i} className={`ipub-bubble ${m.who}`}>
-            {m.text}
-          </div>
-        ))}
+        <ThreadBubbles thread={thread} />
         {gated && !props.closing && (
           <>
             <div className="ipub-bubble bot">Thanks. Before the questions, please confirm we may contact you.</div>
@@ -410,39 +450,23 @@ function Conversation(props: {
         <div ref={endRef} />
       </div>
       {current && !gated && !props.closing && (
-        <div className="ipub-composer-wrap">
-          {hint && <p className="ipub-error">{hint}</p>}
-          <div className="ipub-composer">
-            <textarea
-              ref={inputRef}
-              rows={1}
-              value={draft}
-              maxLength={current.kind === "question" ? SUBMIT_LIMITS.answer : SUBMIT_LIMITS[current.key as "name" | "email" | "phone" | "company"]}
-              onChange={(e) => {
-                setDraft(e.target.value);
-                props.setValue(current.key, current.kind, e.target.value);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  advance(draft);
-                }
-              }}
-              placeholder="Type your answer…"
-              aria-label={current.prompt}
-            />
-            {!current.required && (
-              <button type="button" className="ipub-skip" onClick={() => advance("")}>
-                Skip
-              </button>
-            )}
-            <button type="button" className="ipub-send" onClick={() => advance(draft)} aria-label="Send">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M5 12h14M13 6l6 6-6 6" />
-              </svg>
-            </button>
-          </div>
-        </div>
+        <ConversationInput
+          step={current}
+          draft={draft}
+          maxLength={current.kind === "question" ? SUBMIT_LIMITS.answer : SUBMIT_LIMITS[current.key as "name" | "email" | "phone" | "company"]}
+          hint={hint}
+          picked={picked}
+          inputRef={inputRef}
+          onDraft={(v) => {
+            setDraft(v);
+            props.setValue(current.key, current.kind, v);
+          }}
+          onSend={() => advance(draft)}
+          onSkip={() => (current.type === "text" ? advance("") : advanceChoice([]))}
+          onPick={onPick}
+          onCommit={advanceChoice}
+          onDone={() => advanceChoice(picked)}
+        />
       )}
     </>
   );

@@ -1,9 +1,13 @@
 import Link from "next/link";
-import { RANGES, formatDuration, intakeDetail, intakeTableRows, submissionStats, type RangeDays } from "@/lib/intake-forms/performance";
+import { RANGES, formatDuration, intakeTableRows, submissionStats, timingSplit, type RangeDays } from "@/lib/intake-forms/performance";
 import { INTAKE_TABLE_LIMIT, loadFunnel, loadIntakeList, loadIntakeSubmission, loadSubmissionStatRows } from "@/lib/intake-forms/load-performance";
+import { loadDrawerSteps, loadStepFunnel, loadStoppedAt } from "@/lib/intake-forms/load-steps";
+import { formQuestions } from "@/lib/intake-forms/form-questions";
+import type { StoppedAt } from "@/lib/intake-forms/step-funnel";
 import type { IntakeFormRecord } from "@/lib/intake-forms/store";
 import { getFirmTimeZone } from "@/lib/org/profile";
-import { IntakeStatusForm } from "./IntakeStatusForm";
+import { IntakeDrawer, Unreadable, FIT_TONE, STATUS_TONE } from "./IntakeDrawer";
+import { StepMedians, StoppedAtCell } from "./StepTables";
 
 /**
  * The Performance tab (server-rendered, handed to the workspace as a slot).
@@ -13,28 +17,8 @@ import { IntakeStatusForm } from "./IntakeStatusForm";
  * intakes yet", and a funnel that couldn't load is not a row of zeros.
  */
 
-const FIT_TONE: Record<string, string> = { fit: "ok", non_fit: "risk", unscored: "mute" };
-const STATUS_TONE: Record<string, string> = {
-  new: "ox",
-  referred: "sand",
-  consult_booked: "warn",
-  engaged: "ok",
-  rejected: "risk",
-  stopped: "mute",
-};
-
 function hrefFor(formId: string, range: RangeDays, intake?: string) {
   return `/dashboard/forms/?form=${encodeURIComponent(formId)}&tab=performance&range=${range}${intake ? `&intake=${encodeURIComponent(intake)}` : ""}`;
-}
-
-function Unreadable({ what, unconfigured }: { what: string; unconfigured: boolean }) {
-  return (
-    <div className="lx-banner lx-banner-warn" role="status">
-      {unconfigured
-        ? `${what} aren't set up in this environment (lectual migration 0079). Nothing is broken; it needs the migration.`
-        : `${what} couldn't be loaded. This is a problem reaching the database, not an empty result. Try again shortly.`}
-    </div>
-  );
 }
 
 export async function IntakePerformance({
@@ -48,14 +32,26 @@ export async function IntakePerformance({
   intakeId: string | null;
   canChangeStatus: boolean;
 }) {
-  const [funnel, list, detail, tz, statRows] = await Promise.all([
+  const [funnel, list, detail, tz, statRows, steps] = await Promise.all([
     loadFunnel(form.id, range),
     loadIntakeList(form.id),
     intakeId ? loadIntakeSubmission(intakeId) : Promise.resolve(null),
     getFirmTimeZone(),
     loadSubmissionStatRows(form.id, range),
+    loadStepFunnel(form.id, range, formQuestions(form.kind, form.config)),
   ]);
+  // Where unfinished people stopped: their own step events, read after the list (it names who is shown).
+  const stopped =
+    list.status === "ok"
+      ? await loadStoppedAt(
+          form.id,
+          // A row from before 0093 carries no `submitted_at`: it was only ever written finished.
+          list.value.map((r) => ({ id: r.id, started_at: r.started_at, submitted_at: r.submitted_at === null ? null : (r.submitted_at ?? r.started_at) })),
+        )
+      : null;
+  const drawerSteps = await drawerStepsFor(form.id, detail);
   const stats = statRows.status === "ok" ? submissionStats(statRows.value.rows) : null;
+  const split = statRows.status === "ok" ? timingSplit(statRows.value.rows) : null;
 
   const nothingYet = !form.everSaved && funnel.status === "ok" && funnel.value.visited === 0 && list.status === "ok" && list.value.length === 0;
   const rows = list.status === "ok" ? intakeTableRows(list.value, undefined, tz) : [];
@@ -125,6 +121,25 @@ export async function IntakePerformance({
                 { label: "Finished", value: stats.completed.toLocaleString("en-US"), sub: `${stats.completionRate} of those` },
                 { label: "Didn't finish", value: stats.unfinished.toLocaleString("en-US"), sub: "Still leads: worth a follow-up" },
                 { label: "Median time to finish", value: formatDuration(stats.medianMs), sub: "From opening the page to sending" },
+                {
+                  label: "Page to contact details",
+                  value: formatDuration(split?.medianToContactMs ?? null),
+                  sub: "Median, from opening the page to giving details",
+                },
+                {
+                  label: "Contact details to finish",
+                  value: formatDuration(split?.medianContactToFinishMs ?? null),
+                  sub: "Median, over people who finished",
+                },
+                ...(form.kind === "assessment"
+                  ? [
+                      {
+                        label: "Hot · warm · cold",
+                        value: `${stats.temperatures.hot} · ${stats.temperatures.warm} · ${stats.temperatures.cold}`,
+                        sub: "Of those who finished. Only your firm sees this",
+                      },
+                    ]
+                  : []),
               ].map((k) => (
                 <div key={k.label} className="ifm-card ifm-kpi">
                   <div className="ifm-field-label">{k.label}</div>
@@ -139,6 +154,8 @@ export async function IntakePerformance({
           {statRows.status === "ok" && statRows.value.capped && (
             <p className="ifm-help">Numbers cover the latest 5,000 people in this range.</p>
           )}
+
+          <StepMedians state={steps} range={range} />
 
           <div className="ifm-card ifm-table-card">
             <h2 className="ifm-title ifm-table-title">All intakes</h2>
@@ -158,9 +175,10 @@ export async function IntakePerformance({
                       <th>Name</th>
                       <th>Started</th>
                       <th>Mode</th>
-                      <th>Fit</th>
+                      <th>{form.kind === "assessment" ? "Heat · score" : "Fit"}</th>
                       <th>Status</th>
                       <th>Last active</th>
+                      <th>Stopped at</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -184,6 +202,10 @@ export async function IntakePerformance({
                           <span className={`ifm-badge ${STATUS_TONE[r.statusKey] ?? "mute"}`}>{r.status}</span>
                         </td>
                         <td className="ifm-muted">{r.last}</td>
+                        <StoppedAtCell
+                          state={stopped === null ? "unavailable" : stopped.status === "ok" ? "ok" : stopped.status}
+                          reading={stoppedReading(stopped, r.id, r.finished)}
+                        />
                       </tr>
                     ))}
                   </tbody>
@@ -199,67 +221,25 @@ export async function IntakePerformance({
         </>
       )}
 
-      {intakeId && detail && <IntakeDrawer detail={detail} tz={tz} closeHref={hrefFor(form.id, range)} canChangeStatus={canChangeStatus} />}
+      {intakeId && detail && <IntakeDrawer detail={detail} tz={tz} closeHref={hrefFor(form.id, range)} canChangeStatus={canChangeStatus} steps={drawerSteps} stepQuestions={questionTexts(form)} />}
     </div>
   );
 }
 
-function IntakeDrawer({
-  tz,
-  detail,
-  closeHref,
-  canChangeStatus,
-}: {
-  detail: Awaited<ReturnType<typeof loadIntakeSubmission>>;
-  tz: string;
-  closeHref: string;
-  canChangeStatus: boolean;
-}) {
-  const d = detail.status === "ok" && detail.value ? intakeDetail(detail.value, tz) : null;
-  return (
-    <div className="ifm-drawer-wrap">
-      <Link href={closeHref} scroll={false} className="ifm-drawer-scrim" aria-label="Close" />
-      <aside className="ifm-drawer" aria-label="Intake">
-        <div className="ifm-drawer-head">
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="ifm-drawer-name">{d ? d.name : "Intake"}</div>
-            {d?.sub && <div className="ifm-help">{d.sub}</div>}
-          </div>
-          <Link href={closeHref} scroll={false} className="ifm-icon-btn" aria-label="Close">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
-              <path d="M6 6l12 12M18 6L6 18" />
-            </svg>
-          </Link>
-        </div>
-        <div className="ifm-drawer-body">
-          {detail.status !== "ok" ? (
-            <Unreadable what="This intake" unconfigured={detail.status === "unconfigured"} />
-          ) : !d ? (
-            <p className="ifm-help">That intake isn&apos;t in your firm, or it was removed.</p>
-          ) : (
-            <>
-              <div className="ifm-drawer-badges">
-                <span className={`ifm-badge ${FIT_TONE[d.fitKey] ?? "mute"}`}>{d.fit}</span>
-                <span className={`ifm-badge ${STATUS_TONE[d.statusKey] ?? "mute"}`}>{d.status}</span>
-                <span className="ifm-badge sand">{d.modeLine}</span>
-              </div>
-              <div className="ifm-note">
-                <div className="ifm-caps">Screening note</div>
-                <div>{d.why}</div>
-              </div>
-              {canChangeStatus && <IntakeStatusForm key={`${d.id}:${d.statusKey}`} id={d.id} status={d.statusKey} />}
-              <dl className="ifm-answers">
-                {d.answers.map((a, i) => (
-                  <div key={i}>
-                    <dt>{a.q}</dt>
-                    <dd>{a.a}</dd>
-                  </div>
-                ))}
-              </dl>
-            </>
-          )}
-        </div>
-      </aside>
-    </div>
-  );
+/** One row's reading; a person the read didn't cover is "not recorded", never a blank. */
+function stoppedReading(read: Awaited<ReturnType<typeof loadStoppedAt>> | null, id: string, finished: boolean): StoppedAt | undefined {
+  if (finished) return { kind: "finished" };
+  if (!read || read.status !== "ok") return undefined;
+  return read.value[id] ?? { kind: "not_recorded" };
+}
+
+/** The drawer's step reading, read only for someone who hasn't finished (a finished person has nothing to add). */
+export async function drawerStepsFor(formId: string, detail: Awaited<ReturnType<typeof loadIntakeSubmission>> | null) {
+  if (!detail || detail.status !== "ok" || !detail.value || detail.value.submitted_at) return null;
+  return loadDrawerSteps(formId, detail.value);
+}
+
+/** Question text by id, for labelling a person's saved answers. */
+export function questionTexts(form: IntakeFormRecord): Record<string, string> {
+  return Object.fromEntries(formQuestions(form.kind, form.config).map((q) => [q.id, q.text]));
 }

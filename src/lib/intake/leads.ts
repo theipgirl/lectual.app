@@ -4,7 +4,6 @@ import { listStages, type Stage } from "@/lib/pipeline/stages";
 import { CAN_WRITE_LEAD, resolveCurrentRole, type Lead } from "@/lib/pipeline/leads";
 import { LeadWriteError, forbiddenLeadWrite } from "@/lib/pipeline/errors";
 import { intakeStageIds } from "./scope";
-import type { Temperature } from "./temperature";
 import { suggestedLane, type Lane } from "@/lib/leads/lane";
 import { isReferralSource, type ReferralSource } from "./referral-source";
 
@@ -62,90 +61,10 @@ export async function listIntakeLeads(stages?: Stage[]): Promise<Lead[]> {
 }
 
 /**
- * Sets (or clears, with null) a lead's temperature override — the one human
- * opinion this page writes.
- *
- * Null means "go back to deriving it" (§4.3), so the audit columns are cleared
- * alongside: with no override there is no override to attribute. The clear
- * itself is still recorded on the timeline below, so who reverted it is never
- * lost.
- *
- * Role-gated per call against CAN_WRITE_LEAD — re-resolved via
- * current_org_role() every time, never cached, mirroring the
- * crm_lead_update_staff policy. RLS is the real boundary; this exists so a
- * refusal reads as a sentence instead of a Postgres error.
- */
-export async function setTemperature(leadId: string, level: Temperature | null): Promise<Lead> {
-  if (!leadId) throw new LeadWriteError("Missing lead.");
-
-  const supabase = await getScopedClient();
-  const role = await resolveCurrentRole(supabase);
-  if (!CAN_WRITE_LEAD.includes(role)) {
-    throw forbiddenLeadWrite(role, "set a lead's temperature");
-  }
-
-  // The actor comes from the session, never from the caller — same rule the
-  // approval queue's `resolved_by` follows.
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-  if (userError) throw userError;
-
-  const { data: before, error: beforeError } = await supabase
-    .from("crm_lead")
-    .select("temperature")
-    .eq("id", leadId)
-    .maybeSingle();
-  if (beforeError) throw beforeError;
-  if (!before) throw new LeadWriteError("That lead no longer exists.");
-  const from = before.temperature ?? null;
-
-  const now = new Date().toISOString();
-  const { data, error } = await supabase
-    .from("crm_lead")
-    .update({
-      temperature: level,
-      temperature_set_at: level === null ? null : now,
-      temperature_set_by: level === null ? null : (user?.id ?? null),
-      updated_at: now,
-    })
-    .eq("id", leadId)
-    .select("*");
-  if (error) throw error;
-
-  // An UPDATE whose USING clause matches nothing — another firm's lead id, or
-  // a row deleted between the read above and here — is NOT an error to
-  // PostgREST: it succeeds and affects zero rows. Selecting an array rather
-  // than .single() is what lets us tell that apart from a real write, so a
-  // cross-org id can never come back as a green "saved".
-  const updated = (data ?? [])[0];
-  if (!updated) {
-    throw new LeadWriteError("That lead no longer exists, or isn't visible to your firm.");
-  }
-
-  // Audit AFTER the write (see logActivitySafe's contract in
-  // src/lib/matters/activity.ts): a failed timeline row must never roll back
-  // an edit the user watched succeed.
-  await logActivitySafe({
-    type: "lead_updated",
-    leadId,
-    payload: {
-      field: "temperature",
-      from,
-      to: level,
-      summary: level ? `Temperature set to ${level}` : "Temperature override cleared",
-    },
-  });
-
-  return updated;
-}
-
-/**
  * Sets (or clears, with null) the lead's routing LANE — the person's call
  * that overrides the triage agent's suggestion (intake SOP Stage 2: "Taylor
- * can override"). Distinct from setTemperature above: temperature is the
- * board's activity-derived heat; the lane decides the next step.
+ * can override"). This is the one write behind the Temperature column: the
+ * person's lane, shown as the lead's temperature, and it decides the next step.
  *
  * Who and when are stamped by the database from the session (lectual 0085's
  * crm_lead_lane_guard), and the trigger refuses a write without a session,
@@ -265,7 +184,9 @@ export async function setReferralSource(
     .eq("id", leadId)
     .select("*");
   if (error) throw error;
-  // Zero affected rows is not an error to PostgREST — see setTemperature.
+  // An UPDATE whose USING clause matches nothing (another firm's lead id, or a row
+  // deleted in between) is not an error to PostgREST: it affects zero rows. Selecting
+  // an array rather than .single() tells that apart from a real write.
   const updated = (data ?? [])[0];
   if (!updated) {
     throw new LeadWriteError("That lead no longer exists, or isn't visible to your firm.");

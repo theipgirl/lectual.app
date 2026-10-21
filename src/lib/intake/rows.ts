@@ -3,16 +3,11 @@ import type { Lead, Stage } from "@/lib/pipeline";
 // `import type` is erased at compile time, so nothing from it reaches the
 // client bundle this module is part of.
 import type { MemberIdentity } from "@/lib/members/directory";
-import {
-  deriveTemperature,
-  lastTouchAt,
-  type Temperature,
-  type TemperatureFacts,
-  type TemperatureResult,
-} from "./temperature";
+import { lastTouchAt, type Temperature, type TemperatureFacts } from "./temperature";
+import { effectiveTemperature, type EffectiveTemperature } from "./effective-temperature";
 import { replyState, type ReplyState } from "./reply";
 import { REFERRAL_SOURCES } from "./referral-source";
-import { LANE_RANK, laneView, type Lane, type LaneView } from "@/lib/leads/lane";
+import { LANE_RANK } from "@/lib/leads/lane";
 
 /**
  * Pure view-model for /intake (blueprint §7, re-homed by §11): row building,
@@ -39,15 +34,14 @@ export type IntakeRow = {
   lead: Lead;
   /** The lead's stage row, or null when the stage is missing from the list. */
   stage: Stage | null;
-  temperature: TemperatureResult;
+  /** The one temperature this lead shows: a person's lane, else the derived one. */
+  temperature: EffectiveTemperature;
   /**
    * The recorded facts `temperature` was derived with, kept so a client-side
-   * re-derivation (set temperature, move stage) reads the same ones. Absent when
+   * re-derivation (set lane, move stage) reads the same ones. Absent when
    * the facts read failed or the lead has none.
    */
   facts?: TemperatureFacts;
-  /** The routing lane: a person's, and the triage suggestion beside it (SOP Stage 2). */
-  lane: LaneView;
   reply: ReplyState;
   /** greatest(last_activity_at, last_outbound_at, last_inbound_at), or null. */
   lastTouchAt: string | null;
@@ -64,19 +58,17 @@ export type IntakeRow = {
 export const UNASSIGNED_OWNER = "unassigned";
 
 /**
- * Lane filter values. hot / warm / cold match the lane routing goes by (a
- * person's, else the suggestion); `suggested` is "triage suggested one and
- * nobody has reviewed it" — the hot-lane sample the SOP asks Taylor to check
- * by hand; `none` is no lane and no suggestion.
+ * Temperature filter values. hot / warm / cold match the effective temperature
+ * (a person's lane, else the derived one); `none` is "Not routed": no lane and
+ * nothing recorded to derive from.
  */
-export type LaneFilter = Lane | "suggested" | "none";
-export const LANE_FILTERS: readonly LaneFilter[] = ["hot", "warm", "cold", "suggested", "none"];
+export type TempFilter = Temperature | "none";
+export const TEMP_FILTERS: readonly TempFilter[] = ["hot", "warm", "cold", "none"];
 
 export type IntakeFilters = {
   /** Canonical referral buckets (§4.2). Empty = no source filter. */
   source: string[];
-  temp: Temperature | null;
-  lane: LaneFilter | null;
+  temp: TempFilter | null;
   /** A member user id, or UNASSIGNED_OWNER. */
   owner: string | null;
   /** A crm_stage id. */
@@ -96,7 +88,6 @@ export type IntakeFilters = {
 export const EMPTY_INTAKE_FILTERS: IntakeFilters = {
   source: [],
   temp: null,
-  lane: null,
   owner: null,
   stage: null,
   reply: null,
@@ -107,7 +98,6 @@ export const EMPTY_INTAKE_FILTERS: IntakeFilters = {
 /** The shape Next hands a page as `searchParams` (already awaited). */
 export type IntakeSearchParams = Record<string, string | string[] | undefined>;
 
-const TEMPERATURES: readonly Temperature[] = ["hot", "warm", "cold"];
 const REPLY_STATES: readonly ReplyState[] = ["replied", "awaiting", "unknown"];
 
 function firstValue(raw: string | string[] | undefined): string {
@@ -137,16 +127,18 @@ export function parseIntakeFilters(params: IntakeSearchParams): IntakeFilters {
   const known = new Set<string>(REFERRAL_SOURCES);
   const source = allValues(params.source).filter((value) => known.has(value));
 
-  const temp = firstValue(params.temp) as Temperature;
-  const lane = firstValue(params.lane) as LaneFilter;
+  // `?lane=` was the Lane filter before it merged into Temperature; a bookmarked
+  // `?lane=hot|warm|cold|none` still narrows the same way. `?lane=suggested` has
+  // no meaning any more and, like any unknown value, is dropped.
+  const temp = firstValue(params.temp) as TempFilter;
+  const legacyLane = firstValue(params.lane) as TempFilter;
   const reply = firstValue(params.reply) as ReplyState;
   const owner = firstValue(params.owner);
   const stage = firstValue(params.stage);
 
   return {
     source,
-    temp: TEMPERATURES.includes(temp) ? temp : null,
-    lane: LANE_FILTERS.includes(lane) ? lane : null,
+    temp: TEMP_FILTERS.includes(temp) ? temp : TEMP_FILTERS.includes(legacyLane) ? legacyLane : null,
     owner: owner === "" ? null : owner,
     stage: stage === "" ? null : stage,
     reply: REPLY_STATES.includes(reply) ? reply : null,
@@ -164,7 +156,6 @@ export function filtersToQueryString(filters: IntakeFilters): string {
   const params = new URLSearchParams();
   for (const source of filters.source) params.append("source", source);
   if (filters.temp) params.set("temp", filters.temp);
-  if (filters.lane) params.set("lane", filters.lane);
   if (filters.owner) params.set("owner", filters.owner);
   if (filters.stage) params.set("stage", filters.stage);
   if (filters.reply) params.set("reply", filters.reply);
@@ -184,12 +175,69 @@ export type IntakeView = "table" | "board";
  * flipping back to Board lands on the grouping you left. */
 export type IntakeGroup = "stage" | "owner";
 
-export type IntakeViewState = { view: IntakeView; group: IntakeGroup };
+export type SortKey =
+  | "lead"
+  | "stage"
+  | "temperature"
+  | "source"
+  | "owner"
+  | "nurture"
+  | "reply"
+  | "lastTouch"
+  | "age"
+  | "notes";
 
-export const DEFAULT_VIEW_STATE: IntakeViewState = { view: "table", group: "stage" };
+export type SortDir = "asc" | "desc";
+
+export type IntakeSort = { key: SortKey; dir: SortDir };
+
+/**
+ * Default sort: the last thing that happened, newest first. A lead nobody has
+ * touched sits at the bottom, where "nothing has happened" belongs.
+ */
+export const DEFAULT_SORT: IntakeSort = { key: "lastTouch", dir: "desc" };
+
+export type IntakeViewState = { view: IntakeView; group: IntakeGroup; sort: IntakeSort };
+
+export const DEFAULT_VIEW_STATE: IntakeViewState = { view: "table", group: "stage", sort: DEFAULT_SORT };
 
 const VIEWS: readonly IntakeView[] = ["table", "board"];
 const GROUPS: readonly IntakeGroup[] = ["stage", "owner"];
+const SORT_KEYS: readonly SortKey[] = [
+  "lead",
+  "stage",
+  "temperature",
+  "source",
+  "owner",
+  "nurture",
+  "reply",
+  "lastTouch",
+  "age",
+  "notes",
+];
+const SORT_DIRS: readonly SortDir[] = ["asc", "desc"];
+
+/** Columns whose interesting end is the HIGH one, so they open descending. */
+const DESC_FIRST: ReadonlySet<SortKey> = new Set<SortKey>(["temperature", "reply", "lastTouch", "age", "nurture"]);
+
+/** The direction a column opens in when it is first chosen. */
+export function naturalDir(key: SortKey): SortDir {
+  return DESC_FIRST.has(key) ? "desc" : "asc";
+}
+
+/**
+ * URL → sort. `temp` and `lane` were two sort keys before they merged into
+ * `temperature`, so a bookmarked `?sort=temp` or `?sort=lane` keeps working.
+ * A bad key is the default sort; a good key with a missing or bad direction
+ * takes that column's natural first direction.
+ */
+function parseSort(params: IntakeSearchParams): IntakeSort {
+  const raw = firstValue(params.sort);
+  const key = (raw === "temp" || raw === "lane" ? "temperature" : raw) as SortKey;
+  if (!SORT_KEYS.includes(key)) return DEFAULT_SORT;
+  const dir = firstValue(params.dir) as SortDir;
+  return { key, dir: SORT_DIRS.includes(dir) ? dir : naturalDir(key) };
+}
 
 /**
  * URL → view state. Same rule as parseIntakeFilters: an unrecognised value
@@ -202,6 +250,7 @@ export function parseIntakeViewState(params: IntakeSearchParams): IntakeViewStat
   return {
     view: VIEWS.includes(view) ? view : DEFAULT_VIEW_STATE.view,
     group: GROUPS.includes(group) ? group : DEFAULT_VIEW_STATE.group,
+    sort: parseSort(params),
   };
 }
 
@@ -210,7 +259,8 @@ export function parseIntakeViewState(params: IntakeSearchParams): IntakeViewStat
  *
  * The defaults are omitted rather than spelled out, so the unfiltered table is
  * the bare `/intake` — which is what makes "Save this view" produce a link
- * worth pasting instead of a paragraph of defaults.
+ * worth pasting instead of a paragraph of defaults. That includes the sort:
+ * last touch, newest first, is the default and is never written.
  */
 export function intakeQueryString(filters: IntakeFilters, viewState: IntakeViewState): string {
   const params = new URLSearchParams(filtersToQueryString(filters));
@@ -219,6 +269,11 @@ export function intakeQueryString(filters: IntakeFilters, viewState: IntakeViewS
   // would put a param in the saved link that changes nothing a reader can see.
   if (viewState.view === "board" && viewState.group !== DEFAULT_VIEW_STATE.group) {
     params.set("group", viewState.group);
+  }
+  const { sort } = viewState;
+  if (sort.key !== DEFAULT_SORT.key || sort.dir !== DEFAULT_SORT.dir) {
+    params.set("sort", sort.key);
+    params.set("dir", sort.dir);
   }
   return params.toString();
 }
@@ -279,10 +334,9 @@ export function buildIntakeRows(input: BuildIntakeRowsInput): IntakeRow[] {
     return {
       lead,
       stage,
-      temperature: deriveTemperature(lead, stages, now, facts),
+      temperature: effectiveTemperature(lead, stages, now, facts),
       // Only present when there are facts, so a row built without any is unchanged.
       ...(facts ? { facts } : {}),
-      lane: laneView(lead),
       reply: replyState(lead),
       lastTouchAt: lastTouchAt(lead),
       daysInStage,
@@ -333,8 +387,7 @@ export function applyFilters(rows: IntakeRow[], filters: IntakeFilters): IntakeR
         return false;
       }
     }
-    if (filters.temp && row.temperature.level !== filters.temp) return false;
-    if (filters.lane && !matchesLane(row.lane, filters.lane)) return false;
+    if (filters.temp && (row.temperature.value ?? "none") !== filters.temp) return false;
     if (filters.owner) {
       if (filters.owner === UNASSIGNED_OWNER) {
         if (row.lead.assigned_to) return false;
@@ -349,36 +402,6 @@ export function applyFilters(rows: IntakeRow[], filters: IntakeFilters): IntakeR
   });
 }
 
-/** Pure — whether a row's lane matches the Lane filter (see LaneFilter). */
-export function matchesLane(lane: LaneView, filter: LaneFilter): boolean {
-  if (filter === "suggested") return lane.source === "suggestion";
-  if (filter === "none") return lane.effective === null;
-  return lane.effective === filter;
-}
-
-export type SortKey =
-  | "lead"
-  | "stage"
-  | "temp"
-  | "lane"
-  | "source"
-  | "owner"
-  | "nurture"
-  | "reply"
-  | "lastTouch"
-  | "age"
-  | "notes";
-
-export type SortDir = "asc" | "desc";
-
-/**
- * Default sort (§7): temperature descending — hot first — and, inside a
- * temperature band, whoever has been waiting longest. That is the reading
- * order of a Monday triage: the people most likely to sign, oldest first.
- */
-export const DEFAULT_SORT: { key: SortKey; dir: SortDir } = { key: "temp", dir: "desc" };
-
-const TEMP_RANK: Record<Temperature, number> = { cold: 0, warm: 1, hot: 2 };
 const REPLY_RANK: Record<ReplyState, number> = { unknown: 0, awaiting: 1, replied: 2 };
 
 /** Milliseconds, or null when the stamp is missing/unparseable. */
@@ -393,17 +416,18 @@ function leadName(row: IntakeRow): string {
 }
 
 /**
- * "Longest awaiting" — the tiebreak under every sort. The oldest touch sorts
- * first, and a lead nobody has ever touched sorts first of all: never-contacted
- * is the longest wait there is, not a missing value to shuffle to the bottom.
+ * The tiebreak under every sort, and it follows the sort's direction. Descending
+ * reads newest touch first with never-touched last (the default reading order);
+ * ascending flips it to the longest wait first, and a lead nobody has ever
+ * touched is the longest wait there is, so it sorts first.
  */
-function awaitingCompare(a: IntakeRow, b: IntakeRow): number {
+function touchCompare(a: IntakeRow, b: IntakeRow, dir: SortDir): number {
   const at = timeOf(a.lastTouchAt);
   const bt = timeOf(b.lastTouchAt);
   if (at === bt) return 0;
-  if (at === null) return -1;
-  if (bt === null) return 1;
-  return at - bt;
+  if (at === null) return dir === "asc" ? -1 : 1;
+  if (bt === null) return dir === "asc" ? 1 : -1;
+  return dir === "asc" ? at - bt : bt - at;
 }
 
 /** Per-key value extractor: a comparable, or null for "this row has no value". */
@@ -413,10 +437,8 @@ function sortValue(row: IntakeRow, key: SortKey): string | number | null {
       return leadName(row) || null;
     case "stage":
       return row.stage?.order_index ?? null;
-    case "temp":
-      return TEMP_RANK[row.temperature.level];
-    case "lane":
-      return row.lane.effective ? LANE_RANK[row.lane.effective] : null;
+    case "temperature":
+      return row.temperature.value ? LANE_RANK[row.temperature.value] : null;
     case "source":
       return row.lead.referral_source?.toLowerCase() ?? null;
     case "owner":
@@ -454,8 +476,8 @@ export function sortRows(rows: IntakeRow[], key: SortKey, dir: SortDir): IntakeR
       return dir === "asc" ? raw : -raw;
     }
 
-    const awaiting = awaitingCompare(a, b);
-    if (awaiting !== 0) return awaiting;
+    const touched = touchCompare(a, b, dir);
+    if (touched !== 0) return touched;
     return leadName(a).localeCompare(leadName(b));
   });
 }
@@ -480,9 +502,9 @@ export type IntakeKpis = {
  */
 export function computeIntakeKpis(rows: IntakeRow[]): IntakeKpis {
   return {
-    hot: rows.filter((row) => row.temperature.level === "hot").length,
-    warm: rows.filter((row) => row.temperature.level === "warm").length,
-    cold: rows.filter((row) => row.temperature.level === "cold").length,
+    hot: rows.filter((row) => row.temperature.value === "hot").length,
+    warm: rows.filter((row) => row.temperature.value === "warm").length,
+    cold: rows.filter((row) => row.temperature.value === "cold").length,
     awaitingUs: rows.filter((row) => row.reply === "replied").length,
     unassigned: rows.filter((row) => !row.lead.assigned_to).length,
     stale: rows.filter((row) => row.stale).length,

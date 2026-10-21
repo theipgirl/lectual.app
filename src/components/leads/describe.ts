@@ -5,6 +5,7 @@
  */
 import { STOP_REASON_LABEL, isStopReason } from "@/lib/campaigns/stops";
 import { CONSULT_OUTCOME_LABEL, isConsultOutcome } from "@/lib/pipeline/consult-outcome-labels";
+import { formatFileSize } from "@/lib/files/rules";
 
 type Row = { type: string; actor_type: string | null; created_at: string; payload: unknown };
 
@@ -30,13 +31,31 @@ const MATTER_CHANGE: Record<string, string> = {
   deadline_closed: "Deadline closed out",
   deadline_extended: "Deadline extended",
   litigation_detail: "Case details updated",
+  header: "Matter details updated",
+  contact_linked: "Contact linked",
+  contact_added: "Contact added",
+  contact_edited: "Contact edited",
+  deadline_edited: "Deadline edited",
+  deadline_reopened: "Deadline reopened",
+  deadline_deleted: "Deadline deleted",
+  task_edited: "Task edited",
+  task_assigned: "Task assigned",
+  task_deleted: "Task deleted",
 };
 
+// Column names the matter edits record, in the words a person would say.
+const FIELD_WORDS: Record<string, string> = { referral_source: "came from", due_at: "due date", assignee_id: "assignee" };
+
 function matterChangeDetail(p: Record<string, unknown>): string | null {
-  if (Array.isArray(p.fields)) return (p.fields as string[]).join(", ").replaceAll("_", " ");
+  if (Array.isArray(p.fields)) {
+    return (p.fields as string[]).map((f) => FIELD_WORDS[f] ?? f.replaceAll("_", " ")).join(", ");
+  }
+  // A reassigned task: the new assignee is an id (the row never copies a name), so say only the task and whether it was cleared.
+  if (str(p.change) === "task_assigned") return [str(p.title), p.assignee_id ? null : "unassigned"].filter(Boolean).join(" · ") || null;
   const due = str(p.due_date) ?? str(p.to);
   const kind = str(p.kind)?.replaceAll("_", " ") ?? null;
   if (kind || due) return [kind, due].filter(Boolean).join(" · ");
+  if (str(p.change) === "task_deleted") return str(p.title);
   if (str(p.from) && str(p.to)) return `${str(p.from)} → ${str(p.to)}`;
   return null;
 }
@@ -79,7 +98,8 @@ export function describeActivity(row: Row): Described {
       return { title: "Email sent", detail: str(p.subject) ?? str(p.body), tone: "mail", link: str(p.web_link) };
     case "note":
       // addNote (src/lib/pipeline/notes.ts) writes `note`; older producers wrote `body`/`text`.
-      return { title: "Note", detail: str(p.note) ?? str(p.body) ?? str(p.text), tone: "note", link: null };
+      // A meeting has no activity type of its own, so it is a `note` row tagged entry: "meeting".
+      return { title: str(p.entry) === "meeting" ? "Meeting" : "Note", detail: str(p.note) ?? str(p.body) ?? str(p.text), tone: "note", link: null };
     case "call_logged":
       // logConsultOutcome (src/lib/pipeline/consult-outcome.ts): the outcome is the title, the note the detail.
       if (isConsultOutcome(p.consult_outcome)) {
@@ -88,6 +108,12 @@ export function describeActivity(row: Row): Described {
       return { title: "Call logged", detail: str(p.summary) ?? str(p.notes) ?? str(p.body), tone: "note", link: null };
     case "voice_note":
       return { title: "Voice note", detail: str(p.transcript), tone: "note", link: null };
+    case "file_uploaded": {
+      // confirmUploadAction (src/app/dashboard/files/actions.ts) writes file_name and size_bytes, never the storage path.
+      const name = str(p.file_name);
+      const size = typeof p.size_bytes === "number" && Number.isFinite(p.size_bytes) && p.size_bytes >= 0 ? formatFileSize(p.size_bytes) : null;
+      return { title: name ? `File added: ${name}` : "File added", detail: size, tone: "note", link: null };
+    }
     case "stage_changed": {
       // moveLeadStage and the quote-acceptance advance write `to_stage` /
       // `from_stage` (names); other producers wrote the older keys.
@@ -137,6 +163,14 @@ export function describeActivity(row: Row): Described {
       return { title: "Matter opened", detail: [str(p.matter_number), carriedDetail(p)].filter(Boolean).join(" · ") || null, tone: "system", link: null };
     case "matter_updated":
       return { title: MATTER_CHANGE[str(p.change) ?? ""] ?? "Matter updated", detail: matterChangeDetail(p), tone: "system", link: null };
+    case "booth_scorecard": {
+      // lectual's booth capture: `summary` reads "Booth scorecard — 72/100, WARM" once finished, or
+      // "Booth — contact captured, assessment not yet completed". The score is added only when the summary lacks it.
+      const summary = str(p.summary);
+      const score = typeof p.score === "number" && Number.isFinite(p.score) ? `${p.score}/100` : null;
+      const detail = score && !(summary ?? "").includes(score) ? [summary, score].filter(Boolean).join(" · ") : summary;
+      return { title: "Booth scorecard", detail, tone: "system", link: null };
+    }
     case "quote_payment":
       // Written by the client proposal page (src/lib/quotes/public-payment.ts)
       // and by a manual entry on the quote builder. `summary` is staff-facing.

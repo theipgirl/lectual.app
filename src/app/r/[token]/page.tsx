@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { choiceFields } from "@/lib/intake-forms/choice";
 import { readPublicRequest } from "@/lib/intake-forms/public";
 import { IntakeDisclaimer, IntakeNotice } from "../../i/[slug]/_components/IntakeShell";
 import { RequestForm } from "./_components/RequestForm";
@@ -34,7 +35,7 @@ export default async function IntakeRequestPage({ params }: { params: Promise<{ 
           <h1 className="ipub-headline">A few questions about your matter</h1>
           <p className="ipub-small">Your answers go to {handle.firmName} and are filed on your matter. Answer what you can.</p>
         </header>
-        <RequestForm token={token} questions={handle.questions.map((q) => ({ id: q.id, text: q.text, required: q.required }))} />
+        <RequestForm token={token} questions={handle.questions.map((q) => ({ id: q.id, text: q.text, required: q.required, ...choiceFields(q) }))} />
       </div>
       <IntakeDisclaimer firmName={handle.firmName} existingClient />
     </div>

@@ -21,6 +21,7 @@ import { leadSourceLabel } from "./details";
 import { parseContact } from "./submission";
 import { buildScreeningPrompt, parseScreening, SCREENING_SYSTEM } from "./screening";
 import { isRequestTokenShape } from "./request-token";
+import { isStepSchemaError } from "./steps";
 import { isMissingTableError } from "./store";
 import type { IntakeAnswer } from "./submission";
 import type { Stage } from "@/lib/pipeline/stages";
@@ -70,7 +71,7 @@ function db(): Admin {
 
 type PgError = { code?: string; message?: string } | null | undefined;
 
-const FORM_COLUMNS = "id, org_id, name, slug, source_tag, status, config, allowed_domains, receives_referrals";
+const FORM_COLUMNS = "id, org_id, name, slug, source_tag, kind, status, config, allowed_domains, receives_referrals";
 
 /** Server-side only. Never pass this to a client component. */
 export type IntakeHandle = {
@@ -80,6 +81,8 @@ export type IntakeHandle = {
   /** Staff's name for this intake and the tag its leads carry (0093). */
   name: string;
   sourceTag: string | null;
+  /** chat/form, or the scored assessment (0095). */
+  kind: "intake" | "assessment";
   config: IntakeFormConfig;
   orgName: string;
   receivesReferrals: boolean;
@@ -154,6 +157,7 @@ export async function readIntakeHandle(slug: string): Promise<
         slug: data.slug,
         name: data.name,
         sourceTag: data.source_tag,
+        kind: data.kind === "assessment" ? "assessment" : "intake",
         config: parseIntakeConfig(data.config),
         orgName: name,
         receivesReferrals: data.receives_referrals,
@@ -195,7 +199,7 @@ export async function readPublicIntake(slug: string): Promise<PublicIntakeRead> 
 
 // ── events ───────────────────────────────────────────────────────────────────
 
-export type IntakeEventKind = "visit" | "start_conversation" | "start_form" | "complete";
+export type IntakeEventKind = "visit" | "start_conversation" | "start_form" | "start_assessment" | "complete";
 
 /** Best-effort: a broken funnel table must never break the intake. */
 export async function recordIntakeEvent(handle: IntakeHandle, kind: IntakeEventKind, sessionHash: string | null): Promise<void> {
@@ -203,6 +207,83 @@ export async function recordIntakeEvent(handle: IntakeHandle, kind: IntakeEventK
     await db().from("crm_intake_event").insert({ org_id: handle.orgId, form_id: handle.formId, kind, session_hash: sessionHash });
   } catch {
     // swallowed on purpose
+  }
+}
+
+// ── per-step tracking (0096) ─────────────────────────────────────────────────
+
+export type StepWrite = {
+  token: string;
+  stepIndex: number;
+  questionId: string;
+  /** Already sanitised against the live form's questions (steps.ts), or null to leave progress alone. */
+  progress: Record<string, string> | null;
+  sessionHash: string | null;
+};
+
+/**
+ * Records that one unfinished person reached one question, and saves their
+ * answers so far. Same fences as the rest of this file: the person is found by
+ * the token's sha256 AND the live form's org_id + form_id (read off the form
+ * row, never off the browser), so a token issued for another form or firm
+ * resolves to nothing and nothing is written. Finished people are left alone.
+ * One `step` event per person and question (checked before the insert).
+ *
+ * It never throws and never reports: a database without 0096 (an unknown
+ * column, a schema-cache miss, or a `step` kind the event table doesn't allow)
+ * returns quietly as "step data isn't recorded yet", and any other failure is
+ * logged by code only. The intake itself is unaffected either way.
+ */
+export async function recordIntakeStep(handle: IntakeHandle, w: StepWrite): Promise<void> {
+  if (!RESUME_TOKEN_SHAPE.test(w.token)) return;
+  const fail = (what: string, err: PgError) => {
+    if (!isStepSchemaError(err)) console.error(`[intake] step ${what} failed`, err?.code ?? "unknown");
+  };
+  try {
+    const admin = db();
+    const { data: person, error } = await admin
+      .from("crm_intake_submission")
+      .select("id, submitted_at")
+      .eq("org_id", handle.orgId)
+      .eq("form_id", handle.formId)
+      .eq("resume_hash", resumeHash(w.token))
+      .maybeSingle();
+    if (error) return fail("lookup", error);
+    if (!person || person.submitted_at) return;
+
+    const { count, error: dupErr } = await admin
+      .from("crm_intake_event")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", handle.orgId)
+      .eq("form_id", handle.formId)
+      .eq("kind", "step")
+      .eq("submission_id", person.id)
+      .eq("question_id", w.questionId);
+    if (dupErr) return fail("check", dupErr);
+    if ((count ?? 0) === 0) {
+      const { error: insErr } = await admin.from("crm_intake_event").insert({
+        org_id: handle.orgId,
+        form_id: handle.formId,
+        kind: "step",
+        session_hash: w.sessionHash,
+        step_index: w.stepIndex,
+        question_id: w.questionId,
+        submission_id: person.id,
+      });
+      if (insErr) return fail("event", insErr);
+    }
+    if (w.progress) {
+      const { error: progErr } = await admin
+        .from("crm_intake_submission")
+        .update({ progress: w.progress as unknown as Json })
+        .eq("id", person.id)
+        .eq("org_id", handle.orgId)
+        .eq("form_id", handle.formId)
+        .is("submitted_at", null);
+      if (progErr) fail("progress", progErr);
+    }
+  } catch (e) {
+    fail("write", e as PgError);
   }
 }
 
@@ -329,7 +410,7 @@ async function createIntakeLead(
       actor_type: "system" as const,
       payload: {
         note: answersNote(
-          `${stage === "started" ? "Started" : "Intake"}: ${source} (${sub.mode === "conversation" ? "chat" : "form"}${sourceHost ? ` on ${sourceHost}` : ""})${
+          `${stage === "started" ? "Started" : "Intake"}: ${source} (${sub.mode === "conversation" ? "chat" : sub.mode === "assessment" ? "assessment" : "form"}${sourceHost ? ` on ${sourceHost}` : ""})${
             stage === "started" ? " · contact details only so far" : ""
           }`,
           sub.answers,
@@ -409,7 +490,7 @@ export async function startPublicIntake(
 }
 
 export type CompleteOutcome =
-  | { ok: true; submissionId: string; submission: ValidatedSubmission; alreadyDone: boolean }
+  | { ok: true; submissionId: string; submission: ValidatedSubmission; alreadyDone: boolean; noteBody: string }
   | { ok: false; reason: "not_found" | "failed" };
 
 /**
@@ -423,6 +504,8 @@ export async function completeStartedIntake(
   answers: ValidatedSubmission["answers"],
   mode: ValidatedSubmission["mode"],
   now: Date,
+  /** An assessment's server-computed result (0095), filed with the answers. */
+  assessment?: { score: number; band: string; temperature: string; staffLine: string },
 ): Promise<CompleteOutcome> {
   if (!RESUME_TOKEN_SHAPE.test(token)) return { ok: false, reason: "not_found" };
   const admin = db();
@@ -430,7 +513,13 @@ export async function completeStartedIntake(
   const nowIso = now.toISOString();
   const { data, error } = await admin
     .from("crm_intake_submission")
-    .update({ answers: answers as unknown as Json, mode, submitted_at: nowIso, last_active_at: nowIso })
+    .update({
+      answers: answers as unknown as Json,
+      mode,
+      submitted_at: nowIso,
+      last_active_at: nowIso,
+      ...(assessment ? { score: assessment.score, band: assessment.band, temperature: assessment.temperature } : {}),
+    })
     .eq("org_id", handle.orgId)
     .eq("form_id", handle.formId)
     .eq("resume_hash", hash)
@@ -452,24 +541,23 @@ export async function completeStartedIntake(
       .not("submitted_at", "is", null)
       .maybeSingle();
     if (!done) return { ok: false, reason: "not_found" };
-    return { ok: true, submissionId: done.id, submission: { mode, contact: parseContact(done.contact), answers }, alreadyDone: true };
+    return { ok: true, submissionId: done.id, submission: { mode, contact: parseContact(done.contact), answers }, alreadyDone: true, noteBody: "" };
   }
 
   const contact = parseContact(data.contact);
   const submission: ValidatedSubmission = { mode, contact, answers };
+  const source = leadSourceLabel(handle.name, handle.sourceTag);
+  const how = mode === "conversation" ? "chat" : mode === "assessment" ? "assessment" : "form";
+  const heading = `Intake finished: ${source} (${how}${data.source_host ? ` on ${data.source_host}` : ""})${assessment ? `\n${assessment.staffLine}` : ""}`;
+  const noteBody = answersNote(heading, answers);
   if (data.lead_id) {
-    const source = leadSourceLabel(handle.name, handle.sourceTag);
-    const how = mode === "conversation" ? "chat" : "form";
     const { error: actErr } = await admin.from("crm_activity").insert({
       org_id: handle.orgId,
       lead_id: data.lead_id,
       type: "note" as ActivityType,
       actor_id: null,
       actor_type: "system" as const,
-      payload: {
-        note: answersNote(`Intake finished: ${source} (${how}${data.source_host ? ` on ${data.source_host}` : ""})`, answers),
-        source: "intake-form",
-      },
+      payload: { note: noteBody, source: "intake-form" },
     });
     if (actErr) console.error("[intake] lead timeline write failed", actErr.code);
     // What the answers make obvious, only where the lead has nothing yet.
@@ -494,7 +582,7 @@ export async function completeStartedIntake(
       }
     }
   }
-  return { ok: true, submissionId: data.id, submission, alreadyDone: false };
+  return { ok: true, submissionId: data.id, submission, alreadyDone: false, noteBody };
 }
 
 /** Screened intakes per form per hour; see screenSubmission. */

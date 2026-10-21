@@ -2,7 +2,7 @@ import { getScopedClient } from "@/lib/db/scoped-client";
 import type { Role } from "@/lib/auth/roles";
 import { logActivity } from "@/lib/matters";
 import { CAN_WRITE_LEAD, resolveCurrentRole } from "./leads";
-import { validateNote, type NoteKind } from "./lead-input";
+import { noteEntry, validateNote, type NoteKind } from "./lead-input";
 import { LeadWriteError, forbiddenLeadWrite } from "./errors";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { resolveMentions } from "@/lib/mentions/parse";
@@ -24,7 +24,7 @@ async function requireNoteWriteRole(supabase: ScopedClient): Promise<Role> {
 }
 
 export type AddLeadNoteInput = {
-  /** 'note' | 'call_logged' | 'email_sent' — all pre-existing crm_activity_type values. */
+  /** 'note' | 'call_logged' | 'email_sent' | 'meeting'. A meeting is stored as a `note` row tagged `entry: "meeting"`. */
   kind?: NoteKind | string | null;
   body?: string | null;
   /** Optional heading, used as the timeline summary for logged emails. */
@@ -61,9 +61,9 @@ export async function addLeadNote(leadId: string, input: AddLeadNoteInput): Prom
 
   const { kind, body, subject } = validated.value;
 
-  // §13.2: @-mentions are a plain-note thing — a logged call or email records
-  // something that already happened outside the product, not a message to a
-  // teammate, so text there is never scanned for @names or paged on.
+  // §13.2: @-mentions are a plain-note thing — a logged call, email or meeting
+  // records something that already happened outside the product, not a message
+  // to a teammate, so text there is never scanned for @names or paged on.
   // Resolution failure (directory RPC down, 0031 not applied) must never
   // block the note from saving, so it is swallowed here exactly the way
   // notify() swallows its own failures below.
@@ -79,23 +79,20 @@ export async function addLeadNote(leadId: string, input: AddLeadNoteInput): Prom
     }
   }
 
-  // Payload keys match what summarizeActivity() in
-  // src/components/firm/ActivityTimeline.tsx already reads per type, so these
-  // entries render with a real one-line summary rather than a bare chip.
+  // Payload keys match what the timeline describer already reads per type, so
+  // these entries render with a real one-line summary rather than a bare chip.
+  const entry = noteEntry(kind, body, subject);
   const payload: Record<string, unknown> =
-    kind === "call_logged"
-      ? { summary: subject ?? body, notes: body }
-      : kind === "email_sent"
-        ? { subject: subject ?? body.slice(0, 120), body, logged_manually: true }
-        : {
-            note: body,
-            ...(subject ? { subject } : {}),
-            // Validated ids only, resolved above against the org's member
-            // directory — never the raw "@Whoever" text a form could send.
-            ...(mentionedUserIds.length ? { mentions: mentionedUserIds } : {}),
-          };
+    kind === "note"
+      ? {
+          ...entry.payload,
+          // Validated ids only, resolved above against the org's member
+          // directory — never the raw "@Whoever" text a form could send.
+          ...(mentionedUserIds.length ? { mentions: mentionedUserIds } : {}),
+        }
+      : entry.payload;
 
-  await logActivity({ type: kind, leadId, actorType: "user", payload });
+  await logActivity({ type: entry.type, leadId, actorType: "user", payload });
 
   if (mentionedUserIds.length === 0) return;
 

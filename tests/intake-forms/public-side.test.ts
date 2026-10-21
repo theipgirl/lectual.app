@@ -314,3 +314,99 @@ describe("screening", () => {
     expect(parseScreening(`FIT\n${"x".repeat(3000)}`).note).toHaveLength(2000);
   });
 });
+
+// ── Sprint 10: choice answers (F3) ───────────────────────────────────────────
+
+describe("validateAnswers with choice questions (F3)", () => {
+  const questions = [
+    { id: "qt", text: "Free text?", required: true },
+    { id: "qs", text: "Have you used it?", required: true, type: "single" as const, options: ["Yes", "No", "Not yet, soon"] },
+    { id: "qm", text: "What do you have?", required: false, type: "multi" as const, options: ["Word mark", "Logo", "Slogan, tagline"] },
+    { id: "qo", text: "Optional single", required: false, type: "single" as const, options: ["A", "B"] },
+  ];
+  const ask = (given: Record<string, unknown>) => validateAnswers({ qt: "text", qs: "Yes", ...given }, questions);
+
+  it("stores a single label that is on the list as that label", () => {
+    const r = ask({ qs: "Not yet, soon" });
+    expect(r.errors).toEqual([]);
+    expect(r.answers.find((a) => a.id === "qs")).toEqual({ id: "qs", question: "Have you used it?", answer: "Not yet, soon" });
+  });
+
+  it("stores a multi answer as its labels joined with a comma and space, in option order whatever order was sent", () => {
+    expect(ask({ qm: ["Slogan, tagline", "Word mark"] }).answers.find((a) => a.id === "qm")?.answer).toBe("Word mark, Slogan, tagline");
+    expect(ask({ qm: ["Logo"] }).answers.find((a) => a.id === "qm")?.answer).toBe("Logo");
+    // A single string for a multi is one label.
+    expect(ask({ qm: "Logo" }).answers.find((a) => a.id === "qm")?.answer).toBe("Logo");
+  });
+
+  it("refuses a label that is not on the list, naming the question", () => {
+    const r = ask({ qs: "Maybe" });
+    expect(r.errors).toEqual(["Please choose one of the listed answers for: Have you used it?"]);
+    expect(r.fields).toEqual(["qs"]);
+    expect(ask({ qm: ["Logo", "Hologram"] }).errors).toEqual(["Please choose one of the listed answers for: What do you have?"]);
+  });
+
+  it("matches labels exactly: a position, a lower-case label and a label with different spacing are refused", () => {
+    expect(ask({ qs: "0" }).errors).toHaveLength(1);
+    expect(ask({ qs: 0 }).errors).toHaveLength(1);
+    expect(ask({ qs: "yes" }).errors).toHaveLength(1);
+  });
+
+  it("refuses two labels on a single choice", () => {
+    expect(ask({ qs: ["Yes", "No"] }).errors).toEqual(["Please choose only one answer for: Have you used it?"]);
+  });
+
+  it("refuses a repeat in a multi choice", () => {
+    expect(ask({ qm: ["Logo", "Logo"] }).errors).toEqual(['Each choice for "What do you have?" can be picked only once.']);
+  });
+
+  it("refuses an answer that is not a string or a list of strings", () => {
+    for (const bad of [7, true, { a: 1 }, [1, 2], ["Logo", 3], [["Logo"]]]) {
+      const r = ask({ qm: bad });
+      expect(r.errors).toEqual(["We couldn't read your answer to: What do you have?"]);
+      expect(r.answers.some((a) => a.id === "qm")).toBe(false);
+    }
+  });
+
+  it("refuses a required choice left empty, with the same sentence as a text question", () => {
+    for (const empty of [undefined, "", "  ", [], [""]]) {
+      const r = ask({ qs: empty });
+      expect(r.errors).toEqual(["Please answer: Have you used it?"]);
+      expect(r.fields).toEqual(["qs"]);
+    }
+  });
+
+  it("omits an optional choice that was not answered", () => {
+    const r = ask({ qm: [], qo: "" });
+    expect(r.errors).toEqual([]);
+    expect(r.answers.map((a) => a.id)).toEqual(["qt", "qs"]);
+  });
+
+  it("leaves a text question exactly as before, even when the browser sends a list for it", () => {
+    expect(ask({ qt: ["x"] }).errors).toEqual(["Please answer: Free text?"]);
+    expect(ask({ qt: "  hello  " }).answers[0]).toEqual({ id: "qt", question: "Free text?", answer: "hello" });
+  });
+
+  it("validates a whole public submission with a choice, using the stored options not anything the browser says", () => {
+    const c = defaultIntakeConfig([UUID]);
+    const cfgQuestions = [{ id: "qs", text: "Used it?", required: true, pack: null, edited: true, type: "single" as const, options: ["Yes", "No"] }];
+    const ok = validatePublicSubmission(
+      { mode: "form", contact: { name: "A B", email: "a@b.co" }, answers: { qs: "No", options: ["forged"] }, consent: true, honeypot: "", stamp: "x" },
+      cfgQuestions,
+    );
+    expect(ok.ok).toBe(true);
+    const bad = validatePublicSubmission(
+      { mode: "form", contact: { name: "A B", email: "a@b.co" }, answers: { qs: "Forged" }, consent: true, honeypot: "", stamp: "x" },
+      cfgQuestions,
+    );
+    expect(bad.ok).toBe(false);
+    void c;
+  });
+
+  it("everything that reads stored answers still sees plain text", () => {
+    const r = ask({ qs: "Yes", qm: ["Logo", "Slogan, tagline"] });
+    const note = answersNote("Heading", r.answers);
+    expect(note).toContain("Q: What do you have?\nA: Logo, Slogan, tagline");
+    for (const a of r.answers) expect(Object.keys(a).sort()).toEqual(["answer", "id", "question"]);
+  });
+});

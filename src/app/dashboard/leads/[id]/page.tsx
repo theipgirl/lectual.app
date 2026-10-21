@@ -3,16 +3,22 @@ import { notFound } from "next/navigation";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { CAN_WRITE_LEAD, getLead, listStages } from "@/lib/pipeline";
-import { deriveTemperature } from "@/lib/intake/temperature";
+import { effectiveTemperature } from "@/lib/intake/effective-temperature";
 import { loadTemperatureFacts, type TemperatureFactsRead } from "@/lib/intake/facts";
 import { ConsultOutcomeForm } from "@/components/leads/ConsultOutcomeForm";
-import { LeadTemperature } from "@/components/leads/LeadTemperature";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { pendingProposals } from "@/lib/agents/proposals";
 import { relativeTime } from "@/lib/relative-time";
 import { AssignSelect, EditLeadForm, NoteComposer, ProposalCard, StageSelect } from "@/components/leads/LeadForms";
 import { LeadTags, PrepConsult } from "@/components/leads/LeadExtras";
+import { LeadMattersLine } from "@/components/leads/LeadMatters";
+import { loadMattersForLead } from "@/lib/matters/for-lead";
+import { AnswersCard } from "@/components/answers/AnswersCard";
+import { loadLeadAnswers } from "@/lib/answers/load-answers";
 import { Timeline } from "@/components/timeline/Timeline";
+import { DocumentsCard } from "@/components/files/DocumentsCard";
+import { loadDocumentsRead } from "@/lib/files/read";
+import { FILE_DELETE_ROLES, FILE_UPLOAD_ROLES } from "@/lib/files/roles";
 import VoiceNoteRecorder from "@/components/voice/VoiceNoteRecorder";
 import { listTags, tagsForLead } from "@/lib/pipeline/tags";
 import { orgHasModule } from "@/lib/org/modules";
@@ -26,7 +32,7 @@ import { addVoiceNoteAction } from "./actions";
 import { meetingsFor } from "@/lib/meetings/read";
 import { LinkedMeetings } from "@/components/meetings/LinkedMeetings";
 import { ConsultDetailsSection } from "@/components/leads/ConsultDetailsSection";
-import { LaneCard } from "@/components/leads/LaneCard";
+import { TemperatureCard } from "@/components/leads/TemperatureCard";
 import { WaitingOnRebecca } from "@/components/leads/WaitingOnRebecca";
 import { loadPendingApprovalsByLead } from "@/lib/queue/lead-pending";
 import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
@@ -76,7 +82,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const voiceUrls = await voiceNotePlaybackUrls(rows);
 
   // Lane + next step (SOP Stage 2) and the lead's sequences (SOP rule 1).
-  const [{ links, failed: linksFailed }, tz, enrollments, approvals, factsRead] = await Promise.all([
+  const [{ links, failed: linksFailed }, tz, enrollments, approvals, factsRead, mattersRead, answersRead, documentsRead] = await Promise.all([
     getLaneLinks(),
     getFirmTimeZone(),
     listLeadEnrollments(id).catch(() => null),
@@ -84,8 +90,14 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     loadPendingApprovalsByLead().catch((): LeadPendingApprovals => ({ status: "unavailable" })),
     // The same facts the Intake board reads; a failed read leaves the existing rules, never a guessed "cold".
     loadTemperatureFacts([lead], stages).catch((): TemperatureFactsRead => ({ status: "unavailable" })),
+    // Never throws (a failed read is `unavailable`), so it can't take the page down.
+    loadMattersForLead(lead.id),
+    // Three states per source and never throws; a failed read is named on the card, not an empty one.
+    loadLeadAnswers(lead.id),
+    // Files stored on this lead. Never throws: a failed read is named on the card, not an empty list.
+    loadDocumentsRead({ kind: "lead", id: lead.id }, { includeLetters: false }),
   ]);
-  const temperature = deriveTemperature(lead, stages, new Date(), factsRead.status === "ok" ? factsRead.byLead[lead.id] : undefined);
+  const temperature = effectiveTemperature(lead, stages, new Date(), factsRead.status === "ok" ? factsRead.byLead[lead.id] : undefined);
   const lane = laneView(lead);
   const nextStep = nextStepForLane(lane.effective, links);
   const nurture =
@@ -155,10 +167,9 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             </section>
           )}
 
-          <LeadTemperature leadId={lead.id} temperature={temperature} />
-
-          <LaneCard
+          <TemperatureCard
             leadId={lead.id}
+            temperature={temperature}
             view={lane}
             setByName={setter ? (setter.displayName ?? setter.email ?? null) : null}
             setOn={lane.setAt ? shortDate(lane.setAt, tz) : null}
@@ -169,6 +180,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             linksFailed={linksFailed}
             canWrite={canWrite}
           />
+          <AnswersCard read={answersRead} tz={tz} />
           {lead.ai_summary && !lane.suggested && (
             // A triage summary that carries no lane (an older format) is still shown, as the agent's words.
             <section className="lx-card" style={{ padding: 18 }}>
@@ -218,6 +230,14 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
 
           <ConsultDetailsSection leadId={lead.id} canWrite={canWrite} />
 
+          <DocumentsCard
+            parent={{ kind: "lead", id: lead.id }}
+            read={documentsRead}
+            directory={members.map((m) => ({ userId: m.userId, name: m.displayName ?? m.email ?? "" }))}
+            canUpload={FILE_UPLOAD_ROLES.includes(session.role)}
+            canDelete={FILE_DELETE_ROLES.includes(session.role)}
+          />
+
           <section className="lx-card" style={{ padding: 18 }}>
             <h2 className="lx-h2" style={{ fontSize: 23, marginBottom: 10 }}>
               Timeline
@@ -260,6 +280,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             <span>Came from</span>
             <span>{[lead.referral_source, lead.referral_detail].filter(Boolean).join(" — ") || "—"}</span>
           </div>
+          <LeadMattersLine read={mattersRead} />
         </aside>
       </div>
     </>

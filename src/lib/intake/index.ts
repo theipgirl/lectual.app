@@ -1,6 +1,6 @@
 // Barrel of ONLY the pure intake modules — scope, temperature, referral-source,
 // reply. Every one of these avoids getScopedClient/next/headers on purpose so
-// client components (the /dashboard/intake filter bar, temp-override menu,
+// client components (the /dashboard/intake filter bar, temperature menu,
 // etc.) can import from here safely.
 //
 // Server modules that live alongside these in src/lib/intake/ (e.g. the

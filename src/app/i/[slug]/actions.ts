@@ -7,11 +7,15 @@ import {
   readIntakeHandle as readHandleBySlug,
   recentCompletions,
   recordIntakeEvent,
+  recordIntakeStep,
   screenSubmission,
   startPublicIntake,
   submitPublicIntake,
 } from "@/lib/intake-forms/public";
-import { readSpamFields, validateAnswers, validatePublicStart, validatePublicSubmission } from "@/lib/intake-forms/public-submit";
+import { parseStepIndex, sanitizeProgress, stepQuestions, STEP_LIMIT } from "@/lib/intake-forms/steps";
+import { answersNote, readSpamFields, RESUME_TOKEN_SHAPE, validateAnswers, validatePublicStart, validatePublicSubmission } from "@/lib/intake-forms/public-submit";
+import { assessmentStaffLine, scoreAssessmentAnswers, type AssessmentResultView } from "@/lib/intake-forms/assessment";
+import { syncIntakeCompletion, syncIntakeStart } from "@/lib/intake-forms/lawmatics-sync";
 import {
   checkStamp,
   clientIp,
@@ -46,6 +50,8 @@ async function readIntakeHandle(slug: string) {
 const submitThrottle = new SlidingWindowThrottle(5, 10 * 60_000);
 const startThrottle = new SlidingWindowThrottle(8, 10 * 60_000);
 const eventThrottle = new SlidingWindowThrottle(60, 10 * 60_000);
+// Its own allowance: a person answering a 60-step form must not use up (or be cut off by) the visit/start events.
+const stepThrottle = new SlidingWindowThrottle(STEP_LIMIT.max, STEP_LIMIT.windowMs);
 
 /** The anonymous session id, from the first-party cookie; set when missing. */
 async function sessionId(): Promise<string> {
@@ -65,13 +71,49 @@ async function allowed(throttle: SlidingWindowThrottle, slug: string): Promise<b
 }
 
 export async function recordIntakeEventAction(slug: string, kind: unknown): Promise<void> {
-  if (kind !== "visit" && kind !== "start_conversation" && kind !== "start_form") return;
+  if (kind !== "visit" && kind !== "start_conversation" && kind !== "start_form" && kind !== "start_assessment") return;
   if (typeof slug !== "string") return;
   const read = await readIntakeHandle(slug);
   if (read.status !== "ok") return;
   if (!(await allowed(eventThrottle, slug))) return;
   const hash = sessionHash(await sessionId(), read.handle.formId, intakeSalt());
   await recordIntakeEvent(read.handle, kind, hash);
+}
+
+/**
+ * "This person reached this question" (0096), plus their answers so far. Fire
+ * and forget from the page: it returns nothing, shows no error and never
+ * throws, whatever it was sent. Anything it can't vouch for is dropped quietly:
+ * a token of the wrong shape or for another form or firm, a finished person,
+ * a question the live form doesn't ask (or the firm hid), an index that isn't
+ * a whole number from 0 to 60. The org and form written are the live form's.
+ */
+export async function recordIntakeStepAction(slug: unknown, payload: unknown): Promise<void> {
+  try {
+    if (typeof slug !== "string" || typeof payload !== "object" || payload === null) return;
+    const p = payload as { token?: unknown; stepIndex?: unknown; questionId?: unknown; progress?: unknown };
+    if (typeof p.token !== "string" || !RESUME_TOKEN_SHAPE.test(p.token)) return;
+    const stepIndex = parseStepIndex(p.stepIndex);
+    if (stepIndex === null || typeof p.questionId !== "string") return;
+    const read = await readIntakeHandle(slug);
+    if (read.status !== "ok") return;
+    const { handle } = read;
+    const questions = stepQuestions(handle.kind, handle.config);
+    if (!questions.some((q) => q.id === p.questionId)) return;
+    if (!(await allowed(stepThrottle, slug))) return;
+    const hash = sessionHash(await sessionId(), handle.formId, intakeSalt());
+    // Nothing usable in the progress leaves what is saved alone, rather than overwriting it with {}.
+    const kept = p.progress === undefined ? {} : sanitizeProgress(p.progress, questions);
+    await recordIntakeStep(handle, {
+      token: p.token,
+      stepIndex,
+      questionId: p.questionId,
+      progress: Object.keys(kept).length ? kept : null,
+      sessionHash: hash,
+    });
+  } catch {
+    // The page never learns whether this landed.
+  }
 }
 
 export type StartIntakeResult =
@@ -110,8 +152,12 @@ export async function startIntakeAction(slug: string, payload: unknown): Promise
     return { ok: false, error: "We've had several people start from this connection just now. Please wait a few minutes and try again." };
   }
 
-  const outcome = await startPublicIntake(handle, checked.value, { sourceHost: stamp.host, startedAt: stamp.startedAt, now });
+  // The intake decides the mode for an assessment; the browser's choice only picks chat or form.
+  const start = handle.kind === "assessment" ? { ...checked.value, mode: "assessment" as const } : checked.value;
+  const outcome = await startPublicIntake(handle, start, { sourceHost: stamp.host, startedAt: stamp.startedAt, now });
   if (!outcome.ok) return { ok: false, error: "We couldn't save your details just now. Please try again in a minute." };
+  const submissionId = outcome.submissionId;
+  after(() => syncIntakeStart(handle, submissionId, start.contact));
   return { ok: true, token: outcome.token };
 }
 
@@ -130,6 +176,7 @@ export async function submitIntakeAction(slug: string, payload: unknown): Promis
 
   // Contact-first: the person is already filed; add the answers to their row.
   const token = payload && typeof payload === "object" ? (payload as { token?: unknown }).token : undefined;
+  if (handle.kind === "assessment") return { ok: false, error: "Please reload the page and start again." };
   if (typeof token === "string" && token) {
     const raw = payload as { answers?: unknown; mode?: unknown };
     const a = validateAnswers(raw.answers, handle.config.questions);
@@ -148,6 +195,12 @@ export async function submitIntakeAction(slug: string, payload: unknown): Promis
       const hash = sessionHash(await sessionId(), handle.formId, intakeSalt());
       await recordIntakeEvent(handle, "complete", hash);
       after(() => screenSubmission(handle, done.submissionId, done.submission));
+      after(() =>
+        syncIntakeCompletion(handle, done.submissionId, {
+          contact: done.submission.contact,
+          note: { name: `Intake: ${handle.sourceTag ?? handle.name}`, body: done.noteBody },
+        }),
+      );
     }
     return { ok: true, closing };
   }
@@ -184,5 +237,66 @@ export async function submitIntakeAction(slug: string, payload: unknown): Promis
   // Screening is internal and slow; the prospect never waits on it.
   const submission = checked.value;
   after(() => screenSubmission(handle, outcome.submissionId, submission));
+  // One write, so the completion sync creates the Lawmatics contact as well as tagging it.
+  after(() =>
+    syncIntakeCompletion(handle, outcome.submissionId, {
+      contact: submission.contact,
+      note: { name: `Intake: ${handle.sourceTag ?? handle.name}`, body: answersNote(`Intake: ${handle.sourceTag ?? handle.name}`, submission.answers, submission.contact) },
+    }),
+  );
   return { ok: true, closing };
+}
+
+export type CompleteAssessmentResult =
+  | { ok: true; closing: string; result: AssessmentResultView | null }
+  | { ok: false; error: string; fields?: string[] };
+
+/**
+ * The assessment's finish (0095). The person is already filed (contact first);
+ * this checks the answers against the STORED card, scores them on the server,
+ * files score + band + hot/warm/cold on their row and lead, and hands back only
+ * what they may see: the score, band, gaps and next step (when the firm shows
+ * the score). The temperature never leaves the server.
+ */
+export async function completeAssessmentAction(slug: string, payload: unknown): Promise<CompleteAssessmentResult> {
+  if (typeof slug !== "string") return { ok: false, error: "This assessment isn't available." };
+  const read = await readIntakeHandle(slug);
+  if (read.status === "not_found" || read.status === "moved") return { ok: false, error: "This assessment isn't taking answers right now." };
+  if (read.status !== "ok") return { ok: false, error: "We couldn't reach the firm just now. Please try again in a minute." };
+  const { handle } = read;
+  if (handle.kind !== "assessment") return { ok: false, error: "Please reload the page and start again." };
+  const closing = handle.config.closing.trim() || "Thanks. We'll be in touch.";
+
+  const raw = payload && typeof payload === "object" ? (payload as { token?: unknown; answers?: unknown }) : {};
+  if (typeof raw.token !== "string" || !raw.token) return { ok: true, closing, result: null }; // a bot's empty token: nothing filed
+  const scored = scoreAssessmentAnswers(handle.config.assessment, raw.answers);
+  if (!scored.ok) return { ok: false, error: scored.errors.join("\n") };
+  if (!(await allowed(submitThrottle, slug))) {
+    return { ok: false, error: "We've had several submissions from this connection just now. Please wait a few minutes and try again." };
+  }
+
+  const { score, answerList, view } = scored.value;
+  const done = await completeStartedIntake(handle, raw.token, answerList, "assessment", new Date(), {
+    score: score.score,
+    band: score.band,
+    temperature: score.temperature,
+    staffLine: assessmentStaffLine(score),
+  });
+  if (!done.ok) {
+    return done.reason === "not_found"
+      ? { ok: false, error: "This page has been open a long time. Please reload it and start again." }
+      : { ok: false, error: "We couldn't send your answers just now. Nothing was lost on your side; please try again in a minute." };
+  }
+  if (!done.alreadyDone) {
+    const hash = sessionHash(await sessionId(), handle.formId, intakeSalt());
+    await recordIntakeEvent(handle, "complete", hash);
+    after(() =>
+      syncIntakeCompletion(handle, done.submissionId, {
+        contact: done.submission.contact,
+        temperature: score.temperature,
+        note: { name: `Assessment: ${handle.sourceTag ?? handle.name}`, body: done.noteBody || answersNote(assessmentStaffLine(score), answerList) },
+      }),
+    );
+  }
+  return { ok: true, closing, result: handle.config.assessment.showScore ? view : null };
 }

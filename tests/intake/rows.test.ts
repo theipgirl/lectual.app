@@ -149,7 +149,6 @@ describe("parseIntakeFilters", () => {
         q: "  ada  ",
       }),
     ).toEqual({
-      lane: null,
       source: [],
       temp: "hot",
       owner: "user-1",
@@ -182,11 +181,10 @@ describe("filtersToQueryString", () => {
   it("round-trips through parseIntakeFilters", () => {
     const filters = {
       source: ["UGW", "Instagram"],
-      temp: "cold" as const,
+      temp: "none" as const,
       owner: UNASSIGNED_OWNER,
       stage: "s3",
       reply: "awaiting" as const,
-      lane: "suggested" as const,
       needsRebecca: true,
       q: "acme",
     };
@@ -215,7 +213,7 @@ describe("buildIntakeRows", () => {
     );
 
     expect(row.stage?.name).toBe("Consultation Scheduled");
-    expect(row.temperature.level).toBe("hot");
+    expect(row.temperature).toMatchObject({ value: "hot", source: "suggested" });
     expect(row.reply).toBe("replied");
     expect(row.lastTouchAt).toBe(daysBefore(1));
     expect(row.daysInStage).toBe(3);
@@ -256,7 +254,7 @@ describe("buildIntakeRows", () => {
   it("tolerates a lead whose stage isn't in the list", () => {
     const [row] = rowsFor([lead({ current_stage_id: "gone" })]);
     expect(row.stage).toBeNull();
-    expect(row.temperature.level).toBeTruthy();
+    expect(row.temperature.reason).toBeTruthy();
   });
 });
 
@@ -291,7 +289,8 @@ describe("applyFilters", () => {
         referral_source: null,
         assigned_to: "user-2",
         current_stage_id: "s2",
-        temperature: "cold",
+        // The old hand-set column is ignored: nothing can clear it any more.
+        temperature: "hot",
       }),
     ],
     { c: "Waiting on the specimen" },
@@ -315,9 +314,11 @@ describe("applyFilters", () => {
     expect(ids(applyFilters(rows, { ...EMPTY_INTAKE_FILTERS, source: ["Inbound"] }))).toEqual([]);
   });
 
-  it("filters by temperature, including a hand-set override", () => {
+  it("filters by the effective temperature; a leftover hand-set column is ignored", () => {
     expect(ids(applyFilters(rows, { ...EMPTY_INTAKE_FILTERS, temp: "hot" }))).toEqual(["a"]);
-    expect(ids(applyFilters(rows, { ...EMPTY_INTAKE_FILTERS, temp: "cold" }))).toEqual(["b", "c"]);
+    expect(ids(applyFilters(rows, { ...EMPTY_INTAKE_FILTERS, temp: "cold" }))).toEqual(["b"]);
+    // c has no touch, no facts and a stale `temperature: "hot"` column: Not routed, not hot.
+    expect(ids(applyFilters(rows, { ...EMPTY_INTAKE_FILTERS, temp: "none" }))).toEqual(["c"]);
   });
 
   it("filters by owner, with a sentinel for unassigned", () => {
@@ -360,8 +361,8 @@ describe("sortRows", () => {
     lead({ id: "warm", current_stage_id: "s1", last_activity_at: daysBefore(6), stage_entered_at: daysBefore(10) }),
     // hot (replied yesterday), touched recently
     lead({ id: "hotRecent", current_stage_id: "s1", last_inbound_at: daysBefore(1), stage_entered_at: daysBefore(1) }),
-    // hot override, never touched → longest awaiting of the two hots
-    lead({ id: "hotNever", current_stage_id: "s1", temperature: "hot", stage_entered_at: daysBefore(40) }),
+    // never touched; the old hand-set `temperature` column is ignored, so this is Not routed
+    lead({ id: "neverTouched", current_stage_id: "s1", temperature: "hot", stage_entered_at: daysBefore(40) }),
     // cold: a nurture stage, and untouched for 35 days besides.
     lead({ id: "cold", current_stage_id: "s3", last_activity_at: daysBefore(35), stage_entered_at: daysBefore(35) }),
   ]);
@@ -370,23 +371,58 @@ describe("sortRows", () => {
     return sorted.map((row) => row.lead.id);
   }
 
-  it("defaults to hot first, then longest awaiting", () => {
-    expect(DEFAULT_SORT).toEqual({ key: "temp", dir: "desc" });
+  it("defaults to the last touch, newest first, never-touched last", () => {
+    expect(DEFAULT_SORT).toEqual({ key: "lastTouch", dir: "desc" });
     expect(ids(sortRows(rows, DEFAULT_SORT.key, DEFAULT_SORT.dir))).toEqual([
-      // never-touched hot outranks the hot that replied yesterday
-      "hotNever",
-      "hotRecent",
-      "warm",
-      "cold",
+      "hotRecent", // replied yesterday
+      "warm", // touched 6 days ago
+      "cold", // touched 35 days ago
+      "neverTouched",
     ]);
   });
 
-  it("reverses on ascending", () => {
-    expect(ids(sortRows(rows, "temp", "asc"))).toEqual(["cold", "warm", "hotNever", "hotRecent"]);
+  it("orders three leads touched yesterday, today and never as today, yesterday, never", () => {
+    const three = rowsFor([
+      lead({ id: "yesterday", last_activity_at: daysBefore(1) }),
+      lead({ id: "never" }),
+      lead({ id: "today", last_activity_at: daysBefore(0) }),
+    ]);
+    expect(ids(sortRows(three, DEFAULT_SORT.key, DEFAULT_SORT.dir))).toEqual(["today", "yesterday", "never"]);
+  });
+
+  it("sorts temperature hot, warm, cold and puts Not routed last in both directions", () => {
+    expect(ids(sortRows(rows, "temperature", "desc"))).toEqual(["hotRecent", "warm", "cold", "neverTouched"]);
+    expect(ids(sortRows(rows, "temperature", "asc"))).toEqual(["cold", "warm", "hotRecent", "neverTouched"]);
+  });
+
+  describe("the tiebreak follows the sort direction", () => {
+    // Same stage on every row, so the `stage` sort ties and the touch decides.
+    const tied = rowsFor([
+      lead({ id: "old", last_activity_at: daysBefore(8) }),
+      lead({ id: "never" }),
+      lead({ id: "new", last_activity_at: daysBefore(1) }),
+    ]);
+
+    it("descending: newest touch first, never-touched last", () => {
+      expect(ids(sortRows(tied, "stage", "desc"))).toEqual(["new", "old", "never"]);
+    });
+
+    it("ascending: oldest touch first, never-touched first", () => {
+      expect(ids(sortRows(tied, "stage", "asc"))).toEqual(["never", "old", "new"]);
+    });
+
+    it("still sinks a row with no value on the active column, in both directions", () => {
+      const withSource = rowsFor([
+        lead({ id: "hasSource", referral_source: "UGW", last_activity_at: daysBefore(9) }),
+        lead({ id: "noSource", last_activity_at: daysBefore(1) }),
+      ]);
+      expect(ids(sortRows(withSource, "source", "desc")).at(-1)).toBe("noSource");
+      expect(ids(sortRows(withSource, "source", "asc")).at(-1)).toBe("noSource");
+    });
   });
 
   it("sorts by age in stage", () => {
-    expect(ids(sortRows(rows, "age", "desc"))).toEqual(["hotNever", "cold", "warm", "hotRecent"]);
+    expect(ids(sortRows(rows, "age", "desc"))).toEqual(["neverTouched", "cold", "warm", "hotRecent"]);
   });
 
   it("sinks rows with no value to the bottom in BOTH directions", () => {
@@ -455,10 +491,11 @@ describe("parseIntakeViewState", () => {
   });
 
   it("reads the canvas's two board URLs", () => {
-    expect(parseIntakeViewState({ view: "board" })).toEqual({ view: "board", group: "stage" });
+    expect(parseIntakeViewState({ view: "board" })).toEqual({ view: "board", group: "stage", sort: DEFAULT_SORT });
     expect(parseIntakeViewState({ view: "board", group: "owner" })).toEqual({
       view: "board",
       group: "owner",
+      sort: DEFAULT_SORT,
     });
   });
 
@@ -477,28 +514,121 @@ describe("intakeQueryString / intakeHref", () => {
   });
 
   it("spells out a board, and its grouping only when it isn't the default", () => {
-    expect(intakeHref(EMPTY_INTAKE_FILTERS, { view: "board", group: "stage" })).toBe(
+    expect(intakeHref(EMPTY_INTAKE_FILTERS, { view: "board", group: "stage", sort: DEFAULT_SORT })).toBe(
       "/dashboard/intake/?view=board",
     );
-    expect(intakeHref(EMPTY_INTAKE_FILTERS, { view: "board", group: "owner" })).toBe(
+    expect(intakeHref(EMPTY_INTAKE_FILTERS, { view: "board", group: "owner", sort: DEFAULT_SORT })).toBe(
       "/dashboard/intake/?view=board&group=owner",
     );
   });
 
   it("drops the grouping on the table, where it changes nothing a reader can see", () => {
-    expect(intakeQueryString(EMPTY_INTAKE_FILTERS, { view: "table", group: "owner" })).toBe("");
+    expect(intakeQueryString(EMPTY_INTAKE_FILTERS, { view: "table", group: "owner", sort: DEFAULT_SORT })).toBe("");
   });
 
   it("carries the filters alongside the view, so a saved board stays filtered", () => {
     const href = intakeHref(
       { ...EMPTY_INTAKE_FILTERS, source: ["UGW"], temp: "hot" },
-      { view: "board", group: "owner" },
+      { view: "board", group: "owner", sort: DEFAULT_SORT },
     );
     expect(href).toBe("/dashboard/intake/?source=UGW&temp=hot&view=board&group=owner");
 
     // And it round-trips: the saved link parses back to what was saved.
     const params = Object.fromEntries(new URLSearchParams(href.split("?")[1]));
     expect(parseIntakeFilters(params).source).toEqual(["UGW"]);
-    expect(parseIntakeViewState(params)).toEqual({ view: "board", group: "owner" });
+    expect(parseIntakeViewState(params)).toEqual({ view: "board", group: "owner", sort: DEFAULT_SORT });
+  });
+});
+
+describe("the sort in the URL", () => {
+  const sortOf = (params: Record<string, string>) => parseIntakeViewState(params).sort;
+
+  it("leaves the default sort out of the URL", () => {
+    expect(intakeQueryString(EMPTY_INTAKE_FILTERS, DEFAULT_VIEW_STATE)).toBe("");
+    expect(intakeQueryString(EMPTY_INTAKE_FILTERS, { ...DEFAULT_VIEW_STATE, sort: { key: "lastTouch", dir: "desc" } })).toBe("");
+  });
+
+  it("writes a non-default sort as ?sort=&dir= and reads it back", () => {
+    const state = { ...DEFAULT_VIEW_STATE, sort: { key: "lead" as const, dir: "asc" as const } };
+    expect(intakeQueryString(EMPTY_INTAKE_FILTERS, state)).toBe("sort=lead&dir=asc");
+    expect(sortOf({ sort: "lead", dir: "asc" })).toEqual({ key: "lead", dir: "asc" });
+    // The default key in the other direction is not the default sort.
+    expect(intakeQueryString(EMPTY_INTAKE_FILTERS, { ...DEFAULT_VIEW_STATE, sort: { key: "lastTouch", dir: "asc" } })).toBe(
+      "sort=lastTouch&dir=asc",
+    );
+  });
+
+  it("falls back to the default sort for a bad key", () => {
+    expect(sortOf({ sort: "colour", dir: "asc" })).toEqual(DEFAULT_SORT);
+    expect(sortOf({ dir: "asc" })).toEqual(DEFAULT_SORT);
+  });
+
+  it("takes the column's natural first direction for a missing or bad direction", () => {
+    expect(sortOf({ sort: "lead" })).toEqual({ key: "lead", dir: "asc" });
+    expect(sortOf({ sort: "lead", dir: "sideways" })).toEqual({ key: "lead", dir: "asc" });
+    expect(sortOf({ sort: "temperature" })).toEqual({ key: "temperature", dir: "desc" });
+    expect(sortOf({ sort: "age", dir: "up" })).toEqual({ key: "age", dir: "desc" });
+    expect(sortOf({ sort: "reply" })).toEqual({ key: "reply", dir: "desc" });
+    expect(sortOf({ sort: "nurture" })).toEqual({ key: "nurture", dir: "desc" });
+    expect(sortOf({ sort: "owner" })).toEqual({ key: "owner", dir: "asc" });
+  });
+
+  it("reads the old temp and lane sort keys as the merged temperature sort", () => {
+    expect(sortOf({ sort: "temp", dir: "asc" })).toEqual({ key: "temperature", dir: "asc" });
+    expect(sortOf({ sort: "lane" })).toEqual({ key: "temperature", dir: "desc" });
+  });
+
+  it("round-trips the sort, the filters and the view together", () => {
+    const filters = { ...EMPTY_INTAKE_FILTERS, source: ["UGW"], temp: "none" as const, q: "ada" };
+    const state = { view: "board" as const, group: "owner" as const, sort: { key: "temperature" as const, dir: "asc" as const } };
+    const href = intakeHref(filters, state);
+    expect(href).toBe("/dashboard/intake/?source=UGW&temp=none&q=ada&view=board&group=owner&sort=temperature&dir=asc");
+    const record = searchParamsToRecord(new URLSearchParams(href.split("?")[1]));
+    expect(parseIntakeFilters(record)).toEqual(filters);
+    expect(parseIntakeViewState(record)).toEqual(state);
+  });
+
+  it("keeps the sort on the table and on both boards", () => {
+    const sort = { key: "owner" as const, dir: "desc" as const };
+    expect(intakeQueryString(EMPTY_INTAKE_FILTERS, { view: "table", group: "stage", sort })).toBe("sort=owner&dir=desc");
+    expect(intakeQueryString(EMPTY_INTAKE_FILTERS, { view: "board", group: "stage", sort })).toBe("view=board&sort=owner&dir=desc");
+  });
+});
+
+describe("the merged temperature filter", () => {
+  it("reads ?temp= including none (Not routed)", () => {
+    expect(parseIntakeFilters({ temp: "none" }).temp).toBe("none");
+    expect(parseIntakeFilters({ temp: "warm" }).temp).toBe("warm");
+  });
+
+  it("reads the old ?lane= as an alias, and ?temp= wins when both are present", () => {
+    expect(parseIntakeFilters({ lane: "warm" }).temp).toBe("warm");
+    expect(parseIntakeFilters({ lane: "none" }).temp).toBe("none");
+    expect(parseIntakeFilters({ lane: "cold", temp: "hot" }).temp).toBe("hot");
+  });
+
+  it("drops ?lane=suggested and unknown values rather than filtering everything out", () => {
+    expect(parseIntakeFilters({ lane: "suggested" }).temp).toBeNull();
+    expect(parseIntakeFilters({ temp: "lukewarm" }).temp).toBeNull();
+    expect(parseIntakeFilters({ lane: "suggested", temp: "lukewarm" }).temp).toBeNull();
+  });
+
+  it("writes only ?temp=, never ?lane=", () => {
+    expect(filtersToQueryString({ ...EMPTY_INTAKE_FILTERS, temp: "none" })).toBe("temp=none");
+    const parsed = parseIntakeFilters({ lane: "hot" });
+    expect(filtersToQueryString(parsed)).toBe("temp=hot");
+  });
+});
+
+describe("the KPI counts follow the effective temperature", () => {
+  it("counts a person's lane over what the activity says, and leaves Not routed out", () => {
+    const rows = rowsFor([
+      // replied yesterday: the activity says hot, but a person set cold
+      lead({ id: "a", last_inbound_at: daysBefore(1), lane: "cold", lane_set_at: daysBefore(0) }),
+      lead({ id: "b", lane: "hot", lane_set_at: daysBefore(0) }),
+      lead({ id: "c" }), // Not routed
+    ]);
+    const kpis = computeIntakeKpis(rows);
+    expect(kpis).toMatchObject({ hot: 1, warm: 0, cold: 1 });
   });
 });

@@ -22,6 +22,7 @@ export type IntakeListItem = {
   slug: string;
   url: string;
   sourceTag: string | null;
+  kind: "intake" | "assessment";
   status: "draft" | "live" | "archived";
   stats: { captured: number; completed: number; unfinished: number; median: string; rate: string } | null;
 };
@@ -39,6 +40,7 @@ export function IntakeList({
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
+  const [newKind, setNewKind] = useState<"intake" | "assessment">("intake");
   const [showArchived, setShowArchived] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -75,14 +77,14 @@ export function IntakeList({
         <div style={{ flex: 1, minWidth: 240 }}>
           <div className="lx-label">Intake</div>
           <h1 className="lx-h1">Intake forms</h1>
-          <p className="lx-sub">One per event, campaign or page. Each has its own link, QR code, source tag and numbers.</p>
+          <p className="lx-sub">One per event, campaign or page: a chat or form, or a scored assessment. Each has its own link, QR code, source tag and numbers.</p>
         </div>
         {canEdit && (
           <form
             className="ifl-new"
             onSubmit={(e) => {
               e.preventDefault();
-              run(() => createIntakeFormAction(newName), true);
+              run(() => createIntakeFormAction(newName, newKind), true);
             }}
           >
             <input
@@ -93,6 +95,10 @@ export function IntakeList({
               aria-label="New intake name"
               onChange={(e) => setNewName(e.target.value)}
             />
+            <select className="ifm-input" value={newKind} aria-label="Type" onChange={(e) => setNewKind(e.target.value === "assessment" ? "assessment" : "intake")}>
+              <option value="intake">Chat or form</option>
+              <option value="assessment">Assessment</option>
+            </select>
             <button type="submit" className="lx-btn lx-btn-pri" disabled={pending || !newName.trim()}>
               New intake
             </button>
@@ -123,6 +129,7 @@ export function IntakeList({
                   <i />
                   {i.status === "live" ? "Live" : i.status === "archived" ? "Archived" : "Draft"}
                 </span>
+                <span className="ifl-kind">{i.kind === "assessment" ? "Assessment" : "Chat or form"}</span>
                 {i.sourceTag && <span className="lx-pill lx-pill-ox">{i.sourceTag}</span>}
               </div>
               <div className="ifl-link">

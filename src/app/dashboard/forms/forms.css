@@ -1488,7 +1488,7 @@ textarea.ifm-input {
 }
 .ifm-stats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 12px;
 }
 .ifm-unfinished {
@@ -1716,4 +1716,340 @@ textarea.ifm-input {
   .ifl-new {
     flex-basis: 100%;
   }
+}
+
+/* ── assessment intakes (0095) ─────────────────────────────────────────────── */
+.ifm-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--ink);
+}
+.ifm-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--ox);
+}
+.ifm-asm-list {
+  margin: 0;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.ifm-asm-q {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ifm-asm-sub {
+  font-size: 13px;
+  min-height: 34px;
+}
+.ifm-asm-preview {
+  align-self: start;
+  position: sticky;
+  top: 16px;
+  gap: 10px;
+}
+.ifm-asm-plist {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink);
+}
+.ifl-kind {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.ifl-new select {
+  flex: none;
+  width: auto;
+}
+
+/* ── results (per-question answers, distributions) and event assessments ── */
+.ifr-block {
+  gap: 14px;
+}
+.ifr-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ifr-bar-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 190px) minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  color: var(--ink);
+}
+.ifr-bar-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ifr-bar {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--well);
+  overflow: hidden;
+}
+.ifr-bar > i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--ox);
+}
+.ifr-bar-count {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.ifr-buckets {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 6px;
+  align-items: end;
+  height: 120px;
+}
+.ifr-bucket {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: stretch;
+  gap: 4px;
+  height: 100%;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+.ifr-bucket > i {
+  display: block;
+  border-radius: 4px 4px 0 0;
+  background: var(--ox);
+  min-height: 2px;
+}
+.ifr-bucket b {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.ifr-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+}
+.ifr-q {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ifr-q-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.ifr-answers {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+.ifr-answers > li {
+  display: grid;
+  grid-template-columns: minmax(130px, 200px) minmax(0, 1fr) auto;
+  gap: 4px 16px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line-2);
+  font-size: 14.5px;
+  line-height: 21px;
+  color: var(--ink);
+}
+.ifr-answers .ifr-who {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.ifr-answers .ifr-text {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.ifr-answers .ifr-meta {
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.ifr-gaps {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14.5px;
+}
+.ife-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+@media (max-width: 760px) {
+  .ifr-bar-row {
+    grid-template-columns: minmax(0, 1fr) 44px;
+  }
+  .ifr-bar-row .ifr-bar {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .ifr-answers > li {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.ife-section {
+  margin-top: 28px;
+}
+
+/* Choice questions (Sprint 10): the type select, the option list, and the assessment's own questions. */
+.ifm-q.has-options,
+.ifm-extra.has-options {
+  flex-wrap: wrap;
+}
+.ifm-q-type {
+  flex: 0 0 156px;
+  width: 156px;
+  min-width: 0;
+}
+.ifm-q-options {
+  flex: 1 1 100%;
+  box-sizing: border-box;
+  padding: 2px 0 4px 26px;
+}
+.ifm-opts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ifm-opts-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ifm-opt {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.ifm-opt .ifm-input {
+  flex: 1;
+  min-width: 0;
+}
+.ifm-opts-foot {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.ifm-opts-warn {
+  color: var(--wine);
+}
+.ifm-extras {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ifm-extra {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid rgba(42, 18, 22, 0.1);
+}
+.ifm-extra-moves {
+  display: flex;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+.ifm-asm-hide {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ifm-asm-stays {
+  font-style: italic;
+}
+.ifm-asm-q.hidden .ifm-input {
+  opacity: 0.55;
+}
+
+/* The same choice control, drawn in the editor's live preview (ifm-pv-*). */
+.ifm-pv-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ifm-pv-choice-opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--pv-line);
+  background: var(--pv-field);
+  font-size: 13px;
+  line-height: 18px;
+}
+.ifm-pv-choice-opt input {
+  flex: none;
+  margin: 2px 0 0;
+  accent-color: var(--pv-acc);
+}
+.ifm-pv-choice-opt.on {
+  border-color: var(--pv-acc);
+}
+.ifm-pv-choice.chat {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+.ifm-pv-choice.chat .ifm-pv-choice-opt {
+  border-radius: 999px;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+
+/* Step-level numbers (Sprint 10): drop-off by question, median time per step, "stopped at". */
+.ifr-steps,
+.ifm-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ifr-extras {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ifm-stopped {
+  white-space: nowrap;
+}
+.ifm-stepnote .ifm-answers {
+  margin: 6px 0 0;
 }

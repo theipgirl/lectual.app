@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { MemberIdentity } from "@/lib/members/directory";
-import type { ReferralSource, Temperature } from "@/lib/intake";
+import type { ReferralSource } from "@/lib/intake";
 import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
 import { pendingFor } from "@/lib/intake/needs-rebecca";
 import type { IntakeRow, SortDir, SortKey } from "@/lib/intake/rows";
@@ -13,7 +13,6 @@ import TimeChip from "@/components/intake/TimeChip";
 import { LtnSuggestion } from "@/components/intake/LtnSuggestion";
 import OwnerCell from "./OwnerCell";
 import TemperatureCell from "./TemperatureCell";
-import LaneCell from "./LaneCell";
 import NeedsRebeccaBadge from "./NeedsRebeccaBadge";
 import SourceCell from "./SourceCell";
 import type { Lane } from "@/lib/leads/lane";
@@ -27,8 +26,13 @@ import {
   TOUCH_OUT,
 } from "./styles";
 
-/** The canvas's column widths, verbatim. The checkbox column is omitted (§11). */
-const GRID = "2.1fr 1.15fr .8fr 1.25fr .95fr 64px 1.15fr 1.5fr";
+/**
+ * The canvas's column widths. The checkbox column is omitted (§11), and the
+ * single Temperature column takes the room two columns used to, so
+ * a "Suggested: Warm" chip never runs into its neighbour. Seven columns, in
+ * the header strip and in every row.
+ */
+const GRID = "2.1fr 1.15fr 1.6fr .95fr 64px 1.15fr 1.5fr";
 
 /** Below this the columns would be unreadable, so the table scrolls instead. */
 const MIN_TABLE_WIDTH = 1000;
@@ -36,8 +40,7 @@ const MIN_TABLE_WIDTH = 1000;
 const COLUMNS: Array<{ key: SortKey; label: string }> = [
   { key: "lead", label: "Lead" },
   { key: "stage", label: "Stage" },
-  { key: "temp", label: "Temp" },
-  { key: "lane", label: "Lane" },
+  { key: "temperature", label: "Temperature" },
   { key: "source", label: "Source" },
   { key: "owner", label: "Owner" },
   { key: "lastTouch", label: "Last touch" },
@@ -56,7 +59,7 @@ const ellipsis: React.CSSProperties = {
  * with dates in them is a table.
  *
  * Every value on a row is derived: stage and source are columns, temperature
- * and reply state come from the pure helpers, and "Next step" is the latest
+ * (a person's lane, else the derived one) and reply state come from the pure helpers, and "Next step" is the latest
  * note or a statement of the reply state (views.ts). Nothing here is invented
  * and nothing reads as advice.
  */
@@ -72,7 +75,6 @@ export default function IntakeTable({
   time,
   pendingApprovals,
   onSort,
-  onSetTemperature,
   onSetLane,
   onAssign,
   onSetSource,
@@ -91,7 +93,7 @@ export default function IntakeTable({
   /** Absent = nothing to show; see needs-rebecca.ts for the three states. */
   pendingApprovals?: LeadPendingApprovals;
   onSort: (key: SortKey) => void;
-  onSetTemperature: (leadId: string, level: Temperature | null) => void;
+  /** Sets or clears the person's lane, which is the temperature the chip shows. */
   onSetLane: (leadId: string, lane: Lane | null) => void;
   onAssign: (leadId: string, userId: string | null) => void;
   onSetSource: (leadId: string, source: ReferralSource | null) => void;
@@ -199,7 +201,7 @@ export default function IntakeTable({
                       >
                         {lead.mark_text?.trim() || lead.business_name?.trim() || "—"}
                       </span>
-                      {/* A suggestion, in the lead cell: the Temp column is too narrow for a sentence. */}
+                      {/* A suggestion, in the lead cell: the Temperature column is too narrow for a sentence. */}
                       <LtnSuggestion suggestion={row.temperature.suggestion} leadId={lead.id} />
                     </div>
                   </div>
@@ -223,10 +225,8 @@ export default function IntakeTable({
                     leadName={name}
                     temperature={row.temperature}
                     pending={pending}
-                    onSet={(level) => onSetTemperature(lead.id, level)}
+                    onSet={(lane) => onSetLane(lead.id, lane)}
                   />
-
-                  <LaneCell leadName={name} lane={row.lane} pending={pending} onSet={(lane) => onSetLane(lead.id, lane)} />
 
                   <div style={{ minWidth: 0, display: "flex" }}>
                     <SourceCell

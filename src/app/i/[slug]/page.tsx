@@ -5,6 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { readPublicIntake } from "@/lib/intake-forms/public";
 import { refererHost } from "@/lib/intake-forms/spam";
 import { renderStamp } from "@/lib/intake-forms/secrets";
+import { PublicAssessment } from "./_components/PublicAssessment";
 import { PublicIntake } from "./_components/PublicIntake";
 import { IntakeNotice } from "./_components/IntakeShell";
 import "../intake-public.css";
@@ -70,6 +71,10 @@ export default async function PublicIntakePage({
   const own = (h.get("x-forwarded-host") ?? h.get("host") ?? "").toLowerCase();
   const from = refererHost(h.get("referer"));
   const stamp = renderStamp(r.handle.formId, from && from !== own ? from : null);
+
+  if (r.handle.kind === "assessment") {
+    return <PublicAssessment slug={r.handle.slug} view={r.view} stamp={stamp} embed={sp.embed === "1"} />;
+  }
 
   return (
     <PublicIntake
