@@ -28,7 +28,7 @@ export type FakeDbOptions = {
   tables?: Record<string, Row[]>;
 };
 
-const UNIQUE: Record<string, string[]> = { crm_matter_contact: ["matter_id", "contact_id", "role"] };
+const UNIQUE: Record<string, string[]> = { crm_matter_contact: ["matter_id", "contact_id", "role"], crm_file: ["storage_path"] };
 
 /** Column defaults the database applies on insert. */
 const DEFAULTS: Record<string, Row> = { crm_task: { status: "open", type: "custom" }, crm_matter_deadline: { status: "open" } };
@@ -286,7 +286,9 @@ class Builder implements PromiseLike<Result> {
         if (unique && db.rows(table).some((r) => unique.every((c) => r[c] === raw[c]))) {
           return { data: null, error: { code: "23505", message: "duplicate key value violates unique constraint" } };
         }
-        const row: Row = { id: db.nextId(table), created_at: new Date(Date.now() + db.rows(table).length).toISOString(), ...DEFAULTS[table], ...raw };
+        // crm_file.uploaded_by takes auth.uid() when the insert does not name it (0097).
+        const asUser: Row = table === "crm_file" ? { uploaded_by: db.userId } : {};
+        const row: Row = { id: db.nextId(table), created_at: new Date(Date.now() + db.rows(table).length).toISOString(), ...DEFAULTS[table], ...asUser, ...raw };
         db.rows(table).push(row);
         stored.push({ ...row });
       }

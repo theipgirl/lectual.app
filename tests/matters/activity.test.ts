@@ -176,6 +176,7 @@ describe("append-only: no update/delete exported", () => {
         "ACTIVITY_TYPES_0036",
         "ACTIVITY_TYPES_0045",
         "ACTIVITY_TYPES_0047",
+        "ACTIVITY_TYPES_0097",
         "activityForLead",
         "activityForMatter",
         "hasMatterActivityType",
