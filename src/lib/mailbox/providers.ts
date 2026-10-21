@@ -9,7 +9,7 @@ import { pkceChallenge } from "./state";
  *                              draft in the approver's mailbox; a person sends)
  *   Microsoft Mail.Read, Mail.ReadWrite — the same pair in Graph terms
  *             (ReadWrite is what drafts need; we never send or delete)
- *             Calendars.Read — read-only; the daily sync copies upcoming events
+ *             Calendars.Read, read-only; the daily sync copies upcoming events
  *             so consults show on the calendar, lead page and Today. It is
  *             asked for but NOT required: declining it still connects the
  *             mailbox for mail and leaves it in "Reconnect to read the

@@ -329,7 +329,7 @@ function AgendaView({
 
 /**
  * Calendar: a month grid, a week view and the agenda list, over the same
- * sources — open docket deadlines, open task due dates, and events in
+ * sources: open docket deadlines, open task due dates, and events in
  * crm_calendar_event, which for a firm with the mailbox module include the
  * events the daily sync reads from its connected Outlook calendars. Timed
  * events are placed in the firm's own time zone (Settings → Firm profile).
