@@ -5,9 +5,9 @@ import { getScopedClient } from "@/lib/db/scoped-client";
 import { assignLead, moveLeadStage } from "@/lib/pipeline";
 import { CAN_WRITE_LEAD, resolveCurrentRole } from "@/lib/pipeline/leads";
 import { forbiddenLeadWrite } from "@/lib/pipeline/errors";
-import { setLane, setReferralSource, setTemperature } from "@/lib/intake/leads";
+import { setLane, setReferralSource } from "@/lib/intake/leads";
 import { isLane, type Lane } from "@/lib/leads/lane";
-import { isReferralSource, type ReferralSource, type Temperature } from "@/lib/intake";
+import { isReferralSource, type ReferralSource } from "@/lib/intake";
 // Pure helpers, shared with the pipeline page rather than re-implemented:
 // only a LeadWriteError's message is ever allowed through to a firm user's
 // screen, so a raw RLS/Postgres string can't leak from this surface either.
@@ -29,8 +29,6 @@ import {
 
 export type IntakeActionResult = { ok: true } | { ok: false; error: string };
 
-const TEMPERATURES: readonly Temperature[] = ["hot", "warm", "cold"];
-
 /**
  * Re-checks the caller's role for the one write whose data-layer function does
  * NOT self-gate (assignLead). Same list and same "resolve every time, never
@@ -42,30 +40,6 @@ async function requireIntakeWriteRole(): Promise<void> {
   if (!CAN_WRITE_LEAD.includes(role)) {
     throw forbiddenLeadWrite(role, "edit leads");
   }
-}
-
-/** Sets or clears a lead's hot/warm/cold override (§4.3). */
-export async function setTemperatureAction(
-  leadId: string,
-  level: Temperature | null,
-): Promise<IntakeActionResult> {
-  if (!leadId) return { ok: false, error: "Missing lead." };
-  if (level !== null && !TEMPERATURES.includes(level)) {
-    return { ok: false, error: "That isn't a temperature." };
-  }
-
-  try {
-    await setTemperature(leadId, level);
-  } catch (err) {
-    return {
-      ok: false,
-      error: friendlyLeadWriteError(err, "Couldn't update this lead's temperature."),
-    };
-  }
-
-  revalidatePath("/dashboard/intake/");
-  revalidatePath(`/dashboard/leads/${leadId}`);
-  return { ok: true };
 }
 
 /**
@@ -121,9 +95,10 @@ export async function moveStageAction(
 }
 
 /**
- * Sets or clears a lead's routing lane — the person's override of the triage
- * suggestion (intake SOP Stage 2). The data layer re-checks the role, and the
- * database stamps who and when from the session.
+ * Sets or clears a lead's temperature, which is the routing lane — the
+ * person's call, over what the activity rules and triage suggest (intake SOP
+ * Stage 2). It is the only temperature write on this surface. The data layer
+ * re-checks the role, and the database stamps who and when from the session.
  */
 export async function setLaneAction(leadId: string, lane: Lane | null): Promise<IntakeActionResult> {
   if (!leadId) return { ok: false, error: "Missing lead." };

@@ -46,6 +46,9 @@ export const COLD_NO_TOUCH_DAYS = 10;
 /** A sequence counts as the firm's "standard" one when it has at least this many email steps (also a placeholder). */
 export const STANDARD_SEQUENCE_EMAIL_STEPS = 3;
 
+/** The derivation's answer for a lead with no touch, no facts and no nurture stage. */
+export const NEVER_TOUCHED_REASON = "Never touched";
+
 function daysAgo(iso: string, now: Date): number {
   return (now.getTime() - new Date(iso).getTime()) / 86_400_000;
 }
@@ -144,7 +147,7 @@ export function deriveTemperature(
   // Rule 3.
   const touch = lastTouchAt(lead);
   if (touch == null) {
-    return { level: "cold", reason: "Never touched", overridden: false };
+    return { level: "cold", reason: NEVER_TOUCHED_REASON, overridden: false };
   }
   const daysSinceTouch = daysAgo(touch, now);
 

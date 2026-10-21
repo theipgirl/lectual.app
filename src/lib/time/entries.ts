@@ -278,7 +278,7 @@ export async function stopTimer(entryId: string, note?: string | null): Promise<
   // Zero affected rows is NOT an error to PostgREST — an update whose USING
   // clause matches nothing simply succeeds. Selecting an array rather than
   // .single() is what keeps a cross-org id or a raced Stop from coming back as
-  // a green "saved" (same reasoning as setTemperature in src/lib/intake/leads.ts).
+  // a green "saved" (same reasoning as setLane in src/lib/intake/leads.ts).
   const stopped = (data ?? [])[0];
   if (!stopped) {
     throw new LeadWriteError("That timer has already been stopped, or isn't yours to stop.");
