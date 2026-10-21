@@ -2568,6 +2568,77 @@ export type Database = {
           },
         ]
       }
+      // HAND-ADDED for lectual 0097 (client files). The next `generate_typescript_types`
+      // run against the dev project replaces this block with the generated one.
+      // `uploaded_by` and `created_at` are not insertable: the column grant leaves them to
+      // their defaults (auth.uid(), now()), so an upload cannot be attributed to a colleague.
+      crm_file: {
+        Row: {
+          contact_id: string | null
+          created_at: string
+          file_name: string
+          id: string
+          lead_id: string | null
+          matter_id: string | null
+          mime: string
+          org_id: string
+          size_bytes: number
+          storage_path: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          contact_id?: string | null
+          file_name: string
+          id?: string
+          lead_id?: string | null
+          matter_id?: string | null
+          mime: string
+          org_id: string
+          size_bytes: number
+          storage_path: string
+        }
+        Update: {
+          contact_id?: string | null
+          file_name?: string
+          id?: string
+          lead_id?: string | null
+          matter_id?: string | null
+          mime?: string
+          org_id?: string
+          size_bytes?: number
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_file_contact_fk"
+            columns: ["contact_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contact"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "crm_file_lead_fk"
+            columns: ["lead_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_lead"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "crm_file_matter_fk"
+            columns: ["matter_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_matter"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "crm_file_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_org"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crm_matter_deadline: {
         Row: {
           anchor_date: string | null

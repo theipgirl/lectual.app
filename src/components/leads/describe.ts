@@ -5,6 +5,7 @@
  */
 import { STOP_REASON_LABEL, isStopReason } from "@/lib/campaigns/stops";
 import { CONSULT_OUTCOME_LABEL, isConsultOutcome } from "@/lib/pipeline/consult-outcome-labels";
+import { formatFileSize } from "@/lib/files/rules";
 
 type Row = { type: string; actor_type: string | null; created_at: string; payload: unknown };
 
@@ -107,6 +108,12 @@ export function describeActivity(row: Row): Described {
       return { title: "Call logged", detail: str(p.summary) ?? str(p.notes) ?? str(p.body), tone: "note", link: null };
     case "voice_note":
       return { title: "Voice note", detail: str(p.transcript), tone: "note", link: null };
+    case "file_uploaded": {
+      // confirmUploadAction (src/app/dashboard/files/actions.ts) writes file_name and size_bytes, never the storage path.
+      const name = str(p.file_name);
+      const size = typeof p.size_bytes === "number" && Number.isFinite(p.size_bytes) && p.size_bytes >= 0 ? formatFileSize(p.size_bytes) : null;
+      return { title: name ? `File added: ${name}` : "File added", detail: size, tone: "note", link: null };
+    }
     case "stage_changed": {
       // moveLeadStage and the quote-acceptance advance write `to_stage` /
       // `from_stage` (names); other producers wrote the older keys.

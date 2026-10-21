@@ -26,12 +26,21 @@ export type ActivityType0045 = (typeof ACTIVITY_TYPES_0045)[number];
 export const ACTIVITY_TYPES_0047 = ["welcome_email"] as const;
 export type ActivityType0047 = (typeof ACTIVITY_TYPES_0047)[number];
 
+/**
+ * Added by lectual 0097_client_files.sql (a file stored on a lead or matter). Hand-added
+ * with the other widenings: the next codegen run folds it into `crm_activity_type` and
+ * this becomes a no-op.
+ */
+export const ACTIVITY_TYPES_0097 = ["file_uploaded"] as const;
+export type ActivityType0097 = (typeof ACTIVITY_TYPES_0097)[number];
+
 export type ActivityType =
   | Activity["type"]
   | ActivityType0033
   | ActivityType0036
   | ActivityType0045
-  | ActivityType0047;
+  | ActivityType0047
+  | ActivityType0097;
 
 export type LogActivityInput = {
   type: ActivityType;
