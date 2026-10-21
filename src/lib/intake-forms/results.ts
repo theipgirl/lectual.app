@@ -69,7 +69,7 @@ const time = (iso: string) => {
 /**
  * Per-question answers for an intake. The form's own questions come first, in
  * order (with no answers they say so); a question the form has since removed
- * follows, in first-seen order, under the text it was asked with. A reworded
+ * follows, most recently answered first, under the wording it was last asked with. A reworded
  * question groups with its old answers because the id is the same. Only
  * submissions that sent answers contribute, and a blank answer is no answer.
  */

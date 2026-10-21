@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { RANGES, formatDuration, intakeDetail, intakeTableRows, submissionStats, type RangeDays } from "@/lib/intake-forms/performance";
+import { RANGES, formatDuration, intakeTableRows, submissionStats, timingSplit, type RangeDays } from "@/lib/intake-forms/performance";
 import { INTAKE_TABLE_LIMIT, loadFunnel, loadIntakeList, loadIntakeSubmission, loadSubmissionStatRows } from "@/lib/intake-forms/load-performance";
 import type { IntakeFormRecord } from "@/lib/intake-forms/store";
 import { getFirmTimeZone } from "@/lib/org/profile";
-import { IntakeStatusForm } from "./IntakeStatusForm";
+import { IntakeDrawer, Unreadable, FIT_TONE, STATUS_TONE } from "./IntakeDrawer";
 
 /**
  * The Performance tab (server-rendered, handed to the workspace as a slot).
@@ -13,28 +13,8 @@ import { IntakeStatusForm } from "./IntakeStatusForm";
  * intakes yet", and a funnel that couldn't load is not a row of zeros.
  */
 
-const FIT_TONE: Record<string, string> = { fit: "ok", non_fit: "risk", unscored: "mute", hot: "risk", warm: "warn", cold: "mute" };
-const STATUS_TONE: Record<string, string> = {
-  new: "ox",
-  referred: "sand",
-  consult_booked: "warn",
-  engaged: "ok",
-  rejected: "risk",
-  stopped: "mute",
-};
-
 function hrefFor(formId: string, range: RangeDays, intake?: string) {
   return `/dashboard/forms/?form=${encodeURIComponent(formId)}&tab=performance&range=${range}${intake ? `&intake=${encodeURIComponent(intake)}` : ""}`;
-}
-
-function Unreadable({ what, unconfigured }: { what: string; unconfigured: boolean }) {
-  return (
-    <div className="lx-banner lx-banner-warn" role="status">
-      {unconfigured
-        ? `${what} aren't set up in this environment (lectual migration 0079). Nothing is broken; it needs the migration.`
-        : `${what} couldn't be loaded. This is a problem reaching the database, not an empty result. Try again shortly.`}
-    </div>
-  );
 }
 
 export async function IntakePerformance({
@@ -56,6 +36,7 @@ export async function IntakePerformance({
     loadSubmissionStatRows(form.id, range),
   ]);
   const stats = statRows.status === "ok" ? submissionStats(statRows.value.rows) : null;
+  const split = statRows.status === "ok" ? timingSplit(statRows.value.rows) : null;
 
   const nothingYet = !form.everSaved && funnel.status === "ok" && funnel.value.visited === 0 && list.status === "ok" && list.value.length === 0;
   const rows = list.status === "ok" ? intakeTableRows(list.value, undefined, tz) : [];
@@ -125,6 +106,16 @@ export async function IntakePerformance({
                 { label: "Finished", value: stats.completed.toLocaleString("en-US"), sub: `${stats.completionRate} of those` },
                 { label: "Didn't finish", value: stats.unfinished.toLocaleString("en-US"), sub: "Still leads: worth a follow-up" },
                 { label: "Median time to finish", value: formatDuration(stats.medianMs), sub: "From opening the page to sending" },
+                {
+                  label: "Page to contact details",
+                  value: formatDuration(split?.medianToContactMs ?? null),
+                  sub: "Median, from opening the page to giving details",
+                },
+                {
+                  label: "Contact details to finish",
+                  value: formatDuration(split?.medianContactToFinishMs ?? null),
+                  sub: "Median, over people who finished",
+                },
                 ...(form.kind === "assessment"
                   ? [
                       {
@@ -209,66 +200,6 @@ export async function IntakePerformance({
       )}
 
       {intakeId && detail && <IntakeDrawer detail={detail} tz={tz} closeHref={hrefFor(form.id, range)} canChangeStatus={canChangeStatus} />}
-    </div>
-  );
-}
-
-function IntakeDrawer({
-  tz,
-  detail,
-  closeHref,
-  canChangeStatus,
-}: {
-  detail: Awaited<ReturnType<typeof loadIntakeSubmission>>;
-  tz: string;
-  closeHref: string;
-  canChangeStatus: boolean;
-}) {
-  const d = detail.status === "ok" && detail.value ? intakeDetail(detail.value, tz) : null;
-  return (
-    <div className="ifm-drawer-wrap">
-      <Link href={closeHref} scroll={false} className="ifm-drawer-scrim" aria-label="Close" />
-      <aside className="ifm-drawer" aria-label="Intake">
-        <div className="ifm-drawer-head">
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="ifm-drawer-name">{d ? d.name : "Intake"}</div>
-            {d?.sub && <div className="ifm-help">{d.sub}</div>}
-          </div>
-          <Link href={closeHref} scroll={false} className="ifm-icon-btn" aria-label="Close">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
-              <path d="M6 6l12 12M18 6L6 18" />
-            </svg>
-          </Link>
-        </div>
-        <div className="ifm-drawer-body">
-          {detail.status !== "ok" ? (
-            <Unreadable what="This intake" unconfigured={detail.status === "unconfigured"} />
-          ) : !d ? (
-            <p className="ifm-help">That intake isn&apos;t in your firm, or it was removed.</p>
-          ) : (
-            <>
-              <div className="ifm-drawer-badges">
-                <span className={`ifm-badge ${FIT_TONE[d.fitKey] ?? "mute"}`}>{d.fit}</span>
-                <span className={`ifm-badge ${STATUS_TONE[d.statusKey] ?? "mute"}`}>{d.status}</span>
-                <span className="ifm-badge sand">{d.modeLine}</span>
-              </div>
-              <div className="ifm-note">
-                <div className="ifm-caps">Screening note</div>
-                <div>{d.why}</div>
-              </div>
-              {canChangeStatus && <IntakeStatusForm key={`${d.id}:${d.statusKey}`} id={d.id} status={d.statusKey} />}
-              <dl className="ifm-answers">
-                {d.answers.map((a, i) => (
-                  <div key={i}>
-                    <dt>{a.q}</dt>
-                    <dd>{a.a}</dd>
-                  </div>
-                ))}
-              </dl>
-            </>
-          )}
-        </div>
-      </aside>
     </div>
   );
 }

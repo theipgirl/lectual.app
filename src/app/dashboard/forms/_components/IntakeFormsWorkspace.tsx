@@ -37,9 +37,10 @@ import { AssessmentPreview, AssessmentSettingsCard } from "./AssessmentSettings"
  * answers with the stored form, which becomes the new "saved" snapshot that
  * Discard returns to.
  *
- * The Performance tab is rendered on the server and handed in as `performance`,
- * so switching tabs (a soft navigation to `?tab=performance`) keeps unsaved
- * edits: this component stays mounted and its state with it.
+ * The Performance and Results tabs are rendered on the server and handed in as
+ * `performance` and `results`, so switching tabs (a soft navigation to
+ * `?tab=performance` or `?tab=results`) keeps unsaved edits: this component
+ * stays mounted and its state with it.
  *
  * Read-only for everyone below senior_admin: every control sits in a disabled
  * <fieldset>, and the Save action refuses them regardless.
@@ -53,9 +54,10 @@ type Props = {
   packages: { status: "ok"; items: WorkspacePackage[] } | { status: "unavailable" };
   origin: string;
   canEdit: boolean;
-  tab: "setup" | "performance";
+  tab: "setup" | "performance" | "results";
   range: number;
   performance: ReactNode;
+  results: ReactNode;
 };
 
 type Snapshot = { config: IntakeFormConfig; domains: string[]; details: IntakeDetails };
@@ -284,7 +286,7 @@ export function IntakeFormsWorkspace(props: Props) {
   const live = status === "live";
   const archived = status === "archived";
   const base = `/dashboard/forms/?form=${encodeURIComponent(form.id)}`;
-  const tabHref = (t: "setup" | "performance") => (t === "setup" ? base : `${base}&tab=performance&range=${props.range}`);
+  const tabHref = (t: "setup" | "performance" | "results") => (t === "setup" ? base : `${base}&tab=${t}&range=${props.range}`);
   const firmDisplay = config.firmName.trim() || props.orgName;
   const agreementSigned = form.agreementSignedAt !== null;
 
@@ -331,10 +333,15 @@ export function IntakeFormsWorkspace(props: Props) {
         <Link href={tabHref("performance")} scroll={false} aria-current={props.tab === "performance" ? "page" : undefined}>
           Performance
         </Link>
+        <Link href={tabHref("results")} scroll={false} aria-current={props.tab === "results" ? "page" : undefined}>
+          Results
+        </Link>
       </nav>
 
       {props.tab === "performance" ? (
         props.performance
+      ) : props.tab === "results" ? (
+        props.results
       ) : (
         <div className="ifm-setup">
           <fieldset className="ifm-editor" disabled={!canEdit}>

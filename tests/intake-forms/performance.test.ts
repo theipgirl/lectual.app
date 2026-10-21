@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildFunnel, intakeDetail, intakeTableRows, parseRange, percent } from "@/lib/intake-forms/performance";
+import { buildFunnel, durationBetween, formatDuration, intakeDetail, intakeTableRows, medianOf, parseRange, percent, submissionStats, timingSplit } from "@/lib/intake-forms/performance";
 import { parseAnswers, parseContact, submissionStatusLabel } from "@/lib/intake-forms/submission";
 
 describe("funnel", () => {
@@ -91,5 +91,54 @@ describe("submission shapes", () => {
     expect(parseAnswers("x")).toEqual([]);
     expect(parseAnswers([{ q: "A", a: "B" }, 5, [], { question: "", answer: "" }])).toEqual([{ id: null, question: "A", answer: "B" }]);
     expect(submissionStatusLabel("new")).toBe("New");
+  });
+});
+
+describe("time to finish, split in two (Sprint 9, F11)", () => {
+  const t = (min: number, sec = 0) => new Date(Date.UTC(2026, 9, 18, 15, 0, sec) + min * 60_000).toISOString();
+
+  it("takes the median of page → contact details over everyone, and contact details → finish over people who finished", () => {
+    const rows = [
+      { started_at: t(0), created_at: t(1), submitted_at: t(4) }, // 1 min, 3 min
+      { started_at: t(0), created_at: t(3), submitted_at: t(5) }, // 3 min, 2 min
+      { started_at: t(0), created_at: t(5), submitted_at: null }, // 5 min, did not finish
+    ];
+    expect(timingSplit(rows)).toEqual({ medianToContactMs: 3 * 60_000, medianContactToFinishMs: 150_000 });
+  });
+
+  it("uses the middle value for an odd count and the mean of the middle two for an even one", () => {
+    const odd = [0, 2, 9].map((m) => ({ started_at: t(0), created_at: t(m), submitted_at: t(m + 1) }));
+    expect(timingSplit(odd).medianToContactMs).toBe(2 * 60_000);
+    const even = [1, 2, 4, 9].map((m) => ({ started_at: t(0), created_at: t(m), submitted_at: t(m + 1) }));
+    expect(timingSplit(even).medianToContactMs).toBe(3 * 60_000);
+    expect(timingSplit(even).medianContactToFinishMs).toBe(60_000);
+  });
+
+  it("ignores negative and unparseable durations", () => {
+    const rows = [
+      { started_at: t(5), created_at: t(1), submitted_at: t(0) }, // both negative
+      { started_at: "nonsense", created_at: t(1), submitted_at: t(2) }, // first unparseable, second 1 min
+      { started_at: t(0), created_at: t(2), submitted_at: t(4) }, // 2 min, 2 min
+      { started_at: t(0), submitted_at: t(4) }, // no created_at: nothing to measure
+    ];
+    expect(timingSplit(rows)).toEqual({ medianToContactMs: 2 * 60_000, medianContactToFinishMs: 90_000 });
+  });
+
+  it("gives null (shown as a dash) when there is nothing to take a median of", () => {
+    expect(timingSplit([])).toEqual({ medianToContactMs: null, medianContactToFinishMs: null });
+    expect(timingSplit([{ started_at: t(0), created_at: t(1), submitted_at: null }])).toEqual({ medianToContactMs: 60_000, medianContactToFinishMs: null });
+    expect(formatDuration(null)).toBe("—");
+  });
+
+  it("leaves the existing numbers alone", () => {
+    const rows = [
+      { started_at: t(0), created_at: t(1), submitted_at: t(4) },
+      { started_at: t(0), created_at: t(1), submitted_at: null },
+    ];
+    expect(submissionStats(rows)).toMatchObject({ captured: 2, completed: 1, unfinished: 1, medianMs: 4 * 60_000, completionRate: "50.0%" });
+    expect(medianOf([])).toBeNull();
+    expect(medianOf([5, 1, 3])).toBe(3);
+    expect(durationBetween(t(1), t(0))).toBeNull();
+    expect(durationBetween(null, t(0))).toBeNull();
   });
 });
