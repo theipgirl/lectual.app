@@ -158,6 +158,44 @@ only: nothing is shared with a client and there is no portal.
 - `crm_file` and the `file_uploaded` activity type are hand-added in `src/lib/db/types.ts` and
   `src/lib/matters/activity.ts` until the next codegen run.
 
+## Stage reconciliation (Intake → Reconcile stages, no schema)
+`/dashboard/intake/reconcile/` compares each lead's stage with three sources and moves the ones a person
+chooses. Owner/admin/senior_admin only: the PAGE answers `notFound()` to anyone else (signed out included) and
+BOTH actions (`actions.ts`: `previewReconcileAction`, `applyReconcileAction`) re-resolve the role on every call
+and read or write nothing for a refused one. Nothing is written to Lawmatics, anywhere on this screen.
+- **The sheet wins.** `src/lib/reconcile/propose.ts` (`proposeStage`, pure) proposes only the sheet's stage.
+  Lawmatics and mail can only corroborate: `agree` (another source names the same stage and none names a
+  different one), `conflict` (any source differs; the proposal is still the sheet's), `sheet_only`, or
+  `no_evidence` (no usable sheet row: no proposal, however loudly the others agree). A source that could not be
+  read is `unavailable` on every row and in the reasons; it is never "none".
+- **`needs_matter`.** A sheet status code of 7 or higher, or Lawmatics "Hired"/"Hired Client" (the two names
+  `stage-map.ts` deliberately leaves unmapped), proposes NO stage and links to Open a matter. It outranks the sheet.
+  Any other unmapped Lawmatics stage ("Discovery Call No Show") is shown as unmapped and does not vote.
+- **No `won` stage is ever a target** (proposal, Pick another, bulk or apply): a move there runs the matter
+  handoff and stops the lead's sequences. Apply refuses it again against the live stage list.
+- **CSV only, 5 MB.** No spreadsheet library is installed (`xlsx` lives in lectual, not here), so an Excel file is
+  refused with a sentence telling the person to save as CSV (`src/lib/intake/sheet-read.ts`). The parse is the port of
+  lectual's `parseIntakeSheet` (`sheet-import.ts`, see `PORTED_FROM.md`). `next.config.ts` raises the
+  server-action body limit to 6 MB so the file reaches the action.
+- **Matching.** A lead matches a sheet row on `sheet_key`, exactly first. `sheetKeyFor` includes the status code, so
+  a row that moved on the sheet has a new key; failing an exact hit the owner and mark are also tried under every
+  intake code 0 to 6. Two candidates either way is reported as ambiguous, never picked. Sheet rows with no lead are
+  listed, never created. A lead with no `sheet_key` has no sheet reading.
+- **Email is the stored mail, not mail.** The mailbox sync already classified each message it matched and wrote the
+  type, `sensitive` and date onto the lead's `email_sent`/`email_received` timeline row. `src/lib/reconcile/email.ts`
+  maps four types to stage names (strategy-session link, discovery call, post-consult, LOE and invoice), resolved
+  with `resolveStage`; a sensitive thread, an unlisted type or a stage the firm lacks gives no vote. No mail is fetched.
+- **Lawmatics** is read through the firm's own connection with the read-only client (`pullSource`). Not connected,
+  failing, cut short (truncated) or missing its stage relationships are each a named state, never an empty book.
+- **Apply** goes only through `moveLeadStage(id, stageId, evidenceAt?)`, which logs `stage_changed`. The optional
+  third argument stamps `stage_entered_at` (and the timeline payload's `evidence_at`) with the sheet's newest
+  non-future dated entry; a future or invalid date is ignored. A person's "Pick another" carries no date.
+  `last_activity_at` still becomes now, as for every move.
+- **The fingerprint covers the plan the person was shown** (SHA-256 of the rows, sorted, `fingerprint.ts`). It is an
+  integrity check, not a signature. Apply recomputes it, then re-reads every lead and stage through the scoped client
+  and refuses the WHOLE apply, writing nothing, when a lead is missing or no longer in the stage the plan recorded.
+  One request moves at most 200 leads.
+
 ## JSX text spacing: keep the `{" "}`
 Next 16.2.7's compiler DROPS the leading space of JSX text that contains an HTML entity
 (`&apos;`, `&amp;`, `&rsquo;`…) and runs onto another line, even if that is only the line
