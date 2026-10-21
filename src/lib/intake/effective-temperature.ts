@@ -45,6 +45,14 @@ export type EffectiveTemperatureLead = Pick<
 > &
   Partial<Pick<Lead, "temperature" | "lane" | "lane_set_at">>;
 
+/**
+ * Setting a lane writes its own timeline row, and every timeline row stamps a
+ * touch a moment after `lane_set_at`. That touch is the lane change itself, not
+ * new activity, so a touch has to be later than the lane by more than this to
+ * count as newer.
+ */
+const OWN_TOUCH_GRACE_MS = 60_000;
+
 function time(iso: string | null | undefined): number | null {
   if (!iso) return null;
   const ms = new Date(iso).getTime();
@@ -67,7 +75,7 @@ export function effectiveTemperature(
     // A lane with no set time can't be shown to be newer than the touch, so the
     // touch counts as newer: better a hint that turns out redundant than a
     // lane that quietly hides a reply.
-    const touchedSince = touchedAt != null && (setAt == null || touchedAt > setAt);
+    const touchedSince = touchedAt != null && (setAt == null || touchedAt > setAt + OWN_TOUCH_GRACE_MS);
     const neverTouched = derived.reason === NEVER_TOUCHED_REASON;
     const differs = derived.level !== lane;
     return {

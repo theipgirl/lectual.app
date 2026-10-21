@@ -28,7 +28,7 @@ import {
 
 /**
  * The canvas's column widths. The checkbox column is omitted (§11), and the
- * single Temperature column takes the room the old Temp and Lane pair had, so
+ * single Temperature column takes the room two columns used to, so
  * a "Suggested: Warm" chip never runs into its neighbour. Seven columns, in
  * the header strip and in every row.
  */

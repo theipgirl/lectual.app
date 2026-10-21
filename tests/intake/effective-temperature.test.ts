@@ -137,6 +137,14 @@ describe("activityHint", () => {
     expect(effectiveTemperature(l, STAGES, NOW).activityHint).toBeUndefined();
   });
 
+  it("is absent for the touch the lane change itself leaves a moment later", () => {
+    const setAt = daysBefore(1);
+    const ownTouch = new Date(Date.parse(setAt) + 2_000).toISOString();
+    const l = lead({ lane: "cold", lane_set_at: setAt, last_activity_at: ownTouch });
+    expect(deriveTemperature({ ...l, temperature: null }, STAGES, NOW).level).toBe("warm");
+    expect(effectiveTemperature(l, STAGES, NOW).activityHint).toBeUndefined();
+  });
+
   it("is absent when the only newer thing is the 'Never touched' fallback", () => {
     const l = lead({ lane: "hot", lane_set_at: daysBefore(5) });
     expect(deriveTemperature({ ...l, temperature: null }, STAGES, NOW).reason).toBe("Never touched");
