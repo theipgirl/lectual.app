@@ -86,6 +86,17 @@ Intake → Forms keeps an intake per event, campaign or page (`/dashboard/forms/
   the person (submission with `submitted_at` null + their lead) and returns a token; Submit adds the
   answers to that row by the token's sha256. Someone who walks away is still a lead, and shows as
   "Didn't finish". Never move contact details after the questions again.
+- **Assessment intakes (lectual 0095):** `kind = 'assessment'` runs RPB's booth card
+  (`src/lib/assessment-card/`, ported verbatim) from the intake's link: contact first, then the card
+  one question at a time. The SERVER scores it (`scoreAssessmentAnswers`) from the stored card;
+  points and categories never reach the browser, and the person sees only score, band, gaps and next
+  step. Hot/warm/cold is staff-only (lead note, Intake numbers, Lawmatics tag). A firm may reword a
+  question; options, points and order are the card's.
+- **Lawmatics (`src/lib/intake-forms/lawmatics-sync.ts`):** every intake pushes its person to the
+  FIRM's own Lawmatics (0077 token, read for the org of the form the slug resolved), tagged with the
+  source tag, plus "Hot Lead"/"Warm Lead"/"Cold Lead" for an assessment. Those names are contracts with
+  the firm's Lawmatics automations. Runs in `after()`, never throws; `lawmatics_synced_at` /
+  `lawmatics_tagged_at` stay null when a step didn't land. A firm with no connection is skipped.
 - Archived intakes don't answer publicly and keep their leads. Matter intake requests use the
   firm's MAIN intake (oldest not archived).
 

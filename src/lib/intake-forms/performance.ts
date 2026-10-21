@@ -83,8 +83,13 @@ export type SubmissionListRow = {
   started_at: string;
   /** Null = gave contact details but never sent answers (contact-first, 0093). */
   submitted_at?: string | null;
+  /** Assessments only (0095): the server's score and the staff-only temperature. */
+  score?: number | null;
+  temperature?: string | null;
   last_active_at: string;
 };
+
+const TEMPERATURE_WORD: Record<string, string> = { hot: "Hot", warm: "Warm", cold: "Cold" };
 
 export type IntakeTableRow = {
   id: string;
@@ -124,8 +129,9 @@ export function intakeTableRows(rows: SubmissionListRow[], now = Date.now(), tz:
       email: c.email,
       started: formatIntakeTime(r.started_at, tz),
       mode: submissionModeLabel(r.mode),
-      fit: submissionFitLabel(r.fit),
-      fitKey: r.fit,
+      // An assessment is scored, not screened: show its temperature and score instead.
+      fit: r.temperature ? `${TEMPERATURE_WORD[r.temperature] ?? r.temperature}${typeof r.score === "number" ? ` · ${r.score}` : ""}` : submissionFitLabel(r.fit),
+      fitKey: r.temperature ?? r.fit,
       status: submissionStatusLabel(r.status),
       statusKey: r.status,
       last: relativeTime(r.last_active_at, now),
@@ -179,7 +185,7 @@ export function intakeDetail(r: SubmissionDetailRow, tz: string = FIRM_TIME_ZONE
  * Rows from before 0093 were only ever written on completion; they count as
  * captured and completed, which is what happened.
  */
-export type StatRow = { form_id?: string; started_at: string; submitted_at: string | null };
+export type StatRow = { form_id?: string; started_at: string; submitted_at: string | null; temperature?: string | null };
 
 export type SubmissionStats = {
   captured: number;
@@ -189,14 +195,18 @@ export type SubmissionStats = {
   completionRate: string;
   /** Milliseconds, or null when nothing completed. */
   medianMs: number | null;
+  /** Assessments: how many finished people were hot, warm, cold. */
+  temperatures: { hot: number; warm: number; cold: number };
 };
 
 export function submissionStats(rows: readonly StatRow[]): SubmissionStats {
   const durations: number[] = [];
+  const temperatures = { hot: 0, warm: 0, cold: 0 };
   let completed = 0;
   for (const r of rows) {
     if (!r.submitted_at) continue;
     completed++;
+    if (r.temperature === "hot" || r.temperature === "warm" || r.temperature === "cold") temperatures[r.temperature]++;
     const ms = Date.parse(r.submitted_at) - Date.parse(r.started_at);
     if (Number.isFinite(ms) && ms >= 0) durations.push(ms);
   }
@@ -209,6 +219,7 @@ export function submissionStats(rows: readonly StatRow[]): SubmissionStats {
     unfinished: rows.length - completed,
     completionRate: percent(completed, rows.length),
     medianMs,
+    temperatures,
   };
 }
 

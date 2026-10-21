@@ -25,6 +25,7 @@ import { DETAIL_LIMITS, type IntakeDetails } from "@/lib/intake-forms/details";
 import { saveIntakeFormAction } from "../actions";
 import { IntakePreview } from "./IntakePreview";
 import { IntakeQrButton } from "./IntakeQr";
+import { AssessmentPreview, AssessmentSettingsCard } from "./AssessmentSettings";
 
 /**
  * Intake → Forms (design/Intake_Forms.dc.html): the header, the two tabs,
@@ -148,7 +149,12 @@ export function IntakeFormsWorkspace(props: Props) {
   // The link as saved: an unsaved rename isn't live yet.
   const publicUrl = intakePublicUrl(props.origin, saved.details.slug);
   const embed = intakeEmbedSnippet(props.origin, saved.details.slug);
-  const items = goLiveChecklist(config, { receivesReferrals: form.receivesReferrals, agreementSigned: form.agreementSignedAt !== null });
+  const isAssessment = form.kind === "assessment";
+  const items = goLiveChecklist(config, {
+    receivesReferrals: form.receivesReferrals,
+    agreementSigned: form.agreementSignedAt !== null,
+    kind: form.kind,
+  });
   const done = items.filter((i) => i.ok).length;
   const allDone = checklistComplete(items);
   const err = (key: string) => showErrors && items.some((i) => i.key === key && !i.ok);
@@ -457,6 +463,10 @@ export function IntakeFormsWorkspace(props: Props) {
               </div>
             )}
 
+            {isAssessment ? (
+              <AssessmentSettingsCard settings={config.assessment} onChange={(assessment) => edit({ assessment })} />
+            ) : (
+              <>
             <section id="ifm-sec-mode" className="ifm-card">
               <h2 className="ifm-title">What visitors see first</h2>
               <div className="ifm-modes">
@@ -520,6 +530,9 @@ export function IntakeFormsWorkspace(props: Props) {
               </label>
             </section>
 
+              </>
+            )}
+
             <section id="ifm-sec-intro" className="ifm-card">
               <h2 className="ifm-title">Introduction</h2>
               <div className="ifm-grid2">
@@ -543,6 +556,8 @@ export function IntakeFormsWorkspace(props: Props) {
               <p className="ifm-help">Leave blank to use the standard wording.</p>
             </section>
 
+            {!isAssessment && (
+              <>
             <section id="ifm-sec-questions" className="ifm-card">
               <h2 className="ifm-title">Questions</h2>
               <div className="ifm-contact">
@@ -719,8 +734,12 @@ export function IntakeFormsWorkspace(props: Props) {
               )}
             </section>
 
+              </>
+            )}
+
             <section id="ifm-sec-screening" className="ifm-card">
-              <h2 className="ifm-title">Screening</h2>
+              <h2 className="ifm-title">{isAssessment ? "After they finish" : "Screening"}</h2>
+              {!isAssessment && (
               <div className="ifm-field">
                 <span className="ifm-field-head">
                   <span className="ifm-field-label">Fit criteria</span>
@@ -760,6 +779,7 @@ export function IntakeFormsWorkspace(props: Props) {
                 {err("fit") && <span className="ifm-err">Describe who you take on, so intakes can be screened.</span>}
                 <span className="ifm-help">Prospects are screened against this and never see it.</span>
               </div>
+              )}
               <label className="ifm-field">
                 <span className="ifm-field-head">
                   <span className="ifm-field-label" style={{ flex: 1 }}>
@@ -905,7 +925,11 @@ export function IntakeFormsWorkspace(props: Props) {
             </section>
           </fieldset>
 
-          <IntakePreview config={config} orgName={props.orgName} packages={config.feesOn ? visiblePkgs : []} theme={pvTheme} onTheme={setPvTheme} />
+          {isAssessment ? (
+            <AssessmentPreview settings={config.assessment} />
+          ) : (
+            <IntakePreview config={config} orgName={props.orgName} packages={config.feesOn ? visiblePkgs : []} theme={pvTheme} onTheme={setPvTheme} />
+          )}
         </div>
       )}
 

@@ -20,22 +20,30 @@ export type ChecklistSection = "screening" | "questions" | "compliance";
 
 export type ChecklistItem = { key: ChecklistKey; label: string; ok: boolean; section: ChecklistSection };
 
-export type ChecklistContext = { receivesReferrals: boolean; agreementSigned: boolean };
+export type ChecklistContext = {
+  receivesReferrals: boolean;
+  agreementSigned: boolean;
+  /** An assessment (0095) asks the card's own questions and is scored, not screened. */
+  kind?: "intake" | "assessment";
+};
 
 export function goLiveChecklist(
   config: Pick<IntakeFormConfig, "fitText" | "closing" | "questions" | "office">,
   ctx: ChecklistContext,
 ): ChecklistItem[] {
-  const items: ChecklistItem[] = [
-    { key: "fit", label: "Fit criteria", ok: config.fitText.trim() !== "", section: "screening" },
-    { key: "closing", label: "Closing message", ok: config.closing.trim() !== "", section: "screening" },
-    {
-      key: "questions",
-      label: "At least one question or question pack",
-      ok: config.questions.some((q) => q.text.trim() !== ""),
-      section: "questions",
-    },
-  ];
+  const items: ChecklistItem[] =
+    ctx.kind === "assessment"
+      ? [{ key: "closing", label: "Closing message", ok: config.closing.trim() !== "", section: "screening" }]
+      : [
+          { key: "fit", label: "Fit criteria", ok: config.fitText.trim() !== "", section: "screening" },
+          { key: "closing", label: "Closing message", ok: config.closing.trim() !== "", section: "screening" },
+          {
+            key: "questions",
+            label: "At least one question or question pack",
+            ok: config.questions.some((q) => q.text.trim() !== ""),
+            section: "questions",
+          },
+        ];
   if (ctx.receivesReferrals) {
     items.push({ key: "office", label: "Office location", ok: config.office.trim() !== "", section: "compliance" });
     items.push({ key: "agreement", label: "Participation agreement signed", ok: ctx.agreementSigned, section: "compliance" });

@@ -50,12 +50,15 @@ export function canEditIntakeForm(role: Role | null | undefined): boolean {
 }
 
 export type IntakeFormStatus = "draft" | "live" | "archived";
+export type IntakeKind = "intake" | "assessment";
 
 export type IntakeFormRecord = {
   id: string;
   name: string;
   slug: string;
   sourceTag: string | null;
+  /** chat/form, or the scored event assessment (0095). Fixed at creation. */
+  kind: IntakeKind;
   status: IntakeFormStatus;
   config: IntakeFormConfig;
   allowedDomains: string[];
@@ -79,13 +82,14 @@ export type IntakeFormLoad =
 export class IntakeFormError extends Error {}
 
 const COLUMNS =
-  "id, name, slug, source_tag, status, config, allowed_domains, receives_referrals, agreement_signed_at, published_at, updated_by, created_at, updated_at";
+  "id, name, slug, source_tag, kind, status, config, allowed_domains, receives_referrals, agreement_signed_at, published_at, updated_by, created_at, updated_at";
 
 type FormRow = {
   id: string;
   name: string;
   slug: string;
   source_tag: string | null;
+  kind: string;
   status: string;
   config: Json;
   allowed_domains: string[];
@@ -118,6 +122,7 @@ function toRecord(row: FormRow): IntakeFormRecord {
     name: row.name,
     slug: row.slug,
     sourceTag: row.source_tag,
+    kind: row.kind === "assessment" ? "assessment" : "intake",
     status: toStatus(row.status),
     config: parseIntakeConfig(row.config),
     allowedDomains: row.allowed_domains ?? [],
@@ -190,6 +195,7 @@ async function insertIntakeForm(input: {
   name: string;
   slugBase: string;
   sourceTag: string | null;
+  kind?: IntakeKind;
   config?: IntakeFormConfig;
   allowedDomains?: string[];
 }): Promise<IntakeFormRecord> {
@@ -215,6 +221,7 @@ async function insertIntakeForm(input: {
         name: input.name,
         slug,
         source_tag: input.sourceTag,
+        kind: input.kind ?? "intake",
         status: "draft",
         config: config as unknown as Json,
         allowed_domains: input.allowedDomains ?? [],
@@ -228,13 +235,14 @@ async function insertIntakeForm(input: {
   throw new IntakeFormError("Couldn't find a free link name. Try a different intake name.");
 }
 
-/** A new intake from the defaults, named by the person creating it. */
-export async function createIntakeForm(name: unknown): Promise<IntakeFormRecord> {
+/** A new intake from the defaults, named by the person creating it: chat/form, or an assessment. */
+export async function createIntakeForm(name: unknown, kind: unknown = "intake"): Promise<IntakeFormRecord> {
   await requireAdmin();
   const n = typeof name === "string" ? name.replace(/\s+/g, " ").trim() : "";
   if (!n) throw new IntakeFormError("Give the new intake a name.");
   if (n.length > 120) throw new IntakeFormError("Keep the name under 120 characters.");
-  return insertIntakeForm({ name: n, slugBase: slugFromFirmName(n), sourceTag: null });
+  if (kind !== "intake" && kind !== "assessment") throw new IntakeFormError("Choose chat/form or assessment.");
+  return insertIntakeForm({ name: n, slugBase: slugFromFirmName(n), sourceTag: null, kind });
 }
 
 /** A copy of an intake's setup (questions, look, fees, domains, tag) under a new link, as a draft. */
@@ -248,6 +256,7 @@ export async function duplicateIntakeForm(id: string): Promise<IntakeFormRecord>
     name,
     slugBase: src.form.slug,
     sourceTag: src.form.sourceTag,
+    kind: src.form.kind,
     config: src.form.config,
     allowedDomains: src.form.allowedDomains,
   });
@@ -266,6 +275,7 @@ function liveFor(row: FormRow, config: IntakeFormConfig): { live: boolean; remai
   const items = goLiveChecklist(config, {
     receivesReferrals: row.receives_referrals,
     agreementSigned: row.agreement_signed_at !== null,
+    kind: row.kind === "assessment" ? "assessment" : "intake",
   });
   return { live: checklistComplete(items), remaining: checklistRemaining(items) };
 }

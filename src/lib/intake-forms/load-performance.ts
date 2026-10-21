@@ -64,7 +64,7 @@ export async function loadSubmissionStatRows(
   try {
     const supabase = await getScopedClient();
     const since = new Date(now.getTime() - range * 86_400_000).toISOString();
-    let q = supabase.from("crm_intake_submission").select("form_id, started_at, submitted_at").gte("started_at", since);
+    let q = supabase.from("crm_intake_submission").select("form_id, started_at, submitted_at, temperature").gte("started_at", since);
     if (formId) q = q.eq("form_id", formId);
     const { data, error } = await q.order("started_at", { ascending: false }).limit(STAT_ROW_LIMIT);
     if (error) return isMissingTableError(error) ? { status: "unconfigured" } : { status: "unavailable", error };
@@ -83,7 +83,7 @@ export async function loadIntakeList(formId: string): Promise<Load<SubmissionLis
     const supabase = await getScopedClient();
     const { data, error } = await supabase
       .from("crm_intake_submission")
-      .select("id, mode, contact, fit, status, started_at, submitted_at, last_active_at")
+      .select("id, mode, contact, fit, status, started_at, submitted_at, last_active_at, score, temperature")
       .eq("form_id", formId)
       .order("started_at", { ascending: false })
       .limit(INTAKE_TABLE_LIMIT);

@@ -70,7 +70,7 @@ function db(): Admin {
 
 type PgError = { code?: string; message?: string } | null | undefined;
 
-const FORM_COLUMNS = "id, org_id, name, slug, source_tag, status, config, allowed_domains, receives_referrals";
+const FORM_COLUMNS = "id, org_id, name, slug, source_tag, kind, status, config, allowed_domains, receives_referrals";
 
 /** Server-side only. Never pass this to a client component. */
 export type IntakeHandle = {
@@ -80,6 +80,8 @@ export type IntakeHandle = {
   /** Staff's name for this intake and the tag its leads carry (0093). */
   name: string;
   sourceTag: string | null;
+  /** chat/form, or the scored assessment (0095). */
+  kind: "intake" | "assessment";
   config: IntakeFormConfig;
   orgName: string;
   receivesReferrals: boolean;
@@ -154,6 +156,7 @@ export async function readIntakeHandle(slug: string): Promise<
         slug: data.slug,
         name: data.name,
         sourceTag: data.source_tag,
+        kind: data.kind === "assessment" ? "assessment" : "intake",
         config: parseIntakeConfig(data.config),
         orgName: name,
         receivesReferrals: data.receives_referrals,
@@ -195,7 +198,7 @@ export async function readPublicIntake(slug: string): Promise<PublicIntakeRead> 
 
 // ── events ───────────────────────────────────────────────────────────────────
 
-export type IntakeEventKind = "visit" | "start_conversation" | "start_form" | "complete";
+export type IntakeEventKind = "visit" | "start_conversation" | "start_form" | "start_assessment" | "complete";
 
 /** Best-effort: a broken funnel table must never break the intake. */
 export async function recordIntakeEvent(handle: IntakeHandle, kind: IntakeEventKind, sessionHash: string | null): Promise<void> {
@@ -329,7 +332,7 @@ async function createIntakeLead(
       actor_type: "system" as const,
       payload: {
         note: answersNote(
-          `${stage === "started" ? "Started" : "Intake"}: ${source} (${sub.mode === "conversation" ? "chat" : "form"}${sourceHost ? ` on ${sourceHost}` : ""})${
+          `${stage === "started" ? "Started" : "Intake"}: ${source} (${sub.mode === "conversation" ? "chat" : sub.mode === "assessment" ? "assessment" : "form"}${sourceHost ? ` on ${sourceHost}` : ""})${
             stage === "started" ? " · contact details only so far" : ""
           }`,
           sub.answers,
@@ -409,7 +412,7 @@ export async function startPublicIntake(
 }
 
 export type CompleteOutcome =
-  | { ok: true; submissionId: string; submission: ValidatedSubmission; alreadyDone: boolean }
+  | { ok: true; submissionId: string; submission: ValidatedSubmission; alreadyDone: boolean; noteBody: string }
   | { ok: false; reason: "not_found" | "failed" };
 
 /**
@@ -423,6 +426,8 @@ export async function completeStartedIntake(
   answers: ValidatedSubmission["answers"],
   mode: ValidatedSubmission["mode"],
   now: Date,
+  /** An assessment's server-computed result (0095), filed with the answers. */
+  assessment?: { score: number; band: string; temperature: string; staffLine: string },
 ): Promise<CompleteOutcome> {
   if (!RESUME_TOKEN_SHAPE.test(token)) return { ok: false, reason: "not_found" };
   const admin = db();
@@ -430,7 +435,13 @@ export async function completeStartedIntake(
   const nowIso = now.toISOString();
   const { data, error } = await admin
     .from("crm_intake_submission")
-    .update({ answers: answers as unknown as Json, mode, submitted_at: nowIso, last_active_at: nowIso })
+    .update({
+      answers: answers as unknown as Json,
+      mode,
+      submitted_at: nowIso,
+      last_active_at: nowIso,
+      ...(assessment ? { score: assessment.score, band: assessment.band, temperature: assessment.temperature } : {}),
+    })
     .eq("org_id", handle.orgId)
     .eq("form_id", handle.formId)
     .eq("resume_hash", hash)
@@ -452,24 +463,23 @@ export async function completeStartedIntake(
       .not("submitted_at", "is", null)
       .maybeSingle();
     if (!done) return { ok: false, reason: "not_found" };
-    return { ok: true, submissionId: done.id, submission: { mode, contact: parseContact(done.contact), answers }, alreadyDone: true };
+    return { ok: true, submissionId: done.id, submission: { mode, contact: parseContact(done.contact), answers }, alreadyDone: true, noteBody: "" };
   }
 
   const contact = parseContact(data.contact);
   const submission: ValidatedSubmission = { mode, contact, answers };
+  const source = leadSourceLabel(handle.name, handle.sourceTag);
+  const how = mode === "conversation" ? "chat" : mode === "assessment" ? "assessment" : "form";
+  const heading = `Intake finished: ${source} (${how}${data.source_host ? ` on ${data.source_host}` : ""})${assessment ? `\n${assessment.staffLine}` : ""}`;
+  const noteBody = answersNote(heading, answers);
   if (data.lead_id) {
-    const source = leadSourceLabel(handle.name, handle.sourceTag);
-    const how = mode === "conversation" ? "chat" : "form";
     const { error: actErr } = await admin.from("crm_activity").insert({
       org_id: handle.orgId,
       lead_id: data.lead_id,
       type: "note" as ActivityType,
       actor_id: null,
       actor_type: "system" as const,
-      payload: {
-        note: answersNote(`Intake finished: ${source} (${how}${data.source_host ? ` on ${data.source_host}` : ""})`, answers),
-        source: "intake-form",
-      },
+      payload: { note: noteBody, source: "intake-form" },
     });
     if (actErr) console.error("[intake] lead timeline write failed", actErr.code);
     // What the answers make obvious, only where the lead has nothing yet.
@@ -494,7 +504,7 @@ export async function completeStartedIntake(
       }
     }
   }
-  return { ok: true, submissionId: data.id, submission, alreadyDone: false };
+  return { ok: true, submissionId: data.id, submission, alreadyDone: false, noteBody };
 }
 
 /** Screened intakes per form per hour; see screenSubmission. */
