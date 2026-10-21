@@ -1,15 +1,16 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { SUBMIT_LIMITS } from "@/lib/intake-forms/public-submit";
+import type { AnswerValue } from "@/lib/intake-forms/choice";
+import { QuestionFields, type FieldQuestion } from "../../../i/[slug]/_components/QuestionFields";
 import { submitIntakeRequestAction } from "../actions";
 
 /**
  * The firm's intake questions, sent to an existing client from a matter.
  * Form mode only, questions only: the firm already knows who the client is.
  */
-export function RequestForm(props: { token: string; questions: { id: string; text: string; required: boolean }[] }) {
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+export function RequestForm(props: { token: string; questions: FieldQuestion[] }) {
+  const [answers, setAnswers] = useState<Record<string, AnswerValue>>({});
   const [error, setError] = useState<string | null>(null);
   const [bad, setBad] = useState<string[]>([]);
   const [done, setDone] = useState(false);
@@ -47,23 +48,13 @@ export function RequestForm(props: { token: string; questions: { id: string; tex
         });
       }}
     >
-      {props.questions.map((q) => (
-        <label key={q.id} className="ipub-field">
-          <span className="ipub-label">
-            {q.text}
-            {q.required && <span className="ipub-req"> *</span>}
-          </span>
-          <textarea
-            className="ipub-input"
-            rows={3}
-            maxLength={SUBMIT_LIMITS.answer}
-            required={q.required}
-            aria-invalid={bad.includes(q.id) || undefined}
-            value={answers[q.id] ?? ""}
-            onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
-          />
-        </label>
-      ))}
+      <QuestionFields
+        questions={props.questions}
+        answers={answers}
+        badFields={bad}
+        idPrefix="request"
+        onChange={(id, v) => setAnswers((a) => ({ ...a, [id]: v }))}
+      />
       {error && (
         <p className="ipub-error" role="alert">
           {error}

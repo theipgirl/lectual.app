@@ -499,3 +499,68 @@ textarea.ipub-input {
   font-size: 14.5px;
   line-height: 21px;
 }
+
+/* Choice questions (Sprint 10): native radios and checkboxes inside labels, in the firm's own accent. */
+.ipub-choice-field {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.ipub-choice-field > legend {
+  padding: 0;
+  margin-bottom: 6px;
+}
+.ipub-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ipub-choice-opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--ipub-line);
+  background: var(--ipub-field);
+  font-size: 15px;
+  line-height: 21px;
+  cursor: pointer;
+}
+.ipub-choice-opt input {
+  flex: none;
+  margin: 3px 0 0;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--ipub-acc);
+}
+.ipub-choice-opt.on {
+  border-color: var(--ipub-acc);
+  box-shadow: inset 0 0 0 1px var(--ipub-acc);
+}
+.ipub-choice-opt:focus-within {
+  outline: 2px solid var(--ipub-acc);
+  outline-offset: 1px;
+}
+.ipub-choice.bad .ipub-choice-opt {
+  border-color: var(--ipub-risk);
+}
+/* In the conversation the options sit under the thread as tappable bubbles. */
+.ipub-choice.chat {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ipub-choice.chat .ipub-choice-opt {
+  border-radius: 999px;
+  padding: 7px 14px;
+  background: var(--ipub-bg);
+}
+.ipub-choice-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}

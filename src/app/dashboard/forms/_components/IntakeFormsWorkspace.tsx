@@ -26,6 +26,8 @@ import { saveIntakeFormAction } from "../actions";
 import { IntakePreview } from "./IntakePreview";
 import { IntakeQrButton } from "./IntakeQr";
 import { AssessmentPreview, AssessmentSettingsCard } from "./AssessmentSettings";
+import { OptionsEditor, QuestionTypeSelect } from "./ChoiceEditor";
+import { isChoice, questionType } from "@/lib/intake-forms/choice";
 
 /**
  * Intake → Forms (design/Intake_Forms.dc.html): the header, the two tabs,
@@ -595,7 +597,7 @@ export function IntakeFormsWorkspace(props: Props) {
                   {config.questions.map((q, i) => (
                     <li
                       key={q.id}
-                      className={`ifm-q${justAdded.has(q.id) ? " added" : ""}${drag === q.id ? " dragging" : ""}${over === q.id && drag && drag !== q.id ? " over" : ""}`}
+                      className={`ifm-q${isChoice(q) ? " has-options" : ""}${justAdded.has(q.id) ? " added" : ""}${drag === q.id ? " dragging" : ""}${over === q.id && drag && drag !== q.id ? " over" : ""}`}
                       draggable={canEdit}
                       onDragStart={(e) => {
                         e.dataTransfer.effectAllowed = "move";
@@ -636,6 +638,12 @@ export function IntakeFormsWorkspace(props: Props) {
                         aria-label={`Question ${i + 1}`}
                         onChange={(e) => editQ(q.id, { text: e.target.value, edited: true })}
                       />
+                      <QuestionTypeSelect
+                        type={questionType(q)}
+                        label={`Question ${i + 1}`}
+                        disabled={!canEdit}
+                        onChange={(fields) => edit((c) => ({ questions: c.questions.map((x) => (x.id === q.id ? { id: x.id, text: x.text, required: x.required, pack: x.pack, edited: true, ...fields } : x)) }))}
+                      />
                       {q.pack && <span className="ifm-q-pack">{q.pack}</span>}
                       <span className="ifm-q-req">
                         <span className="ifm-help">Required</span>
@@ -663,6 +671,11 @@ export function IntakeFormsWorkspace(props: Props) {
                           </span>
                         )}
                       </span>
+                      {isChoice(q) && (
+                        <div className="ifm-q-options">
+                          <OptionsEditor options={q.options ?? []} label={`Question ${i + 1}`} disabled={!canEdit} onChange={(options) => editQ(q.id, { options, edited: true })} />
+                        </div>
+                      )}
                     </li>
                   ))}
                 </ol>

@@ -3,6 +3,7 @@ import { intakeStages } from "@/lib/intake/scope";
 import type { Stage } from "@/lib/pipeline/stages";
 import type { IntakeFormConfig, IpType } from "./config";
 import { PACKS } from "./config";
+import { ANSWER_MAX_LENGTH, checkChoiceAnswer, isChoice, type QuestionType } from "./choice";
 import type { IntakeAnswer, IntakeContact, SubmissionMode } from "./submission";
 
 /**
@@ -29,7 +30,7 @@ export const SUBMIT_LIMITS = {
   email: 320,
   phone: 60,
   company: 200,
-  answer: 4000,
+  answer: ANSWER_MAX_LENGTH,
   /** Fastest plausible human submission, from first render. Faster is a bot. */
   minFillMs: 3000,
   /** A stamp older than this is a tab left open overnight: ask for a reload. */
@@ -42,7 +43,8 @@ export const HONEYPOT_FIELD = "website_url";
 export type SubmitPayload = {
   mode: SubmissionMode;
   contact: IntakeContact;
-  answers: Record<string, string>;
+  /** Text answers are strings; a choice is a label, or a list of labels for a multi choice. */
+  answers: Record<string, string | string[]>;
   consent: boolean;
   honeypot: string;
   stamp: string;
@@ -68,7 +70,7 @@ export function readSpamFields(raw: unknown): { honeypot: string; stamp: string 
   return { honeypot: typeof r.honeypot === "string" ? r.honeypot : "", stamp: typeof r.stamp === "string" ? r.stamp.slice(0, 400) : "" };
 }
 
-type Question = Pick<IntakeFormConfig["questions"][number], "id" | "text" | "required">;
+type Question = Pick<IntakeFormConfig["questions"][number], "id" | "text" | "required"> & { type?: QuestionType; options?: readonly string[] };
 
 /**
  * Validates the answers alone — shared by the public intake (which also
@@ -85,6 +87,15 @@ export function validateAnswers(
   questions.forEach((q, i) => {
     const question = q.text.trim();
     if (!question) return;
+    if (isChoice(q)) {
+      // A choice is matched, label by label, against the STORED options; the browser's text is never stored as is.
+      const c = checkChoiceAnswer({ text: question, required: q.required, type: q.type, options: q.options }, given[q.id]);
+      if (!c.ok) {
+        errors.push(c.error);
+        fields.push(q.id);
+      } else if (c.value) answers.push({ id: q.id, question, answer: c.value });
+      return;
+    }
     const v = text(given[q.id]);
     if (v.length > SUBMIT_LIMITS.answer) {
       errors.push(`Answer ${i + 1} is longer than ${SUBMIT_LIMITS.answer.toLocaleString("en-US")} characters.`);

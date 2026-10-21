@@ -2,10 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition, type CSSProperties } from "react";
 import type { PublicIntakeConfig } from "@/lib/intake-forms/config";
-import type { PublicAssessmentQuestion } from "@/lib/intake-forms/assessment";
 import type { AssessmentResultView } from "@/lib/intake-forms/assessment";
+import { askedQuestions, type AskedQuestion, type AssessmentAnswers } from "@/lib/intake-forms/assessment-asked";
+import { labelsOf } from "@/lib/intake-forms/choice";
 import { HONEYPOT_FIELD, SUBMIT_LIMITS } from "@/lib/intake-forms/public-submit";
-import { completeAssessmentAction, recordIntakeEventAction, startIntakeAction } from "../actions";
+import { createStepTracker } from "@/lib/intake-forms/step-tracking";
+import { completeAssessmentAction, recordIntakeEventAction, recordIntakeStepAction, startIntakeAction } from "../actions";
+import { ChoiceControl } from "./ChoiceControl";
 import { IntakeDisclaimer } from "./IntakeShell";
 
 /**
@@ -22,16 +25,9 @@ import { IntakeDisclaimer } from "./IntakeShell";
  */
 
 type Contact = { name: string; email: string; phone: string; company: string };
-type Answers = Record<string, string | string[]>;
+type Answers = AssessmentAnswers;
 
 const RESIZE_MESSAGE = "lectual-intake:resize";
-
-function asked(q: PublicAssessmentQuestion, answers: Answers): boolean {
-  if (!q.showWhen) return true;
-  const a = answers[String(q.showWhen.qId)];
-  if (Array.isArray(a)) return a.some((v) => q.showWhen!.anyOf.includes(v));
-  return typeof a === "string" && q.showWhen.anyOf.includes(a);
-}
 
 export function PublicAssessment(props: { slug: string; view: PublicIntakeConfig; stamp: string; embed: boolean }) {
   const { view, slug } = props;
@@ -48,6 +44,8 @@ export function PublicAssessment(props: { slug: string; view: PublicIntakeConfig
   const [pending, startTransition] = useTransition();
   const root = useRef<HTMLDivElement>(null);
   const sent = useRef(new Set<string>());
+  // Per-step tracking (0096): each question reached, once, with the answers so far. Fire and forget.
+  const [stepTracker] = useState(() => createStepTracker((call) => recordIntakeStepAction(slug, call)));
 
   const track = (kind: "visit" | "start_assessment") => {
     if (sent.current.has(kind)) return;
@@ -70,13 +68,18 @@ export function PublicAssessment(props: { slug: string; view: PublicIntakeConfig
     return () => ro.disconnect();
   }, [props.embed]);
 
-  // The router question picks the track; "brand" uses the personal-brand wording.
-  const questions = useMemo(() => {
-    const t = answers[String(card.trackQuestionId)];
-    const list = (Array.isArray(t) ? t[0] : t) === "brand" ? card.brand : card.business;
-    return list.filter((q) => asked(q, answers));
-  }, [answers, card]);
+  // The router question picks the track; then the card's questions, then the firm's own.
+  const questions = useMemo(() => askedQuestions(card, answers), [answers, card]);
   const current = questions[Math.min(step, questions.length - 1)];
+  const currentKey = current?.key;
+  const currentIndex = Math.min(step, questions.length - 1);
+
+  useEffect(() => {
+    if (token && currentKey !== undefined) {
+      stepTracker.track({ token, stepIndex: currentIndex, questionId: currentKey, progress: answers });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, currentKey, currentIndex]);
 
   const vars = {
     "--ipub-light-bg": view.colors.lightBg,
@@ -116,31 +119,37 @@ export function PublicAssessment(props: { slug: string; view: PublicIntakeConfig
     });
   };
 
-  const choose = (q: PublicAssessmentQuestion, value: string) => {
-    if (q.multiSelect) {
-      const have = Array.isArray(answers[String(q.id)]) ? (answers[String(q.id)] as string[]) : [];
-      setAnswers({ ...answers, [String(q.id)]: have.includes(value) ? have.filter((v) => v !== value) : [...have, value] });
+  const choose = (q: AskedQuestion, value: string) => {
+    if (q.type === "multi") {
+      const have = labelsOf(answers[q.key]);
+      setAnswers({ ...answers, [q.key]: have.includes(value) ? have.filter((v) => v !== value) : [...have, value] });
       return;
     }
-    const next = { ...answers, [String(q.id)]: value };
+    const next = { ...answers, [q.key]: value };
     setAnswers(next);
     // Recompute what's asked with this answer in place, then move on (or finish).
-    const t = next[String(card.trackQuestionId)];
-    const list = ((Array.isArray(t) ? t[0] : t) === "brand" ? card.brand : card.business).filter((x) => asked(x, next));
-    const at = list.findIndex((x) => x.id === q.id);
+    const list = askedQuestions(card, next);
+    const at = list.findIndex((x) => x.key === q.key);
+    setError(null);
     if (at >= 0 && at < list.length - 1) setStep(at + 1);
     else finish(next);
   };
 
-  const advanceMulti = (q: PublicAssessmentQuestion) => {
-    const v = answers[String(q.id)];
-    if (!Array.isArray(v) || v.length === 0) {
-      setError("Choose at least one.");
+  // Multi choice and text questions go on with a button; an optional one can be skipped.
+  const advance = (q: AskedQuestion, skip = false) => {
+    const v = answers[q.key];
+    const blank = Array.isArray(v) ? v.length === 0 : !(v ?? "").trim();
+    if (blank && q.required && !skip) {
+      setError(q.type === "text" ? "This one's needed to continue." : "Choose at least one.");
       return;
     }
     setError(null);
+    const next = { ...answers };
+    if (skip || blank) delete next[q.key];
+    else if (typeof v === "string") next[q.key] = v.trim();
+    setAnswers(next);
     if (step < questions.length - 1) setStep(step + 1);
-    else finish(answers);
+    else finish(next);
   };
 
   const header = (
@@ -233,7 +242,8 @@ export function PublicAssessment(props: { slug: string; view: PublicIntakeConfig
       </form>
     );
   } else if (current) {
-    const value = answers[String(current.id)];
+    const value = answers[current.key];
+    const lastStep = step >= questions.length - 1;
     body = (
       <div className="ipub-body">
         <div className="ipub-asm-progress" aria-label={`Question ${step + 1} of ${questions.length}`}>
@@ -244,23 +254,44 @@ export function PublicAssessment(props: { slug: string; view: PublicIntakeConfig
         </div>
         <h2 className="ipub-asm-q">{current.question}</h2>
         {current.subtext && <p className="ipub-small">{current.subtext}</p>}
-        <div className={`ipub-asm-options${current.grid ? " grid" : ""}`} role={current.multiSelect ? "group" : "radiogroup"}>
-          {current.options.map((o) => {
-            const on = Array.isArray(value) ? value.includes(o.value) : value === o.value;
-            return (
-              <button
-                key={o.value}
-                type="button"
-                className={`ipub-asm-option${on ? " on" : ""}`}
-                aria-pressed={on}
-                disabled={pending}
-                onClick={() => choose(current, o.value)}
-              >
-                {o.label}
-              </button>
-            );
-          })}
-        </div>
+        {current.type === "text" ? (
+          <textarea
+            className="ipub-input"
+            rows={3}
+            maxLength={SUBMIT_LIMITS.answer}
+            aria-label={current.question}
+            value={typeof value === "string" ? value : ""}
+            onChange={(e) => setAnswers({ ...answers, [current.key]: e.target.value })}
+          />
+        ) : current.extra ? (
+          <ChoiceControl
+            name={`asm-${current.key}`}
+            type={current.type === "multi" ? "multi" : "single"}
+            options={current.options.map((o) => o.label)}
+            value={labelsOf(value)}
+            label={current.question}
+            disabled={pending}
+            onChange={(next) => (current.type === "multi" ? setAnswers({ ...answers, [current.key]: next }) : choose(current, next[0]))}
+          />
+        ) : (
+          <div className={`ipub-asm-options${current.grid ? " grid" : ""}`} role={current.type === "multi" ? "group" : "radiogroup"}>
+            {current.options.map((o) => {
+              const on = Array.isArray(value) ? value.includes(o.value) : value === o.value;
+              return (
+                <button
+                  key={o.value}
+                  type="button"
+                  className={`ipub-asm-option${on ? " on" : ""}`}
+                  aria-pressed={on}
+                  disabled={pending}
+                  onClick={() => choose(current, o.value)}
+                >
+                  {o.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
         {error && (
           <p className="ipub-error" role="alert">
             {error}
@@ -273,12 +304,17 @@ export function PublicAssessment(props: { slug: string; view: PublicIntakeConfig
             </button>
           )}
           <span style={{ flex: 1 }} />
-          {current.multiSelect && (
-            <button type="button" className="ipub-submit" onClick={() => advanceMulti(current)} disabled={pending}>
-              {step < questions.length - 1 ? "Next" : pending ? "Sending…" : "See my results"}
+          {!current.required && (
+            <button type="button" className="ipub-link" onClick={() => advance(current, true)} disabled={pending}>
+              Skip
             </button>
           )}
-          {pending && !current.multiSelect && <span className="ipub-small">Scoring…</span>}
+          {current.type !== "single" && (
+            <button type="button" className="ipub-submit" onClick={() => advance(current)} disabled={pending}>
+              {!lastStep ? "Next" : pending ? "Sending…" : "See my results"}
+            </button>
+          )}
+          {pending && current.type === "single" && <span className="ipub-small">Scoring…</span>}
         </div>
       </div>
     );

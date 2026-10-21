@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, type CSSProperties } from "react";
+import { ChoiceControl } from "@/app/i/[slug]/_components/ChoiceControl";
+import { isChoice, questionType } from "@/lib/intake-forms/choice";
 import { CONTACT_FIELDS, displayIntro, DEFAULT_CLOSING, DEFAULT_OPENING, type IntakeFormConfig, type IntakeMode } from "@/lib/intake-forms/config";
 
 /**
@@ -51,10 +53,13 @@ export function IntakePreview(props: {
     "--pv-on-acc": dark ? "#1E0A0E" : "#FFFFFF",
   } as CSSProperties;
 
-  const send = () => {
-    const v = draft.trim();
+  const answeredCount = msgs.filter((m) => m.who === "you").length;
+  // The question the preview is asking now; a choice shows its options instead of the text box.
+  const asking = questions[answeredCount];
+  const send = (text = draft) => {
+    const v = text.trim();
     if (!v) return;
-    const answered = msgs.filter((m) => m.who === "you").length;
+    const answered = answeredCount;
     const next = questions[answered] ? questions[answered].text : config.closing.trim() || DEFAULT_CLOSING;
     setMsgs([...msgs, { who: "you", text: v }, { who: "bot", text: next }]);
     setDraft("");
@@ -129,6 +134,18 @@ export function IntakePreview(props: {
                 {pkgList}
               </div>
               <div className="ifm-pv-composer-wrap">
+                {asking && isChoice(asking) && (
+                  <ChoiceControl
+                    name={`pv-chat-${asking.id}`}
+                    type={questionType(asking) === "multi" ? "multi" : "single"}
+                    options={asking.options ?? []}
+                    value={[]}
+                    label={asking.text}
+                    layout="chat"
+                    scope="preview"
+                    onChange={(next) => send(next.join(", "))}
+                  />
+                )}
                 <div className="ifm-pv-composer">
                   <input
                     type="text"
@@ -143,7 +160,7 @@ export function IntakePreview(props: {
                     placeholder="Type your answer…"
                     aria-label="Preview composer"
                   />
-                  <button type="button" className="ifm-pv-send" onClick={send} aria-label="Send">
+                  <button type="button" className="ifm-pv-send" onClick={() => send()} aria-label="Send">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                       <path d="M5 12h14M13 6l6 6-6 6" />
                     </svg>
@@ -161,15 +178,27 @@ export function IntakePreview(props: {
           ) : (
             <div className="ifm-pv-form">
               {[
-                ...CONTACT_FIELDS.map((f) => ({ label: f.label, required: f.required })),
-                ...questions.map((q) => ({ label: q.text, required: q.required })),
-              ].map((f, i) => (
-                <div key={i} className="ifm-pv-field">
+                ...CONTACT_FIELDS.map((f) => ({ id: f.key, label: f.label, required: f.required, choice: null as (typeof questions)[number] | null })),
+                ...questions.map((q) => ({ id: q.id, label: q.text, required: q.required, choice: isChoice(q) ? q : null })),
+              ].map((f) => (
+                <div key={f.id} className="ifm-pv-field">
                   <div className="ifm-pv-label">
                     {f.label}
                     {f.required && <span className="ifm-pv-req"> *</span>}
                   </div>
-                  <div className="ifm-pv-box" />
+                  {f.choice ? (
+                    <ChoiceControl
+                      name={`pv-form-${f.id}`}
+                      type={questionType(f.choice) === "multi" ? "multi" : "single"}
+                      options={f.choice.options ?? []}
+                      value={[]}
+                      label={f.label}
+                      scope="preview"
+                      disabled
+                    />
+                  ) : (
+                    <div className="ifm-pv-box" />
+                  )}
                 </div>
               ))}
               {showPkgs && (

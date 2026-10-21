@@ -7,11 +7,13 @@ import {
   readIntakeHandle as readHandleBySlug,
   recentCompletions,
   recordIntakeEvent,
+  recordIntakeStep,
   screenSubmission,
   startPublicIntake,
   submitPublicIntake,
 } from "@/lib/intake-forms/public";
-import { answersNote, readSpamFields, validateAnswers, validatePublicStart, validatePublicSubmission } from "@/lib/intake-forms/public-submit";
+import { parseStepIndex, sanitizeProgress, stepQuestions, STEP_LIMIT } from "@/lib/intake-forms/steps";
+import { answersNote, readSpamFields, RESUME_TOKEN_SHAPE, validateAnswers, validatePublicStart, validatePublicSubmission } from "@/lib/intake-forms/public-submit";
 import { assessmentStaffLine, scoreAssessmentAnswers, type AssessmentResultView } from "@/lib/intake-forms/assessment";
 import { syncIntakeCompletion, syncIntakeStart } from "@/lib/intake-forms/lawmatics-sync";
 import {
@@ -48,6 +50,8 @@ async function readIntakeHandle(slug: string) {
 const submitThrottle = new SlidingWindowThrottle(5, 10 * 60_000);
 const startThrottle = new SlidingWindowThrottle(8, 10 * 60_000);
 const eventThrottle = new SlidingWindowThrottle(60, 10 * 60_000);
+// Its own allowance: a person answering a 60-step form must not use up (or be cut off by) the visit/start events.
+const stepThrottle = new SlidingWindowThrottle(STEP_LIMIT.max, STEP_LIMIT.windowMs);
 
 /** The anonymous session id, from the first-party cookie; set when missing. */
 async function sessionId(): Promise<string> {
@@ -74,6 +78,42 @@ export async function recordIntakeEventAction(slug: string, kind: unknown): Prom
   if (!(await allowed(eventThrottle, slug))) return;
   const hash = sessionHash(await sessionId(), read.handle.formId, intakeSalt());
   await recordIntakeEvent(read.handle, kind, hash);
+}
+
+/**
+ * "This person reached this question" (0096), plus their answers so far. Fire
+ * and forget from the page: it returns nothing, shows no error and never
+ * throws, whatever it was sent. Anything it can't vouch for is dropped quietly:
+ * a token of the wrong shape or for another form or firm, a finished person,
+ * a question the live form doesn't ask (or the firm hid), an index that isn't
+ * a whole number from 0 to 60. The org and form written are the live form's.
+ */
+export async function recordIntakeStepAction(slug: unknown, payload: unknown): Promise<void> {
+  try {
+    if (typeof slug !== "string" || typeof payload !== "object" || payload === null) return;
+    const p = payload as { token?: unknown; stepIndex?: unknown; questionId?: unknown; progress?: unknown };
+    if (typeof p.token !== "string" || !RESUME_TOKEN_SHAPE.test(p.token)) return;
+    const stepIndex = parseStepIndex(p.stepIndex);
+    if (stepIndex === null || typeof p.questionId !== "string") return;
+    const read = await readIntakeHandle(slug);
+    if (read.status !== "ok") return;
+    const { handle } = read;
+    const questions = stepQuestions(handle.kind, handle.config);
+    if (!questions.some((q) => q.id === p.questionId)) return;
+    if (!(await allowed(stepThrottle, slug))) return;
+    const hash = sessionHash(await sessionId(), handle.formId, intakeSalt());
+    // Nothing usable in the progress leaves what is saved alone, rather than overwriting it with {}.
+    const kept = p.progress === undefined ? {} : sanitizeProgress(p.progress, questions);
+    await recordIntakeStep(handle, {
+      token: p.token,
+      stepIndex,
+      questionId: p.questionId,
+      progress: Object.keys(kept).length ? kept : null,
+      sessionHash: hash,
+    });
+  } catch {
+    // The page never learns whether this landed.
+  }
 }
 
 export type StartIntakeResult =

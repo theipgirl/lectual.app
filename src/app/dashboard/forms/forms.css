@@ -1918,3 +1918,119 @@ textarea.ifm-input {
 .ife-section {
   margin-top: 28px;
 }
+
+/* Choice questions (Sprint 10): the type select, the option list, and the assessment's own questions. */
+.ifm-q.has-options,
+.ifm-extra.has-options {
+  flex-wrap: wrap;
+}
+.ifm-q-type {
+  flex: 0 0 156px;
+  width: 156px;
+  min-width: 0;
+}
+.ifm-q-options {
+  flex: 1 1 100%;
+  box-sizing: border-box;
+  padding: 2px 0 4px 26px;
+}
+.ifm-opts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ifm-opts-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ifm-opt {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.ifm-opt .ifm-input {
+  flex: 1;
+  min-width: 0;
+}
+.ifm-opts-foot {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.ifm-opts-warn {
+  color: var(--wine);
+}
+.ifm-extras {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ifm-extra {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid rgba(42, 18, 22, 0.1);
+}
+.ifm-extra-moves {
+  display: flex;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+.ifm-asm-hide {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ifm-asm-stays {
+  font-style: italic;
+}
+.ifm-asm-q.hidden .ifm-input {
+  opacity: 0.55;
+}
+
+/* The same choice control, drawn in the editor's live preview (ifm-pv-*). */
+.ifm-pv-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ifm-pv-choice-opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--pv-line);
+  background: var(--pv-field);
+  font-size: 13px;
+  line-height: 18px;
+}
+.ifm-pv-choice-opt input {
+  flex: none;
+  margin: 2px 0 0;
+  accent-color: var(--pv-acc);
+}
+.ifm-pv-choice-opt.on {
+  border-color: var(--pv-acc);
+}
+.ifm-pv-choice.chat {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+.ifm-pv-choice.chat .ifm-pv-choice-opt {
+  border-radius: 999px;
+  padding: 5px 12px;
+  cursor: pointer;
+}

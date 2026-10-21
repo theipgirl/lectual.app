@@ -126,6 +126,8 @@ export type Database = {
           lead_id: string | null
           mode: string
           org_id: string
+          /** lectual 0096: answers so far for an unfinished person (≤ 64 KB). Hand-added. */
+          progress: Json | null
           resume_hash: string | null
           screening_note: string | null
           source_host: string | null
@@ -150,6 +152,7 @@ export type Database = {
           lead_id?: string | null
           mode: string
           org_id: string
+          progress?: Json | null
           resume_hash?: string | null
           screening_note?: string | null
           source_host?: string | null
@@ -174,6 +177,7 @@ export type Database = {
           lead_id?: string | null
           mode?: string
           org_id?: string
+          progress?: Json | null
           resume_hash?: string | null
           screening_note?: string | null
           source_host?: string | null
@@ -213,6 +217,10 @@ export type Database = {
           occurred_at: string
           org_id: string
           session_hash: string | null
+          /** lectual 0096, for kind = 'step'. Hand-added. */
+          question_id: string | null
+          step_index: number | null
+          submission_id: string | null
         }
         Insert: {
           form_id: string
@@ -221,6 +229,9 @@ export type Database = {
           occurred_at?: string
           org_id: string
           session_hash?: string | null
+          question_id?: string | null
+          step_index?: number | null
+          submission_id?: string | null
         }
         Update: {
           form_id?: string
@@ -229,6 +240,9 @@ export type Database = {
           occurred_at?: string
           org_id?: string
           session_hash?: string | null
+          question_id?: string | null
+          step_index?: number | null
+          submission_id?: string | null
         }
         Relationships: [
           {

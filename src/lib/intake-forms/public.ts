@@ -21,6 +21,7 @@ import { leadSourceLabel } from "./details";
 import { parseContact } from "./submission";
 import { buildScreeningPrompt, parseScreening, SCREENING_SYSTEM } from "./screening";
 import { isRequestTokenShape } from "./request-token";
+import { isStepSchemaError } from "./steps";
 import { isMissingTableError } from "./store";
 import type { IntakeAnswer } from "./submission";
 import type { Stage } from "@/lib/pipeline/stages";
@@ -206,6 +207,83 @@ export async function recordIntakeEvent(handle: IntakeHandle, kind: IntakeEventK
     await db().from("crm_intake_event").insert({ org_id: handle.orgId, form_id: handle.formId, kind, session_hash: sessionHash });
   } catch {
     // swallowed on purpose
+  }
+}
+
+// ── per-step tracking (0096) ─────────────────────────────────────────────────
+
+export type StepWrite = {
+  token: string;
+  stepIndex: number;
+  questionId: string;
+  /** Already sanitised against the live form's questions (steps.ts), or null to leave progress alone. */
+  progress: Record<string, string> | null;
+  sessionHash: string | null;
+};
+
+/**
+ * Records that one unfinished person reached one question, and saves their
+ * answers so far. Same fences as the rest of this file: the person is found by
+ * the token's sha256 AND the live form's org_id + form_id (read off the form
+ * row, never off the browser), so a token issued for another form or firm
+ * resolves to nothing and nothing is written. Finished people are left alone.
+ * One `step` event per person and question (checked before the insert).
+ *
+ * It never throws and never reports: a database without 0096 (an unknown
+ * column, a schema-cache miss, or a `step` kind the event table doesn't allow)
+ * returns quietly as "step data isn't recorded yet", and any other failure is
+ * logged by code only. The intake itself is unaffected either way.
+ */
+export async function recordIntakeStep(handle: IntakeHandle, w: StepWrite): Promise<void> {
+  if (!RESUME_TOKEN_SHAPE.test(w.token)) return;
+  const fail = (what: string, err: PgError) => {
+    if (!isStepSchemaError(err)) console.error(`[intake] step ${what} failed`, err?.code ?? "unknown");
+  };
+  try {
+    const admin = db();
+    const { data: person, error } = await admin
+      .from("crm_intake_submission")
+      .select("id, submitted_at")
+      .eq("org_id", handle.orgId)
+      .eq("form_id", handle.formId)
+      .eq("resume_hash", resumeHash(w.token))
+      .maybeSingle();
+    if (error) return fail("lookup", error);
+    if (!person || person.submitted_at) return;
+
+    const { count, error: dupErr } = await admin
+      .from("crm_intake_event")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", handle.orgId)
+      .eq("form_id", handle.formId)
+      .eq("kind", "step")
+      .eq("submission_id", person.id)
+      .eq("question_id", w.questionId);
+    if (dupErr) return fail("check", dupErr);
+    if ((count ?? 0) === 0) {
+      const { error: insErr } = await admin.from("crm_intake_event").insert({
+        org_id: handle.orgId,
+        form_id: handle.formId,
+        kind: "step",
+        session_hash: w.sessionHash,
+        step_index: w.stepIndex,
+        question_id: w.questionId,
+        submission_id: person.id,
+      });
+      if (insErr) return fail("event", insErr);
+    }
+    if (w.progress) {
+      const { error: progErr } = await admin
+        .from("crm_intake_submission")
+        .update({ progress: w.progress as unknown as Json })
+        .eq("id", person.id)
+        .eq("org_id", handle.orgId)
+        .eq("form_id", handle.formId)
+        .is("submitted_at", null);
+      if (progErr) fail("progress", progErr);
+    }
+  } catch (e) {
+    fail("write", e as PgError);
   }
 }
 
