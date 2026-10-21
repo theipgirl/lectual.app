@@ -16,6 +16,8 @@ import {
 } from "@/lib/intake/rows";
 import { loadPendingApprovalsByLead } from "@/lib/queue/lead-pending";
 import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
+import { resolveFirmSession } from "@/lib/firm/session";
+import { canReconcile } from "@/lib/reconcile/roles";
 import { IntakeTopBar } from "@/components/intake/IntakeTopBar";
 import IntakeWorkspace from "./_components/IntakeWorkspace";
 import "./intake.css";
@@ -213,6 +215,10 @@ export default async function IntakePage({
     (): TemperatureFactsRead => ({ status: "unavailable" }),
   );
 
+  // The "Reconcile stages" link is for the admin tier; the page and its actions check the role again.
+  const session = await resolveFirmSession().catch(() => null);
+  const showReconcile = session?.kind === "ok" && canReconcile(session.role);
+
   const rows = buildIntakeRows({
     leads,
     stages,
@@ -234,6 +240,7 @@ export default async function IntakePage({
       time={time}
       now={now.toISOString()}
       pendingApprovals={pendingApprovals}
+      showReconcile={showReconcile}
     />
     </div>
   );

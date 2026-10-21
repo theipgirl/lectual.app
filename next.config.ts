@@ -4,6 +4,12 @@ const nextConfig: NextConfig = {
   // Matches lectual: the magic-link callback and every redirect in the ported
   // auth code are written with trailing slashes.
   trailingSlash: true,
+  experimental: {
+    // The stage reconciliation screen posts an intake sheet (up to 5 MB, see
+    // src/lib/intake/sheet-limits.ts) to a server action; the 1 MB default would refuse it before
+    // the action could say why. The headroom covers the multipart envelope.
+    serverActions: { bodySizeLimit: "6mb" },
+  },
   async headers() {
     return [
       {

@@ -72,6 +72,7 @@ export default function IntakeWorkspace({
   initialViewState,
   time,
   pendingApprovals,
+  showReconcile = false,
   now: nowIso,
 }: {
   rows: IntakeRow[];
@@ -97,6 +98,8 @@ export default function IntakeWorkspace({
    * src/lib/intake/needs-rebecca.ts.
    */
   pendingApprovals?: LeadPendingApprovals;
+  /** Owner, admin and senior admin only: a link to the stage reconciliation screen. */
+  showReconcile?: boolean;
   /** The server's render clock, so "Next step" says the same thing on both sides. */
   now: string;
 }) {
@@ -286,6 +289,11 @@ export default function IntakeWorkspace({
           </div>
           <IntakeSearch value={filters.q} onChange={(q) => setFilters((current) => ({ ...current, q }))} />
           <ViewToggle value={viewState.view} onChange={(view) => setViewState((state) => ({ ...state, view }))} />
+          {showReconcile && (
+            <Link href="/dashboard/intake/reconcile/" style={OUTLINE_BUTTON}>
+              Reconcile stages
+            </Link>
+          )}
           <Link href="/dashboard/settings/integrations/lawmatics/" style={OUTLINE_BUTTON}>
             <ImportIcon />
             Import
