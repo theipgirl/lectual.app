@@ -16,6 +16,9 @@ import { loadMattersForLead } from "@/lib/matters/for-lead";
 import { AnswersCard } from "@/components/answers/AnswersCard";
 import { loadLeadAnswers } from "@/lib/answers/load-answers";
 import { Timeline } from "@/components/timeline/Timeline";
+import { DocumentsCard } from "@/components/files/DocumentsCard";
+import { loadDocumentsRead } from "@/lib/files/read";
+import { FILE_DELETE_ROLES, FILE_UPLOAD_ROLES } from "@/lib/files/roles";
 import VoiceNoteRecorder from "@/components/voice/VoiceNoteRecorder";
 import { listTags, tagsForLead } from "@/lib/pipeline/tags";
 import { orgHasModule } from "@/lib/org/modules";
@@ -79,7 +82,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const voiceUrls = await voiceNotePlaybackUrls(rows);
 
   // Lane + next step (SOP Stage 2) and the lead's sequences (SOP rule 1).
-  const [{ links, failed: linksFailed }, tz, enrollments, approvals, factsRead, mattersRead, answersRead] = await Promise.all([
+  const [{ links, failed: linksFailed }, tz, enrollments, approvals, factsRead, mattersRead, answersRead, documentsRead] = await Promise.all([
     getLaneLinks(),
     getFirmTimeZone(),
     listLeadEnrollments(id).catch(() => null),
@@ -91,6 +94,8 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     loadMattersForLead(lead.id),
     // Three states per source and never throws; a failed read is named on the card, not an empty one.
     loadLeadAnswers(lead.id),
+    // Files stored on this lead. Never throws: a failed read is named on the card, not an empty list.
+    loadDocumentsRead({ kind: "lead", id: lead.id }, { includeLetters: false }),
   ]);
   const temperature = effectiveTemperature(lead, stages, new Date(), factsRead.status === "ok" ? factsRead.byLead[lead.id] : undefined);
   const lane = laneView(lead);
@@ -224,6 +229,14 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           )}
 
           <ConsultDetailsSection leadId={lead.id} canWrite={canWrite} />
+
+          <DocumentsCard
+            parent={{ kind: "lead", id: lead.id }}
+            read={documentsRead}
+            directory={members.map((m) => ({ userId: m.userId, name: m.displayName ?? m.email ?? "" }))}
+            canUpload={FILE_UPLOAD_ROLES.includes(session.role)}
+            canDelete={FILE_DELETE_ROLES.includes(session.role)}
+          />
 
           <section className="lx-card" style={{ padding: 18 }}>
             <h2 className="lx-h2" style={{ fontSize: 23, marginBottom: 10 }}>

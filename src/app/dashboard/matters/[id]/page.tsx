@@ -53,6 +53,9 @@ import {
   TaskControls,
 } from "@/components/matters/MatterEdits";
 import { IntakeRequestCard } from "@/components/matters/IntakeRequestCard";
+import { DocumentsCard } from "@/components/files/DocumentsCard";
+import { loadDocumentsRead } from "@/lib/files/read";
+import { FILE_DELETE_ROLES, FILE_UPLOAD_ROLES } from "@/lib/files/roles";
 import { AnswersCard } from "@/components/answers/AnswersCard";
 import { loadMatterAnswers } from "@/lib/answers/load-answers";
 import { getFirmTimeZone } from "@/lib/org/profile";
@@ -102,7 +105,7 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
   const client = await resolveMatterClientNameFrom(matter, primaryContact);
   const canSendIntake = canSendIntakeRequest(session.role);
   const canWrite = MATTER_WRITE_ROLES.includes(session.role);
-  const [voiceUrls, intakeRequests, origin, meetings, signedQuotes, answersRead, tz] = await Promise.all([
+  const [voiceUrls, intakeRequests, origin, meetings, signedQuotes, answersRead, tz, documentsRead] = await Promise.all([
     voiceNotePlaybackUrls(activity),
     // Intake questions (0079): a failed read says so on the card; it never
     // reads as "no links sent".
@@ -116,6 +119,9 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
     // Never throws: a failed source is named on the card.
     loadMatterAnswers(matter.id, matter.lead_id),
     getFirmTimeZone(),
+    // Stored files, and the generated letters only for a firm with Document Center. Never throws:
+    // each part reports its own failure on the card.
+    loadDocumentsRead({ kind: "matter", id: matter.id }, { includeLetters: hasDocumentCenter }),
   ]);
   const hasSignedQuote = signedQuotes?.status === "ok" && signedQuotes.quotes.length > 0;
 
@@ -454,6 +460,14 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
           ) : null}
 
           <AnswersCard read={answersRead} tz={tz} />
+
+          <DocumentsCard
+            parent={{ kind: "matter", id: matter.id }}
+            read={documentsRead}
+            directory={members === null ? null : members.map((m) => ({ userId: m.userId, name: m.displayName ?? m.email ?? "" }))}
+            canUpload={FILE_UPLOAD_ROLES.includes(session.role)}
+            canDelete={FILE_DELETE_ROLES.includes(session.role)}
+          />
 
           <section className="lx-card lx-aside">
             <div className="lx-label">About</div>
