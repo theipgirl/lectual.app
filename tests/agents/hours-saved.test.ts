@@ -21,16 +21,16 @@ describe("Hours saved (est.)", () => {
       DEFAULT_MINUTES_PER_TASK,
     );
     // 12×10 + 6×5 + 3×20 = 210 min
-    expect(est.tasks).toEqual({ "intake-triage": 12, "email-intel": 6, "post-consult": 3 });
+    expect(est.tasks).toEqual({ "intake-triage": 12, "email-intel": 6, "post-consult": 3, "stage-keeper": 0 });
     expect(est.hours).toBe(3.5);
   });
 
   it("uses the firm's own minutes when set, and defaults for the rest", () => {
     const { minutes, customised } = resolveMinutes({ "intake-triage": 30, "email-intel": 999, bogus: 5 });
     expect(customised).toBe(true);
-    expect(minutes).toEqual({ "intake-triage": 30, "email-intel": 5, "post-consult": 20 });
+    expect(minutes).toEqual({ "intake-triage": 30, "email-intel": 5, "post-consult": 20, "stage-keeper": 2 });
     expect(estimateHoursSaved([r("intake-triage", "ok", 4, 0)], minutes).hours).toBe(2);
-    expect(estimateAssumption(minutes)).toBe("5 min per client email read, 30 min per lead screened, 20 min per follow-up drafted");
+    expect(estimateAssumption(minutes)).toBe("5 min per client email read, 30 min per lead screened, 20 min per follow-up drafted, 2 min per lead placed");
   });
 
   it("parses the settings form: blank = default, out of range refused", () => {

@@ -5,6 +5,7 @@ import type { SyncDeps } from "@/lib/mailbox/sync";
 import { runEmailIntel } from "./email-intel";
 import { runIntakeTriage } from "./intake-triage";
 import { runPostConsult } from "./post-consult";
+import { runStageKeeper } from "./stage-keeper/run";
 import { AGENT_DEFS, AGENT_IDS, type AgentContext, type AgentId, type AgentResult, type AgentTrigger, type Autonomy } from "./types";
 
 /**
@@ -27,6 +28,7 @@ const RUNNERS: Record<AgentId, (ctx: AgentContext) => Promise<AgentResult>> = {
   "email-intel": runEmailIntel,
   "intake-triage": runIntakeTriage,
   "post-consult": runPostConsult,
+  "stage-keeper": runStageKeeper,
 };
 
 export type AgentSetting = { enabled: boolean; autonomy: Autonomy };

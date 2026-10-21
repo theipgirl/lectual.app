@@ -6,7 +6,7 @@ import {
   saveAgentSettingAction,
   type AgentActionState,
 } from "@/app/dashboard/agents/actions";
-import { AUTONOMY_HINT, type AgentId, type Autonomy } from "@/lib/agents/types";
+import { autonomyHint, type AgentId, type Autonomy } from "@/lib/agents/types";
 
 const LEVELS: { k: Autonomy; label: string }[] = [
   { k: "suggest", label: "Suggest" },
@@ -60,14 +60,14 @@ export function AgentControls(props: {
               aria-pressed={autonomy === l.k}
               className={autonomy === l.k ? "on" : undefined}
               disabled={!canManage || !enabled || saving}
-              title={AUTONOMY_HINT[l.k]}
+              title={autonomyHint(agent, l.k)}
             >
               {l.label}
             </button>
           ))}
         </form>
         <div className="lx-note" style={{ marginTop: 6 }}>
-          {AUTONOMY_HINT[autonomy]}
+          {autonomyHint(agent, autonomy)}
         </div>
         {saveState.error && (
           <p role="alert" className="lx-note" style={{ color: "var(--wine)", margin: "6px 0 0" }}>

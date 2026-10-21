@@ -1,3 +1,4 @@
+import { AGENT_MOVES_TODAY_HREF } from "@/lib/stage-keeper/moves";
 import { AGENT_DEFS, AGENT_IDS, type AgentId } from "./types";
 
 /**
@@ -136,6 +137,15 @@ function lineFor(agent: AgentId, runs: DigestRun[]): DigestLine | null {
         return { agent, name, text: `flagged ${plural(items, "follow-up", "follow-ups")} as due`, tone: "attention", href: "/dashboard/agents/" };
       }
       return { agent, name, text: `drafted ${plural(drafts, "follow-up", "follow-ups")} (in the Queue)`, tone: "attention", href: "/dashboard/queue/" };
+    }
+    case "stage-keeper": {
+      // items_in is moves plus suggestion cards; drafts_out is the cards alone.
+      const moved = Math.max(0, items - drafts);
+      if (items === 0) return { agent, name, text: "found no lead to place", tone: "quiet", href: AGENT_MOVES_TODAY_HREF };
+      const parts: string[] = [];
+      if (moved > 0) parts.push(`moved ${plural(moved, "lead", "leads")}`);
+      if (drafts > 0) parts.push(`${plural(drafts, "suggestion", "suggestions")} waiting on the lead page`);
+      return { agent, name, text: parts.join(" · "), tone: drafts > 0 ? "attention" : "ok", href: AGENT_MOVES_TODAY_HREF };
     }
   }
 }

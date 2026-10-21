@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { resolveFirmSession } from "@/lib/firm/session";
-import { CAN_WRITE_LEAD, getLead, listStages } from "@/lib/pipeline";
+import { CAN_MOVE_STAGE, CAN_WRITE_LEAD, getLead, listStages } from "@/lib/pipeline";
 import { effectiveTemperature } from "@/lib/intake/effective-temperature";
 import { loadTemperatureFacts, type TemperatureFactsRead } from "@/lib/intake/facts";
 import { ConsultOutcomeForm } from "@/components/leads/ConsultOutcomeForm";
@@ -16,6 +16,8 @@ import { loadMattersForLead } from "@/lib/matters/for-lead";
 import { AnswersCard } from "@/components/answers/AnswersCard";
 import { loadLeadAnswers } from "@/lib/answers/load-answers";
 import { Timeline } from "@/components/timeline/Timeline";
+import { StageSuggestionCard } from "@/components/leads/StageKeeperControls";
+import { pendingStageSuggestions } from "@/lib/stage-keeper/moves";
 import { DocumentsCard } from "@/components/files/DocumentsCard";
 import { loadDocumentsRead } from "@/lib/files/read";
 import { FILE_DELETE_ROLES, FILE_UPLOAD_ROLES } from "@/lib/files/roles";
@@ -124,6 +126,9 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const renderedAt = new Date().getTime();
   const proposals = pendingProposals(rows);
   const canWrite = CAN_WRITE_LEAD.includes(session.role);
+  // The Stage Keeper's suggestions waiting for a person, and who may act on them (the stage-move roles).
+  const canMove = CAN_MOVE_STAGE.includes(session.role);
+  const stageSuggestions = pendingStageSuggestions(rows);
   const name = `${lead.first_name} ${lead.last_name}`.trim() || lead.email;
   const current: Record<string, string | null> = {
     business_name: lead.business_name,
@@ -170,6 +175,27 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
               </div>
               {proposals.map((p) => (
                 <ProposalCard key={p.activityId} leadId={lead.id} proposal={p} current={current} canWrite={canWrite} />
+              ))}
+            </section>
+          )}
+
+          {stageSuggestions.length > 0 && (
+            <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }}>
+              <div>
+                <div className="lx-label">Stage Keeper · waiting on you</div>
+                <h2 className="lx-h2" style={{ fontSize: 23 }}>
+                  {stageSuggestions.length} stage suggestion{stageSuggestions.length === 1 ? "" : "s"}
+                </h2>
+              </div>
+              {stageSuggestions.map((s) => (
+                <StageSuggestionCard
+                  key={s.activityId}
+                  leadId={lead.id}
+                  suggestion={s}
+                  currentStageId={lead.current_stage_id}
+                  canDecide={canMove}
+                  timeZone={tz}
+                />
               ))}
             </section>
           )}
@@ -254,7 +280,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
                 <VoiceNoteRecorder target={{ kind: "lead", id: lead.id }} action={addVoiceNoteAction} />
               </div>
             )}
-            <Timeline rows={rows} mediaUrls={voiceUrls} />
+            <Timeline rows={rows} mediaUrls={voiceUrls} timeZone={tz} undo={{ leadId: lead.id, canMove, currentStageId: lead.current_stage_id }} />
           </section>
         </div>
 

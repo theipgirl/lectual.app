@@ -53,7 +53,7 @@ describe("the table", () => {
   it("has the columns the screen promises, in order", () => {
     const head = html.slice(html.indexOf("<thead>"), html.indexOf("</thead>"));
     const labels = [...head.matchAll(/<th[^>]*>([^<]+)</g)].map((m) => m[1]);
-    expect(labels).toEqual(["Lead", "Current stage", "Sheet", "Lawmatics", "Email", "Proposed stage", "Confidence", "Decision"]);
+    expect(labels).toEqual(["Lead", "Current stage", "Sheet", "Lawmatics", "Email / calendar", "Proposed stage", "Confidence", "Decision"]);
   });
 
   it("shows, per row, the lead (linked to its page), current stage, the three sources, the proposal and the confidence", () => {
@@ -234,7 +234,7 @@ describe("the summary and the empty states", () => {
     for (const label of ["Agree: 1", "Sheet only: 1", "Conflict: 1", "No evidence: 1", "Needs a matter: 2", "Already in the sheet's stage: 1"]) expect(s).toContain(label);
     expect(s).toContain("Sheet: read");
     expect(s).toContain("Lawmatics: unavailable. Lawmatics returned only part of the firm's records.");
-    expect(s).toContain("Email: unavailable. The synced mail could not be read.");
+    expect(s).toContain("Email / calendar: unavailable. The synced mail could not be read.");
     expect(s).toContain("1 sheet rows have no lead in the app");
     expect(s).toContain("1 sheet rows were not used");
     expect(s).toContain("2 leads could not be matched to one sheet row");

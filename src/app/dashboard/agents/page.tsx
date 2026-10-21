@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { hasRole } from "@/lib/auth/roles";
 import { getScopedClient } from "@/lib/db/scoped-client";
@@ -6,6 +7,9 @@ import { orgHasModule } from "@/lib/org/modules";
 import { aiConfigured } from "@/lib/ai/claude";
 import { AGENT_DEFS, AGENT_IDS, type AgentId, type Autonomy } from "@/lib/agents/types";
 import { agentReadiness, type ReadinessSource } from "@/lib/agents/readiness";
+import { loadAgentMoves, type AgentMovesRead } from "@/lib/stage-keeper/read";
+import { readConsultReadiness } from "@/lib/stage-keeper/readiness-read";
+import { AGENT_MOVES_TODAY_HREF } from "@/lib/stage-keeper/moves";
 import { listConnections } from "@/lib/mailbox/connections";
 import { loadActiveQueue } from "@/lib/queue/load";
 import { relativeTime } from "@/lib/relative-time";
@@ -108,17 +112,22 @@ export default async function AgentsPage() {
   // queue that can't be reached is "unavailable", never "none".
   const hasMailboxModule = await orgHasModule("mailbox");
   const mailbox: ReadinessSource =
-    settingsKnown && isOn("email-intel") && hasMailboxModule
+    settingsKnown && (isOn("email-intel") || isOn("stage-keeper")) && hasMailboxModule
       ? await listConnections().then(
           (r) => (!r.ok ? "unavailable" : r.connections.some((c) => c.status === "active") ? "ok" : "none"),
           () => "unavailable" as const,
         )
       : "ok";
+  // The Stage Keeper is ready with a mailbox OR readable consults, so it also asks for those.
+  const calendar: ReadinessSource =
+    settingsKnown && isOn("stage-keeper") && hasMailboxModule ? await readConsultReadiness() : "ok";
+  // "N leads moved today" on its card: the same read, and the same set, as the Intake board's chips.
+  const agentMoves: AgentMovesRead = await loadAgentMoves(now, tz);
   const queueLoad = settingsKnown && isOn("post-consult") ? await loadActiveQueue() : null;
   const queue: ReadinessSource = !queueLoad ? "ok" : queueLoad.status === "ok" ? "ok" : queueLoad.status === "unconfigured" ? "none" : "unavailable";
   const ai = aiConfigured();
   const readiness = new Map(
-    AGENT_IDS.map((a) => [a, agentReadiness({ agent: a, enabled: isOn(a), hasMailboxModule, mailbox, aiConfigured: ai, queue })]),
+    AGENT_IDS.map((a) => [a, agentReadiness({ agent: a, enabled: isOn(a), hasMailboxModule, mailbox, aiConfigured: ai, queue, calendar })]),
   );
   const enabledAgents = AGENT_IDS.filter(isOn);
   const readyCount = enabledAgents.filter((a) => readiness.get(a)?.tone === "ok").length;
@@ -223,6 +232,15 @@ export default async function AgentsPage() {
                   </span>
                 )}
               </div>
+              {agent === "stage-keeper" && settingsKnown && (
+                <p className="lx-note" style={{ margin: 0, gridColumn: "1 / -1" }}>
+                  {agentMoves.status === "ok" ? (
+                    <Link href={AGENT_MOVES_TODAY_HREF}>{`${agentMoves.movedToday} ${agentMoves.movedToday === 1 ? "lead" : "leads"} moved today`}</Link>
+                  ) : (
+                    "Today's agent moves couldn't be loaded."
+                  )}
+                </p>
+              )}
               {settingsKnown && ready.tone !== "ok" && ready.label !== "Off" && (
                 <p className="lx-note" style={{ margin: 0 }}>
                   {ready.reason}

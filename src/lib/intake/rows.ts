@@ -8,6 +8,7 @@ import { effectiveTemperature, type EffectiveTemperature } from "./effective-tem
 import { replyState, type ReplyState } from "./reply";
 import { REFERRAL_SOURCES } from "./referral-source";
 import { LANE_RANK } from "@/lib/leads/lane";
+import type { AgentMoveChip } from "@/lib/stage-keeper/moves";
 
 /**
  * Pure view-model for /intake (blueprint §7, re-homed by §11): row building,
@@ -52,6 +53,11 @@ export type IntakeRow = {
   latestNote: string | null;
   /** Past this stage's aging threshold — the "Stale" KPI. */
   stale: boolean;
+  /**
+   * Set when the Stage Keeper moved this lead in the last 7 days and nobody has changed its stage
+   * since. Absent when it didn't, and absent for every row when the moves couldn't be read.
+   */
+  agentMove?: AgentMoveChip;
 };
 
 /** Special `owner` filter value meaning "nobody is on the hook for this one". */
@@ -64,6 +70,10 @@ export const UNASSIGNED_OWNER = "unassigned";
  */
 export type TempFilter = Temperature | "none";
 export const TEMP_FILTERS: readonly TempFilter[] = ["hot", "warm", "cold", "none"];
+
+/** The "Agent moves" filter: moved by the Stage Keeper today (the firm's day) or in the last 7 days. */
+export type AgentMoveFilter = "today" | "7d";
+export const AGENT_MOVE_FILTERS: readonly AgentMoveFilter[] = ["today", "7d"];
 
 export type IntakeFilters = {
   /** Canonical referral buckets (§4.2). Empty = no source filter. */
@@ -81,6 +91,12 @@ export type IntakeFilters = {
    * needs-rebecca.ts — an unreachable queue must never filter to "nobody").
    */
   needsRebecca: boolean;
+  /**
+   * Only leads the Stage Keeper moved (and nobody has moved since). Applied by applyFilters, so
+   * the workspace turns it off when the moves couldn't be read: an unreadable list must never
+   * filter to "no leads". Absent = no agent filter.
+   */
+  agent?: AgentMoveFilter | null;
   /** Free text over name / business / email / mark / referral detail / note. */
   q: string;
 };
@@ -135,6 +151,7 @@ export function parseIntakeFilters(params: IntakeSearchParams): IntakeFilters {
   const reply = firstValue(params.reply) as ReplyState;
   const owner = firstValue(params.owner);
   const stage = firstValue(params.stage);
+  const agent = firstValue(params.agent) as AgentMoveFilter;
 
   return {
     source,
@@ -143,6 +160,8 @@ export function parseIntakeFilters(params: IntakeSearchParams): IntakeFilters {
     stage: stage === "" ? null : stage,
     reply: REPLY_STATES.includes(reply) ? reply : null,
     needsRebecca: firstValue(params.needs) === "rebecca",
+    // An unknown value is dropped, like every other param here: it must show the unfiltered list.
+    ...(AGENT_MOVE_FILTERS.includes(agent) ? { agent } : {}),
     q: firstValue(params.q),
   };
 }
@@ -160,6 +179,7 @@ export function filtersToQueryString(filters: IntakeFilters): string {
   if (filters.stage) params.set("stage", filters.stage);
   if (filters.reply) params.set("reply", filters.reply);
   if (filters.needsRebecca) params.set("needs", "rebecca");
+  if (filters.agent) params.set("agent", filters.agent);
   if (filters.q.trim()) params.set("q", filters.q.trim());
   return params.toString();
 }
@@ -301,6 +321,8 @@ export type BuildIntakeRowsInput = {
   latestNoteByLeadId?: Record<string, string>;
   /** lead id → recorded temperature facts. Omit entirely when the facts read failed. */
   factsByLeadId?: Record<string, TemperatureFacts>;
+  /** lead id → the Stage Keeper's move chip. Omit entirely when the moves couldn't be read. */
+  agentMoveByLeadId?: Record<string, AgentMoveChip>;
   now: Date;
 };
 
@@ -320,7 +342,7 @@ function daysBetween(iso: string | null, now: Date): number | null {
  * strip and the row it counts can never disagree.
  */
 export function buildIntakeRows(input: BuildIntakeRowsInput): IntakeRow[] {
-  const { leads, stages, members, latestNoteByLeadId = {}, factsByLeadId = {}, now } = input;
+  const { leads, stages, members, latestNoteByLeadId = {}, factsByLeadId = {}, agentMoveByLeadId = {}, now } = input;
   const stageById = new Map(stages.map((stage) => [stage.id, stage]));
   const memberById = new Map(members.map((member) => [member.userId, member]));
 
@@ -330,6 +352,7 @@ export function buildIntakeRows(input: BuildIntakeRowsInput): IntakeRow[] {
     const threshold = stage?.aging_threshold_days ?? null;
 
     const facts = factsByLeadId[lead.id];
+    const agentMove = agentMoveByLeadId[lead.id];
 
     return {
       lead,
@@ -343,6 +366,8 @@ export function buildIntakeRows(input: BuildIntakeRowsInput): IntakeRow[] {
       owner: lead.assigned_to ? (memberById.get(lead.assigned_to) ?? null) : null,
       latestNote: latestNoteByLeadId[lead.id]?.trim() || null,
       stale: threshold != null && daysInStage > threshold,
+      // Only present when the agent placed the lead, so a row built without one is unchanged.
+      ...(agentMove ? { agentMove } : {}),
     };
   });
 }
@@ -397,6 +422,7 @@ export function applyFilters(rows: IntakeRow[], filters: IntakeFilters): IntakeR
     }
     if (filters.stage && row.lead.current_stage_id !== filters.stage) return false;
     if (filters.reply && row.reply !== filters.reply) return false;
+    if (filters.agent && !(row.agentMove && (filters.agent === "7d" || row.agentMove.today))) return false;
     if (query && !haystack(row).includes(query)) return false;
     return true;
   });

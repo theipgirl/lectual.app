@@ -14,6 +14,7 @@ import { LtnSuggestion } from "@/components/intake/LtnSuggestion";
 import OwnerCell from "./OwnerCell";
 import TemperatureCell from "./TemperatureCell";
 import NeedsRebeccaBadge from "./NeedsRebeccaBadge";
+import AgentMoveChip from "./AgentMoveChip";
 import SourceCell from "./SourceCell";
 import type { Lane } from "@/lib/leads/lane";
 import {
@@ -193,6 +194,7 @@ export default function IntakeTable({
                         {name}
                       </Link>
                       <NeedsRebeccaBadge pending={pendingDrafts} />
+                      <AgentMoveChip move={row.agentMove} />
                     </div>
                     <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0, marginTop: 2 }}>
                       <span

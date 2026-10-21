@@ -1,5 +1,7 @@
 import { resolveStage } from "@/lib/lawmatics/stage-map";
 import type { EmailType } from "@/lib/intake/email-match";
+import { SIGNAL_LABEL } from "@/lib/stage-keeper/signals";
+import { currentAgentMoves, pendingStageSuggestions, type ActivityRow } from "@/lib/stage-keeper/moves";
 import type { SourceSignal, StageOpt } from "./types";
 
 /**
@@ -28,17 +30,52 @@ function time(at: string | null): number {
   return Number.isFinite(t) ? t : Number.NEGATIVE_INFINITY;
 }
 
-/** The email source's reading of one lead from that lead's stored mail rows. */
-export function emailSignalFor(mail: readonly StoredMail[], stages: readonly StageOpt[]): SourceSignal {
+/**
+ * What the Stage Keeper did for a lead, read back from its timeline rows: the move it made (if it
+ * is still the lead's latest stage change) and the suggestions still waiting for a person. Both
+ * name a stage by id, so they are compared with the firm's own stages, never by name.
+ */
+export type AgentEvidence = { stageId: string; wording: string; date: string | null };
+
+/** The Stage Keeper's rows for ONE lead (any order) as evidence for the email / calendar source. */
+export function agentEvidenceFor(rows: readonly ActivityRow[]): AgentEvidence[] {
+  const out: AgentEvidence[] = [];
+  const label = (signal: keyof typeof SIGNAL_LABEL | null) => (signal ? SIGNAL_LABEL[signal] : "stage change");
+  for (const move of currentAgentMoves(rows, new Date(), Number.POSITIVE_INFINITY).values()) {
+    if (!move.toStageId) continue;
+    const evidenceDate = move.evidence?.kind === "mail" ? move.evidence.at : null;
+    out.push({ stageId: move.toStageId, wording: `Stage Keeper: ${label(move.signal)}`, date: evidenceDate ?? move.at });
+  }
+  for (const s of pendingStageSuggestions(rows)) {
+    if (!s.toStageId) continue;
+    const evidenceDate = s.evidence?.kind === "mail" ? s.evidence.at : null;
+    out.push({ stageId: s.toStageId, wording: `Stage Keeper suggests: ${label(s.signal)}`, date: evidenceDate ?? s.at });
+  }
+  return out;
+}
+
+/**
+ * The email / calendar source's reading of one lead: its stored mail rows and what the Stage
+ * Keeper did from mail and calendar consults. The newest mapped evidence wins; a sensitive thread
+ * contributes nothing; a stage id that is not one of the firm's stages is unmapped, never a vote.
+ */
+export function emailSignalFor(mail: readonly StoredMail[], stages: readonly StageOpt[], agent: readonly AgentEvidence[] = []): SourceSignal {
   const mapped = mail.filter((m) => !m.sensitive && m.type !== null && m.type in EMAIL_STAGE_TABLE);
-  if (mapped.length === 0) {
+  if (mapped.length === 0 && agent.length === 0) {
     return { kind: "none", note: mail.length > 0 ? "mail found, but none of it names a stage" : undefined };
   }
   // The newest mapped email wins. Ties keep the first one read.
-  const newest = mapped.reduce((best, m) => (time(m.at) > time(best.at) ? m : best));
-  const entry = EMAIL_STAGE_TABLE[newest.type as EmailType]!;
+  const newestMail = mapped.length > 0 ? mapped.reduce((best, m) => (time(m.at) > time(best.at) ? m : best)) : null;
+  const newestAgent = agent.length > 0 ? agent.reduce((best, a) => (time(a.date) > time(best.date) ? a : best)) : null;
+
+  if (newestAgent && (!newestMail || time(newestAgent.date) > time(newestMail.at))) {
+    const known = stages.find((s) => s.id === newestAgent.stageId);
+    if (!known) return { kind: "unmapped", wording: newestAgent.wording };
+    return { kind: "stage", stageId: known.id, stageName: known.name, wording: newestAgent.wording, date: newestAgent.date };
+  }
+  const entry = EMAIL_STAGE_TABLE[newestMail!.type as EmailType]!;
   const wording = `${entry.label} email`;
   const resolved = resolveStage(entry.stageName, stages);
   if (!resolved.ok) return { kind: "unmapped", wording };
-  return { kind: "stage", stageId: resolved.stage.id, stageName: resolved.stage.name, wording, date: newest.at };
+  return { kind: "stage", stageId: resolved.stage.id, stageName: resolved.stage.name, wording, date: newestMail!.at };
 }

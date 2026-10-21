@@ -13,6 +13,7 @@ import {
   type LeadFieldErrors,
 } from "./lead-input";
 import { LeadWriteError, forbiddenLeadWrite } from "./errors";
+import { usableEvidenceDate } from "./evidence-date";
 import { notifyAssigned } from "@/lib/notifications/producers";
 
 export type Lead = Database["public"]["Tables"]["crm_lead"]["Row"];
@@ -295,25 +296,6 @@ export async function updateLead(id: string, input: UpdateLeadInput): Promise<Le
 }
 
 /**
- * The date a caller says a lead really entered its stage, or null when it is unusable: not an ISO
- * date, not a real calendar day, or later than now. An unusable date is ignored (the move stamps
- * now); it is never an error.
- */
-function usableEvidenceDate(value: string | null | undefined, nowMs: number): string | null {
-  if (!value) return null;
-  const match = /^(\d{4})-(\d{2})-(\d{2})(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?)?$/.exec(value);
-  if (!match) return null;
-  const ms = Date.parse(value);
-  if (!Number.isFinite(ms) || ms > nowMs) return null;
-  // Date.parse rolls "2026-02-31" over to March; a real day reads back as itself.
-  const day = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
-  if (day.getUTCFullYear() !== Number(match[1]) || day.getUTCMonth() !== Number(match[2]) - 1 || day.getUTCDate() !== Number(match[3])) {
-    return null;
-  }
-  return new Date(ms).toISOString();
-}
-
-/**
  * Moves a lead to a new stage. Role-gated: paralegal, social_media, and
  * viewer are rejected even though some of them can otherwise edit leads.
  * Also stamps stage_entered_at and last_activity_at to now.
@@ -321,8 +303,16 @@ function usableEvidenceDate(value: string | null | undefined, nowMs: number): st
  * `evidenceAt` is optional: when a caller has a better date for when the lead really entered the
  * stage (the stage reconciliation screen reads one off the intake sheet), stage_entered_at takes it
  * and the timeline row records it. Without one, or with an unusable one, behaviour is unchanged.
+ *
+ * `extraPayload` adds fields to the same `stage_changed` row (an Undo or an accepted suggestion names
+ * what it answers). It is spread first, so it can never replace the from/to keys the row exists to record.
  */
-export async function moveLeadStage(id: string, stageId: string, evidenceAt?: string | null): Promise<Lead> {
+export async function moveLeadStage(
+  id: string,
+  stageId: string,
+  evidenceAt?: string | null,
+  extraPayload?: Record<string, unknown>,
+): Promise<Lead> {
   const supabase = await getScopedClient();
 
   const role = await resolveCurrentRole(supabase);
@@ -364,6 +354,7 @@ export async function moveLeadStage(id: string, stageId: string, evidenceAt?: st
     type: "stage_changed",
     leadId: id,
     payload: {
+      ...(extraPayload ?? {}),
       from_stage: fromStageId ? (stageNames[fromStageId] ?? null) : null,
       to_stage: stageNames[stageId] ?? null,
       from_stage_id: fromStageId,

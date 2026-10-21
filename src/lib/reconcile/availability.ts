@@ -27,13 +27,13 @@ export function describeAvailability(lawmatics: ConnectionCheck, mailboxes: Conn
     },
     {
       source: "email",
-      label: "Email",
+      label: "Email / calendar",
       tone: mailboxes.ok && mailboxes.active > 0 ? "ok" : "warn",
       text: !mailboxes.ok
-        ? "We couldn't check the mailbox connections. Synced mail will be tried when you upload."
+        ? "We couldn't check the mailbox connections. Synced mail and the Stage Keeper's moves will be tried when you upload."
         : mailboxes.active > 0
-          ? "Mailbox sync is connected. Mail already on each lead's timeline will be used."
-          : "No mailbox is connected, so there may be no synced mail to use. That is not an error.",
+          ? "Mailbox sync is connected. Mail already on each lead's timeline, and what the Stage Keeper did from mail and calendar consults, will be used."
+          : "No mailbox is connected, so there may be no synced mail or calendar consults to use. That is not an error.",
     },
   ];
 }

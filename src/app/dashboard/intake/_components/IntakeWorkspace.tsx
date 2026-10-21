@@ -73,6 +73,7 @@ export default function IntakeWorkspace({
   time,
   pendingApprovals,
   showReconcile = false,
+  agentMoves,
   now: nowIso,
 }: {
   rows: IntakeRow[];
@@ -100,6 +101,13 @@ export default function IntakeWorkspace({
   pendingApprovals?: LeadPendingApprovals;
   /** Owner, admin and senior admin only: a link to the stage reconciliation screen. */
   showReconcile?: boolean;
+  /**
+   * Whether the Stage Keeper's recent moves were read. `ok`: rows carry their chips and the "Agent
+   * moves" filter is offered. `unavailable`: no chip, the filter is neither offered nor applied (an
+   * unreadable list must never filter to "no leads"), and a one-line note says so. Absent: the same
+   * as unavailable, without the note.
+   */
+  agentMoves?: { status: "ok"; truncated: boolean } | { status: "unavailable" };
   /** The server's render clock, so "Next step" says the same thing on both sides. */
   now: string;
 }) {
@@ -114,8 +122,9 @@ export default function IntakeWorkspace({
   // A bookmarked `needs=rebecca` is ignored while the queue isn't readable, and
   // its chip is hidden then, so it stays out of the URL (and "Save this view")
   // rather than riding along as a filter nobody can see or turn off.
+  const agentAvailable = agentMoves?.status === "ok";
   const href = intakeHref(
-    approvalsShown(pendingApprovals) ? filters : { ...filters, needsRebecca: false },
+    { ...(approvalsShown(pendingApprovals) ? filters : { ...filters, needsRebecca: false }), agent: agentAvailable ? filters.agent : null },
     viewState,
   );
 
@@ -143,8 +152,14 @@ export default function IntakeWorkspace({
   }, [href]);
 
   const filtered = useMemo(
-    () => filterNeedsRebecca(applyFilters(rows, filters), pendingApprovals, filters.needsRebecca),
-    [rows, filters, pendingApprovals],
+    // The agent filter is only applied when the moves were read: otherwise every row would lack a
+    // chip and the list would filter to nobody.
+    () => filterNeedsRebecca(applyFilters(rows, { ...filters, agent: agentAvailable ? filters.agent : null }), pendingApprovals, filters.needsRebecca),
+    [rows, filters, pendingApprovals, agentAvailable],
+  );
+  const agentMoveCounts = useMemo(
+    () => (agentAvailable ? { today: rows.filter((row) => row.agentMove?.today).length, week: rows.filter((row) => row.agentMove).length } : null),
+    [rows, agentAvailable],
   );
   // The toggle is offered only when the queue was actually read; the count is
   // over leads in this list, not queue rows for leads that aren't in intake.
@@ -252,8 +267,10 @@ export default function IntakeWorkspace({
         leadId,
         (row) => {
           const lead = { ...row.lead, current_stage_id: stageId };
+          // A person's move takes the agent's chip off the card (the server drops it the same way).
           return {
             ...row,
+            agentMove: undefined,
             lead,
             stage: stages.find((stage) => stage.id === stageId) ?? null,
             // Temperature rule 2 (nurture stage) keys on the stage, so it has to be re-derived
@@ -309,6 +326,7 @@ export default function IntakeWorkspace({
           members={members}
           visibleCount={filtered.length}
           needsRebeccaCount={needsRebeccaCount}
+          agentMoveCounts={agentMoveCounts}
           currentHref={href}
           onFilters={setFilters}
           onGroup={(group: IntakeGroup) => setViewState((state) => ({ ...state, group }))}
@@ -327,6 +345,28 @@ export default function IntakeWorkspace({
             }}
           >
             Couldn&rsquo;t reach the approval queue — approvals not shown.
+          </p>
+        )}
+
+        {agentMoves?.status === "unavailable" && (
+          <p
+            role="status"
+            style={{
+              margin: 0,
+              fontSize: 12,
+              color: "var(--ink2)",
+              background: "var(--warnbg)",
+              borderRadius: 6,
+              padding: "6px 10px",
+            }}
+          >
+            Agent moves couldn&rsquo;t be loaded, so the &ldquo;Moved by agent&rdquo; chips and the Agent moves filter are off.
+          </p>
+        )}
+
+        {agentMoves?.status === "ok" && agentMoves.truncated && (
+          <p role="status" className="lx-note" style={{ margin: 0 }}>
+            There were more agent moves than could be read, so only the most recent are marked.
           </p>
         )}
 

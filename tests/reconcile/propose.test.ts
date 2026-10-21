@@ -25,7 +25,7 @@ describe("proposeStage: agree", () => {
   it("sheet and email on the same stage", () => {
     const p = run({ sheet: stageSignal(S.loe), email: stageSignal(S.loe, "LOE and invoice email") });
     expect(p.confidence).toBe("agree");
-    expect(text(p)).toMatch(/Email:.*It matches the sheet/);
+    expect(text(p)).toMatch(/Email \/ calendar:.*It matches the sheet/);
   });
 
   it("sheet, Lawmatics and email all on the same stage", () => {
@@ -54,7 +54,7 @@ describe("proposeStage: sheet_only", () => {
   it("names each non-voting source by its own state in the reasons", () => {
     const p = run({ sheet, lawmatics: unavailable("not connected"), email: none("mail found, but none of it names a stage") });
     expect(text(p)).toContain("Lawmatics was unavailable: not connected");
-    expect(text(p)).toContain("Email has no stage for this lead (mail found, but none of it names a stage)");
+    expect(text(p)).toContain("Email / calendar has no stage for this lead (mail found, but none of it names a stage)");
     const q = run({ sheet, lawmatics: unmapped("Discovery Call No Show") });
     expect(text(q)).toContain('Lawmatics: "Discovery Call No Show" doesn\'t match any of this firm\'s stages');
   });
@@ -170,7 +170,7 @@ describe("proposeStage: a source that is unavailable", () => {
     expect(p.unavailable).toEqual(["sheet", "lawmatics", "email"]);
     expect(text(p)).toContain("Sheet was unavailable: x");
     expect(text(p)).toContain("Lawmatics was unavailable: y");
-    expect(text(p)).toContain("Email was unavailable: z");
+    expect(text(p)).toContain("Email / calendar was unavailable: z");
   });
 });
 

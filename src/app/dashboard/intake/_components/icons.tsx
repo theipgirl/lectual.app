@@ -40,3 +40,13 @@ export function ChevronIcon(props: IconProps) {
     </Svg>
   );
 }
+
+/** A small robot head: the Stage Keeper's mark on a card it moved. Drawn, not an emoji. */
+export function AgentIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="5" y="9" width="14" height="10" rx="2.5" />
+      <path d="M12 5v4M9.5 14h.01M14.5 14h.01" />
+    </Svg>
+  );
+}

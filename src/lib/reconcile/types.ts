@@ -17,7 +17,7 @@ export type SourceName = "sheet" | "lawmatics" | "email";
 export const SOURCE_LABEL: Record<SourceName, string> = {
   sheet: "Sheet",
   lawmatics: "Lawmatics",
-  email: "Email",
+  email: "Email / calendar",
 };
 
 /**

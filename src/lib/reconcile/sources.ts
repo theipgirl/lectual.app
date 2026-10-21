@@ -4,7 +4,8 @@ import type { getScopedClient } from "@/lib/db/scoped-client";
 import { LawmaticsNotConnectedError, firmLawmaticsClient } from "@/lib/lawmatics/connection";
 import { pullSource } from "@/lib/lawmatics/import";
 import type { LawmaticsSourceRecord } from "@/lib/lawmatics/normalize";
-import type { StoredMail } from "./email";
+import { agentEvidenceFor, type AgentEvidence, type StoredMail } from "./email";
+import type { ActivityRow } from "@/lib/stage-keeper/moves";
 import type { LeadRow, StageOpt } from "./types";
 
 /**
@@ -99,7 +100,7 @@ export async function readLawmatics(): Promise<LawmaticsRead> {
 }
 
 export type EmailRead =
-  | { status: "ok"; byLead: Map<string, StoredMail[]>; total: number }
+  | { status: "ok"; byLead: Map<string, StoredMail[]>; total: number; agent?: Map<string, AgentEvidence[]> }
   | { status: "unavailable"; reason: string };
 
 function chunk<T>(items: readonly T[], size: number): T[][] {
@@ -110,11 +111,13 @@ function chunk<T>(items: readonly T[], size: number): T[][] {
 
 /**
  * The mail the sync already stored on these leads' timelines (`email_sent` / `email_received`, each
- * with its classification in the payload). No mail is fetched. A lead with no mail is simply absent
- * from the map; a failed read is `unavailable`.
+ * with its classification in the payload), and what the Stage Keeper did for them (its moves and its
+ * pending suggestions). No mail is fetched. A lead with neither is simply absent from the maps; a
+ * failed read of EITHER is `unavailable`, never an empty result.
  */
 export async function readStoredMail(supabase: Scoped, leadIds: readonly string[]): Promise<EmailRead> {
   const byLead = new Map<string, StoredMail[]>();
+  const agent = new Map<string, AgentEvidence[]>();
   let total = 0;
   try {
     for (const batch of chunk(leadIds, MAIL_BATCH)) {
@@ -146,10 +149,39 @@ export async function readStoredMail(supabase: Scoped, leadIds: readonly string[
         if (rows.length < PAGE) done = true;
       }
       if (!done) throw new Error("mail-too-large");
+
+      // The Stage Keeper's footprint on the same leads: stage changes and suggestions, read together.
+      const agentRows: ActivityRow[] = [];
+      done = false;
+      for (let page = 0; page < MAIL_PAGES && !done; page++) {
+        const { data, error } = await supabase
+          .from("crm_activity")
+          .select("id, lead_id, type, actor_type, created_at, payload")
+          .in("lead_id", batch)
+          .in("type", ["stage_changed", "ai_insight"])
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+          .range(page * PAGE, page * PAGE + PAGE - 1);
+        if (error) throw error;
+        const rows = (data ?? []) as ActivityRow[];
+        agentRows.push(...rows);
+        if (rows.length < PAGE) done = true;
+      }
+      if (!done) throw new Error("agent-rows-too-large");
+      const perLead = new Map<string, ActivityRow[]>();
+      for (const row of agentRows) {
+        if (!row.lead_id) continue;
+        perLead.set(row.lead_id, [...(perLead.get(row.lead_id) ?? []), row]);
+      }
+      for (const [leadId, rows] of perLead) {
+        const evidence = agentEvidenceFor(rows);
+        if (evidence.length > 0) agent.set(leadId, evidence);
+      }
     }
   } catch (err) {
     console.error("[reconcile] stored mail read failed", err instanceof Error ? err.name : "error");
-    return { status: "unavailable", reason: "The synced mail on the timeline could not be read. Try again shortly." };
+    return { status: "unavailable", reason: "The synced mail and the Stage Keeper's moves on the timeline could not be read. Try again shortly." };
   }
-  return { status: "ok", byLead, total };
+  // `agent` is present only when the Stage Keeper left something to read, so a read without it is unchanged.
+  return { status: "ok", byLead, total, ...(agent.size > 0 ? { agent } : {}) };
 }

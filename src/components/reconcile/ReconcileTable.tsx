@@ -41,7 +41,7 @@ export function ReconcileTable({
             <th scope="col">Current stage</th>
             <th scope="col">Sheet</th>
             <th scope="col">Lawmatics</th>
-            <th scope="col">Email</th>
+            <th scope="col">Email / calendar</th>
             <th scope="col">Proposed stage</th>
             <th scope="col">Confidence</th>
             <th scope="col">Decision</th>

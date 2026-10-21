@@ -8,7 +8,7 @@ import { orgHasModule } from "@/lib/org/modules";
 import { aiConfigured } from "@/lib/ai/claude";
 import { runOneAgent } from "@/lib/agents/runner";
 import { productionRunnerDeps } from "@/lib/agents/deps";
-import { AGENT_IDS, type AgentId, type Autonomy } from "@/lib/agents/types";
+import { AGENT_IDS, agentNeedsAi, type AgentId, type Autonomy } from "@/lib/agents/types";
 import { canPauseAutopilot, canResumeAutopilot, parseMinutesForm } from "@/lib/agents/autopilot-rules";
 import { loadAutopilot } from "@/lib/agents/autopilot";
 
@@ -49,7 +49,14 @@ export async function saveAgentSettingAction(_prev: AgentActionState, formData: 
     },
     { onConflict: "org_id,agent" },
   );
-  if (error) return { error: `Couldn't save: ${error.message}` };
+  if (error) {
+    // The database's agent list (a CHECK) doesn't name the Stage Keeper until lectual 0098 is applied.
+    // Say that, not a raw Postgres message. Other agents' messages are unchanged.
+    if (agent === "stage-keeper" && (error.code === "23514" || /agent_setting_agent|check constraint/i.test(error.message ?? ""))) {
+      return { error: "The Stage Keeper isn't available until the database update (lectual 0098) is applied. Nothing was changed." };
+    }
+    return { error: `Couldn't save: ${error.message}` };
+  }
   refresh();
   return { ok: true };
 }
@@ -59,7 +66,8 @@ export async function runAgentNowAction(_prev: AgentActionState, formData: FormD
   if (!session) return { error: "Only an owner, admin or senior admin can run agents." };
   const agent = formData.get("agent");
   if (!isAgent(agent)) return { error: "Unknown agent." };
-  if (!aiConfigured()) return { error: "The AI key isn't configured on this deployment." };
+  // Rule-based agents (the Stage Keeper) call no model, so a missing AI key doesn't stop them.
+  if (agentNeedsAi(agent) && !aiConfigured()) return { error: "The AI key isn't configured on this deployment." };
 
   // Read the setting as the caller, through RLS: the firm is the caller's own.
   const supabase = await getScopedClient();

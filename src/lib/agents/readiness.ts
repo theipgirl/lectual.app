@@ -1,4 +1,4 @@
-import type { AgentId } from "./types";
+import { agentNeedsAi, type AgentId } from "./types";
 
 /**
  * Whether an agent that is switched on can actually do anything. Pure: the
@@ -23,6 +23,11 @@ export type AgentReadinessInput = {
   aiConfigured: boolean;
   /** The approval queue. Only the post-consult drafter needs it to write anything. */
   queue: ReadinessSource;
+  /**
+   * Outlook consults the page can read. Only the Stage Keeper uses it: it is ready with an
+   * active mailbox OR readable consults. Optional so every other caller is unchanged.
+   */
+  calendar?: ReadinessSource;
 };
 
 export type ReadinessTone = "ok" | "warn" | "mute";
@@ -43,7 +48,7 @@ export type AgentReadiness = {
 export function agentReadiness(input: AgentReadinessInput): AgentReadiness {
   const { agent, enabled, hasMailboxModule, mailbox, queue } = input;
 
-  if (agent === "email-intel" && !hasMailboxModule) {
+  if ((agent === "email-intel" || agent === "stage-keeper") && !hasMailboxModule) {
     return {
       label: "Needs the Mailboxes module",
       tone: enabled ? "warn" : "mute",
@@ -52,7 +57,8 @@ export function agentReadiness(input: AgentReadinessInput): AgentReadiness {
   }
   if (!enabled) return { label: "Off", tone: "mute", reason: "Switched off." };
 
-  if (!input.aiConfigured) {
+  // The Stage Keeper is rule-based: it calls no model, so a missing AI key never blocks it.
+  if (agentNeedsAi(agent) && !input.aiConfigured) {
     return {
       label: "On · needs the AI key",
       tone: "warn",
@@ -73,6 +79,25 @@ export function agentReadiness(input: AgentReadinessInput): AgentReadiness {
         label: "On · couldn't check mailboxes",
         tone: "warn",
         reason: "The mailbox connections couldn't be read just now, so it isn't known whether this agent has any mail to read.",
+      };
+    }
+  }
+
+  if (agent === "stage-keeper" && mailbox !== "ok") {
+    const calendar = input.calendar ?? "none";
+    // Ready with an active mailbox OR consults it can read. Only when neither is there, say which is missing.
+    if (calendar !== "ok") {
+      if (mailbox === "unavailable" || calendar === "unavailable") {
+        return {
+          label: "On · couldn't check its sources",
+          tone: "warn",
+          reason: "The mailbox connections or the calendar couldn't be read just now, so it isn't known whether this agent has anything to read.",
+        };
+      }
+      return {
+        label: "On · waiting for a mailbox",
+        tone: "warn",
+        reason: "No active mailbox is connected that this page can see, and no Outlook consults are readable, so there is no mail or consult to place a lead from.",
       };
     }
   }
