@@ -161,3 +161,41 @@ describe("Sprint 8: meetings and matter edits on the timeline", () => {
     expect(change({ change: "task_assigned", title: "Call the client", assignee_id: null }).detail).toBe("Call the client · unassigned");
   });
 });
+
+describe("booth scorecard rows (Sprint 9, F7)", () => {
+  it("reads 'Booth scorecard' with the payload's summary as the detail", () => {
+    expect(describeActivity(row("booth_scorecard", { summary: "Booth scorecard — 72/100, WARM", score: 72, temperature: "warm" }))).toEqual({
+      title: "Booth scorecard",
+      detail: "Booth scorecard — 72/100, WARM",
+      tone: "system",
+      link: null,
+    });
+  });
+
+  it("adds the score as 72/100 when the summary doesn't already have it", () => {
+    expect(describeActivity(row("booth_scorecard", { summary: "Finished at the booth", score: 72 })).detail).toBe("Finished at the booth · 72/100");
+    expect(describeActivity(row("booth_scorecard", { score: 72 })).detail).toBe("72/100");
+    // A zero is a real score.
+    expect(describeActivity(row("booth_scorecard", { summary: "Finished", score: 0 })).detail).toBe("Finished · 0/100");
+  });
+
+  it("shows a contact-only row's summary and no score", () => {
+    expect(describeActivity(row("booth_scorecard", { summary: "Booth — contact captured, assessment not yet completed" }))).toMatchObject({
+      title: "Booth scorecard",
+      detail: "Booth — contact captured, assessment not yet completed",
+    });
+  });
+
+  it("gives the title alone for an empty, odd or null payload, and never throws", () => {
+    for (const payload of [{}, null, undefined, { summary: 5, score: "72" }, { summary: "   ", score: Number.NaN }]) {
+      const d = describeActivity({ type: "booth_scorecard", actor_type: "system", created_at: "2026-10-17T15:00:00Z", payload });
+      expect(d.title).toBe("Booth scorecard");
+      expect(d.detail).toBeNull();
+    }
+  });
+
+  it("leaves every other row's wording as it was", () => {
+    expect(describeActivity(row("quote_payment", { summary: "Paid" })).title).toBe("Quote payment");
+    expect(describeActivity(row("something_new", {})).title).toBe("Something new");
+  });
+});

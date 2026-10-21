@@ -13,6 +13,8 @@ import { AssignSelect, EditLeadForm, NoteComposer, ProposalCard, StageSelect } f
 import { LeadTags, PrepConsult } from "@/components/leads/LeadExtras";
 import { LeadMattersLine } from "@/components/leads/LeadMatters";
 import { loadMattersForLead } from "@/lib/matters/for-lead";
+import { AnswersCard } from "@/components/answers/AnswersCard";
+import { loadLeadAnswers } from "@/lib/answers/load-answers";
 import { Timeline } from "@/components/timeline/Timeline";
 import VoiceNoteRecorder from "@/components/voice/VoiceNoteRecorder";
 import { listTags, tagsForLead } from "@/lib/pipeline/tags";
@@ -77,7 +79,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const voiceUrls = await voiceNotePlaybackUrls(rows);
 
   // Lane + next step (SOP Stage 2) and the lead's sequences (SOP rule 1).
-  const [{ links, failed: linksFailed }, tz, enrollments, approvals, factsRead, mattersRead] = await Promise.all([
+  const [{ links, failed: linksFailed }, tz, enrollments, approvals, factsRead, mattersRead, answersRead] = await Promise.all([
     getLaneLinks(),
     getFirmTimeZone(),
     listLeadEnrollments(id).catch(() => null),
@@ -87,6 +89,8 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     loadTemperatureFacts([lead], stages).catch((): TemperatureFactsRead => ({ status: "unavailable" })),
     // Never throws (a failed read is `unavailable`), so it can't take the page down.
     loadMattersForLead(lead.id),
+    // Three states per source and never throws; a failed read is named on the card, not an empty one.
+    loadLeadAnswers(lead.id),
   ]);
   const temperature = effectiveTemperature(lead, stages, new Date(), factsRead.status === "ok" ? factsRead.byLead[lead.id] : undefined);
   const lane = laneView(lead);
@@ -171,6 +175,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             linksFailed={linksFailed}
             canWrite={canWrite}
           />
+          <AnswersCard read={answersRead} tz={tz} />
           {lead.ai_summary && !lane.suggested && (
             // A triage summary that carries no lane (an older format) is still shown, as the agent's words.
             <section className="lx-card" style={{ padding: 18 }}>

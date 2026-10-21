@@ -17,7 +17,7 @@
 
 export type Row = Record<string, unknown>;
 type Filter = (row: Row) => boolean;
-type Result = { data: unknown; error: unknown };
+type Result = { data: unknown; error: unknown; count?: number | null };
 
 export type Write = { table: string; op: "insert" | "update" | "delete"; payload?: unknown; ids?: string[] };
 
@@ -94,6 +94,10 @@ export class FakeDb {
   /** Every `.order()` call: [table, column]. */
   orderCalls: Array<[string, string]> = [];
   rpcCalls: string[] = [];
+  /** Every `from()` table, in order. */
+  froms: string[] = [];
+  /** Every `select()` column list: [table, columns]. */
+  selects: Array<[string, string]> = [];
   /** Tables whose deletes RLS silently filters down to zero rows (no error, nothing removed). */
   denyDeletes = new Set<string>();
   private seq = 0;
@@ -134,7 +138,10 @@ export class FakeDb {
 
   client() {
     return {
-      from: (table: string) => new Builder(this, table),
+      from: (table: string) => {
+        this.froms.push(table);
+        return new Builder(this, table);
+      },
       rpc: async (name: string): Promise<Result> => {
         this.rpcCalls.push(name);
         if (name === "current_org_role") return { data: this.role, error: null };
@@ -152,6 +159,10 @@ class Builder implements PromiseLike<Result> {
   private filters: Filter[] = [];
   private orders: Array<[string, boolean]> = [];
   private limitN: number | null = null;
+  private rangeFrom: number | null = null;
+  private rangeTo: number | null = null;
+  private head = false;
+  private counted = false;
   private returning = false;
 
   constructor(
@@ -159,8 +170,11 @@ class Builder implements PromiseLike<Result> {
     private table: string,
   ) {}
 
-  select() {
+  select(columns?: string, opts?: { count?: string; head?: boolean }) {
     this.returning = true;
+    this.db.selects.push([this.table, columns ?? "*"]);
+    if (opts?.head) this.head = true;
+    if (opts?.count) this.counted = true;
     return this;
   }
   insert(payload: unknown) {
@@ -180,6 +194,19 @@ class Builder implements PromiseLike<Result> {
   }
   eq(column: string, value: unknown) {
     this.filters.push((r) => r[column] === value);
+    return this;
+  }
+  gte(column: string, value: string | number) {
+    this.filters.push((r) => r[column] !== null && r[column] !== undefined && (r[column] as string | number) >= value);
+    return this;
+  }
+  lte(column: string, value: string | number) {
+    this.filters.push((r) => r[column] !== null && r[column] !== undefined && (r[column] as string | number) <= value);
+    return this;
+  }
+  range(from: number, to: number) {
+    this.rangeFrom = from;
+    this.rangeTo = to;
     return this;
   }
   in(column: string, values: unknown[]) {
@@ -240,8 +267,12 @@ class Builder implements PromiseLike<Result> {
           return (av < bv ? -1 : av > bv ? 1 : 0) * (asc ? 1 : -1);
         });
       }
+      const total = rows.length;
+      if (this.rangeFrom !== null && this.rangeTo !== null) rows = rows.slice(this.rangeFrom, this.rangeTo + 1);
       if (this.limitN !== null) rows = rows.slice(0, this.limitN);
-      return { data: rows.map((r) => ({ ...r })), error: null };
+      const count = this.counted ? total : undefined;
+      if (this.head) return { data: null, error: null, count };
+      return { data: rows.map((r) => ({ ...r })), error: null, count };
     }
 
     if (this.op === "insert") {

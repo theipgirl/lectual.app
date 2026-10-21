@@ -53,6 +53,9 @@ import {
   TaskControls,
 } from "@/components/matters/MatterEdits";
 import { IntakeRequestCard } from "@/components/matters/IntakeRequestCard";
+import { AnswersCard } from "@/components/answers/AnswersCard";
+import { loadMatterAnswers } from "@/lib/answers/load-answers";
+import { getFirmTimeZone } from "@/lib/org/profile";
 import { canSendIntakeRequest, listMatterIntakeRequests } from "@/lib/intake-forms/requests";
 import { intakeOrigin } from "@/lib/intake-forms/origin";
 import { MATTER_TYPE_LABEL } from "../labels";
@@ -99,7 +102,7 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
   const client = await resolveMatterClientNameFrom(matter, primaryContact);
   const canSendIntake = canSendIntakeRequest(session.role);
   const canWrite = MATTER_WRITE_ROLES.includes(session.role);
-  const [voiceUrls, intakeRequests, origin, meetings, signedQuotes] = await Promise.all([
+  const [voiceUrls, intakeRequests, origin, meetings, signedQuotes, answersRead, tz] = await Promise.all([
     voiceNotePlaybackUrls(activity),
     // Intake questions (0079): a failed read says so on the card; it never
     // reads as "no links sent".
@@ -109,6 +112,10 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
     // Only to decide whether to offer the pre-filled engagement letter, so only for someone who
     // could draft it. A failed read offers nothing extra; "Draft a letter" is still there.
     hasDocumentCenter && canWrite ? loadSignedQuotesForMatter(matter.id) : Promise.resolve(null),
+    // The matter's answered intake requests, and the submissions and booth cards of the lead it came from.
+    // Never throws: a failed source is named on the card.
+    loadMatterAnswers(matter.id, matter.lead_id),
+    getFirmTimeZone(),
   ]);
   const hasSignedQuote = signedQuotes?.status === "ok" && signedQuotes.quotes.length > 0;
 
@@ -445,6 +452,8 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
               </p>
             </section>
           ) : null}
+
+          <AnswersCard read={answersRead} tz={tz} />
 
           <section className="lx-card lx-aside">
             <div className="lx-label">About</div>
