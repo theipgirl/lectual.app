@@ -20,21 +20,25 @@ const fixture = (name: string) => readFileSync(path.join(__dirname, "__fixtures_
 
 const NEW_CARD = /<div class="ifm-card ifm-kpi"><div class="ifm-field-label">(?:Page to contact details|Contact details to finish)<\/div><div class="ifm-kpi-value">[^<]*<\/div><div class="ifm-help">[^<]*<\/div><\/div>/g;
 
+// Sprint 10 deliberately adds a "Median time per step" section and a "Stopped at" column to the Performance tab;
+// they are taken out here so the rest of the markup is still compared byte for byte against the Sprint 9 fixtures.
+const SPRINT_10 = /<section class="ifm-card ifm-steps".*?<\/section>|<th>Stopped at<\/th>|<td class="ifm-stopped[^"]*">[^<]*<\/td>/g;
+
 describe("Performance tab after the drawer moved (F17, V4)", () => {
   it("renders exactly the markup it rendered before, once the two new cards are taken out", async () => {
     expect(await renderPerformance()).not.toBe(fixture("performance-tab.html")); // the two new cards are really there
-    expect((await renderPerformance()).replace(NEW_CARD, "")).toBe(fixture("performance-tab.html"));
+    expect((await renderPerformance()).replace(NEW_CARD, "").replace(SPRINT_10, "")).toBe(fixture("performance-tab.html"));
   });
 
   it("renders the open drawer exactly as before (no lead link, same controls)", async () => {
-    const html = (await renderPerformance({ intakeId: PERF_LIST[0].id })).replace(NEW_CARD, "");
+    const html = (await renderPerformance({ intakeId: PERF_LIST[0].id })).replace(NEW_CARD, "").replace(SPRINT_10, "");
     expect(html).toBe(fixture("performance-tab-drawer.html"));
     expect(html).toContain("SANKOFA");
     expect(html).not.toContain("Open the lead");
   });
 
   it("renders an assessment form's Performance tab exactly as before, including the temperature card", async () => {
-    const html = (await renderPerformance({ kind: "assessment" })).replace(NEW_CARD, "");
+    const html = (await renderPerformance({ kind: "assessment" })).replace(NEW_CARD, "").replace(SPRINT_10, "");
     expect(html).toBe(fixture("performance-tab-assessment.html"));
     expect(html).toContain("Hot · warm · cold");
   });

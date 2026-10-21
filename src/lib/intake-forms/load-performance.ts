@@ -17,6 +17,16 @@ import { isSubmissionStatus } from "./submission";
 type Load<T> = { status: "ok"; value: T } | { status: "unconfigured" } | { status: "unavailable"; error?: unknown };
 
 const PAGE = 1000;
+
+/**
+ * The event kinds the visit/start/complete funnel counts. A listed set, not
+ * "everything but step": a database without 0096 has no `step` kind to compare
+ * against (an enum would refuse the literal), and per-step events (up to a
+ * dozen per person) must never use up the cap below. They are read on their
+ * own by load-steps.ts.
+ */
+export const FUNNEL_KINDS = ["visit", "start_conversation", "start_form", "start_assessment", "complete"] as const;
+
 /** 50k events per range is far past any MVP firm; past it the page says the counts are capped. */
 const MAX_PAGES = 50;
 
@@ -35,6 +45,7 @@ export async function loadFunnel(formId: string, range: RangeDays, now = new Dat
         .from("crm_intake_event")
         .select("kind, session_hash")
         .eq("form_id", formId)
+        .in("kind", [...FUNNEL_KINDS])
         .gte("occurred_at", since)
         .order("id", { ascending: true })
         .range(page * PAGE, page * PAGE + PAGE - 1);

@@ -1,5 +1,6 @@
 import { bandFor, BAND_LABEL, type BoothBand } from "@/lib/assessment-card/score";
 import type { BoothQuestion } from "@/lib/assessment-card/questions";
+import { isExtraAnswerId } from "./assessment";
 import { parseAnswers, parseContact, type IntakeAnswer } from "./submission";
 
 /**
@@ -107,6 +108,17 @@ export function intakeQuestionResults(rows: readonly ResultSubmission[], questio
       capped: g.rows.length > ANSWERS_PER_QUESTION,
     };
   });
+}
+
+/**
+ * An assessment's own questions (Sprint 10): the same per-question answer lists
+ * as an intake's, over only the answers stored under an extra's id (a letter-led
+ * id, never one of the card's numbers). A question the firm has since removed
+ * is still listed, under the wording it was stored with.
+ */
+export function extraQuestionResults(rows: readonly ResultSubmission[], extras: readonly FormQuestionRef[]): QuestionResult[] {
+  const onlyExtras = rows.map((r) => ({ ...r, answers: parseAnswers(r.answers).filter((a) => isExtraAnswerId(a.id)) }));
+  return intakeQuestionResults(onlyExtras, extras);
 }
 
 // ── assessments: distributions ───────────────────────────────────────────────

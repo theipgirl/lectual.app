@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { intakeDetail } from "@/lib/intake-forms/performance";
 import type { loadIntakeSubmission } from "@/lib/intake-forms/load-performance";
+import type { DrawerSteps } from "@/lib/intake-forms/load-steps";
+import type { Load } from "@/lib/intake-forms/load-results";
+import { stoppedAtLabel } from "@/lib/intake-forms/step-funnel";
 import { IntakeStatusForm } from "./IntakeStatusForm";
 
 /**
@@ -35,6 +38,8 @@ export function IntakeDrawer({
   closeHref,
   canChangeStatus,
   leadHref = null,
+  steps = null,
+  stepQuestions = {},
 }: {
   detail: Awaited<ReturnType<typeof loadIntakeSubmission>>;
   tz: string;
@@ -42,6 +47,10 @@ export function IntakeDrawer({
   canChangeStatus: boolean;
   /** The person's lead page, when the caller knows it (the Results tab does; Performance's drawer is unchanged). */
   leadHref?: string | null;
+  /** Where an unfinished person stopped and their answers so far (Sprint 10); null for a finished person. */
+  steps?: Load<DrawerSteps> | null;
+  /** Question texts by id, to label the saved answers. */
+  stepQuestions?: Record<string, string>;
 }) {
   const d = detail.status === "ok" && detail.value ? intakeDetail(detail.value, tz) : null;
   return (
@@ -76,6 +85,7 @@ export function IntakeDrawer({
                   <Link href={leadHref}>Open the lead</Link>
                 </p>
               )}
+              {steps && <DrawerStepsNote steps={steps} questions={stepQuestions} />}
               <div className="ifm-note">
                 <div className="ifm-caps">Screening note</div>
                 <div>{d.why}</div>
@@ -94,5 +104,55 @@ export function IntakeDrawer({
         </div>
       </aside>
     </div>
+  );
+}
+
+/**
+ * Where this person stopped, and the answers they had given when they left
+ * (saved as they went, never submitted). Said in words in every state: a read
+ * that failed is not "nothing saved", and a person from before step recording
+ * is "not recorded".
+ */
+function DrawerStepsNote({ steps, questions }: { steps: Load<DrawerSteps>; questions: Record<string, string> }) {
+  if (steps.status === "unavailable") {
+    return (
+      <div className="ifm-note ifm-stepnote">
+        <div className="ifm-caps">Where they stopped</div>
+        <div>{"Couldn't load step data. This is a problem reaching the database, not an empty result."}</div>
+      </div>
+    );
+  }
+  if (steps.status === "unconfigured") {
+    return (
+      <div className="ifm-note ifm-stepnote">
+        <div className="ifm-caps">Where they stopped</div>
+        <div>not recorded</div>
+      </div>
+    );
+  }
+  const label = stoppedAtLabel(steps.value.reading);
+  const progress = steps.value.progress ? Object.entries(steps.value.progress) : [];
+  return (
+    <>
+      {label && (
+        <div className="ifm-note ifm-stepnote">
+          <div className="ifm-caps">Where they stopped</div>
+          <div>{label}</div>
+        </div>
+      )}
+      {progress.length > 0 && (
+        <div className="ifm-note ifm-stepnote">
+          <div className="ifm-caps">Answers so far (not submitted)</div>
+          <dl className="ifm-answers">
+            {progress.map(([id, text]) => (
+              <div key={id}>
+                <dt>{questions[id] ?? "Question"}</dt>
+                <dd>{text}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
+    </>
   );
 }

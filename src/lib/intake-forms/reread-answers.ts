@@ -1,6 +1,7 @@
 import { boothVariant, type BoothVariantId } from "@/lib/assessment-card/variants";
 import type { BoothOption, BoothQuestion } from "@/lib/assessment-card/questions";
 import type { BoothAnswers, BoothScore } from "@/lib/assessment-card/score";
+import { isExtraAnswerId } from "./assessment";
 import type { IntakeAnswer } from "./submission";
 
 /**
@@ -16,14 +17,28 @@ import type { IntakeAnswer } from "./submission";
  * any answer that cannot be matched to the card makes the whole re-read
  * `unavailable`, so a guess is never shown as a gap. The stored score is the
  * one displayed; a re-read only ever supplies the gaps.
+ *
+ * The firm's own extra questions (Sprint 10) are stored in the same list, after
+ * the card's answers, under their own non-numeric ids. They are never scored,
+ * so they are set aside before the card is matched (`withoutExtras`): the same
+ * answers with or without extras re-read to the same gaps, band and score. An
+ * answer with a numeric id the card doesn't have, or with no id, still fails.
  */
+
+/** The card's answers only: the firm's own questions (ids that start with a letter) removed. */
+export function withoutExtras(list: readonly IntakeAnswer[]): IntakeAnswer[] {
+  return list.filter((a) => !isExtraAnswerId(a.id));
+}
 
 /** The IP card's ids start at 101; the Brand & Business card's end at 8. */
 export const IP_CARD_MIN_ID = 100;
 
 /** Which card an answer set was given on, read from its ids. Null when the ids mix cards or none is numeric. */
 export function variantFromIds(ids: readonly (string | number)[]): BoothVariantId | null {
-  const nums = ids.map((i) => Number(i)).filter((n) => Number.isInteger(n) && n > 0);
+  const nums = ids
+    .filter((i) => !isExtraAnswerId(String(i)))
+    .map((i) => Number(i))
+    .filter((n) => Number.isInteger(n) && n > 0);
   if (nums.length === 0) return null;
   const ip = nums.filter((n) => n >= IP_CARD_MIN_ID).length;
   if (ip === 0) return "business";
@@ -74,7 +89,8 @@ export function answerValues(list: readonly IntakeAnswer[], questions: readonly 
   return { ok: true, answers };
 }
 
-export function rereadAnswers(list: readonly IntakeAnswer[]): Reread {
+export function rereadAnswers(all: readonly IntakeAnswer[]): Reread {
+  const list = withoutExtras(all);
   if (list.length === 0) return { ok: false, reason: "no_answers" };
   const variant = variantFromIds(list.map((a) => a.id ?? ""));
   if (!variant) return { ok: false, reason: list.some((a) => a.id === null) ? "unknown_question" : "mixed_cards" };

@@ -2034,3 +2034,22 @@ textarea.ifm-input {
   padding: 5px 12px;
   cursor: pointer;
 }
+
+/* Step-level numbers (Sprint 10): drop-off by question, median time per step, "stopped at". */
+.ifr-steps,
+.ifm-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ifr-extras {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ifm-stopped {
+  white-space: nowrap;
+}
+.ifm-stepnote .ifm-answers {
+  margin: 6px 0 0;
+}
