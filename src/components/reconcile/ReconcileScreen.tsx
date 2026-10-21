@@ -2,12 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { applyReconcileAction, previewReconcileAction } from "@/app/dashboard/intake/reconcile/actions";
-import { acceptAgreeing, accept, acceptedCount, agreeingCount, movesFrom, pick, skip } from "@/lib/reconcile/decisions";
+import { acceptAgreeing, accept, acceptedCount, movesFrom, pick, skip } from "@/lib/reconcile/decisions";
 import { MAX_SHEET_BYTES } from "@/lib/intake/sheet-limits";
 import type { ApplyResult, Decisions, PlanRow, ReconcileRow, ReconcileView } from "@/lib/reconcile/types";
-import { ApplyBar, ResultPanel } from "./ApplyBar";
-import { ReconcileTable } from "./ReconcileTable";
-import { LeftOutLists, SummaryStrip } from "./SummaryStrip";
+import { ResultPanel } from "./ApplyBar";
+import { ReconcilePreview } from "./ReconcilePreview";
 import { UploadPanel } from "./UploadPanel";
 
 type Preview = { view: ReconcileView; plan: PlanRow[]; fingerprint: string };
@@ -81,45 +80,27 @@ export function ReconcileScreen() {
   }
 
   const { view } = preview;
-  const accepted = acceptedCount(decisions);
   return (
     <div className="rc-wrap">
-      <SummaryStrip summary={view.summary} />
-      {view.rows.length === 0 ? (
-        <section className="lx-card lx-empty-card" aria-label="No leads">
-          <h2 className="lx-h2" style={{ fontSize: 23 }}>
-            No leads matched this sheet
-          </h2>
-          <p>There are no leads in intake to compare, and none of the sheet&apos;s rows matched a lead the app has.</p>
-        </section>
-      ) : (
-        <>
-          <ApplyBar
-            agreeing={agreeingCount(view.rows)}
-            accepted={accepted}
-            busy={busy}
-            confirming={confirming}
-            bulkMessage={bulkMessage}
-            onBulk={() => {
-              const r = acceptAgreeing(decisions, view.rows);
-              setDecisions(r.decisions);
-              setBulkMessage(r.marked === 1 ? "Marked 1 row to move." : `Marked ${r.marked} rows to move.`);
-            }}
-            onAsk={() => setConfirming(true)}
-            onConfirm={onApply}
-            onCancel={() => setConfirming(false)}
-          />
-          <ReconcileTable
-            rows={view.rows}
-            pickable={view.pickable}
-            decisions={decisions}
-            onAccept={(row: ReconcileRow) => setDecisions((d) => accept(d, row))}
-            onPick={(leadId, stageId) => setDecisions((d) => pick(d, leadId, stageId, view.pickable))}
-            onSkip={(leadId) => setDecisions((d) => skip(d, leadId))}
-          />
-        </>
-      )}
-      <LeftOutLists summary={view.summary} />
+      <ReconcilePreview
+        view={view}
+        decisions={decisions}
+        accepted={acceptedCount(decisions)}
+        busy={busy}
+        confirming={confirming}
+        bulkMessage={bulkMessage}
+        onBulk={() => {
+          const r = acceptAgreeing(decisions, view.rows);
+          setDecisions(r.decisions);
+          setBulkMessage(r.marked === 1 ? "Marked 1 row to move." : `Marked ${r.marked} rows to move.`);
+        }}
+        onAsk={() => setConfirming(true)}
+        onConfirm={onApply}
+        onCancel={() => setConfirming(false)}
+        onAccept={(row: ReconcileRow) => setDecisions((d) => accept(d, row))}
+        onPick={(leadId, stageId) => setDecisions((d) => pick(d, leadId, stageId, view.pickable))}
+        onSkip={(leadId) => setDecisions((d) => skip(d, leadId))}
+      />
       <div>
         <button type="button" className="lx-btn lx-btn-ghost" onClick={restart} disabled={busy}>
           Upload a different file
