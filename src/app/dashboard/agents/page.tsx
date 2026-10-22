@@ -28,6 +28,7 @@ import {
   estimateHoursSaved,
 } from "@/lib/agents/autopilot-rules";
 import { buildRunDigest, type DigestRun } from "@/lib/agents/digest";
+import { displayRunStatus, RUN_STATUS_LABEL, runDurationLabel } from "@/lib/agents/run-status";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { monthQueryFloor, monthStartCivil, civilInZone } from "@/lib/today/outcomes";
@@ -54,13 +55,7 @@ const RUN_AGENT_LABEL: Record<string, string> = {
   "calendar-sync": "Calendar sync",
 };
 const TRIGGER_LABEL: Record<string, string> = { cron: "Scheduled", manual: "Run now", webhook: "Webhook", event: "Event" };
-const STATUS_TONE: Record<string, string> = { ok: "#43602F", skipped: "#7C5312", error: "#8E2733", running: "#7A5A5E" };
-
-function duration(r: RunRow): string {
-  if (!r.finished_at) return "running";
-  const s = Math.max(0, Math.round((Date.parse(r.finished_at) - Date.parse(r.started_at)) / 1000));
-  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
-}
+const STATUS_TONE: Record<string, string> = { ok: "#43602F", skipped: "#7C5312", error: "#8E2733", unfinished: "#8E2733", running: "#7A5A5E" };
 
 export default async function AgentsPage() {
   if (!(await orgHasModule("agents"))) notFound();
@@ -212,6 +207,7 @@ export default async function AgentsPage() {
           const enabled = Boolean(s?.enabled);
           const autonomy = (s?.autonomy as Autonomy | undefined) ?? def.defaultAutonomy;
           const last = lastRun(agent);
+          const lastStatus = last ? displayRunStatus(last, now.getTime()) : null;
           const ready = readiness.get(agent)!;
           return (
             <section key={agent} className={`lx-card lx-agent${!settingsKnown || enabled ? "" : " off"}`}>
@@ -244,8 +240,14 @@ export default async function AgentsPage() {
                 )}
                 {enabled && ready.tone !== "ok" && <span className="lx-pill lx-pill-warn">Blocked</span>}
                 {settingsKnown && enabled && last && (
-                  <span className={`lx-pill ${last.status === "error" ? "lx-pill-risk" : last.drafts_out ? "lx-pill-warn" : "lx-pill-ok"}`}>
-                    {last.status === "error" ? "Failed" : last.drafts_out ? `${last.drafts_out} held` : `${last.items_in} read`}
+                  <span
+                    className={`lx-pill ${lastStatus === "error" || lastStatus === "unfinished" ? "lx-pill-risk" : lastStatus === "running" ? "lx-pill-warn" : last.drafts_out ? "lx-pill-warn" : "lx-pill-ok"}`}
+                  >
+                    {lastStatus === "error" || lastStatus === "unfinished" || lastStatus === "running"
+                      ? RUN_STATUS_LABEL[lastStatus]
+                      : last.drafts_out
+                        ? `${last.drafts_out} held`
+                        : `${last.items_in} read`}
                   </span>
                 )}
               </div>
@@ -293,21 +295,26 @@ export default async function AgentsPage() {
               </tr>
             </thead>
             <tbody>
-              {runs.map((r) => (
-                <tr key={r.id}>
-                  <td className="pri">{RUN_AGENT_LABEL[r.agent] ?? r.agent}</td>
-                  <td>{TRIGGER_LABEL[r.trigger] ?? r.trigger}</td>
-                  <td className="wrap" style={r.status === "error" ? { color: "var(--wine)" } : undefined}>
-                    {r.status === "error" ? r.error ?? "Failed" : r.summary ?? "—"}
-                  </td>
-                  <td className="lx-num">
-                    {relativeTime(r.started_at)} <span className="lx-note">· {duration(r)}</span>
-                  </td>
-                  <td>
-                    <span className="lx-dot" style={{ background: STATUS_TONE[r.status] ?? "#7A5A5E" }} title={r.status} />
-                  </td>
-                </tr>
-              ))}
+              {runs.map((r) => {
+                // A row left "running" past 15 minutes was cut off, not still working (run-status.ts).
+                const status = displayRunStatus(r, now.getTime());
+                const failed = status === "error" || status === "unfinished";
+                return (
+                  <tr key={r.id}>
+                    <td className="pri">{RUN_AGENT_LABEL[r.agent] ?? r.agent}</td>
+                    <td>{TRIGGER_LABEL[r.trigger] ?? r.trigger}</td>
+                    <td className="wrap" style={failed ? { color: "var(--wine)" } : undefined}>
+                      {status === "unfinished" ? "Didn't finish. It was stopped before it could report back." : status === "error" ? r.error ?? "Failed" : r.summary ?? "—"}
+                    </td>
+                    <td className="lx-num">
+                      {relativeTime(r.started_at)} <span className="lx-note">· {runDurationLabel(r, now.getTime())}</span>
+                    </td>
+                    <td>
+                      <span className="lx-dot" style={{ background: STATUS_TONE[status] ?? "#7A5A5E" }} title={RUN_STATUS_LABEL[status] ?? status} />
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

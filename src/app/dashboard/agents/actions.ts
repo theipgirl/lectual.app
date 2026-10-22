@@ -7,10 +7,11 @@ import { resolveFirmSession } from "@/lib/firm/session";
 import { orgHasModule } from "@/lib/org/modules";
 import { aiConfigured } from "@/lib/ai/claude";
 import { runOneAgent } from "@/lib/agents/runner";
+import { AGENT_RUN_BUDGET_MS } from "@/lib/agents/budget";
 import { productionRunnerDeps } from "@/lib/agents/deps";
 import { AGENT_IDS, type AgentId, type Autonomy } from "@/lib/agents/types";
 import { agentNeedsDatabaseUpdate, type DatabaseUpdate } from "@/lib/agents/readiness";
-import { autopilotForRun, canRunAgents, decideRunNow, RUN_NOW_REASON } from "@/lib/agents/run-now";
+import { autopilotForRun, canRunAgents, decideRunNow, RUN_NOW_REASON, RUN_NOW_TIME_LIMIT } from "@/lib/agents/run-now";
 import { readCalendarProbe } from "@/lib/stage-keeper/readiness-read";
 import { canPauseAutopilot, canResumeAutopilot, parseMinutesForm } from "@/lib/agents/autopilot-rules";
 import { loadAutopilot } from "@/lib/agents/autopilot";
@@ -122,11 +123,15 @@ export async function runAgentNowAction(_prev: AgentActionState, formData: FormD
     autonomy: (setting?.autonomy ?? "draft") as Autonomy,
     trigger: "manual",
     triggeredBy: session.user.id,
+    // Inside the page's maxDuration (300 s), with room to close the row and answer. Past it, the row is
+    // closed as "Did not finish within the time limit" and the card says so; it never hangs.
+    budgetMs: AGENT_RUN_BUDGET_MS,
   });
   refresh();
   if (outcome.reason === "paused") {
     return { error: "Autopilot is paused for the firm (or its state couldn't be read), so nothing ran." };
   }
+  if (outcome.reason === "time-limit") return { error: RUN_NOW_TIME_LIMIT };
   if (outcome.status === "error") return { error: `The run failed: ${outcome.error}` };
   return {
     ok: true,

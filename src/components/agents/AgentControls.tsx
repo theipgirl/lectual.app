@@ -7,13 +7,26 @@ import {
   type AgentActionState,
 } from "@/app/dashboard/agents/actions";
 import { autonomyHint, type AgentId, type Autonomy } from "@/lib/agents/types";
-import { decideRunNow, runResultLine, type RunNowInput } from "@/lib/agents/run-now";
+import { decideRunNow, runResultLine, RUN_NOW_NO_ANSWER, type RunNowInput } from "@/lib/agents/run-now";
 
 const LEVELS: { k: Autonomy; label: string }[] = [
   { k: "suggest", label: "Suggest" },
   { k: "draft", label: "Draft" },
   { k: "act", label: "Act" },
 ];
+
+/**
+ * Run now, with a failed request turned into a line on the card. Without this a request that never
+ * answers (a network drop, a function stopped at its limit) would throw into the page's error boundary
+ * or leave the button looking idle with nothing said.
+ */
+export async function runNowOrSay(prev: AgentActionState, formData: FormData): Promise<AgentActionState> {
+  try {
+    return await runAgentNowAction(prev, formData);
+  } catch {
+    return { error: RUN_NOW_NO_ANSWER };
+  }
+}
 
 /**
  * The switch, the autonomy segments and "Run now" on one agent card. Run now is always drawn: when it
@@ -29,7 +42,7 @@ export function AgentControls(props: {
   runInput: Omit<RunNowInput, "running">;
 }) {
   const [saveState, save, saving] = useActionState<AgentActionState, FormData>(saveAgentSettingAction, {});
-  const [runState, run, running] = useActionState<AgentActionState, FormData>(runAgentNowAction, {});
+  const [runState, run, running] = useActionState<AgentActionState, FormData>(runNowOrSay, {});
   const { agent, enabled, autonomy, canManage } = props;
   const decision = decideRunNow({ ...props.runInput, running });
   const result = runResultLine(runState);
