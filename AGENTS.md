@@ -285,7 +285,7 @@ tool set (six reads) and the retrieval-only UPL system prompt are in `src/lib/ag
   old statuses (400, 422, 401, 403, 503). `final` carries the authoritative answer and the browser replaces what it
   streamed with it: a short preface before a tool call can show for a moment. Wire format and parser: `src/lib/copilot/sse.ts`.
 - **Model:** `copilotModel()` in `src/lib/ai/claude.ts` = `env.COPILOT_MODEL || "claude-sonnet-5"`; nothing else reads
-  `COPILOT_MODEL`. The other agents still use `AGENT_MODEL`. `streamClaudeWithTools` sits beside the unchanged
+  `COPILOT_MODEL`. The agents use `agentModel(agent)` (see Agent models below). `streamClaudeWithTools` sits beside the unchanged
   `callClaudeWithTools`, with `cache_control` on the system block and on the last tool.
 - **Per question:** tool calls in one step run in parallel; `listMatters()` is read once (`search_matters` and
   `list_stalled_matters` share it, and a failure is shared too, so both report it and `readFailed` is set); the last 10
@@ -657,6 +657,66 @@ Internal only: a flow points at things and explains them; it never clicks, moves
   attribute-only: `lead-head`, `lead-prep`, `lead-timeline`, `matter-head` (on the page head, not the h1), `matter-deadlines`, `matter-updates`,
   `matter-aside`, `intake-board`, and `*-head` on the h1 of the forms, reconcile, calendar, proposals, new proposal, matters, meetings, queue, agents, setup,
   integrations, team, modules and firm pages.
+
+## Agent models (Sprint 24, no schema)
+No model call defaults to Opus. `src/lib/ai/agent-models.ts` (pure, env passed in) holds `AGENT_MODEL_TIER`: intake-triage and
+email-intel are `haiku` (classification and extraction); inbox-summary (its one call writes reply drafts; its triage is rule-based),
+post-consult, morning-brief and consult-prep are `sonnet`; `staff` (a model call that is not an agent run: the letters, prep drafts,
+public intake screening, Meetings "Draft follow-up" is `post-consult`) is `sonnet` and is named at each call site. The Stage Keeper makes no
+model call and is not in the table.
+- `agentModel(subject)` in `src/lib/ai/claude.ts` takes a required subject. `StructuredRequest.agent` carries it; `runOneAgent` fills it in
+  from the run's own agent id, and each agent's call also names itself. `askClaude` requires `agent`.
+- Defaults `claude-sonnet-5` and `claude-haiku-4-5` (the ids and prices already in the cost table). The Opus ids stay in `PRICES` only so
+  old `agent_run` costs still price. Overrides: `AGENT_MODEL_HAIKU`, `AGENT_MODEL_SONNET`; `AGENT_MODEL` is now ONLY the Sonnet-tier override
+  (`AGENT_MODEL_SONNET` wins over it) and no longer forces every agent. An override naming a `claude-opus*` id is ignored with one log line.
+- Haiku is sent no `effort` (the API refuses it for that model) and `max_tokens` is clamped by `maxOutputFor` (64k; triage asks 16k).
+  A cut-off answer is still `AiOutputError` `truncated`, which skips the one lead. Cost is priced from `response.model`, the model that answered.
+- Not verified against the live API in this environment (no key): the ids and the Haiku no-effort rule come from the repo's price table and
+  the API's documented behaviour. Check the first Haiku triage run.
+
+## Agent failure alerts (Sprint 24, no schema)
+A run closed as `error` (cron, Run now and the time-limit close all go through `runOneAgent`) emails Lectual, internal only.
+- Firms: `failureAction` (`digest.ts`) keeps its actions for the fixable causes (reconnect a mailbox or meeting source, try Run now later). Every
+  other cause, a queue 500 included, is "Lectual has been told and is looking into it." with `href: null`: the card draws plain text, never a
+  link, and "Open the run log" no longer exists. Today's needs-you row points those at the Agents page.
+- Lectual: `src/lib/agents/failure-alert.ts`. Recipients come ONLY from `AGENT_FAILURE_ALERT_TO` (comma-separated), from
+  `AGENT_FAILURE_ALERT_FROM` (default `Lectual alerts <noreply@lectual.app>`), through Resend's HTTP API with `RESEND_API_KEY` (a plain `fetch`, no
+  new dependency). Either unset = no read, no email. Subject `[Lectual bug] <agent> failed for <firm name>`; body: firm, org id, agent, run id,
+  started/finished, `VERCEL_ENV` / `VERCEL_GIT_COMMIT_SHA`, and the stored error cut to 2,000 characters. Its input type has no summary or client
+  field, and anything shaped like an email address is replaced with `[email]`.
+- Dedupe, no new table: at most one email per org + agent + error signature (first sentence, digit runs normalised) per UTC day, judged from
+  that day's earlier `agent_run` error rows through the runner's own org-fenced client. An unreadable history sends (a duplicate beats silence).
+  Sending never throws into the run and never changes its status; a failure is one log line with no content.
+- Taylor sets `AGENT_FAILURE_ALERT_TO` (bugs@lectual.app and/or the ClickUp list's email address) and `RESEND_API_KEY` on the deployment.
+
+## Copilot history (Sprint 24, needs lectual 0099)
+`/dashboard/copilot` is a full-page chat (no "IP.OS" label or title block; a visually hidden h1) with "Past conversations" beside it. The four
+stat cards stay in the empty state inside the chat column, each its own read ("Couldn't load" on failure). "Nothing sends without your approval."
+is on the page.
+- Tables `copilot_conversation` / `copilot_message` (lectual 0099) are PRIVATE TO THE AUTHOR by RLS: nobody else, admins and owners included.
+  `src/lib/copilot/history-store.ts` takes the scoped client only and never names a user (`user_id` has no INSERT grant; it takes `auth.uid()`).
+  Titles, content and citations are never logged. `history-pure.ts` holds the rules (title = first question clipped to 80 characters, content cut
+  at 40,000, citations kept whole under 60 KB, relative dates, the delete confirmation).
+- Reads are three-state: ok / not-set-up (error code 42P01 or PGRST205) / unavailable. "No saved chats yet." only for ok.
+  Not set up reads "Saved chats aren't available until the database update."; unavailable reads "Saved chats couldn't be loaded." and New chat still works.
+- Saving (`save-turn.ts`, called by the route AFTER it has sent `final`): the question, then the final answer, one insert per message, never the
+  deltas. SSE gains `saved` ({ conversation_id }) or `save_failed` after `final`; the browser shows the quiet, non-alert line "This chat isn't
+  being saved right now." A save failure never changes `final`. A question is kept only with its answer (if the answer cannot be saved the question,
+  or the chat this call created, is removed). A conversation id the caller cannot see starts a new saved chat. A stream that ends in `error` saves
+  nothing. The drawer saves too. The body accepts an optional `conversationId` (uuid).
+- The page: `?c=<id>` opens a past chat (the server re-reads it; messages and citations come back as done exchanges and the next question sends
+  its last turns as `history` and the same `conversationId`). Delete is a server action (`actions.ts`) with a confirm step; it refuses signed-out and
+  a non-uuid id with fixed sentences. No rename.
+- Before 0099 is applied the chat still answers and the list says it is not available until the database update.
+
+## New document picker (Sprint 24, no schema)
+`/dashboard/documents/new/` starts with the SAME "Who is this for?" as New proposal: `WhoIsThisFor` and `src/lib/proposals/new-picker.ts` take a
+destination (`PickerDestination`: base path, choose link, optional blank link) instead of being forked; `src/lib/documents/new-picker.ts` supplies
+the letter destination. Leads | Matters (opens on Matters), search, 8 recent, "Showing N of M", a failed read is its own alert, no "Start blank".
+- A matter goes to `/dashboard/documents/new/<matterId>/`. Open matters only, as the page always offered. A lead goes to `?lead=<id>`: its OPEN
+  matters (`listMatters({ leadId })`, scoped): none = "Letters are drafted on a matter. Open a matter for <lead> first." with a link to the lead; one =
+  redirect to that matter's template choice; several = a short list. A failed read for the lead's matters is an alert, never the "none" sentence.
+- The Document Center gate stays in the segment `layout.tsx`; the per-matter pages and actions are untouched.
 
 ## JSX text spacing: keep the `{" "}`
 Next 16.2.7's compiler DROPS the leading space of JSX text that contains an HTML entity

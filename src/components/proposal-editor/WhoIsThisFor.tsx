@@ -17,7 +17,19 @@ export type WhoChosen = { kind: "chosen"; label: string; changeHref: string } | 
  * Collapsed, it is one line: "For: <label> . Change". A failed list read is its
  * own sentence for that kind and is never drawn as "No matches".
  */
-export function WhoIsThisFor({ view, chosen }: { view: PickerView | null; chosen: WhoChosen | null }) {
+export function WhoIsThisFor({
+  view,
+  chosen,
+  basePath = NEW_PROPOSAL_PATH,
+  intro = "Pick a lead or a matter and the form below is filled from it. You can change anything before you create the draft.",
+}: {
+  view: PickerView | null;
+  chosen: WhoChosen | null;
+  /** Where the search form submits. New proposal by default; New document passes its own page. */
+  basePath?: string;
+  /** The sentence under the title. */
+  intro?: string;
+}) {
   if (chosen?.kind === "chosen") {
     return (
       <section className="lx-card pe-who pe-who-bar" aria-label="Who is this for?">
@@ -43,11 +55,13 @@ export function WhoIsThisFor({ view, chosen }: { view: PickerView | null; chosen
         <h2 id="who-title" className="pe-h">
           Who is this for?
         </h2>
-        <a href={view.blankHref} className="pe-who-blank">
-          Start blank
-        </a>
+        {view.blankHref && (
+          <a href={view.blankHref} className="pe-who-blank">
+            Start blank
+          </a>
+        )}
       </div>
-      <p className="lx-note pe-hint">Pick a lead or a matter and the form below is filled from it. You can change anything before you create the draft.</p>
+      <p className="lx-note pe-hint">{intro}</p>
       <nav className="lx-segs pe-who-switch" aria-label="Kind of record">
         {(["lead", "matter"] as const).map((k) => (
           <a key={k} href={view.switchHrefs[k]} aria-current={k === kind ? "page" : undefined}>
@@ -55,7 +69,7 @@ export function WhoIsThisFor({ view, chosen }: { view: PickerView | null; chosen
           </a>
         ))}
       </nav>
-      <form method="get" action={NEW_PROPOSAL_PATH} className="pe-who-search" role="search">
+      <form method="get" action={basePath} className="pe-who-search" role="search">
         <input type="hidden" name="kind" value={kind} />
         <input
           id={inputId}
