@@ -82,7 +82,7 @@ function handler(o: Opts = {}): Handler {
       return { data: null, error: null };
     }
     if (q.table === "client_proposal_setting") {
-      const setting = o.setting === undefined ? { approver_user_ids: ["rebecca"], default_pay_url: "https://pay.example.com/form", pricing: {} } : o.setting;
+      const setting = o.setting === undefined ? { approver_user_ids: ["rebecca"], default_pay_url: null, pricing: {} } : o.setting;
       return { data: setting, error: null };
     }
     if (q.table === "crm_org") return { data: o.org ?? { name: "RPB Law", slug: "rpb-law" }, error: null };
@@ -138,7 +138,7 @@ describe("runConsultProposal", () => {
       lead_id: "lead-1",
       client_name: "Sevetri Wilson",
       created_by: "user-1",
-      pay_url: "https://pay.example.com/form",
+      pay_url: null,
     });
     expect((ins.values as { public_token: string }).public_token).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(r.proposalId).toBe((ins.values as { id: string }).id);

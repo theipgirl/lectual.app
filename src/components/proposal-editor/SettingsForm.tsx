@@ -9,7 +9,6 @@ export type SettingsMember = { userId: string; name: string; email: string | nul
 
 export type SettingsValues = {
   approverUserIds: string[];
-  defaultPayUrl: string;
   notifyEmail: string;
   officeActionNote: string;
   includes: ProposalInclude[];
@@ -48,11 +47,6 @@ export function SettingsForm({ members, values }: { members: SettingsMember[]; v
               <h2 className="pe-h">Links and notifications</h2>
             </header>
             <div className="lx-form-grid">
-              <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
-                <span className="lx-label">Default pay link (https)</span>
-                <input className="lx-input" name="defaultPayUrl" type="url" maxLength={2000} defaultValue={values.defaultPayUrl} placeholder="https://" />
-                <span className="lx-note">New proposals start with this link. Each proposal can use a different one.</span>
-              </label>
               <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
                 <span className="lx-label">Tell this address when a client accepts</span>
                 <input className="lx-input" name="notifyEmail" type="email" maxLength={320} defaultValue={values.notifyEmail} />

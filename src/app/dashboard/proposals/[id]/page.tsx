@@ -252,7 +252,6 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
           <DetailsForm
             {...common}
             issues={shown(groups.details)}
-            defaultPayUrl={settings?.default_pay_url ?? null}
             values={{
               fullName: proposal.client_name,
               firstName: content.client?.first_name ?? "",

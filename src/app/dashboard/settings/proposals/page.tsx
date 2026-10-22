@@ -110,7 +110,6 @@ export default async function ProposalSettingsPage() {
         }))}
         values={{
           approverUserIds: settings?.approver_user_ids ?? [],
-          defaultPayUrl: settings?.default_pay_url ?? "",
           notifyEmail: settings?.notify_email ?? "",
           officeActionNote: standard.office_action_note,
           includes: standard.includes,

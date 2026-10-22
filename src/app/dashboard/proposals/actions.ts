@@ -106,7 +106,7 @@ export async function createProposalAction(_prev: ActionState, formData: FormDat
       leadId: leadRaw || null,
       matterId: matterRaw || null,
       expiresOn: expires.value,
-      payUrl: field(formData, "payUrl") || settings?.default_pay_url || null,
+      payUrl: field(formData, "payUrl") || null,
     });
     id = created.id;
   } catch (err) {

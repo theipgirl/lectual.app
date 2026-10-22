@@ -9,7 +9,7 @@ import { proposalActionError, type ActionState } from "../../proposals/errors";
 import { gateAdminAction } from "../../proposals/gate";
 
 /**
- * Save the firm's proposal settings: who may approve, the default pay link,
+ * Save the firm's proposal settings: who may approve (the stored default pay link is kept as it was),
  * where acceptance emails go, and the standard prices + includes a new
  * proposal starts from.
  *
@@ -42,7 +42,8 @@ export async function saveProposalSettingsAction(_prev: ActionState, formData: F
 
     await saveProposalSettings({
       approverUserIds: approvers,
-      defaultPayUrl: text("defaultPayUrl") || null,
+      // The Default pay link field was removed (Sprint 25); a stored value is kept as it was.
+      defaultPayUrl: existing?.default_pay_url ?? null,
       notifyEmail: text("notifyEmail") || null,
       pricing: pricing.value,
     });

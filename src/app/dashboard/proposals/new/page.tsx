@@ -135,7 +135,7 @@ export default async function NewProposalPage({ searchParams }: { searchParams: 
     brandName: "",
     title: "Trademark Proposal",
     expiresOn: defaultExpiry(tz),
-    payUrl: settings?.default_pay_url ?? "",
+    payUrl: "",
   };
 
   let leadNote: string | null = null;

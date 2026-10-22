@@ -188,7 +188,7 @@ async function runStages(input: ConsultProposalRunInput, progress: Progress): Pr
   progress.stage = "settings";
   const { data: setting, error: settingErr } = await db
     .from("client_proposal_setting")
-    .select("approver_user_ids, default_pay_url, pricing")
+    .select("approver_user_ids, pricing")
     .eq("org_id", orgId)
     .maybeSingle();
   if (settingErr) logDbError("settings", settingErr);
@@ -221,7 +221,6 @@ async function runStages(input: ConsultProposalRunInput, progress: Progress): Pr
       lead,
       firm: { name: firmName, slug: firmSlug, teamSignOff },
       pricing: standardProposalPricing((setting as Row).pricing),
-      defaultPayUrl: ((setting as Row).default_pay_url as string | null) ?? null,
       today: firmCivilDate(new Date(now()), tz),
       llm: input.llm,
     });

@@ -64,7 +64,7 @@ export type DetailsValues = {
   payUrl: string;
 };
 
-export function DetailsForm({ proposalId, updatedAt, editable, issues, values, defaultPayUrl }: Common & { values: DetailsValues; defaultPayUrl: string | null }) {
+export function DetailsForm({ proposalId, updatedAt, editable, issues, values }: Common & { values: DetailsValues }) {
   return (
     <Section title="Client and link" hint="Who this is for, when it stops being open, and where “Accept” sends them to pay.">
       <ActionForm action={saveDetailsAction}>
@@ -97,8 +97,8 @@ export function DetailsForm({ proposalId, updatedAt, editable, issues, values, d
                 <input className="lx-input" name="expiresOn" type="date" defaultValue={values.expiresOn} />
               </label>
               <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
-                <span className="lx-label">Pay link (https)</span>
-                <input className="lx-input" name="payUrl" type="url" maxLength={2000} defaultValue={values.payUrl} placeholder={defaultPayUrl ?? "https://"} />
+                <span className="lx-label">Pay link</span>
+                <input className="lx-input" name="payUrl" type="url" maxLength={2000} defaultValue={values.payUrl} placeholder="Enter custom pay link" />
               </label>
             </div>
             <IssueList issues={issues} />
