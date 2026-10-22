@@ -4,7 +4,7 @@ import { listLeads, listStages } from "@/lib/pipeline";
 import { listIntakeLeads } from "@/lib/intake/leads";
 import { loadQuotes } from "@/lib/quotes/load";
 import { readRows } from "./db";
-import { periodDelta, unavailableMetric, type Metric } from "./metric";
+import { comparisonFields, unavailableMetric, type Metric } from "./metric";
 import { isInPeriod, isInPreviousPeriod, isInWindow, type ReportPeriod } from "./period";
 import { isWaitingOnUs, leadLabel, waitingSince } from "./leads";
 import { oldestFirst, type LinkTile, type WaitingItem } from "./waiting";
@@ -39,7 +39,7 @@ export async function loadIntakeReport(period: ReportPeriod): Promise<IntakeRepo
     ? (() => {
         const current = allLeads.filter((l) => isInPeriod(l.created_at, period)).length;
         const prev = allLeads.filter((l) => isInPreviousPeriod(l.created_at, period)).length;
-        return { label: "New leads", value: current, delta: periodDelta(current, prev), sub: "into the pipeline" };
+        return { label: "New leads", value: current, ...comparisonFields(current, prev, period.range), sub: "into the pipeline" };
       })()
     : unavailableMetric("New leads", "Leads couldn't be loaded");
 
@@ -63,7 +63,7 @@ export async function loadIntakeReport(period: ReportPeriod): Promise<IntakeRepo
       allLeads.filter((l) => wonStageIds.has(l.current_stage_id) && isInWindow(l.stage_entered_at, start, end)).length;
     const current = isHiredIn(period.start, period.end);
     const prev = isHiredIn(period.prevStart, period.prevEnd);
-    hired = { label: "Hired this period", value: current, delta: periodDelta(current, prev), sub: "moved to a won stage" };
+    hired = { label: "Hired this period", value: current, ...comparisonFields(current, prev, period.range), sub: "moved to a won stage" };
   }
 
   // --- Waiting on us, right now (a backlog snapshot, not a period figure) ---

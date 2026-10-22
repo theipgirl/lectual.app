@@ -5,7 +5,7 @@ import { filterBySegment } from "@/lib/matters/worklist";
 import { deadlineKindLabel, deadlineNeedsReview } from "@/lib/matters/deadline-rules";
 import { civilDaysBetween, firmCivilDate } from "@/lib/quotes/firm-time";
 import { getFirmTimeZone } from "@/lib/org/profile";
-import { periodDelta, unavailableMetric, type Metric } from "./metric";
+import { comparisonFields, unavailableMetric, type Metric } from "./metric";
 import { isInPeriod, isInPreviousPeriod, type ReportPeriod } from "./period";
 import { oldestFirst, type LinkTile, type WaitingItem } from "./waiting";
 import { relativeTime } from "@/lib/relative-time";
@@ -74,7 +74,7 @@ export async function loadMattersReport(period: ReportPeriod): Promise<MattersRe
   const registrations: Metric = {
     label: "Registrations",
     value: registered,
-    delta: periodDelta(registered, prevRegistered),
+    ...comparisonFields(registered, prevRegistered, period.range),
     sub: "marks that registered this period",
   };
 

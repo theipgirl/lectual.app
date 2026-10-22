@@ -26,6 +26,7 @@ import {
   type GridDay,
 } from "@/lib/calendar/grid";
 import type { Metadata } from "next";
+import { calendarReadState } from "@/lib/calendar/read-state";
 import { pageTitle } from "@/lib/ui/page-title";
 
 export const metadata: Metadata = { title: pageTitle("Calendar") };
@@ -103,7 +104,7 @@ function Chip({ item, compact }: { item: CalendarItem; compact: boolean }) {
     .filter(Boolean)
     .join(" · ");
   const chip = item.href ? (
-    <Link href={item.href} className={cls} title={title}>
+    <Link prefetch={false} href={item.href} className={cls} title={title}>
       {label}
     </Link>
   ) : (
@@ -142,14 +143,14 @@ function MonthView({ weeks }: { weeks: GridDay[][] }) {
               className={`lx-cal-day${day.inMonth ? "" : " is-out"}${day.isToday ? " is-today" : ""}`}
               aria-label={`${formatCivilDate(day.date)}: ${day.items.length} item${day.items.length === 1 ? "" : "s"}`}
             >
-              <Link href={calendarHref("week", day.date)} className="lx-cal-num" aria-label={`Week of ${formatCivilDate(day.date) ?? day.date}`}>
+              <Link prefetch={false} href={calendarHref("week", day.date)} className="lx-cal-num" aria-label={`Week of ${formatCivilDate(day.date) ?? day.date}`}>
                 {day.day}
               </Link>
               {day.items.slice(0, MONTH_CELL_LIMIT).map((item) => (
                 <Chip key={item.key} item={item} compact />
               ))}
               {day.items.length > MONTH_CELL_LIMIT && (
-                <Link href={calendarHref("week", day.date)} className="lx-cal-more">
+                <Link prefetch={false} href={calendarHref("week", day.date)} className="lx-cal-more">
                   +{day.items.length - MONTH_CELL_LIMIT} more
                 </Link>
               )}
@@ -204,7 +205,7 @@ function NeedsReviewBand({ deadlines, now }: { deadlines: UpcomingDeadline[]; no
           return (
             <li key={d.id} className="lx-task">
               <span style={{ minWidth: 0 }}>
-                <Link href={`/dashboard/matters/${d.matter_id}`} className="lx-rowlink">
+                <Link prefetch={false} href={`/dashboard/matters/${d.matter_id}`} className="lx-rowlink">
                   {d.title ?? deadlineKindLabel(d.kind)}
                 </Link>
                 <span className="lx-note" style={{ display: "block" }}>
@@ -241,7 +242,7 @@ function OutlookAgendaBand({ events, timeZone }: { events: OutlookCalendarEvent[
             <li key={e.id} className="lx-task">
               <span style={{ minWidth: 0 }}>
                 {e.lead_id ? (
-                  <Link href={`/dashboard/leads/${e.lead_id}/`} className="lx-rowlink">
+                  <Link prefetch={false} href={`/dashboard/leads/${e.lead_id}/`} className="lx-rowlink">
                     {name}
                   </Link>
                 ) : (
@@ -305,7 +306,7 @@ function AgendaView({
             {g.rows.map((r) => (
               <li key={r.key} className="lx-task">
                 <span style={{ minWidth: 0 }}>
-                  <Link href={r.href} className="lx-rowlink">
+                  <Link prefetch={false} href={r.href} className="lx-rowlink">
                     {r.name}
                   </Link>
                   {unconfirmed.has(r.key) && (
@@ -376,10 +377,10 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         ? "Outlook events couldn't be loaded."
         : null;
 
-  const failed = [deadlines === null && "docket dates", tasks === null && "tasks", events === null && "consults and meetings"].filter(
-    Boolean,
-  ) as string[];
-  const partialNote = failed.length ? `Couldn't load ${failed.join(" or ")}, so this calendar is incomplete. Try again shortly.` : null;
+  const readState = calendarReadState({ deadlines, tasks, events: view === "agenda" ? undefined : events });
+  const partialNote =
+    readState.kind === "partial" ? `Couldn't load ${readState.failed.join(" or ")}, so this calendar is incomplete. Try again shortly.` : null;
+  const unavailable = readState.kind === "unavailable";
 
   const rows = buildCalendarRows(deadlines ?? [], tasks ?? [], now);
   const { needsReview } = splitNeedsReview(deadlines ?? [], now);
@@ -410,20 +411,20 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           {view !== "agenda" && (
             <div className="lx-cal-nav">
-              <Link href={calendarHref(view, stepAnchor(view, anchor, -1))} className="lx-btn lx-btn-sec lx-btn-sm" aria-label="Previous">
+              <Link prefetch={false} href={calendarHref(view, stepAnchor(view, anchor, -1))} className="lx-btn lx-btn-sec lx-btn-sm" aria-label="Previous">
                 ‹
               </Link>
-              <Link href={calendarHref(view, today)} className="lx-btn lx-btn-sec lx-btn-sm">
+              <Link prefetch={false} href={calendarHref(view, today)} className="lx-btn lx-btn-sec lx-btn-sm">
                 Today
               </Link>
-              <Link href={calendarHref(view, stepAnchor(view, anchor, 1))} className="lx-btn lx-btn-sec lx-btn-sm" aria-label="Next">
+              <Link prefetch={false} href={calendarHref(view, stepAnchor(view, anchor, 1))} className="lx-btn lx-btn-sec lx-btn-sm" aria-label="Next">
                 ›
               </Link>
             </div>
           )}
           <nav className="lx-view-toggle" aria-label="Calendar view">
             {(["month", "week", "agenda"] as const).map((v) => (
-              <Link key={v} href={calendarHref(v, anchor)} className={view === v ? "on" : undefined} aria-current={view === v ? "page" : undefined}>
+              <Link key={v} prefetch={false} href={calendarHref(v, anchor)} className={view === v ? "on" : undefined} aria-current={view === v ? "page" : undefined}>
                 {v === "month" ? "Month" : v === "week" ? "Week" : "Agenda"}
               </Link>
             ))}
@@ -443,11 +444,17 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         </p>
       )}
 
-      {view === "month" && <MonthView weeks={monthGrid(anchor, today, items)} />}
-      {view === "week" && <WeekView days={weekGrid(anchor, today, items)} />}
-      {view === "agenda" && (deadlines !== null || tasks !== null) && <AgendaView rows={rows} needsReview={needsReview} now={now} unconfirmed={unconfirmed} outlook={outlookEvents} timeZone={timeZone} />}
+      {unavailable && (
+        <p className="lx-banner lx-banner-warn" role="alert" style={{ margin: 0 }}>
+          This calendar couldn&apos;t be loaded, so nothing is shown. It is not empty. Try again shortly.
+        </p>
+      )}
 
-      {view !== "agenda" && (
+      {!unavailable && view === "month" && <MonthView weeks={monthGrid(anchor, today, items)} />}
+      {!unavailable && view === "week" && <WeekView days={weekGrid(anchor, today, items)} />}
+      {!unavailable && view === "agenda" && <AgendaView rows={rows} needsReview={needsReview} now={now} unconfirmed={unconfirmed} outlook={outlookEvents} timeZone={timeZone} />}
+
+      {!unavailable && view !== "agenda" && (
         <p className="lx-note" style={{ margin: 0 }}>
           <span className="lx-cal-key is-deadline" /> Docket deadline <span className="lx-cal-key is-event" /> Consult or meeting{" "}
           <span className="lx-cal-key is-task" /> Task <span className="lx-cal-key is-overdue" /> Overdue

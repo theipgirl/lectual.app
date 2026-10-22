@@ -7,6 +7,7 @@ import { loadCommunicationReport } from "@/lib/reports/communication";
 import { loadIntakeReport } from "@/lib/reports/intake";
 import { loadMattersReport } from "@/lib/reports/matters";
 import { loadIposReport } from "@/lib/reports/ipos";
+import { KpiTile } from "@/components/reports/KpiTile";
 import type { Metric } from "@/lib/reports/metric";
 import type { LinkTile, WaitingItem } from "@/lib/reports/waiting";
 import type { Metadata } from "next";
@@ -45,22 +46,6 @@ const REPORT_COPY: Record<ReportKey, { sub: string; waitingTitle: string; waitin
     waitingEmpty: "Nothing needs your attention right now.",
   },
 };
-
-/** A KPI tile: value, delta against the previous equal period, a short sub-line — or an
- * honest "—" with why, never a fabricated number (src/lib/reports/metric.ts). */
-function KpiTile({ m }: { m: Metric }) {
-  const positive = m.delta?.startsWith("+");
-  return (
-    <div className="lx-card lx-kpi">
-      <span className="lx-label">{m.label}</span>
-      <span style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-        <span className="lx-kpi-value">{m.value === null ? "—" : m.value}</span>
-        {m.delta && <span className="lx-note" style={{ color: positive ? "var(--ok)" : "var(--wine)" }}>{m.delta}</span>}
-      </span>
-      <span className="lx-note">{m.value === null ? (m.note ?? "Couldn't load") : m.sub}</span>
-    </div>
-  );
-}
 
 /** One child section, with its own count — or no badge at all when a count isn't available. */
 function LinkTileCard({ l }: { l: LinkTile }) {
@@ -129,7 +114,7 @@ export default async function ReportPage({
         </div>
         <nav className="lx-segs lx-view-toggle" aria-label="Period">
           {REPORT_RANGES.map((r) => (
-            <Link key={r} href={rangeHref(r)} aria-current={range === r ? "page" : undefined} className={range === r ? "on" : undefined}>
+            <Link key={r} prefetch={false} href={rangeHref(r)} aria-current={range === r ? "page" : undefined} className={range === r ? "on" : undefined}>
               {r} days
             </Link>
           ))}
