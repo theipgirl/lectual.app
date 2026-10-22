@@ -42,7 +42,26 @@ const GENERIC_HEADER_WORDS = new Set([
   "Contract Type",
 ]);
 
-/** What kind of header this row is, or null when it is a data row. */
+/** Cells that only the trademark intake tab's header carries (either layout). */
+const INTAKE_MARKERS = ["0", "Trademark Owner", "Trademark Name", "Serial No."];
+
+/** The name of a list that is not read, derived from its own header cells. */
+function nameOfOther(cells: readonly string[], has: (name: string) => boolean): string {
+  if (has("Contract Type")) return "Contracts";
+  if (has("Task")) return "Tasks";
+  if (has("Host Name") || has("Podcast")) return "Podcasts";
+  if (cells.some((c) => /agreement/i.test(c))) return "Agreements";
+  return `Other list (${cells.slice(0, 3).join(", ")})`;
+}
+
+/**
+ * What kind of header this row is, or null when it is a data row.
+ *
+ * A row with a cell that is exactly "Status" is ALWAYS a header: a data row's Status cell holds a status
+ * ("Open", "1. Potential New Client"), never the word itself. It is the intake tab only when it also carries one of
+ * the intake tab's own columns; any other list with a Status (tasks, contracts, agreements, podcasts) is its own
+ * section, so its rows are never read under the previous section's header.
+ */
 export function classifyHeader(row: readonly string[]): { kind: SectionKind; name: string } | null {
   const cells = row.map((c) => c.trim()).filter(Boolean);
   if (cells.length < 2) return null;
@@ -50,15 +69,12 @@ export function classifyHeader(row: readonly string[]): { kind: SectionKind; nam
 
   if (has("First Name") && has("Email Address")) return { kind: "contacts", name: "PNC contact list" };
   if (has("Status")) {
-    if (has("Contract Type")) return { kind: "other", name: "Contracts" };
-    if (has("Task")) return { kind: "other", name: "Tasks" };
-    return { kind: "intake", name: "Trademark intake" };
+    const intake = INTAKE_MARKERS.some(has) && !has("Task") && !has("Contract Type");
+    return intake ? { kind: "intake", name: "Trademark intake" } : { kind: "other", name: nameOfOther(cells, has) };
   }
   if (has("Contract Type")) return { kind: "other", name: "Contracts" };
   if (has("Task") && cells.filter((c) => GENERIC_HEADER_WORDS.has(c)).length >= 3) return { kind: "other", name: "Tasks" };
-  if (cells.filter((c) => GENERIC_HEADER_WORDS.has(c)).length >= 4) {
-    return { kind: "other", name: `Other list (${cells.slice(0, 3).join(", ")})` };
-  }
+  if (cells.filter((c) => GENERIC_HEADER_WORDS.has(c)).length >= 4) return { kind: "other", name: nameOfOther(cells, has) };
   return null;
 }
 

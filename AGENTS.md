@@ -158,45 +158,95 @@ only: nothing is shared with a client and there is no portal.
 - `crm_file` and the `file_uploaded` activity type are hand-added in `src/lib/db/types.ts` and
   `src/lib/matters/activity.ts` until the next codegen run.
 
-## Stage reconciliation (Intake → Reconcile stages, no schema)
-`/dashboard/intake/reconcile/` compares each lead's stage with three sources and moves the ones a person
+## Stage reconciliation (Intake → Reconcile stages, no schema; rewritten in Sprint 26)
+`/dashboard/intake/reconcile/` compares each lead's stage with what the sources say and moves the ones a person
 chooses. Owner/admin/senior_admin only: the PAGE answers `notFound()` to anyone else (signed out included) and
-BOTH actions (`actions.ts`: `previewReconcileAction`, `applyReconcileAction`) re-resolve the role on every call
-and read or write nothing for a refused one. Nothing is written to Lawmatics, anywhere on this screen.
-- **The sheet wins.** `src/lib/reconcile/propose.ts` (`proposeStage`, pure) proposes only the sheet's stage.
-  Lawmatics and mail can only corroborate: `agree` (another source names the same stage and none names a
-  different one), `conflict` (any source differs; the proposal is still the sheet's), `sheet_only`, or
-  `no_evidence` (no usable sheet row: no proposal, however loudly the others agree). A source that could not be
-  read is `unavailable` on every row and in the reasons; it is never "none".
-- **`needs_matter`.** A sheet status code of 7 or higher, or Lawmatics "Hired"/"Hired Client" (the two names
-  `stage-map.ts` deliberately leaves unmapped), proposes NO stage and links to Open a matter. It outranks the sheet.
-  Any other unmapped Lawmatics stage ("Discovery Call No Show") is shown as unmapped and does not vote.
-- **No `won` stage is ever a target** (proposal, Pick another, bulk or apply): a move there runs the matter
-  handoff and stops the lead's sequences. Apply refuses it again against the live stage list.
-- **CSV only, 5 MB.** No spreadsheet library is installed (`xlsx` lives in lectual, not here), so an Excel file is
-  refused with a sentence telling the person to save as CSV (`src/lib/intake/sheet-read.ts`). The parse is the port of
-  lectual's `parseIntakeSheet` (`sheet-import.ts`, see `PORTED_FROM.md`). `next.config.ts` raises the
-  server-action body limit to 6 MB so the file reaches the action.
-- **Matching.** A lead matches a sheet row on `sheet_key`, exactly first. `sheetKeyFor` includes the status code, so
-  a row that moved on the sheet has a new key; failing an exact hit the owner and mark are also tried under every
-  intake code 0 to 6. Two candidates for one lead, two leads with one `sheet_key`, or two leads reaching one row
-  (a stale duplicate from an earlier status code plus the current lead) are all reported as ambiguous: none of those
-  leads gets a sheet stage or a proposal, and the summary counts them. Never picked. Sheet rows with no lead are
-  listed, never created. A lead with no `sheet_key` has no sheet reading.
-- **Email is the stored mail, not mail.** The mailbox sync already classified each message it matched and wrote the
-  type, `sensitive` and date onto the lead's `email_sent`/`email_received` timeline row. `src/lib/reconcile/email.ts`
-  maps four types to stage names (strategy-session link, discovery call, post-consult, LOE and invoice), resolved
-  with `resolveStage`; a sensitive thread, an unlisted type or a stage the firm lacks gives no vote. No mail is fetched.
-- **Lawmatics** is read through the firm's own connection with the read-only client (`pullSource`). Not connected,
-  failing, cut short (truncated) or missing its stage relationships are each a named state, never an empty book.
-- **Apply** goes only through `moveLeadStage(id, stageId, evidenceAt?)`, which logs `stage_changed`. The optional
-  third argument stamps `stage_entered_at` (and the timeline payload's `evidence_at`) with the sheet's newest
-  non-future dated entry; a future or invalid date is ignored. A person's "Pick another" carries no date.
-  `last_activity_at` still becomes now, as for every move.
-- **The fingerprint covers the plan the person was shown** (SHA-256 of the rows, sorted, `fingerprint.ts`). It is an
-  integrity check, not a signature. Apply recomputes it, then re-reads every lead and stage through the scoped client
-  and refuses the WHOLE apply, writing nothing, when a lead is missing or no longer in the stage the plan recorded.
-  One request moves at most 200 leads.
+every action (`actions.ts`: `previewReconcileAction`, `applyReconcileAction`; `create-lead.ts`: `createLeadFromReconcileAction`)
+re-resolves the role on every call (`authorizeReconcile`, `src/lib/reconcile/authorize.ts`) and reads or writes nothing for a
+refused one. Nothing is written to Lawmatics, anywhere on this screen, and no mail is sent or opened for its body.
+- **The furthest dated evidence is proposed** (this replaced "the sheet wins"). `src/lib/reconcile/propose.ts` (`proposeStage`, pure)
+  takes every status code, Lawmatics stage, note and mail, each naming a stage of the firm or none, and proposes the MOST ADVANCED
+  stage that has evidence, ties to the newest. Never backwards from the lead's current stage; `declined` / `nurture` only from an
+  explicit note at least as new as all progress (silence never proposes them); a fact the firm has no stage for is cited and
+  proposes nothing; an undated fact is cited and never acted on. Confidence: `agree` (two or more sources at the proposed stage),
+  `conflict` (a status-level reading, such as a status code older than the notes, names another stage; the proposal is still the
+  most advanced), `sheet_only` / `single_source` (one source speaks), `no_evidence`. The proposal text lists every piece of evidence
+  with its source and date ("Proposal sent Oct 16 (sheet note) · Follow-up sent Oct 18 (email)").
+- **One milestone classifier** (`src/lib/reconcile/milestones.ts`, pure) for sheet notes, Lawmatics notes and mail: contacted <
+  consult_scheduled < consult_held < questionnaire_sent < opinion_letter_sent < proposal_sent < follow_up_sent < accepted < loe_sent <
+  paid / hired, plus `no_show`, `declined`, `nurture`. A table of phrase rules with negation guards ("did not attend", "not sent",
+  "rescheduled"); unknown text is no milestone. Mail has a direction: only mail the firm SENT can be a milestone. A milestone names a
+  stage through `stageForMilestone` (the firm brain's `stage_mapping` entry first, then ONE defaults table, `MILESTONE_STAGE_NAMES`);
+  a milestone with no stage gives no proposal. Don't add a second place that maps text to a stage.
+- **`needs_matter`.** A sheet status code of 7 or higher, Lawmatics "Hired"/"Hired Client", or a top milestone of accepted / paid /
+  hired proposes NO stage and links to Open a matter. It outranks everything else. Any other unmapped Lawmatics stage is shown as
+  unmapped; its own name is still read as a milestone ("Proposal Sent", "Consult Completed").
+- **No `won` stage is ever a target** (proposal, Pick another, bulk or apply, Create lead): a move there runs the matter handoff and
+  stops the lead's sequences. Apply refuses it again against the live stage list.
+- **CSV only, 5 MB; the whole workbook as ONE CSV is fine.** No spreadsheet library is installed (`xlsx` lives in lectual, not here), so an
+  Excel file is refused with the save-as-CSV sentence. `src/lib/intake/sheet-sections.ts` finds EVERY section by its header (the old
+  reader trusted row 1, so a workbook whose first tab was a task list found no intake rows): each intake section (either layout,
+  owner under `0` or `Client Name`) is parsed with its OWN header and merged by the importer's `sheet_key` rules (identical rows
+  merge; rows at different codes stay apart and match as ambiguous); PNC contact lists (First Name / Last Name / Email Address) are a
+  read-only source of addresses for name matching; every other section is listed as skipped (never silently dropped), in the summary
+  line "Read: Trademark intake (3 sections, 1,170 rows). Skipped: Tasks, Contracts." Rows keep their WORKSHEET row number.
+  `src/lib/intake/sheet-import.ts` is the port of lectual's `parseIntakeSheet` (see `PORTED_FROM.md`, one change: `Client Name`).
+- **Sheet notes** are the log in `Description` and `Notes`; `splitNoteEntries` gives dated entries and each is classified. A clamped
+  future date is not evidence of when.
+- **Lawmatics** is read through the firm's own connection with the read-only client (`pullSource`, `listAll`, `get`). Not connected,
+  failing, cut short (truncated) or missing its stage relationships are each a named state, never an empty book. **Notes**
+  (`src/lib/lawmatics/notes.ts`, `GET /notes` per person, not verified against a live account) are read for the people on the table
+  (at most 150 per run), swept page by page, held in memory as date + milestones + a 140-character snippet and never stored. Lawmatics
+  ignores parameters silently, so every note must name its own `notable_id`; a note for someone else is dropped and notes that name no
+  record are UNAVAILABLE for that person, never "no notes".
+- **Email has three parts.** The stored mail the mailbox sync classified (`email_sent` / `email_received` rows, with direction and
+  subject), the Stage Keeper's moves, and an on-demand read-only SEARCH of the firm's connected Microsoft mailboxes
+  (`src/lib/reconcile/mailbox-search.ts`; `mailbox` module required; the caller's own scoped view of the connections, sealed tokens via
+  `my-mailbox.ts` only). For each person with a real address (the lead's own, Lawmatics', or a unique match on a contact list):
+  `$filter` on sender / recipient and the last 120 days, `$select` of subject, date and direction only, at most 25 messages, at most 40
+  people per preview. NEVER a body, a preview or an attachment, and nothing about it is stored. States are named, never "no mail":
+  ok (with truncated / unread mailboxes), no address, module off or unchecked, no mailbox, Gmail only, scope missing, reauth, failed,
+  limit. A sensitive thread contributes nothing.
+- **Last touch.** The newest dated evidence across the sources (milestone evidence, the sheet's newest log date, every synced or
+  searched mail), never in the future, is the row's proposed last touch. Apply sets `last_activity_at` to it only for a lead the person
+  applied, only when it is a real past date and NEWER than what the lead held before the apply (a move stamps now; the evidence date
+  replaces that), through `bumpLeadLastTouch`.
+- **Not in Lectual yet.** Sheet rows, Lawmatics records (not hired, not in a matter-opening stage, newest 100) with no lead are
+  listed with a Create lead button. Nothing is created until it is pressed. `createLeadFromReconcileAction` re-validates the candidate
+  the browser sends back (`parseCandidate`), uses the scoped client only, takes the org from the session, refuses a second lead for the
+  same sheet key / Lawmatics id / address, files in the sheet's stage (never a `won` one) else the first open stage, sets the source to
+  where the person was found, and logs `lead_created`. After that the person reconciles like any lead.
+- **Matching.** A lead matches a sheet row on `sheet_key`, exactly first. `sheetKeyFor` includes the status code, so a row that moved
+  on the sheet has a new key; failing an exact hit the owner and mark are also tried under every intake code 0 to 6. Two candidates for
+  one lead, two leads with one `sheet_key`, or two leads reaching one row are reported as ambiguous: none of those leads gets a sheet
+  reading, and the summary counts them. Never picked. A lead with no `sheet_key` has no sheet reading.
+- **Apply** goes only through `moveLeadStage(id, stageId, evidenceAt?)`, which logs `stage_changed`, plus the last touch above. The
+  optional third argument stamps `stage_entered_at` with the newest non-future dated evidence at the proposed stage; a person's "Pick
+  another" carries no date.
+- **The fingerprint covers the plan the person was shown** (SHA-256 of the rows, sorted, `fingerprint.ts`, the proposed last touch
+  included). It is an integrity check, not a signature. Apply recomputes it, then re-reads every lead and stage through the scoped
+  client and refuses the WHOLE apply, writing nothing, when a lead is missing or no longer in the stage the plan recorded. One request
+  moves at most 200 leads.
+
+## Lawmatics import: no person is dropped silently (Sprint 26)
+`/dashboard/settings/integrations/lawmatics/` (`src/lib/lawmatics/import-plan.ts` plans, `import.ts` pulls and writes). Every person
+Lawmatics holds lands in exactly one bucket with a reason, and the preview SHOWS the ones that need a person.
+- **A stage the firm has no name for is imported, not dropped.** "Proposal Sent", "Consult Completed", "Hired", a stage that opens a
+  matter: the person is created in the firm's FIRST open stage (lowest-ordered `open` stage) with a `stageDecision`, shown as "Imported,
+  stage needs a decision: <stage>" or "Hired in Lawmatics — open a matter", and never put in a `won` stage. The alias table in
+  `stage-map.ts` is not widened. The flag is recorded, with no schema, as `lawmatics_stage_unmapped` (and `hired_in_lawmatics`) in the
+  payload of the lead's `lead_created` activity row, written after the insert (`recordStageDecisions`); a flag that fails to write is
+  counted in the report (`flagsNotRecorded`), never thrown. A firm with no open stage keeps them in `unmapped` with that reason.
+- **A Lawmatics contact with no prospect is a lead** (`contactCreates`, source "Lawmatics contact" in `referral_detail`), deduped by
+  contact id within the pull and by email, case-insensitively, against existing leads and against the prospects of the same pull. The
+  lead row has no place for a contact id, so a second run finds the person by the stored email. No email: skipped, with the reason.
+- **The practice-area filter defaults OFF** (plan options and the checkbox). When on, every excluded person, including one with no
+  practice area, is skipped WITH a name and a reason, and the lists are open on the screen. The summary line reads "N skipped, M need a
+  stage decision".
+- **"Find a person in this pull"** (`src/lib/lawmatics/find-in-plan.ts`, pure; the preview carries up to 6,000 people) answers which
+  bucket a name, business or email is in and why; no match says "Not in this pull" and names the causes (truncated, filter on, no
+  prospect). A truncated pull keeps its warning and is never presented as complete.
+- The fingerprint covers the stage flags and the contact leads, and the confirm step still re-derives the plan before writing.
 
 ## Setup checklist (`/dashboard/setup`, no schema)
 A ten-item "get the firm set up" page for owner/admin/senior_admin, computed from real state. The page and

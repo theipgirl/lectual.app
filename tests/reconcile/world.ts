@@ -51,7 +51,7 @@ function makeClient(db: FakeDb, opts: { signedIn?: boolean; roleError?: boolean 
   };
 }
 
-export function makeWorld(opts: { role?: string | null; leads?: Row[]; activity?: Row[]; stages?: Row[]; client?: { signedIn?: boolean; roleError?: boolean } } = {}): World {
+export function makeWorld(opts: { role?: string | null; leads?: Row[]; activity?: Row[]; stages?: Row[]; brain?: Row[]; client?: { signedIn?: boolean; roleError?: boolean } } = {}): World {
   const db = createFakeDb({
     role: opts.role === undefined ? "admin" : opts.role,
     orgId: ORG,
@@ -60,6 +60,7 @@ export function makeWorld(opts: { role?: string | null; leads?: Row[]; activity?
       crm_stage: opts.stages ?? stageRows(),
       crm_lead: opts.leads ?? [],
       crm_activity: opts.activity ?? [],
+      crm_firm_brain_entry: opts.brain ?? [],
     },
   });
   return { db, client: makeClient(db, opts.client ?? {}) };
@@ -71,15 +72,20 @@ export const foreignLead = (id = L.other) => leadRow({ id, org_id: OTHER_ORG });
 export const mockScoped = (client: unknown) => vi.doMock("@/lib/db/scoped-client", () => ({ getScopedClient: vi.fn(async () => client) }));
 
 /** A read-only Lawmatics client stand-in that records every call. */
-export function lawmaticsStub(opts: { prospects?: () => Raw; truncated?: boolean; includeDropped?: boolean; contactsFail?: boolean } = {}) {
+export function lawmaticsStub(opts: { prospects?: () => Raw; truncated?: boolean; includeDropped?: boolean; contactsFail?: boolean; notes?: (notableId: string) => Raw[]; notesFail?: boolean } = {}) {
   const calls: Array<{ method: string; path: string }> = [];
   const client: LawmaticsClient = {
     get: async (path) => {
       calls.push({ method: "get", path });
       return {};
     },
-    listAll: async (path): Promise<ListResult> => {
+    listAll: async (path, listOpts): Promise<ListResult> => {
       calls.push({ method: "listAll", path });
+      if (path === "/notes") {
+        if (opts.notesFail) throw new Error(SECRET);
+        const id = listOpts?.params?.["filter[notable_id]"] ?? "";
+        return { records: (opts.notes?.(id) ?? []) as never, included: new Map(), pagesFetched: 1, truncated: false, includeDropped: false };
+      }
       if (path === "/contacts") {
         if (opts.contactsFail) throw new Error(SECRET);
         return { records: [], included: new Map(), pagesFetched: 1, truncated: false, includeDropped: false };

@@ -293,11 +293,11 @@ describe("the practice-area filter lists everyone it excludes, by name", () => {
 });
 
 describe("Find a person in this pull", () => {
-  const sevetri = rec({ lawmaticsId: "p77", firstName: "Sévetri", lastName: "Wren", email: "sevetri@prospera.example", businessName: "Prosperall", stageName: "Proposal Sent" });
+  const sevetra = rec({ lawmaticsId: "p77", firstName: "Sévetra", lastName: "Wren", email: "sevetra@prospera.example", businessName: "Prosperall", stageName: "Proposal Sent" });
   const plan = planImport(
     [
       rec({ lawmaticsId: "p1", email: "a@x.example", firstName: "Ansel", lastName: "Greaves" }),
-      sevetri,
+      sevetra,
       rec({ lawmaticsId: "p3", email: "c@x.example", firstName: "Cato", lastName: "Mbeki", stageName: "Hired Client" }),
       rec({ lawmaticsId: "p4", email: null, firstName: "Nomail", lastName: "Person" }),
     ],
@@ -308,9 +308,9 @@ describe("Find a person in this pull", () => {
   );
 
   it("matches case- and accent-insensitively and says which bucket, and why", () => {
-    const [hit, ...rest] = findInPlan(plan, "  SEVETRI ");
+    const [hit, ...rest] = findInPlan(plan, "  SEVETRA ");
     expect(rest).toEqual([]);
-    expect(hit).toMatchObject({ bucket: "stage-decision", name: "Sévetri Wren", stage: "Proposal Sent" });
+    expect(hit).toMatchObject({ bucket: "stage-decision", name: "Sévetra Wren", stage: "Proposal Sent" });
     expect(hit.reason).toContain("Imported, stage needs a decision: Proposal Sent");
     expect(BUCKET_LABEL[hit.bucket]).toMatch(/stage needs a decision/);
   });
@@ -334,7 +334,7 @@ describe("Find a person in this pull", () => {
   });
 
   it("a term is trimmed and capped; an empty term finds nothing", () => {
-    expect(foldTerm("   Sévetri   ")).toBe("sevetri");
+    expect(foldTerm("   Sévetra   ")).toBe("sevetra");
     expect(foldTerm("x".repeat(500))).toHaveLength(80);
     expect(findInPlan(plan, "   ")).toEqual([]);
     expect(searchPeople(planPeople(plan), "e", 2)).toHaveLength(2);

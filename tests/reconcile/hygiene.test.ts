@@ -22,6 +22,9 @@ const NEW_FILES = [
   "src/lib/intake/sheet-read.ts",
   "src/lib/intake/sheet-records.ts",
   "src/lib/intake/sheet-import.ts",
+  "src/lib/intake/sheet-sections.ts",
+  "src/lib/lawmatics/notes.ts",
+  "src/lib/lawmatics/find-in-plan.ts",
 ];
 const CODE = NEW_FILES.filter((f) => /\.(ts|tsx)$/.test(f));
 // Sprint 26: "Create lead" is the one place this screen inserts a row (a lead, and only when a person presses
@@ -186,7 +189,7 @@ describe("ported files and docs", () => {
     const agents = read("AGENTS.md");
     const section = agents.slice(agents.indexOf("## Stage reconciliation"), agents.indexOf("## JSX text spacing"));
     expect(section.length).toBeGreaterThan(500);
-    for (const phrase of ["sheet wins", "needs_matter", "CSV only", "stored mail", "fingerprint", "Lawmatics", "won"]) {
+    for (const phrase of ["furthest", "needs_matter", "CSV only", "stored mail", "fingerprint", "Lawmatics", "won", "last touch", "Not in Lectual yet", "Create lead", "sections"]) {
       expect(section.toLowerCase(), phrase).toContain(phrase.toLowerCase());
     }
   });

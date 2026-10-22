@@ -158,7 +158,7 @@ const RULES: readonly Rule[] = [
   {
     milestone: "consult_scheduled",
     pattern:
-      /\b(?:schedul\w*|booked|set up|confirmed|calendared|invite sent)\b[^,;]{0,25}?\b(?:consult\w*|call|session|meeting|appointment)\b|\b(?:consult\w*|call|session|meeting|appointment)\b[^,;]{0,25}?\b(?:scheduled|booked|set for|confirmed|on the calendar)\b|\bresched\w*\b/,
+      /\b(?:schedul\w*|booked|set up|confirmed|calendared|invite sent)\b[^,;]{0,25}?\b(?:consult\w*|call|session|meeting|appointment)\b|\b(?:consult\w*|call|session|meeting|appointment)\b[^,;]{0,25}?\b(?:scheduled|booked|set for|set up|confirmed|on the calendar)\b|\bresched\w*\b/,
   },
   {
     milestone: "consult_held",
