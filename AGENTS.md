@@ -542,6 +542,38 @@ missing, hidden, off-screen or the window is under 768px wide. Internal only: it
 - **Tested without a browser:** the behaviour is in pure functions (`engine.ts`) and the dialog is checked with `renderToStaticMarkup`
   (there is no DOM test environment). Walk it once on desktop and under 768px.
 
+## UI/UX fixes from the Oct 20 test notes (Sprint 22, no schema)
+Display and derivation only: no data is rewritten, nothing is sent, no new dependency.
+- **Titles:** every `page.tsx` under `src/app/dashboard` exports `metadata` (`pageTitle("Calendar")` = "Calendar · Lectual") or
+  `generateMetadata`; `src/lib/ui/page-title.ts` is the one builder and `tests/ui/page-title.test.ts` walks the directory and fails
+  for a page without one. Lead and matter pages read the record through `getLead` / `getMatter` (scoped client) and fall back to
+  "Lead" / "Matter" when the read fails or finds nothing (`recordPageTitle`), so another firm's id gives the same tab as a missing one.
+- **Navigation feedback:** `src/app/dashboard/loading.tsx` (skeleton, `PageSkeleton`, design tokens only) plus `NavProgress`, a
+  dependency-free top bar that appears only after 150 ms (`src/lib/ui/nav-progress.ts`) and ends when the URL changes. `error.tsx` beside
+  it says "This page couldn't be loaded" with Try again, so a failed navigation is never a stale or blank page. With a `loading.tsx` in
+  place, Next prefetches dynamic dashboard routes only down to the skeleton.
+- **Calendar:** every `<Link>` on the calendar page has `prefetch={false}` (a month grid is ~70 links to dynamic payloads). A month or week
+  whose every read failed shows "couldn't be loaded", never an empty grid (`calendarReadState`); a partial failure keeps its banner.
+- **Public intake link:** `shareState(status)` (`src/lib/intake-forms/share.ts`) decides whether Copy link, the QR code, Preview and the Share
+  panel are offered. Only `live` is. Draft and archived show "Not live yet. Publish the form to share it." and a disabled control with
+  `aria-describedby`. Anywhere a new place offers `/i/<slug>`, it asks `shareState`.
+- **Counts:** the rail's Intake badge is the PNC list's length (intake-category stage, trademark or unset practice area;
+  `INTAKE_PRACTICE_AREA_FILTER` in `src/lib/intake/counts.ts` is shared by the list and the badge). The Pipeline's first column is a
+  different question (leads not yet at a consult, any practice area, plus form submissions not yet leads), so it is labelled, not forced
+  equal: the badge has a tooltip and the column hint says why they differ.
+- **Period comparison:** `periodDelta` withholds a percentage beyond +/-500% and a collapse to under a tenth of a prior period of 20 or more;
+  `comparisonText` always gives the prior count ("2 vs 168 in the previous 7 days") and `KpiTile` prints it. Prior 0 shows a plain "+N".
+- **Days in stage (Pipeline cards):** `stageAgeDisplay` (`src/lib/lifecycle/stage-age.ts`): the newest `stage_changed` activity wins; a stage
+  entry equal to the record's created or Lawmatics-synced time reads "In stage since import" (no count); otherwise days from `stage_entered_at`.
+- **Role-neutral copy:** nothing rendered to every firm names a person. The intake chip and badge read "Needs attorney" and hide the
+  chip's count at zero. `tests/intake/role-neutral-copy.test.tsx` greps visible text. RPB-specific modules (consult proposal email,
+  welcome, prep-consult, document templates, the ported assessment card) keep Rebecca's name on purpose.
+- **Matter titles:** `matterDisplayTitle` (`src/lib/matters/display-title.ts`) treats `TM-enisha-smith` / `TM-97123456` (or a title equal to the
+  matter number) as a generated key and shows the mark, then the client (`owner_name`), keeping the stored title only when neither exists.
+  `matterLabel` uses it, so lists, cards and the header agree.
+- **Module list:** `activeOrgModules` is wrapped in React `cache`, one `crm_org` read per request across the layouts and the page.
+  Settings -> Modules keeps its two reads in sequence on purpose: Mailboxes off must not read connections.
+
 ## JSX text spacing: keep the `{" "}`
 Next 16.2.7's compiler DROPS the leading space of JSX text that contains an HTML entity
 (`&apos;`, `&amp;`, `&rsquo;`…) and runs onto another line, even if that is only the line
