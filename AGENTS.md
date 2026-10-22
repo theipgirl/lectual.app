@@ -495,6 +495,28 @@ Everything after a client accepts on `/p/<token>`. Internal only: nothing here s
 - **Entry points**: Quotes & proposals "New proposal" -> the picker; `LeadProposalsCard` -> `?lead=`; the matter page's small aside card
   (`MatterProposalCard`, Proposals module on AND a proposals-writing role; an unreadable module state shows nothing) -> `?matter=`.
 
+## Agent run time budgets (2026-10-22 fix, no schema)
+RPB's cron was killed at `maxDuration = 300` mid-morning-brief (row left "running", consult-prep and inbox-summary never
+ran), intake triage failed on one truncated answer, and Run now could not be clicked. The rules now:
+- **Every run has a budget** (`src/lib/agents/budget.ts`). `runOneAgent` races the agent against it; past it the run's
+  `AbortController` aborts in-flight model calls and context fetches, the row is closed as error
+  `Did not finish within the time limit` (`DID_NOT_FINISH_ERROR`), and a late result is ignored. Run now uses
+  `AGENT_RUN_BUDGET_MS` (240 s) and answers `RUN_NOW_TIME_LIMIT` on the card. Agents read `ctx.timeLeftMs` /
+  `budgetNearlySpent` and stop starting new items first (morning-brief follow-ups, intake-triage leads), saying so in the summary.
+- **The cron** has one wall budget (`CRON_WALL_BUDGET_MS`, 270 s) and runs each firm's agents on `CRON_TRACKS`: track A in
+  dependency order (stage-keeper, post-consult, morning-brief, consult-prep), track B (inbox-summary, email-intel,
+  intake-triage) beside it. Each agent gets at most `CRON_AGENT_CAP_MS`; one with under `MIN_AGENT_START_MS` left gets a
+  `skipped` row saying the run ran out of time. Don't put the agents back in one sequential loop.
+- **A row still `running` 15 minutes after `started_at` reads "Didn't finish"** (`src/lib/agents/run-status.ts`) on the
+  Agents page, its cards and the digest. Nothing waits on run rows: Run now is blocked only by its own request in flight.
+- **Every outbound call has a deadline**: `callClaude`/`askClaude` (120 s, one retry, the run's signal), the queue API, Graph/
+  Gmail/OAuth fetches (`src/lib/http/timeout.ts`), and the agents' service-role client (`getAdminClient({ timeoutMs })`).
+- **`callClaude` checks `stop_reason` before parsing** (`readStructuredResponse`); the SDK's `parse()` parsed first, so a
+  max_tokens cut-off surfaced as "Failed to parse structured output". `AiOutputError.kind` is refusal/truncated/shape, and a
+  list agent skips the one item (`isUnusableModelAnswer`). Intake triage asks for 16000 tokens.
+- **Run now's button stacks above the card footer** (`.lx-agent-slot-run` has `position: relative; z-index: 1`). It shares
+  the footer's grid cell and comes first in the markup, so without that the footer took every click.
+
 ## JSX text spacing: keep the `{" "}`
 Next 16.2.7's compiler DROPS the leading space of JSX text that contains an HTML entity
 (`&apos;`, `&amp;`, `&rsquo;`…) and runs onto another line, even if that is only the line
