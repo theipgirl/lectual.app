@@ -383,6 +383,44 @@ starts with `AGENT_POLICY`, and mail, answers and subjects reach a model only in
   one place names and subjects appear (a briefing for the firm; the digest only for filed or shared-mailbox mail), and
   they are internal.
 
+## Skills page and Run now diagnostics (Sprint 18, no schema)
+`/dashboard/skills` lists the seven staff-run skills the app already has and links to the existing action on a chosen
+record. It reads only and writes nothing: no server action, no insert/update, no send. No migration, no new module.
+- **Catalog:** `src/lib/skills/catalog.ts` (pure) is the one source: Prep a consult, Draft the engagement letter, Welcome a
+  client, Filing follow-up, Opinion letter, Trademark clearance, Meeting follow-up, in that order, plus the nine Claude-only
+  (Cowork) names. It is this app's own wording; nothing is read from the lectual-plugin at runtime. Each skill has a
+  `href(kind, id)` that is the only place its deep-link is built (the record's id only, `encodeURIComponent`, trailing slash).
+  The cards render a plain `<a>`, not `next/link`, so the href reaches the page exactly as built (Link strips the slash in tests).
+- **Where each lands:** Prep -> lead page `#prep-consult` (the `<details>` panel); Welcome and Filing follow-up -> matter page
+  `#client-updates`; the three letters -> `/dashboard/documents/new/<matter>/{loe,opinion-letter,trademark-clearance}/`;
+  Meeting follow-up -> the lead's or matter's page (its Meetings panel), plus a plain "Open Meetings" link, because that action
+  works on a recorded meeting. `tests/skills/catalog.test.ts` checks every path, that each route exists on disk, and that each
+  anchor id appears exactly once in the lead and matter page sources. The filing follow-up card only appears on a matter with a mark in
+  Awaiting Trademark Registration; the card says so.
+- **Gates:** the page and its search need `agent-toolkit` (`notFound()` otherwise, session or not; the not-found path names no
+  module). A card whose target needs a module the firm lacks (`document-center` for the three letters, `agents` for Meeting
+  follow-up) shows its description and "Not switched on for this firm." with no picker, so the page never links to a 404. A role that
+  cannot write leads (viewer, social media; `SKILL_RUN_ROLES`, held equal to `CAN_WRITE_LEAD` and `MATTER_WRITE_ROLES` by a test)
+  sees the catalog, a role line and no picker. The destination pages re-check the role themselves.
+- **Picker rules (`src/lib/skills/pick.ts`, pure):** the existing `listLeads` / `listMatters` through the scoped client, narrowed in
+  memory. A term is trimmed and capped at 80 characters, matched case-insensitively against name, business, email (leads) or
+  mark, title, matter number, client (matters). With no term the list is the recent records, capped at 8, with "Showing N of M".
+  The term rides the URL (`?skill=<slug>&q=<term>`) and applies to that card only. Welcome a client lists only `TM` matters.
+  A failed list read says "We couldn't load your leads/matters" on that card and never "No matches"; the other kind still renders.
+- **Run now (`src/lib/agents/run-now.ts`, pure):** `decideRunNow` is the only place the reasons live, and both the Agents page and
+  `runAgentNowAction` call it, so the page cannot offer a run the action refuses. The button is always drawn on a card whose
+  settings were read; when it can't run it is disabled and the sentence is printed beside it (`aria-describedby`). Precedence, first
+  that applies wins: running, role (below senior admin), database update (Morning brief, Consult prep, Inbox summary only, when
+  `databaseUpdate` is `pending`), off, Autopilot paused, Autopilot unreadable, AI key (never the Stage Keeper). Autopilot "not set up"
+  (0082 missing) blocks nothing. A run that finishes leaves a result line (summary and "N read, M drafts written", "Skipped. ..." or
+  "The run failed: ..."), drawn as an alert only for an error. A setting that can't be read is not "off"; the action says so.
+- **0098 wording is shared with readiness:** `NOT_AVAILABLE_UNTIL_UPDATE` in `readiness.ts` is the label there and the start of the
+  Run now reason (`Not available until the database update (lectual 0098).`). The action probes the calendar columns the same way
+  the page does (only for a firm with the Mailboxes module), so a firm that can't see the update state is never blocked on a guess.
+- **Existing assertions changed on purpose:** the Morning brief card snapshot (`tests/agents/new-agents-page.test.ts`) now holds the
+  Run now reason; `tests/nav.test.ts`, `tests/shell/section-label.test.ts` and `tests/reports/link-tiles.test.ts` name only SMS and
+  Client portals as unbuilt, and Skills is built.
+
 ## JSX text spacing: keep the `{" "}`
 Next 16.2.7's compiler DROPS the leading space of JSX text that contains an HTML entity
 (`&apos;`, `&amp;`, `&rsquo;`…) and runs onto another line, even if that is only the line

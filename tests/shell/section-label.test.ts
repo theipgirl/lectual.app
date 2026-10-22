@@ -30,7 +30,11 @@ describe("sectionLabelFor (F17)", () => {
   });
 
   it("gives an unbuilt section the neutral label too", () => {
-    for (const slug of ["sms", "portals", "skills"]) expect(sectionLabelFor(`/dashboard/${slug}/`)).toBe("Workspace");
+    for (const slug of ["sms", "portals"]) expect(sectionLabelFor(`/dashboard/${slug}/`)).toBe("Workspace");
+  });
+
+  it("labels the Skills page Skills (built in Sprint 18)", () => {
+    expect(sectionLabelFor("/dashboard/skills/")).toBe("Skills");
   });
 
   it("treats a missing pathname as Today", () => {

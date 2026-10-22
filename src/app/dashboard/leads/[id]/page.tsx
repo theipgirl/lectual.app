@@ -229,7 +229,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           <WaitingOnRebecca leadId={lead.id} approvals={approvals} now={renderedAt} />
 
           {canWrite && hasAgentToolkit && (
-            <details className="lx-card lx-disclosure">
+            <details id="prep-consult" className="lx-card lx-disclosure">
               <summary>Prep this consult</summary>
               <div style={{ padding: "0 18px 18px" }}>
                 <PrepConsult leadId={lead.id} practiceArea={lead.practice_area} />

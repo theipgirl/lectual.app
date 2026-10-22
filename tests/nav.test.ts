@@ -75,12 +75,12 @@ describe("rail tree (design/Rail.dc.html)", () => {
 });
 
 describe("unbuilt sections are hidden (built: false)", () => {
-  const UNBUILT = ["sms", "portals", "skills"];
+  const UNBUILT = ["sms", "portals"];
   const everything = ["mailbox", "agents", "proposals", "document-center", "agent-toolkit", "litigation"];
   const railSlugs = (groups: ReturnType<typeof railGroups>) => groups.flat().flatMap((e) => [e.key, ...e.kids.map((k) => k.key)]);
   const railLabels = (groups: ReturnType<typeof railGroups>) => groups.flat().flatMap((e) => [e.label, ...e.kids.map((k) => k.label)]);
 
-  it("flags exactly SMS, Client portals and Skills", () => {
+  it("flags exactly SMS and Client portals (Skills is built, Sprint 18)", () => {
     expect(NAV.filter((n) => n.built === false).map((n) => n.slug)).toEqual(UNBUILT);
   });
 
@@ -101,7 +101,7 @@ describe("unbuilt sections are hidden (built: false)", () => {
       const groups = railGroups(input, "/dashboard/");
       for (const slug of UNBUILT) expect(railSlugs(groups)).not.toContain(slug);
       const labels = railLabels(groups);
-      for (const label of ["SMS", "Client portals", "Skills"]) expect(labels).not.toContain(label);
+      for (const label of ["SMS", "Client portals"]) expect(labels).not.toContain(label);
     }
   });
 
@@ -110,11 +110,37 @@ describe("unbuilt sections are hidden (built: false)", () => {
     const find = (label: string) => groups.flat().find((e) => e.label === label)!;
     expect(find("Communication").kids.map((k) => k.key)).toEqual(["mail", "meetings", "queue", "campaigns"]);
     expect(find("Active matters").kids.map((k) => k.key)).toEqual(["matters", "pipeline", "documents"]);
-    expect(find("IP.OS").kids.map((k) => k.key)).toEqual(["copilot", "agents", "brain"]);
+    expect(find("IP.OS").kids.map((k) => k.key)).toEqual(["copilot", "agents", "skills", "brain"]);
   });
 
   it("every unbuilt section is still listed in NAV so its URL stays a known 404", () => {
     for (const slug of UNBUILT) expect(navItemBySlug(slug)).toBeDefined();
+  });
+});
+
+describe("the Skills section (Sprint 18)", () => {
+  const rail = (modules: string[]) => railGroups(visibleNav(modules, "owner"), "/dashboard/");
+  const iposKids = (modules: string[]) => rail(modules).flat().find((e) => e.label === "IP.OS")!.kids.map((k) => k.key);
+
+  it("is gated on agent-toolkit and is a built section", () => {
+    const skills = navItemBySlug("skills")!;
+    expect(skills.module).toBe("agent-toolkit");
+    expect(skills.built).toBeUndefined();
+    expect(skills.href).toBe("/dashboard/skills/");
+  });
+
+  it("is allowed for a firm with agent-toolkit and refused without it", () => {
+    const skills = navItemBySlug("skills")!;
+    expect(navItemAllowed(skills, ["agent-toolkit"], "owner")).toBe(true);
+    expect(navItemAllowed(skills, ["agents", "mailbox", "document-center"], "owner")).toBe(false);
+    expect(navItemAllowed(skills, [], "owner")).toBe(false);
+  });
+
+  it("appears under IP.OS in the rail for a firm with agent-toolkit, and not for one without", () => {
+    expect(iposKids(["agent-toolkit"])).toContain("skills");
+    expect(iposKids(["agent-toolkit", "agents"])).toEqual(["copilot", "agents", "skills", "brain"]);
+    expect(iposKids(["agents"])).not.toContain("skills");
+    expect(iposKids([])).not.toContain("skills");
   });
 });
 
