@@ -8,7 +8,7 @@ import type {
 } from "@anthropic-ai/sdk/resources/beta/messages/messages";
 import type { z } from "zod";
 import { env } from "@/lib/env";
-import { maxOutputFor, resolveAgentModel, type ModelSubject } from "./agent-models";
+import { maxOutputFor, supportsEffort, resolveAgentModel, type ModelSubject } from "./agent-models";
 
 /**
  * The one way the agents call Claude.
@@ -187,7 +187,7 @@ export const callClaude: StructuredCall = async (req) => {
       max_tokens: Math.min(req.maxTokens ?? 16000, maxOutputFor(model)),
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
-      output_config: { effort: req.effort, format },
+      output_config: supportsEffort(model) ? { effort: req.effort, format } : { format },
       system: [{ type: "text", text: req.system, cache_control: { type: "ephemeral" } }],
       messages: [{ role: "user", content: req.user }],
     },

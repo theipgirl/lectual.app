@@ -24,7 +24,11 @@ export type DigestRun = {
   error: string | null;
 };
 
-export type DigestAction = { label: string; href: string };
+/** `href` is null when there is nothing for the firm to click: the sentence is plain text. */
+export type DigestAction = { label: string; href: string | null };
+
+/** Shown for a failure the firm cannot fix. Lectual is emailed about every failed run (see failure-alert.ts). */
+export const LECTUAL_TOLD_LABEL = "Lectual has been told and is looking into it.";
 
 export type DigestLine = {
   agent: AgentId;
@@ -116,8 +120,10 @@ export function consultPrepProblems(summary: string | null): ConsultPrepProblems
 
 /**
  * What the attorney should do about a failed run, from the error text the
- * runner stored. Only a few causes have a concrete fix in the app; everything
- * else points at the run log, which carries the full error.
+ * runner stored. Only a few causes have a concrete fix in the app (reconnect a
+ * mailbox or meeting source, try again later). Anything else, the approval
+ * queue's own errors included, is not the firm's to fix: the card says Lectual
+ * has been told, with no link.
  */
 export function failureAction(error: string | null): DigestAction {
   const e = (error ?? "").toLowerCase();
@@ -125,11 +131,10 @@ export function failureAction(error: string | null): DigestAction {
     return { label: "Reconnect the mailbox", href: "/dashboard/settings/mailboxes/" };
   }
   if (/fathom|zoom/.test(e)) return { label: "Reconnect the meeting source", href: "/dashboard/settings/integrations/meetings/" };
-  if (/queue/.test(e)) return { label: "Check the approval queue", href: "/dashboard/queue/" };
   if (/anthropic|overloaded|rate limit|429|529|timeout|timed out|time limit/.test(e)) {
     return { label: "Try Run now later", href: "/dashboard/agents/" };
   }
-  return { label: "Open the run log", href: "/dashboard/agents/" };
+  return { label: LECTUAL_TOLD_LABEL, href: null };
 }
 
 /** The error as a person reads it: first sentence, bounded. */

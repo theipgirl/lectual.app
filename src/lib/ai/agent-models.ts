@@ -62,3 +62,11 @@ export function resolveAgentModel(subject: ModelSubject, e: ModelEnv, log?: (lin
 export function maxOutputFor(_model: string): number {
   return MAX_OUTPUT_TOKENS;
 }
+
+/**
+ * Whether the `effort` setting may be sent. Haiku models do not take it (the API refuses the request),
+ * so for them the request carries the structured format alone.
+ */
+export function supportsEffort(model: string): boolean {
+  return !model.toLowerCase().includes("haiku");
+}
