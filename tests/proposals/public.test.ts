@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 
 import {
   PUBLIC_ORG_COLUMNS,
@@ -16,6 +16,21 @@ import {
 } from "@/lib/proposals/public";
 import { defaultSelection, quoteProposal } from "@/lib/proposals/pricing";
 import { sevetri } from "./fixture";
+
+// Sprint 19: the acceptance follow-ups (firm notice + Lawmatics note) are scheduled with next/server's after().
+// Outside a request `after` is a no-op here; tests that care capture the callback and run it themselves.
+const mocks = vi.hoisted(() => ({
+  after: vi.fn<(fn: () => unknown) => void>(),
+  runAcceptanceFollowups: vi.fn<(db: unknown, input: { proposalId: string; orgId: string }) => Promise<void>>(async () => {}),
+}));
+vi.mock("next/server", () => ({ after: mocks.after }));
+vi.mock("@/lib/proposals/accept-followups", () => ({ runAcceptanceFollowups: mocks.runAcceptanceFollowups }));
+
+beforeEach(() => {
+  mocks.after.mockReset();
+  mocks.runAcceptanceFollowups.mockReset();
+  mocks.runAcceptanceFollowups.mockResolvedValue(undefined);
+});
 
 /* ─────────────────────────── pure helpers ─────────────────────────────── */
 
@@ -562,5 +577,63 @@ describe("publicContent never publishes the staff-only package basis (Sprint 6)"
     expect(JSON.stringify(out)).not.toContain("edited");
     // and the rest of the document is intact
     expect(out.pricing).toEqual(sevetri().pricing);
+  });
+});
+
+describe("acceptPublicProposal: the firm notice and the Lawmatics note are follow-ups (Sprint 19)", () => {
+  const pick = (ids: string[]) => Object.fromEntries(ids.map((i) => [i, true]));
+  const IDS = ["p-word", "p-c1"];
+
+  it("schedules them with after() and does not wait for them", async () => {
+    const { db } = world();
+    const r = await acceptPublicProposal(TOKEN, pick(IDS), NOW, db);
+    expect(r.ok).toBe(true);
+    expect(mocks.after).toHaveBeenCalledTimes(1);
+    // The response is built; nothing has run yet. It runs when the framework calls the callback.
+    expect(mocks.runAcceptanceFollowups).not.toHaveBeenCalled();
+    await mocks.after.mock.calls[0][0]();
+    expect(mocks.runAcceptanceFollowups).toHaveBeenCalledTimes(1);
+    // It is handed the connection this module already holds, and the proposal's own id and org (read from the row).
+    expect(mocks.runAcceptanceFollowups.mock.calls[0][0]).toBe(db);
+    expect(mocks.runAcceptanceFollowups.mock.calls[0][1]).toEqual({ proposalId: "prop-2", orgId: "org-1" });
+  });
+
+  it("returns the same result however the follow-ups end", async () => {
+    const baseline = world();
+    const expected = await acceptPublicProposal(TOKEN, pick(IDS), NOW, baseline.db);
+    expect(expected.ok).toBe(true);
+
+    // A follow-up that rejects, run later by after(): the acceptance already returned, and the callback does not throw.
+    const later = world();
+    const r1 = await acceptPublicProposal(TOKEN, pick(IDS), NOW, later.db);
+    mocks.runAcceptanceFollowups.mockRejectedValueOnce(new Error("note exploded"));
+    await expect(Promise.resolve(mocks.after.mock.calls.at(-1)![0]())).resolves.toBeUndefined();
+    expect(r1).toEqual(expected);
+
+    // No request scope (a script, a test): after() throws, the follow-ups are awaited instead, and a rejection still changes nothing.
+    mocks.after.mockImplementation(() => {
+      throw new Error("after() outside a request scope");
+    });
+    mocks.runAcceptanceFollowups.mockRejectedValue(new Error("note exploded"));
+    const direct = world();
+    const r2 = await acceptPublicProposal(TOKEN, pick(IDS), NOW, direct.db);
+    expect(r2).toEqual(expected);
+    expect(mocks.runAcceptanceFollowups).toHaveBeenCalled();
+  });
+
+  it("a refused acceptance schedules nothing", async () => {
+    const { db } = world({ proposal: { status: "accepted" } });
+    const r = await acceptPublicProposal(TOKEN, pick(IDS), NOW, db);
+    expect(r.ok).toBe(false);
+    expect(mocks.after).not.toHaveBeenCalled();
+    expect(mocks.runAcceptanceFollowups).not.toHaveBeenCalled();
+  });
+
+  it("logs nothing about the client at all", async () => {
+    const spies = (["info", "log", "warn", "error"] as const).map((m) => vi.spyOn(console, m).mockImplementation(() => {}));
+    const { db } = world();
+    await acceptPublicProposal(TOKEN, pick(IDS), NOW, db);
+    await mocks.after.mock.calls[0][0]();
+    expect(spies.flatMap((s) => s.mock.calls)).toEqual([]);
   });
 });

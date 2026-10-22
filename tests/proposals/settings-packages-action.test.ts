@@ -80,6 +80,13 @@ describe("savePackagesAction", () => {
     expect(input.pricing.keep).toBe(1);
   });
 
+  it("keeps the Lawmatics LOE fields setting (Sprint 19), on or off, exactly as stored", async () => {
+    const loe = { enabled: true, map: { "LOE Package": "301", "LOE Legal Fee": "304" } };
+    const { saved, run } = await setup({ existing: existingRow({ lawmatics_loe_fields: loe }) });
+    await run(pkg(0, "Concierge", "4950.00"));
+    expect(savedWith(saved).pricing.lawmatics_loe_fields).toEqual(loe);
+  });
+
   it("works for a firm with nothing saved yet", async () => {
     const { saved, run } = await setup({ existing: null });
     const result = await run(pkg(0, "Concierge", "4950.00"));

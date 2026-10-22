@@ -189,3 +189,137 @@ describe("generateApprovedDocument", () => {
     await expect(generateApprovedDocument("rpb-law", "queue-1")).resolves.toBeUndefined();
   });
 });
+
+/**
+ * Sprint 19: an engagement letter born from an accepted proposal (its draft payload carries
+ * proposalId) is uploaded to the matter's Lawmatics record, but only after a person approved the
+ * queue item and the docx was stored. Nothing else uploads, and an upload can't change the approval.
+ */
+describe("generateApprovedDocument: the proposal-born LOE upload", () => {
+  const PROPOSAL = "44444444-4444-4444-8444-444444444444";
+  const loeDraft = { ...draftRow, doc_type: "loe_trademark_current" as const, payload: { clientName: "Sevetri Wilson", proposalId: PROPOSAL } };
+  const approvedLoe = { id: "queue-1", type: "ENGAGEMENT_LETTER", status: "approved", draft_body: "chart", final_body: "reviewed chart" };
+
+  function uploadMocks(over: { draft?: unknown; item?: unknown; renderThrows?: boolean; uploadError?: unknown; uploadResult?: unknown; proposal?: unknown; matter?: unknown; token?: unknown; recordOk?: boolean } = {}) {
+    const base = mocks({ draft: over.draft ?? loeDraft, item: over.item ?? approvedLoe, renderThrows: over.renderThrows, uploadError: over.uploadError });
+    const uploadMatterFile = vi.fn(async () => over.uploadResult ?? { ok: true });
+    const getProposalRow = vi.fn(async () => (over.proposal === undefined ? { id: PROPOSAL, org_id: "org-1", matter_id: "matter-1", lead_id: null } : over.proposal));
+    const recordProposalStep = vi.fn(async () => over.recordOk ?? true);
+    vi.doMock("@/lib/lawmatics/writes", () => ({ uploadMatterFile }));
+    vi.doMock("@/lib/proposals/store", () => ({ getProposalRow, recordProposalStep, listProposalStepEvents: vi.fn() }));
+    vi.doMock("@/lib/proposals/lawmatics-access", async () => {
+      const actual = await vi.importActual<typeof import("@/lib/proposals/lawmatics-access")>("@/lib/proposals/lawmatics-access");
+      return {
+        ...actual,
+        resolveProposalMatter: vi.fn(async () => over.matter ?? { status: "one", id: "matter-1", lawmaticsId: "LM-MATTER-1" }),
+        signedInLawmaticsToken: vi.fn(async () => over.token ?? { status: "ok", token: "TOKEN-ORG-1" }),
+      };
+    });
+    return { ...base, uploadMatterFile, getProposalRow, recordProposalStep };
+  }
+
+  beforeEach(() => vi.resetModules());
+
+  it("uploads the stored docx to the matter's Lawmatics id with the firm's token, after the file is stored", async () => {
+    const m = uploadMocks();
+    const { generateApprovedDocument } = await import("@/lib/documents/approve-hook");
+    await generateApprovedDocument("rpb-law", "queue-1");
+
+    expect(m.markDocumentGenerated).toHaveBeenCalled();
+    expect(m.uploadMatterFile).toHaveBeenCalledTimes(1);
+    const [token, file] = m.uploadMatterFile.mock.calls[0] as unknown as [string, { matterId: string; fileName: string; mime: string; bytes: Uint8Array }];
+    expect(token).toBe("TOKEN-ORG-1");
+    expect(file).toMatchObject({ matterId: "LM-MATTER-1", fileName: "Jane Doe - Opinion Letter DRAFT - SUNBEAM.docx" });
+    expect(file.mime).toContain("wordprocessingml");
+    // Stored first, uploaded second.
+    expect(m.markDocumentGenerated.mock.invocationCallOrder[0]).toBeLessThan(m.uploadMatterFile.mock.invocationCallOrder[0]);
+    // The outcome is a line on the proposal's timeline.
+    expect(m.recordProposalStep).toHaveBeenCalledWith(expect.objectContaining({ id: PROPOSAL }), expect.objectContaining({ step: "loe_file_upload", outcome: "uploaded", draft_id: "draft-1" }));
+  });
+
+  it.each([
+    ["still pending", { id: "queue-1", type: "ENGAGEMENT_LETTER", status: "pending", draft_body: "x" }],
+    ["rejected", { id: "queue-1", type: "ENGAGEMENT_LETTER", status: "rejected", draft_body: "x" }],
+  ])("a queue item that is %s uploads nothing", async (_name, item) => {
+    const m = uploadMocks({ item });
+    const { generateApprovedDocument } = await import("@/lib/documents/approve-hook");
+    await generateApprovedDocument("rpb-law", "queue-1");
+    expect(m.uploadMatterFile).not.toHaveBeenCalled();
+    expect(m.recordProposalStep).not.toHaveBeenCalled();
+    expect(m.getProposalRow).not.toHaveBeenCalled();
+  });
+
+  it("an ordinary opinion letter or a non-proposal LOE makes no upload request", async () => {
+    for (const draft of [draftRow, { ...draftRow, doc_type: "loe_trademark_current" as const, payload: { clientName: "Jane Doe" } }, { ...draftRow, payload: { proposalId: 42 } }]) {
+      vi.resetModules();
+      const m = uploadMocks({ draft, item: draft === draftRow ? undefined : approvedLoe });
+      const { generateApprovedDocument } = await import("@/lib/documents/approve-hook");
+      await generateApprovedDocument("rpb-law", "queue-1");
+      expect(m.uploadMatterFile).not.toHaveBeenCalled();
+      expect(m.recordProposalStep).not.toHaveBeenCalled();
+    }
+  });
+
+  it("nothing uploads when the docx was not stored (render or storage failure)", async () => {
+    for (const over of [{ renderThrows: true }, { uploadError: new Error("bucket full") }]) {
+      vi.resetModules();
+      const m = uploadMocks(over);
+      const { generateApprovedDocument } = await import("@/lib/documents/approve-hook");
+      await generateApprovedDocument("rpb-law", "queue-1");
+      expect(m.uploadMatterFile).not.toHaveBeenCalled();
+    }
+  });
+
+  it("an upload failure never changes the stored document or the approval; the outcome goes on the proposal", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const m = uploadMocks({ uploadResult: { ok: false, reason: "HTTP 422", retryable: false, status: 422 } });
+    const { generateApprovedDocument } = await import("@/lib/documents/approve-hook");
+    await expect(generateApprovedDocument("rpb-law", "queue-1")).resolves.toBeUndefined();
+    expect(m.markDocumentGenerated).toHaveBeenCalledTimes(1);
+    expect(m.markDocumentFailed).not.toHaveBeenCalled();
+    expect(m.recordProposalStep).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ step: "loe_file_upload", outcome: "failed", reason: "HTTP 422" }));
+  });
+
+  it("a throwing upload, a throwing proposal read and a failing timeline write are all contained", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const throwing = uploadMocks();
+    throwing.uploadMatterFile.mockRejectedValueOnce(new Error("socket hang up"));
+    const hook1 = await import("@/lib/documents/approve-hook");
+    await expect(hook1.generateApprovedDocument("rpb-law", "queue-1")).resolves.toBeUndefined();
+    expect(throwing.markDocumentFailed).not.toHaveBeenCalled();
+
+    vi.resetModules();
+    const noProposal = uploadMocks();
+    noProposal.getProposalRow.mockRejectedValueOnce(new Error("db down"));
+    const hook2 = await import("@/lib/documents/approve-hook");
+    await expect(hook2.generateApprovedDocument("rpb-law", "queue-1")).resolves.toBeUndefined();
+    expect(noProposal.uploadMatterFile).not.toHaveBeenCalled();
+    expect(noProposal.markDocumentFailed).not.toHaveBeenCalled();
+
+    vi.resetModules();
+    const noLine = uploadMocks({ recordOk: false });
+    const hook3 = await import("@/lib/documents/approve-hook");
+    await expect(hook3.generateApprovedDocument("rpb-law", "queue-1")).resolves.toBeUndefined();
+    expect(noLine.markDocumentFailed).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["no active Lawmatics connection", { token: { status: "not_connected" } }, "Lawmatics isn't connected, so nothing was uploaded."],
+    ["a matter not linked to Lawmatics", { matter: { status: "one", id: "matter-1", lawmaticsId: null } }, "This matter isn't linked to Lawmatics yet."],
+    ["no matter", { matter: { status: "none" } }, "There is no matter yet, so nothing was uploaded. Open the matter first."],
+  ])("%s: no request, and the reason is on the timeline", async (_name, over, reason) => {
+    const m = uploadMocks(over);
+    const { generateApprovedDocument } = await import("@/lib/documents/approve-hook");
+    await generateApprovedDocument("rpb-law", "queue-1");
+    expect(m.uploadMatterFile).not.toHaveBeenCalled();
+    expect(m.recordProposalStep).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ step: "loe_file_upload", outcome: "blocked", reason }));
+  });
+
+  it("another firm's proposal id (not visible to this firm) uploads nothing and writes nothing", async () => {
+    const m = uploadMocks({ proposal: null });
+    const { generateApprovedDocument } = await import("@/lib/documents/approve-hook");
+    await generateApprovedDocument("rpb-law", "queue-1");
+    expect(m.uploadMatterFile).not.toHaveBeenCalled();
+    expect(m.recordProposalStep).not.toHaveBeenCalled();
+  });
+});
