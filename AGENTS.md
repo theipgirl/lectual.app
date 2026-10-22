@@ -421,6 +421,49 @@ record. It reads only and writes nothing: no server action, no insert/update, no
   Run now reason; `tests/nav.test.ts`, `tests/shell/section-label.test.ts` and `tests/reports/link-tiles.test.ts` name only SMS and
   Client portals as unbuilt, and Skills is built.
 
+## Accepted + paid proposal -> LOE draft, and the /p/ acceptance follow-ups (Sprint 19, no schema)
+Everything after a client accepts on `/p/<token>`. Internal only: nothing here sends, moves a stage, or opens a matter.
+- **Every step is an `edited` event with a `step` and an `outcome`.** `client_proposal_event.type` is a closed set (no `paid`),
+  its staff insert policy allows only `edited` / `revised` / `viewed`, and this repo adds no migration, so `src/lib/proposals/paid.ts`
+  owns the vocabulary: steps `paid_marked`, `paid_undone`, `accept_notice`, `lawmatics_note`, `loe_draft`, `accepted_file_upload`,
+  `loe_file_upload`, `custom_fields`; each has ONE success word (`STEP_SUCCESS`: marked, undone, sent, added, queued, uploaded, uploaded,
+  written) and the rest are `blocked` (a person can fix it), `failed` (a call went wrong) or `skipped` (nothing to do). Staff steps are
+  `actor = 'staff'`; the two that run with no session on the public path (`accept_notice`, `lawmatics_note`) are written by the service
+  role as `actor = 'system'`. Readers that only know "edited" must call `describeStepEvent` / `stepActivityLabel` first (the history
+  and the list's Last activity do). The consult agent's evidence reader filters `actor = 'agent'`, so step events never reach it.
+- **Paid is derived, never stored.** `paidStateFromEvents`: the newest of a version's `paid_marked` / `paid_undone`. The read is three-state
+  (paid / not paid / "Paid status couldn't be read"); a failed read is never "Not paid" and offers no Mark paid. Roles: owner, admin,
+  senior_admin, intake (`PROPOSAL_PAID_ROLES`, a subset of the event policy's staff roles). Page and list both draw from `paid-view.ts`.
+- **Acceptance follow-ups** (`accept-followups.ts`, scheduled with `after()` from `public.ts`, awaited instead when there is no request scope):
+  an in-app `approval_needed` notice to the approvers named in `client_proposal_setting` who are still members, plus every `intake` member,
+  same org only; payload is exactly `source: "proposal_accepted"`, `proposal_id`, `headline` ("<client> accepted <package> · legal $X", legal
+  fee only), and `describeNotification` renders it as "Proposal accepted" linking to the proposal. Then a Lawmatics NOTE through the firm's own
+  token. `public.ts` passes its service-role client in; the module imports no admin client. Once per version: a step that already ended in its
+  success word is not repeated, one that failed is tried again. An unreadable timeline holds the note back (a second note is worse than none).
+- **Note target, in order:** the proposal's `matter_id` -> `crm_matter.lawmatics_id`; its `lead_id` -> `crm_lead.lawmatics_id`; exactly one of the
+  firm's own leads whose email equals the client's (case-insensitive) and that has a `lawmatics_id`. A record with no `lawmatics_id` falls through;
+  two matches or none is no note, with the reason on the timeline. All are Lawmatics matters (`notable_type: "Prospect"`). No contact sweep is built.
+- **LOE draft** (`loe-adapter.ts`, `paid-flow.ts`): only through `generateTrademarkLoe` (the LOE form's own path, `ENGAGEMENT_LETTER` queue item,
+  draft payload carries `proposalId`). Drafted only when a matter exists (`matter_id`, else the single matter for the lead; two is "draft it from
+  the right matter"; none is "Open the matter to draft the LOE."), the firm has Document Center, the package is on the firm's CURRENT list
+  (`client_proposal_setting.pricing` through `normalisePackages`; otherwise "Choose the LOE template", never guessed; an unreadable list is its
+  own state; `legacy` is never chosen), and EXACTLY ONE brand name was accepted (`TrademarkLoeInput` is one mark). Legal fee and USPTO fees are
+  separate figures; gov fees are the quote's own number, printed as "$700 ($350 × 2 classes)" when the math agrees.
+- **Once per version, and the race.** Done-ness is read from the version's own timeline (and, for the LOE draft, the matter's drafts whose payload
+  has this `proposalId`). There is no database constraint behind it, so two truly simultaneous Mark paid clicks could queue two drafts; a re-click,
+  undo then mark again, and a reload create exactly one. Undo deletes and withdraws nothing.
+- **Uploads.** The accepted-proposal docx uploads at "marked paid" (`POST /v1/files`, `documentable_type=matter`, `documentable_id` = the matter's
+  Lawmatics id, `file`, `path[]=Engagement`; multipart, no Content-Type set by us). The approved LOE uploads only from the approve hook
+  (`loe-upload.ts`), and only for a draft whose payload carries `proposalId`; other letters are untouched. An upload failure never changes the
+  approval or the stored document. Retry re-reads the stored docx. The token is `firmLawmaticsToken()` (signed-in, active connection only) or
+  `firmToken(admin, orgId)` on the public path, never a deployment-wide one.
+- **LOE fields (stretch), OFF by default.** Stored with no migration under `client_proposal_setting.pricing.lawmatics_loe_fields`
+  (`{ enabled, map: { <name>: <Lawmatics custom field id> } }`); `withPackages` and `parseSettingsPricing` keep it. At "marked paid", when
+  enabled, one `PUT /v1/prospects/:id` with `custom_fields: [{id, value}]` for the mapped names only (no stage, no tag). Settings ->
+  Integrations -> Lawmatics, admin tier + proposals module; a failed field list keeps the saved matches.
+- **NOT verified against a live Lawmatics:** the `/files` multipart shape, the custom-field write shape and the `/notes` body come from the
+  public API reference. Every non-2xx is "not done" and the page says the shape hasn't been checked; every 2xx is "done".
+
 ## JSX text spacing: keep the `{" "}`
 Next 16.2.7's compiler DROPS the leading space of JSX text that contains an HTML entity
 (`&apos;`, `&amp;`, `&rsquo;`…) and runs onto another line, even if that is only the line
