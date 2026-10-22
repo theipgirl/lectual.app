@@ -761,7 +761,10 @@ the letter destination. Leads | Matters (opens on Matters), search, 8 recent, "S
   `FIRM_CLIENT_LINK_ORIGINS` = JSON `{ "<org_id>": "https://proposals.firm.com" }` (https, origin only, invalid entries ignored; parsing is in the
   import-free `client-link-config.ts`); otherwise `getSiteOrigin()`. The proposal page and the consult-proposal email (`run.ts`) both use it.
   `next.config.ts` adds the same hosts to `serverActions.allowedOrigins` so Accept works when the request arrives through the firm's domain
-  (the old `lectual` project rewrites `/p/<token>/` and `/_next/static` there, see its AGENTS.md). Old app.lectual.app links keep working.
+  (the old `lectual` project rewrites `/p/<token>/`, `/_next/static` and `/brand` there, see its AGENTS.md). Old app.lectual.app links keep working.
+- **The client page may only reference root-relative assets under `/_next/static/` or `/brand/`** (the only prefixes lectual rewrites on a
+  proposals host; the logo is `/brand/rpb-logo-cream.png`). `tests/proposals/public-assets.test.ts` fails on any other `src="/..."` or `url(/...)`
+  in `src/app/p` or `src/components/client-proposal`. A new asset type needs a rewrite in lectual's `next.config.ts` first.
 
 ## JSX text spacing: keep the `{" "}`
 Next 16.2.7's compiler DROPS the leading space of JSX text that contains an HTML entity

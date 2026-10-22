@@ -62,7 +62,7 @@ const TRIGGER_MESSAGES: ReadonlyArray<readonly [prefix: string, code: ProposalEr
   [
     "client_proposal_send_not_approved",
     "conflict",
-    "Only an approved version can be marked as sent. Refresh: it may have been edited back to draft.",
+    "The link can only be turned on for a saved version. Refresh: it may have been taken back to editing.",
   ],
   [
     "client_proposal_family_accepted",
@@ -87,7 +87,7 @@ export function friendlyProposalError(error: DbErrorLike, doing = "save the prop
   }
 
   if (message.includes("approver")) {
-    return new ProposalError("forbidden", "Only the firm's named approvers can approve a proposal.");
+    return new ProposalError("forbidden", "Only the firm's named approvers can create a client link.");
   }
   if (message.includes("service role") || message.includes("service_role")) {
     return new ProposalError("forbidden", "Only the client can accept a proposal, from their own link.");

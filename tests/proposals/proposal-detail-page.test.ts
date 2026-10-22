@@ -187,6 +187,14 @@ describe("LinkedProposalPanel (queue item page)", () => {
     expect(html).not.toContain("Proposal at a glance");
   });
 
+  it("says the right next step for draft, saved and link live", () => {
+    const at = (status: string) => panel({ status: "ok", proposal: { ...(summary(undefined) as { proposal: object }).proposal, status } } as LinkedPanel).replace(/&#x27;/g, "'");
+    expect(at("draft")).toContain("click Save and create link.");
+    expect(at("draft")).not.toMatch(/click Approve/i);
+    expect(at("approved")).toContain("The proposal is saved. Approving this email turns its link on and puts the email in your mailbox as a draft. Nothing is sent.");
+    expect(at("sent")).toContain("The proposal's link is live. Approving this email puts it in your mailbox as a draft. Nothing is sent.");
+  });
+
   it("is unchanged for none and unavailable", () => {
     expect(panel({ status: "none" })).toBe("");
     expect(panel({ status: "unavailable" })).toContain("couldn&#x27;t be loaded");

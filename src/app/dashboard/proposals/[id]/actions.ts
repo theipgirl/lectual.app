@@ -93,7 +93,7 @@ async function edit(
     return {
       saved: true,
       ...(current.status === "approved" && updated.status === "draft"
-        ? { notice: "Saved. This proposal was approved, so it is back to draft and needs approving again." }
+        ? { notice: "Saved. Its link wasn't live yet, so it is back to draft; create the link again when it's ready." }
         : {}),
     };
   } catch (err) {

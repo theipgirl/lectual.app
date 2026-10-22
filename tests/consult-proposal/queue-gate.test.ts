@@ -146,7 +146,7 @@ describe("approving a consult-agent email", () => {
   it("refuses while the linked proposal is still a draft", async () => {
     state.proposal = proposalRow("draft");
     const r = await approve();
-    expect(r.error).toBe("Approve the proposal first: open it, review it, and click Approve.");
+    expect(r.error).toBe("Create the proposal's link first: open it, review it, and click Save and create link.");
     expect(resolveQueueItem).not.toHaveBeenCalled();
     expect(sendProposal).not.toHaveBeenCalled();
   });
