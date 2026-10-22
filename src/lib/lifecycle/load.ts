@@ -111,6 +111,7 @@ export async function loadPipeline(now: Date = new Date()): Promise<PipelineLoad
         stageEnteredAt: lead.stage_entered_at,
         createdAt: lead.created_at,
         importedAt: lead.lawmatics_synced_at,
+        imported: Boolean(lead.lawmatics_id || lead.lawmatics_synced_at || lead.sheet_key),
         lastStageChangeAt: lastChange.get(lead.id) ?? null,
         now,
       });
@@ -155,7 +156,7 @@ export async function loadPipeline(now: Date = new Date()): Promise<PipelineLoad
     const stageMap = mapDocketStages(docketS.value);
     for (const m of mattersS.value) {
       const lead = m.lead_id ? leadById.get(m.lead_id) : undefined;
-      const age = stageAgeDisplay({ stageEnteredAt: m.stage_entered_at, createdAt: m.created_at, importedAt: m.lawmatics_synced_at, now });
+      const age = stageAgeDisplay({ stageEnteredAt: m.stage_entered_at, createdAt: m.created_at, importedAt: m.lawmatics_synced_at, imported: Boolean(m.lawmatics_id || m.lawmatics_synced_at), now });
       const client = leadDisplayName(lead) || m.owner_name?.trim() || matterLabel(m);
       cards.push({
         key: `m-${m.id}`,

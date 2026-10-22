@@ -3,7 +3,9 @@
  *
  * An import stamps `stage_entered_at` with the moment it ran, so every
  * imported lead read the same "61d in stage" whatever had happened to it. That
- * is the import date, not a stage entry. So:
+ * is the import date, not a stage entry. That only applies to a record that
+ * carries an import marker (`imported`); a form or manual record whose stage
+ * date equals its created time was simply created, so it counts days. So:
  *   1. a `stage_entered_at` that is NOT the created or Lawmatics-synced stamp was
  *      set on purpose (a move, a reconcile with the sheet's date, an Undo): count
  *      from it, whatever the activity log says;
@@ -22,6 +24,8 @@ export type StageAgeInput = {
   createdAt?: string | null;
   /** When the record was last pulled from Lawmatics, if it came from there. */
   importedAt?: string | null;
+  /** True when the record carries an import marker (Lawmatics id or sync, sheet key). Without one, nothing stamped its dates but the app. */
+  imported?: boolean;
   /** Newest `stage_changed` activity for this record, when the page read one. */
   lastStageChangeAt?: string | null;
   now: Date;
@@ -48,7 +52,7 @@ export function stageAgeDisplay(input: StageAgeInput): StageAgeDisplay {
   const change = ms(input.lastStageChangeAt);
   const usableChange = change !== null && change <= input.now.getTime() ? change : null;
   const stamps = [ms(input.createdAt), ms(input.importedAt)].filter((t): t is number => t !== null);
-  const isImportStamp = entered !== null && stamps.some((t) => Math.abs(t - entered) <= SAME_MOMENT_MS);
+  const isImportStamp = input.imported === true && entered !== null && stamps.some((t) => Math.abs(t - entered) <= SAME_MOMENT_MS);
   if (entered !== null && !isImportStamp) {
     const days = wholeDays(entered, input.now);
     return { days, label: daysInStageLabel(days), sinceImport: false };

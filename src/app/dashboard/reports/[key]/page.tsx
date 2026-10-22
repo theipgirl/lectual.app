@@ -13,7 +13,10 @@ import type { LinkTile, WaitingItem } from "@/lib/reports/waiting";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 
-export const metadata: Metadata = { title: pageTitle("Report") };
+export async function generateMetadata({ params }: { params: Promise<{ key: string }> }): Promise<Metadata> {
+  const { key } = await params;
+  return { title: pageTitle(isReportKey(key) ? REPORTS[key].label : "Report") };
+}
 
 export const dynamic = "force-dynamic";
 

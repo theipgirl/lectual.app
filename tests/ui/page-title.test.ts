@@ -48,6 +48,11 @@ describe("every dashboard page sets a title", () => {
   it.each(files)("%s exports metadata or generateMetadata", (file) => {
     expect(readFileSync(file, "utf8")).toMatch(/export (const metadata\b|async function generateMetadata\b)/);
   });
+  it("the reports page titles each tab from REPORTS[key].label, not a fixed 'Report'", () => {
+    const src = readFileSync("src/app/dashboard/reports/[key]/page.tsx", "utf8");
+    expect(src).toMatch(/pageTitle\(isReportKey\(key\) \? REPORTS\[key\]\.label/);
+    expect(src).not.toMatch(/metadata: Metadata = \{ title: pageTitle\("Report"\)/);
+  });
   it("lead and matter titles never use the service role", () => {
     for (const f of ["src/app/dashboard/leads/[id]/page.tsx", "src/app/dashboard/matters/[id]/page.tsx"]) {
       expect(readFileSync(f, "utf8")).not.toMatch(/db\/admin|getAdminClient/);
