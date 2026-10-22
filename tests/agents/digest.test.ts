@@ -89,3 +89,33 @@ describe("digest helpers", () => {
     expect(failureAction("lead read failed: x").label).toBe("Open the run log");
   });
 });
+
+describe("buildRunDigest: the Stage Keeper (Sprint 16, F16)", () => {
+  const d = (runs: DigestRun[]) => {
+    const out = buildRunDigest(runs, NOW);
+    if (out.status !== "ok") throw new Error("expected ok");
+    return out;
+  };
+
+  it("moves are items minus cards, and the line links to the filtered board", () => {
+    const line = d([run({ agent: "stage-keeper", items_in: 4, drafts_out: 1, summary: "counts" })]).lines[0];
+    expect(line).toMatchObject({
+      agent: "stage-keeper",
+      name: "Stage Keeper",
+      text: "moved 3 leads · 1 suggestion waiting on the lead page",
+      tone: "attention",
+      href: "/dashboard/intake/?view=board&agent=today",
+    });
+  });
+
+  it("singular and plural, moves alone, cards alone, and nothing to place", () => {
+    expect(d([run({ agent: "stage-keeper", items_in: 1, drafts_out: 0 })]).lines[0]).toMatchObject({ text: "moved 1 lead", tone: "ok" });
+    expect(d([run({ agent: "stage-keeper", items_in: 2, drafts_out: 2 })]).lines[0].text).toBe("2 suggestions waiting on the lead page");
+    expect(d([run({ agent: "stage-keeper", items_in: 0 })]).lines[0]).toMatchObject({ text: "found no lead to place", tone: "quiet" });
+  });
+
+  it("a failed run is reported with the run log as the place to look", () => {
+    const out = d([run({ agent: "stage-keeper", status: "error", error: "3 lead move(s) failed. 3 lead(s) read: 0 moved." })]);
+    expect(out.failures[0]).toMatchObject({ agent: "stage-keeper", text: "Stage Keeper couldn't finish its last run", action: { href: "/dashboard/agents/" } });
+  });
+});

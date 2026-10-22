@@ -136,3 +136,75 @@ describe("Paste or upload a transcript on the proposals page", () => {
   });
 });
 
+
+
+describe("proposals list page: paid marker and Mark paid on accepted rows (Sprint 19)", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-22T16:00:00Z"));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  const PAID = { paid: { state: "paid", by: "u-dawn", at: "2026-10-21T16:00:00Z" }, newest: { payload: { step: "paid_marked", outcome: "marked" }, created_at: "2026-10-21T16:00:00Z", actor: "staff", actor_user_id: "u-dawn" } };
+  const DAWN = [{ userId: "u-dawn", displayName: "Dawn Reyes", email: "dawn@example.com", role: "intake" }];
+  const rows = [item("c1", { status: "accepted", accepted_at: "2026-10-21T15:00:00Z" }), item("s1", { status: "sent", expires_on: "2026-10-30" }), item("a1")];
+  const buttons = (html: string) => [...html.matchAll(/<button[^>]*>([^<]*)<\/button>/g)].map((m) => m[1]);
+
+  it("an accepted row not yet paid shows 'Not paid' and a Mark paid button; no other row has either", async () => {
+    const html = await render({}, { rows });
+    expect(rowOf(html, "Client c1")).toContain("Not paid");
+    expect(buttons(rowOf(html, "Client c1"))).toEqual(["Mark paid"]);
+    for (const other of ["Client s1", "Client a1"]) {
+      expect(rowOf(html, other)).not.toMatch(/Not paid|Mark paid|Paid ·/);
+    }
+  });
+
+  it("a paid row shows 'Paid · marked by Dawn · Oct 21' and no Mark paid; Last activity reads 'Marked paid', not 'Edited'", async () => {
+    const html = await render({}, { rows, steps: { c1: PAID }, directory: DAWN, events: new Map([["c1", { type: "accepted", actor: "client", actor_user_id: null, created_at: "2026-10-21T15:00:00Z" }]]) });
+    const row = rowOf(html, "Client c1");
+    expect(row).toContain("Paid · marked by Dawn · Oct 21");
+    expect(buttons(row)).toEqual([]);
+    expect(row).toMatch(/Marked paid [^<]*· Dawn/);
+    expect(row).not.toContain("Edited");
+  });
+
+  it("an unreadable step history is 'Paid status couldn't be read' with no button, never 'Not paid'", async () => {
+    const html = await render({}, { rows, steps: "fail" });
+    const row = rowOf(html, "Client c1");
+    expect(row).toContain("Paid status couldn&#x27;t be read");
+    expect(row).not.toContain("Not paid");
+    expect(buttons(row)).toEqual([]);
+    // The rest of the page is fine.
+    expect(rowOf(html, "Client s1")).toContain("Client s1");
+  });
+
+  it.each(["paralegal", "attorney", "viewer", "social_media", null])("a %s sees the marker and no Mark paid button", async (role) => {
+    const html = await render({}, { rows, role });
+    expect(rowOf(html, "Client c1")).toContain("Not paid");
+    expect(buttons(rowOf(html, "Client c1"))).toEqual([]);
+  });
+
+  it.each(["owner", "admin", "senior_admin", "intake"])("a %s gets the Mark paid button", async (role) => {
+    expect(buttons(rowOf(await render({}, { rows, role }), "Client c1"))).toEqual(["Mark paid"]);
+  });
+
+  it("a page with no accepted rows makes no step read", async () => {
+    const html = await render({}, { rows: [item("a1")], steps: "fail" });
+    expect(html).toContain("Client a1");
+    expect(html).not.toContain("couldn&#x27;t be read");
+  });
+
+  it("the paid marker and the proposal page agree for the same events (both read paidStateFromEvents)", async () => {
+    const { paidStateFromEvents } = await import("@/lib/proposals/paid");
+    const { paidMarker } = await import("@/lib/proposals/paid-view");
+    const events = [
+      { created_at: "2026-10-21T16:00:00Z", actor_user_id: "u-dawn", payload: { step: "paid_marked", outcome: "marked" } },
+      { created_at: "2026-10-21T17:00:00Z", actor_user_id: "u-dawn", payload: { step: "paid_undone", outcome: "undone" } },
+    ];
+    const state = paidStateFromEvents(events);
+    const marker = paidMarker(state, new Map(), "America/New_York");
+    const html = await render({}, { rows, steps: { c1: { paid: state, newest: null } } });
+    expect(rowOf(html, "Client c1")).toContain(marker.label);
+  });
+});

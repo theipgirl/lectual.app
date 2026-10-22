@@ -327,7 +327,7 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
           )}
 
           {(followUp || (matter.type === "TM" && hasAgentToolkit)) && canWrite && (
-            <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }}>
+            <section id="client-updates" className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }}>
               <h2 className="lx-h2" style={{ fontSize: 23 }}>
                 Client updates
               </h2>

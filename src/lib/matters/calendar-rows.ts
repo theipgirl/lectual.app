@@ -3,15 +3,14 @@ import type { UpcomingDeadline } from "./deadlines";
 import type { Task } from "./tasks";
 
 /**
- * Docket deadline + task due-date merge — the ONE calendar-shaped list this
- * app can honestly build today. There is no external-calendar or
- * consult-booking source wired into the dashboard (no Microsoft Graph /
- * Lawmatics event-booking integration, and crm_discovery_session only holds
- * retrospective started_at/ended_at for sessions that already happened) — so
- * this merges exactly two sources: crm_matter_deadline (listUpcomingDeadlines)
- * and crm_task due dates (listTasks). Both the Ops Home "Deadlines" card and
- * the Calendar page read through this module so there is exactly one place
- * that turns those two reads into one sorted, honestly-labelled list.
+ * Docket deadline + task due-date merge: the two sources that are dated by
+ * CIVIL date (no time of day, no zone). It merges crm_matter_deadline
+ * (listUpcomingDeadlines) and crm_task due dates (listTasks). Timed events,
+ * such as consults read from a connected Outlook calendar, are a separate read
+ * (src/lib/calendar/outlook-read.ts) and are merged in by the Calendar page,
+ * not here. Both the Ops Home "Deadlines" card and the Calendar page read
+ * through this module so there is exactly one place that turns those two reads
+ * into one sorted, honestly-labelled list.
  */
 
 const MS_PER_DAY = 86_400_000;

@@ -61,7 +61,14 @@ const EVIDENCE: ProposalEventRow = {
   created_at: "2026-10-18T12:01:00Z",
 };
 
-async function render(proposal: ProposalRow, events: ProposalEventRow[], strip: unknown = { status: "none" }) {
+type Extra = {
+  role?: string;
+  /** The version's step events (Sprint 19); "fail" = the read fails. */
+  steps?: Array<Record<string, unknown>> | "fail";
+  members?: unknown[];
+};
+
+async function render(proposal: ProposalRow, events: ProposalEventRow[], strip: unknown = { status: "none" }, extra: Extra = {}) {
   const stub = (name: string) => {
     const Stub = () => createElement("div", { "data-stub": name });
     Stub.displayName = `Stub(${name})`;
@@ -70,21 +77,26 @@ async function render(proposal: ProposalRow, events: ProposalEventRow[], strip: 
   const loadStrip = vi.fn(async () => strip);
   vi.doMock("@/app/dashboard/proposals/gate", () => ({ requireProposalsModule: vi.fn(async () => undefined) }));
   vi.doMock("@/lib/firm/session", () => ({
-    resolveFirmSession: vi.fn(async () => ({ kind: "ok", role: "owner", org: { id: "o", name: "RPB Law", slug: "rpb" }, user: { id: "u" } })),
+    resolveFirmSession: vi.fn(async () => ({ kind: "ok", role: extra.role ?? "owner", org: { id: "o", name: "RPB Law", slug: "rpb" }, user: { id: "u" } })),
   }));
   vi.doMock("@/lib/org/profile", () => ({ getFirmTimeZone: vi.fn(async () => "America/New_York") }));
-  vi.doMock("@/lib/members/directory", () => ({ listMemberDirectory: vi.fn(async () => []) }));
+  vi.doMock("@/lib/members/directory", () => ({ listMemberDirectory: vi.fn(async () => extra.members ?? []) }));
   vi.doMock("@/lib/site-origin", () => ({ getSiteOrigin: vi.fn(async () => "https://app.example") }));
   vi.doMock("@/lib/proposals/store", () => ({
     getProposal: vi.fn(async (): Promise<ProposalDetail> => ({ proposal, versions: [], events })),
     getProposalSettings: vi.fn(async () => null),
     isCurrentUserApprover: vi.fn(async () => false),
+    listProposalStepEvents: vi.fn(async () => (extra.steps === "fail" ? { ok: false } : { ok: true, events: extra.steps ?? [] })),
   }));
   vi.doMock("@/lib/consult-proposal/link", () => ({ GOES_LIVE_ON_APPROVAL: "x", proposalSendBlock: vi.fn(async () => ({ blocked: false })) }));
   vi.doMock("@/lib/proposals/consult-strip-load", () => ({ loadConsultStrip: loadStrip }));
   vi.doMock("@/components/client-proposal/ProposalDocument", () => ({ ProposalDocument: stub("document") }));
   vi.doMock("@/components/proposal-editor/Lifecycle", () => ({ Lifecycle: stub("lifecycle") }));
-  vi.doMock("@/components/proposal-editor/ActionForm", () => ({ IssueList: stub("issues") }));
+  vi.doMock("@/components/proposal-editor/ActionForm", async (importOriginal) => ({
+    ...(await importOriginal<typeof import("@/components/proposal-editor/ActionForm")>()),
+    IssueList: stub("issues"),
+  }));
+  vi.doMock("@/app/dashboard/proposals/[id]/paid-actions", () => ({ markPaidAction: vi.fn(), undoPaidAction: vi.fn(), retryUploadAction: vi.fn() }));
   vi.doMock("@/components/proposal-editor/Sections", () => ({
     AddNameForm: stub("add-name"),
     AdjustmentsForm: stub("adjustments"),
@@ -178,5 +190,121 @@ describe("LinkedProposalPanel (queue item page)", () => {
   it("is unchanged for none and unavailable", () => {
     expect(panel({ status: "none" })).toBe("");
     expect(panel({ status: "unavailable" })).toContain("couldn&#x27;t be loaded");
+  });
+});
+
+
+/* ─────────────────────────── Sprint 19: payment and follow-up ─────────────────────────── */
+
+describe("proposal detail page: the payment panel on an accepted version", () => {
+  beforeEach(() => vi.resetModules());
+
+  const accepted = (over: Partial<ProposalRow> = {}) => row({ status: "accepted", accepted_at: "2026-10-21T15:00:00Z", ...over });
+  const step = (stepName: string, outcome: string, at: string, extra: Record<string, unknown> = {}, reason?: string) => ({
+    proposal_id: ID,
+    type: "edited",
+    actor: "staff",
+    actor_user_id: "u-dawn",
+    created_at: at,
+    payload: { step: stepName, outcome, ...(reason ? { reason } : {}), ...extra },
+  });
+  const MARKED = step("paid_marked", "marked", "2026-10-21T16:00:00Z");
+  const DAWN = [{ userId: "u-dawn", displayName: "Dawn Reyes", email: "dawn@example.com", role: "intake" }];
+  const buttons = (html: string) => [...html.matchAll(/<button[^>]*>([^<]*)<\/button>/g)].map((m) => m[1]);
+
+  it.each(["draft", "approved", "sent", "superseded", "withdrawn"] as const)("a %s version has no payment panel and no step read", async (status) => {
+    const { html } = await render(row({ status }), []);
+    expect(html).not.toContain("Payment and follow-up");
+    expect(html).not.toContain("Mark paid");
+  });
+
+  it("an accepted version, not yet paid, offers Mark paid to an owner and says it is by hand", async () => {
+    const { html } = await render(accepted(), [], undefined, { steps: [] });
+    expect(html).toContain("Payment and follow-up");
+    expect(html).toContain("Not paid");
+    expect(buttons(html)).toContain("Mark paid");
+    expect(html).toContain("Marked by hand. LawPay isn&#x27;t connected to proposals yet.");
+  });
+
+  it("paid: 'Paid · marked by Dawn · Oct 21' (first name from the member directory) and Undo", async () => {
+    const { html } = await render(accepted(), [], undefined, { steps: [MARKED], members: DAWN, role: "intake" });
+    expect(html).toContain("Paid · marked by Dawn · Oct 21");
+    expect(buttons(html)).toContain("Undo");
+    expect(buttons(html)).not.toContain("Mark paid");
+  });
+
+  it("a teammate who can't be named is left out of 'marked by', never shown as an id", async () => {
+    const { html } = await render(accepted(), [], undefined, { steps: [MARKED], members: [] });
+    expect(html).toContain("Paid · Oct 21");
+    expect(html).not.toContain("u-dawn");
+    expect(html).not.toContain("A teammate");
+  });
+
+  it("paid then undone: back to Not paid, Mark paid offered again", async () => {
+    const { html } = await render(accepted(), [], undefined, { steps: [MARKED, step("paid_undone", "undone", "2026-10-21T17:00:00Z")], members: DAWN });
+    expect(html).toContain("Not paid");
+    expect(buttons(html)).toContain("Mark paid");
+  });
+
+  it("an unreadable step history says so, offers no Mark paid, and never says Not paid", async () => {
+    const { html } = await render(accepted(), [], undefined, { steps: "fail" });
+    expect(html).toContain("Paid status couldn&#x27;t be read");
+    expect(html).not.toContain("Not paid");
+    expect(buttons(html)).not.toContain("Mark paid");
+    expect(buttons(html)).not.toContain("Undo");
+  });
+
+  it.each(["paralegal", "attorney", "viewer", "social_media"])("a %s sees the state but no buttons", async (role) => {
+    const { html } = await render(accepted(), [], undefined, { steps: [MARKED], members: DAWN, role });
+    expect(html).toContain("Paid · marked by Dawn");
+    expect(buttons(html)).not.toContain("Undo");
+    expect(buttons(html)).not.toContain("Mark paid");
+    expect(buttons(html)).not.toContain("Retry");
+  });
+
+  it("walks the whole story: queued letter with a queue link, then approved and uploaded", async () => {
+    const queued = step("loe_draft", "queued", "2026-10-21T16:01:00Z", { queue_item_id: "q_abc-1" });
+    const before = await render(accepted(), [], undefined, { steps: [MARKED, queued], members: DAWN });
+    expect(before.html).toContain("Engagement letter draft queued for approval.");
+    expect(before.html).toContain('href="/dashboard/queue/q_abc-1/"');
+    expect(before.html).toContain("Waiting for approval in the queue");
+
+    vi.resetModules();
+    const after = await render(accepted(), [], undefined, { steps: [MARKED, queued, step("loe_file_upload", "uploaded", "2026-10-21T18:00:00Z")], members: DAWN });
+    expect(after.html).toContain("LOE file uploaded to Lawmatics.");
+    expect(after.html).not.toContain("Waiting for approval in the queue");
+  });
+
+  it("the unknown-package case shows 'Choose the LOE template' linking to the LOE form (matter linked)", async () => {
+    const blocked = step("loe_draft", "blocked", "2026-10-21T16:01:00Z", { code: "unknown_package" }, "This package isn't on the firm's current package list, so no engagement letter was drafted.");
+    const { html } = await render(accepted({ matter_id: "matter-7" }), [], undefined, { steps: [MARKED, blocked] });
+    expect(html).toContain("Choose the LOE template");
+    expect(html).toContain('href="/dashboard/documents/new/matter-7/loe/"');
+  });
+
+  it("no matter: 'Open the matter to draft the LOE.'", async () => {
+    const blocked = step("loe_draft", "blocked", "2026-10-21T16:01:00Z", { code: "no_matter" }, "Open the matter to draft the LOE.");
+    const { html } = await render(accepted({ matter_id: null }), [], undefined, { steps: [MARKED, blocked] });
+    expect(html).toContain("Open the matter to draft the LOE.");
+  });
+
+  it("the history lists accepted, the firm notice, the note, marked paid (by whom), the LOE draft and an undo, in words and newest first", async () => {
+    const at = (m: number) => `2026-10-21T16:${String(m).padStart(2, "0")}:00Z`;
+    const ev = (id: string, type: string, actor: string, payload: Record<string, unknown>, m: number) =>
+      ({ id, org_id: "o", proposal_id: ID, family_id: ID, type, actor, actor_user_id: actor === "staff" ? "u-dawn" : null, payload, created_at: at(m) }) as ProposalEventRow;
+    const events = [
+      ev("e7", "edited", "staff", { step: "paid_undone", outcome: "undone" }, 7),
+      ev("e6", "edited", "staff", { step: "loe_draft", outcome: "queued" }, 6),
+      ev("e5", "edited", "staff", { step: "paid_marked", outcome: "marked" }, 5),
+      ev("e4", "edited", "system", { step: "lawmatics_note", outcome: "added" }, 4),
+      ev("e3", "edited", "system", { step: "accept_notice", outcome: "sent" }, 3),
+      ev("e2", "accepted", "client", {}, 2),
+    ];
+    const { html } = await render(accepted(), events, undefined, { steps: [], members: DAWN });
+    const order = ["accepted the proposal", "sent the firm an in-app notice", "added a note to Lawmatics", "<strong>Dawn</strong> marked it paid by hand", "queued the engagement letter draft", "undid the paid mark"].map((t) => html.indexOf(t));
+    expect(order.every((n) => n > -1)).toBe(true);
+    // Newest first: the undo is listed before the acceptance.
+    expect([...order].sort((a, b) => b - a)).toEqual(order);
+    expect(html).not.toContain("edited the proposal");
   });
 });

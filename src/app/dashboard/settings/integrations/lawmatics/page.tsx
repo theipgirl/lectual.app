@@ -4,7 +4,10 @@ import { resolveFirmSession } from "@/lib/firm/session";
 import { hasRole } from "@/lib/auth/roles";
 import { getLawmaticsConnection } from "@/lib/lawmatics/connection";
 import { relativeTime } from "@/lib/relative-time";
+import { orgHasModule } from "@/lib/org/modules";
+import { loadLawmaticsCustomFields, loadLoeFieldsConfig } from "@/lib/proposals/loe-fields-load";
 import { ClientsImport, ConnectLawmatics, DisconnectLawmatics, MattersImport } from "@/components/lawmatics/LawmaticsImport";
+import { LoeFieldsForm } from "@/components/lawmatics/LoeFieldsForm";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +24,10 @@ export default async function LawmaticsPage() {
   const read = await getLawmaticsConnection();
   const conn = read.ok ? read.connection : null;
   const active = conn?.status === "active";
+
+  // "LOE fields" belongs to the proposals module and to the admin tier; for anyone else the section is not drawn.
+  const showLoeFields = canManage && (await orgHasModule("proposals"));
+  const [loeConfig, loeOptions] = showLoeFields ? await Promise.all([loadLoeFieldsConfig(), active ? loadLawmaticsCustomFields() : Promise.resolve(null)]) : [null, null];
 
   return (
     <>
@@ -98,6 +105,37 @@ export default async function LawmaticsPage() {
             <MattersImport />
           </section>
         </>
+      )}
+
+      {showLoeFields && loeConfig && (
+        <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }} aria-label="LOE fields">
+          <div>
+            <h2 className="lx-h2" style={{ fontSize: 23 }}>
+              LOE fields
+            </h2>
+            <p className="lx-note" style={{ margin: "4px 0 0" }}>
+              Off unless you switch it on. When a proposal is marked paid, the engagement letter&apos;s figures are written to the matter&apos;s custom fields in
+              Lawmatics, so a Lawmatics automation can build the e-sign draft from them. The legal fee and the USPTO fees go in separate fields. Nothing here moves a
+              stage or sends anything.
+            </p>
+          </div>
+          {loeConfig.status === "unavailable" ? (
+            <p role="alert" className="lx-banner lx-banner-risk" style={{ margin: 0 }}>
+              We couldn&apos;t read your proposal settings. This is a problem reaching the database, not a sign that the setting is off. Try again shortly.
+            </p>
+          ) : (
+            <>
+              {loeOptions === null && (
+                <p className="lx-banner lx-banner-warn" style={{ margin: 0 }}>
+                  {active
+                    ? "Your Lawmatics custom fields couldn't be loaded just now. Your saved matches are kept; only the switch can be changed until the list loads."
+                    : "Connect Lawmatics above to pick from your custom fields. Your saved matches are kept."}
+                </p>
+              )}
+              <LoeFieldsForm config={loeConfig.config} options={loeOptions} />
+            </>
+          )}
+        </section>
       )}
     </>
   );

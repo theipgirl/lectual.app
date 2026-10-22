@@ -20,6 +20,7 @@ import {
 } from "@/lib/intake/views";
 import Popover, { PopoverItem } from "./Popover";
 import NeedsRebeccaBadge from "./NeedsRebeccaBadge";
+import AgentMoveChip from "./AgentMoveChip";
 import SourceCell from "./SourceCell";
 import { temperatureLabel, temperatureTitle } from "@/lib/intake/effective-temperature";
 import {
@@ -215,6 +216,12 @@ export default function IntakeCard({
       {pendingDrafts.length > 0 && (
         <div>
           <NeedsRebeccaBadge pending={pendingDrafts} />
+        </div>
+      )}
+
+      {row.agentMove && (
+        <div style={{ minWidth: 0 }}>
+          <AgentMoveChip move={row.agentMove} />
         </div>
       )}
 

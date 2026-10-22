@@ -72,7 +72,7 @@ export const NAV: readonly NavItem[] = [
   { slug: "portals", label: "Client portals", href: "/dashboard/portals/", icon: ICON.users, step: 6, built: false },
   { slug: "copilot", label: "AI copilot", href: "/dashboard/copilot/", icon: ICON.spark, step: 7 },
   { slug: "agents", label: "Agents", href: "/dashboard/agents/", icon: ICON.bolt, module: "agents", step: 5 },
-  { slug: "skills", label: "Skills", href: "/dashboard/skills/", icon: ICON.cycle, step: 7, built: false },
+  { slug: "skills", label: "Skills", href: "/dashboard/skills/", icon: ICON.cycle, module: "agent-toolkit", step: 7 },
   { slug: "brain", label: "Firm brain", href: "/dashboard/brain/", icon: ICON.globe, step: 7 },
   { slug: "settings", label: "Settings", href: "/dashboard/settings/", icon: ICON.sliders, step: 3 },
 ];

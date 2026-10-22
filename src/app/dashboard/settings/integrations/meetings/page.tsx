@@ -6,6 +6,10 @@ import { listMeetingConnections, type MeetingConnection } from "@/lib/meetings/c
 import { fathomReady, zoomSetup } from "@/lib/meetings/config";
 import { relativeTime } from "@/lib/relative-time";
 import { ConnectFathomForm, DisconnectSourceButton, ImportNowButton } from "@/components/meetings/MeetingForms";
+import { HelpText } from "@/components/integrations/HelpText";
+import { IntegrationHeader } from "@/components/integrations/IntegrationHeader";
+import { stateForStatus, type IntegrationState } from "@/components/integrations/states";
+import { ZOOM_NOT_SWITCHED_ON } from "@/lib/integrations/copy";
 
 export const dynamic = "force-dynamic";
 
@@ -19,13 +23,10 @@ const ERRORS: Record<string, string> = {
   failed: "Zoom sign-in didn't complete. Try again.",
 };
 
-function StatusLine({ c }: { c: MeetingConnection }) {
-  return (
-    <div className="lx-note">
-      {c.account_hint ?? "Connected"} · connected {relativeTime(c.created_at)}
-      {c.last_import_at ? ` · last import ${relativeTime(c.last_import_at)}` : " · not imported yet"}
-    </div>
-  );
+function statusLine(c: MeetingConnection): string {
+  return `${c.account_hint ?? "Connected"} · connected ${relativeTime(c.created_at)}${
+    c.last_import_at ? ` · last import ${relativeTime(c.last_import_at)}` : " · not imported yet"
+  }`;
 }
 
 /**
@@ -45,6 +46,9 @@ export default async function MeetingsIntegrationPage({ searchParams }: { search
   const zoom = conns.find((c) => c.provider === "zoom") ?? null;
   const zoomReady = zoomSetup().ready;
   const canSeal = fathomReady();
+  // A failed read is "couldn't check", never "not connected".
+  const fathomState: IntegrationState = fathom ? stateForStatus(fathom.status) : read.ok ? "not-connected" : "couldnt-check";
+  const zoomState: IntegrationState = zoom ? stateForStatus(zoom.status) : !zoomReady ? "not-available" : read.ok ? "not-connected" : "couldnt-check";
 
   return (
     <>
@@ -76,31 +80,27 @@ export default async function MeetingsIntegrationPage({ searchParams }: { search
         </div>
       )}
 
-      <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }} aria-labelledby="fathom-title">
-        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-          <div style={{ flex: 1, minWidth: 220 }}>
-            <h2 id="fathom-title" className="lx-h2" style={{ fontSize: 23 }}>
-              Fathom
-            </h2>
-            {fathom ? <StatusLine c={fathom} /> : <div className="lx-note">Not connected.</div>}
-          </div>
-          {fathom && <span className={`lx-pill ${fathom.status === "active" ? "lx-pill-ok" : "lx-pill-risk"}`}>{fathom.status === "active" ? "Connected" : "Reconnect"}</span>}
+      <section className="lx-card lxi-card" aria-labelledby="fathom-title">
+        <IntegrationHeader
+          id="fathom-title"
+          title="Fathom"
+          state={fathomState}
+          help={fathom ? statusLine(fathom) : read.ok ? "Not connected." : "We couldn't check this connection just now."}
+        >
           {fathom && canManage && <DisconnectSourceButton provider="fathom" label="Fathom" />}
-        </div>
+        </IntegrationHeader>
         {fathom?.status === "reauth" && (
           <p className="lx-banner lx-banner-risk" style={{ margin: 0 }}>
             Fathom stopped accepting this key. Paste a new one to keep importing.
           </p>
         )}
         {fathom?.last_error && fathom.status === "active" && (
-          <p className="lx-note" style={{ margin: 0, color: "var(--wine)" }}>
-            Last run: {fathom.last_error}
-          </p>
+          <HelpText tone="problem">Last run: {fathom.last_error}</HelpText>
         )}
         {!canManage ? (
-          <p className="lx-note" style={{ margin: 0 }}>Owners and admins connect Fathom and run imports.</p>
+          <HelpText>Owners and admins connect Fathom and run imports.</HelpText>
         ) : !canSeal ? (
-          <p className="lx-note" style={{ margin: 0 }}>Not available yet: this deployment has no encryption key for stored credentials.</p>
+          <HelpText>Not available yet: this deployment has no encryption key for stored credentials.</HelpText>
         ) : fathom?.status === "active" ? (
           <>
             <ImportNowButton provider="fathom" />
@@ -111,38 +111,29 @@ export default async function MeetingsIntegrationPage({ searchParams }: { search
           </>
         ) : (
           <>
-            <p className="lx-note" style={{ margin: 0 }}>
+            <HelpText>
               In Fathom, open <b>Settings → API Access</b> and generate a key. The key sees the meetings its owner recorded or that were shared with
               them or their team, so generate it from the account that records your consults.
-            </p>
+            </HelpText>
             <ConnectFathomForm reconnect={!!fathom} />
           </>
         )}
       </section>
 
-      <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }} aria-labelledby="zoom-title">
-        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-          <div style={{ flex: 1, minWidth: 220 }}>
-            <h2 id="zoom-title" className="lx-h2" style={{ fontSize: 23 }}>
-              Zoom
-            </h2>
-            {zoom ? <StatusLine c={zoom} /> : <div className="lx-note">Not connected.</div>}
-          </div>
-          {zoom && <span className={`lx-pill ${zoom.status === "active" ? "lx-pill-ok" : "lx-pill-risk"}`}>{zoom.status === "active" ? "Connected" : "Reconnect"}</span>}
+      <section className="lx-card lxi-card" aria-labelledby="zoom-title">
+        <IntegrationHeader
+          id="zoom-title"
+          title="Zoom"
+          state={zoomState}
+          help={zoom ? statusLine(zoom) : read.ok ? "Not connected." : "We couldn't check this connection just now."}
+        >
           {zoom && canManage && <DisconnectSourceButton provider="zoom" label="Zoom" />}
-        </div>
-        {zoom?.last_error && (
-          <p className="lx-note" style={{ margin: 0, color: "var(--wine)" }}>
-            {zoom.status === "active" ? "Last run: " : ""}
-            {zoom.last_error}
-          </p>
-        )}
+        </IntegrationHeader>
+        {zoom?.last_error && <HelpText tone="problem">{`${zoom.status === "active" ? "Last run: " : ""}${zoom.last_error}`}</HelpText>}
         {!zoomReady ? (
-          <p className="lx-note" style={{ margin: 0 }}>
-            Not available yet — Lectual&apos;s Zoom sign-in isn&apos;t set up on this deployment. Fathom works today.
-          </p>
+          <HelpText>{ZOOM_NOT_SWITCHED_ON}</HelpText>
         ) : !canManage ? (
-          <p className="lx-note" style={{ margin: 0 }}>Owners and admins connect Zoom and run imports.</p>
+          <HelpText>Owners and admins connect Zoom and run imports.</HelpText>
         ) : (
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-start" }}>
             {zoom?.status === "active" && <ImportNowButton provider="zoom" />}
@@ -153,10 +144,10 @@ export default async function MeetingsIntegrationPage({ searchParams }: { search
             )}
           </div>
         )}
-        <p className="lx-note" style={{ margin: 0 }}>
+        <HelpText>
           Imports cloud recordings of meetings the signed-in Zoom user hosted, with their transcript once Zoom has made one (cloud recording and
           audio transcripts must be on in Zoom).
-        </p>
+        </HelpText>
       </section>
 
       <section className="lx-card lx-facts">

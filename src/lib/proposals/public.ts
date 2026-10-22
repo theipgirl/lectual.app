@@ -1,7 +1,9 @@
 import "server-only";
 
+import { after } from "next/server";
 import { getAdminClient } from "@/lib/db/admin";
 import { resolveTimeZone } from "@/lib/org/profile-rules";
+import { runAcceptanceFollowups, type FollowupDb } from "./accept-followups";
 import { isProposalExpired } from "./expiry";
 import { normalizeSelection, quoteHasItems, quoteProposal } from "./pricing";
 import {
@@ -45,7 +47,8 @@ import {
  *   TICKING BOXES      nothing. The pick lives on the client's page.
  *   ACCEPTING          one conditional update (`status = 'sent'` -> accepted,
  *                      with `accepted_selection` and `accepted_snapshot`) that
- *                      cannot fire twice, then a best-effort firm notice.
+ *                      cannot fire twice, then, after the response, the firm
+ *                      notice and the Lawmatics note (accept-followups.ts).
  * The `accepted` EVENT is written by the 0089 trigger in the same transaction
  * as the status change (it knows the actor), so it is not written here: a
  * second one would double every acceptance in the firm's log.
@@ -590,7 +593,7 @@ export async function acceptPublicProposal(
       return refuse("already_resolved");
     }
 
-    await notifyFirmOfAcceptance({ proposalId });
+    await notifyFirmOfAcceptance({ proposalId, orgId }, client);
 
     const payUrl = asNullableString((data[0] as Record<string, unknown>).pay_url);
     return { ok: true, payUrl, acceptedAt, quote, proposalId };
@@ -600,21 +603,25 @@ export async function acceptPublicProposal(
 }
 
 /**
- * TODO(notify): email the firm that a client accepted, to
- * `client_proposal_setting.notify_email`. lectual.app has no outbound email
- * client yet (`src/lib/env.ts` has no Resend key), and adding a deployment-wide
- * secret is a decision for the owner, not for this module. Until then this logs
- * the fact and nothing else: no client name, no amounts, no token. The
- * acceptance itself is already durable and visible (the trigger-written
- * `accepted` event, and the proposal's status).
+ * After the client has accepted: tell the firm (an in-app notice to the approvers and
+ * the intake staff) and add a note in the firm's Lawmatics, each step recorded on the
+ * proposal's timeline. Scheduled with `after()` so the client's response never waits
+ * for Lawmatics; where there is no request to attach it to (a test, a script) it is
+ * awaited instead. Best-effort by contract: it never throws into the acceptance, and
+ * the acceptance's result is the same whatever happens here.
  *
- * Best-effort by contract: it must never throw into the acceptance, and a
- * future implementation must keep that.
+ * The service-role connection is the one this module already holds; the follow-ups
+ * take it as an argument and stamp the proposal row's OWN org.
  */
-export async function notifyFirmOfAcceptance(input: { proposalId: string }): Promise<void> {
+export async function notifyFirmOfAcceptance(input: { proposalId: string; orgId: string }, db: PublicProposalsDb): Promise<void> {
+  const run = () => runAcceptanceFollowups(db as unknown as FollowupDb, input).catch(() => {});
   try {
-    console.info(JSON.stringify({ event: "proposal_accepted", proposal_id: input.proposalId }));
+    after(run);
   } catch {
-    // Never let a notice break an acceptance.
+    try {
+      await run();
+    } catch {
+      // Never let a notice break an acceptance.
+    }
   }
 }

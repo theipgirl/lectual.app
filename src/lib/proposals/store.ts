@@ -5,6 +5,7 @@ import { ROLES, type Role } from "@/lib/auth/roles";
 import { changedColumns, contentChanges, type EditableColumn } from "./diff";
 import { friendlyProposalError, ProposalError } from "./errors";
 import { defaultSelection, quoteProposal } from "./pricing";
+import { PROPOSAL_STEPS, paidStateFromEvents, readStep, type PaidState, type StepEventInput, type StepPayload } from "./paid";
 import { offeredPackages, type OfferedPackage } from "./segments";
 import {
   PROPOSAL_ADMIN_ROLES,
@@ -308,6 +309,22 @@ async function writeProposalEventSafe(
   actorUserId: string | null,
   payload: Record<string, unknown>,
 ): Promise<void> {
+  await writeProposalEventChecked(db, proposal, type, actor, actorUserId, payload);
+}
+
+/**
+ * The same write, and it says whether the line landed. For the Sprint 19 steps, whose
+ * timeline entry is the record itself (the paid mark IS its event): "the step ran but its
+ * log line did not land" is something the person is told, not something swallowed.
+ */
+async function writeProposalEventChecked(
+  db: ProposalsDbClient,
+  proposal: Pick<ProposalRow, "id" | "org_id" | "family_id">,
+  type: ProposalEventType,
+  actor: ProposalEventActor,
+  actorUserId: string | null,
+  payload: Record<string, unknown>,
+): Promise<boolean> {
   try {
     const { error } = await db.from("client_proposal_event").insert({
       org_id: proposal.org_id,
@@ -319,9 +336,110 @@ async function writeProposalEventSafe(
       payload,
     });
     if (error) console.error(`[proposals] failed to record ${type} event proposal=${proposal.id}`, error.code);
+    return !error;
   } catch (err) {
     console.error(`[proposals] failed to record ${type} event proposal=${proposal.id}`, err);
+    return false;
   }
+}
+
+/* ─────────────────────────── paid, and the follow-up steps (Sprint 19) ──── */
+
+/**
+ * Writes one step as a staff `edited` event for the signed-in user (the only kind of event
+ * 0089 lets staff insert), and returns whether it landed. No user, no write: a step is never
+ * recorded without someone to attribute it to. The org and family are read off the proposal
+ * row the caller loaded through its own scoped client.
+ */
+export async function recordProposalStep(proposal: Pick<ProposalRow, "id" | "org_id" | "family_id">, payload: StepPayload): Promise<boolean> {
+  const supabase = await getScopedClient();
+  const userId = await currentUserId(supabase);
+  if (!userId) return false;
+  return writeProposalEventChecked(proposalsDb(supabase), proposal, "edited", "staff", userId, payload);
+}
+
+/** One version by id, through the caller's own scoped client. Null when it isn't visible to this firm (or the id is malformed). Throws on a failed read. */
+export async function getProposalRow(id: string): Promise<ProposalRow | null> {
+  if (typeof id !== "string" || !UUID_PATTERN.test(id)) return null;
+  const supabase = await getScopedClient();
+  const { data, error } = await proposalsDb(supabase).from("client_proposal").select(PROPOSAL_COLUMNS).eq("id", id).maybeSingle();
+  if (error) throw friendlyProposalError(error, "load the proposal");
+  return (data as ProposalRow | null) ?? null;
+}
+
+export type ProposalStepEvent = StepEventInput & { proposal_id: string; actor: string; actor_user_id: string | null };
+export type StepEventsRead = { ok: true; events: ProposalStepEvent[] } | { ok: false };
+
+/**
+ * The step events of one version, newest first. Two-way on purpose: `{ ok: false }` is a
+ * read that failed, which the page shows as "Paid status couldn't be read", never as "Not paid".
+ */
+export async function listProposalStepEvents(proposalId: string): Promise<StepEventsRead> {
+  if (typeof proposalId !== "string" || !UUID_PATTERN.test(proposalId)) return { ok: false };
+  try {
+    const supabase = await getScopedClient();
+    const { data, error } = await proposalsDb(supabase)
+      .from("client_proposal_event")
+      .select("proposal_id, type, actor, actor_user_id, payload, created_at")
+      .eq("proposal_id", proposalId)
+      .in("payload->>step", PROPOSAL_STEPS)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (error) return { ok: false };
+    return { ok: true, events: (Array.isArray(data) ? data : []) as ProposalStepEvent[] };
+  } catch {
+    return { ok: false };
+  }
+}
+
+export type StepActivity = {
+  paid: PaidState;
+  /** The newest step event (any step), for the list's Last activity cell; null when there is none. */
+  newest: { payload: unknown; created_at: string; actor: string; actor_user_id: string | null } | null;
+};
+
+/**
+ * Paid state and newest step event for each listed version. Named columns, chunked
+ * `in(...)`, THROWS when a read fails: the list shows "Couldn't read", it never treats a
+ * failure as "Not paid".
+ */
+export async function listStepActivity(proposalIds: readonly string[]): Promise<Map<string, StepActivity>> {
+  const out = new Map<string, StepActivity>();
+  const ids = [...new Set(proposalIds)].filter((id) => UUID_PATTERN.test(id));
+  if (ids.length === 0) return out;
+  const supabase = await getScopedClient();
+  const db = proposalsDb(supabase);
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += EVENT_ID_CHUNK) chunks.push(ids.slice(i, i + EVENT_ID_CHUNK));
+  const reads = await Promise.all(
+    chunks.map((chunk) =>
+      db
+        .from("client_proposal_event")
+        .select("proposal_id, type, actor, actor_user_id, payload, created_at")
+        .in("proposal_id", chunk)
+        .in("payload->>step", PROPOSAL_STEPS)
+        .order("created_at", { ascending: false })
+        .limit(500),
+    ),
+  );
+  const byProposal = new Map<string, ProposalStepEvent[]>();
+  for (const { data, error } of reads) {
+    if (error) throw friendlyProposalError(error, "load the paid status");
+    for (const row of (Array.isArray(data) ? data : []) as ProposalStepEvent[]) {
+      byProposal.set(row.proposal_id, [...(byProposal.get(row.proposal_id) ?? []), row]);
+    }
+  }
+  for (const id of ids) {
+    const events = byProposal.get(id) ?? [];
+    const newest = events
+      .filter((e) => readStep(e.payload))
+      .reduce<ProposalStepEvent | null>((best, e) => (!best || e.created_at > best.created_at ? e : best), null);
+    out.set(id, {
+      paid: paidStateFromEvents(events),
+      newest: newest ? { payload: newest.payload, created_at: newest.created_at, actor: newest.actor, actor_user_id: newest.actor_user_id } : null,
+    });
+  }
+  return out;
 }
 
 async function loadRow(db: ProposalsDbClient, id: string): Promise<ProposalRow> {

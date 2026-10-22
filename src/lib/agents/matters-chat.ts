@@ -5,7 +5,18 @@ import type {
   BetaTool,
   BetaToolResultBlockParam,
 } from "@anthropic-ai/sdk/resources/beta/messages/messages";
-import { callClaudeWithTools } from "@/lib/ai/claude";
+import {
+  callClaudeWithTools,
+  streamClaudeWithTools,
+  type ToolTurnRequest,
+  type ToolTurnResult,
+  type Usage,
+} from "@/lib/ai/claude";
+import { logCopilotCost } from "@/lib/agents/copilot-cost";
+import { readCopilotContext } from "@/lib/agents/copilot-context";
+import { parseCopilotContext } from "@/lib/copilot/context";
+import { buildHistory, type HistoryTurn } from "@/lib/copilot/history";
+import type { CopilotCitation } from "@/lib/copilot/sse";
 import {
   activityForMatter,
   deadlineKindLabel,
@@ -55,13 +66,8 @@ import { listLeads, type Lead } from "@/lib/pipeline";
  * forgets to name what it looked at.
  */
 
-export type MattersChatCitation = {
-  type: "matter" | "lead";
-  id: string;
-  /** Human label — matter number + title, or the lead's business/person name. */
-  label: string;
-  href: string;
-};
+/** `label` is the matter number + title, or the lead's business/person name. */
+export type MattersChatCitation = CopilotCitation;
 
 export type MattersChatResult = {
   answer: string;
@@ -199,9 +205,14 @@ export function leadSearchTerm(query: unknown): string {
 /**
  * Builds the tool set for one conversation, recording every matter/lead any
  * tool touches into `citations`, and calling `onReadFailed` when a read inside
- * a tool fails without failing the whole tool.
+ * a tool fails without failing the whole tool. `loadMatters` is the question's
+ * one shared read of the firm's matters (see `once`).
  */
-function buildTools(citations: CitationSink, onReadFailed: () => void): Record<string, ToolSpec> {
+function buildTools(
+  citations: CitationSink,
+  onReadFailed: () => void,
+  loadMatters: () => Promise<Matter[]>,
+): Record<string, ToolSpec> {
   return {
     search_matters: {
       description:
@@ -212,7 +223,7 @@ function buildTools(citations: CitationSink, onReadFailed: () => void): Record<s
         required: ["query"],
       },
       execute: async ({ query }) => {
-        const all = await listMatters();
+        const all = await loadMatters();
         const term = String(query ?? "").trim().toLowerCase();
         const matches = term
           ? all
@@ -314,7 +325,7 @@ function buildTools(citations: CitationSink, onReadFailed: () => void): Record<s
         "List open matters that have sat in their current docket stage longer than the firm's stall threshold for whoever is holding them (firm/client 30 days, court 60, USPTO 120), worst first. Use this for 'which matters are stalled' or 'what hasn't moved' questions.",
       inputSchema: { type: "object", properties: {} },
       execute: async () => {
-        const all = await listMatters();
+        const all = await loadMatters();
         const { open, stalled } = summarizeDocket(all);
         const shown = stalled.slice(0, 15);
         const byId = new Map(all.map((m) => [m.id, m]));
@@ -374,48 +385,85 @@ function buildTools(citations: CitationSink, onReadFailed: () => void): Record<s
 }
 
 /**
- * Answers one natural-language question against the caller's own firm data.
- * Every tool the model can reach reads through getScopedClient() internally
- * (see @/lib/matters and @/lib/pipeline), so a cross-tenant read is
- * impossible regardless of what the model asks for — RLS is the boundary,
- * this function is just the retrieval layer in front of it.
- *
- * Drives its own tool-calling loop (see @/lib/ai/claude's
- * `callClaudeWithTools`), capped at MAX_STEPS round trips — the same shape as
- * the source's `stepCountIs(6)`. `call` is injectable for tests (a fake in
- * place of `callClaudeWithTools`), so a test never reaches the network.
+ * Runs `read` at most once per question and hands every caller the same
+ * promise. A rejection is shared too, so both tools that need the list report
+ * the same failure instead of one of them seeing an empty firm.
  */
-export async function answerMattersChatQuestion(
-  question: string,
-  call: typeof callClaudeWithTools = callClaudeWithTools,
-): Promise<MattersChatResult> {
-  const trimmed = question.trim().slice(0, MAX_QUESTION_LENGTH);
-  if (!trimmed) {
-    return {
-      answer: "Ask a question about a matter, lead, deadline, or recent activity.",
-      citations: [],
-      declined: false,
-      readFailed: false,
-    };
-  }
+function once<T>(read: () => Promise<T>): () => Promise<T> {
+  let pending: Promise<T> | null = null;
+  return () => (pending ??= read());
+}
 
+/** Plain words for the status line while a tool runs: never the tool's internal name or any record content. */
+const TOOL_LABELS: Record<string, string> = {
+  search_matters: "Reading matters",
+  get_matter_detail: "Reading a matter",
+  get_upcoming_deadlines: "Checking deadlines",
+  list_stalled_matters: "Checking for stalled matters",
+  search_leads: "Reading leads",
+  get_recent_activity: "Reading recent activity",
+};
+const toolLabel = (name: string): string => TOOL_LABELS[name] ?? "Reading records";
+
+/** What the model is asked for one step. `onText` is only passed when someone is listening. */
+export type ChatCall = (req: ToolTurnRequest & { onText?: (delta: string) => void }) => Promise<ToolTurnResult>;
+
+export type CopilotProgress =
+  | { type: "delta"; text: string }
+  | { type: "tool"; name: string; label: string; status: "running" | "done" }
+  | { type: "context"; status: "found" | "not-found" | "unavailable" };
+
+type Spend = { usage: Usage; model: string | null; steps: number };
+
+function addUsage(spend: Spend, step: ToolTurnResult): void {
+  spend.usage = {
+    inputTokens: spend.usage.inputTokens + step.usage.inputTokens,
+    outputTokens: spend.usage.outputTokens + step.usage.outputTokens,
+    cacheReadTokens: spend.usage.cacheReadTokens + step.usage.cacheReadTokens,
+    cacheWriteTokens: spend.usage.cacheWriteTokens + step.usage.cacheWriteTokens,
+  };
+  spend.model = step.model;
+  spend.steps += 1;
+}
+
+/**
+ * The tool-calling loop, shared by the one-shot answer and the streaming one:
+ * the same tools, the same system prompt, the same step cap, the same
+ * citation / `declined` / `readFailed` rules. Tool calls inside one step run
+ * concurrently, and the firm's matters are read once for the whole question.
+ */
+async function runToolLoop(opts: {
+  messages: BetaMessageParam[];
+  call: ChatCall;
+  onEvent?: (ev: CopilotProgress) => void;
+  shouldStop?: () => boolean;
+  spend?: Spend;
+}): Promise<MattersChatResult> {
+  const { call, onEvent, shouldStop, spend } = opts;
   const citations: CitationSink = new Map();
   let readFailed = false;
-  const tools = buildTools(citations, () => {
-    readFailed = true;
-  });
+  const tools = buildTools(
+    citations,
+    () => {
+      readFailed = true;
+    },
+    once(() => listMatters()),
+  );
   const toolDefs: BetaTool[] = Object.entries(tools).map(([name, spec]) => ({
     name,
     description: spec.description,
     input_schema: spec.inputSchema,
   }));
 
-  const conversation: BetaMessageParam[] = [{ role: "user", content: trimmed }];
+  const conversation: BetaMessageParam[] = [...opts.messages];
+  const onText = onEvent ? (text: string) => onEvent({ type: "delta", text }) : undefined;
   let toolWasCalled = false;
   let answer = "";
 
   for (let step = 0; step < MAX_STEPS; step++) {
-    const result = await call({ system: SYSTEM_PROMPT, messages: conversation, tools: toolDefs });
+    if (shouldStop?.()) break;
+    const result = await call(onText ? { system: SYSTEM_PROMPT, messages: conversation, tools: toolDefs, onText } : { system: SYSTEM_PROMPT, messages: conversation, tools: toolDefs });
+    if (spend) addUsage(spend, result);
     const content = result.content;
     const toolUses = content.filter(
       (b): b is Extract<(typeof content)[number], { type: "tool_use" }> => b.type === "tool_use",
@@ -440,19 +488,25 @@ export async function answerMattersChatQuestion(
     const toolResults: BetaToolResultBlockParam[] = await Promise.all(
       toolUses.map(async (block): Promise<BetaToolResultBlockParam> => {
         const spec = tools[block.name];
+        const label = toolLabel(block.name);
+        onEvent?.({ type: "tool", name: block.name, label, status: "running" });
         try {
           const input = (block.input ?? {}) as Record<string, unknown>;
           if (!spec) return { type: "tool_result", tool_use_id: block.id, content: JSON.stringify({ error: `Unknown tool '${block.name}'` }), is_error: true };
           const output = await spec.execute(input);
           return { type: "tool_result", tool_use_id: block.id, content: JSON.stringify(output) };
-        } catch (err) {
+        } catch {
           readFailed = true;
+          // A fixed sentence, never the thrown message: the model may repeat
+          // what it is told, and a database error is not for the browser.
           return {
             type: "tool_result",
             tool_use_id: block.id,
-            content: JSON.stringify({ error: err instanceof Error ? err.message : "Tool call failed" }),
+            content: JSON.stringify({ error: "That lookup failed, so these records couldn't be read right now." }),
             is_error: true,
           };
+        } finally {
+          onEvent?.({ type: "tool", name: block.name, label, status: "done" });
         }
       }),
     );
@@ -471,4 +525,80 @@ export async function answerMattersChatQuestion(
     declined: !toolWasCalled,
     readFailed,
   };
+}
+
+const EMPTY_QUESTION_RESULT: MattersChatResult = {
+  answer: "Ask a question about a matter, lead, deadline, or recent activity.",
+  citations: [],
+  declined: false,
+  readFailed: false,
+};
+
+/**
+ * Answers one natural-language question against the caller's own firm data.
+ * Every tool the model can reach reads through getScopedClient() internally
+ * (see @/lib/matters and @/lib/pipeline), so a cross-tenant read is
+ * impossible regardless of what the model asks for — RLS is the boundary,
+ * this function is just the retrieval layer in front of it.
+ *
+ * Drives its own tool-calling loop (see @/lib/ai/claude's
+ * `callClaudeWithTools`), capped at MAX_STEPS round trips — the same shape as
+ * the source's `stepCountIs(6)`. `call` is injectable for tests (a fake in
+ * place of `callClaudeWithTools`), so a test never reaches the network.
+ */
+export async function answerMattersChatQuestion(
+  question: string,
+  call: typeof callClaudeWithTools = callClaudeWithTools,
+): Promise<MattersChatResult> {
+  const trimmed = question.trim().slice(0, MAX_QUESTION_LENGTH);
+  if (!trimmed) return EMPTY_QUESTION_RESULT;
+  return runToolLoop({ messages: [{ role: "user", content: trimmed }], call });
+}
+
+/**
+ * The streaming twin of `answerMattersChatQuestion`, behind
+ * POST /api/matters-chat: the same loop over `streamClaudeWithTools`, reporting
+ * text deltas and tool status through `onEvent` as they happen, and resolving
+ * to the same result the one-shot answer would have given.
+ *
+ * Earlier turns arrive as `history` and are trimmed by `buildHistory`. When the
+ * drawer sends a pathname for a lead or matter page, that record is re-read here
+ * through the scoped readers and described to the model as data — see
+ * @/lib/agents/copilot-context. Token use and cost are logged once, with the
+ * firm id from the session and no content.
+ */
+export async function streamMattersChatQuestion(opts: {
+  question: string;
+  history?: readonly HistoryTurn[];
+  /** The page the question was asked from; only a lead or matter path means anything. */
+  pathname?: string;
+  /** From the resolved session, never from the request body. */
+  orgId: string;
+  onEvent: (ev: CopilotProgress) => void;
+  call?: ChatCall;
+  shouldStop?: () => boolean;
+}): Promise<MattersChatResult> {
+  const trimmed = opts.question.trim().slice(0, MAX_QUESTION_LENGTH);
+  if (!trimmed) return EMPTY_QUESTION_RESULT;
+
+  let content = trimmed;
+  const context = opts.pathname ? parseCopilotContext(opts.pathname) : null;
+  if (context) {
+    const read = await readCopilotContext(context);
+    opts.onEvent({ type: "context", status: read.status });
+    if (read.status === "found") content = `${trimmed}\n\n${read.block}`;
+  }
+
+  const spend: Spend = { usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 }, model: null, steps: 0 };
+  try {
+    return await runToolLoop({
+      messages: buildHistory(opts.history ?? [], content),
+      call: opts.call ?? streamClaudeWithTools,
+      onEvent: opts.onEvent,
+      shouldStop: opts.shouldStop,
+      spend,
+    });
+  } finally {
+    if (spend.model) logCopilotCost({ orgId: opts.orgId, model: spend.model, usage: spend.usage });
+  }
 }

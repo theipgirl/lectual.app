@@ -17,6 +17,8 @@ import {
 import { loadPendingApprovalsByLead } from "@/lib/queue/lead-pending";
 import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
 import { resolveFirmSession } from "@/lib/firm/session";
+import { getFirmTimeZone } from "@/lib/org/profile";
+import { loadAgentMoves, type AgentMovesRead } from "@/lib/stage-keeper/read";
 import { canReconcile } from "@/lib/reconcile/roles";
 import { IntakeTopBar } from "@/components/intake/IntakeTopBar";
 import IntakeWorkspace from "./_components/IntakeWorkspace";
@@ -127,6 +129,12 @@ export default async function IntakePage({
     (): LeadPendingApprovals => ({ status: "unavailable" }),
   );
 
+  // The Stage Keeper's recent moves, for the chip and the "Agent moves" filter. Two states: a read
+  // that failed is `unavailable`, which the workspace says out loud and never filters on.
+  const agentMovesPromise: Promise<AgentMovesRead> = getFirmTimeZone()
+    .then((tz) => loadAgentMoves(now, tz))
+    .catch((): AgentMovesRead => ({ status: "unavailable" }));
+
   let stages: Stage[] = [];
   let leads: Lead[] = [];
   let loadError: string | null = null;
@@ -140,7 +148,7 @@ export default async function IntakePage({
     loadError = err instanceof Error ? err.message : String(err);
   }
 
-  const [members, noteActivity, pendingApprovals] = await Promise.all([membersPromise, notesPromise, approvalsPromise]);
+  const [members, noteActivity, pendingApprovals, agentMoves] = await Promise.all([membersPromise, notesPromise, approvalsPromise, agentMovesPromise]);
 
   if (loadError) {
     return (
@@ -225,6 +233,7 @@ export default async function IntakePage({
     members,
     latestNoteByLeadId: latestNotesByLead(noteActivity),
     factsByLeadId: factsRead.status === "ok" ? factsRead.byLead : undefined,
+    agentMoveByLeadId: agentMoves.status === "ok" ? agentMoves.chips : undefined,
     now,
   });
 
@@ -241,6 +250,7 @@ export default async function IntakePage({
       now={now.toISOString()}
       pendingApprovals={pendingApprovals}
       showReconcile={showReconcile}
+      agentMoves={agentMoves.status === "ok" ? { status: "ok", truncated: agentMoves.truncated } : { status: "unavailable" }}
     />
     </div>
   );

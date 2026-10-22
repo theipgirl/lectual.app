@@ -79,7 +79,7 @@ describe("Agents page: a failed settings read (S3)", () => {
     const { html } = await render({ settings: "error" });
     expect(html).toContain("couldn&#x27;t read agent settings");
     expect(html).toContain("Agent settings unavailable");
-    expect(html).not.toContain("0 of 3 on");
+    expect(html).not.toContain("0 of 7 on");
     expect(html).not.toContain(">Off<");
     expect(html).not.toContain("lx-agent off");
     expect(html).not.toContain('aria-checked="false"');
@@ -133,7 +133,7 @@ describe("Agents page: honest 'On' (S4)", () => {
 
   it("one ready and one enabled-but-blocked agent: the header says both", async () => {
     const { html } = await render({ settings: [on("intake-triage"), on("email-intel")], connections: { ok: true, connections: [] } });
-    expect(html).toContain("1 of 3 on");
+    expect(html).toContain("1 of 7 on");
     expect(html).toContain("1 on but blocked");
   });
 
@@ -142,7 +142,7 @@ describe("Agents page: honest 'On' (S4)", () => {
       settings: [on("intake-triage"), on("email-intel"), off("post-consult")],
       connections: { ok: true, connections: [{ status: "active" }] },
     });
-    expect(html).toContain("2 of 3 on");
+    expect(html).toContain("2 of 7 on");
     expect(html).not.toContain("blocked");
     expect(html).not.toContain("Blocked");
   });

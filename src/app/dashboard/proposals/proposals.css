@@ -221,3 +221,18 @@
   .pq-segs-label { grid-column: 1 / -1; }
   .pq-note { margin-top: 0; }
 }
+
+/* Payment and follow-up panel on an accepted proposal (Sprint 19) */
+.pe-paid-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pe-paid-act { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pe-steps { list-style: none; margin: 0; padding: 0; display: grid; }
+.pe-steps li { display: flex; align-items: baseline; gap: 6px 12px; flex-wrap: wrap; padding: 9px 0; border-bottom: 1px solid var(--line-2); font-size: 14px; line-height: 1.45; color: var(--body); }
+.pe-steps li:last-child { border-bottom: 0; }
+.pe-steps li[data-tone="ok"] .pe-step-text { color: var(--ink); }
+.pe-steps li[data-tone="warn"] .pe-step-text { color: var(--warn); }
+.pe-steps li[data-tone="risk"] .pe-step-text { color: var(--wine); }
+.pe-steps li[data-tone="mute"] .pe-step-text { color: var(--muted); }
+.pe-step-label { min-width: 150px; }
+.pe-step-text { flex: 1 1 260px; min-width: 0; }
+.pq-paid { display: grid; gap: 6px; justify-items: start; margin-top: 6px; }
+.pq-paid-form { display: grid; gap: 4px; justify-items: start; }

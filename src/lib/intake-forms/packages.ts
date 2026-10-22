@@ -17,7 +17,7 @@ export type LibraryItem = Pick<ServiceItemRow, "id" | "label" | "description" | 
 
 export type IntakePackage = { id: string; name: string; price: string; includes: string; visible: boolean };
 
-export function isOfferablePackage(item: LibraryItem): boolean {
+export function isOfferablePackage(item: Pick<LibraryItem, "active" | "kind">): boolean {
   return item.active && item.kind === "legal_fee";
 }
 

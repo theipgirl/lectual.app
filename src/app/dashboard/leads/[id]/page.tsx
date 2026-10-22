@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { resolveFirmSession } from "@/lib/firm/session";
-import { CAN_WRITE_LEAD, getLead, listStages } from "@/lib/pipeline";
+import { CAN_MOVE_STAGE, CAN_WRITE_LEAD, getLead, listStages } from "@/lib/pipeline";
 import { effectiveTemperature } from "@/lib/intake/effective-temperature";
 import { loadTemperatureFacts, type TemperatureFactsRead } from "@/lib/intake/facts";
 import { ConsultOutcomeForm } from "@/components/leads/ConsultOutcomeForm";
@@ -16,6 +16,8 @@ import { loadMattersForLead } from "@/lib/matters/for-lead";
 import { AnswersCard } from "@/components/answers/AnswersCard";
 import { loadLeadAnswers } from "@/lib/answers/load-answers";
 import { Timeline } from "@/components/timeline/Timeline";
+import { StageSuggestionCard } from "@/components/leads/StageKeeperControls";
+import { pendingStageSuggestions } from "@/lib/stage-keeper/moves";
 import { DocumentsCard } from "@/components/files/DocumentsCard";
 import { loadDocumentsRead } from "@/lib/files/read";
 import { FILE_DELETE_ROLES, FILE_UPLOAD_ROLES } from "@/lib/files/roles";
@@ -34,6 +36,8 @@ import { LinkedMeetings } from "@/components/meetings/LinkedMeetings";
 import { ConsultDetailsSection } from "@/components/leads/ConsultDetailsSection";
 import { TemperatureCard } from "@/components/leads/TemperatureCard";
 import { WaitingOnRebecca } from "@/components/leads/WaitingOnRebecca";
+import { ConsultBookedView } from "@/components/calendar/ConsultBookedLine";
+import { loadBookedConsult } from "@/lib/calendar/outlook-read";
 import { loadPendingApprovalsByLead } from "@/lib/queue/lead-pending";
 import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
 import { SequencesCard, type SequenceRow } from "@/components/leads/SequencesCard";
@@ -54,9 +58,10 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   if (!lead) notFound();
 
   const supabase = await getScopedClient();
-  const [hasAgentToolkit, hasProposals, applied, catalog, meetings] = await Promise.all([
+  const [hasAgentToolkit, hasProposals, hasMailbox, applied, catalog, meetings] = await Promise.all([
     orgHasModule("agent-toolkit"),
     orgHasModule("proposals"),
+    orgHasModule("mailbox"),
     tagsForLead(id).catch(() => []),
     listTags().catch(() => []),
     meetingsFor({ leadId: id }),
@@ -82,7 +87,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const voiceUrls = await voiceNotePlaybackUrls(rows);
 
   // Lane + next step (SOP Stage 2) and the lead's sequences (SOP rule 1).
-  const [{ links, failed: linksFailed }, tz, enrollments, approvals, factsRead, mattersRead, answersRead, documentsRead] = await Promise.all([
+  const [{ links, failed: linksFailed }, tz, enrollments, approvals, factsRead, mattersRead, answersRead, documentsRead, consultRead] = await Promise.all([
     getLaneLinks(),
     getFirmTimeZone(),
     listLeadEnrollments(id).catch(() => null),
@@ -96,6 +101,8 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     loadLeadAnswers(lead.id),
     // Files stored on this lead. Never throws: a failed read is named on the card, not an empty list.
     loadDocumentsRead({ kind: "lead", id: lead.id }, { includeLetters: false }),
+    // Outlook consults exist only for a firm with the mailbox module: without it, no read. Never throws (three states).
+    hasMailbox ? loadBookedConsult(lead.id) : Promise.resolve(null),
   ]);
   const temperature = effectiveTemperature(lead, stages, new Date(), factsRead.status === "ok" ? factsRead.byLead[lead.id] : undefined);
   const lane = laneView(lead);
@@ -119,6 +126,9 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const renderedAt = new Date().getTime();
   const proposals = pendingProposals(rows);
   const canWrite = CAN_WRITE_LEAD.includes(session.role);
+  // The Stage Keeper's suggestions waiting for a person, and who may act on them (the stage-move roles).
+  const canMove = CAN_MOVE_STAGE.includes(session.role);
+  const stageSuggestions = pendingStageSuggestions(rows);
   const name = `${lead.first_name} ${lead.last_name}`.trim() || lead.email;
   const current: Record<string, string | null> = {
     business_name: lead.business_name,
@@ -153,6 +163,8 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
 
       <div className="lx-split">
         <div className="lx-col">
+          {consultRead && <ConsultBookedView read={consultRead} timeZone={tz} />}
+
           {proposals.length > 0 && (
             <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }}>
               <div>
@@ -163,6 +175,27 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
               </div>
               {proposals.map((p) => (
                 <ProposalCard key={p.activityId} leadId={lead.id} proposal={p} current={current} canWrite={canWrite} />
+              ))}
+            </section>
+          )}
+
+          {stageSuggestions.length > 0 && (
+            <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }}>
+              <div>
+                <div className="lx-label">Stage Keeper · waiting on you</div>
+                <h2 className="lx-h2" style={{ fontSize: 23 }}>
+                  {stageSuggestions.length} stage suggestion{stageSuggestions.length === 1 ? "" : "s"}
+                </h2>
+              </div>
+              {stageSuggestions.map((s) => (
+                <StageSuggestionCard
+                  key={s.activityId}
+                  leadId={lead.id}
+                  suggestion={s}
+                  currentStageId={lead.current_stage_id}
+                  canDecide={canMove}
+                  timeZone={tz}
+                />
               ))}
             </section>
           )}
@@ -196,7 +229,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           <WaitingOnRebecca leadId={lead.id} approvals={approvals} now={renderedAt} />
 
           {canWrite && hasAgentToolkit && (
-            <details className="lx-card lx-disclosure">
+            <details id="prep-consult" className="lx-card lx-disclosure">
               <summary>Prep this consult</summary>
               <div style={{ padding: "0 18px 18px" }}>
                 <PrepConsult leadId={lead.id} practiceArea={lead.practice_area} />
@@ -247,7 +280,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
                 <VoiceNoteRecorder target={{ kind: "lead", id: lead.id }} action={addVoiceNoteAction} />
               </div>
             )}
-            <Timeline rows={rows} mediaUrls={voiceUrls} />
+            <Timeline rows={rows} mediaUrls={voiceUrls} timeZone={tz} undo={{ leadId: lead.id, canMove, currentStageId: lead.current_stage_id }} />
           </section>
         </div>
 

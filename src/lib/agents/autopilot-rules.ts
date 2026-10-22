@@ -41,6 +41,11 @@ export const DEFAULT_MINUTES_PER_TASK: Record<AgentId, number> = {
   "intake-triage": 10,
   "email-intel": 5,
   "post-consult": 20,
+  "stage-keeper": 2,
+  // The three drafting agents: what the draft would have taken a person to write by hand.
+  "morning-brief": 5,
+  "consult-prep": 15,
+  "inbox-summary": 3,
 };
 
 /** What one "task" is for each agent, for the footnote and the settings form. */
@@ -48,6 +53,10 @@ export const TASK_UNIT: Record<AgentId, { singular: string; plural: string }> = 
   "intake-triage": { singular: "lead screened", plural: "leads screened" },
   "email-intel": { singular: "client email read", plural: "client emails read" },
   "post-consult": { singular: "follow-up drafted", plural: "follow-ups drafted" },
+  "stage-keeper": { singular: "lead placed", plural: "leads placed" },
+  "morning-brief": { singular: "brief or follow-up drafted", plural: "briefs and follow-ups drafted" },
+  "consult-prep": { singular: "consult prepped", plural: "consults prepped" },
+  "inbox-summary": { singular: "digest or reply drafted", plural: "digests and replies drafted" },
 };
 
 export const MAX_MINUTES_PER_TASK = 240;
@@ -109,7 +118,11 @@ export type RunForEstimate = { agent: string; status: string; items_in: number; 
  * count. The unit is the one TASK_UNIT names, read from the run's own counts:
  * triage screens every lead it reads (items_in), email intel reads every
  * email it counts (items_in), and the post-consult drafter's task is the
- * follow-up it drafted (drafts_out). A skipped or failed run saved nothing.
+ * follow-up it drafted (drafts_out), and the Stage Keeper's is the lead it placed on the
+ * board: items_in counts its moves plus its suggestion cards, and drafts_out only the cards,
+ * so a card a person still has to accept is not a lead placed. The Morning brief's and the Inbox summary's
+ * task is each draft they wrote (drafts_out), and Consult prep's is each consult it prepped (items_in).
+ * A skipped or failed run saved nothing.
  */
 export function tasksInRun(run: RunForEstimate): number {
   if (run.status !== "ok") return 0;
@@ -118,7 +131,13 @@ export function tasksInRun(run: RunForEstimate): number {
     case "email-intel":
       return Math.max(0, run.items_in ?? 0);
     case "post-consult":
+    case "morning-brief":
+    case "inbox-summary":
       return Math.max(0, run.drafts_out ?? 0);
+    case "consult-prep":
+      return Math.max(0, run.items_in ?? 0);
+    case "stage-keeper":
+      return Math.max(0, (run.items_in ?? 0) - (run.drafts_out ?? 0));
     default:
       return 0;
   }
@@ -132,7 +151,7 @@ export type HoursSavedEstimate = {
 
 /** Σ tasks × the firm's minutes per task, in hours to one decimal. An estimate, labelled as one. */
 export function estimateHoursSaved(runs: readonly RunForEstimate[], minutes: Record<AgentId, number>): HoursSavedEstimate {
-  const tasks: Record<AgentId, number> = { "intake-triage": 0, "email-intel": 0, "post-consult": 0 };
+  const tasks = Object.fromEntries(AGENT_IDS.map((a) => [a, 0])) as Record<AgentId, number>;
   for (const r of runs) {
     if ((AGENT_IDS as readonly string[]).includes(r.agent)) tasks[r.agent as AgentId] += tasksInRun(r);
   }

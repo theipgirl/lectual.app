@@ -8,7 +8,9 @@ import { formatCents } from "@/lib/quotes/money";
 import { formatFirmStamp, formatShortFirmDate } from "@/lib/quotes/labels";
 import { ProposalError } from "@/lib/proposals/errors";
 import { defaultSelection, quoteProposal } from "@/lib/proposals/pricing";
-import { getProposal, getProposalSettings, isCurrentUserApprover, type ProposalDetail } from "@/lib/proposals/store";
+import { getProposal, getProposalSettings, isCurrentUserApprover, listProposalStepEvents, type ProposalDetail } from "@/lib/proposals/store";
+import { PROPOSAL_PAID_ROLES } from "@/lib/proposals/paid";
+import { buildPaidPanelView } from "@/lib/proposals/paid-view";
 import { PROPOSAL_STAFF_WRITE_ROLES, isProposalEditable, type ProposalRow } from "@/lib/proposals/types";
 import { validateContent } from "@/lib/proposals/validate";
 import { describeProposalEvent } from "@/lib/proposal-editor/events";
@@ -22,6 +24,7 @@ import { ConsultStrip } from "@/components/proposal-editor/ConsultStrip";
 import { ProposalCard } from "@/components/proposal-editor/ProposalCard";
 import { IssueList, type ShownIssue } from "@/components/proposal-editor/ActionForm";
 import { Lifecycle } from "@/components/proposal-editor/Lifecycle";
+import { PaidPanel } from "@/components/proposal-editor/PaidPanel";
 import {
   AddNameForm,
   AdjustmentsForm,
@@ -90,13 +93,15 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
   const { proposal, versions, events } = detail;
   const content = proposal.content;
 
-  const [tz, members, settings, isApprover, origin, consult] = await Promise.all([
+  const [tz, members, settings, isApprover, origin, consult, stepRead] = await Promise.all([
     getFirmTimeZone(),
     listMemberDirectory().catch((): MemberIdentity[] => []),
     getProposalSettings().catch(() => null),
     isCurrentUserApprover(),
     getSiteOrigin(),
     proposal.lead_id ? loadConsultStrip(proposal.lead_id) : Promise.resolve(null),
+    // Only an accepted version has a payment panel. A failed read is `{ ok: false }`, never "not paid".
+    proposal.status === "accepted" ? listProposalStepEvents(proposal.id) : Promise.resolve(null),
   ]);
   // The family's events are already loaded, so the card needs no extra read.
   const card = buildProposalCard(proposal, events);
@@ -137,6 +142,21 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
   const clientUrl = proposal.status === "approved" || proposal.status === "sent" ? `${origin}/p/${proposal.public_token}/` : null;
 
   const readOnlyNote = readOnlyText(proposal, canWrite, approverNames);
+
+  const paidView = stepRead
+    ? buildPaidPanelView({
+        proposalId: proposal.id,
+        matterId: proposal.matter_id,
+        events: stepRead.ok ? stepRead.events : null,
+        // Real names only: a teammate we can't name is left out of "marked by", not shown as "A teammate".
+        names: new Map(members.flatMap((m): Array<[string, string]> => {
+          const n = firstNameOf(m.displayName) ?? firstNameOf(m.email);
+          return n ? [[m.userId, n]] : [];
+        })),
+        tz,
+        canAct: PROPOSAL_PAID_ROLES.includes(session.role),
+      })
+    : null;
 
   const versionOf = new Map(versions.map((v) => [v.id, v.version]));
   const log = events.map((e) => ({ line: describeProposalEvent(e, { names: nameOf, versions: versionOf }), type: e.type }));
@@ -204,6 +224,8 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
           )}
         </div>
       )}
+
+      {paidView && <PaidPanel proposalId={proposal.id} view={paidView} />}
 
       <ProposalCard card={card} />
       {consult && proposal.lead_id && <ConsultStrip state={consult} leadId={proposal.lead_id} tz={tz} />}

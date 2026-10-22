@@ -9,6 +9,11 @@ import { pkceChallenge } from "./state";
  *                              draft in the approver's mailbox; a person sends)
  *   Microsoft Mail.Read, Mail.ReadWrite — the same pair in Graph terms
  *             (ReadWrite is what drafts need; we never send or delete)
+ *             Calendars.Read, read-only; the daily sync copies upcoming events
+ *             so consults show on the calendar, lead page and Today. It is
+ *             asked for but NOT required: declining it still connects the
+ *             mailbox for mail and leaves it in "Reconnect to read the
+ *             calendar". Google stays mail-only.
  *   Both      offline_access / access_type=offline — a refresh token, so the
  *             scheduled sync keeps working while nobody is signed in
  *
@@ -65,6 +70,9 @@ type Config = {
   required: string[];
 };
 
+/** The one calendar permission, read-only. */
+export const CALENDAR_SCOPE = "Calendars.Read";
+
 const CONFIG: Record<MailboxProvider, Config> = {
   google: {
     authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth",
@@ -85,7 +93,8 @@ const CONFIG: Record<MailboxProvider, Config> = {
     // accounts; small firms run on either.
     authorizeUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
     tokenUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
-    scopes: ["openid", "email", "offline_access", "User.Read", "Mail.Read", "Mail.ReadWrite"],
+    scopes: ["openid", "email", "offline_access", "User.Read", "Mail.Read", "Mail.ReadWrite", CALENDAR_SCOPE],
+    // Calendars.Read is deliberately not required: mail works without it.
     required: ["mail.read", "mail.readwrite"],
   },
 };
@@ -101,6 +110,17 @@ function normaliseScope(provider: MailboxProvider, scope: string): string {
     return scope.replace(/^https:\/\/graph\.microsoft\.com\//i, "").toLowerCase();
   }
   return scope;
+}
+
+/**
+ * True when a connection's STORED scopes include the calendar read permission.
+ * Microsoft only (Google is mail-only). A missing or unreadable list means the
+ * permission was never granted: it is the single definition the calendar sync
+ * and Settings → Integrations both use.
+ */
+export function hasCalendarScope(provider: MailboxProvider, scopes: readonly string[] | null | undefined): boolean {
+  if (provider !== "microsoft" || !Array.isArray(scopes)) return false;
+  return scopes.some((s) => typeof s === "string" && normaliseScope(provider, s.trim()) === CALENDAR_SCOPE.toLowerCase());
 }
 
 export function missingScopes(provider: MailboxProvider, granted: string[]): string[] {
@@ -271,6 +291,13 @@ export async function refreshAccessToken(args: {
   provider: MailboxProvider;
   creds: ClientCredentials;
   refreshToken: string;
+  /**
+   * The scopes this connection stored when it consented. Microsoft refuses a
+   * refresh that asks for a permission the account never granted, which would
+   * look like a dead token and take mail sync down, so Calendars.Read is only
+   * asked for when it was granted.
+   */
+  grantedScopes?: readonly string[] | null;
   fetchImpl?: typeof fetch;
   now?: number;
 }): Promise<{ accessToken: string; refreshToken: string | null; expiresAt: string }> {
@@ -281,7 +308,13 @@ export async function refreshAccessToken(args: {
     refresh_token: args.refreshToken,
     grant_type: "refresh_token",
   });
-  if (provider === "microsoft") body.set("scope", CONFIG.microsoft.scopes.join(" "));
+  if (provider === "microsoft") {
+    const calendarGranted = hasCalendarScope(provider, args.grantedScopes);
+    body.set(
+      "scope",
+      CONFIG.microsoft.scopes.filter((s) => s !== CALENDAR_SCOPE || calendarGranted).join(" "),
+    );
+  }
 
   const res = await fetchImpl(CONFIG[provider].tokenUrl, {
     method: "POST",

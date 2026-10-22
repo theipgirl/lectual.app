@@ -37,7 +37,7 @@ import type { IntakeContact } from "./submission";
 
 type Admin = ReturnType<typeof getAdminClient>;
 
-async function firmToken(admin: Admin, orgId: string): Promise<string | null> {
+export async function firmToken(admin: Admin, orgId: string): Promise<string | null> {
   const root = rootKeyOrNull();
   if (!root) return null;
   const { data, error } = await admin

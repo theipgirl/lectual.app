@@ -209,3 +209,24 @@ describe("buildPlan: an empty table", () => {
     expect(view.summary.sheetRowsWithoutLead).toHaveLength(7);
   });
 });
+
+describe("buildPlan: the Email / calendar source with the Stage Keeper's rows (Sprint 16, F19)", () => {
+  it("an agent move shows in the lead's email / calendar cell with its stage and date", async () => {
+    const readEmail = async (): Promise<EmailInput> => ({
+      status: "ok",
+      byLead: new Map(),
+      total: 0,
+      agent: new Map([[L.amara, [{ stageId: S.loe, wording: "Stage Keeper: LOE sent", date: "2026-09-09T10:00:00Z" }]]]),
+    });
+    const { view } = await run({ readEmail });
+    const amara = view.rows.find((r) => r.leadId === L.amara)!;
+    expect(amara.email).toEqual({ kind: "stage", stageId: S.loe, stageName: "LOE & Invoice Sent", wording: "Stage Keeper: LOE sent", date: "2026-09-09T10:00:00Z" });
+    // It only corroborates: the sheet's proposal is unchanged.
+    expect(amara.proposal.kind).toBe("stage");
+  });
+
+  it("a failed read of mail or of the agent's rows is unavailable on every row, never none", async () => {
+    const { view } = await run({ readEmail: async () => ({ status: "unavailable", reason: "The synced mail and the Stage Keeper's moves on the timeline could not be read. Try again shortly." }) });
+    for (const row of view.rows) expect(row.email).toMatchObject({ kind: "unavailable" });
+  });
+});

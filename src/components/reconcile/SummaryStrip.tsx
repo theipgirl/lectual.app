@@ -9,8 +9,8 @@ function lawmaticsLine(s: ReconcileSummary["lawmatics"]): string {
 }
 
 function emailLine(s: ReconcileSummary["email"]): string {
-  if (s.status === "ok") return `Email: read (${s.leadsWithMail} leads with synced mail)`;
-  return `Email: unavailable. ${s.reason}`;
+  if (s.status === "ok") return `Email / calendar: read (${s.leadsWithMail} leads with synced mail)`;
+  return `Email / calendar: unavailable. ${s.reason}`;
 }
 
 /** The counts under the table's heading: confidence, source availability, and what was left out. */

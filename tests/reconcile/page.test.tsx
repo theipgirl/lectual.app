@@ -113,3 +113,16 @@ describe("the link on the Intake page", () => {
     expect(render()).not.toContain("Reconcile stages");
   });
 });
+
+describe("the Email / calendar source label (Sprint 16, F19)", () => {
+  it("the availability line before an upload is named Email / calendar and says the Stage Keeper's moves are used", async () => {
+    const html = text(await renderPage({ kind: "ok", role: "owner" }));
+    expect(html).toContain("Email / calendar");
+    expect(html).toContain("what the Stage Keeper did from mail and calendar consults, will be used");
+  });
+
+  it("with no mailbox it says there may be no mail or calendar consults, and that is not an error", async () => {
+    const none = text(await renderPage({ kind: "ok", role: "owner" }, { lawmatics: { ok: true, connection: null }, mailboxes: { ok: true, connections: [{ status: "reauth" }] } }));
+    expect(none).toContain("no synced mail or calendar consults to use. That is not an error.");
+  });
+});

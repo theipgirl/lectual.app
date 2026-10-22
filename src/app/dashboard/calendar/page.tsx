@@ -7,7 +7,11 @@ import { formatCivilDate } from "@/lib/matters/ip-fields";
 import { getOrgProfile } from "@/lib/org/profile";
 import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
 import { listCalendarEvents, type CalendarEventRow } from "@/lib/calendar/events";
+import { listOutlookCalendarEvents, type OutlookCalendarEvent, type OutlookRead } from "@/lib/calendar/outlook-read";
+import { formatEventWhen, joinHref } from "@/lib/calendar/outlook-format";
+import { orgHasModule } from "@/lib/org/modules";
 import {
+  addDays,
   isCivilDate,
   monthGrid,
   parseCalendarView,
@@ -61,11 +65,31 @@ function eventToItem(e: CalendarEventRow, timeZone: string): CalendarItem {
   };
 }
 
+/** An Outlook event: linked to its lead when there is one, marked when it is a consult. */
+function outlookToItem(e: OutlookCalendarEvent, timeZone: string): CalendarItem {
+  // All-day events are stored at UTC midnight; their date is the UTC date, not a shifted zoned one.
+  const { date, time } = e.all_day ? { date: e.starts_at.slice(0, 10), time: "" } : zonedParts(e.starts_at, timeZone);
+  return {
+    key: `e-${e.id}`,
+    date,
+    time: e.all_day ? null : time,
+    title: e.title?.trim() || (e.is_consult ? "Consult" : "Event"),
+    detail: e.location || null,
+    href: e.lead_id ? `/dashboard/leads/${e.lead_id}/` : null,
+    kind: "event",
+    overdue: false,
+    unconfirmed: false,
+    consult: e.is_consult,
+    joinUrl: joinHref(e.join_url),
+  };
+}
+
 function Chip({ item, compact }: { item: CalendarItem; compact: boolean }) {
   const cls = `lx-cal-item is-${item.kind}${item.overdue ? " is-overdue" : ""}`;
   const label = (
     <>
       {item.time && <span className="lx-cal-time">{shortTime(item.time)}</span>}
+      {item.consult && <span style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.4, marginRight: 4 }}>Consult</span>}
       <span className="lx-cal-title">{item.title}</span>
       {!compact && item.detail && <span className="lx-cal-detail">{item.detail}</span>}
       {!compact && item.unconfirmed && <span className="lx-cal-detail">Unconfirmed</span>}
@@ -74,7 +98,7 @@ function Chip({ item, compact }: { item: CalendarItem; compact: boolean }) {
   const title = [item.time ? shortTime(item.time) : null, item.title, item.detail, item.unconfirmed ? "unconfirmed" : null]
     .filter(Boolean)
     .join(" · ");
-  return item.href ? (
+  const chip = item.href ? (
     <Link href={item.href} className={cls} title={title}>
       {label}
     </Link>
@@ -82,6 +106,16 @@ function Chip({ item, compact }: { item: CalendarItem; compact: boolean }) {
     <span className={cls} title={title}>
       {label}
     </span>
+  );
+  // A link inside a link is invalid, so the meeting link sits beside the chip. The month cell is too small for it.
+  if (compact || !item.joinUrl) return chip;
+  return (
+    <>
+      {chip}
+      <a href={item.joinUrl} target="_blank" rel="noopener noreferrer" className="lx-cal-detail" style={{ color: "var(--ox)", fontWeight: 500 }}>
+        Join
+      </a>
+    </>
   );
 }
 
@@ -185,19 +219,67 @@ function NeedsReviewBand({ deadlines, now }: { deadlines: UpcomingDeadline[]; no
   );
 }
 
+/** Outlook events for the next 30 days, in the same agenda as the deadlines and tasks. */
+function OutlookAgendaBand({ events, timeZone }: { events: OutlookCalendarEvent[]; timeZone: string }) {
+  return (
+    <section className="lx-card lx-band" aria-labelledby="cal-outlook">
+      <header className="lx-band-head">
+        <h2 id="cal-outlook" className="lx-h2">
+          Meetings and consults
+        </h2>
+        <span className="lx-note">{events.length}</span>
+      </header>
+      <ul className="lx-list" style={{ padding: "0 18px 8px" }}>
+        {events.map((e) => {
+          const join = joinHref(e.join_url);
+          const name = e.title?.trim() || (e.is_consult ? "Consult" : "Event");
+          return (
+            <li key={e.id} className="lx-task">
+              <span style={{ minWidth: 0 }}>
+                {e.lead_id ? (
+                  <Link href={`/dashboard/leads/${e.lead_id}/`} className="lx-rowlink">
+                    {name}
+                  </Link>
+                ) : (
+                  <span style={{ fontWeight: 500, color: "var(--ink)" }}>{name}</span>
+                )}
+                <span className="lx-note" style={{ display: "block" }}>
+                  {[formatEventWhen(e, timeZone), e.location].filter(Boolean).join(" · ")}
+                </span>
+              </span>
+              <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                {e.is_consult && <span className="lx-pill lx-pill-ox">Consult</span>}
+                {join && (
+                  <a href={join} target="_blank" rel="noopener noreferrer" className="lx-btn lx-btn-sec lx-btn-sm">
+                    Join
+                  </a>
+                )}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 function AgendaView({
   rows,
   needsReview,
   now,
   unconfirmed,
+  outlook,
+  timeZone,
 }: {
   rows: CalendarRow[];
   needsReview: UpcomingDeadline[];
   now: Date;
   unconfirmed: Set<string>;
+  outlook: OutlookCalendarEvent[];
+  timeZone: string;
 }) {
   const groups = groupCalendarRows(rows, now);
-  if (groups.length === 0 && needsReview.length === 0) {
+  if (groups.length === 0 && needsReview.length === 0 && outlook.length === 0) {
     return (
       <div className="lx-card lx-empty-card">
         <h2 className="lx-h2" style={{ fontSize: 25 }}>Nothing on the docket or task list</h2>
@@ -239,19 +321,23 @@ function AgendaView({
           </ul>
         </section>
       ))}
+      {outlook.length > 0 && <OutlookAgendaBand events={outlook} timeZone={timeZone} />}
       {needsReview.length > 0 && <NeedsReviewBand deadlines={needsReview} now={now} />}
     </>
   );
 }
 
 /**
- * Calendar: a month grid, a week view and the agenda list, over the same three
- * sources — open docket deadlines, open task due dates, and consults and
- * meetings from crm_calendar_event (Lawmatics sync). Timed events are placed
- * in the firm's own time zone (Settings → Firm profile).
+ * Calendar: a month grid, a week view and the agenda list, over the same
+ * sources: open docket deadlines, open task due dates, and events in
+ * crm_calendar_event, which for a firm with the mailbox module include the
+ * events the daily sync reads from its connected Outlook calendars. Timed
+ * events are placed in the firm's own time zone (Settings → Firm profile).
  *
  * Each source is read separately and a failed read is SAID, never drawn as an
  * empty day: a blank grid over a broken read would tell a firm nothing is due.
+ * The Outlook read has its own three states (ok / database-update-needed /
+ * unavailable) and a quiet one-line note; it never blanks the other sources.
  */
 export default async function CalendarPage({ searchParams }: { searchParams: Promise<{ view?: string; d?: string }> }) {
   const params = await searchParams;
@@ -261,16 +347,30 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const anchor = isCivilDate(params.d) ? params.d : today;
   const range = viewRange(view, anchor);
 
-  const [deadlinesS, tasksS, profileS, eventsS] = await Promise.allSettled([
+  // The Outlook events exist only for a firm with the mailbox module; without it, no read and no note.
+  const hasMailbox = await orgHasModule("mailbox");
+  const outlookWindow = view === "agenda" ? { from: today, to: addDays(today, 30) } : range;
+
+  const [deadlinesS, tasksS, profileS, eventsS, outlookS] = await Promise.allSettled([
     listUpcomingDeadlines({}),
     listTasks({ status: "open" }),
     getOrgProfile(),
     view === "agenda" ? Promise.resolve([] as CalendarEventRow[]) : listCalendarEvents(range.from, range.to),
+    hasMailbox ? listOutlookCalendarEvents(outlookWindow.from, outlookWindow.to) : Promise.resolve(null),
   ]);
   const deadlines = deadlinesS.status === "fulfilled" ? deadlinesS.value : null;
   const tasks = tasksS.status === "fulfilled" ? tasksS.value : null;
   const events = eventsS.status === "fulfilled" ? eventsS.value : null;
   const timeZone = (profileS.status === "fulfilled" && profileS.value?.time_zone) || DEFAULT_TIME_ZONE;
+  const outlook: OutlookRead<{ events: OutlookCalendarEvent[] }> | null =
+    outlookS.status === "fulfilled" ? outlookS.value : { status: "unavailable" };
+  const outlookEvents = outlook?.status === "ok" ? outlook.events : [];
+  const outlookNote =
+    outlook?.status === "database-update-needed"
+      ? "Outlook events aren't available until the database update."
+      : outlook?.status === "unavailable"
+        ? "Outlook events couldn't be loaded."
+        : null;
 
   const failed = [deadlines === null && "docket dates", tasks === null && "tasks", events === null && "consults and meetings"].filter(
     Boolean,
@@ -280,7 +380,13 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const rows = buildCalendarRows(deadlines ?? [], tasks ?? [], now);
   const { needsReview } = splitNeedsReview(deadlines ?? [], now);
   const unconfirmed = new Set((deadlines ?? []).filter((d) => !d.attorney_confirmed).map((d) => `d-${d.id}`));
-  const items = [...rows.map((r) => rowToItem(r, unconfirmed)), ...(events ?? []).map((e) => eventToItem(e, timeZone))];
+  // The base read also returns Outlook rows once the database has them; the richer copy wins, so a row never shows twice.
+  const outlookIds = new Set(outlookEvents.map((e) => e.id));
+  const items = [
+    ...rows.map((r) => rowToItem(r, unconfirmed)),
+    ...(events ?? []).filter((e) => !outlookIds.has(e.id)).map((e) => eventToItem(e, timeZone)),
+    ...outlookEvents.map((e) => outlookToItem(e, timeZone)),
+  ];
 
   const title = view === "agenda" ? "Agenda" : viewTitle(view, anchor);
 
@@ -291,7 +397,10 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
           <div className="lx-label">Calendar</div>
           <h1 className="lx-h1">{title}</h1>
           <p className="lx-sub">
-            Docket deadlines, task due dates, and consults and meetings synced from Lawmatics. Times are in {timeZone.replaceAll("_", " ")}.
+            {hasMailbox
+              ? "Docket deadlines, task due dates, and events from your connected Outlook calendars."
+              : "Docket deadlines and task due dates."}{" "}
+            Times are in {timeZone.replaceAll("_", " ")}.
           </p>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
@@ -324,9 +433,15 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         </p>
       )}
 
+      {outlookNote && (
+        <p className="lx-note" role="status" style={{ margin: 0 }}>
+          {outlookNote}
+        </p>
+      )}
+
       {view === "month" && <MonthView weeks={monthGrid(anchor, today, items)} />}
       {view === "week" && <WeekView days={weekGrid(anchor, today, items)} />}
-      {view === "agenda" && (deadlines !== null || tasks !== null) && <AgendaView rows={rows} needsReview={needsReview} now={now} unconfirmed={unconfirmed} />}
+      {view === "agenda" && (deadlines !== null || tasks !== null) && <AgendaView rows={rows} needsReview={needsReview} now={now} unconfirmed={unconfirmed} outlook={outlookEvents} timeZone={timeZone} />}
 
       {view !== "agenda" && (
         <p className="lx-note" style={{ margin: 0 }}>

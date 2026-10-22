@@ -10,9 +10,25 @@ import { renderToStaticMarkup } from "react-dom/server";
  * POST /api/matters-chat call, never from data baked into the page.
  */
 
+/**
+ * The page is an async server component now (it reads the session, the firm
+ * time zone and the landing numbers), so the harness awaits it and mocks those
+ * reads. The assertions below are the original ones, unchanged.
+ */
 async function render() {
+  vi.doMock("@/lib/firm/session", () => ({
+    resolveFirmSession: vi.fn(async () => ({ kind: "ok", user: { id: "u-1", email: "t@example.com", user_metadata: {} }, org: { id: "o-1" } })),
+  }));
+  vi.doMock("@/lib/org/profile", () => ({ getFirmTimeZone: vi.fn(async () => "America/New_York") }));
+  vi.doMock("@/lib/members/directory", () => ({ listMemberDirectory: vi.fn(async () => []) }));
+  vi.doMock("@/lib/matters", () => ({
+    listMatters: vi.fn(async () => []),
+    listUpcomingDeadlines: vi.fn(async () => []),
+    summarizeDocket: () => ({ open: 0, stalled: [] }),
+  }));
+  vi.doMock("@/lib/queue/load", () => ({ loadActiveQueue: vi.fn(async () => ({ status: "ok", items: [] })) }));
   const { default: CopilotPage } = await import("@/app/dashboard/copilot/page");
-  return renderToStaticMarkup(CopilotPage());
+  return renderToStaticMarkup(await CopilotPage());
 }
 
 describe("CopilotPage", () => {

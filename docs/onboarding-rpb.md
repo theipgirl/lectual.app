@@ -45,6 +45,24 @@ State checked 2026-09-29 (lectual-prod, read-only):
 
 ## Part 2 — the session with Rebecca (~30 min)
 
+Work through **`/dashboard/setup`** (also reached from the "Finish setting up" card on Today) during
+the session. It is a ten-item checklist computed from what is actually saved, so Rebecca sees
+what is done, what is still to do, and what could not be checked (a failed read is never shown as
+done). Until every item is done, the Settings link in the rail opens it; the "Go to Integrations"
+link on that page is the way past it. The steps below map onto the items like this:
+
+| Step | Setup item |
+|---|---|
+| 2 | Firm profile and sign-off |
+| 3 | Team invited (more than one member) |
+| 4 | Outlook mailbox connected (yours or a shared one; needs the `mailbox` module) |
+| 5 | Lawmatics connected |
+| 6, 7 | Fathom or Zoom connected (one is enough) |
+| 8 | LawPay connected |
+| 9 | At least one agent on (needs the `agents` module) |
+| 10 | An intake form live, and Packages saved (an active legal-fee item in the service library) |
+| Part 1 | AI configured (the AI key on this deployment; Lectual sets it) |
+
 1. Sign in at `<production URL>/sign-in` with her own email (magic link). Confirm the
    header says RPB Law.
 2. **Settings → Firm profile:** display name, time zone, the sign-off drafts use.

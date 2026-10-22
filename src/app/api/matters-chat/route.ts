@@ -1,20 +1,62 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { resolveFirmSession } from "@/lib/firm/session";
-import { answerMattersChatQuestion } from "@/lib/agents/matters-chat";
-import { AiNotConfiguredError } from "@/lib/ai/claude";
+import { streamMattersChatQuestion, type CopilotProgress } from "@/lib/agents/matters-chat";
+import { aiConfigured } from "@/lib/ai/claude";
+import { encodeSse, type CopilotStreamEvent } from "@/lib/copilot/sse";
 
 export const runtime = "nodejs";
 
 const bodySchema = z.object({
   question: z.string().min(1).max(2000),
+  // Earlier turns of the visible thread. Text only; the server trims it
+  // (buildHistory) and nothing in it grants a read the caller doesn't have.
+  history: z
+    .array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(20_000) }))
+    .max(50)
+    .optional(),
+  // The page the drawer is open on. Only the pathname is used: the record id is
+  // parsed from it again on the server, and unknown fields are dropped.
+  context: z
+    .object({
+      pathname: z.string().max(300),
+      leadId: z.string().max(64).optional(),
+      matterId: z.string().max(64).optional(),
+    })
+    .optional(),
 });
 
+const STREAM_HEADERS = {
+  "Content-Type": "text/event-stream; charset=utf-8",
+  "Cache-Control": "no-cache, no-transform",
+  "X-Accel-Buffering": "no",
+};
+
+const STREAM_FAILED = "Something went wrong answering that — try again.";
+
+function toStreamEvent(ev: CopilotProgress): CopilotStreamEvent {
+  switch (ev.type) {
+    case "delta":
+      return { event: "delta", data: { text: ev.text } };
+    case "tool":
+      return { event: "tool", data: { name: ev.name, label: ev.label, status: ev.status } };
+    case "context":
+      return { event: "context", data: { status: ev.status } };
+  }
+}
+
 /**
- * The AI copilot's question-answering endpoint (/dashboard/copilot/). Ported
- * from lectual's home-page "search your matters" copilot API route — see
- * @/lib/agents/matters-chat for the tool set, the UPL-firewall system
- * prompt, and why every answer carries citations.
+ * The AI copilot's question-answering endpoint (/dashboard/copilot/ and the
+ * drawer on every other dashboard page). Ported from lectual's home-page
+ * "search your matters" copilot API route — see @/lib/agents/matters-chat for
+ * the tool set, the UPL-firewall system prompt, and why every answer carries
+ * citations.
+ *
+ * Answers over Server-Sent Events (@/lib/copilot/sse): `tool` status, `delta`
+ * text as the model writes it, `context` (only when the drawer sent a lead or
+ * matter page), then one closing `final` with the authoritative answer and its
+ * citations, or an `error`. Everything that can be refused is refused as plain
+ * JSON BEFORE the stream opens, with the same statuses as ever.
  *
  * Access is checked here (resolveFirmSession, the dashboard's own door) even
  * though getScopedClient() + RLS is the real tenant boundary for every read
@@ -22,7 +64,7 @@ const bodySchema = z.object({
  * never another org's data) — fail closed before spending a model call on a
  * request that has no firm workspace to read.
  */
-export async function POST(req: NextRequest): Promise<NextResponse> {
+export async function POST(req: NextRequest): Promise<Response> {
   let body: unknown;
   try {
     body = await req.json();
@@ -47,14 +89,55 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "You don't have access to a firm workspace." }, { status: 403 });
   }
 
-  try {
-    const result = await answerMattersChatQuestion(parsed.data.question);
-    return NextResponse.json(result);
-  } catch (err) {
-    if (err instanceof AiNotConfiguredError) {
-      return NextResponse.json({ error: "The copilot isn't configured for this deployment yet." }, { status: 503 });
-    }
-    console.error("[matters-chat] failed to answer question", err);
-    return NextResponse.json({ error: "Something went wrong answering that — try again." }, { status: 500 });
+  if (!aiConfigured()) {
+    return NextResponse.json({ error: "The copilot isn't configured for this deployment yet." }, { status: 503 });
   }
+
+  const { question, history, context } = parsed.data;
+  const orgId = session.org.id;
+  const encoder = new TextEncoder();
+  let cancelled = false;
+
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      const send = (ev: CopilotStreamEvent) => {
+        if (cancelled) return;
+        try {
+          controller.enqueue(encoder.encode(encodeSse(ev)));
+        } catch {
+          cancelled = true;
+        }
+      };
+
+      // Not awaited: the first frames must reach the browser while the model is
+      // still writing, so `start` returns at once and this runs on its own.
+      void (async () => {
+        try {
+          const result = await streamMattersChatQuestion({
+            question,
+            history,
+            pathname: context?.pathname,
+            orgId,
+            onEvent: (ev) => send(toStreamEvent(ev)),
+            shouldStop: () => cancelled,
+          });
+          send({ event: "final", data: result });
+        } catch (err) {
+          console.error("[matters-chat] failed to answer question", err);
+          send({ event: "error", data: { message: STREAM_FAILED } });
+        } finally {
+          try {
+            controller.close();
+          } catch {
+            // already closed by a disconnect
+          }
+        }
+      })();
+    },
+    cancel() {
+      cancelled = true;
+    },
+  });
+
+  return new Response(stream, { status: 200, headers: STREAM_HEADERS });
 }

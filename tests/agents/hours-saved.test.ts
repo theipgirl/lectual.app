@@ -21,16 +21,34 @@ describe("Hours saved (est.)", () => {
       DEFAULT_MINUTES_PER_TASK,
     );
     // 12×10 + 6×5 + 3×20 = 210 min
-    expect(est.tasks).toEqual({ "intake-triage": 12, "email-intel": 6, "post-consult": 3 });
+    expect(est.tasks).toEqual({
+      "intake-triage": 12,
+      "email-intel": 6,
+      "post-consult": 3,
+      "stage-keeper": 0,
+      "morning-brief": 0,
+      "consult-prep": 0,
+      "inbox-summary": 0,
+    });
     expect(est.hours).toBe(3.5);
   });
 
   it("uses the firm's own minutes when set, and defaults for the rest", () => {
     const { minutes, customised } = resolveMinutes({ "intake-triage": 30, "email-intel": 999, bogus: 5 });
     expect(customised).toBe(true);
-    expect(minutes).toEqual({ "intake-triage": 30, "email-intel": 5, "post-consult": 20 });
+    expect(minutes).toEqual({
+      "intake-triage": 30,
+      "email-intel": 5,
+      "post-consult": 20,
+      "stage-keeper": 2,
+      "morning-brief": 5,
+      "consult-prep": 15,
+      "inbox-summary": 3,
+    });
     expect(estimateHoursSaved([r("intake-triage", "ok", 4, 0)], minutes).hours).toBe(2);
-    expect(estimateAssumption(minutes)).toBe("5 min per client email read, 30 min per lead screened, 20 min per follow-up drafted");
+    expect(estimateAssumption(minutes)).toBe(
+      "5 min per client email read, 30 min per lead screened, 20 min per follow-up drafted, 2 min per lead placed, 5 min per brief or follow-up drafted, 15 min per consult prepped, 3 min per digest or reply drafted",
+    );
   });
 
   it("parses the settings form: blank = default, out of range refused", () => {
@@ -83,5 +101,23 @@ describe("outcome metrics", () => {
       { due_date: "2026-09-10", satisfied_at: null, status: "waived" },
     ];
     expect(deadlinesMetThisMonth(rows, now, "America/New_York")).toEqual({ met: 1, closed: 2 });
+  });
+});
+
+describe("Hours saved (est.): the Stage Keeper (Sprint 16, F16)", () => {
+  it("counts leads placed (moves), not suggestion cards a person still has to accept", () => {
+    // 5 moves + 2 cards written: items_in 7, drafts_out 2.
+    const est = estimateHoursSaved([r("stage-keeper", "ok", 7, 2), r("stage-keeper", "error", 9, 0)], DEFAULT_MINUTES_PER_TASK);
+    expect(est.tasks["stage-keeper"]).toBe(5);
+    expect(est.hours).toBe(Math.round(((5 * DEFAULT_MINUTES_PER_TASK["stage-keeper"]) / 60) * 10) / 10);
+  });
+
+  it("has a default, a unit, and a minutes form entry", () => {
+    expect(DEFAULT_MINUTES_PER_TASK["stage-keeper"]).toBe(2);
+    expect(estimateAssumption(DEFAULT_MINUTES_PER_TASK)).toContain("2 min per lead placed");
+    const fd = new FormData();
+    fd.set("minutes-stage-keeper", "3");
+    expect(parseMinutesForm(fd)).toEqual({ ok: true, value: { "stage-keeper": 3 } });
+    expect(resolveMinutes({ "stage-keeper": 4 }).minutes["stage-keeper"]).toBe(4);
   });
 });

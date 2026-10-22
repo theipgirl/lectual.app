@@ -48,6 +48,12 @@ export type LogActivityInput = {
   matterId?: string;
   actorType?: Activity["actor_type"];
   payload?: Record<string, unknown>;
+  /**
+   * Whether this row counts as contact with the lead and bumps its last touch. Default true. A
+   * row that only records a decision about the record (dismissing a Stage Keeper suggestion) is
+   * not contact, so it passes false.
+   */
+  touchLead?: boolean;
 };
 
 /**
@@ -119,7 +125,7 @@ export async function logActivity(input: LogActivityInput): Promise<void> {
   // Anything written to a lead's timeline counts as a touch, so the Intake list's
   // last-touch sort sees it. Best-effort: it never fails or changes this write. A
   // matter-only row touches no lead.
-  if (input.leadId) await bumpLeadLastTouch(supabase, input.leadId, orgId);
+  if (input.leadId && input.touchLead !== false) await bumpLeadLastTouch(supabase, input.leadId, orgId);
 }
 
 /**

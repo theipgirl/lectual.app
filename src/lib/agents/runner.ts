@@ -1,10 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { StructuredCall } from "@/lib/ai/claude";
-import type { NewQueueDraft } from "@/lib/queue/api";
+import type { NewQueueDraft, QueueItem } from "@/lib/queue/api";
 import type { SyncDeps } from "@/lib/mailbox/sync";
 import { runEmailIntel } from "./email-intel";
 import { runIntakeTriage } from "./intake-triage";
 import { runPostConsult } from "./post-consult";
+import { runStageKeeper } from "./stage-keeper/run";
+import { runMorningBrief } from "./morning-brief/run";
+import { runConsultPrep } from "./consult-prep/run";
+import { runInboxSummary } from "./inbox-summary/run";
 import { AGENT_DEFS, AGENT_IDS, type AgentContext, type AgentId, type AgentResult, type AgentTrigger, type Autonomy } from "./types";
 
 /**
@@ -27,6 +31,10 @@ const RUNNERS: Record<AgentId, (ctx: AgentContext) => Promise<AgentResult>> = {
   "email-intel": runEmailIntel,
   "intake-triage": runIntakeTriage,
   "post-consult": runPostConsult,
+  "stage-keeper": runStageKeeper,
+  "morning-brief": runMorningBrief,
+  "consult-prep": runConsultPrep,
+  "inbox-summary": runInboxSummary,
 };
 
 export type AgentSetting = { enabled: boolean; autonomy: Autonomy };
@@ -47,6 +55,8 @@ export type RunnerDeps = {
   admin: SupabaseClient;
   llm: StructuredCall;
   createDraft: (input: NewQueueDraft) => Promise<{ id: string }>;
+  /** Lists a firm's pending queue items by its queue key. Absent in tests that do not need it. */
+  listPending?: (orgKey: string) => Promise<QueueItem[]>;
   mailbox?: SyncDeps;
   fetchImpl?: typeof fetch;
   now?: () => number;
@@ -114,7 +124,11 @@ export async function runOneAgent(
     .single();
   const runId = (run?.id as string | undefined) ?? null;
 
-  const { data: org } = await admin.from("crm_org").select("queue_org_key").eq("id", orgId).maybeSingle();
+  // One read of the firm's own row serves the queue key and the module list. A failed read, or no
+  // row, leaves the module list `null` ("could not be read"), which the Mailboxes gate treats as off.
+  const { data: org, error: orgError } = await admin.from("crm_org").select("queue_org_key, modules").eq("id", orgId).maybeSingle();
+  const orgModules = !orgError && org && Array.isArray(org.modules) ? (org.modules as string[]) : null;
+  const queueOrgKey = (org?.queue_org_key as string | null) ?? null;
 
   // Wrap the model call to total the run's cost.
   let cost = 0;
@@ -131,8 +145,10 @@ export async function runOneAgent(
     orgId,
     autonomy: args.autonomy,
     llm,
-    queueOrgKey: (org?.queue_org_key as string | null) ?? null,
+    queueOrgKey,
     createDraft: deps.createDraft,
+    listPending: deps.listPending && queueOrgKey ? () => (deps.listPending as NonNullable<RunnerDeps["listPending"]>)(queueOrgKey) : undefined,
+    orgModules,
     now,
     siteOrigin: deps.siteOrigin,
     fetchImpl: deps.fetchImpl,

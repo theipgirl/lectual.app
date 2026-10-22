@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { formatCents } from "@/lib/quotes/money";
 import type { ProposalRowView } from "@/lib/proposals/list-rows";
+import { PaidCell } from "./PaidCell";
 
 /**
  * The proposals table, to the Quotes & proposals design: PROPOSAL, CLIENT, STATUS, AT SIGNING,
@@ -36,6 +37,7 @@ export function ProposalsTable({ rows, footerLeft, footerRight }: { rows: Propos
                 <td>
                   <span className={`lx-pill lx-pill-${r.statusTone}`}>{r.statusLabel}</span>
                   {r.statusSub && <div className="pq-mono pq-sub">{r.statusSub}</div>}
+                  {r.paid && <PaidCell proposalId={r.id} marker={r.paid} canMarkPaid={r.canMarkPaid} />}
                 </td>
                 <td className="pq-money">{formatCents(r.atSigningCents)}</td>
                 <td className="pq-money pq-filing">{formatCents(r.atFilingCents)}</td>

@@ -3,7 +3,7 @@ import { sheetKeyFor } from "../../src/lib/intake/sheet-import";
 import { intakeCodeKeys, readSheetText } from "../../src/lib/intake/sheet-read";
 import type { SheetEntry } from "../../src/lib/intake/sheet-read";
 import type { LawmaticsSourceRecord } from "../../src/lib/lawmatics/normalize";
-import { EMAIL_STAGE_TABLE, emailSignalFor } from "../../src/lib/reconcile/email";
+import { EMAIL_STAGE_TABLE, agentEvidenceFor, emailSignalFor } from "../../src/lib/reconcile/email";
 import { indexLawmatics, isHiredStage, lawmaticsSignalFor, matchLawmatics } from "../../src/lib/reconcile/lawmatics";
 import { matchSheetToLeads, sheetSignalFor } from "../../src/lib/reconcile/sheet-match";
 import { NOW, S, STAGES, fixtureText } from "./helpers";
@@ -212,5 +212,73 @@ describe("the email source signal", () => {
   it("a stage name the firm lacks is unmapped, never a guess", () => {
     const withoutPost = STAGES.filter((s) => s.id !== S.post);
     expect(emailSignalFor([mail("post-consult", "2026-09-01T10:00:00Z")], withoutPost)).toEqual({ kind: "unmapped", wording: "Post-consultation email" });
+  });
+});
+
+// ── the Stage Keeper as part of the "Email / calendar" source (Sprint 16, F19) ──
+
+
+describe("the Email / calendar source also reads the Stage Keeper", () => {
+  const mail = (type: string, at: string, sensitive = false) => ({ type, sensitive, at });
+  const agentMove = (over: Record<string, unknown> = {}, at = "2026-09-10T12:00:00.000Z") => ({
+    id: "move-1",
+    lead_id: "L1",
+    type: "stage_changed",
+    actor_type: "ai",
+    created_at: at,
+    payload: {
+      actor: "agent:stage-keeper",
+      to_stage_id: S.loe,
+      to_stage: "LOE & Invoice Sent",
+      signal: "loe-invoice-sent",
+      evidence: { kind: "mail", type: "loe-invoice", direction: "outbound", at: "2026-09-09T10:00:00Z", subject: null },
+      ...over,
+    },
+  });
+  const suggestion = (over: Record<string, unknown> = {}) => ({
+    id: "sug-1",
+    lead_id: "L1",
+    type: "ai_insight",
+    actor_type: "ai",
+    created_at: "2026-09-11T12:00:00.000Z",
+    payload: { source: "stage-keeper", kind: "stage_suggestion", to_stage_id: S.post, to_stage: "Post Consultation Email Sent", signal: "post-consult-sent", evidence: { kind: "mail", type: "post-consult", direction: "outbound", at: "2026-09-11T09:00:00Z", subject: null }, ...over },
+  });
+
+  it("an agent move shows with its stage, its wording and the evidence date", () => {
+    const evidence = agentEvidenceFor([agentMove()]);
+    expect(evidence).toEqual([{ stageId: S.loe, wording: "Stage Keeper: LOE sent", date: "2026-09-09T10:00:00Z" }]);
+    expect(emailSignalFor([], STAGES, evidence)).toEqual({ kind: "stage", stageId: S.loe, stageName: "LOE & Invoice Sent", wording: "Stage Keeper: LOE sent", date: "2026-09-09T10:00:00Z" });
+  });
+
+  it("a pending suggestion shows too, as a suggestion", () => {
+    const evidence = agentEvidenceFor([suggestion()]);
+    expect(evidence[0].wording).toBe("Stage Keeper suggests: Post-consult sent");
+    expect(emailSignalFor([], STAGES, evidence)).toMatchObject({ kind: "stage", stageId: S.post, wording: "Stage Keeper suggests: Post-consult sent" });
+  });
+
+  it("a move that was undone or replaced, and a suggestion that was decided, are not evidence", () => {
+    const undo = { id: "u", lead_id: "L1", type: "stage_changed", actor_type: "user", created_at: "2026-09-12T12:00:00.000Z", payload: { undoes_activity_id: "move-1", to_stage_id: S.pnc } };
+    expect(agentEvidenceFor([agentMove(), undo])).toEqual([]);
+    const reviewed = { id: "r", lead_id: "L1", type: "ai_insight", actor_type: "user", created_at: "2026-09-12T12:00:00.000Z", payload: { source: "stage-keeper-review", suggestion_id: "sug-1", decision: "dismiss" } };
+    expect(agentEvidenceFor([suggestion(), reviewed])).toEqual([]);
+  });
+
+  it("the newest mapped evidence wins, mail or agent", () => {
+    const evidence = agentEvidenceFor([agentMove()]); // 2026-09-09
+    expect(emailSignalFor([mail("discovery-call", "2026-09-20T10:00:00Z")], STAGES, evidence)).toMatchObject({ stageId: S.consult, wording: "Discovery call email" });
+    expect(emailSignalFor([mail("discovery-call", "2026-09-01T10:00:00Z")], STAGES, evidence)).toMatchObject({ stageId: S.loe, wording: "Stage Keeper: LOE sent" });
+  });
+
+  it("a sensitive thread contributes nothing, and does not hide the agent's own evidence", () => {
+    expect(emailSignalFor([mail("loe-invoice", "2026-09-30T10:00:00Z", true)], STAGES)).toMatchObject({ kind: "none" });
+    expect(emailSignalFor([mail("loe-invoice", "2026-09-30T10:00:00Z", true)], STAGES, agentEvidenceFor([suggestion()]))).toMatchObject({ kind: "stage", stageId: S.post });
+  });
+
+  it("a stage id that is not one of the firm's stages is unmapped, never a vote", () => {
+    expect(emailSignalFor([], STAGES, [{ stageId: "not-a-stage", wording: "Stage Keeper: LOE sent", date: "2026-09-09T10:00:00Z" }])).toEqual({ kind: "unmapped", wording: "Stage Keeper: LOE sent" });
+  });
+
+  it("with no agent evidence the reading is exactly what it was", () => {
+    expect(emailSignalFor([mail("loe-invoice", "2026-09-01T10:00:00Z")], STAGES, [])).toEqual(emailSignalFor([mail("loe-invoice", "2026-09-01T10:00:00Z")], STAGES));
   });
 });

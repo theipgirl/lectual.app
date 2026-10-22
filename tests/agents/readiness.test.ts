@@ -91,3 +91,44 @@ describe("agentReadiness (S1)", () => {
     expect(r({ mailbox: "none" })).toEqual(r({ mailbox: "none" }));
   });
 });
+
+describe("agentReadiness: the Stage Keeper (Sprint 16, F16)", () => {
+  const sk = (over: Partial<AgentReadinessInput> = {}) => agentReadiness({ ...base, agent: "stage-keeper", ...over });
+
+  it("needs no AI key: it is rule-based, so a missing key never blocks it", () => {
+    expect(sk({ aiConfigured: false })).toMatchObject({ label: "On", tone: "ok" });
+    expect(sk({ aiConfigured: false, calendar: "ok" })).toMatchObject({ label: "On", tone: "ok" });
+  });
+
+  it("is ready with an active mailbox, or with readable consults and no mailbox", () => {
+    expect(sk({ mailbox: "ok", calendar: "none" })).toMatchObject({ tone: "ok" });
+    expect(sk({ mailbox: "none", calendar: "ok" })).toMatchObject({ tone: "ok" });
+    expect(sk({ mailbox: "unavailable", calendar: "ok" })).toMatchObject({ tone: "ok" });
+  });
+
+  it("is blocked, with a clear label, when there is no mailbox and no readable consult", () => {
+    expect(sk({ mailbox: "none", calendar: "none" })).toMatchObject({ label: "On · waiting for a mailbox", tone: "warn" });
+    expect(sk({ mailbox: "none" })).toMatchObject({ label: "On · waiting for a mailbox", tone: "warn" });
+  });
+
+  it("a failed read of either source is 'couldn't check', never 'nothing connected'", () => {
+    expect(sk({ mailbox: "unavailable", calendar: "none" }).label).toContain("couldn't check");
+    expect(sk({ mailbox: "none", calendar: "unavailable" }).label).toContain("couldn't check");
+    expect(sk({ mailbox: "unavailable", calendar: "unavailable" }).tone).toBe("warn");
+  });
+
+  it("needs the Mailboxes module, on or off", () => {
+    expect(sk({ hasMailboxModule: false })).toMatchObject({ label: "Needs the Mailboxes module", tone: "warn" });
+    expect(sk({ hasMailboxModule: false, enabled: false })).toMatchObject({ label: "Needs the Mailboxes module", tone: "mute" });
+  });
+
+  it("off is off", () => {
+    expect(sk({ enabled: false })).toMatchObject({ label: "Off", tone: "mute" });
+  });
+
+  it("the other agents still need the AI key, as before", () => {
+    for (const agent of ["email-intel", "intake-triage", "post-consult"] as const) {
+      expect(agentReadiness({ ...base, agent, aiConfigured: false }).label).toBe("On · needs the AI key");
+    }
+  });
+});

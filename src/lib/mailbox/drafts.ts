@@ -69,3 +69,45 @@ export async function createMailboxDraft(
     webLink: provider === "google" ? "https://mail.google.com/mail/#drafts" : (json.webLink ?? null),
   };
 }
+
+export type DraftSummary = { subject: string; to: string[] };
+
+const DRAFTS_PAGE = 100;
+const DRAFTS_MAX_PAGES = 2;
+
+/**
+ * The newest items in a Microsoft mailbox's Drafts folder: subject and recipient addresses only, no
+ * body. Read-only. Used to avoid leaving a second reply draft for a message that already has one.
+ * A refused or failed read throws, so the caller can say the folder could not be checked rather than
+ * assume it is empty.
+ */
+export async function listDraftSummaries(args: { accessToken: string; fetchImpl?: typeof fetch }): Promise<DraftSummary[]> {
+  const { accessToken, fetchImpl = fetch } = args;
+  let url =
+    `https://graph.microsoft.com/v1.0/me/mailFolders/drafts/messages?$select=subject,toRecipients&$top=${DRAFTS_PAGE}` +
+    `&$orderby=${encodeURIComponent("lastModifiedDateTime desc")}`;
+  const out: DraftSummary[] = [];
+  for (let page = 0; page < DRAFTS_MAX_PAGES; page += 1) {
+    const res = await fetchImpl(url, { headers: { authorization: `Bearer ${accessToken}` } });
+    if (res.status === 401 || res.status === 403) {
+      throw new ProviderError("Your mailbox connection needs reconnecting before drafts can be checked.", "reauth");
+    }
+    if (!res.ok) throw new ProviderError(`Couldn't read the Drafts folder (${res.status}).`, "fetch-failed");
+    const json = (await res.json()) as {
+      value?: Array<{ subject?: string | null; toRecipients?: Array<{ emailAddress?: { address?: string | null } }> }>;
+      "@odata.nextLink"?: string;
+    };
+    for (const m of json.value ?? []) {
+      out.push({
+        subject: m.subject ?? "",
+        to: (m.toRecipients ?? []).map((r) => r.emailAddress?.address?.trim().toLowerCase() ?? "").filter(Boolean),
+      });
+    }
+    const next = json["@odata.nextLink"];
+    if (!next) break;
+    // Only ever follow a link back to Graph itself: a bearer token goes nowhere else.
+    if (!next.startsWith("https://graph.microsoft.com/")) throw new ProviderError("The Drafts folder returned an unexpected link.", "fetch-failed");
+    url = next;
+  }
+  return out;
+}

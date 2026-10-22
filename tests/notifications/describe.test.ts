@@ -132,3 +132,41 @@ describe("describeNotification links (F2)", () => {
     expect(describeNotification(row("assigned", {}, { lead_id: null, matter_id: null })).href).toBeNull();
   });
 });
+
+describe("describeNotification: a client accepted a proposal (Sprint 19)", () => {
+  const PROPOSAL = "44444444-4444-4444-8444-444444444444";
+  const accepted = { source: "proposal_accepted", proposal_id: PROPOSAL, headline: "Sevetri Wilson accepted Concierge · legal $4,950" };
+
+  it("reads as 'Proposal accepted' with the headline and links to the proposal, not the queue", () => {
+    const out = describeNotification(row("approval_needed", accepted));
+    expect(out).toEqual({
+      icon: "approval",
+      label: "Proposal accepted",
+      sentence: "Sevetri Wilson accepted Concierge · legal $4,950",
+      href: `/dashboard/proposals/${PROPOSAL}/`,
+    });
+    expect(out.sentence).not.toContain("A draft is waiting");
+  });
+
+  it("reads the same under the older 'mentioned' kind", () => {
+    expect(describeNotification(row("mentioned", accepted)).label).toBe("Proposal accepted");
+  });
+
+  it("a malformed payload gives a neutral sentence and no link", () => {
+    const out = describeNotification(row("approval_needed", { source: "proposal_accepted", proposal_id: "../x", headline: 7 }));
+    expect(out.sentence).toBe("A client accepted a proposal");
+    expect(out.href).toBeNull();
+    expect(describeNotification(row("approval_needed", { source: "proposal_accepted" })).href).toBeNull();
+  });
+
+  it("clips a long headline", () => {
+    expect(describeNotification(row("approval_needed", { ...accepted, headline: "x".repeat(500) })).sentence.length).toBeLessThanOrEqual(120);
+  });
+
+  it("an approval_needed row with a queue id still reads the old sentence and links to the queue", () => {
+    const out = describeNotification(row("approval_needed", { source: "approval_needed", queue_id: "q_abc-1", headline: "Follow-up — Ana Ruiz" }));
+    expect(out.label).toBe("Needs approval");
+    expect(out.sentence).toBe("A draft is waiting for your approval: Follow-up — Ana Ruiz");
+    expect(out.href).toBe("/dashboard/queue/q_abc-1/");
+  });
+});

@@ -82,8 +82,8 @@ describe("report link tiles hide unbuilt sections (F12)", () => {
 });
 
 describe("source references to unbuilt sections", () => {
-  it("only src/lib/nav.ts names /dashboard/sms, /portals or /skills", () => {
-    const out = execSync(`grep -rln "dashboard/\\(sms\\|portals\\|skills\\)" src || true`, { encoding: "utf8" }).trim();
+  it("only src/lib/nav.ts names /dashboard/sms or /portals", () => {
+    const out = execSync(`grep -rln "dashboard/\\(sms\\|portals\\)" src || true`, { encoding: "utf8" }).trim();
     expect(out.split("\n").filter(Boolean)).toEqual(["src/lib/nav.ts"]);
   });
 });

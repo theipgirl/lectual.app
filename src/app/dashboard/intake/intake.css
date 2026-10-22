@@ -192,3 +192,27 @@
     justify-content: flex-start;
   }
 }
+
+/* ---- Stage Keeper: the "Moved by agent" chip --------------------- */
+
+.intake-root .intake-agent-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: var(--oxbg);
+  color: var(--ox);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 10px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.intake-root .intake-agent-chip > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

@@ -172,3 +172,11 @@ Runbook (`docs/runbooks/publish-proposal-links.md`) Step 5 defects: #2 (manual r
 read as settled) fixed in `payment-state.ts`; #4 (pre-signature "nothing is charged" depending on an unpicked
 package) fixed by answering from the firm's setup only (`firmTakesCardPayments`); #5 (5xx/429 as decline) kept
 fixed in `lawpay.ts`; #1 and #3 concern client line requests (0071/0073), which this app does not have.
+
+## Ported from `lawmatics-mcp`
+
+Source commit: `73355ec`. Copy, don't import: lawmatics-mcp is a separate deployment.
+
+| lectual.app | From lawmatics-mcp | Changes |
+|---|---|---|
+| `src/lib/inbox/triage.ts` | `src/triage.ts` | bucket order, labels and rule order unchanged. Three deliberate changes: (a) the firm's own domains come from its connected mailbox addresses (`firmDomainsOf`), not the `FIRM_DOMAINS` environment variable; (b) `assignTo` is a role label (Attorney, Intake, Filings, Partnerships, Discovery calls), not a named RPB teammate, because the agent runs for every firm and one firm's staff names must not appear in another's digest; (c) the six sensitive phrases are the app's own `SENSITIVE_PHRASES` (`src/lib/intake/email-match.ts`), not a second copy, so the reason quotes the first matching phrase in this order. Reasons and labels also drop the source's em dashes. |

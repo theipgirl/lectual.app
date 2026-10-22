@@ -205,3 +205,63 @@ describe("readLawmatics", () => {
     expect((await readLawmatics()).status).toBe("unavailable");
   });
 });
+
+describe("readStoredMail: the Stage Keeper's rows (Sprint 16, F19)", () => {
+  const agentMove = (leadId: string) => ({
+    id: `move-${leadId.slice(-3)}`,
+    org_id: "aaaaaaaa-0000-4000-8000-000000000001",
+    lead_id: leadId,
+    type: "stage_changed",
+    actor_type: "ai",
+    created_at: "2026-09-10T12:00:00Z",
+    payload: { actor: "agent:stage-keeper", to_stage_id: S.loe, signal: "loe-invoice-sent", evidence: { kind: "mail", type: "loe-invoice", direction: "outbound", at: "2026-09-09T10:00:00Z", subject: null } },
+  });
+
+  it("returns the agent's moves per lead beside the mail, without changing what the mail read returns", async () => {
+    const world = makeWorld({ activity: [agentMove(L.amara)] });
+    const { readStoredMail } = await load();
+    const read = await readStoredMail(world.client as never, [L.amara, L.kwame]);
+    if (read.status !== "ok") throw new Error("expected ok");
+    expect(read.agent?.get(L.amara)).toEqual([{ stageId: S.loe, wording: "Stage Keeper: LOE sent", date: "2026-09-09T10:00:00Z" }]);
+    expect(read.agent?.has(L.kwame)).toBe(false);
+    expect(read.byLead.size).toBe(0);
+    expect(read.total).toBe(0);
+  });
+
+  it("another firm's rows are never read", async () => {
+    const world = makeWorld({ activity: [{ ...agentMove(L.amara), org_id: OTHER_ORG }] });
+    const { readStoredMail } = await load();
+    const read = await readStoredMail(world.client as never, [L.amara]);
+    if (read.status !== "ok") throw new Error("expected ok");
+    expect(read.agent).toBeUndefined();
+  });
+
+  it("a failure reading the agent's rows makes the whole source unavailable, with a reason and no raw error, never 'none'", async () => {
+    const world = makeWorld({ activity: [] });
+    const base = world.client;
+    const failing = {
+      ...base,
+      from: (table: string) => {
+        const q = base.from(table) as unknown as Record<string, (...a: unknown[]) => unknown>;
+        const select = q.select.bind(q);
+        q.select = (columns: unknown, ...rest: unknown[]) => {
+          if (typeof columns === "string" && columns.includes("actor_type")) {
+            const dead: Record<string, unknown> = {};
+            for (const m of ["in", "order", "range", "eq", "gte", "limit"]) dead[m] = () => dead;
+            dead.then = (ok: (v: unknown) => unknown) => Promise.resolve({ data: null, error: { code: "XX000", message: SECRET } }).then(ok);
+            return dead;
+          }
+          return select(columns, ...rest);
+        };
+        return q;
+      },
+    };
+    const { readStoredMail } = await load();
+    const read = await readStoredMail(failing as never, [L.amara]);
+    expect(read.status).toBe("unavailable");
+    if (read.status !== "unavailable") throw new Error();
+    expect(read.reason).toContain("Stage Keeper");
+    expect(read.reason).not.toContain(SECRET);
+    expect(logged()).not.toContain(SECRET);
+  });
+});

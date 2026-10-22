@@ -7,6 +7,7 @@ import { REFERRAL_SOURCES } from "@/lib/intake";
 import type { ReplyState } from "@/lib/intake/reply";
 import {
   UNASSIGNED_OWNER,
+  type AgentMoveFilter,
   type IntakeFilters,
   type IntakeGroup,
   type IntakeView,
@@ -42,6 +43,12 @@ const TEMP_OPTIONS: Array<{ value: TempFilter; label: string }> = [
   { value: "none", label: "Not routed" },
 ];
 
+/** The "Agent moves" filter: leads the Stage Keeper placed today (the firm's day) or in the last 7 days. */
+const AGENT_OPTIONS: Array<{ value: AgentMoveFilter; label: string }> = [
+  { value: "today", label: "Today" },
+  { value: "7d", label: "7 days" },
+];
+
 function Divider() {
   return <span aria-hidden style={{ width: 1, height: 24, background: "var(--line)" }} />;
 }
@@ -64,6 +71,7 @@ export default function IntakeControls({
   members,
   visibleCount,
   needsRebeccaCount,
+  agentMoveCounts,
   currentHref,
   onFilters,
   onGroup,
@@ -81,6 +89,11 @@ export default function IntakeControls({
    * approval queue wasn't read, so the toggle is not offered at all.
    */
   needsRebeccaCount?: number | null;
+  /**
+   * How many leads in this list the Stage Keeper moved, by window. null/undefined = the moves
+   * couldn't be read (or the board has none to offer), so the filter is not offered at all.
+   */
+  agentMoveCounts?: { today: number; week: number } | null;
   /** The link "Save this view" copies. */
   currentHref: string;
   onFilters: (next: IntakeFilters) => void;
@@ -333,6 +346,57 @@ export default function IntakeControls({
           </>
         )}
       </Popover>
+
+      {agentMoveCounts != null && (
+        <Popover
+          label="Filter by agent moves"
+          width={170}
+          trigger={({ onClick, ref, ...aria }) => (
+            <button
+              {...aria}
+              ref={ref}
+              type="button"
+              onClick={onClick}
+              style={filterChip(Boolean(filters.agent))}
+              title="Show only leads the Stage Keeper moved, and that nobody has moved since."
+            >
+              {filters.agent
+                ? `Agent moves · ${AGENT_OPTIONS.find((option) => option.value === filters.agent)?.label ?? ""}`
+                : "Agent moves"}
+              <span style={CHIP_COUNT}>{filters.agent === "today" ? agentMoveCounts.today : agentMoveCounts.week}</span>
+            </button>
+          )}
+        >
+          {(close) => (
+            <>
+              <PopoverItem
+                muted
+                checked={!filters.agent}
+                onSelect={() => {
+                  close();
+                  onFilters({ ...filters, agent: null });
+                }}
+              >
+                Any lead
+              </PopoverItem>
+              {AGENT_OPTIONS.map((option) => (
+                <PopoverItem
+                  key={option.value}
+                  checked={filters.agent === option.value}
+                  onSelect={() => {
+                    close();
+                    onFilters({ ...filters, agent: option.value });
+                  }}
+                >
+                  {option.label}
+                  {" · "}
+                  {option.value === "today" ? agentMoveCounts.today : agentMoveCounts.week}
+                </PopoverItem>
+              ))}
+            </>
+          )}
+        </Popover>
+      )}
 
       {needsRebeccaCount != null && (
         <button

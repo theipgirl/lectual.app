@@ -2,6 +2,8 @@ import "server-only";
 import { notFound } from "next/navigation";
 import { currentRole } from "@/lib/auth/current-role";
 import { orgHasModule } from "@/lib/org/modules";
+import { PROPOSAL_PAID_ROLES } from "@/lib/proposals/paid";
+import { MARK_PAID_WORDS } from "@/lib/proposals/step-text";
 import { PROPOSAL_ADMIN_ROLES, PROPOSAL_STAFF_WRITE_ROLES } from "@/lib/proposals/types";
 import { NOT_ALLOWED, type ActionState } from "./errors";
 
@@ -39,4 +41,11 @@ export async function gateAdminAction(): Promise<ActionState | null> {
   return role && PROPOSAL_ADMIN_ROLES.includes(role)
     ? null
     : { error: "Only owners, admins and senior admins can change the proposal settings." };
+}
+
+/** Module on, and the caller is owner / admin / senior_admin / intake: who may mark a proposal paid, undo it, or retry a step. Null means go ahead. */
+export async function gatePaidAction(): Promise<ActionState | null> {
+  await requireProposalsModule();
+  const role = await currentRole();
+  return role && PROPOSAL_PAID_ROLES.includes(role) ? null : { error: MARK_PAID_WORDS.notAllowed };
 }

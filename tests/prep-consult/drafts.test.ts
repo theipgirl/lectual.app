@@ -96,3 +96,52 @@ describe("buildClientPrepDraft", () => {
     await expect(buildClientPrepDraft(facts)).rejects.toThrow(JudgmentBoundaryError);
   });
 });
+
+describe("the optional injected text generator (Sprint 17)", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  it("uses the caller's generator instead of askClaude, with the same system prompt and facts, and returns the same shape", async () => {
+    const askClaude = vi.fn();
+    vi.doMock("@/lib/ai/claude", () => ({ askClaude }));
+    const generate = vi.fn<(args: { system: string; prompt: string; maxTokens: number }) => Promise<string>>(async () => "  Dear Jane,\n\nPlease bring the name.  ");
+    const { buildClientPrepDraft, buildHeadsUpDraft } = await import("@/lib/prep-consult/drafts");
+
+    const prep = await buildClientPrepDraft(facts, generate);
+    expect(askClaude).not.toHaveBeenCalled();
+    expect(generate).toHaveBeenCalledTimes(1);
+    const args = generate.mock.calls[0]![0];
+    expect(args.system).toContain("QUEUED FOR APPROVAL");
+    expect(args.prompt).toContain("jane@example.com");
+    expect(args.prompt).toContain("I want to protect the name of my new coffee brand before I launch.");
+    expect(args.maxTokens).toBe(1024);
+    expect(prep.draftBody).toBe("Dear Jane,\n\nPlease bring the name.");
+    expect(prep.headline).toContain("Jane Doe");
+
+    const headsUp = await buildHeadsUpDraft(facts, generate);
+    expect(generate).toHaveBeenCalledTimes(2);
+    expect(headsUp.draftBody).toContain("Dear Jane");
+  });
+
+  it("still refuses judgment content from an injected generator", async () => {
+    vi.doMock("@/lib/ai/claude", () => ({ askClaude: vi.fn() }));
+    const { buildClientPrepDraft } = await import("@/lib/prep-consult/drafts");
+    const { JudgmentBoundaryError } = await import("@/lib/prep-consult/prep-consult");
+    await expect(buildClientPrepDraft(facts, async () => "File in Class 25 for $1,950.")).rejects.toThrow(JudgmentBoundaryError);
+  });
+
+  it("the helpers the agent uses to keep recorded values out of its own wording", async () => {
+    const { hasJudgmentContent, scrubJudgmentContent, assertNoJudgmentContent } = await import("@/lib/prep-consult/prep-consult");
+    expect(hasJudgmentContent("Class 25 and $5,000")).toBe(true);
+    expect(hasJudgmentContent("Craft beer")).toBe(false);
+    const scrubbed = scrubJudgmentContent("Class 25 apparel, about $5,000, Essential package, green risk");
+    expect(scrubbed).toContain("apparel");
+    expect(scrubbed.match(/\[omitted\]/g)).toHaveLength(4);
+    expect(scrubbed).not.toMatch(/class 25|5,000|Essential|green risk/i);
+    expect(() => assertNoJudgmentContent(scrubbed, "card")).not.toThrow();
+    // repeated calls give the same answer (no sticky regex state)
+    expect(scrubJudgmentContent("class 9")).toBe("[omitted]");
+    expect(scrubJudgmentContent("class 9")).toBe("[omitted]");
+  });
+});

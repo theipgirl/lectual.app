@@ -1,124 +1,167 @@
 /*
- * AI copilot (/dashboard/copilot/) — a chat panel on the existing design
- * system. Reuses the app's tokens and lx-* controls; only the thread/bubble
- * layout below is new, under a cpl- prefix.
+ * AI copilot landing page (/dashboard/copilot/): the IP.OS hero from
+ * design/Matters_Prototype.dc.html. The hero's palette and glass values are
+ * defined once, here; the chat styles (src/components/copilot/copilot.css)
+ * read them inside `.cpl-page`. The page is one scroll area: nothing in here
+ * has a fixed height or its own overflow.
  */
 
-.cpl-panel {
-  display: flex;
-  flex-direction: column;
-  height: min(720px, calc(100dvh - 260px));
-  min-height: 420px;
+.cph-hero {
+  --cp-mist: #9C949B;
+  --cp-blush: #C7ADB2;
+  --cp-rose: #B26A72;
+  --cp-wine: #6A1F2B;
+  --cp-deep: #230810;
+  --cp-rail: #3A1218;
+  --cp-pill: #F6F0E3;
+  --cp-glass: rgba(30, 8, 13, 0.72);
+  --cp-glass-line: rgba(253, 247, 235, 0.1);
+  --cp-text: #F6EDE4;
+  --cp-text-soft: rgba(246, 237, 228, 0.72);
+
+  position: relative;
+  isolation: isolate;
+  border-radius: 18px;
   overflow: hidden;
+  min-height: 560px;
+  padding: 36px 20px 32px;
+  color: var(--cp-text);
+  background-color: var(--cp-deep);
+  background-image:
+    radial-gradient(60% 70% at 18% 22%, var(--cp-rose) 0%, transparent 62%),
+    radial-gradient(55% 65% at 82% 16%, var(--cp-mist) 0%, transparent 60%),
+    radial-gradient(70% 80% at 72% 90%, var(--cp-wine) 0%, transparent 66%),
+    radial-gradient(50% 60% at 10% 92%, var(--cp-blush) 0%, transparent 60%);
+  background-size: 170% 170%;
+  background-repeat: no-repeat;
+  animation: cph-drift 26s ease-in-out infinite alternate;
+}
+/* Keeps the cream text legible over the lighter blobs. */
+.cph-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(180deg, rgba(35, 8, 16, 0.5), rgba(35, 8, 16, 0.3));
 }
 
-.cpl-thread {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 20px;
+@keyframes cph-drift {
+  from {
+    background-position: 0% 0%, 100% 0%, 100% 100%, 0% 100%;
+  }
+  to {
+    background-position: 40% 30%, 60% 40%, 70% 60%, 30% 70%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cph-hero {
+    animation: none;
+  }
+}
+
+.cph-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 26px;
+  width: 100%;
+}
+
+.cph-greeting {
+  margin: 0;
+  text-align: center;
+  font-size: 38px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.22;
+  color: var(--cp-text);
+  text-wrap: balance;
+}
+.cph-greeting-b {
+  display: block;
+}
+
+.cph-conversation {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  max-width: 860px;
+  margin: 0 auto;
+  min-height: 480px;
 }
-
-.cpl-empty {
-  margin: auto 0;
-  display: grid;
-  gap: 12px;
-  justify-items: start;
-}
-
-.cpl-prompts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.cpl-exchange {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.cpl-bubble {
-  border-radius: 14px;
-  padding: 12px 15px;
-  font-size: 14.5px;
-  line-height: 1.55;
-  max-width: 78%;
-}
-
-.cpl-bubble-user {
-  align-self: flex-end;
-  background: var(--ox);
-  color: var(--cream);
-  border-radius: 14px 14px 3px 14px;
-}
-
-.cpl-bubble-copilot {
-  align-self: flex-start;
-  background: var(--well);
-  color: var(--ink);
-  border-radius: 14px 14px 14px 3px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-width: 88%;
-}
-
-.cpl-thinking {
-  color: var(--muted);
-  font-style: italic;
-}
-
-.cpl-bubble-error {
-  background: rgba(142, 39, 51, 0.09);
-  color: var(--wine);
-}
-
-.cpl-label {
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.cpl-cites {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.cpl-cite {
-  text-decoration: none;
-}
-.cpl-cite:hover {
-  background: var(--card);
-  text-decoration: none;
-}
-
-.cpl-composer {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 14px 16px;
-  border-top: 1px solid var(--line);
-  background: var(--card);
-}
-
-.cpl-composer .lx-input {
+.cph-conversation .cpl-thread {
   flex: 1;
-  min-width: 0;
+}
+.cph-conversation .cpl-rail {
+  position: sticky;
+  bottom: 12px;
 }
 
-@media (max-width: 640px) {
-  .cpl-bubble {
-    max-width: 92%;
+/* ── the four glass stat cards ──────────────────────────── */
+.cph-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  width: 100%;
+  max-width: 1060px;
+  margin-top: 8px;
+}
+.cph-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px;
+  border-radius: 14px;
+  background: var(--cp-glass);
+  border: 1px solid var(--cp-glass-line);
+  color: var(--cp-text);
+  text-decoration: none;
+}
+.cph-stat:hover {
+  background: rgba(48, 14, 20, 0.86);
+  color: var(--cp-text);
+  text-decoration: none;
+}
+.cph-stat:focus-visible {
+  outline: 2px solid var(--cp-text);
+  outline-offset: 2px;
+}
+.cph-stat-label {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cp-text-soft);
+}
+.cph-stat-value {
+  font-size: 34px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+.cph-stat-note {
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--cp-text-soft);
+}
+
+@media (max-width: 900px) {
+  .cph-stats {
+    grid-template-columns: repeat(2, 1fr);
   }
-  .cpl-panel {
-    height: min(640px, calc(100dvh - 220px));
+  .cph-greeting {
+    font-size: 32px;
+  }
+}
+@media (max-width: 560px) {
+  .cph-stats {
+    grid-template-columns: 1fr;
+  }
+  .cph-hero {
+    padding: 28px 14px 24px;
+  }
+  .cph-greeting {
+    font-size: 27px;
   }
 }

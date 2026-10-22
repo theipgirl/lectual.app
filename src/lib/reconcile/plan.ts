@@ -1,7 +1,7 @@
 import { isTrademarkIntake } from "@/lib/intake/scope";
 import type { SheetRead } from "@/lib/intake/sheet-read";
 import type { LawmaticsSourceRecord } from "@/lib/lawmatics/normalize";
-import { emailSignalFor, type StoredMail } from "./email";
+import { emailSignalFor, type AgentEvidence, type StoredMail } from "./email";
 import { indexLawmatics, lawmaticsSignalFor } from "./lawmatics";
 import { proposeStage } from "./propose";
 import { matchSheetToLeads, sheetSignalFor } from "./sheet-match";
@@ -31,7 +31,7 @@ export type LawmaticsInput =
   | { status: "unavailable"; reason: string };
 
 export type EmailInput =
-  | { status: "ok"; byLead: Map<string, StoredMail[]>; total: number }
+  | { status: "ok"; byLead: Map<string, StoredMail[]>; total: number; agent?: Map<string, AgentEvidence[]> }
   | { status: "unavailable"; reason: string };
 
 export type PlanInput = {
@@ -101,7 +101,7 @@ export async function buildPlan(input: PlanInput): Promise<{ view: ReconcileView
         ? lawmaticsSignalFor({ lawmaticsId: lead.lawmaticsId, email: lead.email }, lawmaticsIndex, stages)
         : unavailable(input.lawmatics.status === "ok" ? "" : input.lawmatics.reason);
     const emailSignal =
-      email.status === "ok" ? emailSignalFor(email.byLead.get(lead.id) ?? [], stages) : unavailable(email.reason);
+      email.status === "ok" ? emailSignalFor(email.byLead.get(lead.id) ?? [], stages, email.agent?.get(lead.id) ?? []) : unavailable(email.reason);
     return {
       leadId: lead.id,
       leadName: leadName(lead),
