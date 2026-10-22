@@ -32,20 +32,6 @@ function stateOf(result: FlowResult, headline: string | null): ActionState {
   return { saved: true, notice: parts.join(" ") };
 }
 
-async function run(formData: FormData, flow: (id: string) => Promise<FlowResult>, headline: string | null, fallback: string): Promise<ActionState> {
-  const refused = await gatePaidAction();
-  if (refused) return refused;
-  const id = field(formData, "proposalId");
-  let result: FlowResult;
-  try {
-    result = await flow(id);
-  } catch {
-    return { error: fallback };
-  }
-  revalidate(id);
-  return stateOf(result, headline);
-}
-
 export async function markPaidAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const refused = await gatePaidAction();
   if (refused) return refused;
@@ -62,7 +48,17 @@ export async function markPaidAction(_prev: ActionState, formData: FormData): Pr
 }
 
 export async function undoPaidAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  return run(formData, undoProposalPaid, MARK_PAID_WORDS.undoneHeadline, "Couldn't undo the paid mark.");
+  const refused = await gatePaidAction();
+  if (refused) return refused;
+  const id = field(formData, "proposalId");
+  let result: FlowResult;
+  try {
+    result = await undoProposalPaid(id);
+  } catch {
+    return { error: "Couldn't undo the paid mark." };
+  }
+  revalidate(id);
+  return stateOf(result, MARK_PAID_WORDS.undoneHeadline);
 }
 
 /** Runs one failed or blocked step again (`step` names it). */
