@@ -144,3 +144,25 @@ export function failureCategory(err: unknown): string {
   if (/declined|cut off|expected shape|ANTHROPIC|AI key/i.test(message)) return "the model did not return a usable draft";
   return "an error";
 }
+
+/**
+ * True when the run's time budget has less than `reserveMs` left, or the run has already been stopped
+ * (its signal aborted: the runner gave up waiting, so nothing more should be written). An agent working
+ * through a list stops starting new items once this is true. No budget (`timeLeftMs` absent) is never spent.
+ */
+export function budgetNearlySpent(ctx: { timeLeftMs?: () => number; signal?: AbortSignal }, reserveMs: number): boolean {
+  if (ctx.signal?.aborted) return true;
+  return ctx.timeLeftMs !== undefined && ctx.timeLeftMs() < reserveMs;
+}
+
+/**
+ * The model answered but the answer can't be used: refused, cut off at max_tokens, or not the
+ * schema's shape (`AiOutputError` from claude.ts, matched by name so this file stays free of the SDK,
+ * or the SDK's own "Failed to parse structured output"). A list-working agent skips that ONE item
+ * and carries on; a transport failure, a missing key or a database error is not this.
+ */
+export function isUnusableModelAnswer(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  if (err.name === "AiOutputError") return true;
+  return /Failed to parse structured output|cut off before it finished|didn't match the expected shape|declined this request/i.test(err.message);
+}

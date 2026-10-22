@@ -17,7 +17,14 @@ export const NOTHING = "Nothing today.";
 export type QueueSection = { state: "ok"; count: number } | { state: "unavailable"; reason: string };
 
 export type FollowUpNote =
-  | { kind: "drafted"; drafted: number; cap: number; skipped: number }
+  | {
+      kind: "drafted";
+      drafted: number;
+      cap: number;
+      skipped: number;
+      /** Chosen but not drafted because the run's time budget was nearly spent. Absent = none. */
+      deferred?: number;
+    }
   | { kind: "suggest" }
   | { kind: "blocked"; reason: string }
   | { kind: "none" };
@@ -137,7 +144,12 @@ export function renderBrief(args: {
 function followUpLine(note: FollowUpNote): string | null {
   switch (note.kind) {
     case "drafted":
-      return `Follow-up emails drafted: ${note.drafted} (at most ${note.cap} a day)${note.skipped > 0 ? `, ${note.skipped} stalled ${note.skipped === 1 ? "lead was" : "leads were"} skipped` : ""}. They are in the queue.`;
+      return (
+        `Follow-up emails drafted: ${note.drafted} (at most ${note.cap} a day)${note.skipped > 0 ? `, ${note.skipped} stalled ${note.skipped === 1 ? "lead was" : "leads were"} skipped` : ""}. They are in the queue.` +
+        (note.deferred
+          ? ` ${note.deferred} more ${note.deferred === 1 ? "was" : "were"} not drafted because this run reached its time limit; the next run picks ${note.deferred === 1 ? "it" : "them"} up.`
+          : "")
+      );
     case "suggest":
       return "No follow-up emails were drafted: this agent is set to suggest.";
     case "blocked":

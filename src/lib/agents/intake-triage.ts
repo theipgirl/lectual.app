@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { AGENT_POLICY } from "./policy";
+import { budgetNearlySpent, isUnusableModelAnswer } from "./shared";
 import type { AgentContext, AgentResult } from "./types";
 
 /**
@@ -25,6 +26,14 @@ import type { AgentContext, AgentResult } from "./types";
  */
 
 export const TRIAGE_BATCH = 20;
+/**
+ * Room for the model's thinking AND the JSON. 4000 was not enough at effort "low": on 2026-10-22 the
+ * answer for one RPB lead stopped at max_tokens mid-string and the whole run failed. Same as callClaude's
+ * default.
+ */
+export const TRIAGE_MAX_TOKENS = 16_000;
+/** No new lead is started with less than this left in the run's time budget; the rest wait for the next run. */
+export const TRIAGE_RESERVE_MS = 30_000;
 
 export const TriageSchema = z.object({
   lane: z.enum(["hot", "warm", "cold"]),
@@ -107,8 +116,24 @@ export async function runIntakeTriage(ctx: AgentContext): Promise<AgentResult> {
 
   let hot = 0;
   let drafts = 0;
-  for (const lead of leads) {
-    const { output } = await llm({ system: SYSTEM, user: triagePrompt(lead), schema: TriageSchema, effort: "low", maxTokens: 4000 });
+  let scored = 0;
+  // A lead whose answer can't be used (cut off, refused, wrong shape) keeps ai_enriched_at null, so
+  // the next run tries it again. It costs that lead only, never the rest of the batch.
+  let unscored = 0;
+  let deferred = 0;
+  for (const [index, lead] of leads.entries()) {
+    if (budgetNearlySpent(ctx, TRIAGE_RESERVE_MS)) {
+      deferred = leads.length - index;
+      break;
+    }
+    let output: Triage;
+    try {
+      ({ output } = await llm({ system: SYSTEM, user: triagePrompt(lead), schema: TriageSchema, effort: "low", maxTokens: TRIAGE_MAX_TOKENS }));
+    } catch (err) {
+      if (!isUnusableModelAnswer(err)) throw err;
+      unscored += 1;
+      continue;
+    }
     const nowIso = new Date(ctx.now()).toISOString();
 
     const update = triageLeadUpdate(output, autonomy, nowIso);
@@ -136,6 +161,7 @@ export async function runIntakeTriage(ctx: AgentContext): Promise<AgentResult> {
       },
     });
     if (actErr) throw new Error(`activity insert failed: ${actErr.message}`);
+    scored += 1;
 
     if (output.lane === "hot") {
       hot += 1;
@@ -161,9 +187,17 @@ export async function runIntakeTriage(ctx: AgentContext): Promise<AgentResult> {
     }
   }
 
-  return {
-    itemsIn: leads.length,
-    draftsOut: drafts,
-    summary: leads.length === 0 ? "No new leads to score." : `${leads.length} lead(s) scored, ${hot} hot.`,
-  };
+  return { itemsIn: scored, draftsOut: drafts, summary: triageSummary({ found: leads.length, scored, hot, unscored, deferred }) };
+}
+
+/**
+ * The run's one line. "N lead(s) scored, H hot." is kept word for word: the digest reads the hot count
+ * out of it (`triageHotCount`). Counts only, never a name.
+ */
+export function triageSummary(c: { found: number; scored: number; hot: number; unscored: number; deferred: number }): string {
+  if (c.found === 0) return "No new leads to score.";
+  const parts = [`${c.scored} lead(s) scored, ${c.hot} hot.`];
+  if (c.unscored > 0) parts.push(`${c.unscored} ${c.unscored === 1 ? "lead" : "leads"} couldn't be scored, will retry.`);
+  if (c.deferred > 0) parts.push(`${c.deferred} ${c.deferred === 1 ? "lead was" : "leads were"} left for the next run (time limit).`);
+  return parts.join(" ");
 }

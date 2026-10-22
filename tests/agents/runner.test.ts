@@ -41,8 +41,9 @@ describe("agent runner", () => {
     });
     const outcomes = await runAllAgents(d);
     expect(outcomes.map((o) => `${o.agent}:${o.status}`)).toEqual(["intake-triage:error", "post-consult:skipped"]);
-    const failed = log.filter((q) => q.table === "agent_run" && q.action === "update")[0];
-    expect(failed.values).toMatchObject({ status: "error", error: expect.stringContaining("boom") });
+    // The two run on different cron tracks, at the same time, so the order of their closing updates is not fixed.
+    const failed = log.filter((q) => q.table === "agent_run" && q.action === "update").find((q) => (q.values as { status?: string }).status === "error");
+    expect(failed!.values).toMatchObject({ status: "error", error: expect.stringContaining("boom") });
   });
 });
 

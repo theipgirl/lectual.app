@@ -1,5 +1,5 @@
 import { MAILBOX_GATE_REASON, mailboxModuleState, noQueueSummary } from "../mailbox-gate";
-import { leadLabel, readFirmStyle } from "../shared";
+import { budgetNearlySpent, leadLabel, readFirmStyle } from "../shared";
 import type { AgentContext, AgentResult } from "../types";
 import { FOLLOW_UP_CAP, openLeads, stalledLeads, waitingOnReply, type BriefLead, type BriefStage, type StalledLead, type WaitingLead } from "./rules";
 import { draftFollowUp, planFollowUps, type FollowUpPlan } from "./follow-ups";
@@ -34,6 +34,14 @@ import {
  */
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/**
+ * No new follow-up is started with less than this left in the run's time budget. It is the room the
+ * rest of the run needs: one model call can take a while, and after the follow-ups the brief itself
+ * still has to be rendered and queued. A follow-up not drafted for time is said in the brief and the
+ * summary, and the next run picks the lead up again (nothing was recorded for it).
+ */
+export const FOLLOW_UP_RESERVE_MS = 60_000;
 
 function leadSections(
   stages: Map<string, BriefStage> | null,
@@ -70,11 +78,15 @@ export async function runMorningBrief(ctx: AgentContext): Promise<AgentResult> {
   const { waiting, stalled, stalledAll } = leadSections(stages, leads, nowMs);
 
   const gate = mailboxModuleState(ctx);
-  const consults: BriefSections["consults"] =
-    gate === "on" ? await readTodaysConsults(admin, orgId, nowMs, tz) : { state: "blocked", reason: MAILBOX_GATE_REASON[gate] };
-  const suggestions = await readPendingSuggestions(admin, orgId);
-  const deadlines = await readUpcomingDeadlines(admin, orgId, nowMs, tz);
-  const pending = await readPending(ctx.listPending);
+  // Independent reads, so they go at once: each catches its own failure and none waits on another.
+  const [consults, suggestions, deadlines, pending] = await Promise.all([
+    gate === "on"
+      ? readTodaysConsults(admin, orgId, nowMs, tz)
+      : Promise.resolve<BriefSections["consults"]>({ state: "blocked", reason: MAILBOX_GATE_REASON[gate] }),
+    readPendingSuggestions(admin, orgId),
+    readUpcomingDeadlines(admin, orgId, nowMs, tz),
+    readPending(ctx.listPending),
+  ]);
   const queue: BriefSections["queue"] = pending.state === "ok" ? { state: "ok", count: pending.items.length } : { state: "unavailable", reason: pending.reason };
 
   const sections: BriefSections = { consults, waiting, suggestions, stalled, deadlines, queue };
@@ -87,6 +99,7 @@ export async function runMorningBrief(ctx: AgentContext): Promise<AgentResult> {
   let followUpsDrafted = 0;
   let followUpsFailed = 0;
   let unrecorded = 0;
+  let followUpsDeferred = 0;
   const draftedFor = new Set<string>();
   if (stalled.state === "ok" && stalledAll.length > 0) {
     if (autonomy === "suggest") {
@@ -96,7 +109,11 @@ export async function runMorningBrief(ctx: AgentContext): Promise<AgentResult> {
       if (!plan.ok) {
         note = { kind: "blocked", reason: plan.reason };
       } else {
-        for (const item of plan.chosen) {
+        for (const [index, item] of plan.chosen.entries()) {
+          if (budgetNearlySpent(ctx, FOLLOW_UP_RESERVE_MS)) {
+            followUpsDeferred = plan.chosen.length - index;
+            break;
+          }
           const result = await draftFollowUp(ctx, item, style.signOff);
           if (!result.ok) {
             followUpsFailed += 1;
@@ -107,7 +124,13 @@ export async function runMorningBrief(ctx: AgentContext): Promise<AgentResult> {
           if (!result.recorded) unrecorded += 1;
         }
         const s = plan.skips;
-        note = { kind: "drafted", drafted: followUpsDrafted, cap: FOLLOW_UP_CAP, skipped: s.noAddress + s.pendingDraft + s.sensitive + s.recent + followUpsFailed };
+        note = {
+          kind: "drafted",
+          drafted: followUpsDrafted,
+          cap: FOLLOW_UP_CAP,
+          skipped: s.noAddress + s.pendingDraft + s.sensitive + s.recent + followUpsFailed,
+          ...(followUpsDeferred > 0 ? { deferred: followUpsDeferred } : {}),
+        };
       }
     }
   }
@@ -159,6 +182,7 @@ export async function runMorningBrief(ctx: AgentContext): Promise<AgentResult> {
   if (queue.state === "ok") parts.push(`${plural(queue.count, "item", "items")} in the queue.`);
   if (followUpsDrafted > 0) parts.push(`${plural(followUpsDrafted, "follow-up draft", "follow-up drafts")} queued.`);
   if (followUpsFailed > 0) parts.push(`${plural(followUpsFailed, "follow-up", "follow-ups")} could not be drafted.`);
+  if (followUpsDeferred > 0) parts.push(`${plural(followUpsDeferred, "follow-up was", "follow-ups were")} left for the next run (time limit).`);
   if (note.kind === "blocked") parts.push("No follow-ups were drafted because the queue or a link lookup could not be read.");
   if (unrecorded > 0) parts.push(`${plural(unrecorded, "follow-up", "follow-ups")} could not be recorded on the lead.`);
   if (unread.length > 0) parts.push(`Not read: ${unread.join(", ")}.`);
