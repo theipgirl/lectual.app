@@ -35,6 +35,9 @@ export const TRIAGE_MAX_TOKENS = 16_000;
 /** No new lead is started with less than this left in the run's time budget; the rest wait for the next run. */
 export const TRIAGE_RESERVE_MS = 30_000;
 
+/** How far back a booth completion can still trigger a re-score of an already-triaged lead. */
+export const BOOTH_RESCORE_DAYS = 14;
+
 export const TriageSchema = z.object({
   lane: z.enum(["hot", "warm", "cold"]),
   readiness: z.number().int().min(1).max(5).describe("1 = just curious, 5 = ready to sign now"),
@@ -48,7 +51,63 @@ export type Triage = z.infer<typeof TriageSchema>;
 
 const SYSTEM = `${AGENT_POLICY}
 
-Your job: triage a new prospective client ("lead") for the firm's intake team. Judge readiness to engage, likely matter value, how quickly the firm should respond, and whether the matter fits an intellectual-property practice. Explain the lane in two or three plain sentences. The reason is read by staff, never by the client. Red flags are things staff should know before calling (for example a mark that is already a famous brand, a deadline already passed, or a non-IP matter).`;
+Your job: triage a new prospective client ("lead") for the firm's intake team. Judge readiness to engage, likely matter value, how quickly the firm should respond, and whether the matter fits an intellectual-property practice. Explain the lane in two or three plain sentences. The reason is read by staff, never by the client. Red flags are things staff should know before calling (for example a mark that is already a famous brand, a deadline already passed, or a non-IP matter).
+
+Some leads come with a <booth_assessment>: the person's own answers to the firm's assessment card, scored by fixed rules. Treat it as what they told the firm. Don't call a detail missing when the assessment gives it (a mark or goods/services named there counts). A reported name conflict is always a red flag for the attorney. The booth heat is a rule-based read, not a fact; you may disagree with it, but say why in the reason.`;
+
+/** The lead's latest completed booth card (lectual 0086 crm_booth_scorecard). */
+export type BoothAssessment = {
+  lead_id: string;
+  event_code: string;
+  track: string | null;
+  score: number | null;
+  band: string | null;
+  temperature: string | null;
+  gaps: string[] | null;
+  answers: Record<string, unknown> | null;
+  mark_name: string | null;
+  mark_goods: string | null;
+  completed_at: string | null;
+};
+
+// Answer ids for the inputs behind the booth heat, on both cards (lectual src/lib/booth/questions.ts
+// and ip-questions.ts). The rest of the card reaches the model through the gap lines.
+const REVENUE_IDS = ["108", "4"];
+const TIMELINE_IDS = ["109", "8"];
+const CONFLICT_ID = "104";
+const REVENUE: Record<string, string> = {
+  under_150k: "Under $150k", "150k_250k": "$150k–$250k", "250k_500k": "$250k–$500k", "500k_1m": "$500k–$1M", over_1m: "$1M+",
+};
+const TIMELINE: Record<string, string> = { right_away: "Right away", "1_2_months": "In 1–2 months", "3_plus_months": "In 3+ months" };
+const YES_NO: Record<string, string> = { yes: "Yes", no: "No", unsure: "Not sure" };
+
+function answer(answers: Record<string, unknown> | null, ids: string[]): string | null {
+  for (const id of ids) {
+    const v = answers?.[id];
+    const first = Array.isArray(v) ? v[0] : v;
+    if (typeof first === "string" && first) return first;
+  }
+  return null;
+}
+
+function boothLines(b: BoothAssessment): string[] {
+  const revenue = answer(b.answers, REVENUE_IDS);
+  const timeline = answer(b.answers, TIMELINE_IDS);
+  const conflict = answer(b.answers, [CONFLICT_ID]);
+  const lines = [
+    `Event: ${b.event_code}`,
+    `Booth heat (rule-based): ${b.temperature ? b.temperature.toUpperCase() : "(not scored)"}`,
+    `Protection score: ${b.score ?? "?"}/100 (${b.band ?? "unknown"}) — higher means better protected`,
+    `Wants help: ${timeline ? (TIMELINE[timeline] ?? timeline) : "(not answered)"}`,
+    `Annual revenue: ${revenue ? (REVENUE[revenue] ?? revenue) : "(not answered)"}`,
+  ];
+  if (conflict) lines.push(`Seen a similar name, or contacted about theirs: ${YES_NO[conflict] ?? conflict}`);
+  lines.push(`Name or wordmark: ${b.mark_name?.trim() || "(not given)"}`);
+  lines.push(`Goods/services: ${b.mark_goods?.trim() || "(not given)"}`);
+  const gaps = (b.gaps ?? []).filter(Boolean);
+  lines.push(gaps.length ? `Gaps the card showed them: ${gaps.join(" | ")}` : "Gaps the card showed them: (none)");
+  return lines;
+}
 
 type LeadRow = {
   id: string;
@@ -65,9 +124,10 @@ type LeadRow = {
   qualification_score: number | null;
   temperature: string | null;
   created_at: string;
+  ai_enriched_at?: string | null;
 };
 
-export function triagePrompt(lead: LeadRow): string {
+export function triagePrompt(lead: LeadRow, booth?: BoothAssessment | null): string {
   const domain = lead.email.includes("@") ? lead.email.split("@")[1] : null;
   const lines = [
     `Name: ${`${lead.first_name} ${lead.last_name}`.trim() || "(not given)"}`,
@@ -78,10 +138,13 @@ export function triagePrompt(lead: LeadRow): string {
     `Practice area: ${lead.practice_area ?? "(not given)"}`,
     `Mark: ${lead.mark_text ?? "(not given)"}`,
     `Came from: ${[lead.referral_source, lead.referral_detail].filter(Boolean).join(" — ") || "(unknown)"}`,
-    `Assessment score: ${lead.qualification_score ?? "(no assessment)"}`,
+    `CRM qualification score (0–1, computed by rules): ${lead.qualification_score ?? "(none)"}`,
     `Arrived: ${lead.created_at.slice(0, 10)}`,
   ];
-  return `Triage this lead.\n\n<lead>\n${lines.join("\n")}\n</lead>`;
+  const assessment = booth
+    ? `\n\n<booth_assessment>\n${boothLines(booth).join("\n")}\n</booth_assessment>`
+    : "\n\nBooth assessment: (none)";
+  return `Triage this lead.\n\n<lead>\n${lines.join("\n")}\n</lead>${assessment}`;
 }
 
 /**
@@ -102,17 +165,51 @@ export function triageLeadUpdate(output: Triage, autonomy: AgentContext["autonom
 export async function runIntakeTriage(ctx: AgentContext): Promise<AgentResult> {
   const { admin, orgId, autonomy, llm } = ctx;
 
+  const LEAD_COLUMNS =
+    "id, first_name, last_name, business_name, email, phone, website, practice_area, mark_text, referral_source, referral_detail, qualification_score, temperature, created_at, ai_enriched_at";
+
   const { data, error } = await admin
     .from("crm_lead")
-    .select(
-      "id, first_name, last_name, business_name, email, phone, website, practice_area, mark_text, referral_source, referral_detail, qualification_score, temperature, created_at",
-    )
+    .select(LEAD_COLUMNS)
     .eq("org_id", orgId)
     .is("ai_enriched_at", null)
     .order("created_at", { ascending: false })
     .limit(TRIAGE_BATCH);
   if (error) throw new Error(`lead read failed: ${error.message}`);
   const leads = (data ?? []) as LeadRow[];
+
+  // Booth completions in the window: the assessment for each lead, and the leads triaged
+  // BEFORE their assessment arrived (the contact step files the lead first, so triage can
+  // run on a bare record and never look again).
+  const since = new Date(ctx.now() - BOOTH_RESCORE_DAYS * 86_400_000).toISOString();
+  const { data: boothData, error: boothErr } = await admin
+    .from("crm_booth_scorecard")
+    .select("lead_id, event_code, track, score, band, temperature, gaps, answers, mark_name, mark_goods, completed_at")
+    .eq("org_id", orgId)
+    .gte("completed_at", since)
+    .order("completed_at", { ascending: false })
+    .limit(200);
+  if (boothErr) throw new Error(`booth read failed: ${boothErr.message}`);
+  const boothByLead = new Map<string, BoothAssessment>();
+  for (const b of (boothData ?? []) as BoothAssessment[]) {
+    if (b.completed_at && !boothByLead.has(b.lead_id)) boothByLead.set(b.lead_id, b); // newest first
+  }
+
+  const queued = new Set(leads.map((l) => l.id));
+  const candidates = [...boothByLead.keys()].filter((id) => !queued.has(id));
+  if (candidates.length && leads.length < TRIAGE_BATCH) {
+    const { data: again, error: againErr } = await admin
+      .from("crm_lead")
+      .select(LEAD_COLUMNS)
+      .eq("org_id", orgId)
+      .in("id", candidates);
+    if (againErr) throw new Error(`lead re-score read failed: ${againErr.message}`);
+    for (const l of (again ?? []) as LeadRow[]) {
+      if (leads.length >= TRIAGE_BATCH) break;
+      const done = boothByLead.get(l.id)?.completed_at;
+      if (l.ai_enriched_at && done && Date.parse(l.ai_enriched_at) < Date.parse(done)) leads.push(l);
+    }
+  }
 
   let hot = 0;
   let drafts = 0;
@@ -128,7 +225,7 @@ export async function runIntakeTriage(ctx: AgentContext): Promise<AgentResult> {
     }
     let output: Triage;
     try {
-      ({ output } = await llm({ system: SYSTEM, user: triagePrompt(lead), schema: TriageSchema, effort: "low", maxTokens: TRIAGE_MAX_TOKENS }));
+      ({ output } = await llm({ system: SYSTEM, user: triagePrompt(lead, boothByLead.get(lead.id)), schema: TriageSchema, effort: "low", maxTokens: TRIAGE_MAX_TOKENS }));
     } catch (err) {
       if (!isUnusableModelAnswer(err)) throw err;
       unscored += 1;
