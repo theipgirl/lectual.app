@@ -11,6 +11,12 @@ export type ChatDeps = {
   setExchanges: (update: (prev: Exchange[]) => Exchange[]) => void;
   /** The drawer's current page; the full-page copilot has none and sends no context. */
   getPathname?: () => string | undefined;
+  /** The saved chat this thread is (lectual 0099). Unset or null = not saved yet. */
+  getConversationId?: () => string | null | undefined;
+  /** The answer was saved: remember the chat so the next question continues it. */
+  onSaved?: (conversationId: string) => void;
+  /** The answer arrived but could not be saved. */
+  onSaveFailed?: () => void;
   newId?: () => string;
 };
 
@@ -24,11 +30,13 @@ export function createChatController(deps: ChatDeps) {
       busy = true;
       try {
         const id = deps.newId ? deps.newId() : crypto.randomUUID();
-        const body = buildRequestBody({ question, exchanges: deps.getExchanges(), pathname: deps.getPathname?.() });
+        const body = buildRequestBody({ question, exchanges: deps.getExchanges(), pathname: deps.getPathname?.(), conversationId: deps.getConversationId?.() });
         deps.setExchanges((prev) => [...prev, { id, question, status: "pending" }]);
         await askCopilot({
           fetchImpl: deps.fetchImpl,
           body,
+          onSaved: deps.onSaved,
+          onSaveFailed: deps.onSaveFailed,
           onUpdate: (update) => deps.setExchanges((prev) => prev.map((e) => (e.id === id ? update(e) : e))),
         });
         return true;

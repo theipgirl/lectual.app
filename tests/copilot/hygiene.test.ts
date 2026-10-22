@@ -20,6 +20,9 @@ const COPILOT_FILES = [
   "src/app/dashboard/copilot/page.tsx",
   "src/app/dashboard/copilot/stat-cards.tsx",
   "src/components/copilot/CopilotChat.tsx",
+  "src/components/copilot/ChatHistoryList.tsx",
+  "src/components/copilot/CopilotWorkspace.tsx",
+  "src/app/dashboard/copilot/actions.ts",
   "src/components/copilot/CopilotLauncher.tsx",
   "src/lib/agents/matters-chat.ts",
   "src/lib/agents/copilot-context.ts",
@@ -27,6 +30,15 @@ const COPILOT_FILES = [
   ...readdirSync("src/lib/copilot").map((f) => `src/lib/copilot/${f}`),
 ];
 const read = (f: string) => readFileSync(f, "utf8");
+
+/** The saved-chat files (lectual 0099) write, but only to the author's own copilot_* rows; the answering agent stays read-only. */
+const HISTORY_FILES = [
+  "src/lib/copilot/history-store.ts",
+  "src/lib/copilot/save-turn.ts",
+  "src/app/dashboard/copilot/actions.ts",
+  "src/components/copilot/CopilotWorkspace.tsx",
+  "src/components/copilot/ChatHistoryList.tsx",
+];
 
 describe("the launcher is mounted exactly once, in the dashboard layout", () => {
   it("finds <CopilotLauncher once in src/, passing configured={aiConfigured()}", () => {
@@ -44,8 +56,17 @@ describe("the copilot stays read-only, firm-scoped and free of send paths", () =
     expect(read(f)).not.toMatch(new RegExp(["getAdmin" + "Client\\(", "@/lib/db/" + "admin", "SUPABASE_" + "SERVICE_ROLE"].join("|")));
   });
 
-  it.each(COPILOT_FILES)("%s writes nothing and sends nothing", (f) => {
+  it.each(COPILOT_FILES.filter((f) => !HISTORY_FILES.includes(f)))("%s writes nothing and sends nothing", (f) => {
     expect(read(f)).not.toMatch(/\.(insert|update|upsert|delete)\(|\.rpc\(|sendMail|resend|notify\(|createDraft|queue_draft|agent_run/i);
+  });
+
+  it("the saved-chat files write only the copilot_* tables, send nothing and name no user", () => {
+    for (const f of HISTORY_FILES) {
+      const text = read(f);
+      expect(text, f).not.toMatch(/\.rpc\(|sendMail|resend|notify\(|createDraft|queue_draft|agent_run/i);
+      for (const m of text.matchAll(/\.from\("([a-z_]+)"\)/g)) expect(["copilot_conversation", "copilot_message"], f).toContain(m[1]);
+    }
+    expect(read("src/lib/copilot/history-store.ts")).not.toMatch(/user_id/);
   });
 
   it.each(COPILOT_FILES)("%s has no placeholders", (f) => {

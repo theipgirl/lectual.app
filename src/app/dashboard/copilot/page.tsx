@@ -8,17 +8,40 @@ import { greetingName } from "@/lib/today/greeting-name";
 import { hourInZone } from "@/lib/today/priorities";
 import { copilotGreeting } from "@/lib/copilot/part-of-day";
 import { buildStatCards, type StatRead } from "@/lib/copilot/stats";
-import { CopilotChat } from "@/components/copilot/CopilotChat";
+import { getScopedClient } from "@/lib/db/scoped-client";
+import { listConversations, loadConversation, type ListResult } from "@/lib/copilot/history-store";
+import { exchangesFromMessages } from "@/lib/copilot/history-pure";
+import type { Exchange } from "@/lib/copilot/client";
+import { CopilotWorkspace } from "@/components/copilot/CopilotWorkspace";
 import { StatCards } from "./stat-cards";
 import "./copilot.css";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 
-export const metadata: Metadata = { title: pageTitle("AI copilot") };
+export const metadata: Metadata = { title: pageTitle("Copilot") };
 
 export const dynamic = "force-dynamic";
 
 const DEADLINE_WINDOW_DAYS = 14;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The saved chats, and the one the address names. Both reads are three-state; a thrown read is "unavailable". */
+async function readHistory(openParam: string | null): Promise<{ history: ListResult; openId: string | null; exchanges?: Exchange[]; openNote: string | null }> {
+  let db: Awaited<ReturnType<typeof getScopedClient>>;
+  try {
+    db = await getScopedClient();
+  } catch {
+    return { history: { status: "unavailable" }, openId: null, openNote: null };
+  }
+  const [history, opened] = await Promise.all([
+    listConversations(db as never),
+    openParam && UUID.test(openParam) ? loadConversation(db as never, openParam) : Promise.resolve(null),
+  ]);
+  if (openParam && !opened) return { history, openId: null, openNote: "That saved chat couldn't be found." };
+  if (!opened || opened.status === "not-set-up") return { history, openId: null, openNote: null };
+  if (opened.status === "ok") return { history, openId: opened.conversation.id, exchanges: exchangesFromMessages(opened.messages), openNote: null };
+  return { history, openId: null, openNote: opened.status === "none" ? "That saved chat couldn't be found." : "That saved chat couldn't be loaded." };
+}
 
 /** A settled read as a stat: a number, or "couldn't load". Never a zero from a failure. */
 function statOf<T>(settled: PromiseSettledResult<T>, count: (value: T) => number): StatRead {
@@ -26,7 +49,7 @@ function statOf<T>(settled: PromiseSettledResult<T>, count: (value: T) => number
 }
 
 /**
- * AI copilot (/dashboard/copilot/) — read-only Q&A over the signed-in firm's
+ * Copilot (/dashboard/copilot/) — read-only Q&A over the signed-in firm's
  * own matters, leads, deadlines and activity. Ported from lectual main's
  * home-page "search your matters" copilot (src/lib/agents/matters-chat.ts,
  * src/app/api/matters-chat/route.ts, src/components/firm/MattersCopilotBox.tsx)
@@ -48,7 +71,9 @@ function statOf<T>(settled: PromiseSettledResult<T>, count: (value: T) => number
  * so one dead source never blanks the others or the page, and a failed read
  * says so instead of printing a zero.
  */
-export default async function CopilotPage() {
+export default async function CopilotPage(props?: { searchParams?: Promise<{ c?: string | string[] }> }) {
+  const params = (await props?.searchParams) ?? {};
+  const openParam = typeof params.c === "string" ? params.c : null;
   const configured = aiConfigured();
   const session = configured ? await resolveFirmSession() : null;
   if (configured && session?.kind !== "ok") return null; // the layout already handled this
@@ -91,21 +116,23 @@ export default async function CopilotPage() {
     );
   }
 
+  const saved = configured ? await readHistory(openParam) : null;
+
   return (
     <>
-      <div className="lx-page-head">
-        <div style={{ flex: 1, minWidth: 260 }}>
-          <div className="lx-label">IP.OS</div>
-          <h1 className="lx-h1">AI copilot</h1>
-          <p className="lx-sub">
-            Ask about a matter, a lead, an open deadline, or recent activity — answered from your
-            firm&apos;s own records, with a link to every matter or lead it read.
-          </p>
-        </div>
-      </div>
+      <h1 className="cpw-sr">Copilot</h1>
 
-      {configured ? (
-        <CopilotChat variant="page" greeting={greeting} stats={landing} />
+      {configured && saved ? (
+        <CopilotWorkspace
+          key={saved.openId ?? "new"}
+          history={saved.history}
+          openId={saved.openId}
+          initialExchanges={saved.exchanges}
+          openNote={saved.openNote}
+          greeting={greeting}
+          stats={landing}
+          now={Date.now()}
+        />
       ) : (
         <div className="lx-card lx-empty-card">
           <h2 className="lx-h2" style={{ fontSize: 25 }}>

@@ -159,7 +159,7 @@ describe("the four stat cards", () => {
 
   it("with every read rejected the page still renders, four dashes", async () => {
     const html = await renderPage({ reads: { matters: "fail", deadlines: "fail", members: "fail", queue: { status: "unavailable", items: [] } } });
-    expect(html).toContain("AI copilot");
+    expect(html).not.toContain("AI copilot");
     expect(cards(html).map((x) => x.value)).toEqual(["—", "—", "—", "—"]);
     expect(html).toContain("Good morning.");
   });
@@ -263,7 +263,7 @@ describe("the active thread", () => {
     const html = await thread([done()]);
     expect(html).toContain("Nothing sends without your approval.");
     expect(html).toContain('placeholder="Ask a follow-up…"');
-    expect(html).toContain(">New thread</button>");
+    expect(html).toContain(">New chat</button>");
     expect(html).not.toContain("cph-greeting");
   });
 
