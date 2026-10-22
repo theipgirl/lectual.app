@@ -4,11 +4,13 @@ import { callClaude } from "@/lib/ai/claude";
 import { createDraft, listQueue } from "@/lib/queue/api";
 import { providerCredentials, rootKeyOrNull } from "@/lib/mailbox/config";
 import { getSiteOrigin } from "@/lib/site-origin";
+import { DB_FETCH_TIMEOUT_MS } from "@/lib/http/timeout";
 import type { RunnerDeps } from "./runner";
 
 /** Production wiring for the agent runner. Tests build their own RunnerDeps. */
 export function productionRunnerDeps(): RunnerDeps {
-  const admin = getAdminClient();
+  // Every statement an agent sends has a deadline (see src/lib/http/timeout.ts).
+  const admin = getAdminClient({ timeoutMs: DB_FETCH_TIMEOUT_MS });
   const root = rootKeyOrNull();
   return {
     admin,

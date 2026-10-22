@@ -1,4 +1,5 @@
 import { ProviderError, type MailboxProvider } from "./providers";
+import { PROVIDER_FETCH_TIMEOUT_MS, withTimeout } from "@/lib/http/timeout";
 
 /**
  * Create an unsent DRAFT in a connected mailbox. Never sends: Gmail's
@@ -44,20 +45,25 @@ export async function createMailboxDraft(
 
   const res =
     provider === "google"
-      ? await fetchImpl("https://gmail.googleapis.com/gmail/v1/users/me/drafts", {
-          method: "POST",
-          headers,
-          body: JSON.stringify({ message: { raw: gmailRawMessage(draft) } }),
-        })
-      : await fetchImpl("https://graph.microsoft.com/v1.0/me/messages", {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            subject: header(draft.subject),
-            body: { contentType: "Text", content: draft.body },
-            toRecipients: draft.to ? [{ emailAddress: { address: header(draft.to) } }] : [],
-          }),
-        });
+      ? await fetchImpl(
+          "https://gmail.googleapis.com/gmail/v1/users/me/drafts",
+          withTimeout({ method: "POST", headers, body: JSON.stringify({ message: { raw: gmailRawMessage(draft) } }) }, PROVIDER_FETCH_TIMEOUT_MS),
+        )
+      : await fetchImpl(
+          "https://graph.microsoft.com/v1.0/me/messages",
+          withTimeout(
+            {
+              method: "POST",
+              headers,
+              body: JSON.stringify({
+                subject: header(draft.subject),
+                body: { contentType: "Text", content: draft.body },
+                toRecipients: draft.to ? [{ emailAddress: { address: header(draft.to) } }] : [],
+              }),
+            },
+            PROVIDER_FETCH_TIMEOUT_MS,
+          ),
+        );
 
   if (res.status === 401 || res.status === 403) {
     throw new ProviderError("Your mailbox connection needs reconnecting before drafts can be created.", "reauth");
@@ -88,7 +94,7 @@ export async function listDraftSummaries(args: { accessToken: string; fetchImpl?
     `&$orderby=${encodeURIComponent("lastModifiedDateTime desc")}`;
   const out: DraftSummary[] = [];
   for (let page = 0; page < DRAFTS_MAX_PAGES; page += 1) {
-    const res = await fetchImpl(url, { headers: { authorization: `Bearer ${accessToken}` } });
+    const res = await fetchImpl(url, withTimeout({ headers: { authorization: `Bearer ${accessToken}` } }, PROVIDER_FETCH_TIMEOUT_MS));
     if (res.status === 401 || res.status === 403) {
       throw new ProviderError("Your mailbox connection needs reconnecting before drafts can be checked.", "reauth");
     }

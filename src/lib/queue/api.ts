@@ -2,6 +2,7 @@ import "server-only";
 import { env } from "@/lib/env";
 import { notifyApprovers } from "@/lib/notifications/approval";
 import { cleanDraftBody, enforceSignOff, isNearDuplicate, movedSummary, signOffSummary } from "./hygiene";
+import { QUEUE_API_TIMEOUT_MS, withTimeout } from "@/lib/http/timeout";
 
 /**
  * Client for the lawmatics-mcp approval-queue API (app/api/queue/* there).
@@ -50,15 +51,21 @@ function config() {
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
   const { base, token } = config();
-  const res = await fetch(`${base}${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      ...init?.headers,
-    },
-    cache: "no-store",
-  });
+  const res = await fetch(
+    `${base}${path}`,
+    withTimeout(
+      {
+        ...init,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          ...init?.headers,
+        },
+        cache: "no-store",
+      },
+      QUEUE_API_TIMEOUT_MS,
+    ),
+  );
   if (!res.ok) {
     let detail = res.statusText;
     try {

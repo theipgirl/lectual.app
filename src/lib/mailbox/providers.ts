@@ -1,4 +1,5 @@
 import { pkceChallenge } from "./state";
+import { PROVIDER_FETCH_TIMEOUT_MS, withTimeout } from "@/lib/http/timeout";
 
 /**
  * Google and Microsoft, behind one shape.
@@ -194,11 +195,10 @@ export async function exchangeCode(args: {
   });
   if (provider === "microsoft") body.set("scope", CONFIG.microsoft.scopes.join(" "));
 
-  const res = await fetchImpl(CONFIG[provider].tokenUrl, {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body,
-  });
+  const res = await fetchImpl(
+    CONFIG[provider].tokenUrl,
+    withTimeout({ method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body }, PROVIDER_FETCH_TIMEOUT_MS),
+  );
   const json = (await res.json().catch(() => ({}))) as TokenResponse;
   if (!res.ok || !json.access_token) {
     // The provider's own words, never the code or our secret.
@@ -241,7 +241,7 @@ export async function fetchAccountEmail(args: {
     provider === "google"
       ? "https://openidconnect.googleapis.com/v1/userinfo"
       : "https://graph.microsoft.com/v1.0/me?$select=mail,userPrincipalName";
-  const res = await fetchImpl(url, { headers: { authorization: `Bearer ${accessToken}` } });
+  const res = await fetchImpl(url, withTimeout({ headers: { authorization: `Bearer ${accessToken}` } }, PROVIDER_FETCH_TIMEOUT_MS));
   if (!res.ok) throw new ProviderError(`Couldn't read the account profile (${res.status}).`, "profile-failed");
   const json = (await res.json()) as {
     email?: string;
@@ -273,11 +273,13 @@ export async function revokeToken(args: {
   fetchImpl?: typeof fetch;
 }): Promise<boolean> {
   if (args.provider !== "google") return false;
-  const res = await (args.fetchImpl ?? fetch)("https://oauth2.googleapis.com/revoke", {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ token: args.token }),
-  });
+  const res = await (args.fetchImpl ?? fetch)(
+    "https://oauth2.googleapis.com/revoke",
+    withTimeout(
+      { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ token: args.token }) },
+      PROVIDER_FETCH_TIMEOUT_MS,
+    ),
+  );
   return res.ok;
 }
 
@@ -316,11 +318,10 @@ export async function refreshAccessToken(args: {
     );
   }
 
-  const res = await fetchImpl(CONFIG[provider].tokenUrl, {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body,
-  });
+  const res = await fetchImpl(
+    CONFIG[provider].tokenUrl,
+    withTimeout({ method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body }, PROVIDER_FETCH_TIMEOUT_MS),
+  );
   const json = (await res.json().catch(() => ({}))) as TokenResponse;
   if (!res.ok || !json.access_token) {
     if (json.error === "invalid_grant") {
