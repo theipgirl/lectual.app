@@ -396,6 +396,35 @@ describe("morning-brief (F4): a failed read is reported, never an empty section"
     expect(digestFor("morning-brief", result)).toMatchObject({ text: "wrote the morning brief · nothing to report", tone: "quiet" });
   });
 
+  it("a firm with the Mailboxes module deliberately off reads 'consults not connected', quiet, not 'some sections couldn't be read'", async () => {
+    const { ctx } = setup({ modules: ["agents"] });
+    const result = await runMorningBrief(ctx);
+    expect(result.summary).not.toMatch(/Not read:|could not be read/);
+    expect(result.summary).toContain("Consults not connected");
+    const digest = digestFor("morning-brief", result);
+    expect(digest.text).toContain("consults not connected");
+    expect(digest.text).not.toContain("couldn't be read");
+    expect(digest.tone).toBe("quiet");
+  });
+
+  it("module off AND another section failing still shows attention for the real failed read", async () => {
+    const { ctx } = setup({ modules: ["agents"], failures: (q) => (q.table === "crm_org_profile" ? undefined : { message: "down" }), pending: [] });
+    const result = await runMorningBrief(ctx);
+    expect(result.summary).toMatch(/Not read: /);
+    expect(result.summary).not.toMatch(/Not read: consults/);
+    const digest = digestFor("morning-brief", result);
+    expect(digest.tone).toBe("attention");
+    expect(digest.text).toContain("couldn't be read");
+  });
+
+  it("an unreadable module list is a failed read, not a deliberate off: still attention", async () => {
+    const { ctx } = setup();
+    ctx.orgModules = null;
+    const result = await runMorningBrief(ctx);
+    expect(result.summary).toMatch(/Not read: consults/);
+    expect(digestFor("morning-brief", result).tone).toBe("attention");
+  });
+
   it("with every source failing the run throws, with no brief written", async () => {
     const { ctx, createDraft } = setup({ failures: (q) => (q.table === "crm_org_profile" ? undefined : { message: "down" }), pending: "fail" });
     await expect(runMorningBrief(ctx)).rejects.toThrow(/none of its six sections could be read/);

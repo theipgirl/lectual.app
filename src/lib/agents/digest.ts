@@ -82,6 +82,11 @@ export function briefHadUnreadSections(summary: string | null): boolean {
   return /\bNot read:/.test(summary ?? "") || /\bcould not be read\b/.test(summary ?? "");
 }
 
+/** The brief's consults section is off by the firm's own choice (Mailboxes module off): not a failed read. */
+export function briefConsultsNotConnected(summary: string | null): boolean {
+  return /\bConsults not connected\b/.test(summary ?? "");
+}
+
 /** "2 mailboxes could not be read." → 2 (0 when the inbox summary read every connection). */
 export function inboxUnreadMailboxes(summary: string | null): number {
   const m = summary?.match(/\b(\d+) mailbox(?:es)? could not be read\./);
@@ -91,6 +96,21 @@ export function inboxUnreadMailboxes(summary: string | null): number {
 /** The inbox summary could not tell which messages are filed on a lead. */
 export function inboxFiledLookupFailed(summary: string | null): boolean {
   return /\bfiled on a lead could not be checked\b/.test(summary ?? "");
+}
+
+/** What a consult-prep run's own summary says went wrong, as counts (all zero and `unreadCard` false = nothing went wrong). */
+export type ConsultPrepProblems = { failed: number; heldBack: number; partial: number; unrecorded: number; unreadCard: boolean };
+
+export function consultPrepProblems(summary: string | null): ConsultPrepProblems {
+  const text = summary ?? "";
+  const count = (re: RegExp) => Number(text.match(re)?.[1] ?? 0);
+  return {
+    failed: count(/\b(\d+) consults? could not be prepped/),
+    heldBack: count(/\b(\d+) consults? held back because a draft contained attorney-judgment content/),
+    partial: count(/\b(\d+) consults? got the heads-up but not the client email/),
+    unrecorded: count(/\b(\d+) preps? could not be recorded on the lead/),
+    unreadCard: /\bSome card sections could not be read/.test(text),
+  };
 }
 
 /**
@@ -177,12 +197,31 @@ function lineFor(agent: AgentId, runs: DigestRun[]): DigestLine | null {
       if (followUps > 0) parts.push(`${plural(followUps, "follow-up", "follow-ups")} drafted (in the Queue)`);
       else if (items === 0 && !unread) parts.push("nothing to report");
       if (unread) parts.push("some sections couldn't be read (see the brief)");
+      if (ok.some((r) => briefConsultsNotConnected(r.summary))) parts.push("consults not connected");
       const tone = followUps > 0 || unread ? "attention" : items === 0 ? "quiet" : "ok";
       return { agent, name, text: parts.join(" · "), tone, href: "/dashboard/queue/" };
     }
     case "consult-prep": {
-      if (items === 0) return { agent, name, text: "found no consults to prep", tone: "quiet", href: "/dashboard/agents/" };
-      return { agent, name, text: `prepped ${plural(items, "consult", "consults")} · ${plural(drafts, "draft", "drafts")} (in the Queue)`, tone: "attention", href: "/dashboard/queue/" };
+      // A run that failed or refused every consult has items === 0 too: its own summary says so, and it is not "nothing to prep".
+      const problems = ok.map((r) => consultPrepProblems(r.summary));
+      const sum = (pick: (p: ConsultPrepProblems) => number) => problems.reduce((s, p) => s + pick(p), 0);
+      const failed = sum((p) => p.failed);
+      const heldBack = sum((p) => p.heldBack);
+      const partial = sum((p) => p.partial);
+      const unrecorded = sum((p) => p.unrecorded);
+      const unreadCard = problems.some((p) => p.unreadCard);
+      if (failed + heldBack + partial + unrecorded === 0 && !unreadCard) {
+        if (items === 0) return { agent, name, text: "found no consults to prep", tone: "quiet", href: "/dashboard/agents/" };
+        return { agent, name, text: `prepped ${plural(items, "consult", "consults")} · ${plural(drafts, "draft", "drafts")} (in the Queue)`, tone: "attention", href: "/dashboard/queue/" };
+      }
+      const parts = [`prepped ${plural(items, "consult", "consults")}`];
+      if (drafts > 0) parts.push(`${plural(drafts, "draft", "drafts")} (in the Queue)`);
+      if (failed > 0) parts.push(`${failed} couldn't be prepped (will retry)`);
+      if (heldBack > 0) parts.push(`${heldBack} held back (attorney-judgment content)`);
+      if (partial > 0) parts.push(`${partial} got the heads-up but not the client email`);
+      if (unrecorded > 0) parts.push(`${unrecorded} ${unrecorded === 1 ? "prep" : "preps"} couldn't be recorded on the lead (may be drafted again)`);
+      if (unreadCard) parts.push("some card sections couldn't be read");
+      return { agent, name, text: parts.join(" · "), tone: "attention", href: drafts > 0 ? "/dashboard/queue/" : "/dashboard/agents/" };
     }
     case "inbox-summary": {
       // drafts_out is the digest plus every reply draft left in Outlook; items_in is the messages sorted.

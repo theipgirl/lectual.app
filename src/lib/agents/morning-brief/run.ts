@@ -144,8 +144,10 @@ export async function runMorningBrief(ctx: AgentContext): Promise<AgentResult> {
     (suggestions.state === "ok" ? suggestions.items.length : 0) +
     (stalled.state === "ok" ? stalled.items.length : 0) +
     (deadlines.state === "ok" ? deadlines.items.length : 0);
+  // A firm with the Mailboxes module deliberately off has not "failed to read" its consults; an unreadable module list still has.
+  const consultsDeliberatelyOff = gate === "off";
   const unread = [
-    consults.state !== "ok" ? "consults" : null,
+    consults.state !== "ok" && !consultsDeliberatelyOff ? "consults" : null,
     waiting.state !== "ok" ? "waiting" : null,
     suggestions.state !== "ok" ? "suggestions" : null,
     stalled.state !== "ok" ? "stalled" : null,
@@ -160,6 +162,7 @@ export async function runMorningBrief(ctx: AgentContext): Promise<AgentResult> {
   if (note.kind === "blocked") parts.push("No follow-ups were drafted because the queue or a link lookup could not be read.");
   if (unrecorded > 0) parts.push(`${plural(unrecorded, "follow-up", "follow-ups")} could not be recorded on the lead.`);
   if (unread.length > 0) parts.push(`Not read: ${unread.join(", ")}.`);
+  if (consultsDeliberatelyOff) parts.push("Consults not connected (the Mailboxes module is off).");
 
   return { itemsIn: listed, draftsOut: 1 + followUpsDrafted, summary: parts.join(" ") };
 }

@@ -3,6 +3,7 @@ import { runConsultPrep, PREP_BATCH } from "@/lib/agents/consult-prep/run";
 import { CLIENT_WORDS_HEADING } from "@/lib/agents/consult-prep/facts";
 import { AGENT_POLICY } from "@/lib/agents/policy";
 import type { Recorded } from "../mailbox/fake-db";
+import { buildRunDigest, type DigestRun } from "@/lib/agents/digest";
 import { agentCtx, assertOrgFenced, fakeLlm, NOW, ORG } from "./helpers";
 import { memDb, type DbError, type Row, type Tables } from "./mem-db";
 
@@ -435,5 +436,73 @@ describe("consult-prep (F16, F17, F15): policy, fence, logging", () => {
     await runConsultPrep(ctx);
     const writes = log.filter((q) => q.action !== "select");
     expect(writes.map((q) => `${q.action} ${q.table}`)).toEqual(["insert crm_activity"]);
+  });
+});
+
+/** The Overnight digest line for one consult-prep run's result, exactly as Today shows it. */
+function digestFor(result: { itemsIn: number; draftsOut: number; summary?: string | null }) {
+  const run: DigestRun = {
+    agent: "consult-prep",
+    status: "ok",
+    started_at: new Date(NOW - 3_600_000).toISOString(),
+    items_in: result.itemsIn,
+    drafts_out: result.draftsOut,
+    summary: result.summary ?? null,
+    error: null,
+  };
+  const out = buildRunDigest([run], new Date(NOW));
+  if (out.status !== "ok") throw new Error("expected ok");
+  return out.lines[0];
+}
+
+describe("consult-prep: the Overnight digest never reports a failed or held-back prep as nothing to prep", () => {
+  it("every consult failing (lead facts unreadable) is attention, not 'found no consults to prep'", async () => {
+    const { ctx } = setup({ failures: (q) => (q.table === "crm_lead" ? { message: "down: planted-secret" } : undefined) });
+    const result = await runConsultPrep(ctx);
+    expect(result.itemsIn).toBe(0);
+    expect(result.summary).toMatch(/1 consult could not be prepped/);
+    const line = digestFor(result);
+    expect(line.text).not.toContain("found no consults to prep");
+    expect(line.text).toContain("1 couldn't be prepped (will retry)");
+    expect(line.text).not.toContain("planted-secret");
+    expect(line.tone).toBe("attention");
+    expect(line.href).toBe("/dashboard/agents/");
+  });
+
+  it("a model output refused for attorney-judgment content is attention too", async () => {
+    const { ctx } = setup({ llm: [{ text: "We recommend the Essential package." }] });
+    const result = await runConsultPrep(ctx);
+    expect(result.itemsIn).toBe(0);
+    const line = digestFor(result);
+    expect(line.text).not.toContain("found no consults to prep");
+    expect(line.text).toContain("1 held back (attorney-judgment content)");
+    expect(line.tone).toBe("attention");
+  });
+
+  it("a mixed run keeps the prepped count and names the problems, linking to the Queue", async () => {
+    const tables: Tables = { crm_calendar_event: [event("e1", { starts_at: hours(2) }), event("e2", { starts_at: hours(3) })] };
+    const { ctx } = setup({ tables });
+    const real = ctx.llm;
+    let n = 0;
+    ctx.llm = (async (req: Parameters<typeof real>[0]) => {
+      n += 1;
+      if (n === 1) throw new Error("model down");
+      return real(req);
+    }) as typeof real;
+    const line = digestFor(await runConsultPrep(ctx));
+    expect(line.text).toMatch(/^prepped 1 consult · 2 drafts \(in the Queue\) · 1 couldn't be prepped \(will retry\)$/);
+    expect(line.tone).toBe("attention");
+    expect(line.href).toBe("/dashboard/queue/");
+  });
+
+  it("a genuinely empty run still reads 'found no consults to prep', quiet", async () => {
+    const { ctx } = setup({ tables: { crm_calendar_event: [] } });
+    const result = await runConsultPrep(ctx);
+    expect(result.summary).toBe("No consults in the next 24 hours need prep.");
+    expect(digestFor(result)).toMatchObject({ text: "found no consults to prep", tone: "quiet" });
+  });
+
+  it("'already prepped' is also quiet", () => {
+    expect(digestFor({ itemsIn: 0, draftsOut: 0, summary: "Every consult in the next 24 hours is already prepped." })).toMatchObject({ text: "found no consults to prep", tone: "quiet" });
   });
 });
