@@ -20,6 +20,9 @@ export function chunk<T>(items: readonly T[], size: number): T[][] {
 /** Values per `.in(...)`: the filter rides in the GET URL. */
 export const IN_CHUNK = 100;
 
+/** "1 mailbox", "3 mailboxes". */
+export const mailboxCount = (n: number): string => `${n} mailbox${n === 1 ? "" : "es"}`;
+
 export const text = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v : null);
 
 /**

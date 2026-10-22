@@ -1,4 +1,4 @@
-import { MAILBOX_GATE_REASON, mailboxModuleState } from "../mailbox-gate";
+import { MAILBOX_GATE_REASON, mailboxModuleState, noQueueSummary } from "../mailbox-gate";
 import { leadLabel, readFirmStyle } from "../shared";
 import type { AgentContext, AgentResult } from "../types";
 import { FOLLOW_UP_CAP, openLeads, stalledLeads, waitingOnReply, type BriefLead, type BriefStage, type StalledLead, type WaitingLead } from "./rules";
@@ -52,7 +52,7 @@ function leadSections(
 export async function runMorningBrief(ctx: AgentContext): Promise<AgentResult> {
   const { admin, orgId, autonomy } = ctx;
   if (!ctx.queueOrgKey) {
-    return { itemsIn: 0, draftsOut: 0, summary: "No approval queue is connected for this firm, so no briefing was written.", skipped: true };
+    return { itemsIn: 0, draftsOut: 0, summary: noQueueSummary(ctx, "briefing"), skipped: true };
   }
   const nowMs = ctx.now();
   const style = await readFirmStyle(admin, orgId);

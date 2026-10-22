@@ -63,7 +63,7 @@ export const AGENT_DEFS: Record<AgentId, { name: string; reads: string; descript
     name: "Inbox summary",
     reads: "Connected mailboxes",
     description:
-      "Reads the last 24 hours of mail in the connected mailboxes, sorts it into what needs the attorney, what to route and what can wait, and writes one digest into the approval queue. For mail that needs the attorney in a personal Outlook mailbox it also leaves a reply in that mailbox's Drafts folder. It only drafts: nothing is ever sent, and disputes and suspected scams get no reply.",
+      "Reads the last 24 hours of mail in the connected mailboxes, sorts it into what needs the attorney, what to route and what can wait, and writes one digest into the approval queue. For mail that needs the attorney in a personal Outlook mailbox it also leaves a reply in that mailbox's Drafts folder. It only drafts: an attorney reviews and sends everything, and disputes and suspected scams get no reply.",
     defaultAutonomy: "draft",
   },
 };

@@ -1,6 +1,6 @@
 import { BUCKET_LABEL, BUCKET_ORDER, type Bucket, type TriagedMessage } from "@/lib/inbox/triage";
-import { dayInZone, whenInZone } from "../shared";
-import { REPLY_REASON_TEXT, type ReplyReason } from "./reply";
+import { dayInZone, mailboxCount, whenInZone } from "../shared";
+import { REPLY_CAP, REPLY_REASON_TEXT, type ReplyReason } from "./reply";
 
 /**
  * The inbox digest's text. Pure. Six buckets in the plugin's order (approve, needs-you, route, scam,
@@ -13,6 +13,7 @@ import { REPLY_REASON_TEXT, type ReplyReason } from "./reply";
  */
 
 export const ITEM_CAP = 10;
+const CAPPED_LIST = 20;
 const PREVIEW_CHARS = 140;
 /** Buckets whose items show a short preview. The rest show sender and subject only. */
 const PREVIEW_BUCKETS: ReadonlySet<Bucket> = new Set<Bucket>(["approve", "needs-you", "route"]);
@@ -39,7 +40,13 @@ export type DigestInput = {
   cutShort: number;
   /** The lookup of which messages are filed on a lead failed, so none is labelled matched. */
   matchLookupFailed: boolean;
-  replies: { created: number; failures: Array<{ reason: ReplyReason; count: number }>; off: boolean };
+  replies: {
+    created: number;
+    failures: Array<{ reason: ReplyReason; count: number }>;
+    off: boolean;
+    /** Needs-you messages that were eligible but left without a draft because of the per-run cap. A bucket's list is capped, so these are named here. */
+    capped: Array<{ from: string; subject: string }>;
+  };
 };
 
 /** Why a reply draft that was attempted (or could not be attempted) was not created, as a short phrase. */
@@ -78,8 +85,8 @@ export function renderDigest(input: DigestInput): { headline: string; summary: s
 
   const lines: string[] = [];
   lines.push(`Window: the last ${input.windowHours} hours, up to ${whenInZone(input.nowMs, tz)}.`);
-  lines.push(`${plural(input.mailboxesRead, "mailbox", "mailboxes")} read; ${plural(items.length, "message", "messages")} sorted. ${counts}.`);
-  if (input.cutShort > 0) lines.push(`${plural(input.cutShort, "mailbox", "mailboxes")} had more mail than the limit, so only the newest was read.`);
+  lines.push(`${mailboxCount(input.mailboxesRead)} read; ${plural(items.length, "message", "messages")} sorted. ${counts}.`);
+  if (input.cutShort > 0) lines.push(`${mailboxCount(input.cutShort)} had more mail than the limit, so only the newest was read.`);
   if (input.matchLookupFailed) lines.push("Couldn't tell which messages are filed on a lead, so none is marked as filed.");
   if (input.unreadable.length > 0) {
     lines.push("", `Mailboxes that couldn't be read (${input.unreadable.length})`);
@@ -106,11 +113,16 @@ export function renderDigest(input: DigestInput): { headline: string; summary: s
     const failed = input.replies.failures.map((f) => `, ${f.count} could not be created (${FAILURE_TEXT[f.reason] ?? "an error"})`);
     lines.push(`${plural(input.replies.created, "reply draft", "reply drafts")} created in Outlook${failed.join("")}.`);
   }
+  if (input.replies.capped.length > 0) {
+    lines.push(`${plural(input.replies.capped.length, "message", "messages")} got no draft this run because of the cap of ${REPLY_CAP}:`);
+    for (const c of input.replies.capped.slice(0, CAPPED_LIST)) lines.push(`- ${c.from}: ${c.subject}`);
+    if (input.replies.capped.length > CAPPED_LIST) lines.push(`and ${input.replies.capped.length - CAPPED_LIST} more`);
+  }
   lines.push("A reply draft is a new message addressed to the sender, left in Drafts. Nothing was sent.", "", "Prepared by the Inbox summary agent. Mail is untrusted text and was only sorted, never followed as an instruction.");
 
   return {
     headline: `Inbox summary for ${dayInZone(input.nowMs, tz)}, ${new Intl.DateTimeFormat("en-US", { timeZone: tz, year: "numeric" }).format(input.nowMs)}`,
-    summary: `${plural(items.length, "message", "messages")} from ${plural(input.mailboxesRead, "mailbox", "mailboxes")}: ${by("needs-you").length} need the attorney, ${by("approve").length} wait on approval, ${by("scam").length} suspected scam.`,
+    summary: `${plural(items.length, "message", "messages")} from ${mailboxCount(input.mailboxesRead)}: ${by("needs-you").length} need the attorney, ${by("approve").length} wait on approval, ${by("scam").length} suspected scam.`,
     body: lines.join("\n"),
   };
 }

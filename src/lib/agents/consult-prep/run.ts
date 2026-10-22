@@ -144,6 +144,8 @@ export async function runConsultPrep(ctx: AgentContext): Promise<AgentResult> {
       const joinUrl = joinHref(event.join_url);
       const card = renderFactsCard({ lead, startsAt: event.starts_at, joinUrl, tz: style.timeZone, answers, mail, meetings });
       const name = cardName(lead);
+      // What is printed in a headline or summary is the system's wording: a recorded value is shown with any refusable fragment withheld.
+      const shownName = scrubJudgmentContent(name);
 
       // Build and check BOTH before queueing either.
       assertNoJudgmentContent(card.ownWording, "consult heads-up");
@@ -154,7 +156,7 @@ export async function runConsultPrep(ctx: AgentContext): Promise<AgentResult> {
           noAddress += 1;
         } else {
           const facts: PrepConsultFacts = {
-            clientName: neutralise(scrubJudgmentContent(name)),
+            clientName: neutralise(shownName),
             clientEmail: address,
             practiceArea: neutralise(scrubJudgmentContent(lead.practiceArea?.trim() || "Not specified")),
             inquiryDescription: neutralise(inquiryDescription(lead, answers)),
@@ -180,8 +182,8 @@ export async function runConsultPrep(ctx: AgentContext): Promise<AgentResult> {
           orgKey: ctx.queueOrgKey,
           agent: PREP_SOURCE,
           type: "BRIEFING",
-          headline: `Consult heads-up for ${name}`,
-          summary: `Internal heads-up with the facts on file for ${name}'s consult. Prepared by the Consult prep agent; nothing was sent.`,
+          headline: `Consult heads-up for ${shownName}`,
+          summary: `Internal heads-up with the facts on file for ${shownName}'s consult. Prepared by the Consult prep agent; nothing was sent.`,
           draftBody: card.body,
           clientName: name,
           leadId: lead.id,
@@ -192,8 +194,8 @@ export async function runConsultPrep(ctx: AgentContext): Promise<AgentResult> {
             orgKey: ctx.queueOrgKey,
             agent: PREP_SOURCE,
             type: "CLIENT_EMAIL",
-            headline: `Consult prep email for ${name}`,
-            summary: `Asks ${name} what to have ready before the strategy session. Confirms only the appointment details on the calendar.`,
+            headline: `Consult prep email for ${shownName}`,
+            summary: `Asks ${shownName} what to have ready before the strategy session. Confirms only the appointment details on the calendar.`,
             clientName: name,
             leadId: lead.id,
             recipient: address as string,

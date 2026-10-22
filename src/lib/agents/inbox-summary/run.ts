@@ -4,7 +4,7 @@ import { ProviderError, type MailboxProvider } from "@/lib/mailbox/providers";
 import { freshAccessToken, type ConnectionRow } from "@/lib/mailbox/sync";
 import type { ThreadMessage } from "@/lib/intake/email-threads";
 import { MAILBOX_GATE_REASON, mailboxModuleState } from "../mailbox-gate";
-import { IN_CHUNK, chunk, readFirmStyle } from "../shared";
+import { IN_CHUNK, chunk, mailboxCount, readFirmStyle } from "../shared";
 import type { AgentContext, AgentResult } from "../types";
 import { renderDigest, type DigestItem } from "./digest";
 import { createReplyDrafts, replyEligibility, type ReplyCandidate, type ReplyReason } from "./reply";
@@ -57,10 +57,13 @@ export async function runInboxSummary(ctx: AgentContext): Promise<AgentResult> {
 
   const { data, error } = await admin
     .from("mailbox_connection")
-    .select("id, org_id, provider, email, scope, status, access_token_enc, refresh_token_enc, token_expires_at, sync_cursor, matched_count, scopes")
+    // No `sync_cursor`: this agent reads a bounded window and never touches the sync's place in the stream.
+    .select("id, org_id, provider, email, scope, status, access_token_enc, refresh_token_enc, token_expires_at, scopes")
     .eq("org_id", orgId);
   if (error) throw new Error("The mailbox connections could not be read.");
-  const rows = ((data ?? []) as Row[]).filter((r) => r.org_id === orgId);
+  const rows = ((data ?? []) as Array<Omit<Row, "sync_cursor" | "matched_count">>)
+    .filter((r) => r.org_id === orgId)
+    .map((r): Row => ({ ...r, sync_cursor: null, matched_count: 0 }));
   const active = rows.filter((r) => r.status === "active");
   const broken = rows.filter((r) => r.status === "reauth" || r.status === "error");
   if (active.length === 0 && broken.length === 0) return skipped("No active mailbox is connected, so there was no mail to read.");
@@ -202,7 +205,12 @@ export async function runInboxSummary(ctx: AgentContext): Promise<AgentResult> {
     unreadable,
     cutShort,
     matchLookupFailed,
-    replies: { created, failures, off: replyOff },
+    replies: {
+      created,
+      failures,
+      off: replyOff,
+      capped: items.filter((i) => i.reply && !i.reply.drafted && i.reply.reason === "cap").map((i) => ({ from: i.from, subject: i.subject })),
+    },
   });
   await ctx.createDraft({
     orgKey: ctx.queueOrgKey,
@@ -215,13 +223,13 @@ export async function runInboxSummary(ctx: AgentContext): Promise<AgentResult> {
 
   const count = (b: Bucket) => items.filter((i) => i.bucket === b).length;
   const parts = [
-    `${plural(items.length, "message", "messages")} sorted from ${plural(mailboxesRead, "mailbox", "mailboxes")} (approve ${count("approve")}, needs you ${count("needs-you")}, route ${count("route")}, scam ${count("scam")}, fyi ${count("fyi")}, low ${count("low")}).`,
+    `${plural(items.length, "message", "messages")} sorted from ${mailboxCount(mailboxesRead)} (approve ${count("approve")}, needs you ${count("needs-you")}, route ${count("route")}, scam ${count("scam")}, fyi ${count("fyi")}, low ${count("low")}).`,
   ];
   if (replyOff) parts.push("Reply drafts are off at the suggest level.");
   else parts.push(`${plural(created, "reply draft", "reply drafts")} created in Outlook.`);
   const failedCount = failures.reduce((n, f) => n + f.count, 0);
   if (failedCount > 0) parts.push(`${plural(failedCount, "reply draft", "reply drafts")} could not be created.`);
-  if (unreadable.length > 0) parts.push(`${plural(unreadable.length, "mailbox", "mailboxes")} could not be read.`);
+  if (unreadable.length > 0) parts.push(`${mailboxCount(unreadable.length)} could not be read.`);
   if (matchLookupFailed) parts.push("Which messages are filed on a lead could not be checked.");
 
   return { itemsIn: items.length, draftsOut: 1 + created, summary: parts.join(" ") };
