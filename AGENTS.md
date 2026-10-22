@@ -517,6 +517,31 @@ ran), intake triage failed on one truncated answer, and Run now could not be cli
 - **Run now's button stacks above the card footer** (`.lx-agent-slot-run` has `position: relative; z-index: 1`). It shares
   the footer's grid cell and comes first in the markup, so without that the footer took every click.
 
+## Onboarding tour (Sprint 21, no schema)
+A first-sign-in guided tour: a spotlight on the rail, bell, account menu and Copilot button, with a centered card whenever a target is
+missing, hidden, off-screen or the window is under 768px wide. Internal only: it reads and links, and writes one preference.
+- **Flag:** `user_metadata.lectual_tour = { version, seen_at, outcome }` (`finished` | `skipped`) on the person's own account, so it follows
+  them across devices. `TOUR_VERSION = 1` (`src/lib/onboarding/tour.ts`); a missing, malformed or lower version shows the tour, and bumping
+  it shows a new tour again. It is user-editable, so it decides only whether the tour is DRAWN, never what anyone may see or do.
+- **Who and when:** everyone, once, on the first dashboard render that says "not seen" (current members included). The layout computes
+  `open` from the `user` it already has (`shouldShowTour(user.user_metadata) && !actingAsStaff`), so a platform admin inside a firm they do
+  not belong to never sees it. On the client it also stays closed when a visible `aria-modal` element is up on load (the hidden Copilot drawer
+  does not count) or when the sessionStorage guard is set; in the modal case nothing is written, so it shows on the next page.
+- **Steps:** `tourSteps({ role, navItems, aiConfigured })` is pure. Rail steps come from the same filtered `items` the rail gets, so a section the
+  firm lacks is never mentioned; Copilot only with AI; the setup/settings step for the admin tier only (`canSeeSetup`), and it is never
+  dropped for them (no Settings row means a centered card with the `SETUP_PATH` link). Queue wording follows `canApproveQueue`; viewer,
+  social_media and any unknown role get the read-only wording.
+- **One action:** `markTourSeenAction(outcome)` (`src/lib/onboarding/actions.ts`) uses `getScopedClient()` and `auth.updateUser`, merges the
+  existing metadata, refuses signed-out and a bad outcome, and returns fixed sentences. Never the service role; no user or org argument.
+- **"Show tips again"** is a button in the account menu. The menu and the tour are joined by a window event, `SHOW_TOUR_EVENT`; the tour
+  restarts at step 1 whatever the flag or guard says. Finishing or skipping writes the flag again.
+- **Fail open for the session:** closing is optimistic (`closeTour` in `engine.ts`): the tour goes away, the sessionStorage guard is set, then
+  the outcome is saved. A rejected or failed save is swallowed and shows nothing; the flag stays unwritten, so a later sign-in can show it again.
+- **Hooks:** `data-tour` tokens are `rail`, `nav-<slug>` (Today is `nav-today`), `bell`, `account`, `copilot`. A rail parent row carries its
+  children's tokens, so a collapsed rail can still be spotlighted. A step cannot point at nothing: `tests/onboarding/tour.test.ts` greps the sources.
+- **Tested without a browser:** the behaviour is in pure functions (`engine.ts`) and the dialog is checked with `renderToStaticMarkup`
+  (there is no DOM test environment). Walk it once on desktop and under 768px.
+
 ## JSX text spacing: keep the `{" "}`
 Next 16.2.7's compiler DROPS the leading space of JSX text that contains an HTML entity
 (`&apos;`, `&amp;`, `&rsquo;`…) and runs onto another line, even if that is only the line

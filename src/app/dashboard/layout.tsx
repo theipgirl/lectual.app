@@ -12,6 +12,8 @@ import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { NoFirmAccess } from "@/components/shell/NoFirmAccess";
 import { CopilotLauncher } from "@/components/copilot/CopilotLauncher";
 import { aiConfigured } from "@/lib/ai/claude";
+import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
+import { shouldShowTour } from "@/lib/onboarding/tour";
 
 export const metadata: Metadata = { title: "Lectual" };
 
@@ -95,6 +97,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </div>
       </div>
       <CopilotLauncher configured={aiConfigured()} />
+      <OnboardingTour open={shouldShowTour(user.user_metadata) && !actingAsStaff} role={role} navSlugs={items.map((i) => i.slug)} firmName={org.name} aiConfigured={aiConfigured()} />
     </div>
   );
 }

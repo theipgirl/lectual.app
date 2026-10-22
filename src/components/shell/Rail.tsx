@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOutAction } from "@/lib/auth/actions";
 import { ICON, RAIL_PIN_COOKIE, isNavActive, navItemBySlug, railGroups, type NavItem } from "@/lib/nav";
+import { navTourToken } from "@/lib/onboarding/tour";
 import { closeRailOnEscape, releaseRailFocus } from "@/lib/rail-behaviour";
 import type { QueueLoadStatus } from "@/lib/queue/load";
 
@@ -71,6 +72,7 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
       <nav
         className={`lx-rail${pinned ? " is-pinned" : ""}`}
         aria-label="Sections"
+        data-tour="rail"
         onKeyDown={(e) => closeRailOnEscape(e.key, e.currentTarget, document.activeElement as HTMLElement | null)}
       >
         <div className="lx-rail-headrow">
@@ -102,6 +104,7 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
                     <Link
                       href={entry.href}
                       onClick={releaseFocus}
+                      data-tour={(entry.kids.length > 0 ? entry.kids.map((k) => k.key) : [entry.key]).map(navTourToken).join(" ")}
                       className={`lx-rail-item${entry.active ? " is-active" : entry.childActive ? " is-parent" : ""}`}
                       aria-current={entry.active ? "page" : undefined}
                       aria-label={count ? `${entry.label} (${count === "!" ? "couldn't reach the queue" : count})` : entry.label}
@@ -122,6 +125,7 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
                               key={kid.key}
                               href={kid.href}
                               onClick={releaseFocus}
+                              data-tour={navTourToken(kid.key)}
                               className={`lx-rail-kid${kid.active ? " is-active" : ""}`}
                               aria-current={kid.active ? "page" : undefined}
                             >
@@ -145,6 +149,7 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
         <Link
           href={settings.href}
           onClick={releaseFocus}
+          data-tour={navTourToken("settings")}
           className={`lx-rail-item lx-rail-settings${settingsActive ? " is-active" : ""}`}
           aria-current={settingsActive ? "page" : undefined}
           aria-label="Settings"

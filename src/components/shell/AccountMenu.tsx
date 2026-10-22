@@ -1,12 +1,13 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useRef } from "react";
 import {
   signOutAction,
   switchFirmAction,
   type SwitchFirmState,
 } from "@/lib/auth/actions";
 import type { SwitchableFirmRef } from "@/lib/firm/session";
+import { requestTourAgain } from "@/lib/onboarding/tour";
 
 type Props = {
   initials: string;
@@ -33,11 +34,14 @@ export function AccountMenu({
     {},
   );
 
+  const menu = useRef<HTMLDetailsElement>(null);
+
   return (
-    <details style={{ position: "relative" }}>
+    <details ref={menu} style={{ position: "relative" }}>
       <summary
         className="lx-avatar"
         style={{ listStyle: "none" }}
+        data-tour="account"
         aria-label={`Account: ${name}`}
         title={`${name} · ${role.replace("_", " ")}`}
       >
@@ -87,6 +91,18 @@ export function AccountMenu({
             )}
           </form>
         )}
+
+        <button
+          type="button"
+          className="lx-btn lx-btn-sec lx-btn-sm"
+          style={{ width: "100%" }}
+          onClick={() => {
+            menu.current?.removeAttribute("open");
+            requestTourAgain(window);
+          }}
+        >
+          Show tips again
+        </button>
 
         <form action={signOutAction}>
           <button type="submit" className="lx-btn lx-btn-ghost lx-btn-sm" style={{ width: "100%" }}>
