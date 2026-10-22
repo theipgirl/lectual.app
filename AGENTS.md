@@ -360,7 +360,11 @@ starts with `AGENT_POLICY`, and mail, answers and subjects reach a model only in
 - **consult-prep** (`src/lib/agents/consult-prep/`): a consult in the next 24 hours, linked to a lead, with no prep
   recorded. Two `queue_drafted` rows per consult (heads_up, client_prep) carry the event id, so a second run skips it.
   The heads-up is a facts card rendered from data, not written by a model. The client email goes through the staff flow's
-  builder (`buildClientPrepDraft`, with an optional injected text generator so the run's cost total sees it). Classes,
+  builder (`buildClientPrepDraft`, with an optional injected text generator so the run's cost total sees it). That builder
+  is RPB Law's wording, name and address, so the client email is written ONLY for a firm holding the `agent-toolkit`
+  module (the gate `prepConsultAction` uses; `agentToolkitModuleState` in `mailbox-gate.ts`, read from `ctx.orgModules`,
+  unreadable = off). Without it the run writes the heads-up only, makes no model call and says so in the summary
+  ("the client-prep email template isn't set up for this firm"). Classes,
   package and price are never generated: values read from the record have refusable fragments withheld (`[omitted]`),
   the client's own answers are shown verbatim in a labelled block, and a model output carrying one is refused and counted.
   Both drafts are built before either is queued.
@@ -371,8 +375,13 @@ starts with `AGENT_POLICY`, and mail, answers and subjects reach a model only in
   `createMailboxDraft` makes. None for a sensitive thread, a scam, official correspondence, an automated sender, a shared
   mailbox or a Gmail mailbox. A message that already has a "Re: <subject>" draft to that sender is skipped; a Drafts folder
   that can't be read means no reply drafts for that mailbox (fail closed).
+  The digest is metadata only: no message preview or body is ever written to it. The queue row is firm-shared and a
+  personal mailbox is visible only to its owner, so a message from a `personal` connection that is not filed on a lead
+  or matter is only COUNTED per bucket ("N unmatched messages in personal mailboxes..."), never listed with sender,
+  address, subject or link (`personalUnmatched` on the digest item). Reply drafts go to the owner's own Drafts folder.
 - **Logging:** counts only in `agent_run`, the summary and every thrown message. The briefing and the digest are the
-  one place names, subjects and short previews appear, and they are internal.
+  one place names and subjects appear (a briefing for the firm; the digest only for filed or shared-mailbox mail), and
+  they are internal.
 
 ## JSX text spacing: keep the `{" "}`
 Next 16.2.7's compiler DROPS the leading space of JSX text that contains an HTML entity
