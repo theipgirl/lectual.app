@@ -48,6 +48,8 @@ async function send(
   path: string,
   body: Record<string, unknown>,
   fetchImpl: FetchLike,
+  /** Leave Lawmatics' answer out of the log. The proposal writers send client text, which an error body can echo. */
+  quiet = false,
 ): Promise<LawmaticsWriteResult<{ body: unknown }>> {
   try {
     const res = await fetchImpl(`${LAWMATICS_DEFAULT_BASE}${path}`, {
@@ -56,14 +58,14 @@ async function send(
       body: JSON.stringify(body),
     });
     if (!res.ok) {
-      const detail = await res.text().catch(() => "");
+      const detail = quiet ? "" : await res.text().catch(() => "");
       console.error(`[lawmatics] ${method} ${path.replace(/\/\d+$/, "/:id")} failed ${res.status}`, detail.slice(0, 300));
       return { ok: false, reason: `HTTP ${res.status}`, retryable: retryableStatus(res.status), status: res.status };
     }
     return { ok: true, body: await res.json().catch(() => null) };
   } catch (err) {
-    console.error(`[lawmatics] ${method} ${path.replace(/\/\d+$/, "/:id")} threw`, err instanceof Error ? err.message : err);
-    return { ok: false, reason: err instanceof Error ? err.message : "unknown error", retryable: true };
+    console.error(`[lawmatics] ${method} ${path.replace(/\/\d+$/, "/:id")} threw`, quiet ? "" : err instanceof Error ? err.message : err);
+    return { ok: false, reason: quiet ? "request failed" : err instanceof Error ? err.message : "unknown error", retryable: true };
   }
 }
 
@@ -101,4 +103,82 @@ export async function updateProspect(
   if (Object.keys(body).length === 0) return { ok: true };
   const r = await send(token, "PUT", prospectPath(contactId), body, fetchImpl);
   return r.ok ? { ok: true } : r;
+}
+
+/* ─────────────────────────── proposals (Sprint 19) ─────────────────────────
+ * The firm's own token, as above. The shapes below come from the public API reference
+ * and have NOT been checked against a live account: any non-2xx is "not done", and
+ * every 2xx is "done" whatever the body says. These writers log no response text.
+ */
+
+/** `POST /notes`: a flat `{name, body, notable_type, notable_id}` (lawmatics-mcp `src/proposals.ts`). */
+export async function addNote(
+  token: string,
+  note: { name: string; body: string; notableType: string; notableId: string },
+  fetchImpl: FetchLike = defaultFetch,
+): Promise<LawmaticsWriteResult> {
+  const r = await send(
+    token,
+    "POST",
+    "/notes",
+    { name: note.name, body: note.body, notable_type: note.notableType, notable_id: note.notableId },
+    fetchImpl,
+    true,
+  );
+  return r.ok ? { ok: true } : r;
+}
+
+/** `PUT /prospects/:id` with `custom_fields: [{id, value}]` and nothing else: no stage, no tags. */
+export async function setProspectCustomFields(
+  token: string,
+  prospectId: string,
+  fields: ReadonlyArray<{ id: string; value: string }>,
+  fetchImpl: FetchLike = defaultFetch,
+): Promise<LawmaticsWriteResult> {
+  if (fields.length === 0) return { ok: true };
+  const r = await send(token, "PUT", prospectPath(prospectId), { custom_fields: fields.map((f) => ({ id: f.id, value: f.value })) }, fetchImpl, true);
+  return r.ok ? { ok: true } : r;
+}
+
+/** Like `FetchLike`, but the body is multipart: the caller sets no Content-Type so the boundary is generated. */
+export type MultipartFetchLike = (
+  url: string,
+  init: { method: string; headers: Record<string, string>; body: FormData },
+) => Promise<{ ok: boolean; status: number }>;
+
+const defaultMultipartFetch: MultipartFetchLike = (url, init) => fetch(url, init);
+
+/** The one folder a proposal's files go in. */
+export const LAWMATICS_FILE_PATH = "Engagement";
+
+/**
+ * `POST /files` (multipart): `documentable_type=matter`, `documentable_id`, `file` and
+ * `path[]`. Any non-2xx, and a thrown request, is `{ ok: false }`; the caller says
+ * "not uploaded".
+ */
+export async function uploadMatterFile(
+  token: string,
+  file: { matterId: string; fileName: string; mime: string; bytes: Uint8Array; path?: string },
+  fetchImpl: MultipartFetchLike = defaultMultipartFetch,
+): Promise<LawmaticsWriteResult> {
+  try {
+    const form = new FormData();
+    form.append("documentable_type", "matter");
+    form.append("documentable_id", file.matterId);
+    form.append("file", new Blob([file.bytes as BlobPart], { type: file.mime }), file.fileName);
+    form.append("path[]", file.path ?? LAWMATICS_FILE_PATH);
+    const res = await fetchImpl(`${LAWMATICS_DEFAULT_BASE}/files`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, Accept: LAWMATICS_HEADERS.Accept },
+      body: form,
+    });
+    if (!res.ok) {
+      console.error(`[lawmatics] POST /files failed ${res.status}`);
+      return { ok: false, reason: `HTTP ${res.status}`, retryable: retryableStatus(res.status), status: res.status };
+    }
+    return { ok: true };
+  } catch {
+    console.error("[lawmatics] POST /files threw");
+    return { ok: false, reason: "request failed", retryable: true };
+  }
 }

@@ -52,8 +52,13 @@ export class LawmaticsNotConnectedError extends Error {
   }
 }
 
-/** A read-only Lawmatics client built from the calling firm's own token. */
-export async function firmLawmaticsClient(fetchImpl?: FetchLike): Promise<LawmaticsClient> {
+/**
+ * The calling firm's own Lawmatics token, opened. The signed-in path: the org comes from
+ * the caller's own RLS read of their connection, only an ACTIVE connection yields a token,
+ * and a firm that has none throws `LawmaticsNotConnectedError`. Callers that WRITE to
+ * Lawmatics (proposals) use this; the read-only client below is built on it.
+ */
+export async function firmLawmaticsToken(): Promise<string> {
   const root = rootKeyOrNull();
   if (!root) throw new LawmaticsNotConnectedError("Integrations aren't set up on this deployment yet (no encryption key).");
 
@@ -72,7 +77,12 @@ export async function firmLawmaticsClient(fetchImpl?: FetchLike): Promise<Lawmat
     .eq("org_id", conn.org_id)
     .maybeSingle();
   if (error || !data?.token_enc) throw new LawmaticsNotConnectedError();
-  return createLawmaticsClient({ token: openToken(root, data.token_enc), fetchImpl });
+  return openToken(root, data.token_enc);
+}
+
+/** A read-only Lawmatics client built from the calling firm's own token. */
+export async function firmLawmaticsClient(fetchImpl?: FetchLike): Promise<LawmaticsClient> {
+  return createLawmaticsClient({ token: await firmLawmaticsToken(), fetchImpl });
 }
 
 /** What a pasted token must look like before anything is sent anywhere. */

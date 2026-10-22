@@ -399,8 +399,9 @@ describe("acceptPublicProposal", () => {
     expect(row.accepted_selection).toMatchObject({ "p-word": true, "t-word": false });
     expect(row.accepted_snapshot).toMatchObject({ schema: 1, version: 2, accepted_at: NOW.toISOString() });
     expect((row.accepted_snapshot as { quote: { legal_total_cents: number } }).quote.legal_total_cents).toBe(742_500);
-    // The notice carries the id and nothing else.
-    expect(info).toHaveBeenCalledWith(JSON.stringify({ event: "proposal_accepted", proposal_id: "prop-2" }));
+    // Sprint 19: the firm notice is a real follow-up now (tests/proposals/accept-followups.test.ts), so the
+    // old "log the id" stub is gone; nothing about the proposal is logged at info level.
+    expect(info).not.toHaveBeenCalled();
   });
 
   it("the write is fenced on id, org and status 'sent', and sets nothing else", async () => {

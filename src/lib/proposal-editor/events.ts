@@ -13,6 +13,7 @@
  * to a guess and never to an exception.
  */
 
+import { describeStepEvent } from "@/lib/proposals/paid";
 import type { ProposalChange, ProposalEventRow } from "@/lib/proposals/types";
 
 export type EventContext = {
@@ -234,6 +235,9 @@ export function describeProposalEvent(event: ProposalEventRow, ctx: EventContext
       };
     }
     case "edited": {
+      // Sprint 19: paid marks, the firm notice, Lawmatics notes and uploads are `edited` events with a `step`.
+      const step = describeStepEvent(p);
+      if (step) return { ...base, what: step, details: [] };
       if (event.actor === "agent" && p.source === CONSULT_SOURCE) return describeConsultDraft(p, base);
       const changes = Array.isArray(p.changes) ? p.changes.filter(isChange) : [];
       const sentences = changes.map(describeChange);

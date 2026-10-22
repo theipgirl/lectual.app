@@ -7,6 +7,7 @@
  */
 
 import type { ProposalDisplayKey } from "./display-status";
+import { stepActivityLabel } from "./paid";
 
 const upper = (s: string) => s.trim().toUpperCase();
 
@@ -109,7 +110,14 @@ export function compactAgo(iso: string | null | undefined, now: number): string 
 /* ─────────────────────────── last activity ──────────────────────────────── */
 
 /** The newest event on a proposal, as much of it as this cell reads. */
-export type ActivityEvent = { type: string; actor: string; actor_user_id: string | null; created_at: string };
+export type ActivityEvent = {
+  type: string;
+  actor: string;
+  actor_user_id: string | null;
+  created_at: string;
+  /** Only set where the page read it (an accepted row's newest step event): lets "Edited" say what was done. */
+  payload?: unknown;
+};
 
 export const AGENT_DRAFT_LINE = "Drafted by the intake agent from the consult";
 
@@ -155,6 +163,11 @@ export function lastActivityLine(input: {
   };
   switch (input.key) {
     case "accepted": {
+      // After acceptance the only edits are Sprint 19 steps. A person's ("Marked paid") is the news; the
+      // system's own notice and note are not, so the client's acceptance stays the headline until a person acts.
+      const e = input.event && input.event !== "unavailable" && input.event.type === "edited" && input.event.actor === "staff" ? input.event : null;
+      const step = e ? stepActivityLabel(e.payload) : null;
+      if (e && step) return withWho(step, e, input);
       const ago = compactAgo(input.acceptedAt ?? input.updatedAt, input.now);
       return ago ? `Accepted by the client · ${ago}` : "Accepted by the client";
     }
@@ -169,8 +182,13 @@ export function lastActivityLine(input: {
   if (input.event === null) return input.source === "agent" ? AGENT_DRAFT_LINE : updated();
   const e = input.event;
   if (e.actor === "agent" || (input.source === "agent" && e.type === "created")) return AGENT_DRAFT_LINE;
-  const verb = EVENT_VERB[e.type] ?? "Updated";
+  const verb = (e.type === "edited" ? stepActivityLabel(e.payload) : null) ?? EVENT_VERB[e.type] ?? "Updated";
+  return withWho(verb, e, input);
+}
+
+/** "<what> 3h ago · Taylor": the name only for a teammate we can name, never an id. */
+function withWho(what: string, e: ActivityEvent, input: { names: ReadonlyMap<string, string>; now: number }): string {
   const ago = compactAgo(e.created_at, input.now);
   const name = e.actor === "staff" && e.actor_user_id ? input.names.get(e.actor_user_id) : undefined;
-  return `${verb}${ago ? ` ${ago}` : ""}${name ? ` · ${name}` : ""}`;
+  return `${what}${ago ? ` ${ago}` : ""}${name ? ` · ${name}` : ""}`;
 }

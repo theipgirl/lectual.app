@@ -75,14 +75,18 @@ export function describeNotification(
   // A `mentioned` row can carry a different event in `payload.source`; the
   // dedicated kinds a later migration adds mean the same thing as their source.
   const source = text(payload.source);
+  // Sprint 19: a client's acceptance of a proposal rides the `approval_needed` kind (the closest one
+  // that exists) and says what it is in `payload.source`, so it must not read as "a draft is waiting".
   const event =
-    row.kind === "consult_outcome" || (row.kind === "mentioned" && source === "consult_outcome")
-      ? "consult_outcome"
-      : row.kind === "approval_needed" || (row.kind === "mentioned" && source === "approval_needed")
-        ? "approval_needed"
-        : row.kind === "mentioned" && source
-          ? "unknown_source"
-          : row.kind;
+    (row.kind === "approval_needed" || row.kind === "mentioned") && source === "proposal_accepted"
+      ? "proposal_accepted"
+      : row.kind === "consult_outcome" || (row.kind === "mentioned" && source === "consult_outcome")
+        ? "consult_outcome"
+        : row.kind === "approval_needed" || (row.kind === "mentioned" && source === "approval_needed")
+          ? "approval_needed"
+          : row.kind === "mentioned" && source
+            ? "unknown_source"
+            : row.kind;
 
   switch (event) {
     case "assigned":
@@ -122,6 +126,16 @@ export function describeNotification(
         sentence: outcomeSentence(payload.outcome, lead),
         href: hrefFor(row, payload, false),
       };
+    case "proposal_accepted": {
+      const headline = text(payload.headline);
+      const id = typeof payload.proposal_id === "string" && UUID.test(payload.proposal_id) ? payload.proposal_id : null;
+      return {
+        icon: "approval",
+        label: "Proposal accepted",
+        sentence: headline ? truncate(headline, HEADLINE_MAX) : "A client accepted a proposal",
+        href: id ? `/dashboard/proposals/${id}/` : null,
+      };
+    }
     case "approval_needed": {
       const headline = text(payload.headline);
       return {
