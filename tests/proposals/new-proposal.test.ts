@@ -70,6 +70,10 @@ describe("new proposal page: ?matter= prefill and the package dropdown", () => {
       }),
     }));
     vi.doMock("@/lib/proposals/consult-strip-load", () => ({ loadConsultStrip: vi.fn(async () => extra.strip ?? { status: "none" }) }));
+    // Sprint 20: the page now also draws the "Who is this for?" picker (two list reads) and reads the lead's reviewed consult.
+    vi.doMock("@/lib/pipeline", () => ({ listLeads: vi.fn(async () => []) }));
+    vi.doMock("@/lib/matters", () => ({ listMatters: vi.fn(async () => []) }));
+    vi.doMock("@/lib/proposals/consult-prefill-load", () => ({ loadConsultForPrefill: vi.fn(async () => ({ status: "ok", details: null, unreadable: false, unreviewed: false })) }));
     vi.doMock("@/app/dashboard/proposals/actions", () => ({ createProposalAction: vi.fn() }));
     const { default: Page } = await import("../../src/app/dashboard/proposals/new/page");
     return renderToStaticMarkup(createElement("div", null, await Page({ searchParams: Promise.resolve(search) })));
