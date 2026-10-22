@@ -11,6 +11,10 @@ import { buildStatCards, type StatRead } from "@/lib/copilot/stats";
 import { CopilotChat } from "@/components/copilot/CopilotChat";
 import { StatCards } from "./stat-cards";
 import "./copilot.css";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("AI copilot") };
 
 export const dynamic = "force-dynamic";
 

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveFirmSession } from "@/lib/firm/session";
@@ -64,6 +65,8 @@ import { intakeOrigin } from "@/lib/intake-forms/origin";
 import { PROPOSAL_STAFF_WRITE_ROLES } from "@/lib/proposals/types";
 import { MatterProposalCard } from "@/components/matters/MatterProposalCard";
 import { MATTER_TYPE_LABEL } from "../labels";
+import { recordPageTitle } from "@/lib/ui/page-title";
+import { matterDisplayTitle } from "@/lib/matters/display-title";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +75,17 @@ function countdown(days: number | null): string {
   if (days < 0) return `${Math.abs(days)}d overdue`;
   if (days === 0) return "due today";
   return `in ${days}d`;
+}
+
+/** Tab title: the matter's display name through the scoped getter; "Matter" when the read fails or finds nothing. */
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  return {
+    title: await recordPageTitle(async () => {
+      const matter = await getMatter(id);
+      return matter ? matterDisplayTitle(matter).title : null;
+    }, "Matter"),
+  };
 }
 
 export default async function MatterPage({ params }: { params: Promise<{ id: string }> }) {

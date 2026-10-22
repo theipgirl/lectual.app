@@ -32,6 +32,10 @@ import { displayRunStatus, RUN_STATUS_LABEL, runDurationLabel } from "@/lib/agen
 import { listMemberDirectory } from "@/lib/members/directory";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { monthQueryFloor, monthStartCivil, civilInZone } from "@/lib/today/outcomes";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Agents") };
 
 // "Run now" executes inside the page's server action.
 export const maxDuration = 300;

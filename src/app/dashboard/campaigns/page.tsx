@@ -6,6 +6,10 @@ import { sequenceStatusLabel, sequenceStatusTone } from "@/lib/campaigns/steps";
 import { relativeTime } from "@/lib/relative-time";
 import { NewSequenceForm } from "./_components/CampaignForms";
 import "./campaigns.css";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Campaigns") };
 
 export const dynamic = "force-dynamic";
 

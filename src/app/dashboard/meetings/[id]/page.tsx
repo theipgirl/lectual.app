@@ -9,6 +9,10 @@ import { relativeTime } from "@/lib/relative-time";
 import { formatDuration, formatWhen, getMeeting, linkLabels } from "@/lib/meetings/read";
 import { PROVIDER_LABEL } from "@/lib/meetings/types";
 import { DraftFollowUpButton, DraftProposalButton, LinkMeetingForm } from "@/components/meetings/MeetingForms";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Meeting") };
 
 export const dynamic = "force-dynamic";
 

@@ -2,6 +2,10 @@ import Link from "next/link";
 import { listMatters } from "@/lib/matters";
 import { isOpenMatter, matterLabel } from "@/lib/matters/docket-summary";
 import { MATTER_TYPE_LABEL } from "@/app/dashboard/matters/labels";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("New letter") };
 
 export const dynamic = "force-dynamic";
 

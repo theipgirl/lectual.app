@@ -3,6 +3,10 @@ import { notFound } from "next/navigation";
 import { getMatter } from "@/lib/matters";
 import { matterLabel } from "@/lib/matters/docket-summary";
 import OpinionLetterForm from "./_components/OpinionLetterForm";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Opinion letter") };
 
 export const dynamic = "force-dynamic";
 

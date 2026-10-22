@@ -15,6 +15,10 @@ import { getFirmTimeZone } from "@/lib/org/profile";
 import { relativeTime } from "@/lib/relative-time";
 import { NewQuoteForm } from "@/components/quotes/QuoteForms";
 import { QuotesRestricted } from "@/components/quotes/QuotesRestricted";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Quotes & proposals") };
 
 export const dynamic = "force-dynamic";
 

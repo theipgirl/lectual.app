@@ -10,6 +10,10 @@ import { HelpText } from "@/components/integrations/HelpText";
 import { IntegrationHeader } from "@/components/integrations/IntegrationHeader";
 import { stateForStatus, type IntegrationState } from "@/components/integrations/states";
 import { ZOOM_NOT_SWITCHED_ON } from "@/lib/integrations/copy";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Meetings integration") };
 
 export const dynamic = "force-dynamic";
 

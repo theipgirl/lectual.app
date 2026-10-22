@@ -24,6 +24,10 @@ import { resolveFirmSession } from "@/lib/firm/session";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import { matterIdsNeedingReview } from "./list-utils";
 import { MATTER_TYPE_LABEL } from "./labels";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Matters") };
 
 export const dynamic = "force-dynamic";
 

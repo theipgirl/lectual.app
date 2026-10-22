@@ -8,6 +8,10 @@ import { leadRecord, matterRecord, normalizeTerm, pickRecords, type PickRecord }
 import { SkillCard, type CardMode } from "@/components/skills/SkillCard";
 import { CoworkSkills } from "@/components/skills/CoworkSkills";
 import type { PickerGroup } from "@/components/skills/SkillPicker";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Skills") };
 
 export const dynamic = "force-dynamic";
 

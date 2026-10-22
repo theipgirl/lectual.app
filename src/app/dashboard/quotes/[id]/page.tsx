@@ -37,6 +37,10 @@ import { formatCents } from "@/lib/quotes/money";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { orgHasModule } from "@/lib/org/modules";
 import "../quotes.css";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Quote") };
 
 export const dynamic = "force-dynamic";
 

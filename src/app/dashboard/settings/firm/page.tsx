@@ -5,6 +5,10 @@ import { getOrgProfile } from "@/lib/org/profile";
 import { DEFAULT_TIME_ZONE, timeZoneOptions } from "@/lib/org/profile-rules";
 import { FirmProfileForm } from "@/components/settings/FirmProfileForm";
 import { listSequences } from "@/lib/automation/drips";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Firm profile") };
 
 export const dynamic = "force-dynamic";
 

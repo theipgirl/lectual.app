@@ -9,6 +9,10 @@ import { loadMattersReport } from "@/lib/reports/matters";
 import { loadIposReport } from "@/lib/reports/ipos";
 import type { Metric } from "@/lib/reports/metric";
 import type { LinkTile, WaitingItem } from "@/lib/reports/waiting";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Report") };
 
 export const dynamic = "force-dynamic";
 

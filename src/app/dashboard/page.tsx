@@ -33,6 +33,10 @@ import { AutopilotControl } from "@/components/agents/AutopilotControl";
 import { RunDigestList } from "@/components/agents/RunDigestList";
 import { FinishSetupCard } from "@/components/setup/FinishSetupCard";
 import { TodayConsults } from "@/components/calendar/TodayConsults";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Today") };
 
 export const dynamic = "force-dynamic";
 

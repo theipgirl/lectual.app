@@ -4,6 +4,10 @@ import { hasRole } from "@/lib/auth/roles";
 import { listServiceItems } from "@/lib/quotes/service-library";
 import type { ServiceItemRow } from "@/lib/quotes/types";
 import { NewServiceItemForm, ServiceItemRowEditor } from "@/components/quotes/ServiceLibraryForms";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Service library") };
 
 export const dynamic = "force-dynamic";
 

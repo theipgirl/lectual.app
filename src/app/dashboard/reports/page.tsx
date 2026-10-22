@@ -1,4 +1,8 @@
 import { redirect } from "next/navigation";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Reports") };
 
 /**
  * There is no bare "Reports" section — each rail parent (Communication,

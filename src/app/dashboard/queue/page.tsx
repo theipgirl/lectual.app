@@ -4,6 +4,10 @@ import { QueueUnavailable } from "@/components/queue/QueueUnavailable";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { markNearDuplicates } from "@/lib/queue/hygiene";
 import { STATUS_PILL, agentLabel, fmtWhen, parseQueueStatus, preview, typeLabel, type QueueStatus } from "@/components/queue/format";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Queue") };
 
 const TABS: { status: QueueStatus; label: string }[] = [
   { status: "pending", label: "Waiting on you" },

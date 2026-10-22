@@ -17,6 +17,10 @@ import { DisconnectButton } from "@/components/mailbox/DisconnectButton";
 import { IntegrationHeader } from "@/components/integrations/IntegrationHeader";
 import { ModeBadge, StatusPill } from "@/components/integrations/StatusPill";
 import { stateForStatus, type IntegrationState } from "@/components/integrations/states";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Integrations") };
 
 /** Shown so the section has its full shape; none of these connect to anything yet. */
 const SOON = [

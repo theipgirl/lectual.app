@@ -8,6 +8,10 @@ import { orgHasModule } from "@/lib/org/modules";
 import { loadLawmaticsCustomFields, loadLoeFieldsConfig } from "@/lib/proposals/loe-fields-load";
 import { ClientsImport, ConnectLawmatics, DisconnectLawmatics, MattersImport } from "@/components/lawmatics/LawmaticsImport";
 import { LoeFieldsForm } from "@/components/lawmatics/LoeFieldsForm";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Lawmatics") };
 
 export const dynamic = "force-dynamic";
 

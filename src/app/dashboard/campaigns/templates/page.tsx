@@ -4,6 +4,10 @@ import { AUTOMATION_ADMIN_ROLES, listTemplates } from "@/lib/automation";
 import { relativeTime } from "@/lib/relative-time";
 import { NewTemplateForm } from "./_components/TemplateForms";
 import "../campaigns.css";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Campaign templates") };
 
 export const dynamic = "force-dynamic";
 

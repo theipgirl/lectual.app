@@ -19,6 +19,7 @@
  *     as an approval queue rendering "all caught up" while unreachable.
  */
 
+import { matterDisplayTitle } from "./display-title";
 import { daysInStage, matterIsStale, STALE_THRESHOLD_DAYS, type MatterWaitingOn } from "./stage-rules";
 
 /**
@@ -31,6 +32,8 @@ export type DocketMatterInput = {
   matter_number: string;
   title: string | null;
   mark_text: string | null;
+  /** The tracker's owner/client, a last resort name when the title is a generated key. */
+  owner_name?: string | null;
   status: string;
   stage_entered_at: string | null;
   stage: {
@@ -91,9 +94,9 @@ export function isOpenMatter(matter: DocketMatterInput): boolean {
   return true;
 }
 
-/** Best human name for a matter: the mark, else the title, else the number. */
+/** Best human name for a matter: the mark, else the title, else the client, else the number (generated keys yield). */
 export function matterLabel(matter: DocketMatterInput): string {
-  return matter.mark_text?.trim() || matter.title?.trim() || matter.matter_number;
+  return matterDisplayTitle({ ...matter, owner_name: matter.owner_name ?? null }).title;
 }
 
 /**

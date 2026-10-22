@@ -25,6 +25,10 @@ import {
   type CalendarView,
   type GridDay,
 } from "@/lib/calendar/grid";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Calendar") };
 
 export const dynamic = "force-dynamic";
 

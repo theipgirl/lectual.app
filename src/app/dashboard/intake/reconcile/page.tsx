@@ -9,6 +9,10 @@ import { Explanation } from "@/components/reconcile/Explanation";
 import { ReconcileScreen } from "@/components/reconcile/ReconcileScreen";
 import "../intake.css";
 import "./reconcile.css";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Reconcile stages") };
 
 export const dynamic = "force-dynamic";
 // Preview pulls the firm's Lawmatics book, and Apply moves leads one at a time.

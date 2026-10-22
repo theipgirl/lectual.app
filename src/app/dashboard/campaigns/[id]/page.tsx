@@ -33,6 +33,10 @@ import {
   ToggleSequenceButton,
 } from "./_components/CampaignBuilderForms";
 import "../campaigns.css";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Campaign") };
 
 export const dynamic = "force-dynamic";
 

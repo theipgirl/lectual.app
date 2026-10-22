@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { activeOrgModules, type OrgModule } from "@/lib/org/modules";
 import { listConnections } from "@/lib/mailbox/connections";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Modules") };
 
 export const dynamic = "force-dynamic";
 

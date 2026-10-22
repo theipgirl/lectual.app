@@ -33,6 +33,10 @@ import { NewProposalForm, type NewProposalDefaults } from "@/components/proposal
 import { WhoIsThisFor, type WhoChosen } from "@/components/proposal-editor/WhoIsThisFor";
 import { requireProposalsModule } from "../gate";
 import "../proposals.css";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("New proposal") };
 
 export const dynamic = "force-dynamic";
 

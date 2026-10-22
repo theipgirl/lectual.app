@@ -14,6 +14,10 @@ import { Markdown } from "@/components/markdown/Markdown";
 import { LinkedProposalPanel } from "@/components/queue/LinkedProposalPanel";
 import { loadLinkedPanel } from "@/lib/consult-proposal/link";
 import { loadAuditContext } from "@/lib/queue/audit-context";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Queue item") };
 
 function Meta({ label, value }: { label: string; value: React.ReactNode }) {
   if (!value) return null;

@@ -5,6 +5,10 @@ import { setupChecklist } from "@/lib/setup/checklist";
 import { canSeeSetup } from "@/lib/setup/roles";
 import { SETUP_PATH } from "@/lib/setup/routes";
 import { GoToIntegrationsLink, SetupChecklistView } from "@/components/setup/SetupChecklistView";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Setup") };
 
 export const dynamic = "force-dynamic";
 

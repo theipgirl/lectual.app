@@ -3,6 +3,10 @@ import { notFound } from "next/navigation";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { loadPipeline } from "@/lib/lifecycle/load";
 import { COLUMN_HINT, COLUMN_LABEL, filterCards, groupColumns, type PipelineCard, type PipelineColumn } from "@/lib/lifecycle/columns";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Pipeline") };
 
 export const dynamic = "force-dynamic";
 

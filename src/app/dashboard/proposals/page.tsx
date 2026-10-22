@@ -31,6 +31,10 @@ import { ProposalsTable } from "@/components/proposal-list/ProposalsTable";
 import { SegmentColumn } from "@/components/proposal-list/SegmentColumn";
 import { requireProposalsModule } from "./gate";
 import "./proposals.css";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Client proposals") };
 
 export const dynamic = "force-dynamic";
 

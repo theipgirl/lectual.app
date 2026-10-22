@@ -4,6 +4,10 @@ import { ROLES, hasRole } from "@/lib/auth/roles";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { QUEUE_APPROVE_ROLES } from "@/lib/queue/roles";
 import { InviteForm, RemoveMember, ROLE_LABEL, RoleSelect } from "@/components/settings/TeamForms";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Team") };
 
 export const dynamic = "force-dynamic";
 

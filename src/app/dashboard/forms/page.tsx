@@ -17,6 +17,10 @@ import { loadBoothEventList } from "@/lib/intake-forms/load-results";
 import { parseEventRange } from "@/lib/intake-forms/booth-results";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import "./forms.css";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Intake forms") };
 
 export const dynamic = "force-dynamic";
 
