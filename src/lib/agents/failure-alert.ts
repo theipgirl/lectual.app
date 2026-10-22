@@ -1,6 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env";
-import { fetchWithTimeout, PROVIDER_FETCH_TIMEOUT_MS } from "@/lib/http/timeout";
+import { fetchWithTimeout } from "@/lib/http/timeout";
+
+/** Short on purpose: the alert runs inside the cron's 270 s wall budget and must never push a run past maxDuration. */
+const ALERT_FETCH_TIMEOUT_MS = 10_000;
 import type { AgentId } from "./types";
 import { AGENT_DEFS } from "./types";
 
@@ -127,7 +130,7 @@ export async function sendFailureAlert(args: {
     const config = args.config === undefined ? alertConfigFromEnv() : args.config;
     if (!config) return "off";
     if (await alreadySentToday(args.admin, args.input)) return "deduped";
-    const post = fetchWithTimeout(args.fetchImpl ?? fetch, PROVIDER_FETCH_TIMEOUT_MS);
+    const post = fetchWithTimeout(args.fetchImpl ?? fetch, ALERT_FETCH_TIMEOUT_MS);
     const res = await post(RESEND_URL, {
       method: "POST",
       headers: { Authorization: `Bearer ${config.apiKey}`, "Content-Type": "application/json" },

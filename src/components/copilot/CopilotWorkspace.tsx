@@ -1,8 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import type { ReactNode } from "react";
-import { newChatNavigation } from "@/lib/copilot/history-pure";
+import { useState, type ReactNode } from "react";
+import { newChatStep } from "@/lib/copilot/history-pure";
 import type { Exchange } from "@/lib/copilot/client";
 import type { ListResult } from "@/lib/copilot/history-store";
 import { ChatHistoryList, COPILOT_PATH } from "./ChatHistoryList";
@@ -26,11 +26,14 @@ export function CopilotWorkspace(props: {
   now: number;
 }) {
   const router = useRouter();
+  // Bumped only by New chat on a chat with no `?c=`: remounting the chat empties it and forgets its saved id.
+  const [fresh, setFresh] = useState(0);
 
-  // A real navigation: the server then renders no open chat before the next question, and a later refresh() keeps that key.
+  // A past chat navigates (the server then renders no open chat, and a later refresh() keeps that key); a fresh one resets.
   function newChat() {
-    const path = newChatNavigation(props.openId, COPILOT_PATH);
-    if (path) router.push(path);
+    const step = newChatStep(props.openId, COPILOT_PATH);
+    if ("push" in step) router.push(step.push);
+    else setFresh((n) => n + 1);
   }
 
   return (
@@ -39,7 +42,7 @@ export function CopilotWorkspace(props: {
       <div className="cpw-main">
         {props.openNote && <p className="cpl-status cpw-open-note">{props.openNote}</p>}
         <CopilotChat
-          key={props.openId ?? "new"}
+          key={`${props.openId ?? "new"}-${fresh}`}
           variant="page"
           greeting={props.greeting}
           stats={props.stats}

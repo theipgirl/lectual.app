@@ -149,6 +149,15 @@ describe("New chat from a past chat", () => {
     expect(newChatNavigation(null, "/dashboard/copilot/")).toBeNull();
   });
 
+  it("on a fresh (just saved, no ?c=) chat, New chat resets the thread instead of doing nothing", async () => {
+    const { newChatStep } = await import("@/lib/copilot/history-pure");
+    expect(newChatStep(C1, "/dashboard/copilot/")).toEqual({ push: "/dashboard/copilot/" });
+    expect(newChatStep(null, "/dashboard/copilot/")).toEqual({ reset: true });
+    const src = readFileSync("src/components/copilot/CopilotWorkspace.tsx", "utf8");
+    expect(src).toMatch(/setFresh\(\(n\) => n \+ 1\)/);
+    expect(src).toContain("${fresh}");
+  });
+
   it("the workspace navigates with the router, wires the composer's button, and never touches history", () => {
     const src = readFileSync("src/components/copilot/CopilotWorkspace.tsx", "utf8");
     expect(src).toContain("router.push");

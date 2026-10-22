@@ -93,3 +93,13 @@ export const SAVE_FAILED_NOTE = "This chat isn't being saved right now.";
 
 /** New chat: when a past chat is open (`?c=`), the path to push so the server renders a fresh chat; null when already on a new one. */
 export const newChatNavigation = (openId: string | null, path: string): string | null => (openId ? path : null);
+
+/**
+ * What New chat does: push the bare path when a past chat is open, else reset the chat in place. A fresh chat that was
+ * just saved has no `?c=` in the address, so there is nothing to navigate to; without the reset the next question would be
+ * appended to that saved chat.
+ */
+export const newChatStep = (openId: string | null, path: string): { push: string } | { reset: true } => {
+  const to = newChatNavigation(openId, path);
+  return to ? { push: to } : { reset: true };
+};
