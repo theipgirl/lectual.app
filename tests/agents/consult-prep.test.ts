@@ -74,7 +74,7 @@ type Setup = { tables?: Tables; autonomy?: "suggest" | "draft" | "act"; modules?
 function setup(s: Setup = {}) {
   const db = memDb({ ...base(), ...s.tables }, { failures: s.failures });
   const { llm, calls } = fakeLlm(...(s.llm ?? [{ text: GOOD_EMAIL }]));
-  const { ctx, log, createDraft } = agentCtx(db.handler, { autonomy: s.autonomy ?? "draft", queue: s.queue ?? true, llm, modules: s.modules });
+  const { ctx, log, createDraft } = agentCtx(db.handler, { autonomy: s.autonomy ?? "draft", queue: s.queue ?? true, llm, modules: s.modules === undefined ? ["mailbox", "agent-toolkit"] : s.modules });
   return { ctx, log, createDraft, db, calls };
 }
 
@@ -207,6 +207,28 @@ describe("consult-prep (F7): the two drafts", () => {
     for (const r of rows) {
       expect(Object.keys(r.payload as object).sort()).toEqual(["agent", "event_id", "kind", "queueItemId", "source"]);
     }
+  });
+
+  it("a firm without the Agent toolkit module gets the heads-up only: no model call, nothing of RPB's template anywhere, and the skip is said in words", async () => {
+    for (const autonomy of ["draft", "act"] as const) {
+      const { ctx, createDraft, calls, db } = setup({ modules: ["agents", "mailbox"], autonomy });
+      const result = await runConsultPrep(ctx);
+      expect(calls).toHaveLength(0); // no model request at all
+      expect(clientEmails(createDraft)).toHaveLength(0);
+      expect(headsUps(createDraft)).toHaveLength(1);
+      expect(result).toMatchObject({ itemsIn: 1, draftsOut: 1 });
+      expect(result.summary).toContain("1 consult got only the heads-up: the client-prep email template isn't set up for this firm, so no client email was written.");
+      const everything = JSON.stringify([createDraft.mock.calls, calls, db.tables.crm_activity]);
+      for (const word of ["RPB", "Rebecca", "333 SE 2nd"]) expect(everything).not.toContain(word);
+      const rows = db.tables.crm_activity.filter((r) => r.type === "queue_drafted");
+      expect(rows.map((r) => (r.payload as { kind: string }).kind)).toEqual(["heads_up"]);
+    }
+  });
+
+  it("suggest in a firm without the module does not mention the template at all (it never writes a client email)", async () => {
+    const { ctx } = setup({ modules: ["mailbox"], autonomy: "suggest" });
+    const result = await runConsultPrep(ctx);
+    expect(result.summary).not.toMatch(/template/);
   });
 
   it("a lead with no real address gets the heads-up only, and the skip is counted", async () => {

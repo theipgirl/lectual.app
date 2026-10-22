@@ -4,7 +4,7 @@ import { joinHref } from "@/lib/calendar/outlook-format";
 import { buildClientPrepDraft, type DraftTextGenerator } from "@/lib/prep-consult/drafts";
 import { JudgmentBoundaryError, assertNoJudgmentContent, scrubJudgmentContent, type PrepConsultFacts } from "@/lib/prep-consult/prep-consult";
 import { AGENT_POLICY } from "../policy";
-import { MAILBOX_GATE_REASON, mailboxModuleState } from "../mailbox-gate";
+import { MAILBOX_GATE_REASON, agentToolkitModuleState, mailboxModuleState } from "../mailbox-gate";
 import { IN_CHUNK, chunk, neutralise, readFirmStyle, realAddress } from "../shared";
 import type { AgentContext, AgentResult } from "../types";
 import {
@@ -27,6 +27,9 @@ import {
  *   CLIENT_EMAIL  a short note to the client on what to have ready, through the same builder the
  *                 staff-invoked prep flow uses, with its model call routed through this run.
  *
+ * The client email template is one firm's wording (the staff flow's builder), so it is written only for a
+ * firm holding the Agent toolkit module, the same gate the staff-invoked prep uses. Without it (or with the
+ * module list unreadable) only the heads-up is written, no model is called, and the summary says so.
  * Both go to the approval queue; nothing is sent. Classes, package and price are the attorney's call
  * and are never generated: the card withholds any such fragment from recorded values, and a model
  * output carrying one is refused (nothing is queued for that consult, it is counted, the run goes on).
@@ -107,6 +110,7 @@ export async function runConsultPrep(ctx: AgentContext): Promise<AgentResult> {
   const batch = todo.slice(0, PREP_BATCH);
 
   const style = await readFirmStyle(admin, orgId);
+  const templateOn = agentToolkitModuleState(ctx) === "on";
   const generate: DraftTextGenerator = async ({ system, prompt, maxTokens }) => {
     const { output } = await ctx.llm({
       system: `${AGENT_POLICY}\n\n${system}`,
@@ -121,6 +125,7 @@ export async function runConsultPrep(ctx: AgentContext): Promise<AgentResult> {
   let prepsMade = 0;
   let draftsOut = 0;
   let noAddress = 0;
+  let noTemplate = 0;
   let refused = 0;
   let failed = 0;
   let partial = 0;
@@ -152,7 +157,9 @@ export async function runConsultPrep(ctx: AgentContext): Promise<AgentResult> {
       const address = realAddress(lead.email);
       let clientBody: string | null = null;
       if (autonomy !== "suggest") {
-        if (!address) {
+        if (!templateOn) {
+          noTemplate += 1;
+        } else if (!address) {
           noAddress += 1;
         } else {
           const facts: PrepConsultFacts = {
@@ -232,6 +239,7 @@ export async function runConsultPrep(ctx: AgentContext): Promise<AgentResult> {
   }
 
   const parts = [`${plural(prepsMade, "consult", "consults")} prepped, ${plural(draftsOut, "draft", "drafts")} queued.`];
+  if (noTemplate > 0) parts.push(`${plural(noTemplate, "consult", "consults")} got only the heads-up: the client-prep email template isn't set up for this firm, so no client email was written.`);
   if (noAddress > 0) parts.push(`${plural(noAddress, "consult", "consults")} had no client address, so only the heads-up was written.`);
   if (refused > 0) parts.push(`${plural(refused, "consult", "consults")} held back because a draft contained attorney-judgment content.`);
   if (failed > 0) parts.push(`${plural(failed, "consult", "consults")} could not be prepped and will be tried again.`);

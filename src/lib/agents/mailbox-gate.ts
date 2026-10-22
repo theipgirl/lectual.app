@@ -16,12 +16,26 @@ import type { AgentContext } from "./types";
 /** The one place an agent file names the module. Same string `orgHasModule` and the mailbox-sync cron use. */
 export const MAILBOX_MODULE = "mailbox";
 
+/**
+ * The Agent toolkit module. The client-prep email builder (`buildClientPrepDraft`) carries one firm's
+ * wording, address and sign-off, so only a firm holding this module may have it written for them; it is the
+ * same gate the staff-invoked "Prep consult" action uses.
+ */
+export const AGENT_TOOLKIT_MODULE = "agent-toolkit";
+
 export type MailboxModuleState = "on" | "off" | "unreadable";
 
 export function mailboxModuleState(ctx: Pick<AgentContext, "orgModules">): MailboxModuleState {
   const modules = ctx.orgModules;
   if (!Array.isArray(modules)) return "unreadable";
   return modules.includes(MAILBOX_MODULE) ? "on" : "off";
+}
+
+/** Same three states for the Agent toolkit module; a list that could not be read is treated as off. */
+export function agentToolkitModuleState(ctx: Pick<AgentContext, "orgModules">): MailboxModuleState {
+  const modules = ctx.orgModules;
+  if (!Array.isArray(modules)) return "unreadable";
+  return modules.includes(AGENT_TOOLKIT_MODULE) ? "on" : "off";
 }
 
 /** The reason a run (or a section) gives when the module blocks it. */

@@ -23,7 +23,7 @@ const iso = (ms: number) => new Date(ms).toISOString();
 function firm(clock: { t: number }) {
   const consultAt = (hours: number) => iso(NOW + hours * 3_600_000);
   const db = memDb({
-    crm_org: [{ id: ORG, queue_org_key: "firm-queue-key", modules: ["agents", "mailbox"] }],
+    crm_org: [{ id: ORG, queue_org_key: "firm-queue-key", modules: ["agents", "mailbox", "agent-toolkit"] }],
     agent_run: [],
     agent_autopilot: [],
     crm_org_profile: [],
