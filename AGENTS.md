@@ -744,6 +744,25 @@ the letter destination. Leads | Matters (opens on Matters), search, 8 recent, "S
 - Taylor sets `FEEDBACK_TO` and `AGENT_FAILURE_ALERT_TO` to the Resend inbox's receiving address (bugs@lectual.app forwards there). Not verified here: a real
   delivery, and that `noreply@lectual.app` is a verified sending domain on the key's Resend account.
 
+## Proposal maker wording, one-step link, the firm's own domain (Sprint 27, no schema)
+"Approve" sat next to the client's "Accept" and the client link was a dead URL until a second button nobody knew about. Now:
+- **Vocabulary is one file** (`src/lib/proposal-editor/vocabulary.ts`): draft "Draft", approved "Saved", sent "Link live", accepted
+  "Accepted by client", superseded "Replaced", withdrawn "Withdrawn"; "Save and create link", "Turn on the link", "Edit again",
+  "Start a new version", "Ask <names> to create the link", settings "Who may create client links". The list labels, history lines and
+  `display-status.ts` read it. The DB statuses and RPCs are unchanged. **"Link live" is not a send:** `sent` only means the client link
+  opens; nothing here emails a client, and no UI text may say it did (`tests/proposal-editor/vocabulary.test.ts` greps).
+- **`createLinkAction`** (`create-link.ts` holds the logic, dependencies injected) = the approve transition, then `sendProposal`. Approve failing never
+  calls the second step; approve ok and the second failing returns "Saved, but the link couldn't be turned on. Try again." and the
+  page then reads "Saved" with "Turn on the link" (`sendAction`, kept as the recovery). It imports no mail, queue or service-role code.
+  Decision: for a consult-agent proposal with its email still pending in the queue, the one-step button still turns the link on (a live
+  link is not a client send); only the old `sendAction` keeps its queue refusal, and `queueNote` is reworded text only.
+- **The link box** (Copy, Open) shows only for `sent` / `accepted`; a saved-but-not-live version shows the button instead of a dead URL.
+- **`clientLinkOrigin(orgId)`** (`src/lib/proposals/client-link-origin.ts`) is the ONLY place a `/p/<token>/` URL is built (grep test). Env
+  `FIRM_CLIENT_LINK_ORIGINS` = JSON `{ "<org_id>": "https://proposals.firm.com" }` (https, origin only, invalid entries ignored; parsing is in the
+  import-free `client-link-config.ts`); otherwise `getSiteOrigin()`. The proposal page and the consult-proposal email (`run.ts`) both use it.
+  `next.config.ts` adds the same hosts to `serverActions.allowedOrigins` so Accept works when the request arrives through the firm's domain
+  (the old `lectual` project rewrites `/p/<token>/` and `/_next/static` there, see its AGENTS.md). Old app.lectual.app links keep working.
+
 ## JSX text spacing: keep the `{" "}`
 Next 16.2.7's compiler DROPS the leading space of JSX text that contains an HTML entity
 (`&apos;`, `&amp;`, `&rsquo;`…) and runs onto another line, even if that is only the line

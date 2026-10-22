@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useState } from "react";
 import type { ProposalStatus } from "@/lib/proposals/types";
 import { joinOr } from "@/lib/proposal-editor/labels";
-import { approveAction, reviseAction, sendAction, unapproveAction, withdrawAction } from "@/app/dashboard/proposals/[id]/actions";
+import { createLinkAction, reviseAction, sendAction, unapproveAction, withdrawAction } from "@/app/dashboard/proposals/[id]/actions";
+import { BUTTON_WORDS, askToCreateLink } from "@/lib/proposal-editor/vocabulary";
 import { ActionForm, Outcome } from "./ActionForm";
 
 /**
@@ -12,6 +13,10 @@ import { ActionForm, Outcome } from "./ActionForm";
  * database trigger and the store enforce what is ALLOWED (only a named approver
  * reaches `approved`, a sent version is frozen). Each button is its own server
  * action, which re-checks the module and the caller's role.
+ *
+ * "Save and create link" does the approve and the send in one click. "Sent" in the
+ * database only means the link is live: nothing here emails a client. The words
+ * are in vocabulary.ts.
  */
 export function Lifecycle({
   proposalId,
@@ -29,12 +34,12 @@ export function Lifecycle({
   version: number;
   canWrite: boolean;
   isApprover: boolean;
-  /** `validateContent` errors at approval strictness; Approve is held back while any remain. */
+  /** `validateContent` errors at approval strictness; "Save and create link" is held back while any remain. */
   blockingErrors: number;
   approverNames: string[];
-  /** `/p/<token>` on this app's origin; only passed for approved / sent versions. */
+  /** The client link (the firm's own domain when configured). Only passed once the link is live (sent / accepted). */
   clientUrl: string | null;
-  /** Set when this proposal's email is still pending in the approval queue (or can't be read): shown instead of "Mark as sent". */
+  /** Set when this proposal's email is still pending in the approval queue (or can't be read): shown instead of "Turn on the link". */
   queueNote?: { text: string; queueId: string | null } | null;
 }) {
   const hidden = <input type="hidden" name="proposalId" value={proposalId} />;
@@ -43,21 +48,19 @@ export function Lifecycle({
   return (
     <div className="pe-bar" role="group" aria-label="Proposal actions">
       {canWrite && status === "draft" && isApprover && (
-        <ActionForm action={approveAction} className="pe-act">
+        <ActionForm action={createLinkAction} className="pe-act">
           {({ state, pending }) => (
             <>
               {hidden}
               <button type="submit" className="lx-btn lx-btn-pri" disabled={pending || blockingErrors > 0} title={blockingErrors > 0 ? "Fix the problems listed first" : undefined}>
-                {pending ? "Approving…" : "Approve"}
+                {pending ? BUTTON_WORDS.creatingLink : BUTTON_WORDS.createLink}
               </button>
               <Outcome state={state} pending={pending} />
             </>
           )}
         </ActionForm>
       )}
-      {canWrite && status === "draft" && !isApprover && (
-        <span className="lx-note">Waiting for {approvers} to approve it.</span>
-      )}
+      {canWrite && status === "draft" && !isApprover && <span className="lx-note">{askToCreateLink(approvers)}.</span>}
 
       {canWrite && status === "approved" && queueNote && (
         <span className="lx-note" role="note">
@@ -74,7 +77,7 @@ export function Lifecycle({
             <>
               {hidden}
               <button type="submit" className="lx-btn lx-btn-pri" disabled={pending}>
-                {pending ? "Marking…" : "Mark as sent"}
+                {pending ? BUTTON_WORDS.turningOnLink : BUTTON_WORDS.turnOnLink}
               </button>
               <Outcome state={state} pending={pending} />
             </>
@@ -82,7 +85,7 @@ export function Lifecycle({
         </ActionForm>
       )}
 
-      {clientUrl && (status === "approved" || status === "sent") && <CopyLink url={clientUrl} live={status === "sent"} />}
+      {clientUrl && (status === "sent" || status === "accepted") && <CopyLink url={clientUrl} />}
 
       {canWrite && status === "approved" && (
         <ActionForm action={unapproveAction} className="pe-act">
@@ -90,7 +93,7 @@ export function Lifecycle({
             <>
               {hidden}
               <button type="submit" className="lx-btn lx-btn-sec" disabled={pending}>
-                Back to draft
+                {BUTTON_WORDS.editAgain}
               </button>
               <Outcome state={state} pending={pending} />
             </>
@@ -104,7 +107,7 @@ export function Lifecycle({
             <>
               {hidden}
               <button type="submit" className="lx-btn lx-btn-sec" disabled={pending} title={`Starts version ${version + 1} as a draft`}>
-                {pending ? "Creating…" : `Revise (start version ${version + 1})`}
+                {pending ? "Creating…" : BUTTON_WORDS.startNewVersion}
               </button>
               <Outcome state={state} pending={pending} />
             </>
@@ -122,7 +125,7 @@ export function Lifecycle({
             <>
               {hidden}
               <button type="submit" className="lx-btn lx-btn-danger" disabled={pending}>
-                Withdraw
+                {BUTTON_WORDS.withdraw}
               </button>
               <Outcome state={state} pending={pending} />
             </>
@@ -133,8 +136,8 @@ export function Lifecycle({
   );
 }
 
-/** Copies the client link. Shows it too, so it can be selected by hand if the clipboard is blocked. */
-function CopyLink({ url, live }: { url: string; live: boolean }) {
+/** Copies the client link, or opens it. Shows it too, so it can be selected by hand if the clipboard is blocked. */
+function CopyLink({ url }: { url: string }) {
   const [copied, setCopied] = useState<"yes" | "no" | null>(null);
   async function copy() {
     try {
@@ -150,9 +153,12 @@ function CopyLink({ url, live }: { url: string; live: boolean }) {
       <button type="button" className="lx-btn lx-btn-sec" onClick={copy}>
         {copied === "yes" ? "Copied" : "Copy client link"}
       </button>
+      <a className="lx-btn lx-btn-sec" href={url} target="_blank" rel="noopener noreferrer">
+        Open
+      </a>
       <input className="lx-input pe-link-url" readOnly value={url} aria-label="Client link" onFocus={(e) => e.currentTarget.select()} />
       <span className="lx-note" role="status">
-        {copied === "no" ? "Couldn’t copy. Select the link and copy it." : live ? "" : "The link opens once you mark it as sent."}
+        {copied === "no" ? "Couldn’t copy. Select the link and copy it." : ""}
       </span>
     </div>
   );

@@ -2,6 +2,7 @@
 
 import type { ProposalInclude } from "@/lib/proposals/types";
 import { saveProposalSettingsAction } from "@/app/dashboard/settings/proposals/actions";
+import { SETTINGS_APPROVERS_HEADING } from "@/lib/proposal-editor/vocabulary";
 import { ActionForm, Outcome } from "./ActionForm";
 import { IncludesFields } from "./IncludesFields";
 
@@ -22,9 +23,9 @@ export function SettingsForm({ members, values }: { members: SettingsMember[]; v
         <>
           <section className="lx-card pe-card">
             <header className="pe-card-head">
-              <h2 className="pe-h">Who can approve</h2>
+              <h2 className="pe-h">{SETTINGS_APPROVERS_HEADING}</h2>
               <p className="lx-note pe-hint">
-                Only these people can approve a proposal, and nothing reaches a client until one of them has. The database enforces this; owners and admins who aren’t listed can’t approve. Up to 10.
+                Only these people can save a proposal and create its client link, and no link opens for a client until one of them has. The database enforces this; owners and admins who aren’t listed can’t. Up to 10.
               </p>
             </header>
             <div className="pe-approvers">

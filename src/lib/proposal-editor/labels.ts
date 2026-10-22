@@ -1,16 +1,10 @@
 import type { ProposalStatus } from "@/lib/proposals/types";
+import { STATUS_WORDS } from "./vocabulary";
 
-/** Pill wording per status. */
-export const STATUS_LABEL: Record<ProposalStatus, string> = {
-  draft: "Draft",
-  approved: "Approved",
-  sent: "Sent",
-  superseded: "Superseded",
-  accepted: "Accepted",
-  withdrawn: "Withdrawn",
-};
+/** Pill wording per status (the words themselves live in vocabulary.ts). */
+export const STATUS_LABEL: Record<ProposalStatus, string> = STATUS_WORDS;
 
-/** `lx-pill-*` tone per status. Approved is "warn": it is waiting on someone to send it. */
+/** `lx-pill-*` tone per status. Saved is "warn": its link is not live yet. */
 export function statusTone(status: string): "ok" | "warn" | "risk" | "mute" {
   switch (status) {
     case "approved":

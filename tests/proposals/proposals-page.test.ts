@@ -44,10 +44,10 @@ describe("proposals list page", () => {
     expect(rowOf(html, "Client e1<")).toContain("lx-pill-warn");
     expect(rowOf(html, "Client e1<")).toContain(">Expired<");
     expect(rowOf(html, "Client s1<")).toContain("lx-pill-ok");
-    expect(rowOf(html, "Client s1<")).toContain(">Sent<");
+    expect(rowOf(html, "Client s1<")).toContain(">Link live<");
     expect(rowOf(html, "Client b1<")).toContain("lx-pill-risk");
     expect(rowOf(html, "Client b1<")).toContain("Add the pay link before approving.");
-    expect(rowOf(html, "Client a2<")).toContain("approved, ready to send");
+    expect(rowOf(html, "Client a2<")).toContain("saved, link not live");
     expect(rowOf(html, "Client a2<")).toContain("lx-pill-mute");
   });
 

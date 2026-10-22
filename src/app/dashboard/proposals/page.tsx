@@ -182,7 +182,7 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
             <p className="lx-note" style={{ margin: 0 }}>
               {all.length === 0
                 ? canWrite
-                  ? "Start one from a consult above, a lead, or with New proposal. It stays a draft until a named approver approves it."
+                  ? "Start one from a consult above, a lead, or with New proposal. It stays a draft until a named approver creates its client link."
                   : "When one is started it will be listed here."
                 : `Nothing is under ${SEGMENT_LABEL[segment]}. Every proposal is still under Everything.`}
             </p>

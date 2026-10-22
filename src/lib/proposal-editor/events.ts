@@ -14,6 +14,7 @@
  */
 
 import { describeStepEvent } from "@/lib/proposals/paid";
+import { EVENT_WORDS } from "./vocabulary";
 import type { ProposalChange, ProposalEventRow } from "@/lib/proposals/types";
 
 export type EventContext = {
@@ -203,17 +204,17 @@ export function describeProposalEvent(event: ProposalEventRow, ctx: EventContext
     case "created":
       return { ...base, what: version ? `created version ${version}` : "created the proposal", details: [] };
     case "approved":
-      return { ...base, what: "approved it", details: [] };
+      return { ...base, what: EVENT_WORDS.approved, details: [] };
     case "unapproved":
       // 0089's client_proposal_log_status: {from, to, version, reason?}. The
-      // reason is set when an edit (not the Back-to-draft button) did it.
+      // reason is set when an edit (not the Edit again button) did it.
       return {
         ...base,
-        what: p.reason === "edited_after_approval" ? "edited it after approval, so it went back to draft" : "sent it back to draft",
+        what: p.reason === "edited_after_approval" ? EVENT_WORDS.unapprovedByEdit : EVENT_WORDS.unapproved,
         details: [],
       };
     case "sent":
-      return { ...base, what: "marked it as sent. The client link is live (nothing was emailed from here)", details: [] };
+      return { ...base, what: EVENT_WORDS.sent, details: [] };
     case "viewed":
       return { ...base, what: "opened the proposal", details: [] };
     case "accepted":
@@ -224,7 +225,7 @@ export function describeProposalEvent(event: ProposalEventRow, ctx: EventContext
       // The trigger's payload is {from, to, version}, and `version` is the
       // SUPERSEDED row's own number, not the one that replaced it: sending a
       // newer version is what supersedes this one.
-      return { ...base, what: "sent a newer version, which replaced this one", details: [] };
+      return { ...base, what: EVENT_WORDS.superseded, details: [] };
     case "revised": {
       const from = num(p.from_version);
       const to = num(p.version);
@@ -257,7 +258,7 @@ export function describeProposalEvent(event: ProposalEventRow, ctx: EventContext
       if (before !== null && after !== null && before !== after) {
         details.push(`The legal fee at the default selection went from ${formatDollars(before)} to ${formatDollars(after)}.`);
       }
-      if (p.reset_to_draft === true) details.push("It was approved, so it went back to draft and needs approving again.");
+      if (p.reset_to_draft === true) details.push("It was saved, so it went back to draft and needs saving again.");
       return { ...base, what, details };
     }
     default:

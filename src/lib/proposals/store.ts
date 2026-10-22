@@ -845,7 +845,7 @@ export async function approveProposal(id: string): Promise<ProposalRow> {
 
   const current = await loadRow(db, id);
   if (current.status !== "draft") {
-    throw new ProposalError("conflict", current.status === "approved" ? "This version is already approved." : `A ${current.status} version can't be approved.`);
+    throw new ProposalError("conflict", current.status === "approved" ? "This version is already saved." : `A ${current.status} version can't be saved this way.`);
   }
   const issues = validateContent(current.content, {
     forApproval: true,
@@ -855,7 +855,7 @@ export async function approveProposal(id: string): Promise<ProposalRow> {
     client_email: current.client_email,
   });
   if (hasErrors(issues)) {
-    throw new ProposalError("validation", "Fix the problems listed before approving.", issues);
+    throw new ProposalError("validation", "Fix the problems listed before creating the link.", issues);
   }
   return transition(db, current, "draft", "approved", "approve the proposal");
 }
@@ -866,7 +866,7 @@ export async function unapproveProposal(id: string): Promise<ProposalRow> {
   await requireProposalWriteRole(supabase);
   const db = proposalsDb(supabase);
   const current = await loadRow(db, id);
-  if (current.status !== "approved") throw new ProposalError("conflict", "Only an approved version can be sent back to draft.");
+  if (current.status !== "approved") throw new ProposalError("conflict", "Only a saved version can be edited again.");
   return transition(db, current, "approved", "draft", "send the proposal back to draft");
 }
 
@@ -882,7 +882,7 @@ export async function sendProposal(id: string): Promise<ProposalRow> {
 
   const current = await loadRow(db, id);
   if (current.status !== "approved") {
-    throw new ProposalError("conflict", "Only an approved version can be marked as sent. Approve it first.");
+    throw new ProposalError("conflict", "The link can only be turned on for a saved version. Save and create the link first.");
   }
   const { error } = await db.rpc("client_proposal_send", { p_id: current.id });
   if (error) throw friendlyProposalError(error, "mark the proposal as sent");

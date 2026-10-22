@@ -125,12 +125,12 @@ const EVENT_VERB: Record<string, string> = {
   created: "Created",
   edited: "Edited",
   revised: "Revised",
-  approved: "Approved",
-  unapproved: "Approval removed",
-  sent: "Sent",
+  approved: "Saved",
+  unapproved: "Edited again",
+  sent: "Link turned on",
   accepted: "Accepted",
   withdrawn: "Withdrawn",
-  superseded: "Superseded",
+  superseded: "Replaced",
   viewed: "Opened by the client",
 };
 

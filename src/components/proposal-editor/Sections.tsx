@@ -352,7 +352,7 @@ export function AddNameForm({ proposalId, updatedAt, editable }: { proposalId: s
         )}
       </ActionForm>
       <p className="lx-note pe-hint" style={{ margin: "8px 0 0" }}>
-        A new brand starts with a word mark and a logo mark, and no class yet. Add what it is used for before approving.
+        A new brand starts with a word mark and a logo mark, and no class yet. Add what it is used for before creating the link.
       </p>
     </section>
   );

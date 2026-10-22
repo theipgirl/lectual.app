@@ -143,8 +143,8 @@ describe("lastActivityLine", () => {
   });
 
   it("other events use their own verb", () => {
-    expect(line({ event: ev({ type: "sent", created_at: "2026-10-18T13:00:00Z" }) })).toBe("Sent 2d ago · Taylor");
-    expect(line({ event: ev({ type: "approved" }) })).toBe("Approved 3h ago · Taylor");
+    expect(line({ event: ev({ type: "sent", created_at: "2026-10-18T13:00:00Z" }) })).toBe("Link turned on 2d ago · Taylor");
+    expect(line({ event: ev({ type: "approved" }) })).toBe("Saved 3h ago · Taylor");
   });
 
   it("a derived expiry says the stored status still says sent", () => {
@@ -218,7 +218,7 @@ describe("one table row per status (the design's cells)", () => {
       headline: "Trademark package — ONEFORME PILATES",
       subline: "pr-ab12cd · 1 package offered · 5 classes",
       client: "Irina Vilarino",
-      statusLabel: "Sent",
+      statusLabel: "Link live",
       statusTone: "ok",
       expires: "Oct 28",
       activity: "Drafted by the intake agent from the consult",
@@ -227,7 +227,7 @@ describe("one table row per status (the design's cells)", () => {
     });
   });
   it("Accepted", () => {
-    expect(accepted).toMatchObject({ key: "accepted", statusLabel: "Accepted", statusTone: "ok", subline: "pr-cd34ef · ENHANCED signed · 2 classes", expires: "Signed 9 Sep", activity: expect.stringMatching(/^Accepted by the client · /) });
+    expect(accepted).toMatchObject({ key: "accepted", statusLabel: "Accepted by client", statusTone: "ok", subline: "pr-cd34ef · ENHANCED signed · 2 classes", expires: "Signed 9 Sep", activity: expect.stringMatching(/^Accepted by the client · /) });
   });
   it("Expired", () => {
     expect(expired).toMatchObject({ key: "expired", statusLabel: "Expired", statusTone: "warn", headline: "Portfolio renewal — ORIN & HALE", expires: "Expired Sep 4", activity: "Stored status still says sent" });

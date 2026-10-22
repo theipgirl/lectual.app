@@ -1,3 +1,4 @@
+import { STATUS_WORDS } from "@/lib/proposal-editor/vocabulary";
 import { isProposalExpired } from "./expiry";
 import type { ProposalStatus } from "./types";
 
@@ -6,11 +7,11 @@ import type { ProposalStatus } from "./types";
  * schema change (spec B5.2):
  *
  *   draft, no approval-blocking issue   -> Draft
- *   approved                            -> Draft ("approved, ready to send")
+ *   approved                            -> Draft ("saved, link not live")
  *   draft / approved with an issue      -> Blocked (sub-label: the first issue)
- *   sent, not past its expiry           -> Sent
+ *   sent, not past its expiry           -> Link live
  *   sent, past its expiry               -> Expired (derived here, never stored)
- *   accepted                            -> Accepted
+ *   accepted                            -> Accepted by client
  *   withdrawn / superseded              -> Closed
  *
  * Pure: the list read has no validation inputs of its own, so the caller hands
@@ -30,8 +31,8 @@ export type ProposalDisplayStatus = {
 
 export const PROPOSAL_DISPLAY_LABEL: Record<ProposalDisplayKey, string> = {
   draft: "Draft",
-  sent: "Sent",
-  accepted: "Accepted",
+  sent: STATUS_WORDS.sent,
+  accepted: STATUS_WORDS.accepted,
   expired: "Expired",
   blocked: "Blocked",
   closed: "Closed",
@@ -86,7 +87,7 @@ export function proposalDisplayStatus(
     case "draft":
       return firstIssue ? make("blocked", firstIssue) : make("draft");
     case "approved":
-      return firstIssue ? make("blocked", firstIssue) : make("draft", "approved, ready to send");
+      return firstIssue ? make("blocked", firstIssue) : make("draft", "saved, link not live");
     case "sent":
       // `today` is a civil date; noon UTC read in UTC is that same civil date.
       return isProposalExpired(row.expires_on, new Date(`${ctx.today}T12:00:00Z`), "UTC") ? make("expired") : make("sent");

@@ -29,6 +29,8 @@ import {
   takenIds,
   type Parsed,
 } from "@/lib/proposal-editor/form";
+import { runCreateLink } from "@/lib/proposal-editor/create-link";
+import { EDIT_AGAIN_DONE, LINK_TURNED_ON } from "@/lib/proposal-editor/vocabulary";
 import { proposalActionError, type ActionState } from "../errors";
 import { gateStaffAction } from "../gate";
 
@@ -166,14 +168,26 @@ export async function saveIncludesAction(_prev: ActionState, formData: FormData)
  * button is SHOWN is `isCurrentUserApprover()` on the page, a courtesy.
  */
 export async function approveAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  return lifecycle(formData, approveProposal, "Approved. You can mark it as sent when you've shared the link.", "Couldn't approve this proposal.");
+  return lifecycle(formData, approveProposal, "Saved.", "Couldn't save this proposal.");
+}
+
+/**
+ * "Save and create link": approve, then make the link live, in one click. Nothing is emailed;
+ * "sent" in the database only means the client link opens. If the first step lands and the
+ * second does not, the version stays saved and "Turn on the link" (sendAction) finishes it.
+ */
+export async function createLinkAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  return runCreateLink(
+    { gate: gateStaffAction, approve: approveProposal, makeLive: sendProposal, describe: proposalActionError, revalidate },
+    field(formData, "proposalId"),
+  );
 }
 
 export async function unapproveAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  return lifecycle(formData, unapproveProposal, "Sent back to draft.", "Couldn't send this proposal back to draft.");
+  return lifecycle(formData, unapproveProposal, EDIT_AGAIN_DONE, "Couldn't take this proposal back to editing.");
 }
 
-/** Marks the version sent (the client link starts working). Nothing is emailed from here. */
+/** "Turn on the link": the recovery for a saved version whose link is not live. Nothing is emailed from here. */
 export async function sendAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const refused = await gateStaffAction();
   if (refused) return refused;
@@ -182,7 +196,7 @@ export async function sendAction(_prev: ActionState, formData: FormData): Promis
   // hand-posted form must not get around that.
   const blocked = await consultSendRefusal(field(formData, "proposalId"));
   if (blocked) return { error: blocked };
-  return lifecycle(formData, sendProposal, "Marked as sent. The client link is live.", "Couldn't mark this proposal as sent.");
+  return lifecycle(formData, sendProposal, LINK_TURNED_ON, "Couldn't turn on the link.");
 }
 
 async function consultSendRefusal(id: string): Promise<string | null> {

@@ -67,7 +67,7 @@ describe("an edited event reads as a sentence", () => {
     expect(line.details.length).toBeGreaterThanOrEqual(3);
     expect(line.details.every((d) => d[0] === d[0].toUpperCase())).toBe(true);
     expect(line.details.some((d) => d.includes("Consultation credit"))).toBe(true);
-    expect(line.details.at(-1)).toBe("It was approved, so it went back to draft and needs approving again.");
+    expect(line.details.at(-1)).toBe("It was saved, so it went back to draft and needs saving again.");
   });
 
   it("describes adds, removes and renames of brands, marks, classes and rows", () => {
@@ -103,7 +103,7 @@ describe("the other events", () => {
   it("names the actor by role when there is no user", () => {
     expect(describeProposalEvent(event({ type: "viewed", actor: "client", actor_user_id: null }), { names })).toMatchObject({ who: "The client", what: "opened the proposal" });
     expect(describeProposalEvent(event({ type: "accepted", actor: "client", actor_user_id: null }), { names }).what).toBe("accepted the proposal");
-    expect(describeProposalEvent(event({ type: "approved", actor_user_id: "u2" }), { names })).toMatchObject({ who: "Rebecca", what: "approved it" });
+    expect(describeProposalEvent(event({ type: "approved", actor_user_id: "u2" }), { names })).toMatchObject({ who: "Rebecca", what: "saved it" });
     expect(describeProposalEvent(event({ type: "approved", actor_user_id: "ghost" }), { names }).who).toBe("A teammate");
   });
   it("says which version", () => {
@@ -115,13 +115,13 @@ describe("the other events", () => {
   it("reads the trigger's status payloads ({from, to, version, reason?})", () => {
     // superseded: `version` is the replaced row's own number, never the newer one.
     const sup = describeProposalEvent(event({ type: "superseded", payload: { from: "sent", to: "superseded", version: 1 } }), { names });
-    expect(sup.what).toBe("sent a newer version, which replaced this one");
+    expect(sup.what).toBe("turned on a newer version, which replaced this one");
     expect(sup.what).not.toMatch(/version 1/);
     expect(
       describeProposalEvent(event({ type: "unapproved", payload: { from: "approved", to: "draft", version: 1, reason: "edited_after_approval" } }), { names }).what,
-    ).toBe("edited it after approval, so it went back to draft");
+    ).toBe("edited it after it was saved, so it went back to draft");
     expect(describeProposalEvent(event({ type: "unapproved", payload: { from: "approved", to: "draft", version: 1 } }), { names }).what).toBe(
-      "sent it back to draft",
+      "took it back to editing",
     );
     expect(describeProposalEvent(event({ type: "sent" }), { names }).what).toContain("nothing was emailed");
   });

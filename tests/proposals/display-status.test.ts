@@ -12,7 +12,7 @@ const show = (status: ProposalStatus, expires_on: string | null = null, issues: 
 describe("proposalDisplayStatus", () => {
   it("a sent proposal is Expired the day after its expiry, Sent on the day, Sent with no expiry", () => {
     expect(show("sent", "2026-10-19")).toMatchObject({ key: "expired", label: "Expired" });
-    expect(show("sent", "2026-10-20")).toMatchObject({ key: "sent", label: "Sent" });
+    expect(show("sent", "2026-10-20")).toMatchObject({ key: "sent", label: "Link live" });
     expect(show("sent", "2026-10-30").key).toBe("sent");
     expect(show("sent", null).key).toBe("sent");
   });
@@ -26,7 +26,7 @@ describe("proposalDisplayStatus", () => {
 
   it("a draft with no issue is Draft; approved is Draft with its sub-label", () => {
     expect(show("draft", "2026-10-30")).toEqual({ key: "draft", label: "Draft", sub: null });
-    expect(show("approved", "2026-10-30")).toEqual({ key: "draft", label: "Draft", sub: "approved, ready to send" });
+    expect(show("approved", "2026-10-30")).toEqual({ key: "draft", label: "Draft", sub: "saved, link not live" });
   });
 
   it("an approved proposal with a blocking issue is Blocked", () => {
@@ -34,7 +34,7 @@ describe("proposalDisplayStatus", () => {
   });
 
   it("accepted is Accepted; withdrawn and superseded are Closed", () => {
-    expect(show("accepted")).toMatchObject({ key: "accepted", label: "Accepted" });
+    expect(show("accepted")).toMatchObject({ key: "accepted", label: "Accepted by client" });
     expect(show("withdrawn")).toMatchObject({ key: "closed", label: "Closed" });
     expect(show("superseded")).toMatchObject({ key: "closed", label: "Closed" });
   });

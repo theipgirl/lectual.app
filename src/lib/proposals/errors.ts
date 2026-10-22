@@ -43,7 +43,7 @@ type DbErrorLike = { code?: string; message?: string } | null | undefined;
  * would collapse them into one generic sentence.
  */
 const TRIGGER_MESSAGES: ReadonlyArray<readonly [prefix: string, code: ProposalErrorCode, message: string]> = [
-  ["client_proposal_not_approver", "forbidden", "Only the firm's named approvers can approve a proposal."],
+  ["client_proposal_not_approver", "forbidden", "Only the firm's named approvers can create a client link."],
   ["client_proposal_accept_service_only", "forbidden", "Only the client can accept a proposal, from their own link."],
   ["client_proposal_frozen", "frozen", "This version has already gone out and can't be changed. Create a revision instead."],
   ["client_proposal_immutable", "frozen", "This version has already gone out and can't be changed. Create a revision instead."],
