@@ -7,7 +7,7 @@
  *   1. the newest `stage_changed` activity, when the card has one, is the real
  *      entry: count from it;
  *   2. a stage entry that equals the record's created (import) time, or the
- *      time it was last synced from Lawmatics, reads "In stage since import"
+ *      time it was last pulled from Lawmatics, reads "In stage since import"
  *      with no day count;
  *   3. otherwise count days from `stage_entered_at`.
  * Display only: nothing here writes to a lead.
@@ -20,7 +20,7 @@ const SAME_MOMENT_MS = 5 * 60_000;
 export type StageAgeInput = {
   stageEnteredAt: string | null;
   createdAt?: string | null;
-  /** When the record was last synced from Lawmatics, if it came from there. */
+  /** When the record was last pulled from Lawmatics, if it came from there. */
   importedAt?: string | null;
   /** Newest `stage_changed` activity for this record, when the page read one. */
   lastStageChangeAt?: string | null;
