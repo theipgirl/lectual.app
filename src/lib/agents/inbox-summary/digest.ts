@@ -6,23 +6,24 @@ import { REPLY_CAP, REPLY_REASON_TEXT, type ReplyReason } from "./reply";
  * The inbox digest's text. Pure. Six buckets in the plugin's order (approve, needs-you, route, scam,
  * fyi, low) with a count in each heading, the reason each message was placed there, a role label for
  * routed mail, an Outlook link when the provider gave one, and the reply-draft result for each
- * needs-you message. A sensitive item shows "[needs attorney, no draft]" with sender and subject and
- * NO preview; a scam item says "do not engage" and shows no preview either.
+ * needs-you message. A sensitive item shows "[needs attorney, no draft]"; a scam item says "do not engage".
  *
- * The digest is internal (the approval queue); it is the one place subjects and short previews appear.
+ * Metadata only: no message preview or body is ever written here. The queue row is shared by the whole
+ * firm, and a personal mailbox is visible only to its owner, so a message from a personal mailbox that is
+ * not filed on a lead or matter is only COUNTED per bucket (no sender, address, subject or link). The
+ * owner sees it in Outlook, where any reply draft is also left.
  */
 
 export const ITEM_CAP = 10;
 const CAPPED_LIST = 20;
-const PREVIEW_CHARS = 140;
-/** Buckets whose items show a short preview. The rest show sender and subject only. */
-const PREVIEW_BUCKETS: ReadonlySet<Bucket> = new Set<Bucket>(["approve", "needs-you", "route"]);
 
 export type DigestItem = TriagedMessage & {
   /** Display name of the lead the message is filed on; null when unmatched. */
   matchedLead: string | null;
   /** Filed on a client matter but no lead. */
   matchedMatter: boolean;
+  /** From a personal mailbox and not filed on a lead or matter: counted in the digest, never listed. */
+  personalUnmatched: boolean;
   /** What happened to the reply draft for a needs-you message. */
   reply: { drafted: true } | { drafted: false; reason: ReplyReason } | null;
 };
@@ -66,11 +67,6 @@ function itemLines(item: DigestItem, tz: string): string[] {
   const when = item.receivedAt ? `, ${whenInZone(item.receivedAt, tz)}` : "";
   const head = item.sensitive ? "[needs attorney, no draft] " : item.bucket === "scam" ? "Do not engage. " : "";
   const lines = [`- ${head}${item.from}: ${item.subject}`, `  ${where}; mailbox ${item.mailbox}${when}`, `  Why: ${item.reason}${item.assignTo ? `; route to: ${item.assignTo}` : ""}`];
-  const showPreview = PREVIEW_BUCKETS.has(item.bucket) && !item.sensitive && item.preview.trim() !== "";
-  if (showPreview) {
-    const flat = item.preview.replace(/\s+/g, " ").trim();
-    lines.push(`  Preview: ${flat.length > PREVIEW_CHARS ? `${flat.slice(0, PREVIEW_CHARS - 1)}…` : flat}`);
-  }
   if (item.bucket === "needs-you" && !item.sensitive) {
     lines.push(`  Reply: ${item.reply === null ? REPLY_REASON_TEXT.suggest : item.reply.drafted ? "a draft is waiting in your Outlook Drafts folder" : REPLY_REASON_TEXT[item.reply.reason]}`);
   }
@@ -100,8 +96,13 @@ export function renderDigest(input: DigestInput): { headline: string; summary: s
       lines.push("Nothing in the last 24 hours.");
       continue;
     }
-    for (const item of list.slice(0, ITEM_CAP)) lines.push(...itemLines(item, tz));
-    if (list.length > ITEM_CAP) lines.push(`and ${list.length - ITEM_CAP} more`);
+    const listed = list.filter((i) => !i.personalUnmatched);
+    const hidden = list.length - listed.length;
+    for (const item of listed.slice(0, ITEM_CAP)) lines.push(...itemLines(item, tz));
+    if (listed.length > ITEM_CAP) lines.push(`and ${listed.length - ITEM_CAP} more`);
+    if (hidden > 0) {
+      lines.push(`${plural(hidden, "unmatched message", "unmatched messages")} in personal mailboxes (shown to their owner in Outlook; reply drafts, if any, are in that mailbox's Drafts)`);
+    }
   }
 
   lines.push("", "Reply drafts");

@@ -17,8 +17,9 @@ import { createReplyDrafts, replyEligibility, type ReplyCandidate, type ReplyRea
  * filed, no mail is marked read.
  *
  * Metadata only: headers and the provider's own short preview are used in memory to triage and then
- * dropped; none is stored. A body is fetched for a message only when it will get a reply draft, goes
- * to the model, and is discarded. The window read never touches a connection's `sync_cursor`.
+ * dropped; none is stored, and the digest carries no preview. Unmatched mail from a personal mailbox is
+ * only counted in the digest (the queue row is firm-shared; that mailbox is its owner's). A body is
+ * fetched for a message only when it will get a reply draft, goes to the model, and is discarded. The window read never touches a connection's `sync_cursor`.
  *
  * It reads mailboxes, so the Mailboxes module is checked first on every run: with the module off (or
  * unreadable) the run ends skipped before ANY provider request is made. A connection that needs
@@ -189,7 +190,13 @@ export async function runInboxSummary(ctx: AgentContext): Promise<AgentResult> {
     } else if (m.bucket === "needs-you") {
       reply = { drafted: false, reason: replyEligibility(m) ?? "suggest" };
     }
-    return { ...m, matchedLead: hit?.leadId ? (leadNames.get(hit.leadId) ?? "a lead") : null, matchedMatter: Boolean(hit && !hit.leadId), reply };
+    return {
+      ...m,
+      matchedLead: hit?.leadId ? (leadNames.get(hit.leadId) ?? "a lead") : null,
+      matchedMatter: Boolean(hit && !hit.leadId),
+      personalUnmatched: m.connection.scope === "personal" && !hit,
+      reply,
+    };
   });
 
   const failureReasons: ReplyReason[] = ["reconnect", "drafts-unreadable", "no-body", "model", "judgment", "error"];
@@ -209,7 +216,7 @@ export async function runInboxSummary(ctx: AgentContext): Promise<AgentResult> {
       created,
       failures,
       off: replyOff,
-      capped: items.filter((i) => i.reply && !i.reply.drafted && i.reply.reason === "cap").map((i) => ({ from: i.from, subject: i.subject })),
+      capped: items.filter((i) => !i.personalUnmatched && i.reply && !i.reply.drafted && i.reply.reason === "cap").map((i) => ({ from: i.from, subject: i.subject })),
     },
   });
   await ctx.createDraft({

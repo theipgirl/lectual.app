@@ -98,14 +98,23 @@ type Setup = {
   llm?: unknown[];
   failures?: (q: Recorded) => DbError | undefined;
   queue?: boolean;
+  /** Leave the messages unfiled. By default every message is filed on a client matter, so personal-mailbox mail is listed in the digest. */
+  unfiled?: boolean;
 };
 
 function setup(s: Setup = {}) {
+  const boxes = s.boxes ?? { "tok-att": { inbox: [] } };
+  const filedRows: Row[] = s.unfiled
+    ? []
+    : [
+        ...Object.values(boxes).flatMap((b) => (b.inbox ?? []).map((m) => `graph:${String(m.id)}`)),
+        ...Object.values(s.gmail ?? {}).flatMap((g) => g.ids.map((id) => `gmail:${id}`)),
+      ].map((id) => ({ id: `filed-${id}`, org_id: ORG, lead_id: null, matter_id: "matter-1", type: "email_received", created_at: hoursAgo(1), payload: { message_id: id } }));
   const db = memDb(
-    { mailbox_connection: s.connections ?? [conn("c-att", "attorney@firm.example", "tok-att")], crm_activity: [], crm_lead: [], crm_org_profile: [], ...s.tables },
+    { mailbox_connection: s.connections ?? [conn("c-att", "attorney@firm.example", "tok-att")], crm_lead: [], crm_org_profile: [], ...s.tables, crm_activity: [...(s.tables?.crm_activity ?? []), ...filedRows] },
     { failures: s.failures },
   );
-  const provider = fakeProvider(s.boxes ?? { "tok-att": { inbox: [] } }, s.gmail);
+  const provider = fakeProvider(boxes, s.gmail);
   const { llm, calls } = fakeLlm(...(s.llm ?? [REPLY]));
   const { ctx, log, createDraft } = agentCtx(db.handler, { autonomy: s.autonomy ?? "draft", queue: s.queue ?? true, llm, fetchImpl: provider.impl, modules: s.modules });
   ctx.mailbox = { admin: ctx.admin as SupabaseClient, root, credentials: () => ({ clientId: "c", clientSecret: "s" }) };
@@ -146,20 +155,22 @@ describe("inbox-summary (F10): what is read", () => {
     expect(digestOf(createDraft).draftBody).toContain("1 mailbox had more mail than the limit, so only the newest was read.");
   });
 
-  it("labels a message filed on a lead with the lead's name, and leaves the rest unmatched", async () => {
+  it("labels a message filed on a lead with the lead's name; unmatched personal mail is only counted, with no sender, subject or link", async () => {
     const tables: Tables = {
       crm_activity: [{ id: "a1", org_id: ORG, lead_id: "L1", matter_id: null, type: "email_received", created_at: hoursAgo(2), payload: { message_id: "graph:KNOWN" } }],
       crm_lead: [{ id: "L1", org_id: ORG, first_name: "Dana", last_name: "Ruiz", business_name: null }],
     };
     const boxes = { "tok-att": { inbox: [gm("KNOWN", { subject: "Question about my filing" }), gm("STRANGER", { subject: "Question from a stranger" })] } };
-    const { ctx, createDraft } = setup({ boxes, tables, autonomy: "suggest" });
+    const { ctx, createDraft } = setup({ boxes, tables, autonomy: "suggest", unfiled: true });
     await runInboxSummary(ctx);
     const body = digestOf(createDraft).draftBody;
     const known = body.slice(body.indexOf("known@client.example"), body.indexOf("known@client.example") + 200);
     expect(known).toContain("filed on Dana Ruiz");
-    const stranger = body.slice(body.indexOf("stranger@client.example"), body.indexOf("stranger@client.example") + 200);
-    expect(stranger).toContain("not filed on a lead");
-    expect(stranger).not.toContain("Dana Ruiz");
+    expect(body).not.toContain("stranger@client.example");
+    expect(body).not.toContain("Question from a stranger");
+    expect(body).not.toContain("https://outlook.example/STRANGER");
+    expect(body).toContain("1 unmatched message in personal mailboxes (shown to their owner in Outlook; reply drafts, if any, are in that mailbox's Drafts)");
+    expect(body).toContain("2 messages sorted"); // the unlisted message is still counted
   });
 
   it("a failed 'is it filed on a lead' lookup is said out loud, and nothing is marked as filed", async () => {
@@ -167,6 +178,8 @@ describe("inbox-summary (F10): what is read", () => {
     const { ctx, createDraft } = setup({ boxes: { "tok-att": { inbox: [gm("A")] } }, failures, autonomy: "suggest" });
     const result = await runInboxSummary(ctx);
     expect(digestOf(createDraft).draftBody).toContain("Couldn't tell which messages are filed on a lead, so none is marked as filed.");
+    expect(digestOf(createDraft).draftBody).not.toContain("a@client.example"); // personal mail stays unlisted when matching can't be checked
+    expect(digestOf(createDraft).draftBody).toContain("1 unmatched message in personal mailboxes");
     expect(result.summary).toMatch(/could not be checked/);
   });
 
@@ -222,7 +235,7 @@ describe("inbox-summary (F12): the digest", () => {
     expect(result).toMatchObject({ itemsIn: 7, draftsOut: 1 });
   });
 
-  it("a sensitive item shows '[needs attorney, no draft]' with sender and subject and no preview; a scam says do not engage", async () => {
+  it("a sensitive item shows '[needs attorney, no draft]' with sender and subject; a scam says do not engage; no preview is ever shown", async () => {
     const { ctx, createDraft } = setup({ boxes: mixed(), autonomy: "suggest" });
     await runInboxSummary(ctx);
     const body = digestOf(createDraft).draftBody;
@@ -230,7 +243,38 @@ describe("inbox-summary (F12): the digest", () => {
     expect(body).not.toContain("PREVIEW-SENSITIVE-TEXT");
     expect(section(body, "Suspected scam, do not engage")).toContain("Do not engage.");
     expect(body).not.toContain("PREVIEW-SCAM-TEXT");
-    expect(body).toContain("PREVIEW-NEED-TEXT"); // an ordinary needs-you item shows its short preview
+    expect(body).not.toContain("PREVIEW-NEED-TEXT"); // metadata only: not even an ordinary item shows a preview
+    expect(body).not.toContain("Preview:");
+  });
+
+  it("a personal-mailbox message that is not filed is never listed: a sentinel in its preview and subject reaches no draftBody", async () => {
+    const inbox = [
+      gm("FILED", { subject: "Question about my filing", preview: "SENTINEL-PREVIEW-FILED" }),
+      gm("LOOSE", { subject: "SENTINEL-SUBJECT-LOOSE please advise", preview: "SENTINEL-PREVIEW-LOOSE", from: "loose-sender@family.example", name: "SENTINEL-NAME-LOOSE" }),
+      gm("LOOSE2", { subject: "Thanks", preview: "SENTINEL-PREVIEW-LOOSE2" }),
+    ];
+    const tables: Tables = { crm_activity: [{ id: "a1", org_id: ORG, lead_id: null, matter_id: "m1", type: "email_received", created_at: hoursAgo(2), payload: { message_id: "graph:FILED" } }] };
+    const { ctx, createDraft } = setup({ boxes: { "tok-att": { inbox } }, tables, unfiled: true, autonomy: "suggest" });
+    await runInboxSummary(ctx);
+    const body = digestOf(createDraft).draftBody;
+    expect(body).not.toMatch(/SENTINEL-/);
+    expect(body).not.toContain("loose-sender@family.example");
+    expect(body).not.toContain("https://outlook.example/LOOSE");
+    expect(body).toContain("filed on a client matter");
+    expect(body).toContain("3 messages sorted");
+    const unmatched = [...body.matchAll(/(\d+) unmatched messages? in personal mailboxes/g)].map((m) => Number(m[1]));
+    expect(unmatched.reduce((a, b) => a + b, 0)).toBe(2); // counted per bucket, never listed
+  });
+
+  it("an unmatched message in a firm (shared) mailbox is still listed", async () => {
+    const connections = [conn("c-int", "intake@firm.example", "tok-int", { scope: "firm" })];
+    const { ctx, createDraft } = setup({ connections, boxes: { "tok-int": { inbox: [gm("SH", { subject: "Shared box question", preview: "SENTINEL-PREVIEW-SH" })] } }, unfiled: true, autonomy: "suggest" });
+    await runInboxSummary(ctx);
+    const body = digestOf(createDraft).draftBody;
+    expect(body).toContain("Shared box question");
+    expect(body).toContain("not filed on a lead");
+    expect(body).not.toContain("SENTINEL-PREVIEW-SH");
+    expect(body).not.toContain("unmatched message");
   });
 
   it("caps each bucket's list and says how many more", async () => {
@@ -535,8 +579,8 @@ describe("inbox-summary (F1, F15, F16, F17): outputs only, bodies never stored, 
     expect(posts(provider.requests)[0].body).toContain(BODY); // ...and the Outlook draft it wrote
     const digest = digestOf(createDraft).draftBody;
     expect(digest).not.toContain(BODY); // never the digest
-    expect(digest).toContain("SENTINEL-SUBJECT-xyz"); // subjects and previews appear inside the internal digest only
-    expect(digest).toContain("SENTINEL-PREVIEW-xyz");
+    expect(digest).toContain("SENTINEL-SUBJECT-xyz"); // a filed message's subject appears inside the internal digest only
+    expect(digest).not.toContain("SENTINEL-PREVIEW-xyz"); // a preview never does
   });
 
   it("errors thrown from the agent carry no address, subject or name", async () => {
@@ -570,6 +614,6 @@ describe("inbox-summary (F1, F15, F16, F17): outputs only, bodies never stored, 
     assertOrgFenced(log);
     expect(provider.requests.some((r) => r.token === "tok-other")).toBe(false);
     expect(digestOf(createDraft).draftBody).not.toContain("Other Firm");
-    expect(digestOf(createDraft).draftBody).toContain("not filed on a lead");
+    expect(digestOf(createDraft).draftBody).toContain("filed on a client matter");
   });
 });
