@@ -20,25 +20,28 @@ export function SkillPicker({ skill, term, groups }: { skill: Skill; term: strin
   const showHeadings = groups.length > 1;
   return (
     <div style={{ display: "grid", gap: 10 }}>
-      <form method="get" action={`#skill-${skill.slug}`} className="lx-search-form" role="search" style={{ flex: "none", display: "flex", gap: 8 }}>
+      <form method="get" action={`#skill-${skill.slug}`} className="lx-search-form" role="search" style={{ flex: "none", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
         <input type="hidden" name="skill" value={skill.slug} />
-        <label htmlFor={inputId} className="lx-label" style={{ alignSelf: "center", whiteSpace: "nowrap" }}>
+        <label htmlFor={inputId} className="lx-label" style={{ whiteSpace: "nowrap" }}>
           Run it on...
         </label>
         <input
           id={inputId}
           className="lx-input"
+          style={{ flex: 1, minWidth: 140, width: "auto" }}
           name="q"
           type="search"
           maxLength={SEARCH_MAX}
           defaultValue={term}
-          placeholder={skill.picks.length > 1 ? "Name, mark or number" : skill.picks[0] === "lead" ? "Name, business or email" : "Mark, number or client"}
           aria-label={`Search records to run ${skill.name} on`}
         />
         <button type="submit" className="lx-btn lx-btn-ghost lx-btn-sm">
           Search
         </button>
       </form>
+      <p className="lx-note" style={{ margin: 0 }}>
+        Search {skill.picks.length > 1 ? "by name, mark or number" : skill.picks[0] === "lead" ? "by name, business or email" : "by mark, matter number or client"}.
+      </p>
       {groups.map((g) => (
         <div key={g.kind} style={{ display: "grid", gap: 4 }}>
           {showHeadings && <div className="lx-label">{KIND_HEADING[g.kind]}</div>}

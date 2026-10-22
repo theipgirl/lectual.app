@@ -4,6 +4,9 @@ import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 
 const root = path.resolve(__dirname, "../..");
+// Spelled in pieces so this file does not trip its own search for them.
+const FORBIDDEN = new RegExp(["send" + "Mail", "Mail\\.Se" + "nd", "dangerously" + "SetInnerHTML", "db\\/ad" + "min", "getAdmin" + "Client"].join("|"));
+const UNFINISHED = new RegExp(["coming " + "soon", "to" + "do", "lor" + "em", "place" + "holder"].join("|"), "i");
 
 type LeadRow = { id: string; first_name: string | null; last_name: string | null; business_name: string | null; email: string | null };
 type MatterRow = { id: string; type: string; title: string | null; mark_text: string | null; matter_number: string; owner_name: string | null };
@@ -394,8 +397,8 @@ describe("Skills page: no writes, no sends, no placeholders", () => {
     for (const [f, src] of sources) {
       expect(src, f).not.toMatch(/\.(insert|update|upsert|delete)\(/);
       expect(src, f).not.toMatch(/["']use server["']/);
-      expect(src, f).not.toMatch(/sendMail|Mail\.Send|dangerouslySetInnerHTML|db\/admin|getAdminClient/);
-      expect(src, f).not.toMatch(/coming soon|todo|lorem|placeholder="?(?:todo|tbd)/i);
+      expect(src, f).not.toMatch(FORBIDDEN);
+      expect(src, f).not.toMatch(UNFINISHED);
     }
   });
 
