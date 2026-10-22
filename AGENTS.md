@@ -580,11 +580,11 @@ Display and derivation only: no data is rewritten, nothing is sent, no new depen
 ## Getting started hub (Sprint 23, no schema)
 `/dashboard/getting-started/` ("Getting started · Lectual") is a set of guided flows over the real screens, open to every member.
 Internal only: a flow points at things and explains them; it never clicks, moves or sends anything. The one write is the person's own progress flag.
-- **Catalog:** `src/lib/onboarding/hub.ts` (pure). Five tracks (`intake`, `consults`, `matters`, `approvals`, `admin`), each a list of flows, each flow a
+- **Catalog:** `src/lib/onboarding/hub.ts` (pure). The Intake track's five flows need a staff role (`requires.staff`: not viewer, not social_media, not unknown), so those roles lose the track. Five tracks (`intake`, `consults`, `matters`, `approvals`, `admin`), each a list of flows, each flow a
   list of steps `{ id, path, target, title, body }`. `hubTracks({ role, modules, aiConfigured })` filters: a flow needs named rail sections to be visible
   (`visibleNav`, the rail's own data, so module gates fail closed), `admin: true` needs `canSeeSetup`, `ai: true` needs the AI key. An unknown role sees
   nothing, an unreadable module list (`null`) is treated as none and the page says some guides couldn't be checked, and a track with no flow left is dropped.
-  Read-only wording for viewer, social_media and unknown roles lives in the step's `bodyReadOnly` (the queue step). A test checks every path exists on disk
+  The queue step's wording follows `canApproveQueue` (like the tour): every role that cannot approve, and any unknown role, gets the non-approver wording; it lives in the step's `bodyReadOnly` (the queue step). A test checks every path exists on disk
   and every target is a `data-tour` hook in the sources, so a step cannot point at nothing; copy is denylist-tested (no advice, no "will send", no names).
 - **Progress:** `user_metadata.lectual_hub = { version: 1, done: string[], hidden_card?: true }`, written only by `hub-actions.ts` (`markHubFlowAction`,
   `resetHubProgressAction`, `hideHubCardAction`) through `getScopedClient()` + `auth.updateUser`, merged with every other key (the Sprint 21 `lectual_tour` flag

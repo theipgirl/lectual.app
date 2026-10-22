@@ -141,7 +141,7 @@ describe("resuming from sessionStorage", () => {
   });
 
   it("clears for a flow the person can no longer see", () => {
-    const viewerFlows = visibleFlows({ role: "viewer", modules: [], aiConfigured: false });
+    const viewerFlows = visibleFlows({ role: "attorney", modules: [], aiConfigured: false });
     expect(resumeFlow("intake-reconcile:0", viewerFlows)).toEqual({ kind: "none" });
     expect(resumeFlow("intake-lead:0", viewerFlows).kind).toBe("resume");
   });

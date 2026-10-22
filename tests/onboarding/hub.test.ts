@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { ROLES } from "@/lib/auth/roles";
+import { canApproveQueue } from "@/lib/queue/roles";
 import {
   EMPTY_PROGRESS,
   HUB_CENTERED,
@@ -86,6 +87,11 @@ describe("role x module matrix", () => {
     expect(flowIds(ctx(role)).includes("intake-reconcile")).toBe(tier);
   });
 
+  it.each(ROLES)("%s: the Intake track is for staff roles only", (role) => {
+    const staff = role !== "viewer" && role !== "social_media";
+    expect(trackIds(ctx(role)).includes("intake")).toBe(staff);
+  });
+
   it("without proposals the proposal flows go", () => {
     const ids = flowIds(ctx("owner", ALL.filter((m) => m !== "proposals")));
     expect(ids).not.toContain("consults-proposal");
@@ -139,7 +145,7 @@ describe("role x module matrix", () => {
 describe("read-only wording", () => {
   const queueBody = (role: string) => visibleFlows(ctx(role)).find((f) => f.id === "approvals-queue")!.steps.find((s) => s.id === "queue")!.body;
 
-  it.each(["viewer", "social_media"])("%s is not told they can approve", (role) => {
+  it.each(ROLES.filter((r) => !canApproveQueue(r)))("%s is not told they can approve", (role) => {
     const body = queueBody(role);
     expect(body).toMatch(/Nothing goes to a client until someone approves it/);
     expect(body).not.toMatch(/you can approve|then approve|approve or reject|review each draft/i);
@@ -149,9 +155,9 @@ describe("read-only wording", () => {
     expect(flowIds(ctx("mystery"))).not.toContain("approvals-queue");
   });
 
-  it.each(["owner", "admin", "senior_admin", "attorney"])("%s gets the approver wording", (role) => {
+  it.each(ROLES.filter((r) => canApproveQueue(r)))("%s gets the approver wording", (role) => {
     expect(queueBody(role)).toMatch(/Nothing goes to a client until someone approves it/);
-    expect(queueBody(role)).toMatch(/approve or reject/);
+    expect(queueBody(role)).toMatch(/then approve or reject it/);
   });
 });
 
@@ -247,7 +253,7 @@ describe("progress", () => {
   });
 
   it("counts only flows the person can see", () => {
-    const tracks = hubTracks(ctx("viewer"));
+    const tracks = hubTracks(ctx("attorney"));
     const counts = trackCounts(tracks, ["intake-leads", "admin-setup", "intake-reconcile"]);
     expect(counts.find((c) => c.id === "intake")!.done).toBe(1);
     expect(overallCount(tracks, ["admin-setup"]).done).toBe(0);

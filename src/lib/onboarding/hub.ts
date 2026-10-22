@@ -38,7 +38,7 @@ export type HubStep = {
 type CatalogStep = HubStep & { bodyReadOnly?: string };
 
 /** What a flow needs. Every named rail section must be visible to the person (the rail's own data). */
-export type HubRequires = { nav: readonly string[]; admin?: boolean; ai?: boolean };
+export type HubRequires = { nav: readonly string[]; admin?: boolean; ai?: boolean; staff?: boolean };
 
 export type HubFlow = {
   id: string;
@@ -71,7 +71,7 @@ const FLOWS: readonly CatalogFlow[] = [
     track: "intake",
     title: "Your leads and last touch",
     summary: "Where leads live and how to read the list.",
-    requires: { nav: ["intake"] },
+    requires: { staff: true, nav: ["intake"] },
     steps: [
       {
         id: "rail",
@@ -96,7 +96,7 @@ const FLOWS: readonly CatalogFlow[] = [
     track: "intake",
     title: "The board and moving a stage",
     summary: "Seeing leads by stage, and how a stage is changed.",
-    requires: { nav: ["intake"] },
+    requires: { staff: true, nav: ["intake"] },
     steps: [
       {
         id: "board",
@@ -121,7 +121,7 @@ const FLOWS: readonly CatalogFlow[] = [
     track: "intake",
     title: "A lead's page",
     summary: "Answers, files, consult details and the timeline.",
-    requires: { nav: ["intake"] },
+    requires: { staff: true, nav: ["intake"] },
     steps: [
       {
         id: "head",
@@ -150,7 +150,7 @@ const FLOWS: readonly CatalogFlow[] = [
     track: "intake",
     title: "Intake forms and results",
     summary: "One form per event, campaign or page.",
-    requires: { nav: ["forms"] },
+    requires: { staff: true, nav: ["forms"] },
     steps: [
       {
         id: "forms",
@@ -167,7 +167,7 @@ const FLOWS: readonly CatalogFlow[] = [
     track: "intake",
     title: "Reconcile stages",
     summary: "Compare leads' stages with your sheet, Lawmatics and mail.",
-    requires: { nav: ["intake"], admin: true },
+    requires: { staff: true, nav: ["intake"], admin: true },
     steps: [
       {
         id: "reconcile",
@@ -386,7 +386,7 @@ const FLOWS: readonly CatalogFlow[] = [
         side: "bottom",
         title: "Approval queue",
         body: "Review each draft, edit it if it needs it, then approve or reject it. Nothing goes to a client until someone approves it.",
-        bodyReadOnly: "You can look at the drafts waiting here, but approving them is for others. Nothing goes to a client until someone approves it.",
+        bodyReadOnly: "You can look at the drafts waiting here, and edit them if your role allows, but approving them is for others. Nothing goes to a client until someone approves it.",
       },
     ],
   },
@@ -553,7 +553,7 @@ function isKnownRole(role: string): role is Role {
   return (ROLES as readonly string[]).includes(role);
 }
 
-/** Read-only wording: a viewer, a social-media role and any role this app does not know. */
+/** Read-only: a viewer, a social-media role and any role this app does not know. */
 export function hubReadOnly(role: string): boolean {
   return !isKnownRole(role) || role === "viewer" || role === "social_media";
 }
@@ -570,13 +570,14 @@ function visibleSlugs(ctx: HubContext): Set<string> {
 
 function flowVisible(flow: CatalogFlow, ctx: HubContext, slugs: Set<string>): boolean {
   if (flow.requires.admin && !canSeeSetup(ctx.role)) return false;
+  if (flow.requires.staff && hubReadOnly(ctx.role)) return false;
   if (flow.requires.ai && !ctx.aiConfigured) return false;
   return flow.requires.nav.every((slug) => slugs.has(slug));
 }
 
 function resolveFlow(flow: CatalogFlow, ctx: HubContext): HubFlow {
-  const readOnly = hubReadOnly(ctx.role);
-  const steps = flow.steps.map(({ bodyReadOnly, ...step }) => ({ ...step, body: readOnly && bodyReadOnly ? bodyReadOnly : step.body }));
+  const approves = hubApproves(ctx.role);
+  const steps = flow.steps.map(({ bodyReadOnly, ...step }) => ({ ...step, body: !approves && bodyReadOnly ? bodyReadOnly : step.body }));
   return { ...flow, steps };
 }
 
