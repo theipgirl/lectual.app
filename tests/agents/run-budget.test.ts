@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { StructuredCall } from "@/lib/ai/claude";
-import { runAllAgents, runOneAgent } from "@/lib/agents/runner";
+import { refuseAfterAbort, runAllAgents, runOneAgent } from "@/lib/agents/runner";
 import { AGENT_RUN_BUDGET_MS, CRON_AGENT_CAP_MS, CRON_TRACKS, CRON_WALL_BUDGET_MS, MIN_AGENT_START_MS } from "@/lib/agents/budget";
 import { AGENT_IDS } from "@/lib/agents/types";
 import { DID_NOT_FINISH_ERROR, displayRunStatus, isStaleRun, runDurationLabel, STALE_RUN_MS } from "@/lib/agents/run-status";
@@ -342,5 +342,17 @@ describe("morning brief: follow-ups stop before the budget runs out", () => {
     const result = await runMorningBrief(ctx);
     expect(calls).toHaveLength(3);
     expect(result.summary).not.toContain("time limit");
+  });
+});
+
+describe("refuseAfterAbort: nothing is queued after the time limit", () => {
+  it("passes calls through while the run is live, and refuses them (without calling through) once it has aborted", async () => {
+    const controller = new AbortController();
+    const createDraft = vi.fn(async () => ({ id: "q" }));
+    const guarded = refuseAfterAbort(controller.signal, createDraft);
+    await expect(guarded()).resolves.toEqual({ id: "q" });
+    controller.abort(new Error(DID_NOT_FINISH_ERROR));
+    await expect(guarded()).rejects.toThrow(DID_NOT_FINISH_ERROR);
+    expect(createDraft).toHaveBeenCalledTimes(1);
   });
 });

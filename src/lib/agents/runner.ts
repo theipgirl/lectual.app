@@ -121,6 +121,11 @@ export async function autopilotAllowsRuns(admin: SupabaseClient, orgId: string):
 }
 
 /** One agent, one firm, one agent_run row. */
+/** Wraps a queue call so it is refused once the run's signal has aborted (the run is already closed as "Did not finish"). */
+export function refuseAfterAbort<A extends unknown[], R>(signal: AbortSignal, fn: (...args: A) => Promise<R>): (...args: A) => Promise<R> {
+  return (...args: A) => (signal.aborted ? Promise.reject(new Error(DID_NOT_FINISH_ERROR)) : fn(...args));
+}
+
 export async function runOneAgent(
   deps: RunnerDeps,
   args: {
@@ -191,8 +196,13 @@ export async function runOneAgent(
     autonomy: args.autonomy,
     llm,
     queueOrgKey,
-    createDraft: deps.createDraft,
-    listPending: deps.listPending && queueOrgKey ? () => (deps.listPending as NonNullable<RunnerDeps["listPending"]>)(queueOrgKey) : undefined,
+    // Once the run is past its budget the row is closed as "Did not finish"; nothing may be queued after that,
+    // or a run recorded as unfinished would still leave a draft (and a retry would leave a second one).
+    createDraft: refuseAfterAbort(controller.signal, deps.createDraft),
+    listPending:
+      deps.listPending && queueOrgKey
+        ? refuseAfterAbort(controller.signal, () => (deps.listPending as NonNullable<RunnerDeps["listPending"]>)(queueOrgKey))
+        : undefined,
     orgModules,
     now,
     siteOrigin: deps.siteOrigin,
