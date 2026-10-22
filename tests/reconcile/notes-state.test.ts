@@ -30,7 +30,7 @@ const read = (entries: Array<[string, NotesRead["byRecord"] extends Map<string, 
 describe("the notes state", () => {
   it("ok: counts the people read and the notes", async () => {
     const { view } = await buildPlan(
-      input({ readLawmaticsNotes: async () => read([["aa11", { status: "ok", truncated: false, notes: [{ date: "2026-09-01T00:00:00Z", milestones: ["consult_held"], snippet: "x" }] }], ["bb22", { status: "ok", truncated: false, notes: [] }]]) }),
+      input({ readLawmaticsNotes: async () => read([["Prospect:aa11", { status: "ok", truncated: false, notes: [{ date: "2026-09-01T00:00:00Z", milestones: ["consult_held"], snippet: "x" }] }], ["Prospect:bb22", { status: "ok", truncated: false, notes: [] }]]) }),
     );
     expect(view.summary.notes).toEqual({ status: "ok", records: 2, notes: 1, truncated: false });
     expect(view.rows.map((r) => r.notes)).toEqual(expect.arrayContaining([{ status: "ok", count: 1 }, { status: "ok", count: 0 }]));
@@ -38,7 +38,7 @@ describe("the notes state", () => {
 
   it("truncated when the per-run bound left people unread, and the screen line says the list is incomplete", async () => {
     const { view } = await buildPlan(
-      input({ readLawmaticsNotes: async () => read([["aa11", { status: "ok", truncated: false, notes: [] }], ["bb22", { status: "unavailable", reason: "Not read: this preview reads the notes of the first 150 people only." }]], 1) }),
+      input({ readLawmaticsNotes: async () => read([["Prospect:aa11", { status: "ok", truncated: false, notes: [] }], ["Prospect:bb22", { status: "unavailable", reason: "Not read: this preview reads the notes of the first 150 people only." }]], 1) }),
     );
     expect(view.summary.notes).toMatchObject({ status: "ok", truncated: true });
     expect(notesSummaryLine(view.summary.notes)).toContain("incomplete");
@@ -46,13 +46,13 @@ describe("the notes state", () => {
   });
 
   it("truncated when one person's notes hit the page cap", async () => {
-    const { view } = await buildPlan(input({ readLawmaticsNotes: async () => read([["aa11", { status: "ok", truncated: true, notes: [] }], ["bb22", { status: "ok", truncated: false, notes: [] }]]) }));
+    const { view } = await buildPlan(input({ readLawmaticsNotes: async () => read([["Prospect:aa11", { status: "ok", truncated: true, notes: [] }], ["Prospect:bb22", { status: "ok", truncated: false, notes: [] }]]) }));
     expect(view.summary.notes).toMatchObject({ truncated: true });
   });
 
   it("unavailable when no person's notes could be read, never an empty ok", async () => {
     const bad = { status: "unavailable" as const, reason: "Lawmatics notes couldn't be read for this record." };
-    const { view } = await buildPlan(input({ readLawmaticsNotes: async () => read([["aa11", bad], ["bb22", bad]]) }));
+    const { view } = await buildPlan(input({ readLawmaticsNotes: async () => read([["Prospect:aa11", bad], ["Prospect:bb22", bad]]) }));
     expect(view.summary.notes).toEqual({ status: "unavailable", reason: bad.reason });
   });
 
@@ -65,5 +65,56 @@ describe("the notes state", () => {
   it("not read when Lawmatics itself is unavailable or no reader was given", async () => {
     expect((await buildPlan(input({ lawmatics: { status: "unavailable", reason: "x" }, readLawmaticsNotes: async () => read([]) }))).view.summary.notes?.status).toBe("not-read");
     expect((await buildPlan(input({}))).view.summary.notes?.status).toBe("not-read");
+  });
+
+  it("a payload the client could not recognise reads \"couldn't be read\" on the row, never \"0 read\"", async () => {
+    const { createLawmaticsClient } = await import("../../src/lib/lawmatics/client");
+    const { readLawmaticsNotes } = await import("../../src/lib/lawmatics/notes");
+    const fetchImpl = async () => ({ ok: true, status: 200, statusText: "OK", json: async () => ({}), text: async () => "" });
+    const client = createLawmaticsClient({ token: "t", fetchImpl: fetchImpl as never });
+    const { view } = await buildPlan(input({ readLawmaticsNotes: (targets) => readLawmaticsNotes(client, targets) }));
+    expect(view.rows.every((r) => r.notes?.status === "unavailable")).toBe(true);
+    expect(view.summary.notes?.status).toBe("unavailable");
+    const line = notesSummaryLine(view.summary.notes);
+    expect(line).toContain("couldn't be read");
+    expect(line).not.toMatch(/\b0 (read|notes)/);
+  });
+
+  it("the contact's notes are read as well, and a failed contact read names the row unavailable", async () => {
+    const withContact = (id: string) => ({ ...record(id), contactId: `c-${id}` });
+    let asked: Array<{ id: string; kind: string }> = [];
+    const ok = { status: "ok" as const, truncated: false, notes: [] };
+    const { view } = await buildPlan(
+      input({
+        lawmatics: { status: "ok", records: [withContact("aa11"), withContact("bb22")] },
+        readLawmaticsNotes: async (t) => {
+          asked = t;
+          return read([
+            ["Prospect:aa11", ok], ["Contact:c-aa11", ok], ["Prospect:bb22", ok],
+            ["Contact:c-bb22", { status: "unavailable", reason: "Lawmatics notes couldn't be read for this record." }],
+          ]);
+        },
+      }),
+    );
+    expect(asked).toEqual(expect.arrayContaining([{ id: "c-aa11", kind: "Contact" }, { id: "c-bb22", kind: "Contact" }, { id: "aa11", kind: "Prospect" }]));
+    expect(view.rows.find((r) => r.leadId === "aa11")?.notes).toEqual({ status: "ok", count: 0 });
+    expect(view.rows.find((r) => r.leadId === "bb22")?.notes).toMatchObject({ status: "unavailable" });
+  });
+
+  it("a note on the contact becomes cited (Lawmatics note) evidence", async () => {
+    const rec = { ...record("aa11"), contactId: "c-aa11" };
+    const ok = { status: "ok" as const, truncated: false, notes: [] };
+    const { view } = await buildPlan(
+      input({
+        leads: [lead("aa11")],
+        lawmatics: { status: "ok", records: [rec] },
+        readLawmaticsNotes: async () =>
+          read([["Prospect:aa11", ok], ["Contact:c-aa11", { status: "ok", truncated: false, notes: [{ date: "2026-09-01T00:00:00Z", milestones: ["consult_held"], snippet: "had the consult" }] }]]),
+      }),
+    );
+    const row = view.rows.find((r) => r.leadId === "aa11")!;
+    expect(row.notes).toEqual({ status: "ok", count: 1 });
+    expect(row.evidence?.some((e) => e.source === "lawmatics" && e.via === "note" && e.milestone === "consult_held")).toBe(true);
+    expect(row.proposal.reasons.join("\n")).toContain("(Lawmatics note)");
   });
 });

@@ -104,6 +104,7 @@ describe("what the screen is allowed to touch", () => {
       "@/lib/lawmatics/import",
       "@/lib/lawmatics/normalize",
       "@/lib/lawmatics/notes",
+      "@/lib/lawmatics/notes-key",
       "@/lib/lawmatics/stage-map",
     ]);
   });

@@ -3,6 +3,7 @@ import { namesMatch } from "@/lib/intake/email-match";
 import { SHEET_PRACTICE_AREA, splitOwnerName } from "@/lib/intake/sheet-import";
 import { describeSections, type SheetContact } from "@/lib/intake/sheet-sections";
 import type { SheetEntry, SheetRead } from "@/lib/intake/sheet-read";
+import { notesKey } from "@/lib/lawmatics/notes-key";
 import type { NotesRead, NotesTarget, RecordNotes } from "@/lib/lawmatics/notes";
 import type { LawmaticsSourceRecord } from "@/lib/lawmatics/normalize";
 import { resolveStage } from "@/lib/lawmatics/stage-map";
@@ -177,10 +178,15 @@ export async function buildPlan(input: PlanInput): Promise<{ view: ReconcileView
 
   // ── the reads that need to know who is on the table ─────────────────────────
   const reads: Reads = { notes: null, notesFailed: null, mail: new Map(), capped: new Set() };
-  const notesTargets: NotesTarget[] = [
-    ...onTable.flatMap((l) => (recordOf.has(l.id) ? [{ id: recordOf.get(l.id)!.lawmaticsId, kind: "Prospect" as const }] : [])),
-    ...lawmaticsOnly.slice(0, NOT_IN_LECTUAL_CAP).map((r) => ({ id: r.lawmaticsId, kind: "Prospect" as const })),
+  // Each pulled person is asked about twice: the notes on the prospect and the notes on their contact.
+  const pulled = [
+    ...onTable.flatMap((l) => (recordOf.has(l.id) ? [recordOf.get(l.id)!] : [])),
+    ...lawmaticsOnly.slice(0, NOT_IN_LECTUAL_CAP),
   ];
+  const notesTargets: NotesTarget[] = pulled.flatMap((r) => [
+    { id: r.lawmaticsId, kind: "Prospect" as const },
+    ...(r.contactId ? [{ id: r.contactId, kind: "Contact" as const }] : []),
+  ]);
   if (input.readLawmaticsNotes && input.lawmatics.status === "ok" && notesTargets.length > 0) {
     try {
       reads.notes = await input.readLawmaticsNotes(notesTargets);
@@ -220,7 +226,18 @@ export async function buildPlan(input: PlanInput): Promise<{ view: ReconcileView
     return mailboxFor(address)?.state ?? NOT_RUN;
   };
 
-  const notesFor = (record: LawmaticsSourceRecord | undefined): RecordNotes | undefined => (record ? reads.notes?.byRecord.get(record.lawmaticsId) : undefined);
+  /** The prospect's notes and the contact's, as one. Unavailable if either read failed; undefined if either wasn't read. */
+  const notesFor = (record: LawmaticsSourceRecord | undefined): RecordNotes | undefined => {
+    if (!record || !reads.notes) return undefined;
+    const byRecord = reads.notes.byRecord;
+    const parts = [byRecord.get(notesKey({ id: record.lawmaticsId, kind: "Prospect" }))];
+    if (record.contactId) parts.push(byRecord.get(notesKey({ id: record.contactId, kind: "Contact" })));
+    const failed = parts.find((p) => p?.status === "unavailable");
+    if (failed && failed.status === "unavailable") return failed;
+    if (parts.some((p) => !p)) return undefined;
+    const ok = parts as Array<Extract<RecordNotes, { status: "ok" }>>;
+    return { status: "ok", notes: ok.flatMap((p) => p.notes), truncated: ok.some((p) => p.truncated) };
+  };
   const rowNotes = (record: LawmaticsSourceRecord | undefined): ReconcileRow["notes"] => {
     if (!record) return undefined;
     if (reads.notesFailed) return { status: "unavailable", reason: reads.notesFailed };

@@ -50,7 +50,7 @@ describe("readLawmaticsNotes", () => {
     });
     const client = createLawmaticsClient({ token: "t", fetchImpl: fetchImpl as never });
     const read = await readLawmaticsNotes(client, [{ id: "p1", kind: "Prospect" }]);
-    expect(read.byRecord.get("p1")).toMatchObject({ status: "ok" });
+    expect(read.byRecord.get("Prospect:p1")).toMatchObject({ status: "ok" });
     expect(seen.every((m) => m === undefined || m === "GET")).toBe(true);
     expect(fetchImpl).toHaveBeenCalled();
   });
@@ -59,7 +59,7 @@ describe("readLawmaticsNotes", () => {
     const long = `consult done, sent proposal ${"x ".repeat(200)}`;
     const { client } = fakeClient(() => ({ records: [note({ body: long })] }));
     const read = await readLawmaticsNotes(client, [{ id: "p1", kind: "Prospect" }]);
-    const result = read.byRecord.get("p1")!;
+    const result = read.byRecord.get("Prospect:p1")!;
     if (result.status !== "ok") throw new Error("expected ok");
     expect(result.notes).toHaveLength(1);
     expect(result.notes[0].date).toBe("2026-10-16T14:00:00.000Z");
@@ -71,7 +71,7 @@ describe("readLawmaticsNotes", () => {
 
   it("drops a note that names a different record (the server ignored the filter)", async () => {
     const { client } = fakeClient(() => ({ records: [note({ notable_id: "p1" }), note({ notable_id: "someone-else", body: "paid via Lawmatics" })] }));
-    const result = (await readLawmaticsNotes(client, [{ id: "p1", kind: "Prospect" }])).byRecord.get("p1")!;
+    const result = (await readLawmaticsNotes(client, [{ id: "p1", kind: "Prospect" }])).byRecord.get("Prospect:p1")!;
     if (result.status !== "ok") throw new Error("expected ok");
     expect(result.notes).toHaveLength(1);
     expect(result.notes[0].milestones).not.toContain("paid");
@@ -79,13 +79,13 @@ describe("readLawmaticsNotes", () => {
 
   it("notes that name no record at all are UNAVAILABLE, never 'no notes'", async () => {
     const { client } = fakeClient(() => ({ records: [note({ notable_id: undefined, notable_type: undefined })] }));
-    const result = (await readLawmaticsNotes(client, [{ id: "p1", kind: "Prospect" }])).byRecord.get("p1")!;
+    const result = (await readLawmaticsNotes(client, [{ id: "p1", kind: "Prospect" }])).byRecord.get("Prospect:p1")!;
     expect(result.status).toBe("unavailable");
   });
 
   it("a person with no notes is ok with none: the read worked", async () => {
     const { client } = fakeClient(() => ({ records: [] }));
-    expect((await readLawmaticsNotes(client, [{ id: "p1", kind: "Prospect" }])).byRecord.get("p1")).toEqual({ status: "ok", notes: [], truncated: false });
+    expect((await readLawmaticsNotes(client, [{ id: "p1", kind: "Prospect" }])).byRecord.get("Prospect:p1")).toEqual({ status: "ok", notes: [], truncated: false });
   });
 
   it("a failed read is a named state with a fixed sentence and nothing from the error", async () => {
@@ -93,7 +93,7 @@ describe("readLawmaticsNotes", () => {
     const { client } = fakeClient(() => new Error("SECRET-body-from-lawmatics"));
     const read = await readLawmaticsNotes(client, [{ id: "p1", kind: "Prospect" }, { id: "p2", kind: "Prospect" }]);
     for (const id of ["p1", "p2"]) {
-      const r = read.byRecord.get(id)!;
+      const r = read.byRecord.get("Prospect:" + id)!;
       expect(r.status).toBe("unavailable");
       expect(JSON.stringify(r)).not.toContain("SECRET");
     }
@@ -104,13 +104,13 @@ describe("readLawmaticsNotes", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const { client } = fakeClient((_p, params) => (params["filter[notable_id]"] === "p1" ? new Error("down") : { records: [note({ notable_id: "p2" })] }));
     const read = await readLawmaticsNotes(client, [{ id: "p1", kind: "Prospect" }, { id: "p2", kind: "Prospect" }]);
-    expect(read.byRecord.get("p1")?.status).toBe("unavailable");
-    expect(read.byRecord.get("p2")?.status).toBe("ok");
+    expect(read.byRecord.get("Prospect:p1")?.status).toBe("unavailable");
+    expect(read.byRecord.get("Prospect:p2")?.status).toBe("ok");
   });
 
   it("surfaces a page cap on one person's notes as truncated", async () => {
     const { client } = fakeClient(() => ({ records: [note()], truncated: true }));
-    const r = (await readLawmaticsNotes(client, [{ id: "p1", kind: "Prospect" }])).byRecord.get("p1")!;
+    const r = (await readLawmaticsNotes(client, [{ id: "p1", kind: "Prospect" }])).byRecord.get("Prospect:p1")!;
     expect(r).toMatchObject({ status: "ok", truncated: true });
   });
 
@@ -120,7 +120,7 @@ describe("readLawmaticsNotes", () => {
     const read = await readLawmaticsNotes(client, targets);
     expect(calls).toHaveLength(NOTES_MAX_RECORDS);
     expect(read.skippedForLimit).toBe(7);
-    expect(read.byRecord.get(`p${NOTES_MAX_RECORDS + 3}`)).toMatchObject({ status: "unavailable" });
+    expect(read.byRecord.get(`Prospect:p${NOTES_MAX_RECORDS + 3}`)).toMatchObject({ status: "unavailable" });
   });
 
   it("asks once per person even when listed twice", async () => {
@@ -139,5 +139,36 @@ describe("nothing in the notes reader writes a note body anywhere", () => {
     expect(src).not.toMatch(/db\/admin|getAdminClient|getScopedClient/);
     // The only logging is a fixed label and an error NAME.
     for (const line of src.split("\n").filter((l) => l.includes("console."))) expect(line).toMatch(/err instanceof Error \? err\.name/);
+  });
+});
+
+describe("a 2xx reply that is not JSON:API-shaped is unavailable, never zero notes", () => {
+  const bodies: Array<[string, unknown]> = [
+    ["{}", {}],
+    ["{data:null}", { data: null }],
+    ["{error}", { error: "nope" }],
+    ["{notes:[...]}", { notes: [note()] }],
+  ];
+  for (const [label, body] of bodies) {
+    it(`${label} through the real client`, async () => {
+      const fetchImpl = vi.fn(async () => ({ ok: true, status: 200, statusText: "OK", json: async () => body, text: async () => "" }));
+      const client = createLawmaticsClient({ token: "t", fetchImpl: fetchImpl as never });
+      const read = await readLawmaticsNotes(client, [{ id: "p1", kind: "Prospect" }]);
+      const r = read.byRecord.get("Prospect:p1")!;
+      expect(r.status).toBe("unavailable");
+      expect(JSON.stringify(r)).not.toContain("nope");
+    });
+  }
+
+  it("a genuine empty JSON:API list is still ok with none", async () => {
+    const fetchImpl = vi.fn(async () => ({ ok: true, status: 200, statusText: "OK", json: async () => ({ data: [] }), text: async () => "" }));
+    const client = createLawmaticsClient({ token: "t", fetchImpl: fetchImpl as never });
+    expect((await readLawmaticsNotes(client, [{ id: "p1", kind: "Prospect" }])).byRecord.get("Prospect:p1")).toEqual({ status: "ok", notes: [], truncated: false });
+  });
+
+  it("a prospect and a contact with the same id are kept apart", async () => {
+    const { client } = fakeClient((_p, params) => ({ records: [note({ notable_id: "7", notable_type: params["filter[notable_type]"] })] }));
+    const read = await readLawmaticsNotes(client, [{ id: "7", kind: "Prospect" }, { id: "7", kind: "Contact" }]);
+    expect(read.byRecord.size).toBe(2);
   });
 });

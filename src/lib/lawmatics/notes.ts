@@ -2,6 +2,7 @@ import "server-only";
 
 import { classifyNote, snippetOf, type Milestone } from "@/lib/reconcile/milestones";
 import type { LawmaticsClient } from "./client";
+import { notesKey } from "./notes-key";
 import { bag, field, relatedId, type Raw } from "./jsonapi";
 
 /**
@@ -42,6 +43,10 @@ export type NotesRead = {
 const FAILED = "Lawmatics notes couldn't be read for this record.";
 const UNVERIFIED = "Lawmatics returned notes that don't say which record they belong to, so they can't be attributed.";
 
+const UNRECOGNISED = "Lawmatics notes couldn't be read: the reply was in a shape this screen doesn't recognise.";
+
+export { notesKey };
+
 function noteDate(rec: Raw): string | null {
   const raw = field(rec, "created_at", "date", "updated_at", "created");
   if (!raw) return null;
@@ -64,6 +69,8 @@ async function readOne(client: LawmaticsClient, target: NotesTarget): Promise<Re
     maxRecords: NOTES_MAX_PER_RECORD,
     params: { "filter[notable_id]": target.id, "filter[notable_type]": target.kind },
   });
+
+  if (list.unrecognisedShape) return { status: "unavailable", reason: UNRECOGNISED };
 
   let attributable = 0;
   const notes: LawmaticsNote[] = [];
@@ -90,7 +97,7 @@ export async function readLawmaticsNotes(
   opts: { maxRecords?: number } = {},
 ): Promise<NotesRead> {
   const max = opts.maxRecords ?? NOTES_MAX_RECORDS;
-  const unique = [...new Map(targets.map((t) => [t.id, t])).values()];
+  const unique = [...new Map(targets.map((t) => [notesKey(t), t])).values()];
   const wanted = unique.slice(0, max);
   const byRecord = new Map<string, RecordNotes>();
 
@@ -99,18 +106,18 @@ export async function readLawmaticsNotes(
     while (next < wanted.length) {
       const target = wanted[next++];
       try {
-        byRecord.set(target.id, await readOne(client, target));
+        byRecord.set(notesKey(target), await readOne(client, target));
       } catch (err) {
         // A name only: the message can carry the provider's body.
         console.error("[reconcile] lawmatics notes read failed", err instanceof Error ? err.name : "error");
-        byRecord.set(target.id, { status: "unavailable", reason: FAILED });
+        byRecord.set(notesKey(target), { status: "unavailable", reason: FAILED });
       }
     }
   };
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, wanted.length) }, worker));
 
   for (const target of unique.slice(max)) {
-    byRecord.set(target.id, { status: "unavailable", reason: "Not read: this preview reads the notes of the first " + max + " people only." });
+    byRecord.set(notesKey(target), { status: "unavailable", reason: "Not read: this preview reads the notes of the first " + max + " people only." });
   }
   return { byRecord, skippedForLimit: Math.max(0, unique.length - max) };
 }
