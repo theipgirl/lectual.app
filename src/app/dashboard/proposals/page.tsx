@@ -6,7 +6,8 @@ import { formatDollars } from "@/lib/proposal-editor/events";
 import { firstNameOf } from "@/lib/proposal-editor/labels";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { CAN_WRITE_LEAD } from "@/lib/pipeline/leads";
-import { getProposalSettings, listLatestProposalEvents, listProposals, type ProposalListItem } from "@/lib/proposals/store";
+import { getProposalSettings, listLatestProposalEvents, listProposals, listStepActivity, type ProposalListItem, type StepActivity } from "@/lib/proposals/store";
+import { PROPOSAL_PAID_ROLES } from "@/lib/proposals/paid";
 import { PROPOSAL_ADMIN_ROLES, PROPOSAL_STAFF_WRITE_ROLES } from "@/lib/proposals/types";
 import { normalisePackages } from "@/lib/proposals/package-list";
 import { buildProposalRowView, type ProposalRowView } from "@/lib/proposals/list-rows";
@@ -81,15 +82,21 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
   const failed = !listedRead.ok;
   const today = firmCivilDate(nowDate, tz);
 
-  const [events, names, strip, leadsRead, draftBlock] = await Promise.all([
+  const [eventsRead, names, strip, leadsRead, draftBlock, stepRead] = await Promise.all([
     listedRead.ok && listed.length > 0 ? readEvents(listed) : Promise.resolve(new Map<string, ActivityEvent>() as ReadonlyMap<string, ActivityEvent> | "unavailable"),
     readNames(),
     loadStrip(listed, now, tz),
     canDraftFromTranscript ? loadLeadOptions() : Promise.resolve(null),
     canDraftFromTranscript ? loadDraftBlock() : Promise.resolve(null),
+    readStepActivity(listed),
   ]);
+  const events = withStepActivity(eventsRead, stepRead);
+  const canMarkPaid = !!role && PROPOSAL_PAID_ROLES.includes(role);
 
-  const all = listed.map((item) => ({ item, view: buildProposalRowView(item, { today, tz, now, events, names }) }));
+  const all = listed.map((item) => ({
+    item,
+    view: buildProposalRowView(item, { today, tz, now, events, names, paid: stepRead === "unavailable" ? "unavailable" : new Map([...stepRead].map(([id, a]) => [id, a.paid])), canMarkPaid }),
+  }));
   const counts = failed
     ? null
     : (Object.fromEntries(PROPOSAL_SEGMENTS.map((s) => [s, all.filter((r) => inSegment(s, r.view.key)).length])) as Record<ProposalSegment, number>);
@@ -191,6 +198,35 @@ async function readEvents(listed: ProposalListItem[]): Promise<ReadonlyMap<strin
   } catch {
     return "unavailable";
   }
+}
+
+/** Each accepted row's paid state and newest step event; "unavailable" when that read fails, so no row reads "Not paid" on a guess. */
+async function readStepActivity(listed: ProposalListItem[]): Promise<ReadonlyMap<string, StepActivity> | "unavailable"> {
+  const accepted = listed.filter((r) => r.status === "accepted").map((r) => r.id);
+  if (accepted.length === 0) return new Map();
+  try {
+    return await listStepActivity(accepted);
+  } catch {
+    return "unavailable";
+  }
+}
+
+/**
+ * An accepted row's Last activity names what a teammate did after the acceptance ("Marked paid"):
+ * its newest step event, with the payload the plain events read leaves out, replaces the plain one.
+ */
+function withStepActivity(
+  events: ReadonlyMap<string, ActivityEvent> | "unavailable",
+  steps: ReadonlyMap<string, StepActivity> | "unavailable",
+): ReadonlyMap<string, ActivityEvent> | "unavailable" {
+  if (events === "unavailable" || steps === "unavailable") return events;
+  const merged = new Map(events);
+  for (const [id, a] of steps) {
+    if (a.newest && a.newest.actor === "staff") {
+      merged.set(id, { type: "edited", actor: a.newest.actor, actor_user_id: a.newest.actor_user_id, created_at: a.newest.created_at, payload: a.newest.payload });
+    }
+  }
+  return merged;
 }
 
 /** user id -> a first name, for "Edited 3h ago · Taylor". Best effort: a failed read drops names, never shows ids. */

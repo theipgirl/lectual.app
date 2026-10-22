@@ -13,6 +13,8 @@ import {
   proposalSubline,
   type ActivityEvent,
 } from "./list-labels";
+import { paidMarker, type PaidMarker } from "./paid-view";
+import type { PaidState } from "./paid";
 import type { OfferedPackage } from "./segments";
 import type { ProposalPackageBasis, ProposalSource, ProposalStatus } from "./types";
 
@@ -53,6 +55,10 @@ export type ProposalRowView = {
   atFilingCents: number;
   expires: string;
   activity: string;
+  /** Accepted rows only: Paid / Not paid / Couldn't read, from the same `PaidState` the proposal page reads. Null on every other row. */
+  paid: PaidMarker | null;
+  /** Mark paid is offered: an accepted row that is read as not paid, for a role that may mark. Never while the read failed. */
+  canMarkPaid: boolean;
 };
 
 export function buildProposalRowView(
@@ -65,9 +71,20 @@ export function buildProposalRowView(
     /** Newest event per proposal id, or "unavailable" when that read failed. */
     events: ReadonlyMap<string, ActivityEvent> | "unavailable";
     names: ReadonlyMap<string, string>;
+    /** Sprint 19: each accepted row's paid state, or "unavailable" when that read failed. Absent = not asked (no paid column). */
+    paid?: ReadonlyMap<string, PaidState> | "unavailable";
+    /** Owner / admin / senior admin / intake. */
+    canMarkPaid?: boolean;
   },
 ): ProposalRowView {
   const display = proposalDisplayStatus(item, { today: ctx.today, issues: item.blocking_issue });
+  let paid: PaidMarker | null = null;
+  let canMarkPaid = false;
+  if (item.status === "accepted" && ctx.paid !== undefined) {
+    const state = ctx.paid === "unavailable" ? "unreadable" : (ctx.paid.get(item.id) ?? ({ state: "not_paid", undoneAt: null } as const));
+    paid = paidMarker(state, ctx.names, ctx.tz);
+    canMarkPaid = !!ctx.canMarkPaid && paid.state === "not_paid";
+  }
   const edited = item.package_basis && item.package_basis.edited.length > 0 ? item.package_basis.name : null;
   return {
     id: item.id,
@@ -99,5 +116,7 @@ export function buildProposalRowView(
       names: ctx.names,
       now: ctx.now,
     }),
+    paid,
+    canMarkPaid,
   };
 }
