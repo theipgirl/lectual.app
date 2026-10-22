@@ -28,6 +28,7 @@ async function renderPage(opts: { hour?: number; configured?: boolean; reads?: R
   vi.setSystemTime(new Date(Date.UTC(2026, 9, 21, (opts.hour ?? 9) + 4, 30)));
   const userId = "u-1";
   vi.doMock("@/lib/ai/claude", () => ({ aiConfigured: () => opts.configured ?? true }));
+  vi.doMock("next/navigation", () => ({ usePathname: () => "/dashboard/copilot/", useRouter: () => ({ push: () => {}, refresh: () => {} }) }));
   vi.doMock("@/lib/firm/session", () => ({
     resolveFirmSession: vi.fn(async () => opts.session ?? { kind: "ok", user: { id: userId, email: "taylormcghee93@gmail.com", user_metadata: {} }, org: { id: "o-1" } }),
   }));
@@ -159,7 +160,7 @@ describe("the four stat cards", () => {
 
   it("with every read rejected the page still renders, four dashes", async () => {
     const html = await renderPage({ reads: { matters: "fail", deadlines: "fail", members: "fail", queue: { status: "unavailable", items: [] } } });
-    expect(html).toContain("AI copilot");
+    expect(html).not.toContain("AI copilot");
     expect(cards(html).map((x) => x.value)).toEqual(["—", "—", "—", "—"]);
     expect(html).toContain("Good morning.");
   });
@@ -263,7 +264,7 @@ describe("the active thread", () => {
     const html = await thread([done()]);
     expect(html).toContain("Nothing sends without your approval.");
     expect(html).toContain('placeholder="Ask a follow-up…"');
-    expect(html).toContain(">New thread</button>");
+    expect(html).toContain(">New chat</button>");
     expect(html).not.toContain("cph-greeting");
   });
 

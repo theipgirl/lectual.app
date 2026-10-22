@@ -37,7 +37,8 @@ async function setup(over: Parameters<typeof makeWorld>[0] = {}) {
 }
 
 const stageOf = (world: ReturnType<typeof makeWorld>, id: string) => world.db.rows("crm_lead").find((r) => r.id === id)!.current_stage_id;
-const AMARA = { leadId: L.amara, stageId: S.pnc };
+// Amara's sheet status says PNC but her note says a consult was scheduled: the furthest dated evidence is proposed.
+const AMARA = { leadId: L.amara, stageId: S.consult };
 const MARGO = { leadId: L.margo, stageId: S.consult };
 
 describe("applyReconcileAction: who may apply", () => {
@@ -45,7 +46,7 @@ describe("applyReconcileAction: who may apply", () => {
     const t = await setup({ role });
     const r = await t.submit([AMARA]);
     expect(r).toMatchObject({ ok: true, totals: { moved: 1, already: 0, failed: 0 } });
-    expect(stageOf(t.world, L.amara)).toBe(S.pnc);
+    expect(stageOf(t.world, L.amara)).toBe(S.consult);
   });
 
   it.each(REFUSED)("refuses %s with a sentence, reads no lead and writes nothing", async (role) => {
@@ -87,13 +88,13 @@ describe("applyReconcileAction: every write is the existing stage move", () => {
     const r = await t.submit([AMARA, MARGO]);
     expect(r.ok).toBe(true);
     expect(t.move.mock.calls).toEqual([
-      [L.amara, S.pnc, "2026-09-14T00:00:00.000Z"],
+      [L.amara, S.consult, "2026-09-14T00:00:00.000Z"],
       [L.margo, S.consult, "2026-09-03T00:00:00.000Z"],
     ]);
     // The move's own logging: one stage_changed row per lead, carrying the date.
     const rows = t.world.db.activity().filter((a) => a.type === "stage_changed");
     expect(rows.map((a) => a.lead_id).sort()).toEqual([L.amara, L.margo].sort());
-    expect(rows.find((a) => a.lead_id === L.amara)!.payload).toMatchObject({ from_stage_id: S.followUp, to_stage_id: S.pnc, evidence_at: "2026-09-14T00:00:00.000Z" });
+    expect(rows.find((a) => a.lead_id === L.amara)!.payload).toMatchObject({ from_stage_id: S.followUp, to_stage_id: S.consult, evidence_at: "2026-09-14T00:00:00.000Z" });
   });
 
   it("the only table written to directly is the lead (by the move) and the timeline (by the move's logging)", async () => {
@@ -178,7 +179,7 @@ describe("applyReconcileAction: a stale plan is refused and writes nothing", () 
     ["the stage it was in", { fromStageId: S.loe }],
     ["the stage it proposed", { proposedStageId: S.loe }],
     ["the date", { evidenceDate: "2026-01-01T00:00:00.000Z" }],
-    ["the confidence", { confidence: "conflict" as const }],
+    ["the confidence", { confidence: "agree" as const }],
     ["the lead", { leadId: L.priya }],
   ])("a submitted row altered after the preview: %s", async (_label, change) => {
     const t = await setup();
@@ -216,7 +217,7 @@ describe("applyReconcileAction: a stale plan is refused and writes nothing", () 
 describe("applyReconcileAction: bad targets and bad requests", () => {
   it("a target stage that no longer exists", async () => {
     const t = await setup();
-    t.world.db.tables.crm_stage = t.world.db.rows("crm_stage").filter((s) => s.id !== S.pnc);
+    t.world.db.tables.crm_stage = t.world.db.rows("crm_stage").filter((s) => s.id !== S.consult);
     const r = await t.submit([AMARA]);
     expect(r).toEqual({ ok: false, error: MSG.stageGone });
     expect(t.world.db.writes).toEqual([]);
@@ -301,7 +302,7 @@ describe("applyReconcileAction: per-row results", () => {
     if (!r.ok) return;
     expect(r.outcomes).toEqual([
       { leadId: L.amara, status: "failed", error: MSG.moveFailed },
-      { leadId: L.margo, status: "moved", stageName: "Consultation Scheduled" },
+      { leadId: L.margo, status: "moved", stageName: "Consultation Scheduled", lastTouchSet: true },
     ]);
     expect(r.totals).toEqual({ moved: 1, already: 0, failed: 1 });
     expect(stageOf(t.world, L.amara)).toBe(S.followUp);
@@ -319,12 +320,12 @@ describe("applyReconcileAction: per-row results", () => {
     expect(r).toMatchObject({ ok: false, outcomes: [{ status: "failed", error: MSG.moveForbidden }] });
   });
 
-  it("a lead already in the target stage is reported and not written", async () => {
+  it("a lead already in the target stage is reported and not moved", async () => {
     const t = await setup();
     // Priya is in Preliminary Search; the person picks that same stage.
     const r = await t.submit([{ leadId: L.priya, stageId: S.prelim }, AMARA]);
     expect(r).toMatchObject({ ok: true, totals: { moved: 1, already: 1, failed: 0 } });
-    if (r.ok) expect(r.outcomes[0]).toEqual({ leadId: L.priya, status: "already", stageName: "Preliminary Search" });
+    if (r.ok) expect(r.outcomes[0]).toEqual({ leadId: L.priya, status: "already", stageName: "Preliminary Search", lastTouchSet: true });
     expect(t.move.mock.calls.map((c) => c[0])).toEqual([L.amara]);
   });
 

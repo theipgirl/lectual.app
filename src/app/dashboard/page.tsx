@@ -32,7 +32,12 @@ import { deadlineKindLabel, deadlineNeedsReview } from "@/lib/matters/deadline-r
 import { AutopilotControl } from "@/components/agents/AutopilotControl";
 import { RunDigestList } from "@/components/agents/RunDigestList";
 import { FinishSetupCard } from "@/components/setup/FinishSetupCard";
+import { GettingStartedCard } from "@/components/onboarding/GettingStartedCard";
 import { TodayConsults } from "@/components/calendar/TodayConsults";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Today") };
 
 export const dynamic = "force-dynamic";
 
@@ -221,6 +226,7 @@ export default async function TodayPage() {
       )}
 
       <FinishSetupCard role={session.role} />
+      <GettingStartedCard />
 
       <div className="lx-split">
         <div className="lx-col">

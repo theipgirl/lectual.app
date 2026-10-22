@@ -10,6 +10,7 @@ import { runMorningBrief } from "./morning-brief/run";
 import { runConsultPrep } from "./consult-prep/run";
 import { runInboxSummary } from "./inbox-summary/run";
 import { AGENT_DEFS, AGENT_IDS, type AgentContext, type AgentId, type AgentResult, type AgentTrigger, type Autonomy } from "./types";
+import { alertConfigFromEnv, deploymentInfo, readFirmName, sendFailureAlert } from "./failure-alert";
 import { DID_NOT_FINISH_ERROR } from "./run-status";
 import { AGENT_RUN_BUDGET_MS, CRON_AGENT_CAP_MS, CRON_TRACKS, CRON_WALL_BUDGET_MS, MIN_AGENT_START_MS } from "./budget";
 
@@ -144,6 +145,7 @@ export async function runOneAgent(
   // The budget counts from here, so the pause check, the row insert and the org read are inside it too.
   const deadline = clock() + Math.max(0, args.budgetMs ?? AGENT_RUN_BUDGET_MS);
   const { orgId, agent } = args;
+  const startedMs = now();
 
   // Checked here, not only by the callers, so every path into an agent (cron,
   // "Run now", anything added later) honours the pause. No run row is written.
@@ -180,8 +182,10 @@ export async function runOneAgent(
   // Wrap the model call to total the run's cost.
   let cost = 0;
   let costKnown = true;
+  // stage-keeper makes no model call; the mapping only keeps the type total.
+  const modelAgent = agent === "stage-keeper" ? "staff" : agent;
   const llm: StructuredCall = async (req) => {
-    const res = await deps.llm({ ...req, signal: withRunSignal(req.signal) });
+    const res = await deps.llm({ agent: modelAgent, ...req, signal: withRunSignal(req.signal) });
     if (res.costUsd == null) costKnown = false;
     else cost += res.costUsd;
     return res;
@@ -252,7 +256,39 @@ export async function runOneAgent(
       .eq("id", runId)
       .eq("org_id", orgId);
   }
+  if (outcome.status === "error") {
+    await alertLectual(deps, { orgId, outcome, startedAt: new Date(startedMs).toISOString(), finishedAt: new Date(now()).toISOString() });
+  }
   return outcome;
+}
+
+/**
+ * Tells Lectual a run ended as an error (cron and Run now both come through runOneAgent). Awaited so a
+ * serverless function is not frozen mid-send, but it cannot throw and cannot change the outcome.
+ * Alerts off (no recipient or no key) costs nothing: no read, no call.
+ */
+async function alertLectual(deps: RunnerDeps, a: { orgId: string; outcome: RunOutcome; startedAt: string; finishedAt: string }) {
+  try {
+    const config = alertConfigFromEnv();
+    if (!config) return;
+    await sendFailureAlert({
+      admin: deps.admin,
+      config,
+      fetchImpl: deps.fetchImpl,
+      input: {
+        orgId: a.orgId,
+        firmName: await readFirmName(deps.admin, a.orgId),
+        agent: a.outcome.agent,
+        runId: a.outcome.runId,
+        startedAt: a.startedAt,
+        finishedAt: a.finishedAt,
+        error: a.outcome.error ?? "",
+        ...deploymentInfo(),
+      },
+    });
+  } catch {
+    // Never into the run.
+  }
 }
 
 /**

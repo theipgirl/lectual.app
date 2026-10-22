@@ -15,6 +15,10 @@ import {
 } from "@/lib/documents/loe-prefill";
 import { loadSignedQuotesForMatter, type SignedQuoteForLoe } from "@/lib/documents/loe-prefill-load";
 import LoeForm from "./_components/LoeForm";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Engagement letter") };
 
 export const dynamic = "force-dynamic";
 

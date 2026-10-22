@@ -4,6 +4,10 @@ import { ROLES, hasRole } from "@/lib/auth/roles";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { QUEUE_APPROVE_ROLES } from "@/lib/queue/roles";
 import { InviteForm, RemoveMember, ROLE_LABEL, RoleSelect } from "@/components/settings/TeamForms";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Team") };
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +37,7 @@ export default async function TeamPage() {
       <div className="lx-page-head">
         <div style={{ flex: 1, minWidth: 260 }}>
           <div className="lx-label">Settings</div>
-          <h1 className="lx-h1">Team &amp; roles</h1>
+          <h1 className="lx-h1" data-tour="team-head">Team &amp; roles</h1>
           <p className="lx-sub">Ten roles, enforced in the database, not just hidden in the menu. A role decides what someone can open, edit and approve.</p>
         </div>
       </div>

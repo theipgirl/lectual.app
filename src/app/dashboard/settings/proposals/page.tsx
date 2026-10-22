@@ -9,6 +9,10 @@ import { SettingsForm } from "@/components/proposal-editor/SettingsForm";
 import { PackagePricesForm } from "@/components/proposal-editor/PackagePricesForm";
 import { requireProposalsModule } from "../../proposals/gate";
 import "../../proposals/proposals.css";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Proposal settings") };
 
 export const dynamic = "force-dynamic";
 

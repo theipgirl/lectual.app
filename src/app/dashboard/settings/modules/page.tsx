@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { activeOrgModules, type OrgModule } from "@/lib/org/modules";
 import { listConnections } from "@/lib/mailbox/connections";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Modules") };
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +48,7 @@ export default async function ModulesPage() {
     <>
       <div>
         <div className="lx-label">Settings</div>
-        <h1 className="lx-h1">Modules</h1>
+        <h1 className="lx-h1" data-tour="modules-head">Modules</h1>
         <p className="lx-sub">Parts of Lectual that are switched on firm by firm. To add one, contact Lectual and we&apos;ll set it up with you.</p>
       </div>
       <section className="lx-card lx-int" aria-label="Modules">

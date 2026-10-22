@@ -24,6 +24,10 @@ import { resolveFirmSession } from "@/lib/firm/session";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import { matterIdsNeedingReview } from "./list-utils";
 import { MATTER_TYPE_LABEL } from "./labels";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Matters") };
 
 export const dynamic = "force-dynamic";
 
@@ -89,7 +93,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
       <div className="lx-page-head">
         <div style={{ flex: 1, minWidth: 260 }}>
           <div className="lx-label">Docket</div>
-          <h1 className="lx-h1">Matters</h1>
+          <h1 className="lx-h1" data-tour="matters-head">Matters</h1>
           <p className="lx-sub">Every engaged matter, grouped by whose move it is. Longest in its stage first.</p>
         </div>
         <form className="lx-search-form" role="search">

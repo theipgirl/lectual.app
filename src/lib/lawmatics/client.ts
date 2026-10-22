@@ -109,7 +109,18 @@ export type ListResult = {
   includeDropped: boolean;
   /** Which include string was rejected, and how — for the operator's banner. */
   includeDroppedReason?: string;
+  /**
+   * True when a 2xx page was neither an array nor an object with an array `data`. `records()` reads such a
+   * payload as no records, which is indistinguishable from an empty list; callers that must not treat it
+   * as "nothing there" check this.
+   */
+  unrecognisedShape?: boolean;
 };
+
+function isListShaped(payload: unknown): boolean {
+  if (Array.isArray(payload)) return true;
+  return typeof payload === "object" && payload !== null && Array.isArray((payload as { data?: unknown }).data);
+}
 
 export function createLawmaticsClient(opts: LawmaticsClientOptions): LawmaticsClient {
   const base = (opts.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, "");
@@ -146,6 +157,7 @@ export function createLawmaticsClient(opts: LawmaticsClientOptions): LawmaticsCl
     let truncatedReason: string | undefined;
     let includeDropped = false;
     let includeDroppedReason: string | undefined;
+    let unrecognisedShape = false;
     const noteIncludeDropped = (reason: string) => {
       // First reason wins — a later page repeating the same rejection adds
       // nothing, and the operator needs one clear sentence, not N.
@@ -157,6 +169,7 @@ export function createLawmaticsClient(opts: LawmaticsClientOptions): LawmaticsCl
     for (let page = 1; page <= maxPages; page += 1) {
       const payload = await getPage(path, page, pageSize, listOpts, noteIncludeDropped);
       pagesFetched += 1;
+      if (!isListShaped(payload)) unrecognisedShape = true;
 
       const pageRecords = records(payload);
       for (const [key, rec] of includedIndex(payload)) {
@@ -209,6 +222,7 @@ export function createLawmaticsClient(opts: LawmaticsClientOptions): LawmaticsCl
       truncatedReason,
       includeDropped,
       includeDroppedReason,
+      unrecognisedShape,
     };
   }
 

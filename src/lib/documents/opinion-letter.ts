@@ -133,6 +133,7 @@ export async function buildOpinionLetterDraft(
     system: SYSTEM_PROMPT,
     prompt: userPrompt(facts, extractedText),
     maxTokens: 4096,
+    agent: "staff",
   });
 
   if ("skipped" in result) {

@@ -53,7 +53,7 @@ describe("the table", () => {
   it("has the columns the screen promises, in order", () => {
     const head = html.slice(html.indexOf("<thead>"), html.indexOf("</thead>"));
     const labels = [...head.matchAll(/<th[^>]*>([^<]+)</g)].map((m) => m[1]);
-    expect(labels).toEqual(["Lead", "Current stage", "Sheet", "Lawmatics", "Email / calendar", "Proposed stage", "Confidence", "Decision"]);
+    expect(labels).toEqual(["Lead", "Current stage", "Sheet", "Lawmatics", "Email / calendar", "Evidence and last touch", "Proposed stage", "Confidence", "Decision"]);
   });
 
   it("shows, per row, the lead (linked to its page), current stage, the three sources, the proposal and the confidence", () => {
@@ -114,7 +114,7 @@ describe("the table", () => {
   });
 
   it("shows why for every row", () => {
-    expect(strip(rowHtml(html, ROWS.conflict.leadId))).toContain("It differs from the sheet; the sheet wins.");
+    expect(strip(rowHtml(html, ROWS.conflict.leadId))).toContain("A source points elsewhere");
     expect(strip(rowHtml(html, ROWS.noEvidence.leadId))).toContain("The sheet has no row for this lead");
   });
 
@@ -162,7 +162,7 @@ describe("the source cells", () => {
   it("no cell in the table is blank, whatever the state", () => {
     const html = renderToStaticMarkup(<ReconcileTable rows={ALL} pickable={pickable} decisions={{}} />);
     const cells = [...html.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((m) => strip(m[1]));
-    expect(cells.length).toBe(ALL.length * 8);
+    expect(cells.length).toBe(ALL.length * 9);
     expect(cells.every((c) => c.length > 0)).toBe(true);
   });
 });
@@ -172,7 +172,7 @@ describe("the bulk action and the apply button", () => {
     text(renderToStaticMarkup(<ApplyBar agreeing={0} accepted={0} busy={false} confirming={false} bulkMessage={null} {...over} />));
 
   it("offers the bulk action only when at least one row agrees", () => {
-    expect(BULK_LABEL).toBe("Accept all where the sheet and another source agree");
+    expect(BULK_LABEL).toBe("Accept all where two or more sources agree");
     expect(bar({ agreeing: 2 })).toContain(BULK_LABEL);
     expect(bar({ agreeing: 0 })).not.toContain(BULK_LABEL);
   });
@@ -211,7 +211,7 @@ describe("the bulk action and the apply button", () => {
 
 const SUMMARY: ReconcileSummary = {
   fileName: "intake.csv",
-  confidence: { agree: 1, sheet_only: 1, conflict: 1, no_evidence: 1 },
+  confidence: { agree: 1, sheet_only: 1, single_source: 0, conflict: 1, no_evidence: 1 },
   needsMatter: 2,
   alreadyThere: 1,
   lawmatics: { status: "unavailable", reason: "Lawmatics returned only part of the firm's records." },
@@ -231,7 +231,7 @@ describe("the summary and the empty states", () => {
     const s = strip(html);
     expect(s).toContain("intake.csv");
     expect(s).toContain("12 rows read, 7 intake leads, 1 blank");
-    for (const label of ["Agree: 1", "Sheet only: 1", "Conflict: 1", "No evidence: 1", "Needs a matter: 2", "Already in the sheet's stage: 1"]) expect(s).toContain(label);
+    for (const label of ["Agree: 1", "Sheet only: 1", "Conflict: 1", "No evidence: 1", "Needs a matter: 2", "Already in the proposed stage: 1"]) expect(s).toContain(label);
     expect(s).toContain("Sheet: read");
     expect(s).toContain("Lawmatics: unavailable. Lawmatics returned only part of the firm's records.");
     expect(s).toContain("Email / calendar: unavailable. The synced mail could not be read.");

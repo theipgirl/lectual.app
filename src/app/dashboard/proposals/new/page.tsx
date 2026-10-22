@@ -33,6 +33,10 @@ import { NewProposalForm, type NewProposalDefaults } from "@/components/proposal
 import { WhoIsThisFor, type WhoChosen } from "@/components/proposal-editor/WhoIsThisFor";
 import { requireProposalsModule } from "../gate";
 import "../proposals.css";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("New proposal") };
 
 export const dynamic = "force-dynamic";
 
@@ -210,7 +214,7 @@ export default async function NewProposalPage({ searchParams }: { searchParams: 
       </Link>
       <div>
         <div className="lx-label">Intake</div>
-        <h1 className="lx-h1">New proposal</h1>
+        <h1 className="lx-h1" data-tour="proposal-new-head">New proposal</h1>
         <p className="lx-sub">
           Starts as a draft from one of your firm&apos;s packages and its included items. You can change anything on the next page before a named approver
           approves it.

@@ -32,7 +32,18 @@ export type PickerView = {
   /** Kinds whose read failed, selected or not; each is named so a dead tab is never a surprise. */
   failed: RecordKind[];
   switchHrefs: Record<RecordKind, string>;
-  blankHref: string;
+  /** "Start blank", or null for a picker that has no blank form (New document). */
+  blankHref: string | null;
+};
+
+/**
+ * Where a picker sends the person. New proposal's is the default; New document passes its own (a matter goes
+ * straight to the template choice, a lead to the page that finds its matter) and has no blank form.
+ */
+export type PickerDestination = {
+  basePath: string;
+  chooseHref: (kind: RecordKind, id: string, term: string) => string;
+  blankHref: string | null;
 };
 
 /** `kind` from the URL: only "matter" selects matters; anything else is leads. */
@@ -60,14 +71,17 @@ export function chooseHref(kind: RecordKind, id: string, term = ""): string {
 }
 
 /** The picker itself, on the given kind and search. */
-export function pickerHref(kind: RecordKind, term = ""): string {
-  return withTerm(`${NEW_PROPOSAL_PATH}?kind=${kind}`, normalizeTerm(term));
+export function pickerHref(kind: RecordKind, term = "", basePath = NEW_PROPOSAL_PATH): string {
+  return withTerm(`${basePath}?kind=${kind}`, normalizeTerm(term));
 }
 
 /** The empty form with no list: "Start blank". */
 export const BLANK_HREF = `${NEW_PROPOSAL_PATH}?blank=1`;
 
-export function buildPicker(input: { kind: RecordKind; term: string; leads: ListRead; matters: ListRead }): PickerView {
+export const PROPOSAL_DESTINATION: PickerDestination = { basePath: NEW_PROPOSAL_PATH, chooseHref, blankHref: BLANK_HREF };
+
+export function buildPicker(input: { kind: RecordKind; term: string; leads: ListRead; matters: ListRead; dest?: PickerDestination }): PickerView {
+  const dest = input.dest ?? PROPOSAL_DESTINATION;
   const term = normalizeTerm(input.term);
   const read = input.kind === "lead" ? input.leads : input.matters;
   let list: PickerList;
@@ -78,7 +92,7 @@ export function buildPicker(input: { kind: RecordKind; term: string; leads: List
     list = {
       status: "ok",
       total: picked.total,
-      rows: picked.shown.map((r) => ({ id: r.id, label: r.label, detail: r.detail, href: chooseHref(input.kind, r.id, term) })),
+      rows: picked.shown.map((r) => ({ id: r.id, label: r.label, detail: r.detail, href: dest.chooseHref(input.kind, r.id, term) })),
     };
   }
   const failed: RecordKind[] = [];
@@ -89,8 +103,8 @@ export function buildPicker(input: { kind: RecordKind; term: string; leads: List
     term,
     list,
     failed,
-    switchHrefs: { lead: pickerHref("lead", term), matter: pickerHref("matter", term) },
-    blankHref: BLANK_HREF,
+    switchHrefs: { lead: pickerHref("lead", term, dest.basePath), matter: pickerHref("matter", term, dest.basePath) },
+    blankHref: dest.blankHref,
   };
 }
 

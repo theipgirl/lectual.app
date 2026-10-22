@@ -22,6 +22,10 @@ import NewEntryForm from "./_components/NewEntryForm";
 import EntryRow from "./_components/EntryRow";
 import ProposeClaimForm from "./_components/ProposeClaimForm";
 import ClaimRow from "./_components/ClaimRow";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Firm brain") };
 
 export const dynamic = "force-dynamic";
 

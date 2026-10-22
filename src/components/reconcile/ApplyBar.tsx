@@ -1,6 +1,6 @@
 import type { ApplyResult, ReconcileRow } from "@/lib/reconcile/types";
 
-export const BULK_LABEL = "Accept all where the sheet and another source agree";
+export const BULK_LABEL = "Accept all where two or more sources agree";
 
 export function applyLabel(count: number): string {
   return count === 1 ? "Apply 1 move" : `Apply ${count} moves`;
@@ -8,7 +8,7 @@ export function applyLabel(count: number): string {
 
 /**
  * The bulk action and the apply button. The bulk action appears only when at least one row has a
- * sheet and another source agreeing. Apply is disabled at zero, and asks for a confirmation that
+ * two or more sources agreeing. Apply is disabled at zero, and asks for a confirmation that
  * names the count before anything runs.
  */
 export function ApplyBar({

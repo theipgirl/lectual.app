@@ -9,6 +9,11 @@ import { PROVIDER_LABEL } from "@/lib/mailbox/providers";
 import { groupMailByDay, mailTime, toMailRows, type MailActivity } from "@/lib/mailbox/my-mail";
 import { relativeTime } from "@/lib/relative-time";
 import { ProviderMark } from "@/components/mailbox/ProviderMark";
+import type { Metadata } from "next";
+import { matterDisplayTitle } from "@/lib/matters/display-title";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("My Mail") };
 
 export const dynamic = "force-dynamic";
 
@@ -78,11 +83,11 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
   const matterIds = [...new Set(activity.map((a) => a.matter_id).filter((x): x is string => !!x))];
   const [{ data: leads }, { data: matters }] = await Promise.all([
     leadIds.length ? supabase.from("crm_lead").select("id, first_name, last_name, business_name, email").in("id", leadIds) : Promise.resolve({ data: [] as never[] }),
-    matterIds.length ? supabase.from("crm_matter").select("id, mark_text, title, matter_number").in("id", matterIds) : Promise.resolve({ data: [] as never[] }),
+    matterIds.length ? supabase.from("crm_matter").select("id, mark_text, title, matter_number, owner_name").in("id", matterIds) : Promise.resolve({ data: [] as never[] }),
   ]);
   const names = {
     leads: new Map((leads ?? []).map((l) => [l.id, l.business_name || `${l.first_name} ${l.last_name}`.trim() || l.email] as [string, string])),
-    matters: new Map((matters ?? []).map((m) => [m.id, m.mark_text ?? m.title ?? m.matter_number] as [string, string])),
+    matters: new Map((matters ?? []).map((m) => [m.id, matterDisplayTitle(m).title] as [string, string])),
   };
   const now = new Date();
   const groups = groupMailByDay(toMailRows(activity, names), now);

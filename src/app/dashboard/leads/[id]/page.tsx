@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getScopedClient } from "@/lib/db/scoped-client";
@@ -37,6 +38,7 @@ import { ConsultDetailsSection } from "@/components/leads/ConsultDetailsSection"
 import { TemperatureCard } from "@/components/leads/TemperatureCard";
 import { WaitingOnRebecca } from "@/components/leads/WaitingOnRebecca";
 import { ConsultBookedView } from "@/components/calendar/ConsultBookedLine";
+import { recordPageTitle } from "@/lib/ui/page-title";
 import { loadBookedConsult } from "@/lib/calendar/outlook-read";
 import { loadPendingApprovalsByLead } from "@/lib/queue/lead-pending";
 import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
@@ -47,6 +49,18 @@ import { listLeadEnrollments } from "@/lib/automation/drips";
 import { AUTOMATION_STAFF_ROLES } from "@/lib/automation/rules";
 import { enrollmentStatusLabel, enrollmentStatusTone } from "@/lib/campaigns/steps";
 import { shortDate, stopLine } from "@/lib/campaigns/stops";
+
+/** Tab title: the lead's name through the scoped getter; "Lead" when the read fails or finds nothing. */
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  return {
+    title: await recordPageTitle(async () => {
+      const lead = await getLead(id);
+      if (!lead) return null;
+      return [lead.first_name, lead.last_name].filter(Boolean).join(" ").trim() || lead.business_name;
+    }, "Lead"),
+  };
+}
 
 export default async function LeadPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -146,7 +160,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
       <div className="lx-page-head">
         <div style={{ flex: 1, minWidth: 260 }}>
           <div className="lx-label">{lead.business_name ?? "Lead"}</div>
-          <h1 className="lx-h1">{name}</h1>
+          <h1 className="lx-h1" data-tour="lead-head">{name}</h1>
           <p className="lx-note" style={{ margin: "6px 0 0" }}>
             {lead.email}
             {lead.phone ? ` · ${lead.phone}` : ""}
@@ -229,7 +243,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           <WaitingOnRebecca leadId={lead.id} approvals={approvals} now={renderedAt} />
 
           {canWrite && hasAgentToolkit && (
-            <details id="prep-consult" className="lx-card lx-disclosure">
+            <details id="prep-consult" className="lx-card lx-disclosure" data-tour="lead-prep">
               <summary>Prep this consult</summary>
               <div style={{ padding: "0 18px 18px" }}>
                 <PrepConsult leadId={lead.id} practiceArea={lead.practice_area} />
@@ -271,7 +285,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             canDelete={FILE_DELETE_ROLES.includes(session.role)}
           />
 
-          <section className="lx-card" style={{ padding: 18 }}>
+          <section className="lx-card" style={{ padding: 18 }} data-tour="lead-timeline">
             <h2 className="lx-h2" style={{ fontSize: 23, marginBottom: 10 }}>
               Timeline
             </h2>

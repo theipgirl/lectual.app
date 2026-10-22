@@ -30,8 +30,10 @@ import {
   type ImportReport,
   type PreviewResult,
 } from "@/lib/lawmatics/import";
+import { planPeople, type PlanPerson } from "@/lib/lawmatics/find-in-plan";
 import type {
   PlanOptions,
+  PlannedContactCreate,
   PlannedCreate,
   PlannedUpdate,
   SkippedRecord,
@@ -130,6 +132,8 @@ export async function disconnectLawmaticsAction(_prev: ConnectState, _formData: 
 // any of this back.
 
 const LIST_CAP = 150;
+/** People the on-screen search can find. Past this the screen says the search covers only part of the pull. */
+const PEOPLE_CAP = 6000;
 
 export type PreviewView = {
   fetchedAt: string;
@@ -139,6 +143,8 @@ export type PreviewView = {
   totals: {
     sourceRecords: number;
     create: number;
+    stageDecision: number;
+    contactOnly: number;
     update: number;
     unchanged: number;
     divergent: number;
@@ -152,13 +158,21 @@ export type PreviewView = {
   includeDroppedReason?: string;
   stageNames: string[];
   creates: PlannedCreate[];
+  /** The creates filed in a stand-in stage, listed apart so they are seen. */
+  stageDecisions: PlannedCreate[];
+  contactCreates: PlannedContactCreate[];
   updates: PlannedUpdate[];
   divergences: StageDivergence[];
   withheld: WithheldFields[];
   unmapped: UnmappedRecord[];
   skipped: SkippedRecord[];
+  /** Everyone the plan accounts for, for "Find a person in this pull". */
+  people: PlanPerson[];
+  peopleTruncated: boolean;
   omitted: {
     creates: number;
+    stageDecisions: number;
+    contactCreates: number;
     updates: number;
     divergences: number;
     withheld: number;
@@ -195,14 +209,20 @@ function toPreviewView(preview: PreviewResult): PreviewView {
     includeDropped: preview.includeDropped,
     includeDroppedReason: preview.includeDroppedReason,
     stageNames: preview.stageNames,
-    creates: p.creates.slice(0, LIST_CAP),
+    creates: p.creates.filter((c) => !c.stageDecision).slice(0, LIST_CAP),
+    stageDecisions: p.creates.filter((c) => c.stageDecision).slice(0, LIST_CAP),
+    contactCreates: p.contactCreates.slice(0, LIST_CAP),
     updates: p.updates.slice(0, LIST_CAP),
     divergences: p.divergences.slice(0, LIST_CAP),
     withheld: p.withheld.slice(0, LIST_CAP),
     unmapped: p.unmapped.slice(0, LIST_CAP),
     skipped: p.skipped.slice(0, LIST_CAP),
+    people: planPeople(p).slice(0, PEOPLE_CAP),
+    peopleTruncated: p.creates.length + p.contactCreates.length + p.updates.length + p.unchanged.length + p.unmapped.length + p.skipped.length > PEOPLE_CAP,
     omitted: {
-      creates: Math.max(0, p.creates.length - LIST_CAP),
+      creates: Math.max(0, p.creates.filter((c) => !c.stageDecision).length - LIST_CAP),
+      stageDecisions: Math.max(0, p.creates.filter((c) => c.stageDecision).length - LIST_CAP),
+      contactCreates: Math.max(0, p.contactCreates.length - LIST_CAP),
       updates: Math.max(0, p.updates.length - LIST_CAP),
       divergences: Math.max(0, p.divergences.length - LIST_CAP),
       withheld: Math.max(0, p.withheld.length - LIST_CAP),

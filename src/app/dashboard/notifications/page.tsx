@@ -4,6 +4,10 @@ import { loadActorNames } from "@/components/notifications/NotificationBell";
 import { NotificationRow } from "@/components/notifications/NotificationRow";
 import { MarkAllReadButton } from "@/components/notifications/MarkAllReadButton";
 import { toRowViews } from "@/components/notifications/view";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Notifications") };
 
 type Tab = "all" | "unread";
 

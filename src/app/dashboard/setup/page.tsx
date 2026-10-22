@@ -5,6 +5,10 @@ import { setupChecklist } from "@/lib/setup/checklist";
 import { canSeeSetup } from "@/lib/setup/roles";
 import { SETUP_PATH } from "@/lib/setup/routes";
 import { GoToIntegrationsLink, SetupChecklistView } from "@/components/setup/SetupChecklistView";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Setup") };
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +29,7 @@ export default async function SetupPage() {
       <div className="lx-page-head">
         <div style={{ flex: 1, minWidth: 260 }}>
           <div className="lx-label">Setup</div>
-          <h1 className="lx-h1">Get your firm set up</h1>
+          <h1 className="lx-h1" data-tour="setup-head">Get your firm set up</h1>
           <p className="lx-sub">
             Ten things that make Lectual work for your firm. Each one is checked against what is actually saved, not what
             someone ticked.

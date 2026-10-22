@@ -403,11 +403,11 @@ export default function IntakeControls({
           type="button"
           style={filterChip(filters.needsRebecca)}
           aria-pressed={filters.needsRebecca}
-          title="Show only leads with a draft waiting for Rebecca's review in the approval queue."
+          title="Show only leads with a draft waiting for an attorney's review in the approval queue."
           onClick={() => onFilters({ ...filters, needsRebecca: !filters.needsRebecca })}
         >
-          Needs Rebecca
-          <span style={CHIP_COUNT}>{needsRebeccaCount}</span>
+          Needs attorney
+          {needsRebeccaCount > 0 && <span style={CHIP_COUNT}>{needsRebeccaCount}</span>}
         </button>
       )}
 

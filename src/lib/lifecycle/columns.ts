@@ -41,6 +41,8 @@
  * matter is CLOSED unless its stage or registration date says registered.
  */
 
+import { PIPELINE_INTAKE_HINT } from "@/lib/intake/counts";
+
 export const PIPELINE_COLUMNS = ["intake", "consult", "engaged", "filed", "office", "registered", "closed"] as const;
 export type PipelineColumn = (typeof PIPELINE_COLUMNS)[number];
 
@@ -55,7 +57,7 @@ export const COLUMN_LABEL: Record<PipelineColumn, string> = {
 };
 
 export const COLUMN_HINT: Record<PipelineColumn, string> = {
-  intake: "New leads and referrals not yet at a consult",
+  intake: PIPELINE_INTAKE_HINT,
   consult: "Consult booked or held, not yet engaged",
   engaged: "Quote signed or matter open, not yet filed",
   filed: "At the office: filed, published, allowed, SOU",
@@ -157,6 +159,8 @@ export type PipelineCard = {
   stageLabel: string | null;
   /** Days since the record entered its current stage, when known. */
   ageDays: number | null;
+  /** What the card says about it: "61d in stage", "In stage since import", or null when unknown. */
+  ageLabel: string | null;
   ownerId: string | null;
   ownerName: string | null;
   href: string;

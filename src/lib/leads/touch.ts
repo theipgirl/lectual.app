@@ -12,7 +12,7 @@ type ScopedClient = Awaited<ReturnType<typeof getScopedClient>>;
  * saved is the real write; this only keeps the list's ordering honest. A
  * returned error and a thrown one are both swallowed (and logged with the
  * greppable `[touch]` prefix), so a bump that can't land never fails, undoes or
- * changes the result of the write it follows.
+ * changes the result of the write it follows. It returns whether the bump landed, for a caller that reports it.
  *
  * Runs through the caller's scoped client, so RLS is the tenant boundary; the
  * org filter is added when the caller already knows the row's org_id.
@@ -22,12 +22,17 @@ export async function bumpLeadLastTouch(
   leadId: string,
   orgId?: string | null,
   at: Date = new Date(),
-): Promise<void> {
+): Promise<boolean> {
   try {
     const update = supabase.from("crm_lead").update({ last_activity_at: at.toISOString() }).eq("id", leadId);
     const { error } = await (orgId ? update.eq("org_id", orgId) : update);
-    if (error) console.error(`[touch] failed to bump last touch for lead=${leadId}`, error);
+    if (error) {
+      console.error(`[touch] failed to bump last touch for lead=${leadId}`, error);
+      return false;
+    }
+    return true;
   } catch (err) {
     console.error(`[touch] failed to bump last touch for lead=${leadId}`, err);
+    return false;
   }
 }

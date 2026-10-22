@@ -1,11 +1,16 @@
 /**
  * Lawmatics stage name → the tenant's own `crm_stage` row, BY NAME.
  *
- * DESIGN RULE: never guess. A record whose Lawmatics stage cannot be resolved
- * to one of the firm's real stages is reported in the "unmapped" bucket and
- * NOT imported — it is not parked in the first stage, not dropped, and not
- * approximated. A wrong stage is worse than a missing row: it tells an attorney
- * a matter is somewhere it isn't.
+ * DESIGN RULE: never guess a stage. This module only ever says which of the
+ * firm's stages a Lawmatics name IS, or that it is none of them. What the
+ * importer does with "none of them" changed in Sprint 26 (the original rule here,
+ * "unmapped is not imported", silently dropped real people in stages like
+ * "Proposal Sent" or "Hired"): such a person is IMPORTED into the firm's first
+ * open stage, flagged with the Lawmatics stage name, and shown on the preview as
+ * "stage needs a decision" for a human to place. The alias table below is NOT
+ * widened to make that happen, and "Hired" / "Hired Client" never reach a
+ * `won` stage by themselves. A wrong stage is worse than a missing row only
+ * when it looks right; a flagged first-stage lead looks like what it is.
  *
  * Resolution order:
  *   1. Normalized exact match against the tenant's stage names.
@@ -120,6 +125,12 @@ const ALIASES: Record<string, readonly string[]> = {
   lost: ["Lost", "Lost Lead"],
   nurture: ["Nurture"],
 };
+
+/** The two names `ALIASES` deliberately leaves unmapped: the person is a client, not a stage. */
+const HIRED_NAMES = new Set(["hired", "hired client"]);
+export function isHiredStageName(name: string): boolean {
+  return HIRED_NAMES.has(normalizeStageName(name));
+}
 
 /** One of the tenant's own stage rows — only the fields the mapper needs. */
 export type StageRef = { id: string; name: string };

@@ -3,6 +3,10 @@ import { notFound } from "next/navigation";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { loadPipeline } from "@/lib/lifecycle/load";
 import { COLUMN_HINT, COLUMN_LABEL, filterCards, groupColumns, type PipelineCard, type PipelineColumn } from "@/lib/lifecycle/columns";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Pipeline") };
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +27,7 @@ function Card({ c }: { c: PipelineCard }) {
       </span>
       <span className="lx-note" style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
         <span>{c.ownerName ?? (c.ownerId ? "Team member" : "No owner")}</span>
-        {c.ageDays !== null && <span className="lx-num">{c.ageDays}d in stage</span>}
+        {c.ageLabel && <span className="lx-num">{c.ageLabel}</span>}
       </span>
     </li>
   );

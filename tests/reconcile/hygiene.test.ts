@@ -22,8 +22,15 @@ const NEW_FILES = [
   "src/lib/intake/sheet-read.ts",
   "src/lib/intake/sheet-records.ts",
   "src/lib/intake/sheet-import.ts",
+  "src/lib/intake/sheet-sections.ts",
+  "src/lib/lawmatics/notes.ts",
+  "src/lib/lawmatics/find-in-plan.ts",
 ];
 const CODE = NEW_FILES.filter((f) => /\.(ts|tsx)$/.test(f));
+// Sprint 26: "Create lead" is the one place this screen inserts a row (a lead, and only when a person presses
+// the button). It is checked by its own test below and leaves the no-write rule for every other file intact.
+const CREATE_LEAD_ACTION = "src/app/dashboard/intake/reconcile/create-lead.ts";
+const READ_ONLY_CODE = CODE.filter((f) => f !== CREATE_LEAD_ACTION);
 // Built from pieces so this file does not itself contain the strings the repo-wide greps look for.
 const FORBIDDEN_ADMIN = new RegExp([["getAdmin", "Client\\("], ["@/lib/db/", "admin"], ["SUPABASE_SERVICE", "_ROLE"]].map((p) => p.join("")).join("|"));
 const FORBIDDEN_HTML = new RegExp(["dangerously", "SetInnerHTML"].join(""));
@@ -49,8 +56,8 @@ describe("what the screen is allowed to touch", () => {
     }
   });
 
-  it("no direct write to a table: the only write is the existing stage move", () => {
-    for (const f of CODE) {
+  it("no direct write to a table: the only writes are the stage move, the last touch and Create lead", () => {
+    for (const f of READ_ONLY_CODE) {
       const src = strip(read(f));
       // (`createHash(...).update(...)` in fingerprint.ts is a hash, not a table write.)
       if (!f.endsWith("fingerprint.ts")) expect(src, f).not.toMatch(/\.(update|insert|upsert|delete)\(/);
@@ -60,13 +67,26 @@ describe("what the screen is allowed to touch", () => {
     const actions = read("src/app/dashboard/intake/reconcile/actions.ts");
     expect(actions.match(/moveLeadStage\(/g)).toHaveLength(1);
     expect(actions).toMatch(/import \{ moveLeadStage \} from "@\/lib\/pipeline"/);
+    // The last touch goes through the shared best-effort bump, never a statement of this screen's own.
+    expect(actions).toMatch(/bumpLeadLastTouch\(/);
+  });
+
+  it("Create lead inserts one lead row, scoped, behind the role gate, and nothing else", () => {
+    const src = strip(read(CREATE_LEAD_ACTION));
+    expect(src.match(/\.insert\(/g)).toHaveLength(1);
+    expect(src).toMatch(/\.from\("crm_lead"\)\s*\.insert\(/);
+    expect(src).not.toMatch(/\.(update|upsert|delete)\(/);
+    expect(src.indexOf("await authorizeReconcile()")).toBeGreaterThan(0);
+    expect(src.indexOf("await authorizeReconcile()")).toBeLessThan(src.indexOf(".insert("));
+    expect(src).not.toMatch(/org_?id\s*:\s*(input|candidate)/);
+    expect(read(CREATE_LEAD_ACTION)).toMatch(/^"use server";/);
   });
 
   it("reads only named columns and only existing tables", () => {
     const sources = read("src/lib/reconcile/sources.ts") + read("src/app/dashboard/intake/reconcile/actions.ts");
     expect(sources).not.toMatch(/select\(\s*["'`]\*/);
     const tables = [...sources.matchAll(/\.from\("([a-z_]+)"\)/g)].map((m) => m[1]);
-    expect([...new Set(tables)].sort()).toEqual(["crm_activity", "crm_lead", "crm_stage"]);
+    expect([...new Set(tables)].sort()).toEqual(["crm_activity", "crm_firm_brain_entry", "crm_lead", "crm_stage"]);
   });
 
   it("nothing is written to Lawmatics: no write module, no HTTP verb, no write call", () => {
@@ -77,7 +97,16 @@ describe("what the screen is allowed to touch", () => {
       expect(strip(src), f).not.toMatch(/["'`](POST|PATCH|PUT|DELETE)["'`]/);
     }
     const lawmaticsImports = CODE.flatMap((f) => [...read(f).matchAll(/from "(@\/lib\/lawmatics\/[a-z-]+)"/g)].map((m) => m[1]));
-    expect([...new Set(lawmaticsImports)].sort()).toEqual(["@/lib/lawmatics/connection", "@/lib/lawmatics/import", "@/lib/lawmatics/normalize", "@/lib/lawmatics/stage-map"]);
+    // `client` is a type import (the read-only client's shape); `notes` reads GET-only through that client.
+    expect([...new Set(lawmaticsImports)].sort()).toEqual([
+      "@/lib/lawmatics/client",
+      "@/lib/lawmatics/connection",
+      "@/lib/lawmatics/import",
+      "@/lib/lawmatics/normalize",
+      "@/lib/lawmatics/notes",
+      "@/lib/lawmatics/notes-key",
+      "@/lib/lawmatics/stage-map",
+    ]);
   });
 
   it("sends no mail, uses no queue, notifies no one and builds no client-facing link", () => {
@@ -161,7 +190,7 @@ describe("ported files and docs", () => {
     const agents = read("AGENTS.md");
     const section = agents.slice(agents.indexOf("## Stage reconciliation"), agents.indexOf("## JSX text spacing"));
     expect(section.length).toBeGreaterThan(500);
-    for (const phrase of ["sheet wins", "needs_matter", "CSV only", "stored mail", "fingerprint", "Lawmatics", "won"]) {
+    for (const phrase of ["furthest", "needs_matter", "CSV only", "stored mail", "fingerprint", "Lawmatics", "won", "last touch", "Not in Lectual yet", "Create lead", "sections"]) {
       expect(section.toLowerCase(), phrase).toContain(phrase.toLowerCase());
     }
   });

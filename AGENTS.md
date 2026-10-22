@@ -158,45 +158,95 @@ only: nothing is shared with a client and there is no portal.
 - `crm_file` and the `file_uploaded` activity type are hand-added in `src/lib/db/types.ts` and
   `src/lib/matters/activity.ts` until the next codegen run.
 
-## Stage reconciliation (Intake → Reconcile stages, no schema)
-`/dashboard/intake/reconcile/` compares each lead's stage with three sources and moves the ones a person
+## Stage reconciliation (Intake → Reconcile stages, no schema; rewritten in Sprint 26)
+`/dashboard/intake/reconcile/` compares each lead's stage with what the sources say and moves the ones a person
 chooses. Owner/admin/senior_admin only: the PAGE answers `notFound()` to anyone else (signed out included) and
-BOTH actions (`actions.ts`: `previewReconcileAction`, `applyReconcileAction`) re-resolve the role on every call
-and read or write nothing for a refused one. Nothing is written to Lawmatics, anywhere on this screen.
-- **The sheet wins.** `src/lib/reconcile/propose.ts` (`proposeStage`, pure) proposes only the sheet's stage.
-  Lawmatics and mail can only corroborate: `agree` (another source names the same stage and none names a
-  different one), `conflict` (any source differs; the proposal is still the sheet's), `sheet_only`, or
-  `no_evidence` (no usable sheet row: no proposal, however loudly the others agree). A source that could not be
-  read is `unavailable` on every row and in the reasons; it is never "none".
-- **`needs_matter`.** A sheet status code of 7 or higher, or Lawmatics "Hired"/"Hired Client" (the two names
-  `stage-map.ts` deliberately leaves unmapped), proposes NO stage and links to Open a matter. It outranks the sheet.
-  Any other unmapped Lawmatics stage ("Discovery Call No Show") is shown as unmapped and does not vote.
-- **No `won` stage is ever a target** (proposal, Pick another, bulk or apply): a move there runs the matter
-  handoff and stops the lead's sequences. Apply refuses it again against the live stage list.
-- **CSV only, 5 MB.** No spreadsheet library is installed (`xlsx` lives in lectual, not here), so an Excel file is
-  refused with a sentence telling the person to save as CSV (`src/lib/intake/sheet-read.ts`). The parse is the port of
-  lectual's `parseIntakeSheet` (`sheet-import.ts`, see `PORTED_FROM.md`). `next.config.ts` raises the
-  server-action body limit to 6 MB so the file reaches the action.
-- **Matching.** A lead matches a sheet row on `sheet_key`, exactly first. `sheetKeyFor` includes the status code, so
-  a row that moved on the sheet has a new key; failing an exact hit the owner and mark are also tried under every
-  intake code 0 to 6. Two candidates for one lead, two leads with one `sheet_key`, or two leads reaching one row
-  (a stale duplicate from an earlier status code plus the current lead) are all reported as ambiguous: none of those
-  leads gets a sheet stage or a proposal, and the summary counts them. Never picked. Sheet rows with no lead are
-  listed, never created. A lead with no `sheet_key` has no sheet reading.
-- **Email is the stored mail, not mail.** The mailbox sync already classified each message it matched and wrote the
-  type, `sensitive` and date onto the lead's `email_sent`/`email_received` timeline row. `src/lib/reconcile/email.ts`
-  maps four types to stage names (strategy-session link, discovery call, post-consult, LOE and invoice), resolved
-  with `resolveStage`; a sensitive thread, an unlisted type or a stage the firm lacks gives no vote. No mail is fetched.
-- **Lawmatics** is read through the firm's own connection with the read-only client (`pullSource`). Not connected,
-  failing, cut short (truncated) or missing its stage relationships are each a named state, never an empty book.
-- **Apply** goes only through `moveLeadStage(id, stageId, evidenceAt?)`, which logs `stage_changed`. The optional
-  third argument stamps `stage_entered_at` (and the timeline payload's `evidence_at`) with the sheet's newest
-  non-future dated entry; a future or invalid date is ignored. A person's "Pick another" carries no date.
-  `last_activity_at` still becomes now, as for every move.
-- **The fingerprint covers the plan the person was shown** (SHA-256 of the rows, sorted, `fingerprint.ts`). It is an
-  integrity check, not a signature. Apply recomputes it, then re-reads every lead and stage through the scoped client
-  and refuses the WHOLE apply, writing nothing, when a lead is missing or no longer in the stage the plan recorded.
-  One request moves at most 200 leads.
+every action (`actions.ts`: `previewReconcileAction`, `applyReconcileAction`; `create-lead.ts`: `createLeadFromReconcileAction`)
+re-resolves the role on every call (`authorizeReconcile`, `src/lib/reconcile/authorize.ts`) and reads or writes nothing for a
+refused one. Nothing is written to Lawmatics, anywhere on this screen, and no mail is sent or opened for its body.
+- **The furthest dated evidence is proposed** (this replaced "the sheet wins"). `src/lib/reconcile/propose.ts` (`proposeStage`, pure)
+  takes every status code, Lawmatics stage, note and mail, each naming a stage of the firm or none, and proposes the MOST ADVANCED
+  stage that has evidence, ties to the newest. Never backwards from the lead's current stage; `declined` / `nurture` only from an
+  explicit note at least as new as all progress (silence never proposes them); a fact the firm has no stage for is cited and
+  proposes nothing; an undated fact is cited and never acted on. Confidence: `agree` (two or more sources at the proposed stage),
+  `conflict` (a status-level reading, such as a status code older than the notes, names another stage; the proposal is still the
+  most advanced), `sheet_only` / `single_source` (one source speaks), `no_evidence`. The proposal text lists every piece of evidence
+  with its source and date ("Proposal sent Oct 16 (sheet note) · Follow-up sent Oct 18 (email)").
+- **One milestone classifier** (`src/lib/reconcile/milestones.ts`, pure) for sheet notes, Lawmatics notes and mail: contacted <
+  consult_scheduled < consult_held < questionnaire_sent < opinion_letter_sent < proposal_sent < follow_up_sent < accepted < loe_sent <
+  paid / hired, plus `no_show`, `declined`, `nurture`. A table of phrase rules with negation guards ("did not attend", "not sent",
+  "rescheduled"); unknown text is no milestone. Mail has a direction: only mail the firm SENT can be a milestone. A milestone names a
+  stage through `stageForMilestone` (the firm brain's `stage_mapping` entry first, then ONE defaults table, `MILESTONE_STAGE_NAMES`);
+  a milestone with no stage gives no proposal. Don't add a second place that maps text to a stage.
+- **`needs_matter`.** A sheet status code of 7 or higher, Lawmatics "Hired"/"Hired Client", or a top milestone of accepted / paid /
+  hired proposes NO stage and links to Open a matter. It outranks everything else. Any other unmapped Lawmatics stage is shown as
+  unmapped; its own name is still read as a milestone ("Proposal Sent", "Consult Completed").
+- **No `won` stage is ever a target** (proposal, Pick another, bulk or apply, Create lead): a move there runs the matter handoff and
+  stops the lead's sequences. Apply refuses it again against the live stage list.
+- **CSV only, 5 MB; the whole workbook as ONE CSV is fine.** No spreadsheet library is installed (`xlsx` lives in lectual, not here), so an
+  Excel file is refused with the save-as-CSV sentence. `src/lib/intake/sheet-sections.ts` finds EVERY section by its header (the old
+  reader trusted row 1, so a workbook whose first tab was a task list found no intake rows): each intake section (either layout,
+  owner under `0` or `Client Name`) is parsed with its OWN header and merged by the importer's `sheet_key` rules (identical rows
+  merge; rows at different codes stay apart and match as ambiguous); PNC contact lists (First Name / Last Name / Email Address) are a
+  read-only source of addresses for name matching; every other section is listed as skipped (never silently dropped), in the summary
+  line "Read: Trademark intake (3 sections, 1,170 rows). Skipped: Tasks, Contracts." Rows keep their WORKSHEET row number.
+  `src/lib/intake/sheet-import.ts` is the port of lectual's `parseIntakeSheet` (see `PORTED_FROM.md`, one change: `Client Name`).
+- **Sheet notes** are the log in `Description` and `Notes`; `splitNoteEntries` gives dated entries and each is classified. A clamped
+  future date is not evidence of when.
+- **Lawmatics** is read through the firm's own connection with the read-only client (`pullSource`, `listAll`, `get`). Not connected,
+  failing, cut short (truncated) or missing its stage relationships are each a named state, never an empty book. **Notes**
+  (`src/lib/lawmatics/notes.ts`, `GET /notes` per person, not verified against a live account) are read for the people on the table
+  (at most 150 per run), swept page by page, held in memory as date + milestones + a 140-character snippet and never stored. Lawmatics
+  ignores parameters silently, so every note must name its own `notable_id`; a note for someone else is dropped and notes that name no
+  record are UNAVAILABLE for that person, never "no notes".
+- **Email has three parts.** The stored mail the mailbox sync classified (`email_sent` / `email_received` rows, with direction and
+  subject), the Stage Keeper's moves, and an on-demand read-only SEARCH of the firm's connected Microsoft mailboxes
+  (`src/lib/reconcile/mailbox-search.ts`; `mailbox` module required; the caller's own scoped view of the connections, sealed tokens via
+  `my-mailbox.ts` only). For each person with a real address (the lead's own, Lawmatics', or a unique match on a contact list):
+  `$filter` on sender / recipient and the last 120 days, `$select` of subject, date and direction only, at most 25 messages, at most 40
+  people per preview. NEVER a body, a preview or an attachment, and nothing about it is stored. States are named, never "no mail":
+  ok (with truncated / unread mailboxes), no address, module off or unchecked, no mailbox, Gmail only, scope missing, reauth, failed,
+  limit. A sensitive thread contributes nothing.
+- **Last touch.** The newest dated evidence across the sources (milestone evidence, the sheet's newest log date, every synced or
+  searched mail), never in the future, is the row's proposed last touch. Apply sets `last_activity_at` to it only for a lead the person
+  applied, only when it is a real past date and NEWER than what the lead held before the apply (a move stamps now; the evidence date
+  replaces that), through `bumpLeadLastTouch`.
+- **Not in Lectual yet.** Sheet rows, Lawmatics records (not hired, not in a matter-opening stage, newest 100) with no lead are
+  listed with a Create lead button. Nothing is created until it is pressed. `createLeadFromReconcileAction` re-validates the candidate
+  the browser sends back (`parseCandidate`), uses the scoped client only, takes the org from the session, refuses a second lead for the
+  same sheet key / Lawmatics id / address, files in the sheet's stage (never a `won` one) else the first open stage, sets the source to
+  where the person was found, and logs `lead_created`. After that the person reconciles like any lead.
+- **Matching.** A lead matches a sheet row on `sheet_key`, exactly first. `sheetKeyFor` includes the status code, so a row that moved
+  on the sheet has a new key; failing an exact hit the owner and mark are also tried under every intake code 0 to 6. Two candidates for
+  one lead, two leads with one `sheet_key`, or two leads reaching one row are reported as ambiguous: none of those leads gets a sheet
+  reading, and the summary counts them. Never picked. A lead with no `sheet_key` has no sheet reading.
+- **Apply** goes only through `moveLeadStage(id, stageId, evidenceAt?)`, which logs `stage_changed`, plus the last touch above. The
+  optional third argument stamps `stage_entered_at` with the newest non-future dated evidence at the proposed stage; a person's "Pick
+  another" carries no date.
+- **The fingerprint covers the plan the person was shown** (SHA-256 of the rows, sorted, `fingerprint.ts`, the proposed last touch
+  included). It is an integrity check, not a signature. Apply recomputes it, then re-reads every lead and stage through the scoped
+  client and refuses the WHOLE apply, writing nothing, when a lead is missing or no longer in the stage the plan recorded. One request
+  moves at most 200 leads.
+
+## Lawmatics import: no person is dropped silently (Sprint 26)
+`/dashboard/settings/integrations/lawmatics/` (`src/lib/lawmatics/import-plan.ts` plans, `import.ts` pulls and writes). Every person
+Lawmatics holds lands in exactly one bucket with a reason, and the preview SHOWS the ones that need a person.
+- **A stage the firm has no name for is imported, not dropped.** "Proposal Sent", "Consult Completed", "Hired", a stage that opens a
+  matter: the person is created in the firm's FIRST open stage (lowest-ordered `open` stage) with a `stageDecision`, shown as "Imported,
+  stage needs a decision: <stage>" or "Hired in Lawmatics — open a matter", and never put in a `won` stage. The alias table in
+  `stage-map.ts` is not widened. The flag is recorded, with no schema, as `lawmatics_stage_unmapped` (and `hired_in_lawmatics`) in the
+  payload of the lead's `lead_created` activity row, written after the insert (`recordStageDecisions`); a flag that fails to write is
+  counted in the report (`flagsNotRecorded`), never thrown. A firm with no open stage keeps them in `unmapped` with that reason.
+- **A Lawmatics contact with no prospect is a lead** (`contactCreates`, source "Lawmatics contact" in `referral_detail`), deduped by
+  contact id within the pull and by email, case-insensitively, against existing leads and against the prospects of the same pull. The
+  lead row has no place for a contact id, so a second run finds the person by the stored email. No email: skipped, with the reason.
+- **The practice-area filter defaults OFF** (plan options and the checkbox). When on, every excluded person, including one with no
+  practice area, is skipped WITH a name and a reason, and the lists are open on the screen. The summary line reads "N skipped, M need a
+  stage decision".
+- **"Find a person in this pull"** (`src/lib/lawmatics/find-in-plan.ts`, pure; the preview carries up to 6,000 people) answers which
+  bucket a name, business or email is in and why; no match says "Not in this pull" and names the causes (truncated, filter on, no
+  prospect). A truncated pull keeps its warning and is never presented as complete.
+- The fingerprint covers the stage flags and the contact leads, and the confirm step still re-derives the plan before writing.
 
 ## Setup checklist (`/dashboard/setup`, no schema)
 A ten-item "get the firm set up" page for owner/admin/senior_admin, computed from real state. The page and
@@ -235,7 +285,7 @@ tool set (six reads) and the retrieval-only UPL system prompt are in `src/lib/ag
   old statuses (400, 422, 401, 403, 503). `final` carries the authoritative answer and the browser replaces what it
   streamed with it: a short preface before a tool call can show for a moment. Wire format and parser: `src/lib/copilot/sse.ts`.
 - **Model:** `copilotModel()` in `src/lib/ai/claude.ts` = `env.COPILOT_MODEL || "claude-sonnet-5"`; nothing else reads
-  `COPILOT_MODEL`. The other agents still use `AGENT_MODEL`. `streamClaudeWithTools` sits beside the unchanged
+  `COPILOT_MODEL`. The agents use `agentModel(agent)` (see Agent models below). `streamClaudeWithTools` sits beside the unchanged
   `callClaudeWithTools`, with `cache_control` on the system block and on the last tool.
 - **Per question:** tool calls in one step run in parallel; `listMatters()` is read once (`search_matters` and
   `list_stalled_matters` share it, and a failure is shared too, so both report it and `readFailed` is set); the last 10
@@ -541,6 +591,134 @@ missing, hidden, off-screen or the window is under 768px wide. Internal only: it
   children's tokens, so a collapsed rail can still be spotlighted. A step cannot point at nothing: `tests/onboarding/tour.test.ts` greps the sources.
 - **Tested without a browser:** the behaviour is in pure functions (`engine.ts`) and the dialog is checked with `renderToStaticMarkup`
   (there is no DOM test environment). Walk it once on desktop and under 768px.
+
+## UI/UX fixes from the Oct 20 test notes (Sprint 22, no schema)
+Display and derivation only: no data is rewritten, nothing is sent, no new dependency.
+- **Titles:** every `page.tsx` under `src/app/dashboard` exports `metadata` (`pageTitle("Calendar")` = "Calendar · Lectual") or
+  `generateMetadata`; `src/lib/ui/page-title.ts` is the one builder and `tests/ui/page-title.test.ts` walks the directory and fails
+  for a page without one. Lead and matter pages read the record through `getLead` / `getMatter` (scoped client) and fall back to
+  "Lead" / "Matter" when the read fails or finds nothing (`recordPageTitle`), so another firm's id gives the same tab as a missing one.
+- **Navigation feedback:** `src/app/dashboard/loading.tsx` (skeleton, `PageSkeleton`, design tokens only) plus `NavProgress`, a
+  dependency-free top bar that appears only after 150 ms (`src/lib/ui/nav-progress.ts`) and ends when the URL changes. `error.tsx` beside
+  it says "This page couldn't be loaded" with Try again, so a failed navigation is never a stale or blank page. With a `loading.tsx` in
+  place, Next prefetches dynamic dashboard routes only down to the skeleton.
+- **Calendar:** every `<Link>` on the calendar page has `prefetch={false}` (a month grid is ~70 links to dynamic payloads). A month or week
+  whose every read failed shows "couldn't be loaded", never an empty grid (`calendarReadState`); a partial failure keeps its banner.
+- **Public intake link:** `shareState(status)` (`src/lib/intake-forms/share.ts`) decides whether Copy link, the QR code, Preview and the Share
+  panel are offered. Only `live` is. Draft and archived show "Not live yet. Publish the form to share it." and a disabled control with
+  `aria-describedby`. Anywhere a new place offers `/i/<slug>`, it asks `shareState`.
+- **Counts:** the rail's Intake badge is the PNC list's length (intake-category stage, trademark or unset practice area;
+  `INTAKE_PRACTICE_AREA_FILTER` in `src/lib/intake/counts.ts` is shared by the list and the badge). The Pipeline's first column is a
+  different question (leads not yet at a consult, any practice area, plus form submissions not yet leads), so it is labelled, not forced
+  equal: the badge has a tooltip and the column hint says why they differ.
+- **Period comparison:** `periodDelta` withholds a percentage beyond +/-500% and a collapse to under a tenth of a prior period of 20 or more;
+  `comparisonText` always gives the prior count ("2 vs 168 in the previous 7 days") and `KpiTile` prints it. Prior 0 shows a plain "+N".
+- **Days in stage (Pipeline cards):** `stageAgeDisplay` (`src/lib/lifecycle/stage-age.ts`): the import rule applies only to a record carrying an import marker (lead: `lawmatics_id`,
+  `lawmatics_synced_at` or `sheet_key`; matter: `lawmatics_id` or `lawmatics_synced_at`); a form or manual record whose
+  stage date equals its created time counts days ("0d in stage"). For a marked record, a `stage_entered_at` that is not the created or Lawmatics-synced time
+  counts days from itself (reconcile dates, Undo and plain moves set it on purpose, so a newer `stage_changed` row never overrides it); when it IS that import
+  stamp, the newest `stage_changed` activity is the entry, and with none it reads "In stage since import" (no count).
+- **Role-neutral copy:** nothing rendered to every firm names a person. The intake chip and badge read "Needs attorney" and hide the
+  chip's count at zero. `tests/intake/role-neutral-copy.test.tsx` greps visible text. RPB-specific modules (consult proposal email,
+  welcome, prep-consult, document templates, the ported assessment card) keep Rebecca's name on purpose.
+- **Matter titles:** `matterDisplayTitle` (`src/lib/matters/display-title.ts`) treats `TM-enisha-smith` / `TM-97123456` (or a title equal to the
+  matter number) as a generated key and shows the mark, then the client (`owner_name`), keeping the stored title only when neither exists.
+  `matterLabel` uses it, so lists, cards and the header agree.
+- **Module list:** `activeOrgModules` is wrapped in React `cache`, one `crm_org` read per request across the layouts and the page.
+  Settings -> Modules keeps its two reads in sequence on purpose: Mailboxes off must not read connections.
+
+## Getting started hub (Sprint 23, no schema)
+`/dashboard/getting-started/` ("Getting started · Lectual") is a set of guided flows over the real screens, open to every member.
+Internal only: a flow points at things and explains them; it never clicks, moves or sends anything. The one write is the person's own progress flag.
+- **Catalog:** `src/lib/onboarding/hub.ts` (pure). The Intake track's five flows need a staff role (`requires.staff`: not viewer, not social_media, not unknown), so those roles lose the track. Five tracks (`intake`, `consults`, `matters`, `approvals`, `admin`), each a list of flows, each flow a
+  list of steps `{ id, path, target, title, body }`. `hubTracks({ role, modules, aiConfigured })` filters: a flow needs named rail sections to be visible
+  (`visibleNav`, the rail's own data, so module gates fail closed), `admin: true` needs `canSeeSetup`, `ai: true` needs the AI key. An unknown role sees
+  nothing, an unreadable module list (`null`) is treated as none and the page says some guides couldn't be checked, and a track with no flow left is dropped.
+  The queue step's wording follows `canApproveQueue` (like the tour): every role that cannot approve, and any unknown role, gets the non-approver wording; it lives in the step's `bodyReadOnly` (the queue step). A test checks every path exists on disk
+  and every target is a `data-tour` hook in the sources, so a step cannot point at nothing; copy is denylist-tested (no advice, no "will send", no names).
+- **Progress:** `user_metadata.lectual_hub = { version: 1, done: string[], hidden_card?: true }`, written only by `hub-actions.ts` (`markHubFlowAction`,
+  `resetHubProgressAction`, `hideHubCardAction`) through `getScopedClient()` + `auth.updateUser`, merged with every other key (the Sprint 21 `lectual_tour` flag
+  included), fixed-sentence errors, no user or org argument. Unknown, repeated or non-string ids and another version read as empty. Reset also clears `hidden_card`.
+  Counts only include flows the person currently sees. It decides what is drawn, never what anyone may see or do.
+- **No rail entry (decision):** `NAV` rows carry a `step`, and the Sprint 21 tour and `tests/nav.test.ts` derive from the same list, so a row is not a one-line
+  edit. The page is reached from the account menu ("Getting started", beside "Show tips again") and the Today card (`GettingStartedCard`, its own async
+  component with its own read; hidden when every visible flow is done or after Hide; a failed read still shows the link, with no count).
+- **Runner:** `GettingStartedRunner` is mounted once in the dashboard layout. It is closed on load unless sessionStorage holds a valid `lectual_hub_flow` =
+  `<flowId>:<index>` (`resumeFlow`: malformed, unknown or no-longer-visible clears it; a bad index restarts the flow). Records picked at start live in
+  `lectual_hub_records` (ids are charset-checked before they reach a path). Next/Back to a step on another page navigates with the router and the new
+  `flowId:index` is stored first; leaving the step's page by hand ends the flow (not done); Skip/Esc never marks done; Finish marks done optimistically and a
+  failed save only keeps the check locally (`lectual_hub_local_done`). Decisions are pure in `hub-runner.ts`; the popover is Sprint 21's `TourView`
+  (with optional `finishLabel`/`skipLabel`) and `tour.css`.
+- **Record steps:** the first lead (most recent last activity) and first matter the person can see are read at flow start by `pickHubRecordsAction`
+  (scoped client, read only, `limit(1)`, three states per kind: ok / none / unavailable). With no record the step becomes a centered card saying what the
+  page would show ("Nothing here yet." or "Your records couldn't be loaded."), never an error and never another firm's record. The page shows the same
+  note under such flows.
+- **Sprint 21's tour is unchanged** (its props, flag, guard and wording); the hub only adds the runner beside it. `data-tour` hooks added by this sprint are
+  attribute-only: `lead-head`, `lead-prep`, `lead-timeline`, `matter-head` (on the page head, not the h1), `matter-deadlines`, `matter-updates`,
+  `matter-aside`, `intake-board`, and `*-head` on the h1 of the forms, reconcile, calendar, proposals, new proposal, matters, meetings, queue, agents, setup,
+  integrations, team, modules and firm pages.
+
+## Agent models (Sprint 24, no schema)
+No model call defaults to Opus. `src/lib/ai/agent-models.ts` (pure, env passed in) holds `AGENT_MODEL_TIER`: intake-triage and
+email-intel are `haiku` (classification and extraction); inbox-summary (its one call writes reply drafts; its triage is rule-based),
+post-consult, morning-brief and consult-prep are `sonnet`; `staff` (a model call that is not an agent run: the letters, prep drafts,
+public intake screening, Meetings "Draft follow-up" is `post-consult`) is `sonnet` and is named at each call site. The Stage Keeper makes no
+model call and is not in the table.
+- `agentModel(subject)` in `src/lib/ai/claude.ts` takes a required subject. `StructuredRequest.agent` carries it; `runOneAgent` fills it in
+  from the run's own agent id, and each agent's call also names itself. `askClaude` requires `agent`.
+- Defaults `claude-sonnet-5-5` ($2 / $10 per million tokens) and `claude-haiku-5-5` ($0.10 / $0.50; $0.50 / $2.50 when the prompt is over 100k
+  tokens, which `costFor` applies), the newest of each per platform.claude.com/docs/en/about-claude/models/overview, where `claude-sonnet-5` and
+  `claude-haiku-4-5` are listed as legacy. Both stay in `PRICES` so old runs still price. The Opus ids stay in `PRICES` only so
+  old `agent_run` costs still price. Overrides: `AGENT_MODEL_HAIKU`, `AGENT_MODEL_SONNET`; `AGENT_MODEL` is now ONLY the Sonnet-tier override
+  (`AGENT_MODEL_SONNET` wins over it) and no longer forces every agent. An override naming a `claude-opus*` id is ignored with one log line.
+- `supportsEffort` is false only for `claude-haiku-4-*` (the API refuses it there); `claude-haiku-5-5` takes `effort` (triage sends `low`).
+  `max_tokens` is clamped by `maxOutputFor` (128k for the 5.5 ids, 64k for older; triage asks 16k).
+  A cut-off answer is still `AiOutputError` `truncated`, which skips the one lead. Cost is priced from `response.model`, the model that answered.
+- Not verified against the live API in this environment (no key): the ids, prices and effort rule come from the models and effort docs. Check the first Haiku triage run.
+
+## Agent failure alerts (Sprint 24, no schema)
+A run closed as `error` (cron, Run now and the time-limit close all go through `runOneAgent`) emails Lectual, internal only.
+- Firms: `failureAction` (`digest.ts`) keeps its actions for the fixable causes (reconnect a mailbox or meeting source, try Run now later). Every
+  other cause, a queue 500 included, is "Lectual has been told and is looking into it." with `href: null`: the card draws plain text, never a
+  link, and "Open the run log" no longer exists. Today's needs-you row points those at the Agents page.
+- Lectual: `src/lib/agents/failure-alert.ts`. Recipients come ONLY from `AGENT_FAILURE_ALERT_TO` (comma-separated), from
+  `AGENT_FAILURE_ALERT_FROM` (default `Lectual alerts <noreply@lectual.app>`), through Resend's HTTP API with `RESEND_API_KEY` (a plain `fetch`, no
+  new dependency). Either unset = no read, no email. Subject `[Lectual bug] <agent> failed for <firm name>`; body: firm, org id, agent, run id,
+  started/finished, `VERCEL_ENV` / `VERCEL_GIT_COMMIT_SHA`, and the stored error cut to 2,000 characters. Its input type has no summary or client
+  field, and anything shaped like an email address is replaced with `[email]`.
+- Dedupe, no new table: at most one email per org + agent + error signature (first sentence, digit runs normalised) per UTC day, judged from
+  that day's earlier `agent_run` error rows through the runner's own org-fenced client. An unreadable history sends (a duplicate beats silence).
+  Sending never throws into the run and never changes its status; a failure is one log line with no content.
+- Taylor sets `AGENT_FAILURE_ALERT_TO` (bugs@lectual.app and/or the ClickUp list's email address) and `RESEND_API_KEY` on the deployment.
+
+## Copilot history (Sprint 24, needs lectual 0099)
+`/dashboard/copilot` is a full-page chat (no "IP.OS" label or title block; a visually hidden h1) with "Past conversations" beside it. The four
+stat cards stay in the empty state inside the chat column, each its own read ("Couldn't load" on failure). "Nothing sends without your approval."
+is on the page.
+- Tables `copilot_conversation` / `copilot_message` (lectual 0099) are PRIVATE TO THE AUTHOR by RLS: nobody else, admins and owners included.
+  `src/lib/copilot/history-store.ts` takes the scoped client only and never names a user (`user_id` has no INSERT grant; it takes `auth.uid()`).
+  Titles, content and citations are never logged. `history-pure.ts` holds the rules (title = first question clipped to 80 characters, content cut
+  at 40,000, citations kept whole under 60 KB, relative dates, the delete confirmation).
+- Reads are three-state: ok / not-set-up (error code 42P01 or PGRST205) / unavailable. "No saved chats yet." only for ok.
+  Not set up reads "Saved chats aren't available until the database update."; unavailable reads "Saved chats couldn't be loaded." and New chat still works.
+- Saving (`save-turn.ts`, called by the route AFTER it has sent `final`): the question, then the final answer, one insert per message, never the
+  deltas. SSE gains `saved` ({ conversation_id }) or `save_failed` after `final`; the browser shows the quiet, non-alert line "This chat isn't
+  being saved right now." A save failure never changes `final`. A question is kept only with its answer (if the answer cannot be saved the question,
+  or the chat this call created, is removed). A conversation id the caller cannot see starts a new saved chat. A stream that ends in `error` saves
+  nothing. The drawer saves too. The body accepts an optional `conversationId` (uuid).
+- The page: `?c=<id>` opens a past chat (the server re-reads it; messages and citations come back as done exchanges and the next question sends
+  its last turns as `history` and the same `conversationId`). Delete is a server action (`actions.ts`) with a confirm step; it refuses signed-out and
+  a non-uuid id with fixed sentences. No rename.
+- Before 0099 is applied the chat still answers and the list says it is not available until the database update.
+
+## New document picker (Sprint 24, no schema)
+`/dashboard/documents/new/` starts with the SAME "Who is this for?" as New proposal: `WhoIsThisFor` and `src/lib/proposals/new-picker.ts` take a
+destination (`PickerDestination`: base path, choose link, optional blank link) instead of being forked; `src/lib/documents/new-picker.ts` supplies
+the letter destination. Leads | Matters (opens on Matters), search, 8 recent, "Showing N of M", a failed read is its own alert, no "Start blank".
+- A matter goes to `/dashboard/documents/new/<matterId>/`. Open matters only, as the page always offered. A lead goes to `?lead=<id>`: its OPEN
+  matters (`listMatters({ leadId })`, scoped): none = "Letters are drafted on a matter. Open a matter for <lead> first." with a link to the lead; one =
+  redirect to that matter's template choice; several = a short list. A failed read for the lead's matters is an alert, never the "none" sentence.
+- The Document Center gate stays in the segment `layout.tsx`; the per-matter pages and actions are untouched.
 
 ## JSX text spacing: keep the `{" "}`
 Next 16.2.7's compiler DROPS the leading space of JSX text that contains an HTML entity

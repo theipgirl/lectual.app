@@ -29,9 +29,13 @@ export function RunDigestList({ digest, paused }: { digest: RunDigest; paused: b
         <li key={`f-${f.agent}`} style={{ padding: "8px 0", display: "grid", gap: 2 }}>
           <span style={{ color: "var(--wine)", fontWeight: 500 }}>{f.text}</span>
           <span className="lx-note">{f.reason}</span>
-          <Link href={f.action.href} className="lx-note" style={{ color: "var(--ox)", fontWeight: 500 }}>
-            {f.action.label} →
-          </Link>
+          {f.action.href ? (
+            <Link href={f.action.href} className="lx-note" style={{ color: "var(--ox)", fontWeight: 500 }}>
+              {f.action.label} →
+            </Link>
+          ) : (
+            <span className="lx-note">{f.action.label}</span>
+          )}
         </li>
       ))}
       {digest.lines.map((l) => (

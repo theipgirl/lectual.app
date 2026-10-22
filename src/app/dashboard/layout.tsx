@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { resolveFirmSession } from "@/lib/firm/session";
@@ -13,6 +14,8 @@ import { NoFirmAccess } from "@/components/shell/NoFirmAccess";
 import { CopilotLauncher } from "@/components/copilot/CopilotLauncher";
 import { aiConfigured } from "@/lib/ai/claude";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
+import { GettingStartedRunner } from "@/components/onboarding/GettingStartedRunner";
+import { NavProgress } from "@/components/shell/NavProgress";
 import { shouldShowTour } from "@/lib/onboarding/tour";
 
 export const metadata: Metadata = { title: "Lectual" };
@@ -48,6 +51,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="lx-app">
+      <Suspense fallback={null}>
+        <NavProgress />
+      </Suspense>
       {actingAsStaff && (
         <div
           role="status"
@@ -98,6 +104,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       </div>
       <CopilotLauncher configured={aiConfigured()} />
       <OnboardingTour open={shouldShowTour(user.user_metadata) && !actingAsStaff} role={role} navSlugs={items.map((i) => i.slug)} firmName={org.name} aiConfigured={aiConfigured()} />
+      <GettingStartedRunner role={role} modules={org.modules} aiConfigured={aiConfigured()} />
     </div>
   );
 }

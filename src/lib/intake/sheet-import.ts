@@ -1,4 +1,5 @@
-// Ported from theipgirl/lectual `src/lib/intake/sheet-import.ts` (main @ 0c65dca). Logic unchanged;
+// Ported from theipgirl/lectual `src/lib/intake/sheet-import.ts` (main @ 0c65dca). Logic unchanged except
+// the owner column list in parseIntakeRow, which also reads "Client Name" (see PORTED_FROM.md);
 // only this header is new. Used by the stage reconciliation screen to read Caitlyn's intake sheet.
 /**
  * Parse layer for the spreadsheet → intake importer (blueprint
@@ -352,7 +353,8 @@ export function parseIntakeRow(
   // Owner is under the header `0`; the column headed "Trademark Owner" is
   // blank on every row. Only the FIRST blank-header column may arrive as ''
   // (see recordsFromSheetRows) — later spacer columns must not win.
-  const ownerName = cell(sheetRow, "0", "Trademark Owner", "", "Owner", "Client");
+  // "Client Name" heads the owner column in the workbook's second intake layout.
+  const ownerName = cell(sheetRow, "0", "Trademark Owner", "", "Owner", "Client", "Client Name");
   if (!ownerName) {
     return {
       refusal: {

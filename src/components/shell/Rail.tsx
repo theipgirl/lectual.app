@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOutAction } from "@/lib/auth/actions";
 import { ICON, RAIL_PIN_COOKIE, isNavActive, navItemBySlug, railGroups, type NavItem } from "@/lib/nav";
+import { RAIL_COUNT_TITLE } from "@/lib/intake/counts";
 import { navTourToken } from "@/lib/onboarding/tour";
 import { closeRailOnEscape, releaseRailFocus } from "@/lib/rail-behaviour";
 import type { QueueLoadStatus } from "@/lib/queue/load";
@@ -108,6 +109,7 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
                       className={`lx-rail-item${entry.active ? " is-active" : entry.childActive ? " is-parent" : ""}`}
                       aria-current={entry.active ? "page" : undefined}
                       aria-label={count ? `${entry.label} (${count === "!" ? "couldn't reach the queue" : count})` : entry.label}
+                      title={count && entry.countKey ? RAIL_COUNT_TITLE[entry.countKey] : undefined}
                     >
                       <span className="lx-rail-icon">
                         <Icon d={entry.icon} size={17} />
@@ -128,6 +130,7 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
                               data-tour={navTourToken(kid.key)}
                               className={`lx-rail-kid${kid.active ? " is-active" : ""}`}
                               aria-current={kid.active ? "page" : undefined}
+                              title={kc ? RAIL_COUNT_TITLE[kid.countKey] : undefined}
                             >
                               <Icon d={kid.icon} size={13} />
                               <span className="lx-rail-label">{kid.label}</span>

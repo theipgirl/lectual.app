@@ -1,4 +1,8 @@
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Not found") };
 
 /**
  * Every /dashboard/... URL no real page claims: a mistyped link, an old

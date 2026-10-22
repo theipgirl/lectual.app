@@ -9,6 +9,10 @@ import { Explanation } from "@/components/reconcile/Explanation";
 import { ReconcileScreen } from "@/components/reconcile/ReconcileScreen";
 import "../intake.css";
 import "./reconcile.css";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Reconcile stages") };
 
 export const dynamic = "force-dynamic";
 // Preview pulls the firm's Lawmatics book, and Apply moves leads one at a time.
@@ -52,7 +56,7 @@ export default async function ReconcilePage() {
         <div className="lx-page-head">
           <div style={{ flex: 1, minWidth: 260 }}>
             <div className="lx-label">Intake</div>
-            <h1 className="lx-h1">Reconcile stages</h1>
+            <h1 className="lx-h1" data-tour="reconcile-head">Reconcile stages</h1>
             <p className="lx-sub">
               Check each lead&apos;s stage against your intake sheet, Lawmatics and synced mail, then move the ones you
               agree with.

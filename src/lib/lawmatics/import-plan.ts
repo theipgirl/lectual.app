@@ -2,8 +2,8 @@ import { createHash } from "node:crypto";
 
 import { classifyReferralSource } from "@/lib/intake/referral-source";
 
-import type { LawmaticsSourceRecord } from "./normalize";
-import { resolveStage, type StageRef } from "./stage-map";
+import type { LawmaticsSourceContact, LawmaticsSourceRecord } from "./normalize";
+import { isHiredStageName, resolveStage, type StageRef } from "./stage-map";
 
 /**
  * The importer's decision engine — PURE. Given sanitized Lawmatics records,
@@ -14,15 +14,30 @@ import { resolveStage, type StageRef } from "./stage-map";
  * separate code path that can drift from what the write actually does.
  *
  * Three rules the planner never breaks:
- *   1. Never invent a stage. Unresolvable → the record is NOT imported and is
- *      listed in `unmapped` with the offending stage name.
+ *   1. Never invent a stage. A person whose Lawmatics stage the firm has no
+ *      stage for ("Proposal Sent", "Consult Completed", "Hired") is still
+ *      IMPORTED: into the firm's first open stage, flagged with the Lawmatics
+ *      stage name (`stageDecision`) so a human places them. "Hired" never lands
+ *      in a `won` stage. Only a firm with no open stage at all leaves them in
+ *      `unmapped`, with that reason.
  *   2. Never silently drop a record. Everything lands in exactly one bucket —
  *      create / update / unchanged / unmapped / skipped — and every non-import
- *      bucket carries a human-readable reason.
+ *      bucket carries a human-readable reason. A Lawmatics contact with no
+ *      prospect is a lead too (`contactCreates`), deduped by email.
  *   3. Never duplicate. Matching is by `lawmatics_id` first; an unlinked local
  *      lead with the same email is adopted (linked), not cloned. Ambiguity is
  *      reported, never resolved by guessing.
  */
+
+/** A stage row as the planner needs it. Category and order are optional: without them no "first open stage" exists. */
+export type PlanStage = StageRef & { category?: string; orderIndex?: number };
+
+/** The firm's first open stage: the lowest-ordered stage whose category is `open`. */
+export function firstOpenPlanStage(stages: readonly PlanStage[]): PlanStage | null {
+  const open = stages.filter((s) => s.category === "open");
+  open.sort((a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0));
+  return open[0] ?? null;
+}
 
 /** An existing crm_lead row, reduced to the fields matching needs. */
 export type ExistingLead = {
@@ -59,6 +74,31 @@ export type LeadWriteFields = {
 
 export type FieldChange = { field: keyof LeadWriteFields; from: string | null; to: string };
 
+/**
+ * This person's Lawmatics stage is not one of the firm's stages (or is "Hired"), so they were filed in the
+ * first open stage for a human to place. Recorded on the lead's timeline row as `lawmatics_stage_unmapped`.
+ */
+export type StageDecision = {
+  lawmaticsStage: string | null;
+  /** "Hired" / "Hired Client", or a Lawmatics stage that is one of the firm's matter-opening stages. */
+  hired: boolean;
+  /** What the preview prints for this person. */
+  label: string;
+};
+
+export const HIRED_LABEL = "Hired in Lawmatics — open a matter";
+export const stageDecisionLabel = (lawmaticsStage: string | null) => `Imported, stage needs a decision: ${lawmaticsStage ?? "no stage"}`;
+
+/** A Lawmatics contact that no prospect refers to, filed as a lead. It has no Lawmatics prospect id to store. */
+export type PlannedContactCreate = {
+  contactId: string;
+  fields: LeadWriteFields;
+  stageId: string;
+  stageName: string;
+};
+
+export const CONTACT_SOURCE = "Lawmatics contact";
+
 export type PlannedCreate = {
   lawmaticsId: string;
   matterName: string | null;
@@ -70,12 +110,17 @@ export type PlannedCreate = {
   sourceStageName: string | null;
   createdAt: string | null;
   lastActivityAt: string | null;
+  /** Non-null when the stage above is the first open stage standing in for one the firm doesn't have. */
+  stageDecision: StageDecision | null;
 };
 
 export type PlannedUpdate = {
   lawmaticsId: string;
   leadId: string;
   matterName: string | null;
+  name?: string | null;
+  email?: string | null;
+  business: string | null;
   matchedBy: "lawmatics_id" | "email";
   /** True when this run would attach lawmatics_id to a previously local lead. */
   linksRecord: boolean;
@@ -102,6 +147,7 @@ export type UnmappedRecord = {
   lawmaticsId: string;
   matterName: string | null;
   name: string | null;
+  business: string | null;
   email: string | null;
   sourceStageName: string | null;
   reason: string;
@@ -111,6 +157,7 @@ export type SkippedRecord = {
   lawmaticsId: string;
   matterName: string | null;
   name: string | null;
+  business: string | null;
   email: string | null;
   reason: string;
 };
@@ -188,9 +235,11 @@ export type WithheldFields = {
 export type ImportPlan = {
   options: PlanOptions;
   creates: PlannedCreate[];
+  /** Lawmatics contacts with no prospect, to be filed as leads. */
+  contactCreates: PlannedContactCreate[];
   updates: PlannedUpdate[];
   /** Matched, already current — nothing to write. */
-  unchanged: Array<{ lawmaticsId: string; leadId: string; matterName: string | null }>;
+  unchanged: Array<{ lawmaticsId: string; leadId: string; matterName: string | null; name?: string | null; business?: string | null; email?: string | null }>;
   /** Informational: stage disagreements left alone. Not a write. */
   divergences: StageDivergence[];
   /** Informational: field disagreements left alone. Not a write. */
@@ -198,8 +247,14 @@ export type ImportPlan = {
   unmapped: UnmappedRecord[];
   skipped: SkippedRecord[];
   totals: {
+    /** Prospects plus the contacts that no prospect refers to. */
     sourceRecords: number;
+    /** Prospect creates plus contact creates. */
     create: number;
+    /** Of `create`: filed in the first open stage for a human to place. */
+    stageDecision: number;
+    /** Of `create`: Lawmatics contacts with no prospect. */
+    contactOnly: number;
     update: number;
     unchanged: number;
     divergent: number;
@@ -263,11 +318,16 @@ function diff(
 
 export function planImport(
   sources: readonly LawmaticsSourceRecord[],
-  stages: readonly StageRef[],
+  stages: readonly PlanStage[],
   existing: readonly ExistingLead[],
   options: PlanOptions = DEFAULT_PLAN_OPTIONS,
+  /** Contacts that no prospect refers to (see `pullSource`). */
+  contacts: readonly LawmaticsSourceContact[] = [],
 ): ImportPlan {
   const creates: PlannedCreate[] = [];
+  const contactCreates: PlannedContactCreate[] = [];
+  const openStage = firstOpenPlanStage(stages);
+  const categoryOf = new Map(stages.map((s) => [s.id, s.category]));
   const updates: PlannedUpdate[] = [];
   const unchanged: ImportPlan["unchanged"] = [];
   const unmapped: UnmappedRecord[] = [];
@@ -299,6 +359,7 @@ export function planImport(
       lawmaticsId: rec.lawmaticsId,
       matterName: rec.matterName,
       name,
+      business: rec.businessName,
       email: rec.email,
     };
 
@@ -430,10 +491,28 @@ export function planImport(
       continue;
     }
 
-    // ── Brand new → create, but only with a real stage ─────────────────────
-    if (!stageResult.ok) {
-      unmapped.push({ ...base, sourceStageName: rec.stageName, reason: stageResult.reason });
-      continue;
+    // ── Brand new → create ──────────────────────────────────────────────────
+    // A stage the firm has (and that does not open a matter) is used as it is. Anything else -- a Lawmatics
+    // stage with no match, "Hired", a stage that opens a matter -- is IMPORTED into the first open stage and
+    // flagged, never dropped and never put in a `won` stage.
+    const hired = rec.stageName !== null && isHiredStageName(rec.stageName);
+    const opensMatter = stageResult.ok && categoryOf.get(stageResult.stage.id) === "won";
+    let stageDecision: StageDecision | null = null;
+    let target: { id: string; name: string; via: "exact" | "alias" };
+    if (stageResult.ok && !hired && !opensMatter) {
+      target = { id: stageResult.stage.id, name: stageResult.stage.name, via: stageResult.via };
+    } else {
+      if (!openStage) {
+        const why = stageResult.ok ? `Lawmatics stage "${rec.stageName}" opens a matter here.` : stageResult.reason;
+        unmapped.push({ ...base, sourceStageName: rec.stageName, reason: `${why} This firm has no open stage to file them in, so a person has to decide.` });
+        continue;
+      }
+      stageDecision = {
+        lawmaticsStage: rec.stageName,
+        hired: hired || opensMatter,
+        label: hired || opensMatter ? HIRED_LABEL : stageDecisionLabel(rec.stageName),
+      };
+      target = { id: openStage.id, name: openStage.name, via: "exact" };
     }
     if (claimedEmails.has(rec.email)) {
       skipped.push({
@@ -448,12 +527,79 @@ export function planImport(
       lawmaticsId: rec.lawmaticsId,
       matterName: rec.matterName,
       fields,
-      stageId: stageResult.stage.id,
-      stageName: stageResult.stage.name,
-      stageVia: stageResult.via,
+      stageId: target.id,
+      stageName: target.name,
+      stageVia: target.via,
       sourceStageName: rec.stageName,
       createdAt: rec.createdAt,
       lastActivityAt: rec.updatedAt,
+      stageDecision,
+    });
+  }
+
+  // ── Contacts that no prospect refers to → leads ───────────────────────────
+  // Deduped by Lawmatics contact id within the pull and by email (case-insensitive) against the leads that
+  // exist and against the prospects in this same pull. The lead row has no place for a contact id, so a second
+  // run finds the person by the email the first run stored.
+  const pullEmails = new Set(sources.map((r) => normalizedEmail(r.email)).filter((e): e is string => e !== null));
+  const seenContactIds = new Set<string>();
+  for (const c of contacts) {
+    const name = [c.firstName, c.lastName].filter(Boolean).join(" ").trim() || null;
+    const base = { lawmaticsId: `contact:${c.lawmaticsId}`, matterName: null, name, business: c.businessName, email: c.email };
+    if (seenContactIds.has(c.lawmaticsId)) {
+      skipped.push({ ...base, reason: "Duplicate — this Lawmatics contact appeared more than once in the response." });
+      continue;
+    }
+    seenContactIds.add(c.lawmaticsId);
+    if (!c.email) {
+      skipped.push({ ...base, reason: "A Lawmatics contact with no prospect and no email address can't be matched to a person here, so it isn't imported." });
+      continue;
+    }
+    if (!c.firstName && !c.lastName) {
+      skipped.push({ ...base, reason: "No name on the Lawmatics contact." });
+      continue;
+    }
+    if (options.practiceAreaFilter) {
+      skipped.push({
+        ...base,
+        reason: `no practice area on record — excluded by filter "${options.practiceAreaFilter}"`,
+      });
+      continue;
+    }
+    const email = normalizedEmail(c.email)!;
+    const lead = byEmail.get(email)?.[0];
+    if (lead) {
+      unchanged.push({ lawmaticsId: base.lawmaticsId, leadId: lead.id, matterName: null, name, email: c.email });
+      continue;
+    }
+    if (pullEmails.has(email)) {
+      skipped.push({ ...base, reason: "A prospect in this same pull has this email address, so this person is imported from that record." });
+      continue;
+    }
+    if (claimedEmails.has(email)) {
+      skipped.push({ ...base, reason: "Another Lawmatics contact in this same pull already claims this email address." });
+      continue;
+    }
+    if (!openStage) {
+      unmapped.push({ lawmaticsId: base.lawmaticsId, matterName: null, name, business: c.businessName, email: c.email, sourceStageName: null, reason: "This firm has no open stage to file a Lawmatics contact in, so a person has to decide." });
+      continue;
+    }
+    claimedEmails.add(email);
+    contactCreates.push({
+      contactId: c.lawmaticsId,
+      fields: {
+        first_name: c.firstName ?? "",
+        last_name: c.lastName ?? "",
+        email: c.email,
+        phone: c.phone,
+        business_name: c.businessName,
+        website: c.website,
+        practice_area: null,
+        referral_source: null,
+        referral_detail: CONTACT_SOURCE,
+      },
+      stageId: openStage.id,
+      stageName: openStage.name,
     });
   }
 
@@ -486,6 +632,9 @@ export function planImport(
         lawmaticsId: update.lawmaticsId,
         leadId: update.leadId,
         matterName: update.matterName,
+        name: update.name ?? null,
+        business: update.business,
+        email: update.email ?? null,
       });
     } else {
       realUpdates.push(update);
@@ -495,6 +644,7 @@ export function planImport(
   const plan: Omit<ImportPlan, "fingerprint"> = {
     options,
     creates,
+    contactCreates,
     updates: realUpdates,
     unchanged,
     divergences,
@@ -502,8 +652,10 @@ export function planImport(
     unmapped,
     skipped,
     totals: {
-      sourceRecords: sources.length,
-      create: creates.length,
+      sourceRecords: sources.length + contacts.length,
+      create: creates.length + contactCreates.length,
+      stageDecision: creates.filter((c) => c.stageDecision).length,
+      contactOnly: contactCreates.length,
       update: realUpdates.length,
       unchanged: unchanged.length,
       divergent: divergences.length,
@@ -556,6 +708,9 @@ function buildUpdate(
     lawmaticsId: rec.lawmaticsId,
     leadId: lead.id,
     matterName: rec.matterName,
+    name: displayName(rec),
+    business: rec.businessName,
+    email: rec.email,
     matchedBy,
     linksRecord,
     changes,
@@ -583,8 +738,11 @@ export function fingerprintPlan(plan: Omit<ImportPlan, "fingerprint">): string {
   ];
   for (const c of plan.creates) {
     lines.push(
-      `create|${c.lawmaticsId}|${c.stageId}|${JSON.stringify(c.fields)}`,
+      `create|${c.lawmaticsId}|${c.stageId}|${JSON.stringify(c.fields)}|decision:${c.stageDecision ? c.stageDecision.label : ""}`,
     );
+  }
+  for (const c of plan.contactCreates) {
+    lines.push(`contact|${c.contactId}|${c.stageId}|${JSON.stringify(c.fields)}`);
   }
   for (const u of plan.updates) {
     lines.push(

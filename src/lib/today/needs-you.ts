@@ -285,8 +285,9 @@ export function buildNeedsYou(input: NeedsYouInput): NeedsYou {
         subject: f.name,
         detail: f.reason,
         forYou: false,
-        href: f.action.href,
-        cta: f.action.label,
+        // A failure with no firm-side fix has no link of its own: Today points at the Agents page.
+        href: f.action.href ?? "/dashboard/agents/",
+        cta: f.action.href ? f.action.label : "See Agents",
         tone: "risk",
         score: 700,
       });

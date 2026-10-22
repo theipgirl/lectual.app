@@ -5,6 +5,10 @@ import { hasRole } from "@/lib/auth/roles";
 import { formatDuration, formatWhen, linkLabels, listMeetings, type MeetingFilters } from "@/lib/meetings/read";
 import { listMeetingConnections } from "@/lib/meetings/connection";
 import { PROVIDER_LABEL, isMeetingProvider } from "@/lib/meetings/types";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Meetings") };
 
 export const dynamic = "force-dynamic";
 
@@ -57,7 +61,7 @@ export default async function MeetingsPage({ searchParams }: { searchParams: Pro
       <div className="lx-page-head">
         <div style={{ flex: 1, minWidth: 260 }}>
           <div className="lx-label">Communication</div>
-          <h1 className="lx-h1">Meetings</h1>
+          <h1 className="lx-h1" data-tour="meetings-head">Meetings</h1>
           <p className="lx-sub">Consults and calls recorded in Fathom or Zoom, with the summary, the transcript and the client they were about.</p>
         </div>
         <Link href="/dashboard/settings/integrations/meetings/" className="lx-btn lx-btn-sec lx-btn-sm">

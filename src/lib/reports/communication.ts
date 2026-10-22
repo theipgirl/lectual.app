@@ -3,7 +3,7 @@ import { getScopedClient } from "@/lib/db/scoped-client";
 import { listLeads } from "@/lib/pipeline";
 import { loadActiveQueue } from "@/lib/queue/load";
 import { readRows } from "./db";
-import { periodDelta, unavailableMetric, type Metric } from "./metric";
+import { comparisonFields, unavailableMetric, type Metric } from "./metric";
 import { isInPeriod, isInPreviousPeriod, type ReportPeriod } from "./period";
 import { isWaitingOnUs, leadLabel, waitingSince } from "./leads";
 import { oldestFirst, type LinkTile, type WaitingItem } from "./waiting";
@@ -58,7 +58,7 @@ export async function loadCommunicationReport(
     emails = {
       label: "Emails",
       value: received + sent,
-      delta: periodDelta(received + sent, prevReceived + prevSent),
+      ...comparisonFields(received + sent, prevReceived + prevSent, period.range),
       sub: `${received} received · ${sent} sent`,
     };
   }
@@ -88,7 +88,7 @@ export async function loadCommunicationReport(
   } else {
     const current = runs.rows.filter((r) => isInPeriod(r.started_at, period)).reduce((sum, r) => sum + (r.drafts_out ?? 0), 0);
     const prev = runs.rows.filter((r) => isInPreviousPeriod(r.started_at, period)).reduce((sum, r) => sum + (r.drafts_out ?? 0), 0);
-    draftsOut = { label: "Agent drafts", value: current, delta: periodDelta(current, prev), sub: "written by agents, held for approval" };
+    draftsOut = { label: "Agent drafts", value: current, ...comparisonFields(current, prev, period.range), sub: "written by agents, held for approval" };
   }
 
   // --- Active sequences (a snapshot, not a period aggregate) ---------------

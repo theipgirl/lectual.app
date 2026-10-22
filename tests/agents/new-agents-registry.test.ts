@@ -122,13 +122,13 @@ describe("the Overnight digest lines (D4)", () => {
     expect(lines([run({ agent: "inbox-summary", items_in: 0, drafts_out: 0 })]).lines[0]).toMatchObject({ text: "found no new mail to summarise", tone: "quiet" });
   });
 
-  it("a skipped run shows its reason in words, and a failed latest run is reported with the usual action link", () => {
+  it("a skipped run shows its reason in words, and a failed latest run is reported with the usual action link, or Lectual-told when the firm cannot fix it", () => {
     const skipped = lines([run({ agent: "inbox-summary", status: "skipped", summary: "Skipped: the Mailboxes module is off." })]);
     expect(skipped.lines[0].text).toBe("didn't run: Skipped: the Mailboxes module is off.");
     const failed = lines([run({ agent: "inbox-summary", status: "error", error: "The inbox summary could not be written: none of the connected mailboxes could be read." })]);
     expect(failed.failures[0]).toMatchObject({ agent: "inbox-summary", text: "Inbox summary couldn't finish its last run", action: { label: "Reconnect the mailbox", href: "/dashboard/settings/mailboxes/" } });
     const brief = lines([run({ agent: "morning-brief", status: "error", error: "The morning brief could not be written: none of its six sections could be read." })]);
-    expect(brief.failures[0]).toMatchObject({ agent: "morning-brief", text: "Morning brief couldn't finish its last run", action: { href: "/dashboard/agents/" } });
+    expect(brief.failures[0]).toMatchObject({ agent: "morning-brief", text: "Morning brief couldn't finish its last run", action: { label: "Lectual has been told and is looking into it.", href: null } });
   });
 });
 

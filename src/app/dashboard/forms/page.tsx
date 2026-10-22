@@ -17,6 +17,10 @@ import { loadBoothEventList } from "@/lib/intake-forms/load-results";
 import { parseEventRange } from "@/lib/intake-forms/booth-results";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import "./forms.css";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Intake forms") };
 
 export const dynamic = "force-dynamic";
 
@@ -162,7 +166,7 @@ function IntakeEmpty({ status }: { status: "none" | "unconfigured" | "unavailabl
         <div className="lx-page-head">
           <div style={{ flex: 1, minWidth: 240 }}>
             <div className="lx-label">Intake</div>
-            <h1 className="lx-h1">Intake forms</h1>
+            <h1 className="lx-h1" data-tour="forms-head">Intake forms</h1>
             <p className="lx-sub">Your public intake, how it looks, and where it lives.</p>
           </div>
         </div>

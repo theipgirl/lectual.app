@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { getScopedClient } from "@/lib/db/scoped-client";
 
 /**
@@ -81,7 +82,7 @@ export type OrgModule =
  * Returns [] on any failure — a module list we could not read must never be
  * treated as "everything is enabled".
  */
-export async function activeOrgModules(): Promise<string[]> {
+async function readOrgModules(): Promise<string[]> {
   try {
     const supabase = await getScopedClient();
     const { data } = await supabase.from("crm_org").select("modules").maybeSingle();
@@ -90,6 +91,14 @@ export async function activeOrgModules(): Promise<string[]> {
     return [];
   }
 }
+
+/**
+ * One read per request: the dashboard layout, the settings layout and the page
+ * all ask for the module list while one page renders, and `cache` makes those
+ * a single crm_org SELECT. Outside a render (an action, a route) it simply
+ * calls through, so a stale list can never be served across requests.
+ */
+export const activeOrgModules: () => Promise<string[]> = cache(readOrgModules);
 
 /** True when the caller's active org holds `mod`. Fails closed. */
 export async function orgHasModule(mod: OrgModule): Promise<boolean> {

@@ -12,6 +12,7 @@ import {
   planImport,
   type ExistingLead,
   type ImportPlan,
+  type PlanStage,
   type PlanOptions,
   type SkippedRecord,
   type StageDivergence,
@@ -24,7 +25,7 @@ import {
   type LawmaticsSourceContact,
   type LawmaticsSourceRecord,
 } from "./normalize";
-import type { StageRef } from "./stage-map";
+import { logActivity } from "@/lib/matters/activity";
 
 /**
  * One-way Lawmatics → Lectual importer (orchestration layer).
@@ -95,6 +96,12 @@ export type ImportReport = {
   /** Leads whose stage was moved (only when the operator opted in). */
   stageMoves: number;
   unchanged: number;
+  /** Of `created`: Lawmatics contacts with no prospect, filed as leads. */
+  contactsCreated: number;
+  /** Of `created`: filed in the first open stage for a human to place. */
+  stageDecisions: number;
+  /** Stage-decision leads whose flag could not be written to the timeline. The leads themselves were created. */
+  flagsNotRecorded: number;
   /** Stage disagreements left alone (the operator didn't opt into moves). */
   divergences: StageDivergence[];
   unmapped: UnmappedRecord[];
@@ -127,6 +134,8 @@ export type ImportReport = {
 
 export type SourcePull = {
   records: LawmaticsSourceRecord[];
+  /** Contacts that no prospect refers to: people who are in Lawmatics but have no matter there. */
+  contactOnly: LawmaticsSourceContact[];
   contactCount: number;
   truncated: boolean;
   truncatedReason?: string;
@@ -142,9 +151,11 @@ export type SourcePull = {
 
 /**
  * Pull prospects (Lawmatics' name for Matters — `/matters` does not exist) and
- * enrich them from `/contacts`. Contacts are only ever used to fill gaps; a
- * contact that belongs to no prospect is counted but not imported, because a
- * standalone address-book entry is not a matter in the firm's pipeline.
+ * enrich them from `/contacts`. A contact that a prospect refers to only fills
+ * that prospect's gaps. A contact that NO prospect refers to is returned in
+ * `contactOnly` and filed as a lead by the planner: a person with a Lawmatics
+ * contact and no matter yet is a real lead, and leaving them out dropped them
+ * silently.
  */
 export async function pullSource(client: LawmaticsClient): Promise<SourcePull> {
   const prospects = await client.listAll(PROSPECTS_PATH, { include: PROSPECT_INCLUDE });
@@ -176,9 +187,11 @@ export async function pullSource(client: LawmaticsClient): Promise<SourcePull> {
   }
 
   const records: LawmaticsSourceRecord[] = [];
+  const referenced = new Set<string>();
   for (const raw of prospects.records) {
     const normalized = normalizeProspect(raw, prospects.included);
     if (!normalized) continue;
+    if (normalized.contactId) referenced.add(normalized.contactId);
     records.push(
       mergeContact(
         normalized,
@@ -189,6 +202,7 @@ export async function pullSource(client: LawmaticsClient): Promise<SourcePull> {
 
   return {
     records,
+    contactOnly: [...contactsById.values()].filter((c) => !referenced.has(c.lawmaticsId)),
     contactCount,
     truncated,
     truncatedReason,
@@ -200,13 +214,18 @@ export async function pullSource(client: LawmaticsClient): Promise<SourcePull> {
 // ── Destination side ─────────────────────────────────────────────────────────
 
 /** The active org's stages. RLS scopes the rows; no org filter is applied here. */
-async function loadStages(supabase: Scoped): Promise<StageRef[]> {
+async function loadStages(supabase: Scoped): Promise<PlanStage[]> {
   const { data, error } = await supabase
     .from("crm_stage")
-    .select("id,name")
+    .select("id,name,category,order_index")
     .order("order_index", { ascending: true });
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).map((s) => ({
+    id: s.id,
+    name: s.name,
+    ...(s.category !== undefined ? { category: String(s.category) } : {}),
+    ...(s.order_index !== undefined ? { orderIndex: s.order_index } : {}),
+  }));
 }
 
 /**
@@ -253,7 +272,7 @@ export async function previewImport(
 
   return {
     fetchedAt: new Date().toISOString(),
-    plan: planImport(source.records, stages, existing, options),
+    plan: planImport(source.records, stages, existing, options, source.contactOnly),
     counts: { prospects: source.records.length, contacts: source.contactCount },
     truncated: source.truncated,
     truncatedReason: source.truncatedReason,
@@ -323,6 +342,7 @@ export async function applyImport(
   const syncedAt = new Date().toISOString();
   const failures: ImportFailure[] = [];
   let created = 0;
+  let contactsCreated = 0;
   let updated = 0;
   let linked = 0;
   let stageMoves = 0;
@@ -351,6 +371,22 @@ export async function applyImport(
     ...(c.createdAt ? { created_at: c.createdAt } : {}),
     ...(c.lastActivityAt ? { last_activity_at: c.lastActivityAt } : {}),
   }));
+  // A Lawmatics contact has no prospect id to store; the next run finds the person by the email stored here.
+  const contactInserts: LeadInsert[] = plan.contactCreates.map((c) => ({
+    org_id: orgId,
+    first_name: c.fields.first_name,
+    last_name: c.fields.last_name,
+    email: c.fields.email,
+    phone: c.fields.phone,
+    business_name: c.fields.business_name,
+    website: c.fields.website,
+    practice_area: c.fields.practice_area,
+    referral_source: c.fields.referral_source,
+    referral_detail: c.fields.referral_detail,
+    current_stage_id: c.stageId,
+    lawmatics_synced_at: syncedAt,
+  }));
+  inserts.push(...contactInserts);
 
   let partial = false;
   let createsDone = 0;
@@ -369,6 +405,7 @@ export async function applyImport(
     const { error } = await supabase.from("crm_lead").insert(chunk);
     if (!error) {
       created += chunk.length;
+      contactsCreated += chunk.filter((r) => !r.lawmatics_id).length;
       continue;
     }
     // One bad row fails the whole statement — retry individually so a single
@@ -383,9 +420,12 @@ export async function applyImport(
         });
       } else {
         created += 1;
+        if (!row.lawmatics_id) contactsCreated += 1;
       }
     }
   }
+
+  const flags = await recordStageDecisions(supabase, plan);
 
   // ── Updates ────────────────────────────────────────────────────────────────
   // One round trip per record, sequentially. Kept sequential on purpose: each
@@ -433,6 +473,9 @@ export async function applyImport(
     linked,
     stageMoves,
     unchanged: plan.unchanged.length,
+    contactsCreated,
+    stageDecisions: flags.expected,
+    flagsNotRecorded: flags.notRecorded,
     divergences: plan.divergences,
     unmapped: plan.unmapped,
     skipped: plan.skipped,
@@ -445,6 +488,54 @@ export async function applyImport(
       updates: Math.max(0, plan.updates.length - updatesDone),
     },
   };
+}
+
+/**
+ * Writes `lawmatics_stage_unmapped` for each lead filed in a stand-in stage: one `lead_created` timeline row per
+ * lead (no schema: the existing activity payload carries it) holding the Lawmatics stage name and whether it was
+ * "Hired". Only leads this run actually created are flagged; a flag that can't be written is counted, never thrown,
+ * because the lead exists either way and the preview already showed the flag.
+ */
+async function recordStageDecisions(supabase: Scoped, plan: ImportPlan): Promise<{ expected: number; notRecorded: number }> {
+  const flagged = plan.creates.filter((c) => c.stageDecision);
+  if (flagged.length === 0) return { expected: 0, notRecorded: 0 };
+  const byLawmaticsId = new Map(flagged.map((c) => [c.lawmaticsId, c]));
+  let written = 0;
+  let found = 0;
+  let unreadable = 0;
+  const ids = [...byLawmaticsId.keys()];
+  for (let i = 0; i < ids.length; i += 50) {
+    const chunk = ids.slice(i, i + 50);
+    const { data, error } = await supabase.from("crm_lead").select("id,lawmatics_id").in("lawmatics_id", chunk);
+    if (error) {
+      unreadable += chunk.length;
+      continue;
+    }
+    for (const row of data ?? []) {
+      const planned = row.lawmatics_id ? byLawmaticsId.get(row.lawmatics_id) : undefined;
+      if (!planned?.stageDecision) continue;
+      found += 1;
+      try {
+        await logActivity({
+          type: "lead_created",
+          leadId: row.id,
+          actorType: "system",
+          touchLead: false,
+          payload: {
+            source: "lawmatics_import",
+            lawmatics_stage_unmapped: planned.stageDecision.lawmaticsStage,
+            hired_in_lawmatics: planned.stageDecision.hired,
+            stage_id: planned.stageId,
+          },
+        });
+        written += 1;
+      } catch {
+        // counted below
+      }
+    }
+  }
+  // `found` counts only leads this run created (a run stopped by its budget never inserted the rest).
+  return { expected: found + unreadable, notRecorded: found - written + unreadable };
 }
 
 /** Narrow, exhaustive field assignment — no dynamic key writes into the patch. */

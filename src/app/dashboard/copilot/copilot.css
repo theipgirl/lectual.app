@@ -1,5 +1,5 @@
 /*
- * AI copilot landing page (/dashboard/copilot/): the IP.OS hero from
+ * Copilot landing page (/dashboard/copilot/): the glass hero from
  * design/Matters_Prototype.dc.html. The hero's palette and glass values are
  * defined once, here; the chat styles (src/components/copilot/copilot.css)
  * read them inside `.cpl-page`. The page is one scroll area: nothing in here

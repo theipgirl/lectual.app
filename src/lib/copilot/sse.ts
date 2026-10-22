@@ -17,6 +17,9 @@ export type CopilotStreamEvent =
   | { event: "delta"; data: { text: string } }
   | { event: "context"; data: { status: "found" | "not-found" | "unavailable" } }
   | { event: "final"; data: CopilotFinal }
+  // After `final`, only when the chat is saved (lectual 0099): the id to continue it with, or the reason it was not.
+  | { event: "saved"; data: { conversation_id: string } }
+  | { event: "save_failed"; data: Record<string, never> }
   | { event: "error"; data: { message: string } };
 
 export function encodeSse(ev: CopilotStreamEvent): string {
@@ -92,6 +95,12 @@ export function decodeFrame(frame: SseFrame): CopilotStreamEvent | null {
         };
       }
       return null;
+    case "saved":
+      return typeof data.conversation_id === "string" && data.conversation_id
+        ? { event: "saved", data: { conversation_id: data.conversation_id } }
+        : null;
+    case "save_failed":
+      return { event: "save_failed", data: {} };
     case "error":
       return { event: "error", data: { message: typeof data.message === "string" ? data.message : "Something went wrong — try again." } };
     default:

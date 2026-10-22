@@ -19,6 +19,7 @@ import {
   type IntakeTheme,
 } from "@/lib/intake-forms/config";
 import { checklistComplete, goLiveChecklist, type ChecklistSection } from "@/lib/intake-forms/checklist";
+import { NOT_LIVE_MESSAGE, shareState } from "@/lib/intake-forms/share";
 import { intakeEmbedSnippet, intakePublicUrl } from "@/lib/intake-forms/links";
 import type { IntakeFormRecord } from "@/lib/intake-forms/store";
 import { DETAIL_LIMITS, type IntakeDetails } from "@/lib/intake-forms/details";
@@ -287,6 +288,7 @@ export function IntakeFormsWorkspace(props: Props) {
 
   const live = status === "live";
   const archived = status === "archived";
+  const shareable = shareState(status).canShare;
   const base = `/dashboard/forms/?form=${encodeURIComponent(form.id)}`;
   const tabHref = (t: "setup" | "performance" | "results") => (t === "setup" ? base : `${base}&tab=${t}&range=${props.range}`);
   const firmDisplay = config.firmName.trim() || props.orgName;
@@ -309,16 +311,30 @@ export function IntakeFormsWorkspace(props: Props) {
             <i />
             {live ? "Live" : archived ? "Archived" : "Draft"}
           </span>
-          <IntakeQrButton url={publicUrl} name={saved.details.name} slug={saved.details.slug} />
-          <button type="button" className="lx-btn lx-btn-sec" onClick={() => copy(publicUrl, "Link copied")}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />
-            </svg>
-            Copy link
-          </button>
-          <a className="lx-btn lx-btn-sec" href={publicUrl} target="_blank" rel="noopener noreferrer">
-            Preview
-          </a>
+          {shareable ? (
+            <>
+              <IntakeQrButton url={publicUrl} name={saved.details.name} slug={saved.details.slug} />
+              <button type="button" className="lx-btn lx-btn-sec" onClick={() => copy(publicUrl, "Link copied")}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />
+                </svg>
+                Copy link
+              </button>
+              <a className="lx-btn lx-btn-sec" href={publicUrl} target="_blank" rel="noopener noreferrer">
+                Preview
+              </a>
+            </>
+          ) : (
+            <>
+              <IntakeQrButton url={publicUrl} name={saved.details.name} slug={saved.details.slug} shareable={false} describedBy="ifm-notlive" />
+              <button type="button" className="lx-btn lx-btn-sec" disabled aria-describedby="ifm-notlive">
+                Copy link
+              </button>
+              <span id="ifm-notlive" className="ifm-help">
+                {NOT_LIVE_MESSAGE}
+              </span>
+            </>
+          )}
           {canEdit && (
             <button type="button" className="lx-btn lx-btn-pri" onClick={save} disabled={saving || !dirty} aria-busy={saving}>
               {saving && <span className="ifm-spin" aria-hidden />}
@@ -891,26 +907,34 @@ export function IntakeFormsWorkspace(props: Props) {
 
             <section id="ifm-sec-share" className="ifm-card">
               <h2 className="ifm-title">Share</h2>
-              <div className="ifm-field">
-                <span className="ifm-field-label">Direct link</span>
-                <div className="ifm-row">
-                  <input className="ifm-input ifm-readonly" value={publicUrl} readOnly aria-label="Direct link" />
-                  <button type="button" className="lx-btn lx-btn-sec" onClick={() => copy(publicUrl, "Link copied")}>
-                    Copy
-                  </button>
-                </div>
-              </div>
-              <div className="ifm-field">
-                <span className="ifm-field-head">
-                  <span className="ifm-field-label" style={{ flex: 1 }}>
-                    Embed snippet
-                  </span>
-                  <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" onClick={() => copy(embed, "Embed snippet copied")}>
-                    Copy
-                  </button>
-                </span>
-                <pre className="ifm-code">{embed}</pre>
-              </div>
+              {shareable ? (
+                <>
+                  <div className="ifm-field">
+                    <span className="ifm-field-label">Direct link</span>
+                    <div className="ifm-row">
+                      <input className="ifm-input ifm-readonly" value={publicUrl} readOnly aria-label="Direct link" />
+                      <button type="button" className="lx-btn lx-btn-sec" onClick={() => copy(publicUrl, "Link copied")}>
+                        Copy
+                      </button>
+                    </div>
+                  </div>
+                  <div className="ifm-field">
+                    <span className="ifm-field-head">
+                      <span className="ifm-field-label" style={{ flex: 1 }}>
+                        Embed snippet
+                      </span>
+                      <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" onClick={() => copy(embed, "Embed snippet copied")}>
+                        Copy
+                      </button>
+                    </span>
+                    <pre className="ifm-code">{embed}</pre>
+                  </div>
+                </>
+              ) : (
+                <p className="ifm-help" role="status">
+                  {NOT_LIVE_MESSAGE}
+                </p>
+              )}
               <div className="ifm-field">
                 <span className="ifm-field-label">Allowed domains</span>
                 <div className="ifm-domains">

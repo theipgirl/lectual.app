@@ -236,7 +236,7 @@ describe("matter page placement (F6)", () => {
   it("renders the card in the aside, reading through the matter's lead_id, with the matter's completed requests", async () => {
     const db = createFakeDb({ tables: matterTables("lead-1") });
     const html = await matterPage(db);
-    const aside = html.slice(html.indexOf('<aside class="lx-col lx-col-aside">'));
+    const aside = html.slice(html.indexOf('<aside class="lx-col lx-col-aside"'));
     expect(aside).toContain('aria-label="Intake & assessment answers"');
     expect(html.slice(0, html.indexOf("<aside"))).not.toContain("Intake & assessment answers");
     expect(aside).toContain("Intake questions sent to the client · Oct 12, 10:00 AM");

@@ -171,6 +171,7 @@ export async function runEmailIntel(ctx: AgentContext): Promise<AgentResult> {
       schema: IntelSchema,
       effort: "medium",
       maxTokens: 4000,
+      agent: "email-intel",
     });
 
     const writable = autonomy === "act" ? fillOnly(lead as LeadRow, output.changes) : {};

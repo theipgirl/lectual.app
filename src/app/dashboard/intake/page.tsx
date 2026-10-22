@@ -23,6 +23,10 @@ import { canReconcile } from "@/lib/reconcile/roles";
 import { IntakeTopBar } from "@/components/intake/IntakeTopBar";
 import IntakeWorkspace from "./_components/IntakeWorkspace";
 import "./intake.css";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Intake") };
 
 export const dynamic = "force-dynamic";
 
@@ -238,7 +242,7 @@ export default async function IntakePage({
   });
 
   return (
-    <div className="intake-root">
+    <div className="intake-root" data-tour="intake-board">
     <IntakeWorkspace
       rows={rows}
       stages={stages}

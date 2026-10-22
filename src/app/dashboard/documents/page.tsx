@@ -3,6 +3,11 @@ import { getScopedClient } from "@/lib/db/scoped-client";
 import { DOC_FILTERS, DOC_KIND, DOC_TYPE_LABEL, docStatus, isDocFilter, type DocFilter } from "@/lib/documents/list";
 import { relativeTime } from "@/lib/relative-time";
 import { orgHasModule } from "@/lib/org/modules";
+import type { Metadata } from "next";
+import { matterDisplayTitle } from "@/lib/matters/display-title";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Documents") };
 
 export const dynamic = "force-dynamic";
 
@@ -102,7 +107,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
                     </td>
                     <td>
                       {m ? (
-                        <Link href={`/dashboard/matters/${m.id}/`}>{m.mark_text ?? m.title ?? m.matter_number}</Link>
+                        <Link href={`/dashboard/matters/${m.id}/`}>{matterDisplayTitle(m).title}</Link>
                       ) : (
                         <span className="lx-note">—</span>
                       )}

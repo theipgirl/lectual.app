@@ -11,13 +11,16 @@ export function Explanation({ availability }: { availability: Availability }) {
         </h2>
       </div>
       <p>
-        Upload your intake sheet saved as a CSV file. Three sources are compared for each lead: the sheet, your
-        Lawmatics stages, and mail already synced onto the lead&apos;s timeline. Where they disagree, the sheet wins.
+        Upload your intake sheet saved as a CSV file (the whole workbook saved as one CSV is fine). Three sources are
+        read for each lead: the sheet&apos;s status and notes, your Lawmatics stage and notes, and mail (what is already
+        synced onto the lead, plus a read-only search of your connected Outlook mailboxes). The furthest point with a
+        dated record is proposed, and the latest dated touch becomes the proposed last touch.
       </p>
       <ul className="rc-lines">
-        <li>Lawmatics is only read. Nothing on this page writes to it.</li>
+        <li>Lawmatics is only read. Nothing on this page writes to it, and no email is sent or opened for its body.</li>
         <li>Nothing moves until you choose it and press Apply. Every move is logged on the lead&apos;s timeline.</li>
-        <li>A person Lawmatics lists as hired is never moved to a stage here. Open a matter for them instead.</li>
+        <li>A person who has accepted, paid or is hired is never moved to a stage here. Open a matter for them instead.</li>
+        <li>People in the sheet or Lawmatics with no lead here are listed. A lead is created only when you press Create lead.</li>
       </ul>
       <ul className="rc-lines" aria-label="Sources">
         {availability.map((line) => (

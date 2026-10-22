@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const PROPOSAL_ID = "11111111-1111-4111-8111-111111111111";
 const QUEUE_ID = "q-42";
-const REFUSAL = "This proposal goes live when Rebecca approves its email in the approval queue.";
+const REFUSAL = "This proposal goes live when an attorney approves its email in the approval queue.";
 
 type Row = Record<string, unknown>;
 const state = {

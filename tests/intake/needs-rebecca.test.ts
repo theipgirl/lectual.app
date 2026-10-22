@@ -86,7 +86,7 @@ describe("filterNeedsRebecca", () => {
 
 describe("badge copy", () => {
   it("labels with the count", () => {
-    expect(needsRebeccaLabel(2)).toBe("Needs Rebecca · 2");
+    expect(needsRebeccaLabel(2)).toBe("Needs attorney · 2");
   });
 
   it("lists headlines one per line and names a blank one", () => {

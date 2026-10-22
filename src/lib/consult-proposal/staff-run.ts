@@ -48,7 +48,7 @@ export async function draftProposalForStaff(args: {
       source: args.source,
       lead: args.lead,
       matterId: args.matterId,
-      llm: callClaude,
+      llm: (req) => callClaude({ agent: "staff", ...req }),
       createDraft,
       queueOrgKey: orgKey,
       origin,

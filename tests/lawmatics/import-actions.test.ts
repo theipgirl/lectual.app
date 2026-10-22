@@ -47,6 +47,7 @@ vi.mock("@/lib/mailbox/config", () => ({ rootKeyOrNull: () => null }));
 const emptyPlan = {
   options: { moveExistingStages: false, overwriteEditedFields: false, practiceAreaFilter: null },
   creates: [],
+  contactCreates: [],
   updates: [],
   unchanged: [],
   divergences: [],
@@ -56,6 +57,8 @@ const emptyPlan = {
   totals: {
     sourceRecords: 0,
     create: 0,
+    stageDecision: 0,
+    contactOnly: 0,
     update: 0,
     unchanged: 0,
     divergent: 0,

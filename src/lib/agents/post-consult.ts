@@ -315,6 +315,7 @@ async function runConsultNotes(ctx: AgentContext): Promise<AgentResult> {
       schema: FollowUpSchema,
       effort: "high",
       maxTokens: 8000,
+      agent: "post-consult",
     });
 
     const hasRealAddress = lead.email && !lead.email.toLowerCase().endsWith(".invalid");

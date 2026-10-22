@@ -2,7 +2,7 @@ import "server-only";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { AGENT_DEFS, type AgentId } from "@/lib/agents/types";
 import { readRows } from "./db";
-import { periodDelta, unavailableMetric, type Metric } from "./metric";
+import { comparisonFields, unavailableMetric, type Metric } from "./metric";
 import { isInPeriod, isInPreviousPeriod, type ReportPeriod } from "./period";
 import { oldestFirst, type LinkTile, type WaitingItem } from "./waiting";
 import { relativeTime } from "@/lib/relative-time";
@@ -62,7 +62,7 @@ export async function loadIposReport(period: ReportPeriod, opts: { hasAgents: bo
     ? unavailableMetric("Agent runs", "Agents aren't turned on for this firm")
     : runs.status !== "ok"
       ? unavailableMetric("Agent runs", runs.status === "missing" ? "Agent runs aren't recorded in this environment yet" : "Couldn't be read just now")
-      : { label: "Agent runs", value: runsInPeriod.length, delta: periodDelta(runsInPeriod.length, prevRunsInPeriod.length), sub: "across every agent" };
+      : { label: "Agent runs", value: runsInPeriod.length, ...comparisonFields(runsInPeriod.length, prevRunsInPeriod.length, period.range), sub: "across every agent" };
 
   const queueMetric = waitingInQueueMetric(queue);
 
@@ -79,7 +79,7 @@ export async function loadIposReport(period: ReportPeriod, opts: { hasAgents: bo
           return {
             label: "Drafts out",
             value: current,
-            delta: periodDelta(current, prev),
+            ...comparisonFields(current, prev, period.range),
             sub: queueHoldsMore
               ? "drafts written by Lectual's own agents in the period. The queue also receives drafts from Cowork skills and staff actions"
               : "drafts written by Lectual's own agents in the period",

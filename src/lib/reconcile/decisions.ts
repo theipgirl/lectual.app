@@ -33,7 +33,7 @@ export function skip(decisions: Decisions, leadId: string): Decisions {
 }
 
 /**
- * "Accept all where the sheet and another source agree": marks exactly the rows whose confidence is
+ * "Accept all where two or more sources agree": marks exactly the rows whose confidence is
  * `agree` and that propose a stage. A row the person already decided (accepted or picked) is left as
  * they set it. Returns the new decisions and how many rows it marked.
  */

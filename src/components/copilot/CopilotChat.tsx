@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { createChatController } from "@/lib/copilot/controller";
+import { SAVE_FAILED_NOTE } from "@/lib/copilot/history-pure";
+import { refreshHistoryAction } from "@/app/dashboard/copilot/actions";
 import type { Exchange } from "@/lib/copilot/client";
 import "./copilot.css";
 
@@ -90,6 +92,10 @@ type Props = {
   pathname?: string;
   /** For tests and for restoring a thread. */
   initialExchanges?: Exchange[];
+  /** The saved chat these exchanges belong to (lectual 0099). Unset = a new chat. */
+  conversationId?: string | null;
+  /** Called when "New chat" is pressed in the composer. */
+  onNewChat?: () => void;
 };
 
 /**
@@ -103,11 +109,14 @@ type Props = {
  * straight to the matter or lead record it came from, and an answer with no
  * citations says so plainly instead of pretending to be backed by one.
  */
-export function CopilotChat({ variant, greeting, stats, pathname, initialExchanges }: Props) {
+export function CopilotChat({ variant, greeting, stats, pathname, initialExchanges, conversationId: savedId, onNewChat }: Props) {
   const [question, setQuestion] = useState("");
   const [exchanges, setExchanges] = useState<Exchange[]>(initialExchanges ?? []);
   const [pending, setPending] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  // The saved chat this thread continues. A ref, because the controller reads it between renders.
+  const conversationRef = useRef<string | null>(savedId ?? null);
+  const [saveNote, setSaveNote] = useState(false);
 
   useEffect(() => {
     if (exchanges.length > 0) bottomRef.current?.scrollIntoView({ block: "end" });
@@ -116,6 +125,7 @@ export function CopilotChat({ variant, greeting, stats, pathname, initialExchang
   async function ask(raw: string) {
     if (!raw.trim() || pending) return;
     setQuestion("");
+    setSaveNote(false);
     setPending(true);
     try {
       await createChatController({
@@ -123,6 +133,14 @@ export function CopilotChat({ variant, greeting, stats, pathname, initialExchang
         getExchanges: () => exchanges,
         setExchanges,
         getPathname: () => pathname,
+        getConversationId: () => conversationRef.current,
+        onSaved: (id) => {
+          const first = conversationRef.current === null;
+          conversationRef.current = id;
+          // The page shows the history list: re-read it once, when this chat first appears there.
+          if (variant === "page" && first) void refreshHistoryAction();
+        },
+        onSaveFailed: () => setSaveNote(true),
       }).ask(raw);
     } finally {
       setPending(false);
@@ -151,10 +169,20 @@ export function CopilotChat({ variant, greeting, stats, pathname, initialExchang
         maxLength={2000}
       />
       <div className="cpl-composer-row">
-        <span className="cpl-footnote">{pill ? "Answers come only from your firm's records." : APPROVAL_FOOTER}</span>
+        <span className="cpl-footnote">{pill ? `Answers come only from your firm's records. ${APPROVAL_FOOTER}` : APPROVAL_FOOTER}</span>
         {!idle && (
-          <button type="button" className="cpl-ghost" onClick={() => setExchanges([])} disabled={pending}>
-            New thread
+          <button
+            type="button"
+            className="cpl-ghost"
+            onClick={() => {
+              setExchanges([]);
+              setSaveNote(false);
+              conversationRef.current = null;
+              onNewChat?.();
+            }}
+            disabled={pending}
+          >
+            New chat
           </button>
         )}
         <button type="submit" className="cpl-send" disabled={pending || !question.trim()} aria-label={pending ? "Asking" : "Ask"}>
@@ -184,13 +212,14 @@ export function CopilotChat({ variant, greeting, stats, pathname, initialExchang
       ) : (
         exchanges.map((ex) => <ExchangeView key={ex.id} ex={ex} />)
       )}
+      {saveNote && <p className="cpl-status cpl-save-note">{SAVE_FAILED_NOTE}</p>}
       <div ref={bottomRef} />
     </div>
   );
 
   if (variant === "page") {
     return (
-      <section className={idle ? "cph-hero cpl-root cpl-page" : "cph-hero cpl-root cpl-page cpl-active"} aria-label="AI copilot">
+      <section className={idle ? "cph-hero cpl-root cpl-page" : "cph-hero cpl-root cpl-page cpl-active"} aria-label="Copilot">
         {idle ? (
           <div className="cph-stage">
             <h2 className="cph-greeting">

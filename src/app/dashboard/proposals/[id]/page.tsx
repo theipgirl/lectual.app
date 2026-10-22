@@ -38,6 +38,10 @@ import {
 import { GOES_LIVE_ON_APPROVAL, proposalSendBlock } from "@/lib/consult-proposal/link";
 import { requireProposalsModule } from "../gate";
 import "../proposals.css";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Client proposal") };
 
 export const dynamic = "force-dynamic";
 

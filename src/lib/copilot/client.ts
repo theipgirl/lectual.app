@@ -26,7 +26,7 @@ export type Exchange = {
   contextStatus?: "found" | "not-found" | "unavailable";
 };
 
-export type CopilotRequestBody = { question: string; history?: HistoryTurn[]; context?: CopilotContextBody };
+export type CopilotRequestBody = { question: string; history?: HistoryTurn[]; context?: CopilotContextBody; conversationId?: string };
 
 /** The last turns of the visible thread, as the server's `history`. Unanswered or failed exchanges are left out. */
 export function historyFromExchanges(exchanges: readonly Exchange[]): HistoryTurn[] {
@@ -43,12 +43,15 @@ export function buildRequestBody(input: {
   question: string;
   exchanges: readonly Exchange[];
   pathname?: string;
+  /** The saved chat this continues, if it has one. */
+  conversationId?: string | null;
 }): CopilotRequestBody {
   const history = historyFromExchanges(input.exchanges);
   return {
     question: input.question,
     ...(history.length > 0 ? { history } : {}),
     ...(input.pathname ? { context: contextBodyFor(input.pathname) } : {}),
+    ...(input.conversationId ? { conversationId: input.conversationId } : {}),
   };
 }
 
@@ -80,6 +83,9 @@ export function reduceEvent(ex: Exchange, ev: CopilotStreamEvent): Exchange {
       };
     case "error":
       return { ...ex, status: "error", streamed: undefined, tools: [], error: ev.data.message };
+    case "saved":
+    case "save_failed":
+      return ex; // chat-level, handled by askCopilot's callbacks
   }
 }
 
@@ -98,6 +104,10 @@ export async function askCopilot(opts: {
   fetchImpl: typeof fetch;
   body: CopilotRequestBody;
   onUpdate: (update: (ex: Exchange) => Exchange) => void;
+  /** The chat was saved (or this exchange was added to it): the id to continue it with. */
+  onSaved?: (conversationId: string) => void;
+  /** The answer arrived but could not be saved. */
+  onSaveFailed?: () => void;
 }): Promise<void> {
   const { fetchImpl, body, onUpdate } = opts;
   let res: Response;
@@ -130,6 +140,14 @@ export async function askCopilot(opts: {
         const ev = decodeFrame(frame);
         if (!ev) continue;
         if (ev.event === "final" || ev.event === "error") finished = true;
+        if (ev.event === "saved") {
+          opts.onSaved?.(ev.data.conversation_id);
+          continue;
+        }
+        if (ev.event === "save_failed") {
+          opts.onSaveFailed?.();
+          continue;
+        }
         onUpdate((ex) => reduceEvent(ex, ev));
       }
     }

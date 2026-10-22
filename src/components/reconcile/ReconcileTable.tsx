@@ -2,6 +2,7 @@ import Link from "next/link";
 import { isAlreadyThere } from "@/lib/reconcile/propose";
 import type { Decisions, ReconcileRow } from "@/lib/reconcile/types";
 import { ConfidenceBadge } from "./ConfidenceBadge";
+import { EvidenceBlock } from "./EvidenceBlock";
 import { SourceCell } from "./SourceCell";
 
 export const MATTERS_HREF = "/dashboard/matters/";
@@ -9,8 +10,8 @@ export const MATTERS_HREF = "/dashboard/matters/";
 type Pickable = { id: string; name: string };
 
 /**
- * The comparison table: one row per lead, with what each source says, the stage the sheet
- * proposes, and how sure that is. Presentational: the person's choices are held by the parent
+ * The comparison table: one row per lead, with what each source says, the stage the evidence
+ * proposes, the dated evidence behind it, and how sure that is. Presentational: the person's choices are held by the parent
  * (`decisions`) and nothing here writes anything.
  *
  * A row that needs a matter offers no Accept control at all. It links to the existing "Open a
@@ -42,6 +43,7 @@ export function ReconcileTable({
             <th scope="col">Sheet</th>
             <th scope="col">Lawmatics</th>
             <th scope="col">Email / calendar</th>
+            <th scope="col">Evidence and last touch</th>
             <th scope="col">Proposed stage</th>
             <th scope="col">Confidence</th>
             <th scope="col">Decision</th>
@@ -105,6 +107,9 @@ function ReconcileRowView({
       </td>
       <td>
         <SourceCell source="email" signal={row.email} />
+      </td>
+      <td>
+        <EvidenceBlock evidence={row.evidence} lastTouch={row.lastTouch} mailbox={row.mailbox} notes={row.notes} />
       </td>
       <td>
         {proposedCell(row)}

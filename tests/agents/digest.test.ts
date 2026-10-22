@@ -86,7 +86,7 @@ describe("digest helpers", () => {
   });
   it("maps failures to an action", () => {
     expect(failureAction("model overloaded (529)").label).toBe("Try Run now later");
-    expect(failureAction("lead read failed: x").label).toBe("Open the run log");
+    expect(failureAction("lead read failed: x")).toEqual({ label: "Lectual has been told and is looking into it.", href: null });
   });
 });
 
@@ -114,8 +114,8 @@ describe("buildRunDigest: the Stage Keeper (Sprint 16, F16)", () => {
     expect(d([run({ agent: "stage-keeper", items_in: 0 })]).lines[0]).toMatchObject({ text: "found no lead to place", tone: "quiet" });
   });
 
-  it("a failed run is reported with the run log as the place to look", () => {
+  it("a failed run Lectual must fix says Lectual has been told, with no link", () => {
     const out = d([run({ agent: "stage-keeper", status: "error", error: "3 lead move(s) failed. 3 lead(s) read: 0 moved." })]);
-    expect(out.failures[0]).toMatchObject({ agent: "stage-keeper", text: "Stage Keeper couldn't finish its last run", action: { href: "/dashboard/agents/" } });
+    expect(out.failures[0]).toMatchObject({ agent: "stage-keeper", text: "Stage Keeper couldn't finish its last run", action: { label: "Lectual has been told and is looking into it.", href: null } });
   });
 });

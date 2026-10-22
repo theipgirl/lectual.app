@@ -73,12 +73,17 @@ export function gate() {
   return { promise, release };
 }
 
-export function parseBody(text: string): CopilotStreamEvent[] {
+/**
+ * The events of a streamed body. `saved` / `save_failed` come after `final` (lectual 0099) and are left out
+ * unless asked for, so the tests about the answer keep reading `final` as the last frame.
+ */
+export function parseBody(text: string, opts: { keepSaveEvents?: boolean } = {}): CopilotStreamEvent[] {
   const parser = createSseParser();
   return parser
     .push(text)
     .map(decodeFrame)
-    .filter((e): e is CopilotStreamEvent => e !== null);
+    .filter((e): e is CopilotStreamEvent => e !== null)
+    .filter((e) => opts.keepSaveEvents || (e.event !== "saved" && e.event !== "save_failed"));
 }
 
 /** Reads a streamed Response to the end. */

@@ -3,6 +3,10 @@ import { notFound } from "next/navigation";
 import { getMatter } from "@/lib/matters";
 import { matterLabel } from "@/lib/matters/docket-summary";
 import TrademarkClearanceForm from "./_components/TrademarkClearanceForm";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Trademark clearance") };
 
 export const dynamic = "force-dynamic";
 

@@ -4,6 +4,10 @@ import { loadSetupState } from "@/lib/setup/load";
 import { setupChecklist } from "@/lib/setup/checklist";
 import { canSeeSetup } from "@/lib/setup/roles";
 import { INTEGRATIONS_PATH, SETUP_PATH } from "@/lib/setup/routes";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Settings") };
 
 export const dynamic = "force-dynamic";
 

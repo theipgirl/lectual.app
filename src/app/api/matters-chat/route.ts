@@ -3,7 +3,9 @@ import { z } from "zod";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { streamMattersChatQuestion, type CopilotProgress } from "@/lib/agents/matters-chat";
 import { aiConfigured } from "@/lib/ai/claude";
-import { encodeSse, type CopilotStreamEvent } from "@/lib/copilot/sse";
+import { getScopedClient } from "@/lib/db/scoped-client";
+import { saveTurn } from "@/lib/copilot/save-turn";
+import { encodeSse, type CopilotFinal, type CopilotStreamEvent } from "@/lib/copilot/sse";
 
 export const runtime = "nodejs";
 
@@ -17,6 +19,8 @@ const bodySchema = z.object({
     .optional(),
   // The page the drawer is open on. Only the pathname is used: the record id is
   // parsed from it again on the server, and unknown fields are dropped.
+  // The saved chat this question continues (lectual 0099). Optional; one the caller cannot see starts a new chat.
+  conversationId: z.uuid().optional(),
   context: z
     .object({
       pathname: z.string().max(300),
@@ -93,7 +97,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     return NextResponse.json({ error: "The copilot isn't configured for this deployment yet." }, { status: 503 });
   }
 
-  const { question, history, context } = parsed.data;
+  const { question, history, context, conversationId } = parsed.data;
   const orgId = session.org.id;
   const encoder = new TextEncoder();
   let cancelled = false;
@@ -111,6 +115,19 @@ export async function POST(req: NextRequest): Promise<Response> {
 
       // Not awaited: the first frames must reach the browser while the model is
       // still writing, so `start` returns at once and this runs on its own.
+      // The answer has been sent. Saving it can only add a note after it: it never changes `final`, never
+      // throws into the stream, and never logs the question, the answer or a title.
+      const saveAfterFinal = async (result: CopilotFinal) => {
+        try {
+          const db = await getScopedClient();
+          const saved = await saveTurn(db, { orgId, conversationId, question, result });
+          if (saved.status === "saved") send({ event: "saved", data: { conversation_id: saved.conversationId } });
+          else send({ event: "save_failed", data: {} });
+        } catch {
+          send({ event: "save_failed", data: {} });
+        }
+      };
+
       void (async () => {
         try {
           const result = await streamMattersChatQuestion({
@@ -122,6 +139,8 @@ export async function POST(req: NextRequest): Promise<Response> {
             shouldStop: () => cancelled,
           });
           send({ event: "final", data: result });
+          // A disconnected request never showed this answer (it may be the loop's fallback): save nothing.
+          if (!cancelled) await saveAfterFinal(result);
         } catch (err) {
           console.error("[matters-chat] failed to answer question", err);
           send({ event: "error", data: { message: STREAM_FAILED } });

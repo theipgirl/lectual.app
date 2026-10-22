@@ -31,6 +31,10 @@ import { ProposalsTable } from "@/components/proposal-list/ProposalsTable";
 import { SegmentColumn } from "@/components/proposal-list/SegmentColumn";
 import { requireProposalsModule } from "./gate";
 import "./proposals.css";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("Client proposals") };
 
 export const dynamic = "force-dynamic";
 
@@ -142,7 +146,7 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
       <div className="pq-main">
         <div className="lx-page-head">
           <div style={{ flex: 1, minWidth: 260 }}>
-            <h1 className="lx-h1">Quotes &amp; proposals</h1>
+            <h1 className="lx-h1" data-tour="proposals-head">Quotes &amp; proposals</h1>
             <p className="lx-sub">{subtitle}</p>
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

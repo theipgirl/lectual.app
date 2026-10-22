@@ -1,4 +1,4 @@
-import { normalizeStageName, resolveStage } from "@/lib/lawmatics/stage-map";
+import { isHiredStageName, resolveStage } from "@/lib/lawmatics/stage-map";
 import type { LawmaticsSourceRecord } from "@/lib/lawmatics/normalize";
 import { isPlaceholderEmail } from "@/lib/intake/email-match";
 import type { SourceSignal, StageOpt } from "./types";
@@ -33,10 +33,8 @@ export function indexLawmatics(records: readonly LawmaticsSourceRecord[]): Lawma
   return { byId, byEmail };
 }
 
-const HIRED = new Set(["hired", "hired client"]);
-
 export function isHiredStage(name: string): boolean {
-  return HIRED.has(normalizeStageName(name));
+  return isHiredStageName(name);
 }
 
 export type LawmaticsMatch =

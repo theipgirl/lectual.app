@@ -39,6 +39,9 @@ export function fakeUpload(name: string, size: number, text = "") {
 
 export type LoadOptions = {
   lawmatics?: ReturnType<typeof lawmaticsStub> | "not-connected" | "throws";
+  /** Mailbox search: the Mailboxes module flag and the mailboxes the caller can see (default: module off). */
+  mailbox?: { moduleOn: boolean; items?: Array<{ id: string; email: string; provider: "google" | "microsoft"; scopes: string[] | null; accessToken: () => Promise<string> }>; readFails?: boolean };
+  /** A map of table name -> columns the brain mapping read should see is done through the fake db itself. */
 };
 
 export async function loadActions(world: World, opts: LoadOptions = {}) {
@@ -55,6 +58,10 @@ export async function loadActions(world: World, opts: LoadOptions = {}) {
   vi.doMock("@/lib/lawmatics/connection", async (orig) => ({
     ...(await orig<typeof import("../../src/lib/lawmatics/connection")>()),
     firmLawmaticsClient: clientFactory,
+  }));
+  vi.doMock("@/lib/org/modules", () => ({ orgHasModule: vi.fn(async () => opts.mailbox?.moduleOn ?? false) }));
+  vi.doMock("@/lib/mailbox/my-mailbox", () => ({
+    searchableMailboxAccess: vi.fn(async () => (opts.mailbox?.readFails ? { ok: false } : { ok: true, items: opts.mailbox?.items ?? [] })),
   }));
   vi.doMock("@/lib/pipeline", async (orig) => {
     const actual = await orig<typeof import("../../src/lib/pipeline")>();

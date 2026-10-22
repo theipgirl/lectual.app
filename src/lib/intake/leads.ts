@@ -4,6 +4,7 @@ import { listStages, type Stage } from "@/lib/pipeline/stages";
 import { CAN_WRITE_LEAD, resolveCurrentRole, type Lead } from "@/lib/pipeline/leads";
 import { LeadWriteError, forbiddenLeadWrite } from "@/lib/pipeline/errors";
 import { intakeStageIds } from "./scope";
+import { INTAKE_PRACTICE_AREA_FILTER } from "./counts";
 import { suggestedLane, type Lane } from "@/lib/leads/lane";
 import { isReferralSource, type ReferralSource } from "./referral-source";
 
@@ -54,7 +55,7 @@ export async function listIntakeLeads(stages?: Stage[]): Promise<Lead[]> {
     // importer stamps 'Trademark', and a lead with an unknown practice area
     // silently vanishing from the Monday view is the failure this page exists
     // to avoid.
-    .or("practice_area.is.null,practice_area.ilike.%trademark%")
+    .or(INTAKE_PRACTICE_AREA_FILTER)
     .order("last_activity_at", { ascending: false, nullsFirst: false });
   if (error) throw error;
   return data ?? [];

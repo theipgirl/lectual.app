@@ -164,6 +164,7 @@ export async function buildTrademarkClearanceDraft(
     system: SYSTEM_PROMPT,
     prompt: userPrompt(facts, searchFindings),
     maxTokens: 4096,
+    agent: "staff",
   });
 
   if ("skipped" in result) {

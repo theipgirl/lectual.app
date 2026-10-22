@@ -102,7 +102,8 @@ describe("previewReconcileAction: the preview", () => {
     expect(r.fingerprint).toBe(planFingerprint(r.plan));
     expect(r.plan.map((p) => p.leadId)).toEqual(r.view.rows.map((row) => row.leadId));
     const by = Object.fromEntries(r.view.rows.map((row) => [row.leadId, row]));
-    expect(by[L.amara].proposal).toMatchObject({ kind: "stage", stage: { id: S.pnc }, confidence: "sheet_only" });
+    // Her status says PNC and her note says a consult was scheduled: the furthest dated evidence is proposed.
+    expect(by[L.amara].proposal).toMatchObject({ kind: "stage", stage: { id: S.consult }, confidence: "conflict" });
     expect(by[L.margo].proposal).toMatchObject({ kind: "stage", stage: { id: S.consult }, confidence: "agree" });
     expect(by[L.priya].proposal.reasons[0]).toBe("Already in this stage.");
     expect(r.view.summary.fileName).toBe("sheet.csv");

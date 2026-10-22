@@ -9,6 +9,10 @@ import { listLawPayMappings } from "@/lib/payments/accounts";
 import { accountLabel, candidateAccounts } from "@/lib/payments/lawpay-accounts";
 import { DisconnectLawPayButton, MapAccountForm, RefreshAccountsButton, UnmapButton } from "@/components/lawpay/LawPayForms";
 import { NOT_A_LAW_FIRM_DISCLAIMER } from "@/lib/legal/disclaimer";
+import type { Metadata } from "next";
+import { pageTitle } from "@/lib/ui/page-title";
+
+export const metadata: Metadata = { title: pageTitle("LawPay") };
 
 export const dynamic = "force-dynamic";
 
