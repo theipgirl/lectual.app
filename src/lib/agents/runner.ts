@@ -180,8 +180,10 @@ export async function runOneAgent(
   // Wrap the model call to total the run's cost.
   let cost = 0;
   let costKnown = true;
+  // stage-keeper makes no model call; the mapping only keeps the type total.
+  const modelAgent = agent === "stage-keeper" ? "staff" : agent;
   const llm: StructuredCall = async (req) => {
-    const res = await deps.llm({ ...req, signal: withRunSignal(req.signal) });
+    const res = await deps.llm({ agent: modelAgent, ...req, signal: withRunSignal(req.signal) });
     if (res.costUsd == null) costKnown = false;
     else cost += res.costUsd;
     return res;

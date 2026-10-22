@@ -225,7 +225,7 @@ export async function runIntakeTriage(ctx: AgentContext): Promise<AgentResult> {
     }
     let output: Triage;
     try {
-      ({ output } = await llm({ system: SYSTEM, user: triagePrompt(lead, boothByLead.get(lead.id)), schema: TriageSchema, effort: "low", maxTokens: TRIAGE_MAX_TOKENS }));
+      ({ output } = await llm({ system: SYSTEM, user: triagePrompt(lead, boothByLead.get(lead.id)), schema: TriageSchema, effort: "low", maxTokens: TRIAGE_MAX_TOKENS, agent: "intake-triage" }));
     } catch (err) {
       if (!isUnusableModelAnswer(err)) throw err;
       unscored += 1;

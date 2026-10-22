@@ -8,6 +8,7 @@ import type {
 } from "@anthropic-ai/sdk/resources/beta/messages/messages";
 import type { z } from "zod";
 import { env } from "@/lib/env";
+import { maxOutputFor, resolveAgentModel, type ModelSubject } from "./agent-models";
 
 /**
  * The one way the agents call Claude.
@@ -27,8 +28,6 @@ import { env } from "@/lib/env";
  * Agents take a `StructuredCall` rather than importing this directly, so
  * tests can hand them a fake and never reach the network.
  */
-
-export const DEFAULT_AGENT_MODEL = "claude-opus-5";
 
 export class AiNotConfiguredError extends Error {
   constructor() {
@@ -83,6 +82,8 @@ export type StructuredRequest<S extends z.ZodType> = {
   /** low for scoring, medium for extraction, high for writing to clients. */
   effort: "low" | "medium" | "high";
   maxTokens?: number;
+  /** Whose call this is; picks the model tier. Unset = "staff" (Sonnet). Never Opus. */
+  agent?: ModelSubject;
   /**
    * Aborts the call. The agent runner passes its run's signal here, so a run that
    * reaches its time limit stops waiting on the model instead of hanging on.
@@ -110,8 +111,16 @@ export function costFor(model: string, u: Usage): number | null {
   return Math.round(usd * 10_000) / 10_000;
 }
 
-export function agentModel(): string {
-  return env.AGENT_MODEL || DEFAULT_AGENT_MODEL;
+/**
+ * The model a job runs on (see agent-models.ts). The subject is required: a call with no identity
+ * says "staff" so it lands on Sonnet on purpose rather than on whatever a default happens to be.
+ */
+export function agentModel(subject: ModelSubject): string {
+  return resolveAgentModel(subject, {
+    AGENT_MODEL: env.AGENT_MODEL,
+    AGENT_MODEL_SONNET: env.AGENT_MODEL_SONNET,
+    AGENT_MODEL_HAIKU: env.AGENT_MODEL_HAIKU,
+  });
 }
 
 export const DEFAULT_COPILOT_MODEL = "claude-sonnet-5";
@@ -169,13 +178,13 @@ export function readStructuredResponse<T>(response: StructuredResponseLike, pars
 }
 
 export const callClaude: StructuredCall = async (req) => {
-  const model = agentModel();
+  const model = agentModel(req.agent ?? "staff");
   const format = betaZodOutputFormat(req.schema);
   // `create`, not `parse`: see readStructuredResponse for why the parsing is ours.
   const response = await getClient().beta.messages.create(
     {
       model,
-      max_tokens: req.maxTokens ?? 16000,
+      max_tokens: Math.min(req.maxTokens ?? 16000, maxOutputFor(model)),
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
       output_config: { effort: req.effort, format },
@@ -195,7 +204,7 @@ export const callClaude: StructuredCall = async (req) => {
   return { output, model: response.model, usage, costUsd: costFor(response.model, usage) };
 };
 
-export type AskClaudeInput = { system: string; prompt: string; maxTokens?: number };
+export type AskClaudeInput = { system: string; prompt: string; maxTokens?: number; agent: ModelSubject };
 export type AskClaudeResult = { skipped: true } | { text: string; model: string; costUsd: number | null };
 
 /**
@@ -209,7 +218,7 @@ export async function askClaude(input: AskClaudeInput): Promise<AskClaudeResult>
   try {
     const response = await getClient().beta.messages.create(
       {
-        model: agentModel(),
+        model: agentModel(input.agent),
         max_tokens: input.maxTokens ?? 1024,
         betas: ["server-side-fallback-2026-07-01"],
         fallbacks: "default",
@@ -268,7 +277,7 @@ export type ToolTurnResult = {
  */
 export async function callClaudeWithTools(req: ToolTurnRequest): Promise<ToolTurnResult> {
   const response = await getClient().beta.messages.create({
-    model: agentModel(),
+    model: agentModel("staff"),
     max_tokens: req.maxTokens ?? 4096,
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",

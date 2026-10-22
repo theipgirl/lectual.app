@@ -211,6 +211,7 @@ export async function buildGeneralLoeDraft(input: GeneralLoeInput): Promise<LoeD
     system: GENERAL_LOE_SYSTEM_PROMPT,
     prompt: input.scopeDescription,
     maxTokens: 512,
+    agent: "staff",
   });
   if ("skipped" in result) {
     throw new DocumentFlowError(

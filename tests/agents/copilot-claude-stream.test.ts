@@ -134,7 +134,7 @@ describe("callClaudeWithTools is unchanged", () => {
 
     expect(sdk.stream).not.toHaveBeenCalled();
     const body = sdk.create.mock.calls[0][0] as { model: string; tools: Array<Record<string, unknown>> };
-    expect(body.model).toBe("claude-opus-5");
+    expect(body.model).toBe("claude-sonnet-5");
     expect(body.tools.every((t) => t.cache_control === undefined)).toBe(true);
   });
 

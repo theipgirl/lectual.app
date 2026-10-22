@@ -21,8 +21,15 @@ const fieldSchemas = {
   // Voice notes: optional Whisper transcription. Unset = notes save untranscribed.
   OPENAI_API_KEY: z.string().optional(),
   VERCEL_AI_GATEWAY_KEY: z.string().optional(),
-  // Model for the in-app agents (src/lib/ai/claude.ts). Unset = claude-opus-5.
+  // Model overrides (src/lib/ai/agent-models.ts). AGENT_MODEL is ONLY the Sonnet-tier override and
+  // no longer forces every agent; AGENT_MODEL_SONNET wins over it. An Opus id in any of them is ignored.
   AGENT_MODEL: z.string().optional(),
+  AGENT_MODEL_SONNET: z.string().optional(),
+  AGENT_MODEL_HAIKU: z.string().optional(),
+  // Failure alerts to Lectual (src/lib/agents/failure-alert.ts). Unset TO or key = no email.
+  AGENT_FAILURE_ALERT_TO: z.string().optional(),
+  AGENT_FAILURE_ALERT_FROM: z.string().optional(),
+  RESEND_API_KEY: z.string().optional(),
   // Model for the matters copilot (src/lib/ai/claude.ts copilotModel()). Unset = claude-sonnet-5.
   COPILOT_MODEL: z.string().optional(),
   // Mailbox OAuth (step 3). Optional until that step lands.

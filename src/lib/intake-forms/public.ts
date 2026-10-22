@@ -608,7 +608,7 @@ export async function screenSubmission(handle: IntakeHandle, submissionId: strin
       .eq("form_id", handle.formId)
       .gte("created_at", since);
     if (countErr || count === null || count > SCREENING_HOURLY_CAP) return;
-    const result = await askClaude({ system: SCREENING_SYSTEM, prompt: buildScreeningPrompt(handle.config, sub), maxTokens: 600 });
+    const result = await askClaude({ system: SCREENING_SYSTEM, prompt: buildScreeningPrompt(handle.config, sub), maxTokens: 600, agent: "staff" });
     if ("skipped" in result) return;
     const parsed = parseScreening(result.text);
     if (parsed.fit === "unscored" && !parsed.note) return;

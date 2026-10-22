@@ -182,6 +182,7 @@ export async function createReplyDrafts(ctx: AgentContext, deps: ReplyDeps): Pro
         schema: ReplySchema,
         effort: "medium",
         maxTokens: 2000,
+        agent: "inbox-summary",
       });
       const cleaned = enforceSignOff(cleanDraftBody(output.reply, { placeholders: true }).body, { signOff: deps.signOff }).body;
       assertNoJudgmentContent(cleaned, "reply");

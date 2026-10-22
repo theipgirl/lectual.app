@@ -172,6 +172,7 @@ export async function draftFollowUp(ctx: AgentContext, item: StalledLead, signOf
       schema: FollowUpSchema,
       effort: "medium",
       maxTokens: 2000,
+      agent: "morning-brief",
     });
     // A follow-up that names a price, a class or a package is attorney judgment: it is refused, not queued.
     assertNoJudgmentContent(`${output.subject}\n${output.body}`, "follow-up email");

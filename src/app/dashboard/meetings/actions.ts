@@ -143,6 +143,7 @@ export async function draftFollowUpAction(_prev: ActionState, formData: FormData
       schema: FollowUpSchema,
       effort: "high",
       maxTokens: 8000,
+      agent: "post-consult",
     });
     const name = `${lead.first_name} ${lead.last_name}`.trim() || lead.business_name || "Client";
     const hasRealAddress = lead.email && !lead.email.toLowerCase().endsWith(".invalid");

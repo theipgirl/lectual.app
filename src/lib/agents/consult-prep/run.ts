@@ -118,6 +118,7 @@ export async function runConsultPrep(ctx: AgentContext): Promise<AgentResult> {
       schema: GeneratedText,
       effort: "high",
       maxTokens,
+      agent: "consult-prep",
     });
     return output.text;
   };
