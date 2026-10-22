@@ -141,6 +141,15 @@ export type AgentContext = {
   fetchImpl?: typeof fetch;
   /** Mailbox deps for email-intel (root key + provider credentials). */
   mailbox?: import("@/lib/mailbox/sync").SyncDeps;
+  /**
+   * Milliseconds left in this run's time budget, on the real clock (not `now`, which tests fix).
+   * Set by the runner; absent means no budget was given (a test calling an agent directly). An
+   * agent working through a list checks it between items and stops early, saying so in its
+   * summary, rather than being cut off mid-item by the runner. See `budgetNearlySpent`.
+   */
+  timeLeftMs?: () => number;
+  /** Aborted when the run reaches its time limit. The runner also hands it to every model call. */
+  signal?: AbortSignal;
 };
 
 export type AgentResult = {

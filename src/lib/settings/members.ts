@@ -87,6 +87,23 @@ async function assertNotLastOwner(supabase: ScopedClient, current: Role): Promis
  * before any invite email is sent, so a re-invite can never spam a colleague
  * who is already on the team.
  */
+/**
+ * The firm's name for the invite email: the profile's display name, else the org's name. Read
+ * through the caller's scoped client. A failed read means no merge tag (the template falls back
+ * to "your firm"), never a failed invite.
+ */
+async function firmNameForInvite(supabase: Awaited<ReturnType<typeof getScopedClient>>, orgId: string): Promise<string | null> {
+  try {
+    const { data: profile } = await supabase.from("crm_org_profile").select("display_name").eq("org_id", orgId).maybeSingle();
+    const display = (profile as { display_name?: string | null } | null)?.display_name?.trim();
+    if (display) return display;
+    const { data: org } = await supabase.from("crm_org").select("name").eq("id", orgId).maybeSingle();
+    return (org as { name?: string | null } | null)?.name?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function inviteMember(emailInput: string, role: Role): Promise<InviteMemberResult> {
   if (!isRole(role)) {
     throw new Error(`Invalid role: ${String(role)}`);
@@ -137,8 +154,11 @@ export async function inviteMember(emailInput: string, role: Role): Promise<Invi
   if (!userId) {
     const origin = await getSiteOrigin();
     const admin = getAdminClient();
+    // `firm_name` is the invite email's {{ .Data.firm_name }} merge tag (Supabase "Invite user" template).
+    const firmName = await firmNameForInvite(supabase, orgId);
     const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
       redirectTo: `${origin}/sign-in/?next=${encodeURIComponent("/dashboard")}`,
+      ...(firmName ? { data: { firm_name: firmName } } : {}),
     });
     if (error || !data?.user?.id) {
       throw new Error(`Couldn't send the invite: ${error?.message ?? "no user returned"}`);

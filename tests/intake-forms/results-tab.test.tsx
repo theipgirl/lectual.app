@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { PERF_FORM, PERF_LIST, renderPerformance } from "./helpers/perf-harness";
 import { ASSESSMENT_FORM_ID, BUSINESS_ANSWERS, FORM_ID, assessmentAnswers, assessmentFormRow, formRow, intakeConfig } from "./helpers/forms-db";
@@ -23,6 +23,15 @@ const NEW_CARD = /<div class="ifm-card ifm-kpi"><div class="ifm-field-label">(?:
 // Sprint 10 deliberately adds a "Median time per step" section and a "Stopped at" column to the Performance tab;
 // they are taken out here so the rest of the markup is still compared byte for byte against the Sprint 9 fixtures.
 const SPRINT_10 = /<section class="ifm-card ifm-steps".*?<\/section>|<th>Stopped at<\/th>|<td class="ifm-stopped[^"]*">[^<]*<\/td>/g;
+
+// The fixtures are dated Oct 18 and the rows render relative times ("3 days ago"): pin the clock so they don't drift.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-21T20:00:00Z"));
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("Performance tab after the drawer moved (F17, V4)", () => {
   it("renders exactly the markup it rendered before, once the two new cards are taken out", async () => {

@@ -559,6 +559,11 @@ a:hover {
   grid-area: foot;
   justify-self: end;
   align-self: end;
+  /* Run now shares the footer's grid cell and comes BEFORE the footer in the markup, so without its own
+     stacking level the footer (painted later) sits on top of the button and takes every click: the button
+     showed through but could not be pressed. Keep it above the footer. */
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: flex-end;

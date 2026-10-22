@@ -42,6 +42,14 @@ export const RUN_NOW_REASON: Record<RunNowBlock, string> = {
   "ai-key": "The AI key isn't configured on this deployment.",
 };
 
+/** A Run now that reached its time budget. Anything queued before that stays queued. */
+export const RUN_NOW_TIME_LIMIT =
+  "The run didn't finish within the time limit, so it was stopped. Anything it drafted before that is in the queue; the next run picks up the rest.";
+
+/** The action never answered (the request failed or the function was stopped). Said on the card instead of nothing. */
+export const RUN_NOW_NO_ANSWER =
+  "The run didn't report back. Check Recent runs below: a run that never finishes shows there as Didn't finish.";
+
 /** Who may press Run now. The one place the role is named for it. */
 export const canRunAgents = (role: Role | null | undefined): boolean => !!role && hasRole(role, "senior_admin");
 

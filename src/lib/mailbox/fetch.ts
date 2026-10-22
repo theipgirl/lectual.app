@@ -1,5 +1,6 @@
 import type { Party, ThreadMessage } from "@/lib/intake/email-threads";
 import { ProviderError, type MailboxProvider } from "./providers";
+import { PROVIDER_FETCH_TIMEOUT_MS, withTimeout } from "@/lib/http/timeout";
 
 /**
  * New mail since the last sync, in the matcher's `ThreadMessage` shape.
@@ -111,7 +112,7 @@ export function parseAddressList(header: string | null | undefined): Party[] {
 }
 
 async function getJson(url: string, accessToken: string, fetchImpl: typeof fetch, headers: Record<string, string> = {}) {
-  const res = await fetchImpl(url, { headers: { authorization: `Bearer ${accessToken}`, ...headers } });
+  const res = await fetchImpl(url, withTimeout({ headers: { authorization: `Bearer ${accessToken}`, ...headers } }, PROVIDER_FETCH_TIMEOUT_MS));
   if (res.status === 401 || res.status === 403) {
     // The token was just refreshed, so this is access withdrawn, not expiry.
     throw new ProviderError("Access to this mailbox was withdrawn. Reconnect to resume syncing.", "reauth");

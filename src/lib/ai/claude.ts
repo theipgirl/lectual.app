@@ -35,7 +35,31 @@ export class AiNotConfiguredError extends Error {
     super("ANTHROPIC_API_KEY is not set, so the agents cannot run.");
   }
 }
-export class AiOutputError extends Error {}
+/**
+ * The model answered, but not with something an agent may act on. `kind` says why:
+ *   refusal    declined, even after the server-side fallback
+ *   truncated  stopped at max_tokens, so the JSON is cut off
+ *   shape      the text is not JSON, or not the schema's shape
+ * An agent working through a list (intake triage) skips the one item on any of
+ * these and moves on; it is never a reason to fail the whole run.
+ */
+export class AiOutputError extends Error {
+  constructor(
+    message: string,
+    readonly kind: "refusal" | "truncated" | "shape" = "shape",
+  ) {
+    super(message);
+    this.name = "AiOutputError";
+  }
+}
+
+/**
+ * How long one agent model call may take (each attempt), and how many times the
+ * SDK retries it. The SDK's own defaults are 10 minutes and 2 retries, which let
+ * one stuck call outlive a 300-second function many times over.
+ */
+export const AGENT_CALL_TIMEOUT_MS = 120_000;
+export const AGENT_CALL_MAX_RETRIES = 1;
 
 export type Usage = {
   inputTokens: number;
@@ -59,6 +83,11 @@ export type StructuredRequest<S extends z.ZodType> = {
   /** low for scoring, medium for extraction, high for writing to clients. */
   effort: "low" | "medium" | "high";
   maxTokens?: number;
+  /**
+   * Aborts the call. The agent runner passes its run's signal here, so a run that
+   * reaches its time limit stops waiting on the model instead of hanging on.
+   */
+  signal?: AbortSignal;
 };
 
 export type StructuredCall = <S extends z.ZodType>(req: StructuredRequest<S>) => Promise<StructuredResult<z.infer<S>>>;
@@ -103,37 +132,67 @@ export function aiConfigured(): boolean {
   return Boolean(env.ANTHROPIC_API_KEY);
 }
 
-export const callClaude: StructuredCall = async (req) => {
-  const model = agentModel();
-  const response = await getClient().beta.messages.parse({
-    model,
-    max_tokens: req.maxTokens ?? 16000,
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
-    output_config: { effort: req.effort, format: betaZodOutputFormat(req.schema) },
-    system: [{ type: "text", text: req.system, cache_control: { type: "ephemeral" } }],
-    messages: [{ role: "user", content: req.user }],
-  });
+/** The bits of a Messages response `readStructuredResponse` looks at. */
+export type StructuredResponseLike = {
+  stop_reason: string | null;
+  stop_details?: { category?: string | null } | null;
+  content: ReadonlyArray<{ type: string; text?: string }>;
+};
 
+/**
+ * Turns a raw response into the parsed output, or an AiOutputError. Pure, and
+ * the stop reason is checked BEFORE any parsing: the SDK's own `parse()` helper
+ * parses first, so an answer cut off at max_tokens surfaced as "Failed to parse
+ * structured output: SyntaxError: Unterminated string in JSON" and never reached
+ * the max_tokens check. That is what failed RPB's intake triage on 2026-10-22.
+ */
+export function readStructuredResponse<T>(response: StructuredResponseLike, parse: (text: string) => T): T {
   if (response.stop_reason === "refusal") {
     throw new AiOutputError(
       `The model declined this request (${response.stop_details?.category ?? "unspecified"}). Nothing was written.`,
+      "refusal",
     );
   }
   if (response.stop_reason === "max_tokens") {
-    throw new AiOutputError("The answer was cut off before it finished. Nothing was written.");
+    throw new AiOutputError("The answer was cut off before it finished. Nothing was written.", "truncated");
   }
-  if (response.parsed_output == null) {
-    throw new AiOutputError("The answer didn't match the expected shape. Nothing was written.");
+  const block = response.content.find((b) => b.type === "text" && typeof b.text === "string");
+  if (!block?.text) throw new AiOutputError("The answer didn't match the expected shape. Nothing was written.", "shape");
+  let parsed: T;
+  try {
+    parsed = parse(block.text);
+  } catch {
+    throw new AiOutputError("The answer didn't match the expected shape. Nothing was written.", "shape");
   }
+  if (parsed == null) throw new AiOutputError("The answer didn't match the expected shape. Nothing was written.", "shape");
+  return parsed;
+}
 
+export const callClaude: StructuredCall = async (req) => {
+  const model = agentModel();
+  const format = betaZodOutputFormat(req.schema);
+  // `create`, not `parse`: see readStructuredResponse for why the parsing is ours.
+  const response = await getClient().beta.messages.create(
+    {
+      model,
+      max_tokens: req.maxTokens ?? 16000,
+      betas: ["server-side-fallback-2026-07-01"],
+      fallbacks: "default",
+      output_config: { effort: req.effort, format },
+      system: [{ type: "text", text: req.system, cache_control: { type: "ephemeral" } }],
+      messages: [{ role: "user", content: req.user }],
+    },
+    { timeout: AGENT_CALL_TIMEOUT_MS, maxRetries: AGENT_CALL_MAX_RETRIES, signal: req.signal },
+  );
+
+  const output = readStructuredResponse(response, (text) => format.parse(text));
   const usage: Usage = {
     inputTokens: response.usage.input_tokens,
     outputTokens: response.usage.output_tokens,
     cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
     cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
   };
-  return { output: response.parsed_output, model: response.model, usage, costUsd: costFor(response.model, usage) };
+  return { output, model: response.model, usage, costUsd: costFor(response.model, usage) };
 };
 
 export type AskClaudeInput = { system: string; prompt: string; maxTokens?: number };
@@ -148,14 +207,18 @@ export type AskClaudeResult = { skipped: true } | { text: string; model: string;
 export async function askClaude(input: AskClaudeInput): Promise<AskClaudeResult> {
   if (!aiConfigured()) return { skipped: true };
   try {
-    const response = await getClient().beta.messages.create({
-      model: agentModel(),
-      max_tokens: input.maxTokens ?? 1024,
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
-      system: [{ type: "text", text: input.system, cache_control: { type: "ephemeral" } }],
-      messages: [{ role: "user", content: input.prompt }],
-    });
+    const response = await getClient().beta.messages.create(
+      {
+        model: agentModel(),
+        max_tokens: input.maxTokens ?? 1024,
+        betas: ["server-side-fallback-2026-07-01"],
+        fallbacks: "default",
+        system: [{ type: "text", text: input.system, cache_control: { type: "ephemeral" } }],
+        messages: [{ role: "user", content: input.prompt }],
+      },
+      // The consult-prep agent writes through this too: same deadline as callClaude, never the SDK's 10 minutes.
+      { timeout: AGENT_CALL_TIMEOUT_MS, maxRetries: AGENT_CALL_MAX_RETRIES },
+    );
     if (response.stop_reason === "refusal") return { skipped: true };
     const text = response.content
       .map((b) => (b.type === "text" ? b.text : ""))
