@@ -209,6 +209,13 @@ describe("declined and nurture are proposed only from an explicit note", () => {
     expect(p.stage?.id).toBe(S.followUp);
   });
 
+  it("a nurture note whose mapping names a won stage proposes no stage (it would open a matter)", () => {
+    const item: EvidenceItem = { source: "sheet", via: "note", milestone: "nurture", label: MILESTONE_LABEL.nurture, date: "2026-10-20T00:00:00.000Z", stageId: S.signed };
+    const p = run([item], {}, S.consult);
+    expect(p.kind).not.toBe("stage");
+    expect(p.stage).toBeNull();
+  });
+
   it("silence never proposes either: no note, no decline", () => {
     const p = run([ev("sheet", "note", "proposal_sent", "2026-01-02T00:00:00.000Z")], {}, S.pnc);
     expect(p.stage?.id).not.toBe(S.lost);

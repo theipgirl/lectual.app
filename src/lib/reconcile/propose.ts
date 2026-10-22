@@ -151,7 +151,10 @@ export function proposeStage(
     if (!item.stageId) continue;
     const stage = byId.get(item.stageId);
     if (!stage) continue;
-    if (item.milestone === "declined" || item.milestone === "nurture") exits.push({ item, stage });
+    // An exit mapped to a won-category stage would open a matter, which this screen never does: no claim.
+    if (item.milestone === "declined" || item.milestone === "nurture") {
+      if (stage.category !== "won") exits.push({ item, stage });
+    }
     else progress.push({ item, stage });
   }
   const wonOnly = progress.length > 0 && progress.every((c) => c.stage.category === "won");

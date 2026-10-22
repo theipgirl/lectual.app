@@ -70,7 +70,7 @@ export function planPeople(plan: ImportPlan): PlanPerson[] {
     out.push({
       bucket: "update",
       name: u.name ?? u.matterName,
-      business: null,
+      business: u.business ?? null,
       email: u.email ?? null,
       ref: u.lawmaticsId,
       stage: u.sourceStageName,
@@ -81,7 +81,7 @@ export function planPeople(plan: ImportPlan): PlanPerson[] {
     out.push({
       bucket: "unchanged",
       name: u.name ?? u.matterName,
-      business: null,
+      business: u.business ?? null,
       email: u.email ?? null,
       ref: u.lawmaticsId,
       stage: null,
@@ -89,10 +89,10 @@ export function planPeople(plan: ImportPlan): PlanPerson[] {
     });
   }
   for (const u of plan.unmapped) {
-    out.push({ bucket: "unmapped", name: u.name ?? u.matterName, business: null, email: u.email, ref: u.lawmaticsId, stage: u.sourceStageName, reason: u.reason });
+    out.push({ bucket: "unmapped", name: u.name ?? u.matterName, business: u.business, email: u.email, ref: u.lawmaticsId, stage: u.sourceStageName, reason: u.reason });
   }
   for (const s of plan.skipped) {
-    out.push({ bucket: "skipped", name: s.name ?? s.matterName, business: null, email: s.email, ref: s.lawmaticsId, stage: null, reason: s.reason });
+    out.push({ bucket: "skipped", name: s.name ?? s.matterName, business: s.business, email: s.email, ref: s.lawmaticsId, stage: null, reason: s.reason });
   }
   return out;
 }

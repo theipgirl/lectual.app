@@ -62,8 +62,9 @@ export async function draftInMyMailbox(draft: DraftInput): Promise<{ provider: M
  * exactly as draftInMyMailbox does. Read-only: nothing here writes a message.
  */
 export async function searchableMailboxAccess(): Promise<{ ok: true; items: SearchableMailbox[] } | { ok: false }> {
+  // Not configured is "can't tell", never "no mailbox is connected".
   const root = rootKeyOrNull();
-  if (!root) return { ok: true, items: [] };
+  if (!root) return { ok: false };
 
   const supabase = await getScopedClient();
   const { data, error } = await supabase

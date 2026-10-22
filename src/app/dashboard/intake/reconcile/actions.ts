@@ -189,8 +189,7 @@ async function applyLastTouch(supabase: Scoped, leadId: string, proposed: string
   const usable = usableEvidenceDate(proposed, nowMs);
   if (!usable) return false;
   if (stored !== null && Date.parse(usable) <= Date.parse(stored)) return false;
-  await bumpLeadLastTouch(supabase, leadId, null, new Date(usable));
-  return true;
+  return (await bumpLeadLastTouch(supabase, leadId, null, new Date(usable))) !== false;
 }
 
 export async function applyReconcileAction(input: unknown): Promise<ApplyResult> {

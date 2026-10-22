@@ -469,3 +469,33 @@ describe("applyImport writes the contact leads and flags the stand-in stages", (
     expect(again.totals.create).toBe(0);
   });
 });
+
+describe("a business name finds the person in every bucket", () => {
+  const biz = { businessName: "Prosperall", firstName: "Wen", lastName: "Aldercott", email: "wen@pros.example" };
+  const bucketOf = (plan: ReturnType<typeof planImport>) => findInPlan(plan, "prosperall").map((p) => p.bucket);
+
+  it("skipped by the practice-area filter", () => {
+    const plan = planImport([rec({ ...biz, lawmaticsId: "pb1", practiceArea: "Patent" })], STAGES, [], FILTER_ON);
+    expect(bucketOf(plan)).toEqual(["skipped"]);
+  });
+
+  it("already linked and current (unchanged)", () => {
+    const lead = existing({ id: "lead-b", email: "wen@pros.example", first_name: "Wen", last_name: "Aldercott", business_name: "Prosperall", lawmatics_id: "pb2", current_stage_id: "s-consult", practice_area: "Trademark" });
+    const plan = planImport([rec({ ...biz, lawmaticsId: "pb2" })], STAGES, [lead]);
+    expect(plan.unchanged).toHaveLength(1);
+    expect(bucketOf(plan)).toEqual(["unchanged"]);
+  });
+
+  it("an update", () => {
+    const lead = existing({ id: "lead-c", email: "wen@pros.example", first_name: "Wen", last_name: "Aldercott", business_name: "Prosperall", lawmatics_id: "pb3", phone: null });
+    const plan = planImport([rec({ ...biz, lawmaticsId: "pb3", phone: "555-0100" })], STAGES, [lead]);
+    expect(plan.updates).toHaveLength(1);
+    expect(bucketOf(plan)).toEqual(["update"]);
+  });
+
+  it("unmapped (a firm with no open stage)", () => {
+    const noOpen = STAGES.filter((s) => s.category !== "open");
+    const plan = planImport([rec({ ...biz, lawmaticsId: "pb4", stageName: "Proposal Sent" })], noOpen, []);
+    expect(bucketOf(plan)).toEqual(["unmapped"]);
+  });
+});

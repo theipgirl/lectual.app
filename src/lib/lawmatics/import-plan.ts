@@ -120,6 +120,7 @@ export type PlannedUpdate = {
   matterName: string | null;
   name?: string | null;
   email?: string | null;
+  business: string | null;
   matchedBy: "lawmatics_id" | "email";
   /** True when this run would attach lawmatics_id to a previously local lead. */
   linksRecord: boolean;
@@ -146,6 +147,7 @@ export type UnmappedRecord = {
   lawmaticsId: string;
   matterName: string | null;
   name: string | null;
+  business: string | null;
   email: string | null;
   sourceStageName: string | null;
   reason: string;
@@ -155,6 +157,7 @@ export type SkippedRecord = {
   lawmaticsId: string;
   matterName: string | null;
   name: string | null;
+  business: string | null;
   email: string | null;
   reason: string;
 };
@@ -236,7 +239,7 @@ export type ImportPlan = {
   contactCreates: PlannedContactCreate[];
   updates: PlannedUpdate[];
   /** Matched, already current — nothing to write. */
-  unchanged: Array<{ lawmaticsId: string; leadId: string; matterName: string | null; name?: string | null; email?: string | null }>;
+  unchanged: Array<{ lawmaticsId: string; leadId: string; matterName: string | null; name?: string | null; business?: string | null; email?: string | null }>;
   /** Informational: stage disagreements left alone. Not a write. */
   divergences: StageDivergence[];
   /** Informational: field disagreements left alone. Not a write. */
@@ -356,6 +359,7 @@ export function planImport(
       lawmaticsId: rec.lawmaticsId,
       matterName: rec.matterName,
       name,
+      business: rec.businessName,
       email: rec.email,
     };
 
@@ -541,7 +545,7 @@ export function planImport(
   const seenContactIds = new Set<string>();
   for (const c of contacts) {
     const name = [c.firstName, c.lastName].filter(Boolean).join(" ").trim() || null;
-    const base = { lawmaticsId: `contact:${c.lawmaticsId}`, matterName: null, name, email: c.email };
+    const base = { lawmaticsId: `contact:${c.lawmaticsId}`, matterName: null, name, business: c.businessName, email: c.email };
     if (seenContactIds.has(c.lawmaticsId)) {
       skipped.push({ ...base, reason: "Duplicate — this Lawmatics contact appeared more than once in the response." });
       continue;
@@ -577,7 +581,7 @@ export function planImport(
       continue;
     }
     if (!openStage) {
-      unmapped.push({ lawmaticsId: base.lawmaticsId, matterName: null, name, email: c.email, sourceStageName: null, reason: "This firm has no open stage to file a Lawmatics contact in, so a person has to decide." });
+      unmapped.push({ lawmaticsId: base.lawmaticsId, matterName: null, name, business: c.businessName, email: c.email, sourceStageName: null, reason: "This firm has no open stage to file a Lawmatics contact in, so a person has to decide." });
       continue;
     }
     claimedEmails.add(email);
@@ -629,6 +633,7 @@ export function planImport(
         leadId: update.leadId,
         matterName: update.matterName,
         name: update.name ?? null,
+        business: update.business,
         email: update.email ?? null,
       });
     } else {
@@ -704,6 +709,7 @@ function buildUpdate(
     leadId: lead.id,
     matterName: rec.matterName,
     name: displayName(rec),
+    business: rec.businessName,
     email: rec.email,
     matchedBy,
     linksRecord,
