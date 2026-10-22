@@ -1310,3 +1310,29 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
 .lx-notif-sentence { overflow-wrap: anywhere; line-height: 1.4; }
 .lx-notif-meta { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
 .lx-notif-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--ox); display: inline-block; }
+
+/* ── navigation feedback (Sprint 22): skeleton + thin top bar ─────── */
+.lx-skel { display: grid; gap: 14px; }
+.lx-skel-bar, .lx-skel-card, .lx-skel-block {
+  background: var(--well);
+  border-radius: 10px;
+  animation: lx-skel-pulse 1.4s ease-in-out infinite;
+}
+.lx-skel-label { height: 12px; width: 120px; }
+.lx-skel-title { height: 34px; width: min(420px, 70%); }
+.lx-skel-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.lx-skel-card { height: 96px; border: 1px solid var(--line-2); }
+.lx-skel-block { height: 260px; border: 1px solid var(--line-2); }
+@keyframes lx-skel-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+.lx-navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  width: 100%;
+  z-index: 60;
+  background: var(--ox);
+  transform-origin: left;
+  animation: lx-navbar-grow 8s cubic-bezier(0.1, 0.6, 0.3, 1) forwards;
+}
+@keyframes lx-navbar-grow { from { transform: scaleX(0.05); } to { transform: scaleX(0.92); } }
