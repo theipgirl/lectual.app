@@ -32,4 +32,17 @@ describe("stageAgeDisplay", () => {
   it("has nothing to say with no stage date", () => {
     expect(stageAgeDisplay({ stageEnteredAt: null, createdAt: "2026-01-01T00:00:00Z", now })).toEqual({ days: null, label: null, sinceImport: false });
   });
+  it("keeps a stage date set on purpose even when a stage_changed was logged today", () => {
+    const r = stageAgeDisplay({
+      stageEnteredAt: "2026-10-02T12:00:00Z",
+      createdAt: "2026-01-01T00:00:00Z",
+      lastStageChangeAt: "2026-10-22T11:00:00Z",
+      now,
+    });
+    expect(r).toEqual({ days: 20, label: "20d in stage", sinceImport: false });
+  });
+  it("an imported lead with no stage move still reads 'In stage since import'", () => {
+    const r = stageAgeDisplay({ stageEnteredAt: "2026-08-22T10:00:00Z", createdAt: "2026-08-22T10:00:00Z", now });
+    expect(r).toEqual({ days: null, label: SINCE_IMPORT_LABEL, sinceImport: true });
+  });
 });

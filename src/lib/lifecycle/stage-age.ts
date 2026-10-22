@@ -4,12 +4,12 @@
  * An import stamps `stage_entered_at` with the moment it ran, so every
  * imported lead read the same "61d in stage" whatever had happened to it. That
  * is the import date, not a stage entry. So:
- *   1. the newest `stage_changed` activity, when the card has one, is the real
- *      entry: count from it;
- *   2. a stage entry that equals the record's created (import) time, or the
- *      time it was last pulled from Lawmatics, reads "In stage since import"
- *      with no day count;
- *   3. otherwise count days from `stage_entered_at`.
+ *   1. a `stage_entered_at` that is NOT the created or Lawmatics-synced stamp was
+ *      set on purpose (a move, a reconcile with the sheet's date, an Undo): count
+ *      from it, whatever the activity log says;
+ *   2. when it IS the import stamp, the newest `stage_changed` activity, if the
+ *      card has one, is the real entry: count from it;
+ *   3. otherwise it reads "In stage since import" with no day count.
  * Display only: nothing here writes to a lead.
  */
 export const SINCE_IMPORT_LABEL = "In stage since import";
@@ -44,17 +44,19 @@ export function daysInStageLabel(days: number): string {
 }
 
 export function stageAgeDisplay(input: StageAgeInput): StageAgeDisplay {
+  const entered = ms(input.stageEnteredAt);
   const change = ms(input.lastStageChangeAt);
-  if (change !== null && change <= input.now.getTime()) {
-    const days = wholeDays(change, input.now);
+  const usableChange = change !== null && change <= input.now.getTime() ? change : null;
+  const stamps = [ms(input.createdAt), ms(input.importedAt)].filter((t): t is number => t !== null);
+  const isImportStamp = entered !== null && stamps.some((t) => Math.abs(t - entered) <= SAME_MOMENT_MS);
+  if (entered !== null && !isImportStamp) {
+    const days = wholeDays(entered, input.now);
     return { days, label: daysInStageLabel(days), sinceImport: false };
   }
-  const entered = ms(input.stageEnteredAt);
-  if (entered === null) return { days: null, label: null, sinceImport: false };
-  const stamps = [ms(input.createdAt), ms(input.importedAt)].filter((t): t is number => t !== null);
-  if (stamps.some((t) => Math.abs(t - entered) <= SAME_MOMENT_MS)) {
-    return { days: null, label: SINCE_IMPORT_LABEL, sinceImport: true };
+  if (usableChange !== null) {
+    const days = wholeDays(usableChange, input.now);
+    return { days, label: daysInStageLabel(days), sinceImport: false };
   }
-  const days = wholeDays(entered, input.now);
-  return { days, label: daysInStageLabel(days), sinceImport: false };
+  if (entered === null) return { days: null, label: null, sinceImport: false };
+  return { days: null, label: SINCE_IMPORT_LABEL, sinceImport: true };
 }

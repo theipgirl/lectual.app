@@ -45,7 +45,7 @@ describe("KpiTile", () => {
 
 describe("failed page reads", () => {
   it("the dashboard error boundary says the page could not be loaded", () => {
-    const html = renderToStaticMarkup(DashboardError({ reset: () => {} }));
+    const html = renderToStaticMarkup(DashboardError({ retry: () => {} }));
     expect(html).toContain('role="alert"');
     expect(html).toContain("couldn&#x27;t be loaded");
     expect(html).toContain("Try again");

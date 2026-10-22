@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { PROGRESS_DELAY_MS, PROGRESS_GIVE_UP_MS, startsNavigation } from "@/lib/ui/nav-progress";
+import { PROGRESS_DELAY_MS, PROGRESS_GIVE_UP_MS, barVisible, staleBar, startsNavigation } from "@/lib/ui/nav-progress";
 
 /**
  * A thin bar under the top header while a dashboard link is loading. It shows
@@ -17,6 +17,8 @@ export function NavProgress() {
   // The page the person was on when the bar was switched on. The bar shows only while that is still the
   // current page, so a landed navigation hides it without any state being set from an effect.
   const [shownFor, setShownFor] = useState<string | null>(null);
+  // The URL moved away from the page the bar was set for: forget it, so returning there never shows the bar.
+  if (staleBar(shownFor, here)) setShownFor(null);
   const hereRef = useRef(here);
   const showTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const giveUpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -51,13 +53,15 @@ export function NavProgress() {
       if (showTimer.current) clearTimeout(showTimer.current);
       if (giveUpTimer.current) clearTimeout(giveUpTimer.current);
       const from = hereRef.current;
-      showTimer.current = setTimeout(() => setShownFor(from), PROGRESS_DELAY_MS);
+      showTimer.current = setTimeout(() => {
+        if (hereRef.current === from) setShownFor(from);
+      }, PROGRESS_DELAY_MS);
       giveUpTimer.current = setTimeout(() => setShownFor(null), PROGRESS_GIVE_UP_MS);
     };
     document.addEventListener("click", onClick);
     return () => document.removeEventListener("click", onClick);
   }, []);
 
-  if (shownFor !== here) return null;
+  if (!barVisible(shownFor, here)) return null;
   return <div className="lx-navbar" role="progressbar" aria-label="Loading the next page" aria-busy="true" />;
 }

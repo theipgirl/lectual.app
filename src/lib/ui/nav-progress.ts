@@ -31,3 +31,16 @@ export function startsNavigation(click: ClickInfo, current: URL): boolean {
   if (!next.pathname.startsWith("/dashboard")) return false;
   return next.pathname !== current.pathname || next.search !== current.search;
 }
+
+/**
+ * The bar shows only while the page it was switched on for is still the current one.
+ * Once the URL has moved away, that flag is stale and must be cleared (`staleBar`), or
+ * coming back to the origin page would show the bar again.
+ */
+export function barVisible(shownFor: string | null, here: string): boolean {
+  return shownFor !== null && shownFor === here;
+}
+
+export function staleBar(shownFor: string | null, here: string): boolean {
+  return shownFor !== null && shownFor !== here;
+}

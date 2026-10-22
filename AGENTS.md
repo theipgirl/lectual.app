@@ -563,8 +563,9 @@ Display and derivation only: no data is rewritten, nothing is sent, no new depen
   equal: the badge has a tooltip and the column hint says why they differ.
 - **Period comparison:** `periodDelta` withholds a percentage beyond +/-500% and a collapse to under a tenth of a prior period of 20 or more;
   `comparisonText` always gives the prior count ("2 vs 168 in the previous 7 days") and `KpiTile` prints it. Prior 0 shows a plain "+N".
-- **Days in stage (Pipeline cards):** `stageAgeDisplay` (`src/lib/lifecycle/stage-age.ts`): the newest `stage_changed` activity wins; a stage
-  entry equal to the record's created or Lawmatics-synced time reads "In stage since import" (no count); otherwise days from `stage_entered_at`.
+- **Days in stage (Pipeline cards):** `stageAgeDisplay` (`src/lib/lifecycle/stage-age.ts`): a `stage_entered_at` that is not the record's created or Lawmatics-synced time
+  counts days from itself (reconcile dates, Undo and plain moves set it on purpose, so a newer `stage_changed` row never overrides it); when it IS that import
+  stamp, the newest `stage_changed` activity is the entry, and with none it reads "In stage since import" (no count).
 - **Role-neutral copy:** nothing rendered to every firm names a person. The intake chip and badge read "Needs attorney" and hide the
   chip's count at zero. `tests/intake/role-neutral-copy.test.tsx` greps visible text. RPB-specific modules (consult proposal email,
   welcome, prep-consult, document templates, the ported assessment card) keep Rebecca's name on purpose.

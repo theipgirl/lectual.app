@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
 import DashboardLoading from "@/app/dashboard/loading";
-import { PROGRESS_DELAY_MS, startsNavigation, type ClickInfo } from "@/lib/ui/nav-progress";
+import { PROGRESS_DELAY_MS, barVisible, staleBar, startsNavigation, type ClickInfo } from "@/lib/ui/nav-progress";
 
 const here = new URL("https://app.lectual.app/dashboard/leads/");
 const click = (over: Partial<ClickInfo> = {}): ClickInfo => ({
@@ -51,5 +51,17 @@ describe("top progress bar trigger", () => {
     expect(startsNavigation(click({ button: 1 }), here)).toBe(false);
     expect(startsNavigation(click({ download: true }), here)).toBe(false);
     expect(startsNavigation(click({ defaultPrevented: true }), here)).toBe(false);
+  });
+});
+
+describe("progress bar returning to the origin page", () => {
+  it("is cleared once the URL moves away, so Back to the origin shows no bar", () => {
+    const origin = "/dashboard/a?";
+    expect(barVisible(origin, origin)).toBe(true);
+    expect(barVisible(origin, "/dashboard/b?")).toBe(false);
+    expect(staleBar(origin, "/dashboard/b?")).toBe(true);
+    // after the reset the flag is null, so landing on the origin again shows nothing
+    expect(barVisible(null, origin)).toBe(false);
+    expect(staleBar(null, origin)).toBe(false);
   });
 });
