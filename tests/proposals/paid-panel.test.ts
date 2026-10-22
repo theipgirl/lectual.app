@@ -119,6 +119,13 @@ describe("one line per follow-up step", () => {
     expect(without).not.toContain("/dashboard/documents/new/");
   });
 
+  it("unknown package with no matter on the proposal but one recorded on the line: links to that matter's LOE form", () => {
+    const events = paid(ev("loe_draft", "blocked", "2026-10-21T15:01:00Z", { code: "unknown_package", matter_id: "matter-from-lead" }, "This package isn't on the firm's current package list, so no engagement letter was drafted."));
+    const html = render(events, { matterId: null });
+    expect(html).toContain('href="/dashboard/documents/new/matter-from-lead/loe/"');
+    expect(html).not.toContain("Open the matter first");
+  });
+
   it("a failed upload: the short reason, the unverified-shape caution and a Retry", () => {
     const html = render(paid(ev("accepted_file_upload", "failed", "2026-10-21T15:02:00Z", {}, "HTTP 422")));
     expect(html).toContain("Not uploaded to Lawmatics: HTTP 422. The shape of this request hasn&#x27;t been checked against a live account.");

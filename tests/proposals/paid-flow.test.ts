@@ -226,6 +226,26 @@ describe("the LOE draft step: blocked and failed, never silent", () => {
     expect(draftLine(t)).toMatchObject({ outcome: "blocked", code: "unknown_package", reason: LOE_REFUSAL_TEXT.unknown_package });
   });
 
+  it("an unknown package with the matter found through the lead: the line carries the matter id and no draft is made", async () => {
+    const t = await setupFlow({
+      proposal: acceptedRow({ lead_id: "lead-1", matter_id: null }, acceptedSnapshot({ packageName: "Platinum" })),
+      matter: { status: "one", id: "matter-from-lead", lawmaticsId: "LM-1" },
+    });
+    await t.flow.markProposalPaid(PROPOSAL_ID);
+    expect(t.spies.generateTrademarkLoe).not.toHaveBeenCalled();
+    expect(draftLine(t)).toMatchObject({ outcome: "blocked", code: "unknown_package", matter_id: "matter-from-lead" });
+  });
+
+  it("an unknown package with no single matter carries no matter id", async () => {
+    const t = await setupFlow({
+      proposal: acceptedRow({ lead_id: "lead-1", matter_id: null }, acceptedSnapshot({ packageName: "Platinum" })),
+      matter: { status: "many" },
+    });
+    await t.flow.markProposalPaid(PROPOSAL_ID);
+    expect(draftLine(t)).toMatchObject({ outcome: "blocked", code: "unknown_package" });
+    expect(draftLine(t)).not.toHaveProperty("matter_id");
+  });
+
   it("an unreadable package list is its own state, not 'unknown package'", async () => {
     const t = await setupFlow({ settings: "fail" });
     await t.flow.markProposalPaid(PROPOSAL_ID);

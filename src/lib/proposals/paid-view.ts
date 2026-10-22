@@ -149,7 +149,8 @@ export function buildPaidPanelView(input: PaidPanelInput): PaidPanelView {
       link = { href: `/dashboard/queue/${encodeURIComponent(s.payload.queue_item_id)}/`, label: "Open the queued engagement letter" };
     }
     if (step === "loe_draft" && !success && s.payload.code === "unknown_package") {
-      chooseTemplate = { text: CHOOSE_LOE_TEMPLATE, href: input.matterId ? LOE_FORM(input.matterId) : null };
+      const matterId = typeof s.payload.matter_id === "string" ? s.payload.matter_id : input.matterId;
+      chooseTemplate = { text: CHOOSE_LOE_TEMPLATE, href: matterId ? LOE_FORM(matterId) : null };
     }
     lines.push({ key: step, label: STEP_LABEL[step], text: stepText(s), tone: toneOf(s), retry, link });
   }
