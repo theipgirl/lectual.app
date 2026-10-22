@@ -1624,6 +1624,13 @@ textarea.ifm-input {
 .ifl-act:hover {
   text-decoration: underline;
 }
+.ifl-copy:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.ifl-notlive {
+  font-style: normal;
+}
 .ifl-act:disabled {
   opacity: 0.5;
   cursor: default;

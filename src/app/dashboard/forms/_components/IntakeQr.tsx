@@ -18,7 +18,23 @@ function fileBase(slug: string) {
   return `qr-${slug}`;
 }
 
-export function IntakeQrButton({ url, name, slug, compact = false }: { url: string; name: string; slug: string; compact?: boolean }) {
+export function IntakeQrButton({
+  url,
+  name,
+  slug,
+  compact = false,
+  shareable = true,
+  describedBy,
+}: {
+  url: string;
+  name: string;
+  slug: string;
+  compact?: boolean;
+  /** False for a draft or archived intake: its link answers nothing, so the code is off. */
+  shareable?: boolean;
+  /** Id of the element that says why the code is off. */
+  describedBy?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [svg, setSvg] = useState<string | null>(null);
   const [png, setPng] = useState<string | null>(null);
@@ -45,6 +61,14 @@ export function IntakeQrButton({ url, name, slug, compact = false }: { url: stri
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
+
+  if (!shareable) {
+    return (
+      <button type="button" className={compact ? "ifl-act" : "lx-btn lx-btn-sec"} disabled aria-describedby={describedBy}>
+        QR code
+      </button>
+    );
+  }
 
   const svgHref = svg ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}` : undefined;
 

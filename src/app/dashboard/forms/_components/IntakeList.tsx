@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { createIntakeFormAction, duplicateIntakeFormAction, setIntakeArchivedAction } from "../actions";
 import { IntakeQrButton } from "./IntakeQr";
+import { NOT_LIVE_MESSAGE, shareState } from "@/lib/intake-forms/share";
 
 /**
  * Intake → Forms, the list: every intake the firm keeps (one per event,
@@ -133,10 +134,23 @@ export function IntakeList({
                 {i.sourceTag && <span className="lx-pill lx-pill-ox">{i.sourceTag}</span>}
               </div>
               <div className="ifl-link">
-                <span>{i.url.replace(/^https?:\/\//, "")}</span>
-                <button type="button" className="ifl-copy" onClick={() => copy(i.url, i.id)}>
-                  {copied === i.id ? "Copied" : "Copy link"}
-                </button>
+                {shareState(i.status).canShare ? (
+                  <>
+                    <span>{i.url.replace(/^https?:\/\//, "")}</span>
+                    <button type="button" className="ifl-copy" onClick={() => copy(i.url, i.id)}>
+                      {copied === i.id ? "Copied" : "Copy link"}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span id={`ifl-notlive-${i.id}`} className="ifl-notlive">
+                      {NOT_LIVE_MESSAGE}
+                    </span>
+                    <button type="button" className="ifl-copy" disabled aria-describedby={`ifl-notlive-${i.id}`}>
+                      Copy link
+                    </button>
+                  </>
+                )}
               </div>
             </div>
             <dl className="ifl-stats" aria-label="Last 30 days">
@@ -167,7 +181,7 @@ export function IntakeList({
               <Link className="ifl-act" href={`/dashboard/forms/?form=${encodeURIComponent(i.id)}&tab=performance`}>
                 Numbers
               </Link>
-              <IntakeQrButton url={i.url} name={i.name} slug={i.slug} compact />
+              <IntakeQrButton url={i.url} name={i.name} slug={i.slug} compact shareable={shareState(i.status).canShare} describedBy={`ifl-notlive-${i.id}`} />
               {canEdit && (
                 <>
                   <button type="button" className="ifl-act" disabled={pending} onClick={() => run(() => duplicateIntakeFormAction(i.id), true)}>
