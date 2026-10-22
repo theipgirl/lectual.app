@@ -102,6 +102,7 @@ export function CopilotLauncher({ configured }: { configured: boolean }) {
         ref={buttonRef}
         type="button"
         className="cpd-launcher"
+        data-tour="copilot"
         aria-label="Ask the copilot"
         aria-haspopup="dialog"
         aria-expanded={open}
