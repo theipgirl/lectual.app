@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, type ReactNode } from "react";
+import { useActionState, useState, type ReactNode } from "react";
 import {
   applyMattersImportAction,
   connectLawmaticsAction,
@@ -12,6 +12,8 @@ import {
   type MattersImportState,
   type PreviewView,
 } from "@/app/dashboard/settings/integrations/lawmatics/actions";
+
+import { BUCKET_LABEL, foldTerm, notInPullMessage, searchPeople } from "@/lib/lawmatics/find-in-plan";
 
 const IDLE: ImportState = { phase: "idle" };
 const MATTERS_IDLE: MattersImportState = { phase: "idle" };
@@ -100,10 +102,10 @@ function Totals({ items }: { items: Array<[string, number, string?]> }) {
   );
 }
 
-function Section({ title, count, omitted, children }: { title: string; count: number; omitted?: number; children: ReactNode }) {
+function Section({ title, count, omitted, open, children }: { title: string; count: number; omitted?: number; open?: boolean; children: ReactNode }) {
   if (count === 0) return null;
   return (
-    <details className="lx-lm-section">
+    <details className="lx-lm-section" open={open}>
       <summary>
         {title} <span className="lx-chip-count">{count}</span>
       </summary>
@@ -154,8 +156,8 @@ function OptionBoxes({ options }: { options?: PreviewView["options"] }) {
   return (
     <div style={{ display: "grid", gap: 6 }}>
       <label className="lx-proposal-row">
-        <input type="checkbox" name="trademarkOnly" defaultChecked={options ? options.practiceAreaFilter === "Trademark" : true} />
-        <span>Trademark matters only</span>
+        <input type="checkbox" name="trademarkOnly" defaultChecked={options ? options.practiceAreaFilter === "Trademark" : false} />
+        <span>Trademark matters only (leaves out everyone whose practice area isn&apos;t Trademark, including people with none; each is listed by name)</span>
       </label>
       <label className="lx-proposal-row">
         <input type="checkbox" name="moveExistingStages" defaultChecked={options?.moveExistingStages ?? false} />
@@ -166,6 +168,145 @@ function OptionBoxes({ options }: { options?: PreviewView["options"] }) {
         <span>Overwrite details someone here has already edited</span>
       </label>
     </div>
+  );
+}
+
+/** "Find a person in this pull": searches the whole plan on the screen and says which bucket they are in, and why. */
+export function FindPerson({ preview }: { preview: PreviewView }) {
+  const [term, setTerm] = useState("");
+  const results = searchPeople(preview.people, term);
+  const searching = foldTerm(term).length > 0;
+  return (
+    <div style={{ display: "grid", gap: 8 }} data-find-person>
+      <label className="lx-field">
+        <span className="lx-label">Find a person in this pull</span>
+        <input
+          className="lx-input"
+          type="search"
+          value={term}
+          maxLength={80}
+          autoComplete="off"
+          placeholder="A name, business or email"
+          onChange={(e) => setTerm(e.target.value)}
+        />
+      </label>
+      {searching && results.length === 0 ? (
+        <p role="status" className="lx-banner lx-banner-warn" style={{ margin: 0 }}>
+          {notInPullMessage({ truncated: preview.truncated, practiceAreaFilterOn: preview.options.practiceAreaFilter !== null, includeDropped: preview.includeDropped })}
+        </p>
+      ) : null}
+      {results.length > 0 ? (
+        <ul className="lx-list" aria-label="People found">
+          {results.map((r) => (
+            <Row
+              key={`${r.bucket}:${r.ref}`}
+              title={`${name(null, null, r.name ?? r.email ?? r.ref)}${r.business ? ` · ${r.business}` : ""}`}
+              detail={`${BUCKET_LABEL[r.bucket]}${r.stage ? ` · Lawmatics stage "${r.stage}"` : ""} · ${r.reason}`}
+            />
+          ))}
+        </ul>
+      ) : null}
+      {searching && preview.peopleTruncated ? <p className="lx-note">The search covers the first {preview.people.length} people of this pull only.</p> : null}
+    </div>
+  );
+}
+
+/** The preview of a Lawmatics pull: counts, the people it would drop or place by hand, a search, and the confirm form. */
+export function PreviewBody({ p, action, pending }: { p: PreviewView; action: (formData: FormData) => void; pending: boolean }) {
+  return (
+  <>
+    <p className="lx-note" style={{ margin: 0 }}>
+      Read {p.counts.prospects} records and {p.counts.contacts} contacts from Lawmatics. Nothing has been written yet.
+    </p>
+    <Notices truncated={p.truncated} truncatedReason={p.truncatedReason} includeDropped={p.includeDropped} includeDroppedReason={p.includeDroppedReason} />
+    <Totals
+      items={[
+        ["new leads", p.totals.create, "var(--ox)"],
+        ["need a stage decision", p.totals.stageDecision],
+        ["from contacts with no matter", p.totals.contactOnly],
+        ["updated", p.totals.update],
+        ["already current", p.totals.unchanged],
+        ["stage differs", p.totals.divergent],
+        ["not imported (no stage to file in)", p.totals.unmapped],
+        ["skipped", p.totals.skipped],
+      ]}
+    />
+    <p className="lx-note" style={{ margin: 0 }} data-summary-line>
+      {`${p.totals.skipped} skipped, ${p.totals.stageDecision} need a stage decision.`}
+    </p>
+    <FindPerson preview={p} />
+    <Section title="Imported, stage needs a decision" count={p.totals.stageDecision} omitted={p.omitted.stageDecisions} open>
+      {p.stageDecisions.map((c) => (
+        <Row
+          key={c.lawmaticsId}
+          title={name(c.fields.first_name, c.fields.last_name, c.fields.email)}
+          detail={[c.stageDecision?.label, c.fields.business_name, c.fields.email, `filed in ${c.stageName}`].filter(Boolean).join(" · ")}
+        />
+      ))}
+    </Section>
+    <Section title="New leads from Lawmatics contacts (no matter in Lawmatics)" count={p.totals.contactOnly} omitted={p.omitted.contactCreates} open>
+      {p.contactCreates.map((c) => (
+        <Row
+          key={c.contactId}
+          title={name(c.fields.first_name, c.fields.last_name, c.fields.email)}
+          detail={[c.fields.business_name, c.fields.email, `→ ${c.stageName}`, "source: Lawmatics contact"].filter(Boolean).join(" · ")}
+        />
+      ))}
+    </Section>
+    <Section title="New leads" count={p.totals.create - p.totals.stageDecision - p.totals.contactOnly} omitted={p.omitted.creates}>
+      {p.creates.map((c) => (
+        <Row key={c.lawmaticsId} title={name(c.fields.first_name, c.fields.last_name, c.fields.email)} detail={[c.fields.business_name, c.fields.email, `→ ${c.stageName}`].filter(Boolean).join(" · ")} />
+      ))}
+    </Section>
+    <Section title="Updates to existing leads" count={p.totals.update} omitted={p.omitted.updates}>
+      {p.updates.map((u) => (
+        <Row
+          key={u.lawmaticsId}
+          title={u.matterName ?? u.lawmaticsId}
+          detail={[u.linksRecord ? "links the record" : null, ...u.changes.map((c) => `${c.field.replaceAll("_", " ")}: ${c.from ?? "—"} → ${c.to}`), u.stageWillMove ? `stage → ${u.targetStageName}` : null].filter(Boolean).join(" · ")}
+        />
+      ))}
+    </Section>
+    <Section title="Stage differs (left as is)" count={p.totals.divergent} omitted={p.omitted.divergences}>
+      {p.divergences.map((d) => (
+        <Row key={d.lawmaticsId} title={d.matterName ?? d.lawmaticsId} detail={`Lawmatics: ${d.sourceStageName ?? "—"} · here: ${d.targetStageName ?? "—"}`} />
+      ))}
+    </Section>
+    <Section title="Details kept because someone edited them here" count={p.totals.withheld} omitted={p.omitted.withheld}>
+      {p.withheld.map((w) => (
+        <Row key={w.lawmaticsId} title={w.matterName ?? w.lawmaticsId} detail={w.changes.map((c) => `${c.field.replaceAll("_", " ")}: keeps ${c.from ?? "—"}`).join(" · ")} />
+      ))}
+    </Section>
+    <Section title="Not imported: no open stage to file them in" count={p.totals.unmapped} omitted={p.omitted.unmapped} open>
+      {p.unmapped.map((u) => (
+        <Row key={u.lawmaticsId} title={u.name ?? u.matterName ?? u.lawmaticsId} detail={`${u.sourceStageName ?? "No stage"} · ${u.reason}`} />
+      ))}
+    </Section>
+    <Section title="Skipped" count={p.totals.skipped} omitted={p.omitted.skipped} open>
+      {p.skipped.map((s) => (
+        <Row key={s.lawmaticsId} title={s.name ?? s.matterName ?? s.lawmaticsId} detail={[s.email, s.reason].filter(Boolean).join(" · ")} />
+      ))}
+    </Section>
+
+    <form action={action} className="lx-lm-confirm">
+      <input type="hidden" name="intent" value="confirm" />
+      <input type="hidden" name="fingerprint" value={p.fingerprint} />
+      {p.options.practiceAreaFilter === "Trademark" && <input type="hidden" name="trademarkOnly" value="on" />}
+      {p.options.moveExistingStages && <input type="hidden" name="moveExistingStages" value="on" />}
+      {p.options.overwriteEditedFields && <input type="hidden" name="overwriteEditedFields" value="on" />}
+      <Acknowledge label={`Write ${p.totals.create} new and ${p.totals.update} updated leads into Lectual.`} />
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <button type="submit" className="lx-btn lx-btn-pri" disabled={pending}>
+          {pending ? "Importing…" : "Import"}
+        </button>
+      </div>
+    </form>
+    <div>
+      <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" disabled={pending} onClick={() => location.reload()}>
+        Change options
+      </button>
+    </div>
+  </>
   );
 }
 
@@ -191,83 +332,15 @@ export function ClientsImport() {
       {state.notice && <p className="lx-banner lx-banner-ok" style={{ margin: 0 }}>{state.notice}</p>}
       <Err text={state.error} />
 
-      {p && state.phase === "preview" && (
-        <>
-          <p className="lx-note" style={{ margin: 0 }}>
-            Read {p.counts.prospects} records and {p.counts.contacts} contacts from Lawmatics. Nothing has been written yet.
-          </p>
-          <Notices truncated={p.truncated} truncatedReason={p.truncatedReason} includeDropped={p.includeDropped} includeDroppedReason={p.includeDroppedReason} />
-          <Totals
-            items={[
-              ["new leads", p.totals.create, "var(--ox)"],
-              ["updated", p.totals.update],
-              ["already current", p.totals.unchanged],
-              ["stage differs", p.totals.divergent],
-              ["no matching stage", p.totals.unmapped],
-              ["skipped", p.totals.skipped],
-            ]}
-          />
-          <Section title="New leads" count={p.totals.create} omitted={p.omitted.creates}>
-            {p.creates.map((c) => (
-              <Row key={c.lawmaticsId} title={name(c.fields.first_name, c.fields.last_name, c.fields.email)} detail={[c.fields.business_name, c.fields.email, `→ ${c.stageName}`].filter(Boolean).join(" · ")} />
-            ))}
-          </Section>
-          <Section title="Updates to existing leads" count={p.totals.update} omitted={p.omitted.updates}>
-            {p.updates.map((u) => (
-              <Row
-                key={u.lawmaticsId}
-                title={u.matterName ?? u.lawmaticsId}
-                detail={[u.linksRecord ? "links the record" : null, ...u.changes.map((c) => `${c.field.replaceAll("_", " ")}: ${c.from ?? "—"} → ${c.to}`), u.stageWillMove ? `stage → ${u.targetStageName}` : null].filter(Boolean).join(" · ")}
-              />
-            ))}
-          </Section>
-          <Section title="Stage differs (left as is)" count={p.totals.divergent} omitted={p.omitted.divergences}>
-            {p.divergences.map((d) => (
-              <Row key={d.lawmaticsId} title={d.matterName ?? d.lawmaticsId} detail={`Lawmatics: ${d.sourceStageName ?? "—"} · here: ${d.targetStageName ?? "—"}`} />
-            ))}
-          </Section>
-          <Section title="Details kept because someone edited them here" count={p.totals.withheld} omitted={p.omitted.withheld}>
-            {p.withheld.map((w) => (
-              <Row key={w.lawmaticsId} title={w.matterName ?? w.lawmaticsId} detail={w.changes.map((c) => `${c.field.replaceAll("_", " ")}: keeps ${c.from ?? "—"}`).join(" · ")} />
-            ))}
-          </Section>
-          <Section title="No matching stage" count={p.totals.unmapped} omitted={p.omitted.unmapped}>
-            {p.unmapped.map((u) => (
-              <Row key={u.lawmaticsId} title={u.name ?? u.matterName ?? u.lawmaticsId} detail={`${u.sourceStageName ?? "No stage"} · ${u.reason}`} />
-            ))}
-          </Section>
-          <Section title="Skipped" count={p.totals.skipped} omitted={p.omitted.skipped}>
-            {p.skipped.map((s) => (
-              <Row key={s.lawmaticsId} title={s.name ?? s.matterName ?? s.lawmaticsId} detail={s.reason} />
-            ))}
-          </Section>
-
-          <form action={action} className="lx-lm-confirm">
-            <input type="hidden" name="intent" value="confirm" />
-            <input type="hidden" name="fingerprint" value={p.fingerprint} />
-            {p.options.practiceAreaFilter === "Trademark" && <input type="hidden" name="trademarkOnly" value="on" />}
-            {p.options.moveExistingStages && <input type="hidden" name="moveExistingStages" value="on" />}
-            {p.options.overwriteEditedFields && <input type="hidden" name="overwriteEditedFields" value="on" />}
-            <Acknowledge label={`Write ${p.totals.create} new and ${p.totals.update} updated leads into Lectual.`} />
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <button type="submit" className="lx-btn lx-btn-pri" disabled={pending}>
-                {pending ? "Importing…" : "Import"}
-              </button>
-            </div>
-          </form>
-          <div>
-            <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" disabled={pending} onClick={() => location.reload()}>
-              Change options
-            </button>
-          </div>
-        </>
-      )}
+      {p && state.phase === "preview" && <PreviewBody p={p} action={action} pending={pending} />}
 
       {r && state.phase === "done" && (
         <>
           <Totals
             items={[
               ["created", r.created, "var(--ok)"],
+              ["need a stage decision", r.stageDecisions],
+              ["from contacts", r.contactsCreated],
               ["updated", r.updated],
               ["linked", r.linked],
               ["stages moved", r.stageMoves],
@@ -277,6 +350,11 @@ export function ClientsImport() {
           {r.partial && (
             <p className="lx-banner lx-banner-warn" style={{ margin: 0 }}>
               The import stopped at its time limit. Everything counted above was written. Run it again to finish the other {r.remaining.creates + r.remaining.updates}.
+            </p>
+          )}
+          {r.flagsNotRecorded > 0 && (
+            <p className="lx-banner lx-banner-warn" style={{ margin: 0 }}>
+              {`${r.flagsNotRecorded} of the leads filed in a stand-in stage could not be flagged on their timeline. They were created; find them in the first open stage.`}
             </p>
           )}
           <Notices truncated={r.truncated} truncatedReason={r.truncatedReason} />
