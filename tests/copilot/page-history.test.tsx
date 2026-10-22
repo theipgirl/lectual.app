@@ -17,6 +17,7 @@ afterEach(() => vi.useRealTimers());
 async function render(opts: { handler?: StmtHandler; configured?: boolean; scopedThrows?: boolean; c?: string } = {}) {
   vi.resetModules();
   vi.doMock("@/lib/ai/claude", () => ({ aiConfigured: () => opts.configured ?? true }));
+  vi.doMock("next/navigation", () => ({ usePathname: () => "/dashboard/copilot/", useRouter: () => ({ push: () => {}, refresh: () => {} }) }));
   vi.doMock("@/lib/firm/session", () => ({
     resolveFirmSession: vi.fn(async () => ({ kind: "ok", user: { id: "u-1", email: "t@example.com", user_metadata: {} }, org: { id: "o-1" } })),
   }));
@@ -138,5 +139,20 @@ describe("opening a past chat", () => {
     expect(html).toContain("Ask the copilot");
     expect(html).not.toContain("Two deadlines are due.");
     expect(await render({ c: "not-an-id", handler: healthyDb({ existing }) })).not.toContain("Two deadlines");
+  });
+});
+
+describe("New chat from a past chat", () => {
+  it("pushes the bare path only when a past chat is open", async () => {
+    const { newChatNavigation } = await import("@/lib/copilot/history-pure");
+    expect(newChatNavigation(C1, "/dashboard/copilot/")).toBe("/dashboard/copilot/");
+    expect(newChatNavigation(null, "/dashboard/copilot/")).toBeNull();
+  });
+
+  it("the workspace navigates with the router, wires the composer's button, and never touches history", () => {
+    const src = readFileSync("src/components/copilot/CopilotWorkspace.tsx", "utf8");
+    expect(src).toContain("router.push");
+    expect(src).toMatch(/onNewChat=\{newChat\}\s*\/>/);
+    expect(src).not.toContain("pushState");
   });
 });

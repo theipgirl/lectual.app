@@ -90,3 +90,6 @@ export const SAVED_CHATS_NOT_SET_UP = "Saved chats aren't available until the da
 export const SAVED_CHATS_UNAVAILABLE = "Saved chats couldn't be loaded.";
 export const SAVED_CHATS_EMPTY = "No saved chats yet.";
 export const SAVE_FAILED_NOTE = "This chat isn't being saved right now.";
+
+/** New chat: when a past chat is open (`?c=`), the path to push so the server renders a fresh chat; null when already on a new one. */
+export const newChatNavigation = (openId: string | null, path: string): string | null => (openId ? path : null);

@@ -139,7 +139,8 @@ export async function POST(req: NextRequest): Promise<Response> {
             shouldStop: () => cancelled,
           });
           send({ event: "final", data: result });
-          await saveAfterFinal(result);
+          // A disconnected request never showed this answer (it may be the loop's fallback): save nothing.
+          if (!cancelled) await saveAfterFinal(result);
         } catch (err) {
           console.error("[matters-chat] failed to answer question", err);
           send({ event: "error", data: { message: STREAM_FAILED } });

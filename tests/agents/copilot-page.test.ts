@@ -38,6 +38,7 @@ describe("CopilotPage", () => {
 
   it("says plainly when no AI provider is configured, and renders no chat box", async () => {
     vi.doMock("@/lib/ai/claude", () => ({ aiConfigured: () => false }));
+    vi.doMock("next/navigation", () => ({ usePathname: () => "/dashboard/copilot/", useRouter: () => ({ push: () => {}, refresh: () => {} }) }));
     const html = await render();
 
     expect(html).toContain("isn&#x27;t configured for this deployment yet");
@@ -46,6 +47,7 @@ describe("CopilotPage", () => {
 
   it("renders the chat panel with suggested prompts when configured", async () => {
     vi.doMock("@/lib/ai/claude", () => ({ aiConfigured: () => true }));
+    vi.doMock("next/navigation", () => ({ usePathname: () => "/dashboard/copilot/", useRouter: () => ({ push: () => {}, refresh: () => {} }) }));
     const html = await render();
 
     expect(html).toContain("Ask the copilot");
@@ -54,6 +56,7 @@ describe("CopilotPage", () => {
 
   it("renders no fabricated matter, statistic, or sample conversation", async () => {
     vi.doMock("@/lib/ai/claude", () => ({ aiConfigured: () => true }));
+    vi.doMock("next/navigation", () => ({ usePathname: () => "/dashboard/copilot/", useRouter: () => ({ push: () => {}, refresh: () => {} }) }));
     const html = await render();
 
     // Invented matter references or model statistics baked into the page.
@@ -65,6 +68,7 @@ describe("CopilotPage", () => {
 
   it("states the UPL boundary plainly", async () => {
     vi.doMock("@/lib/ai/claude", () => ({ aiConfigured: () => true }));
+    vi.doMock("next/navigation", () => ({ usePathname: () => "/dashboard/copilot/", useRouter: () => ({ push: () => {}, refresh: () => {} }) }));
     const html = await render();
 
     expect(html).toMatch(/never gives legal analysis/i);

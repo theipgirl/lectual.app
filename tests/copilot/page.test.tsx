@@ -28,6 +28,7 @@ async function renderPage(opts: { hour?: number; configured?: boolean; reads?: R
   vi.setSystemTime(new Date(Date.UTC(2026, 9, 21, (opts.hour ?? 9) + 4, 30)));
   const userId = "u-1";
   vi.doMock("@/lib/ai/claude", () => ({ aiConfigured: () => opts.configured ?? true }));
+  vi.doMock("next/navigation", () => ({ usePathname: () => "/dashboard/copilot/", useRouter: () => ({ push: () => {}, refresh: () => {} }) }));
   vi.doMock("@/lib/firm/session", () => ({
     resolveFirmSession: vi.fn(async () => opts.session ?? { kind: "ok", user: { id: userId, email: "taylormcghee93@gmail.com", user_metadata: {} }, org: { id: "o-1" } }),
   }));
