@@ -1,5 +1,6 @@
 import "server-only";
 import { getScopedClient } from "@/lib/db/scoped-client";
+import { leadOptionLabel } from "./lead-label";
 
 /**
  * The leads the proposals page offers in its "Draft from a transcript" picker:
@@ -14,15 +15,7 @@ export const LEAD_OPTION_LIMIT = 100;
 export type LeadOptionRow = { id: string; label: string };
 export type LeadOptionsRead = { status: "ok"; leads: LeadOptionRow[] } | { status: "unavailable" };
 
-type LeadRow = { id: string; first_name: string | null; last_name: string | null; business_name: string | null; email: string | null };
-
-/** "Ana Ruiz · Ruiz Co", or whichever parts exist; the email as a last resort. */
-export function leadOptionLabel(lead: LeadRow): string {
-  const person = `${lead.first_name ?? ""} ${lead.last_name ?? ""}`.trim();
-  const business = lead.business_name?.trim() ?? "";
-  if (person && business) return `${person} · ${business}`;
-  return person || business || lead.email?.trim() || "Unnamed lead";
-}
+export { leadOptionLabel };
 
 export async function loadLeadOptions(): Promise<LeadOptionsRead> {
   try {

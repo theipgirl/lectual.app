@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { createProposalAction } from "@/app/dashboard/proposals/actions";
 import type { PackageOption } from "@/lib/proposals/package-list";
+import { USE_CONSULT_LABEL } from "@/lib/proposals/prefill-words";
 import { ActionForm, Outcome } from "./ActionForm";
 
 export type NewProposalDefaults = {
@@ -13,6 +14,8 @@ export type NewProposalDefaults = {
   firstName: string;
   company: string;
   clientEmail: string;
+  /** The first brand name: the lead's or matter's mark. Editable. */
+  brandName: string;
   title: string;
   expiresOn: string;
   payUrl: string;
@@ -36,19 +39,27 @@ export function fieldsForPackage(options: readonly PackageOption[], name: string
  * when the firm's settings couldn't be read: no dropdown is offered, and the
  * server starts from the standard prices. The included items and the office
  * action note always come from the firm's settings on the server.
+ * `defaultPackage` (a name on the list) starts the dropdown, and its five
+ * fields, on that package, exactly as picking it by hand would. `consult`
+ * offers the "use the marks and classes from the reviewed consult" box (ticked)
+ * with the page's list of what it adds; it posts only a yes, never a mark.
  * On success the action redirects to the new draft's editor.
  */
 export function NewProposalForm({
   defaults,
   hasSettings,
   packages,
+  defaultPackage,
+  consult,
 }: {
   defaults: NewProposalDefaults;
   hasSettings: boolean;
   packages: PackageOption[] | null;
+  defaultPackage?: string;
+  consult?: ReactNode;
 }) {
   const options = packages ?? [];
-  const first = options[0];
+  const first = options.find((o) => o.name === defaultPackage) ?? options[0];
   const [chosen, setChosen] = useState(first?.name ?? "");
   const [fields, setFields] = useState<PackageFields>(
     first
@@ -90,8 +101,16 @@ export function NewProposalForm({
             </label>
             <label className="lx-field">
               <span className="lx-label">First brand name (optional)</span>
-              <input className="lx-input" name="brandName" maxLength={200} placeholder="e.g. Prosperall" />
+              <input className="lx-input" name="brandName" maxLength={200} defaultValue={defaults.brandName} placeholder="e.g. Prosperall" />
             </label>
+            {consult && (
+              <div className="pe-consult-use" style={{ gridColumn: "1 / -1" }}>
+                <label className="pe-check" style={{ whiteSpace: "normal" }}>
+                  <input type="checkbox" name="useConsult" defaultChecked /> {USE_CONSULT_LABEL}
+                </label>
+                {consult}
+              </div>
+            )}
             {packages !== null && options.length > 0 && (
               <>
                 <label className="lx-field" style={{ gridColumn: "1 / -1" }}>

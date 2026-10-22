@@ -5,8 +5,10 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createProposal, getProposalSettings } from "@/lib/proposals/store";
 import { findPackage, normalisePackages } from "@/lib/proposals/package-list";
-import { standardProposalPricing, type ProposalPackageBasis, type ProposalSettingRow } from "@/lib/proposals/types";
+import { standardProposalPricing, type ProposalName, type ProposalPackageBasis, type ProposalSettingRow } from "@/lib/proposals/types";
 import { buildNewContent, parseDateInput, pricingFromPackage } from "@/lib/proposal-editor/form";
+import { loadConsultForPrefill } from "@/lib/proposals/consult-prefill-load";
+import { buildBrandNames, CHANGED_SINCE_LOAD, consultPrefill } from "@/lib/proposals/prefill";
 import { proposalActionError, type ActionState } from "./errors";
 import { gateStaffAction } from "./gate";
 
@@ -32,6 +34,13 @@ function field(form: FormData, key: string): string {
  * name posted anyway is refused, because there is nothing to check it against.
  * The lead and matter ids are re-checked by 0089's composite foreign keys, so
  * another firm's cannot be linked.
+ *
+ * "Use the marks and classes from the reviewed consult" (`useConsult`) carries
+ * no marks or classes: the browser is never trusted for them. When it is ticked
+ * and a lead is posted, the action reads that lead's consult details itself
+ * (the caller's scoped client), requires the newest to still be reviewed, and
+ * builds the brand names from that read. If they are no longer reviewed, can't
+ * be read, or are not that firm's, nothing is created.
  */
 export async function createProposalAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const refused = await gateStaffAction();
@@ -68,16 +77,26 @@ export async function createProposalAction(_prev: ActionState, formData: FormDat
     basis = { name: chosen.package, edited: priced.value.edited };
   }
 
+  const rand = () => randomBytes(4).toString("hex");
+  const brandName = field(formData, "brandName");
+  let names: ProposalName[] | undefined;
+  if (field(formData, "useConsult") && leadRaw) {
+    const fill = consultPrefill(await loadConsultForPrefill(leadRaw));
+    if (fill.state !== "filled" && fill.state !== "no_marks") return { error: CHANGED_SINCE_LOAD };
+    names = buildBrandNames({ typed: brandName, brands: fill.state === "filled" ? fill.brands : [], rand });
+  }
+
   let id: string;
   try {
     const content = buildNewContent({
       firstName,
       fullName,
       company: field(formData, "company"),
-      brandName: field(formData, "brandName"),
+      brandName,
+      names,
       standard,
       packageBasis: basis,
-      rand: () => randomBytes(4).toString("hex"),
+      rand,
     });
     const created = await createProposal({
       clientName: fullName,
