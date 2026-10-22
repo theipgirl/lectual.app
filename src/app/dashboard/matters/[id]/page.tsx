@@ -170,7 +170,7 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
       <Link href="/dashboard/matters/" className="lx-back">
         ← Matters
       </Link>
-      <div className="lx-page-head">
+      <div className="lx-page-head" data-tour="matter-head">
         <div style={{ flex: 1, minWidth: 260 }}>
           <div className="lx-label">
             {MATTER_TYPE_LABEL[matter.type]} · <span className="lx-num">{matter.matter_number}</span>
@@ -219,7 +219,7 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
 
       <div className="lx-split">
         <div className="lx-col">
-          <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }}>
+          <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }} data-tour="matter-deadlines">
             <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
               <h2 className="lx-h2" style={{ fontSize: 23 }}>
                 Deadlines
@@ -346,7 +346,7 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
           )}
 
           {(followUp || (matter.type === "TM" && hasAgentToolkit)) && canWrite && (
-            <section id="client-updates" className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }}>
+            <section id="client-updates" className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }} data-tour="matter-updates">
               <h2 className="lx-h2" style={{ fontSize: 23 }}>
                 Client updates
               </h2>
@@ -421,7 +421,7 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
           </section>
         </div>
 
-        <aside className="lx-col lx-col-aside">
+        <aside className="lx-col lx-col-aside" data-tour="matter-aside">
           <ClientContactCard matterId={matter.id} read={contactsRead} canWrite={canWrite} />
 
           {canStartProposal && <MatterProposalCard matterId={matter.id} />}

@@ -56,7 +56,7 @@ export default async function ReconcilePage() {
         <div className="lx-page-head">
           <div style={{ flex: 1, minWidth: 260 }}>
             <div className="lx-label">Intake</div>
-            <h1 className="lx-h1">Reconcile stages</h1>
+            <h1 className="lx-h1" data-tour="reconcile-head">Reconcile stages</h1>
             <p className="lx-sub">
               Check each lead&apos;s stage against your intake sheet, Lawmatics and synced mail, then move the ones you
               agree with.

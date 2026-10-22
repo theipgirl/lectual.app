@@ -38,7 +38,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
       <div className="lx-page-head">
         <div style={{ flex: 1, minWidth: 260 }}>
           <div className="lx-label">Review</div>
-          <h1 className="lx-h1">Approval queue</h1>
+          <h1 className="lx-h1" data-tour="queue-head">Approval queue</h1>
           <p className="lx-sub">
             Everything an agent drafted for a client, newest first. Approving puts the message in a mail client for a
             person to send — nothing reaches a client on its own.

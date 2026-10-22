@@ -145,7 +145,7 @@ export default async function AgentsPage() {
       <div className="lx-page-head">
         <div style={{ flex: 1, minWidth: 260 }}>
           <div className="lx-label">IP.OS</div>
-          <h1 className="lx-h1">Agents</h1>
+          <h1 className="lx-h1" data-tour="agents-head">Agents</h1>
           <p className="lx-sub">
             Each agent reads one source and writes one kind of thing. Anything addressed to a client
             goes into the approval queue, so switching an agent on can never put a word in front of a

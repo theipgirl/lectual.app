@@ -400,7 +400,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
       <div className="lx-page-head">
         <div style={{ flex: 1, minWidth: 260 }}>
           <div className="lx-label">Calendar</div>
-          <h1 className="lx-h1">{title}</h1>
+          <h1 className="lx-h1" data-tour="calendar-head">{title}</h1>
           <p className="lx-sub">
             {hasMailbox
               ? "Docket deadlines, task due dates, and events from your connected Outlook calendars."

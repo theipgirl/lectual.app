@@ -166,7 +166,7 @@ function IntakeEmpty({ status }: { status: "none" | "unconfigured" | "unavailabl
         <div className="lx-page-head">
           <div style={{ flex: 1, minWidth: 240 }}>
             <div className="lx-label">Intake</div>
-            <h1 className="lx-h1">Intake forms</h1>
+            <h1 className="lx-h1" data-tour="forms-head">Intake forms</h1>
             <p className="lx-sub">Your public intake, how it looks, and where it lives.</p>
           </div>
         </div>

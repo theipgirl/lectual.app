@@ -242,7 +242,7 @@ export default async function IntakePage({
   });
 
   return (
-    <div className="intake-root">
+    <div className="intake-root" data-tour="intake-board">
     <IntakeWorkspace
       rows={rows}
       stages={stages}

@@ -93,7 +93,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
       <div className="lx-page-head">
         <div style={{ flex: 1, minWidth: 260 }}>
           <div className="lx-label">Docket</div>
-          <h1 className="lx-h1">Matters</h1>
+          <h1 className="lx-h1" data-tour="matters-head">Matters</h1>
           <p className="lx-sub">Every engaged matter, grouped by whose move it is. Longest in its stage first.</p>
         </div>
         <form className="lx-search-form" role="search">

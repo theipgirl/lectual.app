@@ -186,7 +186,7 @@ export default async function IntegrationsPage({
     <>
       <div>
         <div className="lx-label">Settings</div>
-        <h1 className="lx-h1">Integrations</h1>
+        <h1 className="lx-h1" data-tour="integrations-head">Integrations</h1>
         <p className="lx-sub">Connect outside services to your firm.</p>
       </div>
 

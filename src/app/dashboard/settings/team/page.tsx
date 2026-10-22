@@ -37,7 +37,7 @@ export default async function TeamPage() {
       <div className="lx-page-head">
         <div style={{ flex: 1, minWidth: 260 }}>
           <div className="lx-label">Settings</div>
-          <h1 className="lx-h1">Team &amp; roles</h1>
+          <h1 className="lx-h1" data-tour="team-head">Team &amp; roles</h1>
           <p className="lx-sub">Ten roles, enforced in the database, not just hidden in the menu. A role decides what someone can open, edit and approve.</p>
         </div>
       </div>

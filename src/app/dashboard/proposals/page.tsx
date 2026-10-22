@@ -146,7 +146,7 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
       <div className="pq-main">
         <div className="lx-page-head">
           <div style={{ flex: 1, minWidth: 260 }}>
-            <h1 className="lx-h1">Quotes &amp; proposals</h1>
+            <h1 className="lx-h1" data-tour="proposals-head">Quotes &amp; proposals</h1>
             <p className="lx-sub">{subtitle}</p>
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
