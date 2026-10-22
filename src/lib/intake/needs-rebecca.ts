@@ -1,11 +1,11 @@
 import type { LeadPendingApproval, LeadPendingApprovals } from "./pending-approvals";
 
 /**
- * Pure helpers behind the "Needs Rebecca" badge and filter on /intake. No
+ * Pure helpers behind the "Needs attorney" badge and filter on /intake. No
  * server imports — see scope.ts's header for why that matters here.
  *
  * The approvals read has three states plus "not passed at all", and none of the
- * last three may ever look like "nobody needs Rebecca": only an `ok` read can
+ * last three may ever look like "nobody needs an attorney": only an `ok` read can
  * say that. Every helper below therefore returns "nothing to show" for
  * undefined / unconfigured / unavailable, and `approvalsShown` is the one place
  * the caller asks whether the badge and the filter are allowed to render.
@@ -52,9 +52,9 @@ export function filterNeedsRebecca<T extends { lead: { id: string } }>(
   return rows.filter((row) => needing.has(row.lead.id));
 }
 
-/** "Needs Rebecca · 2" */
+/** "Needs attorney · 2" (role-neutral: every firm sees this, not one firm's attorney). */
 export function needsRebeccaLabel(count: number): string {
-  return `Needs Rebecca · ${count}`;
+  return `Needs attorney · ${count}`;
 }
 
 /** Tooltip text: one headline per line, blank headlines named rather than dropped. */

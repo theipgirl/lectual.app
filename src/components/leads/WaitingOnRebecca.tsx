@@ -2,15 +2,15 @@ import Link from "next/link";
 import type { LeadPendingApproval, LeadPendingApprovals } from "@/lib/intake/pending-approvals";
 import { relativeTime } from "@/lib/relative-time";
 
-/** What a pending item is, in Rebecca's words. */
+/** What a pending item is, in plain words. */
 export function approvalLabel(kind: LeadPendingApproval["kind"]): string {
-  if (kind === "rebecca_brief") return "Brief for Rebecca";
+  if (kind === "rebecca_brief") return "Brief for the attorney";
   if (kind === "client_draft") return "Client email draft — needs approval";
   return "Draft awaiting approval";
 }
 
 /**
- * The lead page's "Waiting on Rebecca" panel: this lead's pending approvals,
+ * The lead page's "Waiting on attorney review" panel: this lead's pending approvals,
  * each linking to the queue item where it is reviewed. Nothing is approved or
  * sent from here.
  *
@@ -34,7 +34,7 @@ export function WaitingOnRebecca({
   return (
     <section className="lx-card" style={{ padding: 18, display: "grid", gap: 10 }} aria-labelledby="waiting-on-rebecca-heading">
       <h2 id="waiting-on-rebecca-heading" className="lx-h2" style={{ fontSize: 23, margin: 0 }}>
-        Waiting on Rebecca
+        Waiting on attorney review
       </h2>
       {approvals.status === "unavailable" ? (
         <p role="alert" className="lx-note" style={{ margin: 0, color: "var(--wine)" }}>

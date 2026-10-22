@@ -38,7 +38,7 @@ describe("WaitingOnRebecca", () => {
         ],
       },
     });
-    expect(html).toContain("Brief for Rebecca");
+    expect(html).toContain("Brief for the attorney");
     expect(html).toContain("Client email draft — needs approval");
     expect(html).toContain("Draft awaiting approval");
     expect(html).toContain("Heads-up: Dana consult");
@@ -49,7 +49,7 @@ describe("WaitingOnRebecca", () => {
   });
 
   it("labels each kind", () => {
-    expect(approvalLabel("rebecca_brief")).toBe("Brief for Rebecca");
+    expect(approvalLabel("rebecca_brief")).toBe("Brief for the attorney");
     expect(approvalLabel("client_draft")).toBe("Client email draft — needs approval");
     expect(approvalLabel("other")).toBe("Draft awaiting approval");
   });

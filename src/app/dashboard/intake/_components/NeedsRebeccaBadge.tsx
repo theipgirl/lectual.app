@@ -2,8 +2,8 @@ import type { LeadPendingApproval } from "@/lib/intake/pending-approvals";
 import { needsRebeccaLabel, needsRebeccaTitle } from "@/lib/intake/needs-rebecca";
 
 /**
- * "Needs Rebecca · N": this lead has drafts sitting in the approval queue for
- * her review. The tooltip lists the headlines, one per line.
+ * "Needs attorney · N": this lead has drafts sitting in the approval queue for
+ * an attorney's review. The tooltip lists the headlines, one per line.
  *
  * Informational only — it does not open, approve or send anything; the queue
  * stays the one place a draft is resolved. Renders nothing for an empty list,

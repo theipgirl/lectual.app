@@ -223,7 +223,7 @@ export async function makeProposalLive(proposalId: string): Promise<{ ok: true }
 
 /* ── "Mark as sent" for a proposal the consult agent drafted ────────────────── */
 
-export const GOES_LIVE_ON_APPROVAL = "This proposal goes live when Rebecca approves its email in the approval queue.";
+export const GOES_LIVE_ON_APPROVAL = "This proposal goes live when an attorney approves its email in the approval queue.";
 
 /**
  * May "Mark as sent" be used on this proposal? Not while the consult agent's
