@@ -287,7 +287,7 @@ describe("inbox-summary (F12): the digest", () => {
     expect(d.draftBody).toContain("Nothing in the last 24 hours.");
     for (const text of [d.headline, d.draftBody, d.summary ?? ""]) {
       expect(text).not.toMatch(/undefined|null|\[object Object\]/);
-      expect(text).not.toMatch(/—/);
+      expect(text).not.toMatch(/\u2014/);
       expect(text).not.toMatch(/\p{Extended_Pictographic}/u);
     }
     expect(result).toMatchObject({ itemsIn: 0, draftsOut: 1 });

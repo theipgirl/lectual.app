@@ -242,7 +242,7 @@ describe("morning-brief (F3): the six sections from fixtures", () => {
     const brief = briefOf(createDraft);
     for (const text of [brief.headline, brief.summary, brief.draftBody]) {
       expect(text).not.toMatch(/undefined|null|\[object Object\]|\{"/);
-      expect(text).not.toMatch(/—/);
+      expect(text).not.toMatch(/\u2014/);
       expect(text).not.toMatch(/\p{Extended_Pictographic}/u);
     }
   });

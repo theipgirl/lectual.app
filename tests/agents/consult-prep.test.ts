@@ -304,7 +304,7 @@ describe("consult-prep (F8): classes, package and price are never generated", ()
     const [email] = clientEmails(createDraft);
     for (const re of FORBIDDEN) expect(email.draftBody as string).not.toMatch(re);
     expect(email.subject).toBe("Preparing for your strategy session");
-    expect(`${email.headline} ${headsUp.headline}`).not.toMatch(/—/);
+    expect(`${email.headline} ${headsUp.headline}`).not.toMatch(/\u2014/);
   });
 
   it.each([
