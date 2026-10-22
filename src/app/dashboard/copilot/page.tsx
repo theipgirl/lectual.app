@@ -131,7 +131,7 @@ export default async function CopilotPage(props?: { searchParams?: Promise<{ c?:
           openNote={saved.openNote}
           greeting={greeting}
           stats={landing}
-          now={Date.now()}
+          now={new Date().getTime()}
         />
       ) : (
         <div className="lx-card lx-empty-card">
