@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useRef } from "react";
 import {
   signOutAction,
@@ -91,6 +92,15 @@ export function AccountMenu({
             )}
           </form>
         )}
+
+        <Link
+          href="/dashboard/getting-started/"
+          className="lx-btn lx-btn-sec lx-btn-sm"
+          style={{ width: "100%" }}
+          onClick={() => menu.current?.removeAttribute("open")}
+        >
+          Getting started
+        </Link>
 
         <button
           type="button"

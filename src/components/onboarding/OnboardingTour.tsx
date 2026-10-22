@@ -32,10 +32,13 @@ type ViewProps = {
   onLink: () => void;
   popRef?: React.Ref<HTMLDivElement>;
   nextRef?: React.Ref<HTMLButtonElement>;
+  /** Wording for the last step's button and the skip button. The first-sign-in tour keeps its own. */
+  finishLabel?: string;
+  skipLabel?: string;
 };
 
 /** The dialog itself. Presentational, so it renders the same on the server as in the browser. */
-export function TourView({ steps, index, placement, onNext, onBack, onSkip, onLink, popRef, nextRef }: ViewProps) {
+export function TourView({ steps, index, placement, onNext, onBack, onSkip, onLink, popRef, nextRef, finishLabel = "Done", skipLabel = "Skip tour" }: ViewProps) {
   const titleId = useId();
   const step = steps[clampIndex(index, steps.length)];
   if (!step) return null;
@@ -86,12 +89,12 @@ export function TourView({ steps, index, placement, onNext, onBack, onSkip, onLi
             </button>
           )}
           <button ref={nextRef} type="button" className="lx-btn lx-btn-pri lx-btn-sm" onClick={onNext}>
-            {last ? "Done" : "Next"}
+            {last ? finishLabel : "Next"}
           </button>
           <span className="ot-spacer" />
           {!last && (
             <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={onSkip}>
-              Skip tour
+              {skipLabel}
             </button>
           )}
         </div>

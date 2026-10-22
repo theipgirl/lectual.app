@@ -577,6 +577,37 @@ Display and derivation only: no data is rewritten, nothing is sent, no new depen
 - **Module list:** `activeOrgModules` is wrapped in React `cache`, one `crm_org` read per request across the layouts and the page.
   Settings -> Modules keeps its two reads in sequence on purpose: Mailboxes off must not read connections.
 
+## Getting started hub (Sprint 23, no schema)
+`/dashboard/getting-started/` ("Getting started · Lectual") is a set of guided flows over the real screens, open to every member.
+Internal only: a flow points at things and explains them; it never clicks, moves or sends anything. The one write is the person's own progress flag.
+- **Catalog:** `src/lib/onboarding/hub.ts` (pure). Five tracks (`intake`, `consults`, `matters`, `approvals`, `admin`), each a list of flows, each flow a
+  list of steps `{ id, path, target, title, body }`. `hubTracks({ role, modules, aiConfigured })` filters: a flow needs named rail sections to be visible
+  (`visibleNav`, the rail's own data, so module gates fail closed), `admin: true` needs `canSeeSetup`, `ai: true` needs the AI key. An unknown role sees
+  nothing, an unreadable module list (`null`) is treated as none and the page says some guides couldn't be checked, and a track with no flow left is dropped.
+  Read-only wording for viewer, social_media and unknown roles lives in the step's `bodyReadOnly` (the queue step). A test checks every path exists on disk
+  and every target is a `data-tour` hook in the sources, so a step cannot point at nothing; copy is denylist-tested (no advice, no "will send", no names).
+- **Progress:** `user_metadata.lectual_hub = { version: 1, done: string[], hidden_card?: true }`, written only by `hub-actions.ts` (`markHubFlowAction`,
+  `resetHubProgressAction`, `hideHubCardAction`) through `getScopedClient()` + `auth.updateUser`, merged with every other key (the Sprint 21 `lectual_tour` flag
+  included), fixed-sentence errors, no user or org argument. Unknown, repeated or non-string ids and another version read as empty. Reset also clears `hidden_card`.
+  Counts only include flows the person currently sees. It decides what is drawn, never what anyone may see or do.
+- **No rail entry (decision):** `NAV` rows carry a `step`, and the Sprint 21 tour and `tests/nav.test.ts` derive from the same list, so a row is not a one-line
+  edit. The page is reached from the account menu ("Getting started", beside "Show tips again") and the Today card (`GettingStartedCard`, its own async
+  component with its own read; hidden when every visible flow is done or after Hide; a failed read still shows the link, with no count).
+- **Runner:** `GettingStartedRunner` is mounted once in the dashboard layout. It is closed on load unless sessionStorage holds a valid `lectual_hub_flow` =
+  `<flowId>:<index>` (`resumeFlow`: malformed, unknown or no-longer-visible clears it; a bad index restarts the flow). Records picked at start live in
+  `lectual_hub_records` (ids are charset-checked before they reach a path). Next/Back to a step on another page navigates with the router and the new
+  `flowId:index` is stored first; leaving the step's page by hand ends the flow (not done); Skip/Esc never marks done; Finish marks done optimistically and a
+  failed save only keeps the check locally (`lectual_hub_local_done`). Decisions are pure in `hub-runner.ts`; the popover is Sprint 21's `TourView`
+  (with optional `finishLabel`/`skipLabel`) and `tour.css`.
+- **Record steps:** the first lead (most recent last activity) and first matter the person can see are read at flow start by `pickHubRecordsAction`
+  (scoped client, read only, `limit(1)`, three states per kind: ok / none / unavailable). With no record the step becomes a centered card saying what the
+  page would show ("Nothing here yet." or "Your records couldn't be loaded."), never an error and never another firm's record. The page shows the same
+  note under such flows.
+- **Sprint 21's tour is unchanged** (its props, flag, guard and wording); the hub only adds the runner beside it. `data-tour` hooks added by this sprint are
+  attribute-only: `lead-head`, `lead-prep`, `lead-timeline`, `matter-head` (on the page head, not the h1), `matter-deadlines`, `matter-updates`,
+  `matter-aside`, `intake-board`, and `*-head` on the h1 of the forms, reconcile, calendar, proposals, new proposal, matters, meetings, queue, agents, setup,
+  integrations, team, modules and firm pages.
+
 ## JSX text spacing: keep the `{" "}`
 Next 16.2.7's compiler DROPS the leading space of JSX text that contains an HTML entity
 (`&apos;`, `&amp;`, `&rsquo;`…) and runs onto another line, even if that is only the line
