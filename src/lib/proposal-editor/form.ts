@@ -370,6 +370,8 @@ export function buildNewContent(input: {
   fullName: string;
   company?: string;
   brandName?: string;
+  /** Brand names already built (a consult's marks and classes). When given they are used as they are and `brandName` is ignored. */
+  names?: ProposalName[];
   standard: StandardPricing;
   /** The firm package this started from, and what was changed from it. Left out when nothing was. */
   packageBasis?: ProposalPackageBasis | null;
@@ -381,7 +383,7 @@ export function buildNewContent(input: {
     client: { first_name: input.firstName.trim(), full_name: input.fullName.trim(), ...(company ? { company } : {}) },
     greeting: defaultGreeting(input.firstName),
     pricing: { ...input.standard.pricing },
-    names: brand ? [newBrandName(brand, new Set<string>(), input.rand)] : [],
+    names: input.names ?? (brand ? [newBrandName(brand, new Set<string>(), input.rand)] : []),
     adjustments: [],
     includes: input.standard.includes.map((r) => ({ ...r })),
     office_action_note: input.standard.office_action_note,

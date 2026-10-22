@@ -61,6 +61,8 @@ import { loadMatterAnswers } from "@/lib/answers/load-answers";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { canSendIntakeRequest, listMatterIntakeRequests } from "@/lib/intake-forms/requests";
 import { intakeOrigin } from "@/lib/intake-forms/origin";
+import { PROPOSAL_STAFF_WRITE_ROLES } from "@/lib/proposals/types";
+import { MatterProposalCard } from "@/components/matters/MatterProposalCard";
 import { MATTER_TYPE_LABEL } from "../labels";
 
 export const dynamic = "force-dynamic";
@@ -83,11 +85,14 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
 
   // Per-firm modules (0040): litigation facts, and the agent-toolkit cards,
   // whose copy is written in one firm's voice. Each action re-checks.
-  const [hasLitigation, hasAgentToolkit, hasDocumentCenter] = await Promise.all([
+  const [hasLitigation, hasAgentToolkit, hasDocumentCenter, hasProposals] = await Promise.all([
     orgHasModule("litigation"),
     orgHasModule("agent-toolkit"),
     orgHasModule("document-center"),
+    // A module state that can't be read is "off": no link to New proposal.
+    orgHasModule("proposals").catch(() => false),
   ]);
+  const canStartProposal = hasProposals && PROPOSAL_STAFF_WRITE_ROLES.includes(session.role);
 
   const [stages, tasks, activity, deadlines, contactsRead, members, litigation] = await Promise.all([
     // null = could not read, which is not the same as "this firm has none".
@@ -404,6 +409,8 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
 
         <aside className="lx-col lx-col-aside">
           <ClientContactCard matterId={matter.id} read={contactsRead} canWrite={canWrite} />
+
+          {canStartProposal && <MatterProposalCard matterId={matter.id} />}
 
           <section className="lx-card lx-aside">
             <div className="lx-label">Tasks</div>

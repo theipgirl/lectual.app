@@ -6,10 +6,31 @@ import { firmCivilDate } from "@/lib/quotes/firm-time";
 import { getProposalSettings } from "@/lib/proposals/store";
 import { PROPOSAL_STAFF_WRITE_ROLES } from "@/lib/proposals/types";
 import { normalisePackages, packageOption, type PackageOption } from "@/lib/proposals/package-list";
-import type { ProposalSettingRow } from "@/lib/proposals/types";
+import type { ProposalPricing, ProposalSettingRow } from "@/lib/proposals/types";
 import { loadConsultStrip } from "@/lib/proposals/consult-strip-load";
+import { loadConsultForPrefill } from "@/lib/proposals/consult-prefill-load";
+import { leadOptionLabel } from "@/lib/proposals/lead-label";
+import { buildPicker, NEW_PROPOSAL_PATH, pickerHref, pickerKind, proposalLeadRecord, proposalMatterRecord, type ListRead } from "@/lib/proposals/new-picker";
+import {
+  clientFromLead,
+  consultPrefill,
+  filledFromLine,
+  leadBrand,
+  matterBrand,
+  matterTitle,
+  packageFromConsult,
+  packageNote,
+  type LeadFill,
+  type MatterFill,
+} from "@/lib/proposals/prefill";
+import { listLeads } from "@/lib/pipeline";
+import { listMatters } from "@/lib/matters";
+import { normalizeTerm } from "@/lib/skills/pick";
+import type { RecordKind } from "@/lib/skills/catalog";
 import { ConsultStrip } from "@/components/proposal-editor/ConsultStrip";
+import { ConsultFillList, ConsultSkipNote, FilledFrom } from "@/components/proposal-editor/FilledFrom";
 import { NewProposalForm, type NewProposalDefaults } from "@/components/proposal-editor/NewProposalForm";
+import { WhoIsThisFor, type WhoChosen } from "@/components/proposal-editor/WhoIsThisFor";
 import { requireProposalsModule } from "../gate";
 import "../proposals.css";
 
@@ -23,20 +44,43 @@ function defaultExpiry(tz: string): string {
   return firmCivilDate(new Date(Date.now() + DEFAULT_OPEN_DAYS * 86_400_000), tz);
 }
 
+/** A query value is a string, or the first of several. */
+const first = (v: string | string[] | undefined): string => (Array.isArray(v) ? v[0] : v) ?? "";
+
+type Search = { lead?: string | string[]; matter?: string | string[]; kind?: string | string[]; q?: string | string[]; blank?: string | string[] };
+
+/** A list read, in the states it can end in. A failed read is never an empty list. */
+async function readRecords(kind: RecordKind): Promise<ListRead> {
+  try {
+    const records = kind === "lead" ? (await listLeads()).map(proposalLeadRecord) : (await listMatters()).map(proposalMatterRecord);
+    return { status: "ok", records };
+  } catch {
+    return { status: "failed" };
+  }
+}
+
 /**
- * New proposal. `?lead=<id>` pre-fills the client from the lead, and
- * `?matter=<id>` from the matter's lead and links the matter (the matter wins
- * when both are given). Both are read through the caller's own scoped client,
- * so a lead or matter from another firm is simply not found. The package
- * dropdown lists the firm's saved packages (name plus "$4,950 · 3 classes") and
- * pre-fills the price fields in the browser; the create action re-reads the
- * package by name itself, so a price the form carries is never trusted over the
- * package. A failed settings read shows a note and no dropdown. A linked lead's
- * latest consult is shown above the form.
+ * New proposal. At the top, "Who is this for?": a Leads | Matters picker (recent
+ * first, searchable, "Start blank"). Choosing a record is a link to `?lead=<id>`
+ * or `?matter=<id>`, and the page re-reads that record itself through the
+ * caller's own scoped client, so the browser is never trusted and a lead or
+ * matter from another firm is simply not found. The matter wins when both are
+ * given. Once a record is chosen the picker collapses to "For: <label> . Change".
+ *
+ * What it fills: the client (name, first name, company, email) and the first
+ * brand name from the lead's or matter's own fields, and, ONLY when a person has
+ * reviewed the newest consult details, each mark with its classes and a package
+ * that is on the firm's current list. Anything else about the consult fills
+ * nothing and says why in one line. No price is read from any record: the price
+ * fields are the chosen package's, which the browser fills in and the create
+ * action re-reads by name from settings. A failed settings read shows a note and
+ * no dropdown. A linked lead's latest consult is shown above the form.
  */
-export default async function NewProposalPage({ searchParams }: { searchParams: Promise<{ lead?: string; matter?: string }> }) {
+export default async function NewProposalPage({ searchParams }: { searchParams: Promise<Search> }) {
   await requireProposalsModule();
-  const { lead: leadRaw, matter: matterRaw } = await searchParams;
+  const params = await searchParams;
+  const leadRaw = first(params.lead);
+  const matterRaw = first(params.matter);
 
   const role = await currentRole();
   if (!role || !PROPOSAL_STAFF_WRITE_ROLES.includes(role)) {
@@ -60,6 +104,7 @@ export default async function NewProposalPage({ searchParams }: { searchParams: 
   // Three states: settings read (a row or none yet) or couldn't be read. A failed read offers no package and says so.
   let settings: ProposalSettingRow | null = null;
   let packages: PackageOption[] | null;
+  let packageList: ProposalPricing[] | null;
   const [tz, settingsRead] = await Promise.all([
     getFirmTimeZone(),
     getProposalSettings().then(
@@ -69,8 +114,10 @@ export default async function NewProposalPage({ searchParams }: { searchParams: 
   ]);
   if (settingsRead.ok) {
     settings = settingsRead.row;
-    packages = normalisePackages(settings?.pricing ?? {}).map(packageOption);
+    packageList = normalisePackages(settings?.pricing ?? {});
+    packages = packageList.map(packageOption);
   } else {
+    packageList = null;
     packages = null;
   }
 
@@ -81,39 +128,80 @@ export default async function NewProposalPage({ searchParams }: { searchParams: 
     firstName: "",
     company: "",
     clientEmail: "",
+    brandName: "",
     title: "Trademark Proposal",
     expiresOn: defaultExpiry(tz),
     payUrl: settings?.default_pay_url ?? "",
   };
 
   let leadNote: string | null = null;
+  let matterRow: MatterFill | null = null;
+  let leadRow: LeadFill | null = null;
   if (matterRaw) {
     if (!UUID.test(matterRaw)) leadNote = "That matter link isn't valid, so the form is blank.";
     else {
       const supabase = await getScopedClient();
-      const { data: matter, error } = await supabase.from("crm_matter").select("id, lead_id, owner_name").eq("id", matterRaw).maybeSingle();
+      const { data: matter, error } = await supabase
+        .from("crm_matter")
+        .select("id, lead_id, owner_name, mark_text, title, matter_number")
+        .eq("id", matterRaw)
+        .maybeSingle();
       if (error) leadNote = "That matter couldn't be loaded just now, so the form is blank.";
       else if (!matter) leadNote = "That matter couldn't be found, so the form is blank.";
       else {
+        matterRow = matter;
         defaults.matterId = matter.id;
         defaults.fullName = matter.owner_name?.trim() ?? "";
         if (matter.lead_id) {
           const result = await readLead(matter.lead_id);
-          if (result.lead) applyLead(defaults, result.lead);
+          if (result.lead) leadRow = result.lead;
           else leadNote = result.note;
         }
+        defaults.brandName = matterBrand(matter, leadRow);
       }
     }
   } else if (leadRaw) {
     if (!UUID.test(leadRaw)) leadNote = "That lead link isn't valid, so the form is blank.";
     else {
       const result = await readLead(leadRaw);
-      if (result.lead) applyLead(defaults, result.lead);
-      else leadNote = result.note;
+      if (result.lead) {
+        leadRow = result.lead;
+        defaults.brandName = leadBrand(leadRow);
+      } else leadNote = result.note;
     }
   }
+  if (leadRow) applyLead(defaults, leadRow);
 
-  const strip = defaults.leadId ? await loadConsultStrip(defaults.leadId) : null;
+  // What the picker shows: the chosen record (collapsed), or the lists.
+  const term = normalizeTerm(params.q);
+  const kind: RecordKind = matterRaw ? "matter" : leadRaw ? "lead" : pickerKind(params.kind);
+  const chosenLabel = matterRow ? matterTitle(matterRow) : leadRow && !matterRaw ? leadOptionLabel(leadRow) : null;
+  const blank = first(params.blank) === "1" && !matterRaw && !leadRaw;
+  let who: WhoChosen | null = null;
+  let view: ReturnType<typeof buildPicker> | null = null;
+  if (chosenLabel) who = { kind: "chosen", label: chosenLabel, changeHref: pickerHref(matterRow ? "matter" : "lead", term) };
+  else if (blank) who = { kind: "blank", chooseHref: NEW_PROPOSAL_PATH };
+  else {
+    const [leads, matters] = await Promise.all([readRecords("lead"), readRecords("matter")]);
+    view = buildPicker({ kind, term, leads, matters });
+  }
+
+  // The consult: for the lead, or the matter's lead. Only a REVIEWED newest record fills anything.
+  const [strip, consultRead] = defaults.leadId
+    ? await Promise.all([loadConsultStrip(defaults.leadId), loadConsultForPrefill(defaults.leadId)])
+    : [null, null];
+  const consult = matterRow && !matterRow.lead_id ? consultPrefill(null) : consultRead ? consultPrefill(consultRead) : null;
+  const filled = consult?.state === "filled" ? consult : null;
+  const packageFill = filled ? packageFromConsult(filled.recommendedPackage, packageList) : null;
+
+  const line = filledFromLine({
+    matter: matterRow ? matterTitle(matterRow) : null,
+    lead: leadRow ? leadOptionLabel(leadRow) : null,
+    consult: filled ? { reviewedBy: filled.reviewedBy, reviewedAt: filled.reviewedAt } : null,
+    packageName: packageFill?.kind === "match" ? packageFill.name : null,
+    droppedClasses: filled?.dropped ?? 0,
+    tz,
+  });
 
   return (
     <div className="pe-page">
@@ -128,6 +216,8 @@ export default async function NewProposalPage({ searchParams }: { searchParams: 
           approves it.
         </p>
       </div>
+      <WhoIsThisFor view={view} chosen={who} />
+      <FilledFrom line={line} />
       {defaults.leadId && (
         <p className="lx-note" style={{ margin: 0 }}>
           Linked to the lead you came from.{" "}
@@ -141,24 +231,35 @@ export default async function NewProposalPage({ searchParams }: { searchParams: 
         </p>
       )}
       {strip && defaults.leadId && <ConsultStrip state={strip} leadId={defaults.leadId} tz={tz} />}
+      {consult && consult.state !== "filled" && <ConsultSkipNote skip={consult.state} leadId={defaults.leadId} />}
       {leadNote && (
         <p role="status" className="lx-banner lx-banner-mute" style={{ margin: 0 }}>
           {leadNote}
         </p>
       )}
-      <NewProposalForm defaults={defaults} hasSettings={settings !== null || !settingsRead.ok} packages={packages} />
+      {packageFill?.kind === "unlisted" && (
+        <p role="status" className="lx-banner lx-banner-mute" style={{ margin: 0 }}>
+          {packageNote(packageFill.asked)}
+        </p>
+      )}
+      <NewProposalForm
+        key={`${defaults.matterId}|${defaults.leadId}`}
+        defaults={defaults}
+        hasSettings={settings !== null || !settingsRead.ok}
+        packages={packages}
+        defaultPackage={packageFill?.kind === "match" ? packageFill.name : undefined}
+        consult={filled ? <ConsultFillList brands={filled.brands} /> : undefined}
+      />
     </div>
   );
 }
 
-type LeadFields = { id: string; first_name: string | null; last_name: string | null; business_name: string | null; email: string | null };
-
 /** A lead through the caller's scoped client: found, not found, or not readable (never confused). */
-async function readLead(id: string): Promise<{ lead: LeadFields; note?: undefined } | { lead: null; note: string }> {
+async function readLead(id: string): Promise<{ lead: LeadFill; note?: undefined } | { lead: null; note: string }> {
   const supabase = await getScopedClient();
   const { data: lead, error } = await supabase
     .from("crm_lead")
-    .select("id, first_name, last_name, business_name, email")
+    .select("id, first_name, last_name, business_name, email, mark_text")
     .eq("id", id)
     .maybeSingle();
   if (error) return { lead: null, note: "That lead couldn't be loaded just now, so the client details are blank." };
@@ -166,11 +267,11 @@ async function readLead(id: string): Promise<{ lead: LeadFields; note?: undefine
   return { lead };
 }
 
-function applyLead(defaults: NewProposalDefaults, lead: LeadFields): void {
-  const person = `${lead.first_name ?? ""} ${lead.last_name ?? ""}`.trim();
+function applyLead(defaults: NewProposalDefaults, lead: LeadFill): void {
+  const client = clientFromLead(lead);
   defaults.leadId = lead.id;
-  defaults.fullName = person || lead.business_name?.trim() || defaults.fullName;
-  defaults.firstName = lead.first_name?.trim() ?? "";
-  defaults.company = person && lead.business_name ? lead.business_name.trim() : "";
-  defaults.clientEmail = lead.email?.trim() ?? "";
+  defaults.fullName = client.fullName || defaults.fullName;
+  defaults.firstName = client.firstName;
+  defaults.company = client.company;
+  defaults.clientEmail = client.clientEmail;
 }

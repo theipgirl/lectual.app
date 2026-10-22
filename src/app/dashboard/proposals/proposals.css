@@ -236,3 +236,19 @@
 .pe-step-text { flex: 1 1 260px; min-width: 0; }
 .pq-paid { display: grid; gap: 6px; justify-items: start; margin-top: 6px; }
 .pq-paid-form { display: grid; gap: 4px; justify-items: start; }
+
+/* ── New proposal: who it is for (Sprint 20) ──────────────── */
+.pe-who { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.pe-who-bar { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 6px; padding: 12px 18px; }
+.pe-who-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.pe-who-switch { align-self: flex-start; }
+.pe-who-search { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.pe-who-search .lx-input { flex: 1; min-width: 160px; width: auto; }
+.pe-who-list { margin: 0; }
+.pe-who-list li { padding: 8px 0; }
+.pe-who-alert { margin: 0; color: var(--warn); }
+.pe-who a:focus-visible { outline: 2px solid var(--ox); outline-offset: 2px; border-radius: 4px; }
+.pe-filled-from { line-height: 1.5; }
+.pe-consult-use { display: grid; gap: 8px; }
+.pe-consult-fill { list-style: none; margin: 0; padding: 0 0 0 24px; display: grid; gap: 6px; font-size: 14px; }
+.pe-consult-fill ul { margin: 2px 0 0; padding-left: 18px; color: var(--body); }

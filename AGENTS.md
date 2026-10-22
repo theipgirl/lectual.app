@@ -464,6 +464,37 @@ Everything after a client accepts on `/p/<token>`. Internal only: nothing here s
 - **NOT verified against a live Lawmatics:** the `/files` multipart shape, the custom-field write shape and the `/notes` body come from the
   public API reference. Every non-2xx is "not done" and the page says the shape hasn't been checked; every 2xx is "done".
 
+## New proposal picker and pre-fill (Sprint 20, no schema)
+`/dashboard/proposals/new/` starts from a lead or matter. Internal only: nothing here sends, moves a stage or opens a matter.
+- **"Who is this for?"** (`WhoIsThisFor.tsx`, rules in `src/lib/proposals/new-picker.ts`, pure): a Leads | Matters switch, a plain GET
+  search, recent first capped at 8 with "Showing N of M", and "Start blank" (`?blank=1`: no list, the same blank form). It reuses
+  `src/lib/skills/pick.ts` as it is (`leadRecord`, `matterRecord`, `normalizeTerm`, `pickRecords`, `PICK_LIMIT`; every matter type is offered) over
+  `listLeads()` / `listMatters()`. The lead label is `leadOptionLabel`, moved to `lead-label.ts` (pure) and re-exported by `lead-options.ts`.
+  A failed read is that kind's own "We couldn't load your leads/matters." alert, never "No matches"; the other kind still works.
+- **Choosing is a link**: `?lead=<id>` or `?matter=<id>` (id URL-encoded, plus the person's own `&q=` so Change can return to the search; nothing
+  else about the record is in a URL). The server re-reads the record through the scoped client, so another firm's id is "couldn't be found" and the
+  picker stays. Once resolved the picker collapses to "For: <label> · Change". The matter wins when both are given. `kind` (`lead`|`matter`) and `q`
+  only choose which list and search the picker shows.
+- **Pre-fill** (`src/lib/proposals/prefill.ts`, pure): the client and first brand name from the lead (`mark_text`, else `business_name`) or matter
+  (`mark_text`, else `title`, else its lead's). The first brand name keeps the firm's default word/logo descriptions; the mark text is the name,
+  never a description. **No price is read from any record**: not the matter's `package_name`, not a consult's discount. The price fields are the chosen
+  package's.
+- **Consult details fill more ONLY when the newest record is REVIEWED** (`loadReviewedConsult`, through `consult-prefill-load.ts`, the one place
+  this feature reads them): each mark (grouped by `markKey`, so word + design of one name is one brand name with both marks; type not stated gets the
+  default pair), its classes as the goods text (no class number is carried; at most 3 per brand name, the rest counted in the "Filled from" line; blank
+  goods skipped), at most 10 names, all ticked. A package fills only when its name equals (trimmed, case-insensitive) one on the firm's CURRENT list; it
+  then selects the dropdown and the five fields exactly as picking it by hand does. Otherwise the first package stays and, if the consult named one,
+  "Package from the consult (<name>) isn't on your list. Choose one." With the settings unreadable there is no dropdown and no package note.
+- **One line says why nothing was filled**: not reviewed (with a link to the lead), unreadable or failed read, reviewed with no usable mark, matter
+  with no linked lead. No consult details at all has no line (the consult strip says so). The "Filled from" line names only the sources used.
+- **The action does not trust the browser.** The form posts one checkbox (`useConsult`, ticked by default); `createProposalAction` re-reads the lead's
+  consult details itself and refuses (creates nothing: "The consult details changed since this page loaded...") unless the newest is still reviewed.
+  A ticked box with no lead id is ignored. With it off, the content is exactly the single typed brand name. The typed first brand name combines with the
+  consult marks: a match (by `markKey`) is that mark's name and the others follow; no match stays first with the default pair; blank creates only the
+  consult marks.
+- **Entry points**: Quotes & proposals "New proposal" -> the picker; `LeadProposalsCard` -> `?lead=`; the matter page's small aside card
+  (`MatterProposalCard`, Proposals module on AND a proposals-writing role; an unreadable module state shows nothing) -> `?matter=`.
+
 ## JSX text spacing: keep the `{" "}`
 Next 16.2.7's compiler DROPS the leading space of JSX text that contains an HTML entity
 (`&apos;`, `&amp;`, `&rsquo;`…) and runs onto another line, even if that is only the line
