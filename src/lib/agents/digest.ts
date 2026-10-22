@@ -1,6 +1,7 @@
 import { AGENT_MOVES_TODAY_HREF } from "@/lib/stage-keeper/moves";
 import { mailboxCount } from "./shared";
 import { AGENT_DEFS, AGENT_IDS, type AgentId } from "./types";
+import { DID_NOT_FINISH_ERROR, isStaleRun } from "./run-status";
 
 /**
  * The "Overnight run" digest on Today and the Agents page: what each agent
@@ -125,7 +126,7 @@ export function failureAction(error: string | null): DigestAction {
   }
   if (/fathom|zoom/.test(e)) return { label: "Reconnect the meeting source", href: "/dashboard/settings/integrations/meetings/" };
   if (/queue/.test(e)) return { label: "Check the approval queue", href: "/dashboard/queue/" };
-  if (/anthropic|overloaded|rate limit|429|529|timeout|timed out/.test(e)) {
+  if (/anthropic|overloaded|rate limit|429|529|timeout|timed out|time limit/.test(e)) {
     return { label: "Try Run now later", href: "/dashboard/agents/" };
   }
   return { label: "Open the run log", href: "/dashboard/agents/" };
@@ -254,7 +255,11 @@ function lineFor(agent: AgentId, runs: DigestRun[]): DigestLine | null {
 export function buildRunDigest(runs: readonly DigestRun[] | null, now: Date, windowHours = 24): RunDigest {
   if (runs === null) return { status: "unavailable" };
   const since = now.getTime() - windowHours * 3_600_000;
-  const inWindow = runs.filter((r) => Date.parse(r.started_at) >= since && (AGENT_IDS as readonly string[]).includes(r.agent));
+  // A row still "running" 15 minutes on was cut off (run-status.ts): it reads as a run that didn't
+  // finish, never as one still going, so it is reported like the runner's own time-limit failure.
+  const inWindow = runs
+    .filter((r) => Date.parse(r.started_at) >= since && (AGENT_IDS as readonly string[]).includes(r.agent))
+    .map((r) => (isStaleRun(r, now.getTime()) ? { ...r, status: "error", error: DID_NOT_FINISH_ERROR } : r));
 
   const lines: DigestLine[] = [];
   const failures: DigestFailure[] = [];
@@ -265,10 +270,11 @@ export function buildRunDigest(runs: readonly DigestRun[] | null, now: Date, win
     if (line) lines.push(line);
     const latestFinished = mine.find((r) => r.status !== "running");
     if (latestFinished?.status === "error") {
+      const cutOff = latestFinished.error === DID_NOT_FINISH_ERROR;
       failures.push({
         agent,
         name: AGENT_DEFS[agent].name,
-        text: `${AGENT_DEFS[agent].name} couldn't finish its last run`,
+        text: cutOff ? `${AGENT_DEFS[agent].name} didn't finish its last run` : `${AGENT_DEFS[agent].name} couldn't finish its last run`,
         reason: plainReason(latestFinished.error),
         action: failureAction(latestFinished.error),
         at: latestFinished.started_at,
