@@ -82,6 +82,32 @@ export async function getDocumentDraftByQueueItemId(
   return (data as unknown as DocumentDraftRow | null) ?? null;
 }
 
+/**
+ * The drafts on a matter that were born from one accepted proposal version (their payload
+ * carries `proposalId`), or null when they can't be read. Null is not "none": a caller that
+ * is about to create a draft must not do it on a failed read.
+ */
+export async function listDraftsForProposal(
+  supabase: ScopedClient,
+  matterId: string,
+  proposalId: string,
+): Promise<Array<Pick<DocumentDraftRow, "id" | "queue_item_id" | "status">> | null> {
+  const { data, error } = await supabase
+    .from("crm_document_draft")
+    .select("id, queue_item_id, status")
+    .eq("matter_id", matterId)
+    .eq("payload->>proposalId", proposalId);
+  if (error) return null;
+  return (data ?? []) as unknown as Array<Pick<DocumentDraftRow, "id" | "queue_item_id" | "status">>;
+}
+
+/** The stored file of a generated document, or null when it can't be read. Through the caller's own scoped client, so the bucket's policy is the gate. */
+export async function downloadStoredDocument(supabase: ScopedClient, storagePath: string): Promise<Uint8Array | null> {
+  const { data, error } = await supabase.storage.from(MATTER_DOCUMENTS_BUCKET).download(storagePath);
+  if (error || !data) return null;
+  return new Uint8Array(await data.arrayBuffer());
+}
+
 export async function markDocumentGenerated(
   supabase: ScopedClient,
   draftId: string,

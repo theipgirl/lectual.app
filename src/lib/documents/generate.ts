@@ -223,7 +223,11 @@ export async function generateTrademarkClearance(
   });
 }
 
-export type TrademarkLoeFormInput = TrademarkLoeInput & { matterId: string };
+export type TrademarkLoeFormInput = TrademarkLoeInput & {
+  matterId: string;
+  /** Set when the draft is born from an accepted proposal (Sprint 19): marks the draft so approval uploads its file and a re-run finds it. */
+  proposalId?: string;
+};
 
 export async function generateTrademarkLoe(
   input: TrademarkLoeFormInput,
@@ -245,7 +249,7 @@ export async function generateTrademarkLoe(
     summary: built.summary,
     draftBody: built.draftBody,
     clientName: input.entityName?.trim() || input.clientName,
-    payload: built.payload,
+    payload: input.proposalId ? { ...built.payload, proposalId: input.proposalId } : built.payload,
   });
 }
 

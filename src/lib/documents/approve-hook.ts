@@ -2,6 +2,7 @@ import "server-only";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { getQueueItem } from "@/lib/queue/api";
 import { logActivity } from "@/lib/matters/activity";
+import { uploadApprovedLoe } from "@/lib/proposals/loe-upload";
 import { renderDocumentDocx } from "./docx";
 import {
   MATTER_DOCUMENTS_BUCKET,
@@ -72,6 +73,10 @@ export async function generateApprovedDocument(orgKey: string, queueItemId: stri
         // generation over it.
         console.error(`[document-center] activity log failed for draft ${draft.id}`, err);
       });
+      // An engagement letter born from an accepted proposal (its payload carries proposalId) is also
+      // uploaded to the matter in Lawmatics, now that a person has approved it. Anything else is untouched.
+      // It reports on the proposal's own timeline and cannot change the approval or the stored file.
+      await uploadApprovedLoe(supabase, draft, { bytes: buffer, fileName }).catch(() => {});
     } catch (err) {
       console.error(`[document-center] docx generation failed for draft ${draft.id}`, err);
       await markDocumentFailed(
