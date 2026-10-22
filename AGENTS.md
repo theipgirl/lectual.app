@@ -528,7 +528,7 @@ Everything after a client accepts on `/p/<token>`. Internal only: nothing here s
 - **Pre-fill** (`src/lib/proposals/prefill.ts`, pure): the client and first brand name from the lead (`mark_text`, else `business_name`) or matter
   (`mark_text`, else `title`, else its lead's). The first brand name keeps the firm's default word/logo descriptions; the mark text is the name,
   never a description. **No price is read from any record**: not the matter's `package_name`, not a consult's discount. The price fields are the chosen
-  package's.
+  package's. **The pay link starts EMPTY** (Sprint 25): nothing fills it, not even the firm default.
 - **Consult details fill more ONLY when the newest record is REVIEWED** (`loadReviewedConsult`, through `consult-prefill-load.ts`, the one place
   this feature reads them): each mark (grouped by `markKey`, so word + design of one name is one brand name with both marks; type not stated gets the
   default pair), its classes as the goods text (no class number is carried; at most 3 per brand name, the rest counted in the "Filled from" line; blank
@@ -719,6 +719,30 @@ the letter destination. Leads | Matters (opens on Matters), search, 8 recent, "S
   matters (`listMatters({ leadId })`, scoped): none = "Letters are drafted on a matter. Open a matter for <lead> first." with a link to the lead; one =
   redirect to that matter's template choice; several = a short list. A failed read for the lead's matters is an alert, never the "none" sentence.
 - The Document Center gate stays in the segment `layout.tsx`; the per-matter pages and actions are untouched.
+
+## Send feedback and the pay link (Sprint 25, no schema)
+- **Pay link is a plain input.** New proposal and the proposal editor show "Pay link" with the placeholder "Enter custom pay link"; it starts empty and
+  nothing copies `client_proposal_setting.default_pay_url` into a proposal (not `createProposalAction`, not the editor, not the consult-proposal drafter,
+  whose `pay_url` is null and whose flag is always "Add the client's pay link before approving."). A new VERSION keeps its own proposal's link. Approval
+  still needs one ("Add the pay link before approving."). The **"Default pay link" field was removed from Settings -> Client proposals** because nothing
+  reads it any more; the column stays (no schema change), and the settings save passes the stored value through untouched so nothing is lost.
+- **Send feedback** (account menu and the Getting started footer -> `SHOW_FEEDBACK_EVENT` -> the ONE `FeedbackDialog` in the dashboard layout, with
+  `FeedbackTrailRecorder` beside it). Type (Bug / Request / Question / Other), a description of at most 5,000 characters, the fixed disclosure sentence.
+  Esc closes, Tab wraps (the tour's `tourKeyAction`), focus returns to the opener.
+- **The transcript** (`src/lib/feedback/trail.ts`, pure) is a ring buffer in sessionStorage under one key, at most 20 KB (oldest dropped first): the last 30
+  dashboard route paths with times (query string and hash dropped, uuid segments kept), the last 20 client errors (message and file:line, 300 characters each,
+  email-shaped text replaced with `[email]`, no stack), viewport, user agent, `NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA` if exposed. It never reads the DOM, page
+  text, form values, record names or other storage. The server re-sanitises whatever is posted (`sanitizeTrail`), so a forged client cannot add anything.
+- **The action** (`sendFeedbackAction` -> `sendFeedback` in `src/lib/feedback/submit.ts`, dependencies injected): any signed-in member, every role; session only,
+  no database client, no service role, no write, not an approval-queue item. Sends ONE email through `sendInternalMail` to `FEEDBACK_TO` (comma-separated;
+  unset or no `RESEND_API_KEY` = "Feedback isn't set up yet.") from `FEEDBACK_FROM` (default `Lectual feedback <noreply@lectual.app>`), `reply_to` the
+  sender's own session address. Subject `[Lectual feedback] <Type>: <first 60 characters>`. Firm, org id, sender, role and deployment come from the session
+  and env, never the form. Errors are fixed sentences; Resend's reply and exception text are never returned or logged.
+- **Rate limit:** 5 per person per rolling hour, in memory per server instance (`rate-limit.ts`), so on serverless it is a courtesy limit, not a hard cap.
+  Keyed by the session user id. A failed send does not use a slot.
+- **One mailer:** `src/lib/mail/internal-mail.ts` is the only file that names Resend; the Sprint 24 failure alerts and feedback both use it.
+- Taylor sets `FEEDBACK_TO` and `AGENT_FAILURE_ALERT_TO` to the Resend inbox's receiving address (bugs@lectual.app forwards there). Not verified here: a real
+  delivery, and that `noreply@lectual.app` is a verified sending domain on the key's Resend account.
 
 ## JSX text spacing: keep the `{" "}`
 Next 16.2.7's compiler DROPS the leading space of JSX text that contains an HTML entity

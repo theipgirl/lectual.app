@@ -9,6 +9,7 @@ import {
 } from "@/lib/auth/actions";
 import type { SwitchableFirmRef } from "@/lib/firm/session";
 import { requestTourAgain } from "@/lib/onboarding/tour";
+import { requestFeedback } from "@/lib/feedback/open";
 
 type Props = {
   initials: string;
@@ -112,6 +113,19 @@ export function AccountMenu({
           }}
         >
           Show tips again
+        </button>
+
+        <button
+          type="button"
+          className="lx-btn lx-btn-sec lx-btn-sm"
+          style={{ width: "100%" }}
+          onClick={() => {
+            menu.current?.removeAttribute("open");
+            // Focus returns to the avatar, which stays visible when the menu closes.
+            requestFeedback(window, menu.current?.querySelector("summary") ?? null);
+          }}
+        >
+          Send feedback
         </button>
 
         <form action={signOutAction}>

@@ -40,7 +40,7 @@ describe("A2: createProposalAction does not copy the firm default", () => {
   beforeEach(() => vi.resetModules());
   class Redirected extends Error {}
   async function setup() {
-    const created = vi.fn(async (_i: unknown) => ({ id: "new-1" }));
+    const created = vi.fn(async () => ({ id: "new-1" }));
     vi.doUnmock("@/app/dashboard/proposals/actions");
     vi.doMock("next/navigation", () => ({ redirect: vi.fn((): never => { throw new Redirected(); }) }));
     vi.doMock("next/cache", () => ({ revalidatePath: vi.fn() }));

@@ -4,6 +4,7 @@ import { aiConfigured } from "@/lib/ai/claude";
 import { hubTracks, parseHubProgress } from "@/lib/onboarding/hub";
 import { pickHubRecordsAction } from "@/lib/onboarding/hub-actions";
 import { FlowList } from "@/components/onboarding/FlowList";
+import { SendFeedbackButton } from "@/components/feedback/SendFeedbackButton";
 import { pageTitle } from "@/lib/ui/page-title";
 
 export const metadata: Metadata = { title: pageTitle("Getting started") };
@@ -41,6 +42,10 @@ export default async function GettingStartedPage() {
       ) : (
         <FlowList tracks={tracks} doneIds={progress.done} picks={picks} modulesUnreadable={modules === null} />
       )}
+      <footer className="lx-note" style={{ marginTop: 32, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <span>Something not working, or missing a guide?</span>
+        <SendFeedbackButton />
+      </footer>
     </div>
   );
 }
