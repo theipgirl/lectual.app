@@ -780,7 +780,7 @@ export async function updateProposal(
     throw new ProposalError(
       "frozen",
       current.status === "sent"
-        ? "This version has been sent. Create a revision to change it."
+        ? "This version has been sent. Start a new version to change it."
         : `This version is ${current.status} and can't be changed.`,
     );
   }
@@ -857,7 +857,7 @@ export async function approveProposal(id: string): Promise<ProposalRow> {
   if (hasErrors(issues)) {
     throw new ProposalError("validation", "Fix the problems listed before creating the link.", issues);
   }
-  return transition(db, current, "draft", "approved", "approve the proposal");
+  return transition(db, current, "draft", "approved", "save the proposal");
 }
 
 /** Approved -> draft, so it can be edited again. Needs re-approval afterwards. */
@@ -867,7 +867,7 @@ export async function unapproveProposal(id: string): Promise<ProposalRow> {
   const db = proposalsDb(supabase);
   const current = await loadRow(db, id);
   if (current.status !== "approved") throw new ProposalError("conflict", "Only a saved version can be edited again.");
-  return transition(db, current, "approved", "draft", "send the proposal back to draft");
+  return transition(db, current, "approved", "draft", "take the proposal back to editing");
 }
 
 /**
@@ -885,7 +885,7 @@ export async function sendProposal(id: string): Promise<ProposalRow> {
     throw new ProposalError("conflict", "The link can only be turned on for a saved version. Save and create the link first.");
   }
   const { error } = await db.rpc("client_proposal_send", { p_id: current.id });
-  if (error) throw friendlyProposalError(error, "mark the proposal as sent");
+  if (error) throw friendlyProposalError(error, "turn on the link");
   return loadRow(db, current.id);
 }
 
@@ -974,7 +974,7 @@ export async function reviseProposal(id: string): Promise<ProposalRow> {
     })
     .select(PROPOSAL_COLUMNS)
     .single();
-  if (error) throw friendlyProposalError(error, "create the revision");
+  if (error) throw friendlyProposalError(error, "start a new version");
   const revision = data as ProposalRow;
 
   await writeProposalEventSafe(db, revision, "revised", "staff", userId, {

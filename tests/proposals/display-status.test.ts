@@ -30,7 +30,7 @@ describe("proposalDisplayStatus", () => {
   });
 
   it("an approved proposal with a blocking issue is Blocked", () => {
-    expect(show("approved", null, ["Set an expiry date before approving."])).toMatchObject({ key: "blocked", sub: "Set an expiry date before approving." });
+    expect(show("approved", null, ["Set an expiry date before creating the link."])).toMatchObject({ key: "blocked", sub: "Set an expiry date before creating the link." });
   });
 
   it("accepted is Accepted; withdrawn and superseded are Closed", () => {

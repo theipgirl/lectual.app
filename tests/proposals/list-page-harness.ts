@@ -42,7 +42,7 @@ export function item(id: string, over: Partial<ProposalListItem> = {}): Proposal
 export const ROWS: ProposalListItem[] = [
   item("a1"),
   item("a2", { status: "approved" }),
-  item("b1", { blocking_issue: "Add the pay link before approving." }),
+  item("b1", { blocking_issue: "Add the pay link before creating the link." }),
   item("s1", { status: "sent", expires_on: "2026-10-30" }),
   item("e1", { status: "sent", expires_on: "2026-10-10" }),
   item("e2", { status: "sent", expires_on: "2026-10-19" }),

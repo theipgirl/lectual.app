@@ -172,7 +172,7 @@ describe("Quotes & proposals page", () => {
       expect(html).toContain('class="wrap pq-activity"');
       for (const id of ["a1", "a2", "s1"]) expect(rowOf(html, `Client ${id}<`)).toMatch(/pq-activity">Updated 1d ago</);
       expect(rowOf(html, "Client e1<")).toContain("Stored status still says sent");
-      expect(rowOf(html, "Client b1<")).toContain("Add the pay link before approving.");
+      expect(rowOf(html, "Client b1<")).toContain("Add the pay link before creating the link.");
       expect(html).not.toContain('pq-activity"><');
     });
 

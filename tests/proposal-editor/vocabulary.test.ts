@@ -62,12 +62,16 @@ describe("the old words are gone from what people read", () => {
     "src/lib/proposals/errors.ts",
     "src/app/dashboard/proposals/[id]/actions.ts",
     "src/components/queue/LinkedProposalPanel.tsx",
+    "src/lib/proposals/store.ts",
+    "src/lib/proposals/validate.ts",
+    "src/lib/consult-proposal/draft.ts",
   ];
   const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
   it.each(files)("%s", (f) => {
     const text = strip(readFileSync(f, "utf8"));
     expect(text).not.toMatch(/Back to draft|>\s*Approve\b|"Approve"|Approving…|Ask for approval|Revise \(/);
     expect(text).not.toMatch(/mark(?:ed)? as sent|click Approve\b/i);
+    expect(text).not.toMatch(/before approving|mark the proposal as sent|Create a revision/i);
     expect(text).not.toMatch(/sent to the client|emailed to|we(?:'|’)ll email/i);
   });
 });

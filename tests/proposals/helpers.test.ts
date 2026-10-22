@@ -305,7 +305,7 @@ describe("friendlyProposalError", () => {
       "forbidden",
       /Only the client/,
     ],
-    ["23514", "client_proposal_frozen: a sent proposal is frozen and cannot be edited; revise it as a new version", "frozen", /revision/],
+    ["23514", "client_proposal_frozen: a sent proposal is frozen and cannot be edited; revise it as a new version", "frozen", /new version/],
     ["23514", "client_proposal_bad_transition: sent -> draft is not allowed", "conflict", /can't move/],
     [
       "23514",

@@ -821,9 +821,9 @@ export async function draftProposalFromConsult(input: DraftConsultProposalInput)
   const expiresOn = addDays(input.today, PROPOSAL_VALID_DAYS);
   const rawEmail = oneLine(input.lead.email, 320);
   const clientEmail = rawEmail && !rawEmail.toLowerCase().endsWith(".invalid") ? rawEmail : null;
-  if (!clientEmail) flags.push("The lead has no usable email address. Add it before approving.");
+  if (!clientEmail) flags.push("The lead has no usable email address. Add it before creating the link.");
   const payUrl: string | null = null;
-  flags.push("Add the client's pay link before approving.");
+  flags.push("Add the client's pay link before creating the link.");
 
   const issues = validateContent(content, {
     forApproval: true,

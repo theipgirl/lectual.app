@@ -71,7 +71,7 @@ describe("draftProposalFromConsult: the Sevetri call", () => {
     expect(d.title).toBe("Trademark Proposal");
     expect(d.expiresOn).toBe("2026-10-26");
     expect(d.payUrl).toBeNull();
-    expect(d.reviewerNotes).toContain("Add the client's pay link before approving.");
+    expect(d.reviewerNotes).toContain("Add the client's pay link before creating the link.");
     expect(d.reviewerNotes).not.toContain("default pay link");
     // The only thing left to fix before approval is the pay link a person types.
     expect(d.issues.filter((i) => i.level === "error").map((i) => i.path)).toEqual(["pay_url"]);

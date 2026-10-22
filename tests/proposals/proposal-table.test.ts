@@ -153,7 +153,7 @@ describe("lastActivityLine", () => {
 
   it("blocked: no package offered yet, else the first thing blocking approval", () => {
     expect(line({ key: "blocked", offeredCount: 0, blockingIssue: "Name the package." })).toBe("No package offered yet");
-    expect(line({ key: "blocked", offeredCount: 1, blockingIssue: "Add the pay link before approving." })).toBe("Add the pay link before approving.");
+    expect(line({ key: "blocked", offeredCount: 1, blockingIssue: "Add the pay link before creating the link." })).toBe("Add the pay link before creating the link.");
   });
 
   it("accepted: 'Accepted by the client · <when>'", () => {

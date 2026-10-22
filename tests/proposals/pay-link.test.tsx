@@ -107,7 +107,7 @@ describe("A3: the existing-proposal editor", () => {
 describe("A4: approval still refuses a missing link", () => {
   it("says to add the pay link", () => {
     const issues = validateContent(sevetri(), { forApproval: true, pay_url: null });
-    expect(issues.some((i) => i.path === "pay_url" && i.message === "Add the pay link before approving.")).toBe(true);
+    expect(issues.some((i) => i.path === "pay_url" && i.message === "Add the pay link before creating the link.")).toBe(true);
   });
 });
 
@@ -170,7 +170,7 @@ describe("A5/A6: no code path reads the default for behaviour", () => {
 
   it("the drafter's flag never mentions a default", () => {
     const draft = readFileSync("src/lib/consult-proposal/draft.ts", "utf8");
-    expect(draft).toContain("Add the client's pay link before approving.");
+    expect(draft).toContain("Add the client's pay link before creating the link.");
     expect(draft).not.toMatch(/default pay link/i);
   });
 });

@@ -46,7 +46,7 @@ describe("proposals list page", () => {
     expect(rowOf(html, "Client s1<")).toContain("lx-pill-ok");
     expect(rowOf(html, "Client s1<")).toContain(">Link live<");
     expect(rowOf(html, "Client b1<")).toContain("lx-pill-risk");
-    expect(rowOf(html, "Client b1<")).toContain("Add the pay link before approving.");
+    expect(rowOf(html, "Client b1<")).toContain("Add the pay link before creating the link.");
     expect(rowOf(html, "Client a2<")).toContain("saved, link not live");
     expect(rowOf(html, "Client a2<")).toContain("lx-pill-mute");
   });

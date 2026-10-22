@@ -45,8 +45,8 @@ type DbErrorLike = { code?: string; message?: string } | null | undefined;
 const TRIGGER_MESSAGES: ReadonlyArray<readonly [prefix: string, code: ProposalErrorCode, message: string]> = [
   ["client_proposal_not_approver", "forbidden", "Only the firm's named approvers can create a client link."],
   ["client_proposal_accept_service_only", "forbidden", "Only the client can accept a proposal, from their own link."],
-  ["client_proposal_frozen", "frozen", "This version has already gone out and can't be changed. Create a revision instead."],
-  ["client_proposal_immutable", "frozen", "This version has already gone out and can't be changed. Create a revision instead."],
+  ["client_proposal_frozen", "frozen", "This version has already gone out and can't be changed. Start a new version instead."],
+  ["client_proposal_immutable", "frozen", "This version has already gone out and can't be changed. Start a new version instead."],
   ["client_proposal_acceptance_final", "frozen", "The client's acceptance is a record and can't be changed."],
   [
     "client_proposal_edit_and_move",
@@ -58,7 +58,7 @@ const TRIGGER_MESSAGES: ReadonlyArray<readonly [prefix: string, code: ProposalEr
     "conflict",
     "This proposal can't move to that status from where it is now. Refresh and check its status.",
   ],
-  ["client_proposal_approval_incomplete", "validation", "Set an expiry date and a pay link before approving."],
+  ["client_proposal_approval_incomplete", "validation", "Set an expiry date and a pay link before creating the link."],
   [
     "client_proposal_send_not_approved",
     "conflict",
@@ -96,7 +96,7 @@ export function friendlyProposalError(error: DbErrorLike, doing = "save the prop
     return new ProposalError("forbidden", `You don't have permission to ${doing}.`);
   }
   if (message.includes("frozen") || message.includes("immutable") || message.includes("cannot be edited") || message.includes("can no longer")) {
-    return new ProposalError("frozen", "This version has already gone out and can't be changed. Create a revision instead.");
+    return new ProposalError("frozen", "This version has already gone out and can't be changed. Start a new version instead.");
   }
   if (message.includes("transition")) {
     return new ProposalError("conflict", "This proposal can't move to that status from where it is now. Refresh and check its status.");
