@@ -2,6 +2,7 @@ import { z } from "zod";
 import { createMailboxDraft, listDraftSummaries, type DraftSummary } from "@/lib/mailbox/drafts";
 import { fetchMessageBody } from "@/lib/mailbox/fetch";
 import { ProviderError } from "@/lib/mailbox/providers";
+import { classifyEmail } from "@/lib/intake/email-match";
 import { isAutomatedSender, isOfficialSender, type TriagedMessage } from "@/lib/inbox/triage";
 import { assertNoJudgmentContent } from "@/lib/prep-consult/prep-consult";
 import { cleanDraftBody, enforceSignOff } from "@/lib/queue/hygiene";
@@ -167,6 +168,12 @@ export async function createReplyDrafts(ctx: AgentContext, deps: ReplyDeps): Pro
       const body = await fetchMessageBody("microsoft", { accessToken, messageId: item.id, fetchImpl: ctx.fetchImpl });
       if (!body) {
         skip(item.id, "no-body");
+        continue;
+      }
+      // The subject and preview looked ordinary, but the message itself reads as a dispute: it goes to the
+      // attorney with no draft, and the body is not sent to the model.
+      if (classifyEmail(item.subject, body).sensitive) {
+        skip(item.id, "sensitive");
         continue;
       }
       const { output } = await ctx.llm({

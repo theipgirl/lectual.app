@@ -322,6 +322,16 @@ describe("inbox-summary (F13): who gets a reply draft", () => {
     expect(digestOf(createDraft).draftBody).toContain("[needs attorney, no draft]");
   });
 
+  it("a message whose subject looks ordinary but whose text reads as a dispute gets no draft, and the body never reaches the model", async () => {
+    const box: Box = { inbox: [needs("N1")], bodies: { N1: "We will be filing a lawsuit unless you reply." } };
+    const { ctx, provider, calls, createDraft } = setup({ boxes: { "tok-att": box } });
+    await runInboxSummary(ctx);
+    expect(bodyFetches(provider.requests)).toHaveLength(1);
+    expect(posts(provider.requests)).toHaveLength(0);
+    expect(calls).toHaveLength(0);
+    expect(digestOf(createDraft).draftBody).toContain("Reply: [needs attorney, no draft]");
+  });
+
   it("scam mail gets no draft", async () => {
     const { ctx, provider } = setup({ boxes: { "tok-att": { inbox: [gm("SC", { from: "x@tm-register.example", subject: "URGENT trademark registration fee", preview: "final notice, wire transfer" })] } } });
     await runInboxSummary(ctx);
