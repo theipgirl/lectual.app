@@ -82,7 +82,7 @@ function handler(o: Opts = {}): Handler {
       return { data: null, error: null };
     }
     if (q.table === "client_proposal_setting") {
-      const setting = o.setting === undefined ? { approver_user_ids: ["rebecca"], default_pay_url: null, pricing: {} } : o.setting;
+      const setting = o.setting === undefined ? { approver_user_ids: ["rebecca"], default_pay_url: "https://pay.example.com/form", pricing: {} } : o.setting;
       return { data: setting, error: null };
     }
     if (q.table === "crm_org") return { data: o.org ?? { name: "RPB Law", slug: "rpb-law" }, error: null };

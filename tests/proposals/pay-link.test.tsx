@@ -40,7 +40,13 @@ describe("A2: createProposalAction does not copy the firm default", () => {
   beforeEach(() => vi.resetModules());
   class Redirected extends Error {}
   async function setup() {
-    const created = vi.fn(async () => ({ id: "new-1" }));
+    const inserted: unknown[] = [];
+    const created = vi.fn(async (input: { payUrl: string | null }) => {
+      const { checkDraftColumns } = await vi.importActual<typeof import("@/lib/proposals/store")>("@/lib/proposals/store");
+      checkDraftColumns({ payUrl: input.payUrl });
+      inserted.push(input);
+      return { id: "new-1" };
+    });
     vi.doUnmock("@/app/dashboard/proposals/actions");
     vi.doMock("next/navigation", () => ({ redirect: vi.fn((): never => { throw new Redirected(); }) }));
     vi.doMock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -55,19 +61,27 @@ describe("A2: createProposalAction does not copy the firm default", () => {
       for (const [k, v] of Object.entries({ fullName: "Ana Ruiz", firstName: "Ana", expiresOn: "2026-11-10", ...extra })) f.set(k, v);
       return createProposalAction({}, f);
     };
-    return { created, run };
+    return { created, inserted, run };
   }
 
   it("a blank pay link stays null", async () => {
     const { created, run } = await setup();
     await expect(run({ payUrl: "" })).rejects.toBeInstanceOf(Redirected);
-    expect((created.mock.calls[0][0] as { payUrl: string | null }).payUrl).toBeNull();
+    expect(created.mock.calls[0][0].payUrl).toBeNull();
   });
 
   it("a typed https link is stored", async () => {
     const { created, run } = await setup();
     await expect(run({ payUrl: "https://pay.example/ana" })).rejects.toBeInstanceOf(Redirected);
-    expect((created.mock.calls[0][0] as { payUrl: string | null }).payUrl).toBe("https://pay.example/ana");
+    expect(created.mock.calls[0][0].payUrl).toBe("https://pay.example/ana");
+  });
+
+  it("an http link is refused with the real check and nothing is created", async () => {
+    const { created, inserted, run } = await setup();
+    const r = await run({ payUrl: "http://insecure.example/pay" });
+    expect(r).toMatchObject({ error: "The pay link must be an https:// address." });
+    expect(created).toHaveBeenCalledTimes(1);
+    expect(inserted).toEqual([]);
   });
 });
 
