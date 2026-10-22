@@ -1,0 +1,94 @@
+/* The first-sign-in tour. Tokens and button classes come from globals.css. */
+.ot-root {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+}
+.ot-backdrop {
+  position: absolute;
+  inset: 0;
+}
+.ot-backdrop.is-centered {
+  background: color-mix(in srgb, var(--ink) 55%, transparent);
+}
+.ot-spot {
+  position: absolute;
+  border-radius: 10px;
+  pointer-events: none;
+  box-shadow: 0 0 0 100vmax color-mix(in srgb, var(--ink) 55%, transparent);
+  outline: 2px solid var(--cream);
+  transition: top 0.18s ease, left 0.18s ease, width 0.18s ease, height 0.18s ease;
+}
+.ot-pop {
+  position: absolute;
+  width: 340px;
+  max-width: calc(100vw - 16px);
+  padding: 18px;
+  display: grid;
+  gap: 10px;
+  box-shadow: var(--shadow-lift);
+}
+.ot-pop.is-centered {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 420px;
+}
+.ot-pop:focus {
+  outline: none;
+}
+.ot-title {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 24px;
+  font-weight: 400;
+  line-height: 1.15;
+}
+.ot-body {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+.ot-link {
+  font-size: 14px;
+  color: var(--wine);
+}
+.ot-dots {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ot-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--line);
+}
+.ot-dot[aria-current="step"] {
+  background: var(--wine);
+}
+.ot-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ot-spacer {
+  flex: 1;
+}
+.ot-pop .lx-btn:focus-visible,
+.ot-link:focus-visible {
+  outline: 2px solid var(--wine);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ot-spot,
+  .ot-pop,
+  .ot-root * {
+    transition: none;
+    animation: none;
+  }
+}
