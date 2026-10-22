@@ -27,7 +27,7 @@ function Card({ c }: { c: PipelineCard }) {
       </span>
       <span className="lx-note" style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
         <span>{c.ownerName ?? (c.ownerId ? "Team member" : "No owner")}</span>
-        {c.ageDays !== null && <span className="lx-num">{c.ageDays}d in stage</span>}
+        {c.ageLabel && <span className="lx-num">{c.ageLabel}</span>}
       </span>
     </li>
   );

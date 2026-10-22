@@ -82,7 +82,7 @@ describe("lead stage → pipeline column", () => {
 
 describe("filters and grouping", () => {
   const card = (p: Partial<PipelineCard>): PipelineCard => ({
-    key: Math.random().toString(), kind: "matter", column: "filed", client: "Acme", mark: "ACME", ref: "TM-1", stageLabel: null, ageDays: 3, ownerId: null, ownerName: null, href: "#", ...p,
+    key: Math.random().toString(), kind: "matter", column: "filed", client: "Acme", mark: "ACME", ref: "TM-1", stageLabel: null, ageDays: 3, ageLabel: "3d in stage", ownerId: null, ownerName: null, href: "#", ...p,
   });
   it("searches client/mark/ref and filters by owner (including none)", () => {
     const cards = [card({ client: "Blue Fern LLC", ownerId: "u1" }), card({ mark: "ORCHID", ownerId: "u2" }), card({ ref: "TM-77" })];

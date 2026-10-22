@@ -11,6 +11,7 @@ import {
   matterColumn,
   type PipelineCard,
 } from "./columns";
+import { daysInStageLabel, stageAgeDisplay } from "./stage-age";
 
 /**
  * Everything the pipeline board reads, through the caller's scoped client.
@@ -31,6 +32,10 @@ export type PipelineLoad = {
   notes: string[];
 };
 
+function ageLabelOf(days: number | null): string | null {
+  return days === null ? null : daysInStageLabel(days);
+}
+
 type SubmissionRow = { id: string; contact: unknown; status: string; submitted_at: string | null; created_at: string };
 
 function submissionName(contact: unknown): string {
@@ -41,7 +46,7 @@ function submissionName(contact: unknown): string {
 
 export async function loadPipeline(now: Date = new Date()): Promise<PipelineLoad> {
   const supabase = await getScopedClient();
-  const [leadStagesS, leadsS, notesS, subsS, docketS, mattersS, membersS] = await Promise.allSettled([
+  const [leadStagesS, leadsS, notesS, subsS, docketS, mattersS, membersS, changesS] = await Promise.allSettled([
     listStages(),
     listLeads(),
     (async () => {
@@ -64,6 +69,20 @@ export async function loadPipeline(now: Date = new Date()): Promise<PipelineLoad
     listMatterStages(),
     listMatters(),
     listMemberDirectory(),
+    (async () => {
+      // The newest stage move per lead: the real "entered this stage" date, which an import's stage_entered_at is not.
+      const { data, error } = await supabase
+        .from("crm_activity")
+        .select("lead_id, created_at")
+        .eq("type", "stage_changed")
+        .not("lead_id", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(5000);
+      if (error) throw error;
+      const newest = new Map<string, string>();
+      for (const r of data ?? []) if (r.lead_id && !newest.has(r.lead_id)) newest.set(r.lead_id, r.created_at);
+      return newest;
+    })(),
   ]);
 
   const notes: string[] = [];
@@ -84,8 +103,17 @@ export async function loadPipeline(now: Date = new Date()): Promise<PipelineLoad
     const stageName = new Map(leadStagesS.value.map((s) => [s.id, s.name]));
     const consulted = notesS.status === "fulfilled" ? notesS.value : new Set<string>();
     if (notesS.status === "rejected") notes.push("Consult notes couldn't be read, so a lead whose consult is recorded only as a note may show under New intake.");
+    const lastChange = changesS.status === "fulfilled" ? changesS.value : new Map<string, string>();
+    if (changesS.status === "rejected") notes.push("Stage history couldn't be read, so days in stage count from the stored stage date.");
     for (const lead of leads) {
       if (leadsWithMatter.has(lead.id)) continue;
+      const age = stageAgeDisplay({
+        stageEnteredAt: lead.stage_entered_at,
+        createdAt: lead.created_at,
+        importedAt: lead.lawmatics_synced_at,
+        lastStageChangeAt: lastChange.get(lead.id) ?? null,
+        now,
+      });
       cards.push({
         key: `l-${lead.id}`,
         kind: "lead",
@@ -94,7 +122,8 @@ export async function loadPipeline(now: Date = new Date()): Promise<PipelineLoad
         mark: lead.mark_text,
         ref: "Lead",
         stageLabel: stageName.get(lead.current_stage_id) ?? null,
-        ageDays: ageInDays(lead.stage_entered_at, now),
+        ageDays: age.days,
+        ageLabel: age.label,
         ownerId: lead.assigned_to,
         ownerName: lead.assigned_to ? memberName.get(lead.assigned_to) ?? null : null,
         href: `/dashboard/leads/${lead.id}/`,
@@ -111,6 +140,7 @@ export async function loadPipeline(now: Date = new Date()): Promise<PipelineLoad
           ref: s.status === "referred" ? "Referral" : "Intake form",
           stageLabel: s.status === "new" ? "Not reviewed yet" : s.status === "referred" ? "Referred" : "Consult booked",
           ageDays: ageInDays(s.submitted_at ?? s.created_at, now),
+          ageLabel: ageLabelOf(ageInDays(s.submitted_at ?? s.created_at, now)),
           ownerId: null,
           ownerName: null,
           href: "/dashboard/forms/",
@@ -125,6 +155,7 @@ export async function loadPipeline(now: Date = new Date()): Promise<PipelineLoad
     const stageMap = mapDocketStages(docketS.value);
     for (const m of mattersS.value) {
       const lead = m.lead_id ? leadById.get(m.lead_id) : undefined;
+      const age = stageAgeDisplay({ stageEnteredAt: m.stage_entered_at, createdAt: m.created_at, importedAt: m.lawmatics_synced_at, now });
       const client = leadDisplayName(lead) || m.owner_name?.trim() || matterLabel(m);
       cards.push({
         key: `m-${m.id}`,
@@ -134,7 +165,8 @@ export async function loadPipeline(now: Date = new Date()): Promise<PipelineLoad
         mark: m.mark_text,
         ref: m.matter_number,
         stageLabel: m.stage ? m.stage.label : "Not on the docket",
-        ageDays: ageInDays(m.stage_entered_at, now),
+        ageDays: age.days,
+        ageLabel: age.label,
         ownerId: m.assigned_to,
         ownerName: m.assigned_to ? memberName.get(m.assigned_to) ?? null : null,
         href: `/dashboard/matters/${m.id}/`,
