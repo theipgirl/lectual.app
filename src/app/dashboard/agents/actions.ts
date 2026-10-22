@@ -8,11 +8,23 @@ import { orgHasModule } from "@/lib/org/modules";
 import { aiConfigured } from "@/lib/ai/claude";
 import { runOneAgent } from "@/lib/agents/runner";
 import { productionRunnerDeps } from "@/lib/agents/deps";
-import { AGENT_IDS, agentNeedsAi, type AgentId, type Autonomy } from "@/lib/agents/types";
+import { AGENT_IDS, type AgentId, type Autonomy } from "@/lib/agents/types";
+import { agentNeedsDatabaseUpdate, type DatabaseUpdate } from "@/lib/agents/readiness";
+import { autopilotForRun, canRunAgents, decideRunNow, RUN_NOW_REASON } from "@/lib/agents/run-now";
+import { readCalendarProbe } from "@/lib/stage-keeper/readiness-read";
 import { canPauseAutopilot, canResumeAutopilot, parseMinutesForm } from "@/lib/agents/autopilot-rules";
 import { loadAutopilot } from "@/lib/agents/autopilot";
 
-export type AgentActionState = { ok?: boolean; error?: string; message?: string };
+export type AgentActionState = {
+  ok?: boolean;
+  error?: string;
+  message?: string;
+  /** A finished run that did nothing for a reason worth showing (see AgentResult.skipped). */
+  skipped?: boolean;
+  /** Counts for the "N read, M drafts written" line. Only a run that finished carries them. */
+  itemsIn?: number;
+  draftsOut?: number;
+};
 
 const AUTONOMIES: readonly Autonomy[] = ["suggest", "draft", "act"];
 /** The agents the database's settings CHECK only accepts once lectual 0098 is applied, as the refusal names them. */
@@ -70,36 +82,44 @@ export async function saveAgentSettingAction(_prev: AgentActionState, formData: 
 }
 
 export async function runAgentNowAction(_prev: AgentActionState, formData: FormData): Promise<AgentActionState> {
-  const session = await adminSession();
-  if (!session) return { error: "Only an owner, admin or senior admin can run agents." };
+  // A forged request is refused with the same sentence the page prints beside the button: both ask decideRunNow.
+  if (!(await orgHasModule("agents"))) return { error: RUN_NOW_REASON.role };
+  const session = await resolveFirmSession();
+  if (session.kind !== "ok" || !canRunAgents(session.role)) return { error: RUN_NOW_REASON.role };
   const agent = formData.get("agent");
   if (!isAgent(agent)) return { error: "Unknown agent." };
-  // Rule-based agents (the Stage Keeper) call no model, so a missing AI key doesn't stop them.
-  if (agentNeedsAi(agent) && !aiConfigured()) return { error: "The AI key isn't configured on this deployment." };
 
   // Read the setting as the caller, through RLS: the firm is the caller's own.
   const supabase = await getScopedClient();
-  const { data: setting } = await supabase
+  const { data: setting, error: settingError } = await supabase
     .from("agent_setting")
     .select("enabled, autonomy")
     .eq("agent", agent)
     .maybeSingle();
-  if (!setting?.enabled) return { error: "Switch the agent on first." };
+  // A failed read is not "off": the page draws no Run now for it either.
+  if (settingError) return { error: "We couldn't read this agent's setting, so nothing ran. Try again shortly." };
 
   // The firm-wide pause, read as the caller for a clear message. runOneAgent
   // checks it again with the service role, so this is not the only guard.
   const autopilot = await loadAutopilot();
-  if (autopilot.status === "unavailable") {
-    return { error: "We couldn't check whether Autopilot is paused, so nothing ran. Try again shortly." };
-  }
-  if (autopilot.status === "ok" && autopilot.state.paused) {
-    return { error: "Autopilot is paused for the firm, so no agent runs, including Run now. Resume Autopilot first." };
-  }
+  // The page probes the calendar only for a firm with the Mailboxes module; the same rule here.
+  let databaseUpdate: DatabaseUpdate = "unknown";
+  if (agentNeedsDatabaseUpdate(agent) && (await orgHasModule("mailbox"))) databaseUpdate = (await readCalendarProbe()).databaseUpdate;
+
+  const decision = decideRunNow({
+    agent,
+    role: session.role,
+    enabled: Boolean(setting?.enabled),
+    autopilot: autopilotForRun(autopilot),
+    aiConfigured: aiConfigured(),
+    databaseUpdate,
+  });
+  if (!decision.canRun) return { error: decision.reason };
 
   const outcome = await runOneAgent(productionRunnerDeps(), {
     orgId: session.org.id,
     agent,
-    autonomy: setting.autonomy as Autonomy,
+    autonomy: (setting?.autonomy ?? "draft") as Autonomy,
     trigger: "manual",
     triggeredBy: session.user.id,
   });
@@ -108,7 +128,13 @@ export async function runAgentNowAction(_prev: AgentActionState, formData: FormD
     return { error: "Autopilot is paused for the firm (or its state couldn't be read), so nothing ran." };
   }
   if (outcome.status === "error") return { error: `The run failed: ${outcome.error}` };
-  return { ok: true, message: outcome.result?.summary };
+  return {
+    ok: true,
+    skipped: outcome.status === "skipped",
+    message: outcome.result?.summary,
+    itemsIn: outcome.result?.itemsIn,
+    draftsOut: outcome.result?.draftsOut,
+  };
 }
 
 // ── Autopilot (lectual 0082) ─────────────────────────────────────────────────

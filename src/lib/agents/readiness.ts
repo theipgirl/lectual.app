@@ -40,6 +40,9 @@ export type DatabaseUpdate = "applied" | "pending" | "unknown";
 
 /** The agents that exist only once lectual 0098 is applied. The Stage Keeper predates this and keeps its own wording. */
 const NEEDS_DATABASE_UPDATE: ReadonlySet<AgentId> = new Set<AgentId>(["morning-brief", "consult-prep", "inbox-summary"]);
+export const agentNeedsDatabaseUpdate = (agent: AgentId): boolean => NEEDS_DATABASE_UPDATE.has(agent);
+/** The state's name, shared by the readiness label and the "Run now" reason so the two cannot drift apart. */
+export const NOT_AVAILABLE_UNTIL_UPDATE = "Not available until the database update";
 /** The agents that read connected mailboxes or the Outlook calendar, and so need the Mailboxes module. */
 const NEEDS_MAILBOX_MODULE: ReadonlySet<AgentId> = new Set<AgentId>(["email-intel", "stage-keeper", "consult-prep", "inbox-summary"]);
 
@@ -64,7 +67,7 @@ export function agentReadiness(input: AgentReadinessInput): AgentReadiness {
 
   if (NEEDS_DATABASE_UPDATE.has(agent) && input.databaseUpdate === "pending") {
     return {
-      label: "Not available until the database update",
+      label: NOT_AVAILABLE_UNTIL_UPDATE,
       tone: enabled ? "warn" : "mute",
       reason: "This agent needs a database update (lectual 0098) that hasn't been applied yet. Ask Lectual to apply the database update, then switch it on.",
     };

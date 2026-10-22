@@ -7,6 +7,7 @@ import { orgHasModule } from "@/lib/org/modules";
 import { aiConfigured } from "@/lib/ai/claude";
 import { AGENT_DEFS, AGENT_IDS, type AgentId, type Autonomy } from "@/lib/agents/types";
 import { agentReadiness, type ReadinessSource } from "@/lib/agents/readiness";
+import { autopilotForRun } from "@/lib/agents/run-now";
 import { loadAgentMoves, type AgentMovesRead } from "@/lib/stage-keeper/read";
 import { readCalendarProbe } from "@/lib/stage-keeper/readiness-read";
 import { AGENT_MOVES_TODAY_HREF } from "@/lib/stage-keeper/moves";
@@ -132,6 +133,7 @@ export default async function AgentsPage() {
   const queueLoad = settingsKnown && writesToQueue ? await loadActiveQueue() : null;
   const queue: ReadinessSource = !queueLoad ? "ok" : queueLoad.status === "ok" ? "ok" : queueLoad.status === "unconfigured" ? "none" : "unavailable";
   const ai = aiConfigured();
+  const autopilotRun = autopilotForRun(autopilot);
   const readiness = new Map(
     AGENT_IDS.map((a) => [a, agentReadiness({ agent: a, enabled: isOn(a), hasMailboxModule, mailbox, aiConfigured: ai, queue, calendar, databaseUpdate })]),
   );
@@ -213,7 +215,16 @@ export default async function AgentsPage() {
           const ready = readiness.get(agent)!;
           return (
             <section key={agent} className={`lx-card lx-agent${!settingsKnown || enabled ? "" : " off"}`}>
-              {settingsKnown && <AgentControls agent={agent} name={def.name} enabled={enabled} autonomy={autonomy} canManage={canManage} />}
+              {settingsKnown && (
+                <AgentControls
+                  agent={agent}
+                  name={def.name}
+                  enabled={enabled}
+                  autonomy={autonomy}
+                  canManage={canManage}
+                  runInput={{ agent, role: session.role, enabled, autopilot: autopilotRun, aiConfigured: ai, databaseUpdate }}
+                />
+              )}
               <div className="lx-agent-head">
                 <div style={{ fontSize: 17, fontWeight: 600 }}>{def.name}</div>
                 <div className="lx-label" style={{ fontSize: 11, marginTop: 4 }}>

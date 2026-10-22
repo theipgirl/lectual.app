@@ -7,6 +7,7 @@ import {
   type AgentActionState,
 } from "@/app/dashboard/agents/actions";
 import { autonomyHint, type AgentId, type Autonomy } from "@/lib/agents/types";
+import { decideRunNow, runResultLine, type RunNowInput } from "@/lib/agents/run-now";
 
 const LEVELS: { k: Autonomy; label: string }[] = [
   { k: "suggest", label: "Suggest" },
@@ -14,17 +15,25 @@ const LEVELS: { k: Autonomy; label: string }[] = [
   { k: "act", label: "Act" },
 ];
 
-/** The switch, the autonomy segments and "Run now" on one agent card. */
+/**
+ * The switch, the autonomy segments and "Run now" on one agent card. Run now is always drawn: when it
+ * can't run it is disabled and says why, in text, from the same decision the action makes.
+ */
 export function AgentControls(props: {
   agent: AgentId;
   name: string;
   enabled: boolean;
   autonomy: Autonomy;
   canManage: boolean;
+  /** What decideRunNow needs, minus "running", which only this card knows. */
+  runInput: Omit<RunNowInput, "running">;
 }) {
   const [saveState, save, saving] = useActionState<AgentActionState, FormData>(saveAgentSettingAction, {});
   const [runState, run, running] = useActionState<AgentActionState, FormData>(runAgentNowAction, {});
   const { agent, enabled, autonomy, canManage } = props;
+  const decision = decideRunNow({ ...props.runInput, running });
+  const result = runResultLine(runState);
+  const reasonId = `run-reason-${agent}`;
 
   return (
     <>
@@ -77,21 +86,36 @@ export function AgentControls(props: {
       </div>
 
       <div className="lx-agent-slot-run">
-        {canManage && (
-          <form action={run}>
-            <input type="hidden" name="agent" value={agent} />
-            <button type="submit" className="lx-btn lx-btn-ghost lx-btn-sm" disabled={!enabled || running}>
-              {running ? "Running…" : "Run now"}
-            </button>
-          </form>
-        )}
-        {runState.error && (
-          <span role="alert" className="lx-note" style={{ color: "var(--wine)" }}>
-            {runState.error}
-          </span>
-        )}
-        {runState.ok && runState.message && <span className="lx-note">{runState.message}</span>}
+        <form action={run}>
+          <input type="hidden" name="agent" value={agent} />
+          <button
+            type="submit"
+            className="lx-btn lx-btn-ghost lx-btn-sm"
+            disabled={!decision.canRun}
+            aria-describedby={decision.canRun ? undefined : reasonId}
+          >
+            {running ? "Running..." : "Run now"}
+          </button>
+        </form>
       </div>
+      {(!decision.canRun || result) && (
+        <div style={{ gridColumn: "1 / -1", display: "grid", gap: 4 }}>
+          {!decision.canRun && (
+            <p id={reasonId} className="lx-note" style={{ margin: 0, ...(decision.tone === "warn" ? { color: "var(--warn)" } : {}) }}>
+              {decision.reason}
+            </p>
+          )}
+          {result && (
+            <p
+              role={result.alert ? "alert" : "status"}
+              className="lx-note"
+              style={{ margin: 0, ...(result.alert ? { color: "var(--wine)" } : {}) }}
+            >
+              {result.text}
+            </p>
+          )}
+        </div>
+      )}
     </>
   );
 }
