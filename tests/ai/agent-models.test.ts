@@ -96,16 +96,26 @@ describe("A5: prices", () => {
   const usage = { inputTokens: 1_000_000, outputTokens: 1_000_000, cacheReadTokens: 0, cacheWriteTokens: 0 };
   it("prices both defaults and still the old ids", () => {
     expect(costFor(DEFAULT_SONNET_MODEL, usage)).toBe(12);
-    expect(costFor(DEFAULT_HAIKU_MODEL, usage)).toBe(6);
+    expect(costFor(DEFAULT_HAIKU_MODEL, { ...usage, inputTokens: 100_000, outputTokens: 1_000_000 })).toBe(0.51);
+    expect(costFor(DEFAULT_HAIKU_MODEL, usage)).toBe(3); // 1M prompt tokens: the over-100k band
+    expect(costFor("claude-haiku-4-5", usage)).toBe(6);
+    expect(costFor("claude-sonnet-5", usage)).toBe(12);
+    // Haiku 5.5 over 100k prompt tokens is the higher band.
+    expect(costFor("claude-haiku-5-5", { ...usage, inputTokens: 200_000, outputTokens: 0 })).toBe(0.1);
+    expect(costFor("claude-haiku-5-5", { ...usage, inputTokens: 100_000, outputTokens: 0 })).toBe(0.01);
     expect(costFor("claude-opus-5", usage)).toBe(30);
     expect(costFor("something-unknown", usage)).toBeNull();
   });
 });
 
 describe("A6: Haiku limits", () => {
-  it("the triage request fits the model's output limit, and Haiku is sent no effort setting", () => {
+  it("the triage request fits the model's output limit, Haiku 5.5 is sent effort and Haiku 4.5 is not", () => {
     expect(TRIAGE_MAX_TOKENS).toBeLessThanOrEqual(maxOutputFor(DEFAULT_HAIKU_MODEL));
-    expect(supportsEffort(DEFAULT_HAIKU_MODEL)).toBe(false);
+    expect(DEFAULT_SONNET_MODEL).toBe("claude-sonnet-5-5");
+    expect(DEFAULT_HAIKU_MODEL).toBe("claude-haiku-5-5");
+    expect(supportsEffort(DEFAULT_HAIKU_MODEL)).toBe(true);
+    expect(supportsEffort("claude-haiku-4-5")).toBe(false);
+    expect(maxOutputFor("claude-haiku-4-5")).toBe(64_000);
     expect(supportsEffort(DEFAULT_SONNET_MODEL)).toBe(true);
   });
 });

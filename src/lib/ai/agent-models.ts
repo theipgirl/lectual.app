@@ -22,11 +22,12 @@ export const AGENT_MODEL_TIER: Record<ModelSubject, ModelTier> = {
   staff: "sonnet",
 };
 
-export const DEFAULT_SONNET_MODEL = "claude-sonnet-5";
-export const DEFAULT_HAIKU_MODEL = "claude-haiku-4-5";
+export const DEFAULT_SONNET_MODEL = "claude-sonnet-5-5";
+export const DEFAULT_HAIKU_MODEL = "claude-haiku-5-5";
 
-/** The most output tokens either tier's default model can return in one answer. */
+/** Output ceilings: the 5.5 models allow 128K; the older ids (claude-haiku-4-5, claude-sonnet-5) 64K. */
 const MAX_OUTPUT_TOKENS = 64_000;
+const MAX_OUTPUT_TOKENS_5_5 = 128_000;
 
 export type ModelEnv = {
   AGENT_MODEL?: string;
@@ -59,14 +60,14 @@ export function resolveAgentModel(subject: ModelSubject, e: ModelEnv, log?: (lin
 }
 
 /** The largest max_tokens a request to this model may carry. */
-export function maxOutputFor(_model: string): number {
-  return MAX_OUTPUT_TOKENS;
+export function maxOutputFor(model: string): number {
+  return /claude-(sonnet|haiku)-5-5/.test(model) ? MAX_OUTPUT_TOKENS_5_5 : MAX_OUTPUT_TOKENS;
 }
 
 /**
- * Whether the `effort` setting may be sent. Haiku models do not take it (the API refuses the request),
- * so for them the request carries the structured format alone.
+ * Whether the `effort` setting may be sent. claude-haiku-4-x does not take it (the API refuses the request),
+ * so for it the request carries the structured format alone. claude-haiku-5-5 does (default medium).
  */
 export function supportsEffort(model: string): boolean {
-  return !model.toLowerCase().includes("haiku");
+  return !/claude-haiku-4/.test(model.toLowerCase());
 }

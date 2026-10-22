@@ -71,7 +71,7 @@ describe("cost is the model that answered", () => {
             create: async (b: Record<string, unknown>) => {
               body = b;
               return {
-                model: "claude-haiku-4-5",
+                model: "claude-haiku-5-5",
                 stop_reason: "end_turn",
                 content: [{ type: "text", text: "{}" }],
                 usage: { input_tokens: 1_000_000, output_tokens: 0 },
@@ -83,10 +83,10 @@ describe("cost is the model that answered", () => {
     }));
     const { callClaude } = await import("@/lib/ai/claude");
     const res = await callClaude({ system: "s", user: "u", schema: z.object({}), effort: "low", agent: "intake-triage", maxTokens: 16_000 });
-    expect(body.model).toBe("claude-haiku-4-5");
-    expect((body.output_config as Record<string, unknown>).effort).toBeUndefined();
-    expect(res.model).toBe("claude-haiku-4-5");
-    expect(res.costUsd).toBe(1);
+    expect(body.model).toBe("claude-haiku-5-5");
+    expect((body.output_config as Record<string, unknown>).effort).toBe("low");
+    expect(res.model).toBe("claude-haiku-5-5");
+    expect(res.costUsd).toBe(0.5);
     delete process.env.ANTHROPIC_API_KEY;
   });
 });

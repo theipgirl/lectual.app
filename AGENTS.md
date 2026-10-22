@@ -666,13 +666,15 @@ public intake screening, Meetings "Draft follow-up" is `post-consult`) is `sonne
 model call and is not in the table.
 - `agentModel(subject)` in `src/lib/ai/claude.ts` takes a required subject. `StructuredRequest.agent` carries it; `runOneAgent` fills it in
   from the run's own agent id, and each agent's call also names itself. `askClaude` requires `agent`.
-- Defaults `claude-sonnet-5` and `claude-haiku-4-5` (the ids and prices already in the cost table). The Opus ids stay in `PRICES` only so
+- Defaults `claude-sonnet-5-5` ($2 / $10 per million tokens) and `claude-haiku-5-5` ($0.10 / $0.50; $0.50 / $2.50 when the prompt is over 100k
+  tokens, which `costFor` applies), the newest of each per platform.claude.com/docs/en/about-claude/models/overview, where `claude-sonnet-5` and
+  `claude-haiku-4-5` are listed as legacy. Both stay in `PRICES` so old runs still price. The Opus ids stay in `PRICES` only so
   old `agent_run` costs still price. Overrides: `AGENT_MODEL_HAIKU`, `AGENT_MODEL_SONNET`; `AGENT_MODEL` is now ONLY the Sonnet-tier override
   (`AGENT_MODEL_SONNET` wins over it) and no longer forces every agent. An override naming a `claude-opus*` id is ignored with one log line.
-- Haiku is sent no `effort` (the API refuses it for that model) and `max_tokens` is clamped by `maxOutputFor` (64k; triage asks 16k).
+- `supportsEffort` is false only for `claude-haiku-4-*` (the API refuses it there); `claude-haiku-5-5` takes `effort` (triage sends `low`).
+  `max_tokens` is clamped by `maxOutputFor` (128k for the 5.5 ids, 64k for older; triage asks 16k).
   A cut-off answer is still `AiOutputError` `truncated`, which skips the one lead. Cost is priced from `response.model`, the model that answered.
-- Not verified against the live API in this environment (no key): the ids and the Haiku no-effort rule come from the repo's price table and
-  the API's documented behaviour. Check the first Haiku triage run.
+- Not verified against the live API in this environment (no key): the ids, prices and effort rule come from the models and effort docs. Check the first Haiku triage run.
 
 ## Agent failure alerts (Sprint 24, no schema)
 A run closed as `error` (cron, Run now and the time-limit close all go through `runOneAgent`) emails Lectual, internal only.

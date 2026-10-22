@@ -100,12 +100,21 @@ const PRICES: Record<string, [number, number]> = {
   "claude-opus-5-5": [4, 20],
   "claude-sonnet-5": [2, 10],
   "claude-haiku-4-5": [1, 5],
+  // Newest defaults (platform.claude.com/docs/en/about-claude/models/overview).
+  "claude-sonnet-5-5": [2, 10],
+  "claude-haiku-5-5": [0.1, 0.5],
 };
+
+/** claude-haiku-5-5 is $0.50 / $2.50 for prompts over 100k tokens. */
+const HAIKU_5_5_LONG_PROMPT: [number, number] = [0.5, 2.5];
+const HAIKU_5_5_LONG_PROMPT_TOKENS = 100_000;
 
 export function costFor(model: string, u: Usage): number | null {
   const price = PRICES[model];
   if (!price) return null;
-  const [inp, out] = price;
+  const promptTokens = u.inputTokens + u.cacheReadTokens + u.cacheWriteTokens;
+  const [inp, out] =
+    model === "claude-haiku-5-5" && promptTokens > HAIKU_5_5_LONG_PROMPT_TOKENS ? HAIKU_5_5_LONG_PROMPT : price;
   const usd =
     (u.inputTokens * inp + u.cacheReadTokens * inp * 0.1 + u.cacheWriteTokens * inp * 1.25 + u.outputTokens * out) / 1e6;
   return Math.round(usd * 10_000) / 10_000;
