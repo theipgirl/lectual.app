@@ -330,6 +330,50 @@ stored type, direction, date, subject and `sensitive` flag) and the Sprint 15 Ou
   the database update"; mail signals still work for a firm that managed to switch it on. A firm switching it on can see up to 30 days
   of matched mail acted on in the first run (each move forward-only and undoable).
 
+## New agents: morning-brief, consult-prep, inbox-summary (Sprint 17, need lectual 0098)
+Three in-app agents that ONLY DRAFT. Their output is an approval-queue draft (`ctx.createDraft`) or, for the inbox
+summary, a draft in a person's own Outlook Drafts folder. No send call, no send scope, no automatic delivery. They run
+as the service role, org-fenced, from `runAllAgents` (the existing daily `/api/cron/agents`) and from Run now; they are
+NOT in the mailbox post-sync hook (that stays the Stage Keeper's) and `vercel.json` is unchanged. Every system prompt
+starts with `AGENT_POLICY`, and mail, answers and subjects reach a model only inside tags with `<` and `>` made inert.
+- **Autonomy:** default `draft`. `draft` and `act` behave the same. `suggest` writes the internal BRIEFING only: no
+  follow-up email, no client-prep email, no Outlook draft.
+- **Before 0098** the settings CHECK refuses all three (the action says "isn't available until the database update"),
+  their `agent_run` rows are refused, and `crm_calendar_event` has no `is_consult` / `lead_id` / `source`. Readiness shows
+  "Not available until the database update", inferred from the same column probe the calendar readiness uses
+  (`readCalendarProbe`); consults say so in words, never "no consults".
+- **The Mailboxes module is checked on every run**, not only on the Agents-page label. `runOneAgent` already reads
+  `crm_org` for `queue_org_key`; the same select also carries `modules` (`ctx.orgModules`, `null` when the read failed or
+  found no row). `mailboxModuleState` (`src/lib/agents/mailbox-gate.ts`, the one place the module is named) answers on /
+  off / unreadable, and unreadable is treated as off with its own words. inbox-summary and consult-prep end `skipped`
+  before any provider or calendar statement; morning-brief writes its brief with the consults section marked not read.
+  A failed `crm_org` read also loses the queue key, so the agents say the firm's settings couldn't be read rather than
+  that no queue is connected.
+- **morning-brief** (`src/lib/agents/morning-brief/`): six sections read independently (`ok` / blocked /
+  `database-update-needed` / `unavailable`), so a failed read says "Couldn't be read" and an empty one says "Nothing today".
+  If no section could be read the run throws. Up to 5 stalled-lead follow-ups a run (most stalled first), none for a
+  sensitive thread, a lead followed up in 7 days (a `queue_drafted` row, which does not count as contact), a lead with no
+  real address, or a lead with a draft already pending. "Pending" uses the repo's three linking rules in order through
+  the SAME resolver the lead pages use (`resolveBatch`, now in `src/lib/queue/resolve-batch.ts`, called by
+  `lead-pending.ts` with the signed-in client and by the agent through `orgFencedReader`), then a case-insensitive client
+  name. If the pending list (`ctx.listPending`) or any link lookup can't be read, NONE are drafted and the brief says why.
+- **consult-prep** (`src/lib/agents/consult-prep/`): a consult in the next 24 hours, linked to a lead, with no prep
+  recorded. Two `queue_drafted` rows per consult (heads_up, client_prep) carry the event id, so a second run skips it.
+  The heads-up is a facts card rendered from data, not written by a model. The client email goes through the staff flow's
+  builder (`buildClientPrepDraft`, with an optional injected text generator so the run's cost total sees it). Classes,
+  package and price are never generated: values read from the record have refusable fragments withheld (`[omitted]`),
+  the client's own answers are shown verbatim in a labelled block, and a model output carrying one is refused and counted.
+  Both drafts are built before either is queued.
+- **inbox-summary** (`src/lib/agents/inbox-summary/`, triage in `src/lib/inbox/triage.ts`): reads inbound mail of the last
+  24 hours through `fetchNewMessages`'s optional `window` (newest first, 200 per mailbox, never the sync cursor). Bodies
+  are fetched only for a message that gets a reply draft and are never stored. The reply is a NEW message addressed to
+  the sender ("Re: <subject>") in a personal Outlook mailbox's Drafts, not a threaded reply, because that is what
+  `createMailboxDraft` makes. None for a sensitive thread, a scam, official correspondence, an automated sender, a shared
+  mailbox or a Gmail mailbox. A message that already has a "Re: <subject>" draft to that sender is skipped; a Drafts folder
+  that can't be read means no reply drafts for that mailbox (fail closed).
+- **Logging:** counts only in `agent_run`, the summary and every thrown message. The briefing and the digest are the
+  one place names, subjects and short previews appear, and they are internal.
+
 ## JSX text spacing: keep the `{" "}`
 Next 16.2.7's compiler DROPS the leading space of JSX text that contains an HTML entity
 (`&apos;`, `&amp;`, `&rsquo;`…) and runs onto another line, even if that is only the line
