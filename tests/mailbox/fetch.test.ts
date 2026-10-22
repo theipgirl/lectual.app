@@ -181,3 +181,89 @@ describe("Outlook (Graph delta) fetch", () => {
     expect(calls.some((c) => c.includes("evil.example"))).toBe(false);
   });
 });
+
+describe("the optional window argument (Sprint 17, F10)", () => {
+  const NOW = Date.parse("2026-10-21T12:00:00Z");
+  const graphMsg = (id: string, at: string, extra: Record<string, unknown> = {}) => ({
+    id,
+    conversationId: `c-${id}`,
+    subject: "Hello",
+    bodyPreview: "Hi",
+    from: { emailAddress: { name: "Client", address: "client@example.com" } },
+    toRecipients: [{ emailAddress: { address: "me@firm.example" } }],
+    receivedDateTime: at,
+    webLink: `https://outlook.office.com/${id}`,
+    ...extra,
+  });
+
+  it("Outlook: the default is still the 30-day delta read of both folders (unchanged)", async () => {
+    const { impl, calls } = router([["/messages/delta", () => json({ value: [], "@odata.deltaLink": "https://graph.microsoft.com/delta/x" })]]);
+    const r = await fetchNewMessages("microsoft", { accessToken: "at", mailbox: "me@firm.example", cursor: null, fetchImpl: impl, now: NOW });
+    expect(calls).toHaveLength(2);
+    expect(calls[0]).toContain("/inbox/messages/delta");
+    expect(calls[1]).toContain("/sentitems/messages/delta");
+    expect(decodeURIComponent(calls[0])).toContain("receivedDateTime ge 2026-09-21T12:00:00.000Z");
+    expect(JSON.parse(r.cursor)).toHaveProperty("inbox");
+  });
+
+  it("Outlook: a window reads only the Inbox, newest first, from `hours` ago, and returns no cursor", async () => {
+    const { impl, calls } = router([["/inbox/messages?", () => json({ value: [graphMsg("a", "2026-10-21T10:00:00Z")] })]]);
+    const r = await fetchNewMessages("microsoft", {
+      accessToken: "at",
+      mailbox: "me@firm.example",
+      cursor: "ignored-cursor",
+      fetchImpl: impl,
+      now: NOW,
+      window: { hours: 24 },
+    });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).not.toContain("/delta");
+    expect(calls[0]).not.toContain("sentitems");
+    expect(decodeURIComponent(calls[0])).toContain("receivedDateTime ge 2026-10-20T12:00:00.000Z");
+    expect(decodeURIComponent(calls[0])).toContain("receivedDateTime desc");
+    expect(r.cursor).toBe("");
+    expect(r.messages.map((m) => m.id)).toEqual(["graph:a"]);
+    expect(r.messages[0].direction).toBe("inbound");
+  });
+
+  it("Outlook: a window stops at the cap and says it was cut short; it never follows a link off Graph", async () => {
+    const page = (n: number, next?: string) => json({ value: Array.from({ length: n }, (_, i) => graphMsg(`m${i}-${next ?? "end"}`, "2026-10-21T10:00:00Z")), ...(next ? { "@odata.nextLink": next } : {}) });
+    const { impl } = router([
+      ["/inbox/messages?", () => page(50, "https://graph.microsoft.com/next-page")],
+      ["/next-page", () => page(50, "https://graph.microsoft.com/next-page-2")],
+    ]);
+    const r = await fetchNewMessages("microsoft", { accessToken: "at", mailbox: "me@firm.example", cursor: null, fetchImpl: impl, now: NOW, window: { hours: 24 }, maxMessages: 100 });
+    expect(r.messages).toHaveLength(100);
+    expect(r.truncated).toBe(true);
+
+    const evil = router([["/inbox/messages?", () => json({ value: [], "@odata.nextLink": "https://evil.example/steal" })]]);
+    await expect(
+      fetchNewMessages("microsoft", { accessToken: "at", mailbox: "me@firm.example", cursor: null, fetchImpl: evil.impl, now: NOW, window: { hours: 24 } }),
+    ).rejects.toMatchObject({ code: "fetch-failed" });
+    expect(evil.calls).toHaveLength(1);
+  });
+
+  it("Outlook: a window turns a 401 into a reconnect", async () => {
+    const { impl } = router([["/inbox/messages?", () => json({}, 401)]]);
+    await expect(
+      fetchNewMessages("microsoft", { accessToken: "at", mailbox: "me@firm.example", cursor: null, fetchImpl: impl, now: NOW, window: { hours: 24 } }),
+    ).rejects.toMatchObject({ code: "reauth" });
+  });
+
+  it("Gmail: the default still lists newer_than:30d; a window asks for mail after `hours` ago, excluding sent, and keeps inbound only", async () => {
+    const meta = (id: string, labels: string[]) => json({ id, threadId: `t-${id}`, labelIds: labels, internalDate: String(NOW - 3_600_000), snippet: "s", payload: { headers: [] } });
+    const { impl, calls } = router([
+      ["/messages?q=", () => json({ messages: [{ id: "a" }, { id: "b" }] })],
+      [/\/messages\/a\?/, () => meta("a", ["INBOX"])],
+      [/\/messages\/b\?/, () => meta("b", ["SENT"])],
+    ]);
+    const r = await fetchNewMessages("google", { accessToken: "at", mailbox: "me@x.com", cursor: "keep-me", fetchImpl: impl, now: NOW, window: { hours: 24 } });
+    expect(calls.some((c) => c.includes("/profile") || c.includes("/history"))).toBe(false);
+    const q = decodeURIComponent(calls[0]);
+    expect(q).toContain(`after:${Math.floor((NOW - 24 * 3_600_000) / 1000)}`);
+    expect(q).toContain("-in:sent");
+    expect(q).not.toContain("newer_than");
+    expect(r.cursor).toBe("");
+    expect(r.messages.map((m) => m.id)).toEqual(["gmail:a"]);
+  });
+});

@@ -2,6 +2,7 @@ import { vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { StructuredCall } from "@/lib/ai/claude";
 import type { AgentContext, Autonomy } from "@/lib/agents/types";
+import type { NewQueueDraft } from "@/lib/queue/api";
 import { fakeAdmin, filterValue, type Handler, type Recorded } from "../mailbox/fake-db";
 
 export const ORG = "11111111-1111-1111-1111-111111111111";
@@ -18,9 +19,23 @@ export function fakeLlm(...outputs: unknown[]) {
   return { llm, calls };
 }
 
-export function agentCtx(handler: Handler, opts: { autonomy: Autonomy; queue?: boolean; llm: StructuredCall; fetchImpl?: typeof fetch; mailbox?: AgentContext["mailbox"] }) {
+export function agentCtx(
+  handler: Handler,
+  opts: {
+    autonomy: Autonomy;
+    queue?: boolean;
+    llm: StructuredCall;
+    fetchImpl?: typeof fetch;
+    mailbox?: AgentContext["mailbox"];
+    /** The firm's module list as the runner read it. Default: the Mailboxes module on. `null` = the read failed. */
+    modules?: readonly string[] | null;
+    /** The pending-queue reader. Absent = none was wired. */
+    listPending?: AgentContext["listPending"];
+  },
+) {
   const { client, log } = fakeAdmin(handler);
-  const createDraft = vi.fn(async () => ({ id: `q-${createDraft.mock.calls.length}` }));
+  let drafted = 0;
+  const createDraft = vi.fn<(input: NewQueueDraft) => Promise<{ id: string }>>(async () => ({ id: `q-${(drafted += 1)}` }));
   const ctx: AgentContext = {
     admin: client as unknown as SupabaseClient,
     orgId: ORG,
@@ -31,6 +46,8 @@ export function agentCtx(handler: Handler, opts: { autonomy: Autonomy; queue?: b
     now: () => NOW,
     fetchImpl: opts.fetchImpl,
     mailbox: opts.mailbox,
+    listPending: opts.listPending,
+    orgModules: opts.modules === undefined ? ["mailbox"] : opts.modules,
   };
   return { ctx, log, createDraft };
 }
