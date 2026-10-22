@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { markPaidAction, retryUploadAction, undoPaidAction } from "@/app/dashboard/proposals/[id]/paid-actions";
 import type { PaidPanelView } from "@/lib/proposals/paid-view";
 import { ActionForm, Outcome } from "./ActionForm";
@@ -11,6 +10,7 @@ import { ActionForm, Outcome } from "./ActionForm";
  * outcome. It draws what `buildPaidPanelView` decided (the words, the tones and which
  * buttons exist), and every button is a server action that re-checks the module and the
  * role itself. A failed events read draws "Paid status couldn't be read" and no buttons.
+ * The two links are plain anchors so the target is exactly the path built in `paid-view.ts`.
  */
 export function PaidPanel({ proposalId, view }: { proposalId: string; view: PaidPanelView }) {
   const hidden = <input type="hidden" name="proposalId" value={proposalId} />;
@@ -66,7 +66,7 @@ export function PaidPanel({ proposalId, view }: { proposalId: string; view: Paid
           {" "}
           {view.chooseTemplate.href ? (
             <>
-              Pick the template from the <Link href={view.chooseTemplate.href}>LOE form</Link>.
+              Pick the template from the <a href={view.chooseTemplate.href}>LOE form</a>.
             </>
           ) : (
             "Open the matter first, then pick the template from the LOE form."
@@ -80,7 +80,7 @@ export function PaidPanel({ proposalId, view }: { proposalId: string; view: Paid
             <li key={line.key} data-tone={line.tone}>
               <span className="lx-label pe-step-label">{line.label}</span>
               <span className="pe-step-text">{line.text}</span>
-              {line.link && <Link href={line.link.href}>{line.link.label}</Link>}
+              {line.link && <a href={line.link.href}>{line.link.label}</a>}
               {line.retry && (
                 <ActionForm action={retryUploadAction} className="pe-paid-act">
                   {({ state, pending }) => (

@@ -100,7 +100,8 @@ export function readStep(payload: unknown): ParsedStep | null {
 }
 
 function ms(iso: string): number {
-  const t = Date.parse(iso.replace(" ", "T"));
+  // PostgREST sends "…T…+00:00"; a bare "+00" offset (raw SQL) is widened so Date can read it.
+  const t = Date.parse(iso.replace(" ", "T").replace(/(T[\d:.]+[+-]\d{2})$/, "$1:00"));
   return Number.isNaN(t) ? 0 : t;
 }
 

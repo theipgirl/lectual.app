@@ -31,7 +31,7 @@ export type PaidMarker = { state: "paid" | "not_paid" | "unreadable"; label: str
 
 /** The marker the list shows and the panel's first line: from the same `PaidState`, or "unreadable". */
 export function paidMarker(paid: PaidState | "unreadable", names: ReadonlyMap<string, string>, tz: string): PaidMarker {
-  if (paid === "unreadable") return { state: "unreadable", label: "Couldn't read", tone: "risk" };
+  if (paid === "unreadable") return { state: "unreadable", label: MARK_PAID_WORDS.unreadable, tone: "risk" };
   if (paid.state === "paid") return { state: "paid", label: paidLine(paid, names, tz), tone: "ok" };
   return { state: "not_paid", label: "Not paid", tone: "mute" };
 }

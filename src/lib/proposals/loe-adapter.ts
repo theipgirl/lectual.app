@@ -177,7 +177,7 @@ export function flattenFeeChart(input: Pick<TrademarkLoeInput, "benefitRowsText"
     .map((l) => l.trim())
     .filter(Boolean);
   return [
-    `Trademark Package / Word Mark – ${input.markText}`,
+    `Trademark Package — Word Mark – ${input.markText}`,
     ...rows,
     `Class Selected: ${input.classSelected}`,
     `Amount Paid: ${input.amountPaid}${input.amountPaidMath ? ` (${input.amountPaidMath})` : ""}`,
