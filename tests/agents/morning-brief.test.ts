@@ -4,6 +4,7 @@ import { runMorningBrief } from "@/lib/agents/morning-brief/run";
 import { FOLLOW_UP_CAP, NO_CONTACT_DAYS, stalledLeads, waitingOnReply, type BriefLead, type BriefStage } from "@/lib/agents/morning-brief/rules";
 import { NOTHING } from "@/lib/agents/morning-brief/render";
 import { AGENT_POLICY } from "@/lib/agents/policy";
+import { buildRunDigest, type DigestRun } from "@/lib/agents/digest";
 import type { QueueItem } from "@/lib/queue/api";
 import type { Recorded } from "../mailbox/fake-db";
 import { agentCtx, assertOrgFenced, fakeLlm, NOW, ORG } from "./helpers";
@@ -104,6 +105,22 @@ const section = (body: string, title: string) => {
   const end = rest.indexOf("\n\n");
   return end < 0 ? rest : rest.slice(0, end);
 };
+
+/** The Overnight digest line for one run's result, exactly as Today shows it. */
+function digestFor(agent: string, result: { itemsIn: number; draftsOut: number; summary?: string | null }) {
+  const run: DigestRun = {
+    agent,
+    status: "ok",
+    started_at: new Date(NOW - 3_600_000).toISOString(),
+    items_in: result.itemsIn,
+    drafts_out: result.draftsOut,
+    summary: result.summary ?? null,
+    error: null,
+  };
+  const out = buildRunDigest([run], new Date(NOW));
+  if (out.status !== "ok") throw new Error("expected ok");
+  return out.lines[0];
+}
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -359,6 +376,24 @@ describe("morning-brief (F4): a failed read is reported, never an empty section"
     await runMorningBrief(early.ctx);
     const strings = [empty, failedRun, early].map((s) => section(briefOf(s.createDraft).draftBody, "Today's consults").split("\n")[1]);
     expect(new Set(strings).size).toBe(3);
+  });
+
+  it("a brief written with only the queue readable is not reported as 'nothing to report' on the Overnight digest", async () => {
+    const { ctx } = setup({ failures: (q) => (q.table === "crm_org_profile" ? undefined : { message: "down" }), pending: [] });
+    const result = await runMorningBrief(ctx);
+    expect(result.summary).toMatch(/Not read: /);
+    const digest = digestFor("morning-brief", result);
+    expect(digest.text).not.toContain("nothing to report");
+    expect(digest.tone).not.toBe("quiet");
+    expect(digest.tone).toBe("attention");
+    expect(digest.text).toContain("couldn't be read");
+  });
+
+  it("a genuinely empty brief (every section read, nothing in any) still reads 'nothing to report', quiet", async () => {
+    const { ctx } = setup();
+    const result = await runMorningBrief(ctx);
+    expect(result.summary).not.toMatch(/Not read:|could not be read/);
+    expect(digestFor("morning-brief", result)).toMatchObject({ text: "wrote the morning brief · nothing to report", tone: "quiet" });
   });
 
   it("with every source failing the run throws, with no brief written", async () => {

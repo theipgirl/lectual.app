@@ -1,4 +1,5 @@
 import { AGENT_MOVES_TODAY_HREF } from "@/lib/stage-keeper/moves";
+import { mailboxCount } from "./shared";
 import { AGENT_DEFS, AGENT_IDS, type AgentId } from "./types";
 
 /**
@@ -70,6 +71,26 @@ export function triageHotCount(summary: string | null): number | null {
 export function intelFilledCount(summary: string | null): number | null {
   const m = summary?.match(/\b(\d+) record\(s\) filled in\b/);
   return m ? Number(m[1]) : null;
+}
+
+/**
+ * True when the morning brief's own summary says a section, the queue or a link
+ * lookup could not be read ("Not read: queue.", "No follow-ups were drafted because
+ * ..."). Such a brief is never reported as "nothing to report".
+ */
+export function briefHadUnreadSections(summary: string | null): boolean {
+  return /\bNot read:/.test(summary ?? "") || /\bcould not be read\b/.test(summary ?? "");
+}
+
+/** "2 mailboxes could not be read." → 2 (0 when the inbox summary read every connection). */
+export function inboxUnreadMailboxes(summary: string | null): number {
+  const m = summary?.match(/\b(\d+) mailbox(?:es)? could not be read\./);
+  return m ? Number(m[1]) : 0;
+}
+
+/** The inbox summary could not tell which messages are filed on a lead. */
+export function inboxFiledLookupFailed(summary: string | null): boolean {
+  return /\bfiled on a lead could not be checked\b/.test(summary ?? "");
 }
 
 /**
@@ -150,10 +171,14 @@ function lineFor(agent: AgentId, runs: DigestRun[]): DigestLine | null {
     case "morning-brief": {
       // drafts_out is the brief itself plus every follow-up it queued.
       const followUps = Math.max(0, drafts - ok.length);
+      // A brief that couldn't read some section is not "nothing to report": the run's own summary says so.
+      const unread = ok.some((r) => briefHadUnreadSections(r.summary));
       const parts = [`wrote the morning brief${ok.length > 1 ? ` (${ok.length} runs)` : ""}`];
       if (followUps > 0) parts.push(`${plural(followUps, "follow-up", "follow-ups")} drafted (in the Queue)`);
-      else if (items === 0) parts.push("nothing to report");
-      return { agent, name, text: parts.join(" · "), tone: followUps > 0 ? "attention" : items === 0 ? "quiet" : "ok", href: "/dashboard/queue/" };
+      else if (items === 0 && !unread) parts.push("nothing to report");
+      if (unread) parts.push("some sections couldn't be read (see the brief)");
+      const tone = followUps > 0 || unread ? "attention" : items === 0 ? "quiet" : "ok";
+      return { agent, name, text: parts.join(" · "), tone, href: "/dashboard/queue/" };
     }
     case "consult-prep": {
       if (items === 0) return { agent, name, text: "found no consults to prep", tone: "quiet", href: "/dashboard/agents/" };
@@ -162,6 +187,16 @@ function lineFor(agent: AgentId, runs: DigestRun[]): DigestLine | null {
     case "inbox-summary": {
       // drafts_out is the digest plus every reply draft left in Outlook; items_in is the messages sorted.
       const replies = Math.max(0, drafts - ok.length);
+      // A mailbox that couldn't be read, or a failed filed-on-a-lead lookup, is not "no new mail".
+      const unreadBoxes = ok.reduce((s, r) => s + inboxUnreadMailboxes(r.summary), 0);
+      const lookupFailed = ok.some((r) => inboxFiledLookupFailed(r.summary));
+      if (unreadBoxes > 0 || lookupFailed) {
+        const parts = [`summarised the inbox (${plural(items, "message", "messages")})`];
+        if (replies > 0) parts.push(`${plural(replies, "reply draft", "reply drafts")} in Outlook`);
+        if (unreadBoxes > 0) parts.push(`${mailboxCount(unreadBoxes)} couldn't be read (reconnect it)`);
+        if (lookupFailed) parts.push("couldn't tell which messages are filed on a lead");
+        return { agent, name, text: parts.join(" · "), tone: "attention", href: unreadBoxes > 0 ? "/dashboard/settings/mailboxes/" : "/dashboard/queue/" };
+      }
       if (items === 0 && replies === 0) return { agent, name, text: "found no new mail to summarise", tone: "quiet", href: "/dashboard/queue/" };
       const parts = [`summarised the inbox (${plural(items, "message", "messages")})`];
       if (replies > 0) parts.push(`${plural(replies, "reply draft", "reply drafts")} in Outlook`);

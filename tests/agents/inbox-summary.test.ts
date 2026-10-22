@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { runInboxSummary, MAILBOX_CAP } from "@/lib/agents/inbox-summary/run";
 import { REPLY_CAP, hasReplyDraft, replyEligibility, replySubject } from "@/lib/agents/inbox-summary/reply";
 import { AGENT_POLICY } from "@/lib/agents/policy";
+import { buildRunDigest, type DigestRun } from "@/lib/agents/digest";
 import { sealToken } from "@/lib/mailbox/crypto";
 import { SENSITIVE_PHRASES } from "@/lib/intake/email-match";
 import type { Recorded } from "../mailbox/fake-db";
@@ -131,6 +132,22 @@ const section = (body: string, title: string) => {
   const end = rest.indexOf("\n\n");
   return end < 0 ? rest : rest.slice(0, end);
 };
+
+/** The Overnight digest line for one run's result, exactly as Today shows it. */
+function digestFor(result: { itemsIn: number; draftsOut: number; summary?: string | null }) {
+  const run: DigestRun = {
+    agent: "inbox-summary",
+    status: "ok",
+    started_at: new Date(NOW - 3_600_000).toISOString(),
+    items_in: result.itemsIn,
+    drafts_out: result.draftsOut,
+    summary: result.summary ?? null,
+    error: null,
+  };
+  const out = buildRunDigest([run], new Date(NOW));
+  if (out.status !== "ok") throw new Error("expected ok");
+  return out.lines[0];
+}
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -300,6 +317,35 @@ describe("inbox-summary (F12): the digest", () => {
     expect(body).toContain("- bad@firm.example: needs reconnecting");
     expect(result.summary).toMatch(/2 mailboxes could not be read/);
     expect(result.itemsIn).toBe(1);
+  });
+
+  it("an empty mailbox plus one that returns 401 is not reported as 'found no new mail' on the Overnight digest", async () => {
+    const connections = [conn("c-att", "attorney@firm.example", "tok-att"), conn("c-bad", "bad@firm.example", "tok-bad")];
+    const boxes = { "tok-att": { inbox: [] }, "tok-bad": { inbox: [], inboxStatus: 401 } };
+    const { ctx } = setup({ connections, boxes, autonomy: "suggest" });
+    const result = await runInboxSummary(ctx);
+    expect(result.itemsIn).toBe(0);
+    const line = digestFor(result);
+    expect(line.text).not.toContain("found no new mail");
+    expect(line.tone).not.toBe("quiet");
+    expect(line.tone).toBe("attention");
+    expect(line.text).toContain("1 mailbox couldn't be read (reconnect it)");
+    expect(line.href).toBe("/dashboard/settings/mailboxes/");
+  });
+
+  it("a failed 'filed on a lead' lookup is flagged on the Overnight digest; every mailbox read and empty still reads quiet", async () => {
+    const failures = (q: Recorded): DbError | undefined => (q.table === "crm_activity" ? { message: "down" } : undefined);
+    const lookup = setup({ boxes: { "tok-att": { inbox: [gm("A")] } }, failures, autonomy: "suggest" });
+    const lookupLine = digestFor(await runInboxSummary(lookup.ctx));
+    expect(lookupLine.tone).toBe("attention");
+    expect(lookupLine.text).toContain("couldn't tell which messages are filed on a lead");
+    // the same wording from a run summary with no messages must not read as quiet either
+    expect(digestFor({ itemsIn: 0, draftsOut: 1, summary: "0 messages sorted from 1 mailbox. Which messages are filed on a lead could not be checked." })).toMatchObject({ tone: "attention" });
+
+    const empty = setup({ boxes: { "tok-att": { inbox: [] } }, autonomy: "suggest" });
+    const emptyResult = await runInboxSummary(empty.ctx);
+    expect(emptyResult.draftsOut).toBe(1);
+    expect(digestFor(emptyResult)).toMatchObject({ text: "found no new mail to summarise", tone: "quiet" });
   });
 
   it("with every connection failing the run throws and writes no digest", async () => {
