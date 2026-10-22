@@ -5,6 +5,7 @@ import { providerCredentials, rootKeyOrNull } from "./config";
 import { createMailboxDraft, type DraftInput } from "./drafts";
 import { freshAccessToken, type ConnectionRow } from "./sync";
 import type { MailboxProvider } from "./providers";
+import type { SearchableMailbox } from "@/lib/reconcile/mailbox-search";
 
 /**
  * Put an approved client email into the APPROVER'S OWN mailbox as a draft.
@@ -43,4 +44,42 @@ export async function draftInMyMailbox(draft: DraftInput): Promise<{ provider: M
   const accessToken = await freshAccessToken({ admin, root, credentials: providerCredentials }, row as ConnectionRow);
   const made = await createMailboxDraft(mine.provider as MailboxProvider, { accessToken, draft });
   return { provider: mine.provider as MailboxProvider, email: mine.email, webLink: made.webLink };
+}
+
+/**
+ * The mailboxes this person may search for the stage reconciliation screen: the ones RLS shows them
+ * (their own personal mailboxes plus the firm's shared ones) that are active. The sealed tokens are
+ * read only when a search actually needs one, by connection id AND the org the scoped read returned,
+ * exactly as draftInMyMailbox does. Read-only: nothing here writes a message.
+ */
+export async function searchableMailboxAccess(): Promise<{ ok: true; items: SearchableMailbox[] } | { ok: false }> {
+  const root = rootKeyOrNull();
+  if (!root) return { ok: true, items: [] };
+
+  const supabase = await getScopedClient();
+  const { data, error } = await supabase
+    .from("mailbox_connection")
+    .select("id, org_id, provider, email, status, scopes")
+    .eq("status", "active")
+    .order("created_at", { ascending: true });
+  if (error) return { ok: false };
+
+  const items = (data ?? []).map((mine): SearchableMailbox => ({
+    id: mine.id,
+    email: mine.email,
+    provider: mine.provider as MailboxProvider,
+    scopes: Array.isArray(mine.scopes) ? (mine.scopes as string[]) : null,
+    accessToken: async () => {
+      const admin = getAdminClient();
+      const { data: row } = await admin
+        .from("mailbox_connection")
+        .select("id, org_id, provider, email, status, access_token_enc, refresh_token_enc, token_expires_at, sync_cursor, matched_count, scopes")
+        .eq("id", mine.id)
+        .eq("org_id", mine.org_id)
+        .maybeSingle();
+      if (!row) throw new Error("mailbox gone");
+      return freshAccessToken({ admin, root, credentials: providerCredentials }, row as ConnectionRow);
+    },
+  }));
+  return { ok: true, items };
 }

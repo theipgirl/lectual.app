@@ -26,4 +26,9 @@ export const RECONCILE_MESSAGES = {
   moveFailed: "Couldn't move this lead. Nothing was changed for it.",
   moveForbidden: "You don't have permission to move this lead.",
   allFailed: "None of the moves went through.",
+  createBadRequest: "That person's details weren't understood, so no lead was created. Upload the sheet again.",
+  createNoStage: "This firm has no open stage to file a new lead in, so no lead was created. Add a stage in Settings first.",
+  createExists: "A lead for this person already exists, so no second one was created. Upload the sheet again to see it.",
+  createReadFailed: "We couldn't check whether this person already has a lead, so none was created. Try again shortly.",
+  createFailed: "Couldn't create this lead. Nothing was changed.",
 } as const;

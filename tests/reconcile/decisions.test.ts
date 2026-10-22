@@ -3,7 +3,7 @@ import { accept, acceptAgreeing, acceptedCount, agreeingCount, canAccept, movesF
 import { canonicalPlan, planFingerprint } from "../../src/lib/reconcile/fingerprint";
 import { proposeStage } from "../../src/lib/reconcile/propose";
 import type { Decisions, PlanRow, ProposeSources, ReconcileRow } from "../../src/lib/reconcile/types";
-import { S, STAGES, matter, none, planRow, stageName, stageSignal, unavailable } from "./helpers";
+import { S, STAGES, matter, none, planRow, stageName, stageSignal, unavailable, unmapped } from "./helpers";
 
 let n = 0;
 function row(sources: Partial<ProposeSources>, current = S.pnc): ReconcileRow {
@@ -23,7 +23,8 @@ const date = "2026-09-03T00:00:00.000Z";
 const agree = () => row({ sheet: stageSignal(S.consult, "3.", date), lawmatics: stageSignal(S.consult) });
 const sheetOnly = () => row({ sheet: stageSignal(S.consult, "3.", date) });
 const conflict = () => row({ sheet: stageSignal(S.consult), lawmatics: stageSignal(S.post) });
-const noEvidence = () => row({ lawmatics: stageSignal(S.consult) });
+// A source that names no stage this firm has proposes nothing (a Lawmatics stage alone now would).
+const noEvidence = () => row({ lawmatics: unmapped("Discovery Call No Show") });
 const needsMatter = () => row({ sheet: stageSignal(S.consult), lawmatics: matter("Hired") });
 const alreadyThere = () => row({ sheet: stageSignal(S.pnc), lawmatics: stageSignal(S.pnc) });
 const unavailableRow = () => row({ sheet: stageSignal(S.consult), lawmatics: unavailable("down"), email: unavailable("down") });
@@ -74,7 +75,7 @@ describe("skip", () => {
   });
 });
 
-describe("accept all where the sheet and another source agree", () => {
+describe("accept all where two or more sources agree", () => {
   it("marks exactly the agree rows and returns the count", () => {
     const rows = [agree(), sheetOnly(), conflict(), noEvidence(), needsMatter(), alreadyThere(), unavailableRow(), agree()];
     expect(agreeingCount(rows)).toBe(2);

@@ -104,11 +104,11 @@ describe("readStoredMail", () => {
     const read = await readStoredMail(world.client as never, [L.amara, L.kwame, L.priya]);
     if (read.status !== "ok") throw new Error("expected ok");
     expect(read.byLead.get(L.amara)).toEqual([
-      { type: "other", sensitive: true, at: "2026-09-03T10:00:00Z" },
-      { type: "loe-invoice", sensitive: false, at: "2026-09-01T10:00:00Z" },
+      { type: "other", sensitive: true, at: "2026-09-03T10:00:00Z", direction: "sent", subject: null },
+      { type: "loe-invoice", sensitive: false, at: "2026-09-01T10:00:00Z", direction: "sent", subject: null },
     ]);
     expect(read.byLead.has(L.kwame)).toBe(false); // a note is not mail
-    expect(read.byLead.get(L.priya)).toEqual([{ type: null, sensitive: false, at: "2026-08-01T00:00:00Z" }]);
+    expect(read.byLead.get(L.priya)).toEqual([{ type: null, sensitive: false, at: "2026-08-01T00:00:00Z", direction: "sent", subject: null }]);
     expect(read.total).toBe(3);
   });
 

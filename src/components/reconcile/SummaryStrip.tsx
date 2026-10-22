@@ -1,6 +1,7 @@
+import { notesSummaryLine } from "@/lib/reconcile/describe";
 import { CONFIDENCE_LABEL, type Confidence, type ReconcileSummary } from "@/lib/reconcile/types";
 
-const ORDER: Confidence[] = ["agree", "sheet_only", "conflict", "no_evidence"];
+const ORDER: Confidence[] = ["agree", "sheet_only", "single_source", "conflict", "no_evidence"];
 
 function lawmaticsLine(s: ReconcileSummary["lawmatics"]): string {
   if (s.status === "ok") return `Lawmatics: read (${s.records} records, ${s.matched} matched)`;
@@ -25,15 +26,21 @@ export function SummaryStrip({ summary }: { summary: ReconcileSummary }) {
       {ORDER.map((c) => (
         <span key={c} data-count={c}>
           {`${CONFIDENCE_LABEL[c]}: `}
-          <b>{summary.confidence[c]}</b>
+          <b>{summary.confidence[c] ?? 0}</b>
         </span>
       ))}
+      {summary.sectionsLine ? <span data-sections>{summary.sectionsLine}</span> : null}
+      {summary.mappingNote ? (
+        <span className="rc-warn" data-mapping-note>
+          {summary.mappingNote}
+        </span>
+      ) : null}
       <span data-count="needs_matter">
         {"Needs a matter: "}
         <b>{summary.needsMatter}</b>
       </span>
       <span data-count="already">
-        {"Already in the sheet's stage: "}
+        {"Already in the proposed stage: "}
         <b>{summary.alreadyThere}</b>
       </span>
       <span data-source="sheet">Sheet: read</span>
@@ -44,6 +51,16 @@ export function SummaryStrip({ summary }: { summary: ReconcileSummary }) {
         {emailLine(summary.email)}
       </span>
       {summary.email.status === "ok" && summary.email.note ? <span>{summary.email.note}</span> : null}
+      {summary.notes ? (
+        <span data-source="notes" data-status={summary.notes.status} className={summary.notes.status === "unavailable" ? "rc-warn" : undefined}>
+          {notesSummaryLine(summary.notes)}
+        </span>
+      ) : null}
+      {summary.mailbox ? (
+        <span data-source="mailbox" className={summary.mailbox.note ? "rc-warn" : undefined}>
+          {summary.mailbox.note ? `Mailbox search: ${summary.mailbox.note}` : `Mailbox search: ${summary.mailbox.searched} people searched`}
+        </span>
+      ) : null}
       <span data-count="no-lead">{`${summary.sheetRowsWithoutLead.length} sheet rows have no lead in the app`}</span>
       <span data-count="refused">{`${summary.refused.length} sheet rows were not used`}</span>
       {summary.ambiguousLeads > 0 ? (
@@ -60,7 +77,8 @@ export function SummaryStrip({ summary }: { summary: ReconcileSummary }) {
 
 /** The sheet rows left out: ones with no lead (never created) and ones the parser refused, each with why. */
 export function LeftOutLists({ summary }: { summary: ReconcileSummary }) {
-  const noLead = summary.sheetRowsWithoutLead;
+  // "Not in Lectual yet" lists these people with a Create lead button; this list is only for a summary without it.
+  const noLead = summary.notInLectual ? [] : summary.sheetRowsWithoutLead;
   const refused = summary.refused;
   if (noLead.length === 0 && refused.length === 0) return null;
   return (

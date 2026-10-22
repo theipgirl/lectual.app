@@ -18,20 +18,22 @@ describe("proposeStage: agree", () => {
     expect(p.kind).toBe("stage");
     expect(p.stage).toEqual({ id: S.consult, name: "Consultation Scheduled" });
     expect(p.confidence).toBe("agree");
-    expect(text(p)).toMatch(/Lawmatics:.*It matches the sheet/);
+    expect(text(p)).toContain("Consultation Scheduled (Lawmatics stage)");
+    expect(text(p)).toContain("3. Consultation Scheduled Sep 3 (sheet status)");
     expect(p.evidenceDate).toBe("2026-09-03T00:00:00.000Z");
   });
 
   it("sheet and email on the same stage", () => {
     const p = run({ sheet: stageSignal(S.loe), email: stageSignal(S.loe, "LOE and invoice email") });
     expect(p.confidence).toBe("agree");
-    expect(text(p)).toMatch(/Email \/ calendar:.*It matches the sheet/);
+    expect(text(p)).toContain("LOE and invoice email (email)");
   });
 
   it("sheet, Lawmatics and email all on the same stage", () => {
     const p = run({ sheet: stageSignal(S.post), lawmatics: stageSignal(S.post), email: stageSignal(S.post) });
     expect(p.confidence).toBe("agree");
-    expect(p.reasons.filter((r) => r.includes("It matches the sheet"))).toHaveLength(2);
+    const evidence = p.reasons.find((r) => r.startsWith("Evidence:"))!;
+    expect(evidence.split(" · ")).toHaveLength(3);
   });
 });
 
@@ -61,35 +63,41 @@ describe("proposeStage: sheet_only", () => {
 });
 
 describe("proposeStage: conflict", () => {
-  it("the sheet wins over a different Lawmatics stage, and both are named", () => {
+  it("the furthest evidenced stage wins over an older sheet status, and both are named", () => {
     const p = run({ sheet: stageSignal(S.consult, "3. Consultation Scheduled"), lawmatics: stageSignal(S.post, "Post Consultation") });
     expect(p.confidence).toBe("conflict");
-    expect(p.stage?.id).toBe(S.consult);
+    expect(p.stage?.id).toBe(S.post);
     expect(text(p)).toContain("Sheet:");
     expect(text(p)).toContain("Lawmatics:");
-    expect(text(p)).toContain("the sheet wins");
+    expect(text(p)).toContain("A source points elsewhere");
   });
 
-  it("sheet X + Lawmatics X + email Y is a conflict, not agree", () => {
+  it("sheet X + Lawmatics X + email Y is a conflict, not agree, and Y (the furthest) is proposed", () => {
     const p = run({ sheet: stageSignal(S.consult), lawmatics: stageSignal(S.consult), email: stageSignal(S.loe) });
     expect(p.confidence).toBe("conflict");
-    expect(p.stage?.id).toBe(S.consult);
-    expect(text(p)).toContain("Another source disagrees");
+    expect(p.stage?.id).toBe(S.loe);
+    expect(text(p)).toContain("A source points elsewhere");
   });
 });
 
 describe("proposeStage: no_evidence", () => {
-  it("a lead with no sheet row proposes nothing even when Lawmatics and email agree", () => {
+  it("a lead with no sheet row is proposed from Lawmatics and email when they agree (the sheet no longer has to speak)", () => {
     const p = run({ sheet: none(), lawmatics: stageSignal(S.loe), email: stageSignal(S.loe) });
-    expect(p.kind).toBe("no_proposal");
-    expect(p.stage).toBeNull();
-    expect(p.confidence).toBe("no_evidence");
+    expect(p.kind).toBe("stage");
+    expect(p.stage?.id).toBe(S.loe);
+    expect(p.confidence).toBe("agree");
     expect(text(p)).toContain("The sheet has no row for this lead");
-    expect(p.evidenceDate).toBeNull();
   });
 
-  it("an unmapped sheet row is no_evidence with its raw status in the reasons", () => {
+  it("an unmapped sheet row does not vote; another source can still propose, as one source", () => {
     const p = run({ sheet: unmapped("2. Petting Zoo Review"), lawmatics: stageSignal(S.consult) });
+    expect(p.kind).toBe("stage");
+    expect(p.confidence).toBe("single_source");
+    expect(text(p)).toContain("2. Petting Zoo Review");
+  });
+
+  it("an unmapped sheet row with nothing else is no_evidence", () => {
+    const p = run({ sheet: unmapped("2. Petting Zoo Review") });
     expect(p.confidence).toBe("no_evidence");
     expect(p.stage).toBeNull();
     expect(text(p)).toContain("2. Petting Zoo Review");
@@ -195,7 +203,7 @@ describe("proposeStage: no change and no won stage", () => {
   it("a sheet stage the firm does not have is never proposed", () => {
     const p = run({ sheet: { kind: "stage", stageId: "00000000-0000-4000-8000-00000000dead", stageName: "Ghost", wording: "9. Ghost", date: null } });
     expect(p.stage).toBeNull();
-    expect(text(p)).toContain("not one of this firm's stages");
+    expect(text(p)).toContain("none of this evidence names a stage this firm has");
   });
 
   it("a lead with no current stage still gets a proposal", () => {
@@ -228,7 +236,10 @@ describe("proposeStage: property over a grid of source combinations", () => {
               expect(first.stage.name).toBe(stageName(first.stage.id));
               expect(first.kind).toBe("stage");
               expect(first.stage.id).not.toBe(current);
-              expect(sheet.kind).toBe("stage");
+              // Some source named it, and a lead is never moved backwards.
+              expect([sheet, lawmatics, email].some((x) => x.kind === "stage")).toBe(true);
+              const order = (id: string | null) => STAGES.find((x) => x.id === id)?.orderIndex ?? -1;
+              expect(order(first.stage.id)).toBeGreaterThanOrEqual(order(current));
             } else {
               expect(first.kind).not.toBe("stage");
             }

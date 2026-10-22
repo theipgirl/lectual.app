@@ -1,7 +1,9 @@
 import type { StageRef } from "@/lib/lawmatics/stage-map";
 import { CsvError, parseCsv } from "./sheet-csv";
 import { MAX_SHEET_BYTES } from "./sheet-limits";
+import { classifyNote, snippetOf, type Milestone } from "@/lib/reconcile/milestones";
 import { recordsFromSheetRows } from "./sheet-records";
+import { contactsFrom, findSections, summarizeSections, type SectionsSummary, type SheetContact, type SheetSection } from "./sheet-sections";
 import {
   parseIntakeSheet,
   sheetKeyFor,
@@ -67,6 +69,9 @@ export type SheetReading =
   | { kind: "client"; wording: string }
   | { kind: "unmapped"; wording: string };
 
+/** One dated entry of a row's log, classified in memory. `snippet` is at most 140 characters and is never stored. */
+export type SheetNote = { date: string | null; milestones: Milestone[]; snippet: string };
+
 export type SheetEntry = {
   /** 1-based worksheet row (the header is row 1). */
   row: number;
@@ -77,6 +82,8 @@ export type SheetEntry = {
   /** The key this owner and mark would have under each intake status code 0 to 6. */
   anyCodeKeys: string[];
   reading: SheetReading;
+  /** The dated log entries (Description, then Notes), each classified. Empty for a row the importer refused. */
+  notes?: SheetNote[];
 };
 
 export type SheetRead = {
@@ -86,6 +93,10 @@ export type SheetRead = {
   rowsRead: number;
   /** Rows the importer would keep as intake leads (after merging repeated rows). */
   intakeRows: number;
+  /** Which sections of the workbook were read and which skipped (absent when the read had no section info). */
+  sections?: SectionsSummary;
+  /** Name and address pairs from the PNC contact-list sections: a read-only source of email addresses. */
+  contacts?: SheetContact[];
 };
 
 export type SheetReadResult = { ok: true; read: SheetRead } | { ok: false; error: string };
@@ -114,7 +125,7 @@ function cellText(record: Record<string, unknown>, ...keys: string[]): string | 
 /** The same owner and mark columns, in the same order, that the ported parser reads. */
 function ownerAndMark(record: Record<string, unknown>): { owner: string | null; mark: string | null } {
   return {
-    owner: cellText(record, "0", "Trademark Owner", "", "Owner", "Client"),
+    owner: cellText(record, "0", "Trademark Owner", "", "Owner", "Client", "Client Name"),
     mark: cellText(record, "Trademark Name", "Mark"),
   };
 }
@@ -124,12 +135,26 @@ function tidyHeader(header: readonly string[]): string[] {
   return header.map((cell) => (cell.trim() === "Status" ? "Status" : cell));
 }
 
-export type SheetRecords = { ok: true; records: Array<Record<string, unknown>> } | { ok: false; error: string };
+export type SheetRecords =
+  | {
+      ok: true;
+      records: Array<Record<string, unknown>>;
+      /** The 1-based worksheet row each record came from, same order as `records`. */
+      rowNumbers: number[];
+      sections: SectionsSummary;
+      contacts: SheetContact[];
+    }
+  | { ok: false; error: string };
 
 /**
  * Turns CSV text into the parse layer's rows and checks the file's shape. Needs no database: every
  * refusal that is about the FILE (empty, unclosed quote, no Status column, no rows) comes from here,
  * before anything else is read.
+ *
+ * The file may be a whole workbook exported as one CSV. Every section whose header is an intake
+ * header is parsed with its OWN header and the rows are read together, so a person who appears in
+ * several sections is merged by the importer's own key (identical rows merge; rows that disagree stay
+ * apart and are reported as ambiguous when matched).
  */
 export function parseSheetRecords(text: string): SheetRecords {
   if (!text.trim()) return { ok: false, error: SHEET_MESSAGES.empty };
@@ -143,24 +168,50 @@ export function parseSheetRecords(text: string): SheetRecords {
   }
   if (grid.length === 0) return { ok: false, error: SHEET_MESSAGES.empty };
 
-  const header = tidyHeader(grid[0]);
-  if (!header.includes("Status")) return { ok: false, error: SHEET_MESSAGES.noStatus };
+  const sections = findSections(grid.map(tidyHeader));
+  const intake = sections.filter((s) => s.kind === "intake");
+  if (intake.length === 0) return { ok: false, error: SHEET_MESSAGES.noStatus };
 
-  const records = recordsFromSheetRows([header, ...grid.slice(1)]);
+  const records: Array<Record<string, unknown>> = [];
+  const rowNumbers: number[] = [];
+  for (const section of intake) {
+    const sectionRecords = recordsFromSheetRows([tidyHeader(section.header), ...section.rows]);
+    sectionRecords.forEach((record, i) => {
+      records.push(record);
+      rowNumbers.push(section.headerRow + 1 + i);
+    });
+  }
   if (!records.some((r) => cellText(r, "Status") !== null)) return { ok: false, error: SHEET_MESSAGES.noRows };
-  return { ok: true, records };
+  return { ok: true, records, rowNumbers, sections: summarizeSections(sections), contacts: contactsFrom(sections) };
 }
 
-/** Reads the parsed rows against the firm's stages. */
+export type { SheetSection };
+
+/** The classified log entries of one parsed intake row. A clamped future date is not evidence of when. */
+function notesOf(row: { notes: Array<{ text: string; date: string | null; dateSuspect: boolean }> }): SheetNote[] {
+  return row.notes.map((n) => ({
+    date: n.dateSuspect ? null : n.date,
+    milestones: classifyNote(n.text),
+    snippet: snippetOf(n.text),
+  }));
+}
+
+/**
+ * Reads the parsed rows against the firm's stages. `extras` carries what the section reader found
+ * (worksheet row numbers, the sections summary, the contact lists); without it, record i is worksheet row i + 2.
+ */
 export function readSheetRecords(
   records: ReadonlyArray<Record<string, unknown>>,
   stages: readonly StageRef[],
   now: Date,
+  extras: { rowNumbers?: readonly number[]; sections?: SectionsSummary; contacts?: SheetContact[] } = {},
 ): SheetRead {
   const parsed = parseIntakeSheet(records, { now, stages });
+  // The parser numbers rows from the concatenated records; the worksheet's own number is what a person looks for.
+  const worksheetRow = (row: number) => extras.rowNumbers?.[row - 2] ?? row;
 
   const entries: SheetEntry[] = parsed.rows.map((row) => ({
-    row: row.row,
+    row: worksheetRow(row.row),
     ownerName: row.ownerName,
     markText: row.markText,
     exactKey: row.sheetKey,
@@ -172,6 +223,7 @@ export function readSheetRecords(
       wording: row.statusText,
       date: row.lastActivityAt,
     },
+    notes: notesOf(row),
   }));
 
   // Refused rows that still name a person: a client code, or a status the pipeline does not name.
@@ -181,7 +233,7 @@ export function readSheetRecords(
     const { owner, mark } = ownerAndMark(record);
     if (!owner) continue;
     entries.push({
-      row: refusal.row,
+      row: worksheetRow(refusal.row),
       ownerName: owner,
       markText: mark,
       exactKey: null,
@@ -190,15 +242,18 @@ export function readSheetRecords(
         refusal.reason === CLIENT_REFUSAL
           ? { kind: "client", wording: refusal.statusText }
           : { kind: "unmapped", wording: refusal.statusText },
+      notes: [],
     });
   }
 
   return {
     entries,
-    refused: parsed.refused,
+    refused: parsed.refused.map((r) => ({ ...r, row: worksheetRow(r.row) })),
     blankRows: parsed.blankRows,
     rowsRead: parsed.rowsRead,
     intakeRows: parsed.rows.length,
+    ...(extras.sections ? { sections: extras.sections } : {}),
+    ...(extras.contacts ? { contacts: extras.contacts } : {}),
   };
 }
 
@@ -206,5 +261,12 @@ export function readSheetRecords(
 export function readSheetText(text: string, stages: readonly StageRef[], now: Date): SheetReadResult {
   const parsed = parseSheetRecords(text);
   if (!parsed.ok) return parsed;
-  return { ok: true, read: readSheetRecords(parsed.records, stages, now) };
+  return {
+    ok: true,
+    read: readSheetRecords(parsed.records, stages, now, {
+      rowNumbers: parsed.rowNumbers,
+      sections: parsed.sections,
+      contacts: parsed.contacts,
+    }),
+  };
 }

@@ -1,7 +1,8 @@
 import { agreeingCount } from "@/lib/reconcile/decisions";
-import type { Decisions, ReconcileRow, ReconcileView } from "@/lib/reconcile/types";
+import type { Decisions, NotInLectualItem, ReconcileRow, ReconcileView } from "@/lib/reconcile/types";
 import { ApplyBar } from "./ApplyBar";
 import { ReconcileTable } from "./ReconcileTable";
+import { NotInLectual, type CreatedLead } from "./NotInLectual";
 import { LeftOutLists, SummaryStrip } from "./SummaryStrip";
 
 export const EMPTY_TITLE = "No leads matched this sheet";
@@ -25,6 +26,9 @@ export function ReconcilePreview({
   onAccept,
   onPick,
   onSkip,
+  created = {},
+  creatingKey = null,
+  onCreate,
 }: {
   view: ReconcileView;
   decisions: Decisions;
@@ -39,6 +43,9 @@ export function ReconcilePreview({
   onAccept?: (row: ReconcileRow) => void;
   onPick?: (leadId: string, stageId: string) => void;
   onSkip?: (leadId: string) => void;
+  created?: Readonly<Record<string, CreatedLead>>;
+  creatingKey?: string | null;
+  onCreate?: (item: NotInLectualItem) => void;
 }) {
   return (
     <div className="rc-wrap">
@@ -73,6 +80,13 @@ export function ReconcilePreview({
           />
         </>
       )}
+      <NotInLectual
+        items={view.summary.notInLectual ?? []}
+        total={view.summary.notInLectualTotal ?? (view.summary.notInLectual ?? []).length}
+        created={created}
+        busyKey={creatingKey}
+        onCreate={onCreate}
+      />
       <LeftOutLists summary={view.summary} />
     </div>
   );

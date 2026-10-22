@@ -11,6 +11,8 @@ export type StageOpt = {
   orderIndex: number;
 };
 
+import type { Milestone } from "./milestones";
+
 /** The three places a stage can be read from. */
 export type SourceName = "sheet" | "lawmatics" | "email";
 
@@ -35,14 +37,54 @@ export type SourceSignal =
 
 export type ProposeSources = { sheet: SourceSignal; lawmatics: SourceSignal; email: SourceSignal };
 
-export type Confidence = "agree" | "sheet_only" | "conflict" | "no_evidence";
+/**
+ * `sheet_only`: only the sheet has evidence. `single_source`: only Lawmatics or mail does. `agree`: two or
+ * more sources, each at the proposed stage. `conflict`: a source points somewhere else (often backward).
+ */
+export type Confidence = "agree" | "sheet_only" | "single_source" | "conflict" | "no_evidence";
 
 export const CONFIDENCE_LABEL: Record<Confidence, string> = {
   agree: "Agree",
   sheet_only: "Sheet only",
+  single_source: "One source",
   conflict: "Conflict",
   no_evidence: "No evidence",
 };
+
+/** How a piece of evidence was read. */
+export type EvidenceVia = "status" | "note" | "stage" | "mail" | "mailbox" | "agent";
+
+/**
+ * One dated fact about a person: a status code, a note, a Lawmatics stage or note, a mail. `snippet` is at
+ * most 140 characters of a NOTE and exists only in the preview that is on the screen: nothing stores it.
+ */
+export type EvidenceItem = {
+  source: SourceName;
+  via: EvidenceVia;
+  milestone: Milestone | null;
+  label: string;
+  date: string | null;
+  /** The firm's stage this evidence names, or null when it names none (or none the firm has). */
+  stageId: string | null;
+  /** The evidence says the person is a client: never a stage, always "Open a matter". */
+  matter?: boolean;
+  snippet?: string;
+};
+
+/** What the on-demand search of the firm's Microsoft mailboxes found for one person. */
+export type MailboxSearchState =
+  | { status: "ok"; messages: number; sent: number; received: number; truncated: boolean; mailboxes: number; unread: number }
+  | {
+      status: "unavailable";
+      code: "no-address" | "no-mailbox" | "module-off" | "gmail-only" | "scope-missing" | "reauth" | "failed" | "limit" | "not-run";
+      reason: string;
+    };
+
+/** Lawmatics notes for the people on the table. */
+export type NotesState =
+  | { status: "ok"; records: number; notes: number; truncated: boolean }
+  | { status: "unavailable"; reason: string }
+  | { status: "not-read"; reason: string };
 
 export type ProposalKind = "stage" | "needs_matter" | "no_proposal";
 
@@ -56,6 +98,8 @@ export type Proposal = {
   /** The date the winning source can honestly give for when the stage was entered; null if none. */
   evidenceDate: string | null;
   unavailable: SourceName[];
+  /** Every dated fact the proposal rests on, newest first, so the screen can cite each one. */
+  evidence?: EvidenceItem[];
 };
 
 /** One row of the table. */
@@ -68,6 +112,13 @@ export type ReconcileRow = {
   lawmatics: SourceSignal;
   email: SourceSignal;
   proposal: Proposal;
+  /** Notes, mail and stages cited as evidence (the proposal's evidence list). */
+  evidence?: EvidenceItem[];
+  /** The newest dated evidence across the sources, never in the future; null when there is none. */
+  lastTouch?: string | null;
+  mailbox?: MailboxSearchState;
+  /** Lawmatics notes for this person: read (and how many), or why not. Never "none" for a failed read. */
+  notes?: { status: "ok"; count: number } | { status: "unavailable"; reason: string } | { status: "not-read" };
 };
 
 /** The part of a row that is fingerprinted and posted back for apply. */
@@ -79,6 +130,8 @@ export type PlanRow = {
   proposedStageId: string | null;
   evidenceDate: string | null;
   confidence: Confidence | null;
+  /** The proposed last touch (ISO), or null. Apply sets it only when it is newer than what the lead holds. */
+  lastTouch?: string | null;
 };
 
 /** What the person decided for one row. A skipped row has no entry. */
@@ -100,6 +153,7 @@ export type EmailState =
 /** A lead as the screen reads it (a subset of crm_lead). */
 export type LeadRow = {
   id: string;
+  lastActivityAt?: string | null;
   firstName: string;
   lastName: string;
   email: string | null;
@@ -112,8 +166,43 @@ export type LeadRow = {
 export type SheetRowRef = { row: number; owner: string; mark: string | null; status: string };
 export type RefusedSheetRow = { row: number; reason: string; status: string | null };
 
+/** A person the sources know and the app does not. Listed with a Create lead button; never created unasked. */
+export type NotInLectualItem = {
+  key: string;
+  found: "sheet" | "lawmatics" | "mailbox";
+  name: string;
+  detail: string;
+  /** What to file them as; the server validates it again before writing. */
+  candidate: CreateLeadCandidate;
+  evidence: EvidenceItem[];
+  lastTouch: string | null;
+  mailbox?: MailboxSearchState;
+};
+
+/** The facts the Create lead action needs. The browser sends them back; the server checks every one. */
+export type CreateLeadCandidate = {
+  found: "sheet" | "lawmatics" | "mailbox";
+  firstName: string;
+  lastName: string;
+  businessName: string | null;
+  email: string | null;
+  sheetKey: string | null;
+  lawmaticsId: string | null;
+  /** A stage id from the preview, or null for the firm's first open stage. */
+  stageId: string | null;
+  practiceArea: string | null;
+};
+
 export type ReconcileSummary = {
   fileName: string;
+  /** "Read: Trademark intake (3 sections, 1,170 rows). Skipped: Tasks, Contracts." */
+  sectionsLine?: string | null;
+  notes?: NotesState;
+  mailbox?: { searched: number; unavailable: number; note: string | null };
+  /** A sentence when the firm's own stage mapping could not be read and the default names were used. */
+  mappingNote?: string | null;
+  notInLectual?: NotInLectualItem[];
+  notInLectualTotal?: number;
   confidence: Record<Confidence, number>;
   needsMatter: number;
   alreadyThere: number;
@@ -139,8 +228,8 @@ export type PreviewResult =
   | { ok: false; error: string };
 
 export type RowOutcome =
-  | { leadId: string; status: "moved"; stageName: string }
-  | { leadId: string; status: "already"; stageName: string }
+  | { leadId: string; status: "moved"; stageName: string; lastTouchSet?: boolean }
+  | { leadId: string; status: "already"; stageName: string; lastTouchSet?: boolean }
   | { leadId: string; status: "failed"; error: string };
 
 export type ApplyResult =

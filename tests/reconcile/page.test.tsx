@@ -60,9 +60,10 @@ describe("the page's gate", () => {
 });
 
 describe("the explanation", () => {
-  it("says the sheet wins, Lawmatics is only read, and moves are logged, in plain words", async () => {
+  it("says the furthest dated evidence is proposed, Lawmatics is only read, and moves are logged, in plain words", async () => {
     const html = text(await renderPage({ kind: "ok", role: "admin" }));
-    expect(html).toContain("the sheet wins");
+    expect(html).toContain("The furthest point with a dated record is proposed");
+    expect(html).toContain("proposed last touch");
     expect(html).toContain("Lawmatics is only read");
     expect(html).toContain("Nothing on this page writes to it");
     expect(html).toContain("Every move is logged on the lead's timeline");

@@ -2,9 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { applyReconcileAction, previewReconcileAction } from "@/app/dashboard/intake/reconcile/actions";
+import { createLeadFromReconcileAction } from "@/app/dashboard/intake/reconcile/create-lead";
 import { acceptAgreeing, accept, acceptedCount, movesFrom, pick, skip } from "@/lib/reconcile/decisions";
 import { MAX_SHEET_BYTES } from "@/lib/intake/sheet-limits";
-import type { ApplyResult, Decisions, PlanRow, ReconcileRow, ReconcileView } from "@/lib/reconcile/types";
+import type { ApplyResult, Decisions, NotInLectualItem, PlanRow, ReconcileRow, ReconcileView } from "@/lib/reconcile/types";
+import type { CreatedLead } from "./NotInLectual";
 import { ResultPanel } from "./ApplyBar";
 import { ReconcilePreview } from "./ReconcilePreview";
 import { UploadPanel } from "./UploadPanel";
@@ -23,6 +25,8 @@ export function ReconcileScreen() {
   const [bulkMessage, setBulkMessage] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [result, setResult] = useState<ApplyResult | null>(null);
+  const [created, setCreated] = useState<Record<string, CreatedLead>>({});
+  const [creatingKey, setCreatingKey] = useState<string | null>(null);
   const [busy, startTransition] = useTransition();
 
   function restart() {
@@ -32,6 +36,21 @@ export function ReconcileScreen() {
     setConfirming(false);
     setResult(null);
     setError(null);
+    setCreated({});
+    setCreatingKey(null);
+  }
+
+  function onCreate(item: NotInLectualItem) {
+    setCreatingKey(item.key);
+    startTransition(async () => {
+      try {
+        const r = await createLeadFromReconcileAction(item.candidate);
+        setCreated((c) => ({ ...c, [item.key]: r.ok ? { leadId: r.leadId } : { error: r.error } }));
+      } catch {
+        setCreated((c) => ({ ...c, [item.key]: { error: "Something went wrong, so we can't tell whether the lead was created. Check the leads before trying again." } }));
+      }
+      setCreatingKey(null);
+    });
   }
 
   function onUpload(form: HTMLFormElement) {
@@ -100,6 +119,9 @@ export function ReconcileScreen() {
         onAccept={(row: ReconcileRow) => setDecisions((d) => accept(d, row))}
         onPick={(leadId, stageId) => setDecisions((d) => pick(d, leadId, stageId, view.pickable))}
         onSkip={(leadId) => setDecisions((d) => skip(d, leadId))}
+        created={created}
+        creatingKey={creatingKey}
+        onCreate={onCreate}
       />
       <div>
         <button type="button" className="lx-btn lx-btn-ghost" onClick={restart} disabled={busy}>

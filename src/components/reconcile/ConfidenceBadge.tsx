@@ -3,6 +3,7 @@ import { CONFIDENCE_LABEL, type Proposal } from "@/lib/reconcile/types";
 const TONE = {
   agree: "lx-pill lx-pill-ok",
   sheet_only: "lx-pill lx-pill-mute",
+  single_source: "lx-pill lx-pill-mute",
   conflict: "lx-pill lx-pill-risk",
   no_evidence: "lx-pill lx-pill-warn",
 } as const;

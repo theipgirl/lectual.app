@@ -23,7 +23,15 @@ export const EMAIL_STAGE_TABLE: Partial<Record<EmailType, { label: string; stage
 };
 
 /** One stored mail row, as read from the timeline. */
-export type StoredMail = { type: string | null; sensitive: boolean; at: string | null };
+export type StoredMail = {
+  type: string | null;
+  sensitive: boolean;
+  at: string | null;
+  /** From the timeline row's own type (`email_sent` / `email_received`); absent on a row of unknown direction. */
+  direction?: "sent" | "received";
+  /** The subject the sync stored. Classified in memory for the screen; never written anywhere. */
+  subject?: string | null;
+};
 
 function time(at: string | null): number {
   const t = at ? Date.parse(at) : NaN;

@@ -77,10 +77,12 @@ describe("which leads are on the table", () => {
 });
 
 describe("buildPlan: the rows", () => {
-  it("proposes the sheet's stage with the right confidence per lead", async () => {
+  it("proposes the furthest evidenced stage with the right confidence per lead", async () => {
     const { view } = await run();
     const by = Object.fromEntries(view.rows.map((r) => [r.leadId, r]));
-    expect(by[L.amara].proposal).toMatchObject({ kind: "stage", stage: { id: S.pnc }, confidence: "agree", evidenceDate: "2026-09-14T00:00:00.000Z" });
+    // The sheet's status says PNC, but its own note ("PNC scheduled consult for 9.14.26") is further on: the notes are
+    // read now, the furthest dated evidence is proposed, and the older status is the conflict.
+    expect(by[L.amara].proposal).toMatchObject({ kind: "stage", stage: { id: S.consult }, confidence: "conflict", evidenceDate: "2026-09-14T00:00:00.000Z" });
     expect(by[L.priya].proposal).toMatchObject({ kind: "no_proposal" });
     expect(by[L.priya].proposal.reasons[0]).toBe("Already in this stage.");
     expect(by[L.margo].proposal).toMatchObject({ kind: "stage", stage: { id: S.consult }, confidence: "agree" });
@@ -99,7 +101,7 @@ describe("buildPlan: the rows", () => {
     const { view, plan } = await run();
     expect(plan.map((p) => p.leadId)).toEqual(view.rows.map((r) => r.leadId));
     expect(plan.find((p) => p.leadId === L.amara)).toEqual({
-      leadId: L.amara, fromStageId: S.followUp, proposedStageId: S.pnc, evidenceDate: "2026-09-14T00:00:00.000Z", confidence: "agree",
+      leadId: L.amara, fromStageId: S.followUp, proposedStageId: S.consult, evidenceDate: "2026-09-14T00:00:00.000Z", confidence: "conflict", lastTouch: "2026-09-14T00:00:00.000Z",
     });
     expect(planFingerprint([...plan].reverse())).toBe(planFingerprint(plan));
   });
@@ -114,8 +116,9 @@ describe("buildPlan: the summary", () => {
   it("counts confidences and lists what was left out", async () => {
     const { view } = await run();
     const s = view.summary;
-    expect(s.confidence).toEqual({ agree: 2, sheet_only: 1, conflict: 0, no_evidence: 1 });
-    expect(s.confidence.agree + s.confidence.sheet_only + s.confidence.conflict + s.confidence.no_evidence + s.needsMatter).toBe(view.rows.length);
+    expect(s.confidence).toEqual({ agree: 1, sheet_only: 1, single_source: 0, conflict: 1, no_evidence: 1 });
+    const counted = s.confidence.agree + s.confidence.sheet_only + s.confidence.single_source + s.confidence.conflict + s.confidence.no_evidence;
+    expect(counted + s.needsMatter).toBe(view.rows.length);
     expect(s.needsMatter).toBe(2);
     expect(s.alreadyThere).toBe(1);
     expect(s.sheet).toEqual({ rowsRead: 12, intakeRows: 7, blankRows: 1 });
@@ -141,7 +144,8 @@ describe("buildPlan: the summary", () => {
     expect(view.summary.ambiguousLeads).toBe(2);
     const amara = view.rows.find((r) => r.leadId === L.amara)!;
     expect(amara.sheet).toEqual({ kind: "none", note: "2 leads share this sheet key" });
-    expect(amara.proposal.confidence).toBe("no_evidence");
+    // The ambiguous sheet row does not vote; the synced mail still speaks for her, as one source.
+    expect(amara.proposal).toMatchObject({ kind: "stage", stage: { id: S.pnc }, confidence: "single_source" });
   });
 });
 
@@ -153,10 +157,15 @@ describe("buildPlan: two leads for one sheet row", () => {
     expect(view.summary.ambiguousLeads).toBeGreaterThanOrEqual(2);
     for (const id of [L.amara, stale.id]) {
       const row = view.rows.find((r) => r.leadId === id)!;
-      expect(row.proposal.kind).toBe("no_proposal");
-      expect(row.proposal.confidence).toBe("no_evidence");
+      // The sheet gives neither of them anything. Amara's synced mail still names a stage; the stale lead has no mail.
       expect(row.sheet).toEqual({ kind: "none", note: "2 leads match this sheet row" });
       expect(row.proposal.reasons.join(" ")).toContain("2 leads match this sheet row");
+      if (id === stale.id) {
+        expect(row.proposal.kind).toBe("no_proposal");
+        expect(row.proposal.confidence).toBe("no_evidence");
+      } else {
+        expect(row.proposal).toMatchObject({ kind: "stage", confidence: "single_source" });
+      }
     }
   });
 });

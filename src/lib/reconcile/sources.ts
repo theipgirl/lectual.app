@@ -1,11 +1,13 @@
 import "server-only";
 
 import type { getScopedClient } from "@/lib/db/scoped-client";
+import type { LawmaticsClient } from "@/lib/lawmatics/client";
 import { LawmaticsNotConnectedError, firmLawmaticsClient } from "@/lib/lawmatics/connection";
 import { pullSource } from "@/lib/lawmatics/import";
 import type { LawmaticsSourceRecord } from "@/lib/lawmatics/normalize";
 import { agentEvidenceFor, type AgentEvidence, type StoredMail } from "./email";
 import type { ActivityRow } from "@/lib/stage-keeper/moves";
+import { parseMilestoneMapping, type MilestoneMapping } from "./milestones";
 import type { LeadRow, StageOpt } from "./types";
 
 /**
@@ -48,7 +50,7 @@ export async function readLeads(supabase: Scoped): Promise<LeadsRead> {
     }
     const { data, error } = await supabase
       .from("crm_lead")
-      .select("id, first_name, last_name, email, current_stage_id, sheet_key, lawmatics_id, practice_area")
+      .select("id, first_name, last_name, email, current_stage_id, sheet_key, lawmatics_id, practice_area, last_activity_at")
       .order("created_at", { ascending: true })
       .order("id", { ascending: true })
       .range(from, from + PAGE - 1);
@@ -64,6 +66,7 @@ export async function readLeads(supabase: Scoped): Promise<LeadsRead> {
         sheetKey: r.sheet_key,
         lawmaticsId: r.lawmatics_id,
         practiceArea: r.practice_area,
+        lastActivityAt: r.last_activity_at,
       });
     }
     if (page.length < PAGE) break;
@@ -72,7 +75,7 @@ export async function readLeads(supabase: Scoped): Promise<LeadsRead> {
 }
 
 export type LawmaticsRead =
-  | { status: "ok"; records: LawmaticsSourceRecord[] }
+  | { status: "ok"; records: LawmaticsSourceRecord[]; /** The read-only client, so the notes can be read through the same connection. */ client?: LawmaticsClient }
   | { status: "not-connected"; reason: string }
   | { status: "unavailable"; reason: string };
 
@@ -91,7 +94,7 @@ export async function readLawmatics(): Promise<LawmaticsRead> {
     if (pull.truncated) {
       return { status: "unavailable", reason: "Lawmatics returned only part of the firm's records, so its stages can't be compared." };
     }
-    return { status: "ok", records: pull.records };
+    return { status: "ok", records: pull.records, client };
   } catch (err) {
     if (err instanceof LawmaticsNotConnectedError) return { status: "not-connected", reason: err.message };
     console.error("[reconcile] lawmatics read failed", err instanceof Error ? err.name : "error");
@@ -125,7 +128,7 @@ export async function readStoredMail(supabase: Scoped, leadIds: readonly string[
       for (let page = 0; page < MAIL_PAGES && !done; page++) {
         const { data, error } = await supabase
           .from("crm_activity")
-          .select("lead_id, payload, created_at")
+          .select("lead_id, type, payload, created_at")
           .in("lead_id", batch)
           .in("type", ["email_sent", "email_received"])
           .order("created_at", { ascending: false })
@@ -142,6 +145,8 @@ export async function readStoredMail(supabase: Scoped, leadIds: readonly string[
             type: typeof payload.type === "string" ? payload.type : null,
             sensitive: payload.sensitive === true,
             at,
+            direction: row.type === "email_sent" ? "sent" : "received",
+            subject: typeof payload.subject === "string" ? payload.subject : null,
           });
           byLead.set(row.lead_id, list);
           total += 1;
@@ -184,4 +189,22 @@ export async function readStoredMail(supabase: Scoped, leadIds: readonly string[
   }
   // `agent` is present only when the Stage Keeper left something to read, so a read without it is unchanged.
   return { status: "ok", byLead, total, ...(agent.size > 0 ? { agent } : {}) };
+}
+
+export type MappingRead = { mapping: MilestoneMapping; note: string | null };
+
+/**
+ * The firm brain's `stage_mapping` entries, read through the caller's scoped client. A failed read
+ * is not an empty mapping: the default stage names are used and the screen SAYS so, because a firm
+ * that overrode them would otherwise be proposed stages it never chose.
+ */
+export async function readStageMapping(supabase: Scoped): Promise<MappingRead> {
+  try {
+    const { data, error } = await supabase.from("crm_firm_brain_entry").select("key, body, data").eq("category", "stage_mapping");
+    if (error) throw error;
+    return { mapping: parseMilestoneMapping((data ?? []) as Array<{ key?: unknown; body?: unknown; data?: unknown }>), note: null };
+  } catch (err) {
+    console.error("[reconcile] stage mapping read failed", err instanceof Error ? err.name : "error");
+    return { mapping: {}, note: "The firm's own stage mapping couldn't be read, so the default stage names were used. Check each proposal before accepting it." };
+  }
 }
