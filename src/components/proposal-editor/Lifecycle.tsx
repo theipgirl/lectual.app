@@ -5,7 +5,7 @@ import { useState } from "react";
 import type { ProposalStatus } from "@/lib/proposals/types";
 import { joinOr } from "@/lib/proposal-editor/labels";
 import { createLinkAction, reviseAction, sendAction, unapproveAction, withdrawAction } from "@/app/dashboard/proposals/[id]/actions";
-import { BUTTON_WORDS, askToCreateLink } from "@/lib/proposal-editor/vocabulary";
+import { BUTTON_WORDS, LINK_NOT_LIVE_YET, askToCreateLink } from "@/lib/proposal-editor/vocabulary";
 import { ActionForm, Outcome } from "./ActionForm";
 
 /**
@@ -76,6 +76,9 @@ export function Lifecycle({
           {({ state, pending }) => (
             <>
               {hidden}
+              <span className="lx-note" role="note">
+                {LINK_NOT_LIVE_YET}
+              </span>
               <button type="submit" className="lx-btn lx-btn-pri" disabled={pending}>
                 {pending ? BUTTON_WORDS.turningOnLink : BUTTON_WORDS.turnOnLink}
               </button>

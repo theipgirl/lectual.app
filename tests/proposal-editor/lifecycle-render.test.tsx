@@ -50,6 +50,7 @@ describe("Lifecycle", () => {
   it("approved (the send step failed): Turn on the link and Edit again, no URL", () => {
     const html = render({ status: "approved" });
     expect(html).toContain("Turn on the link");
+    expect(html).toContain("isn&#x27;t live yet. Turn on the link to finish.");
     expect(html).toContain("Edit again");
     expect(html).not.toMatch(/\/p\/|Client link|Copy client link/);
   });

@@ -38,6 +38,8 @@ export const SETTINGS_APPROVERS_HEADING = "Who may create client links";
 
 /** Shown when the first step (saving) worked and the second (turning the link on) did not. */
 export const LINK_NOT_TURNED_ON = "Saved, but the link couldn't be turned on. Try again.";
+/** Shown on every approved (link not live) version, so a failed link step is explained even after the page re-renders. */
+export const LINK_NOT_LIVE_YET = "Saved, but the link isn't live yet. Turn on the link to finish.";
 export const LINK_CREATED = "Link created. It is live now.";
 export const LINK_TURNED_ON = "The link is live now.";
 export const EDIT_AGAIN_DONE = "Back to editing.";
