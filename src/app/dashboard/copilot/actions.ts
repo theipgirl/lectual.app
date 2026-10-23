@@ -15,7 +15,7 @@ export type DeleteChatResult = { ok: true } | { ok: false; error: string };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export const DELETE_CHAT_MESSAGES = {
+const DELETE_CHAT_MESSAGES = {
   signedOut: "Sign in to delete a saved chat.",
   badId: "That chat couldn't be found.",
   notSetUp: "Saved chats aren't available until the database update.",
