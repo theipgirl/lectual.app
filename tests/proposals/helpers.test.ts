@@ -305,7 +305,7 @@ describe("friendlyProposalError", () => {
       "forbidden",
       /Only the client/,
     ],
-    ["23514", "client_proposal_frozen: a sent proposal is frozen and cannot be edited; revise it as a new version", "frozen", /revision/],
+    ["23514", "client_proposal_frozen: a sent proposal is frozen and cannot be edited; revise it as a new version", "frozen", /new version/],
     ["23514", "client_proposal_bad_transition: sent -> draft is not allowed", "conflict", /can't move/],
     [
       "23514",
@@ -314,7 +314,7 @@ describe("friendlyProposalError", () => {
       /separate steps/,
     ],
     ["23514", "client_proposal_approval_incomplete: set an expiry date and a pay link before approving", "validation", /expiry date and a pay link/],
-    ["23514", "client_proposal_send_not_approved: only an approved proposal can be sent (this one is draft)", "conflict", /approved version/],
+    ["23514", "client_proposal_send_not_approved: only an approved proposal can be sent (this one is draft)", "conflict", /turned on for a saved version/],
     [
       "23514",
       "client_proposal_family_accepted: the client has already accepted a version of this proposal",

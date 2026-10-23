@@ -14,7 +14,7 @@ import {
 } from "@/lib/consult-proposal/draft";
 import type { ConsultProposalDraft } from "@/lib/consult-proposal/types";
 import { defaultSelection, quoteProposal } from "@/lib/proposals/pricing";
-import { hasErrors, validateContent } from "@/lib/proposals/validate";
+import { validateContent } from "@/lib/proposals/validate";
 import { fakeLlm } from "../agents/helpers";
 import { SEVETRI_TURNS, draftInput, meetingSource, sevetriOutput } from "./fixture";
 
@@ -70,8 +70,11 @@ describe("draftProposalFromConsult: the Sevetri call", () => {
     expect(d.clientEmail).toBe("sevetri@example.com");
     expect(d.title).toBe("Trademark Proposal");
     expect(d.expiresOn).toBe("2026-10-26");
-    expect(d.payUrl).toBe("https://app.lawmatics.com/forms/share/example");
-    expect(hasErrors(d.issues)).toBe(false);
+    expect(d.payUrl).toBeNull();
+    expect(d.reviewerNotes).toContain("Add the client's pay link before creating the link.");
+    expect(d.reviewerNotes).not.toContain("default pay link");
+    // The only thing left to fix before approval is the pay link a person types.
+    expect(d.issues.filter((i) => i.level === "error").map((i) => i.path)).toEqual(["pay_url"]);
     expect(d.issues).toEqual(
       validateContent(d.content, { forApproval: true, title: d.title, expires_on: d.expiresOn, pay_url: d.payUrl, client_email: d.clientEmail }),
     );
@@ -167,7 +170,7 @@ describe("prices: never invented", () => {
     expect(d.content.names[0].price_override).toEqual({ base_cents: 400_000 });
     expect(d.content.names[1].price_override).toBeUndefined();
     expect(d.reviewerNotes).toContain("CHECK: applied a price of $4,000 for Prosperall");
-    expect(hasErrors(d.issues)).toBe(false);
+    expect(d.issues.filter((i) => i.level === "error" && i.path !== "pay_url")).toEqual([]);
   });
 
   it("leaves the price alone and flags it when the quote is not in the transcript", async () => {
@@ -243,7 +246,7 @@ describe("class numbers never reach the client", () => {
       "Educational Workshops & AI Upskilling Programs",
     ]);
     for (const l of labels) expect(l).not.toMatch(CLASS_NUMBER);
-    expect(d.issues).toEqual([]);
+    expect(d.issues.filter((i) => i.path !== "pay_url")).toEqual([]);
     expect(d.reviewerNotes).toContain("Removed a class number from");
   });
 
@@ -268,7 +271,7 @@ describe("class numbers never reach the client", () => {
       "Charitable Services",
       "Educational Workshops & AI Upskilling Programs",
     ]);
-    expect(d.issues).toEqual([]);
+    expect(d.issues.filter((i) => i.path !== "pay_url")).toEqual([]);
     expect(d.reviewerNotes).toContain("Removed a class number from");
   });
 
@@ -439,7 +442,6 @@ describe("the record", () => {
       await draftProposalFromConsult(
         draftInput(fakeLlm(sevetriOutput()).llm, {
           lead: { id: "l", firstName: null, lastName: null, email: "x@test.invalid", businessName: "Prosperall" },
-          defaultPayUrl: null,
         }),
       ),
     );

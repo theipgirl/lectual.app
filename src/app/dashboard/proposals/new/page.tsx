@@ -135,7 +135,7 @@ export default async function NewProposalPage({ searchParams }: { searchParams: 
     brandName: "",
     title: "Trademark Proposal",
     expiresOn: defaultExpiry(tz),
-    payUrl: settings?.default_pay_url ?? "",
+    payUrl: "",
   };
 
   let leadNote: string | null = null;
@@ -217,7 +217,7 @@ export default async function NewProposalPage({ searchParams }: { searchParams: 
         <h1 className="lx-h1" data-tour="proposal-new-head">New proposal</h1>
         <p className="lx-sub">
           Starts as a draft from one of your firm&apos;s packages and its included items. You can change anything on the next page before a named approver
-          approves it.
+          creates the client link.
         </p>
       </div>
       <WhoIsThisFor view={view} chosen={who} />

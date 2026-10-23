@@ -250,9 +250,9 @@ export function validateContent(content: unknown, options: ValidateOptions = {})
   if (email && !isPlausibleEmail(email)) err("client_email", "That client email address doesn't look right.");
 
   if (options.forApproval) {
-    if (!expires) err("expires_on", "Set an expiry date before approving.");
-    if (!payUrl) err("pay_url", "Add the pay link before approving.");
-    if (!email) err("client_email", "Add the client's email before approving.");
+    if (!expires) err("expires_on", "Set an expiry date before creating the link.");
+    if (!payUrl) err("pay_url", "Add the pay link before creating the link.");
+    if (!email) err("client_email", "Add the client's email before creating the link.");
   }
 
   /* ── the content document ── */

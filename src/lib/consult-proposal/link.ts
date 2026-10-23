@@ -37,7 +37,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export type ProposalMarker = { proposalId: string; leadId: string | null };
 export type MarkerRead = { status: "none" } | { status: "found"; marker: ProposalMarker } | { status: "failed" };
 
-export const APPROVE_PROPOSAL_FIRST = "Approve the proposal first: open it, review it, and click Approve.";
+export const APPROVE_PROPOSAL_FIRST = "Create the proposal's link first: open it, review it, and click Save and create link.";
 
 /** The consult-proposal marker for one queue item, or none (an ordinary draft). */
 export async function findProposalMarker(queueId: string): Promise<MarkerRead> {

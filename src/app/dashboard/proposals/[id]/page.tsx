@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { listMemberDirectory, type MemberIdentity } from "@/lib/members/directory";
-import { getSiteOrigin } from "@/lib/site-origin";
+import { clientLinkOrigin, clientLinkUrl } from "@/lib/proposals/client-link-origin";
 import { formatCents } from "@/lib/quotes/money";
 import { formatFirmStamp, formatShortFirmDate } from "@/lib/quotes/labels";
 import { ProposalError } from "@/lib/proposals/errors";
@@ -102,7 +102,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
     listMemberDirectory().catch((): MemberIdentity[] => []),
     getProposalSettings().catch(() => null),
     isCurrentUserApprover(),
-    getSiteOrigin(),
+    clientLinkOrigin(proposal.org_id),
     proposal.lead_id ? loadConsultStrip(proposal.lead_id) : Promise.resolve(null),
     // Only an accepted version has a payment panel. A failed read is `{ ok: false }`, never "not paid".
     proposal.status === "accepted" ? listProposalStepEvents(proposal.id) : Promise.resolve(null),
@@ -139,11 +139,12 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
   const newer = latest && latest.version > proposal.version ? latest : null;
 
   // A consult-agent proposal goes live by approving its email in the queue, so
-  // "Mark as sent" is replaced by a note while that email is pending (or unreadable).
+  // "Turn on the link" is replaced by a note while that email is pending (or unreadable).
   const sendBlock =
     canWrite && proposal.status === "approved" && proposal.source === "agent" ? await proposalSendBlock(proposal.id) : ({ blocked: false } as const);
 
-  const clientUrl = proposal.status === "approved" || proposal.status === "sent" ? `${origin}/p/${proposal.public_token}/` : null;
+  // Only a live link is shown: an approved (saved) version's URL would open nothing.
+  const clientUrl = proposal.status === "sent" || proposal.status === "accepted" ? clientLinkUrl(origin, proposal.public_token) : null;
 
   const readOnlyNote = readOnlyText(proposal, canWrite, approverNames);
 
@@ -237,13 +238,13 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
       {statusEditable && (errors > 0 || warnings > 0) && (
         <div className={`lx-banner ${errors > 0 ? "lx-banner-risk" : "lx-banner-mute"}`} role="status">
           {errors > 0
-            ? `${errors} ${errors === 1 ? "problem blocks" : "problems block"} approval${warnings > 0 ? `, and ${warnings} to check` : ""}. Each is listed in the section that can fix it.`
-            : `${warnings} ${warnings === 1 ? "thing" : "things"} to check before approving. None blocks approval.`}
+            ? `${errors} ${errors === 1 ? "problem blocks" : "problems block"} creating the link${warnings > 0 ? `, and ${warnings} to check` : ""}. Each is listed in the section that can fix it.`
+            : `${warnings} ${warnings === 1 ? "thing" : "things"} to check before creating the link. None blocks it.`}
         </div>
       )}
       {statusEditable && errors === 0 && warnings === 0 && (
         <div className="lx-banner lx-banner-ok" role="status">
-          Nothing blocks approval.
+          Nothing blocks creating the link.
         </div>
       )}
 
@@ -252,7 +253,6 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
           <DetailsForm
             {...common}
             issues={shown(groups.details)}
-            defaultPayUrl={settings?.default_pay_url ?? null}
             values={{
               fullName: proposal.client_name,
               firstName: content.client?.first_name ?? "",
@@ -382,7 +382,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
       <section className="lx-card pe-card" aria-label="Versions">
         <header className="pe-card-head">
           <h2 className="pe-h">Versions</h2>
-          <p className="lx-note pe-hint">Every change after a proposal is sent is a new version, so what the client saw is never rewritten.</p>
+          <p className="lx-note pe-hint">Every change after the link is live is a new version, so what the client saw is never rewritten.</p>
         </header>
         <ul className="pe-versions">
           {versions.map((v) => (
@@ -438,10 +438,10 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
 function versionWhen(v: ProposalDetail["versions"][number], tz: string): string {
   const stamp = (iso: string | null) => (iso ? formatFirmStamp(iso, tz) : "");
   if (v.status === "accepted") return `Accepted ${stamp(v.accepted_at)}`;
-  if (v.status === "sent") return `Sent ${stamp(v.sent_at)}`;
+  if (v.status === "sent") return `Link live ${stamp(v.sent_at)}`;
   if (v.status === "superseded") return `Replaced ${stamp(v.superseded_at)}`;
   if (v.status === "withdrawn") return `Withdrawn ${stamp(v.withdrawn_at)}`;
-  if (v.status === "approved") return `Approved ${stamp(v.approved_at)}`;
+  if (v.status === "approved") return `Saved ${stamp(v.approved_at)}`;
   return `Started ${stamp(v.created_at)}`;
 }
 
@@ -454,7 +454,7 @@ function readOnlyText(
   switch (p.status) {
     case "sent":
       return {
-        text: `Sent proposals can't be edited. Revise creates version ${p.version + 1}, which ${approverNames.length > 0 ? joinOr(approverNames) : "a named approver"} approves before the client sees it.`,
+        text: `A proposal with a live link can't be edited. Start a new version creates version ${p.version + 1}; ${approverNames.length > 0 ? joinOr(approverNames) : "a named approver"} creates its link before the client sees it.`,
       };
     case "accepted":
       return { text: "The client accepted this version, so it is the record of what they agreed to and can't be changed. Anything new is a separate proposal." };

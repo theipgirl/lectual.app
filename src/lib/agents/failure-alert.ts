@@ -1,9 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env";
-import { fetchWithTimeout } from "@/lib/http/timeout";
-
-/** Short on purpose: the alert runs inside the cron's 270 s wall budget and must never push a run past maxDuration. */
-const ALERT_FETCH_TIMEOUT_MS = 10_000;
+import { sendInternalMail } from "@/lib/mail/internal-mail";
 import type { AgentId } from "./types";
 import { AGENT_DEFS } from "./types";
 
@@ -22,7 +19,6 @@ import { AGENT_DEFS } from "./types";
 
 export const ALERT_ERROR_MAX_CHARS = 2_000;
 export const DEFAULT_ALERT_FROM = "Lectual alerts <noreply@lectual.app>";
-const RESEND_URL = "https://api.resend.com/emails";
 
 export type FailureAlertInput = {
   orgId: string;
@@ -130,22 +126,16 @@ export async function sendFailureAlert(args: {
     const config = args.config === undefined ? alertConfigFromEnv() : args.config;
     if (!config) return "off";
     if (await alreadySentToday(args.admin, args.input)) return "deduped";
-    const post = fetchWithTimeout(args.fetchImpl ?? fetch, ALERT_FETCH_TIMEOUT_MS);
-    const res = await post(RESEND_URL, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${config.apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        from: config.from,
-        to: config.to,
-        subject: alertSubject(args.input.agent, args.input.firmName),
-        text: alertBody(args.input),
-      }),
+    const res = await sendInternalMail({
+      apiKey: config.apiKey,
+      from: config.from,
+      to: config.to,
+      subject: alertSubject(args.input.agent, args.input.firmName),
+      text: alertBody(args.input),
+      fetchImpl: args.fetchImpl,
+      label: "failure-alert",
     });
-    if (!res.ok) {
-      console.error(`[failure-alert] the alert email was refused (HTTP ${res.status}).`);
-      return "failed";
-    }
-    return "sent";
+    return res.status === "sent" ? "sent" : "failed";
   } catch {
     console.error("[failure-alert] the alert email could not be sent.");
     return "failed";

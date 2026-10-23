@@ -52,8 +52,8 @@ describe("listProposals blocking_issue", () => {
     ]);
     const by = Object.fromEntries(items.map((i) => [i.id, i.blocking_issue]));
     expect(by.ok).toBeNull();
-    expect(by.nopay).toBe("Add the pay link before approving.");
-    expect(by.noemail).toBe("Add the client's email before approving.");
+    expect(by.nopay).toBe("Add the pay link before creating the link.");
+    expect(by.noemail).toBe("Add the client's email before creating the link.");
   });
 
   it("is null for rows that can no longer be approved, whatever they are missing", async () => {

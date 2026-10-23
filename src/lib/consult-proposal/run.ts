@@ -8,6 +8,7 @@ import { insertAgentProposal, recordConsultDraftEvent } from "@/lib/proposals/ag
 import type { ProposalsDbClient } from "@/lib/proposals/store";
 import { standardProposalPricing } from "@/lib/proposals/types";
 import type { ValidationIssue } from "@/lib/proposals/validate";
+import { clientLinkUrl, resolveClientLinkOrigin } from "@/lib/proposals/client-link-origin";
 import { draftProposalFromConsult } from "./draft";
 import { renderProposalEmail } from "./email";
 import { describeConsultFailure, logConsultFailure, type ConsultStage } from "./failure";
@@ -188,7 +189,7 @@ async function runStages(input: ConsultProposalRunInput, progress: Progress): Pr
   progress.stage = "settings";
   const { data: setting, error: settingErr } = await db
     .from("client_proposal_setting")
-    .select("approver_user_ids, default_pay_url, pricing")
+    .select("approver_user_ids, pricing")
     .eq("org_id", orgId)
     .maybeSingle();
   if (settingErr) logDbError("settings", settingErr);
@@ -221,7 +222,6 @@ async function runStages(input: ConsultProposalRunInput, progress: Progress): Pr
       lead,
       firm: { name: firmName, slug: firmSlug, teamSignOff },
       pricing: standardProposalPricing((setting as Row).pricing),
-      defaultPayUrl: ((setting as Row).default_pay_url as string | null) ?? null,
       today: firmCivilDate(new Date(now()), tz),
       llm: input.llm,
     });
@@ -289,7 +289,7 @@ async function runStages(input: ConsultProposalRunInput, progress: Progress): Pr
   // 3. The email, with the client link, into the approval queue.
   progress.stage = "email";
   const origin = input.origin.replace(/\/$/, "");
-  const proposalUrl = `${origin}/p/${proposal.public_token}/`;
+  const proposalUrl = clientLinkUrl(resolveClientLinkOrigin(orgId, origin), proposal.public_token);
   const staffUrl = `${origin}/dashboard/proposals/${proposal.id}/`;
   let email: { subject: string; body: string };
   try {

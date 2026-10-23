@@ -155,8 +155,8 @@ export function NewProposalForm({
               </>
             )}
             <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
-              <span className="lx-label">Pay link (https)</span>
-              <input className="lx-input" name="payUrl" type="url" maxLength={2000} defaultValue={defaults.payUrl} />
+              <span className="lx-label">Pay link</span>
+              <input className="lx-input" name="payUrl" type="url" maxLength={2000} defaultValue={defaults.payUrl} placeholder="Enter custom pay link" />
             </label>
           </div>
           {packages === null && (

@@ -36,8 +36,8 @@ export default async function ProposalSettingsPage() {
       <div className="lx-label">Settings</div>
       <h1 className="lx-h1">Client proposals</h1>
       <p className="lx-sub">
-        Who approves proposals, the packages and prices a new proposal starts from, and the included items. Nothing reaches a client until one of the named approvers has
-        approved it.
+        Who may create client links, the packages and prices a new proposal starts from, and the included items. No link opens for a client until one of the named people
+        has created it.
       </p>
     </div>
   );
@@ -88,7 +88,7 @@ export default async function ProposalSettingsPage() {
       {head}
       {!settings && (
         <p className="lx-note" style={{ margin: 0 }}>
-          Nothing is saved yet. The values below are the defaults a new proposal uses until you save. Name at least one approver, or no one can approve.
+          Nothing is saved yet. The values below are the defaults a new proposal uses until you save. Name at least one person who may create client links, or no one can.
         </p>
       )}
       <PackagePricesForm
@@ -110,7 +110,6 @@ export default async function ProposalSettingsPage() {
         }))}
         values={{
           approverUserIds: settings?.approver_user_ids ?? [],
-          defaultPayUrl: settings?.default_pay_url ?? "",
           notifyEmail: settings?.notify_email ?? "",
           officeActionNote: standard.office_action_note,
           includes: standard.includes,

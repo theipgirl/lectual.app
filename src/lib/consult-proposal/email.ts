@@ -177,7 +177,7 @@ export type RenderableProposalDraft = {
 };
 
 export type RenderProposalEmailOptions = {
-  /** The client's proposal page, e.g. `${origin}/p/${public_token}/`. */
+  /** The client's proposal page URL, built by clientLinkUrl() (the firm's own domain when configured). */
   proposalUrl: string;
   /** Firm override; a template without the link or sign-off slots falls back to the default. */
   template?: string | null;

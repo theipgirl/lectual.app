@@ -97,7 +97,6 @@ export function draftInput(llm: StructuredCall, over: Partial<DraftConsultPropos
     lead: { id: "lead-1", firstName: "Sevetri", lastName: "Wilson", email: "sevetri@example.com", businessName: "Prosperall" },
     firm: { name: "RPB Law", slug: "rpb-law", teamSignOff: "The RPB Law Team" },
     pricing: standardProposalPricing({}),
-    defaultPayUrl: "https://app.lawmatics.com/forms/share/example",
     today: "2026-10-16",
     llm,
     ...over,

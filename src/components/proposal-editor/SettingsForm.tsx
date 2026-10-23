@@ -2,6 +2,7 @@
 
 import type { ProposalInclude } from "@/lib/proposals/types";
 import { saveProposalSettingsAction } from "@/app/dashboard/settings/proposals/actions";
+import { SETTINGS_APPROVERS_HEADING } from "@/lib/proposal-editor/vocabulary";
 import { ActionForm, Outcome } from "./ActionForm";
 import { IncludesFields } from "./IncludesFields";
 
@@ -9,7 +10,6 @@ export type SettingsMember = { userId: string; name: string; email: string | nul
 
 export type SettingsValues = {
   approverUserIds: string[];
-  defaultPayUrl: string;
   notifyEmail: string;
   officeActionNote: string;
   includes: ProposalInclude[];
@@ -23,9 +23,9 @@ export function SettingsForm({ members, values }: { members: SettingsMember[]; v
         <>
           <section className="lx-card pe-card">
             <header className="pe-card-head">
-              <h2 className="pe-h">Who can approve</h2>
+              <h2 className="pe-h">{SETTINGS_APPROVERS_HEADING}</h2>
               <p className="lx-note pe-hint">
-                Only these people can approve a proposal, and nothing reaches a client until one of them has. The database enforces this; owners and admins who aren’t listed can’t approve. Up to 10.
+                Only these people can save a proposal and create its client link, and no link opens for a client until one of them has. The database enforces this; owners and admins who aren’t listed can’t. Up to 10.
               </p>
             </header>
             <div className="pe-approvers">
@@ -48,11 +48,6 @@ export function SettingsForm({ members, values }: { members: SettingsMember[]; v
               <h2 className="pe-h">Links and notifications</h2>
             </header>
             <div className="lx-form-grid">
-              <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
-                <span className="lx-label">Default pay link (https)</span>
-                <input className="lx-input" name="defaultPayUrl" type="url" maxLength={2000} defaultValue={values.defaultPayUrl} placeholder="https://" />
-                <span className="lx-note">New proposals start with this link. Each proposal can use a different one.</span>
-              </label>
               <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
                 <span className="lx-label">Tell this address when a client accepts</span>
                 <input className="lx-input" name="notifyEmail" type="email" maxLength={320} defaultValue={values.notifyEmail} />

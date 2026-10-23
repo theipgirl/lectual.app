@@ -138,7 +138,7 @@ describe("runConsultProposal", () => {
       lead_id: "lead-1",
       client_name: "Sevetri Wilson",
       created_by: "user-1",
-      pay_url: "https://pay.example.com/form",
+      pay_url: null,
     });
     expect((ins.values as { public_token: string }).public_token).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(r.proposalId).toBe((ins.values as { id: string }).id);

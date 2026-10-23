@@ -49,7 +49,6 @@ export type DraftConsultProposalInput = {
   firm: { name: string; slug: string; teamSignOff: string };
   /** From src/lib/proposals/types.ts `standardProposalPricing(setting.pricing)`. */
   pricing: ReturnType<typeof standardProposalPricing>;
-  defaultPayUrl: string | null;
   /** YYYY-MM-DD in the firm's time zone. */
   today: string;
   llm: StructuredCall;
@@ -69,7 +68,7 @@ export type ConsultProposalDraft =
       title: string;
       /** today + 10 calendar days (Rebecca's Sevetri precedent). */
       expiresOn: string;
-      /** defaultPayUrl for now; step 4 replaces it with the client's own form. */
+      /** Always null: the client's pay link is typed by a person; no default is copied. */
       payUrl: string | null;
       /** validateContent(content, { forApproval: true, ... }). */
       issues: ValidationIssue[];

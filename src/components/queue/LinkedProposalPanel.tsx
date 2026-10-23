@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { LinkedPanel } from "@/lib/consult-proposal/link";
+import { APPROVE_PROPOSAL_FIRST, type LinkedPanel } from "@/lib/consult-proposal/link";
 import { statusLabel, statusTone } from "@/lib/proposal-editor/labels";
 import { formatCents } from "@/lib/quotes/money";
 import { ProposalCard } from "@/components/proposal-editor/ProposalCard";
@@ -20,7 +20,12 @@ export function LinkedProposalPanel({ panel, pending }: { panel: LinkedPanel; pe
     );
   }
   const p = panel.proposal;
-  const ready = p.status === "approved" || p.status === "sent";
+  const readyNote =
+    p.status === "sent"
+      ? "The proposal's link is live. Approving this email puts it in your mailbox as a draft. Nothing is sent."
+      : p.status === "approved"
+        ? "The proposal is saved. Approving this email turns its link on and puts the email in your mailbox as a draft. Nothing is sent."
+        : null;
   return (
     <>
       {p.card && <ProposalCard card={p.card} />}
@@ -59,9 +64,7 @@ export function LinkedProposalPanel({ panel, pending }: { panel: LinkedPanel; pe
         </Link>
         {pending && (
           <p className="lx-note" style={{ margin: 0 }}>
-            {ready
-              ? "The proposal is approved. Approving this email makes the client's link live and puts the email in your mailbox as a draft. Nothing is sent."
-              : "Approve the proposal first: open it, review it, and click Approve. Only the firm's named proposal approvers can approve this email."}
+            {readyNote ?? `${APPROVE_PROPOSAL_FIRST} Only the firm's named proposal approvers can approve this email.`}
           </p>
         )}
       </section>

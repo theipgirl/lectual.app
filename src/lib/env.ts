@@ -30,6 +30,9 @@ const fieldSchemas = {
   AGENT_FAILURE_ALERT_TO: z.string().optional(),
   AGENT_FAILURE_ALERT_FROM: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
+  // "Send feedback" (src/lib/feedback/submit.ts). Unset TO = "Feedback isn't set up yet." and nothing is sent.
+  FEEDBACK_TO: z.string().optional(),
+  FEEDBACK_FROM: z.string().optional(),
   // Model for the matters copilot (src/lib/ai/claude.ts copilotModel()). Unset = claude-sonnet-5.
   COPILOT_MODEL: z.string().optional(),
   // Mailbox OAuth (step 3). Optional until that step lands.
