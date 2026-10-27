@@ -19,7 +19,7 @@ import { isSignalId, type SignalId } from "@/lib/stage-keeper/signals";
 /** The one table of default stage names. Candidates are tried in order; the first the firm has wins. */
 export const DEFAULT_STAGE_NAMES: Record<SignalId, readonly string[]> = {
   "consult-scheduled": ["Consultation Scheduled", "Consult Scheduled", "Consult Booked", "Strategy Session Scheduled", "Discovery Call Scheduled"],
-  // A consult that has taken place. The proposed new board names ("Consult Held - Proposal in Progress") are ON HOLD and not listed.
+  // A consult that has taken place. The proposed new intake board's names are ON HOLD (Taylor, Oct 27) and deliberately not listed.
   "consult-held": ["Consult Held", "Consultation Held", "Consult Completed"],
   "questionnaire-sent": ["Questionnaire Sent", "Intake Questionnaire Sent", "Questionnaire"],
   "post-consult-sent": ["Post Consultation Email Sent", "Post Consult Email Sent", "Post Consultation Follow Up"],

@@ -8,6 +8,15 @@ const STAGE = "5a000000-0000-4000-8000-000000000005";
 const WON = "5a000000-0000-4000-8000-000000000008";
 const FROM = "5a000000-0000-4000-8000-000000000001";
 
+const state = vi.hoisted(() => ({
+  role: "attorney" as string,
+  stage: { id: "5a000000-0000-4000-8000-000000000005", category: "open" } as { id: string; category: string } | null,
+  leads: [] as Array<{ id: string; current_stage_id: string }>,
+  moves: [] as Array<[string, string]>,
+  froms: [] as string[],
+  failOn: null as string | null,
+}));
+
 function deps(over: Partial<BulkMoveDeps> & { leads?: Array<{ id: string; current_stage_id: string }> } = {}) {
   const leads = over.leads ?? [1, 2, 3].map((n) => ({ id: id(n), current_stage_id: FROM }));
   const moved: Array<[string, string]> = [];
@@ -133,15 +142,6 @@ describe("runBulkMove", () => {
 });
 
 describe("the server action wires the real reads and moves", () => {
-  const state = vi.hoisted(() => ({
-    role: "attorney" as string,
-    stage: { id: "5a000000-0000-4000-8000-000000000005", category: "open" } as { id: string; category: string } | null,
-    leads: [] as Array<{ id: string; current_stage_id: string }>,
-    moves: [] as Array<[string, string]>,
-    froms: [] as string[],
-    failOn: null as string | null,
-  }));
-
   beforeEach(() => {
     vi.resetModules();
     state.role = "attorney";

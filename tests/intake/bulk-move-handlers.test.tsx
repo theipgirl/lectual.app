@@ -66,7 +66,6 @@ vi.mock("@/app/dashboard/leads/actions", () => ({ createLeadAction: vi.fn() }));
 vi.mock("@/app/dashboard/intake/time-actions", () => ({ startTimerAction: vi.fn(), stopTimerAction: vi.fn(), logTimeAction: vi.fn() }));
 
 const { default: IntakeWorkspace } = await import("@/app/dashboard/intake/_components/IntakeWorkspace");
-const { default: IntakeTable } = await import("@/app/dashboard/intake/_components/IntakeTable");
 const { default: IntakeBoard } = await import("@/app/dashboard/intake/_components/IntakeBoard");
 const { default: BulkMoveBar } = await import("@/app/dashboard/intake/_components/BulkMoveBar");
 

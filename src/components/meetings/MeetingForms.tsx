@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useState } from "react";
 import { draftFollowUpAction, draftProposalAction, linkMeetingAction, type ActionState } from "@/app/dashboard/meetings/actions";
 import {
   connectFathomAction,
@@ -57,9 +57,12 @@ export function LinkMeetingForm(props: {
   const [state, action, pending] = useActionState<ActionState, FormData>(linkMeetingAction, {});
   const [choosing, setChoosing] = useState(false);
   // A saved change folds the form back to its text; the page's own data (props) is what it then reads.
-  useEffect(() => {
+  // Adjusted while rendering, when the action returns a new state, rather than in an effect.
+  const [seenState, setSeenState] = useState(state);
+  if (state !== seenState) {
+    setSeenState(state);
     if (state.ok) setChoosing(false);
-  }, [state]);
+  }
 
   const linked = Boolean(props.leadId || props.matterId);
   const hasSuggestion = !linked && Boolean(props.suggestedLeadId || props.suggestedMatterId);
