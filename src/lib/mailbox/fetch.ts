@@ -486,6 +486,14 @@ function gmailBodyText(part: GmailPart | undefined): string {
   return "";
 }
 
+function bodyTextOf(provider: MailboxProvider, json: { payload?: GmailPart; body?: { contentType?: string; content?: string } }): string {
+  return provider === "google"
+    ? gmailBodyText(json.payload)
+    : json.body?.contentType === "html"
+      ? htmlToText(json.body.content ?? "")
+      : (json.body?.content ?? "");
+}
+
 /**
  * The text of ONE already-matched message, capped at BODY_MAX characters.
  * Used only by the email-intel agent, only for a message the sync has already
@@ -507,11 +515,106 @@ export async function fetchMessageBody(
   if (res.status === 404) return null;
   if (!res.ok) throw new ProviderError(`Message read failed (${res.status}).`, "fetch-failed");
   const json = (await res.json()) as { payload?: GmailPart; body?: { contentType?: string; content?: string } };
-  const text =
+  return bodyTextOf(provider, json).slice(0, BODY_MAX);
+}
+
+// ── one message to read, for the My Mail reading pane ────────────────────────
+
+const READ_BODY_MAX = 60_000;
+
+/**
+ * A live message id, as the reading pane accepts it from a URL: provider ids are URL-safe base64 or hex, so no
+ * slash, dot, whitespace or query character. Tighter than the pattern inside fetchMessageBody, which the
+ * stored-mail callers keep unchanged. The reader still encodes the id into the provider URL.
+ */
+export const LIVE_MESSAGE_ID = /^[A-Za-z0-9_=+-]{1,512}$/;
+
+export type MessageToRead = {
+  from: string;
+  to: string[];
+  cc: string[];
+  at: string | null;
+  subject: string | null;
+  /** Plain text. Never HTML: Graph is asked for text and anything HTML is converted. */
+  body: string;
+};
+
+const partyText = (p: Party): string => (p.name && p.address ? `${p.name} <${p.address}>` : (p.address ?? p.name ?? ""));
+const partyTexts = (list: Party[]): string[] => list.map(partyText).filter(Boolean);
+
+/**
+ * One message for a person to read: the headers and the body as plain text, fetched live. Nothing is stored or
+ * logged. Shares the body conversion with fetchMessageBody. Null when the message is gone or the id is not safe.
+ */
+export async function fetchMessageToRead(
+  provider: MailboxProvider,
+  args: { accessToken: string; messageId: string; fetchImpl?: typeof fetch },
+): Promise<MessageToRead | null> {
+  const { accessToken, fetchImpl = fetch } = args;
+  const rawId = args.messageId.replace(/^(gmail|graph):/, "");
+  if (!LIVE_MESSAGE_ID.test(rawId)) return null;
+  const url =
     provider === "google"
-      ? gmailBodyText(json.payload)
-      : json.body?.contentType === "html"
-        ? htmlToText(json.body.content ?? "")
-        : (json.body?.content ?? "");
-  return text.slice(0, BODY_MAX);
+      ? `${GMAIL}/messages/${encodeURIComponent(rawId)}?format=full`
+      : `https://graph.microsoft.com/v1.0/me/messages/${encodeURIComponent(rawId)}?$select=subject,from,toRecipients,ccRecipients,receivedDateTime,sentDateTime,body`;
+  const res = await getJson(url, accessToken, fetchImpl, provider === "microsoft" ? { prefer: 'outlook.body-content-type="text"' } : {});
+  if (res.status === 404) return null;
+  if (!res.ok) throw new ProviderError(`Message read failed (${res.status}).`, "fetch-failed");
+  const json = (await res.json()) as GmailMessage & GraphMessage & { payload?: GmailPart; body?: { contentType?: string; content?: string } };
+  const body = bodyTextOf(provider, json).slice(0, READ_BODY_MAX);
+  if (provider === "google") {
+    const tm = gmailToThreadMessage(json as GmailMessage, "");
+    const header = (name: string) => (json.payload as { headers?: GmailHeader[] } | undefined)?.headers?.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value ?? null;
+    return {
+      from: partyText(parseAddressList(header("From"))[0] ?? { name: null, address: null }),
+      to: partyTexts(parseAddressList(header("To"))),
+      cc: partyTexts(parseAddressList(header("Cc"))),
+      at: tm?.at ?? (header("Date") && Number.isFinite(Date.parse(header("Date") as string)) ? new Date(header("Date") as string).toISOString() : null),
+      subject: header("Subject"),
+      body,
+    };
+  }
+  return {
+    from: partyText(graphParty(json.from)),
+    to: partyTexts((json.toRecipients ?? []).map(graphParty)),
+    cc: partyTexts((json.ccRecipients ?? []).map(graphParty)),
+    at: json.receivedDateTime ?? json.sentDateTime ?? null,
+    subject: json.subject ?? null,
+    body,
+  };
+}
+
+// ── the live Inbox tab: the newest 50, read now, never stored ────────────────
+
+export const LIVE_INBOX_COUNT = 50;
+
+export type LiveInboxResult = { messages: ThreadMessage[]; truncated: boolean };
+
+/** The newest {@link LIVE_INBOX_COUNT} inbox messages (subject, sender, date, short preview), newest first. */
+export async function fetchLiveInbox(
+  provider: MailboxProvider,
+  args: { accessToken: string; mailbox: string; fetchImpl?: typeof fetch },
+): Promise<LiveInboxResult> {
+  const { accessToken, mailbox, fetchImpl = fetch } = args;
+  if (provider === "google") {
+    const res = await getJson(`${GMAIL}/messages?labelIds=INBOX&maxResults=${LIVE_INBOX_COUNT}`, accessToken, fetchImpl);
+    if (!res.ok) throw new ProviderError(`Gmail list failed (${res.status}).`, "fetch-failed");
+    const page = (await res.json()) as { messages?: { id: string }[]; nextPageToken?: string };
+    const headers = ["From", "To", "Cc", "Subject", "Date"].map((h) => `metadataHeaders=${h}`).join("&");
+    const messages = await mapLimit((page.messages ?? []).slice(0, LIVE_INBOX_COUNT), 5, async (m) => {
+      const r = await getJson(`${GMAIL}/messages/${encodeURIComponent(m.id)}?format=metadata&${headers}`, accessToken, fetchImpl);
+      if (r.status === 404) return null;
+      if (!r.ok) throw new ProviderError(`Gmail message read failed (${r.status}).`, "fetch-failed");
+      return gmailToThreadMessage((await r.json()) as GmailMessage, mailbox);
+    });
+    return { messages: messages.filter((m): m is ThreadMessage => m !== null), truncated: Boolean(page.nextPageToken) };
+  }
+  const url =
+    `${GRAPH}/inbox/messages?$select=${GRAPH_SELECT}` +
+    `&$orderby=${encodeURIComponent("receivedDateTime desc")}&$top=${LIVE_INBOX_COUNT}`;
+  const res = await getJson(url, accessToken, fetchImpl);
+  if (!res.ok) throw new ProviderError(`Outlook inbox read failed (${res.status}).`, "fetch-failed");
+  const page = (await res.json()) as { value?: GraphMessage[]; "@odata.nextLink"?: string };
+  const messages = (page.value ?? []).map((m) => graphToThreadMessage(m, "inbox", mailbox)).filter((m): m is ThreadMessage => m !== null);
+  return { messages: messages.slice(0, LIVE_INBOX_COUNT), truncated: Boolean(page["@odata.nextLink"]) };
 }
