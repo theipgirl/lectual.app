@@ -256,9 +256,9 @@ describe("the table", () => {
   ];
   const html = renderToStaticMarkup(createElement(ProposalsTable, { rows, footerLeft: "All 3 proposals", footerRight: "Government filing fees are $350 per class, paid before the application goes in." }));
 
-  it("has the seven columns, in order", () => {
+  it("has the nine columns, in order", () => {
     const heads = [...html.matchAll(/<th[^>]*>([^<]*)<\/th>/g)].map((m) => m[1]);
-    expect(heads).toEqual(["Proposal", "Client", "Status", "At signing", "At filing", "Expires", "Last activity"]);
+    expect(heads).toEqual(["Proposal", "Client", "Status", "Accepted", "Paid", "At signing", "At filing", "Expires", "Last activity"]);
   });
 
   it("shows the legal fee and the USPTO fees as two separate cells, and never a sum or a 'total'", () => {

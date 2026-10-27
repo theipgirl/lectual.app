@@ -234,8 +234,38 @@
 .pe-steps li[data-tone="mute"] .pe-step-text { color: var(--muted); }
 .pe-step-label { min-width: 150px; }
 .pe-step-text { flex: 1 1 260px; min-width: 0; }
-.pq-paid { display: grid; gap: 6px; justify-items: start; margin-top: 6px; }
-.pq-paid-form { display: grid; gap: 4px; justify-items: start; }
+/* The Paid column (Sprint 29). Mark paid is by hand, a stopgap until LawPay takes payment on the proposal. */
+.pq-paid { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.pq-paid-form { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.pq-paid-act { display: inline-flex; align-items: center; gap: 6px; }
+.pq-paid-note { flex-basis: 100%; margin: 0; max-width: 240px; font-size: 12.5px; }
+.pq-paid-text[data-paid="unreadable"] { color: var(--wine); }
+.pq-paid-none { color: var(--muted); }
+.pq-c-accepted[data-accepted="no"] { color: var(--muted); }
+.pq-c-accepted { white-space: nowrap; }
+
+/* Under 760px a row is a stack: the proposal, the client, then Accepted and Paid directly under the client's name. */
+@media (max-width: 760px) {
+  .pq-tbl { min-width: 0; display: block; }
+  .pq-tbl thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .pq-tbl tbody { display: block; }
+  .pq-tbl tr {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 12px; row-gap: 4px;
+    padding: 12px 14px; border-bottom: 1px solid var(--line);
+    grid-template-areas: "proposal proposal" "client client" "accepted paid" "status status" "signing filing" "expires activity";
+  }
+  .pq-tbl td { display: block; height: auto; min-width: 0; padding: 0; border: 0; }
+  .pq-tbl td:first-child { min-width: 0; }
+  .pq-tbl td.pq-c-proposal { grid-area: proposal; }
+  .pq-tbl td.pq-c-client { grid-area: client; }
+  .pq-tbl td.pq-c-accepted { grid-area: accepted; }
+  .pq-tbl td.pq-c-paid { grid-area: paid; }
+  .pq-tbl td.pq-c-status { grid-area: status; }
+  .pq-tbl td.pq-c-signing { grid-area: signing; text-align: left; }
+  .pq-tbl td.pq-c-filing { grid-area: filing; text-align: left; }
+  .pq-tbl td.pq-c-expires { grid-area: expires; }
+  .pq-tbl td.pq-c-activity { grid-area: activity; }
+}
 
 /* ── New proposal: who it is for (Sprint 20) ──────────────── */
 .pe-who { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }

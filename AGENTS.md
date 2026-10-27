@@ -820,3 +820,53 @@ Money sprint. Nothing here sends, moves a stage or opens a matter. No migration,
   said (`sourceText` rule); a credit larger than the legal fee is capped; every applied and every ignored value is named in the flags with its source. **No email
   body or mailbox is read for proposals (spec D2, Taylor Oct 27).** Both the transcript upload and the meeting "Create proposal" go through `runConsultProposal`,
   which carries `lead.id` onto the proposal.
+
+## Pipeline moves from consults and proposals, new-lead stage, board and queue polish (Sprint 29, no schema)
+No migration, no dependency, nothing sends. The Stage Keeper's rules from Sprint 16 (forward only, never into `won` / `lost` / `nurture`, the sensitive guard, the
+7-day person-move card, one action per lead per run) apply to every new signal below.
+- **New Stage Keeper signals** (`src/lib/stage-keeper/signals.ts`, reads in `src/lib/agents/stage-keeper/run.ts`). `consult-held`: a `crm_meeting` (Zoom or Fathom)
+  with `lead_id` set (never `suggested_lead_id`) that started in the past, or already holds a transcript, within the 30-day window; key `<lead>:meeting:<id>`; the
+  transcript, summary, attendees and link are never selected. `post-consult-sent` gains two sources: a `client_proposal` with status `sent` or `accepted` (one per family,
+  key `<lead>:proposal:<family_id>`; status, version and dates only, no content or address) and an APPROVED `CLIENT_EMAIL` queue item of the post-consult drafter
+  (`ctx.listApproved`, wired next to `listPending`; key `<lead>:queue:<id>`; linked to a lead through the queue's own `resolveBatch` and only when it names exactly ONE
+  lead). Each optional read that fails (meetings, proposals, queue, the firm's mailbox addresses) adds one sentence to the run summary and gives no signal: "none found"
+  is only said about a read that answered. Evidence stored on a move or card: meeting provider/title/start, proposal version/status/date, queue type/approved date.
+  `consult-held` resolves "Consult Held", "Consultation Held", "Consult Completed" (`DEFAULT_STAGE_NAMES`), and when the firm has none it supports the
+  `consult-scheduled` stage. **A move records the other forward signals it accounts for** (`also_signal_keys`, read by `consumedSignalKeys`), so a lead a person undoes
+  is not moved back by the held meeting or the approved email under the proposal that acted. `moves.ts`, `format.ts`, the lead timeline line and the Reconcile "Email /
+  calendar" source (`evidenceOwnDate`) describe the new kinds in words.
+- **Firm mail cc'd into a shared inbox counts as sent by the firm** (`src/lib/mailbox/firm-sender.ts`, pure): a message stored as `email_received` whose sender is a firm
+  mailbox address, or on the domain of one (a public webmail domain such as gmail.com contributes its exact address only), is firm-sent for the Stage Keeper and the Reconcile
+  milestone classifier. Sender and subject only, never a body; nothing about the address is stored or logged.
+- **NO Lawmatics stage mapping** (Taylor, Oct 27). Lawmatics stage names never choose or move a lead. The importer (`import-plan.ts`) files every new lead in the firm's
+  new-enquiry stage, flags a person Lawmatics gave a stage (or "Hired") with the Lawmatics text as read-only evidence (`lawmatics_stage_unmapped` on the `lead_created` row), and
+  never moves an existing lead: the "move existing leads" option, the divergence report and `stage-map` use in the planner are gone. Reconcile's Lawmatics source is always
+  "unmapped" text (a `needs_matter` pointer for "Hired" only) and its stage-name milestones are undated, so they are cited and never acted on. `stage-map.ts` itself is untouched
+  (the matters importer still uses it). **The ON HOLD new RPB intake board is NOT built**: no new aliases ("Discovery Call Scheduled" and "Strategy Session Scheduled" stay as
+  they were), no "Consult Held - Proposal in Progress" or "Proposal Sent" names, no milestone-order change, no Lost / Nurture change.
+- **The new-enquiry stage** (`src/lib/pipeline/new-enquiry.ts`, the ONE rule): the open stage named like "Potential New Client", "New Lead", "New Inquiry" / "New Enquiry" (one alias
+  list), else the first open stage in pipeline order; never `won`, `lost` or `nurture`, and never "Follow-Up" just because it sorts first. Used by the importer, Reconcile's Create
+  lead (when the sheet names no stage), `createLead` with no stage, and the public intake form. **Stage order finding:** `crm_stage.order_index` is NOT NULL in the generated schema
+  (this repo has no database access, so RPB's actual rows were not read) but is not unique, and the board sorted on it alone; `src/lib/pipeline/stage-order.ts` breaks ties on name
+  then id (a missing number sorts last) and the Intake board, `listStages` (the Pipeline page) and the new-enquiry rule all use it, so every surface draws the pipeline the same way.
+- **Intake board**: each card has a one-line reason (`src/lib/intake/stage-decision.ts`): "Moved automatically · consult held Oct 23" (the Stage Keeper's move, evidence as the tooltip;
+  the table keeps the chip) or "Lawmatics: <stage>" for an imported lead still in the stage the importer filed it in, with a pill "Imported — stage needs a decision" ("Hired in Lawmatics —
+  open a matter" for a hired one). A flag is open only while the lead has not left that stage. The "Needs a stage decision" filter (`?decision=1`) and a per-column "N to decide" badge read
+  the same flags (`loadStageDecisions`, two states: an unreadable list says so, hides the filter and badge, and never filters to "no leads"). Tick cards and "Move to..." moves up to 200
+  at once through `bulkMoveStageAction` -> `runBulkMove` (`src/lib/pipeline/bulk-move.ts`): role re-resolved, a `won` stage refused (the select never offers one either), more than 200 refused
+  with nothing written, every lead re-read through the scoped client, each moved through `moveLeadStage` (logged one by one), a failing lead reported on its own card while the rest move.
+  Drag is unchanged.
+- **Meeting link form** (`LinkMeetingForm`): linked reads "Linked to <lead> · <matter>" (links) with Change; the selects appear only after Change, with "Update link" and Cancel; unlinked
+  reads "Link"; a suggestion reads "Suggested: <name> · Link" with Choose another; a saved change folds back to the text; Unlink stays. "Save link" is gone.
+- **Pickers**: rows are one link with a bold name and ONE quieter line (lead: business · email; matter: client, then mark · matter number), no repeated text, a visible "Selected"
+  marker plus `aria-current` on the chosen row, tokens only, `:focus-visible` in `--ox`. `/dashboard/proposals/?lead=<id>` opens the transcript form with that lead chosen (`preselectedLeadId`
+  accepts only an id in the list the form offers).
+- **Queue item**: the draft is drawn ONCE, as its rendered view with Edit; Edit swaps in the editor with "Done editing" (keeps the edit, shown as "edited") and Cancel (puts back what the
+  editor opened with); the edit is posted from whichever view is showing. The aside is a `<dl>` (Client, To, Subject, Send at, Queued...). "For the reviewer" is a list
+  (`reviewer-summary.ts`): split on line breaks, bullet markers and inline "CHECK FIRST", CHECK FIRST items first and marked, more than five behind "Show all".
+- **Proposals list**: Accepted ("Accepted Oct 21" / "Not yet") and Paid columns on every row. Paid is "Paid Oct 24 · Undo" (who marked it is the tooltip), "Not paid · Mark paid" with "Mark
+  paid after you've confirmed the payment in Lawmatics.", "Paid status couldn't be read" (never "Not paid", no button) or "—" for a row not accepted. Mark paid / Undo are Sprint 19's own
+  actions and roles; `paid.ts` and `paid-view.ts` are unchanged. **Mark paid is a stopgap until the firm's LawPay connection takes payment on the proposal**; then the paid state comes from
+  that payment. The Accepted segment lists accepted-and-not-paid first (`sortForSegment`). Under 760px a row stacks, with Accepted and Paid directly under the client's name.
+- **Existing assertions changed on purpose**: the importer and Reconcile tests that pinned a Lawmatics stage choosing a Lectual stage; the board test that pinned the chip text on the card
+  (the card now says "Moved automatically ..."); the queue page tests that pinned the stacked Preview plus textarea; the proposals table's seven columns (now nine).

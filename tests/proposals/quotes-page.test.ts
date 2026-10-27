@@ -116,10 +116,10 @@ describe("Quotes & proposals page", () => {
   });
 
   describe("the table", () => {
-    it("has the seven columns in order, with the legal fee and the USPTO fees in two cells and no total", async () => {
+    it("has the nine columns in order (Accepted and Paid after Status), with the legal fee and the USPTO fees in two cells and no total", async () => {
       const html = await go();
-      const heads = [...html.slice(html.indexOf("<thead")).matchAll(/<th[^>]*>([^<]*)<\/th>/g)].map((m) => m[1]).slice(0, 7);
-      expect(heads).toEqual(["Proposal", "Client", "Status", "At signing", "At filing", "Expires", "Last activity"]);
+      const heads = [...html.slice(html.indexOf("<thead")).matchAll(/<th[^>]*>([^<]*)<\/th>/g)].map((m) => m[1]).slice(0, 9);
+      expect(heads).toEqual(["Proposal", "Client", "Status", "Accepted", "Paid", "At signing", "At filing", "Expires", "Last activity"]);
       const row = rowOf(html, "Client s1<");
       expect([...row.matchAll(/<td class="pq-money[^"]*">([^<]*)<\/td>/g)].map((m) => m[1])).toEqual(["$4,950.00", "$700.00"]);
       expect(html.toLowerCase()).not.toContain("total");
@@ -169,8 +169,8 @@ describe("Quotes & proposals page", () => {
 
     it("a failed events read still renders every Last activity cell, with a derived line", async () => {
       const html = await go({}, { events: "fail" });
-      expect(html).toContain('class="wrap pq-activity"');
-      for (const id of ["a1", "a2", "s1"]) expect(rowOf(html, `Client ${id}<`)).toMatch(/pq-activity">Updated 1d ago</);
+      expect(html).toContain('class="wrap pq-activity pq-c-activity"');
+      for (const id of ["a1", "a2", "s1"]) expect(rowOf(html, `Client ${id}<`)).toMatch(/pq-c-activity">Updated 1d ago</);
       expect(rowOf(html, "Client e1<")).toContain("Stored status still says sent");
       expect(rowOf(html, "Client b1<")).toContain("Add the pay link before creating the link.");
       expect(html).not.toContain('pq-activity"><');

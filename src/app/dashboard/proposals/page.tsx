@@ -10,7 +10,7 @@ import { getProposalSettings, listLatestProposalEvents, listProposals, listStepA
 import { PROPOSAL_PAID_ROLES } from "@/lib/proposals/paid";
 import { PROPOSAL_ADMIN_ROLES, PROPOSAL_STAFF_WRITE_ROLES } from "@/lib/proposals/types";
 import { normalisePackages } from "@/lib/proposals/package-list";
-import { buildProposalRowView, type ProposalRowView } from "@/lib/proposals/list-rows";
+import { buildProposalRowView, sortForSegment, type ProposalRowView } from "@/lib/proposals/list-rows";
 import type { ActivityEvent } from "@/lib/proposals/list-labels";
 import {
   PROPOSAL_SEGMENTS,
@@ -106,7 +106,8 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
     ? null
     : (Object.fromEntries(PROPOSAL_SEGMENTS.map((s) => [s, all.filter((r) => inSegment(s, r.view.key)).length])) as Record<ProposalSegment, number>);
   const out = outWithClientsCents(failed ? null : all.map((r) => ({ displayKey: r.view.key, offered: r.item.offered })));
-  const rows: ProposalRowView[] = all.filter((r) => inSegment(segment, r.view.key)).map((r) => r.view);
+  // The Accepted segment lists accepted-and-not-paid first (what still needs a person); every other segment keeps the list's order.
+  const rows: ProposalRowView[] = sortForSegment(segment, all.filter((r) => inSegment(segment, r.view.key)).map((r) => r.view));
 
   // The default package's figures, from the firm's own settings; none (never defaults) when they couldn't be read.
   const packages = settingsRead.ok ? normalisePackages(settingsRead.row?.pricing ?? {}) : null;
