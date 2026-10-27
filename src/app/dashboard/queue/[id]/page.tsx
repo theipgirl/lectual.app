@@ -12,6 +12,8 @@ import { checkDraftStaleness, type StaleCheck } from "@/lib/queue/stale";
 import { staleWarning } from "@/components/queue/stale-warning";
 import { Markdown } from "@/components/markdown/Markdown";
 import { LinkedProposalPanel } from "@/components/queue/LinkedProposalPanel";
+import { ReviewerSummary } from "@/components/queue/ReviewerSummary";
+import "@/components/queue/review.css";
 import { loadLinkedPanel } from "@/lib/consult-proposal/link";
 import { loadAuditContext } from "@/lib/queue/audit-context";
 import type { Metadata } from "next";
@@ -19,13 +21,14 @@ import { pageTitle } from "@/lib/ui/page-title";
 
 export const metadata: Metadata = { title: pageTitle("Queue item") };
 
+/** One row of the aside's detail list; nothing is drawn for a value the item doesn't have. */
 function Meta({ label, value }: { label: string; value: React.ReactNode }) {
   if (!value) return null;
   return (
-    <div className="lx-meta">
-      <span>{label}</span>
-      <span>{value}</span>
-    </div>
+    <>
+      <dt>{label}</dt>
+      <dd>{value}</dd>
+    </>
   );
 }
 
@@ -148,30 +151,24 @@ export default async function QueueItemPage({
           <span className={`lx-pill ${STATUS_PILL[item.status].tone}`} style={{ justifySelf: "start" }}>
             {STATUS_PILL[item.status].label}
           </span>
-          <Meta label="Client" value={item.client_name} />
-          <Meta label="To" value={item.recipient} />
-          <Meta label="Subject" value={item.subject} />
-          <Meta label="Send at" value={item.proposed_send_at ? fmtWhen(item.proposed_send_at, tz) : null} />
-          <Meta label="Attachments" value={item.attachments?.length ? item.attachments.map((a) => a.name).join(", ") : null} />
-          <Meta label="Queued" value={fmtWhen(item.created_at, tz)} />
-          {resolved && (
-            <>
-              <Meta label="Resolved" value={fmtWhen(item.resolved_at, tz)} />
-              <Meta label="By" value={item.resolved_by} />
-              <Meta label="Note" value={item.resolution_note} />
-            </>
-          )}
+          {/* Client, To, Subject, Send at and Queued as one compact definition list. */}
+          <dl className="lx-dl" data-queue-details>
+            <Meta label="Client" value={item.client_name} />
+            <Meta label="To" value={item.recipient} />
+            <Meta label="Subject" value={item.subject} />
+            <Meta label="Send at" value={item.proposed_send_at ? fmtWhen(item.proposed_send_at, tz) : null} />
+            <Meta label="Attachments" value={item.attachments?.length ? item.attachments.map((a) => a.name).join(", ") : null} />
+            <Meta label="Queued" value={fmtWhen(item.created_at, tz)} />
+            {resolved && (
+              <>
+                <Meta label="Resolved" value={fmtWhen(item.resolved_at, tz)} />
+                <Meta label="By" value={item.resolved_by} />
+                <Meta label="Note" value={item.resolution_note} />
+              </>
+            )}
+          </dl>
           <LinkedProposalPanel panel={linkedProposal} pending={!resolved} />
-          {item.summary && (
-            <div>
-              <div className="lx-label" style={{ fontSize: 11, marginBottom: 4 }}>
-                For the reviewer
-              </div>
-              <p className="lx-note" style={{ margin: 0, color: "var(--body)" }}>
-                {item.summary}
-              </p>
-            </div>
-          )}
+          <ReviewerSummary summary={item.summary} />
         </aside>
       </div>
     </>
