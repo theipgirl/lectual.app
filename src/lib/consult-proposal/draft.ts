@@ -72,6 +72,7 @@ export const MAX_QUOTE_CHARS = 600;
 
 const MAX_BRANDS = 10;
 const MAX_CLASSES_KEPT = 10;
+const CONSULT_CREDIT_LABEL = "Consult credit";
 const MAX_CREDITS = 5;
 const MAX_NAME = 120;
 const MAX_WHAT = 120;
@@ -717,6 +718,8 @@ export async function draftProposalFromConsult(input: DraftConsultProposalInput)
     let label = clientText(cr.label, MAX_NAME);
     label = stripClassNumbers(label).text;
     if (!label || MONEY_OR_LINK.test(label)) label = isPercent ? "Discount" : "Credit";
+    // An amount taken from the call is always the fixed "Consult credit" line; the model's wording is only for percent discounts.
+    if (isAmount) label = CONSULT_CREDIT_LABEL;
     const path = `Credit › ${label}`;
     const verified = quoteInSource(cr.quote, record.text);
     evidence.push({ path, quote: oneLine(cr.quote, MAX_QUOTE_CHARS), verified });

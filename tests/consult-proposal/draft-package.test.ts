@@ -46,7 +46,7 @@ function melvinOutput(over: Partial<ConsultProposalExtract> = {}): ConsultPropos
       },
     ],
     recommended_package: "Essential",
-    credits: [{ label: "Consult credit", amount_usd: 150, percent: null, quote: "I'll give you a $150 credit toward the legal fee" }],
+    credits: [{ label: "$150 credit", amount_usd: 150, percent: null, quote: "I'll give you a $150 credit toward the legal fee" }],
     second_mark_discount: { percent: 10, quote: "I can do 10% off the second mark" },
     reasoning_parts: { principle: false, risk_brand: null, risk_quote: null, fallback_brand: null, fallback_quote: null },
     ...over,
@@ -134,7 +134,7 @@ describe("the recommended package, credit and second-mark discount from the call
 
 describe("credit and second-mark percent need the attorney's own words", () => {
   it("a credit whose quote is not in the transcript is not applied, and the flag says so", async () => {
-    const out = melvinOutput({ credits: [{ label: "Consult credit", amount_usd: 150, percent: null, quote: "I will take $150 off because of the consult fee" }] });
+    const out = melvinOutput({ credits: [{ label: "Consultation credit", amount_usd: 150, percent: null, quote: "I will take $150 off because of the consult fee" }] });
     const d = ok(await run(out));
     expect(d.content.adjustments).toEqual([]);
     expect(d.reviewerNotes).toContain('Not applied: the credit "Consult credit" of $150, because its quote was not found in the record');
@@ -167,7 +167,7 @@ describe("credit and second-mark percent need the attorney's own words", () => {
   it("a credit larger than the legal fee is capped at the fee and flagged", async () => {
     const turns = [...MELVIN, { speaker: "Rebecca", text: "I'll give you a $9,000 credit as well." }];
     const out = melvinOutput({
-      credits: [{ label: "Consult credit", amount_usd: 9000, percent: null, quote: "I'll give you a $9,000 credit as well" }],
+      credits: [{ label: "Bonus credit", amount_usd: 9000, percent: null, quote: "I'll give you a $9,000 credit as well" }],
     });
     const d = ok(await run(out, {}, turns));
     const subtotal = quoteProposal({ ...d.content, adjustments: [] }, defaultSelection(d.content)).legal_subtotal_cents;

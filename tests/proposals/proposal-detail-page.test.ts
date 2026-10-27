@@ -7,6 +7,7 @@ import { LinkedProposalPanel } from "@/components/queue/LinkedProposalPanel";
 import { buildProposalCard } from "@/lib/proposals/card";
 import type { LinkedPanel } from "@/lib/consult-proposal/link";
 import { sevetri } from "./fixture";
+import { acceptedSnapshot } from "./accepted-fixture";
 
 /**
  * D3/D4: the approver sees the proposal card above the editor, the consult strip
@@ -160,6 +161,49 @@ describe("proposal detail page", () => {
     const { html } = await render(row({ source: "manual" }), []);
     expect(html).toContain("Proposal at a glance");
     expect(html).not.toContain("Heard on the call");
+  });
+});
+
+describe("proposal detail page: classes the client added", () => {
+  beforeEach(() => vi.resetModules());
+
+  function addedSnapshot() {
+    const snap = acceptedSnapshot({ classes: 1 });
+    const nm = snap.content.names[0];
+    nm.classes.push({ id: "p-added", label: "Podcast production services", preselected: false, client_added: true });
+    snap.selection["p-added"] = true;
+    return { snap, brand: nm.name };
+  }
+
+  const ACCEPTED: ProposalEventRow = {
+    id: "e-acc",
+    org_id: "o",
+    proposal_id: ID,
+    family_id: ID,
+    type: "accepted",
+    actor: "client",
+    actor_user_id: null,
+    payload: {},
+    created_at: "2026-10-21T15:00:00Z",
+  } as ProposalEventRow;
+
+  it("lists them in the aside and in the accepted line of the activity log", async () => {
+    const { snap, brand } = addedSnapshot();
+    const { html } = await render(
+      row({ status: "accepted", accepted_at: "2026-10-21T15:00:00Z", accepted_snapshot: snap, accepted_selection: snap.selection }),
+      [ACCEPTED],
+    );
+    expect(html).toContain("Classes the client added (1)");
+    expect(html).toContain(`<strong>${brand}</strong>: Podcast production services`);
+    expect(html).toContain("adding 1 class");
+    expect(html).toContain(`Added for ${brand}: Podcast production services`);
+  });
+
+  it("shows neither when the client added nothing", async () => {
+    const snap = acceptedSnapshot({ classes: 1 });
+    const { html } = await render(row({ status: "accepted", accepted_at: "2026-10-21T15:00:00Z", accepted_snapshot: snap, accepted_selection: snap.selection }), [ACCEPTED]);
+    expect(html).not.toContain("Classes the client added");
+    expect(html).not.toContain("adding 1 class");
   });
 });
 

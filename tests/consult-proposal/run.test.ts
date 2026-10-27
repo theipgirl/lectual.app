@@ -478,7 +478,7 @@ describe("runConsultProposal: the package from the firm's list and the lead on b
     ...EXTRACT,
     brands: [EXTRACT.brands[0]],
     recommended_package: "Essential",
-    credits: [{ label: "Consult credit", amount_usd: 150, percent: null, quote: "I'll give you a $150 credit" }],
+    credits: [{ label: "Consultation credit", amount_usd: 150, percent: null, quote: "I'll give you a $150 credit" }],
     second_mark_discount: { percent: 10, quote: "10% off the second mark" },
   };
   const insertedContent = (t: ReturnType<typeof setup>) =>
