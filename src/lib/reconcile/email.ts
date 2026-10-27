@@ -1,7 +1,7 @@
 import { resolveStage } from "@/lib/lawmatics/stage-map";
 import type { EmailType } from "@/lib/intake/email-match";
 import { SIGNAL_LABEL } from "@/lib/stage-keeper/signals";
-import { currentAgentMoves, pendingStageSuggestions, type ActivityRow } from "@/lib/stage-keeper/moves";
+import { currentAgentMoves, evidenceOwnDate, pendingStageSuggestions, type ActivityRow } from "@/lib/stage-keeper/moves";
 import type { SourceSignal, StageOpt } from "./types";
 
 /**
@@ -51,12 +51,12 @@ export function agentEvidenceFor(rows: readonly ActivityRow[]): AgentEvidence[] 
   const label = (signal: keyof typeof SIGNAL_LABEL | null) => (signal ? SIGNAL_LABEL[signal] : "stage change");
   for (const move of currentAgentMoves(rows, new Date(), Number.POSITIVE_INFINITY).values()) {
     if (!move.toStageId) continue;
-    const evidenceDate = move.evidence?.kind === "mail" ? move.evidence.at : null;
+    const evidenceDate = evidenceOwnDate(move.evidence);
     out.push({ stageId: move.toStageId, wording: `Stage Keeper: ${label(move.signal)}`, date: evidenceDate ?? move.at });
   }
   for (const s of pendingStageSuggestions(rows)) {
     if (!s.toStageId) continue;
-    const evidenceDate = s.evidence?.kind === "mail" ? s.evidence.at : null;
+    const evidenceDate = evidenceOwnDate(s.evidence);
     out.push({ stageId: s.toStageId, wording: `Stage Keeper suggests: ${label(s.signal)}`, date: evidenceDate ?? s.at });
   }
   return out;

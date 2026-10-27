@@ -48,6 +48,13 @@ function parseEvidence(raw: unknown): MoveEvidence | null {
   }
   if (e.kind === "calendar" && typeof e.starts_at === "string") return { kind: "calendar", title: str(e.title), starts_at: e.starts_at };
   if (e.kind === "payment") return { kind: "payment", at: str(e.at) };
+  if (e.kind === "meeting" && typeof e.starts_at === "string") {
+    return { kind: "meeting", provider: str(e.provider) ?? "meeting", title: str(e.title), starts_at: e.starts_at };
+  }
+  if (e.kind === "proposal" && typeof e.status === "string") {
+    return { kind: "proposal", version: typeof e.version === "number" && Number.isFinite(e.version) ? e.version : null, status: e.status, at: str(e.at) };
+  }
+  if (e.kind === "queue" && typeof e.type === "string") return { kind: "queue", type: e.type, at: str(e.at) };
   return null;
 }
 
@@ -117,9 +124,18 @@ export function currentAgentMoves(rows: readonly ActivityRow[], now: Date, windo
   return out;
 }
 
-/** The date the chip shows: the mail's own date, else the day the agent placed the lead. */
+/** The fact's own date, when its evidence carries one: a mail, proposal or approval date, or the day a held meeting began. */
+export function evidenceOwnDate(evidence: MoveEvidence | null): string | null {
+  if (!evidence) return null;
+  if (evidence.kind === "calendar") return null;
+  if (evidence.kind === "meeting") return evidence.starts_at;
+  return evidence.at;
+}
+
+/** The date the chip shows: the evidence's own date, else the day the agent placed the lead. */
 function chipDate(move: AgentMove, timeZone: string): string | null {
-  if (move.evidence?.kind === "mail" && move.evidence.at) return monthDay(move.evidence.at, timeZone) ?? monthDay(move.at, timeZone);
+  const own = evidenceOwnDate(move.evidence);
+  if (own) return monthDay(own, timeZone) ?? monthDay(move.at, timeZone);
   return monthDay(move.at, timeZone);
 }
 
@@ -257,7 +273,10 @@ export function consumedSignalKeys(rows: readonly ActivityRow[]): Set<string> {
     const p = obj(r.payload);
     const key = str(p.signal_key);
     if (!key) continue;
-    if (isAgentMoveRow(r) || isSuggestionRow(r)) out.add(key);
+    if (!isAgentMoveRow(r) && !isSuggestionRow(r)) continue;
+    out.add(key);
+    // The other signals the same decision accounted for (a held consult under a sent proposal).
+    if (Array.isArray(p.also_signal_keys)) for (const also of p.also_signal_keys) if (typeof also === "string" && also) out.add(also);
   }
   return out;
 }

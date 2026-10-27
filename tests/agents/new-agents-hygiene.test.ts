@@ -104,7 +104,10 @@ describe("Sprint 17 hygiene", () => {
     const hits = walk("src", /\.(ts|tsx)$/).filter((f) => /function resolveBatch\b/.test(read(f)));
     expect(hits).toEqual([path.join("src/lib/queue/resolve-batch.ts")]);
     const importers = walk("src", /\.(ts|tsx)$/).filter((f) => /import \{[^}]*\bresolveBatch\b[^}]*\} from/.test(read(f)));
-    expect(importers.sort()).toEqual([path.join("src/lib/agents/morning-brief/follow-ups.ts"), path.join("src/lib/queue/lead-pending.ts")].sort());
+    // The Stage Keeper (Sprint 29) matches approved post-consult emails to leads through the same resolver.
+    expect(importers.sort()).toEqual(
+      [path.join("src/lib/agents/morning-brief/follow-ups.ts"), path.join("src/lib/agents/stage-keeper/run.ts"), path.join("src/lib/queue/lead-pending.ts")].sort(),
+    );
   });
 
   it("the agents write only to the queue, Outlook Drafts and the timeline: no update or delete anywhere, and an insert only into crm_activity", () => {

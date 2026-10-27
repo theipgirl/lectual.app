@@ -125,6 +125,12 @@ export type AgentContext = {
    */
   listPending?: () => Promise<QueueItem[]>;
   /**
+   * The firm's APPROVED queue items, for the Stage Keeper (an approved post-consult email places the lead).
+   * Rejects when the queue cannot be read; absent when no reader was wired or the firm has no queue.
+   * The agent treats a rejection as "unknown" and says so, never as "none approved".
+   */
+  listApproved?: () => Promise<QueueItem[]>;
+  /**
    * The firm's module list, read with the `queue_org_key` the runner already fetches. `null` means
    * the read failed or found no row; `undefined` means the context was built without one. Both are
    * "could not be read": see `mailboxModuleState`.

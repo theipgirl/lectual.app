@@ -5,6 +5,7 @@ import type { LawmaticsClient } from "@/lib/lawmatics/client";
 import { LawmaticsNotConnectedError, firmLawmaticsClient } from "@/lib/lawmatics/connection";
 import { pullSource } from "@/lib/lawmatics/import";
 import type { LawmaticsSourceRecord } from "@/lib/lawmatics/normalize";
+import { NO_FIRM_SENDERS, firmSendersFrom, isFirmSender, type FirmSenders } from "@/lib/mailbox/firm-sender";
 import { agentEvidenceFor, type AgentEvidence, type StoredMail } from "./email";
 import type { ActivityRow } from "@/lib/stage-keeper/moves";
 import { parseMilestoneMapping, type MilestoneMapping } from "./milestones";
@@ -113,12 +114,32 @@ function chunk<T>(items: readonly T[], size: number): T[][] {
 }
 
 /**
+ * The firm's own addresses, from its connected mailboxes (the caller's scoped view). A failed read
+ * means no firm-sender rule for this read, so mail cc'd into a shared inbox is not counted as sent;
+ * it can only lose a milestone, never invent one.
+ */
+async function readFirmSenders(supabase: Scoped): Promise<FirmSenders> {
+  try {
+    const { data, error } = await supabase.from("mailbox_connection").select("email, status");
+    if (error) throw error;
+    const emails = ((data ?? []) as Array<{ email?: string | null; status?: string | null }>)
+      .filter((c) => c.status !== "revoked")
+      .map((c) => c.email);
+    return firmSendersFrom(emails);
+  } catch (err) {
+    console.error("[reconcile] firm mailbox read failed", err instanceof Error ? err.name : "error");
+    return NO_FIRM_SENDERS;
+  }
+}
+
+/**
  * The mail the sync already stored on these leads' timelines (`email_sent` / `email_received`, each
  * with its classification in the payload), and what the Stage Keeper did for them (its moves and its
  * pending suggestions). No mail is fetched. A lead with neither is simply absent from the maps; a
  * failed read of EITHER is `unavailable`, never an empty result.
  */
 export async function readStoredMail(supabase: Scoped, leadIds: readonly string[]): Promise<EmailRead> {
+  const firmSenders = leadIds.length > 0 ? await readFirmSenders(supabase) : NO_FIRM_SENDERS;
   const byLead = new Map<string, StoredMail[]>();
   const agent = new Map<string, AgentEvidence[]>();
   let total = 0;
@@ -145,7 +166,8 @@ export async function readStoredMail(supabase: Scoped, leadIds: readonly string[
             type: typeof payload.type === "string" ? payload.type : null,
             sensitive: payload.sensitive === true,
             at,
-            direction: row.type === "email_sent" ? "sent" : "received",
+            // Mail the firm wrote but that reached a shared inbox as a cc is stored as received: the sender decides.
+            direction: row.type === "email_sent" || isFirmSender(typeof payload.from === "string" ? payload.from : null, firmSenders) ? "sent" : "received",
             subject: typeof payload.subject === "string" ? payload.subject : null,
           });
           byLead.set(row.lead_id, list);

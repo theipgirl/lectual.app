@@ -69,6 +69,18 @@ export function reasonText(evidence: MoveEvidence | null, timeZone: string = DEF
     const time = clockTime(evidence.starts_at, timeZone);
     return `a consult was booked${day ? ` for ${day}${time ? ` at ${time}` : ""}` : ""}`;
   }
+  if (evidence.kind === "meeting") {
+    const day = monthDay(evidence.starts_at, timeZone);
+    return `a ${evidence.provider === "fathom" ? "Fathom" : evidence.provider === "zoom" ? "Zoom" : "recorded"} consult was held${day ? ` on ${day}` : ""}`;
+  }
+  if (evidence.kind === "proposal") {
+    const day = monthDay(evidence.at, timeZone);
+    return `the proposal link ${evidence.status === "accepted" ? "was accepted by the client" : "was turned on"}${day ? ` on ${day}` : ""}`;
+  }
+  if (evidence.kind === "queue") {
+    const day = monthDay(evidence.at, timeZone);
+    return `the post-consult email was approved${day ? ` on ${day}` : ""}`;
+  }
   const day = monthDay(evidence.at, timeZone);
   return `a payment was recorded${day ? ` on ${day}` : ""}`;
 }
@@ -85,6 +97,18 @@ export function evidenceTooltip(evidence: MoveEvidence | null, timeZone: string 
     const time = clockTime(evidence.starts_at, timeZone);
     const when = day ? ` on ${day}${time ? ` at ${time}` : ""}` : "";
     return `Evidence: calendar event${evidence.title ? ` "${evidence.title}"` : ""}${when}.`;
+  }
+  if (evidence.kind === "meeting") {
+    const day = monthDay(evidence.starts_at, timeZone);
+    return `Evidence: ${evidence.provider === "fathom" ? "Fathom" : evidence.provider === "zoom" ? "Zoom" : "recorded"} meeting${evidence.title ? ` "${evidence.title}"` : ""}${day ? ` on ${day}` : ""}.`;
+  }
+  if (evidence.kind === "proposal") {
+    const day = monthDay(evidence.at, timeZone);
+    return `Evidence: proposal${evidence.version ? ` version ${evidence.version}` : ""} ${evidence.status === "accepted" ? "accepted" : "link live"}${day ? ` ${day}` : ""}.`;
+  }
+  if (evidence.kind === "queue") {
+    const day = monthDay(evidence.at, timeZone);
+    return `Evidence: post-consult email approved${day ? ` ${day}` : ""}.`;
   }
   const day = monthDay(evidence.at, timeZone);
   return `Evidence: payment recorded${day ? ` ${day}` : ""}.`;

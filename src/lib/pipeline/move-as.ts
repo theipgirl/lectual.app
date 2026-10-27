@@ -45,6 +45,8 @@ export type AgentMove = {
   fromStageId: string;
   toStageId: string;
   signalKey: string;
+  /** Keys of the other signals this move accounts for; they are used up with it. */
+  alsoSignalKeys?: readonly string[];
   signalId: SignalId;
   evidence: MoveEvidence;
   /** The evidence date; null (or unusable, or in the future) means "now". */
@@ -131,6 +133,7 @@ async function moveAsAgent(actor: AgentActor, move: AgentMove): Promise<AgentMov
         from_stage_id: from.id,
         to_stage_id: to.id,
         signal_key: move.signalKey,
+        ...(move.alsoSignalKeys && move.alsoSignalKeys.length > 0 ? { also_signal_keys: [...move.alsoSignalKeys] } : {}),
         signal: move.signalId,
         previous_stage_entered_at: previousStageEnteredAt,
         evidence: move.evidence,
