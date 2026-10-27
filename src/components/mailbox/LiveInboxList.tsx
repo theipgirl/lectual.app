@@ -45,7 +45,7 @@ export function LiveInboxList({ state, openHref, now }: { state: LiveInboxState;
   return (
     <div className="lx-card lx-mail lx-mail-list">
       <p className="lx-note" style={{ margin: "10px 0 0" }}>
-        {state.mailbox.email} · the newest {state.rows.length} messages, read just now. Nothing here is saved.
+        {state.mailbox.email} · {state.rows.length === 1 ? "the newest message" : `the newest ${state.rows.length} messages`}, read just now. Nothing here is saved.
         {state.truncated ? " Older mail is in the mailbox itself." : ""}
       </p>
       {groups.map((g) => (

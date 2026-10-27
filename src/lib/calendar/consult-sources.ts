@@ -60,7 +60,7 @@ export function joinKey(url: string | null | undefined): string | null {
   if (!url) return null;
   try {
     const u = new URL(url);
-    const zoom = u.pathname.match(/^\/(?:j|my\/[^/]+\/)?(\d{8,})/);
+    const zoom = u.pathname.match(/^\/(?:j\/|wc\/join\/|my\/[^/]+\/)?(\d{8,})/);
     if (/(^|\.)zoom\.(us|com)$/.test(u.hostname) && zoom) return `zoom:${zoom[1]}`;
     return `${u.origin}${u.pathname}`.toLowerCase();
   } catch {

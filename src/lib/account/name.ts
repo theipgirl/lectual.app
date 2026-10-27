@@ -30,8 +30,11 @@ export function validateName(input: unknown): NameCheck {
   if (!input || typeof input !== "object") return { ok: false, error: NAME_MESSAGES.invalid };
   const { first, last } = input as Record<string, unknown>;
   if (typeof first !== "string" || (last !== undefined && typeof last !== "string")) return { ok: false, error: NAME_MESSAGES.invalid };
+  const rawLast = typeof last === "string" ? last : "";
+  // Control characters (a newline included) are refused before whitespace is tidied.
+  if (CONTROL.test(first) || CONTROL.test(rawLast)) return { ok: false, error: NAME_MESSAGES.badChars };
   const f = first.trim().replace(/\s+/g, " ");
-  const l = (typeof last === "string" ? last : "").trim().replace(/\s+/g, " ");
+  const l = rawLast.trim().replace(/\s+/g, " ");
   if (!f) return { ok: false, error: NAME_MESSAGES.needFirst };
   if (f.length > NAME_MAX || l.length > NAME_MAX) return { ok: false, error: NAME_MESSAGES.tooLong };
   if (CONTROL.test(f) || CONTROL.test(l) || f.includes("@") || l.includes("@")) return { ok: false, error: NAME_MESSAGES.badChars };

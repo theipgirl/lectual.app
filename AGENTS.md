@@ -766,6 +766,43 @@ the letter destination. Leads | Matters (opens on Matters), search, 8 recent, "S
   proposals host; the logo is `/brand/rpb-logo-cream.png`). `tests/proposals/public-assets.test.ts` fails on any other `src="/..."` or `url(/...)`
   in `src/app/p` or `src/components/client-proposal`. A new asset type needs a rewrite in lectual's `next.config.ts` first.
 
+## Today, names, consults, My Mail reading pane (Sprint 30, no schema)
+No migration, no dependency, nothing sends. The only sealed-token reads are the existing helpers (`ownConnectionSecrets` family in `src/lib/meetings/connection.ts`,
+`searchableMailboxAccess` in `src/lib/mailbox/my-mailbox.ts`); no new file imports the admin client (a test greps the list).
+- **Today header:** the "<firm> · <date>" label line is gone, so the h1 ("Good afternoon, Rebecca.") is the first thing; the firm name and date appear nowhere on Today.
+  **"Next two weeks" is removed** with its computation (the Calendar page still has dates). **Needs you** shows `NEEDS_YOU_SHOWN = 3` rows and "See all N" is a `<details>` holding the rest
+  in the same order (`NeedsYouSection`); the unavailable warning and the zero-items note are unchanged. The Consults card sits ABOVE Needs you.
+- **Logo:** `firmLogo(orgId, firmName, slug?)` in `src/lib/org/logo.ts` is the only map (by org id, else by slug). An entry is used only when it is a `/brand/` file, is not a cream variant and
+  EXISTS in `public/brand/` at render time, else the wordmark keeps the firm NAME as text. RPB maps to `/brand/rpb-logo-dark.png`, which is not in the repo yet (only the cream file is, and
+  it vanishes on the light bar), so RPB still shows its name until Taylor drops the dark file in. The CSS is `src/components/shell/wordmark.css`.
+- **Names:** "Your name" in the account menu opens `YourNameDialog` (mounted once in the dashboard layout, opened by `SHOW_NAME_EVENT`, like the feedback dialog: Esc, Tab wrap, focus return).
+  `saveFullNameAction` (`src/lib/account/actions.ts`) = `getScopedClient()` + `auth.updateUser`, merges `user_metadata`, writes `full_name = "<first> <last>"`, no user/org argument, fixed
+  sentences. Rules in `src/lib/account/name.ts`: first name required, 80 characters each, no `@`, no control characters (checked BEFORE whitespace is tidied). No usable name: Today greets
+  "Good afternoon." with a quiet "Add your name" button (`AddNameLink`) that opens the same dialog. Team settings already read the directory's `displayName`, which is `full_name`.
+- **Consults (Today):** two sources merged in `src/lib/calendar/consult-sources.ts` (pure; reads injected; live wiring `consult-sources-live.ts`). Outlook = the stored events (Mailboxes module
+  + an active Microsoft connection WITH `Calendars.Read`); Zoom = a LIVE `GET /users/me/meetings?type=upcoming` (`listUpcomingZoomMeetings`, 15 s timeout, nothing stored, no title/attendee/token
+  logged) through `ownZoomAccess()` in `connection.ts` (the importer's own refresh path, which persists the rotated refresh token; any member can read the firm-level connection).
+  Consult = `isConsultTitle` (the same regex as the sync). A Zoom consult's lead link needs an EXACT meeting-id or join-URL match to an imported `crm_meeting` with `lead_id`, else none.
+  Merge: sort by start, one row per call (`joinKey` ties a Zoom `/j/<id>` link to its meeting id), Outlook's row kept. Every source has a named state (ok, not-connected, needs-calendar,
+  needs-permission, reconnect, no-module, update-needed, unavailable) with its sentence and next-step link (`sourceNote`); "No consults in the next 7 days." only when EVERY source was read,
+  otherwise "No consults found in <the sources that were read>" plus the notes. The card never renders nothing. The helper returning nothing is "couldn't be read", never "no consults".
+- **Zoom scope:** `ZOOM_SCOPES` (the three recording/user scopes plus `meeting:read:list_meetings`) is sent as the OAuth `scope` (the authorize URL sent none before). **There is no `scopes`
+  column on `meeting_source_connection` (and this sprint adds no migration), so "needs permission" is judged from Zoom's own refusal** (403, or a 400/401 whose message names a scope), not from a
+  stored list. A firm that connected before this must press Reconnect Zoom once, and Taylor must add the scope in the Zoom app (docs/meetings-setup.md).
+- **My Mail reading pane:** `?m=<activity id>` opens the message in the page (`MailReadingPane`): From, To, Cc (only when present), date, subject and the body as PLAIN TEXT in a `<pre>` (wraps;
+  tags are escaped; links are text; no `dangerouslySetInnerHTML`). Rules in `src/lib/mailbox/read-message.ts`: the id must be a uuid; the `crm_activity` row is read through the scoped client and
+  the connection id and provider message id come ONLY from it; the connection is re-read through the scoped client on EVERY request (`searchableMailboxAccess`: active, visible, so another
+  person's personal mailbox or another firm is "This message is no longer available." with zero fetches). States: loading (Suspense), not available, gone (404, "no longer in the mailbox"),
+  couldn't be read, and a token/scope problem with a Reconnect link. Fetching is `fetchMessageToRead` in `fetch.ts`, which shares `bodyTextOf` with `fetchMessageBody` (Graph is asked for a text
+  body; HTML is converted). Nothing about the body is stored, cached or logged; the page stays `force-dynamic`. "Open in Outlook/Gmail" stays as a secondary link. Under 640px the pane replaces the
+  list and "Back to the list" returns to it.
+- **Inbox tab:** `?tab=inbox` lists the newest 50 messages of the chosen (else first) visible mailbox, read live (`fetchLiveInbox`: Graph `$top=50` ordered newest first; Gmail `labelIds=INBOX&maxResults=50`),
+  subject, sender, date and a short preview, nothing stored. A message that matches a stored activity row carries its client tag. A row opens the pane through a DISTINCT pair `?box=<connection id>&live=<provider id>`
+  (`m` wins when both are present): `box` must be a uuid AND be returned by the person's own scoped read, and `live` must match `LIVE_MESSAGE_ID` (`/^[A-Za-z0-9_=+-]{1,512}$/`: no slash, dot, whitespace or query
+  character; the existing looser pattern inside `fetchMessageBody` is unchanged) and is `encodeURIComponent`-encoded in the provider URL. Gmail uses its existing list/read calls, so there is no "Not available for
+  Gmail yet" state. The sidebar's old "Inbox" folder is now "Received" (the client-matched list) so the tab name is unambiguous.
+- **D2 and this sprint:** Taylor's "no email body or mailbox reading for proposals" is about proposals. The reading pane is a staff-facing My Mail feature and feeds nothing else (no agent, no proposal, no model call).
+
 ## JSX text spacing: keep the `{" "}`
 Next 16.2.7's compiler DROPS the leading space of JSX text that contains an HTML entity
 (`&apos;`, `&amp;`, `&rsquo;`…) and runs onto another line, even if that is only the line
