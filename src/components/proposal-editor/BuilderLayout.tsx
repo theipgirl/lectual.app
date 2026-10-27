@@ -33,11 +33,11 @@ export function BuilderLayout({
   const steps = [who, names, packageStep];
   return (
     <div className="pe-builder">
-      <ol className="pe-steps">
+      <ol className="pe-build-steps">
         {steps.map((body, i) => (
-          <li key={i} className="pe-step" data-step={i + 1}>
-            <h2 className="pe-step-h">
-              <span className="pe-step-n" aria-hidden="true">
+          <li key={i} className="pe-build-step" data-step={i + 1}>
+            <h2 className="pe-build-step-h">
+              <span className="pe-build-step-n" aria-hidden="true">
                 {i + 1}
               </span>
               <span>

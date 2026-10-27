@@ -158,3 +158,42 @@ describe("the client page: accepted and closed versions show added classes read-
     expect(html).toContain("&lt;img");
   });
 });
+
+describe("the client page: price words agree with the engine, and added classes carry no class number", () => {
+  function custom(): ProposalContent {
+    const c = sevetri();
+    c.pricing = { ...c.pricing, reduce_under_included: true };
+    c.names = [{ ...c.names[0], marks: [c.names[0].marks[0]], classes: [c.names[0].classes[0]] }];
+    return c;
+  }
+
+  it("with the custom switch on, never says 'no extra legal fee' and states the engine's next-class figure", () => {
+    const base = custom();
+    const sel = { "p-word": true, "p-c1": true };
+    const without = quoteWithAddedClasses(base, sel, {});
+    const withOne = quoteWithAddedClasses(base, sel, { p: ["Online store services"] });
+    if (!without.ok || !withOne.ok) throw new Error("priced");
+    const delta = withOne.quote.legal_total_cents - without.quote.legal_total_cents;
+    expect(delta).toBe(82_500);
+    const html = render({ content: base });
+    expect(html).not.toContain("no extra legal fee");
+    expect(html).toContain(`The next class adds $${(delta / 100).toLocaleString("en-US")} legal`);
+  });
+
+  it("with the switch off, the included classes are still described as free of legal fee", () => {
+    const html = render({ content: { ...custom(), pricing: { ...custom().pricing, reduce_under_included: false } } });
+    expect(html).toContain("no extra legal fee");
+  });
+
+  it("three staff classes and two added: no 'Class 4' to 'Class 9' label anywhere", () => {
+    const base = sevetri();
+    base.names[0].classes.push({ id: "p-c3", label: "Printed goods", preselected: true });
+    const sel = { "p-word": true, "p-c1": true, "p-c2": true, "p-c3": true };
+    const priced = quoteWithAddedClasses(base, sel, { p: ["Online store services", "Event hosting"] });
+    if (!priced.ok) throw new Error("priced");
+    const html = render({ content: priced.content, initialSelection: priced.selection });
+    expect(html).toContain("Added class · Online store services");
+    expect(html).toContain("Added class · Event hosting");
+    expect(html).not.toMatch(/Class [4-9]/);
+  });
+});

@@ -11,11 +11,12 @@ import {
   type AddedClasses,
 } from "@/lib/proposals/added-classes";
 import { classLock, markWithoutClass } from "@/lib/proposals/class-lock";
-import { defaultSelection, normalizeSelection, quoteHasItems } from "@/lib/proposals/pricing";
+import { defaultSelection, normalizeSelection, priceForClassCount, quoteHasItems } from "@/lib/proposals/pricing";
 import {
   MARK_KIND_DEFAULT_DESC,
   MARK_KIND_LABEL,
   type ProposalContent,
+  type ProposalPricing,
   type ProposalQuote,
   type Selection,
 } from "@/lib/proposals/types";
@@ -84,14 +85,21 @@ function plural(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`;
 }
 
-/** In words, what one more class costs on this package. Display only: the figures come from the content, the arithmetic from `quoteProposal`. */
-function classPriceWords(pkg: string, included: number, picked: number, perClassCents: number, govCents: number): string {
-  const head = `${pkg} includes ${plural(included, "class", "classes")}.`;
+/**
+ * In words, what one more class costs on this package. Display only: the next-class legal figure is the
+ * difference between two `priceForClassCount` runs (the engine itself), so the words cannot disagree with the total.
+ */
+function classPriceWords(pricing: ProposalPricing, perClassCents: number, picked: number): string {
+  const included = pricing.included_classes;
+  const effective: ProposalPricing = { ...pricing, per_class_cents: perClassCents };
+  const nextLegal = priceForClassCount(effective, picked + 1) - priceForClassCount(effective, picked);
+  const head = `${pricing.package} includes ${plural(included, "class", "classes")}.`;
   const left = Math.max(0, included - picked);
-  const tail = `${money(perClassCents)} legal + ${money(govCents)} USPTO per class`;
+  const tail = `${money(pricing.gov_per_class_cents)} USPTO per class`;
+  if (nextLegal <= 0) return `${head} ${left} more included at no extra legal fee; after that ${money(perClassCents)} legal + ${tail}.`;
   return left > 0
-    ? `${head} ${left} more included at no extra legal fee; after that ${tail}.`
-    : `${head} Each class past that is ${tail}.`;
+    ? `${head} The next class adds ${money(nextLegal)} legal + ${tail}.`
+    : `${head} Each class past that is ${money(nextLegal)} legal + ${tail}.`;
 }
 
 export function ProposalDocument(props: ProposalDocumentProps) {
@@ -389,7 +397,7 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                           return (
                             <div className="cp-opt cp-mine" key={c.id}>
                               <span className="cp-t">
-                                <b>{`Class ${staffClasses.length + ai + 1} · ${c.label}`}</b>
+                                <b>{`Added class · ${c.label}`}</b>
                                 <span className="cp-lock">{readOnly ? "Added by you" : locked ? lock.text : "Added by you"}</span>
                               </span>
                               {readOnly ? null : (
@@ -416,7 +424,7 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                         <div className="cp-part cp-add">
                           <h4>Add a class</h4>
                           <p className="cp-how-add">Add another class (category of goods or services) you&rsquo;d like us to include.</p>
-                          <p className="cp-how-add">{classPriceWords(pricing.package, pricing.included_classes, pickedClasses, perClass, pricing.gov_per_class_cents)}</p>
+                          <p className="cp-how-add">{classPriceWords(pricing, perClass, pickedClasses)}</p>
                           <div className="cp-add-row">
                             <input
                               type="text"

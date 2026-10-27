@@ -255,11 +255,10 @@
 
 /* Sprint 28 C: the three-step builder and its one closed "More options". Existing tokens only. */
 .pe-builder { display: grid; gap: 14px; }
-.pe-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
-.pe-step { display: grid; gap: 10px; }
-.pe-step-h { display: flex; align-items: center; gap: 10px; margin: 0; font-family: var(--serif); font-weight: 400; font-size: 20px; color: var(--ink); }
-.pe-step-n { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--line-2); font-size: 14px; color: var(--ox); }
-.pe-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.pe-build-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.pe-build-step { display: grid; gap: 10px; }
+.pe-build-step-h { display: flex; align-items: center; gap: 10px; margin: 0; font-family: var(--serif); font-weight: 400; font-size: 20px; color: var(--ink); }
+.pe-build-step-n { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--line-2); font-size: 14px; color: var(--ox); }
 .pe-create { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .pe-more { border: 1px solid var(--line-2); border-radius: 10px; padding: 0; }
 .pe-more-sum { cursor: pointer; padding: 12px 16px; font-weight: 600; color: var(--ink); }
