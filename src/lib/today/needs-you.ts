@@ -393,3 +393,6 @@ export function emptyNeedsYouNote(n: Pick<NeedsYou, "unavailable">, queue: "ok" 
   }
   return "Nothing is overdue or waiting on you.";
 }
+
+/** How many "Needs you" rows Today draws before the rest fold behind "See all N". */
+export const NEEDS_YOU_SHOWN = 3;

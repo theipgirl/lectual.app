@@ -7,11 +7,10 @@ import { listLeads, type Lead } from "@/lib/pipeline";
 import { listMatters, listTasks, listUpcomingDeadlines, summarizeDocket } from "@/lib/matters";
 import { buildCalendarRows } from "@/lib/matters/calendar-rows";
 import { BAND_COPY } from "@/lib/matters/worklist";
-import { formatCivilDate } from "@/lib/matters/ip-fields";
 import { laneOf, laneReason } from "@/lib/leads/lane";
 import { hourInZone } from "@/lib/today/priorities";
 import { greetingName, greetingSuffix } from "@/lib/today/greeting-name";
-import { buildNeedsYou, emptyNeedsYouNote, type NeedsYouItem } from "@/lib/today/needs-you";
+import { buildNeedsYou } from "@/lib/today/needs-you";
 import { loadConnectionsNeedingReauth, loadDeadlinesClosedSince, loadOpenQuotes, loadUnreviewedSubmissions } from "@/lib/today/load-needs-you";
 import { civilInZone, deadlinesMetThisMonth, mattersOpenedThisMonth, monthQueryFloor, monthStartCivil } from "@/lib/today/outcomes";
 import { getFirmTimeZone } from "@/lib/org/profile";
@@ -33,6 +32,8 @@ import { AutopilotControl } from "@/components/agents/AutopilotControl";
 import { RunDigestList } from "@/components/agents/RunDigestList";
 import { FinishSetupCard } from "@/components/setup/FinishSetupCard";
 import { GettingStartedCard } from "@/components/onboarding/GettingStartedCard";
+import { NeedsYouSection } from "@/components/today/NeedsYouSection";
+import { AddNameLink } from "@/components/account/AddNameLink";
 import { TodayConsults } from "@/components/calendar/TodayConsults";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
@@ -40,10 +41,6 @@ import { pageTitle } from "@/lib/ui/page-title";
 export const metadata: Metadata = { title: pageTitle("Today") };
 
 export const dynamic = "force-dynamic";
-
-const TONE: Record<NeedsYouItem["tone"], string> = { risk: "lx-pill-risk", warn: "lx-pill-warn", ox: "lx-pill-ox", mute: "lx-pill-mute" };
-/** How many "Needs you" rows Today draws before summarising the rest. */
-const NEEDS_YOU_SHOWN = 10;
 
 function greeting(hour: number): string {
   return hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening";
@@ -119,17 +116,7 @@ export default async function TodayPage() {
 
   const docket = matters ? summarizeDocket(matters, now) : null;
   const rows = buildCalendarRows(deadlines ?? [], tasks ?? [], now);
-  const next14 = rows.filter((r) => r.overdueDays > 0 || Date.parse(`${r.dueDate}T00:00:00Z`) - now.getTime() <= 14 * 86_400_000);
   const overdue = rows.filter((r) => r.overdueDays > 0).length;
-  const calendarNote =
-    deadlines === null && tasks === null
-      ? "Deadlines and tasks couldn't be loaded. Try again shortly."
-      : deadlines === null
-        ? "Docket dates couldn't be loaded; showing task dates only."
-        : tasks === null
-          ? "Tasks couldn't be loaded; showing docket dates only."
-          : null;
-
   const weekAgo = now.getTime() - 7 * 86_400_000;
   const newLeads = leads ? leads.filter((l) => Date.parse(l.created_at) >= weekAgo) : null;
   const hotLeads = (leads ?? [])
@@ -181,7 +168,6 @@ export default async function TodayPage() {
     hotLeads,
     stalled: docket ? docket.stalled : null,
   });
-  const forYouCount = needs.items.filter((i) => i.forYou).length;
 
   // Outcomes. Each is "—" with why when its source couldn't be read.
   const opened = matters ? mattersOpenedThisMonth(matters, now, tz) : null;
@@ -196,25 +182,23 @@ export default async function TodayPage() {
 
   const queueValue = queue.status === "ok" ? queue.items.length : null;
   const queueFailed = queue.status === "unavailable" ? "Queue unreachable, so we can't say" : "No queue connected yet";
-  const dateLine = now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: tz });
+  const firstName = greetingName({ userId: session.user.id, members, metadata: session.user.user_metadata, email: session.user.email });
 
   return (
     <>
       <div className="lx-page-head">
         <div style={{ flex: 1, minWidth: 260 }}>
-          <div className="lx-label">
-            {session.org.name} · {dateLine}
-          </div>
           <h1 className="lx-h1">
             Good {greeting(hourInZone(now, tz))}
-            {greetingSuffix(greetingName({ userId: session.user.id, members, metadata: session.user.user_metadata, email: session.user.email }))}.
+            {greetingSuffix(firstName)}.
           </h1>
+          {!firstName && <AddNameLink />}
         </div>
       </div>
 
       <div className="lx-kpis">
         <Kpi label="Waiting on you" value={queueValue} sub="drafts to approve" href="/dashboard/queue/" failed={queueFailed} />
-        <Kpi label="Overdue" value={calendarNote && deadlines === null && tasks === null ? null : overdue} sub="deadlines and tasks past due" href="/dashboard/calendar/" />
+        <Kpi label="Overdue" value={deadlines === null && tasks === null ? null : overdue} sub="deadlines and tasks past due" href="/dashboard/calendar/" />
         <Kpi label="Our move" value={docket ? docket.waitingOn.firm : null} sub={docket ? `of ${docket.open} open matters` : ""} href="/dashboard/matters/?seg=firm" />
         <Kpi label="New leads" value={newLeads ? newLeads.length : null} sub="in the last 7 days" href="/dashboard/intake/" />
       </div>
@@ -230,84 +214,9 @@ export default async function TodayPage() {
 
       <div className="lx-split">
         <div className="lx-col">
-          <section className="lx-card" style={{ padding: 18, display: "grid", gap: 10 }} aria-labelledby="needs-you-h">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-              <h2 id="needs-you-h" className="lx-h2" style={{ fontSize: 25 }}>
-                Needs you{needs.items.length > 0 && <span className="lx-note" style={{ fontSize: 16 }}> · {needs.items.length}</span>}
-              </h2>
-              {forYouCount > 0 && <span className="lx-pill lx-pill-ox">{forYouCount} yours</span>}
-            </div>
-            {needs.items.length > 0 && needs.unavailable.length > 0 && (
-              <p className="lx-note" style={{ margin: 0, color: "var(--warn)" }}>
-                {needs.unavailable.join(", ")}{" "}couldn&apos;t be read, so this list may be missing items.
-              </p>
-            )}
-            {needs.items.length === 0 ? (
-              <p className="lx-note" style={{ margin: 0 }}>
-                {emptyNeedsYouNote(needs, queue.status)}
-              </p>
-            ) : (
-              <ol className="lx-list lx-prio">
-                {needs.items.slice(0, NEEDS_YOU_SHOWN).map((n) => (
-                  <li key={n.key}>
-                    <span className={`lx-pill ${TONE[n.tone]}`}>{n.forYou ? "You" : "Firm"}</span>
-                    <span style={{ minWidth: 0 }}>
-                      <Link href={n.href} className="lx-rowlink">
-                        {n.action}
-                      </Link>
-                      <span className="lx-note" style={{ display: "block" }}>
-                        {n.subject}
-                        {n.detail ? ` · ${n.detail}` : ""}
-                        {" · "}
-                        <Link href={n.href} style={{ fontWeight: 500, color: "var(--ox)", whiteSpace: "nowrap" }}>
-                          {n.cta} →
-                        </Link>
-                      </span>
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            )}
-            {needs.items.length > NEEDS_YOU_SHOWN && (
-              <p className="lx-note" style={{ margin: 0 }}>
-                And {needs.items.length - NEEDS_YOU_SHOWN} more. See the <Link href="/dashboard/queue/">Queue</Link> and the{" "}
-                <Link href="/dashboard/calendar/">Calendar</Link>.
-              </p>
-            )}
-          </section>
-
           <TodayConsults />
 
-          <section className="lx-card" style={{ padding: 18, display: "grid", gap: 10 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
-              <h2 className="lx-h2" style={{ fontSize: 25 }}>
-                Next two weeks
-              </h2>
-              <Link href="/dashboard/calendar/" className="lx-note">
-                Calendar →
-              </Link>
-            </div>
-            {calendarNote && <p className="lx-note" style={{ margin: 0, color: "var(--warn)" }}>{calendarNote}</p>}
-            {next14.length === 0 ? (
-              !calendarNote && <p className="lx-note" style={{ margin: 0 }}>Nothing due in the next two weeks.</p>
-            ) : (
-              <ul className="lx-list">
-                {next14.slice(0, 8).map((r) => (
-                  <li key={r.key} className="lx-task">
-                    <span style={{ minWidth: 0 }}>
-                      <Link href={r.href} className="lx-rowlink">
-                        {r.name}
-                      </Link>
-                      <span className="lx-note" style={{ display: "block" }}>{r.source === "deadline" ? `Docket · ${r.detail}` : "Task"}</span>
-                    </span>
-                    <span className={`lx-pill ${r.overdueDays > 0 ? "lx-pill-risk" : "lx-pill-mute"}`}>
-                      {r.overdueDays > 0 ? `${r.overdueDays}d overdue` : formatCivilDate(r.dueDate)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+          <NeedsYouSection needs={needs} queue={queue.status} />
         </div>
 
         <aside className="lx-col lx-col-aside">

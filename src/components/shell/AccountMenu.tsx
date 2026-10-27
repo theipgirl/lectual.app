@@ -10,6 +10,7 @@ import {
 import type { SwitchableFirmRef } from "@/lib/firm/session";
 import { requestTourAgain } from "@/lib/onboarding/tour";
 import { requestFeedback } from "@/lib/feedback/open";
+import { requestNameDialog } from "@/lib/account/name";
 
 type Props = {
   initials: string;
@@ -102,6 +103,18 @@ export function AccountMenu({
         >
           Getting started
         </Link>
+
+        <button
+          type="button"
+          className="lx-btn lx-btn-sec lx-btn-sm"
+          style={{ width: "100%" }}
+          onClick={() => {
+            menu.current?.removeAttribute("open");
+            requestNameDialog(window, menu.current?.querySelector("summary") ?? null);
+          }}
+        >
+          Your name
+        </button>
 
         <button
           type="button"

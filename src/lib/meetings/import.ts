@@ -213,7 +213,7 @@ async function markConnection(deps: ImportDeps, conn: ConnectionSecrets, patch: 
 }
 
 /** A Zoom access token good for at least two more minutes; a refresh re-seals BOTH tokens (Zoom rotates the refresh token). */
-async function zoomAccessToken(deps: ImportDeps, conn: ConnectionSecrets): Promise<string> {
+export async function zoomAccessToken(deps: ImportDeps, conn: ConnectionSecrets): Promise<string> {
   const now = (deps.now ?? Date.now)();
   if (!conn.access_token_enc || !conn.refresh_token_enc) throw new MeetingAuthError("No Zoom sign-in is stored. Reconnect Zoom.");
   const expires = conn.token_expires_at ? Date.parse(conn.token_expires_at) : 0;
