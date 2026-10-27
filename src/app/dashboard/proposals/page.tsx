@@ -22,6 +22,7 @@ import {
 } from "@/lib/proposals/segments";
 import { loadConsultsStrip, type ConsultsStripData } from "@/lib/proposals/consults-load";
 import { loadLeadOptions } from "@/lib/proposals/lead-options";
+import { preselectedLeadId } from "@/lib/proposals/transcript-lead";
 import { loadDraftBlock } from "@/lib/consult-proposal/draft-gate";
 import { DRAFT_BLOCK_NOTE } from "@/lib/consult-proposal/draft-availability";
 import { MAX_PASTED_TRANSCRIPT_CHARS } from "@/lib/consult-proposal/types";
@@ -60,7 +61,7 @@ export const dynamic = "force-dynamic";
  * Reading is for the whole firm (0089's select policy is org members); starting a proposal is
  * for the staff roles, and the actions re-check that.
  */
-export default async function ProposalsPage({ searchParams }: { searchParams: Promise<{ segment?: string; status?: string }> }) {
+export default async function ProposalsPage({ searchParams }: { searchParams: Promise<{ segment?: string; status?: string; lead?: string | string[] }> }) {
   await requireProposalsModule();
   const sp = await searchParams;
   const segment: ProposalSegment = parseSegment(sp.segment) ?? parseSegment(sp.status) ?? "everything";
@@ -119,6 +120,8 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
     : "Government filing fees are paid before the application goes in.";
   const footerLeft = segment === "everything" ? `All ${all.length} proposals` : `${rows.length} of ${all.length} proposals`;
 
+  // Opened from a lead (`?lead=<id>`): that lead is chosen in the transcript form, and the form is open.
+  const preselected = leadsRead?.status === "ok" ? preselectedLeadId(sp.lead, leadsRead.leads) : "";
   const paste = canDraftFromTranscript
     ? draftBlock ? (
         <p className="lx-note" style={{ margin: 0 }} data-draft-block={draftBlock}>
@@ -131,7 +134,7 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
           )}
         </p>
       ) : leadsRead?.status === "ok" ? (
-        <TranscriptDraft leads={leadsRead.leads} maxChars={MAX_PASTED_TRANSCRIPT_CHARS} />
+        <TranscriptDraft leads={leadsRead.leads} maxChars={MAX_PASTED_TRANSCRIPT_CHARS} defaultLeadId={preselected} />
       ) : (
         <p className="lx-note" style={{ margin: 0 }}>
           The leads couldn&apos;t be loaded just now, so this form isn&apos;t offered. This is a problem reaching the database, not an empty list. Try again shortly.
@@ -163,7 +166,7 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
           </div>
         </div>
 
-        <ConsultsStrip data={strip} canDraft={canDraftFromTranscript} draftNote={draftBlock ? DRAFT_BLOCK_NOTE[draftBlock] : null} paste={paste} />
+        <ConsultsStrip data={strip} canDraft={canDraftFromTranscript} draftNote={draftBlock ? DRAFT_BLOCK_NOTE[draftBlock] : null} paste={paste} pasteOpen={preselected !== "" && !draftBlock} />
 
         {failed ? (
           <div className="lx-card lx-empty-card">

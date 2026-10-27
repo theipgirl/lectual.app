@@ -231,7 +231,8 @@ describe("the picker, with nothing chosen", () => {
     const html = await render({ leads: [lead(1, { id: 'a&b"c', first_name: "<b>Ana</b>", last_name: "Ruiz", business_name: "Zephyr", email: "ana@example.com" })] });
     const p = picker(html);
     expect(p).toContain('href="/dashboard/proposals/new/?lead=a%26b%22c"');
-    expect(p).toContain("&lt;b&gt;Ana&lt;/b&gt; Ruiz · Zephyr");
+    expect(p).toContain('<span class="pe-who-name">&lt;b&gt;Ana&lt;/b&gt; Ruiz</span>');
+    expect(p).toContain('<span class="pe-who-sub">Zephyr · ana@example.com</span>');
     expect(p).not.toContain("<b>Ana");
     const choose = hrefs(p).filter((x) => x.includes("lead=a"));
     for (const href of choose) for (const word of ["Ana", "Ruiz", "Zephyr", "example"]) expect(href).not.toContain(word);

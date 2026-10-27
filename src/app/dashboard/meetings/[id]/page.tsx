@@ -118,24 +118,8 @@ export default async function MeetingPage({ params }: { params: Promise<{ id: st
 
         <aside className="lx-card lx-aside" style={{ width: 340 }}>
           <div className="lx-label">Client</div>
-          {m.lead_id || m.matter_id ? (
-            <div style={{ display: "grid", gap: 4 }}>
-              {m.lead_id && <Link href={`/dashboard/leads/${m.lead_id}/`}>{labels.leads.get(m.lead_id) ?? "Lead"}</Link>}
-              {m.matter_id && <Link href={`/dashboard/matters/${m.matter_id}/`}>{labels.matters.get(m.matter_id) ?? "Matter"}</Link>}
-              <span className="lx-note">{m.link_source === "auto" ? "Filed automatically from an attendee's email." : "Linked by your team."}</span>
-            </div>
-          ) : m.suggested_lead_id || m.suggested_matter_id ? (
-            <p className="lx-note" style={{ margin: 0 }}>
-              More than one client shares an attendee&apos;s email. Suggested:{" "}
-              {[m.suggested_lead_id && labels.leads.get(m.suggested_lead_id), m.suggested_matter_id && labels.matters.get(m.suggested_matter_id)]
-                .filter(Boolean)
-                .join(" / ") || "see below"}
-              . Confirm below.
-            </p>
-          ) : (
-            <p className="lx-note" style={{ margin: 0 }}>Not linked to a lead or matter.</p>
-          )}
-          {canWrite && (
+          {canWrite ? (
+            // The form carries the "Linked to ..." text itself, so the linked state and its Change button are one thing.
             <LinkMeetingForm
               meetingId={m.id}
               leadId={m.lead_id}
@@ -144,7 +128,20 @@ export default async function MeetingPage({ params }: { params: Promise<{ id: st
               matters={matterOptions}
               suggestedLeadId={m.suggested_lead_id}
               suggestedMatterId={m.suggested_matter_id}
+              leadLabel={m.lead_id ? (labels.leads.get(m.lead_id) ?? null) : null}
+              matterLabel={m.matter_id ? (labels.matters.get(m.matter_id) ?? null) : null}
+              suggestedLeadLabel={m.suggested_lead_id ? (labels.leads.get(m.suggested_lead_id) ?? null) : null}
+              suggestedMatterLabel={m.suggested_matter_id ? (labels.matters.get(m.suggested_matter_id) ?? null) : null}
+              note={m.link_source === "auto" ? "Filed automatically from an attendee's email." : "Linked by your team."}
             />
+          ) : m.lead_id || m.matter_id ? (
+            <div style={{ display: "grid", gap: 4 }}>
+              {m.lead_id && <Link href={`/dashboard/leads/${m.lead_id}/`}>{labels.leads.get(m.lead_id) ?? "Lead"}</Link>}
+              {m.matter_id && <Link href={`/dashboard/matters/${m.matter_id}/`}>{labels.matters.get(m.matter_id) ?? "Matter"}</Link>}
+              <span className="lx-note">{m.link_source === "auto" ? "Filed automatically from an attendee's email." : "Linked by your team."}</span>
+            </div>
+          ) : (
+            <p className="lx-note" style={{ margin: 0 }}>Not linked to a lead or matter.</p>
           )}
 
           {canWrite && hasAgents && (

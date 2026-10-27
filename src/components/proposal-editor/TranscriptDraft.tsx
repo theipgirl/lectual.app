@@ -12,14 +12,14 @@ export type LeadOption = { id: string; label: string };
  * the transcript or upload a file. The agent drafts the proposal for a named
  * approver and its email for the approval queue. Nothing is sent or stored.
  */
-export function TranscriptDraft({ leads, maxChars }: { leads: LeadOption[]; maxChars: number }) {
+export function TranscriptDraft({ leads, maxChars, defaultLeadId = "" }: { leads: LeadOption[]; maxChars: number; /** The lead the page was opened for (`?lead=`); only used when it is one of `leads`. */ defaultLeadId?: string }) {
   const [state, action, pending] = useActionState<TranscriptDraftState, FormData>(draftProposalFromUploadAction, {});
   const locked = pending || !!state.ok;
   return (
     <form action={action} style={{ display: "grid", gap: 8 }}>
       <label className="lx-field">
         <span className="lx-label">Lead</span>
-        <select className="lx-input" name="leadId" required defaultValue="" disabled={locked}>
+        <select className="lx-input" name="leadId" required defaultValue={leads.some((l) => l.id === defaultLeadId) ? defaultLeadId : ""} disabled={locked}>
           <option value="" disabled>
             Choose the lead this call was with
           </option>

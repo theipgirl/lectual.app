@@ -52,12 +52,15 @@ export function ConsultsStrip({
   canDraft,
   draftNote,
   paste,
+  pasteOpen = false,
 }: {
   data: ConsultsStripData;
   canDraft: boolean;
   /** Why drafting isn't available right now (no queue, no AI key, no settings), or null. */
   draftNote: string | null;
   paste: ReactNode | null;
+  /** Open the transcript form on load (the page was opened for one lead with `?lead=`). */
+  pasteOpen?: boolean;
 }) {
   const { header, meetings } = data;
   const head = (
@@ -83,7 +86,7 @@ export function ConsultsStrip({
   return (
     <section className="lx-card pq-consults" aria-label="Recent consults">
       {paste ? (
-        <details className="pq-paste">
+        <details className="pq-paste" open={pasteOpen || undefined}>
           <summary className="pq-consults-head">
             {head}
             <span className="lx-btn lx-btn-sec lx-btn-sm pq-paste-btn">Paste or upload a transcript</span>

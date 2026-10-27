@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { draftFollowUpAction, draftProposalAction, linkMeetingAction, type ActionState } from "@/app/dashboard/meetings/actions";
 import {
   connectFathomAction,
@@ -30,7 +30,15 @@ function Result({ state }: { state: ActionState | MeetingsSettingsState }) {
 
 type Option = { id: string; label: string };
 
-/** Link (or unlink) a meeting to one lead and/or one matter of this firm. */
+/**
+ * Link (or unlink) a meeting to one lead and/or one matter of this firm.
+ *
+ * Three looks, one form. Linked: the text "Linked to <lead> · <matter>" (each a link) and a Change button; the
+ * selects stay hidden until Change, and the submit then reads "Update link". Unlinked with a suggestion: "Suggested:
+ * <name> · Link" (one button that files it) and "Choose another". Unlinked with nothing suggested: the selects and "Link".
+ * After a saved change the form folds back to the linked text. Unlink stays a button of its own. A person is always
+ * named by what the server read (`*Label`), never by an id.
+ */
 export function LinkMeetingForm(props: {
   meetingId: string;
   leadId: string | null;
@@ -39,54 +47,125 @@ export function LinkMeetingForm(props: {
   matters: Option[];
   suggestedLeadId: string | null;
   suggestedMatterId: string | null;
+  leadLabel?: string | null;
+  matterLabel?: string | null;
+  suggestedLeadLabel?: string | null;
+  suggestedMatterLabel?: string | null;
+  /** A sentence under the linked text ("Filed automatically from an attendee's email."). */
+  note?: string | null;
 }) {
   const [state, action, pending] = useActionState<ActionState, FormData>(linkMeetingAction, {});
+  const [choosing, setChoosing] = useState(false);
+  // A saved change folds the form back to its text; the page's own data (props) is what it then reads.
+  useEffect(() => {
+    if (state.ok) setChoosing(false);
+  }, [state]);
+
+  const linked = Boolean(props.leadId || props.matterId);
+  const hasSuggestion = !linked && Boolean(props.suggestedLeadId || props.suggestedMatterId);
+  const showSelects = choosing || (!linked && !hasSuggestion);
   const leadDefault = props.leadId ?? props.suggestedLeadId ?? "";
   const matterDefault = props.matterId ?? props.suggestedMatterId ?? "";
-  const linked = Boolean(props.leadId || props.matterId);
+  const suggestedText = [props.suggestedLeadLabel, props.suggestedMatterLabel].filter(Boolean).join(" · ") || "a client of this firm";
+
+  function clearLinks(form: HTMLFormElement | null) {
+    if (!form) return;
+    for (const name of ["leadId", "matterId"]) {
+      const field = form.elements.namedItem(name) as HTMLInputElement | HTMLSelectElement | null;
+      if (field) field.value = "";
+    }
+  }
+
   return (
-    <form action={action} style={{ display: "grid", gap: 10 }}>
+    <form action={action} style={{ display: "grid", gap: 10 }} data-link-form={linked ? "linked" : hasSuggestion ? "suggested" : "unlinked"}>
       <input type="hidden" name="meetingId" value={props.meetingId} />
-      <label className="lx-field">
-        <span className="lx-label">Lead</span>
-        <select className="lx-input" name="leadId" defaultValue={leadDefault}>
-          <option value="">— None —</option>
-          {props.leads.map((l) => (
-            <option key={l.id} value={l.id}>
-              {l.label}
-              {l.id === props.suggestedLeadId && !props.leadId ? " (suggested)" : ""}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="lx-field">
-        <span className="lx-label">Matter</span>
-        <select className="lx-input" name="matterId" defaultValue={matterDefault}>
-          <option value="">— None —</option>
-          {props.matters.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.label}
-              {m.id === props.suggestedMatterId && !props.matterId ? " (suggested)" : ""}
-            </option>
-          ))}
-        </select>
-      </label>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={pending}>
-          {pending ? "Saving…" : linked ? "Save link" : "Link"}
-        </button>
+
+      {linked && (
+        <p style={{ margin: 0 }} data-linked-text>
+          {"Linked to "}
+          {props.leadId && <Link href={`/dashboard/leads/${props.leadId}/`}>{props.leadLabel ?? "Lead"}</Link>}
+          {props.leadId && props.matterId && " · "}
+          {props.matterId && <Link href={`/dashboard/matters/${props.matterId}/`}>{props.matterLabel ?? "Matter"}</Link>}
+        </p>
+      )}
+      {linked && props.note && (
+        <p className="lx-note" style={{ margin: 0 }}>
+          {props.note}
+        </p>
+      )}
+      {hasSuggestion && !choosing && (
+        <p className="lx-note" style={{ margin: 0 }}>
+          More than one client shares an attendee&apos;s email, so this meeting was not filed on its own.
+        </p>
+      )}
+
+      {showSelects ? (
+        <>
+          <label className="lx-field">
+            <span className="lx-label">Lead</span>
+            <select className="lx-input" name="leadId" defaultValue={leadDefault}>
+              <option value="">— None —</option>
+              {props.leads.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="lx-field">
+            <span className="lx-label">Matter</span>
+            <select className="lx-input" name="matterId" defaultValue={matterDefault}>
+              <option value="">— None —</option>
+              {props.matters.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </>
+      ) : (
+        <>
+          <input type="hidden" name="leadId" value={props.leadId ?? props.suggestedLeadId ?? ""} />
+          <input type="hidden" name="matterId" value={props.matterId ?? props.suggestedMatterId ?? ""} />
+        </>
+      )}
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        {hasSuggestion && !showSelects && (
+          <span data-suggested-text>
+            {"Suggested: "}
+            {suggestedText}
+            {" · "}
+          </span>
+        )}
+        {showSelects ? (
+          <>
+            <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={pending}>
+              {pending ? "Saving…" : linked ? "Update link" : "Link"}
+            </button>
+            {choosing && (
+              <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" disabled={pending} onClick={() => setChoosing(false)}>
+                Cancel
+              </button>
+            )}
+          </>
+        ) : linked ? (
+          <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" onClick={() => setChoosing(true)}>
+            Change
+          </button>
+        ) : (
+          <>
+            <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={pending}>
+              {pending ? "Saving…" : "Link"}
+            </button>
+            <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={() => setChoosing(true)}>
+              Choose another
+            </button>
+          </>
+        )}
         {linked && (
-          <button
-            type="submit"
-            className="lx-btn lx-btn-ghost lx-btn-sm"
-            disabled={pending}
-            onClick={(e) => {
-              const form = e.currentTarget.form;
-              if (!form) return;
-              (form.elements.namedItem("leadId") as HTMLSelectElement).value = "";
-              (form.elements.namedItem("matterId") as HTMLSelectElement).value = "";
-            }}
-          >
+          <button type="submit" className="lx-btn lx-btn-ghost lx-btn-sm" disabled={pending} onClick={(e) => clearLinks(e.currentTarget.form)}>
             Unlink
           </button>
         )}

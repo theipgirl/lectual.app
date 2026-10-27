@@ -245,7 +245,13 @@
 .pe-who-search { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .pe-who-search .lx-input { flex: 1; min-width: 160px; width: auto; }
 .pe-who-list { margin: 0; }
-.pe-who-list li { padding: 8px 0; }
+.pe-who-list li { padding: 0; }
+.pe-who-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 10px; row-gap: 2px; align-items: baseline; padding: 9px 10px; border-radius: 8px; border: 1px solid transparent; color: inherit; text-decoration: none; }
+.pe-who-row:hover { background: var(--card); border-color: var(--line); }
+.pe-who-row[aria-current] { background: var(--card); border-color: var(--ox); }
+.pe-who-name { grid-column: 1; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.pe-who-sub { grid-column: 1; color: var(--muted); font-size: 0.875em; min-width: 0; overflow-wrap: anywhere; }
+.pe-who-mark { grid-column: 2; grid-row: 1; color: var(--ox); font-size: 0.8125em; font-weight: 600; }
 .pe-who-alert { margin: 0; color: var(--warn); }
 .pe-who a:focus-visible { outline: 2px solid var(--ox); outline-offset: 2px; border-radius: 4px; }
 .pe-filled-from { line-height: 1.5; }
