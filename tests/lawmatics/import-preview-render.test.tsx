@@ -88,7 +88,7 @@ describe("the import preview shows every person it would place by hand or leave 
 
   it("states the summary line as skipped and need-a-decision counts", async () => {
     const out = html(await previewOf(DEFAULT_PLAN_OPTIONS));
-    expect(plain(out)).toContain("0 skipped, 2 need a stage decision.");
+    expect(plain(out)).toContain("0 skipped, 5 need a stage decision.");
   });
 
   it("with the filter on, every excluded person is listed by name with the reason, visible", async () => {
@@ -100,7 +100,7 @@ describe("the import preview shows every person it would place by hand or leave 
     expect(s).toContain("Zed Blank");
     expect(s).toContain("no practice area on record");
     expect(s).toContain("Lone Contact");
-    expect(s).toMatch(/3 skipped, 2 need a stage decision\./);
+    expect(s).toMatch(/3 skipped, 3 need a stage decision\./);
     expect(out).toMatch(/<details class="lx-lm-section" open="">\s*<summary>Skipped/);
   });
 

@@ -54,8 +54,9 @@ export function sheetNoteEvidence(entry: SheetEntry | null | undefined, ctx: Ctx
 }
 
 /**
- * Lawmatics evidence beyond the stage the signal already carries: its notes, and, for a stage name the
- * firm has no match for ("Proposal Sent", "Consult Completed"), the milestone that name itself states.
+ * Lawmatics evidence beyond what the signal carries: its notes, and the milestone a stage NAME states
+ * ("Proposal Sent", "Consult Completed"). The name is cited as read-only text: it is undated (the record's
+ * updated time is not when the stage was entered) and so is never acted on, and it names no Lectual stage.
  */
 export function lawmaticsEvidence(
   record: LawmaticsSourceRecord | null | undefined,
@@ -66,8 +67,7 @@ export function lawmaticsEvidence(
   if (!record) return [];
   const out: EvidenceItem[] = [];
   if (stageIsUnmapped && record.stageName) {
-    const date = pastDate(record.updatedAt, ctx.now);
-    for (const m of classifyNote(record.stageName)) out.push(fromMilestone("lawmatics", "stage", m, date, ctx));
+    for (const m of classifyNote(record.stageName)) out.push(fromMilestone("lawmatics", "stage", m, null, ctx));
   }
   if (notes?.status === "ok") {
     for (const note of notes.notes as LawmaticsNote[]) {

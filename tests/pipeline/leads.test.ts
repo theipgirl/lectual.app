@@ -285,7 +285,15 @@ const NEW_LEAD_ROW = {
 
 function stubCreateTables() {
   state.resultsByTable = {
-    crm_stage: { data: { id: "stage-first" }, error: null },
+    // RPB-shaped: "Follow-Up" sorts first, the new-enquiry stage is "Potential New Client".
+    crm_stage: {
+      data: [
+        { id: "stage-follow-up", name: "Follow-Up", category: "open", order_index: 1 },
+        { id: "stage-first", name: "Potential New Client", category: "open", order_index: 2 },
+        { id: "stage-won", name: "Signed LOE / Deposit Received", category: "won", order_index: 8 },
+      ],
+      error: null,
+    },
     crm_lead: { data: NEW_LEAD_ROW, error: null },
   };
 }
@@ -318,7 +326,7 @@ describe("createLead", () => {
     expect(state.tables).toHaveLength(0);
   });
 
-  it("defaults to the tenant's lowest order_index stage and stamps org_id from current_org_id()", async () => {
+  it("defaults to the tenant's new-enquiry stage (not whichever sorts first) and stamps org_id from current_org_id()", async () => {
     state.role = "intake";
     stubCreateTables();
 
@@ -330,7 +338,7 @@ describe("createLead", () => {
     });
     expect((created as { id: string }).id).toBe("lead-new");
 
-    // The default-stage lookup orders by order_index ascending.
+    // The stage lookup is read in pipeline order; the new-enquiry rule then picks one.
     const stageQuery = state.queries[0];
     expect(state.tables[0]).toBe("crm_stage");
     expect(stageQuery.calls.find(([n]) => n === "order")![1]).toEqual([

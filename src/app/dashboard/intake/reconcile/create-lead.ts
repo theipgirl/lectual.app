@@ -5,7 +5,7 @@ import { placeholderEmailFor } from "@/lib/intake/sheet-import";
 import { logActivitySafe } from "@/lib/matters/activity";
 import { authorizeReconcile } from "@/lib/reconcile/authorize";
 import { FOUND_LABEL, parseCandidate } from "@/lib/reconcile/create-lead";
-import { firstOpenStage } from "@/lib/reconcile/plan";
+import { newEnquiryStageOf } from "@/lib/reconcile/plan";
 import { RECONCILE_MESSAGES as MSG } from "@/lib/reconcile/rules";
 import { readStages } from "@/lib/reconcile/sources";
 
@@ -17,7 +17,8 @@ import { readStages } from "@/lib/reconcile/sources";
  *
  * The person is filed with where they were found as the source, the sheet's key and Lawmatics id when
  * known (so the next preview reconciles them like any lead), the sheet's stage when it names one the
- * firm has, else the firm's first open stage. A stage that opens a matter is never used.
+ * firm has, else the firm's new-enquiry stage (never "Follow-Up" just because it sorts first). A stage that
+ * opens a matter is never used.
  */
 
 export type CreateLeadResult = { ok: true; leadId: string; name: string } | { ok: false; error: string };
@@ -37,7 +38,7 @@ export async function createLeadFromReconcileAction(input: unknown): Promise<Cre
     return { ok: false, error: MSG.stagesUnreadable };
   }
   const named = candidate.stageId ? stages.find((s) => s.id === candidate.stageId && s.category !== "won") : undefined;
-  const stage = named ?? firstOpenStage(stages);
+  const stage = named ?? newEnquiryStageOf(stages);
   if (!stage) return { ok: false, error: MSG.createNoStage };
 
   // One lead per person: refuse when the key, the Lawmatics id or the address is already a lead.

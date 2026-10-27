@@ -1,4 +1,5 @@
 import type { Stage } from "@/lib/pipeline";
+import { inPipelineOrder } from "@/lib/pipeline/stage-order";
 // Type-only import: @/lib/members/directory is `import "server-only"`, but a
 // `import type` is erased at compile time, so nothing from it reaches the
 // client bundle this module is part of — same reasoning as rows.ts.
@@ -68,9 +69,7 @@ export type StageColumn = {
  * us, and inventing a column for it would be inventing data.
  */
 export function stageColumns(rows: IntakeRow[], stages: Stage[]): StageColumn[] {
-  const columns = intakeStages(stages)
-    .slice()
-    .sort((a, b) => a.order_index - b.order_index);
+  const columns = inPipelineOrder(intakeStages(stages));
 
   return columns.map((stage) => {
     const inStage = rows.filter((row) => row.lead.current_stage_id === stage.id);

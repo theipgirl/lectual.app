@@ -20,9 +20,9 @@ import {
 } from "@/lib/intake/views";
 import Popover, { PopoverItem } from "./Popover";
 import NeedsRebeccaBadge from "./NeedsRebeccaBadge";
-import AgentMoveChip from "./AgentMoveChip";
 import SourceCell from "./SourceCell";
 import { temperatureLabel, temperatureTitle } from "@/lib/intake/effective-temperature";
+import { decisionOpen, decisionPillText, whyLine } from "@/lib/intake/stage-decision";
 import {
   NEXT,
   NEXT_HOT,
@@ -67,6 +67,8 @@ export default function IntakeCard({
   onMoveStage,
   onAssign,
   onSetSource,
+  selected = false,
+  onToggleSelect,
 }: {
   row: IntakeRow;
   /** 10b shows the owner chip; 10c shows the next step and the stage pill. */
@@ -83,6 +85,9 @@ export default function IntakeCard({
   onMoveStage: (leadId: string, stageId: string) => void;
   onAssign: (leadId: string, userId: string | null) => void;
   onSetSource: (leadId: string, source: ReferralSource | null) => void;
+  /** Ticked for the bulk "Move to..." bar. Only drawn when `onToggleSelect` is given. */
+  selected?: boolean;
+  onToggleSelect?: (leadId: string) => void;
 }) {
   const lead = row.lead;
   const name = `${lead.first_name} ${lead.last_name}`.trim() || lead.email;
@@ -92,6 +97,8 @@ export default function IntakeCard({
   const temperature = row.temperature;
   const ownerName = row.owner ? memberLabel(row.owner) : null;
   const pendingDrafts = pendingFor(pendingApprovals, lead.id);
+  const why = whyLine({ agentMove: row.agentMove, decision: row.decision, currentStageId: lead.current_stage_id });
+  const openDecision = decisionOpen(row.decision, lead.current_stage_id) ? row.decision : null;
 
   const menu = (
     <Popover
@@ -170,6 +177,7 @@ export default function IntakeCard({
   return (
     <div
       data-lead-id={lead.id}
+      className={selected ? "intake-card-selected" : undefined}
       draggable
       onDragStart={(event) => event.dataTransfer.setData("text/plain", lead.id)}
       style={{
@@ -185,6 +193,17 @@ export default function IntakeCard({
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+        {onToggleSelect && (
+          <input
+            type="checkbox"
+            className="intake-select"
+            aria-label={`Select ${name}`}
+            checked={selected}
+            onChange={() => onToggleSelect(lead.id)}
+            // A tick is not a drag: the card is draggable, the box must not start one.
+            draggable={false}
+          />
+        )}
         <Link
           href={`/dashboard/leads/${lead.id}`}
           style={{
@@ -219,9 +238,23 @@ export default function IntakeCard({
         </div>
       )}
 
-      {row.agentMove && (
+      {/* Why the card is in this column, in one line; nothing at all when nothing says. A Stage Keeper move reads here
+          ("Moved automatically · consult held Oct 23", its evidence as the tooltip); the table keeps the chip. */}
+      {why && (
+        <div
+          className="intake-why"
+          data-why={why.kind}
+          data-agent-move={why.kind === "agent" ? row.agentMove?.activityId : undefined}
+          title={why.kind === "agent" ? row.agentMove?.tooltip : why.text}
+        >
+          {why.text}
+        </div>
+      )}
+      {openDecision && (
         <div style={{ minWidth: 0 }}>
-          <AgentMoveChip move={row.agentMove} />
+          <span className="intake-decision-pill" data-needs-decision title="Nobody has chosen this person's stage yet. Move the card, or let the Stage Keeper or Reconcile place it from evidence.">
+            {decisionPillText(openDecision)}
+          </span>
         </div>
       )}
 

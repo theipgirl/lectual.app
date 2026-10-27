@@ -144,6 +144,8 @@ export type AgentMoveChip = {
   activityId: string;
   /** "Moved by agent · LOE sent Oct 20" */
   text: string;
+  /** The board card's reason line: "Moved automatically · consult held Oct 23". */
+  why: string;
   /** The evidence, as a sentence. */
   tooltip: string;
   movedAt: string;
@@ -151,12 +153,18 @@ export type AgentMoveChip = {
   today: boolean;
 };
 
+/** "Consult held" -> "consult held"; "LOE sent" keeps its capitals. */
+function lowerFirst(text: string): string {
+  return /^[A-Z][a-z]/.test(text) ? text.charAt(0).toLowerCase() + text.slice(1) : text;
+}
+
 export function chipFor(move: AgentMove, now: Date, timeZone: string): AgentMoveChip {
   const label = move.signal ? SIGNAL_LABEL[move.signal] : "Stage moved";
   const date = chipDate(move, timeZone);
   return {
     activityId: move.activityId,
     text: `Moved by agent · ${label}${date ? ` ${date}` : ""}`,
+    why: `Moved automatically · ${lowerFirst(label)}${date ? ` ${date}` : ""}`,
     tooltip: evidenceTooltip(move.evidence, timeZone),
     movedAt: move.at,
     today: civilDay(move.at, timeZone) === civilDay(now.toISOString(), timeZone),

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { describeActivity } from "../../src/components/leads/describe";
 import { evidenceTooltip, reasonText } from "../../src/lib/stage-keeper/format";
-import { chipFor, consumedSignalKeys, currentAgentMoves, parseAgentMove, parseSuggestion, type ActivityRow } from "../../src/lib/stage-keeper/moves";
+import { chipFor, consumedSignalKeys, parseAgentMove, parseSuggestion, type ActivityRow } from "../../src/lib/stage-keeper/moves";
 import { SIGNAL_LABEL, SIGNAL_IDS } from "../../src/lib/stage-keeper/signals";
 import { agentEvidenceFor, emailSignalFor } from "../../src/lib/reconcile/email";
 import { proposeStage } from "../../src/lib/reconcile/propose";

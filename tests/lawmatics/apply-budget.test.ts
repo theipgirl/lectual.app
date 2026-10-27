@@ -74,6 +74,7 @@ function makeSupabase(writes: { inserted: number; updated: number }) {
       const chain = {
         order: () => chain,
         range: () => Promise.resolve(result),
+        in: () => Promise.resolve(result),
       };
       return chain;
     },
@@ -86,7 +87,8 @@ function makeSupabase(writes: { inserted: number; updated: number }) {
       if (table === "crm_stage") {
         return {
           select: () => ({
-            order: () => Promise.resolve({ data: stages.map((x) => ({ id: x.id, name: x.name })), error: null }),
+            order: () =>
+              Promise.resolve({ data: stages.map((x, i) => ({ id: x.id, name: x.name, category: i <= 6 ? "open" : "won", order_index: i + 1 })), error: null }),
           }),
         };
       }

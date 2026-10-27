@@ -72,6 +72,7 @@ export default function IntakeControls({
   visibleCount,
   needsRebeccaCount,
   agentMoveCounts,
+  decisionCount,
   currentHref,
   onFilters,
   onGroup,
@@ -94,6 +95,11 @@ export default function IntakeControls({
    * couldn't be read (or the board has none to offer), so the filter is not offered at all.
    */
   agentMoveCounts?: { today: number; week: number } | null;
+  /**
+   * Leads still waiting for a stage decision after a Lawmatics import. null/undefined = the flags couldn't be read, so
+   * the filter is not offered at all (an unreadable list must never filter to "no leads").
+   */
+  decisionCount?: number | null;
   /** The link "Save this view" copies. */
   currentHref: string;
   onFilters: (next: IntakeFilters) => void;
@@ -396,6 +402,19 @@ export default function IntakeControls({
             </>
           )}
         </Popover>
+      )}
+
+      {decisionCount != null && (
+        <button
+          type="button"
+          style={filterChip(Boolean(filters.decision))}
+          aria-pressed={Boolean(filters.decision)}
+          title="Show only leads imported from Lawmatics whose stage nobody has chosen yet."
+          onClick={() => onFilters({ ...filters, decision: filters.decision ? undefined : true })}
+        >
+          Needs a stage decision
+          {decisionCount > 0 && <span style={CHIP_COUNT}>{decisionCount}</span>}
+        </button>
       )}
 
       {needsRebeccaCount != null && (

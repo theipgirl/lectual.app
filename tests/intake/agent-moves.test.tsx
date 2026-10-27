@@ -146,15 +146,25 @@ describe("the chip", () => {
     expect(chips["l-old"].tooltip).toBe('Evidence: calendar event "Strategy session" on Oct 24 at 2:00 PM.');
   });
 
-  it("the board card and the table row both draw it, with a drawn icon hidden from screen readers", () => {
-    for (const params of [{}, { view: "board" }, { view: "board", group: "owner" }] as IntakeSearchParams[]) {
+  it("the table row draws the chip, with a drawn icon hidden from screen readers", () => {
+    const html = text(render({}));
+    expect(html).toContain("Moved by agent · LOE sent Oct 20");
+    expect(html).toContain("Moved by agent · Consult booked Oct 17");
+    expect(html).toContain('title="Evidence: LOE and invoice email sent Oct 20."');
+    expect(html).toMatch(/class="intake-agent-chip"[^>]*><svg[^>]*aria-hidden="true"/);
+    // The lead a person moved afterwards, and the one never moved, carry no chip.
+    expect(html.match(/intake-agent-chip/g)).toHaveLength(2);
+  });
+
+  it("the board card says the same thing as its one-line reason (Sprint 29), with the evidence as the tooltip", () => {
+    for (const params of [{ view: "board" }, { view: "board", group: "owner" }] as IntakeSearchParams[]) {
       const html = text(render(params));
-      expect(html, JSON.stringify(params)).toContain("Moved by agent · LOE sent Oct 20");
-      expect(html).toContain("Moved by agent · Consult booked Oct 17");
+      expect(html, JSON.stringify(params)).toContain("Moved automatically · LOE sent Oct 20");
+      expect(html).toContain("Moved automatically · consult booked Oct 17");
       expect(html).toContain('title="Evidence: LOE and invoice email sent Oct 20."');
-      expect(html).toMatch(/class="intake-agent-chip"[^>]*><svg[^>]*aria-hidden="true"/);
-      // The lead a person moved afterwards, and the one never moved, carry no chip.
-      expect(html.match(/intake-agent-chip/g)).toHaveLength(2);
+      // One line per moved lead, and the lead a person moved afterwards, and the one never moved, carry none.
+      expect(html.match(/data-why="agent"/g)).toHaveLength(2);
+      expect(html).not.toContain("intake-agent-chip");
     }
   });
 

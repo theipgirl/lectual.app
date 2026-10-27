@@ -154,11 +154,12 @@ describe("matching a lead to a Lawmatics record", () => {
 
 describe("the Lawmatics source signal", () => {
   const lead = { lawmaticsId: "100", email: null };
-  const sig = (stageName: string | null) => lawmaticsSignalFor(lead, indexLawmatics([rec({ stageName })]), STAGES);
+  const sig = (stageName: string | null) => lawmaticsSignalFor(lead, indexLawmatics([rec({ stageName })]));
 
-  it("resolves a stage by name", () => {
-    expect(sig("Consultation Scheduled")).toMatchObject({ kind: "stage", stageId: S.consult, wording: "Consultation Scheduled" });
-    expect(sig("Discovery Call Scheduled")).toMatchObject({ kind: "stage", stageId: S.consult });
+  it("never resolves a stage by name: even a name that is also one of the firm's stages is read-only text", () => {
+    expect(sig("Consultation Scheduled")).toEqual({ kind: "unmapped", wording: "Consultation Scheduled" });
+    expect(sig("Discovery Call Scheduled")).toEqual({ kind: "unmapped", wording: "Discovery Call Scheduled" });
+    expect(sig("Potential New Client")).toEqual({ kind: "unmapped", wording: "Potential New Client" });
   });
   it.each(["Hired", "Hired Client", "hired client", "HIRED-CLIENT", "3. Hired"])('"%s" is a client', (name) => {
     expect(sig(name)).toEqual({ kind: "needs_matter", wording: name });
@@ -173,7 +174,7 @@ describe("the Lawmatics source signal", () => {
     expect(sig("  ")).toEqual({ kind: "none", note: "the Lawmatics record has no stage" });
   });
   it("no record is none", () => {
-    expect(lawmaticsSignalFor({ lawmaticsId: "nope", email: null }, indexLawmatics([rec({})]), STAGES)).toEqual({ kind: "none", note: undefined });
+    expect(lawmaticsSignalFor({ lawmaticsId: "nope", email: null }, indexLawmatics([rec({})]))).toEqual({ kind: "none", note: undefined });
   });
 });
 

@@ -23,9 +23,13 @@ import { topBarCounts, topBarLine } from "@/lib/intake/views";
 import type { IntakeTime } from "@/lib/time";
 import { IntakeTopBar } from "@/components/intake/IntakeTopBar";
 import { ViewToggle } from "@/components/ViewToggle";
-import { assignLeadAction, moveStageAction, setLaneAction, setSourceAction } from "../actions";
+import { assignLeadAction, bulkMoveStageAction, moveStageAction, setLaneAction, setSourceAction } from "../actions";
+import { BULK_MOVE_MAX, bulkMoveSummary } from "@/lib/pipeline/bulk-move";
+import { decisionOpen } from "@/lib/intake/stage-decision";
+import { stageCodeFor, stageLabelFor } from "@/lib/intake/views";
 import type { Lane } from "@/lib/leads/lane";
 import AddLeadDialog from "./AddLeadDialog";
+import BulkMoveBar from "./BulkMoveBar";
 import IntakeBoard from "./IntakeBoard";
 import IntakeControls from "./IntakeControls";
 import IntakeSearch from "./IntakeSearch";
@@ -74,6 +78,7 @@ export default function IntakeWorkspace({
   pendingApprovals,
   showReconcile = false,
   agentMoves,
+  stageDecisions,
   now: nowIso,
 }: {
   rows: IntakeRow[];
@@ -108,6 +113,12 @@ export default function IntakeWorkspace({
    * as unavailable, without the note.
    */
   agentMoves?: { status: "ok"; truncated: boolean } | { status: "unavailable" };
+  /**
+   * Whether the Lawmatics-import stage flags were read. `ok`: rows carry their flag, the "Needs a stage decision"
+   * filter and the column badges are offered. `unavailable`: none of that is drawn or applied (an unreadable list must
+   * never filter to "no leads") and a one-line note says so. Absent: the same, without the note.
+   */
+  stageDecisions?: { status: "ok"; truncated: boolean } | { status: "unavailable" };
   /** The server's render clock, so "Next step" says the same thing on both sides. */
   now: string;
 }) {
@@ -123,8 +134,13 @@ export default function IntakeWorkspace({
   // its chip is hidden then, so it stays out of the URL (and "Save this view")
   // rather than riding along as a filter nobody can see or turn off.
   const agentAvailable = agentMoves?.status === "ok";
+  const decisionAvailable = stageDecisions?.status === "ok";
   const href = intakeHref(
-    { ...(approvalsShown(pendingApprovals) ? filters : { ...filters, needsRebecca: false }), agent: agentAvailable ? filters.agent : null },
+    {
+      ...(approvalsShown(pendingApprovals) ? filters : { ...filters, needsRebecca: false }),
+      agent: agentAvailable ? filters.agent : null,
+      decision: decisionAvailable ? filters.decision : undefined,
+    },
     viewState,
   );
 
@@ -154,8 +170,18 @@ export default function IntakeWorkspace({
   const filtered = useMemo(
     // The agent filter is only applied when the moves were read: otherwise every row would lack a
     // chip and the list would filter to nobody.
-    () => filterNeedsRebecca(applyFilters(rows, { ...filters, agent: agentAvailable ? filters.agent : null }), pendingApprovals, filters.needsRebecca),
-    [rows, filters, pendingApprovals, agentAvailable],
+    () =>
+      filterNeedsRebecca(
+        applyFilters(rows, { ...filters, agent: agentAvailable ? filters.agent : null, decision: decisionAvailable ? filters.decision : undefined }),
+        pendingApprovals,
+        filters.needsRebecca,
+      ),
+    [rows, filters, pendingApprovals, agentAvailable, decisionAvailable],
+  );
+  // Leads still waiting for a stage decision, over the whole list (like the agent counts), only when the flags were read.
+  const decisionCount = useMemo(
+    () => (decisionAvailable ? rows.filter((row) => decisionOpen(row.decision, row.lead.current_stage_id)).length : null),
+    [rows, decisionAvailable],
   );
   const agentMoveCounts = useMemo(
     () => (agentAvailable ? { today: rows.filter((row) => row.agentMove?.today).length, week: rows.filter((row) => row.agentMove).length } : null),
@@ -261,27 +287,79 @@ export default function IntakeWorkspace({
     [runWrite],
   );
 
+  /** The row after a person moved it: the one patch the drag, the menu and the bulk move all share. */
+  const movedRow = useCallback(
+    (row: IntakeRow, stageId: string): IntakeRow => {
+      const lead = { ...row.lead, current_stage_id: stageId };
+      // A person's move takes the agent's chip off the card (the server drops it the same way).
+      return {
+        ...row,
+        agentMove: undefined,
+        lead,
+        stage: stages.find((stage) => stage.id === stageId) ?? null,
+        // Temperature rule 2 (nurture stage) keys on the stage, so it has to be re-derived
+        // with the lead's new home or the card would carry the old answer.
+        temperature: effectiveTemperature(lead, stages, now, row.facts),
+      };
+    },
+    [stages, now],
+  );
+
   const moveStage = useCallback(
     (leadId: string, stageId: string) => {
-      runWrite(
-        leadId,
-        (row) => {
-          const lead = { ...row.lead, current_stage_id: stageId };
-          // A person's move takes the agent's chip off the card (the server drops it the same way).
-          return {
-            ...row,
-            agentMove: undefined,
-            lead,
-            stage: stages.find((stage) => stage.id === stageId) ?? null,
-            // Temperature rule 2 (nurture stage) keys on the stage, so it has to be re-derived
-            // with the lead's new home or the card would carry the old answer.
-            temperature: effectiveTemperature(lead, stages, now, row.facts),
-          };
-        },
-        () => moveStageAction(leadId, stageId),
-      );
+      runWrite(leadId, (row) => movedRow(row, stageId), () => moveStageAction(leadId, stageId));
     },
-    [runWrite, stages, now],
+    [runWrite, movedRow],
+  );
+
+  // ── bulk "Move to..." ───────────────────────────────────────────────────────
+  const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
+  const [bulkPending, setBulkPending] = useState(false);
+  const [bulkMessage, setBulkMessage] = useState<{ tone: "ok" | "warn" | "error"; text: string } | null>(null);
+
+  const toggleSelect = useCallback((leadId: string) => {
+    setBulkMessage(null);
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(leadId)) next.delete(leadId);
+      else next.add(leadId);
+      return next;
+    });
+  }, []);
+
+  const bulkMove = useCallback(
+    (stageId: string) => {
+      const ids = rows.map((row) => row.lead.id).filter((id) => selected.has(id));
+      if (ids.length === 0) return;
+      setBulkMessage(null);
+      setBulkPending(true);
+      startTransition(async () => {
+        let result: Awaited<ReturnType<typeof bulkMoveStageAction>>;
+        try {
+          result = await bulkMoveStageAction(ids, stageId);
+        } catch {
+          setBulkPending(false);
+          setBulkMessage({ tone: "error", text: "Couldn't move these leads. Nothing was changed that you can see here; refresh to check." });
+          return;
+        }
+        setBulkPending(false);
+        if (!result.ok) {
+          setBulkMessage({ tone: "error", text: result.error });
+          return;
+        }
+        const moved = new Set(result.moved);
+        setRows((current) => current.map((row) => (moved.has(row.lead.id) ? movedRow(row, stageId) : row)));
+        // A lead that failed says why on its own card and stays ticked so it can be retried; the rest are done.
+        setErrors((current) => ({ ...current, ...Object.fromEntries(result.failed.map((f) => [f.leadId, f.error])) }));
+        setSelected(new Set(result.failed.map((f) => f.leadId)));
+        const target = intakeStages.find((stage) => stage.id === stageId);
+        setBulkMessage({
+          tone: result.failed.length > 0 ? "warn" : "ok",
+          text: bulkMoveSummary(target ? `${stageCodeFor(target)} · ${stageLabelFor(target)}` : "that stage", result),
+        });
+      });
+    },
+    [rows, selected, movedRow, intakeStages],
   );
 
   const board = viewState.view === "board";
@@ -327,6 +405,7 @@ export default function IntakeWorkspace({
           visibleCount={filtered.length}
           needsRebeccaCount={needsRebeccaCount}
           agentMoveCounts={agentMoveCounts}
+          decisionCount={decisionCount}
           currentHref={href}
           onFilters={setFilters}
           onGroup={(group: IntakeGroup) => setViewState((state) => ({ ...state, group }))}
@@ -364,6 +443,37 @@ export default function IntakeWorkspace({
           </p>
         )}
 
+        {stageDecisions?.status === "unavailable" && (
+          <p role="status" className="lx-banner lx-banner-warn" style={{ margin: 0 }}>
+            Stage decisions couldn&rsquo;t be loaded, so the &ldquo;Needs a stage decision&rdquo; filter and badges are off.
+          </p>
+        )}
+
+        {stageDecisions?.status === "ok" && stageDecisions.truncated && (
+          <p role="status" className="lx-note" style={{ margin: 0 }}>
+            There were more imported leads than could be read, so only the newest are marked as needing a stage decision.
+          </p>
+        )}
+
+        {board && (
+          <BulkMoveBar
+            selectedCount={selected.size}
+            shownCount={sorted.length}
+            stages={intakeStages}
+            pending={bulkPending}
+            message={bulkMessage}
+            onSelectShown={() => {
+              setBulkMessage(null);
+              setSelected(new Set(sorted.slice(0, BULK_MOVE_MAX).map((row) => row.lead.id)));
+            }}
+            onClear={() => {
+              setBulkMessage(null);
+              setSelected(new Set());
+            }}
+            onMove={bulkMove}
+          />
+        )}
+
         {agentMoves?.status === "ok" && agentMoves.truncated && (
           <p role="status" className="lx-note" style={{ margin: 0 }}>
             There were more agent moves than could be read, so only the most recent are marked.
@@ -384,6 +494,8 @@ export default function IntakeWorkspace({
             onMoveStage={moveStage}
             onAssign={assign}
             onSetSource={setSource}
+            selectedIds={selected}
+            onToggleSelect={toggleSelect}
           />
         ) : (
           <IntakeTable

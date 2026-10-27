@@ -2,6 +2,7 @@ import { listStages, type Stage } from "@/lib/pipeline";
 import type { Lead } from "@/lib/pipeline";
 import { listIntakeLeads } from "@/lib/intake/leads";
 import { intakeStages } from "@/lib/intake/scope";
+import { inPipelineOrder } from "@/lib/pipeline/stage-order";
 import { loadTemperatureFacts, type TemperatureFactsRead } from "@/lib/intake/facts";
 import { leadActivitySince, type Activity } from "@/lib/matters";
 import { listMemberDirectory, type MemberIdentity } from "@/lib/members/directory";
@@ -19,6 +20,7 @@ import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { loadAgentMoves, type AgentMovesRead } from "@/lib/stage-keeper/read";
+import { loadStageDecisions, type StageDecisionsRead } from "@/lib/intake/stage-decisions-read";
 import { canReconcile } from "@/lib/reconcile/roles";
 import { IntakeTopBar } from "@/components/intake/IntakeTopBar";
 import IntakeWorkspace from "./_components/IntakeWorkspace";
@@ -139,6 +141,9 @@ export default async function IntakePage({
     .then((tz) => loadAgentMoves(now, tz))
     .catch((): AgentMovesRead => ({ status: "unavailable" }));
 
+  // The Lawmatics-import stage flags, for the card's "why" line and the "Needs a stage decision" filter. Two states.
+  const decisionsPromise: Promise<StageDecisionsRead> = loadStageDecisions().catch((): StageDecisionsRead => ({ status: "unavailable" }));
+
   let stages: Stage[] = [];
   let leads: Lead[] = [];
   let loadError: string | null = null;
@@ -152,7 +157,7 @@ export default async function IntakePage({
     loadError = err instanceof Error ? err.message : String(err);
   }
 
-  const [members, noteActivity, pendingApprovals, agentMoves] = await Promise.all([membersPromise, notesPromise, approvalsPromise, agentMovesPromise]);
+  const [members, noteActivity, pendingApprovals, agentMoves, decisions] = await Promise.all([membersPromise, notesPromise, approvalsPromise, agentMovesPromise, decisionsPromise]);
 
   if (loadError) {
     return (
@@ -168,9 +173,7 @@ export default async function IntakePage({
     );
   }
 
-  const columns = intakeStages(stages)
-    .slice()
-    .sort((a, b) => a.order_index - b.order_index);
+  const columns = inPipelineOrder(intakeStages(stages));
 
   if (columns.length === 0) {
     return (
@@ -238,6 +241,7 @@ export default async function IntakePage({
     latestNoteByLeadId: latestNotesByLead(noteActivity),
     factsByLeadId: factsRead.status === "ok" ? factsRead.byLead : undefined,
     agentMoveByLeadId: agentMoves.status === "ok" ? agentMoves.chips : undefined,
+    decisionByLeadId: decisions.status === "ok" ? decisions.byLead : undefined,
     now,
   });
 
@@ -255,6 +259,7 @@ export default async function IntakePage({
       pendingApprovals={pendingApprovals}
       showReconcile={showReconcile}
       agentMoves={agentMoves.status === "ok" ? { status: "ok", truncated: agentMoves.truncated } : { status: "unavailable" }}
+      stageDecisions={decisions.status === "ok" ? { status: "ok", truncated: decisions.truncated } : { status: "unavailable" }}
     />
     </div>
   );
