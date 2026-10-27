@@ -19,9 +19,8 @@ import { FeedbackTrailRecorder } from "@/components/feedback/FeedbackTrailRecord
 import { FeedbackDialog } from "@/components/feedback/FeedbackDialog";
 import { NavProgress } from "@/components/shell/NavProgress";
 import { shouldShowTour } from "@/lib/onboarding/tour";
-import "@/components/shell/wordmark.css";
+import { FirmWordmark } from "@/components/shell/FirmWordmark";
 import { YourNameDialog } from "@/components/account/YourNameDialog";
-import { firmLogo } from "@/lib/org/logo";
 
 export const metadata: Metadata = { title: "Lectual" };
 
@@ -52,7 +51,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
     loadRailCounts().catch(() => ({})),
     cookies(),
   ]);
-  const logo = firmLogo(org.id, org.name, org.slug);
   const railPinned = cookieStore.get(RAIL_PIN_COOKIE)?.value === "pinned";
 
   return (
@@ -78,12 +76,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       )}
       <header className="lx-top">
         <div className="lx-wordmark" title={org.name}>
-          {logo ? (
-            // eslint-disable-next-line @next/next/no-img-element -- a small static brand file, not a content image
-            <img src={logo.src} alt={logo.alt} className="lx-wordmark-logo" />
-          ) : (
-            org.name
-          )}
+          <FirmWordmark org={org} />
         </div>
         <div className="lx-vr" />
         <SectionLabel />

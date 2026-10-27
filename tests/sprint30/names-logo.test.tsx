@@ -157,14 +157,15 @@ describe("firmLogo (A)", () => {
     expect(entries.join("\n")).not.toMatch(/cream/);
     expect(src).toMatch(/export function firmLogo/);
     const layout = fs.readFileSync("src/app/dashboard/layout.tsx", "utf8");
-    expect(layout).toContain("firmLogo(");
+    expect(layout).toContain("<FirmWordmark");
     expect(layout).not.toContain("rpb-logo-cream");
+    expect(fs.readFileSync("src/components/shell/FirmWordmark.tsx", "utf8")).toContain("firmLogo(");
   });
 
-  it("the layout renders an <img> with the alt when there is a logo, else the name", () => {
-    const layout = fs.readFileSync("src/app/dashboard/layout.tsx", "utf8");
-    expect(layout).toMatch(/logo \? \(/);
-    expect(layout).toContain("alt={logo.alt}");
-    expect(layout).toContain("org.name");
+  it("FirmWordmark renders an <img> with the alt when there is a logo, else the name", () => {
+    const src = fs.readFileSync("src/components/shell/FirmWordmark.tsx", "utf8");
+    expect(src).toMatch(/if \(!logo\) return/);
+    expect(src).toContain("alt={logo.alt}");
+    expect(src).toContain("org.name");
   });
 });

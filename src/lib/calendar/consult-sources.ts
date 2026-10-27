@@ -192,7 +192,7 @@ export function sourceNote(source: "outlook" | "zoom", state: SourceState): Sour
       case "not-connected":
         return { source, text: "Zoom isn't connected, so Zoom consults aren't shown.", link: { label: "Connect Zoom", href: MEETINGS_SETTINGS } };
       default:
-        return { source, text: "Zoom meetings couldn't be read just now. Refresh to try again.", link: null };
+        return { source, text: "Zoom meetings couldn't be read.", link: { label: "Check Zoom", href: MEETINGS_SETTINGS } };
     }
   }
   switch (state) {
@@ -203,10 +203,10 @@ export function sourceNote(source: "outlook" | "zoom", state: SourceState): Sour
     case "no-module":
       return { source, text: "Outlook calendar isn't switched on for your firm.", link: { label: "See Integrations", href: INTEGRATIONS } };
     case "update-needed":
-      return { source, text: "Consults from Outlook aren't switched on for your firm yet. Lectual will turn them on.", link: null };
+      return { source, text: "Consults from Outlook aren't switched on for your firm yet. Lectual will turn them on.", link: { label: "See Integrations", href: INTEGRATIONS } };
     case "reconnect":
       return { source, text: "Outlook no longer accepts your firm's sign-in.", link: { label: "Reconnect Outlook", href: INTEGRATIONS } };
     default:
-      return { source, text: "Outlook consults couldn't be read just now. Refresh to try again.", link: null };
+      return { source, text: "Outlook consults couldn't be read just now.", link: { label: "See Integrations", href: INTEGRATIONS } };
   }
 }

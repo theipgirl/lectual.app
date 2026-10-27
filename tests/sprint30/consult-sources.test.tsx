@@ -200,6 +200,8 @@ describe("source states", () => {
     expect(r.zoom).toBe("unavailable");
     const html = renderCard(r);
     expect(html).toContain("couldn't be read");
+    expect(html).toContain("Check Zoom");
+    expect(html).toContain("/dashboard/settings/integrations/meetings/");
     expect(html).not.toContain("No consults in the next");
   });
 
@@ -249,7 +251,7 @@ describe("each state renders its own sentence, with a next step, and never null"
     ["Outlook calendar scope missing", { ...base, outlook: "needs-calendar" }, ["Outlook calendar isn't connected", "Reconnect to read the calendar", "/dashboard/settings/integrations/"]],
     ["Outlook not connected", { ...base, outlook: "not-connected" }, ["Outlook calendar isn't connected", "Connect Outlook"]],
     ["no module", { ...base, outlook: "no-module", zoom: "not-connected" }, ["Outlook calendar isn't switched on for your firm.", "See Integrations", "Connect Zoom"]],
-    ["read failed", { ...base, outlook: "unavailable", zoom: "unavailable" }, ["Outlook consults couldn't be read just now.", "Zoom meetings couldn't be read just now."]],
+    ["read failed", { ...base, outlook: "unavailable", zoom: "unavailable" }, ["Outlook consults couldn't be read just now.", "Zoom meetings couldn't be read.", "Check Zoom", "/dashboard/settings/integrations/meetings/", "See Integrations"]],
   ];
 
   it.each(cases)("%s", (_name, result, needles) => {
@@ -271,6 +273,8 @@ describe("each state renders its own sentence, with a next step, and never null"
     for (const s of ["not-connected", "needs-calendar", "needs-permission", "reconnect", "no-module", "update-needed", "unavailable"] as const) {
       expect(sourceNote("zoom", s)).not.toBeNull();
       expect(sourceNote("outlook", s)).not.toBeNull();
+      expect(sourceNote("zoom", s)?.link).not.toBeNull();
+      expect(sourceNote("outlook", s)?.link).not.toBeNull();
     }
   });
 
