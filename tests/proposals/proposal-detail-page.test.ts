@@ -101,11 +101,20 @@ async function render(proposal: ProposalRow, events: ProposalEventRow[], strip: 
     AddNameForm: stub("add-name"),
     AdjustmentsForm: stub("adjustments"),
     DetailsForm: stub("details"),
+    DetailsMoreFields: stub("details-more"),
     IncludesForm: stub("includes"),
     MessageForm: stub("message"),
     NameCard: stub("name-card"),
+    NameMoreFields: stub("name-more"),
+    NameRowsProvider: ({ children }: { children: unknown }) => children,
     PricingForm: stub("pricing"),
+    PricingMoreFields: stub("pricing-more"),
   }));
+  vi.doMock("@/lib/proposals/lead-link", () => ({
+    loadLeadLink: vi.fn(async (id: string | null) => (id ? { state: "linked", id, name: "Sevetri Wilson" } : { state: "none" })),
+  }));
+  vi.doMock("@/lib/proposals/lead-options", () => ({ loadLeadOptions: vi.fn(async () => ({ status: "ok", leads: [] })) }));
+  vi.doMock("@/components/proposal-editor/LinkLeadForm", () => ({ LinkLeadForm: stub("link-lead") }));
   const { default: Page } = await import("../../src/app/dashboard/proposals/[id]/page");
   const html = renderToStaticMarkup(createElement("div", null, await Page({ params: Promise.resolve({ id: ID }) })));
   return { html, loadStrip };

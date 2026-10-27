@@ -132,7 +132,7 @@ describe("changedColumns and buildChanges", () => {
 
 describe("offerTotals", () => {
   it("is the firm's preselected offer", () => {
-    expect(offerTotals(sevetri())).toEqual({ legal_total_cents: 1_485_000, gov_total_cents: 280_000 });
+    expect(offerTotals(sevetri())).toEqual({ legal_total_cents: 1_782_000, gov_total_cents: 280_000 });
   });
 });
 
@@ -264,7 +264,7 @@ describe("standardProposalPricing", () => {
     const c = sevetri();
     c.includes = DEFAULT_PROPOSAL_INCLUDES;
     expect(validateContent(c)).toEqual([]);
-    expect(quoteProposal(c, defaultSelection(c)).legal_total_cents).toBe(1_485_000);
+    expect(quoteProposal(c, defaultSelection(c)).legal_total_cents).toBe(1_782_000);
   });
 });
 

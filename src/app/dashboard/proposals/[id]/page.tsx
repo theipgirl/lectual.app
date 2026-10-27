@@ -7,20 +7,28 @@ import { clientLinkOrigin, clientLinkUrl } from "@/lib/proposals/client-link-ori
 import { formatCents } from "@/lib/quotes/money";
 import { formatFirmStamp, formatShortFirmDate } from "@/lib/quotes/labels";
 import { ProposalError } from "@/lib/proposals/errors";
-import { defaultSelection, quoteProposal } from "@/lib/proposals/pricing";
 import { getProposal, getProposalSettings, isCurrentUserApprover, listProposalStepEvents, type ProposalDetail } from "@/lib/proposals/store";
 import { PROPOSAL_PAID_ROLES } from "@/lib/proposals/paid";
 import { buildPaidPanelView } from "@/lib/proposals/paid-view";
 import { PROPOSAL_STAFF_WRITE_ROLES, isProposalEditable, type ProposalRow } from "@/lib/proposals/types";
 import { validateContent } from "@/lib/proposals/validate";
-import { describeProposalEvent } from "@/lib/proposal-editor/events";
+import { describeProposalEvent, formatDollars } from "@/lib/proposal-editor/events";
 import { describeIssuePath, groupIssues } from "@/lib/proposal-editor/issues";
 import { firstNameOf, joinOr, statusLabel, statusTone } from "@/lib/proposal-editor/labels";
 import { moneyInput } from "@/lib/proposal-editor/form";
+import { editorChangedCount, shouldOpenMore } from "@/lib/proposal-editor/more-options";
+import { addedClassesPhrase, clientAddedClasses } from "@/lib/proposals/added-view";
+import { findPackage, normalisePackages } from "@/lib/proposals/package-list";
+import { loadLeadLink } from "@/lib/proposals/lead-link";
+import { loadLeadOptions } from "@/lib/proposals/lead-options";
+import { defaultSelection, priceForClassCount, quoteProposal } from "@/lib/proposals/pricing";
 import { buildProposalCard } from "@/lib/proposals/card";
 import { loadConsultStrip } from "@/lib/proposals/consult-strip-load";
 import { ProposalDocument } from "@/components/client-proposal/ProposalDocument";
+import { BuilderLayout } from "@/components/proposal-editor/BuilderLayout";
 import { ConsultStrip } from "@/components/proposal-editor/ConsultStrip";
+import { LeadLink } from "@/components/proposal-editor/LeadLink";
+import { LinkLeadForm } from "@/components/proposal-editor/LinkLeadForm";
 import { ProposalCard } from "@/components/proposal-editor/ProposalCard";
 import { IssueList, type ShownIssue } from "@/components/proposal-editor/ActionForm";
 import { Lifecycle } from "@/components/proposal-editor/Lifecycle";
@@ -29,10 +37,14 @@ import {
   AddNameForm,
   AdjustmentsForm,
   DetailsForm,
+  DetailsMoreFields,
   IncludesForm,
   MessageForm,
   NameCard,
+  NameMoreFields,
+  NameRowsProvider,
   PricingForm,
+  PricingMoreFields,
   type NameValues,
 } from "@/components/proposal-editor/Sections";
 import { GOES_LIVE_ON_APPROVAL, proposalSendBlock } from "@/lib/consult-proposal/link";
@@ -97,7 +109,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
   const { proposal, versions, events } = detail;
   const content = proposal.content;
 
-  const [tz, members, settings, isApprover, origin, consult, stepRead] = await Promise.all([
+  const [tz, members, settings, isApprover, origin, consult, stepRead, leadLink, leadOptions] = await Promise.all([
     getFirmTimeZone(),
     listMemberDirectory().catch((): MemberIdentity[] => []),
     getProposalSettings().catch(() => null),
@@ -106,6 +118,9 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
     proposal.lead_id ? loadConsultStrip(proposal.lead_id) : Promise.resolve(null),
     // Only an accepted version has a payment panel. A failed read is `{ ok: false }`, never "not paid".
     proposal.status === "accepted" ? listProposalStepEvents(proposal.id) : Promise.resolve(null),
+    loadLeadLink(proposal.lead_id),
+    // Only an unlinked, still-editable proposal on a writer's page needs the list to link one from.
+    !proposal.lead_id && isProposalEditable(proposal.status) && canWrite ? loadLeadOptions() : Promise.resolve(null),
   ]);
   // The family's events are already loaded, so the card needs no extra read.
   const card = buildProposalCard(proposal, events);
@@ -164,7 +179,21 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
     : null;
 
   const versionOf = new Map(versions.map((v) => [v.id, v.version]));
-  const log = events.map((e) => ({ line: describeProposalEvent(e, { names: nameOf, versions: versionOf }), type: e.type }));
+  // What the client added on the page (accepted versions only), for staff.
+  const clientAdded = clientAddedClasses(proposal.accepted_snapshot);
+  const addedPhrase = addedClassesPhrase(clientAdded);
+
+  const log = events.map((e) => {
+    const line = describeProposalEvent(e, { names: nameOf, versions: versionOf });
+    // The accepted line of THIS version also says what the client added.
+    if (e.type === "accepted" && e.proposal_id === proposal.id && clientAdded.length > 0) {
+      return {
+        line: { ...line, what: `${line.what}, ${addedPhrase}`, details: [...line.details, ...clientAdded.map((a) => `Added for ${a.brand}: ${a.description}`)] },
+        type: e.type,
+      };
+    }
+    return { line, type: e.type };
+  });
 
   const nameValues = (content.names ?? []).map(
     (n): NameValues => ({
@@ -180,6 +209,39 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
   );
 
   const common = { proposalId: proposal.id, updatedAt: proposal.updated_at, editable };
+
+  // More options: how many of its fields differ from the firm's defaults, and whether a problem is inside it.
+  const pricing = content.pricing;
+  const firmPackage = (settings && pricing ? findPackage(normalisePackages(settings.pricing ?? {}), pricing.package) : null) ?? null;
+  const changedCount = pricing
+    ? editorChangedCount({
+        pricing,
+        firmPackage,
+        adjustments: (content.adjustments ?? []).length,
+        brandPriceOverrides: (content.names ?? []).filter((n) => n.price_override && Object.keys(n.price_override).length > 0).length,
+      })
+    : 0;
+  const moreOpen = shouldOpenMore(issues.map((i) => i.path));
+  const customLabel = `Custom package: ${formatDollars(pricing?.per_class_cents ?? 0)} less per class under the package's included classes`;
+  const customHelp = pricing
+    ? `Off (the default): ${pricing.package} is a flat ${formatDollars(priceForClassCount({ ...pricing, reduce_under_included: false }, 1))} for one class. On: one class is ${formatDollars(priceForClassCount({ ...pricing, reduce_under_included: true }, 1))}. Turn it on only when the firm has agreed a reduced package.`
+    : "";
+  const pricingValues = {
+    package: content.pricing?.package ?? "",
+    base: moneyInput(content.pricing?.base_cents),
+    includedClasses: String(content.pricing?.included_classes ?? ""),
+    perClass: moneyInput(content.pricing?.per_class_cents),
+    secondMarkPct: String(content.pricing?.second_mark_discount_pct ?? ""),
+    govPerClass: moneyInput(content.pricing?.gov_per_class_cents),
+  };
+  const detailsValues = {
+    fullName: proposal.client_name,
+    firstName: content.client?.first_name ?? "",
+    company: content.client?.company ?? "",
+    clientEmail: proposal.client_email ?? "",
+    title: proposal.title,
+    expiresOn: proposal.expires_on ?? "",
+  };
 
   return (
     <div className="pe-page">
@@ -199,24 +261,19 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
             </span>
             <span>{proposal.title}</span>
             {proposal.expires_on && <span>Open until {formatShortFirmDate(`${proposal.expires_on}T12:00:00Z`, "UTC")}</span>}
-            {proposal.lead_id && <Link href={`/dashboard/leads/${proposal.lead_id}/`}>Lead</Link>}
-            {proposal.matter_id && <Link href={`/dashboard/matters/${proposal.matter_id}/`}>Matter</Link>}
             {proposal.source === "agent" && <span className="lx-note">Drafted by the agent</span>}
           </div>
+          <LeadLink
+            lead={leadLink}
+            matterId={proposal.matter_id}
+            linker={
+              leadOptions ? (
+                <LinkLeadForm proposalId={proposal.id} updatedAt={proposal.updated_at} leads={leadOptions.status === "ok" ? leadOptions.leads : null} />
+              ) : null
+            }
+          />
         </div>
       </div>
-
-      <Lifecycle
-        proposalId={proposal.id}
-        status={proposal.status}
-        version={proposal.version}
-        canWrite={canWrite}
-        isApprover={isApprover}
-        blockingErrors={errors}
-        approverNames={approverNames}
-        clientUrl={clientUrl}
-        queueNote={sendBlock.blocked ? { text: GOES_LIVE_ON_APPROVAL, queueId: sendBlock.queueId } : null}
-      />
 
       {readOnlyNote && (
         <div className="pe-readonly" role="note">
@@ -250,63 +307,68 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
 
       <div className="pe-cols">
         <div className="pe-forms">
-          <DetailsForm
-            {...common}
-            issues={shown(groups.details)}
-            values={{
-              fullName: proposal.client_name,
-              firstName: content.client?.first_name ?? "",
-              company: content.client?.company ?? "",
-              clientEmail: proposal.client_email ?? "",
-              title: proposal.title,
-              expiresOn: proposal.expires_on ?? "",
-              payUrl: proposal.pay_url ?? "",
-            }}
-          />
-          <MessageForm
-            {...common}
-            issues={shown(groups.message)}
-            values={{ greeting: content.greeting ?? "", recommendation: content.recommendation ?? "", officeActionNote: content.office_action_note ?? "" }}
-          />
-          <PricingForm
-            {...common}
-            issues={shown(groups.pricing)}
-            values={{
-              package: content.pricing?.package ?? "",
-              base: moneyInput(content.pricing?.base_cents),
-              includedClasses: String(content.pricing?.included_classes ?? ""),
-              perClass: moneyInput(content.pricing?.per_class_cents),
-              secondMarkPct: String(content.pricing?.second_mark_discount_pct ?? ""),
-              govPerClass: moneyInput(content.pricing?.gov_per_class_cents),
-            }}
-          />
-
-          <h2 className="lx-label" style={{ margin: "6px 0 -4px" }}>
-            Brand names
-          </h2>
-          <IssueList issues={shown(groups.general)} />
-          {nameValues.map((n, i) => (
-            <NameCard
-              key={n.id}
-              {...common}
-              issues={shown(groups.names.get(i) ?? [])}
-              value={n}
-              packageName={content.pricing?.package ?? ""}
+          <NameRowsProvider key={nameValues.map((n) => n.id).join("|")} names={nameValues}>
+            <BuilderLayout
+              changed={changedCount}
+              moreOpen={moreOpen}
+              who={<DetailsForm {...common} issues={shown(groups.details)} values={detailsValues} />}
+              names={
+                <>
+                  <IssueList issues={shown(groups.general)} />
+                  {nameValues.map((n, i) => (
+                    <NameCard key={n.id} {...common} issues={shown(groups.names.get(i) ?? [])} value={n} packageName={content.pricing?.package ?? ""} />
+                  ))}
+                  <AddNameForm proposalId={proposal.id} updatedAt={proposal.updated_at} editable={editable} />
+                </>
+              }
+              packageStep={<PricingForm {...common} issues={shown(groups.pricing)} values={pricingValues} payUrl={proposal.pay_url ?? ""} />}
+              create={
+                <Lifecycle
+                  proposalId={proposal.id}
+                  status={proposal.status}
+                  version={proposal.version}
+                  canWrite={canWrite}
+                  isApprover={isApprover}
+                  blockingErrors={errors}
+                  approverNames={approverNames}
+                  clientUrl={clientUrl}
+                  queueNote={sendBlock.blocked ? { text: GOES_LIVE_ON_APPROVAL, queueId: sendBlock.queueId } : null}
+                />
+              }
+              more={
+                <>
+                  <DetailsMoreFields proposalId={proposal.id} editable={editable} values={detailsValues} />
+                  <PricingMoreFields
+                    proposalId={proposal.id}
+                    editable={editable}
+                    values={pricingValues}
+                    reduceUnderIncluded={content.pricing?.reduce_under_included === true}
+                    customLabel={customLabel}
+                    customHelp={customHelp}
+                  />
+                  {nameValues.map((n) => (
+                    <NameMoreFields key={n.id} proposalId={proposal.id} editable={editable} value={n} packageName={content.pricing?.package ?? ""} />
+                  ))}
+                  <MessageForm
+                    {...common}
+                    issues={shown(groups.message)}
+                    values={{ greeting: content.greeting ?? "", recommendation: content.recommendation ?? "", officeActionNote: content.office_action_note ?? "" }}
+                  />
+                  <AdjustmentsForm
+                    {...common}
+                    issues={shown(groups.adjustments)}
+                    value={(content.adjustments ?? []).map((a) => ({
+                      id: a.id,
+                      label: a.label,
+                      kind: a.kind,
+                      value: a.kind === "percent" ? String(a.value) : moneyInput(a.value),
+                    }))}
+                  />
+                  <IncludesForm {...common} issues={shown(groups.includes)} initial={content.includes ?? []} />
+                </>
+              }
             />
-          ))}
-          <AddNameForm proposalId={proposal.id} updatedAt={proposal.updated_at} editable={editable} />
-
-          <AdjustmentsForm
-            {...common}
-            issues={shown(groups.adjustments)}
-            value={(content.adjustments ?? []).map((a) => ({
-              id: a.id,
-              label: a.label,
-              kind: a.kind,
-              value: a.kind === "percent" ? String(a.value) : moneyInput(a.value),
-            }))}
-          />
-          <IncludesForm {...common} issues={shown(groups.includes)} initial={content.includes ?? []} />
+          </NameRowsProvider>
         </div>
 
         <aside className="pe-side" aria-label="Figures and preview">
@@ -357,6 +419,18 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
                   <dd>{formatCents(proposal.accepted_snapshot.quote.gov_total_cents)}</dd>
                 </div>
               </dl>
+              {clientAdded.length > 0 && (
+                <div className="pe-client-added">
+                  <div className="lx-label">Classes the client added ({clientAdded.length})</div>
+                  <ul>
+                    {clientAdded.map((a, n) => (
+                      <li key={n}>
+                        <strong>{a.brand}</strong>: {a.description}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </section>
           )}
 

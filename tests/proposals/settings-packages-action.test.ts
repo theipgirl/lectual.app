@@ -181,7 +181,7 @@ describe("Settings -> Client proposals page: the Package prices card", () => {
     const html = await render({});
     expect(html).toContain("Package prices");
     expect(html).toContain("Dollars here, whole cents underneath. Totals are always worked out from these, never typed. USPTO fees are due at filing and are shown to the");
-    for (const label of ["Package name", "Price with the included classes ($)", "Classes included", "Per class over / under ($)", "Second mark discount (%)", "USPTO fee per class per mark ($)"]) {
+    for (const label of ["Package name", "Price with the included classes ($)", "Classes included", "Price per extra class ($)", "Second mark discount (%)", "USPTO fee per class per mark ($)"]) {
       expect(html).toContain(label);
     }
     expect(html).toContain("Add package");

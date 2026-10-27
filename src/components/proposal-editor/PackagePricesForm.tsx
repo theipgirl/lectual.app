@@ -67,7 +67,7 @@ export function PackagePricesForm({ packages }: { packages: PricingValues[] }) {
                   <input className="lx-input" name={`pkg.${n}.includedClasses`} inputMode="numeric" required defaultValue={row.includedClasses} />
                 </label>
                 <label className="lx-field">
-                  <span className="lx-label">Per class over / under ($)</span>
+                  <span className="lx-label">Price per extra class ($)</span>
                   <input className="lx-input" name={`pkg.${n}.perClass`} inputMode="decimal" required defaultValue={row.perClass} />
                 </label>
                 <label className="lx-field">

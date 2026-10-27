@@ -11,25 +11,35 @@ import { sevetri } from "./fixture";
 
 /**
  * The Sevetri example, in cents. The numbers come from the firm's own proposal
- * page: a Concierge package is $4,950 with 3 classes, $825 more or less per
- * class, 20% off the second mark of the SAME brand name, and the USPTO's $350
- * per class per mark is due at filing, not with the legal fee.
+ * page: a Concierge package is a FLAT $4,950 up to 3 classes (Sprint 28: fewer
+ * classes never lower it), $825 more for each class past the third, 20% off the
+ * second mark of the SAME brand name, and the USPTO's $350 per class per mark is
+ * due at filing, not with the legal fee.
  */
 
 /** Tick exactly these ids. */
 const pick = (...ids: string[]): Selection => Object.fromEntries(ids.map((id) => [id, true]));
 
 describe("quoteProposal: the firm's Concierge price by class count", () => {
-  it("1 class is $3,300.00", () => {
+  it("1 class is the flat $4,950.00 (fewer classes than included never lower it)", () => {
     const q = quoteProposal(sevetri(), pick("p-word", "p-c1"));
-    expect(q.names[0].base_cents).toBe(330_000);
-    expect(q.names[0].legal_cents).toBe(330_000);
-    expect(q.legal_total_cents).toBe(330_000);
+    expect(q.names[0].base_cents).toBe(495_000);
+    expect(q.names[0].legal_cents).toBe(495_000);
+    expect(q.legal_total_cents).toBe(495_000);
   });
 
-  it("2 classes is $4,125.00", () => {
+  it("2 classes is the same flat $4,950.00", () => {
     const q = quoteProposal(sevetri(), pick("p-word", "p-c1", "p-c2"));
-    expect(q.legal_total_cents).toBe(412_500);
+    expect(q.legal_total_cents).toBe(495_000);
+  });
+
+  it("the 4th class adds $825.00 legal and $350.00 USPTO", () => {
+    const content = sevetri();
+    content.names[0].classes.push({ id: "p-c3", label: "Marketing", preselected: false }, { id: "p-c4", label: "Training", preselected: false });
+    const three = quoteProposal(content, pick("p-word", "p-c1", "p-c2", "p-c3"));
+    const four = quoteProposal(content, pick("p-word", "p-c1", "p-c2", "p-c3", "p-c4"));
+    expect(four.legal_total_cents - three.legal_total_cents).toBe(82_500);
+    expect(four.gov_total_cents - three.gov_total_cents).toBe(35_000);
   });
 
   it("3 classes is the $4,950.00 base", () => {
@@ -42,11 +52,11 @@ describe("quoteProposal: the firm's Concierge price by class count", () => {
   it("the second mark of the same brand name is 20% off", () => {
     const q = quoteProposal(sevetri(), pick("p-word", "p-logo", "p-c1", "p-c2"));
     const [first, second] = q.names[0].marks;
-    expect(first.price_cents).toBe(412_500);
+    expect(first.price_cents).toBe(495_000);
     expect(first.second).toBe(false);
-    expect(second.price_cents).toBe(330_000); // 412500 x 0.8
+    expect(second.price_cents).toBe(396_000); // 495000 x 0.8
     expect(second.second).toBe(true);
-    expect(q.names[0].legal_cents).toBe(742_500);
+    expect(q.names[0].legal_cents).toBe(891_000);
   });
 
   it("'second' follows content order, not mark kind", () => {
@@ -59,8 +69,8 @@ describe("quoteProposal: the firm's Concierge price by class count", () => {
 
   it("the discount applies per brand name, not across them", () => {
     const q = quoteProposal(sevetri(), pick("p-word", "t-word", "p-c1", "t-c1"));
-    expect(q.names.map((n) => n.legal_cents)).toEqual([330_000, 330_000]);
-    expect(q.legal_total_cents).toBe(660_000);
+    expect(q.names.map((n) => n.legal_cents)).toEqual([495_000, 495_000]);
+    expect(q.legal_total_cents).toBe(990_000);
   });
 
   it("rounds the discounted price once, to the cent", () => {
@@ -84,10 +94,10 @@ describe("quoteProposal: the Sevetri proposal as the firm preselects it", () => 
     ]);
   });
 
-  it("each name is $7,425.00 and the legal fee is $14,850.00", () => {
-    expect(q.names.map((n) => n.legal_cents)).toEqual([742_500, 742_500]);
-    expect(q.legal_subtotal_cents).toBe(1_485_000);
-    expect(q.legal_total_cents).toBe(1_485_000);
+  it("each name is $8,910.00 and the legal fee is $17,820.00", () => {
+    expect(q.names.map((n) => n.legal_cents)).toEqual([891_000, 891_000]);
+    expect(q.legal_subtotal_cents).toBe(1_782_000);
+    expect(q.legal_total_cents).toBe(1_782_000);
   });
 
   it("USPTO fees are separate: 8 filing classes at $350.00, never in the legal fee", () => {
@@ -129,7 +139,7 @@ describe("quoteProposal: nothing is bought unless a mark AND a class are ticked"
     const q = quoteProposal(sevetri(), pick("t-logo", "t-c1"));
     expect(q.names.map((n) => n.included)).toEqual([false, true]);
     expect(q.names[0].legal_cents).toBe(0);
-    expect(q.legal_total_cents).toBe(330_000);
+    expect(q.legal_total_cents).toBe(495_000);
     expect(q.gov_total_cents).toBe(35_000);
   });
 
@@ -144,22 +154,22 @@ describe("quoteProposal: price_override", () => {
     const content = sevetri();
     content.names[0].price_override = { base_cents: 450_000 };
     const q = quoteProposal(content, pick("p-word", "p-c1", "p-c2", "t-word", "t-c1", "t-c2"));
-    expect(q.names[0].legal_cents).toBe(450_000 + 82_500 * (2 - 3));
-    expect(q.names[1].legal_cents).toBe(412_500);
+    expect(q.names[0].legal_cents).toBe(450_000); // flat: 2 classes is under the 3 included
+    expect(q.names[1].legal_cents).toBe(495_000);
   });
 
   it("a different per-class amount for one brand", () => {
     const content = sevetri();
     content.names[0].price_override = { per_class_cents: 50_000 };
     const q = quoteProposal(content, pick("p-word", "p-c1"));
-    expect(q.names[0].legal_cents).toBe(495_000 - 2 * 50_000);
+    expect(q.names[0].legal_cents).toBe(495_000); // under the included count the per-class amount does not apply
   });
 
   it("override fields are independent: setting one keeps the package's other", () => {
     const content = sevetri();
     content.names[0].price_override = { base_cents: 600_000 };
     const q = quoteProposal(content, pick("p-word", "p-c1"));
-    expect(q.names[0].legal_cents).toBe(600_000 - 2 * 82_500);
+    expect(q.names[0].legal_cents).toBe(600_000);
   });
 
   it("an override of 0 is a real override, not 'unset'", () => {
@@ -184,9 +194,9 @@ describe("quoteProposal: adjustments on the legal fee", () => {
     const content = sevetri();
     content.adjustments = [{ id: "a1", label: "Consultation credit", kind: "amount", value: 45_000 }];
     const q = all(content);
-    expect(q.legal_subtotal_cents).toBe(1_485_000);
+    expect(q.legal_subtotal_cents).toBe(1_782_000);
     expect(q.discount_cents).toBe(45_000);
-    expect(q.legal_total_cents).toBe(1_440_000);
+    expect(q.legal_total_cents).toBe(1_737_000);
     expect(q.adjustments[0]).toMatchObject({ id: "a1", discount_cents: 45_000 });
   });
 
@@ -194,8 +204,8 @@ describe("quoteProposal: adjustments on the legal fee", () => {
     const content = sevetri();
     content.adjustments = [{ id: "a1", label: "Referral", kind: "percent", value: 10 }];
     const q = all(content);
-    expect(q.adjustments[0].discount_cents).toBe(148_500);
-    expect(q.legal_total_cents).toBe(1_336_500);
+    expect(q.adjustments[0].discount_cents).toBe(178_200);
+    expect(q.legal_total_cents).toBe(1_603_800);
   });
 
   it("percent adjustments are each taken from the SUBTOTAL, not compounded", () => {
@@ -204,7 +214,7 @@ describe("quoteProposal: adjustments on the legal fee", () => {
       { id: "a1", label: "A", kind: "percent", value: 10 },
       { id: "a2", label: "B", kind: "percent", value: 10 },
     ];
-    expect(all(content).legal_total_cents).toBe(1_485_000 - 148_500 * 2);
+    expect(all(content).legal_total_cents).toBe(1_782_000 - 178_200 * 2);
   });
 
   it("an amount and a percent together", () => {
@@ -214,8 +224,8 @@ describe("quoteProposal: adjustments on the legal fee", () => {
       { id: "a2", label: "Referral", kind: "percent", value: 5 },
     ];
     const q = all(content);
-    expect(q.discount_cents).toBe(45_000 + 74_250);
-    expect(q.legal_total_cents).toBe(1_485_000 - 45_000 - 74_250);
+    expect(q.discount_cents).toBe(45_000 + 89_100);
+    expect(q.legal_total_cents).toBe(1_782_000 - 45_000 - 89_100);
   });
 
   it("rounds a percent to the nearest cent", () => {
@@ -236,8 +246,8 @@ describe("quoteProposal: adjustments on the legal fee", () => {
     ];
     const q = all(content);
     expect(q.legal_total_cents).toBe(0);
-    expect(q.discount_cents).toBe(1_485_000);
-    expect(q.adjustments.map((a) => a.discount_cents)).toEqual([1_485_000, 0]);
+    expect(q.discount_cents).toBe(1_782_000);
+    expect(q.adjustments.map((a) => a.discount_cents)).toEqual([1_782_000, 0]);
     expect(q.adjustments.reduce((s, a) => s + a.discount_cents, 0)).toBe(q.discount_cents);
   });
 
@@ -261,7 +271,7 @@ describe("quoteProposal: adjustments on the legal fee", () => {
   it("a negative amount cannot raise the price", () => {
     const content = sevetri();
     content.adjustments = [{ id: "a1", label: "?", kind: "amount", value: -50_000 }];
-    expect(all(content).legal_total_cents).toBe(1_485_000);
+    expect(all(content).legal_total_cents).toBe(1_782_000);
   });
 
   it("a percent outside 0..100 is clamped", () => {
@@ -269,7 +279,7 @@ describe("quoteProposal: adjustments on the legal fee", () => {
     content.adjustments = [{ id: "a1", label: "?", kind: "percent", value: 250 }];
     expect(all(content).legal_total_cents).toBe(0);
     content.adjustments = [{ id: "a1", label: "?", kind: "percent", value: -20 }];
-    expect(all(content).legal_total_cents).toBe(1_485_000);
+    expect(all(content).legal_total_cents).toBe(1_782_000);
   });
 });
 
@@ -286,8 +296,8 @@ describe("quoteProposal: total, never throwing", () => {
 
   it("a name priced below zero is priced at zero, not negative", () => {
     const content = sevetri();
-    content.names[0].price_override = { base_cents: 100_000 };
-    const q = quoteProposal(content, pick("p-word", "p-c1")); // 100000 - 2 x 82500 < 0
+    content.names[0].price_override = { base_cents: -100_000 };
+    const q = quoteProposal(content, pick("p-word", "p-c1"));
     expect(q.names[0].legal_cents).toBe(0);
     expect(q.legal_total_cents).toBe(0);
   });
@@ -330,5 +340,62 @@ describe("defaultSelection and normalizeSelection", () => {
     expect("not-an-id" in sel).toBe(false);
     expect(Object.values(sel).every((v) => typeof v === "boolean")).toBe(true);
     expect(normalizeSelection(sevetri(), "garbage")["p-word"]).toBe(false);
+  });
+});
+
+
+/* ───────────── Sprint 28 B2: a package is flat up to its included classes ───────────── */
+
+describe("quoteProposal: the package decides what an added class costs", () => {
+  const PACKAGES = {
+    Essential: { base_cents: 195_000, included_classes: 1, per_class_cents: 82_500 },
+    Enhanced: { base_cents: 295_000, included_classes: 2, per_class_cents: 82_500 },
+    Concierge: { base_cents: 495_000, included_classes: 3, per_class_cents: 82_500 },
+  } as const;
+
+  /** One brand name, one mark, n classes ticked. */
+  function priced(pkg: keyof typeof PACKAGES, classes: number, extra: Record<string, unknown> = {}) {
+    const c = sevetri();
+    c.pricing = { ...c.pricing, package: pkg, ...PACKAGES[pkg], ...extra };
+    c.names = [{ ...c.names[0], marks: [c.names[0].marks[0]], classes: Array.from({ length: 6 }, (_, i) => ({ id: `c${i}`, label: `C${i}`, preselected: false })) }];
+    return quoteProposal(c, pick("p-word", ...Array.from({ length: classes }, (_, i) => `c${i}`)));
+  }
+  const step = (pkg: keyof typeof PACKAGES, from: number, to: number) => {
+    const a = priced(pkg, from);
+    const b = priced(pkg, to);
+    return { legal: b.legal_total_cents - a.legal_total_cents, gov: b.gov_total_cents - a.gov_total_cents };
+  };
+
+  it("Essential 1 -> 2 classes = +$825 legal +$350 USPTO", () => {
+    expect(step("Essential", 1, 2)).toEqual({ legal: 82_500, gov: 35_000 });
+    expect(priced("Essential", 1).legal_total_cents).toBe(195_000);
+  });
+  it("Enhanced 1 -> 2 classes = +$0 legal +$350 USPTO, and 1 class is still the flat $2,950", () => {
+    expect(step("Enhanced", 1, 2)).toEqual({ legal: 0, gov: 35_000 });
+    expect(priced("Enhanced", 1).legal_total_cents).toBe(295_000);
+    expect(step("Enhanced", 2, 3)).toEqual({ legal: 82_500, gov: 35_000 });
+  });
+  it("Concierge 1 -> 3 = +$0 legal +$700 USPTO; 3 -> 4 = +$825 +$350; 1 class is the flat $4,950", () => {
+    expect(priced("Concierge", 1).legal_total_cents).toBe(495_000);
+    expect(step("Concierge", 1, 3)).toEqual({ legal: 0, gov: 70_000 });
+    expect(step("Concierge", 3, 4)).toEqual({ legal: 82_500, gov: 35_000 });
+  });
+  it("USPTO is $350 per class even inside the included count, and is not touched by credits, the second-mark percent or the custom switch", () => {
+    const c = sevetri();
+    c.adjustments = [{ id: "a", label: "Credit", kind: "percent", value: 50 }];
+    const base = quoteProposal(c, pick("p-word", "p-logo", "p-c1", "p-c2"));
+    expect(base.gov_total_cents).toBe(4 * 35_000);
+    c.pricing = { ...c.pricing, second_mark_discount_pct: 50, reduce_under_included: true };
+    expect(quoteProposal(c, pick("p-word", "p-logo", "p-c1", "p-c2")).gov_total_cents).toBe(4 * 35_000);
+  });
+  it("reduce_under_included: absent or false is flat; true restores $825 less per class under the included count", () => {
+    expect(priced("Concierge", 1, { reduce_under_included: false }).legal_total_cents).toBe(495_000);
+    expect(priced("Concierge", 1, { reduce_under_included: "yes" }).legal_total_cents).toBe(495_000);
+    expect(priced("Concierge", 1, { reduce_under_included: true }).legal_total_cents).toBe(495_000 - 2 * 82_500);
+    expect(priced("Concierge", 2, { reduce_under_included: true }).legal_total_cents).toBe(495_000 - 82_500);
+    expect(priced("Concierge", 3, { reduce_under_included: true }).legal_total_cents).toBe(495_000);
+  });
+  it("reduce_under_included never takes a name below zero", () => {
+    expect(priced("Essential", 1, { base_cents: 10_000, included_classes: 5, reduce_under_included: true }).legal_total_cents).toBe(0);
   });
 });

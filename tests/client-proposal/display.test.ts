@@ -15,7 +15,7 @@ describe("markDisplayPrices", () => {
         expect(d[m.id].second).toBe(m.second);
       }
     }
-    expect(d["p-word"].price_cents).toBe(495_000 + 82_500 * (2 - 3));
+    expect(d["p-word"].price_cents).toBe(495_000); // flat: 2 classes is under the 3 included
     expect(d["p-logo"].second).toBe(true);
   });
 

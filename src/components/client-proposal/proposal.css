@@ -317,3 +317,21 @@ footer.cp-footer { background: var(--cp-ink); color: var(--cp-on-brand); padding
   .cp-rec h2 { font-size: 14px; }
   footer.cp-footer { padding-top: 14px; padding-bottom: 14px; }
 }
+
+/* Sprint 28: locked classes and the client's "Add a class" control. Tokens only. */
+.cp-lock { display: block; font-size: 14px; color: var(--cp-soft); }
+.cp-mine { align-items: center; }
+.cp-link { background: none; border: 0; padding: 4px 8px; color: var(--cp-brand); font: inherit; text-decoration: underline; cursor: pointer; }
+.cp-link:disabled { color: var(--cp-soft); text-decoration: none; cursor: default; }
+.cp-add { border-top: 1px solid var(--cp-line); }
+.cp-how-add { margin: 0 0 6px; font-size: 15px; color: var(--cp-soft); }
+.cp-add-row { display: flex; gap: 8px; align-items: stretch; }
+.cp-add-input {
+  flex: 1; min-width: 0; padding: 10px 12px; font: inherit;
+  background: var(--cp-box); color: var(--cp-ink); border: 1px solid var(--cp-line-2); border-radius: 8px;
+}
+.cp-add-btn {
+  padding: 10px 18px; font: inherit; font-weight: 600; cursor: pointer;
+  background: var(--cp-brand); color: var(--cp-on-brand); border: 0; border-radius: 8px;
+}
+.cp-add-btn:hover { background: var(--cp-brand-dark); }

@@ -143,12 +143,18 @@ export type ProposalPricing = {
   /** Price with `included_classes` classes. */
   base_cents: number;
   included_classes: number;
-  /** Added per class over `included_classes`, removed per class under. */
+  /** Added per class over `included_classes`. A package is flat up to `included_classes`: fewer classes never lower the price. */
   per_class_cents: number;
   /** 0..100. Second mark of the SAME brand name. */
   second_mark_discount_pct: number;
-  /** USPTO fee per class per mark, due at filing. */
+  /** USPTO fee per class per mark, due at filing. Always charged for every class, never waived. */
   gov_per_class_cents: number;
+  /**
+   * Custom package only: take `per_class_cents` off for each class UNDER `included_classes`
+   * (the pre-Sprint-28 rule). Absent or false = the package is flat. Set by staff, or by the
+   * consult drafter on quoted evidence; never read from the browser.
+   */
+  reduce_under_included?: boolean;
 };
 
 export type ProposalMark = {
@@ -163,6 +169,8 @@ export type ProposalClass = {
   /** Plain business language. Never an International Class number. */
   label: string;
   preselected: boolean;
+  /** True for a class the client added on /p/<token> (Sprint 28); its label is their plain-text description. */
+  client_added?: boolean;
 };
 
 export type ProposalName = {

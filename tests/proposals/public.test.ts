@@ -14,6 +14,7 @@ import {
   recordProposalViewed,
   type PublicProposalsDb,
 } from "@/lib/proposals/public";
+import { ADDED_CLASS_REFUSAL } from "@/lib/proposals/added-classes";
 import { defaultSelection, quoteProposal } from "@/lib/proposals/pricing";
 import { sevetri } from "./fixture";
 
@@ -368,7 +369,7 @@ describe("readPublicProposal", () => {
     const r = await readPublicProposal(TOKEN, new Date("2027-01-01T00:00:00Z"), db);
     if (r.status !== "ok") throw new Error(r.status);
     expect(r.view.status).toBe("accepted");
-    expect(r.view.acceptedQuote?.legal_total_cents).toBe(1_485_000);
+    expect(r.view.acceptedQuote?.legal_total_cents).toBe(1_782_000);
     expect(r.view.acceptedSelection).toEqual(selection);
     expect(r.view.payUrl).toBe("https://app.lawmatics.com/forms/share/abc");
     expect(r.handle.storedStatus).toBe("accepted");
@@ -404,7 +405,7 @@ describe("acceptPublicProposal", () => {
     const { db, tables } = world();
     const r = await acceptPublicProposal(TOKEN, selection(["p-word", "p-logo", "p-c1", "p-c2"]), NOW, db);
     if (!r.ok) throw new Error(r.reason);
-    expect(r.quote.legal_total_cents).toBe(742_500);
+    expect(r.quote.legal_total_cents).toBe(891_000);
     expect(r.quote.gov_total_cents).toBe(140_000);
     expect(r.payUrl).toBe("https://app.lawmatics.com/forms/share/abc");
     expect(r.acceptedAt).toBe(NOW.toISOString());
@@ -413,7 +414,7 @@ describe("acceptPublicProposal", () => {
     expect(row.status).toBe("accepted");
     expect(row.accepted_selection).toMatchObject({ "p-word": true, "t-word": false });
     expect(row.accepted_snapshot).toMatchObject({ schema: 1, version: 2, accepted_at: NOW.toISOString() });
-    expect((row.accepted_snapshot as { quote: { legal_total_cents: number } }).quote.legal_total_cents).toBe(742_500);
+    expect((row.accepted_snapshot as { quote: { legal_total_cents: number } }).quote.legal_total_cents).toBe(891_000);
     // Sprint 19: the firm notice is a real follow-up now (tests/proposals/accept-followups.test.ts), so the
     // old "log the id" stub is gone; nothing about the proposal is logged at info level.
     expect(info).not.toHaveBeenCalled();
@@ -452,7 +453,7 @@ describe("acceptPublicProposal", () => {
     const second = await acceptPublicProposal(TOKEN, selection(["p-word", "p-logo", "p-c1", "p-c2"]), NOW, db);
     expect(first.ok).toBe(true);
     expect(second).toMatchObject({ ok: false, reason: "already_resolved" });
-    expect((tables.client_proposal[0].accepted_snapshot as { quote: { legal_total_cents: number } }).quote.legal_total_cents).toBe(330_000);
+    expect((tables.client_proposal[0].accepted_snapshot as { quote: { legal_total_cents: number } }).quote.legal_total_cents).toBe(495_000);
   });
 
   it("loses cleanly when the row leaves 'sent' between the read and the write", async () => {
@@ -476,12 +477,18 @@ describe("acceptPublicProposal", () => {
     expect(tables.client_proposal[0].accepted_snapshot).toBeNull();
   });
 
-  it("refuses an empty selection, and a mark without a class", async () => {
-    const { db, calls } = world();
+  it("refuses an empty selection; a mark without a class is repaired to its first class (Sprint 28)", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    const { db, calls, tables } = world();
     expect(await acceptPublicProposal(TOKEN, {}, NOW, db)).toMatchObject({ ok: false, reason: "nothing_selected" });
-    expect(await acceptPublicProposal(TOKEN, selection(["p-word"]), NOW, db)).toMatchObject({ ok: false, reason: "nothing_selected" });
     expect(await acceptPublicProposal(TOKEN, "garbage", NOW, db)).toMatchObject({ ok: false, reason: "nothing_selected" });
     expect(calls.some((c) => c.op === "update")).toBe(false);
+    // Before Sprint 28 this was refused; now it can never be recorded as a mark with no class.
+    expect(await acceptPublicProposal(TOKEN, selection(["p-word"]), NOW, db)).toMatchObject({ ok: true });
+    const stored = tables.client_proposal[0].accepted_selection as Record<string, boolean>;
+    expect(stored["p-word"]).toBe(true);
+    expect(stored["p-c1"]).toBe(true);
+    expect(stored["p-c2"]).toBe(false);
   });
 
   it("ignores ids the proposal does not offer and non-boolean ticks", async () => {
@@ -635,5 +642,129 @@ describe("acceptPublicProposal: the firm notice and the Lawmatics note are follo
     await acceptPublicProposal(TOKEN, pick(IDS), NOW, db);
     await mocks.after.mock.calls[0][0]();
     expect(spies.flatMap((s) => s.mock.calls)).toEqual([]);
+  });
+});
+
+/* ───────────── Sprint 28: the client adds a class; the server re-prices ───────────── */
+
+function essentialContent() {
+  const c = sevetri();
+  c.pricing = { ...c.pricing, package: "Essential", base_cents: 195_000, included_classes: 1, per_class_cents: 82_500, second_mark_discount_pct: 20 };
+  c.names = [c.names[0]];
+  c.names[0].classes = [c.names[0].classes[0]];
+  return c;
+}
+
+describe("acceptPublicProposal: classes the client adds", () => {
+  const ticks = (ids: string[]) => Object.fromEntries(ids.map((i) => [i, true]));
+  const accepted = (tables: Record<string, Row[]>) => tables.client_proposal[0] as { accepted_selection: Record<string, boolean>; accepted_snapshot: { quote: ReturnType<typeof quoteProposal>; content: ReturnType<typeof sevetri> } };
+
+  it("one added class on a single mark: legal $2,775 and USPTO $700, stored in the selection and the snapshot", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    const { db, tables } = world({ proposal: { content: essentialContent() } });
+    const r = await acceptPublicProposal(TOKEN, ticks(["p-word", "p-c1"]), NOW, db, { p: ["Online store services"] });
+    expect(r.ok).toBe(true);
+    const row = accepted(tables);
+    expect(row.accepted_snapshot.quote.legal_total_cents).toBe(277_500);
+    expect(row.accepted_snapshot.quote.gov_total_cents).toBe(70_000);
+    expect(row.accepted_snapshot.quote.gov_class_count).toBe(2);
+    expect(row.accepted_snapshot.quote.names[0].classes.map((c) => c.label)).toEqual([expect.any(String), "Online store services"]);
+    expect(row.accepted_selection["add-p-1"]).toBe(true);
+    expect(row.accepted_snapshot.content.names[0].classes[1]).toMatchObject({ id: "add-p-1", client_added: true, label: "Online store services" });
+    if (r.ok) expect(r.quote.legal_total_cents).toBe(277_500);
+  });
+
+  it("with word and design ticked the second mark's discount applies to the extra-class fee, exactly as the engine does", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    const { db, tables } = world({ proposal: { content: essentialContent() } });
+    await acceptPublicProposal(TOKEN, ticks(["p-word", "p-logo", "p-c1"]), NOW, db, { p: ["Online store services"] });
+    const real = essentialContent();
+    real.names[0].classes.push({ id: "x", label: "Online store services", preselected: true });
+    const engine = quoteProposal(real, ticks(["p-word", "p-logo", "p-c1", "x"]));
+    const row = accepted(tables);
+    expect(row.accepted_snapshot.quote.legal_total_cents).toBe(engine.legal_total_cents);
+    expect(row.accepted_snapshot.quote.gov_total_cents).toBe(engine.gov_total_cents);
+    // 1,950 + 825 = 2,775 for the first mark; the second is 20% off that whole figure.
+    expect(engine.legal_total_cents).toBe(277_500 + 222_000);
+    expect(engine.gov_total_cents).toBe(140_000);
+  });
+
+  it("ignores forged price, total, per-class and class-count fields", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    const { db, tables } = world({ proposal: { content: essentialContent() } });
+    const forged = { ...ticks(["p-word", "p-c1"]), legal_total_cents: 1, total: 1, per_class_cents: 1, class_count: 99, price: 1 };
+    const r = await acceptPublicProposal(TOKEN, forged, NOW, db, { p: ["Online store services"], per_class_cents: 1, legal_total_cents: 1 });
+    expect(r).toMatchObject({ ok: false, reason: "invalid_added" });
+    expect(tables.client_proposal[0].status).toBe("sent");
+    const ok = await acceptPublicProposal(TOKEN, forged, NOW, db, { p: ["Online store services"] });
+    expect(ok.ok).toBe(true);
+    expect(accepted(tables).accepted_snapshot.quote.legal_total_cents).toBe(277_500);
+    expect("legal_total_cents" in accepted(tables).accepted_selection).toBe(false);
+  });
+
+  it.each([
+    ["too many", { p: ["a", "b", "c", "d", "e", "f"] }],
+    ["too long", { p: ["x".repeat(201)] }],
+    ["markup", { p: ["<b>hi</b>"] }],
+    ["not a list", { p: "software" }],
+    ["wrong shape", ["software"]],
+    ["unknown brand name id", { zzz: ["software"] }],
+    ["an empty description", { p: ["   "] }],
+  ])("refuses %s with the one fixed sentence and writes nothing", async (_n, added) => {
+    const { db, calls, tables } = world({ proposal: { content: essentialContent() } });
+    const r = await acceptPublicProposal(TOKEN, ticks(["p-word", "p-c1"]), NOW, db, added);
+    expect(r).toEqual({ ok: false, reason: "invalid_added", message: ADDED_CLASS_REFUSAL });
+    expect(calls.some((c) => c.op === "update")).toBe(false);
+    expect(tables.client_proposal[0].accepted_snapshot).toBeNull();
+  });
+
+  it("accepts exactly 5 added classes of exactly 200 characters", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    const { db } = world({ proposal: { content: essentialContent() } });
+    const five = ["a", "b", "c", "d", "e"].map((x) => x.repeat(200));
+    const r = await acceptPublicProposal(TOKEN, ticks(["p-word", "p-c1"]), NOW, db, { p: five });
+    expect(r.ok && r.quote.legal_total_cents).toBe(195_000 + 5 * 82_500);
+  });
+
+  it("drops added classes for a brand name with no mark ticked", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    const { db, tables } = world();
+    await acceptPublicProposal(TOKEN, ticks(["p-word", "p-c1"]), NOW, db, { t: ["Something"] });
+    expect(accepted(tables).accepted_selection["add-t-1"]).toBeUndefined();
+  });
+
+  it("repairs a forged mark with every class unticked to its first class, and refuses one with no class at all", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    const { db, tables } = world();
+    await acceptPublicProposal(TOKEN, { "p-word": true, "p-c1": false, "p-c2": false }, NOW, db);
+    const sel = accepted(tables).accepted_selection;
+    expect(sel["p-c1"]).toBe(true);
+    for (const nm of accepted(tables).accepted_snapshot.content.names) {
+      const markOn = nm.marks.some((m) => sel[m.id]);
+      if (markOn) expect(nm.classes.some((c) => sel[c.id])).toBe(true);
+    }
+    const noClass = sevetri();
+    noClass.names[0].classes = [];
+    const w = world({ proposal: { content: noClass } });
+    expect(await acceptPublicProposal(TOKEN, ticks(["p-word", "t-logo", "t-c1"]), NOW, w.db)).toMatchObject({ ok: false, reason: "nothing_selected" });
+    expect(w.tables.client_proposal[0].status).toBe("sent");
+  });
+
+  it("refuses added classes on a version that is not sent", async () => {
+    for (const status of ["accepted", "superseded", "draft"]) {
+      const { db, calls } = world({ proposal: { content: essentialContent(), status } });
+      const r = await acceptPublicProposal(TOKEN, ticks(["p-word", "p-c1"]), NOW, db, { p: ["x"] });
+      expect(r.ok).toBe(false);
+      expect(calls.some((c) => c.op === "update")).toBe(false);
+    }
+  });
+
+  it("pricing with reduce_under_included is only what is stored on the proposal, never the browser's", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    const { db, tables } = world();
+    await acceptPublicProposal(TOKEN, { ...ticks(["p-word", "p-c1"]), reduce_under_included: true }, NOW, db, { pricing: { reduce_under_included: true } });
+    expect(tables.client_proposal[0].status).toBe("sent");
+    await acceptPublicProposal(TOKEN, { ...ticks(["p-word", "p-c1"]), reduce_under_included: true }, NOW, db);
+    expect(accepted(tables).accepted_snapshot.quote.legal_total_cents).toBe(495_000);
   });
 });

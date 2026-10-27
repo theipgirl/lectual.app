@@ -107,6 +107,18 @@ function withContent(next: Parsed<ProposalContent>): Parsed<UpdateProposalInput>
 
 /* ── the sections ───────────────────────────────────────────────────────── */
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Links an unlinked draft or approved proposal to a lead. The composite foreign key keeps it inside the firm. */
+export async function linkLeadAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  return edit(formData, (current) => {
+    const leadId = field(formData, "leadId");
+    if (!UUID_RE.test(leadId)) return { ok: false, error: "Choose a lead to link." };
+    if (current.lead_id) return { ok: false, error: "This proposal is already linked to a lead." };
+    return { ok: true, value: { leadId } };
+  });
+}
+
 export async function saveDetailsAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   return edit(formData, (current) => {
     const r = parseDetails(formData, current.content);
@@ -121,7 +133,10 @@ export async function saveMessageAction(_prev: ActionState, formData: FormData):
 export async function savePricingAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   return edit(formData, (current) => {
     const r = parsePricing(formData);
-    return r.ok ? { ok: true, value: { content: { ...current.content, pricing: r.value } } } : r;
+    if (!r.ok) return r;
+    // The pay link rides on this form (Step 3); a form that did not carry it leaves the stored one alone.
+    const payUrl = formData.has("payUrl") ? { payUrl: field(formData, "payUrl") || null } : {};
+    return { ok: true, value: { content: { ...current.content, pricing: r.value }, ...payUrl } };
   });
 }
 

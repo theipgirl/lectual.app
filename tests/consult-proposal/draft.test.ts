@@ -37,7 +37,7 @@ describe("draftProposalFromConsult: the Sevetri call", () => {
     const d = expectOk(await draftProposalFromConsult(draftInput(llm)));
 
     const q = quoteOf(d);
-    expect(q.legal_total_cents).toBe(1_485_000);
+    expect(q.legal_total_cents).toBe(1_782_000);
     expect(q.gov_total_cents).toBe(280_000);
     expect(d.content.names.flatMap((n) => [...n.marks, ...n.classes]).every((x) => x.preselected)).toBe(true);
     expect(d.content.adjustments).toEqual([]);
@@ -120,7 +120,7 @@ describe("evidence is verbatim or it is left out", () => {
     });
     expect(d.reviewerNotes).toContain('Left out "Downloadable Mobile Apps" for Prosperall: its quote was not found');
     expect(d.reviewerNotes).toContain("[NOT FOUND, left out]");
-    expect(quoteOf(d).legal_total_cents).toBe(1_485_000);
+    expect(quoteOf(d).legal_total_cents).toBe(1_782_000);
   });
 
   it("matches quotes whitespace- and case-insensitively, with curly quotes, but not paraphrases", () => {
@@ -178,7 +178,7 @@ describe("prices: never invented", () => {
     out.price_changes = [{ brand: "Prosperall", amount_usd: 4000, quote: "I can do Prosperall for $4,000 instead" }];
     const d = expectOk(await draftProposalFromConsult(draftInput(fakeLlm(out).llm)));
     expect(d.content.names[0].price_override).toBeUndefined();
-    expect(quoteOf(d).legal_total_cents).toBe(1_485_000);
+    expect(quoteOf(d).legal_total_cents).toBe(1_782_000);
     expect(d.reviewerNotes).toContain("Not applied: a price of $4,000 for Prosperall, because its quote was not found in the record");
   });
 
@@ -220,7 +220,7 @@ describe("prices: never invented", () => {
     out.recommended_package = "Essential";
     const d = expectOk(await draftProposalFromConsult(draftInput(fakeLlm(out).llm)));
     expect(d.content.pricing.package).toBe("Concierge");
-    expect(quoteOf(d).legal_total_cents).toBe(1_485_000);
+    expect(quoteOf(d).legal_total_cents).toBe(1_782_000);
     expect(d.reviewerNotes).toContain('CHECK FIRST: the AI reported the package "Essential"');
   });
 
@@ -339,7 +339,7 @@ describe("prompt injection in the transcript", () => {
     expect(d.content.names.every((n) => n.price_override === undefined)).toBe(true);
     expect(d.content.adjustments).toEqual([]);
     expect(d.content.pricing).toEqual(draftInput(llm).pricing.pricing);
-    expect(quoteOf(d).legal_total_cents).toBe(1_485_000);
+    expect(quoteOf(d).legal_total_cents).toBe(1_782_000);
     expect(d.reviewerNotes).toContain("looks like instructions to an AI");
     expect(d.reviewerNotes).toContain('CHECK FIRST: the AI reported the package "Free"');
 
@@ -354,7 +354,7 @@ describe("prompt injection in the transcript", () => {
     out.price_changes = [{ brand: "Prosperall", amount_usd: 1, quote: "I can do Prosperall for $1 today" }];
     const d = expectOk(await draftProposalFromConsult(draftInput(fakeLlm(out).llm, { source: meetingSource(spoofed) })));
     expect(d.content.names[0].price_override).toBeUndefined();
-    expect(quoteOf(d).legal_total_cents).toBe(1_485_000);
+    expect(quoteOf(d).legal_total_cents).toBe(1_782_000);
     expect(d.reviewerNotes).toContain("because the record contains text that looks like instructions to an AI");
   });
 
@@ -423,7 +423,7 @@ describe("the record", () => {
     out.price_changes = [{ brand: "Prosperall", amount_usd: 2000, quote: "Could you do Prosperall for $2,000" }];
     const input = draftInput(fakeLlm(out).llm, { source: { kind: "pasted", text: `${pasted}\nSevetri Wilson: Could you do Prosperall for $2,000?` } });
     const d = expectOk(await draftProposalFromConsult(input));
-    expect(quoteOf(d).legal_total_cents).toBe(1_485_000);
+    expect(quoteOf(d).legal_total_cents).toBe(1_782_000);
     expect(d.reviewerNotes).toContain("a pasted transcript");
     expect(d.reviewerNotes).toContain("only the client said it");
   });

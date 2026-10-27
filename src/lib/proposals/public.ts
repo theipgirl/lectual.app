@@ -5,7 +5,8 @@ import { getAdminClient } from "@/lib/db/admin";
 import { resolveTimeZone } from "@/lib/org/profile-rules";
 import { runAcceptanceFollowups, type FollowupDb } from "./accept-followups";
 import { isProposalExpired } from "./expiry";
-import { normalizeSelection, quoteHasItems, quoteProposal } from "./pricing";
+import { ADDED_CLASS_REFUSAL, parseAddedClasses, quoteWithAddedClasses } from "./added-classes";
+import { normalizeSelection, quoteHasItems } from "./pricing";
 import {
   isWellFormedProposalToken,
   type AcceptedSnapshot,
@@ -265,12 +266,13 @@ export function publicContent(raw: unknown): ProposalContent {
     "per_class_cents",
     "second_mark_discount_pct",
     "gov_per_class_cents",
+    "reduce_under_included",
   ]);
   out.names = objects(c.names).map((nm) => {
     const name = pick(nm, ["id", "name", "what", "note"]);
     if (isObject(nm.price_override)) name.price_override = pick(nm.price_override, ["base_cents", "per_class_cents"]);
     name.marks = objects(nm.marks).map((m) => pick(m, ["id", "kind", "desc", "preselected"]));
-    name.classes = objects(nm.classes).map((cl) => pick(cl, ["id", "label", "preselected"]));
+    name.classes = objects(nm.classes).map((cl) => pick(cl, ["id", "label", "preselected", "client_added"]));
     return name;
   });
   out.adjustments = objects(c.adjustments).map((a) => pick(a, ["id", "label", "kind", "value"]));
@@ -501,6 +503,8 @@ export type AcceptRefusal =
   | "already_resolved"
   /** The selection has no brand name with both a mark and a class ticked. */
   | "nothing_selected"
+  /** An added class is over the limits, malformed, or names a brand name the proposal does not have. */
+  | "invalid_added"
   | "unconfigured"
   | "unavailable";
 
@@ -522,6 +526,7 @@ const REFUSAL_MESSAGE: Record<AcceptRefusal, string> = {
   closed: "This proposal is no longer open. Please contact the firm.",
   already_resolved: "This proposal has already been accepted.",
   nothing_selected: "Choose at least one mark and one class to accept.",
+  invalid_added: ADDED_CLASS_REFUSAL,
   unconfigured: "This page isn't available right now. Please try again later.",
   unavailable: "We couldn't record your acceptance. Please try again.",
 };
@@ -546,6 +551,8 @@ export async function acceptPublicProposal(
   selection: unknown,
   now: Date,
   db?: PublicProposalsDb,
+  /** Added-class DESCRIPTIONS by brand name id: the only other thing the browser may send. */
+  addedClasses?: unknown,
 ): Promise<AcceptResult> {
   const read = await readPublicProposal(token, now, db);
   if (read.status === "unconfigured") return refuse("unconfigured");
@@ -554,16 +561,22 @@ export async function acceptPublicProposal(
   if (read.status === "closed") return refuse("closed");
   if (read.handle.storedStatus !== "sent") return refuse("already_resolved");
 
-  const { content } = read.view;
-  const picked = normalizeSelection(content, selection);
-  const quote = quoteProposal(content, picked);
+  const picked = normalizeSelection(read.view.content, selection);
+  const parsed = parseAddedClasses(read.view.content, picked, addedClasses);
+  if (!parsed.ok) return refuse("invalid_added");
+  // One price path: the stored content plus the ticks plus the added descriptions,
+  // through the helper the page uses. A mark ticked with no class is repaired to
+  // its first class; one with no class to fall back on is refused.
+  const priced = quoteWithAddedClasses(read.view.content, picked, parsed.added, { repair: true });
+  if (!priced.ok) return refuse("nothing_selected");
+  const { content, selection: finalSelection, quote } = priced;
   if (!quoteHasItems(quote)) return refuse("nothing_selected");
 
   const acceptedAt = now.toISOString();
   const snapshot = buildAcceptedSnapshot({
     version: read.handle.version,
     content,
-    selection: picked,
+    selection: finalSelection,
     quote,
     acceptedAt,
   });
@@ -576,7 +589,7 @@ export async function acceptPublicProposal(
       .from("client_proposal")
       .update({
         status: "accepted",
-        accepted_selection: picked,
+        accepted_selection: finalSelection,
         accepted_snapshot: snapshot,
       })
       .eq("id", proposalId)

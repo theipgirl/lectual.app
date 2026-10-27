@@ -26,12 +26,15 @@ export function ActionForm({
   children,
   confirm,
   className,
+  id,
 }: {
   action: Action;
   children: (s: { state: ActionState; pending: boolean }) => ReactNode;
   /** A question to ask before submitting (withdraw, remove). */
   confirm?: string;
   className?: string;
+  /** Lets fields placed elsewhere on the page (More options) belong to this form through their `form` attribute. */
+  id?: string;
 }) {
   const [state, dispatch, pending] = useActionState<ActionState, FormData>(action, {});
 
@@ -44,7 +47,7 @@ export function ActionForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className={className}>
+    <form id={id} onSubmit={onSubmit} className={className}>
       {children({ state, pending })}
     </form>
   );
