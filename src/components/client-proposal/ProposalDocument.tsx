@@ -2,7 +2,13 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { NOT_A_LAW_FIRM_DISCLAIMER } from "@/lib/legal/disclaimer";
-import { defaultSelection, normalizeSelection, quoteHasItems, quoteProposal } from "@/lib/proposals/pricing";
+import {
+  defaultSelection,
+  lockedSelectionIds,
+  normalizeSelection,
+  quoteHasItems,
+  quoteProposal,
+} from "@/lib/proposals/pricing";
 import {
   MARK_KIND_DEFAULT_DESC,
   MARK_KIND_LABEL,
@@ -61,6 +67,9 @@ export type ProposalDocumentProps = {
 
 const DEFAULT_TITLE = "Trademark Proposal";
 
+/** Shown on a card whose last mark or class is held on, so a client can't untick to $0. */
+export const KEEP_ONE_HINT = "At least one class and one mark must stay selected.";
+
 function Rich({ text }: { text: string | undefined }): ReactNode {
   return richSegments(text).map((seg, i) => (seg.bold ? <b key={i}>{seg.text}</b> : seg.text));
 }
@@ -98,6 +107,11 @@ export function ProposalDocument(props: ProposalDocumentProps) {
     [mode, acceptedQuote, content, selection],
   );
   const display = useMemo(() => markDisplayPrices(content, selection), [content, selection]);
+  // Boxes the client may not untick: doing so would leave nothing to accept.
+  const locked = useMemo(
+    () => (readOnly ? new Set<string>() : lockedSelectionIds(content, selection)),
+    [readOnly, content, selection],
+  );
 
   const canAccept = quoteHasItems(quote);
   const pricing = content.pricing;
@@ -111,6 +125,7 @@ export function ProposalDocument(props: ProposalDocumentProps) {
 
   function toggle(id: string, on: boolean) {
     if (readOnly) return;
+    if (!on && locked.has(id)) return;
     setOverrides((prev) => ({ ...prev, [id]: on }));
   }
 
@@ -226,6 +241,7 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                   const qn = quote.names.find((q) => q.id === nm.id);
                   const pickedMarks = nm.marks.filter((m) => selection[m.id] === true).length;
                   const pickedClasses = nm.classes.filter((c) => selection[c.id] === true).length;
+                  const holdsLast = [...nm.marks, ...nm.classes].some((x) => locked.has(x.id));
                   return (
                     <article className="cp-card" key={nm.id} aria-labelledby={`cp-h-${nm.id}`}>
                       <div className="cp-card-h">
@@ -254,7 +270,8 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                               <input
                                 type="checkbox"
                                 checked={on}
-                                disabled={readOnly}
+                                disabled={readOnly || locked.has(m.id)}
+                                aria-describedby={locked.has(m.id) ? `cp-keep-${nm.id}` : undefined}
                                 onChange={(e) => toggle(m.id, e.target.checked)}
                               />
                               <span className="cp-box" aria-hidden="true" />
@@ -287,7 +304,8 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                               <input
                                 type="checkbox"
                                 checked={on}
-                                disabled={readOnly}
+                                disabled={readOnly || locked.has(c.id)}
+                                aria-describedby={locked.has(c.id) ? `cp-keep-${nm.id}` : undefined}
                                 onChange={(e) => toggle(c.id, e.target.checked)}
                               />
                               <span className="cp-box" aria-hidden="true" />
@@ -306,6 +324,11 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                       {!readOnly && pickedMarks > 0 && pickedClasses === 0 ? (
                         <p className="cp-warn" role="status">
                           Please select at least one class to include {nm.name}.
+                        </p>
+                      ) : null}
+                      {holdsLast ? (
+                        <p className="cp-keep" id={`cp-keep-${nm.id}`}>
+                          {KEEP_ONE_HINT}
                         </p>
                       ) : null}
                     </article>

@@ -192,3 +192,33 @@ export function normalizeSelection(content: ProposalContent, raw: unknown): Sele
 export function quoteHasItems(quote: ProposalQuote): boolean {
   return quote.names.some((n) => n.included);
 }
+
+/**
+ * The firm never wants a client to untick their way to an empty proposal ($0,
+ * nothing to accept). True when unticking `id` would take a quote that HAS
+ * something in it (`quoteHasItems`) to one that has nothing. The rule is the
+ * WHOLE proposal: a second brand name's boxes stay free while another brand
+ * name is still buyable (a mark and a class). A selection that is already empty
+ * (nothing preselected) locks nothing, so the client can always tick their way
+ * in. Ticking is never refused; an id that isn't ticked is never "locked".
+ */
+export function wouldEmptyQuote(content: ProposalContent, selection: Selection, id: string): boolean {
+  if (selection == null || selection[id] !== true) return false;
+  if (!quoteHasItems(quoteProposal(content, selection))) return false;
+  return !quoteHasItems(quoteProposal(content, { ...selection, [id]: false }));
+}
+
+/** Every mark and class id the client may not untick right now (see `wouldEmptyQuote`). */
+export function lockedSelectionIds(content: ProposalContent, selection: Selection): Set<string> {
+  const locked = new Set<string>();
+  for (const nm of arr<ProposalContent["names"][number]>(content?.names)) {
+    const ids = [
+      ...arr<ProposalContent["names"][number]["marks"][number]>(nm?.marks).map((m) => m?.id),
+      ...arr<ProposalContent["names"][number]["classes"][number]>(nm?.classes).map((c) => c?.id),
+    ];
+    for (const id of ids) {
+      if (typeof id === "string" && wouldEmptyQuote(content, selection, id)) locked.add(id);
+    }
+  }
+  return locked;
+}

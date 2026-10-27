@@ -7,7 +7,11 @@ vi.mock("next/font/google", () => ({
   Source_Serif_4: () => ({ variable: "serif-var" }),
 }));
 
-import { ProposalDocument, type ProposalDocumentProps } from "@/components/client-proposal/ProposalDocument";
+import {
+  KEEP_ONE_HINT,
+  ProposalDocument,
+  type ProposalDocumentProps,
+} from "@/components/client-proposal/ProposalDocument";
 import { defaultSelection, quoteProposal } from "@/lib/proposals/pricing";
 import { sevetri } from "../proposals/fixture";
 
@@ -84,5 +88,63 @@ describe("ProposalDocument", () => {
     expect(html).toContain('data-brand="neutral"');
     expect(html).not.toContain("rpb-logo-cream.png");
     expect(html).toContain("Acme IP");
+  });
+});
+
+describe("ProposalDocument: the last mark and class stay selected", () => {
+  function single() {
+    const c = sevetri();
+    c.names = [c.names[0]];
+    c.names[0].marks = [c.names[0].marks[0]];
+    c.names[0].classes = [c.names[0].classes[0]];
+    return c;
+  }
+  const checkboxes = (html: string) => html.match(/<input[^>]*type="checkbox"[^>]*>/g) ?? [];
+
+  it("one mark and one class: both boxes are checked and disabled, with the hint", () => {
+    const html = render({ content: single() });
+    const boxes = checkboxes(html);
+    expect(boxes).toHaveLength(2);
+    for (const b of boxes) {
+      expect(b).toContain("checked");
+      expect(b).toContain("disabled");
+      expect(b).toContain('aria-describedby="cp-keep-p"');
+    }
+    expect(html).toContain(KEEP_ONE_HINT);
+    expect(html).toContain('id="cp-keep-p"');
+  });
+
+  it("the full two-brand offer locks nothing and shows no hint", () => {
+    const html = render();
+    for (const b of checkboxes(html)) expect(b).not.toContain("disabled");
+    expect(html).not.toContain(KEEP_ONE_HINT);
+  });
+
+  it("the staff preview applies the same rule", () => {
+    const html = render({ content: single(), mode: "preview", onAccept: undefined });
+    expect(html).toContain(KEEP_ONE_HINT);
+  });
+
+  it("a page that loads with nothing selected leaves every box tickable", () => {
+    const c = single();
+    c.names[0].marks[0].preselected = false;
+    c.names[0].classes[0].preselected = false;
+    const html = render({ content: c });
+    for (const b of checkboxes(html)) expect(b).not.toContain("disabled");
+    expect(html).not.toContain(KEEP_ONE_HINT);
+    expect(html).toMatch(/<button[^>]*disabled[^>]*>Accept and pay my legal fee<\/button>/);
+  });
+
+  it("the accepted receipt shows no hint", () => {
+    const content = single();
+    const selection = defaultSelection(content);
+    const html = render({
+      content,
+      mode: "accepted",
+      onAccept: undefined,
+      initialSelection: selection,
+      acceptedQuote: quoteProposal(content, selection),
+    });
+    expect(html).not.toContain(KEEP_ONE_HINT);
   });
 });

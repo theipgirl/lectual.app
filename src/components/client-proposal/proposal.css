@@ -161,6 +161,8 @@
 .cp-pr s { color: var(--cp-soft); font-weight: 400; font-size: 14px; margin-right: 6px; }
 .cp-off .cp-t b, .cp-off .cp-pr { opacity: 0.5; }
 .cp-warn { margin: 0 22px 14px; font-size: 15px; font-weight: 600; color: var(--cp-brand); }
+/* The last mark or class held on so the proposal can't be emptied to $0. */
+.cp-keep { margin: 0 22px 14px; font-size: 14px; color: var(--cp-soft); }
 
 /* what the package includes */
 .cp-inc { background: var(--cp-sheet); border: 1px solid var(--cp-line); border-radius: 12px; overflow: hidden; }
@@ -252,7 +254,7 @@ footer.cp-footer { background: var(--cp-ink); color: var(--cp-on-brand); padding
   .cp-sub { text-align: left; }
   .cp-note { margin-left: 16px; margin-right: 16px; }
   .cp-part { padding-left: 16px; padding-right: 16px; }
-  .cp-warn { margin-left: 16px; margin-right: 16px; }
+  .cp-warn, .cp-keep { margin-left: 16px; margin-right: 16px; }
   /* The price drops under the description: as a third column its caption
      ("20% off as your second mark") set the column's width and squeezed the
      description to two or three words a line at phone width. */

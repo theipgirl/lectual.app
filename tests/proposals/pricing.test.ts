@@ -2,9 +2,11 @@ import { describe, it, expect } from "vitest";
 
 import {
   defaultSelection,
+  lockedSelectionIds,
   normalizeSelection,
   quoteHasItems,
   quoteProposal,
+  wouldEmptyQuote,
 } from "@/lib/proposals/pricing";
 import type { ProposalContent, Selection } from "@/lib/proposals/types";
 import { sevetri } from "./fixture";
@@ -330,5 +332,73 @@ describe("defaultSelection and normalizeSelection", () => {
     expect("not-an-id" in sel).toBe(false);
     expect(Object.values(sel).every((v) => typeof v === "boolean")).toBe(true);
     expect(normalizeSelection(sevetri(), "garbage")["p-word"]).toBe(false);
+  });
+});
+
+describe("wouldEmptyQuote / lockedSelectionIds: a client can never untick to $0", () => {
+  /** One brand name, one mark, one class. */
+  function single(): ProposalContent {
+    const c = sevetri();
+    c.names = [c.names[0]];
+    c.names[0].marks = [c.names[0].marks[0]];
+    c.names[0].classes = [c.names[0].classes[0]];
+    return c;
+  }
+  const locked = (c: ProposalContent, s: Selection) => [...lockedSelectionIds(c, s)].sort();
+
+  it("one brand, one mark, one class: both are locked", () => {
+    const c = single();
+    const s = pick("p-word", "p-c1");
+    expect(locked(c, s)).toEqual(["p-c1", "p-word"]);
+    expect(wouldEmptyQuote(c, s, "p-word")).toBe(true);
+    expect(wouldEmptyQuote(c, s, "p-c1")).toBe(true);
+  });
+
+  it("one brand, two classes: neither class is locked until one is left; the only mark is", () => {
+    const c = sevetri();
+    c.names = [c.names[0]];
+    expect(locked(c, pick("p-word", "p-c1", "p-c2"))).toEqual(["p-word"]);
+    expect(locked(c, pick("p-word", "p-c2"))).toEqual(["p-c2", "p-word"]);
+  });
+
+  it("one brand, two marks: neither mark is locked until one is left", () => {
+    const c = sevetri();
+    c.names = [c.names[0]];
+    expect(locked(c, pick("p-word", "p-logo", "p-c1"))).toEqual(["p-c1"]);
+    expect(locked(c, pick("p-logo", "p-c1"))).toEqual(["p-c1", "p-logo"]);
+  });
+
+  it("two brands: nothing is locked while both are buyable", () => {
+    const c = sevetri();
+    expect(locked(c, defaultSelection(c))).toEqual([]);
+    expect(locked(c, pick("p-word", "p-c1", "t-logo", "t-c1"))).toEqual([]);
+  });
+
+  it("two brands, one not buyable: the other's last mark and class lock, the first stays free", () => {
+    const c = sevetri();
+    // Prosperall has a mark but no class, so it isn't buyable; Tech4PublicGood is the only one left.
+    const s = pick("p-word", "t-logo", "t-c1");
+    expect(locked(c, s)).toEqual(["t-c1", "t-logo"]);
+    expect(wouldEmptyQuote(c, s, "p-word")).toBe(false);
+  });
+
+  it("nothing selected (no preselected items): nothing is locked, so the client can tick their way in", () => {
+    const c = sevetri();
+    for (const nm of c.names) {
+      for (const m of nm.marks) m.preselected = false;
+      for (const k of nm.classes) k.preselected = false;
+    }
+    const s = defaultSelection(c);
+    expect(quoteHasItems(quoteProposal(c, s))).toBe(false);
+    expect(locked(c, s)).toEqual([]);
+    // A mark ticked but no class yet: still empty, still nothing locked.
+    expect(locked(c, { ...s, "p-word": true })).toEqual([]);
+  });
+
+  it("an unticked id is never locked, and garbage reads as not locked", () => {
+    const c = single();
+    expect(wouldEmptyQuote(c, pick("p-word", "p-c1"), "nope")).toBe(false);
+    expect(wouldEmptyQuote(c, {}, "p-word")).toBe(false);
+    expect(lockedSelectionIds({} as ProposalContent, {}).size).toBe(0);
   });
 });
