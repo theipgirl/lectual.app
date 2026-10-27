@@ -10,6 +10,8 @@ export type ActionState = {
   notice?: string;
   /** Firm-rule problems the store listed when it refused (approval). */
   issues?: ValidationIssue[];
+  /** The approval-queue item "Create post-consult email" made, so the page can link to it. */
+  queueId?: string;
 };
 
 export const NOT_ALLOWED: ActionState = {

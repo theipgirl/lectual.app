@@ -15,7 +15,7 @@ import {
   type UpdateProposalInput,
 } from "@/lib/proposals/store";
 import type { ProposalContent, ProposalRow } from "@/lib/proposals/types";
-import { GOES_LIVE_ON_APPROVAL, proposalSendBlock } from "@/lib/consult-proposal/link";
+import { GOES_LIVE_ON_APPROVAL, pendingProposalEmail, proposalSendBlock } from "@/lib/consult-proposal/link";
 import {
   newBrandName,
   parseAdjustments,
@@ -29,6 +29,14 @@ import {
   takenIds,
   type Parsed,
 } from "@/lib/proposal-editor/form";
+import { resolveFirmSession } from "@/lib/firm/session";
+import { getScopedClient } from "@/lib/db/scoped-client";
+import { CAN_WRITE_LEAD } from "@/lib/pipeline/leads";
+import { createDraft } from "@/lib/queue/api";
+import { activeQueueOrgKey } from "@/lib/queue/org";
+import { getSiteOrigin } from "@/lib/site-origin";
+import { clientLinkOrigin, clientLinkUrl } from "@/lib/proposals/client-link-origin";
+import { runManualEmail } from "@/lib/consult-proposal/manual-email";
 import { runCreateLink } from "@/lib/proposal-editor/create-link";
 import { EDIT_AGAIN_DONE, LINK_TURNED_ON } from "@/lib/proposal-editor/vocabulary";
 import { proposalActionError, type ActionState } from "../errors";
@@ -248,4 +256,55 @@ export async function reviseAction(_prev: ActionState, formData: FormData): Prom
   revalidate(id);
   revalidate(nextId);
   redirect(`/dashboard/proposals/${nextId}/`);
+}
+
+/* ── the post-consult email ─────────────────────────────────────────────── */
+
+/**
+ * "Create post-consult email": queues Rebecca's approved proposal-link email for THIS proposal in the
+ * approval queue (the same email, link marker and approve gate as the consult agent's). Nothing is
+ * sent; a named approver approves the email in the queue and a person sends the mailbox draft.
+ * Re-checks the session, the lead-writing role, the `proposals` module and the proposal staff roles.
+ */
+export async function queuePostConsultEmailAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const result = await runManualEmail(
+    {
+      gate: async () => {
+        const refused = await gateStaffAction();
+        if (refused) return refused;
+        const session = await resolveFirmSession();
+        return session.kind === "ok" && CAN_WRITE_LEAD.includes(session.role) ? null : { error: "Your role can't draft client email." };
+      },
+      loadProposal: async (id) => (await getProposal(id))?.proposal ?? null,
+      context: async () => {
+        const session = await resolveFirmSession();
+        return session.kind === "ok"
+          ? { orgId: session.org.id, userId: session.user.id, firmName: session.org.name, firmSlug: session.org.slug }
+          : null;
+      },
+      queueOrgKey: activeQueueOrgKey,
+      links: async (orgId, publicToken, proposalId) => {
+        const origin = (await getSiteOrigin()).replace(/\/$/, "");
+        return {
+          clientUrl: clientLinkUrl(await clientLinkOrigin(orgId), publicToken),
+          staffUrl: `${origin}/dashboard/proposals/${proposalId}/`,
+        };
+      },
+      pendingFor: pendingProposalEmail,
+      createDraft,
+      writeMarker: async (row) => {
+        const supabase = await getScopedClient();
+        const { error } = await supabase.from("crm_activity").insert(row);
+        return !error;
+      },
+      revalidate: (proposalId, leadId) => {
+        revalidate(proposalId);
+        revalidatePath("/dashboard/queue/");
+        if (leadId) revalidatePath(`/dashboard/leads/${leadId}/`);
+      },
+      testPrefix: process.env.VERCEL_ENV === "production" ? "" : "[TEST] ",
+    },
+    field(formData, "proposalId"),
+  );
+  return result.ok ? { saved: true, notice: result.notice, queueId: result.queueId } : { error: result.error };
 }

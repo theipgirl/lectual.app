@@ -271,3 +271,50 @@ export async function proposalSendBlock(proposalId: string): Promise<SendBlock> 
     return { blocked: true, queueId, reason: "unreadable" };
   }
 }
+
+/* ── is an email for this proposal already waiting? ─────────────────────────── */
+
+export type PendingEmailRead = { status: "none" } | { status: "pending"; queueId: string } | { status: "unreadable" };
+
+/**
+ * Is any post-consult email linked to this proposal VERSION still pending in the
+ * approval queue? Reads every `queue_drafted` marker for it (not just the first,
+ * as `proposalSendBlock` does, because a version can have a rejected email and a
+ * newer pending one) and asks the queue for each one's status. Fails CLOSED: an
+ * unreadable marker, queue key or item is "unreadable", never "none".
+ */
+export async function pendingProposalEmail(proposalId: string): Promise<PendingEmailRead> {
+  if (!UUID.test(proposalId)) return { status: "unreadable" };
+  const ids: string[] = [];
+  try {
+    const supabase = await getScopedClient();
+    const { data, error } = await supabase
+      .from("crm_activity")
+      .select("payload")
+      .eq("type", "queue_drafted")
+      .eq("payload->>source", CONSULT_PROPOSAL_SOURCE)
+      .eq("payload->>proposal_id", proposalId)
+      .order("created_at", { ascending: false })
+      .limit(20);
+    if (error) return { status: "unreadable" };
+    for (const row of (data ?? []) as Array<{ payload?: Record<string, unknown> | null }>) {
+      const id = row.payload?.queue_id;
+      if (typeof id !== "string" || !QUEUE_ID.test(id)) return { status: "unreadable" };
+      ids.push(id);
+    }
+  } catch {
+    return { status: "unreadable" };
+  }
+  if (ids.length === 0) return { status: "none" };
+  try {
+    const orgKey = await activeQueueOrgKey();
+    if (!orgKey) return { status: "unreadable" };
+    for (const id of ids) {
+      const item = await getQueueItem(orgKey, id);
+      if (item.status === "pending") return { status: "pending", queueId: id };
+    }
+    return { status: "none" };
+  } catch {
+    return { status: "unreadable" };
+  }
+}
