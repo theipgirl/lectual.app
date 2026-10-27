@@ -64,6 +64,8 @@ export type ProposalDocumentProps = {
   acceptedQuote?: ProposalQuote;
   /** accepted mode: where the legal fee is paid. Additive to the original prop list. */
   payUrl?: string | null;
+  /** Descriptions already added (by brand name id) when the page opens. The page starts with none; tests and the editor preview may start with some. */
+  initialAddedClasses?: AddedClasses;
   /** live mode: records the acceptance on the server. Receives the ticks and the added-class descriptions only, never a price. */
   onAccept?: (selection: Selection, addedClasses: AddedClasses) => Promise<ProposalAcceptResult>;
 };
@@ -93,7 +95,7 @@ function classPriceWords(pkg: string, included: number, picked: number, perClass
 }
 
 export function ProposalDocument(props: ProposalDocumentProps) {
-  const { content, title, clientName, expiresOn, firm, mode, initialSelection, acceptedQuote, payUrl, onAccept } = props;
+  const { content, title, clientName, expiresOn, firm, mode, initialSelection, acceptedQuote, payUrl, onAccept, initialAddedClasses } = props;
   const brand: ProposalBrand = brandForSlug(firm.slug);
 
   // Ticks the visitor changed. Layered over the firm's defaults (and any given
@@ -101,7 +103,7 @@ export function ProposalDocument(props: ProposalDocumentProps) {
   // the viewer made and never keeps a tick for a mark that no longer exists.
   const [overrides, setOverrides] = useState<Selection>({});
   // Classes the visitor added (descriptions only), by brand name id; the server keeps its own copy of the rules.
-  const [added, setAdded] = useState<AddedClasses>({});
+  const [added, setAdded] = useState<AddedClasses>(initialAddedClasses ?? {});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [addErrors, setAddErrors] = useState<Record<string, string>>({});
   const [pending, setPending] = useState(false);

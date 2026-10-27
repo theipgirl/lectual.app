@@ -211,7 +211,7 @@ describe("prices: never invented", () => {
     });
     const d = expectOk(await draftProposalFromConsult(input));
     expect(d.content.adjustments).toEqual([{ id: "adj-1", label: "Consultation credit", kind: "amount", value: 20_000 }]);
-    expect(quoteOf(d).legal_total_cents).toBe(1_465_000);
+    expect(quoteOf(d).legal_total_cents).toBe(1_762_000);
     expect(d.reviewerNotes).toContain('Not applied: the discount "Friends and family" of 10%');
   });
 

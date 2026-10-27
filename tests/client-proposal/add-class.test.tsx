@@ -93,6 +93,31 @@ describe("the client page: Add a class", () => {
   });
 });
 
+describe("the client page: a class the client added", () => {
+  it("is listed with a Remove button, priced into the legal and USPTO lines, and removing it returns them", () => {
+    const withOne = render({ content: oneClass(), initialAddedClasses: { p: ["Online store services"] } });
+    expect(withOne).toContain("Online store services");
+    expect(withOne).toContain('aria-label="Remove Online store services"');
+    expect(withOne).toContain(">Remove</button>");
+    expect(withOne).toContain("Added by you");
+    // Essential $1,950 + $825 for the first mark, the second mark 20% off that: legal 2,775 + 2,220; USPTO 2 classes x 2 marks
+    expect(withOne).toContain("$4,995");
+    expect(withOne).toContain("$1,400");
+    const without = render({ content: oneClass() });
+    expect(without).not.toContain("Online store services");
+    expect(without).toContain("$3,510");
+    expect(without).toContain("$700");
+  });
+
+  it("the added class is the only ticked one it cannot be removed while another is not ticked", () => {
+    const c = oneClass();
+    c.names[0].classes[0].preselected = false;
+    const html = render({ content: c, initialAddedClasses: { p: ["Online store services"] } });
+    expect(html).toMatch(/<button type="button" class="cp-link" disabled="" aria-label="Remove Online store services">/);
+    expect(html).toContain("At least one class is included");
+  });
+});
+
 describe("the client page: accepted and closed versions show added classes read-only", () => {
   function accepted() {
     const base = oneClass();

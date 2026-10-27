@@ -778,3 +778,45 @@ this and plain-JSX line-break glue (`{name}↵word`); `pnpm lint --fix` writes t
 ## Commands
 `pnpm build` · `pnpm lint` · `pnpm test`. Env: copy `.env.example` to `.env.local` and fill it in
 from lectual-dev.
+
+## Proposal builder, classes, client add-class, recommended package (Sprint 28, no schema)
+Money sprint. Nothing here sends, moves a stage or opens a matter. No migration, no dependency.
+- **A package is FLAT up to its included classes** (Taylor, Oct 27). `quoteProposal` uses `base + perClass x max(0, classes - included)`: fewer classes never
+  lower a package, each class past the included count adds the per-class legal price, and the USPTO fee is $350 per class per mark for EVERY class, inside
+  the included count too (never waived, never touched by a credit, the second-mark percent or the custom switch). Accepted snapshots keep their stored figure
+  and are never re-priced. **Exception:** `pricing.reduce_under_included === true` (a custom package, in the content jsonb) restores the old reduction
+  (never below zero). Staff set it under More options ("Custom package: $825 less per class under the package's included classes", with both prices shown);
+  the drafter sets it only on a quoted, firm-spoken sentence plus a CHECK FIRST flag; the accept action and the client page never take it from the browser.
+- **One class is always included** (`src/lib/proposals/class-lock.ts`, pure). `classLock`: exactly one ticked class locks (text "Included" when it is the brand's
+  only class, "At least one class is included" otherwise); with several ticked nothing is locked. `repairSelection` / `repairPreselections` tick the first class
+  of a ticked mark that has none; a brand with no class at all cannot be repaired. Used by the client page, the editor's class rows (a locked box is posted by a
+  hidden twin, since a disabled box is not posted), `validateContent` (a mark that starts ticked needs a class that starts ticked: an error), `parseName`
+  (repairs) and the accept path.
+- **The client adds a class** (`src/lib/proposals/added-classes.ts`, pure). The browser sends DESCRIPTIONS only, `{ brandNameId: string[] }`: at most 5 per
+  brand name, 1 to 200 characters after trimming, plain text (angle brackets and control characters are REFUSED, not cleaned). Each becomes one more ticked class
+  (`id add-<nameId>-<n>`, `client_added: true`, label = the description) and is priced by `quoteProposal`: it is a class like any other, so past the package's
+  included count it costs the extra-class fee (the second mark is discounted on it like any extra class) plus the USPTO fee per class per mark.
+  `quoteWithAddedClasses` is the ONE helper the page's live total and the accept path both call (`{ repair: true }` only on the server). Accept refuses anything
+  over the limits with one fixed sentence and writes nothing (`invalid_added`), drops added classes for a brand name with no ticked mark, and stores the added
+  classes in `accepted_selection` (their ids) and `accepted_snapshot.content` (the classes, flagged) with the recomputed quote. `acceptProposalAction(token,
+  selection, addedClasses)` has no money parameter. `publicContent` keeps `client_added` and `reduce_under_included`.
+- **What the client typed never leaves the staff pages.** The Lawmatics note, the staff notice and the timeline line carry the COUNT of added classes and the new
+  legal total (`added_classes`, `legal_total_cents` on the step payload); `acceptanceNoteBody` leaves the client's classes out of its class list. Staff see the
+  descriptions on the proposal page ("Classes the client added") and on the accepted line of the Activity log (`src/lib/proposals/added-view.ts`, React text).
+  The LOE adapter already reads the snapshot's quote, so it gets the larger class count, the class and the higher amount (tested).
+- **The builder** (`BuilderLayout`, shared by New proposal and the editor): 1 Who, 2 Brand names and classes, 3 Package and pay link, then the one button
+  (Create draft / Save and create link), then ONE closed `<details class="pe-more">` "More options" (" - N changed" only when N > 0;
+  `src/lib/proposal-editor/more-options.ts`). It opens by itself when an issue's path is inside it. Each step's form carries an `id`; the More options fields
+  belong to it through their `form` attribute (client: first name, company, title, expiry; package: the five numbers and the custom switch; per brand: what it
+  is, note, own price, what each mark protects). The marks' and classes' rows live in `NameRowsProvider` so Step 2 and More options agree on which row is which
+  (give it a `key` that changes when a brand name is added or removed). **The pay link moved** from the client form to the package form (`savePricingAction`
+  saves it; `parseDetails` leaves it alone when it isn't posted).
+- **Lead link** in the editor header (`LeadLink`): "For <name> ->" to the lead, "Matter ->" when set, "Lead couldn't be loaded" on a failed read, "Not linked to a
+  lead" with a picker (`LinkLeadForm`, `linkLeadAction`) over `loadLeadOptions()`. Scoped client only.
+- **Consult drafter** (`draft.ts`, `package-choice.ts`): prices with the package the REVIEWED consult details name (when on the firm's current list), else the one
+  named on the call (on the list AND its name really in the record), else the firm's default (first on the list) with "CHECK FIRST: ... Choose the package before
+  saving." Names match whole, ignoring case, a leading "the" and a trailing "package" (`findPackageSpoken`). An unreadable or empty list falls back to the flat
+  pricing package and says so. A consult credit (fixed amount, "Consult credit") and a second-mark percent (0 to 50) are applied only on quoted words the firm
+  said (`sourceText` rule); a credit larger than the legal fee is capped; every applied and every ignored value is named in the flags with its source. **No email
+  body or mailbox is read for proposals (spec D2, Taylor Oct 27).** Both the transcript upload and the meeting "Create proposal" go through `runConsultProposal`,
+  which carries `lead.id` onto the proposal.

@@ -78,6 +78,8 @@ export function sevetriOutput(): ConsultProposalExtract {
       },
     ],
     recommended_package: "Concierge",
+    second_mark_discount: null,
+    reduced_package: null,
     price_changes: [],
     credits: [],
     recommendation_summary: "Rebecca recommended word and logo marks for Prosperall and Tech4PublicGood, two classes each, Concierge.",

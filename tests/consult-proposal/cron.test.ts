@@ -30,6 +30,8 @@ const EXTRACT = {
     },
   ],
   recommended_package: "Concierge",
+  second_mark_discount: null,
+  reduced_package: null,
   price_changes: [],
   credits: [],
   recommendation_summary: "Word and logo for Prosperall.",
