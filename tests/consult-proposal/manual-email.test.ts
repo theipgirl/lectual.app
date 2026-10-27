@@ -197,6 +197,12 @@ describe("runManualEmail", () => {
     }
   });
 
+  it("a proposal on no lead or matter is refused before queuing (its marker couldn't be written)", async () => {
+    const d = deps({ loadProposal: vi.fn(async () => proposal({ lead_id: null, matter_id: null })) });
+    expect(await runManualEmail(d, PROPOSAL_ID)).toEqual({ ok: false, error: R.noRecord });
+    nothingQueued(d);
+  });
+
   it("no queue connected", async () => {
     const d = deps({ queueOrgKey: vi.fn(async () => null) });
     expect(await runManualEmail(d, PROPOSAL_ID)).toEqual({ ok: false, error: R.noQueue });

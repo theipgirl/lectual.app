@@ -39,6 +39,8 @@ export const MANUAL_EMAIL_REFUSALS = {
   notFound: "Proposal not found.",
   status: "Only a draft, saved or link-live proposal can have its email queued. Nothing was queued.",
   noEmail: "Add the client's email address to this proposal first. Nothing was queued.",
+  noRecord:
+    "Link this proposal to a lead or matter first, so the email can be tied to it for approval. Nothing was queued.",
   noQueue: "No approval queue is connected for your firm, so nothing was queued.",
   noFirmName: "Your firm has no name set (Settings, then Firm), so the email can't be signed. Nothing was queued.",
   noOrigin: "The site address isn't known here, so the proposal link couldn't be built. Nothing was queued.",
@@ -173,6 +175,9 @@ async function run(deps: ManualEmailDeps, proposalId: string): Promise<ManualEma
 
   const recipient = usableRecipient(proposal.client_email);
   if (!recipient) return fail(MANUAL_EMAIL_REFUSALS.noEmail);
+  // The approve gate reads a timeline marker, and a timeline row needs a lead or a matter
+  // (crm_activity_target). Without one the email would sit in the queue ungated: refuse first.
+  if (!proposal.lead_id && !proposal.matter_id) return fail(MANUAL_EMAIL_REFUSALS.noRecord);
 
   const orgKey = await deps.queueOrgKey();
   if (!orgKey) return fail(MANUAL_EMAIL_REFUSALS.noQueue);
