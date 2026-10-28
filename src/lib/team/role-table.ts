@@ -47,7 +47,4 @@ export function roleRows(): RoleRow[] {
   }));
 }
 
-/** The question asked before a role changes. */
-export function roleChangeQuestion(name: string, from: string, to: string): string {
-  return `Change ${name}'s role from ${ROLE_LABEL[from] ?? from} to ${ROLE_LABEL[to] ?? to}?`;
-}
+export { roleChangeQuestion } from "./role-change";

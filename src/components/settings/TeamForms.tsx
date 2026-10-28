@@ -8,7 +8,7 @@ import {
   type MemberActionState,
 } from "@/app/dashboard/settings/team/actions";
 import { ROLE_LABEL } from "@/lib/auth/roles";
-import { roleChangeQuestion } from "@/lib/team/role-table";
+import { roleChangeQuestion } from "@/lib/team/role-change";
 
 export { ROLE_LABEL };
 

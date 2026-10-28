@@ -975,3 +975,47 @@ No migration, no dependency, nothing sends. Navigation changes are a courtesy: e
   `hub.css` has a <=560px layout.
 - **Copilot launcher** lifts above a sticky Save bar (`data-save-bar`, today the Forms "Unsaved changes" bar) and hides on phones while one shows; the Esc hint shows
   from 900px. The proposal editor's save rows are not sticky, so they are not marked.
+
+## Page-level cleanups (Sprint 33, no schema)
+No migration, no dependency, nothing sends, no new service-role code. Pricing is untouched (`src/lib/proposals/pricing.ts` has no diff); the client page still prices through
+`quoteWithAddedClasses`. Taylor, Oct 27: no "what is a class" text and no class renumbering on the client page. Decisions D1-D11 (contract `pge-workspace/sprint_33_contract.md`):
+- **D1 Contact line.** `crm_org_profile` has no phone or email column and a migration is not allowed, so `firmContactFromSignoff` (`src/lib/proposals/firm-contact.ts`) takes the first
+  email address and the first phone-looking number from the profile's `email_signature`; neither found = no line. The public read (`PUBLIC_PROFILE_COLUMNS`) gains `display_name` and
+  `email_signature` ONLY to derive `PublicProposalFirm.displayName` and `.contactLine`; the raw sign-off never reaches the view. The commitment sentence
+  (`commitmentSentence`, `commitment.ts`) names the profile display name, else the firm's name, never a hard-coded firm. RPB's footer keeps its own branded line.
+- **D2 USPTO line.** `usptoLine` (`uspto-line.ts`) only formats the engine's quote: "3 classes × 2 marks × $350" when one brand name's classes × marks equals the quote's own `class_count`
+  and its `gov_cents` equals the total; otherwise "USPTO fees: $X ($350 per class per mark)". It does no money arithmetic (a guard test forbids multiplying cents outside `pricing.ts`).
+- **D3 Draft email to client.** `runDraftClientEmail` (`src/lib/proposal-editor/draft-email.ts`, deps injected; `draftClientEmailAction` wires it) queues ONE `CLIENT_EMAIL` draft carrying the
+  link (`clientLinkOrigin` + `clientLinkUrl`) through `createDraft`, only for a `sent` / `accepted` version. The queue's three states apply: no queue key / unconfigured / unreachable returns a fixed
+  sentence and creates nothing; a pending `CLIENT_EMAIL` whose body already holds the link is not duplicated. No send call, no mailbox read (spec D2). The page says "The client hasn't been emailed by Lectual."
+- **D4 Withdraw** moved into a "More" menu (the shared Popover: Esc and outside click close it) with an in-page confirm and Cancel; the action and its roles are unchanged.
+- **D5 Documents.** `documents/page.tsx` is gated on `document-center` (`notFound()`, an unreadable module list too). `failureReason` (`src/lib/documents/failure-reason.ts`) maps the stored
+  `error_message` to a fixed sentence and never prints it. Retry (`retryDocumentAction`, `src/lib/documents/retry.ts`) re-runs the existing `generateApprovedDocument` for the same approved queue item,
+  with the matter write role and the module re-checked; it reads the row back and reports done or still failed. A list that came back with 300 rows says it is cut at 300.
+- **D6 Team.** `RoleSelect` asks "Change <name>'s role from X to Y?" with Confirm and Cancel; the select no longer submits on change. `RoleTable` ("What each role can do") is computed from the
+  SAME role lists the code checks (`CAN_WRITE_LEAD`, `MATTER_WRITE_ROLES`, `QUEUE_APPROVE_ROLES`, `FILE_DELETE_ROLES`, `hasRole(... "senior_admin")`) in `src/lib/team/role-table.ts`; Clerk and Law clerk have
+  the same access today and the table says so.
+- **D7 Assistants.** `assistantHealth` (`src/lib/agents/health-line.ts`) is the one line at the top ("All assistants ran normally today" / "N need attention" / "Can't show assistant health right now."); the
+  "Didn't finish" 15-minute rule is the run log's. Changing autonomy asks first (only Confirm saves). The run log's status dots carry text. **Run now is drawn only for a role that can run it**
+  (`decideRunNow`'s `role` block draws nothing, and no reason line); every other block is still a disabled button with its sentence.
+- **D8 Matters.** Four chips (`LIST_CHIPS`: Open, Needs your review, Unassigned, Closed); the bands stay as headings and the other segment keys still work in a URL. `stageDisplayName` strips a "3. " prefix.
+  The Status column is gone (status joins the sub-line when not Open). Board cards have a `MoveMenu` (the existing stage action, then a refresh; `MovedCardScroller` brings the card back into view).
+  "Open a matter" is a header button (`OpenMatterButton`) that opens the existing `#open-matter` panel.
+- **D9 Lead page.** Order: header, `LeadStatusRow`, ONE `NeedsAttentionCard` (booked consult, pending approvals, client-email proposals, stage suggestions; rendered only when `needsAttention` says so, and a failed
+  read still opens it), `ComposerTabs` (Text | Voice, both panels mounted), Timeline, Prep, Consult details, Meetings, Proposals, "Log a consult outcome" (closed `<details>`), Answers, Documents, Sequences,
+  Temperature detail. "Last heard from N days ago" reads `last_activity_at` ("No contact yet" when empty). On phones a Call / Email row (`tel:` / `mailto:` only for what the lead has) and the aside is a
+  `<details>` "Details and tags" that comes first. Every anchor and `data-tour` token is kept once.
+- **Matter page.** Header buttons for the letters; phone order by CSS (`matter-page.css`); "Saved" appears on the Stage / Status / Owner selects from the action's own result; Owner, Package, Came from and
+  days in stage each appear once; deadlines say "No deadlines yet." with an "Add a deadline" button; "Case details" / "Filing details".
+- **Proposals list and editor.** One name, "Proposals" (`PROPOSALS_NAME`, `words.ts`), on the h1, tab title, back links and editor label. Table first; the consults strip is a collapsed `<details>` "(N ready to
+  draft)"; "Not ready" prints "Transcript still processing"; "Link to a lead" is a picker (`LinkLeadPicker`, the existing `linkMeetingAction`, the scoped lead list, a failed read is its own alert; the meeting's matter
+  is sent back so linking never drops it). The fee sentence (`FEE_SENTENCE`) appears once. The editor shows the fees once (the card's copy is `showFees={false}`), "Go to first problem" (`firstProblem`), one "History" card.
+- **Integrations.** Every card is an `IntegrationRow`; the IMAP and AI-assistant "Coming soon" rows are gone (the `coming-soon` state stays in `states.ts`, unused); a disabled connect button carries `SWITCH_ON_WORDS`
+  through `aria-describedby`. **Proposal settings** are one form (approvers first, then prices, links, includes) with one Save; `saveProposalSettingsAction` also saves `pkg.*` fields when present and passes
+  `default_pay_url` through; `savePackagesAction` stays as the prices-only entry point.
+- **D10 Small items done:** the approval item's tab title is its headline ("Approval" fallback); Notifications lost the "Inbox" eyebrow and has the new error sentence; Calendar says "Eastern time", has plain Outlook notes
+  and arrows named by period; the Meetings banner names the source. **Not built (need a new action or a decision):** a direct "Import recent meetings" button on an empty Meetings page; naming who to ask
+  to connect Meetings; folding consults into one mixed Calendar agenda; the Calendar "Unconfirmed" visible text.
+- **Existing assertions changed on purpose:** the lead-page placement tests (Answers, Documents now after the consult material; the consult outcome form is inside a `<details>`), `WaitingOnRebecca` renders nothing for an
+  empty queue, the matter page sub-line tests (second line), Integrations "Coming soon" rows, the proposals list subtitle / "Show" / fee sentence / strip tests, the Lifecycle Withdraw tests (it is in More), the
+  Matters Status column, the Run now role tests, the settings "Save proposal settings" label, and the calendar / notifications copy.
