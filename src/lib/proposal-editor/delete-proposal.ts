@@ -65,12 +65,13 @@ export async function runDeleteProposalFamily(deps: DeleteFamilyDeps, id: string
 
     const gone = await deps.deleteFamily(row.familyId);
     if (gone.length === 0) {
-      // RLS answered "nothing to delete". For the owner that means 0102 is not applied yet (a draft-only
-      // family would have gone under 0089), or the row vanished in between.
+      // RLS answered "nothing to delete": the row vanished in between, or (a fallback, 0102 is applied
+      // since 2026-10-28) a database without 0102.
       return { ok: false, error: DELETE_NEEDS_DB_UPDATE };
     }
     if (gone.length < expected) {
-      // Before 0102, RLS lets the owner delete only the family's drafts.
+      // A fallback only: 0102 is applied to dev and prod (2026-10-28). Without it, RLS lets the owner
+      // delete only the family's drafts, so fewer rows than the family would go.
       return { ok: false, error: DELETE_PARTIAL, partial: true };
     }
     return { ok: true, deleted: gone.length };
@@ -79,10 +80,17 @@ export async function runDeleteProposalFamily(deps: DeleteFamilyDeps, id: string
   }
 }
 
-/** Which items the proposal page's "More" menu offers. Delete is drawn for the owner only (hidden, not disabled, for everyone else). */
-export function moreMenuItems(input: { status: ProposalStatus; canWrite: boolean; canDelete: boolean }): ("withdraw" | "delete")[] {
-  const items: ("withdraw" | "delete")[] = [];
+export type MoreMenuItem = "withdraw" | "reset" | "delete";
+
+/**
+ * Which items the proposal page's "More" menu offers, in order. Withdraw: a proposal-writing role on a draft, saved or live version.
+ * Reset acceptance (lectual 0101): an accepted version when `canResetAcceptance` said yes. Delete (lectual 0102): the owner, any
+ * status; hidden, not disabled, for everyone else.
+ */
+export function moreMenuItems(input: { status: ProposalStatus; canWrite: boolean; canDelete: boolean; canReset?: boolean }): MoreMenuItem[] {
+  const items: MoreMenuItem[] = [];
   if (input.canWrite && (input.status === "draft" || input.status === "approved" || input.status === "sent")) items.push("withdraw");
+  if (input.canWrite && input.status === "accepted" && input.canReset) items.push("reset");
   if (input.canDelete) items.push("delete");
   return items;
 }

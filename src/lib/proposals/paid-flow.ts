@@ -16,7 +16,9 @@ import { fieldWrites, readLoeFieldsConfig, type LoeFieldsConfig } from "./loe-fi
 import { retryLoeFileUpload } from "./loe-upload";
 import { normalisePackages } from "./package-list";
 import {
+  draftsInRound,
   paidStateFromEvents,
+  roundStartedAt,
   stepPayload,
   stepSucceeded,
   type ProposalStep,
@@ -156,8 +158,10 @@ async function loeDraftStep(supabase: ScopedClient, proposal: ProposalRow, event
   if (matter.status === "many") return report(proposal, "loe_draft", "blocked", STEP_TEXT.manyMatters, { code: "many_matters" });
   if (matter.status === "unreadable") return report(proposal, "loe_draft", "failed", STEP_TEXT.mattersUnreadable, { code: "matters_unreadable" });
 
-  const earlier = await listDraftsForProposal(supabase, matter.id, proposal.id);
-  if (earlier === null) return report(proposal, "loe_draft", "failed", STEP_TEXT.draftsUnreadable, { code: "drafts_unreadable" });
+  const drafts = await listDraftsForProposal(supabase, matter.id, proposal.id);
+  if (drafts === null) return report(proposal, "loe_draft", "failed", STEP_TEXT.draftsUnreadable, { code: "drafts_unreadable" });
+  // lectual 0101: a reset starts a fresh round, so a letter drafted for the earlier acceptance doesn't count.
+  const earlier = draftsInRound(drafts, roundStartedAt(events, proposal.id));
   if (earlier.length > 0) {
     // A draft exists but its timeline line never landed: write the line, create nothing.
     const queueItemId = earlier.find((d) => d.queue_item_id)?.queue_item_id;

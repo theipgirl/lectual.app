@@ -330,3 +330,16 @@ describe("settings pricing", () => {
     }
   });
 });
+
+describe("the expiry date is saved by the package form, never wiped by the client save", () => {
+  it("parseDetails leaves expiresOn out when the form did not post it", () => {
+    const r = parseDetails(fd({ fullName: "A", firstName: "A", title: "T" }), sevetri());
+    expect(r.ok).toBe(true);
+    if (r.ok) expect("expiresOn" in r.value).toBe(false);
+  });
+
+  it("parseDetails still reads an expiresOn that is posted (blank clears it on purpose)", () => {
+    const r = parseDetails(fd({ fullName: "A", firstName: "A", title: "T", expiresOn: "" }), sevetri());
+    expect(r.ok && r.value.expiresOn).toBe(null);
+  });
+});

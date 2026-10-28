@@ -795,17 +795,19 @@ roles (`PROPOSAL_STAFF_WRITE_ROLES`). Never for accepted, replaced or withdrawn 
   (`client_proposal_pay_link_frozen` / `_staff_only` / `_required`) are mapped in `src/lib/proposals/errors.ts`.
 - Nothing is emailed and the offer itself (content, prices, expiry) stays frozen; any other change is still a new version.
 
-## Owner deletes a proposal (needs lectual 0102, no schema here)
-Taylor (2026-10-28): the owner clears out test proposals herself. "Delete proposal" sits in the proposal page's More menu (beside
-Withdraw), drawn ONLY for role `owner` (`canDeleteProposal`; hidden, not disabled, for everyone else) and in EVERY status, so More
+## Owner deletes a proposal (lectual 0102, applied to dev and prod 2026-10-28; no schema here)
+Taylor (2026-10-28): the owner clears out test proposals herself. "Delete proposal" sits in the proposal page's ONE More menu (beside
+Withdraw and Reset acceptance, `moreMenuItems`; one confirm open at a time), drawn ONLY for role `owner` (`canDeleteProposal`; hidden, not disabled, for everyone else) and in EVERY status, so More
 also appears on accepted / replaced / withdrawn versions for the owner. In-page confirm (`DeleteConfirm`): "Delete this proposal and all its
 versions? The client link stops working and its history is removed. This can't be undone." with "Delete proposal" and Cancel.
 - `deleteProposalAction` (module gate `notFound()`, owner check) -> `deleteProposalFamily` in the store -> `runDeleteProposalFamily`
   (`src/lib/proposal-editor/delete-proposal.ts`, pure, deps injected): role re-read through the scoped client, the row and its family read
   through RLS, then ONE `delete().eq("family_id", ...).select("id")` (lectual 0089's family FK is NO ACTION, so the versions must go
   together). Events go by cascade. Success redirects to `/dashboard/proposals/?deleted=1` ("Proposal deleted."). Never the service role.
-- Fixed sentences only: owner only, not found, 0 rows = `notReadyYet("Deleting this proposal")` (0102 not applied), fewer rows than the
-  family = only the drafts went (0089 lets the owner delete drafts) plus the not-ready line, any throw = "Couldn't delete this proposal."
+- Fixed sentences only: owner only, not found, any throw = "Couldn't delete this proposal." 0102 is applied to both projects
+  (2026-10-28, checked: another firm's owner 0 rows, paralegal 0, admin on a sent version 0, the owner removes a two-version family and every
+  event), so the two remaining sentences are fallbacks for a database without it: 0 rows = `notReadyYet("Deleting this proposal")`, fewer
+  rows than the family = only the drafts went (`DELETE_PARTIAL`; the drafts are already gone at that point).
 - Nothing is sent and nothing touches Lawmatics or LawPay. `/p/<token>` then reads like an unknown token; a notification naming the
   proposal still renders and its link lands on the page's `notFound()`.
 
@@ -1147,3 +1149,25 @@ Sprint 28's rule stands: what the client typed never leaves the staff pages.
 - Existing assertions changed on purpose: Sprint 28's add-class page, accept, LOE and source-guard tests moved to the new shapes (its follow-up tests still pin that the note
   never carries the client's words); the fixed-offer page test now pins no "Add a class";
   `tests/client-proposal/commitment.test.tsx`'s "leaves pricing.ts untouched" compares with HEAD, so it passes once `isFixedOffer`'s change is committed.
+
+## Reset a client's acceptance (needs lectual 0101, no schema here)
+An ACCEPTED version can go back to "Link live" so the same client link can be accepted again (testing, a mistaken or changed acceptance).
+- **The rule is lectual 0101's trigger:** signed in (never the service role), owner/admin/senior_admin OR named in
+  `client_proposal_setting.approver_user_ids`, status alone (nothing client-facing changes), and NOT marked paid in the current round. It clears
+  `accepted_at` / `accepted_selection` / `accepted_snapshot` and writes a `reset` event (`{from, to, version, previous_accepted_at, previous_snapshot}`)
+  so the earlier acceptance is kept. Before 0101 is applied the trigger answers `client_proposal_bad_transition`, read as
+  `notReadyYet("Resetting an acceptance")`. The 0101 prefixes (`client_proposal_reset_not_allowed` / `_paid` / `_with_edit`) are mapped in `src/lib/proposals/errors.ts`.
+- **UI:** "Reset acceptance" in the proposal's More menu (beside where Withdraw lives on other statuses), with the in-page confirm "Reset this acceptance? The client
+  link opens again and they can accept again. The Lawmatics note and alerts already sent stay as they are." Offered only when `canResetAcceptance` says so (accepted, a
+  proposal-writing role that is the admin tier or a named approver, paid state READ and not paid; an unread paid state hides it).
+- `resetAcceptanceAction` -> `runResetAcceptance` (`src/lib/proposal-editor/reset-acceptance.ts`, pure, deps injected): `gateStaffAction`, role + approver re-read
+  (`mayResetAcceptance`), the current-round paid read (paid = "Undo Mark paid first.", unreadable = refused), then `resetProposalAcceptance` in the store: scoped client,
+  `status: 'sent'` ALONE, fenced on `status = accepted` and the rendered `updated_at`. It writes no event and sends nothing.
+- **A reset starts a fresh round** (`currentRound` / `roundStartedAt` in `src/lib/proposals/paid.ts`): paid state, step states and "already done" checks count only step
+  events AFTER the version's newest `reset` event. Every step-event reader also reads the version's `reset` rows (`listProposalStepEvents`, `listStepActivity`, the
+  follow-ups' `readEarlierSteps`), so a second acceptance runs the firm notice and the Lawmatics note again, starts unpaid, and Mark paid drafts the LOE again (an LOE
+  draft from before the reset doesn't count: `draftsInRound`; one with no readable date still does). The LOE upload retry only uses a letter queued in the current round.
+- Downstream a reset version is simply `sent`: the list's Accepted column reads "Not yet", the public page shows the offer again (not the receipt), the paid column is "—".
+  The history reads "Acceptance reset by <name>" (`describeResetEvent`; `EventLine.text`), with the earlier legal fee in the details; the list's Last activity says
+  "Acceptance reset". Only the NEWEST accepted line of a version carries what the client typed.
+- Not verified against a live database: the 0101 trigger and its event payload (lectual's DB cases skip without `.env.test`).

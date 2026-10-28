@@ -4,11 +4,13 @@ import { resolveFirmSession } from "@/lib/firm/session";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { listMemberDirectory, type MemberIdentity } from "@/lib/members/directory";
 import { clientLinkOrigin, clientLinkUrl } from "@/lib/proposals/client-link-origin";
+import { firmCivilDate } from "@/lib/quotes/firm-time";
 import { formatCents } from "@/lib/quotes/money";
 import { formatFirmStamp, formatShortFirmDate } from "@/lib/quotes/labels";
 import { ProposalError } from "@/lib/proposals/errors";
 import { getProposal, getProposalSettings, isCurrentUserApprover, listProposalStepEvents, type ProposalDetail } from "@/lib/proposals/store";
-import { PROPOSAL_PAID_ROLES } from "@/lib/proposals/paid";
+import { PROPOSAL_PAID_ROLES, paidStateFromEvents } from "@/lib/proposals/paid";
+import { canResetAcceptance } from "@/lib/proposal-editor/reset-acceptance";
 import { buildPaidPanelView } from "@/lib/proposals/paid-view";
 import { PROPOSAL_STAFF_WRITE_ROLES, isProposalEditable, type ProposalRow } from "@/lib/proposals/types";
 import { validateContent } from "@/lib/proposals/validate";
@@ -187,7 +189,25 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
       })
     : null;
 
+  // lectual 0101: "Reset acceptance" is offered only on an accepted version, to the admin tier or a named approver
+  // who can write proposals, and only when the current round's paid state was read and is not paid.
+  const canReset =
+    canWrite &&
+    canResetAcceptance({
+      status: proposal.status,
+      role: session.role,
+      isApprover,
+      paid: stepRead && stepRead.ok ? paidStateFromEvents(stepRead.events) : null,
+    });
+
   const versionOf = new Map(versions.map((v) => [v.id, v.version]));
+  // A reset version can be accepted again: only its NEWEST acceptance carries what the client typed this time.
+  const newestAcceptedId = events
+    .filter((e) => e.type === "accepted" && e.proposal_id === proposal.id)
+    .reduce<{ id: string; at: number } | null>((best, e) => {
+      const at = Date.parse(e.created_at);
+      return !best || at > best.at ? { id: e.id, at } : best;
+    }, null)?.id;
   // What the client added on the page (accepted versions only), for staff.
   const clientAdded = clientAddedClasses(proposal.accepted_snapshot);
   const clientDescribed = clientDescribedClasses(proposal.accepted_snapshot);
@@ -196,7 +216,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
   const log = events.map((e) => {
     const line = describeProposalEvent(e, { names: nameOf, versions: versionOf });
     // The accepted line of THIS version also says what the client added.
-    if (e.type === "accepted" && e.proposal_id === proposal.id && (clientAdded.length > 0 || clientDescribed.length > 0)) {
+    if (e.type === "accepted" && e.id === newestAcceptedId && proposal.status === "accepted" && (clientAdded.length > 0 || clientDescribed.length > 0)) {
       return {
         line: {
           ...line,
@@ -259,7 +279,6 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
     company: content.client?.company ?? "",
     clientEmail: proposal.client_email ?? "",
     title: proposal.title,
-    expiresOn: proposal.expires_on ?? "",
   };
 
   return (
@@ -346,7 +365,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
                   <AddNameForm proposalId={proposal.id} updatedAt={proposal.updated_at} editable={editable} />
                 </>
               }
-              packageStep={<PricingForm {...common} issues={shown(groups.pricing)} values={pricingValues} payUrl={proposal.pay_url ?? ""} />}
+              packageStep={<PricingForm {...common} issues={shown(groups.pricing)} values={pricingValues} payUrl={proposal.pay_url ?? ""} expiresOn={proposal.expires_on ?? ""} today={firmCivilDate(new Date(), tz)} />}
               create={
                 <Lifecycle
                   proposalId={proposal.id}
@@ -359,6 +378,8 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
                   clientUrl={clientUrl}
                   queueNote={sendBlock.blocked ? { text: GOES_LIVE_ON_APPROVAL, queueId: sendBlock.queueId } : null}
                   canDelete={canDeleteProposal(session.role)}
+                  canReset={canReset}
+                  updatedAt={proposal.updated_at}
                 />
               }
               more={
@@ -523,7 +544,14 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
               <li key={line.id} data-kind={type}>
                 <div className="pe-log-line">
                   {line.version && versions.length > 1 && <span className="pe-log-v">v{line.version}</span>}
-                  <strong>{line.who}</strong> {line.what} <span className="pe-log-when">· {formatFirmStamp(line.at, tz)}</span>
+                  {line.text ? (
+                    <strong>{line.text}</strong>
+                  ) : (
+                    <>
+                      <strong>{line.who}</strong> {line.what}
+                    </>
+                  )}{" "}
+                  <span className="pe-log-when">· {formatFirmStamp(line.at, tz)}</span>
                 </div>
                 {line.details.length > 0 && (
                   <details>

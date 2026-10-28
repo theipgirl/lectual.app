@@ -5,7 +5,7 @@ import { ROLES, type Role } from "@/lib/auth/roles";
 import { changedColumns, contentChanges, type EditableColumn } from "./diff";
 import { friendlyProposalError, ProposalError } from "./errors";
 import { defaultSelection, quoteProposal } from "./pricing";
-import { PROPOSAL_STEPS, paidStateFromEvents, readStep, type PaidState, type StepEventInput, type StepPayload } from "./paid";
+import { PROPOSAL_STEPS, RESET_EVENT_TYPE, currentRound, paidStateFromEvents, readStep, type PaidState, type StepEventInput, type StepPayload } from "./paid";
 import { offeredPackages, type OfferedPackage } from "./segments";
 import {
   PROPOSAL_ADMIN_ROLES,
@@ -27,6 +27,7 @@ import {
 import { MAX_CONTENT_BYTES, hasErrors, isCivilDate, isPlausibleEmail, validateContent, validateSettingInput } from "./validate";
 import { PAY_LINK_NEEDS_DB_UPDATE, PAY_LINK_NOT_HTTPS, PAY_LINK_NOT_LIVE, PAY_LINK_UNCHANGED } from "@/lib/proposal-editor/pay-link";
 import { runDeleteProposalFamily, type DeleteFamilyResult } from "@/lib/proposal-editor/delete-proposal";
+import { RESET_NEEDS_DB_UPDATE, RESET_NOT_ACCEPTED } from "@/lib/proposal-editor/reset-acceptance";
 
 /**
  * The proposal data layer — every read and write the signed-in firm makes.
@@ -381,15 +382,27 @@ export async function listProposalStepEvents(proposalId: string): Promise<StepEv
   if (typeof proposalId !== "string" || !UUID_PATTERN.test(proposalId)) return { ok: false };
   try {
     const supabase = await getScopedClient();
-    const { data, error } = await proposalsDb(supabase)
-      .from("client_proposal_event")
-      .select("proposal_id, type, actor, actor_user_id, payload, created_at")
-      .eq("proposal_id", proposalId)
-      .in("payload->>step", PROPOSAL_STEPS)
-      .order("created_at", { ascending: false })
-      .limit(200);
-    if (error) return { ok: false };
-    return { ok: true, events: (Array.isArray(data) ? data : []) as ProposalStepEvent[] };
+    const db = proposalsDb(supabase);
+    const [steps, resets] = await Promise.all([
+      db
+        .from("client_proposal_event")
+        .select("proposal_id, type, actor, actor_user_id, payload, created_at")
+        .eq("proposal_id", proposalId)
+        .in("payload->>step", PROPOSAL_STEPS)
+        .order("created_at", { ascending: false })
+        .limit(200),
+      // lectual 0101: the version's resets, so the readers count only the current round (paid.ts).
+      db
+        .from("client_proposal_event")
+        .select("proposal_id, type, actor, actor_user_id, created_at")
+        .eq("proposal_id", proposalId)
+        .eq("type", RESET_EVENT_TYPE)
+        .order("created_at", { ascending: false })
+        .limit(20),
+    ]);
+    if (steps.error || resets.error) return { ok: false };
+    const list = (rows: unknown) => (Array.isArray(rows) ? rows : []) as ProposalStepEvent[];
+    return { ok: true, events: [...list(steps.data), ...list(resets.data)] };
   } catch {
     return { ok: false };
   }
@@ -415,7 +428,7 @@ export async function listStepActivity(proposalIds: readonly string[]): Promise<
   const chunks: string[][] = [];
   for (let i = 0; i < ids.length; i += EVENT_ID_CHUNK) chunks.push(ids.slice(i, i + EVENT_ID_CHUNK));
   const reads = await Promise.all(
-    chunks.map((chunk) =>
+    chunks.flatMap((chunk) => [
       db
         .from("client_proposal_event")
         .select("proposal_id, type, actor, actor_user_id, payload, created_at")
@@ -423,7 +436,15 @@ export async function listStepActivity(proposalIds: readonly string[]): Promise<
         .in("payload->>step", PROPOSAL_STEPS)
         .order("created_at", { ascending: false })
         .limit(500),
-    ),
+      // lectual 0101: resets start a fresh round (paid.ts), so they are read beside the steps.
+      db
+        .from("client_proposal_event")
+        .select("proposal_id, type, actor, actor_user_id, created_at")
+        .in("proposal_id", chunk)
+        .eq("type", RESET_EVENT_TYPE)
+        .order("created_at", { ascending: false })
+        .limit(500),
+    ]),
   );
   const byProposal = new Map<string, ProposalStepEvent[]>();
   for (const { data, error } of reads) {
@@ -434,7 +455,7 @@ export async function listStepActivity(proposalIds: readonly string[]): Promise<
   }
   for (const id of ids) {
     const events = byProposal.get(id) ?? [];
-    const newest = events
+    const newest = currentRound(events, id)
       .filter((e) => readStep(e.payload))
       .reduce<ProposalStepEvent | null>((best, e) => (!best || e.created_at > best.created_at ? e : best), null);
     out.set(id, {
@@ -912,6 +933,44 @@ export async function deleteProposalFamily(proposalId: string): Promise<DeleteFa
     },
     proposalId,
   );
+}
+
+/**
+ * "Reset acceptance" (lectual 0101): an accepted version back to "Link live" (`sent`), so the same
+ * client link can be accepted again. Scoped client only; writes `status` ALONE (the database clears
+ * accepted_at / accepted_selection / accepted_snapshot, refuses a paid version, a caller who is not
+ * the admin tier or a named approver, and any other change, and writes the `reset` event itself with
+ * the previous acceptance). Fenced on `status = accepted` and the rendered `updated_at`.
+ */
+export async function resetProposalAcceptance(id: string, options: UpdateProposalOptions): Promise<ProposalRow> {
+  const expected = typeof options?.expectedUpdatedAt === "string" ? options.expectedUpdatedAt.trim() : "";
+  if (!expected || Number.isNaN(Date.parse(expected))) throw new ProposalError("conflict", PROPOSAL_SAVE_CONFLICT);
+
+  const supabase = await getScopedClient();
+  await requireProposalWriteRole(supabase);
+  const db = proposalsDb(supabase);
+
+  const current = await loadRow(db, id);
+  if (Date.parse(current.updated_at) !== Date.parse(expected)) throw new ProposalError("conflict", PROPOSAL_SAVE_CONFLICT);
+  if (current.status !== "accepted") throw new ProposalError("conflict", RESET_NOT_ACCEPTED);
+
+  const { data, error } = await db
+    .from("client_proposal")
+    .update({ status: "sent" })
+    .eq("id", current.id)
+    .eq("status", "accepted")
+    .eq("updated_at", expected)
+    .select(PROPOSAL_COLUMNS)
+    .maybeSingle();
+  if (error) {
+    // Before 0101 the 0089/0100 trigger knows no accepted -> sent move.
+    if ((error.message ?? "").toLowerCase().includes("client_proposal_bad_transition")) {
+      throw new ProposalError("unavailable", RESET_NEEDS_DB_UPDATE);
+    }
+    throw friendlyProposalError(error, "reset the acceptance");
+  }
+  if (!data) throw new ProposalError("conflict", PROPOSAL_SAVE_CONFLICT);
+  return data as ProposalRow;
 }
 
 /* ─────────────────────────── lifecycle ───────────────────────────────────── */

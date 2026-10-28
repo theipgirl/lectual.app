@@ -26,6 +26,7 @@ vi.mock("@/app/dashboard/proposals/[id]/actions", () => ({
   sendAction: vi.fn(),
   unapproveAction: vi.fn(),
   withdrawAction: vi.fn(),
+  resetAcceptanceAction: vi.fn(),
 }));
 
 const ID = "11111111-1111-4111-8111-111111111111";
@@ -111,6 +112,22 @@ describe("who may delete, and the More menu", () => {
     }
     expect(moreMenuItems({ status: "accepted", canWrite: true, canDelete: false })).toEqual([]);
     expect(moreMenuItems({ status: "sent", canWrite: true, canDelete: false })).toEqual(["withdraw"]);
+  });
+
+  it("one menu holds Withdraw, Reset acceptance and Delete, each only when allowed", () => {
+    expect(moreMenuItems({ status: "sent", canWrite: true, canDelete: true, canReset: true })).toEqual(["withdraw", "delete"]);
+    expect(moreMenuItems({ status: "accepted", canWrite: true, canDelete: true, canReset: true })).toEqual(["reset", "delete"]);
+    expect(moreMenuItems({ status: "accepted", canWrite: true, canDelete: false, canReset: true })).toEqual(["reset"]);
+    expect(moreMenuItems({ status: "accepted", canWrite: false, canDelete: false, canReset: true })).toEqual([]);
+    expect(moreMenuItems({ status: "withdrawn", canWrite: true, canDelete: true, canReset: true })).toEqual(["delete"]);
+    expect(moreMenuItems({ status: "superseded", canWrite: true, canDelete: false, canReset: true })).toEqual([]);
+  });
+
+  it("the More menu keeps a single confirm state, so only one confirm is open at a time", () => {
+    const src = readFileSync("src/components/proposal-editor/Lifecycle.tsx", "utf8");
+    expect(src.match(/function MoreMenu\(/g)).toHaveLength(1);
+    expect(src).toContain("useState<MoreMenuItem | null>(null)");
+    expect(src.match(/<MoreMenu /g)).toHaveLength(1);
   });
 
   const render = (canDelete: boolean, status: ProposalStatus) =>

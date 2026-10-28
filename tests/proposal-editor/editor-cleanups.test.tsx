@@ -15,6 +15,7 @@ vi.mock("@/app/dashboard/proposals/[id]/actions", () => ({
   sendAction: vi.fn(),
   unapproveAction: vi.fn(),
   withdrawAction: vi.fn(),
+  resetAcceptanceAction: vi.fn(),
   deleteProposalAction: vi.fn(),
 }));
 

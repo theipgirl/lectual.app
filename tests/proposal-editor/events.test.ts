@@ -142,7 +142,8 @@ describe("issues land on the section that can fix them", () => {
     expect(g.names.get(0)?.some((i) => i.path === "names[0].marks[1].desc")).toBe(true);
     expect(g.adjustments.length).toBeGreaterThan(0);
     expect(g.includes.length).toBeGreaterThan(0);
-    expect(g.details.map((i) => i.path).sort()).toEqual(["client_email", "expires_on", "pay_url"]);
+    expect(g.details.map((i) => i.path).sort()).toEqual(["client_email", "pay_url"]);
+    expect(g.pricing.some((i) => i.path === "expires_on")).toBe(true);
     expect(describeIssuePath("names[0].marks[1].desc", c)).toBe("Prosperall, mark 2, description");
     expect(describeIssuePath("pricing.base_cents", c)).toBe("package prices, base price");
     expect(describeIssuePath("expires_on", c)).toBe("expiry date");

@@ -4,11 +4,12 @@ import Link from "next/link";
 import { useState } from "react";
 import type { ProposalStatus } from "@/lib/proposals/types";
 import { joinOr } from "@/lib/proposal-editor/labels";
-import { createLinkAction, deleteProposalAction, reviseAction, sendAction, unapproveAction, withdrawAction } from "@/app/dashboard/proposals/[id]/actions";
-import { DELETE_CONFIRM, DELETE_LABEL, moreMenuItems } from "@/lib/proposal-editor/delete-proposal";
+import { createLinkAction, deleteProposalAction, resetAcceptanceAction, reviseAction, sendAction, unapproveAction, withdrawAction } from "@/app/dashboard/proposals/[id]/actions";
+import { DELETE_CONFIRM, DELETE_LABEL, moreMenuItems, type MoreMenuItem } from "@/lib/proposal-editor/delete-proposal";
 import Popover from "@/components/list-page/Popover";
 import { NOT_EMAILED } from "@/lib/consult-proposal/manual-email";
 import { BUTTON_WORDS, LINK_NOT_LIVE_YET, askToCreateLink } from "@/lib/proposal-editor/vocabulary";
+import { RESET_CONFIRM, RESET_CONFIRM_BUTTON, RESET_LABEL, RESET_PENDING } from "@/lib/proposal-editor/reset-acceptance";
 import { ActionForm, Outcome } from "./ActionForm";
 import { PostConsultEmail } from "./PostConsultEmail";
 
@@ -33,6 +34,8 @@ export function Lifecycle({
   clientUrl,
   queueNote = null,
   canDelete = false,
+  canReset = false,
+  updatedAt = "",
 }: {
   proposalId: string;
   status: ProposalStatus;
@@ -48,10 +51,14 @@ export function Lifecycle({
   queueNote?: { text: string; queueId: string | null } | null;
   /** The firm's owner (lectual 0102): "Delete proposal" is drawn in More only then. Everyone else never sees it. */
   canDelete?: boolean;
+  /** lectual 0101: an accepted version, the admin tier or a named approver, and read as not paid (`canResetAcceptance`). */
+  canReset?: boolean;
+  /** The row's `updated_at` as rendered; the reset is fenced on it. */
+  updatedAt?: string;
 }) {
   const hidden = <input type="hidden" name="proposalId" value={proposalId} />;
   const approvers = approverNames.length > 0 ? joinOr(approverNames) : "a named approver";
-  const menu = moreMenuItems({ status, canWrite, canDelete });
+  const menu = moreMenuItems({ status, canWrite, canDelete, canReset });
 
   return (
     <div className="pe-bar" role="group" aria-label="Proposal actions">
@@ -135,7 +142,7 @@ export function Lifecycle({
         </>
       )}
 
-      {menu.length > 0 && <MoreMenu proposalId={proposalId} status={status} items={menu} />}
+      {menu.length > 0 && <MoreMenu proposalId={proposalId} status={status} items={menu} updatedAt={updatedAt} />}
     </div>
   );
 }
@@ -169,11 +176,25 @@ function CopyLink({ url }: { url: string }) {
 }
 
 /**
- * "More": the rare, destructive action. Withdraw asks first, in the page, with an explicit Cancel;
- * the menu itself closes on Esc or a click outside (the shared Popover).
+ * "More": the rare, destructive actions. Withdraw (draft, saved, link live), on an accepted version
+ * Reset acceptance (lectual 0101), and for the owner Delete proposal (lectual 0102, any status). Each asks
+ * first, in the page, with an explicit Cancel, and only one confirm is open at a time; the menu itself
+ * closes on Esc or a click outside (the shared Popover).
  */
-function MoreMenu({ proposalId, status, items }: { proposalId: string; status: ProposalStatus; items: ("withdraw" | "delete")[] }) {
-  const [confirming, setConfirming] = useState<"withdraw" | "delete" | null>(null);
+function MoreMenu({
+  proposalId,
+  status,
+  items,
+  updatedAt = "",
+}: {
+  proposalId: string;
+  status: ProposalStatus;
+  items: MoreMenuItem[];
+  updatedAt?: string;
+}) {
+  // One confirm open at a time: choosing another item replaces the one showing.
+  const [confirming, setConfirming] = useState<MoreMenuItem | null>(null);
+  const label: Record<MoreMenuItem, string> = { withdraw: BUTTON_WORDS.withdraw, reset: RESET_LABEL, delete: DELETE_LABEL };
   return (
     <div className="pe-more-menu">
       <Popover
@@ -189,52 +210,48 @@ function MoreMenu({ proposalId, status, items }: { proposalId: string; status: P
       >
         {(close) => (
           <>
-            {items.includes("withdraw") && (
+            {items.map((item) => (
               <button
+                key={item}
                 type="button"
                 role="menuitem"
                 className="lp-pop-item"
                 onClick={() => {
-                  setConfirming("withdraw");
+                  setConfirming(item);
                   close();
                 }}
               >
-                <span className="lp-pop-text">{BUTTON_WORDS.withdraw}…</span>
+                <span className="lp-pop-text">{label[item]}…</span>
               </button>
-            )}
-            {items.includes("delete") && (
-              <button
-                type="button"
-                role="menuitem"
-                className="lp-pop-item"
-                onClick={() => {
-                  setConfirming("delete");
-                  close();
-                }}
-              >
-                <span className="lp-pop-text">{DELETE_LABEL}…</span>
-              </button>
-            )}
+            ))}
           </>
         )}
       </Popover>
-      {confirming === "withdraw" && (
-        <ActionForm action={withdrawAction} className="pe-act pe-confirm">
-          {({ state, pending }) => (
-            <>
-              <input type="hidden" name="proposalId" value={proposalId} />
-              <p className="lx-note" role="alert" style={{ margin: 0 }}>
-                {status === "sent" ? "Withdraw this version? The client’s link will stop opening it." : "Withdraw this version? It can’t be brought back."}
-              </p>
-              <button type="submit" className="lx-btn lx-btn-danger" disabled={pending}>
-                {pending ? "Withdrawing…" : "Yes, withdraw"}
-              </button>
-              <button type="button" className="lx-btn lx-btn-sec" onClick={() => setConfirming(null)} disabled={pending}>
-                Cancel
-              </button>
-              <Outcome state={state} pending={pending} />
-            </>
-          )}
+      {(confirming === "withdraw" || confirming === "reset") && (
+        <ActionForm key={confirming} action={confirming === "reset" ? resetAcceptanceAction : withdrawAction} className="pe-act pe-confirm">
+          {({ state, pending }) => {
+            const reset = confirming === "reset";
+            return (
+              <>
+                <input type="hidden" name="proposalId" value={proposalId} />
+                {reset && <input type="hidden" name="updatedAt" value={updatedAt} />}
+                <p className="lx-note" role="alert" style={{ margin: 0 }}>
+                  {reset
+                    ? RESET_CONFIRM
+                    : status === "sent"
+                      ? "Withdraw this version? The client’s link will stop opening it."
+                      : "Withdraw this version? It can’t be brought back."}
+                </p>
+                <button type="submit" className="lx-btn lx-btn-danger" disabled={pending}>
+                  {reset ? (pending ? RESET_PENDING : RESET_CONFIRM_BUTTON) : pending ? "Withdrawing…" : "Yes, withdraw"}
+                </button>
+                <button type="button" className="lx-btn lx-btn-sec" onClick={() => setConfirming(null)} disabled={pending}>
+                  Cancel
+                </button>
+                <Outcome state={state} pending={pending} />
+              </>
+            );
+          }}
         </ActionForm>
       )}
       {confirming === "delete" && <DeleteConfirm proposalId={proposalId} onCancel={() => setConfirming(null)} />}

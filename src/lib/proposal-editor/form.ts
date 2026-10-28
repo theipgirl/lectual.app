@@ -148,26 +148,27 @@ export type DetailsPatch = {
   clientName: string;
   clientEmail: string | null;
   title: string;
-  expiresOn: string | null;
+  /** Left out when the form did not carry the field (the expiry date is on the Package step), so saving the client never clears it. */
+  expiresOn?: string | null;
   /** Left out when the form did not carry the field (the pay link is on the Package step), so saving the client never clears it. */
   payUrl?: string | null;
   content: ProposalContent;
 };
 
-/** Client names, email, title, expiry and pay link. `client_name` follows `content.client.full_name`. */
+/** Client names, email and title; the expiry date and pay link only when the form carries them (they live on the Package step). `client_name` follows `content.client.full_name`. */
 export function parseDetails(form: FormData, current: ProposalContent): Parsed<DetailsPatch> {
   const fullName = text(form, "fullName");
   if (!fullName) return fail("Client name: enter the client's full name.");
   const title = text(form, "title");
   if (!title) return fail("Title: enter a title.");
-  const expires = parseDateInput(text(form, "expiresOn"), "Expiry date");
-  if (!expires.ok) return expires;
+  const expires = form.has("expiresOn") ? parseDateInput(text(form, "expiresOn"), "Expiry date") : null;
+  if (expires && !expires.ok) return expires;
   const company = optionalText(form, "company");
   return ok({
     clientName: fullName,
     clientEmail: text(form, "clientEmail") || null,
     title,
-    expiresOn: expires.value,
+    ...(expires ? { expiresOn: expires.value } : {}),
     ...(form.has("payUrl") ? { payUrl: text(form, "payUrl") || null } : {}),
     content: {
       ...current,

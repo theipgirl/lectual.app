@@ -9,6 +9,9 @@ import {
   changeLivePayLink,
   deleteProposalFamily,
   getProposal,
+  isCurrentUserApprover,
+  listProposalStepEvents,
+  resetProposalAcceptance,
   reviseProposal,
   sendProposal,
   unapproveProposal,
@@ -21,6 +24,7 @@ import { GOES_LIVE_ON_APPROVAL, pendingProposalEmail, proposalSendBlock } from "
 import {
   newBrandName,
   parseAdjustments,
+  parseDateInput,
   parseDetails,
   parseIncludes,
   parseMessage,
@@ -40,6 +44,8 @@ import { runManualEmail } from "@/lib/consult-proposal/manual-email";
 import { runCreateLink } from "@/lib/proposal-editor/create-link";
 import { runChangePayLink } from "@/lib/proposal-editor/pay-link";
 import { DELETE_OWNER_ONLY, canDeleteProposal } from "@/lib/proposal-editor/delete-proposal";
+import { runResetAcceptance } from "@/lib/proposal-editor/reset-acceptance";
+import { paidStateFromEvents } from "@/lib/proposals/paid";
 import { currentRole } from "@/lib/auth/current-role";
 import { createDraft, listQueue } from "@/lib/queue/api";
 import { activeQueueOrgKey } from "@/lib/queue/org";
@@ -149,7 +155,14 @@ export async function savePricingAction(_prev: ActionState, formData: FormData):
     if (!r.ok) return r;
     // The pay link rides on this form (Step 3); a form that did not carry it leaves the stored one alone.
     const payUrl = formData.has("payUrl") ? { payUrl: field(formData, "payUrl") || null } : {};
-    return { ok: true, value: { content: { ...current.content, pricing: r.value }, ...payUrl } };
+    // So does the expiry date; a form that did not carry it leaves the stored one alone.
+    let expiresOn: { expiresOn: string | null } | Record<string, never> = {};
+    if (formData.has("expiresOn")) {
+      const e = parseDateInput(field(formData, "expiresOn"), "Expiry date");
+      if (!e.ok) return e;
+      expiresOn = { expiresOn: e.value };
+    }
+    return { ok: true, value: { content: { ...current.content, pricing: r.value }, ...payUrl, ...expiresOn } };
   });
 }
 
@@ -226,6 +239,34 @@ export async function changePayLinkAction(_prev: ActionState, formData: FormData
       revalidate,
     },
     { id: field(formData, "proposalId"), payUrl: formData.get("payUrl"), updatedAt: field(formData, "updatedAt") },
+  );
+}
+
+/**
+ * "Reset acceptance" on an accepted version (lectual 0101): back to "Link live", so the same client link can be
+ * accepted again. Re-checks the module and the staff role (gateStaffAction), then the caller's role and whether they
+ * are a named approver, then the CURRENT-round paid state (paid = "Undo Mark paid first.", unreadable = refused), and
+ * writes `status` alone through the scoped client, fenced on `accepted` and the rendered `updated_at`. The database
+ * re-judges all of it, clears the acceptance and logs the reset with the previous acceptance. Nothing is emailed.
+ */
+export async function resetAcceptanceAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  return runResetAcceptance(
+    {
+      gate: gateStaffAction,
+      authorize: async () => {
+        const [role, isApprover] = await Promise.all([currentRole(), isCurrentUserApprover()]);
+        return { role: role ?? null, isApprover };
+      },
+      paid: async (id) => {
+        const read = await listProposalStepEvents(id);
+        if (!read.ok) return "unavailable";
+        return paidStateFromEvents(read.events).state === "paid" ? "paid" : "not_paid";
+      },
+      reset: (id, expectedUpdatedAt) => resetProposalAcceptance(id, { expectedUpdatedAt }),
+      describe: proposalActionError,
+      revalidate,
+    },
+    { id: field(formData, "proposalId"), updatedAt: field(formData, "updatedAt") },
   );
 }
 

@@ -46,7 +46,7 @@ describe("More options: the pure rules", () => {
 
   it("a refusal sentence is placed by its label", () => {
     expect(messageInMoreOptions("Second-mark discount: enter a percentage from 0 to 100.")).toBe(true);
-    expect(messageInMoreOptions("Expiry date: pick a real date.")).toBe(true);
+    expect(messageInMoreOptions("Expiry date: pick a real date.")).toBe(false);
     expect(messageInMoreOptions("Enter the client's full name.")).toBe(false);
     expect(messageInMoreOptions(undefined)).toBe(false);
   });
@@ -90,10 +90,14 @@ describe("New proposal: three steps, the button, then one closed More options", 
     const more = html.slice(at(html, 'class="pe-more"'));
     const before = html.slice(0, at(html, 'class="pe-more"'));
     for (const n of ["fullName", "clientEmail", "brandName", "useConsult", "package", "payUrl"]) expect(namesOf(before)).toContain(n);
-    for (const n of ["firstName", "company", "title", "expiresOn", "base", "includedClasses", "perClass", "secondMarkPct", "govPerClass"]) {
+    for (const n of ["firstName", "company", "title", "base", "includedClasses", "perClass", "secondMarkPct", "govPerClass"]) {
       expect(namesOf(more)).toContain(n);
       expect(namesOf(before)).not.toContain(n);
     }
+    // the expiry date sits in Step 3 beside the pay link, not in More options
+    expect(namesOf(before)).toContain("expiresOn");
+    expect(namesOf(more)).not.toContain("expiresOn");
+    expect(before.indexOf('name="payUrl"')).toBeLessThan(before.indexOf('name="expiresOn"'));
   });
 
   it("every field that existed before the redesign is still rendered under its old name", () => {
@@ -179,9 +183,9 @@ describe("the proposal editor: three steps, the button, then one closed More opt
     expect(names.has("reduceUnderIncluded")).toBe(true);
     // the rarely-changed ones are inside More options, the step ones are not
     const more = html.slice(at(html, 'class="pe-more"'));
-    for (const n of ["firstName", "company", "title", "expiresOn", "base", "secondMarkPct", "greeting", "recommendation", "officeActionNote", "what", "note", "overrideBase", "mark.0.desc"]) expect(namesOf(more), n).toContain(n);
+    for (const n of ["firstName", "company", "title", "base", "secondMarkPct", "greeting", "recommendation", "officeActionNote", "what", "note", "overrideBase", "mark.0.desc"]) expect(namesOf(more), n).toContain(n);
     const steps = html.slice(0, at(html, 'class="pe-more"'));
-    for (const n of ["fullName", "clientEmail", "package", "payUrl", "class.0.label"]) expect(namesOf(steps), n).toContain(n);
+    for (const n of ["fullName", "clientEmail", "package", "payUrl", "expiresOn", "class.0.label"]) expect(namesOf(steps), n).toContain(n);
   });
 
   it("More options fields belong to their step's form through the form attribute", async () => {
@@ -190,6 +194,16 @@ describe("the proposal editor: three steps, the button, then one closed More opt
     expect(html).toContain(`id="pe-pricing-${ID}"`);
     expect(html).toMatch(new RegExp(`<input[^>]*name="title"[^>]*form="pe-details-${ID}"|<input[^>]*form="pe-details-${ID}"[^>]*name="title"`));
     expect(html).toMatch(new RegExp(`name="secondMarkPct"[^>]*form="pe-pricing-${ID}"|form="pe-pricing-${ID}"[^>]*name="secondMarkPct"`));
+  });
+
+  it("the expiry date belongs to the package form, beside the pay link, and is not in More options", async () => {
+    const html = await renderEditor(row());
+    const more = html.slice(at(html, 'class="pe-more"'));
+    expect(namesOf(more)).not.toContain("expiresOn");
+    const pkg = html.slice(at(html, `id="pe-pricing-${ID}"`), at(html, 'class="pe-more"'));
+    expect(pkg).toContain('name="expiresOn"');
+    expect(pkg).toContain('value="2026-11-10"');
+    expect(pkg.indexOf('name="payUrl"')).toBeLessThan(pkg.indexOf('name="expiresOn"'));
   });
 
   it("a stored non-default value inside More options is still in the markup", async () => {

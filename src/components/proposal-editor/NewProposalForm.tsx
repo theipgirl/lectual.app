@@ -6,6 +6,7 @@ import type { PackageOption } from "@/lib/proposals/package-list";
 import { USE_CONSULT_LABEL } from "@/lib/proposals/prefill-words";
 import { countChangedFields, messageInMoreOptions } from "@/lib/proposal-editor/more-options";
 import { ActionForm, Outcome } from "./ActionForm";
+import { ExpiryField } from "./ExpiryField";
 import { BuilderLayout } from "./BuilderLayout";
 
 export type NewProposalDefaults = {
@@ -53,12 +54,15 @@ export function NewProposalForm({
   packages,
   defaultPackage,
   consult,
+  today,
 }: {
   defaults: NewProposalDefaults;
   hasSettings: boolean;
   packages: PackageOption[] | null;
   defaultPackage?: string;
   consult?: ReactNode;
+  /** The firm's civil date, for the expiry warning. */
+  today?: string;
 }) {
   const options = packages ?? [];
   const first = options.find((o) => o.name === defaultPackage) ?? options[0];
@@ -70,14 +74,13 @@ export function NewProposalForm({
   );
   const set = (key: keyof PackageFields) => (e: { target: { value: string } }) => setFields((f) => ({ ...f, [key]: e.target.value }));
   // The More options fields are controlled so the section can say how many differ from their defaults.
-  const [more, setMore] = useState({ firstName: defaults.firstName, company: defaults.company, title: defaults.title, expiresOn: defaults.expiresOn });
+  const [more, setMore] = useState({ firstName: defaults.firstName, company: defaults.company, title: defaults.title });
   const setMoreField = (key: keyof typeof more) => (e: { target: { value: string } }) => setMore((m) => ({ ...m, [key]: e.target.value }));
   const chosenOption = options.find((o) => o.name === chosen);
   const changed = countChangedFields([
     { current: more.firstName, baseline: defaults.firstName },
     { current: more.company, baseline: defaults.company },
     { current: more.title, baseline: defaults.title },
-    { current: more.expiresOn, baseline: defaults.expiresOn },
     ...(chosenOption
       ? [
           { current: fields.base, baseline: chosenOption.base },
@@ -154,6 +157,7 @@ export function NewProposalForm({
                   <span className="lx-label">Pay link</span>
                   <input className="lx-input" name="payUrl" type="url" maxLength={2000} defaultValue={defaults.payUrl} placeholder="Enter custom pay link" />
                 </label>
+                <ExpiryField defaultValue={defaults.expiresOn} today={today} />
                 {packages === null && (
                   <p className="lx-note" role="status" style={{ margin: "12px 0 0" }}>
                     Your packages couldn&apos;t be loaded just now, so no package is offered and the standard prices will be used. You can change them on the next page.
@@ -187,10 +191,6 @@ export function NewProposalForm({
                 <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
                   <span className="lx-label">Title</span>
                   <input className="lx-input" name="title" maxLength={300} value={more.title} onChange={setMoreField("title")} />
-                </label>
-                <label className="lx-field">
-                  <span className="lx-label">Open until</span>
-                  <input className="lx-input" name="expiresOn" type="date" value={more.expiresOn} onChange={setMoreField("expiresOn")} />
                 </label>
                 {packages !== null && options.length > 0 && (
                   <>

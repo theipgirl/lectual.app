@@ -250,6 +250,7 @@ export default async function NewProposalPage({ searchParams }: { searchParams: 
       <NewProposalForm
         key={`${defaults.matterId}|${defaults.leadId}`}
         defaults={defaults}
+        today={firmCivilDate(new Date(), tz)}
         hasSettings={settings !== null || !settingsRead.ok}
         packages={packages}
         defaultPackage={packageFill?.kind === "match" ? packageFill.name : undefined}
