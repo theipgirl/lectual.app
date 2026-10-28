@@ -4,7 +4,7 @@ import { firmToken } from "@/lib/intake-forms/lawmatics-sync";
 import { addNote, type FetchLike } from "@/lib/lawmatics/writes";
 import { formatDollars } from "@/lib/proposal-editor/events";
 import { addedClassCount } from "./client-classes";
-import { stepPayload, stepSucceeded, type ProposalStep, type StepEventInput, type StepPayload } from "./paid";
+import { RESET_EVENT_TYPE, stepPayload, stepSucceeded, type ProposalStep, type StepEventInput, type StepPayload } from "./paid";
 import { MARK_KIND_LABEL, type AcceptedSnapshot } from "./types";
 
 /**
@@ -229,21 +229,37 @@ async function readProposal(db: FollowupDb, input: FollowupInput): Promise<Row |
   };
 }
 
-/** The step events already on this version, or null when they could not be read. */
+/**
+ * The step events already on this version, plus its `reset` events (lectual 0101), or null when
+ * either could not be read. A reset starts a fresh round (paid.ts `currentRound`), so a client who
+ * accepts again after a reset gets the notice and the note again; steps from before it don't count.
+ */
 async function readEarlierSteps(db: FollowupDb, row: Row): Promise<StepEventInput[] | null> {
-  const { data, error } = await db
-    .from("client_proposal_event")
-    .select("proposal_id, created_at, payload")
-    .eq("proposal_id", row.id)
-    .eq("org_id", row.orgId)
-    .in("payload->>step", ["accept_notice", "lawmatics_note"])
-    .limit(50);
-  if (error) return null;
-  return (Array.isArray(data) ? data : []).filter(isObject).map((r) => ({
-    proposal_id: typeof r.proposal_id === "string" ? r.proposal_id : row.id,
-    created_at: typeof r.created_at === "string" ? r.created_at : "",
-    payload: r.payload,
-  }));
+  const [steps, resets] = await Promise.all([
+    db
+      .from("client_proposal_event")
+      .select("proposal_id, created_at, payload")
+      .eq("proposal_id", row.id)
+      .eq("org_id", row.orgId)
+      .in("payload->>step", ["accept_notice", "lawmatics_note"])
+      .limit(50),
+    db
+      .from("client_proposal_event")
+      .select("proposal_id, type, created_at")
+      .eq("proposal_id", row.id)
+      .eq("org_id", row.orgId)
+      .eq("type", RESET_EVENT_TYPE)
+      .limit(50),
+  ]);
+  if (steps.error || resets.error) return null;
+  const read = (data: unknown, type?: string): StepEventInput[] =>
+    (Array.isArray(data) ? data : []).filter(isObject).map((r) => ({
+      proposal_id: typeof r.proposal_id === "string" ? r.proposal_id : row.id,
+      created_at: typeof r.created_at === "string" ? r.created_at : "",
+      payload: r.payload,
+      ...(type ? { type } : {}),
+    }));
+  return [...read(steps.data), ...read(resets.data, RESET_EVENT_TYPE)];
 }
 
 /** Writes the step to the timeline as the system. Returns whether the line landed. */

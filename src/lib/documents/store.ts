@@ -91,14 +91,14 @@ export async function listDraftsForProposal(
   supabase: ScopedClient,
   matterId: string,
   proposalId: string,
-): Promise<Array<Pick<DocumentDraftRow, "id" | "queue_item_id" | "status">> | null> {
+): Promise<Array<Pick<DocumentDraftRow, "id" | "queue_item_id" | "status"> & { created_at?: string | null }> | null> {
   const { data, error } = await supabase
     .from("crm_document_draft")
-    .select("id, queue_item_id, status")
+    .select("id, queue_item_id, status, created_at")
     .eq("matter_id", matterId)
     .eq("payload->>proposalId", proposalId);
   if (error) return null;
-  return (data ?? []) as unknown as Array<Pick<DocumentDraftRow, "id" | "queue_item_id" | "status">>;
+  return (data ?? []) as unknown as Array<Pick<DocumentDraftRow, "id" | "queue_item_id" | "status"> & { created_at?: string | null }>;
 }
 
 /** The stored file of a generated document, or null when it can't be read. Through the caller's own scoped client, so the bucket's policy is the gate. */

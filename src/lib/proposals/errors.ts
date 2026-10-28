@@ -8,6 +8,7 @@
  */
 
 import type { ValidationIssue } from "./validate";
+import { RESET_NOT_ALLOWED, RESET_PAID, RESET_WITH_EDIT } from "@/lib/proposal-editor/reset-acceptance";
 
 export type ProposalErrorCode =
   /** The content or a column failed a firm rule; `issues` says which. */
@@ -49,6 +50,10 @@ const TRIGGER_MESSAGES: ReadonlyArray<readonly [prefix: string, code: ProposalEr
   ["client_proposal_pay_link_frozen", "frozen", "Only a proposal whose link is live can have its pay link changed, and only on its own."],
   ["client_proposal_pay_link_staff_only", "forbidden", "Only a signed-in staff member can change a live proposal's pay link."],
   ["client_proposal_pay_link_required", "validation", "Enter the pay link."],
+  // lectual 0101: resetting a client's acceptance (accepted -> sent).
+  ["client_proposal_reset_not_allowed", "forbidden", RESET_NOT_ALLOWED],
+  ["client_proposal_reset_paid", "conflict", RESET_PAID],
+  ["client_proposal_reset_with_edit", "conflict", RESET_WITH_EDIT],
   ["client_proposal_frozen", "frozen", "This version has already gone out and can't be changed. Start a new version instead."],
   ["client_proposal_immutable", "frozen", "This version has already gone out and can't be changed. Start a new version instead."],
   ["client_proposal_acceptance_final", "frozen", "The client's acceptance is a record and can't be changed."],
