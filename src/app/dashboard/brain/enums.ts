@@ -50,6 +50,23 @@ export const BRAIN_CATEGORY_BLURB: Record<BrainCategory, string> = {
   other: "Everything else the firm has written down.",
 };
 
+/**
+ * The plain "Type" a person picks for a new note, mapped onto the stored categories. Existing notes
+ * in the other categories still display grouped as before; they just aren't offered for new ones.
+ */
+export const ENTRY_TYPES = [
+  { value: "voice", label: "Tone of voice", category: "voice" },
+  { value: "pricing", label: "Prices and packages", category: "pricing" },
+  { value: "stage_rules", label: "Stage rules", category: "stage_mapping" },
+  { value: "other", label: "Other", category: "other" },
+] as const satisfies readonly { value: string; label: string; category: BrainCategory }[];
+
+export type EntryTypeValue = (typeof ENTRY_TYPES)[number]["value"];
+
+export function entryTypeOf(value: unknown) {
+  return ENTRY_TYPES.find((t) => t.value === value) ?? null;
+}
+
 export function isBrainCategory(value: unknown): value is BrainCategory {
   return typeof value === "string" && (BRAIN_CATEGORIES as readonly string[]).includes(value);
 }
@@ -122,4 +139,20 @@ export function canReviewClaims(role: Role): boolean {
  */
 export function canDeleteClaims(role: Role): boolean {
   return hasRole(role, "senior_admin");
+}
+
+/** Who can add a firm note, computed from the same role test the action uses. */
+export function knowledgeHelp(role: Role): string {
+  return canManageBrainEntries(role)
+    ? "You can add and edit firm notes. Owners, admins and senior admins can add them; everyone else can read them."
+    : "Owners, admins and senior admins add firm notes. You can read them.";
+}
+
+/** Who can propose and who can review a claim, from the same role tests the actions use. */
+export function claimsHelp(role: Role): string {
+  const propose = canProposeClaims(role) ? "You can propose a claim." : "You can read the claims but not propose one.";
+  const review = canReviewClaims(role)
+    ? "You can also review claims."
+    : "Owners, admins, senior admins and attorneys review them.";
+  return `${propose} ${review}`;
 }
