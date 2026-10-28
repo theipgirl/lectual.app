@@ -199,7 +199,7 @@ function MoreMenu({
     <div className="pe-more-menu">
       <Popover
         label="More actions"
-        align="right"
+        align="left"
         width={190}
         trigger={({ onClick, ref, ...aria }) => (
           <button {...aria} ref={ref} type="button" onClick={onClick} className="lx-btn lx-btn-sec">
