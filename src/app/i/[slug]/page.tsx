@@ -5,7 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { readPublicIntake } from "@/lib/intake-forms/public";
 import { refererHost } from "@/lib/intake-forms/spam";
 import { renderStamp } from "@/lib/intake-forms/secrets";
-import { parseUtm } from "@/lib/intake-forms/utm";
+import { parseUtmParams } from "@/lib/intake-forms/utm";
 import { PublicAssessment } from "./_components/PublicAssessment";
 import { PublicIntake } from "./_components/PublicIntake";
 import { ClosedIntakeNotice, IntakeNotice } from "./_components/IntakeShell";
@@ -77,7 +77,7 @@ export default async function PublicIntakePage({
   const stamp = renderStamp(r.handle.formId, from && from !== own ? from : null);
 
   // Where the person came from, off the link. Cleaned here and cleaned again by the start action.
-  const utm = parseUtm(sp);
+  const utm = parseUtmParams(sp);
 
   if (r.handle.kind === "assessment") {
     return <PublicAssessment slug={r.handle.slug} view={r.view} stamp={stamp} embed={sp.embed === "1"} utm={utm} />;

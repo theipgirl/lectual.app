@@ -29,7 +29,7 @@ export function sectionLabelFor(pathname: string | null | undefined): string {
 }
 
 /** List roots whose page title (h1) already says the section name, so the label beside the wordmark would only repeat it. */
-const TITLE_SAYS_IT = new Set(["", "reports", "calendar", "meetings", "pipeline", "notifications", "intake", "matters", "queue", "documents", "proposals", "mail"]);
+const TITLE_SAYS_IT = new Set(["", "reports", "calendar", "meetings", "pipeline", "notifications", "intake", "matters", "queue", "documents", "proposals", "mail", "forms"]);
 
 /**
  * Whether the section label shows. Not on the root page of a section whose h1

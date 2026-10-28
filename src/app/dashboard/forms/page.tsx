@@ -166,7 +166,6 @@ function IntakeEmpty({ status }: { status: "none" | "unconfigured" | "unavailabl
       <>
         <div className="lx-page-head">
           <div style={{ flex: 1, minWidth: 240 }}>
-            <div className="lx-label">Intake</div>
             <h1 className="lx-h1" data-tour="forms-head">Forms</h1>
             <p className="lx-sub">Your public intake, how it looks, and where it lives.</p>
           </div>
@@ -181,7 +180,7 @@ function IntakeEmpty({ status }: { status: "none" | "unconfigured" | "unavailabl
           </h2>
           <p className="lx-note" style={{ margin: 0 }}>
             {status === "unconfigured"
-              ? "Lectual will turn them on. Nothing is broken."
+              ? "Lectual will turn it on. Nothing is broken."
               : status === "unavailable"
                 ? "Can't show this intake right now. Nothing was changed. Refresh to try again."
                 : `${ADMIN_TIER_PHRASE} can set it up here.`}

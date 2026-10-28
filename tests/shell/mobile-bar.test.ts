@@ -34,7 +34,7 @@ describe("the phone bar (F6)", () => {
 
   it("the sheet carries everything else, only if visible", () => {
     expect(moreLabels(ALL)).toEqual([
-      "Calendar", "Meetings", "Campaigns", "Intake forms", "Client proposals", "Matters", "Pipeline", "Documents",
+      "Calendar", "Meetings", "Campaigns", "Forms", "Client proposals", "Matters", "Pipeline", "Documents",
       "Copilot", "Assistants", "Shortcuts", "Firm notes", "Communication", "Leads", "Active matters", "AI tools", "Settings",
     ]);
     const bare = moreLabels([]);

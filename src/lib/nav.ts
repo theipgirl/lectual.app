@@ -62,7 +62,7 @@ export const NAV: readonly NavItem[] = [
   { slug: "meetings", label: "Meetings", href: "/dashboard/meetings/", icon: ICON.video, step: 7 },
   { slug: "calendar", label: "Calendar", href: "/dashboard/calendar/", icon: ICON.cal, step: 6 },
   { slug: "intake", label: LEADS_NAME, railLabel: LEADS_NAME, href: "/dashboard/intake/", also: ["/dashboard/leads/"], icon: ICON.users, step: 6 },
-  { slug: "forms", label: "Intake forms", railLabel: "Forms", href: "/dashboard/forms/", icon: ICON.file, step: 7 },
+  { slug: "forms", label: "Forms", railLabel: "Forms", href: "/dashboard/forms/", icon: ICON.file, step: 7 },
   { slug: "quotes", label: "Quotes & proposals", href: "/dashboard/quotes/", icon: ICON.file, step: 7 },
   // The client trademark proposal (brand names x marks x classes, a named approver, a /p/<token> page). Opt-in per firm.
   { slug: "proposals", label: "Client proposals", railLabel: "Proposals", href: "/dashboard/proposals/", icon: ICON.send, module: "proposals", step: 7 },

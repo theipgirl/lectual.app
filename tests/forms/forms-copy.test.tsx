@@ -122,6 +122,13 @@ describe("the list (12.7 to 12.10)", () => {
     return text(renderToStaticMarkup(<IntakeList items={items} canEdit={canEdit} statsFailed={false} />));
   }
 
+  it("the shell label for the Forms pages is Forms and is not repeated beside the h1", async () => {
+    const { sectionLabelFor, showSectionLabel } = await import("../../src/lib/section-label");
+    expect(sectionLabelFor("/dashboard/forms/")).toBe("Forms");
+    expect(sectionLabelFor("/dashboard/forms/?form=abc")).toBe("Forms");
+    expect(showSectionLabel("/dashboard/forms/")).toBe(false);
+  });
+
   it("is called Forms, with Results and Performance actions", async () => {
     const html = await list();
     expect(html).toContain('<h1 class="lx-h1">Forms</h1>');

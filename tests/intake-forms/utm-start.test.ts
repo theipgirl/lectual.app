@@ -3,6 +3,7 @@ import { QUESTIONS, loadActions, person } from "./helpers/step-harness";
 import { FORM_A, ORG_A } from "./helpers/step-db";
 import { defaultIntakeConfig } from "@/lib/intake-forms/config";
 import { leadFromSubmission, validatePublicStart } from "@/lib/intake-forms/public-submit";
+import { parseUtmParams, hasUtm } from "@/lib/intake-forms/utm";
 import { makeStamp } from "@/lib/intake-forms/spam";
 
 /**
@@ -26,6 +27,12 @@ describe("validatePublicStart carries a clean utm", () => {
   it("keeps the clean subset and drops forged values", () => {
     const r = validatePublicStart({ mode: "form", contact, consent: true, utm: { source: "ig", medium: "<b>x</b>", campaign: "UGW-2026", fbclid: "zz", content: "a".repeat(80) } });
     expect(r.ok && r.value.utm).toEqual({ source: "ig", campaign: "UGW-2026" });
+  });
+  it("a bare source/campaign/medium/content query key stores no utm (page reader, then start)", () => {
+    const fromPage = parseUtmParams({ source: "x", campaign: "y", medium: "z", content: "w" });
+    expect(hasUtm(fromPage)).toBe(false);
+    const r = validatePublicStart({ mode: "form", contact, consent: true, utm: fromPage });
+    expect(r.ok && r.value.utm).toEqual({});
   });
   it("is {} when none is posted", () => {
     const r = validatePublicStart({ mode: "form", contact, consent: true });

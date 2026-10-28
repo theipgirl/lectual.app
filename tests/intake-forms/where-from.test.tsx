@@ -6,7 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { groupBySource } from "@/lib/intake-forms/where-from";
 import { WhereTheyCameFrom } from "../../src/app/dashboard/forms/_components/WhereTheyCameFrom";
 import { IntakeLinksForChannels } from "../../src/app/dashboard/forms/_components/IntakeLinksForChannels";
-import { channelLinks, parseUtm } from "@/lib/intake-forms/utm";
+import { channelLinks, parseUtmParams } from "@/lib/intake-forms/utm";
 import { leadFromSubmission } from "@/lib/intake-forms/public-submit";
 import { defaultIntakeConfig } from "@/lib/intake-forms/config";
 import { intakeTags } from "@/lib/intake-forms/lawmatics-sync";
@@ -117,7 +117,7 @@ describe("Links for each channel", () => {
 describe("a visitor on the generated Instagram link, end to end through the pure parts", () => {
   it("becomes a tagged lead, a stored utm and a Results row under Instagram bio", () => {
     const ig = channelLinks("ugw-2026", "UGW 2026", "https://app.example.test")[0];
-    const utm = parseUtm(Object.fromEntries(new URL(ig.url).searchParams)); // what the page reads
+    const utm = parseUtmParams(Object.fromEntries(new URL(ig.url).searchParams)); // what the page reads
     const lead = leadFromSubmission({ mode: "form", contact: { name: "Ana Rivera", email: "ana@example.com", phone: "", company: "" }, answers: [] }, defaultIntakeConfig(), "instagram.com", "UGW 2026", utm);
     expect(lead.referral_detail).toBe("UGW 2026 · ig / social / link_in_bio / UGW-2026 · Form on instagram.com");
     expect(intakeTags("UGW 2026", null, utm)).toEqual(["UGW 2026", "UTM: ig", "Campaign: UGW-2026"]);

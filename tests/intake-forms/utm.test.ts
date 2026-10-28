@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { CHANNEL_PRESETS, campaignFromSourceTag, channelLinks, hasUtm, parseUtm, sourceLabel, utmFromContact, utmReferralPart, utmTags } from "@/lib/intake-forms/utm";
+import { CHANNEL_PRESETS, campaignFromSourceTag, channelLinks, hasUtm, parseUtm, parseUtmParams, sourceLabel, utmFromContact, utmReferralPart, utmTags } from "@/lib/intake-forms/utm";
 
-describe("parseUtm", () => {
+describe("parseUtmParams", () => {
   it("keeps the four keys and trims them", () => {
-    expect(parseUtm({ utm_source: " ig ", utm_medium: "social", utm_campaign: "UGW-2026", utm_content: "link_in_bio" })).toEqual({
+    expect(parseUtmParams({ utm_source: " ig ", utm_medium: "social", utm_campaign: "UGW-2026", utm_content: "link_in_bio" })).toEqual({
       source: "ig",
       medium: "social",
       campaign: "UGW-2026",
@@ -12,24 +12,29 @@ describe("parseUtm", () => {
   });
 
   it("ignores fbclid, gclid and every other key", () => {
-    expect(parseUtm({ utm_source: "fb", fbclid: "abc", gclid: "def", utm_term: "x", embed: "1" })).toEqual({ source: "fb" });
+    expect(parseUtmParams({ utm_source: "fb", fbclid: "abc", gclid: "def", utm_term: "x", embed: "1" })).toEqual({ source: "fb" });
   });
 
   it("drops a value whole when it is over 64 characters or outside [A-Za-z0-9_.-]", () => {
-    expect(parseUtm({ utm_source: "a".repeat(64) })).toEqual({ source: "a".repeat(64) });
-    expect(parseUtm({ utm_source: "a".repeat(65) })).toEqual({});
+    expect(parseUtmParams({ utm_source: "a".repeat(64) })).toEqual({ source: "a".repeat(64) });
+    expect(parseUtmParams({ utm_source: "a".repeat(65) })).toEqual({});
     for (const bad of ["two words", "<script>", "50%", 'q"uote', "it's", "café", "a/b", "", "   "]) {
-      expect(parseUtm({ utm_campaign: bad })).toEqual({});
+      expect(parseUtmParams({ utm_campaign: bad })).toEqual({});
     }
   });
 
   it("takes the first of a string array, and the clean ones beside a dirty one", () => {
-    expect(parseUtm({ utm_source: ["ig", "li"], utm_medium: "bad value" })).toEqual({ source: "ig" });
+    expect(parseUtmParams({ utm_source: ["ig", "li"], utm_medium: "bad value" })).toEqual({ source: "ig" });
   });
 
   it("returns {} for junk", () => {
-    for (const junk of [null, undefined, 7, "utm_source=ig", ["utm_source"], true]) expect(parseUtm(junk)).toEqual({});
-    expect(parseUtm({ utm_source: 5, utm_medium: { a: 1 } })).toEqual({});
+    for (const junk of [null, undefined, 7, "utm_source=ig", ["utm_source"], true]) expect(parseUtmParams(junk)).toEqual({});
+    expect(parseUtmParams({ utm_source: 5, utm_medium: { a: 1 } })).toEqual({});
+  });
+
+  it("reads only the utm_* names from a URL: bare source/campaign/medium/content are ignored", () => {
+    expect(parseUtmParams({ source: "x", campaign: "y", medium: "z", content: "w" })).toEqual({});
+    expect(parseUtm({ utm_source: "x", utm_medium: "y" })).toEqual({});
   });
 
   it("round-trips its own output (a stored or posted { source, ... })", () => {
@@ -67,7 +72,7 @@ describe("channel links", () => {
       ["Facebook", "fb", "social"],
       ["TikTok", "tt", "social"],
       ["Website", "web", "website"],
-      ["Email signature", "email", "website"],
+      ["Email signature", "email", "email"],
       ["Event QR", "event", "event"],
     ]);
     expect(CHANNEL_PRESETS).toHaveLength(7);
@@ -77,7 +82,7 @@ describe("channel links", () => {
     for (const l of links) {
       const url = new URL(l.url);
       expect(url.origin + url.pathname).toBe("https://app.lectual.app/i/ugw-2026");
-      expect(parseUtm(Object.fromEntries(url.searchParams))).toEqual(l.utm);
+      expect(parseUtmParams(Object.fromEntries(url.searchParams))).toEqual(l.utm);
       expect(l.utm.campaign).toBe("UGW-2026");
     }
     expect(links[0].utm.content).toBe("link_in_bio");

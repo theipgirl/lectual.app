@@ -31,16 +31,25 @@ function one(v: unknown): string | null {
   return t.length > 0 && t.length <= UTM_MAX && UTM_SHAPE.test(t) ? t : null;
 }
 
-/** Accepts `searchParams` (string or string[] per key; first wins) or a stored/posted `{ source, ... }` or `{ utm_source, ... }`. */
-export function parseUtm(input: unknown): Utm {
-  if (typeof input !== "object" || input === null || Array.isArray(input)) return {};
-  const r = input as Record<string, unknown>;
+function readKeys(r: Record<string, unknown>, names: (k: (typeof KEYS)[number]) => string): Utm {
   const out: Utm = {};
-  for (const [param, key] of KEYS) {
-    const v = one(r[param] ?? r[key]);
-    if (v) out[key] = v;
+  for (const k of KEYS) {
+    const v = one(r[names(k)]);
+    if (v) out[k[1]] = v;
   }
   return out;
+}
+
+const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+
+/** The link's query (`searchParams`; string or string[] per key, first wins). Reads ONLY the four `utm_*` names; `source=`, `campaign=` and every other key are ignored. */
+export function parseUtmParams(searchParams: unknown): Utm {
+  return isRecord(searchParams) ? readKeys(searchParams, (k) => k[0]) : {};
+}
+
+/** A stored or posted `{ source, medium, campaign, content }`. Not for a URL: use `parseUtmParams`. */
+export function parseUtm(input: unknown): Utm {
+  return isRecord(input) ? readKeys(input, (k) => k[1]) : {};
 }
 
 /** The utm stored on a submission's `contact` jsonb (`contact.utm`), or {}. */
@@ -87,7 +96,7 @@ export const CHANNEL_PRESETS: readonly Preset[] = [
   { key: "facebook", label: "Facebook", source: "fb", medium: "social" },
   { key: "tiktok", label: "TikTok", source: "tt", medium: "social" },
   { key: "website", label: "Website", source: "web", medium: "website" },
-  { key: "email", label: "Email signature", source: "email", medium: "website" },
+  { key: "email", label: "Email signature", source: "email", medium: "email" },
   { key: "event", label: "Event QR", source: "event", medium: "event" },
 ];
 
