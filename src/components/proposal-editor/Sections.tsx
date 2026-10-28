@@ -15,6 +15,7 @@ import {
   savePricingAction,
 } from "@/app/dashboard/proposals/[id]/actions";
 import { ActionForm, IssueList, SaveRow, type ShownIssue } from "./ActionForm";
+import { ExpiryField } from "./ExpiryField";
 import { IncludesFields } from "./IncludesFields";
 import type { PricingValues } from "./PricingFields";
 import { newRowId, useRows, type Keyed } from "./rows";
@@ -63,7 +64,6 @@ export type DetailsValues = {
   company: string;
   clientEmail: string;
   title: string;
-  expiresOn: string;
 };
 
 /** The form ids that let More options fields belong to a step's form. */
@@ -74,7 +74,7 @@ export const nameFormId = (proposalId: string, nameId: string) => `pe-name-${pro
 /** Step 1: who the proposal is for. The rest of this form's fields are in More options (`DetailsMoreFields`). */
 export function DetailsForm({ proposalId, updatedAt, editable, issues, values }: Common & { values: DetailsValues }) {
   return (
-    <Section title="Client" hint="Who this is for. Its title, greeting name and expiry date are under More options.">
+    <Section title="Client" hint="Who this is for. Its title and greeting name are under More options.">
       <ActionForm action={saveDetailsAction} id={detailsFormId(proposalId)}>
         {({ state, pending }) => (
           <fieldset className="pe-fieldset" disabled={!editable}>
@@ -98,11 +98,11 @@ export function DetailsForm({ proposalId, updatedAt, editable, issues, values }:
   );
 }
 
-/** More options: the rest of the client form (greeting name, company, title, expiry date). Saved with Step 1's button. */
+/** More options: the rest of the client form (greeting name, company, title). Saved with Step 1's button. */
 export function DetailsMoreFields({ proposalId, editable, values }: { proposalId: string; editable: boolean; values: DetailsValues }) {
   const form = detailsFormId(proposalId);
   return (
-    <div className="lx-form-grid" role="group" aria-label="Client details, title and expiry">
+    <div className="lx-form-grid" role="group" aria-label="Client details and title">
       <label className="lx-field">
         <span className="lx-label">First name (greeting)</span>
         <input className="lx-input" name="firstName" form={form} disabled={!editable} maxLength={120} defaultValue={values.firstName} />
@@ -114,10 +114,6 @@ export function DetailsMoreFields({ proposalId, editable, values }: { proposalId
       <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
         <span className="lx-label">Title</span>
         <input className="lx-input" name="title" form={form} disabled={!editable} required maxLength={300} defaultValue={values.title} />
-      </label>
-      <label className="lx-field">
-        <span className="lx-label">Open until</span>
-        <input className="lx-input" name="expiresOn" form={form} disabled={!editable} type="date" defaultValue={values.expiresOn} />
       </label>
       <p className="lx-note" style={{ gridColumn: "1 / -1", margin: 0 }}>
         Saved with the Client step&apos;s button.
@@ -162,7 +158,7 @@ export function MessageForm({ proposalId, updatedAt, editable, issues, values }:
 export type { PricingValues };
 
 /** Step 3: the package name and where "Accept" sends the client to pay. The prices are in More options (`PricingMoreFields`). */
-export function PricingForm({ proposalId, updatedAt, editable, issues, values, payUrl }: Common & { values: PricingValues; payUrl: string }) {
+export function PricingForm({ proposalId, updatedAt, editable, issues, values, payUrl, expiresOn, today }: Common & { values: PricingValues; payUrl: string; expiresOn: string; today?: string }) {
   return (
     <Section title="Package and pay link" hint="Totals are always worked out from the package, never typed. Packages are edited in Settings → Proposals; this proposal can change its own numbers under More options.">
       <ActionForm action={savePricingAction} id={pricingFormId(proposalId)}>
@@ -178,6 +174,7 @@ export function PricingForm({ proposalId, updatedAt, editable, issues, values, p
                 <span className="lx-label">Pay link</span>
                 <input className="lx-input" name="payUrl" type="url" maxLength={2000} defaultValue={payUrl} placeholder="Enter custom pay link" />
               </label>
+              <ExpiryField defaultValue={expiresOn} today={today} disabled={!editable} />
             </div>
             <IssueList issues={issues} />
             <SaveRow editable={editable} state={state} pending={pending} label="Save package and pay link" />

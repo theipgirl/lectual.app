@@ -93,6 +93,7 @@ describe("A3: the existing-proposal editor", () => {
         proposalId: "p",
         updatedAt: "2026-10-22T00:00:00Z",
         editable: true,
+        expiresOn: "2026-11-10",
         issues: [],
         values: { package: "Concierge", base: "4950", includedClasses: "3", perClass: "825", secondMarkPct: "20", govPerClass: "350" },
         payUrl,
