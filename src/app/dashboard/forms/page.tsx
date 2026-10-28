@@ -21,7 +21,7 @@ import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 
-export const metadata: Metadata = { title: pageTitle("Intake forms") };
+export const metadata: Metadata = { title: pageTitle("Forms") };
 
 export const dynamic = "force-dynamic";
 
@@ -167,14 +167,14 @@ function IntakeEmpty({ status }: { status: "none" | "unconfigured" | "unavailabl
         <div className="lx-page-head">
           <div style={{ flex: 1, minWidth: 240 }}>
             <div className="lx-label">Intake</div>
-            <h1 className="lx-h1" data-tour="forms-head">Intake forms</h1>
+            <h1 className="lx-h1" data-tour="forms-head">Forms</h1>
             <p className="lx-sub">Your public intake, how it looks, and where it lives.</p>
           </div>
         </div>
         <div className="lx-card lx-empty-card">
           <h2 className="lx-h2" style={{ fontSize: 25 }}>
             {status === "unconfigured"
-              ? "Intake forms aren't switched on for your firm yet"
+              ? "Forms isn't switched on for your firm yet"
               : status === "unavailable"
                 ? "Your intake couldn't be loaded"
                 : "Your firm hasn't set up its intake yet"}

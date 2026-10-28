@@ -43,7 +43,6 @@ export function IntakeList({
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
-  const [newKind, setNewKind] = useState<"intake" | "assessment">("intake");
   const [showArchived, setShowArchived] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -60,13 +59,15 @@ export function IntakeList({
     });
   };
 
+  const create = (kind: "intake" | "assessment") => run(() => createIntakeFormAction(newName, kind), true);
+
   const copy = (url: string, id: string) => {
     navigator.clipboard?.writeText(url).then(
       () => {
         setCopied(id);
         setTimeout(() => setCopied((c) => (c === id ? null : c)), 1800);
       },
-      () => setError("Couldn't copy. Open the intake and copy its link from there."),
+      () => setError("Couldn't copy. Open the form and copy its link from there."),
     );
   };
 
@@ -78,33 +79,39 @@ export function IntakeList({
     <div className="ifl-root">
       <div className="lx-page-head">
         <div style={{ flex: 1, minWidth: 240 }}>
-          <div className="lx-label">Intake</div>
-          <h1 className="lx-h1">Intake forms</h1>
-          <p className="lx-sub">One per event, campaign or page: a chat or form, or a scored assessment. Each has its own link, QR code, source tag and numbers.</p>
+          <h1 className="lx-h1">Forms</h1>
+          <p className="lx-sub">One per event, campaign or page: a form or a scored assessment. Each has its own link, QR code, source tag and numbers.</p>
         </div>
         {canEdit && (
           <form
-            className="ifl-new"
+            className="ifl-new ifl-create"
             onSubmit={(e) => {
               e.preventDefault();
-              run(() => createIntakeFormAction(newName, newKind), true);
+              create("intake");
             }}
           >
             <input
               className="ifm-input"
               value={newName}
               maxLength={120}
-              placeholder="New intake, e.g. UGW 2026 booth"
-              aria-label="New intake name"
+              placeholder="Name it, e.g. UGW 2026 booth"
+              aria-label="New form name"
               onChange={(e) => setNewName(e.target.value)}
             />
-            <select className="ifm-input" value={newKind} aria-label="Type" onChange={(e) => setNewKind(e.target.value === "assessment" ? "assessment" : "intake")}>
-              <option value="intake">Chat or form</option>
-              <option value="assessment">Assessment</option>
-            </select>
-            <button type="submit" className="lx-btn lx-btn-pri" disabled={pending || !newName.trim()}>
-              New intake
-            </button>
+            <div className="ifl-create-row">
+              <div>
+                <button type="submit" data-kind="intake" className="lx-btn lx-btn-pri" disabled={pending || !newName.trim()}>
+                  New form
+                </button>
+                <span className="ifl-create-hint">A chat or form that collects contact details and answers.</span>
+              </div>
+              <div>
+                <button type="button" data-kind="assessment" className="lx-btn lx-btn-sec" disabled={pending || !newName.trim()} onClick={() => create("assessment")}>
+                  New scored assessment (for events)
+                </button>
+                <span className="ifl-create-hint">A short scored quiz for a booth or event, with a result for the person.</span>
+              </div>
+            </div>
           </form>
         )}
       </div>
@@ -172,25 +179,28 @@ export function IntakeList({
                 <dd>{i.stats ? i.stats.unfinished.toLocaleString("en-US") : "—"}</dd>
               </div>
               <div>
-                <dt>Median time</dt>
+                <dt>Typical time (median)</dt>
                 <dd>{i.stats ? i.stats.median : "—"}</dd>
               </div>
             </dl>
             <div className="ifl-actions">
-              <Link className="ifl-act" href={`/dashboard/forms/?form=${encodeURIComponent(i.id)}`}>
+              <Link className="lx-btn lx-btn-sm lx-btn-ghost" href={`/dashboard/forms/?form=${encodeURIComponent(i.id)}`}>
                 {canEdit ? "Edit" : "View"}
               </Link>
-              <Link className="ifl-act" href={`/dashboard/forms/?form=${encodeURIComponent(i.id)}&tab=performance`}>
-                Numbers
+              <Link className="lx-btn lx-btn-sm lx-btn-ghost" href={`/dashboard/forms/?form=${encodeURIComponent(i.id)}&tab=results`}>
+                Results
+              </Link>
+              <Link className="lx-btn lx-btn-sm lx-btn-ghost" href={`/dashboard/forms/?form=${encodeURIComponent(i.id)}&tab=performance`}>
+                Performance
               </Link>
               <IntakeQrButton url={i.url} name={i.name} slug={i.slug} compact shareable={shareState(i.status).canShare} describedBy={`ifl-notlive-${i.id}`} />
               {canEdit && (
                 <>
-                  <button type="button" className="ifl-act" disabled={pending} onClick={() => run(() => duplicateIntakeFormAction(i.id), true)}>
+                  <button type="button" className="lx-btn lx-btn-sm lx-btn-ghost" disabled={pending} onClick={() => run(() => duplicateIntakeFormAction(i.id), true)}>
                     Duplicate
                   </button>
                   {i.status === "archived" ? (
-                    <button type="button" className="ifl-act" disabled={pending} onClick={() => run(() => setIntakeArchivedAction(i.id, false), false)}>
+                    <button type="button" className="lx-btn lx-btn-sm lx-btn-ghost" disabled={pending} onClick={() => run(() => setIntakeArchivedAction(i.id, false), false)}>
                       Restore
                     </button>
                   ) : (
@@ -198,7 +208,7 @@ export function IntakeList({
                       label="Archive"
                       question={`Archive “${i.name}”? Its link stops taking new people. Its leads and numbers are kept.`}
                       confirmLabel="Archive"
-                      className="ifl-act"
+                      className="lx-btn lx-btn-sm lx-btn-ghost"
                       pending={pending}
                       onConfirm={() => run(() => setIntakeArchivedAction(i.id, true), false)}
                     />
@@ -211,7 +221,7 @@ export function IntakeList({
         {shown.length === 0 && (
           <div className="lx-card lx-empty-card">
             <p className="lx-note" style={{ margin: 0 }}>
-              {canEdit ? "No intakes yet. Name one above to start." : `No intakes yet. ${ADMIN_TIER_PHRASE} can set them up.`}
+              {canEdit ? "No forms yet. Name one above to start." : `No forms yet. ${ADMIN_TIER_PHRASE} can set them up.`}
             </p>
           </div>
         )}
@@ -222,7 +232,7 @@ export function IntakeList({
           {showArchived ? "Hide archived" : `Show ${archived.length} archived`}
         </button>
       )}
-      <p className="ifm-help">Numbers are for the last 30 days. Open an intake&apos;s Numbers for other ranges and the people behind them.</p>
+      <p className="ifm-help">The figures are for the last 30 days. Open a form&apos;s Results or Performance for other ranges and the people behind them.</p>
     </div>
   );
 }

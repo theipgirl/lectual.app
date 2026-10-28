@@ -6,6 +6,7 @@ import type { IntakeFormConfig, IpType } from "./config";
 import { PACKS } from "./config";
 import { ANSWER_MAX_LENGTH, checkChoiceAnswer, isChoice, type QuestionType } from "./choice";
 import type { IntakeAnswer, IntakeContact, SubmissionMode } from "./submission";
+import { parseUtm, utmReferralPart, type Utm } from "./utm";
 
 /**
  * What a prospect sends from `/i/<slug>` (and a client from `/r/<token>`), and
@@ -166,7 +167,7 @@ export function validatePublicSubmission(raw: unknown, questions: readonly Quest
  * consent, before any question. Filing this first means someone who stops
  * halfway is still a lead the firm can follow up.
  */
-export type ValidatedStart = { mode: SubmissionMode; contact: IntakeContact };
+export type ValidatedStart = { mode: SubmissionMode; contact: IntakeContact; utm: Utm };
 
 export function validatePublicStart(
   raw: unknown,
@@ -181,7 +182,7 @@ export function validatePublicStart(
     fields.push("consent");
   }
   if (errors.length) return { ok: false, errors, fields };
-  return { ok: true, value: { mode, contact: c.contact } };
+  return { ok: true, value: { mode, contact: c.contact, utm: parseUtm(raw.utm) } };
 }
 
 /** The resume token the browser holds between the contact and answers steps. */
@@ -263,6 +264,7 @@ export function leadFromSubmission(
   config: Pick<IntakeFormConfig, "questions" | "packs">,
   sourceHost: string | null,
   source?: string | null,
+  utm?: Utm | null,
 ): LeadFields {
   const { first, last } = splitName(sub.contact.name);
   const practice = inferPracticeArea(config, sub.answers);
@@ -277,7 +279,7 @@ export function leadFromSubmission(
     practice_area: practice,
     mark_text: practice === "Trademark" ? markFromAnswer(markAnswer) : null,
     referral_source: INTAKE_REFERRAL_SOURCE,
-    referral_detail: [source?.trim() || null, sourceHost ? `${how} on ${sourceHost}` : how].filter(Boolean).join(" · "),
+    referral_detail: [source?.trim() || null, utm ? utmReferralPart(utm) : null, sourceHost ? `${how} on ${sourceHost}` : how].filter(Boolean).join(" · "),
   };
 }
 

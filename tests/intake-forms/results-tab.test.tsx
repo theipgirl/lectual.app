@@ -20,7 +20,7 @@ const fixture = (name: string) => readFileSync(path.join(__dirname, "__fixtures_
 
 const NEW_CARD = /<div class="ifm-card ifm-kpi"><div class="ifm-field-label">(?:Page to contact details|Contact details to finish)<\/div><div class="ifm-kpi-value">[^<]*<\/div><div class="ifm-help">[^<]*<\/div><\/div>/g;
 
-// Sprint 10 deliberately adds a "Median time per step" section and a "Stopped at" column to the Performance tab;
+// Sprint 10 deliberately adds a "Typical time per step (median)" section and a "Stopped at" column to the Performance tab;
 // they are taken out here so the rest of the markup is still compared byte for byte against the Sprint 9 fixtures.
 const SPRINT_10 = /<section class="ifm-card ifm-steps".*?<\/section>|<th>Stopped at<\/th>|<td class="ifm-stopped[^"]*">[^<]*<\/td>/g;
 
@@ -54,10 +54,10 @@ describe("Performance tab after the drawer moved (F17, V4)", () => {
 
   it("adds 'Page to contact details' and 'Contact details to finish' with their medians, after the existing four cards", async () => {
     const html = text(await renderPerformance());
-    for (const label of ["Gave contact details", "Finished", "Didn't finish", "Median time to finish", "Page to contact details", "Contact details to finish"]) {
+    for (const label of ["Gave contact details", "Finished", "Didn't finish", "Typical time (median)", "Page to contact details", "Contact details to finish"]) {
       expect(html).toContain(`>${label}<`);
     }
-    expect(html.indexOf(">Median time to finish<")).toBeLessThan(html.indexOf(">Page to contact details<"));
+    expect(html.indexOf(">Typical time (median)<")).toBeLessThan(html.indexOf(">Page to contact details<"));
     expect(html.indexOf(">Page to contact details<")).toBeLessThan(html.indexOf(">Contact details to finish<"));
     // Rows: 1 min and 2 min to give details (median 1.5 min); the one who finished took 3 min more.
     expect(html).toMatch(/Page to contact details<\/div><div class="ifm-kpi-value">2 min</);
@@ -70,7 +70,7 @@ describe("Performance tab after the drawer moved (F17, V4)", () => {
     expect(html).toMatch(/Contact details to finish<\/div><div class="ifm-kpi-value">—</);
     const noCreated = await renderPerformance({ statRows: [{ started_at: "2026-10-18T15:00:00Z", submitted_at: "2026-10-18T15:04:00Z" }] });
     expect(noCreated).toMatch(/Page to contact details<\/div><div class="ifm-kpi-value">—</);
-    expect(noCreated).toMatch(/Median time to finish<\/div><div class="ifm-kpi-value">4 min</);
+    expect(noCreated).toMatch(/Typical time \(median\)<\/div><div class="ifm-kpi-value">4 min</);
   });
 
   it("still shows the failure warning, not dashes, when the numbers couldn't be read", async () => {
@@ -381,7 +381,7 @@ describe("workspace tabs", () => {
       ),
     );
     const nav = html.slice(html.indexOf('<nav class="ifm-tabs"'), html.indexOf("</nav>", html.indexOf('<nav class="ifm-tabs"')));
-    expect([...nav.matchAll(/>([^<]+)<\/a>/g)].map((m) => m[1])).toEqual(["Form setup", "Performance", "Results"]);
+    expect([...nav.matchAll(/>([^<]+)<\/a>/g)].map((m) => m[1])).toEqual(["Setup", "Results", "Performance"]);
     expect(nav).toMatch(/href="\/dashboard\/forms\?form=11111111-1111-4111-8111-111111111111&tab=results&range=90"/);
     expect(nav).toMatch(/aria-current="page" href="[^"]*tab=results/);
     expect(html).toContain('<div id="results-slot">results here</div>');

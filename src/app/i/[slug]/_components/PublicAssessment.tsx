@@ -1,5 +1,6 @@
 "use client";
 
+import type { Utm } from "@/lib/intake-forms/utm";
 import { useEffect, useMemo, useRef, useState, useTransition, type CSSProperties } from "react";
 import type { PublicIntakeConfig } from "@/lib/intake-forms/config";
 import type { AssessmentResultView } from "@/lib/intake-forms/assessment";
@@ -59,7 +60,7 @@ export function AssessmentExtraChoice(props: {
   );
 }
 
-export function PublicAssessment(props: { slug: string; view: PublicIntakeConfig; stamp: string; embed: boolean }) {
+export function PublicAssessment(props: { slug: string; view: PublicIntakeConfig; stamp: string; embed: boolean; utm?: Utm }) {
   const { view, slug } = props;
   const card = view.assessment;
   const [contact, setContact] = useState<Contact>({ name: "", email: "", phone: "", company: "" });
@@ -124,7 +125,7 @@ export function PublicAssessment(props: { slug: string; view: PublicIntakeConfig
     track("start_assessment");
     startTransition(async () => {
       try {
-        const res = await startIntakeAction(slug, { mode: "form", contact, consent, honeypot, stamp: props.stamp });
+        const res = await startIntakeAction(slug, { mode: "form", contact, consent, honeypot, stamp: props.stamp, utm: props.utm });
         if (res.ok) setToken(res.token);
         else {
           setError(res.error);

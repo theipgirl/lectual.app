@@ -157,7 +157,7 @@ export async function startIntakeAction(slug: string, payload: unknown): Promise
   const outcome = await startPublicIntake(handle, start, { sourceHost: stamp.host, startedAt: stamp.startedAt, now });
   if (!outcome.ok) return { ok: false, error: "We couldn't save your details just now. Please try again in a minute." };
   const submissionId = outcome.submissionId;
-  after(() => syncIntakeStart(handle, submissionId, start.contact));
+  after(() => syncIntakeStart(handle, submissionId, start.contact, start.utm));
   return { ok: true, token: outcome.token };
 }
 

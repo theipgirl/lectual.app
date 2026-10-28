@@ -1,4 +1,5 @@
 import "server-only";
+import { hasUtm, utmFromContact, type Utm } from "./utm";
 
 import { createHash, randomBytes } from "node:crypto";
 import { getAdminClient } from "@/lib/db/admin";
@@ -91,6 +92,8 @@ export type IntakeHandle = {
 export type PublicIntakeRead =
   | { status: "ok"; handle: IntakeHandle; view: PublicIntakeConfig; packages: { name: string; price: string; includes: string }[] }
   | { status: "moved"; slug: string }
+  /** An ARCHIVED intake's link: only the firm's name and where to reach it (never the intake's name, tag or config). */
+  | { status: "closed"; firmName: string; contactSlug: string | null }
   | { status: "not_found" }
   | { status: "unconfigured" }
   | { status: "unavailable" };
@@ -168,9 +171,39 @@ export async function readIntakeHandle(slug: string): Promise<
   }
 }
 
+/**
+ * An archived intake's link (12.12): the firm's display name and the link of
+ * its main live intake (oldest live one), so a scanned event QR is not a dead
+ * end. Archived ONLY: a draft and an unknown slug stay identical `not_found`,
+ * so the page still can't tell a visitor which firms have an intake in progress.
+ * Any failure reads as `not_found`.
+ */
+async function readClosed(slug: string): Promise<PublicIntakeRead> {
+  try {
+    const admin = db();
+    const { data: form, error } = await admin.from("crm_intake_form").select("org_id").eq("slug", slug).eq("status", "archived").maybeSingle();
+    if (error || !form) return { status: "not_found" };
+    const { data: profile } = await admin.from("crm_org_profile").select("display_name").eq("org_id", form.org_id).maybeSingle();
+    const firmName = profile?.display_name?.trim() || (await orgName(admin, form.org_id));
+    if (!firmName) return { status: "not_found" };
+    const { data: main } = await admin
+      .from("crm_intake_form")
+      .select("slug")
+      .eq("org_id", form.org_id)
+      .eq("status", "live")
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    return { status: "closed", firmName, contactSlug: main?.slug ?? null };
+  } catch {
+    return { status: "not_found" };
+  }
+}
+
 /** The page's read: handle + public view + the fee packages marked visible. */
 export async function readPublicIntake(slug: string): Promise<PublicIntakeRead> {
   const read = await readIntakeHandle(slug);
+  if (read.status === "not_found") return SLUG_SHAPE.test(slug) ? readClosed(slug) : read;
   if (read.status !== "ok") return read;
   const { handle } = read;
   let packages: { name: string; price: string; includes: string }[] = [];
@@ -367,6 +400,7 @@ async function createIntakeLead(
   sourceHost: string | null,
   nowIso: string,
   stage: "started" | "complete",
+  utm?: Utm,
 ): Promise<string | null> {
   const { data: stages, error: stageErr } = await admin
     .from("crm_stage")
@@ -377,7 +411,7 @@ async function createIntakeLead(
   if (!stageId) return null;
 
   const source = leadSourceLabel(handle.name, handle.sourceTag);
-  const fields = leadFromSubmission(sub, handle.config, sourceHost, source);
+  const fields = leadFromSubmission(sub, handle.config, sourceHost, source, utm);
   const { data: lead, error } = await admin
     .from("crm_lead")
     .insert({
@@ -457,7 +491,8 @@ export async function startPublicIntake(
       org_id: handle.orgId,
       form_id: handle.formId,
       mode: start.mode,
-      contact: start.contact as unknown as Json,
+      // The utm labels ride in the server-written contact jsonb (no schema); readers take name/email/phone/company only.
+      contact: (hasUtm(start.utm) ? { ...start.contact, utm: start.utm } : start.contact) as unknown as Json,
       answers: [] as unknown as Json,
       source_host: ctx.sourceHost,
       started_at: new Date(Math.min(ctx.startedAt, ctx.now.getTime())).toISOString(),
@@ -474,7 +509,7 @@ export async function startPublicIntake(
 
   let leadId: string | null = null;
   try {
-    leadId = await createIntakeLead(admin, handle, { mode: start.mode, contact: start.contact, answers: [] }, ctx.sourceHost, nowIso, "started");
+    leadId = await createIntakeLead(admin, handle, { mode: start.mode, contact: start.contact, answers: [] }, ctx.sourceHost, nowIso, "started", start.utm);
     if (leadId) {
       const { error: linkErr } = await admin
         .from("crm_intake_submission")
@@ -490,7 +525,7 @@ export async function startPublicIntake(
 }
 
 export type CompleteOutcome =
-  | { ok: true; submissionId: string; submission: ValidatedSubmission; alreadyDone: boolean; noteBody: string }
+  | { ok: true; submissionId: string; submission: ValidatedSubmission; alreadyDone: boolean; noteBody: string; utm: Utm }
   | { ok: false; reason: "not_found" | "failed" };
 
 /**
@@ -541,7 +576,7 @@ export async function completeStartedIntake(
       .not("submitted_at", "is", null)
       .maybeSingle();
     if (!done) return { ok: false, reason: "not_found" };
-    return { ok: true, submissionId: done.id, submission: { mode, contact: parseContact(done.contact), answers }, alreadyDone: true, noteBody: "" };
+    return { ok: true, submissionId: done.id, submission: { mode, contact: parseContact(done.contact), answers }, alreadyDone: true, noteBody: "", utm: utmFromContact(done.contact) };
   }
 
   const contact = parseContact(data.contact);
@@ -582,7 +617,7 @@ export async function completeStartedIntake(
       }
     }
   }
-  return { ok: true, submissionId: data.id, submission, alreadyDone: false, noteBody };
+  return { ok: true, submissionId: data.id, submission, alreadyDone: false, noteBody, utm: utmFromContact(data.contact) };
 }
 
 /** Screened intakes per form per hour; see screenSubmission. */

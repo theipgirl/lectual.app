@@ -61,13 +61,13 @@ describe("Forms list: Event assessments (F15)", () => {
     expect(rows).toHaveLength(2);
     const urban = rows.find((r) => r.includes("urban-golf-2026"))!;
     const story = rows.find((r) => r.includes("story2profit-2026"))!;
-    const dd = (row: string, label: string) => row.match(new RegExp(`<dt>${label}</dt><dd>(.*?)</dd>`))?.[1].replace(/<[^>]+>/g, "").trim();
+    const dd = (row: string, label: string) => row.match(new RegExp(`<dt>${label.replace(/[()]/g, "\\$&")}</dt><dd>(.*?)</dd>`))?.[1].replace(/<[^>]+>/g, "").trim();
     expect(dd(urban, "Started")).toBe("3");
     expect(dd(urban, "Finished")).toBe("2 66.7%");
-    expect(dd(urban, "Median time")).toBe("4 min"); // (2 + 6) / 2 minutes
+    expect(dd(urban, "Typical time (median)")).toBe("4 min"); // (2 + 6) / 2 minutes
     expect(dd(story, "Started")).toBe("1");
     expect(dd(story, "Finished")).toBe("0 0.0%");
-    expect(dd(story, "Median time")).toBe("—");
+    expect(dd(story, "Typical time (median)")).toBe("—");
     expect(urban).toContain('href="/dashboard/forms?event=urban-golf-2026"');
     expect(story).toContain('href="/dashboard/forms?event=story2profit-2026"');
     // Most recently active first.
@@ -82,7 +82,7 @@ describe("Forms list: Event assessments (F15)", () => {
   it("has no create, edit, archive, duplicate or copy control in the section", async () => {
     const html = await listPage(newDb({ crm_booth_scorecard: boothTables() }));
     const section = html.slice(html.indexOf('aria-label="Event assessments"'));
-    for (const word of ["<button", "<form", "<input", "<select", "Archive", "Duplicate", "New intake", "Copy link", ">Edit<", "disabled"]) expect(section).not.toContain(word);
+    for (const word of ["<button", "<form", "<input", "<select", "Archive", "Duplicate", "New form", "Copy link", ">Edit<", "disabled"]) expect(section).not.toContain(word);
   });
 
   it("says the event assessments couldn't be loaded when the read fails: not 'none' and not zeros", async () => {
@@ -113,20 +113,20 @@ describe("Forms list: Event assessments (F15)", () => {
   it("shows a read-only role the same rows, with no edit controls anywhere", async () => {
     const html = await listPage(newDb({ crm_booth_scorecard: boothTables() }, "viewer"), "viewer");
     expect(html).toContain('aria-label="Event assessments"');
-    expect(html).not.toContain("New intake");
+    expect(html).not.toContain("New form");
     expect(html).not.toContain("Duplicate");
   });
 
   it("keeps the existing list as before: intakes, create, duplicate, archive, QR, numbers", async () => {
     const html = await listPage(newDb({ crm_booth_scorecard: boothTables() }));
     const list = html.slice(0, html.indexOf('aria-label="Event assessments"'));
-    expect(list).toContain("Intake forms");
+    expect(list).toContain("Forms");
     expect(list).toContain("UGW 2026 booth");
-    expect(list).toContain("New intake");
+    expect(list).toContain("New form");
     expect(list).toContain("Duplicate");
     expect(list).toContain("Archive");
     expect(list).toContain("Copy link");
-    expect(list).toContain("Numbers are for the last 30 days.");
+    expect(list).toContain("The figures are for the last 30 days.");
   });
 
   it("does not show another firm's booth cards", async () => {
@@ -140,11 +140,11 @@ describe("event page (F16)", () => {
   it("renders the performance numbers, the distribution blocks, option counts with card labels, the stored top gaps and the drop-off section", async () => {
     const html = await eventPage(newDb({ crm_booth_scorecard: boothTables() }), "urban-golf-2026");
     expect(html).toContain('<h1 class="lx-h1">urban-golf-2026</h1>');
-    const kpi = (label: string) => html.match(new RegExp(`${label}</div><div class="ifm-kpi-value">([^<]*)</div>`))?.[1];
+    const kpi = (label: string) => html.match(new RegExp(`${label.replace(/[()]/g, "\\$&")}</div><div class="ifm-kpi-value">([^<]*)</div>`))?.[1];
     expect(kpi("Started")).toBe("3");
     expect(kpi("Finished")).toBe("2");
     expect(kpi("Completion rate")).toBe("66.7%");
-    expect(kpi("Median time to finish")).toBe("4 min");
+    expect(kpi("Typical time (median)")).toBe("4 min");
     for (const heading of ["Score bands", "Hot, warm and cold", "Score distribution", "Most common gaps", "Drop-off by question"]) expect(html).toContain(`>${heading}<`);
     expect(html).toContain("2 people finished at this event. 1 more gave contact details and didn't finish.");
     // Option counts use the card's labels, with options nobody chose present.
@@ -241,13 +241,13 @@ describe("the list and the event page agree (D4) and the range shrinks the count
     const db = newDb({ crm_booth_scorecard: boothTables() });
     const list = await listPage(db);
     const row = list.slice(list.indexOf("urban-golf-2026"), list.indexOf("</article>", list.indexOf("urban-golf-2026")));
-    const dd = (label: string) => row.match(new RegExp(`<dt>${label}</dt><dd>(.*?)</dd>`))?.[1].replace(/<[^>]+>/g, "").trim();
+    const dd = (label: string) => row.match(new RegExp(`<dt>${label.replace(/[()]/g, "\\$&")}</dt><dd>(.*?)</dd>`))?.[1].replace(/<[^>]+>/g, "").trim();
     const page = await eventPage(db, "urban-golf-2026");
-    const kpi = (label: string) => page.match(new RegExp(`${label}</div><div class="ifm-kpi-value">([^<]*)</div>`))?.[1];
+    const kpi = (label: string) => page.match(new RegExp(`${label.replace(/[()]/g, "\\$&")}</div><div class="ifm-kpi-value">([^<]*)</div>`))?.[1];
     expect(dd("Started")).toBe(kpi("Started"));
     expect(dd("Finished")?.split(" ")[0]).toBe(kpi("Finished"));
     expect(dd("Finished")?.split(" ")[1]).toBe(kpi("Completion rate"));
-    expect(dd("Median time")).toBe(kpi("Median time to finish"));
+    expect(dd("Typical time (median)")).toBe(kpi("Typical time (median)"));
   });
 
   it("filters one event to 7, 30, 90 days and all time against a fixed clock", async () => {

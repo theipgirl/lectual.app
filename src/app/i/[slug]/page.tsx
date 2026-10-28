@@ -5,9 +5,10 @@ import { notFound, redirect } from "next/navigation";
 import { readPublicIntake } from "@/lib/intake-forms/public";
 import { refererHost } from "@/lib/intake-forms/spam";
 import { renderStamp } from "@/lib/intake-forms/secrets";
+import { parseUtm } from "@/lib/intake-forms/utm";
 import { PublicAssessment } from "./_components/PublicAssessment";
 import { PublicIntake } from "./_components/PublicIntake";
-import { IntakeNotice } from "./_components/IntakeShell";
+import { ClosedIntakeNotice, IntakeNotice } from "./_components/IntakeShell";
 import "../intake-public.css";
 
 /**
@@ -19,7 +20,8 @@ import "../intake-public.css";
  * exact slug, explicit columns, every write fenced on the form's own org).
  * Read that file's header before changing anything here.
  *
- *  - not live / unknown / malformed → `notFound()`, all identical.
+ *  - draft / unknown / malformed → `notFound()`, all identical. An ARCHIVED link
+ *    shows the firm's name and a way to reach it (`closed`).
  *  - unconfigured / unavailable     → a "can't load" notice, never a 404:
  *    telling a prospect the firm has no intake because we couldn't reach the
  *    database would be the wrong answer.
@@ -36,6 +38,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const r = await read(slug);
   return {
+    // A closed intake gets the generic title: it must not carry the intake's or firm's name into search or tabs.
     title: r.status === "ok" ? `${r.view.firmName} · Intake` : "Intake",
     description: r.status === "ok" ? r.view.headline : undefined,
     // An intake is a form, not content: keep it out of search results.
@@ -48,12 +51,13 @@ export default async function PublicIntakePage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ embed?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const [{ slug }, sp] = await Promise.all([params, searchParams]);
   const r = await read(slug);
   // A renamed link (0093): send printed QR codes and old links to where it lives now.
   if (r.status === "moved") redirect(`/i/${r.slug}/${sp.embed === "1" ? "?embed=1" : ""}`);
+  if (r.status === "closed") return <ClosedIntakeNotice firmName={r.firmName} contactSlug={r.contactSlug} />;
   if (r.status === "not_found") notFound();
   if (r.status !== "ok") {
     return (
@@ -72,8 +76,11 @@ export default async function PublicIntakePage({
   const from = refererHost(h.get("referer"));
   const stamp = renderStamp(r.handle.formId, from && from !== own ? from : null);
 
+  // Where the person came from, off the link. Cleaned here and cleaned again by the start action.
+  const utm = parseUtm(sp);
+
   if (r.handle.kind === "assessment") {
-    return <PublicAssessment slug={r.handle.slug} view={r.view} stamp={stamp} embed={sp.embed === "1"} />;
+    return <PublicAssessment slug={r.handle.slug} view={r.view} stamp={stamp} embed={sp.embed === "1"} utm={utm} />;
   }
 
   return (
@@ -83,6 +90,7 @@ export default async function PublicIntakePage({
       packages={r.packages}
       stamp={stamp}
       embed={sp.embed === "1"}
+      utm={utm}
     />
   );
 }

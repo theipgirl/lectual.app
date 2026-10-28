@@ -93,9 +93,9 @@ export function StepDropOff({ state, range }: { state: Load<StepFunnelRead>; ran
 export function StepMedians({ state, range }: { state: Load<StepFunnelRead>; range: number }) {
   const ok = state.status === "ok" && state.value.recorded ? state.value : null;
   return (
-    <section className="ifm-card ifm-steps" aria-label="Median time per step">
+    <section className="ifm-card ifm-steps" aria-label="Typical time per step (median)">
       <div className="ifr-q-head">
-        <h3 className="ifm-title">Median time per step</h3>
+        <h3 className="ifm-title">Typical time per step (median)</h3>
         <span className="ifm-help">{`Last ${range} days`}</span>
       </div>
       <StepNotice state={state} range={range} />
@@ -105,7 +105,7 @@ export function StepMedians({ state, range }: { state: Load<StepFunnelRead>; ran
             <thead>
               <tr>
                 <th>Question</th>
-                <th>Median time on the question</th>
+                <th>Typical time on the question (median)</th>
                 <th>People</th>
               </tr>
             </thead>

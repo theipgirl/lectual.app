@@ -1609,33 +1609,12 @@ textarea.ifm-input {
   padding-top: 12px;
   border-top: 1px solid var(--line);
 }
-.ifl-act {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 0;
-  background: none;
-  padding: 4px 0;
-  font: inherit;
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--ox);
-  text-decoration: none;
-  cursor: pointer;
-}
-.ifl-act:hover {
-  text-decoration: underline;
-}
 .ifl-copy:disabled {
   opacity: 0.5;
   cursor: default;
 }
 .ifl-notlive {
   font-style: normal;
-}
-.ifl-act:disabled {
-  opacity: 0.5;
-  cursor: default;
 }
 .ifl-toggle {
   align-self: flex-start;
@@ -2061,4 +2040,98 @@ textarea.ifm-input {
 }
 .ifm-stepnote .ifm-answers {
   margin: 6px 0 0;
+}
+
+/* Results: where they came from (Sprint 36) */
+.ifr-where-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.ifr-where-table th,
+.ifr-where-table td {
+  padding: 6px 0;
+  text-align: left;
+  font-weight: 500;
+  border-bottom: 1px solid var(--line);
+}
+.ifr-where-table td {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.ifr-where-table .ifr-where-sub th {
+  padding-left: 16px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.ifm-editor-col {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding-bottom: 24px;
+}
+.ifm-editor-col .ifm-editor {
+  padding-bottom: 0;
+}
+.ifm-bare {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.ifm-bare:disabled .ifm-input {
+  background: var(--paper);
+  color: var(--body);
+}
+.ifm-save-row {
+  justify-content: flex-end;
+}
+.ifm-embed summary {
+  cursor: pointer;
+}
+.ifl-chan {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ifl-chan > li {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+}
+.ifl-chan-url {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ifl-create {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 260px;
+}
+.ifl-create-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ifl-create-hint {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+}
+@media (max-width: 700px) {
+  .ifl-chan > li {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+  .ifl-chan > li > :first-child {
+    grid-column: 1 / -1;
+  }
 }

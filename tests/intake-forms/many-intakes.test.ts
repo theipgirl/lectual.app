@@ -114,7 +114,7 @@ describe("contact first", () => {
   it("files a person with contact details and consent, before any question", () => {
     expect(validatePublicStart({ mode: "conversation", contact, consent: true })).toEqual({
       ok: true,
-      value: { mode: "conversation", contact },
+      value: { mode: "conversation", contact, utm: {} },
     });
   });
 

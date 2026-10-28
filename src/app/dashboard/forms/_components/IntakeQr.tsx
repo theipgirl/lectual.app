@@ -64,7 +64,7 @@ export function IntakeQrButton({
 
   if (!shareable) {
     return (
-      <button type="button" className={compact ? "ifl-act" : "lx-btn lx-btn-sec"} disabled aria-describedby={describedBy}>
+      <button type="button" className={compact ? "lx-btn lx-btn-sm lx-btn-ghost" : "lx-btn lx-btn-sec"} disabled aria-describedby={describedBy}>
         QR code
       </button>
     );
@@ -74,7 +74,7 @@ export function IntakeQrButton({
 
   return (
     <>
-      <button type="button" className={compact ? "ifl-act" : "lx-btn lx-btn-sec"} onClick={() => {
+      <button type="button" className={compact ? "lx-btn lx-btn-sm lx-btn-ghost" : "lx-btn lx-btn-sec"} onClick={() => {
           setFailed(false);
           setOpen(true);
         }}
