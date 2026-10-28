@@ -39,7 +39,7 @@ export type SavedMessage = { id: string; role: "user" | "assistant"; content: st
 const isCitation = (v: unknown): v is CopilotCitation =>
   typeof v === "object" &&
   v !== null &&
-  ((v as CopilotCitation).type === "matter" || (v as CopilotCitation).type === "lead") &&
+  ((v as CopilotCitation).type === "matter" || (v as CopilotCitation).type === "lead" || (v as CopilotCitation).type === "proposal") &&
   typeof (v as CopilotCitation).id === "string" &&
   typeof (v as CopilotCitation).label === "string" &&
   typeof (v as CopilotCitation).href === "string";

@@ -371,3 +371,26 @@ describe("proposal detail page: the payment panel on an accepted version", () =>
     expect(html).not.toContain("edited the proposal");
   });
 });
+
+describe("proposal detail page: Change pay link (lectual 0100)", () => {
+  beforeEach(() => vi.resetModules());
+
+  it("a link-live version offers Change pay link to a proposal-writing role, prefilled with the current link", async () => {
+    const { html } = await render(row({ status: "sent", sent_at: "2026-10-19T12:00:00Z" }), [], undefined, { role: "paralegal" });
+    expect(html).toContain("Change pay link");
+    expect(html).toContain('name="payUrl"');
+    expect(html).toContain('value="https://pay.example/x"');
+    expect(html).toContain("except its pay link (below)");
+  });
+
+  it.each(["draft", "approved", "accepted", "superseded", "withdrawn"] as const)("a %s version has no Change pay link", async (status) => {
+    const { html } = await render(row({ status }), [], undefined, { steps: [] });
+    expect(html).not.toContain("Change pay link");
+  });
+
+  it.each(["viewer", "social_media"])("a %s never sees it, even on a live link", async (role) => {
+    const { html } = await render(row({ status: "sent", sent_at: "2026-10-19T12:00:00Z" }), [], undefined, { role });
+    expect(html).not.toContain("Change pay link");
+    expect(html).not.toContain("except its pay link");
+  });
+});

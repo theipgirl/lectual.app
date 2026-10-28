@@ -3,7 +3,8 @@
  * Pure and client-safe (the route encodes, the browser decodes).
  */
 
-export type CopilotCitation = { type: "matter" | "lead"; id: string; label: string; href: string };
+/** `proposal` is the draft `draft_proposal` created (the one write the copilot makes). */
+export type CopilotCitation = { type: "matter" | "lead" | "proposal"; id: string; label: string; href: string };
 
 export type CopilotFinal = {
   answer: string;

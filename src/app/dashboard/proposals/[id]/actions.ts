@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import {
   PROPOSAL_SAVE_CONFLICT,
   approveProposal,
+  changeLivePayLink,
   getProposal,
   reviseProposal,
   sendProposal,
@@ -36,6 +37,7 @@ import { getSiteOrigin } from "@/lib/site-origin";
 import { clientLinkOrigin, clientLinkUrl } from "@/lib/proposals/client-link-origin";
 import { runManualEmail } from "@/lib/consult-proposal/manual-email";
 import { runCreateLink } from "@/lib/proposal-editor/create-link";
+import { runChangePayLink } from "@/lib/proposal-editor/pay-link";
 import { createDraft, listQueue } from "@/lib/queue/api";
 import { activeQueueOrgKey } from "@/lib/queue/org";
 import { EDIT_AGAIN_DONE, LINK_TURNED_ON } from "@/lib/proposal-editor/vocabulary";
@@ -203,6 +205,24 @@ export async function createLinkAction(_prev: ActionState, formData: FormData): 
   return runCreateLink(
     { gate: gateStaffAction, approve: approveProposal, makeLive: sendProposal, describe: proposalActionError, revalidate },
     field(formData, "proposalId"),
+  );
+}
+
+/**
+ * "Change pay link" on a version whose link is live (lectual 0100): the one field that may change after
+ * the link is on. Re-checks the module and the proposal-writing role (gateStaffAction), validates the https
+ * link, and writes `pay_url` alone through the scoped client, fenced on the rendered `updated_at`. The
+ * database refuses every other status and logs the change itself (hosts only).
+ */
+export async function changePayLinkAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  return runChangePayLink(
+    {
+      gate: gateStaffAction,
+      change: (id, payUrl, expectedUpdatedAt) => changeLivePayLink(id, payUrl, { expectedUpdatedAt }),
+      describe: proposalActionError,
+      revalidate,
+    },
+    { id: field(formData, "proposalId"), payUrl: formData.get("payUrl"), updatedAt: field(formData, "updatedAt") },
   );
 }
 
