@@ -1,5 +1,4 @@
 import { describe, it, expect, vi } from "vitest";
-import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 vi.mock("@/app/dashboard/proposals/[id]/actions", () => ({
@@ -36,10 +35,9 @@ const VALUE: NameValues = {
 
 function render(value: NameValues = VALUE) {
   return renderToStaticMarkup(
-    createElement(NameRowsProvider, {
-      names: [value],
-      children: createElement(NameCard, { proposalId: "prop-1", updatedAt: "t", editable: true, issues: [], value, packageName: "Essential" }),
-    }),
+    <NameRowsProvider names={[value]}>
+      <NameCard proposalId="prop-1" updatedAt="t" editable issues={[]} value={value} packageName="Essential" />
+    </NameRowsProvider>,
   );
 }
 
