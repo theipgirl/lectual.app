@@ -23,12 +23,15 @@ import { safeHttpsUrl } from "@/components/client-proposal/format";
  * no proposal id, no org id, no snapshot, no refusal code. The token is never
  * echoed, logged or put in a redirect.
  *
+ * `clientClasses` is what the client wrote (`{ entries, added }`, see `client-classes.ts`): text only, cleaned
+ * and checked against the stored content by `acceptPublicProposal`, never a price.
+ *
  * `payUrl` is "" when the firm has no usable https payment link on the row; the
  * acceptance is still recorded and the page says the firm will send the link.
  */
-export async function acceptProposalAction(token: string, selection: unknown, addedClasses?: unknown): Promise<ProposalAcceptResult> {
+export async function acceptProposalAction(token: string, selection: unknown, clientClasses?: unknown): Promise<ProposalAcceptResult> {
   try {
-    const result = await acceptPublicProposal(String(token ?? ""), selection, new Date(), undefined, addedClasses);
+    const result = await acceptPublicProposal(String(token ?? ""), selection, new Date(), undefined, clientClasses);
     if (!result.ok) return { ok: false, message: result.message };
     return { ok: true, payUrl: safeHttpsUrl(result.payUrl) ?? "" };
   } catch {

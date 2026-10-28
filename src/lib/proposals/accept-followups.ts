@@ -3,7 +3,7 @@ import "server-only";
 import { firmToken } from "@/lib/intake-forms/lawmatics-sync";
 import { addNote, type FetchLike } from "@/lib/lawmatics/writes";
 import { formatDollars } from "@/lib/proposal-editor/events";
-import { addedClassCount } from "./added-classes";
+import { addedClassCount } from "./client-classes";
 import { stepPayload, stepSucceeded, type ProposalStep, type StepEventInput, type StepPayload } from "./paid";
 import { MARK_KIND_LABEL, type AcceptedSnapshot } from "./types";
 
@@ -80,18 +80,26 @@ export function acceptanceHeadline(input: { clientName: string; packageName: str
  */
 export function acceptanceNoteBody(snapshot: AcceptedSnapshot, clientName: string): { name: string; body: string } {
   const { content, quote } = snapshot;
-  const addedIds = new Set((content.names ?? []).flatMap((n) => (n.classes ?? []).filter((c) => c.client_added === true).map((c) => c.id)));
+  const allClasses = (content.names ?? []).flatMap((n) => n.classes ?? []);
+  const addedIds = new Set(allClasses.filter((c) => c.client_added === true && snapshot.selection?.[c.id] === true).map((c) => c.id));
+  const describedIds = new Set(allClasses.filter((c) => c.client_entry === true && c.client_added !== true && snapshot.selection?.[c.id] === true).map((c) => c.id));
   const pkg = text(content.pricing?.package) || "Proposal";
   const lines: string[] = [`${text(clientName) || "The client"} accepted this proposal. Accepted ${snapshot.accepted_at}.`, `Package: ${pkg}`];
   for (const n of (Array.isArray(quote.names) ? quote.names : []).filter((x) => x.included)) {
     const marks = n.marks.map((m) => MARK_KIND_LABEL[m.kind] ?? m.kind).join(" + ");
-    // What the client typed is never copied into the firm's CRM: only the firm's own class labels are named.
-    const classes = n.classes.filter((c) => !addedIds.has(c.id)).map((c) => text(c.label)).filter(Boolean).join("; ");
+    // What the client typed is never copied into the firm's CRM (Sprint 28, kept by Spec 3): only the firm's own class
+    // labels are named; an open or added class is counted below, never quoted.
+    const classes = n.classes
+      .filter((c) => !addedIds.has(c.id) && !describedIds.has(c.id))
+      .map((c) => text(c.label))
+      .filter(Boolean)
+      .join("; ");
     lines.push(`- ${text(n.name)}: ${marks}${classes ? `; classes: ${classes}` : ""}`);
   }
   for (const a of (Array.isArray(quote.adjustments) ? quote.adjustments : []).filter((x) => x.discount_cents > 0)) {
     lines.push(`Adjustment: ${text(a.label) || "Adjustment"} −${formatDollars(a.discount_cents)}`);
   }
+  if (describedIds.size > 0) lines.push(`Classes described by the client: ${describedIds.size} (their words are on the proposal page in Lectual)`);
   if (addedIds.size > 0) lines.push(`Classes added by the client: ${addedIds.size} (priced into the totals below)`);
   lines.push(`Legal fee, due when accepted: ${formatDollars(quote.legal_total_cents)}`);
   lines.push(`USPTO fees, due at filing: ${formatDollars(quote.gov_total_cents)} (separate; not part of the legal fee)`);
@@ -283,7 +291,7 @@ async function noticeStep(db: FollowupDb, row: Row): Promise<StepResult> {
       clientName: row.clientName,
       packageName: row.snapshot.content.pricing?.package ?? "",
       legalTotalCents: row.snapshot.quote.legal_total_cents,
-      addedClasses: addedClassCount(row.snapshot.content),
+      addedClasses: addedClassCount(row.snapshot.content, row.snapshot.selection),
     });
     const { error } = await db.from("crm_notification").insert(
       recipients.map((userId) => ({
@@ -313,7 +321,7 @@ async function runStep(db: FollowupDb, row: Row, step: ProposalStep, earlier: St
   if (earlier && stepSucceeded(earlier, row.id, step)) return;
   const result = earlier === null && blockWhenUnchecked ? ({ outcome: "blocked", reason: "couldn't check for an earlier one" } as StepResult) : await run();
   // Counts and the new legal total only: never what the client typed.
-  const added = addedClassCount(row.snapshot.content);
+  const added = addedClassCount(row.snapshot.content, row.snapshot.selection);
   const extra: Record<string, number> = added > 0 ? { added_classes: added, legal_total_cents: row.snapshot.quote.legal_total_cents } : {};
   await recordStep(db, row, stepPayload(step, result.outcome, result.reason, extra));
 }

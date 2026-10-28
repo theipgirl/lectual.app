@@ -87,7 +87,10 @@ function flatten(content: unknown): Map<string, Leaf> {
       const clabel = text(c.label) || cid;
       set(cp, `${who}: class`, "text", c.label);
       set(`${cp}.preselected`, `${who}: "${clabel}" starts ticked`, "bool", c.preselected);
+      set(`${cp}.client_entry`, `${who}: "${clabel}" described by the client`, "bool", c.client_entry === true);
     }
+    const addMax = isObj(nm.client_add) && typeof nm.client_add.max === "number" ? nm.client_add.max : 0;
+    set(`${base}.client_add.max`, `${who}: classes the client may add`, "count", addMax);
   }
 
   for (const a of arr(content.adjustments)) {

@@ -215,7 +215,8 @@ function hasStringId(value: unknown): boolean {
  * only, one class). The page shows it as written, with no checkboxes, and it is
  * always priced and accepted fully selected, whatever `preselected` says.
  * Anything malformed (no names array, a mark or class without an id) is not
- * fixed and keeps the ordinary checkboxes.
+ * fixed and keeps the ordinary checkboxes. Neither is a brand name with an open
+ * class (`client_entry`) or `client_add` room: the client has something to write.
  */
 export function isFixedOffer(content: ProposalContent): boolean {
   const names = arr<unknown>(content?.names);
@@ -223,6 +224,12 @@ export function isFixedOffer(content: ProposalContent): boolean {
   const nm = obj(names[0]);
   const marks = arr<unknown>(nm.marks);
   const classes = arr<unknown>(nm.classes);
+  // Spec 3: a class the client describes, or room to add classes, IS a choice, so it is never a fixed offer.
+  // Only an EXPLICIT max above 0 counts here; an absent `client_add` is the firm saying nothing, and its default
+  // (`clientAddMax`: 5, or 0 on a fixed offer) is worked out from this function, never fed into it.
+  const addMax = obj(nm.client_add).max;
+  if (typeof addMax === "number" && Number.isInteger(addMax) && addMax > 0) return false;
+  if (classes.some((c) => obj(c).client_entry === true)) return false;
   return marks.length === 1 && classes.length === 1 && hasStringId(marks[0]) && hasStringId(classes[0]);
 }
 

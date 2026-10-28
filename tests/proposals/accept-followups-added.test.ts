@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { acceptanceHeadline, acceptanceNoteBody, runAcceptanceFollowups, type FollowupDb } from "@/lib/proposals/accept-followups";
-import { quoteWithAddedClasses } from "@/lib/proposals/added-classes";
+import { quoteWithClientClasses } from "@/lib/proposals/client-classes";
 import { describeStepEvent } from "@/lib/proposals/paid";
 import { buildAcceptedSnapshot } from "@/lib/proposals/public";
 import type { FetchLike } from "@/lib/lawmatics/writes";
@@ -12,8 +12,8 @@ const SECRET = "ZQX-distinctive-client-wording";
 function snapshotWithAdded() {
   const c = sevetri();
   c.pricing = { ...c.pricing, package: "Essential", base_cents: 195_000, included_classes: 1, per_class_cents: 82_500 };
-  c.names = [{ ...c.names[0], classes: [c.names[0].classes[0]] }];
-  const priced = quoteWithAddedClasses(c, { "p-word": true, "p-c1": true }, { p: [SECRET] });
+  c.names = [{ ...c.names[0], classes: [c.names[0].classes[0]], client_add: { max: 2 } }];
+  const priced = quoteWithClientClasses(c, { "p-word": true, "p-c1": true }, { entries: {}, added: { p: [{ text: SECRET, on: true }, { text: "Not ticked", on: false }] } });
   if (!priced.ok) throw new Error("priced");
   return buildAcceptedSnapshot({ version: 1, content: priced.content, selection: priced.selection, quote: priced.quote, acceptedAt: "2026-10-27T15:00:00.000Z" });
 }
@@ -33,6 +33,7 @@ describe("accept follow-ups name the number of added classes and the new legal t
     expect(body).toContain("Legal fee, due when accepted: $2,775");
     expect(body).toContain("USPTO fees, due at filing: $700");
     expect(body).not.toContain(SECRET);
+    expect(body).not.toContain("Not ticked");
   });
 
   it("the notice payload, the Lawmatics request, the timeline events and every log call omit the client's text", async () => {
@@ -70,5 +71,21 @@ describe("accept follow-ups name the number of added classes and the new legal t
     expect(line).toContain("2 classes added by the client");
     expect(line).toContain("legal fee now $4,425");
     expect(describeStepEvent({ step: "accept_notice", outcome: "sent" })).not.toContain("added by the client");
+  });
+});
+
+describe("Spec 3: an open class the client described", () => {
+  it("is COUNTED in the Lawmatics note, never quoted, and its question is not repeated", () => {
+    const c = sevetri();
+    c.pricing = { ...c.pricing, package: "Essential", base_cents: 195_000, included_classes: 1, per_class_cents: 82_500 };
+    c.names = [{ ...c.names[0], classes: [{ id: "o1", label: "Describe what you sell", preselected: true, client_entry: true }] }];
+    const priced = quoteWithClientClasses(c, { "p-word": true, o1: true }, { entries: { o1: "Scented candles" }, added: {} });
+    if (!priced.ok) throw new Error("priced");
+    const snap = buildAcceptedSnapshot({ version: 1, content: priced.content, selection: priced.selection, quote: priced.quote, acceptedAt: "2026-10-28T15:00:00.000Z" });
+    const { body } = acceptanceNoteBody(snap, "Sevetri");
+    expect(body).not.toContain("Scented candles");
+    expect(body).toContain("Classes described by the client: 1");
+    expect(body).not.toContain("Classes added by the client");
+    expect(body).not.toContain("Describe what you sell");
   });
 });

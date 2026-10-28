@@ -169,8 +169,16 @@ export type ProposalClass = {
   /** Plain business language. Never an International Class number. */
   label: string;
   preselected: boolean;
-  /** True for a class the client added on /p/<token> (Sprint 28); its label is their plain-text description. */
+  /** True for a class the client added on /p/<token> (Sprint 28 / Spec 3); its label is their plain-text description. */
   client_added?: boolean;
+  /**
+   * An OPEN class (Spec 3): the client types the goods or services. In the stored offer `label` is the PROMPT the
+   * client reads; in an accepted snapshot `label` is what the client typed and `prompt` keeps the firm's question.
+   * Priced exactly like any other class. See `client-classes.ts`.
+   */
+  client_entry?: true;
+  /** Accepted snapshot only: the firm's prompt of an open class (its `label` there is the client's text). */
+  prompt?: string;
 };
 
 export type ProposalName = {
@@ -183,6 +191,8 @@ export type ProposalName = {
   price_override?: { base_cents?: number; per_class_cents?: number };
   marks: ProposalMark[];
   classes: ProposalClass[];
+  /** The client may add up to `max` (0..10) more open classes to this brand name on /p/<token> (Spec 3). */
+  client_add?: { max: number };
 };
 
 export type ProposalAdjustment = {

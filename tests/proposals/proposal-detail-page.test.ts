@@ -201,6 +201,22 @@ describe("proposal detail page: classes the client added", () => {
     expect(html).toContain(`Added for ${brand}: Podcast production services`);
   });
 
+  it("Spec 3: lists open classes the client described, labelled as entered by the client, in the aside and the log", async () => {
+    const snap = acceptedSnapshot({ classes: 1 });
+    const nm = snap.content.names[0];
+    nm.classes.push({ id: "o1", label: "Scented candles", prompt: "Describe what you sell or offer under this mark", preselected: true, client_entry: true });
+    snap.selection["o1"] = true;
+    const { html } = await render(
+      row({ status: "accepted", accepted_at: "2026-10-21T15:00:00Z", accepted_snapshot: snap, accepted_selection: snap.selection }),
+      [ACCEPTED],
+    );
+    expect(html).toContain("Classes described by the client (1)");
+    expect(html).toContain(`<strong>${nm.name}</strong>: Scented candles`);
+    expect(html).toContain("Entered by the client on the proposal page, in their own words.");
+    expect(html).toContain(`Described by the client for ${nm.name}: Scented candles`);
+    expect(html).not.toContain("Classes the client added");
+  });
+
   it("shows neither when the client added nothing", async () => {
     const snap = acceptedSnapshot({ classes: 1 });
     const { html } = await render(row({ status: "accepted", accepted_at: "2026-10-21T15:00:00Z", accepted_snapshot: snap, accepted_selection: snap.selection }), [ACCEPTED]);

@@ -3,13 +3,13 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { NOT_A_LAW_FIRM_DISCLAIMER } from "@/lib/legal/disclaimer";
 import {
-  ADDED_CLASS_REFUSAL,
-  MAX_ADDED_CLASSES_PER_NAME,
-  MAX_ADDED_CLASS_CHARS,
-  cleanAddedDescription,
-  quoteWithAddedClasses,
-  type AddedClasses,
-} from "@/lib/proposals/added-classes";
+  DESCRIBE_BEFORE_ACCEPT,
+  MAX_CLIENT_TEXT_CHARS,
+  clientAddMax,
+  quoteWithClientClasses,
+  type ClientAddedEntry,
+  type ClientClassInput,
+} from "@/lib/proposals/client-classes";
 import { classLock, markWithoutClass } from "@/lib/proposals/class-lock";
 import {
   defaultSelection,
@@ -18,6 +18,7 @@ import {
   normalizeSelection,
   priceForClassCount,
   quoteHasItems,
+  quoteProposal,
 } from "@/lib/proposals/pricing";
 import {
   MARK_KIND_DEFAULT_DESC,
@@ -81,10 +82,13 @@ export type ProposalDocumentProps = {
   acceptedQuote?: ProposalQuote;
   /** accepted mode: where the legal fee is paid. Additive to the original prop list. */
   payUrl?: string | null;
-  /** Descriptions already added (by brand name id) when the page opens. The page starts with none; tests and the editor preview may start with some. */
-  initialAddedClasses?: AddedClasses;
-  /** live mode: records the acceptance on the server. Receives the ticks and the added-class descriptions only, never a price. */
-  onAccept?: (selection: Selection, addedClasses: AddedClasses) => Promise<ProposalAcceptResult>;
+  /** What the client has written when the page opens (open-class descriptions, added classes). The page starts with none; tests may start with some. */
+  initialClientClasses?: ClientClassInput;
+  /**
+   * live mode: records the acceptance on the server. Receives the ticks and what the client wrote
+   * (`{ entries: { classId: text }, added: { nameId: [{ text, on }] } }`) only, never a price.
+   */
+  onAccept?: (selection: Selection, clientClasses: ClientClassInput) => Promise<ProposalAcceptResult>;
 };
 
 const DEFAULT_TITLE = "Trademark Proposal";
@@ -96,8 +100,8 @@ function Rich({ text }: { text: string | undefined }): ReactNode {
   return richSegments(text).map((seg, i) => (seg.bold ? <b key={i}>{seg.text}</b> : seg.text));
 }
 
-function addedCount(content: ProposalContent, nameId: string): number {
-  return (content.names.find((n) => n.id === nameId)?.classes ?? []).filter((c) => c.client_added === true).length;
+function addedCount(content: ProposalContent, selection: Selection, nameId: string): number {
+  return (content.names.find((n) => n.id === nameId)?.classes ?? []).filter((c) => c.client_added === true && selection[c.id] === true).length;
 }
 
 function plural(n: number, one: string, many: string): string {
@@ -122,17 +126,17 @@ function classPriceWords(pricing: ProposalPricing, perClassCents: number, picked
 }
 
 export function ProposalDocument(props: ProposalDocumentProps) {
-  const { content, title, clientName, expiresOn, firm, mode, initialSelection, acceptedQuote, payUrl, onAccept, initialAddedClasses } = props;
+  const { content, title, clientName, expiresOn, firm, mode, initialSelection, acceptedQuote, payUrl, onAccept, initialClientClasses } = props;
   const brand: ProposalBrand = brandForSlug(firm.slug);
 
   // Ticks the visitor changed. Layered over the firm's defaults (and any given
   // starting ticks), so editing the content in the preview never loses a tick
   // the viewer made and never keeps a tick for a mark that no longer exists.
   const [overrides, setOverrides] = useState<Selection>({});
-  // Classes the visitor added (descriptions only), by brand name id; the server keeps its own copy of the rules.
-  const [added, setAdded] = useState<AddedClasses>(initialAddedClasses ?? {});
-  const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const [addErrors, setAddErrors] = useState<Record<string, string>>({});
+  // What the visitor wrote: a description for each open class (by class id) and the classes they added (by brand
+  // name id). Text only; the server cleans and checks all of it again (`parseClientClassInput`).
+  const [entries, setEntries] = useState<Record<string, string>>(initialClientClasses?.entries ?? {});
+  const [added, setAdded] = useState<Record<string, ClientAddedEntry[]>>(initialClientClasses?.added ?? {});
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ payUrl: string | null; opened: boolean } | null>(null);
@@ -149,15 +153,18 @@ export function ProposalDocument(props: ProposalDocumentProps) {
     return normalizeSelection(content, merged);
   }, [content, initialSelection, overrides, mode]);
 
-  // The page's own total: the SAME helper the accept path runs, over the stored content plus the
-  // visitor's added descriptions. A receipt shows the content it was accepted with (already carrying
-  // those classes) and the frozen quote, so nothing is added twice.
+  // The page's own total: the SAME helper the accept path runs, over the stored content plus what the
+  // visitor wrote (the effective content). A receipt shows the content it was accepted with (already
+  // carrying the client's words and classes) and the frozen quote, so nothing is added twice.
   const priced = useMemo(() => {
-    const live = mode === "accepted" ? { added: {} as AddedClasses } : { added };
-    const result = quoteWithAddedClasses(content, selection, live.added);
+    // An accepted snapshot is ALREADY the effective content (its open classes carry the client's words), so it is
+    // shown as stored and not rebuilt; its totals are the frozen quote below.
+    if (mode === "accepted") return { content, selection, quote: quoteProposal(content, selection), missing: [] as string[] };
+    const input: ClientClassInput = { entries, added };
+    const result = quoteWithClientClasses(content, selection, input);
     if (!result.ok) throw new Error("unreachable: repair is off");
     return result;
-  }, [mode, content, selection, added]);
+  }, [mode, content, selection, entries, added]);
   const shown = priced.content;
   const shownSelection = priced.selection;
   const quote = useMemo<ProposalQuote>(
@@ -165,7 +172,8 @@ export function ProposalDocument(props: ProposalDocumentProps) {
     [mode, acceptedQuote, priced],
   );
   const display = useMemo(() => markDisplayPrices(shown, shownSelection), [shown, shownSelection]);
-  // One name, one mark, one class: nothing to choose, so no checkboxes at all (added classes still show, removable).
+  // One name, one mark, one class: nothing to choose, so no checkboxes at all. A class the client describes or room to
+  // add classes is a choice, so such a proposal is never fixed (`isFixedOffer`).
   const fixed = isFixedOffer(content);
   // Boxes the client may not untick because doing so would leave nothing to accept (the whole proposal,
   // over the content AS SHOWN, so a class the client added counts). Separate from the per-name class lock below.
@@ -186,7 +194,7 @@ export function ProposalDocument(props: ProposalDocumentProps) {
   }, [locked, readOnly, shown, shownSelection]);
 
   /** One mark or class row: a checkbox when the client has a choice, a plain row for a fixed offer. */
-  function option(nameId: string, id: string, on: boolean, body: ReactNode) {
+  function option(nameId: string, id: string, on: boolean, body: ReactNode, onToggle?: (on: boolean) => void, label?: string) {
     if (fixed) {
       return (
         <div className="cp-opt cp-fixed" key={id}>
@@ -201,7 +209,8 @@ export function ProposalDocument(props: ProposalDocumentProps) {
           checked={on}
           disabled={readOnly || held.has(id)}
           aria-describedby={locked.has(id) ? `cp-keep-${nameId}` : undefined}
-          onChange={(e) => toggle(id, e.target.checked)}
+          aria-label={label}
+          onChange={(e) => (onToggle ? onToggle(e.target.checked) : toggle(id, e.target.checked))}
         />
         <span className="cp-box" aria-hidden="true" />
         {body}
@@ -212,7 +221,10 @@ export function ProposalDocument(props: ProposalDocumentProps) {
   // A ticked mark with no class is warned about on the card and cannot be accepted (the server would
   // repair it to the first class, which is not the price the visitor was looking at).
   const missingClass = shown.names.some((nm) => markWithoutClass(nm, shownSelection));
-  const canAccept = quoteHasItems(quote) && !missingClass;
+  // A ticked class the client describes needs their words first (the server refuses it the same way).
+  const missingText = !readOnly && priced.missing.length > 0;
+  const missingIds = new Set(readOnly ? [] : priced.missing);
+  const canAccept = quoteHasItems(quote) && !missingClass && !missingText;
   const pricing = content.pricing;
   const firstName = content.client?.first_name?.trim() || "";
   const who = clientName?.trim() || content.client?.full_name || "";
@@ -228,33 +240,28 @@ export function ProposalDocument(props: ProposalDocumentProps) {
     setOverrides((prev) => ({ ...prev, [id]: on }));
   }
 
-  function setDraft(nameId: string, value: string) {
-    setDrafts((prev) => ({ ...prev, [nameId]: value }));
-    setAddErrors((prev) => ({ ...prev, [nameId]: "" }));
+  function setEntry(classId: string, value: string) {
+    if (readOnly) return;
+    setEntries((prev) => ({ ...prev, [classId]: value.slice(0, MAX_CLIENT_TEXT_CHARS) }));
   }
 
-  function addClass(nameId: string) {
+  /** One more open class on this brand name, ticked, with an empty description to fill in. */
+  function addClass(nameId: string, max: number) {
     if (readOnly) return;
-    const one = cleanAddedDescription(drafts[nameId] ?? "");
-    const have = added[nameId] ?? [];
-    let message = "";
-    if (!one.ok) {
-      message =
-        one.reason === "empty"
-          ? "Write what the class should cover, then press Add."
-          : one.reason === "too_long"
-            ? `Please keep it to ${MAX_ADDED_CLASS_CHARS} characters or fewer.`
-            : "Please use plain words only (no symbols such as < or >).";
-    } else if (have.length >= MAX_ADDED_CLASSES_PER_NAME) {
-      message = `You can add up to ${MAX_ADDED_CLASSES_PER_NAME} classes for each name.`;
-    }
-    if (message || !one.ok) {
-      setAddErrors((prev) => ({ ...prev, [nameId]: message || ADDED_CLASS_REFUSAL }));
-      return;
-    }
-    setAdded((prev) => ({ ...prev, [nameId]: [...(prev[nameId] ?? []), one.text] }));
-    setDrafts((prev) => ({ ...prev, [nameId]: "" }));
-    setAddErrors((prev) => ({ ...prev, [nameId]: "" }));
+    setAdded((prev) => {
+      const have = prev[nameId] ?? [];
+      return have.length >= max ? prev : { ...prev, [nameId]: [...have, { text: "", on: true }] };
+    });
+  }
+
+  function setAddedRow(nameId: string, index: number, patch: Partial<ClientAddedEntry>) {
+    if (readOnly) return;
+    setAdded((prev) => ({ ...prev, [nameId]: (prev[nameId] ?? []).map((row, i) => (i === index ? { ...row, ...patch } : row)) }));
+  }
+
+  function toggleAdded(nameId: string, index: number, id: string | undefined, on: boolean) {
+    if (!on && id && held.has(id)) return;
+    setAddedRow(nameId, index, { on });
   }
 
   function removeAdded(nameId: string, index: number) {
@@ -279,7 +286,7 @@ export function ProposalDocument(props: ProposalDocumentProps) {
       tab = null;
     }
     try {
-      const result = await onAccept(selection, added);
+      const result = await onAccept(selection, { entries, added });
       if (!result.ok) {
         tab?.close();
         setError(result.message);
@@ -384,6 +391,8 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                   const mine = nm.classes.filter((c) => c.client_added === true);
                   const staffClasses = nm.classes.filter((c) => c.client_added !== true);
                   const perClass = nm.price_override?.per_class_cents ?? pricing.per_class_cents;
+                  // The firm's content decides (an explicit max, else 5, else 0 on a fixed offer), never what was added.
+                  const addMax = clientAddMax(content, nm);
                   const holdsLast = [...nm.marks, ...nm.classes].some((x) => locked.has(x.id));
                   return (
                     <article className="cp-card" key={nm.id} aria-labelledby={`cp-h-${nm.id}`}>
@@ -442,80 +451,152 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                         {staffClasses.map((c, ci) => {
                           const on = shownSelection[c.id] === true;
                           const classHeld = !fixed && lock?.classId === c.id;
-                          return option(
-                            nm.id,
-                            c.id,
-                            on,
-                            <>
-                              <span className="cp-t">
-                                <b>{`Class ${ci + 1} · ${c.label}`}</b>
-                                {classHeld ? <span className="cp-lock">{lock.text}</span> : null}
-                              </span>
-                              <span className="cp-pr cp-num">
-                                + {money(pricing.gov_per_class_cents)}
-                                <small>filing fee per mark</small>
-                              </span>
-                            </>,
+                          const price = (
+                            <span className="cp-pr cp-num">
+                              + {money(pricing.gov_per_class_cents)}
+                              <small>filing fee per mark</small>
+                            </span>
+                          );
+                          if (c.client_entry !== true) {
+                            return option(
+                              nm.id,
+                              c.id,
+                              on,
+                              <>
+                                <span className="cp-t">
+                                  <b>{`Class ${ci + 1} · ${c.label}`}</b>
+                                  {classHeld ? <span className="cp-lock">{lock.text}</span> : null}
+                                </span>
+                                {price}
+                              </>,
+                            );
+                          }
+                          // An open class: the firm's question, and the client's own words under it.
+                          const prompt = c.prompt ?? c.label;
+                          const entryId = `cp-entry-${c.id}`;
+                          if (readOnly) {
+                            return option(
+                              nm.id,
+                              c.id,
+                              on,
+                              <>
+                                <span className="cp-t">
+                                  <b>{`Class ${ci + 1} · ${c.label.trim() || prompt}`}</b>
+                                  {c.label.trim() ? <span className="cp-lock">Described by you</span> : null}
+                                </span>
+                                {price}
+                              </>,
+                            );
+                          }
+                          return (
+                            <div className="cp-open" key={c.id}>
+                              {option(
+                                nm.id,
+                                c.id,
+                                on,
+                                <>
+                                  <span className="cp-t">
+                                    <b>{`Class ${ci + 1} · ${prompt}`}</b>
+                                    {classHeld ? <span className="cp-lock">{lock.text}</span> : null}
+                                  </span>
+                                  {price}
+                                </>,
+                              )}
+                              <div className="cp-entry">
+                                <input
+                                  id={entryId}
+                                  type="text"
+                                  className="cp-add-input"
+                                  value={entries[c.id] ?? ""}
+                                  maxLength={MAX_CLIENT_TEXT_CHARS}
+                                  aria-label={`Class ${ci + 1} for ${nm.name}: ${prompt}`}
+                                  aria-invalid={missingIds.has(c.id) || undefined}
+                                  placeholder="For example: handmade candles and soaps"
+                                  onChange={(e) => setEntry(c.id, e.target.value)}
+                                />
+                              </div>
+                            </div>
                           );
                         })}
                         {mine.map((c, ai) => {
+                          const on = shownSelection[c.id] === true;
                           const classHeld = held.has(c.id);
+                          const price = (
+                            <span className="cp-pr cp-num">
+                              + {money(pricing.gov_per_class_cents)}
+                              <small>filing fee per mark</small>
+                            </span>
+                          );
+                          if (readOnly) {
+                            return (
+                              <div className={`cp-opt cp-fixed cp-mine${on ? "" : " cp-off"}`} key={c.id}>
+                                <span className="cp-t">
+                                  <b>{`Added class · ${c.label}`}</b>
+                                  <span className="cp-lock">{on ? "Added by you" : "Added by you, not selected"}</span>
+                                </span>
+                                {price}
+                              </div>
+                            );
+                          }
+                          const row = added[nm.id]?.[ai];
+                          const nth = ai + 1;
                           return (
-                            <div className="cp-opt cp-mine" key={c.id}>
-                              <span className="cp-t">
-                                <b>{`Added class · ${c.label}`}</b>
-                                <span className="cp-lock">{!readOnly && lock?.classId === c.id ? lock.text : "Added by you"}</span>
-                              </span>
-                              {readOnly ? null : (
+                            <div className="cp-open" key={c.id}>
+                              {option(
+                                nm.id,
+                                c.id,
+                                on,
+                                <>
+                                  <span className="cp-t">
+                                    <b>{`Added class ${nth}`}</b>
+                                    <span className="cp-lock">{lock?.classId === c.id ? lock.text : "Added by you"}</span>
+                                  </span>
+                                  {price}
+                                </>,
+                                (next) => toggleAdded(nm.id, ai, c.id, next),
+                                `Include added class ${nth} for ${nm.name}`,
+                              )}
+                              <div className="cp-entry">
+                                <input
+                                  type="text"
+                                  className="cp-add-input"
+                                  value={row?.text ?? ""}
+                                  maxLength={MAX_CLIENT_TEXT_CHARS}
+                                  aria-label={`Added class ${nth} for ${nm.name}: describe what you sell or offer`}
+                                  aria-invalid={missingIds.has(c.id) || undefined}
+                                  placeholder="Describe what you sell or offer"
+                                  onChange={(e) => setAddedRow(nm.id, ai, { text: e.target.value.slice(0, MAX_CLIENT_TEXT_CHARS) })}
+                                />
                                 <button
                                   type="button"
                                   className="cp-link"
                                   disabled={classHeld}
                                   aria-describedby={locked.has(c.id) ? `cp-keep-${nm.id}` : undefined}
                                   onClick={() => removeAdded(nm.id, ai)}
-                                  aria-label={`Remove ${c.label}`}
+                                  aria-label={`Remove added class ${nth} for ${nm.name}`}
                                 >
                                   Remove
                                 </button>
-                              )}
-                              <span className="cp-pr cp-num">
-                                + {money(pricing.gov_per_class_cents)}
-                                <small>filing fee per mark</small>
-                              </span>
+                              </div>
                             </div>
                           );
                         })}
                       </div>
 
-                      {readOnly || pickedMarks === 0 ? null : (
+                      {readOnly || addMax === 0 || pickedMarks === 0 ? null : (
                         <div className="cp-part cp-add">
                           <h4>Add a class</h4>
-                          <p className="cp-how-add">Add another class (category of goods or services) you&rsquo;d like us to include.</p>
+                          <p className="cp-how-add">Add another class (category of goods or services) you&rsquo;d like us to include, and describe it in your own words.</p>
                           <p className="cp-how-add">{classPriceWords(pricing, perClass, pickedClasses)}</p>
-                          <div className="cp-add-row">
-                            <input
-                              type="text"
-                              className="cp-add-input"
-                              value={drafts[nm.id] ?? ""}
-                              maxLength={MAX_ADDED_CLASS_CHARS + 50}
-                              aria-label={`Add a class for ${nm.name}`}
-                              onChange={(e) => setDraft(nm.id, e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  addClass(nm.id);
-                                }
-                              }}
-                            />
-                            <button type="button" className="cp-add-btn" onClick={() => addClass(nm.id)}>
-                              Add
+                          {mine.length < addMax ? (
+                            <button type="button" className="cp-add-btn" onClick={() => addClass(nm.id, addMax)}>
+                              Add a class
                             </button>
-                          </div>
-                          {addErrors[nm.id] ? (
-                            <p className="cp-error" role="alert">
-                              {addErrors[nm.id]}
+                          ) : (
+                            <p className="cp-how-add" role="status">
+                              You can add up to {plural(addMax, "class", "classes")} for {nm.name}.
                             </p>
-                          ) : null}
+                          )}
                         </div>
                       )}
 
@@ -588,9 +669,9 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                       ) : (
                         <p className="cp-empty">Not included</p>
                       )}
-                      {qn.included && addedCount(shown, qn.id) > 0 ? (
+                      {qn.included && addedCount(shown, shownSelection, qn.id) > 0 ? (
                         <p className="cp-empty">
-                          Includes {plural(addedCount(shown, qn.id), "class", "classes")} {accepted ? "you added" : "you added, priced above"}
+                          Includes {plural(addedCount(shown, shownSelection, qn.id), "class", "classes")} {accepted ? "you added" : "you added, priced above"}
                         </p>
                       ) : null}
                     </div>
@@ -656,7 +737,7 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                   <>
                     <p className="cp-commit">{commitmentSentence(firm.displayName ?? firm.name)}</p>
                     {mode === "preview" ? (
-                      <button type="button" className="cp-btn" disabled>
+                      <button type="button" className="cp-btn" disabled aria-describedby={missingText ? "cp-describe" : undefined}>
                         Preview
                       </button>
                     ) : (
@@ -665,10 +746,16 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                         className="cp-btn"
                         onClick={accept}
                         disabled={!canAccept || pending || !onAccept}
+                        aria-describedby={missingText ? "cp-describe" : undefined}
                       >
                         {pending ? "Recording…" : "Accept and pay my legal fee"}
                       </button>
                     )}
+                    {missingText ? (
+                      <p className="cp-warn cp-describe" id="cp-describe" role="status">
+                        {DESCRIBE_BEFORE_ACCEPT}
+                      </p>
+                    ) : null}
                     {error ? (
                       <p className="cp-error" role="alert">
                         {error}

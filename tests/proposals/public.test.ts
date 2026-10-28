@@ -14,7 +14,7 @@ import {
   recordProposalViewed,
   type PublicProposalsDb,
 } from "@/lib/proposals/public";
-import { ADDED_CLASS_REFUSAL } from "@/lib/proposals/added-classes";
+import { DEFAULT_CLIENT_ENTRY_PROMPT, DESCRIBE_BEFORE_ACCEPT } from "@/lib/proposals/client-classes";
 import { defaultSelection, quoteProposal } from "@/lib/proposals/pricing";
 import { sevetri } from "./fixture";
 
@@ -661,92 +661,160 @@ describe("acceptPublicProposal: the firm notice and the Lawmatics note are follo
   });
 });
 
-/* ───────────── Sprint 28: the client adds a class; the server re-prices ───────────── */
+/* ───────────── Spec 3: classes the client describes or adds; the server re-prices ───────────── */
 
 function essentialContent() {
   const c = sevetri();
   c.pricing = { ...c.pricing, package: "Essential", base_cents: 195_000, included_classes: 1, per_class_cents: 82_500, second_mark_discount_pct: 20 };
   c.names = [c.names[0]];
   c.names[0].classes = [c.names[0].classes[0]];
+  c.names[0].client_add = { max: 2 };
   return c;
 }
 
-describe("acceptPublicProposal: classes the client adds", () => {
-  const ticks = (ids: string[]) => Object.fromEntries(ids.map((i) => [i, true]));
-  const accepted = (tables: Record<string, Row[]>) => tables.client_proposal[0] as { accepted_selection: Record<string, boolean>; accepted_snapshot: { quote: ReturnType<typeof quoteProposal>; content: ReturnType<typeof sevetri> } };
+/** The real case: a design mark, Essential, three open classes (no room to add). */
+function openContent() {
+  const c = essentialContent();
+  c.names[0].marks = [{ ...c.names[0].marks[1], preselected: true }];
+  c.names[0].classes = ["o1", "o2", "o3"].map((id) => ({ id, label: DEFAULT_CLIENT_ENTRY_PROMPT, preselected: true, client_entry: true as const }));
+  delete c.names[0].client_add;
+  return c;
+}
 
-  it("one added class on a single mark: legal $2,775 and USPTO $700, stored in the selection and the snapshot", async () => {
+const add = (...rows: Array<[string, boolean]>) => ({ added: { p: rows.map(([text, on]) => ({ text, on })) } });
+
+describe("acceptPublicProposal: classes the client describes or adds", () => {
+  const ticks = (ids: string[]) => Object.fromEntries(ids.map((i) => [i, true]));
+  const accepted = (tables: Record<string, Row[]>) => tables.client_proposal[0] as { accepted_selection: Record<string, boolean>; accepted_snapshot: { quote: ReturnType<typeof quoteProposal>; content: ReturnType<typeof sevetri>; selection: Record<string, boolean> } };
+
+  it("stores the EFFECTIVE content: open classes carry the client's words, priced like any class", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    const { db, tables } = world({ proposal: { content: openContent() } });
+    const r = await acceptPublicProposal(TOKEN, ticks(["p-logo", "o1", "o2", "o3"]), NOW, db, {
+      entries: { o1: "  Scented   candles ", o2: "Bath <b>soaps</b>", o3: "Room\ndiffusers" },
+    });
+    expect(r.ok).toBe(true);
+    const row = accepted(tables);
+    expect(row.accepted_snapshot.content.names[0].classes.map((c) => c.label)).toEqual(["Scented candles", "Bath bsoaps/b", "Room diffusers"]);
+    expect(row.accepted_snapshot.content.names[0].classes[0]).toMatchObject({ id: "o1", client_entry: true, prompt: DEFAULT_CLIENT_ENTRY_PROMPT });
+    expect(row.accepted_snapshot.quote.names[0].classes.map((c) => c.label)).toEqual(["Scented candles", "Bath bsoaps/b", "Room diffusers"]);
+    // Essential: 1,950 + 2 x 825; USPTO 3 x 350.
+    expect(row.accepted_snapshot.quote.legal_total_cents).toBe(360_000);
+    expect(row.accepted_snapshot.quote.gov_total_cents).toBe(105_000);
+    expect(row.accepted_selection).toEqual({ "p-logo": true, o1: true, o2: true, o3: true });
+    expect(row.accepted_snapshot.selection).toEqual(row.accepted_selection);
+  });
+
+  it("refuses a ticked open class with no words, with the fixed sentence, and writes nothing", async () => {
+    const { db, calls, tables } = world({ proposal: { content: openContent() } });
+    const r = await acceptPublicProposal(TOKEN, ticks(["p-logo", "o1", "o2"]), NOW, db, { entries: { o1: "Candles", o2: "   <> " } });
+    expect(r).toEqual({ ok: false, reason: "missing_description", message: DESCRIBE_BEFORE_ACCEPT });
+    expect(calls.some((c) => c.op === "update")).toBe(false);
+    expect(tables.client_proposal[0].accepted_snapshot).toBeNull();
+  });
+
+  it("an unticked open class needs no words", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    const { db, tables } = world({ proposal: { content: openContent() } });
+    const r = await acceptPublicProposal(TOKEN, ticks(["p-logo", "o1"]), NOW, db, { entries: { o1: "Candles" } });
+    expect(r.ok).toBe(true);
+    expect(accepted(tables).accepted_snapshot.quote.legal_total_cents).toBe(195_000);
+  });
+
+  it("one added class on a single mark: legal $2,775 and USPTO $700, with a server id, in the selection and the snapshot", async () => {
     vi.spyOn(console, "info").mockImplementation(() => {});
     const { db, tables } = world({ proposal: { content: essentialContent() } });
-    const r = await acceptPublicProposal(TOKEN, ticks(["p-word", "p-c1"]), NOW, db, { p: ["Online store services"] });
+    const r = await acceptPublicProposal(TOKEN, ticks(["p-word", "p-c1"]), NOW, db, add(["Online store services", true]));
     expect(r.ok).toBe(true);
     const row = accepted(tables);
     expect(row.accepted_snapshot.quote.legal_total_cents).toBe(277_500);
     expect(row.accepted_snapshot.quote.gov_total_cents).toBe(70_000);
     expect(row.accepted_snapshot.quote.gov_class_count).toBe(2);
     expect(row.accepted_snapshot.quote.names[0].classes.map((c) => c.label)).toEqual([expect.any(String), "Online store services"]);
-    expect(row.accepted_selection["add-p-1"]).toBe(true);
-    expect(row.accepted_snapshot.content.names[0].classes[1]).toMatchObject({ id: "add-p-1", client_added: true, label: "Online store services" });
+    expect(row.accepted_selection["ca-p-1"]).toBe(true);
+    expect(row.accepted_snapshot.content.names[0].classes[1]).toMatchObject({ id: "ca-p-1", client_added: true, label: "Online store services" });
     if (r.ok) expect(r.quote.legal_total_cents).toBe(277_500);
   });
 
   it("with word and design ticked the second mark's discount applies to the extra-class fee, exactly as the engine does", async () => {
     vi.spyOn(console, "info").mockImplementation(() => {});
     const { db, tables } = world({ proposal: { content: essentialContent() } });
-    await acceptPublicProposal(TOKEN, ticks(["p-word", "p-logo", "p-c1"]), NOW, db, { p: ["Online store services"] });
+    await acceptPublicProposal(TOKEN, ticks(["p-word", "p-logo", "p-c1"]), NOW, db, add(["Online store services", true]));
     const real = essentialContent();
     real.names[0].classes.push({ id: "x", label: "Online store services", preselected: true });
     const engine = quoteProposal(real, ticks(["p-word", "p-logo", "p-c1", "x"]));
     const row = accepted(tables);
     expect(row.accepted_snapshot.quote.legal_total_cents).toBe(engine.legal_total_cents);
     expect(row.accepted_snapshot.quote.gov_total_cents).toBe(engine.gov_total_cents);
-    // 1,950 + 825 = 2,775 for the first mark; the second is 20% off that whole figure.
     expect(engine.legal_total_cents).toBe(277_500 + 222_000);
     expect(engine.gov_total_cents).toBe(140_000);
+  });
+
+  it("drops adds beyond the max, an unticked empty add, and keeps an unticked described one unticked and unpriced", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    const { db, tables } = world({ proposal: { content: essentialContent() } });
+    const r = await acceptPublicProposal(TOKEN, ticks(["p-word", "p-c1"]), NOW, db, add(["", false], ["Kept, not ticked", false], ["Third", true], ["Fourth", true]));
+    expect(r.ok).toBe(true);
+    const row = accepted(tables);
+    // max 2: the first two rows are read; the empty unticked one is dropped, the described one stays off.
+    expect(row.accepted_snapshot.content.names[0].classes.map((c) => c.label)).toEqual([expect.any(String), "Kept, not ticked"]);
+    expect(row.accepted_selection["ca-p-1"]).toBe(false);
+    expect(row.accepted_snapshot.quote.legal_total_cents).toBe(195_000);
+  });
+
+  it("refuses a ticked added class with no words", async () => {
+    const { db, calls } = world({ proposal: { content: essentialContent() } });
+    const r = await acceptPublicProposal(TOKEN, ticks(["p-word", "p-c1"]), NOW, db, add(["  ", true]));
+    expect(r).toMatchObject({ ok: false, reason: "missing_description" });
+    expect(calls.some((c) => c.op === "update")).toBe(false);
+  });
+
+  it("drops adds for a brand name whose max is 0, unknown ids, and entries for classes that are not open", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    const content = sevetri();
+    content.names[0].client_add = { max: 0 };
+    const { db, tables } = world({ proposal: { content } });
+    const r = await acceptPublicProposal(TOKEN, ticks(["p-word", "p-c1"]), NOW, db, {
+      entries: { "p-c1": "Renamed by the client", zzz: "x" },
+      added: { p: [{ text: "Not allowed", on: true }], zzz: [{ text: "x", on: true }] },
+    });
+    expect(r.ok).toBe(true);
+    const row = accepted(tables);
+    expect(row.accepted_snapshot.content.names[0].classes.map((c) => c.label)).toEqual(sevetri().names[0].classes.map((c) => c.label));
+    expect(Object.keys(row.accepted_selection).some((k) => k.startsWith("ca-"))).toBe(false);
+  });
+
+  it("still takes the Sprint 28 post shape { nameId: string[] } (default 5, no client_add needed)", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    const content = essentialContent();
+    delete content.names[0].client_add;
+    const { db, tables } = world({ proposal: { content } });
+    const r = await acceptPublicProposal(TOKEN, ticks(["p-word", "p-c1"]), NOW, db, { p: ["Online store services"] });
+    expect(r.ok).toBe(true);
+    expect(accepted(tables).accepted_snapshot.content.names[0].classes[1]).toMatchObject({ id: "ca-p-1", client_added: true, label: "Online store services" });
+    expect(accepted(tables).accepted_snapshot.quote.legal_total_cents).toBe(277_500);
+  });
+
+  it("a fixed offer with no client_add takes no added class", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    const content = essentialContent();
+    delete content.names[0].client_add;
+    content.names[0].marks = [content.names[0].marks[0]];
+    const { db, tables } = world({ proposal: { content } });
+    const r = await acceptPublicProposal(TOKEN, ticks(["p-word", "p-c1"]), NOW, db, { p: ["Online store services"] });
+    expect(r.ok).toBe(true);
+    expect(accepted(tables).accepted_snapshot.content.names[0].classes).toHaveLength(1);
+    expect(accepted(tables).accepted_snapshot.quote.legal_total_cents).toBe(195_000);
   });
 
   it("ignores forged price, total, per-class and class-count fields", async () => {
     vi.spyOn(console, "info").mockImplementation(() => {});
     const { db, tables } = world({ proposal: { content: essentialContent() } });
     const forged = { ...ticks(["p-word", "p-c1"]), legal_total_cents: 1, total: 1, per_class_cents: 1, class_count: 99, price: 1 };
-    const r = await acceptPublicProposal(TOKEN, forged, NOW, db, { p: ["Online store services"], per_class_cents: 1, legal_total_cents: 1 });
-    expect(r).toMatchObject({ ok: false, reason: "invalid_added" });
-    expect(tables.client_proposal[0].status).toBe("sent");
-    const ok = await acceptPublicProposal(TOKEN, forged, NOW, db, { p: ["Online store services"] });
-    expect(ok.ok).toBe(true);
+    const r = await acceptPublicProposal(TOKEN, forged, NOW, db, { ...add(["Online store services", true]), per_class_cents: 1, legal_total_cents: 1 });
+    expect(r.ok).toBe(true);
     expect(accepted(tables).accepted_snapshot.quote.legal_total_cents).toBe(277_500);
     expect("legal_total_cents" in accepted(tables).accepted_selection).toBe(false);
-  });
-
-  it.each([
-    ["too many", { p: ["a", "b", "c", "d", "e", "f"] }],
-    ["too long", { p: ["x".repeat(201)] }],
-    ["markup", { p: ["<b>hi</b>"] }],
-    ["not a list", { p: "software" }],
-    ["wrong shape", ["software"]],
-    ["unknown brand name id", { zzz: ["software"] }],
-    ["an empty description", { p: ["   "] }],
-  ])("refuses %s with the one fixed sentence and writes nothing", async (_n, added) => {
-    const { db, calls, tables } = world({ proposal: { content: essentialContent() } });
-    const r = await acceptPublicProposal(TOKEN, ticks(["p-word", "p-c1"]), NOW, db, added);
-    expect(r).toEqual({ ok: false, reason: "invalid_added", message: ADDED_CLASS_REFUSAL });
-    expect(calls.some((c) => c.op === "update")).toBe(false);
-    expect(tables.client_proposal[0].accepted_snapshot).toBeNull();
-  });
-
-  it("accepts exactly 5 added classes of exactly 200 characters", async () => {
-    vi.spyOn(console, "info").mockImplementation(() => {});
-    const { db } = world({ proposal: { content: essentialContent() } });
-    const five = ["a", "b", "c", "d", "e"].map((x) => x.repeat(200));
-    const r = await acceptPublicProposal(TOKEN, ticks(["p-word", "p-c1"]), NOW, db, { p: five });
-    expect(r.ok && r.quote.legal_total_cents).toBe(195_000 + 5 * 82_500);
-  });
-
-  it("drops added classes for a brand name with no mark ticked", async () => {
-    vi.spyOn(console, "info").mockImplementation(() => {});
-    const { db, tables } = world();
-    await acceptPublicProposal(TOKEN, ticks(["p-word", "p-c1"]), NOW, db, { t: ["Something"] });
-    expect(accepted(tables).accepted_selection["add-t-1"]).toBeUndefined();
   });
 
   it("repairs a forged mark with every class unticked to its first class, and refuses one with no class at all", async () => {
@@ -766,10 +834,10 @@ describe("acceptPublicProposal: classes the client adds", () => {
     expect(w.tables.client_proposal[0].status).toBe("sent");
   });
 
-  it("refuses added classes on a version that is not sent", async () => {
+  it("refuses client classes on a version that is not sent", async () => {
     for (const status of ["accepted", "superseded", "draft"]) {
       const { db, calls } = world({ proposal: { content: essentialContent(), status } });
-      const r = await acceptPublicProposal(TOKEN, ticks(["p-word", "p-c1"]), NOW, db, { p: ["x"] });
+      const r = await acceptPublicProposal(TOKEN, ticks(["p-word", "p-c1"]), NOW, db, add(["x", true]));
       expect(r.ok).toBe(false);
       expect(calls.some((c) => c.op === "update")).toBe(false);
     }
@@ -779,8 +847,14 @@ describe("acceptPublicProposal: classes the client adds", () => {
     vi.spyOn(console, "info").mockImplementation(() => {});
     const { db, tables } = world();
     await acceptPublicProposal(TOKEN, { ...ticks(["p-word", "p-c1"]), reduce_under_included: true }, NOW, db, { pricing: { reduce_under_included: true } });
-    expect(tables.client_proposal[0].status).toBe("sent");
-    await acceptPublicProposal(TOKEN, { ...ticks(["p-word", "p-c1"]), reduce_under_included: true }, NOW, db);
     expect(accepted(tables).accepted_snapshot.quote.legal_total_cents).toBe(495_000);
+  });
+
+  it("publicContent keeps client_add, client_entry and prompt", () => {
+    const c = openContent() as unknown as Record<string, unknown>;
+    (c.names as Array<Record<string, unknown>>)[0].client_add = { max: 2, extra: "x" };
+    const out = publicContent(c);
+    expect(out.names[0].client_add).toEqual({ max: 2 });
+    expect(out.names[0].classes[0]).toEqual({ id: "o1", label: DEFAULT_CLIENT_ENTRY_PROMPT, preselected: true, client_entry: true });
   });
 });

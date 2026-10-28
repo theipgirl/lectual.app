@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addedClassesPhrase, clientAddedClasses } from "@/lib/proposals/added-view";
+import { addedClassesPhrase, clientAddedClasses, clientDescribedClasses } from "@/lib/proposals/added-view";
 import { acceptedSnapshot } from "./accepted-fixture";
 
 describe("clientAddedClasses / addedClassesPhrase", () => {
@@ -28,5 +28,19 @@ describe("clientAddedClasses / addedClassesPhrase", () => {
     expect(addedClassesPhrase([])).toBe("");
     expect(addedClassesPhrase([{ brand: "A", description: "x" }])).toBe("adding 1 class");
     expect(addedClassesPhrase([{ brand: "A", description: "x" }, { brand: "A", description: "y" }])).toBe("adding 2 classes");
+  });
+});
+
+describe("clientDescribedClasses (Spec 3)", () => {
+  it("returns ticked open classes with the firm's question and the client's words; never unticked, empty or added ones", () => {
+    const snap = acceptedSnapshot({ classes: 1 });
+    const nm = snap.content.names[0];
+    nm.classes.push({ id: "o1", label: "Scented candles", prompt: "What do you sell?", preselected: true, client_entry: true });
+    nm.classes.push({ id: "o2", label: "Not ticked", prompt: "What do you sell?", preselected: false, client_entry: true });
+    nm.classes.push({ id: "o3", label: "", prompt: "What do you sell?", preselected: false, client_entry: true });
+    nm.classes.push({ id: "a1", label: "Added one", preselected: true, client_added: true });
+    Object.assign(snap.selection, { o1: true, o2: false, o3: true, a1: true });
+    expect(clientDescribedClasses(snap)).toEqual([{ brand: nm.name, prompt: "What do you sell?", description: "Scented candles" }]);
+    expect(clientDescribedClasses(null)).toEqual([]);
   });
 });

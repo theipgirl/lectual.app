@@ -37,6 +37,7 @@ import {
   type ProposalSettingPricing,
 } from "@/lib/proposals/types";
 import { isCivilDate } from "@/lib/proposals/validate";
+import { DEFAULT_CLIENT_ENTRY_PROMPT, MAX_CLIENT_ADD } from "@/lib/proposals/client-classes";
 
 export type Parsed<T> = { ok: true; value: T } | { ok: false; error: string };
 
@@ -246,11 +247,27 @@ export function parseName(form: FormData, existing: ProposalContent, rand: () =>
       preselected: row.preselected === "on",
     });
   }
-  const classes: ProposalClass[] = collectRows(form, "class", ["id", "label", "preselected"]).map((row) => ({
-    id: cleanId(row.id, "c", taken, rand),
-    label: row.label,
-    preselected: row.preselected === "on",
-  }));
+  const classes: ProposalClass[] = collectRows(form, "class", ["id", "label", "preselected", "clientEntry"]).map((row) => {
+    // "Client describes this class": the label is the question the client answers (a default when left blank).
+    const open = row.clientEntry === "on";
+    return {
+      id: cleanId(row.id, "c", taken, rand),
+      label: open && !row.label ? DEFAULT_CLIENT_ENTRY_PROMPT : row.label,
+      preselected: row.preselected === "on",
+      ...(open ? { client_entry: true as const } : {}),
+    };
+  });
+
+  // "Let the client add classes": blank is the default (no `client_add`: 5, none on a fixed offer); 0..10 is the firm's
+  // own max, 0 included. The total with the listed classes is checked by validateContent.
+  const addRaw = text(form, "clientAddMax");
+  let clientAdd: number | null = null;
+  if (addRaw) {
+    if (!/^\d{1,2}$/.test(addRaw) || Number(addRaw) > MAX_CLIENT_ADD) {
+      return fail(`Classes the client may add: enter a whole number from 0 to ${MAX_CLIENT_ADD}.`);
+    }
+    clientAdd = Number(addRaw);
+  }
 
   // Every package includes one class: a brand whose mark starts ticked keeps its first class ticked.
   if (classes.length > 0 && marks.some((m) => m.preselected) && !classes.some((c) => c.preselected)) classes[0].preselected = true;
@@ -269,6 +286,7 @@ export function parseName(form: FormData, existing: ProposalContent, rand: () =>
     ...(Object.keys(override).length > 0 ? { price_override: override } : {}),
     marks,
     classes,
+    ...(clientAdd !== null ? { client_add: { max: clientAdd } } : {}),
   });
 }
 

@@ -342,3 +342,16 @@ footer.cp-footer { background: var(--cp-ink); color: var(--cp-on-brand); padding
   background: var(--cp-brand); color: var(--cp-on-brand); border: 0; border-radius: 8px;
 }
 .cp-add-btn:hover { background: var(--cp-brand-dark); }
+
+/* Spec 3: classes the client describes (an open class, or one they added). Tokens only. The text box sits under
+   the checkbox row, lined up with the description (26px box + 14px gap), never inside the label. */
+.cp-open { border-top: 1px solid var(--cp-line); }
+.cp-part h4 + .cp-open { border-top: 0; }
+.cp-open > .cp-opt { border-top: 0; }
+.cp-entry { display: flex; gap: 8px; align-items: center; padding: 0 0 13px 40px; }
+.cp-entry .cp-add-input[aria-invalid="true"] { border-color: var(--cp-brand); }
+.cp-add > .cp-add-btn { margin-bottom: 10px; }
+.cp-describe { margin: 10px 0 0; }
+@container cp (max-width: 560px) {
+  .cp-entry { padding-left: 36px; flex-wrap: wrap; }
+}
