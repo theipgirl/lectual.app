@@ -1396,7 +1396,7 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
   .lx-stack:not(.pq-tbl) tr { display: block; min-width: 0; width: 100%; }
   .lx-stack:not(.pq-tbl) colgroup { display: none; }
   .lx-stack thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-  .lx-stack:not(.pq-tbl) tr { padding: 12px 14px; border-bottom: 1px solid var(--line-2); }
+  .lx-stack:not(.pq-tbl) tr { height: auto; padding: 12px 14px; border-bottom: 1px solid var(--line-2); }
   .lx-stack:not(.pq-tbl) tr:last-child { border-bottom: 0; }
   .lx-stack:not(.pq-tbl) td {
     display: flex;

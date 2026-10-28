@@ -32,6 +32,11 @@ describe("stacked cards under 640px (V1)", () => {
     expect(small).not.toMatch(/\.lx-stack[^{]*thead[^{]*\{[^}]*display:\s*none/);
   });
 
+  it("a stacked row's fixed height is reset so cards grow to fit (Matters .lp-row)", () => {
+    expect(small).toMatch(/\.lx-stack:not\(\.pq-tbl\) tr \{ height: auto;/);
+    expect(listPage).toMatch(/\.lp-row \{ height: var\(--lp-row-h\)/);
+  });
+
   it("the leads grid stacks the same way", () => {
     const lp = media(listPage, "max-width: 640px", listPage.indexOf("Leads table: wide keeps"));
     expect(lp).toContain(".lp-table-min { min-width: 0; width: 100%; }");
