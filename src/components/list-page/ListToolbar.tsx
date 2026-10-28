@@ -82,10 +82,30 @@ export function ListToolbar({
   return (
     <div className="lp-toolbar">
       <ListSearch {...search} />
-      {toggle}
       <span className="lp-toolbar-spacer" />
-      {more}
-      {primary}
+      <div className="lp-toolbar-actions">
+        {toggle}
+        {more}
+        {primary}
+      </div>
     </div>
+  );
+}
+
+/**
+ * A button label with an icon and a short form for phones: the full label above 640px, the icon plus
+ * the short word at or below it. The full label stays the accessible name (aria-label on the button).
+ */
+export function ButtonLabel({ icon, label, short }: { icon: string; label: string; short: string }) {
+  return (
+    <>
+      <span className="lp-btn-icon" aria-hidden>
+        {icon}
+      </span>
+      <span className="lp-label-long">{label}</span>
+      <span className="lp-label-short" aria-hidden>
+        {short}
+      </span>
+    </>
   );
 }

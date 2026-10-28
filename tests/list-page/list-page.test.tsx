@@ -3,7 +3,7 @@ import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { ListHeader } from "@/components/list-page/ListHeader";
-import { ListToolbar, showClear } from "@/components/list-page/ListToolbar";
+import { ButtonLabel, ListToolbar, showClear } from "@/components/list-page/ListToolbar";
 import { Chip, FilterChips, chipClass } from "@/components/list-page/Chips";
 import { ViewToggle } from "@/components/ViewToggle";
 
@@ -64,6 +64,27 @@ describe("ListToolbar", () => {
 
   it("posts hidden fields with a plain GET search", () => {
     expect(toolbar("", { search: { label: "s", placeholder: "p", hidden: { view: "board", seg: "court" } } })).toMatch(/<input type="hidden" name="view" value="board"\/>/);
+  });
+});
+
+describe("phone toolbar markup", () => {
+  it("groups the controls in one wrapper and gives the primary buttons an icon plus a short label", async () => {
+    const { OpenMatterButton } = await import("@/components/matters/OpenMatterButton");
+    const { MoreMenu } = await import("@/components/list-page/MoreMenu");
+    const matters = renderToStaticMarkup(
+      <ListToolbar search={{ label: "s", placeholder: "p" }} toggle={<span>toggle</span>} primary={<OpenMatterButton />} />,
+    );
+    expect(matters).toContain("lp-toolbar-actions");
+    expect(matters).toContain('<span class="lp-btn-icon" aria-hidden="true">+</span>');
+    expect(matters).toContain('<span class="lp-label-long">Open a matter</span>');
+    expect(matters).toContain(">Open</span>");
+    const leads = renderToStaticMarkup(
+      <ListToolbar search={{ label: "s", placeholder: "p" }} more={<MoreMenu items={[{ label: "Import", href: "/x/" }]} />} primary={<button><ButtonLabel icon="+" label="Add a lead" short="Add" /></button>} />,
+    );
+    expect(leads).toContain('<span class="lp-label-long">Add a lead</span>');
+    expect(leads).toContain(">Add</span>");
+    expect(leads).toContain("lp-btn-icon");
+    expect(read("src/app/dashboard/intake/_components/AddLeadDialog.tsx")).toContain('short="Add"');
   });
 });
 

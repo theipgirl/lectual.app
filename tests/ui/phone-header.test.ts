@@ -44,6 +44,12 @@ describe("compact page tops under 640px (Sprint 34 B)", () => {
     expect(globals).toMatch(/\.lx-head-actions\s*\{[^}]*flex-wrap:\s*nowrap/);
   });
 
+  it("the non-search toolbar controls sit on one nowrap row under 640px, with an icon and a short label", () => {
+    expect(listPage).toMatch(/\.lp-toolbar-actions\s*\{[^}]*display:\s*flex;[^}]*flex-wrap:\s*nowrap[^}]*overflow-x:\s*auto/);
+    expect(listPage).toMatch(/\.lp-label-long\s*\{\s*display:\s*none/);
+    expect(listPage).toMatch(/\.lp-label-short\s*\{\s*display:\s*inline/);
+  });
+
   it("the sideways-overflow clip from Sprint 32 and the 44px touch targets are still there", () => {
     expect(globals).toMatch(/html,\s*body\s*\{\s*overflow-x:\s*clip/);
     expect(read("src/app/globals.css")).toMatch(/@media \(pointer: coarse\)[\s\S]*min-height: 44px/);
