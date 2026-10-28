@@ -54,8 +54,9 @@ describe("scope: no migration, no dependency, no new unsafe HTML", () => {
     for (const file of changed) {
       expect(file, file).not.toMatch(/migrations?\/|\.sql$|^package\.json$|pnpm-lock\.yaml|pnpm-workspace\.yaml|^vercel\.json$/);
     }
-    // The paid logic and the Lawmatics stage alias table are untouched.
-    for (const file of ["src/lib/proposals/paid.ts", "src/lib/proposals/paid-view.ts", "src/lib/lawmatics/stage-map.ts", "src/lib/reconcile/milestones.ts"]) {
+    // The paid view and the Lawmatics stage alias table are untouched. (paid.ts left this list on
+    // purpose: the 2026-10-28 reset-acceptance change, lectual 0101, gave it the fresh-round rule.)
+    for (const file of ["src/lib/proposals/paid-view.ts", "src/lib/lawmatics/stage-map.ts", "src/lib/reconcile/milestones.ts"]) {
       expect(changed, file).not.toContain(file);
     }
   });
