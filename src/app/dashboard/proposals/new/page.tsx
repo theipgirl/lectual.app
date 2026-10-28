@@ -35,6 +35,7 @@ import { requireProposalsModule } from "../gate";
 import "../proposals.css";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { PROPOSALS_NAME } from "@/lib/ui/words";
 
 export const metadata: Metadata = { title: pageTitle("New proposal") };
 
@@ -91,7 +92,7 @@ export default async function NewProposalPage({ searchParams }: { searchParams: 
     return (
       <>
         <Link href="/dashboard/proposals/" className="lx-back">
-          ← Client proposals
+          ← {PROPOSALS_NAME}
         </Link>
         <div className="lx-card lx-empty-card">
           <h2 className="lx-h2" style={{ fontSize: 25 }}>
@@ -210,7 +211,7 @@ export default async function NewProposalPage({ searchParams }: { searchParams: 
   return (
     <div className="pe-page">
       <Link href="/dashboard/proposals/" className="lx-back">
-        ← Client proposals
+        ← {PROPOSALS_NAME}
       </Link>
       <div>
         <div className="lx-label">Intake</div>

@@ -74,6 +74,8 @@ export type RunnerDeps = {
   createDraft: (input: NewQueueDraft) => Promise<{ id: string }>;
   /** Lists a firm's pending queue items by its queue key. Absent in tests that do not need it. */
   listPending?: (orgKey: string) => Promise<QueueItem[]>;
+  /** Lists a firm's approved queue items by its queue key (the Stage Keeper's post-consult signal). */
+  listApproved?: (orgKey: string) => Promise<QueueItem[]>;
   mailbox?: SyncDeps;
   fetchImpl?: typeof fetch;
   /** The time stamped on rows and handed to agents as `ctx.now` (tests fix it). */
@@ -206,6 +208,10 @@ export async function runOneAgent(
     listPending:
       deps.listPending && queueOrgKey
         ? refuseAfterAbort(controller.signal, () => (deps.listPending as NonNullable<RunnerDeps["listPending"]>)(queueOrgKey))
+        : undefined,
+    listApproved:
+      deps.listApproved && queueOrgKey
+        ? refuseAfterAbort(controller.signal, () => (deps.listApproved as NonNullable<RunnerDeps["listApproved"]>)(queueOrgKey))
         : undefined,
     orgModules,
     now,

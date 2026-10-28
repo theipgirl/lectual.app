@@ -147,11 +147,11 @@ describe("consult-prep (F6): which consults, and never twice", () => {
     expect(result.summary).toMatch(/4 consults left for the next run/);
   });
 
-  it("before lectual 0098 it is skipped with 'not available until the database update', never 'no consults'", async () => {
+  it("before lectual 0098 it is skipped with 'isn't switched on for your firm yet', never 'no consults'", async () => {
     const { ctx, createDraft } = setup({ failures: (q) => (q.table === "crm_calendar_event" ? { message: "column crm_calendar_event.is_consult does not exist", code: "42703" } : undefined) });
     const result = await runConsultPrep(ctx);
     expect(result.skipped).toBe(true);
-    expect(result.summary).toMatch(/not available until the database update/);
+    expect(result.summary).toMatch(/isn't switched on for your firm yet/);
     expect(result.summary).not.toMatch(/no consults/i);
     expect(createDraft).not.toHaveBeenCalled();
   });
@@ -490,7 +490,7 @@ describe("consult-prep: the Overnight digest never reports a failed or held-back
       return real(req);
     }) as typeof real;
     const line = digestFor(await runConsultPrep(ctx));
-    expect(line.text).toMatch(/^prepped 1 consult · 2 drafts \(in the Queue\) · 1 couldn't be prepped \(will retry\)$/);
+    expect(line.text).toMatch(/^prepped 1 consult · 2 drafts \(in Approvals\) · 1 couldn't be prepped \(will retry\)$/);
     expect(line.tone).toBe("attention");
     expect(line.href).toBe("/dashboard/queue/");
   });

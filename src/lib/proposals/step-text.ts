@@ -53,7 +53,7 @@ export function notWrittenText(reason: string): string {
 export const MARK_PAID_WORDS = {
   byHand: "Marked by hand. LawPay isn't connected to proposals yet.",
   unreadable: "Paid status couldn't be read",
-  unreadableHelp: "This is a problem reaching the database, not a sign that it hasn't been paid. Reload the page to try again.",
+  unreadableHelp: "Can't show whether this was paid right now. Refresh to try again.",
   notAllowed: "Only owners, admins, senior admins and intake staff can mark a proposal paid or undo it.",
   markedNotice: "Marked paid.",
   undoneHeadline: "Paid mark undone.",

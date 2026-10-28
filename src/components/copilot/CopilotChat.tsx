@@ -164,7 +164,7 @@ export function CopilotChat({ variant, greeting, stats, pathname, initialExchang
         value={question}
         onChange={(e) => setQuestion(e.target.value)}
         placeholder={pill ? "Ask anything — every answer cites a matter or lead…" : idle ? "Ask about a matter, lead, or deadline…" : "Ask a follow-up…"}
-        aria-label="Ask the copilot"
+        aria-label="Ask Copilot"
         disabled={pending}
         maxLength={2000}
       />

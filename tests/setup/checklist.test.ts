@@ -11,7 +11,7 @@ const item = (state: SetupState, id: SetupItemId) => setupChecklist(state).items
 const statuses = (state: SetupState) => Object.fromEntries(setupChecklist(state).items.map((i) => [i.id, i.status]));
 
 describe("shape", () => {
-  it("is exactly ten items in the contract's order, total 10", () => {
+  it("is exactly ten items in the contract's order, total 10 when none is Lectual's to do", () => {
     for (const state of [NOTHING_DONE, ALL_DONE]) {
       const c = setupChecklist(state);
       expect(c.items.map((i) => i.id)).toEqual([...ITEM_IDS]);
@@ -22,20 +22,21 @@ describe("shape", () => {
         "Lawmatics connected",
         "Fathom or Zoom connected",
         "LawPay connected",
-        "At least one agent on",
+        "At least one assistant on",
         "An intake form live",
         "Packages saved",
         "AI configured",
       ]);
-      expect(c.total).toBe(10);
+      // NOTHING_DONE has no AI key: that one item is Lectual's and is left out of the count.
+      expect(c.total).toBe(state === ALL_DONE ? 10 : 9);
     }
   });
 
   it("counts done items, and is complete only when all ten are done", () => {
     expect(setupChecklist(NOTHING_DONE)).toMatchObject({ doneCount: 0, complete: false });
     expect(setupChecklist(ALL_DONE)).toMatchObject({ doneCount: 10, complete: true });
-    const nine = setupChecklist({ ...ALL_DONE, aiConfigured: false });
-    expect(nine).toMatchObject({ doneCount: 9, complete: false });
+    const nine = setupChecklist({ ...ALL_DONE, lawmatics: ok(null) });
+    expect(nine).toMatchObject({ doneCount: 9, total: 10, complete: false });
   });
 
   it("is pure: the same input gives the same output twice, and the input is not changed", () => {
@@ -138,7 +139,7 @@ describe("each item", () => {
   });
 
   it("the AI item says Lectual sets the key", () => {
-    expect(item({ ...ALL_DONE, aiConfigured: false }, "ai").why).toBe("The AI key isn't set on this deployment. Lectual sets it.");
+    expect(item({ ...ALL_DONE, aiConfigured: false }, "ai").why).toBe("AI isn't switched on for your firm yet. Lectual will turn it on.");
   });
 });
 
@@ -160,8 +161,8 @@ describe("couldn't check", () => {
       const i = item({ ...base, [key]: bad }, id);
       expect(i.status).toBe("couldnt-check");
       expect(i.why).toMatch(/couldn't check/i);
-      expect(i.why).toMatch(/Try again shortly/);
-      expect(i.why).toContain('not the same as "to do"');
+      expect(i.why).toMatch(/Try again in a minute\.$/);
+      expect(i.why).not.toMatch(/not the same as/i);
       expect(i.why).not.toBe(item(ALL_DONE, id).why);
     }
   });
@@ -215,13 +216,13 @@ describe("couldn't check", () => {
 describe("a module that is off", () => {
   it.each([
     ["outlook", "mailbox", "Mailboxes"],
-    ["agents", "agents", "Agents"],
+    ["agents", "agents", "Assistants"],
   ] as const)("%s is to-do, says it is not switched on for the firm, and links to Modules", (id, mod, noun) => {
     const modules = ok(["mailbox", "agents"].filter((m) => m !== mod));
     const i = item({ ...ALL_DONE, modules }, id);
     expect(i.status).toBe("to-do");
     expect(i.why).toContain(`${noun} aren't switched on for your firm`);
-    expect(i.why).toContain("Lectual turns them on");
+    expect(i.why).toMatch(/Lectual (turns|will turn) them on/);
     expect(i.href).toBe(MODULES_PATH);
     expect(statuses({ ...ALL_DONE, modules })[id === "outlook" ? "agents" : "outlook"]).toBe("done");
   });

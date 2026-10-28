@@ -26,8 +26,8 @@ describe("agentReadiness (S1)", () => {
   });
 
   it("email-intel without the Mailboxes module needs it, on or off", () => {
-    expect(r({ hasMailboxModule: false })).toMatchObject({ label: "Needs the Mailboxes module", tone: "warn" });
-    expect(r({ hasMailboxModule: false, enabled: false })).toMatchObject({ label: "Needs the Mailboxes module", tone: "mute" });
+    expect(r({ hasMailboxModule: false })).toMatchObject({ label: "Needs the Mailboxes feature", tone: "warn" });
+    expect(r({ hasMailboxModule: false, enabled: false })).toMatchObject({ label: "Needs the Mailboxes feature", tone: "mute" });
   });
 
   it("email-intel with a connected mailbox and the AI key is ok", () => {
@@ -37,7 +37,7 @@ describe("agentReadiness (S1)", () => {
   it("intake triage without the AI key is not ok", () => {
     const out = r({ agent: "intake-triage", aiConfigured: false });
     expect(out.tone).not.toBe("ok");
-    expect(out.label).toBe("On · needs the AI key");
+    expect(out.label).toBe("On · waiting for Lectual to switch on AI");
   });
 
   it("intake triage depends on neither the mailbox nor the queue", () => {
@@ -82,8 +82,8 @@ describe("agentReadiness (S1)", () => {
   });
 
   it("precedence: a missing module beats a missing AI key, which beats a missing mailbox", () => {
-    expect(r({ hasMailboxModule: false, aiConfigured: false, mailbox: "none" }).label).toBe("Needs the Mailboxes module");
-    expect(r({ aiConfigured: false, mailbox: "none" }).label).toBe("On · needs the AI key");
+    expect(r({ hasMailboxModule: false, aiConfigured: false, mailbox: "none" }).label).toBe("Needs the Mailboxes feature");
+    expect(r({ aiConfigured: false, mailbox: "none" }).label).toBe("On · waiting for Lectual to switch on AI");
     expect(r({ mailbox: "none" }).label).toBe("On · waiting for a mailbox");
   });
 
@@ -118,8 +118,8 @@ describe("agentReadiness: the Stage Keeper (Sprint 16, F16)", () => {
   });
 
   it("needs the Mailboxes module, on or off", () => {
-    expect(sk({ hasMailboxModule: false })).toMatchObject({ label: "Needs the Mailboxes module", tone: "warn" });
-    expect(sk({ hasMailboxModule: false, enabled: false })).toMatchObject({ label: "Needs the Mailboxes module", tone: "mute" });
+    expect(sk({ hasMailboxModule: false })).toMatchObject({ label: "Needs the Mailboxes feature", tone: "warn" });
+    expect(sk({ hasMailboxModule: false, enabled: false })).toMatchObject({ label: "Needs the Mailboxes feature", tone: "mute" });
   });
 
   it("off is off", () => {
@@ -128,7 +128,7 @@ describe("agentReadiness: the Stage Keeper (Sprint 16, F16)", () => {
 
   it("the other agents still need the AI key, as before", () => {
     for (const agent of ["email-intel", "intake-triage", "post-consult"] as const) {
-      expect(agentReadiness({ ...base, agent, aiConfigured: false }).label).toBe("On · needs the AI key");
+      expect(agentReadiness({ ...base, agent, aiConfigured: false }).label).toBe("On · waiting for Lectual to switch on AI");
     }
   });
 });

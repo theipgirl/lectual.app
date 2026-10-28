@@ -76,9 +76,9 @@ describe("the merged lead-page card", () => {
     expect(html).not.toContain("set by");
   });
 
-  it("shows Not routed when nothing is known", () => {
+  it("shows Not rated when nothing is known", () => {
     const html = card();
-    expect(html).toContain("Not routed");
+    expect(html).toContain("Not rated");
     expect(html).toContain("Never touched");
   });
 

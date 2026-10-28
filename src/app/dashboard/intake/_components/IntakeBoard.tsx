@@ -7,6 +7,7 @@ import type { IntakeRow } from "@/lib/intake/rows";
 import type { IntakeTime } from "@/lib/time";
 import type { ReferralSource } from "@/lib/intake";
 import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
+import { decisionOpen } from "@/lib/intake/stage-decision";
 import { ownerColumns, stageColumns } from "@/lib/intake/views";
 import IntakeCard from "./IntakeCard";
 import { CHIP_COUNT, ownerAvatar, ownerAvatarFor } from "./styles";
@@ -58,6 +59,8 @@ export default function IntakeBoard({
   onMoveStage,
   onAssign,
   onSetSource,
+  selectedIds,
+  onToggleSelect,
 }: {
   group: "stage" | "owner";
   rows: IntakeRow[];
@@ -73,6 +76,9 @@ export default function IntakeBoard({
   onMoveStage: (leadId: string, stageId: string) => void;
   onAssign: (leadId: string, userId: string | null) => void;
   onSetSource: (leadId: string, source: ReferralSource | null) => void;
+  /** Cards ticked for the bulk "Move to..." bar. Absent = no checkboxes. */
+  selectedIds?: ReadonlySet<string>;
+  onToggleSelect?: (leadId: string) => void;
 }) {
   const [dragOver, setDragOver] = useState<string | null>(null);
 
@@ -182,6 +188,15 @@ export default function IntakeBoard({
               <header style={{ display: "flex", alignItems: "center", gap: group === "stage" ? 7 : 9 }}>
                 {column.head}
                 <span style={{ flex: 1 }} />
+                {(() => {
+                  // Leads here whose Lawmatics-import stage is still undecided. Only drawn when there are some.
+                  const undecided = column.rows.filter((row) => decisionOpen(row.decision, row.lead.current_stage_id)).length;
+                  return undecided > 0 ? (
+                    <span className="intake-column-badge" data-decision-count={undecided} title={`${undecided} here need a stage decision`}>
+                      {`${undecided} to decide`}
+                    </span>
+                  ) : null;
+                })()}
                 <span style={{ ...CHIP_COUNT, color: "var(--mute)" }}>{column.count}</span>
               </header>
 
@@ -200,6 +215,8 @@ export default function IntakeBoard({
                   onMoveStage={onMoveStage}
                   onAssign={onAssign}
                   onSetSource={onSetSource}
+                  selected={selectedIds?.has(row.lead.id) ?? false}
+                  onToggleSelect={onToggleSelect}
                 />
               ))}
 

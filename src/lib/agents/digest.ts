@@ -2,6 +2,8 @@ import { AGENT_MOVES_TODAY_HREF } from "@/lib/stage-keeper/moves";
 import { mailboxCount } from "./shared";
 import { AGENT_DEFS, AGENT_IDS, type AgentId } from "./types";
 import { DID_NOT_FINISH_ERROR, isStaleRun } from "./run-status";
+import { friendlyRunError } from "./friendly-run-error";
+import { LECTUAL_TOLD } from "@/lib/ui/words";
 
 /**
  * The "Overnight run" digest on Today and the Agents page: what each agent
@@ -28,7 +30,7 @@ export type DigestRun = {
 export type DigestAction = { label: string; href: string | null };
 
 /** Shown for a failure the firm cannot fix. Lectual is emailed about every failed run (see failure-alert.ts). */
-export const LECTUAL_TOLD_LABEL = "Lectual has been told and is looking into it.";
+export const LECTUAL_TOLD_LABEL = LECTUAL_TOLD;
 
 export type DigestLine = {
   agent: AgentId;
@@ -137,12 +139,11 @@ export function failureAction(error: string | null): DigestAction {
   return { label: LECTUAL_TOLD_LABEL, href: null };
 }
 
-/** The error as a person reads it: first sentence, bounded. */
+/** The error as a person reads it: a fixed plain sentence, never the stored text (friendlyRunError). */
 export function plainReason(error: string | null): string {
   const e = (error ?? "").trim();
   if (!e) return "The run stopped without saying why.";
-  const first = e.split(/(?<=\.)\s/)[0];
-  return first.length > 140 ? `${first.slice(0, 137)}…` : first;
+  return friendlyRunError(e);
 }
 
 function lineFor(agent: AgentId, runs: DigestRun[]): DigestLine | null {
@@ -166,7 +167,7 @@ function lineFor(agent: AgentId, runs: DigestRun[]): DigestLine | null {
       const hot = hots.every((h) => h !== null) ? hots.reduce<number>((s, h) => s + (h ?? 0), 0) : null;
       const parts = [`screened ${plural(items, "new lead", "new leads")}`];
       if (hot !== null && hot > 0) parts.push(`${hot} hot, ${hot === 1 ? "needs" : "need"} your review`);
-      if (drafts > 0) parts.push(`${plural(drafts, "briefing", "briefings")} in the Queue`);
+      if (drafts > 0) parts.push(`${plural(drafts, "briefing", "briefings")} in Approvals`);
       return { agent, name, text: parts.join(" · "), tone: hot ? "attention" : "ok", href: "/dashboard/intake/" };
     }
     case "email-intel": {
@@ -175,7 +176,7 @@ function lineFor(agent: AgentId, runs: DigestRun[]): DigestLine | null {
       const filledTotal = filled.every((f) => f !== null) ? filled.reduce<number>((s, f) => s + (f ?? 0), 0) : null;
       const parts = [`read ${plural(items, "client email", "client emails")}`];
       if (filledTotal !== null && filledTotal > 0) parts.push(`filled in ${plural(filledTotal, "client record", "client records")}`);
-      if (drafts > 0) parts.push(`${plural(drafts, "legal question", "legal questions")} flagged for the attorney (in the Queue)`);
+      if (drafts > 0) parts.push(`${plural(drafts, "legal question", "legal questions")} flagged for the attorney (in Approvals)`);
       return { agent, name, text: parts.join(" · "), tone: drafts > 0 ? "attention" : "ok", href: drafts > 0 ? "/dashboard/queue/" : "/dashboard/agents/" };
     }
     case "post-consult": {
@@ -183,7 +184,7 @@ function lineFor(agent: AgentId, runs: DigestRun[]): DigestLine | null {
       if (drafts === 0) {
         return { agent, name, text: `flagged ${plural(items, "follow-up", "follow-ups")} as due`, tone: "attention", href: "/dashboard/agents/" };
       }
-      return { agent, name, text: `drafted ${plural(drafts, "follow-up", "follow-ups")} (in the Queue)`, tone: "attention", href: "/dashboard/queue/" };
+      return { agent, name, text: `drafted ${plural(drafts, "follow-up", "follow-ups")} (in Approvals)`, tone: "attention", href: "/dashboard/queue/" };
     }
     case "stage-keeper": {
       // items_in is moves plus suggestion cards; drafts_out is the cards alone.
@@ -200,7 +201,7 @@ function lineFor(agent: AgentId, runs: DigestRun[]): DigestLine | null {
       // A brief that couldn't read some section is not "nothing to report": the run's own summary says so.
       const unread = ok.some((r) => briefHadUnreadSections(r.summary));
       const parts = [`wrote the morning brief${ok.length > 1 ? ` (${ok.length} runs)` : ""}`];
-      if (followUps > 0) parts.push(`${plural(followUps, "follow-up", "follow-ups")} drafted (in the Queue)`);
+      if (followUps > 0) parts.push(`${plural(followUps, "follow-up", "follow-ups")} drafted (in Approvals)`);
       else if (items === 0 && !unread) parts.push("nothing to report");
       if (unread) parts.push("some sections couldn't be read (see the brief)");
       if (ok.some((r) => briefConsultsNotConnected(r.summary))) parts.push("consults not connected");
@@ -218,10 +219,10 @@ function lineFor(agent: AgentId, runs: DigestRun[]): DigestLine | null {
       const unreadCard = problems.some((p) => p.unreadCard);
       if (failed + heldBack + partial + unrecorded === 0 && !unreadCard) {
         if (items === 0) return { agent, name, text: "found no consults to prep", tone: "quiet", href: "/dashboard/agents/" };
-        return { agent, name, text: `prepped ${plural(items, "consult", "consults")} · ${plural(drafts, "draft", "drafts")} (in the Queue)`, tone: "attention", href: "/dashboard/queue/" };
+        return { agent, name, text: `prepped ${plural(items, "consult", "consults")} · ${plural(drafts, "draft", "drafts")} (in Approvals)`, tone: "attention", href: "/dashboard/queue/" };
       }
       const parts = [`prepped ${plural(items, "consult", "consults")}`];
-      if (drafts > 0) parts.push(`${plural(drafts, "draft", "drafts")} (in the Queue)`);
+      if (drafts > 0) parts.push(`${plural(drafts, "draft", "drafts")} (in Approvals)`);
       if (failed > 0) parts.push(`${failed} couldn't be prepped (will retry)`);
       if (heldBack > 0) parts.push(`${heldBack} held back (attorney-judgment content)`);
       if (partial > 0) parts.push(`${partial} got the heads-up but not the client email`);

@@ -1,0 +1,17 @@
+/* The queue item view: the aside's detail list and "For the reviewer". Design tokens only (src/app/globals.css). */
+
+.lx-dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: 12px; row-gap: 6px; margin: 0; font-size: 14px; }
+.lx-dl dt { color: var(--muted); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; align-self: baseline; padding-top: 2px; }
+.lx-dl dd { margin: 0; color: var(--ink); overflow-wrap: anywhere; min-width: 0; }
+
+.lx-rv { display: grid; gap: 6px; }
+.lx-rv-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.lx-rv-item { padding: 6px 8px; border-radius: 8px; color: var(--body); font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; background: var(--well); }
+.lx-rv-item[data-check-first="true"] { background: var(--cream); border: 1px solid var(--warn); color: var(--ink); }
+.lx-rv-tag { display: inline-block; margin-right: 6px; color: var(--warn); font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.lx-rv-more > summary { cursor: pointer; color: var(--ox); font-size: 13px; padding: 4px 0; }
+.lx-rv-more > summary:focus-visible { outline: 2px solid var(--ox); outline-offset: 2px; border-radius: 4px; }
+.lx-rv-more[open] > summary { margin-bottom: 6px; }
+
+.lx-view-draft { display: grid; gap: 8px; }
+.lx-view-draft-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }

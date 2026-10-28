@@ -59,7 +59,7 @@ describe("buildOpinionLetterDraft", () => {
     }));
     const { buildOpinionLetterDraft } = await import("@/lib/documents/opinion-letter");
     await expect(buildOpinionLetterDraft(facts, "report text")).rejects.toThrow(
-      /no ai provider is configured/i,
+      /AI isn't switched on for your firm yet/,
     );
   });
 });

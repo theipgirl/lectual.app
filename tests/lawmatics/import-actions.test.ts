@@ -14,7 +14,7 @@ const state = vi.hoisted(() => ({
   connected: true,
   applyCalls: [] as Array<{
     fingerprint: string;
-    moveExistingStages: boolean;
+    overwriteEditedFields: boolean;
     practiceAreaFilter: string | null;
   }>,
   previewCalls: 0,
@@ -45,12 +45,11 @@ vi.mock("@/lib/firm/session", () => ({ resolveFirmSession: async () => ({ kind: 
 vi.mock("@/lib/mailbox/config", () => ({ rootKeyOrNull: () => null }));
 
 const emptyPlan = {
-  options: { moveExistingStages: false, overwriteEditedFields: false, practiceAreaFilter: null },
+  options: { overwriteEditedFields: false, practiceAreaFilter: null },
   creates: [],
   contactCreates: [],
   updates: [],
   unchanged: [],
-  divergences: [],
   withheld: [],
   unmapped: [],
   skipped: [],
@@ -61,7 +60,6 @@ const emptyPlan = {
     contactOnly: 0,
     update: 0,
     unchanged: 0,
-    divergent: 0,
     withheld: 0,
     unmapped: 0,
     skipped: 0,
@@ -75,7 +73,7 @@ vi.mock("@/lib/lawmatics/import", async () => {
   );
   return {
     ...actual,
-    previewImport: async (options: { moveExistingStages: boolean }) => {
+    previewImport: async (options: { overwriteEditedFields: boolean }) => {
       if (!state.connected) {
         const { LawmaticsNotConnectedError } = await import("@/lib/lawmatics/connection");
         throw new LawmaticsNotConnectedError("not connected");
@@ -91,11 +89,11 @@ vi.mock("@/lib/lawmatics/import", async () => {
     },
     applyImport: async (
       fingerprint: string,
-      options: { moveExistingStages: boolean; practiceAreaFilter: string | null },
+      options: { overwriteEditedFields: boolean; practiceAreaFilter: string | null },
     ) => {
       state.applyCalls.push({
         fingerprint,
-        moveExistingStages: options.moveExistingStages,
+        overwriteEditedFields: options.overwriteEditedFields,
         practiceAreaFilter: options.practiceAreaFilter,
       });
       return {
@@ -105,9 +103,7 @@ vi.mock("@/lib/lawmatics/import", async () => {
         created: 0,
         updated: 0,
         linked: 0,
-        stageMoves: 0,
         unchanged: 0,
-        divergences: [],
         withheld: [],
         unmapped: [],
         skipped: [],
@@ -208,22 +204,23 @@ describe("importAction — two-step confirmation", () => {
       form({ intent: "confirm", fingerprint: "fp-current", acknowledge: "on" }),
     );
     expect(state.applyCalls).toEqual([
-      { fingerprint: "fp-current", moveExistingStages: false, practiceAreaFilter: null },
+      { fingerprint: "fp-current", overwriteEditedFields: false, practiceAreaFilter: null },
     ]);
     expect(result.phase).toBe("done");
   });
 
-  it("carries the stage-move opt-in only when it was ticked", async () => {
+  it("carries the overwrite opt-in only when it was ticked, and a stale stage-move box does nothing", async () => {
     await importAction(
       { phase: "idle" },
       form({
         intent: "confirm",
         fingerprint: "fp-current",
         acknowledge: "on",
+        overwriteEditedFields: "on",
         moveExistingStages: "on",
       }),
     );
-    expect(state.applyCalls[0].moveExistingStages).toBe(true);
+    expect(state.applyCalls[0]).toEqual({ fingerprint: "fp-current", overwriteEditedFields: true, practiceAreaFilter: null });
   });
 
   it("reads the trademark-only filter from its own checkbox, on or off", async () => {

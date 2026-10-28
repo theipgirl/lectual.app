@@ -2,6 +2,7 @@
 
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { getSiteOrigin } from "@/lib/site-origin";
+import { SIGN_IN_GENERIC } from "@/lib/ui/words";
 
 export type LoginState = { ok?: boolean; error?: string };
 
@@ -34,6 +35,10 @@ export async function sendMagicLink(
     email,
     options: { emailRedirectTo: `${origin}/auth/callback/?next=${encodeURIComponent(next)}` },
   });
-  if (error) return { error: `Could not send the link: ${error.message}` };
+  if (error) {
+    // The provider's text can carry the address or internal detail, so it is not shown.
+    console.error("[sign-in] the magic link could not be sent:", error.status ?? "unknown status");
+    return { error: SIGN_IN_GENERIC };
+  }
   return { ok: true };
 }

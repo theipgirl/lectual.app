@@ -20,7 +20,11 @@ export { SEARCH_MAX };
 /** A list read by the page. A failed read is never `ok` with no records. */
 export type ListRead = { status: "ok"; records: PickRecord[] } | { status: "failed" };
 
-export type PickerRow = { id: string; label: string; detail: string | null; href: string };
+/**
+ * One row of the picker: `name` (bold) and ONE `secondary` line under it (lead: business, email; matter: mark,
+ * matter number), neither repeating the other. `label` and `detail` are the older single-line form.
+ */
+export type PickerRow = { id: string; label: string; detail: string | null; name: string; secondary: string | null; selected: boolean; href: string };
 export type PickerList = { status: "ok"; rows: PickerRow[]; total: number } | { status: "failed" };
 
 export type PickerView = {
@@ -52,14 +56,35 @@ export function pickerKind(raw: string | string[] | undefined | null): RecordKin
   return first === "matter" ? "matter" : "lead";
 }
 
+/** The parts of a line, without blanks and without repeating the bold name. */
+function secondaryOf(parts: Array<string | null | undefined>, name: string): string | null {
+  const seen = new Set([name.trim().toLowerCase()]);
+  const out: string[] = [];
+  for (const raw of parts) {
+    const part = raw?.trim();
+    if (!part || seen.has(part.toLowerCase())) continue;
+    seen.add(part.toLowerCase());
+    out.push(part);
+  }
+  return out.length > 0 ? out.join(" · ") : null;
+}
+
 /** A lead as the proposals picker names it (the same label the transcript picker uses). */
 export function proposalLeadRecord(lead: LeadLabelRow): PickRecord {
   const label = leadOptionLabel(lead);
   const email = lead.email?.trim() || null;
-  return { ...leadRecord(lead), label, detail: email && email !== label ? email : null };
+  const person = `${lead.first_name ?? ""} ${lead.last_name ?? ""}`.trim();
+  const business = lead.business_name?.trim() ?? "";
+  const name = person || business || email || "Unnamed lead";
+  return { ...leadRecord(lead), label, detail: email && email !== label ? email : null, name, secondary: secondaryOf([business, email], name) };
 }
 
-export { matterRecord as proposalMatterRecord };
+/** A matter as the pickers name it: the client (else the mark or title) in bold, then mark and matter number. */
+export function proposalMatterRecord(matter: Parameters<typeof matterRecord>[0]): PickRecord {
+  const base = matterRecord(matter);
+  const name = matter.owner_name?.trim() || matter.mark_text?.trim() || matter.title?.trim() || matter.matter_number;
+  return { ...base, name, secondary: secondaryOf([matter.mark_text, matter.title, matter.matter_number], name) };
+}
 
 function withTerm(base: string, term: string): string {
   return term ? `${base}${base.includes("?") ? "&" : "?"}q=${encodeURIComponent(term)}` : base;
@@ -80,7 +105,7 @@ export const BLANK_HREF = `${NEW_PROPOSAL_PATH}?blank=1`;
 
 export const PROPOSAL_DESTINATION: PickerDestination = { basePath: NEW_PROPOSAL_PATH, chooseHref, blankHref: BLANK_HREF };
 
-export function buildPicker(input: { kind: RecordKind; term: string; leads: ListRead; matters: ListRead; dest?: PickerDestination }): PickerView {
+export function buildPicker(input: { kind: RecordKind; term: string; leads: ListRead; matters: ListRead; dest?: PickerDestination; /** The record already chosen, marked on its row. */ selectedId?: string | null }): PickerView {
   const dest = input.dest ?? PROPOSAL_DESTINATION;
   const term = normalizeTerm(input.term);
   const read = input.kind === "lead" ? input.leads : input.matters;
@@ -92,7 +117,15 @@ export function buildPicker(input: { kind: RecordKind; term: string; leads: List
     list = {
       status: "ok",
       total: picked.total,
-      rows: picked.shown.map((r) => ({ id: r.id, label: r.label, detail: r.detail, href: dest.chooseHref(input.kind, r.id, term) })),
+      rows: picked.shown.map((r) => ({
+        id: r.id,
+        label: r.label,
+        detail: r.detail,
+        name: r.name ?? r.label,
+        secondary: r.name !== undefined ? (r.secondary ?? null) : r.detail,
+        selected: input.selectedId != null && input.selectedId === r.id,
+        href: dest.chooseHref(input.kind, r.id, term),
+      })),
     };
   }
   const failed: RecordKind[] = [];

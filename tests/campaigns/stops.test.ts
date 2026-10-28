@@ -100,6 +100,6 @@ describe("the words", () => {
         created_at: "2026-10-03T21:10:00Z",
         payload: { field: "lane", from: "warm", to: "hot", suggested: "cold", by: "Taylor" },
       }),
-    ).toMatchObject({ title: "Lane set to Hot", detail: "by Taylor · was Warm · triage suggested Cold" });
+    ).toMatchObject({ title: "Temperature set to Hot", detail: "by Taylor · was Warm · triage suggested Cold" });
   });
 });

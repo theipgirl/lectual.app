@@ -96,8 +96,11 @@ export function WhoIsThisFor({
           <ul className="lx-list pe-who-list">
             {list.rows.map((r) => (
               <li key={r.id}>
-                <a href={r.href}>{r.label}</a>
-                {r.detail && <span className="lx-note"> · {r.detail}</span>}
+                <a href={r.href} className="pe-who-row" aria-current={r.selected ? "true" : undefined} data-selected={r.selected ? "true" : undefined}>
+                  <span className="pe-who-name">{r.name}</span>
+                  {r.secondary && <span className="pe-who-sub">{r.secondary}</span>}
+                  {r.selected && <span className="pe-who-mark">Selected</span>}
+                </a>
               </li>
             ))}
           </ul>

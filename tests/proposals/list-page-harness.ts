@@ -113,7 +113,7 @@ export async function renderListPage(search: { segment?: string; status?: string
 
 /** The segment links as "Label:count" (a count is absent while the proposals read has failed). */
 export function segments(html: string): string[] {
-  const nav = html.slice(html.indexOf('aria-label="Segments"'));
+  const nav = html.slice(html.indexOf('aria-label="Show"'));
   const end = nav.indexOf("</nav>");
   return [...nav.slice(0, end).matchAll(/<a [^>]*><span>([^<]*)<\/span>(?:<span class="pq-count">(\d+)<\/span>)?<\/a>/g)].map((m) => (m[2] === undefined ? m[1] : `${m[1]}:${m[2]}`));
 }

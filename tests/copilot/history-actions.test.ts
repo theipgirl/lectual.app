@@ -55,7 +55,7 @@ describe("deleteChatAction", () => {
     const failed = await load({ handler: () => ({ data: null, error: { code: "XX000", message: "secret db text" } }) });
     expect(JSON.stringify(await failed.deleteChatAction(ID))).not.toMatch(/secret/);
     const missing = await load({ handler: () => ({ data: null, error: { code: "42P01" } }) });
-    expect(await missing.deleteChatAction(ID)).toEqual({ ok: false, error: "Saved chats aren't available until the database update." });
+    expect(await missing.deleteChatAction(ID)).toEqual({ ok: false, error: "Saved chats aren't switched on for your firm yet. Lectual will turn them on." });
   });
 
   it("uses the scoped client only", () => {

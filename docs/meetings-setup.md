@@ -59,7 +59,11 @@ credential (and revokes the Zoom grant at Zoom); meetings already imported stay.
     set `ZOOM_OAUTH_REDIRECT_URI` to exactly what is registered).
   - Scopes (granular): `cloud_recording:read:list_user_recordings` (list the user's recordings),
     `cloud_recording:read:list_recording_files` (recording files incl. the transcript download),
-    and `user:read:user` (the account email shown as "connected as"). Check the names against the
+    `user:read:user` (the account email shown as "connected as"), and `meeting:read:list_meetings`
+    (Today's Consults card lists the firm's upcoming meetings live; Taylor must ADD this one in the Zoom
+    app's scope picker, and a firm that connected Zoom before it existed must press Reconnect Zoom once,
+    otherwise Today says "Zoom needs permission to read upcoming meetings"). Connect sends all four as the
+    OAuth `scope` (`ZOOM_SCOPES` in `src/lib/meetings/zoom.ts`). Check the names against the
     app's scope picker: Zoom's docs and forum show both names for the list endpoint.
   - Set `ZOOM_OAUTH_CLIENT_ID` and `ZOOM_OAUTH_CLIENT_SECRET`. Separate apps for dev and prod.
   - Until both are set, Connect Zoom shows "not set up on this deployment" and does nothing.

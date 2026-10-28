@@ -24,8 +24,9 @@ import ProposeClaimForm from "./_components/ProposeClaimForm";
 import ClaimRow from "./_components/ClaimRow";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { AI_TOOLS_GROUP, CANT_SHOW, FIRM_NOTES_NAME } from "@/lib/ui/words";
 
-export const metadata: Metadata = { title: pageTitle("Firm brain") };
+export const metadata: Metadata = { title: pageTitle(FIRM_NOTES_NAME) };
 
 export const dynamic = "force-dynamic";
 
@@ -70,7 +71,7 @@ function latestUpdate(rows: { updated_at: string }[]): string | null {
 }
 
 /**
- * Firm brain — the firm's own internal memory (identity, voice, pricing,
+ * Firm notes — the firm's own internal memory (identity, voice, pricing,
  * engagement norms, decision log, client language, templates, stage
  * mapping), plus a claim library for attorney-advertising compliance.
  *
@@ -107,13 +108,13 @@ export default async function BrainPage() {
       <>
         <div className="lx-page-head">
           <div style={{ flex: 1, minWidth: 260 }}>
-            <div className="lx-label">IP.OS</div>
-            <h1 className="lx-h1">Firm brain</h1>
+            <div className="lx-label">{AI_TOOLS_GROUP}</div>
+            <h1 className="lx-h1">{FIRM_NOTES_NAME}</h1>
           </div>
         </div>
         <div className="lx-card lx-empty-card">
           <h2 className="lx-h2" style={{ fontSize: 25 }}>
-            Sign in to see the firm brain
+            Sign in to see your firm notes
           </h2>
         </div>
       </>
@@ -127,11 +128,13 @@ export default async function BrainPage() {
 
   let entries: BrainEntry[] = [];
   let claims: ClaimEntry[] = [];
-  let loadError: string | null = null;
+  let loadFailed = false;
   try {
     [entries, claims] = await Promise.all([listBrainEntries(), listClaims()]);
   } catch (err) {
-    loadError = err instanceof Error ? err.message : String(err);
+    // The message can carry database text, so it is logged and never drawn.
+    console.error("[brain] load failed", err instanceof Error ? err.name : typeof err);
+    loadFailed = true;
   }
 
   const entriesByCategory = groupBy(entries, (e) => e.category as BrainCategory);
@@ -144,21 +147,21 @@ export default async function BrainPage() {
       <div className="lx-page-head">
         <div style={{ flex: 1, minWidth: 260 }}>
           <div className="lx-label">
-            IP.OS · {entries.length} {entries.length === 1 ? "entry" : "entries"} · {claims.length}{" "}
+            {AI_TOOLS_GROUP} · {entries.length} {entries.length === 1 ? "entry" : "entries"} · {claims.length}{" "}
             {claims.length === 1 ? "claim" : "claims"}
             {lastTouched ? ` · updated ${lastTouched}` : ""}
           </div>
-          <h1 className="lx-h1">Firm brain</h1>
+          <h1 className="lx-h1">{FIRM_NOTES_NAME}</h1>
           <p className="lx-sub">Everything the firm has written down about itself — internal only, nothing here sends.</p>
         </div>
       </div>
 
-      {loadError ? (
+      {loadFailed ? (
         <div className="lx-card lx-empty-card">
           <h2 className="lx-h2" style={{ fontSize: 25 }}>
-            Couldn&apos;t load the firm brain
+            Couldn&apos;t load your firm notes
           </h2>
-          <p className="lx-note" style={{ margin: 0 }}>{loadError}</p>
+          <p className="lx-note" style={{ margin: 0 }}>{CANT_SHOW}</p>
         </div>
       ) : (
         <>
@@ -197,7 +200,7 @@ export default async function BrainPage() {
             {usedCategories.length === 0 ? (
               <div className="lx-card lx-empty-card">
                 <h2 className="lx-h2" style={{ fontSize: 20 }}>
-                  No brain entries yet
+                  No firm notes yet
                 </h2>
                 <p className="lx-note" style={{ margin: 0 }}>
                   {canManageEntries

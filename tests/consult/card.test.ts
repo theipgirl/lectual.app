@@ -91,7 +91,7 @@ describe("Consult details card", () => {
     const html = await render([note(withConsultDetails({}, reviewedBy(extracted())))]);
     expect(html).toContain("Reviewed");
     expect(html).not.toContain("Needs review");
-    expect(html).toContain("Reviewed by Dawn (paralegal)");
+    expect(html).toContain("Reviewed by Dawn (Paralegal)");
     expect(html).toContain("Save changes");
   });
 

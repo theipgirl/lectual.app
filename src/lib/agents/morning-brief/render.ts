@@ -61,7 +61,7 @@ function notOk(section: { state: string; reason?: string }): string | null {
     case "blocked":
       return section.reason ? `Not read: ${section.reason}.` : "Not read.";
     case "database-update-needed":
-      return "Not available until the database update.";
+      return "Not switched on for your firm yet.";
     case "unavailable":
       return `Couldn't be read: ${section.reason}.`;
     default:

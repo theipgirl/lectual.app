@@ -36,6 +36,8 @@ export type ConsultRowView = {
   state: ConsultRowState["state"];
   proposalId: string | null;
   leadId: string | null;
+  /** The meeting's own matter, kept when a lead is linked from the strip. */
+  matterId?: string | null;
 };
 
 export type ConsultsStripData = {
@@ -128,6 +130,7 @@ export async function loadConsultsStrip(input: {
       state: facts.state,
       proposalId: facts.proposalId,
       leadId,
+      matterId: m.matter_id ?? null,
     };
   });
   return { header, meetings: { status: "ok", rows, more: recent.length - shown.length } };

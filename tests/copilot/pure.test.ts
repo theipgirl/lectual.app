@@ -187,6 +187,6 @@ describe("buildStatCards", () => {
 
   it("an unconfigured queue says it isn't connected", () => {
     const cards = buildStatCards({ open: ok(1), stalled: ok(1), deadlines: ok(1), approvals: { status: "unconfigured" } });
-    expect(cards[3]).toMatchObject({ value: null, note: "Queue isn't connected", state: "unconfigured" });
+    expect(cards[3]).toMatchObject({ value: null, note: "Approvals aren't connected", state: "unconfigured" });
   });
 });

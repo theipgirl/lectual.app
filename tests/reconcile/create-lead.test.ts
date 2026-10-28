@@ -3,7 +3,7 @@ import { FOUND_LABEL, parseCandidate } from "../../src/lib/reconcile/create-lead
 import { RECONCILE_MESSAGES as MSG } from "../../src/lib/reconcile/rules";
 import type { CreateLeadCandidate } from "../../src/lib/reconcile/types";
 import { writesTo } from "../matters/helpers/fake-db";
-import { ORG, OTHER_ORG, S, SECRET } from "./helpers";
+import { ORG, OTHER_ORG, S, SECRET, STAGES } from "./helpers";
 import { L, leadRow, lawmaticsStub, makeWorld, type World } from "./world";
 import { csvFile, formWith, key, loadActions } from "./actions-helpers";
 
@@ -127,6 +127,14 @@ describe("what is written", () => {
     const { createLeadFromReconcileAction } = await load(w);
     await createLeadFromReconcileAction({ ...sheetPerson, stageId: "99999999-0000-4000-8000-000000000009" });
     expect(w.db.rows("crm_lead")[0].current_stage_id).toBe(S.pnc);
+  });
+
+  it("with no evidence the person lands in the new-enquiry stage, not in an open Follow-Up that sorts first (Sprint 29)", async () => {
+    const stages = STAGES.map((st) => (st.id === S.followUp ? { ...st, category: "open" } : st));
+    const w = makeWorld({ stages: stages.map((st) => ({ id: st.id, org_id: ORG, name: st.name, category: st.category, order_index: st.orderIndex })) });
+    const { createLeadFromReconcileAction } = await load(w);
+    await createLeadFromReconcileAction({ ...sheetPerson, found: "lawmatics", sheetKey: null, lawmaticsId: "801", email: "p@x.example", stageId: null });
+    expect(w.db.rows("crm_lead").find((r) => r.lawmatics_id === "801")!.current_stage_id).toBe(S.pnc);
   });
 
   it("a firm with no open stage creates nothing and says why", async () => {

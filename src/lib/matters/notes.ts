@@ -3,6 +3,8 @@ import { noteEntry, validateNote, type NoteKind } from "@/lib/pipeline/lead-inpu
 import { logActivity } from "./activity";
 import { requireMatterWriteRole } from "./matters";
 import { recordNotFoundError } from "./not-found";
+import { ReadableError } from "@/lib/ui/readable-error";
+
 
 export type AddMatterNoteInput = {
   /** 'note' | 'call_logged' | 'email_sent' | 'meeting'. A meeting is stored as a `note` row tagged `entry: "meeting"`. */
@@ -34,7 +36,7 @@ export async function addMatterNote(matterId: string, input: AddMatterNoteInput)
     subject: input.subject,
   });
   if (!validated.ok) {
-    throw new Error(Object.values(validated.fieldErrors)[0] ?? "Check the entry.");
+    throw new ReadableError(Object.values(validated.fieldErrors)[0] ?? "Check the entry.");
   }
 
   const supabase = await getScopedClient();

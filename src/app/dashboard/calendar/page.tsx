@@ -1,3 +1,4 @@
+import { stepLabel, zoneLabel } from "@/lib/calendar/zone-label";
 import Link from "next/link";
 import { listTasks, listUpcomingDeadlines } from "@/lib/matters";
 import { buildCalendarRows, civilDate, civilDaysBetween, groupCalendarRows, type CalendarRow } from "@/lib/matters/calendar-rows";
@@ -340,7 +341,7 @@ function AgendaView({
  * events are placed in the firm's own time zone (Settings → Firm profile).
  *
  * Each source is read separately and a failed read is SAID, never drawn as an
- * empty day: a blank grid over a broken read would tell a firm nothing is due.
+ * empty day: a blank grid over a failed read would tell a firm nothing is due.
  * The Outlook read has its own three states (ok / database-update-needed /
  * unavailable) and a quiet one-line note; it never blanks the other sources.
  */
@@ -372,9 +373,9 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const outlookEvents = outlook?.status === "ok" ? outlook.events : [];
   const outlookNote =
     outlook?.status === "database-update-needed"
-      ? "Outlook events aren't available until the database update."
+      ? "Your Outlook calendar isn't showing yet. Lectual will turn it on."
       : outlook?.status === "unavailable"
-        ? "Outlook events couldn't be loaded."
+        ? "We couldn't load your Outlook calendar. Docket dates and tasks are shown."
         : null;
 
   const readState = calendarReadState({ deadlines, tasks, events: view === "agenda" ? undefined : events });
@@ -405,19 +406,19 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
             {hasMailbox
               ? "Docket deadlines, task due dates, and events from your connected Outlook calendars."
               : "Docket deadlines and task due dates."}{" "}
-            Times are in {timeZone.replaceAll("_", " ")}.
+            Times are in {zoneLabel(timeZone)}.
           </p>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           {view !== "agenda" && (
             <div className="lx-cal-nav">
-              <Link prefetch={false} href={calendarHref(view, stepAnchor(view, anchor, -1))} className="lx-btn lx-btn-sec lx-btn-sm" aria-label="Previous">
+              <Link prefetch={false} href={calendarHref(view, stepAnchor(view, anchor, -1))} className="lx-btn lx-btn-sec lx-btn-sm" aria-label={stepLabel("previous", view)}>
                 ‹
               </Link>
               <Link prefetch={false} href={calendarHref(view, today)} className="lx-btn lx-btn-sec lx-btn-sm">
                 Today
               </Link>
-              <Link prefetch={false} href={calendarHref(view, stepAnchor(view, anchor, 1))} className="lx-btn lx-btn-sec lx-btn-sm" aria-label="Next">
+              <Link prefetch={false} href={calendarHref(view, stepAnchor(view, anchor, 1))} className="lx-btn lx-btn-sec lx-btn-sm" aria-label={stepLabel("next", view)}>
                 ›
               </Link>
             </div>
@@ -446,7 +447,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
 
       {unavailable && (
         <p className="lx-banner lx-banner-warn" role="alert" style={{ margin: 0 }}>
-          This calendar couldn&apos;t be loaded, so nothing is shown. It is not empty. Try again shortly.
+          Can&apos;t show this calendar right now. Refresh to try again.
         </p>
       )}
 

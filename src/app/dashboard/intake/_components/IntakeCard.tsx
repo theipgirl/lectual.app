@@ -20,16 +20,14 @@ import {
 } from "@/lib/intake/views";
 import Popover, { PopoverItem } from "./Popover";
 import NeedsRebeccaBadge from "./NeedsRebeccaBadge";
-import AgentMoveChip from "./AgentMoveChip";
 import SourceCell from "./SourceCell";
 import { temperatureLabel, temperatureTitle } from "@/lib/intake/effective-temperature";
+import { decisionOpen, decisionPillText, whyLine } from "@/lib/intake/stage-decision";
 import {
   NEXT,
   NEXT_HOT,
   OWNER_CHIP,
   OWNER_CHIP_NONE,
-  STAGE_PILL,
-  STAGE_WARN,
   TEMP_PILL,
   TOUCH_IN_SMALL,
   TOUCH_OUT_SMALL,
@@ -67,6 +65,8 @@ export default function IntakeCard({
   onMoveStage,
   onAssign,
   onSetSource,
+  selected = false,
+  onToggleSelect,
 }: {
   row: IntakeRow;
   /** 10b shows the owner chip; 10c shows the next step and the stage pill. */
@@ -83,6 +83,9 @@ export default function IntakeCard({
   onMoveStage: (leadId: string, stageId: string) => void;
   onAssign: (leadId: string, userId: string | null) => void;
   onSetSource: (leadId: string, source: ReferralSource | null) => void;
+  /** Ticked for the bulk "Move to..." bar. Only drawn when `onToggleSelect` is given. */
+  selected?: boolean;
+  onToggleSelect?: (leadId: string) => void;
 }) {
   const lead = row.lead;
   const name = `${lead.first_name} ${lead.last_name}`.trim() || lead.email;
@@ -92,6 +95,8 @@ export default function IntakeCard({
   const temperature = row.temperature;
   const ownerName = row.owner ? memberLabel(row.owner) : null;
   const pendingDrafts = pendingFor(pendingApprovals, lead.id);
+  const why = whyLine({ agentMove: row.agentMove, decision: row.decision, currentStageId: lead.current_stage_id });
+  const openDecision = decisionOpen(row.decision, lead.current_stage_id) ? row.decision : null;
 
   const menu = (
     <Popover
@@ -170,21 +175,26 @@ export default function IntakeCard({
   return (
     <div
       data-lead-id={lead.id}
+      className={`lp-board-card${selected ? " intake-card-selected" : ""}`}
       draggable
       onDragStart={(event) => event.dataTransfer.setData("text/plain", lead.id)}
       style={{
-        padding: variant === "owner" ? 12 : 11,
-        border: "1px solid var(--line)",
-        borderRadius: 10,
-        background: "var(--ground)",
-        display: "flex",
-        flexDirection: "column",
-        gap: variant === "owner" ? 7 : 6,
         cursor: "grab",
         opacity: pending ? 0.55 : 1,
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+        {onToggleSelect && (
+          <input
+            type="checkbox"
+            className="intake-select"
+            aria-label={`Select ${name}`}
+            checked={selected}
+            onChange={() => onToggleSelect(lead.id)}
+            // A tick is not a drag: the card is draggable, the box must not start one.
+            draggable={false}
+          />
+        )}
         <Link
           href={`/dashboard/leads/${lead.id}`}
           style={{
@@ -219,9 +229,23 @@ export default function IntakeCard({
         </div>
       )}
 
-      {row.agentMove && (
+      {/* Why the card is in this column, in one line; nothing at all when nothing says. A Stage Keeper move reads here
+          ("Moved automatically · consult held Oct 23", its evidence as the tooltip); the table keeps the chip. */}
+      {why && (
+        <div
+          className="intake-why"
+          data-why={why.kind}
+          data-agent-move={why.kind === "agent" ? row.agentMove?.activityId : undefined}
+          title={why.kind === "agent" ? row.agentMove?.tooltip : why.text}
+        >
+          {why.text}
+        </div>
+      )}
+      {openDecision && (
         <div style={{ minWidth: 0 }}>
-          <AgentMoveChip move={row.agentMove} />
+          <span className="intake-decision-pill" data-needs-decision title="Nobody has chosen this person's stage yet. Move the card, or let automatic moves or Reconcile place it from evidence.">
+            {decisionPillText(openDecision)}
+          </span>
         </div>
       )}
 
@@ -232,7 +256,7 @@ export default function IntakeCard({
       )}
 
       {/* One temperature line. A person's reads as a fact, in its own colour; a
-          derived one reads as a suggestion, in words; with neither, "Not routed".
+          derived one reads as a suggestion, in words; with neither, "Not rated".
           The reason is the tooltip. */}
       <div
         style={{
@@ -256,7 +280,7 @@ export default function IntakeCard({
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         {variant === "owner" ? (
           <span
-            style={{ ...(row.stage ? STAGE_PILL : STAGE_WARN), ...ellipsis, display: "inline-block" }}
+            className={`lp-pill${row.stage ? "" : " lp-pill-warn"}`}
           >
             {stageCodeFor(row.stage)} · {stageLabelFor(row.stage)}
           </span>

@@ -79,7 +79,7 @@ export async function runConsultPrep(ctx: AgentContext): Promise<AgentResult> {
     .order("starts_at", { ascending: true })
     .limit(EVENT_ROWS);
   if (error) {
-    if (isDatabaseUpdateNeeded(error)) return skipped("Skipped: the calendar is not available until the database update.");
+    if (isDatabaseUpdateNeeded(error)) return skipped("Skipped: the calendar isn't switched on for your firm yet.");
     throw new Error("The calendar could not be read, so no consults were prepped.");
   }
   // The query says all of this; it is checked again on the rows so a row that slipped through is never prepped.

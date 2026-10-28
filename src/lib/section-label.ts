@@ -27,3 +27,21 @@ export function sectionLabelFor(pathname: string | null | undefined): string {
   const item = built.find((n) => n.slug === slug) ?? built.find((n) => (n.also ?? []).some((prefix) => path.startsWith(prefix)));
   return item?.label ?? FALLBACK_SECTION_LABEL;
 }
+
+/** List roots whose page title (h1) already says the section name, so the label beside the wordmark would only repeat it. */
+const TITLE_SAYS_IT = new Set(["", "calendar", "meetings", "pipeline", "notifications", "intake", "matters", "queue", "documents", "proposals", "mail"]);
+
+/**
+ * Whether the section label shows. Not on the root page of a section whose h1
+ * is the same word; it still shows on deeper pages (a lead, a matter, a
+ * proposal) and on reports, where it says where you are. `sectionLabelFor`
+ * is unchanged.
+ */
+export function showSectionLabel(pathname: string | null | undefined): boolean {
+  const bare = pathname?.split(/[?#]/)[0];
+  const path = !bare ? "/dashboard/" : bare.endsWith("/") ? bare : `${bare}/`;
+  if (!path.startsWith("/dashboard/")) return true;
+  const [slug, ...rest] = path.slice("/dashboard/".length).split("/").filter(Boolean);
+  if (slug === undefined) return false;
+  return !(TITLE_SAYS_IT.has(slug) && rest.length === 0);
+}

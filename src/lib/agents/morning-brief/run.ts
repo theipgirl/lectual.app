@@ -186,7 +186,7 @@ export async function runMorningBrief(ctx: AgentContext): Promise<AgentResult> {
   if (note.kind === "blocked") parts.push("No follow-ups were drafted because the queue or a link lookup could not be read.");
   if (unrecorded > 0) parts.push(`${plural(unrecorded, "follow-up", "follow-ups")} could not be recorded on the lead.`);
   if (unread.length > 0) parts.push(`Not read: ${unread.join(", ")}.`);
-  if (consultsDeliberatelyOff) parts.push("Consults not connected (the Mailboxes module is off).");
+  if (consultsDeliberatelyOff) parts.push("Consults not connected (Mailboxes isn't switched on for your firm).");
 
   return { itemsIn: listed, draftsOut: 1 + followUpsDrafted, summary: parts.join(" ") };
 }

@@ -34,6 +34,12 @@ export type PickRecord = {
   haystack: readonly string[];
   /** The matter's type code; null for a lead. */
   matterType: string | null;
+  /**
+   * How a picker ROW names it, when the picker wants more than `label` (New proposal and New document):
+   * `name` is the bold line (the person), `secondary` the one quieter line under it. Absent for the Skills picker.
+   */
+  name?: string;
+  secondary?: string | null;
 };
 
 /** A search term from the URL: first value, trimmed, at most 80 characters. */

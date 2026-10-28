@@ -1,0 +1,93 @@
+/* My Mail: the reading pane beside the list, and the live Inbox tab. Tokens only. */
+.lx-mail-wrap {
+  display: grid;
+  gap: 16px;
+}
+.lx-mail-wrap[data-pane="open"] {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  align-items: start;
+}
+.lx-mail-tabs {
+  display: flex;
+  gap: 6px;
+}
+.lx-mail-pane {
+  padding: 18px;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.lx-mail-head {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 14px;
+}
+.lx-mail-head dt {
+  color: var(--muted);
+}
+.lx-mail-head dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.lx-mail-subject {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+/* Plain text only: it wraps, so nothing scrolls sideways even at 375px. */
+.lx-mail-body {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: inherit;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--body);
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.lx-mail-pane-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.lx-mail-rowlink {
+  color: inherit;
+  text-decoration: none;
+}
+.lx-mail-rowlink:hover,
+.lx-mail-rowlink:focus-visible {
+  text-decoration: underline;
+}
+.lx-mail-live-row {
+  display: grid;
+  gap: 2px;
+  padding: 11px 0;
+  font-size: 14.5px;
+}
+.lx-mail-live-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.lx-mail-preview {
+  color: var(--muted);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* On a phone the pane replaces the list; Back returns to it. */
+@media (max-width: 640px) {
+  .lx-mail-wrap[data-pane="open"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lx-mail-wrap[data-pane="open"] .lx-mail-list {
+    display: none;
+  }
+}

@@ -27,6 +27,11 @@ export type SetupState = {
   services: Reading<Pick<LibraryItem, "active" | "kind">[]>;
   /** A deployment fact (the AI key is set or it is not); reading it cannot fail. */
   aiConfigured: boolean;
+  /**
+   * What only Lectual can switch on, as deployment facts (plain booleans, so reading them cannot
+   * fail). Absent = treated as switched on, which keeps every item the firm's to finish.
+   */
+  lectual?: { lawpayApp: boolean; zoomApp: boolean };
 };
 
 export type SetupItemId =
@@ -43,10 +48,18 @@ export type SetupItemId =
 
 export type SetupItemStatus = "done" | "to-do" | "couldnt-check";
 
+/** Who finishes an item: the firm, or Lectual (an app or key only the deployment can hold). */
+export type SetupOwner = "firm" | "lectual";
+
 export type SetupItem = {
   id: SetupItemId;
   label: string;
   status: SetupItemStatus;
+  /**
+   * "lectual" = not the firm's to finish. Such an item that is not done is shown as "Lectual sets
+   * this up" and is left out of `total` and `complete`; if it IS done it counts as done like any other.
+   */
+  owner: SetupOwner;
   /** One line: why it matters, or why it is not done, or why it could not be checked. */
   why: string;
   /** Where "Set up" goes. Always an existing route. */
@@ -56,8 +69,8 @@ export type SetupItem = {
 export type SetupChecklist = {
   items: SetupItem[];
   doneCount: number;
-  /** Always 10. */
+  /** The items that count for the firm: the ten, less any that are Lectual's and not done yet. */
   total: number;
-  /** True only when every one of the ten items is `done`. */
+  /** True only when every counted item is `done`. A "couldn't check" item is never left out. */
   complete: boolean;
 };

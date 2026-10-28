@@ -1,4 +1,5 @@
 import { isTrademarkIntake } from "@/lib/intake/scope";
+import { newEnquiryStage } from "@/lib/pipeline/new-enquiry";
 import { namesMatch } from "@/lib/intake/email-match";
 import { SHEET_PRACTICE_AREA, splitOwnerName } from "@/lib/intake/sheet-import";
 import { describeSections, type SheetContact } from "@/lib/intake/sheet-sections";
@@ -6,7 +7,6 @@ import type { SheetEntry, SheetRead } from "@/lib/intake/sheet-read";
 import { notesKey } from "@/lib/lawmatics/notes-key";
 import type { NotesRead, NotesTarget, RecordNotes } from "@/lib/lawmatics/notes";
 import type { LawmaticsSourceRecord } from "@/lib/lawmatics/normalize";
-import { resolveStage } from "@/lib/lawmatics/stage-map";
 import { emailSignalFor, type AgentEvidence, type StoredMail } from "./email";
 import { collapseEvidence, lastTouchOf, lawmaticsEvidence, mailEvidence, sheetNoteEvidence } from "./evidence";
 import { indexLawmatics, isHiredStage, lawmaticsSignalFor, matchLawmatics, type LawmaticsIndex } from "./lawmatics";
@@ -16,7 +16,7 @@ import {
   searchableAddress,
   type MailboxSearch,
 } from "./mailbox-search";
-import type { MilestoneMapping } from "./milestones";
+import { classifyNote, opensMatter, type MilestoneMapping } from "./milestones";
 import { isAlreadyThere, proposeStage } from "./propose";
 import { matchSheetToLeads, sheetSignalFor } from "./sheet-match";
 import type {
@@ -100,9 +100,10 @@ export function tableLeads(
   );
 }
 
-/** The firm's first open stage: where a person is filed when nothing says better. */
-export function firstOpenStage(stages: readonly StageOpt[]): StageOpt | null {
-  return [...stages].filter((s) => s.category === "open").sort((a, b) => a.orderIndex - b.orderIndex)[0] ?? null;
+/** The firm's new-enquiry stage (`newEnquiryStage`): where a person is filed when nothing says better. */
+export function newEnquiryStageOf(stages: readonly StageOpt[]): StageOpt | null {
+  const hit = newEnquiryStage(stages.map((s) => ({ id: s.id, name: s.name, category: s.category, order_index: s.orderIndex })));
+  return hit ? (stages.find((s) => s.id === hit.id) ?? null) : null;
 }
 
 function leadName(lead: LeadRow): string {
@@ -172,7 +173,7 @@ export async function buildPlan(input: PlanInput): Promise<{ view: ReconcileView
   const lawmaticsOnly: LawmaticsSourceRecord[] =
     input.lawmatics.status === "ok"
       ? input.lawmatics.records
-          .filter((r) => !claimedRecords.has(r.lawmaticsId) && !(r.stageName && isHiredStage(r.stageName)) && !isWonStageName(r.stageName, stages))
+          .filter((r) => !claimedRecords.has(r.lawmaticsId) && !(r.stageName && isHiredStage(r.stageName)) && !statesAClient(r.stageName))
           .sort((a, b) => Date.parse(b.updatedAt ?? "") - Date.parse(a.updatedAt ?? "") || 0)
       : [];
 
@@ -191,7 +192,7 @@ export async function buildPlan(input: PlanInput): Promise<{ view: ReconcileView
     try {
       reads.notes = await input.readLawmaticsNotes(notesTargets);
     } catch {
-      reads.notesFailed = "Lawmatics notes couldn't be read. This is not an empty notes list.";
+      reads.notesFailed = "Lawmatics notes couldn't be read, so none are shown. Refresh to try again.";
     }
   }
 
@@ -254,7 +255,7 @@ export async function buildPlan(input: PlanInput): Promise<{ view: ReconcileView
     const record = recordOf.get(lead.id);
     const lawmaticsSignal =
       lawmaticsIndex && input.lawmatics.status === "ok"
-        ? lawmaticsSignalFor({ lawmaticsId: lead.lawmaticsId, email: lead.email }, lawmaticsIndex, stages)
+        ? lawmaticsSignalFor({ lawmaticsId: lead.lawmaticsId, email: lead.email }, lawmaticsIndex)
         : unavailable(input.lawmatics.status === "ok" ? "" : input.lawmatics.reason);
     const mail = email.status === "ok" ? (email.byLead.get(lead.id) ?? []) : [];
     const emailSignal =
@@ -371,13 +372,10 @@ export async function buildPlan(input: PlanInput): Promise<{ view: ReconcileView
   for (const r of lawmaticsListed.slice(0, NOT_IN_LECTUAL_CAP)) {
     const address = addressOfLawmaticsOnly(r);
     const search = mailboxFor(address);
-    const resolved = r.stageName ? resolveStage(r.stageName, stages) : null;
-    const unmappedStage = !!r.stageName && !resolved?.ok;
+    // The Lawmatics stage is cited as text and never chooses the stage: the create action files the person
+    // in the new-enquiry stage unless a source that is not Lawmatics says better.
     const evidence = collapseEvidence([
-      ...(resolved?.ok
-        ? [{ source: "lawmatics" as const, via: "stage" as const, milestone: null, label: r.stageName!, date: null, stageId: resolved.stage.id }]
-        : []),
-      ...lawmaticsEvidence(r, notesFor(r), unmappedStage, ctx),
+      ...lawmaticsEvidence(r, notesFor(r), !!r.stageName, ctx),
       ...mailEvidence([], search?.hits ?? [], ctx),
     ]);
     const name = [r.firstName, r.lastName].filter(Boolean).join(" ") || r.matterName || "Unnamed";
@@ -394,7 +392,7 @@ export async function buildPlan(input: PlanInput): Promise<{ view: ReconcileView
         email: r.email,
         sheetKey: null,
         lawmaticsId: r.lawmaticsId,
-        stageId: resolved?.ok && stages.find((s) => s.id === resolved.stage.id)?.category === "open" ? resolved.stage.id : null,
+        stageId: null,
         practiceArea: r.practiceArea,
       },
       evidence,
@@ -451,10 +449,9 @@ export async function buildPlan(input: PlanInput): Promise<{ view: ReconcileView
   return { view, plan };
 }
 
-function isWonStageName(name: string | null, stages: readonly StageOpt[]): boolean {
-  if (!name) return false;
-  const resolved = resolveStage(name, stages);
-  return resolved.ok && stages.find((s) => s.id === resolved.stage.id)?.category === "won";
+/** A Lawmatics stage whose own words say the person is a client (paid, accepted, hired): not a new lead. Read as text; it names no Lectual stage. */
+function statesAClient(name: string | null): boolean {
+  return !!name && classifyNote(name).some((m) => opensMatter(m));
 }
 
 function proposeEvidence(signal: SourceSignal): EvidenceItem[] {

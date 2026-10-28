@@ -158,7 +158,7 @@ describe("campaign page — who the enroll picker offers", () => {
 
     h.role = "attorney";
     h.leadsFail = true;
-    expect(await render()).toContain("Intake couldn&#x27;t be loaded");
+    expect(await render()).toContain("Leads couldn&#x27;t be loaded");
 
     h.leadsFail = false;
     h.enrollmentsFail = true;

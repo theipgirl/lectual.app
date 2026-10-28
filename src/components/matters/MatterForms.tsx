@@ -56,7 +56,11 @@ function AutoSelect(props: {
   value: string;
   options: { value: string; label: string; disabled?: boolean }[];
 }) {
-  const [state, action, pending] = useActionState<ActionState, FormData>(props.action, {});
+  // `saved` is part of the result, so "Saved" appears only after the action really succeeded.
+  const [state, action, pending] = useActionState<ActionState & { saved?: boolean }, FormData>(async (prev, fd) => {
+    const res = await props.action(prev, fd);
+    return res.error ? res : { ...res, saved: true };
+  }, {});
   return (
     <form action={action} className="lx-inline-form">
       {Object.entries(props.hidden).map(([k, v]) => (
@@ -70,6 +74,11 @@ function AutoSelect(props: {
         ))}
       </select>
       <Err state={state} />
+      {state.saved && !pending && !state.error && (
+        <span role="status" className="lx-note" style={{ color: "var(--ok)" }}>
+          Saved
+        </span>
+      )}
     </form>
   );
 }

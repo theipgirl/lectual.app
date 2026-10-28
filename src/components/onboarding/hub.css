@@ -54,8 +54,11 @@
   color: var(--cream);
 }
 .gs-check.is-done {
-  background: var(--wine);
-  border-color: var(--wine);
+  background: var(--ok);
+  border-color: var(--ok);
+}
+.gs-rec {
+  margin-left: 8px;
 }
 .gs-sr {
   position: absolute;
@@ -91,4 +94,29 @@
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* Narrow screens: the check and title keep a row, the button drops to its own row under them. */
+@media (max-width: 560px) {
+  .gs-track {
+    padding: 14px;
+  }
+  .gs-flow {
+    grid-template-columns: 22px 1fr;
+    align-items: start;
+  }
+  .gs-flow > .lx-btn {
+    grid-column: 2;
+    justify-self: start;
+  }
+  .gs-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .gs-card-actions {
+    flex-wrap: wrap;
+  }
+  .gs-reset {
+    justify-content: flex-start;
+  }
 }

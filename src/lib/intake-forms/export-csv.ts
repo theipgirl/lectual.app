@@ -53,14 +53,14 @@ export async function exportIntakeCsv(request: Request, now = new Date()): Promi
   const range = parseRange(url.searchParams.get("range"));
 
   const loaded = await loadIntakeForm(formId);
-  if (loaded.status === "unconfigured") return text(503, "Intake forms aren't set up in this environment.");
-  if (loaded.status === "unavailable") return text(500, "We couldn't load that intake. This is a problem reaching the database. Try again shortly.");
+  if (loaded.status === "unconfigured") return text(503, "Intake forms aren't switched on for your firm yet. Lectual will turn them on.");
+  if (loaded.status === "unavailable") return text(500, "We couldn't load that intake. Refresh to try again.");
   if (!loaded.form) return text(404, "That intake isn't in your firm.");
   const form = loaded.form;
 
   const read = await loadCsvSubmissions(form.id, range, now);
-  if (read.status === "unconfigured") return text(503, "Intake answers aren't set up in this environment.");
-  if (read.status === "unavailable") return text(500, "We couldn't read the answers. This is a problem reaching the database, so no file was made. Try again shortly.");
+  if (read.status === "unconfigured") return text(503, "Intake answers aren't switched on for your firm yet. Lectual will turn them on.");
+  if (read.status === "unavailable") return text(500, "We couldn't read the answers. Refresh to try again.");
   if (read.value.over) {
     return text(413, `That range has more than ${CSV_MAX_ROWS.toLocaleString("en-US")} people, which is too many for one file. Choose a shorter range.`);
   }

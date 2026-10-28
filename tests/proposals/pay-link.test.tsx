@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { NewProposalForm } from "@/components/proposal-editor/NewProposalForm";
-import { DetailsForm } from "@/components/proposal-editor/Sections";
+import { PricingForm } from "@/components/proposal-editor/Sections";
 import { SettingsForm } from "@/components/proposal-editor/SettingsForm";
 import { validateContent } from "@/lib/proposals/validate";
 import { sevetri } from "./fixture";
@@ -88,12 +88,14 @@ describe("A2: createProposalAction does not copy the firm default", () => {
 describe("A3: the existing-proposal editor", () => {
   const render = (payUrl: string) =>
     renderToStaticMarkup(
-      createElement(DetailsForm, {
+      // Sprint 28: the pay link moved from the client form to Step 3, the package and pay link form.
+      createElement(PricingForm, {
         proposalId: "p",
         updatedAt: "2026-10-22T00:00:00Z",
         editable: true,
         issues: [],
-        values: { fullName: "A", firstName: "A", company: "", clientEmail: "", title: "T", expiresOn: "2026-11-10", payUrl },
+        values: { package: "Concierge", base: "4950", includedClasses: "3", perClass: "825", secondMarkPct: "20", govPerClass: "350" },
+        payUrl,
       }),
     );
   it("shows the proposal's own link, or an empty input with the placeholder", () => {

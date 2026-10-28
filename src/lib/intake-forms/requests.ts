@@ -105,7 +105,7 @@ export async function createMatterIntakeRequest(matterId: string): Promise<strin
   const { data: form, error: formErr } = await mainIntakeForm(supabase, "id, config");
   if (formErr) throw formErr;
   if (!form || !parseIntakeConfig(form.config).questions.some((q) => q.text.trim())) {
-    throw new IntakeRequestError("Set up your intake questions in Intake → Forms first.");
+    throw new IntakeRequestError("Set up your intake questions in Leads → Forms first.");
   }
 
   const { data: user } = await supabase.auth.getUser();

@@ -1,7 +1,7 @@
 import { COWORK_SKILLS } from "@/lib/skills/catalog";
 
 /**
- * The skills that run in Claude, not here. Text only: no button, no form and no link, because nothing
+ * The shortcuts that run in Claude, not here. Text only: no button, no form and no link, because nothing
  * on this page can start them.
  */
 export function CoworkSkills() {

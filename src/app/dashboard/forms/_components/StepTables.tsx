@@ -19,14 +19,14 @@ export function StepNotice({ state, range, what = "Step data" }: { state: Load<S
   if (state.status === "unconfigured") {
     return (
       <div className="lx-banner lx-banner-warn" role="status">
-        {`${what} isn't recorded yet for this intake. It needs lectual migration 0096. Nothing is broken; the numbers appear once it is applied and people answer.`}
+        {`${what} isn't recorded yet for this intake. Lectual will turn it on; the numbers appear once people answer.`}
       </div>
     );
   }
   if (state.status === "unavailable") {
     return (
       <div className="lx-banner lx-banner-warn" role="status">
-        {`Couldn't load ${what.toLowerCase()}. This is a problem reaching the database, not an empty result. Try again shortly.`}
+        {`Couldn't load ${what.toLowerCase()}. Refresh to try again.`}
       </div>
     );
   }

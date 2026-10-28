@@ -14,6 +14,7 @@ import {
 } from "./lead-input";
 import { LeadWriteError, forbiddenLeadWrite } from "./errors";
 import { usableEvidenceDate } from "./evidence-date";
+import { newEnquiryStage } from "./new-enquiry";
 import { notifyAssigned } from "@/lib/notifications/producers";
 
 export type Lead = Database["public"]["Tables"]["crm_lead"]["Row"];
@@ -147,7 +148,7 @@ export async function getLead(id: string): Promise<Lead | null> {
 }
 
 export type CreateLeadInput = LeadContactInput & {
-  /** Defaults to the tenant's lowest `order_index` stage when omitted. */
+  /** Defaults to the tenant's new-enquiry stage (`newEnquiryStage`) when omitted. */
   currentStageId?: string | null;
   assignedTo?: string | null;
   /** Provenance for the audit row — a human at the dashboard unless stated. */
@@ -162,8 +163,8 @@ export type CreateLeadInput = LeadContactInput & {
  * — never cached), org-scoped through getScopedClient so RLS is the real
  * boundary, and input-validated by the same pure rules the form uses.
  *
- * `current_stage_id` defaults to the tenant's lowest `order_index` stage: a
- * firm's first column, whatever they named it — never a hardcoded stage.
+ * `current_stage_id` defaults to the tenant's new-enquiry stage (the open stage named like "Potential
+ * New Client", else the first open stage in pipeline order) — never a hardcoded stage id.
  */
 export async function createLead(input: CreateLeadInput): Promise<Lead> {
   const supabase = await getScopedClient();
@@ -181,21 +182,21 @@ export async function createLead(input: CreateLeadInput): Promise<Lead> {
 
   let stageId = input.currentStageId ?? null;
   if (!stageId) {
-    // RLS already scopes crm_stage to the active org, so "first stage" means
-    // this tenant's first stage.
-    const { data: firstStage, error: stageError } = await supabase
+    // RLS already scopes crm_stage to the active org. A lead with no stage given goes to the firm's new-enquiry
+    // stage ("Potential New Client" and friends, else the first open stage in pipeline order), never to
+    // whichever stage happens to sort first: that was "Follow-Up" for RPB.
+    const { data: stageRows, error: stageError } = await supabase
       .from("crm_stage")
-      .select("id")
-      .order("order_index", { ascending: true })
-      .limit(1)
-      .maybeSingle();
+      .select("id, name, category, order_index")
+      .order("order_index", { ascending: true });
     if (stageError) throw stageError;
-    if (!firstStage) {
+    const enquiry = newEnquiryStage(Array.isArray(stageRows) ? stageRows : []);
+    if (!enquiry) {
       throw new LeadWriteError(
         "This firm has no pipeline stages yet — an owner or admin needs to set them up in Settings first.",
       );
     }
-    stageId = firstStage.id;
+    stageId = enquiry.id;
   }
 
   const now = new Date().toISOString();

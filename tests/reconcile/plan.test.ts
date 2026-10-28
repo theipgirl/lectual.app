@@ -85,7 +85,8 @@ describe("buildPlan: the rows", () => {
     expect(by[L.amara].proposal).toMatchObject({ kind: "stage", stage: { id: S.consult }, confidence: "conflict", evidenceDate: "2026-09-14T00:00:00.000Z" });
     expect(by[L.priya].proposal).toMatchObject({ kind: "no_proposal" });
     expect(by[L.priya].proposal.reasons[0]).toBe("Already in this stage.");
-    expect(by[L.margo].proposal).toMatchObject({ kind: "stage", stage: { id: S.consult }, confidence: "agree" });
+    // Lawmatics' "Consultation Scheduled" is cited, not a vote: the sheet is her only source.
+    expect(by[L.margo].proposal).toMatchObject({ kind: "stage", stage: { id: S.consult }, confidence: "sheet_only" });
     expect(by[L.hollis].proposal).toMatchObject({ kind: "needs_matter", stage: null, confidence: null });
     expect(by[L.ines].proposal.kind).toBe("needs_matter");
     expect(by[L.desmond].proposal).toMatchObject({ kind: "no_proposal", confidence: "no_evidence" });
@@ -116,7 +117,7 @@ describe("buildPlan: the summary", () => {
   it("counts confidences and lists what was left out", async () => {
     const { view } = await run();
     const s = view.summary;
-    expect(s.confidence).toEqual({ agree: 1, sheet_only: 1, single_source: 0, conflict: 1, no_evidence: 1 });
+    expect(s.confidence).toEqual({ agree: 0, sheet_only: 2, single_source: 0, conflict: 1, no_evidence: 1 });
     const counted = s.confidence.agree + s.confidence.sheet_only + s.confidence.single_source + s.confidence.conflict + s.confidence.no_evidence;
     expect(counted + s.needsMatter).toBe(view.rows.length);
     expect(s.needsMatter).toBe(2);
@@ -187,7 +188,7 @@ describe("buildPlan: a source that cannot be read", () => {
     const { view } = await run({ readEmail: async () => ({ status: "unavailable", reason: "The synced mail could not be read." }) });
     for (const row of view.rows) expect(row.email.kind).toBe("unavailable");
     const margo = view.rows.find((r) => r.leadId === L.margo)!;
-    expect(margo.lawmatics.kind).toBe("stage");
+    expect(margo.lawmatics).toEqual({ kind: "unmapped", wording: "Consultation Scheduled" });
     expect(margo.sheet.kind).toBe("stage");
     expect(view.summary.email).toEqual({ status: "unavailable", reason: "The synced mail could not be read." });
   });
@@ -225,11 +226,11 @@ describe("buildPlan: the Email / calendar source with the Stage Keeper's rows (S
       status: "ok",
       byLead: new Map(),
       total: 0,
-      agent: new Map([[L.amara, [{ stageId: S.loe, wording: "Stage Keeper: LOE sent", date: "2026-09-09T10:00:00Z" }]]]),
+      agent: new Map([[L.amara, [{ stageId: S.loe, wording: "Automatic move: LOE sent", date: "2026-09-09T10:00:00Z" }]]]),
     });
     const { view } = await run({ readEmail });
     const amara = view.rows.find((r) => r.leadId === L.amara)!;
-    expect(amara.email).toEqual({ kind: "stage", stageId: S.loe, stageName: "LOE & Invoice Sent", wording: "Stage Keeper: LOE sent", date: "2026-09-09T10:00:00Z" });
+    expect(amara.email).toEqual({ kind: "stage", stageId: S.loe, stageName: "LOE & Invoice Sent", wording: "Automatic move: LOE sent", date: "2026-09-09T10:00:00Z" });
     // It only corroborates: the sheet's proposal is unchanged.
     expect(amara.proposal.kind).toBe("stage");
   });

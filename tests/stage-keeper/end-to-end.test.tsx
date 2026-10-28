@@ -66,16 +66,19 @@ describe("D1 an agent move, end to end", () => {
     const [row] = agentRows(w.rows("crm_activity"));
     expect(row.payload).toMatchObject({ from_stage: "New PNC", to_stage: "LOE & Invoice Sent", evidence: { kind: "mail", type: "loe-invoice", at: "2026-09-23T10:00:00.000Z", subject: "Your engagement letter" } });
 
-    // The Intake rows built from the result show the chip, on the table and on the board.
-    for (const view of [{}, { view: "board" }] as Record<string, string>[]) {
+    // The Intake rows built from the result show the chip on the table and the one-line reason on the board card.
+    for (const [view, wording] of [
+      [{}, "Moved automatically · LOE sent Sep 23"],
+      [{ view: "board" }, "Moved automatically · LOE sent Sep 23"],
+    ] as Array<[Record<string, string>, string]>) {
       const { html } = renderBoard(w.rows("crm_lead"), w.rows("crm_activity"), view);
-      expect(html).toContain("Moved by agent · LOE sent Sep 23");
+      expect(html).toContain(wording);
       expect(html).toContain('title="Evidence: LOE and invoice email sent Sep 23."');
     }
 
     // The lead-page timeline shows the sentence, with Undo while it is still the lead's stage.
     const timeline = text(renderToStaticMarkup(<Timeline rows={w.rows("crm_activity") as never} timeZone={ZONE} undo={{ leadId: L.amara, canMove: true, currentStageId: S.loe }} />));
-    expect(timeline).toContain("Stage Keeper moved this lead from New PNC to LOE & Invoice Sent because an LOE and invoice email was sent on Sep 23");
+    expect(timeline).toContain("Moved this lead automatically from New PNC to LOE & Invoice Sent because an LOE and invoice email was sent on Sep 23");
     expect(timeline).toContain("Your engagement letter");
     expect(timeline).toMatch(/>Undo<\/button>/);
   });
@@ -86,7 +89,8 @@ describe("D2 the Undo round trip", () => {
     const w = keeperWorld({ leads: [lead(L.amara, S.newPnc)], activity: [mail(L.amara, "loe-invoice", { at: "2026-09-23T10:00:00.000Z" })] });
     await runStageKeeper(w.ctx("act").ctx);
     const move = agentRows(w.rows("crm_activity"))[0];
-    expect(renderBoard(w.rows("crm_lead"), w.rows("crm_activity")).html).toContain("Moved by agent");
+    expect(renderBoard(w.rows("crm_lead"), w.rows("crm_activity")).html).toContain("Moved automatically");
+    expect(renderBoard(w.rows("crm_lead"), w.rows("crm_activity"), { view: "board" }).html).toContain("Moved automatically");
 
     const { actions, db } = await loadKeeperActions({ leads: w.rows("crm_lead"), activity: w.rows("crm_activity") });
     expect(await actions.undoAgentMoveAction({}, form({ leadId: L.amara, activityId: move.id }))).toEqual({ ok: true });

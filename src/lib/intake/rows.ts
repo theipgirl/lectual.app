@@ -9,6 +9,7 @@ import { replyState, type ReplyState } from "./reply";
 import { REFERRAL_SOURCES } from "./referral-source";
 import { LANE_RANK } from "@/lib/leads/lane";
 import type { AgentMoveChip } from "@/lib/stage-keeper/moves";
+import { decisionOpen, type DecisionFlag } from "./stage-decision";
 
 /**
  * Pure view-model for /intake (blueprint §7, re-homed by §11): row building,
@@ -58,6 +59,11 @@ export type IntakeRow = {
    * since. Absent when it didn't, and absent for every row when the moves couldn't be read.
    */
   agentMove?: AgentMoveChip;
+  /**
+   * What the Lawmatics importer recorded about this lead's stage (see stage-decision.ts). Present only when the flags
+   * were read and the lead has one; whether it is still OPEN depends on where the lead is now (`decisionOpen`).
+   */
+  decision?: DecisionFlag;
 };
 
 /** Special `owner` filter value meaning "nobody is on the hook for this one". */
@@ -92,11 +98,16 @@ export type IntakeFilters = {
    */
   needsRebecca: boolean;
   /**
-   * Only leads the Stage Keeper moved (and nobody has moved since). Applied by applyFilters, so
+   * Only leads that were moved automatically (and nobody has moved since). Applied by applyFilters, so
    * the workspace turns it off when the moves couldn't be read: an unreadable list must never
    * filter to "no leads". Absent = no agent filter.
    */
   agent?: AgentMoveFilter | null;
+  /**
+   * Only leads whose Lawmatics-import stage decision is still open ("Needs a stage decision"). Applied by applyFilters,
+   * so the workspace turns it off when the flags couldn't be read: an unreadable list must never filter to "no leads".
+   */
+  decision?: boolean;
   /** Free text over name / business / email / mark / referral detail / note. */
   q: string;
 };
@@ -162,6 +173,7 @@ export function parseIntakeFilters(params: IntakeSearchParams): IntakeFilters {
     needsRebecca: firstValue(params.needs) === "rebecca",
     // An unknown value is dropped, like every other param here: it must show the unfiltered list.
     ...(AGENT_MOVE_FILTERS.includes(agent) ? { agent } : {}),
+    ...(firstValue(params.decision) === "1" ? { decision: true } : {}),
     q: firstValue(params.q),
   };
 }
@@ -180,6 +192,7 @@ export function filtersToQueryString(filters: IntakeFilters): string {
   if (filters.reply) params.set("reply", filters.reply);
   if (filters.needsRebecca) params.set("needs", "rebecca");
   if (filters.agent) params.set("agent", filters.agent);
+  if (filters.decision) params.set("decision", "1");
   if (filters.q.trim()) params.set("q", filters.q.trim());
   return params.toString();
 }
@@ -323,6 +336,8 @@ export type BuildIntakeRowsInput = {
   factsByLeadId?: Record<string, TemperatureFacts>;
   /** lead id → the Stage Keeper's move chip. Omit entirely when the moves couldn't be read. */
   agentMoveByLeadId?: Record<string, AgentMoveChip>;
+  /** lead id → the Lawmatics-import stage flag. Omit entirely when the flags couldn't be read. */
+  decisionByLeadId?: Record<string, DecisionFlag>;
   now: Date;
 };
 
@@ -342,7 +357,7 @@ function daysBetween(iso: string | null, now: Date): number | null {
  * strip and the row it counts can never disagree.
  */
 export function buildIntakeRows(input: BuildIntakeRowsInput): IntakeRow[] {
-  const { leads, stages, members, latestNoteByLeadId = {}, factsByLeadId = {}, agentMoveByLeadId = {}, now } = input;
+  const { leads, stages, members, latestNoteByLeadId = {}, factsByLeadId = {}, agentMoveByLeadId = {}, decisionByLeadId = {}, now } = input;
   const stageById = new Map(stages.map((stage) => [stage.id, stage]));
   const memberById = new Map(members.map((member) => [member.userId, member]));
 
@@ -368,6 +383,7 @@ export function buildIntakeRows(input: BuildIntakeRowsInput): IntakeRow[] {
       stale: threshold != null && daysInStage > threshold,
       // Only present when the agent placed the lead, so a row built without one is unchanged.
       ...(agentMove ? { agentMove } : {}),
+      ...(decisionByLeadId[lead.id] ? { decision: decisionByLeadId[lead.id] } : {}),
     };
   });
 }
@@ -423,6 +439,7 @@ export function applyFilters(rows: IntakeRow[], filters: IntakeFilters): IntakeR
     if (filters.stage && row.lead.current_stage_id !== filters.stage) return false;
     if (filters.reply && row.reply !== filters.reply) return false;
     if (filters.agent && !(row.agentMove && (filters.agent === "7d" || row.agentMove.today))) return false;
+    if (filters.decision && !decisionOpen(row.decision, row.lead.current_stage_id)) return false;
     if (query && !haystack(row).includes(query)) return false;
     return true;
   });

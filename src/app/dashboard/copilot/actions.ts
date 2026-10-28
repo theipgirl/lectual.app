@@ -18,7 +18,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DELETE_CHAT_MESSAGES = {
   signedOut: "Sign in to delete a saved chat.",
   badId: "That chat couldn't be found.",
-  notSetUp: "Saved chats aren't available until the database update.",
+  notSetUp: "Saved chats aren't switched on for your firm yet. Lectual will turn them on.",
   failed: "The chat couldn't be deleted. Try again.",
 } as const;
 

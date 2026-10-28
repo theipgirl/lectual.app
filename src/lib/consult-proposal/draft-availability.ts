@@ -45,7 +45,7 @@ export function draftBlock(input: {
 /** The note shown in place of the disclosure. Never includes a secret value. */
 export const DRAFT_BLOCK_NOTE: Record<DraftBlock, string> = {
   "no-ai":
-    "Drafting from a transcript isn't available on this deployment: the AI key (ANTHROPIC_API_KEY) isn't set for this environment.",
-  "no-queue": "Drafting from a transcript needs the firm's approval queue, which isn't connected on this deployment.",
+    "Drafting from a transcript isn't switched on for your firm yet. Lectual will turn it on.",
+  "no-queue": "Drafting from a transcript needs your firm's approvals set up, and they aren't connected yet. Lectual will connect them.",
   "no-settings": "Set up Settings → Client proposals (approvers and prices) first.",
 };

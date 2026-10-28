@@ -20,6 +20,7 @@ import { DRIP_STEP_TYPES } from "@/lib/campaigns/steps";
 import { stopLine } from "@/lib/campaigns/stops";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { friendlyCampaignError, type ActionState } from "../errors";
+import { ReadableError } from "@/lib/ui/readable-error";
 
 /**
  * The campaign BUILDER's own write surface — everything that mutates ONE
@@ -56,7 +57,7 @@ function errorState(err: unknown, fallback: string): ActionState {
  * refuses it here instead.
  */
 async function requireVisibleSequence(sequenceId: string): Promise<void> {
-  if (!(await getSequence(sequenceId))) throw new Error("That campaign couldn't be found. Refresh and try again.");
+  if (!(await getSequence(sequenceId))) throw new ReadableError("That campaign couldn't be found. Refresh and try again.");
 }
 
 function isStepType(value: unknown): value is DripStepType {

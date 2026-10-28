@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import {
   signOutAction,
   switchFirmAction,
@@ -10,6 +10,10 @@ import {
 import type { SwitchableFirmRef } from "@/lib/firm/session";
 import { requestTourAgain } from "@/lib/onboarding/tour";
 import { requestFeedback } from "@/lib/feedback/open";
+import { requestNameDialog } from "@/lib/account/name";
+import { roleLabel } from "@/lib/auth/roles";
+import { isOutsidePress, menuKeyAction } from "@/lib/shell/menu-behaviour";
+import { HELP_AND_TIPS } from "@/lib/ui/words";
 
 type Props = {
   initials: string;
@@ -37,15 +41,38 @@ export function AccountMenu({
   );
 
   const menu = useRef<HTMLDetailsElement>(null);
+  const [open, setOpen] = useState(false);
+
+  const closeMenu = () => menu.current?.removeAttribute("open");
+  const avatar = () => menu.current?.querySelector("summary") ?? null;
+
+  // Esc and a press outside close the menu; Esc returns focus to the avatar.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (menuKeyAction(e.key, true) !== "close") return;
+      closeMenu();
+      avatar()?.focus();
+    };
+    const onPress = (e: PointerEvent) => {
+      if (isOutsidePress(menu.current, e.target)) closeMenu();
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPress);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPress);
+    };
+  }, [open]);
 
   return (
-    <details ref={menu} style={{ position: "relative" }}>
+    <details ref={menu} style={{ position: "relative" }} onToggle={(e) => setOpen(e.currentTarget.open)}>
       <summary
         className="lx-avatar"
         style={{ listStyle: "none" }}
         data-tour="account"
         aria-label={`Account: ${name}`}
-        title={`${name} · ${role.replace("_", " ")}`}
+        title={`${name} · ${roleLabel(role)}`}
       >
         {initials}
       </summary>
@@ -67,7 +94,7 @@ export function AccountMenu({
           <div style={{ fontWeight: 500 }}>{name}</div>
           {email && <div className="lx-note">{email}</div>}
           <div className="lx-label" style={{ fontSize: 11, marginTop: 6 }}>
-            {firmName} · {role.replace("_", " ")}
+            {firmName} · {roleLabel(role)}
           </div>
         </div>
 
@@ -94,45 +121,66 @@ export function AccountMenu({
           </form>
         )}
 
-        <Link
-          href="/dashboard/getting-started/"
-          className="lx-btn lx-btn-sec lx-btn-sm"
-          style={{ width: "100%" }}
-          onClick={() => menu.current?.removeAttribute("open")}
-        >
-          Getting started
-        </Link>
-
-        <button
-          type="button"
-          className="lx-btn lx-btn-sec lx-btn-sm"
-          style={{ width: "100%" }}
-          onClick={() => {
-            menu.current?.removeAttribute("open");
-            requestTourAgain(window);
-          }}
-        >
-          Show tips again
-        </button>
-
-        <button
-          type="button"
-          className="lx-btn lx-btn-sec lx-btn-sm"
-          style={{ width: "100%" }}
-          onClick={() => {
-            menu.current?.removeAttribute("open");
-            // Focus returns to the avatar, which stays visible when the menu closes.
-            requestFeedback(window, menu.current?.querySelector("summary") ?? null);
-          }}
-        >
-          Send feedback
-        </button>
-
-        <form action={signOutAction}>
-          <button type="submit" className="lx-btn lx-btn-ghost lx-btn-sm" style={{ width: "100%" }}>
-            Sign out
+        <div role="menu" aria-label="Account" style={{ display: "grid", gap: 8 }}>
+          <button
+            type="button"
+            role="menuitem"
+            className="lx-btn lx-btn-sec lx-btn-sm"
+            style={{ width: "100%" }}
+            onClick={() => {
+              closeMenu();
+              requestNameDialog(window, avatar());
+            }}
+          >
+            Your name
           </button>
-        </form>
+
+          <div role="group" aria-labelledby="lx-help-h" style={{ display: "grid", gap: 8 }}>
+            <div id="lx-help-h" className="lx-label" style={{ fontSize: 11 }}>
+              {HELP_AND_TIPS}
+            </div>
+            <Link
+              href="/dashboard/getting-started/"
+              role="menuitem"
+              className="lx-btn lx-btn-sec lx-btn-sm"
+              style={{ width: "100%" }}
+              onClick={closeMenu}
+            >
+              Getting started
+            </Link>
+            <button
+              type="button"
+              role="menuitem"
+              className="lx-btn lx-btn-sec lx-btn-sm"
+              style={{ width: "100%" }}
+              onClick={() => {
+                closeMenu();
+                requestTourAgain(window);
+              }}
+            >
+              Show tips again
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              className="lx-btn lx-btn-sec lx-btn-sm"
+              style={{ width: "100%" }}
+              onClick={() => {
+                closeMenu();
+                // Focus returns to the avatar, which stays visible when the menu closes.
+                requestFeedback(window, avatar());
+              }}
+            >
+              Send feedback
+            </button>
+          </div>
+
+          <form action={signOutAction} role="none" style={{ borderTop: "1px solid var(--line-2)", paddingTop: 8 }}>
+            <button type="submit" role="menuitem" className="lx-btn lx-btn-ghost lx-btn-sm" style={{ width: "100%" }}>
+              Sign out
+            </button>
+          </form>
+        </div>
       </div>
     </details>
   );

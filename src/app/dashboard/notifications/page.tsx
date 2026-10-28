@@ -56,12 +56,8 @@ export default async function NotificationsPage({
     <>
       <div className="lx-page-head">
         <div style={{ flex: 1, minWidth: 260 }}>
-          <div className="lx-label">Inbox</div>
           <h1 className="lx-h1">Notifications</h1>
-          <p className="lx-sub">
-            What changed on your leads and matters, and drafts waiting for your approval. These stay inside Lectual.
-            Nothing here is emailed, texted or sent to a client.
-          </p>
+          <p className="lx-sub">Updates on your leads and matters, and drafts waiting for you.</p>
         </div>
         <nav aria-label="Notification filter" className="lx-segs">
           {TABS.map((t) => (
@@ -74,7 +70,7 @@ export default async function NotificationsPage({
 
       {!loaded ? (
         <div role="alert" className="lx-banner lx-banner-risk">
-          Your notifications couldn&apos;t be loaded. This isn&apos;t the same as having none. Try refreshing in a moment.
+          We couldn&apos;t load your notifications. Try again in a moment.
         </div>
       ) : rows.length === 0 ? (
         <div className="lx-card lx-empty-card">
@@ -111,6 +107,9 @@ export default async function NotificationsPage({
           )}
         </div>
       )}
+      <p className="lx-note" style={{ margin: 0 }}>
+        These stay inside Lectual. Nothing here is emailed, texted or sent to a client.
+      </p>
     </>
   );
 }

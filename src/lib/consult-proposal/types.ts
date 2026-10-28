@@ -10,7 +10,8 @@
  */
 
 import type { StructuredCall } from "@/lib/ai/claude";
-import type { ProposalContent, standardProposalPricing } from "@/lib/proposals/types";
+import type { ReviewedConsultRead } from "@/lib/consult/store";
+import type { ProposalContent, ProposalPricing, standardProposalPricing } from "@/lib/proposals/types";
 import type { ValidationIssue } from "@/lib/proposals/validate";
 
 /** One speaker turn in a stored meeting transcript (crm_meeting.transcript). */
@@ -49,6 +50,14 @@ export type DraftConsultProposalInput = {
   firm: { name: string; slug: string; teamSignOff: string };
   /** From src/lib/proposals/types.ts `standardProposalPricing(setting.pricing)`. */
   pricing: ReturnType<typeof standardProposalPricing>;
+  /**
+   * The firm's CURRENT package list, first one the default (`normalisePackages`). The proposal is priced with
+   * the package the call (or the reviewed details) names; null or empty = the list couldn't be read, so the
+   * flat `pricing` package is used and a flag says so.
+   */
+  packages?: readonly ProposalPricing[] | null;
+  /** The lead's reviewed consult details (`loadReviewedConsult`): a package named there wins over the call's. */
+  reviewedConsult?: ReviewedConsultRead | null;
   /** YYYY-MM-DD in the firm's time zone. */
   today: string;
   llm: StructuredCall;

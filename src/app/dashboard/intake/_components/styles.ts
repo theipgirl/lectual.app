@@ -5,7 +5,7 @@ import type { Temperature } from "@/lib/intake";
  * The canvas's style vocabulary, transcribed once (Intake_Leads.dc.html's
  * <script> block: TEMP / DOT / OWNER_CHIP / TOUCH / NEXT / STAGE_PILL).
  *
- * Presentation only — nothing here decides anything. Every colour is a token
+ * Presentation only — nothing here decides anything (the header, toolbar, chips, pills and panels are the shared list-page classes). Every colour is a token
  * that src/app/(intake)/intake.css defines under `.intake-root`; there is no
  * ad-hoc hex in this folder, so re-skinning the surface means editing that
  * stylesheet and nothing else.
@@ -29,10 +29,6 @@ function pill(background: string, color: string, fontSize = 11): CSSProperties {
     whiteSpace: "nowrap",
   };
 }
-
-export const STAGE_PILL = pill("var(--surface2)", "var(--ink2)", 10.5);
-/** Used when a lead's stage can't be resolved — the canvas's "Unresolved" column. */
-export const STAGE_WARN = pill("var(--warnbg)", "var(--warn)", 10.5);
 
 export const TEMP_PILL: Record<Temperature, CSSProperties> = {
   hot: pill("var(--critbg)", "var(--crit)", 10.5),
@@ -126,89 +122,5 @@ export function ownerAvatarFor(index: number): CSSProperties {
   return ownerAvatar(AVATAR_CYCLE[index % AVATAR_CYCLE.length]);
 }
 
-/** The pill-shaped "Group by" toggle. */
-export function groupPill(active: boolean): CSSProperties {
-  return {
-    height: 30,
-    padding: "0 12px",
-    borderRadius: 999,
-    border: active ? "1px solid var(--ox)" : "1px solid var(--line)",
-    background: active ? "var(--ox)" : "var(--surface)",
-    color: active ? "var(--cream)" : "var(--ink2)",
-    fontSize: 12.5,
-    fontWeight: active ? 500 : 400,
-    fontFamily: "inherit",
-    display: "flex",
-    alignItems: "center",
-    cursor: "pointer",
-  };
-}
-
-/** A filter chip: outlined when idle, oxblood-tinted once it is narrowing the list. */
-export function filterChip(active: boolean): CSSProperties {
-  return {
-    height: 32,
-    padding: "0 12px",
-    borderRadius: 8,
-    border: `1px solid ${active ? "var(--ox)" : "var(--line)"}`,
-    background: active ? "var(--oxbg)" : "var(--surface)",
-    color: active ? "var(--ox)" : "var(--ink2)",
-    display: "flex",
-    alignItems: "center",
-    gap: 7,
-    fontSize: 12.5,
-    fontFamily: "inherit",
-    cursor: "pointer",
-    whiteSpace: "nowrap",
-  };
-}
-
 /** The count that rides inside a filter chip. */
 export const CHIP_COUNT: CSSProperties = { fontFamily: MONO, fontSize: 11 };
-
-export const PRIMARY_BUTTON: CSSProperties = {
-  height: 36,
-  padding: "0 14px",
-  borderRadius: 9,
-  border: "1px solid var(--ox)",
-  background: "var(--ox)",
-  color: "var(--cream)",
-  display: "flex",
-  alignItems: "center",
-  gap: 8,
-  fontSize: 12.5,
-  fontWeight: 500,
-  fontFamily: "inherit",
-  cursor: "pointer",
-  whiteSpace: "nowrap",
-};
-
-export const OUTLINE_BUTTON: CSSProperties = {
-  height: 36,
-  padding: "0 14px",
-  borderRadius: 9,
-  border: "1px solid var(--line)",
-  background: "var(--surface)",
-  color: "var(--ink2)",
-  display: "flex",
-  alignItems: "center",
-  gap: 8,
-  fontSize: 12.5,
-  fontFamily: "inherit",
-  cursor: "pointer",
-  textDecoration: "none",
-  whiteSpace: "nowrap",
-};
-
-/** The 14px-radius card every table/board sits inside. */
-export const PANEL: CSSProperties = {
-  flex: 1,
-  minHeight: 0,
-  minWidth: 0,
-  border: "1px solid var(--line)",
-  borderRadius: 14,
-  background: "var(--surface)",
-  overflow: "hidden",
-  display: "flex",
-  flexDirection: "column",
-};

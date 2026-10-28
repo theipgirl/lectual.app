@@ -117,7 +117,7 @@ describe("CopilotLauncher markup", () => {
   it("closed, shows the fixed button with its accessible name and no drawer", async () => {
     const html = await renderLauncher("/dashboard/matters/", true);
     expect(html).toContain('class="cpd-launcher"');
-    expect(html).toContain('aria-label="Ask the copilot"');
+    expect(html).toContain('aria-label="Ask Copilot"');
     expect(html).toContain('aria-expanded="false"');
     expect(html).not.toContain('role="dialog"');
     expect(html).not.toContain("cpl-composer");
@@ -139,7 +139,7 @@ describe("CopilotDrawer markup", () => {
     expect(html).toMatch(/aria-labelledby="copilot-drawer-title"/);
     expect(html).toContain('id="copilot-drawer-title"');
     expect(html).toContain(">Close</button>");
-    expect(html).toContain('aria-label="Ask the copilot"');
+    expect(html).toContain('aria-label="Ask Copilot"');
     expect(html).toContain("cpl-composer");
     expect(html).toContain("Nothing sends without your approval.");
     expect(html).not.toMatch(/<aside[^>]*\shidden/);

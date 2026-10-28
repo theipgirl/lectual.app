@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Json } from "@/lib/db/types";
 import { openToken, sealToken } from "@/lib/mailbox/crypto";
+import { MEETINGS_MORE_THAN_ONE_RUN } from "@/lib/ui/words";
 import { listFathomMeetings } from "./fathom";
 import { listZoomMeetings, refreshZoomToken, type ZoomClientCredentials } from "./zoom";
 import { decideLinks, NO_LINK, type MatchContext } from "./match";
@@ -213,12 +214,12 @@ async function markConnection(deps: ImportDeps, conn: ConnectionSecrets, patch: 
 }
 
 /** A Zoom access token good for at least two more minutes; a refresh re-seals BOTH tokens (Zoom rotates the refresh token). */
-async function zoomAccessToken(deps: ImportDeps, conn: ConnectionSecrets): Promise<string> {
+export async function zoomAccessToken(deps: ImportDeps, conn: ConnectionSecrets): Promise<string> {
   const now = (deps.now ?? Date.now)();
   if (!conn.access_token_enc || !conn.refresh_token_enc) throw new MeetingAuthError("No Zoom sign-in is stored. Reconnect Zoom.");
   const expires = conn.token_expires_at ? Date.parse(conn.token_expires_at) : 0;
   if (expires - now > 120_000) return openToken(deps.root, conn.access_token_enc, "lectual-meetings");
-  if (!deps.zoomCreds) throw new Error("Zoom sign-in isn't configured on this deployment.");
+  if (!deps.zoomCreds) throw new Error("Zoom isn't switched on for your firm yet. Lectual will turn it on.");
   const fresh = await refreshZoomToken({
     creds: deps.zoomCreds,
     refreshToken: openToken(deps.root, conn.refresh_token_enc, "lectual-meetings"),
@@ -274,7 +275,7 @@ export async function importConnection(deps: ImportDeps, conn: ConnectionSecrets
       import_cursor: nextCursor(conn.import_cursor, pull.meetings),
       last_import_at: new Date(now).toISOString(),
       last_import_count: counts.inserted,
-      last_error: pull.truncated ? "More meetings than one run reads: the newest were imported, and the rest will follow on later runs where the provider allows." : null,
+      last_error: pull.truncated ? MEETINGS_MORE_THAN_ONE_RUN : null,
     });
     return { ok: true, ...base, counts, truncated: pull.truncated };
   } catch (err) {

@@ -37,6 +37,19 @@ const WINDOW_DAYS = 30;
 const MAX_PAGES_PER_WINDOW = 10;
 const MAX_TRANSCRIPTS = 60;
 
+/**
+ * The scopes asked for at connect time (a space-separated `scope` on the authorize URL, so the grant
+ * names them rather than relying on whatever the Zoom app has registered). The last one lets Today
+ * list upcoming meetings; a connection made before it existed is refused by Zoom until reconnected.
+ */
+export const ZOOM_UPCOMING_SCOPE = "meeting:read:list_meetings";
+export const ZOOM_SCOPES: readonly string[] = [
+  "cloud_recording:read:list_user_recordings",
+  "cloud_recording:read:list_recording_files",
+  "user:read:user",
+  ZOOM_UPCOMING_SCOPE,
+];
+
 export type ZoomClientCredentials = { clientId: string; clientSecret: string };
 export type ZoomTokenSet = { accessToken: string; refreshToken: string; expiresAt: string; scopes: string[] };
 
@@ -48,6 +61,7 @@ export function zoomAuthorizeUrl(args: { clientId: string; redirectUri: string; 
     state: args.nonce,
     code_challenge: args.challenge,
     code_challenge_method: "S256",
+    scope: ZOOM_SCOPES.join(" "),
   });
   return `${ZOOM_AUTHORIZE_URL}?${q.toString()}`;
 }
@@ -263,4 +277,61 @@ export async function listZoomMeetings(args: { accessToken: string; since: strin
     if (mapped) meetings.push(mapped);
   }
   return { meetings, truncated };
+}
+
+// ── upcoming meetings, for Today's Consults card ─────────────────────────────
+
+export type ZoomUpcoming = { id: string; title: string; startsAt: string; joinUrl: string | null };
+
+/** Why a live read did not give meetings. "needs-permission" = the grant lacks the list scope. */
+export type UpcomingZoom =
+  | { status: "ok"; meetings: ZoomUpcoming[] }
+  | { status: "needs-permission" | "reconnect" | "unavailable" };
+
+const UPCOMING_TIMEOUT_MS = 15_000;
+
+/**
+ * A LIVE read of the signed-in Zoom user's upcoming meetings (`GET /users/me/meetings?type=upcoming`).
+ * Nothing is stored and nothing is logged: not the titles, not the join links, not the token. A refusal is
+ * classified, never thrown: 403, or a 400/401 whose body names a scope, means the grant lacks
+ * `meeting:read:list_meetings`; any other 401 means the sign-in itself is no longer accepted.
+ */
+export async function listUpcomingZoomMeetings(args: { accessToken: string; fetchImpl?: FetchLike }): Promise<UpcomingZoom> {
+  const fetchImpl = args.fetchImpl ?? fetch;
+  let res: Response;
+  try {
+    res = await fetchImpl(`${ZOOM_API_BASE}/users/me/meetings?type=upcoming&page_size=50`, {
+      headers: { Authorization: `Bearer ${args.accessToken}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(UPCOMING_TIMEOUT_MS),
+    });
+  } catch {
+    return { status: "unavailable" };
+  }
+  if (!res.ok) {
+    if (res.status === 403) return { status: "needs-permission" };
+    if (res.status === 400 || res.status === 401) {
+      const body = (await res.json().catch(() => ({}))) as { message?: unknown };
+      const message = typeof body.message === "string" ? body.message : "";
+      if (/scope/i.test(message)) return { status: "needs-permission" };
+      return res.status === 401 ? { status: "reconnect" } : { status: "unavailable" };
+    }
+    return { status: "unavailable" };
+  }
+  let json: { meetings?: unknown };
+  try {
+    json = (await res.json()) as { meetings?: unknown };
+  } catch {
+    return { status: "unavailable" };
+  }
+  const raw = Array.isArray(json.meetings) ? (json.meetings as Record<string, unknown>[]) : [];
+  const meetings: ZoomUpcoming[] = [];
+  for (const m of raw) {
+    const id = typeof m.id === "number" || typeof m.id === "string" ? String(m.id) : "";
+    const startsAt = typeof m.start_time === "string" && Number.isFinite(Date.parse(m.start_time)) ? new Date(m.start_time).toISOString() : "";
+    if (!id || !startsAt) continue; // a recurring meeting with no fixed time has no start to show
+    const join = typeof m.join_url === "string" && m.join_url.startsWith("https://") ? m.join_url : null;
+    meetings.push({ id, title: typeof m.topic === "string" ? m.topic.trim().slice(0, 300) : "", startsAt, joinUrl: join });
+  }
+  return { status: "ok", meetings };
 }

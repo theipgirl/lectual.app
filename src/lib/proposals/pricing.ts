@@ -14,7 +14,13 @@
  *
  *   per name:  n = picked classes
  *              base = (override.base ?? base) + (override.per_class ?? per_class)
- *                       * ((n || all classes of the name) - included_classes)
+ *                       * max(0, (n || all classes of the name) - included_classes)
+ *              A package is its FLAT price up to its included classes (Sprint 28):
+ *              fewer classes never lower it, each class past the included count adds
+ *              the per-class price. `pricing.reduce_under_included === true` (a
+ *              custom package, set by staff) restores the old reduction. Before Sprint 28 a name with fewer classes than
+ *              included took the per-class price off; accepted snapshots keep the
+ *              figure they were accepted at and are never re-priced.
  *              picked marks in content order; the first is `base`, each later
  *              one is round(base * (100 - pct) / 100)
  *              included only when n > 0 AND >= 1 mark is picked
@@ -43,6 +49,7 @@
 
 import type {
   ProposalAdjustment,
+  ProposalPricing,
   ProposalContent,
   ProposalQuote,
   QuotedAdjustment,
@@ -94,6 +101,9 @@ export function quoteProposal(content: ProposalContent, selection: Selection): P
   const includedClasses = int(pricing.included_classes);
   const secondMarkPct = pct(pricing.second_mark_discount_pct);
   const govPerClassCents = int(pricing.gov_per_class_cents);
+  // Only a custom package ("$825 less per class under the included classes") sets
+  // this; absent or anything but `true` is the flat package price.
+  const reduceUnderIncluded = pricing.reduce_under_included === true;
 
   const names: QuotedName[] = arr<ProposalContent["names"][number]>(content?.names).map((nm) => {
     const allClasses = arr<ProposalContent["names"][number]["classes"][number]>(nm?.classes);
@@ -102,7 +112,8 @@ export function quoteProposal(content: ProposalContent, selection: Selection): P
     const override = obj(nm?.price_override);
     const nameBase = override.base_cents == null ? baseCents : int(override.base_cents);
     const namePerClass = override.per_class_cents == null ? perClassCents : int(override.per_class_cents);
-    const base = Math.max(0, nameBase + namePerClass * ((n || allClasses.length) - includedClasses));
+    const classDelta = (n || allClasses.length) - includedClasses;
+    const base = Math.max(0, nameBase + namePerClass * (reduceUnderIncluded ? classDelta : Math.max(0, classDelta)));
 
     const marks: QuotedMark[] = arr<ProposalContent["names"][number]["marks"][number]>(nm?.marks)
       .filter((m) => on(m.id))
@@ -224,6 +235,23 @@ function fixedOfferSelection(content: ProposalContent): Selection {
 /** True when the quote has at least one brand name in it (something to accept). */
 export function quoteHasItems(quote: ProposalQuote): boolean {
   return quote.names.some((n) => n.included);
+}
+
+/**
+ * The legal fee for ONE mark of a package with `classCount` classes, worked out by `quoteProposal` itself over a
+ * one-brand, one-mark stand-in. For words like "one class costs $X under the custom package"; nothing here prices on its own.
+ */
+export function priceForClassCount(pricing: ProposalPricing, classCount: number): number {
+  const classes = Array.from({ length: Math.max(0, Math.floor(classCount)) }, (_, i) => ({ id: `c${i}`, label: `Class ${i + 1}`, preselected: true }));
+  const content = {
+    client: { first_name: "", full_name: "" },
+    greeting: "",
+    pricing,
+    names: [{ id: "n", name: "n", marks: [{ id: "m", kind: "word" as const, desc: "", preselected: true }], classes }],
+    adjustments: [],
+    includes: [],
+  } as ProposalContent;
+  return quoteProposal(content, defaultSelection(content)).legal_total_cents;
 }
 
 /**

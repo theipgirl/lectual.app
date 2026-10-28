@@ -37,7 +37,7 @@ export async function connectFathomAction(_prev: MeetingsSettingsState, formData
   const session = await adminSession();
   if (!session) return { error: "Only owners and admins can connect Fathom." };
   const root = rootKeyOrNull();
-  if (!root) return { error: "Integrations aren't set up on this deployment yet (no encryption key)." };
+  if (!root) return { error: "Integrations aren't switched on for your firm yet. Lectual will turn them on." };
 
   const shape = checkFathomKeyShape(String(formData.get("key") ?? ""));
   if (!shape.ok) return { error: shape.reason };
@@ -66,7 +66,7 @@ export async function importNowAction(_prev: MeetingsSettingsState, formData: Fo
   const session = await adminSession();
   if (!session) return { error: "Only owners and admins can run an import." };
   const root = rootKeyOrNull();
-  if (!root) return { error: "Integrations aren't set up on this deployment yet (no encryption key)." };
+  if (!root) return { error: "Integrations aren't switched on for your firm yet. Lectual will turn them on." };
 
   // The connection row comes from the caller's own RLS read; its secrets are
   // then read by that row's (id, org_id), and every write stamps that org_id.

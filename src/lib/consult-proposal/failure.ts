@@ -114,7 +114,7 @@ function emailRuleOf(err: unknown): ProposalEmailRule | null {
 
 /** Why the proposal link was refused, in words, and what the deployment resolved. */
 export function emailRuleSentence(rule: ProposalEmailRule | string, origin?: string | null): string {
-  const resolved = origin ? ` This deployment's site address resolved to "${origin.replace(/[^\x21-\x7e]/g, "").slice(0, 200)}".` : "";
+  const resolved = origin ? ` The site address Lectual used was "${origin.replace(/[^\x21-\x7e]/g, "").slice(0, 200)}".` : "";
   switch (rule) {
     case "not_https":
       return `The proposal link address is invalid: it must start with https://.${resolved}`;
@@ -132,12 +132,12 @@ export function emailRuleSentence(rule: ProposalEmailRule | string, origin?: str
 function queueMessage(err: unknown): string | null {
   const { message } = parts(err);
   if (/queue api not configured/i.test(message)) {
-    return "The approval queue isn't configured on this deployment (QUEUE_API_URL or DASHBOARD_API_TOKEN is missing), so the email couldn't be queued.";
+    return "Approvals aren't connected for your firm yet, so the email couldn't be queued. Lectual will connect them.";
   }
   const status = /^Queue API (\d{3})\b/.exec(message);
-  if (status) return `The approval queue didn't accept the draft (it answered HTTP ${status[1]}), so the email couldn't be queued.`;
+  if (status) return `Approvals didn't accept the draft (it answered HTTP ${status[1]}), so the email couldn't be queued.`;
   if (/fetch failed|ECONN|ENOTFOUND|ETIMEDOUT|network|timed? ?out/i.test(message)) {
-    return "The approval queue couldn't be reached, so the email couldn't be queued.";
+    return "Approvals couldn't be reached, so the email couldn't be queued.";
   }
   return null;
 }
@@ -153,9 +153,9 @@ export function describeConsultFailure(stage: ConsultStage, err: unknown, ctx: {
   const env = envKeyOf(inner);
   if (env) {
     if (env.key === "SUPABASE_SERVICE_ROLE_KEY") {
-      return `The proposal couldn't be drafted because the server key (SUPABASE_SERVICE_ROLE_KEY) isn't set on this deployment. ${NOTHING_SENT}`;
+      return `The proposal couldn't be drafted because a setting on Lectual's side is missing. Use Send feedback so Lectual can fix it. ${NOTHING_SENT}`;
     }
-    return `The proposal couldn't be drafted because a server setting (${env.key}) is ${env.reason === "invalid" ? "invalid" : "not set"} on this deployment. ${NOTHING_SENT}`;
+    return `The proposal couldn't be drafted because a setting on Lectual's side is missing or wrong. Use Send feedback so Lectual can fix it. ${NOTHING_SENT}`;
   }
 
   const rule = emailRuleOf(inner);
@@ -170,7 +170,7 @@ export function describeConsultFailure(stage: ConsultStage, err: unknown, ctx: {
 
   switch (stage) {
     case "env":
-      return `The proposal couldn't be drafted: this deployment isn't fully set up (step: env). ${NOTHING_SENT} Try again shortly.`;
+      return `The proposal couldn't be drafted: Lectual's setup for your firm isn't finished. Use Send feedback so Lectual can fix it. ${NOTHING_SENT}`;
     case "check":
     case "settings":
       return `The proposal couldn't be drafted: the firm's records couldn't be read (step: ${stage}). ${NOTHING_SENT} Try again shortly.`;

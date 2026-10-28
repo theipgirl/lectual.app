@@ -26,9 +26,9 @@ import { safeHttpsUrl } from "@/components/client-proposal/format";
  * `payUrl` is "" when the firm has no usable https payment link on the row; the
  * acceptance is still recorded and the page says the firm will send the link.
  */
-export async function acceptProposalAction(token: string, selection: unknown): Promise<ProposalAcceptResult> {
+export async function acceptProposalAction(token: string, selection: unknown, addedClasses?: unknown): Promise<ProposalAcceptResult> {
   try {
-    const result = await acceptPublicProposal(String(token ?? ""), selection, new Date());
+    const result = await acceptPublicProposal(String(token ?? ""), selection, new Date(), undefined, addedClasses);
     if (!result.ok) return { ok: false, message: result.message };
     return { ok: true, payUrl: safeHttpsUrl(result.payUrl) ?? "" };
   } catch {

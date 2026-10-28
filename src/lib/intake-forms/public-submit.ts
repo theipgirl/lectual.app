@@ -1,5 +1,6 @@
 import { isEmailAddress } from "@/lib/members/email";
 import { intakeStages } from "@/lib/intake/scope";
+import { newEnquiryStage } from "@/lib/pipeline/new-enquiry";
 import type { Stage } from "@/lib/pipeline/stages";
 import type { IntakeFormConfig, IpType } from "./config";
 import { PACKS } from "./config";
@@ -293,13 +294,10 @@ export function answersNote(heading: string, answers: readonly IntakeAnswer[], c
 }
 
 /**
- * Where a new intake lead lands: the firm's first OPEN intake stage (lowest
- * `order_index` among `intakeStages`, category 'open' — not a nurture
- * column). Null when the firm has none; the submission is still kept.
+ * Where a new intake lead lands: the firm's new-enquiry stage among its OPEN intake stages (the one named
+ * "Potential New Client", "New Lead" or "New Inquiry", else the first open one in pipeline order — not a nurture
+ * column, and not "Follow-Up" just because it sorts first). Null when the firm has none; the submission is still kept.
  */
 export function firstOpenIntakeStageId(stages: Stage[]): string | null {
-  const open = intakeStages(stages)
-    .filter((s) => s.category === "open")
-    .sort((a, b) => a.order_index - b.order_index);
-  return open[0]?.id ?? null;
+  return newEnquiryStage(intakeStages(stages))?.id ?? null;
 }

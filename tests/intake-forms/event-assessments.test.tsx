@@ -89,7 +89,7 @@ describe("Forms list: Event assessments (F15)", () => {
     const db = newDb({ crm_booth_scorecard: boothTables() });
     db.fail("crm_booth_scorecard", "select");
     const html = await listPage(db);
-    expect(html).toContain("Event assessments couldn't be loaded. This is a problem reaching the database, not an empty list.");
+    expect(html).toContain("Event assessments couldn't be loaded. Refresh to try again.");
     expect(html).not.toContain('aria-label="Event assessments"');
     expect(html).not.toContain("urban-golf-2026");
     // The intakes above it are still listed.
@@ -100,8 +100,8 @@ describe("Forms list: Event assessments (F15)", () => {
     const db = newDb({ crm_booth_scorecard: boothTables() });
     db.fail("crm_booth_scorecard", "select", { code: "PGRST205", message: "Could not find the table 'public.crm_booth_scorecard'" });
     const html = await listPage(db);
-    expect(html).toContain("Event assessments aren't set up in this environment (lectual migration 0086).");
-    expect(html).not.toContain("couldn't be loaded. This is a problem reaching the database, not an empty list.");
+    expect(html).toContain("Event assessments aren't switched on for your firm yet. Lectual will turn them on.");
+    expect(html).not.toContain("couldn't be loaded. Refresh to try again.");
   });
 
   it("shows no section at all for a firm with no booth cards", async () => {
@@ -184,11 +184,11 @@ describe("event page (F16)", () => {
     failing.fail("crm_booth_scorecard", "select");
     const html = await eventPage(failing, "urban-golf-2026");
     expect(html).toContain("This event's scorecards couldn't be loaded.");
-    expect(html).toContain("not an empty result");
+    expect(html).toContain("Refresh to try again.");
     expect(html).not.toContain("ifm-kpi-value");
     const missing = newDb({ crm_booth_scorecard: boothTables() });
     missing.fail("crm_booth_scorecard", "select", { code: "42P01", message: "relation does not exist" });
-    expect(await eventPage(missing, "urban-golf-2026")).toContain("aren't set up in this environment (lectual migration 0086)");
+    expect(await eventPage(missing, "urban-golf-2026")).toContain("aren't switched on for your firm yet");
   });
 
   it("renders no setup controls: it is read-only", async () => {

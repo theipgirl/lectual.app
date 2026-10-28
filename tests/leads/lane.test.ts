@@ -101,7 +101,7 @@ describe("temperature filter on Intake (the merged Lane + Temp filter)", () => {
     expect(ids("cold")).toEqual(["cold"]);
     expect(ids("warm")).toEqual([]);
   });
-  it("'none' (Not routed) is no lane and nothing recorded to derive from", () => {
+  it("'none' (Not rated) is no lane and nothing recorded to derive from", () => {
     expect(ids("none")).toEqual(["blank"]);
   });
 });

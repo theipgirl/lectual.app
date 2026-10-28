@@ -108,7 +108,7 @@ describe("Agents page: the three new cards (V1)", () => {
   it("the text of each new card, once, so a wording change is a deliberate one", async () => {
     const { html } = await render({ settings: [off("morning-brief"), off("consult-prep"), off("inbox-summary")] });
     const text = (name: string) => decode(card(html, name).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
-    expect(text("Morning brief")).toMatchInlineSnapshot(`"Autonomy Suggest Draft Act Writes the internal briefing and a follow-up email draft for each stalled lead. Everything waits in the approval queue; nothing is sent. Run now Switch the agent on first. Morning brief Reads · Leads, matters, consults and the queue Writes the attorney a daily briefing into the approval queue: today's consults, leads waiting on a reply, stage suggestions, stalled leads, deadlines in the next 14 days and the queue count. For up to five stalled leads a day it also drafts a follow-up email. It only drafts: an attorney reviews and sends everything. Off"`);
+    expect(text("Morning brief")).toMatchInlineSnapshot(`"Autonomy Suggest Draft Act Writes the internal briefing and a follow-up email draft for each stalled lead. Everything waits in Approvals; nothing is sent. Run now Switch the assistant on first. Morning brief Reads · Leads, matters, consults and Approvals Writes the attorney a daily briefing into Approvals: today's consults, leads waiting on a reply, stage suggestions, stalled leads, deadlines in the next 14 days and the Approvals count. For up to five stalled leads a day it also drafts a follow-up email. It only drafts: an attorney reviews and sends everything. Off"`);
     expect(text("Consult prep")).toContain("Reads · Outlook consults and the lead record");
     expect(text("Inbox summary")).toContain("Reads · Connected mailboxes");
   });
@@ -133,7 +133,7 @@ describe("Agents page: readiness drives each new card (D3)", () => {
 
   it("no Mailboxes module: inbox-summary and consult-prep need it; morning-brief does not", async () => {
     const out = await labels({ modules: ["agents"] });
-    expect(out).toEqual({ "morning-brief": "On · not run yet", "consult-prep": "Needs the Mailboxes module", "inbox-summary": "Needs the Mailboxes module" });
+    expect(out).toEqual({ "morning-brief": "On · not run yet", "consult-prep": "Needs the Mailboxes feature", "inbox-summary": "Needs the Mailboxes feature" });
   });
 
   it("no active mailbox: only inbox-summary is waiting", async () => {
@@ -175,16 +175,16 @@ describe("Agents page: readiness drives each new card (D3)", () => {
 
   it("a missing AI key: all three need it", async () => {
     const out = await labels({ ai: false });
-    expect(Object.values(out)).toEqual(["On · needs the AI key", "On · needs the AI key", "On · needs the AI key"]);
+    expect(Object.values(out)).toEqual(["On · waiting for Lectual to switch on AI", "On · waiting for Lectual to switch on AI", "On · waiting for Lectual to switch on AI"]);
   });
 
-  it("a pending database update: all three read 'Not available until the database update', on or off, and nothing else does", async () => {
+  it("a pending database update: all three read 'Not switched on yet', on or off, and nothing else does", async () => {
     const onOut = await labels({ calendar: "columns-missing" });
-    expect(Object.values(onOut)).toEqual(Array(3).fill("Not available until the database update"));
+    expect(Object.values(onOut)).toEqual(Array(3).fill("Not switched on yet"));
     const { html } = await render({ settings: [off("morning-brief"), on("stage-keeper")], calendar: "columns-missing" });
-    for (const name of Object.values(NAMES)) expect(decode(footText(card(html, name)))).toBe("Not available until the database update");
-    expect(decode(footText(card(html, "Email → client intel")))).toBe("Off");
-    expect(card(html, "Stage Keeper")).not.toContain("Not available until the database update");
+    for (const name of Object.values(NAMES)) expect(decode(footText(card(html, name)))).toBe("Not switched on yet");
+    expect(decode(footText(card(html, "From their emails")))).toBe("Off");
+    expect(card(html, "Automatic stage moves")).not.toContain("Not switched on yet");
     // the header counts: the Stage Keeper is the only agent on, and it is blocked on its own sources, so none is "ready"
     expect(html).toContain("0 of 7 on");
   });
@@ -209,7 +209,7 @@ describe("Agents page: readiness drives each new card (D3)", () => {
   it("the page copy is whole sentences with no raw database wording (V3)", async () => {
     const { html } = await render({ settings: [on("morning-brief"), on("consult-prep"), on("inbox-summary")], calendar: "columns-missing" });
     const text = decode(html.replace(/<script[\s\S]*?<\/script>/g, " ").replace(/<[^>]+>/g, " "));
-    expect(text).toContain("Ask Lectual to apply the database update");
+    expect(text).toContain("Lectual will turn it on");
     expect(text).not.toMatch(/PGRST|42703|23514|violates|does not exist|\bnull\b|undefined|\[object/);
   });
 });

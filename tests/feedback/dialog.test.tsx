@@ -19,9 +19,9 @@ const view = (over = {}) =>
 
 describe("B1/B2: the dialog", () => {
   it("shows the disclosure verbatim", () => {
-    const literal = "This report will include your description and the current session transcript. We may use these to debug related issues and improve Lectual.";
+    const literal = "We'll include your note and a list of the pages you visited and any errors, to help us fix it. We don't include client information.";
     expect(FEEDBACK_DISCLOSURE).toBe(literal);
-    expect(view()).toContain(literal);
+    expect(view()).toContain(literal.replace(/'/g, "&#x27;"));
   });
   it("is an accessible dialog with the four types (Bug first), a required 5,000-character textarea, a count, Cancel and Send", () => {
     const html = view({ description: "hello" });

@@ -1,3 +1,4 @@
+import { roleLabel } from "@/lib/auth/roles";
 import "@/app/dashboard/proposals/proposals.css";
 import Link from "next/link";
 import { CONSULT_BASIS_LABEL, MARK_TYPE_LABEL, formatClassLines } from "@/lib/consult/vocab";
@@ -32,7 +33,7 @@ export function ConsultStrip({ state, leadId, tz }: { state: ConsultStripState; 
         <span>
           {state.unreadable
             ? "The details saved on the newest consult couldn't be read, so none are shown. "
-            : "This is a problem reaching the database, not a lead with no consult. "}
+            : "Can't show this right now. Refresh to try again. "}
           {lead}
         </span>
       </section>
@@ -69,7 +70,7 @@ export function ConsultStrip({ state, leadId, tz }: { state: ConsultStripState; 
       {review ? (
         <span className="lx-note">
           Reviewed by {review.reviewed_by_name ?? "a teammate"}
-          {review.reviewed_by_role ? ` (${review.reviewed_by_role.replaceAll("_", " ")})` : ""} · {formatFirmStamp(review.reviewed_at, tz)}
+          {review.reviewed_by_role ? ` (${roleLabel(review.reviewed_by_role)})` : ""} · {formatFirmStamp(review.reviewed_at, tz)}
         </span>
       ) : (
         <span className="lx-note">Not yet reviewed by a person, so treat these as what the notes appear to say, not as fact.</span>

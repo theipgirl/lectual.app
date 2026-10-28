@@ -42,7 +42,7 @@ export function AutopilotControl(props: {
               />
             )}
             <button type="submit" className={`lx-btn lx-btn-sm ${paused ? "lx-btn-pri" : "lx-btn-sec"}`} disabled={pending}>
-              {pending ? "Saving…" : paused ? "Resume Autopilot" : "Pause Autopilot"}
+              {pending ? "Saving…" : paused ? "Resume assistants" : "Pause assistants"}
             </button>
           </form>
         )}

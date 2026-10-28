@@ -36,6 +36,6 @@ describe("ConsultOutcomeForm", () => {
 describe("lead page", () => {
   it("renders the form only under canWrite", () => {
     const source = readFileSync(path.resolve(__dirname, "../../src/app/dashboard/leads/[id]/page.tsx"), "utf8");
-    expect(source).toMatch(/\{canWrite && \(\s*<section[^>]*>\s*<ConsultOutcomeForm leadId=\{lead\.id\} \/>/);
+    expect(source).toMatch(/\{canWrite && \(\s*<details[^>]*>\s*<summary>Log a consult outcome<\/summary>\s*<div[^>]*>\s*<ConsultOutcomeForm leadId=\{lead\.id\} \/>/);
   });
 });

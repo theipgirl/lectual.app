@@ -40,8 +40,8 @@ export function agentToolkitModuleState(ctx: Pick<AgentContext, "orgModules">): 
 
 /** The reason a run (or a section) gives when the module blocks it. */
 export const MAILBOX_GATE_REASON: Record<Exclude<MailboxModuleState, "on">, string> = {
-  off: "the Mailboxes module is off",
-  unreadable: "couldn't check the Mailboxes module",
+  off: "Mailboxes isn't switched on for your firm",
+  unreadable: "couldn't check whether Mailboxes is switched on",
 };
 
 /**

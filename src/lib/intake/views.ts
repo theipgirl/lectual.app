@@ -1,4 +1,5 @@
 import type { Stage } from "@/lib/pipeline";
+import { inPipelineOrder } from "@/lib/pipeline/stage-order";
 // Type-only import: @/lib/members/directory is `import "server-only"`, but a
 // `import type` is erased at compile time, so nothing from it reaches the
 // client bundle this module is part of — same reasoning as rows.ts.
@@ -68,9 +69,7 @@ export type StageColumn = {
  * us, and inventing a column for it would be inventing data.
  */
 export function stageColumns(rows: IntakeRow[], stages: Stage[]): StageColumn[] {
-  const columns = intakeStages(stages)
-    .slice()
-    .sort((a, b) => a.order_index - b.order_index);
+  const columns = inPipelineOrder(intakeStages(stages));
 
   return columns.map((stage) => {
     const inStage = rows.filter((row) => row.lead.current_stage_id === stage.id);
@@ -265,6 +264,22 @@ export function topBarCounts(rows: IntakeRow[]): TopBarCounts {
     needFirstReply: rows.filter((row) => row.reply === "replied").length,
     unassigned: rows.filter((row) => !row.lead.assigned_to).length,
   };
+}
+
+/**
+ * The Leads page's sub-line: the former status strip folded into one short sentence, then one short
+ * hint for the current view. `board` and `group` are the view state's own fields.
+ */
+export const LEADS_VIEW_HINT = {
+  table: "Newest activity first.",
+  stage: "Drag a card to move it, or use the stage menu on the card.",
+  owner: "Leads with no owner are in the first column.",
+} as const;
+
+export function leadsSubline(counts: TopBarCounts, view: { board: boolean; group: "stage" | "owner" }): string {
+  const hint = view.board ? LEADS_VIEW_HINT[view.group] : LEADS_VIEW_HINT.table;
+  const total = `${counts.inIntake} ${counts.inIntake === 1 ? "lead" : "leads"}`;
+  return `${total} · ${counts.needFirstReply} need a first reply · ${counts.unassigned} unassigned. ${hint}`;
 }
 
 /** The counts as the one mono line the top bar renders. */

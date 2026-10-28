@@ -59,7 +59,7 @@ describe("the Stage Keeper in the registry (Sprint 16, F16)", () => {
   it("is an agent id with a definition that says it moves leads and defaults to act", async () => {
     const { AGENT_DEFS, AGENT_IDS, autonomyHint, agentNeedsAi } = await import("@/lib/agents/types");
     expect(AGENT_IDS).toContain("stage-keeper");
-    expect(AGENT_DEFS["stage-keeper"]).toMatchObject({ name: "Stage Keeper", defaultAutonomy: "act" });
+    expect(AGENT_DEFS["stage-keeper"]).toMatchObject({ name: "Automatic stage moves", defaultAutonomy: "act" });
     expect(AGENT_DEFS["stage-keeper"].description).toMatch(/moves the lead forward/);
     expect(AGENT_DEFS["stage-keeper"].description).toMatch(/never sends anything/);
     expect(agentNeedsAi("stage-keeper")).toBe(false);
@@ -119,10 +119,10 @@ describe("the Stage Keeper in the registry (Sprint 16, F16)", () => {
     };
     expect(await runAgentNowAction({}, fd("stage-keeper"))).toMatchObject({ ok: true });
     expect(state.runs).toBe(1);
-    expect((await runAgentNowAction({}, fd("intake-triage"))).error).toMatch(/AI key/);
+    expect((await runAgentNowAction({}, fd("intake-triage"))).error).toMatch(/AI isn't switched on/);
     expect(state.runs).toBe(1);
     state.enabled = false;
-    expect((await runAgentNowAction({}, fd("stage-keeper"))).error).toBe("Switch the agent on first.");
+    expect((await runAgentNowAction({}, fd("stage-keeper"))).error).toBe("Switch the assistant on first.");
     expect(state.runs).toBe(1);
     vi.resetModules();
   });
@@ -143,12 +143,12 @@ describe("the Stage Keeper in the registry (Sprint 16, F16)", () => {
       return f;
     };
     const refused = await saveAgentSettingAction({}, fd("stage-keeper"));
-    expect(refused.error).toMatch(/isn't available until the database update/);
+    expect(refused.error).toMatch(/isn't switched on for your firm yet/);
     expect(refused.error).not.toMatch(/violates|constraint|agent_setting/);
     error = { code: "42501", message: "permission denied for table agent_setting" };
-    expect((await saveAgentSettingAction({}, fd("stage-keeper"))).error).toBe("Couldn't save: permission denied for table agent_setting");
+    expect((await saveAgentSettingAction({}, fd("stage-keeper"))).error).toBe("Couldn't save. Nothing was changed. Refresh to try again.");
     error = { code: "23514", message: "check constraint" };
-    expect((await saveAgentSettingAction({}, fd("email-intel"))).error).toBe("Couldn't save: check constraint");
+    expect((await saveAgentSettingAction({}, fd("email-intel"))).error).toBe("Couldn't save. Nothing was changed. Refresh to try again.");
     error = null;
     expect(await saveAgentSettingAction({}, fd("stage-keeper"))).toEqual({ ok: true });
     vi.resetModules();

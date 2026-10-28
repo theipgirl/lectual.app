@@ -91,6 +91,7 @@ describe("loadConsultsStrip", () => {
           state: "ready",
           proposalId: null,
           leadId: "lead-1",
+          matterId: null,
         },
       ],
     });

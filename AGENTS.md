@@ -264,7 +264,7 @@ the Today card only read; the "Set up" links go to pages that already exist and 
   can't be asked) is `couldnt-check`, never done and never to do, and no error text reaches the screen (the reading
   keeps only "could not be read"). The module list is read by the loader itself so a failed read isn't "module off".
   A module that is off is "to do" with a link to Settings → Modules, so the count is always N of 10.
-- **Settings redirect:** `/dashboard/settings` goes to the setup page for the admin tier until all ten are done (a
+- **Settings redirect (replaced in Sprint 32, see below):** `/dashboard/settings` goes to the setup page for the admin tier until all ten are done (a
   couldn't-check item counts as not done), then to Integrations as before. Every other role, signed out and an
   unresolvable role go to Integrations without the loader running. The setup page's "Go to Integrations" link is the
   escape for a firm whose remaining items are Lectual's to switch on (LawPay or Zoom not set up, no AI key, a module off).
@@ -766,6 +766,74 @@ the letter destination. Leads | Matters (opens on Matters), search, 8 recent, "S
   proposals host; the logo is `/brand/rpb-logo-cream.png`). `tests/proposals/public-assets.test.ts` fails on any other `src="/..."` or `url(/...)`
   in `src/app/p` or `src/components/client-proposal`. A new asset type needs a rewrite in lectual's `next.config.ts` first.
 
+## Today, names, consults, My Mail reading pane (Sprint 30, no schema)
+No migration, no dependency, nothing sends. The only sealed-token reads are the existing helpers (`ownConnectionSecrets` family in `src/lib/meetings/connection.ts`,
+`searchableMailboxAccess` in `src/lib/mailbox/my-mailbox.ts`); no new file imports the admin client (a test greps the list).
+- **Today header:** the "<firm> · <date>" label line is gone, so the h1 ("Good afternoon, Rebecca.") is the first thing; the firm name and date appear nowhere on Today.
+  **"Next two weeks" is removed** with its computation (the Calendar page still has dates). **Needs you** shows `NEEDS_YOU_SHOWN = 3` rows and "See all N" is a `<details>` holding the rest
+  in the same order (`NeedsYouSection`); the unavailable warning and the zero-items note are unchanged. The Consults card sits ABOVE Needs you.
+- **Logo:** `firmLogo(orgId, firmName, slug?)` in `src/lib/org/logo.ts` is the only map (by org id, else by slug). An entry is used only when it is a `/brand/` file, is not a cream variant and
+  EXISTS in `public/brand/` at render time, else the wordmark keeps the firm NAME as text. RPB maps to `/brand/rpb-logo-dark.png`, which is not in the repo yet (only the cream file is, and
+  it vanishes on the light bar), so RPB still shows its name until Taylor drops the dark file in. The CSS is `src/components/shell/wordmark.css`.
+- **Names:** "Your name" in the account menu opens `YourNameDialog` (mounted once in the dashboard layout, opened by `SHOW_NAME_EVENT`, like the feedback dialog: Esc, Tab wrap, focus return).
+  `saveFullNameAction` (`src/lib/account/actions.ts`) = `getScopedClient()` + `auth.updateUser`, merges `user_metadata`, writes `full_name = "<first> <last>"`, no user/org argument, fixed
+  sentences. Rules in `src/lib/account/name.ts`: first name required, 80 characters each, no `@`, no control characters (checked BEFORE whitespace is tidied). No usable name: Today greets
+  "Good afternoon." with a quiet "Add your name" button (`AddNameLink`) that opens the same dialog. Team settings already read the directory's `displayName`, which is `full_name`.
+- **Consults (Today):** two sources merged in `src/lib/calendar/consult-sources.ts` (pure; reads injected; live wiring `consult-sources-live.ts`). Outlook = the stored events (Mailboxes module
+  + an active Microsoft connection WITH `Calendars.Read`); Zoom = a LIVE `GET /users/me/meetings?type=upcoming` (`listUpcomingZoomMeetings`, 15 s timeout, nothing stored, no title/attendee/token
+  logged) through `ownZoomAccess()` in `connection.ts` (the importer's own refresh path, which persists the rotated refresh token; any member can read the firm-level connection).
+  Consult = `isConsultTitle` (the same regex as the sync). A Zoom consult's lead link needs an EXACT meeting-id or join-URL match to an imported `crm_meeting` with `lead_id`, else none.
+  Merge: sort by start, one row per call (`joinKey` ties a Zoom `/j/<id>` link to its meeting id), Outlook's row kept. Every source has a named state (ok, not-connected, needs-calendar,
+  needs-permission, reconnect, no-module, update-needed, unavailable) with its sentence and next-step link (`sourceNote`); "No consults in the next 7 days." only when EVERY source was read,
+  otherwise "No consults found in <the sources that were read>" plus the notes. The card never renders nothing. The helper returning nothing is "couldn't be read", never "no consults".
+- **Zoom scope:** `ZOOM_SCOPES` (the three recording/user scopes plus `meeting:read:list_meetings`) is sent as the OAuth `scope` (the authorize URL sent none before). **There is no `scopes`
+  column on `meeting_source_connection` (and this sprint adds no migration), so "needs permission" is judged from Zoom's own refusal** (403, or a 400/401 whose message names a scope), not from a
+  stored list. A firm that connected before this must press Reconnect Zoom once, and Taylor must add the scope in the Zoom app (docs/meetings-setup.md).
+- **My Mail reading pane:** `?m=<activity id>` opens the message in the page (`MailReadingPane`): From, To, Cc (only when present), date, subject and the body as PLAIN TEXT in a `<pre>` (wraps;
+  tags are escaped; links are text; no `dangerouslySetInnerHTML`). Rules in `src/lib/mailbox/read-message.ts`: the id must be a uuid; the `crm_activity` row is read through the scoped client and
+  the connection id and provider message id come ONLY from it; the connection is re-read through the scoped client on EVERY request (`searchableMailboxAccess`: active, visible, so another
+  person's personal mailbox or another firm is "This message is no longer available." with zero fetches). States: loading (Suspense), not available, gone (404, "no longer in the mailbox"),
+  couldn't be read, and a token/scope problem with a Reconnect link. Fetching is `fetchMessageToRead` in `fetch.ts`, which shares `bodyTextOf` with `fetchMessageBody` (Graph is asked for a text
+  body; HTML is converted). Nothing about the body is stored, cached or logged; the page stays `force-dynamic`. "Open in Outlook/Gmail" stays as a secondary link. Under 640px the pane replaces the
+  list and "Back to the list" returns to it.
+- **Inbox tab:** `?tab=inbox` lists the newest 50 messages of the chosen (else first) visible mailbox, read live (`fetchLiveInbox`: Graph `$top=50` ordered newest first; Gmail `labelIds=INBOX&maxResults=50`),
+  subject, sender, date and a short preview, nothing stored. A message that matches a stored activity row carries its client tag. A row opens the pane through a DISTINCT pair `?box=<connection id>&live=<provider id>`
+  (`m` wins when both are present): `box` must be a uuid AND be returned by the person's own scoped read, and `live` must match `LIVE_MESSAGE_ID` (`/^[A-Za-z0-9_=+-]{1,512}$/`: no slash, dot, whitespace or query
+  character; the existing looser pattern inside `fetchMessageBody` is unchanged) and is `encodeURIComponent`-encoded in the provider URL. Gmail uses its existing list/read calls, so there is no "Not available for
+  Gmail yet" state. The sidebar's old "Inbox" folder is now "Received" (the client-matched list) so the tab name is unambiguous.
+- **D2 and this sprint:** Taylor's "no email body or mailbox reading for proposals" is about proposals. The reading pane is a staff-facing My Mail feature and feeds nothing else (no agent, no proposal, no model call).
+
+## Plain language, one vocabulary, one list-page pattern (Sprint 31, no schema)
+No migration, no dependency, nothing sends. Words and layout only; every state rule (three-state reads, fail-closed modules, no send) is untouched.
+- **The glossary is `src/lib/ui/words.ts`** (pure). One export per firm-facing name: Copilot (ask questions), **Assistants** (the background agents, was Agents/Autopilot),
+  **Shortcuts** (was Skills), **Firm notes** (was Firm brain), the rail group **AI tools** (was IP.OS), **Approvals** (was Queue), **Leads** (was Intake/PNC for the list),
+  **Our turn**, **Temperature** (was lane), **Not rated** (was Not routed), **Moved automatically**, **Copy link to this view**, **Features** (was Modules),
+  **From their emails** / **Automatic stage moves** / **First read of this lead** (lead-page cards), `NOT_SWITCHED_ON` / `notReadyYet(feature)` / `notReadyPlural(...)`
+  ("This isn't switched on for your firm yet. Lectual will turn it on."), `CANT_SHOW`, the sign-in and feedback sentences. A name is changed there and nowhere else
+  (`tests/ui/words.test.ts` fails on a second whole-string copy). URLs, slugs, `data-tour` tokens, anchors (`#prep-consult`), DB values, agent ids, `orgHasModule` and the
+  `/dashboard/settings/modules/` route are NOT renamed; only the words a person reads.
+- **Platform voice vs firm voice.** Anything Lectual has to switch on (AI, Mailboxes, Zoom, LawPay, a table not yet there) says "isn't switched on for your firm yet. Lectual will
+  turn it on." Never "administrator", "deployment", "environment", "migration 0xxx", "database update", "AI key", "partner app", "schema", "module", "scope" (OAuth sense).
+  A failed read still says what could not load and what to do ("Can't show this right now. Refresh to try again."), never as empty or zero.
+- **Grep gate:** `tests/ui/no-build-words.test.ts` walks `src/app`, `src/components` and `src/lib` (comments stripped, string literals and JSX text only; `tests/ui/_scan.ts`)
+  and fails on the build vocabulary. The allow-list in the test has a reason on every entry: model prompts and letter text ("scope" as the legal term), `env.ts`, internal
+  email to Lectual (`failure-alert.ts`, `feedback/email.ts`), the firm's own Lawmatics stage names and spreadsheet vocabulary ("PNC"), and comma lists of column names (database selects).
+- **No raw error text:** `tests/ui/no-raw-error-text.test.ts` fails on `err.message` / `String(err)` under `src/app/dashboard` and `src/components` unless the line only logs or tests it.
+  The documented exceptions are the `friendly*Error` helpers and typed errors whose message is a sentence written for a person. Pages use fixed sentences: Brain, Leads
+  (`LeadsLoadFailed`), Campaigns (`campaignLoadError`), sign-in (`signInErrorMessage` maps `otp_expired` / `access_denied`, nothing else is echoed), the Assistants run log
+  (`friendlyRunError`, also used by the digest's reason line; unknown text becomes "This run failed. Lectual has been told and is looking into it.").
+- **One list-page pattern** (`src/components/list-page/`): `ListHeader` (one h1, one sub-line, no eyebrow), `ListToolbar` (search with a Search button and a Clear link only when a term
+  is set, the Table | Board toggle, a primary slot, a `MoreMenu` for rare actions), `Chip`/`FilterChips`, the shared `Popover`, and `list-page.css` (tokens only, text at least 12.5px, one
+  row height `--lp-row-h`, `.lp-pill`, `.lp-board-card`). Leads (`IntakeWorkspace`) and Matters (`matters/page.tsx`) both use it; Pipeline uses the toolbar and chips. `intake.css` keeps only
+  cell, board and drag rules. Leads keeps its behaviour: URL-driven filters, drag, stage menu, bulk move, the "Moved automatically" filter.
+- **Leads page:** the status strip is gone; the sub-line carries the counts and one hint (`leadsSubline`). Import and Reconcile stages are in More (`leadsMoreItems`; Reconcile only for the
+  admin tier). The three warning lines are ONE note (`detailsNote`): "Some details couldn't load (approvals, automatic moves). Refresh to try again." with a Refresh button, naming only the reads
+  that failed or were cut short; the chips and filters that depend on a failed read stay off. Empty states: no leads (Add a lead and a link to the intake form) and "No lead matches these
+  filters." (Clear filters). The Last touch header carries the arrow legend; each row's arrow has a title and a hidden label.
+- **Pipeline** says "This is a view-only overview. To move a lead, open it in Leads." and its column headers link to the Leads board (lead columns) or the Matters board (the rest).
+- Existing assertions changed on purpose: every test that pinned an old name or sentence (the agents, readiness, run-now, digest, nav, shell, reports, copilot, files, integrations,
+  consult-proposal failure, intake, matters-header and feedback tests) now pins the glossary wording.
+
 ## JSX text spacing: keep the `{" "}`
 Next 16.2.7's compiler DROPS the leading space of JSX text that contains an HTML entity
 (`&apos;`, `&amp;`, `&rsquo;`…) and runs onto another line, even if that is only the line
@@ -778,3 +846,182 @@ this and plain-JSX line-break glue (`{name}↵word`); `pnpm lint --fix` writes t
 ## Commands
 `pnpm build` · `pnpm lint` · `pnpm test`. Env: copy `.env.example` to `.env.local` and fill it in
 from lectual-dev.
+
+## Proposal builder, classes, client add-class, recommended package (Sprint 28, no schema)
+Money sprint. Nothing here sends, moves a stage or opens a matter. No migration, no dependency.
+- **A package is FLAT up to its included classes** (Taylor, Oct 27). `quoteProposal` uses `base + perClass x max(0, classes - included)`: fewer classes never
+  lower a package, each class past the included count adds the per-class legal price, and the USPTO fee is $350 per class per mark for EVERY class, inside
+  the included count too (never waived, never touched by a credit, the second-mark percent or the custom switch). Accepted snapshots keep their stored figure
+  and are never re-priced. **Exception:** `pricing.reduce_under_included === true` (a custom package, in the content jsonb) restores the old reduction
+  (never below zero). Staff set it under More options ("Custom package: $825 less per class under the package's included classes", with both prices shown);
+  the drafter sets it only on a quoted, firm-spoken sentence plus a CHECK FIRST flag; the accept action and the client page never take it from the browser.
+- **One class is always included** (`src/lib/proposals/class-lock.ts`, pure). `classLock`: exactly one ticked class locks (text "Included" when it is the brand's
+  only class, "At least one class is included" otherwise); with several ticked nothing is locked. `repairSelection` / `repairPreselections` tick the first class
+  of a ticked mark that has none; a brand with no class at all cannot be repaired. Used by the client page, the editor's class rows (a locked box is posted by a
+  hidden twin, since a disabled box is not posted), `validateContent` (a mark that starts ticked needs a class that starts ticked: an error), `parseName`
+  (repairs) and the accept path.
+- **No untick to $0, fixed offers (main's PR #4, merged on top).** `wouldEmptyQuote` / `lockedSelectionIds` (`pricing.ts`, over the content AS SHOWN, added classes included) hold
+  the last buyable mark/class with `KEEP_ONE_HINT`; the page disables a box held by EITHER that or `classLock`. `isFixedOffer` (one name, one mark, one class) draws plain rows,
+  no checkboxes, and `defaultSelection` / `normalizeSelection` always tick it; the "Add a class" field still shows on a fixed offer. PR #4's $3,300 expectations became $4,950 (flat rule).
+- **The client adds a class** (`src/lib/proposals/added-classes.ts`, pure). The browser sends DESCRIPTIONS only, `{ brandNameId: string[] }`: at most 5 per
+  brand name, 1 to 200 characters after trimming, plain text (angle brackets and control characters are REFUSED, not cleaned). Each becomes one more ticked class
+  (`id add-<nameId>-<n>`, `client_added: true`, label = the description) and is priced by `quoteProposal`: it is a class like any other, so past the package's
+  included count it costs the extra-class fee (the second mark is discounted on it like any extra class) plus the USPTO fee per class per mark.
+  `quoteWithAddedClasses` is the ONE helper the page's live total and the accept path both call (`{ repair: true }` only on the server). Accept refuses anything
+  over the limits with one fixed sentence and writes nothing (`invalid_added`), drops added classes for a brand name with no ticked mark, and stores the added
+  classes in `accepted_selection` (their ids) and `accepted_snapshot.content` (the classes, flagged) with the recomputed quote. `acceptProposalAction(token,
+  selection, addedClasses)` has no money parameter. `publicContent` keeps `client_added` and `reduce_under_included`.
+- **What the client typed never leaves the staff pages.** The Lawmatics note, the staff notice and the timeline line carry the COUNT of added classes and the new
+  legal total (`added_classes`, `legal_total_cents` on the step payload); `acceptanceNoteBody` leaves the client's classes out of its class list. Staff see the
+  descriptions on the proposal page ("Classes the client added") and on the accepted line of the Activity log (`src/lib/proposals/added-view.ts`, React text).
+  The LOE adapter already reads the snapshot's quote, so it gets the larger class count, the class and the higher amount (tested).
+- **The builder** (`BuilderLayout`, shared by New proposal and the editor): 1 Who, 2 Brand names and classes, 3 Package and pay link, then the one button
+  (Create draft / Save and create link), then ONE closed `<details class="pe-more">` "More options" (" - N changed" only when N > 0;
+  `src/lib/proposal-editor/more-options.ts`). It opens by itself when an issue's path is inside it. Each step's form carries an `id`; the More options fields
+  belong to it through their `form` attribute (client: first name, company, title, expiry; package: the five numbers and the custom switch; per brand: what it
+  is, note, own price, what each mark protects). The marks' and classes' rows live in `NameRowsProvider` so Step 2 and More options agree on which row is which
+  (give it a `key` that changes when a brand name is added or removed). **The pay link moved** from the client form to the package form (`savePricingAction`
+  saves it; `parseDetails` leaves it alone when it isn't posted).
+- **Lead link** in the editor header (`LeadLink`): "For <name> ->" to the lead, "Matter ->" when set, "Lead couldn't be loaded" on a failed read, "Not linked to a
+  lead" with a picker (`LinkLeadForm`, `linkLeadAction`) over `loadLeadOptions()`. Scoped client only.
+- **Consult drafter** (`draft.ts`, `package-choice.ts`): prices with the package the REVIEWED consult details name (when on the firm's current list), else the one
+  named on the call (on the list AND its name really in the record), else the firm's default (first on the list) with "CHECK FIRST: ... Choose the package before
+  saving." Names match whole, ignoring case, a leading "the" and a trailing "package" (`findPackageSpoken`). An unreadable or empty list falls back to the flat
+  pricing package and says so. A consult credit (fixed amount, "Consult credit") and a second-mark percent (0 to 50) are applied only on quoted words the firm
+  said (`sourceText` rule); a credit larger than the legal fee is capped; every applied and every ignored value is named in the flags with its source. **No email
+  body or mailbox is read for proposals (spec D2, Taylor Oct 27).** Both the transcript upload and the meeting "Create proposal" go through `runConsultProposal`,
+  which carries `lead.id` onto the proposal.
+
+## Pipeline moves from consults and proposals, new-lead stage, board and queue polish (Sprint 29, no schema)
+No migration, no dependency, nothing sends. The Stage Keeper's rules from Sprint 16 (forward only, never into `won` / `lost` / `nurture`, the sensitive guard, the
+7-day person-move card, one action per lead per run) apply to every new signal below.
+- **New Stage Keeper signals** (`src/lib/stage-keeper/signals.ts`, reads in `src/lib/agents/stage-keeper/run.ts`). `consult-held`: a `crm_meeting` (Zoom or Fathom)
+  with `lead_id` set (never `suggested_lead_id`) that started in the past, or already holds a transcript, within the 30-day window; key `<lead>:meeting:<id>`; the
+  transcript, summary, attendees and link are never selected. `post-consult-sent` gains two sources: a `client_proposal` with status `sent` or `accepted` (one per family,
+  key `<lead>:proposal:<family_id>`; status, version and dates only, no content or address) and an APPROVED `CLIENT_EMAIL` queue item of the post-consult drafter
+  (`ctx.listApproved`, wired next to `listPending`; key `<lead>:queue:<id>`; linked to a lead through the queue's own `resolveBatch` and only when it names exactly ONE
+  lead). Each optional read that fails (meetings, proposals, queue, the firm's mailbox addresses) adds one sentence to the run summary and gives no signal: "none found"
+  is only said about a read that answered. Evidence stored on a move or card: meeting provider/title/start, proposal version/status/date, queue type/approved date.
+  `consult-held` resolves "Consult Held", "Consultation Held", "Consult Completed" (`DEFAULT_STAGE_NAMES`), and when the firm has none it supports the
+  `consult-scheduled` stage. **A move records the other forward signals it accounts for** (`also_signal_keys`, read by `consumedSignalKeys`), so a lead a person undoes
+  is not moved back by the held meeting or the approved email under the proposal that acted. `moves.ts`, `format.ts`, the lead timeline line and the Reconcile "Email /
+  calendar" source (`evidenceOwnDate`) describe the new kinds in words.
+- **Firm mail cc'd into a shared inbox counts as sent by the firm** (`src/lib/mailbox/firm-sender.ts`, pure): a message stored as `email_received` whose sender is a firm
+  mailbox address, or on the domain of one (a public webmail domain such as gmail.com contributes its exact address only), is firm-sent for the Stage Keeper and the Reconcile
+  milestone classifier. Sender and subject only, never a body; nothing about the address is stored or logged.
+- **NO Lawmatics stage mapping** (Taylor, Oct 27). Lawmatics stage names never choose or move a lead. The importer (`import-plan.ts`) files every new lead in the firm's
+  new-enquiry stage, flags a person Lawmatics gave a stage (or "Hired") with the Lawmatics text as read-only evidence (`lawmatics_stage_unmapped` on the `lead_created` row), and
+  never moves an existing lead: the "move existing leads" option, the divergence report and `stage-map` use in the planner are gone. Reconcile's Lawmatics source is always
+  "unmapped" text (a `needs_matter` pointer for "Hired" only) and its stage-name milestones are undated, so they are cited and never acted on. `stage-map.ts` itself is untouched
+  (the matters importer still uses it). **The ON HOLD new RPB intake board is NOT built**: no new aliases ("Discovery Call Scheduled" and "Strategy Session Scheduled" stay as
+  they were), no "Consult Held - Proposal in Progress" or "Proposal Sent" names, no milestone-order change, no Lost / Nurture change.
+- **The new-enquiry stage** (`src/lib/pipeline/new-enquiry.ts`, the ONE rule): the open stage named like "Potential New Client", "New Lead", "New Inquiry" / "New Enquiry" (one alias
+  list), else the first open stage in pipeline order; never `won`, `lost` or `nurture`, and never "Follow-Up" just because it sorts first. Used by the importer, Reconcile's Create
+  lead (when the sheet names no stage), `createLead` with no stage, and the public intake form. **Stage order finding:** `crm_stage.order_index` is NOT NULL in the generated schema
+  (this repo has no database access, so RPB's actual rows were not read) but is not unique, and the board sorted on it alone; `src/lib/pipeline/stage-order.ts` breaks ties on name
+  then id (a missing number sorts last) and the Intake board, `listStages` (the Pipeline page) and the new-enquiry rule all use it, so every surface draws the pipeline the same way.
+- **Intake board**: each card has a one-line reason (`src/lib/intake/stage-decision.ts`): "Moved automatically · consult held Oct 23" (the Stage Keeper's move, evidence as the tooltip;
+  the table keeps the chip) or "Lawmatics: <stage>" for an imported lead still in the stage the importer filed it in, with a pill "Imported — stage needs a decision" ("Hired in Lawmatics —
+  open a matter" for a hired one). A flag is open only while the lead has not left that stage. The "Needs a stage decision" filter (`?decision=1`) and a per-column "N to decide" badge read
+  the same flags (`loadStageDecisions`, two states: an unreadable list says so, hides the filter and badge, and never filters to "no leads"). Tick cards and "Move to..." moves up to 200
+  at once through `bulkMoveStageAction` -> `runBulkMove` (`src/lib/pipeline/bulk-move.ts`): role re-resolved, a `won` stage refused (the select never offers one either), more than 200 refused
+  with nothing written, every lead re-read through the scoped client, each moved through `moveLeadStage` (logged one by one), a failing lead reported on its own card while the rest move.
+  Drag is unchanged.
+- **Meeting link form** (`LinkMeetingForm`): linked reads "Linked to <lead> · <matter>" (links) with Change; the selects appear only after Change, with "Update link" and Cancel; unlinked
+  reads "Link"; a suggestion reads "Suggested: <name> · Link" with Choose another; a saved change folds back to the text; Unlink stays. "Save link" is gone.
+- **Pickers**: rows are one link with a bold name and ONE quieter line (lead: business · email; matter: client, then mark · matter number), no repeated text, a visible "Selected"
+  marker plus `aria-current` on the chosen row, tokens only, `:focus-visible` in `--ox`. `/dashboard/proposals/?lead=<id>` opens the transcript form with that lead chosen (`preselectedLeadId`
+  accepts only an id in the list the form offers).
+- **Queue item**: the draft is drawn ONCE, as its rendered view with Edit; Edit swaps in the editor with "Done editing" (keeps the edit, shown as "edited") and Cancel (puts back what the
+  editor opened with); the edit is posted from whichever view is showing. The aside is a `<dl>` (Client, To, Subject, Send at, Queued...). "For the reviewer" is a list
+  (`reviewer-summary.ts`): split on line breaks, bullet markers and inline "CHECK FIRST", CHECK FIRST items first and marked, more than five behind "Show all".
+- **Proposals list**: Accepted ("Accepted Oct 21" / "Not yet") and Paid columns on every row. Paid is "Paid Oct 24 · Undo" (who marked it is the tooltip), "Not paid · Mark paid" with "Mark
+  paid after you've confirmed the payment in Lawmatics.", "Paid status couldn't be read" (never "Not paid", no button) or "—" for a row not accepted. Mark paid / Undo are Sprint 19's own
+  actions and roles; `paid.ts` and `paid-view.ts` are unchanged. **Mark paid is a stopgap until the firm's LawPay connection takes payment on the proposal**; then the paid state comes from
+  that payment. The Accepted segment lists accepted-and-not-paid first (`sortForSegment`). Under 760px a row stacks, with Accepted and Paid directly under the client's name.
+- **Existing assertions changed on purpose**: the importer and Reconcile tests that pinned a Lawmatics stage choosing a Lectual stage; the board test that pinned the chip text on the card
+  (the card now says "Moved automatically ..."); the queue page tests that pinned the stacked Preview plus textarea; the proposals table's seven columns (now nine).
+
+## Shell, navigation, mobile, settings (Sprint 32, no schema)
+No migration, no dependency, nothing sends. Navigation changes are a courtesy: every page and action still gates itself.
+- **Rail open by default.** `railIsPinned(cookie)` (`src/lib/nav.ts`): a missing `lx_rail` cookie is open; only `collapsed` closes it. Pin still writes the cookie.
+- **Parent rows open the list.** A `RAIL_TREE` parent's `href` is its `link` child (Leads -> `/dashboard/intake/`, Active matters -> `/dashboard/matters/`) or, with
+  no list of its own, its first visible child (Communication -> Mail with the mailbox module, else Meetings; AI tools -> Copilot). The reports (`REPORTS`,
+  `/dashboard/reports/<key>/`) stay and are the section's **Summary** tab: `SectionTabs` ("<List name> | Summary", never the Table | Board toggle's class) sits on
+  Leads, Matters and the report pages; `reportListHref` / `reportListLabel` give the list side for a report.
+- **Approvals is top level**, right under Today, keeping `nav-queue` and the three queue states (`railCountFor`, shared by the rail and the phone bar). Communication
+  no longer counts it.
+- **One sign-out.** The rail's avatar/name/Profile/Sign out block is gone; `AccountMenu` is the only signed-in-shell place with Sign out (`NoFirmAccess` keeps its own,
+  there is no menu on that screen). The menu closes on Esc (focus back to the avatar) and on a pointer-down outside (`src/lib/shell/menu-behaviour.ts`, pure), uses
+  `role="menu"`/`menuitem`, groups Getting started + Show tips again + Send feedback under "Help and tips", and prints roles with `ROLE_LABEL` / `roleLabel`
+  (moved to `src/lib/auth/roles.ts`; `TeamForms` re-exports it). No source prints a role with `replace("_", " ")`.
+- **Section label** is drawn only where the h1 differs: `showSectionLabel` (`src/lib/section-label.ts`) hides it on the root of Today, Calendar, Meetings, Pipeline,
+  Notifications, Leads, Matters, Approvals, Documents, Proposals and Mail; deeper pages, reports and Settings keep it. `sectionLabelFor` is unchanged. The divider
+  now lives inside `SectionLabel`.
+- **Phone bar** (`MobileBar.tsx`, under 900px; the rail column is hidden there): Leads, Approvals, Mail, Matters, More, each with a text label. Mail is dropped
+  without the mailbox module. `moreSections` builds the More sheet from the same visible list, grouped by the rail's labels (Meetings, Calendar, Campaigns, Forms,
+  Proposals, Pipeline, Documents, Copilot, Assistants, Shortcuts, Firm notes, Settings), so a section the firm lacks never appears. The sheet is a modal dialog:
+  focus moves in, Tab wraps, Esc / an outside tap / navigating close it, focus returns to More.
+- **Stacked cards under 640px.** CSS only: `.lx-stack` tables (Matters, Documents, Approvals) and the Proposals table (its own 760px grid) show each cell's `data-label`
+  via `::before`; the header row is kept off-screen for screen readers; the Leads grid does the same through `.lp-table-min` / `data-label`. The 760/980/1000px minimums
+  apply only above those widths. `html, body, .lx-page, .lx-content` clip sideways overflow at <=640px. `@media (pointer: coarse)` sets 44px on buttons, nav items, chips,
+  the avatar and bell. Not verified in a real browser at 375px here; the CSS and markup are tested.
+- **Settings always opens Settings.** `/dashboard/settings` redirects to Integrations for every role and reads nothing. Setup is a tab: `SETUP_PATH` is now
+  `/dashboard/settings/setup/` (inside the Settings layout; the admin tier sees a "Setup · N of M" tab, the page still `notFound()`s for every other role). The old
+  `/dashboard/setup/` redirects there. The side list is a horizontally scrolling strip under 900px; the note uses `ADMIN_TIER_PHRASE`.
+- **Lectual sets this up.** Checklist items carry `owner`. AI (when off) and LawPay (when the deployment has no LawPay app) are Lectual's: the pill reads "Lectual sets
+  this up", no button, and they are left out of `total` and `complete` while not done (M can be below 10; a done one counts normally). The Zoom option inside the Meetings
+  item says "Zoom: Lectual sets this up." when the Zoom app is missing, but that item stays the firm's. A "couldn't check" item is never reclassified. The facts are
+  plain booleans on `SetupState.lectual` from `lawPayClientCredentials()` / `zoomClientCredentials()`; only an explicit `false` makes a step Lectual's, so a missing or failing
+  reader leaves it the firm's. Button labels: to-do "Set up", couldn't-check "Check again", done "Review"; the bar is a `role="progressbar"`.
+- **Getting started**: `recommendedFlow(tracks, done)` (first undone flow in track order) gets the only primary button and a "Start here" pill; done checks use `--ok`;
+  `hub.css` has a <=560px layout.
+- **Copilot launcher** lifts above a sticky Save bar (`data-save-bar`, today the Forms "Unsaved changes" bar) and hides on phones while one shows; the Esc hint shows
+  from 900px. The proposal editor's save rows are not sticky, so they are not marked.
+
+## Page-level cleanups (Sprint 33, no schema)
+No migration, no dependency, nothing sends, no new service-role code. Pricing is untouched (`src/lib/proposals/pricing.ts` has no diff); the client page still prices through
+`quoteWithAddedClasses`. Taylor, Oct 27: no "what is a class" text and no class renumbering on the client page. Decisions D1-D11 (contract `pge-workspace/sprint_33_contract.md`):
+- **D1 Contact line.** `crm_org_profile` has no phone or email column and a migration is not allowed, so `firmContactFromSignoff` (`src/lib/proposals/firm-contact.ts`) takes the first
+  email address and the first phone-looking number from the profile's `email_signature`; neither found = no line. The public read (`PUBLIC_PROFILE_COLUMNS`) gains `display_name` and
+  `email_signature` ONLY to derive `PublicProposalFirm.displayName` and `.contactLine`; the raw sign-off never reaches the view. The commitment sentence
+  (`commitmentSentence`, `commitment.ts`) names the profile display name, else the firm's name, never a hard-coded firm. RPB's footer keeps its own branded line.
+- **D2 USPTO line.** `usptoLine` (`uspto-line.ts`) only formats the engine's quote: "3 classes × 2 marks × $350" when one brand name's classes × marks equals the quote's own `class_count`
+  and its `gov_cents` equals the total; otherwise "USPTO fees: $X ($350 per class per mark)". It does no money arithmetic (a guard test forbids multiplying cents outside `pricing.ts`).
+- **D3 The one client-email button (merged with main's PR #4).** "Create post-consult email" (`PostConsultEmail`, drawn by `Lifecycle` beside the link) ->
+  `queuePostConsultEmailAction` -> `runManualEmail` (`src/lib/consult-proposal/manual-email.ts`, deps injected). Sprint 33's separate "Draft email to client" (`draft-email.ts`)
+  was removed: both queued a `CLIENT_EMAIL` with the link. It queues Rebecca's approved template (`renderProposalEmail`) plus the `queue_drafted` marker `link.ts` gates
+  approval on, ONLY for a `sent` / `accepted` version, link via `clientLinkOrigin` + `clientLinkUrl`. Refused, creating nothing: no lead or matter (the marker needs one), no
+  real client email, no firm name, an email for this version pending (marker), any pending `CLIENT_EMAIL` whose body holds `/p/<token>` (three-state: unconfigured = no queue,
+  unreachable = fail closed). No send call, no mailbox read (spec D2). The page says "The client hasn't been emailed by Lectual." (`NOT_EMAILED`).
+- **D4 Withdraw** moved into a "More" menu (the shared Popover: Esc and outside click close it) with an in-page confirm and Cancel; the action and its roles are unchanged.
+- **D5 Documents.** `documents/page.tsx` is gated on `document-center` (`notFound()`, an unreadable module list too). `failureReason` (`src/lib/documents/failure-reason.ts`) maps the stored
+  `error_message` to a fixed sentence and never prints it. Retry (`retryDocumentAction`, `src/lib/documents/retry.ts`) re-runs the existing `generateApprovedDocument` for the same approved queue item,
+  with the matter write role and the module re-checked; it reads the row back and reports done or still failed. A list that came back with 300 rows says it is cut at 300.
+- **D6 Team.** `RoleSelect` asks "Change <name>'s role from X to Y?" with Confirm and Cancel; the select no longer submits on change. `RoleTable` ("What each role can do") is computed from the
+  SAME role lists the code checks (`CAN_WRITE_LEAD`, `MATTER_WRITE_ROLES`, `QUEUE_APPROVE_ROLES`, `FILE_DELETE_ROLES`, `hasRole(... "senior_admin")`) in `src/lib/team/role-table.ts`; Clerk and Law clerk have
+  the same access today and the table says so.
+- **D7 Assistants.** `assistantHealth` (`src/lib/agents/health-line.ts`) is the one line at the top ("All assistants ran normally today" / "N need attention" / "Can't show assistant health right now."); the
+  "Didn't finish" 15-minute rule is the run log's. Changing autonomy asks first (only Confirm saves). The run log's status dots carry text. **Run now is drawn only for a role that can run it**
+  (`decideRunNow`'s `role` block draws nothing, and no reason line); every other block is still a disabled button with its sentence.
+- **D8 Matters.** Four chips (`LIST_CHIPS`: Open, Needs your review, Unassigned, Closed); the bands stay as headings and the other segment keys still work in a URL. `stageDisplayName` strips a "3. " prefix.
+  The Status column is gone (status joins the sub-line when not Open). Board cards have a `MoveMenu` (the existing stage action, then a refresh; `MovedCardScroller` brings the card back into view).
+  "Open a matter" is a header button (`OpenMatterButton`) that opens the existing `#open-matter` panel.
+- **D9 Lead page.** Order: header, `LeadStatusRow`, ONE `NeedsAttentionCard` (booked consult, pending approvals, client-email proposals, stage suggestions; rendered only when `needsAttention` says so, and a failed
+  read still opens it), `ComposerTabs` (Text | Voice, both panels mounted), Timeline, Prep, Consult details, Meetings, Proposals, "Log a consult outcome" (closed `<details>`), Answers, Documents, Sequences,
+  Temperature detail. "Last heard from N days ago" reads `lead.last_inbound_at` (prop `lastInboundAt`), the same field as the aside, not `last_activity_at` (which staff notes, edits and moves bump); null, unparseable or future is "No contact yet". This deliberately departs from the contract's D9 (attempt 2). On phones a Call / Email row (`tel:` / `mailto:` only for what the lead has) and the aside is a
+  `<details>` "Details and tags" that comes first. Every anchor and `data-tour` token is kept once.
+- **Matter page.** Header buttons for the letters; phone order by CSS (`matter-page.css`); "Saved" appears on the Stage / Status / Owner selects from the action's own result; Owner, Package, Came from and
+  days in stage each appear once; deadlines say "No deadlines yet." with an "Add a deadline" button; "Case details" / "Filing details".
+- **Proposals list and editor.** One name, "Proposals" (`PROPOSALS_NAME`, `words.ts`), on the h1, tab title, back links and editor label. Table first; the consults strip is a collapsed `<details>` "(N ready to
+  draft)"; "Not ready" prints "Transcript still processing"; "Link to a lead" is a picker (`LinkLeadPicker`, the existing `linkMeetingAction`, the scoped lead list, a failed read is its own alert; the meeting's matter
+  is sent back so linking never drops it). The fee sentence (`FEE_SENTENCE`) appears once. The editor shows the fees once (the card's copy is `showFees={false}`), "Go to first problem" (`firstProblem`), one "History" card.
+- **Integrations.** Every card is an `IntegrationRow`; the IMAP and AI-assistant "Coming soon" rows are gone (the `coming-soon` state stays in `states.ts`, unused); a disabled connect button carries `SWITCH_ON_WORDS`
+  through `aria-describedby`. **Proposal settings** are one form (approvers first, then prices, links, includes) with one Save; `saveProposalSettingsAction` also saves `pkg.*` fields when present and passes
+  `default_pay_url` through; `savePackagesAction` stays as the prices-only entry point.
+- **D10 Small items done:** the approval item's tab title is its headline ("Approval" fallback); Notifications lost the "Inbox" eyebrow and has the new error sentence; Calendar says "Eastern time", has plain Outlook notes
+  and arrows named by period; the Meetings banner names the source. **Not built (need a new action or a decision):** a direct "Import recent meetings" button on an empty Meetings page; naming who to ask
+  to connect Meetings; folding consults into one mixed Calendar agenda; the Calendar "Unconfirmed" visible text.
+- **Existing assertions changed on purpose:** the lead-page placement tests (Answers, Documents now after the consult material; the consult outcome form is inside a `<details>`), `WaitingOnRebecca` renders nothing for an
+  empty queue, the matter page sub-line tests (second line), Integrations "Coming soon" rows, the proposals list subtitle / "Show" / fee sentence / strip tests, the Lifecycle Withdraw tests (it is in More), the
+  Matters Status column, the Run now role tests, the settings "Save proposal settings" label, and the calendar / notifications copy.

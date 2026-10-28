@@ -3,6 +3,8 @@ import type { Database } from "@/lib/db/types";
 // @/lib/matters does NOT import automation or pipeline, so this is cycle-free
 // (pipeline → automation → matters; matters is a leaf).
 import { ensureMatterForLead } from "@/lib/matters";
+import { ReadableError } from "@/lib/ui/readable-error";
+
 
 type ScopedClient = Awaited<ReturnType<typeof getScopedClient>>;
 type AutomationTrigger = Database["public"]["Enums"]["crm_automation_trigger"];
@@ -134,7 +136,7 @@ async function executeAction(
       case "apply_tag": {
         const a = raw as unknown as ApplyTagAction;
         if (!ctx.leadId || !a.tagId) {
-          throw new Error("apply_tag requires a leadId in context and a tagId");
+          throw new ReadableError("apply_tag requires a leadId in context and a tagId");
         }
         const { error } = await supabase.from("crm_lead_tag").insert({
           org_id: orgId,
@@ -150,7 +152,7 @@ async function executeAction(
       case "change_stage": {
         const a = raw as unknown as ChangeStageAction;
         if (!ctx.leadId || !a.stageId) {
-          throw new Error("change_stage requires a leadId in context and a stageId");
+          throw new ReadableError("change_stage requires a leadId in context and a stageId");
         }
         const now = new Date().toISOString();
         const { error } = await supabase
@@ -179,7 +181,7 @@ async function executeAction(
 
       case "assign_task": {
         const a = raw as unknown as AssignTaskAction;
-        if (!a.title) throw new Error("assign_task requires a title");
+        if (!a.title) throw new ReadableError("assign_task requires a title");
         const { error } = await supabase.from("crm_task").insert({
           org_id: orgId,
           lead_id: ctx.leadId ?? null,
@@ -195,7 +197,7 @@ async function executeAction(
       case "enroll_drip": {
         const a = raw as unknown as EnrollDripAction;
         if (!ctx.leadId || !a.sequenceId) {
-          throw new Error("enroll_drip requires a leadId in context and a sequenceId");
+          throw new ReadableError("enroll_drip requires a leadId in context and a sequenceId");
         }
         const { error } = await supabase.from("crm_drip_enrollment").insert({
           org_id: orgId,
@@ -222,7 +224,7 @@ async function executeAction(
       }
 
       default:
-        throw new Error(`Unknown automation action type: ${type}`);
+        throw new ReadableError(`Unknown automation action type: ${type}`);
     }
   } catch (err) {
     return { type, ok: false, error: err instanceof Error ? err.message : String(err) };

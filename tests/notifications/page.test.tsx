@@ -50,7 +50,7 @@ describe("/dashboard/notifications page (F4)", () => {
     listMinePage.mockResolvedValue({ rows: [], hasMore: false });
     const html = await render();
     expect(html).toContain("You&#x27;re all caught up");
-    expect(html).not.toContain("couldn&#x27;t be loaded");
+    expect(html).not.toContain("We couldn&#x27;t load your notifications");
   });
 
   it("says No unread notifications on an empty Unread tab", async () => {
@@ -63,7 +63,7 @@ describe("/dashboard/notifications page (F4)", () => {
   it("says it couldn't load, and never all caught up, when the read fails", async () => {
     listMinePage.mockRejectedValue(new Error("db down"));
     const html = await render();
-    expect(html).toContain("couldn&#x27;t be loaded");
+    expect(html).toContain("We couldn&#x27;t load your notifications. Try again in a moment.");
     expect(html).toContain("lx-banner-risk");
     expect(html).not.toContain("all caught up");
     expect(html).not.toContain("No unread");

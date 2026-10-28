@@ -11,6 +11,7 @@ import {
   loeVariantFor,
   LOE_REFUSAL_TEXT,
 } from "@/lib/proposals/loe-adapter";
+import { quoteWithAddedClasses } from "@/lib/proposals/added-classes";
 import { sevetri } from "./fixture";
 import { acceptedSnapshot, CONCIERGE } from "./accepted-fixture";
 
@@ -230,5 +231,20 @@ describe("the fee chart flattened for the Lawmatics fields", () => {
     expect(values["LOE Legal Fee"]).toBe(input.amountPaid);
     expect(values["LOE USPTO Fees"]).toBe(input.govFeesText);
     expect(values["LOE Signature Deadline"]).toBe("2026-11-05");
+  });
+});
+
+describe("Sprint 28: a snapshot with a client-added class", () => {
+  it("gives the LOE the larger class count, the added class in the class list and the higher amount paid", () => {
+    const base = acceptedSnapshot({ classes: 3, packageName: "Concierge" });
+    const plain = adapt(base);
+    const priced = quoteWithAddedClasses(base.content, base.selection, { p: ["Online store services"] });
+    if (!priced.ok) throw new Error("priced");
+    const added = { ...base, content: priced.content, selection: priced.selection, quote: priced.quote };
+    const input = adapt(added);
+    expect(input.classCount).toBe(plain.classCount + 1);
+    expect(input.classSelected).toContain("Online store services");
+    expect(Number(String(input.amountPaid).replace(/[^0-9.]/g, ""))).toBeGreaterThan(Number(String(plain.amountPaid).replace(/[^0-9.]/g, "")));
+    expect(priced.quote.legal_total_cents - base.quote.legal_total_cents).toBe(82_500);
   });
 });

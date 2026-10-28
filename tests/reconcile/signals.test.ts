@@ -154,11 +154,12 @@ describe("matching a lead to a Lawmatics record", () => {
 
 describe("the Lawmatics source signal", () => {
   const lead = { lawmaticsId: "100", email: null };
-  const sig = (stageName: string | null) => lawmaticsSignalFor(lead, indexLawmatics([rec({ stageName })]), STAGES);
+  const sig = (stageName: string | null) => lawmaticsSignalFor(lead, indexLawmatics([rec({ stageName })]));
 
-  it("resolves a stage by name", () => {
-    expect(sig("Consultation Scheduled")).toMatchObject({ kind: "stage", stageId: S.consult, wording: "Consultation Scheduled" });
-    expect(sig("Discovery Call Scheduled")).toMatchObject({ kind: "stage", stageId: S.consult });
+  it("never resolves a stage by name: even a name that is also one of the firm's stages is read-only text", () => {
+    expect(sig("Consultation Scheduled")).toEqual({ kind: "unmapped", wording: "Consultation Scheduled" });
+    expect(sig("Discovery Call Scheduled")).toEqual({ kind: "unmapped", wording: "Discovery Call Scheduled" });
+    expect(sig("Potential New Client")).toEqual({ kind: "unmapped", wording: "Potential New Client" });
   });
   it.each(["Hired", "Hired Client", "hired client", "HIRED-CLIENT", "3. Hired"])('"%s" is a client', (name) => {
     expect(sig(name)).toEqual({ kind: "needs_matter", wording: name });
@@ -173,7 +174,7 @@ describe("the Lawmatics source signal", () => {
     expect(sig("  ")).toEqual({ kind: "none", note: "the Lawmatics record has no stage" });
   });
   it("no record is none", () => {
-    expect(lawmaticsSignalFor({ lawmaticsId: "nope", email: null }, indexLawmatics([rec({})]), STAGES)).toEqual({ kind: "none", note: undefined });
+    expect(lawmaticsSignalFor({ lawmaticsId: "nope", email: null }, indexLawmatics([rec({})]))).toEqual({ kind: "none", note: undefined });
   });
 });
 
@@ -246,14 +247,14 @@ describe("the Email / calendar source also reads the Stage Keeper", () => {
 
   it("an agent move shows with its stage, its wording and the evidence date", () => {
     const evidence = agentEvidenceFor([agentMove()]);
-    expect(evidence).toEqual([{ stageId: S.loe, wording: "Stage Keeper: LOE sent", date: "2026-09-09T10:00:00Z" }]);
-    expect(emailSignalFor([], STAGES, evidence)).toEqual({ kind: "stage", stageId: S.loe, stageName: "LOE & Invoice Sent", wording: "Stage Keeper: LOE sent", date: "2026-09-09T10:00:00Z" });
+    expect(evidence).toEqual([{ stageId: S.loe, wording: "Automatic move: LOE sent", date: "2026-09-09T10:00:00Z" }]);
+    expect(emailSignalFor([], STAGES, evidence)).toEqual({ kind: "stage", stageId: S.loe, stageName: "LOE & Invoice Sent", wording: "Automatic move: LOE sent", date: "2026-09-09T10:00:00Z" });
   });
 
   it("a pending suggestion shows too, as a suggestion", () => {
     const evidence = agentEvidenceFor([suggestion()]);
-    expect(evidence[0].wording).toBe("Stage Keeper suggests: Post-consult sent");
-    expect(emailSignalFor([], STAGES, evidence)).toMatchObject({ kind: "stage", stageId: S.post, wording: "Stage Keeper suggests: Post-consult sent" });
+    expect(evidence[0].wording).toBe("Automatic move suggested: Post-consult sent");
+    expect(emailSignalFor([], STAGES, evidence)).toMatchObject({ kind: "stage", stageId: S.post, wording: "Automatic move suggested: Post-consult sent" });
   });
 
   it("a move that was undone or replaced, and a suggestion that was decided, are not evidence", () => {
@@ -266,7 +267,7 @@ describe("the Email / calendar source also reads the Stage Keeper", () => {
   it("the newest mapped evidence wins, mail or agent", () => {
     const evidence = agentEvidenceFor([agentMove()]); // 2026-09-09
     expect(emailSignalFor([mail("discovery-call", "2026-09-20T10:00:00Z")], STAGES, evidence)).toMatchObject({ stageId: S.consult, wording: "Discovery call email" });
-    expect(emailSignalFor([mail("discovery-call", "2026-09-01T10:00:00Z")], STAGES, evidence)).toMatchObject({ stageId: S.loe, wording: "Stage Keeper: LOE sent" });
+    expect(emailSignalFor([mail("discovery-call", "2026-09-01T10:00:00Z")], STAGES, evidence)).toMatchObject({ stageId: S.loe, wording: "Automatic move: LOE sent" });
   });
 
   it("a sensitive thread contributes nothing, and does not hide the agent's own evidence", () => {
@@ -275,7 +276,7 @@ describe("the Email / calendar source also reads the Stage Keeper", () => {
   });
 
   it("a stage id that is not one of the firm's stages is unmapped, never a vote", () => {
-    expect(emailSignalFor([], STAGES, [{ stageId: "not-a-stage", wording: "Stage Keeper: LOE sent", date: "2026-09-09T10:00:00Z" }])).toEqual({ kind: "unmapped", wording: "Stage Keeper: LOE sent" });
+    expect(emailSignalFor([], STAGES, [{ stageId: "not-a-stage", wording: "Automatic move: LOE sent", date: "2026-09-09T10:00:00Z" }])).toEqual({ kind: "unmapped", wording: "Automatic move: LOE sent" });
   });
 
   it("with no agent evidence the reading is exactly what it was", () => {

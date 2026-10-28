@@ -470,7 +470,7 @@ describe("F12 run lifecycle", () => {
     expect(out.status).toBe("ok");
     expect(leadOf(w, L.amara).current_stage_id).toBe(S.loe);
     expect(leadOf(w, L.kwame).current_stage_id).toBe(S.newPnc);
-    expect(out.result?.summary).toContain("Calendar consults: not available until the database update.");
+    expect(out.result?.summary).toContain("Calendar consults: not switched on for your firm yet.");
   });
 
   it("a calendar read that fails some other way is reported as such and mail still works", async () => {

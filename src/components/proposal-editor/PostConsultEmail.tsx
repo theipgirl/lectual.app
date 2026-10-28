@@ -8,7 +8,7 @@ import { ActionForm, Outcome } from "./ActionForm";
 /**
  * "Create post-consult email": queues the firm's approved proposal email for this proposal in the
  * approval queue. It never sends: the queue's approver approves it, and a person sends the draft.
- * Shown to staff for a draft, saved or link-live version; the action re-checks everything.
+ * The ONE client-email button: drawn by Lifecycle for a link-live (sent / accepted) version; the action re-checks everything.
  */
 export function PostConsultEmail({ proposalId }: { proposalId: string }) {
   return (

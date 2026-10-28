@@ -14,17 +14,15 @@ describe("WaitingOnRebecca", () => {
     expect(WaitingOnRebecca({ leadId: "lead-1", approvals: { status: "unconfigured" }, now: NOW })).toBeNull();
   });
 
-  it("says the queue could not be reached, and that it is not an empty queue", () => {
+  it("says what is waiting for approval can't be shown, never an empty queue", () => {
     const html = render({ status: "unavailable" });
-    expect(html).toContain("Couldn&#x27;t reach the approval queue — this isn&#x27;t an empty queue.");
+    expect(html).toContain("Can&#x27;t show what&#x27;s waiting for approval right now. Refresh to try again.");
     expect(html).not.toContain("Nothing waiting");
   });
 
-  it("says nothing is waiting only when the queue was read and had nothing for this lead", () => {
+  it("renders nothing (no empty card) when the queue was read and had nothing for this lead", () => {
     const html = render({ status: "ok", byLead: { "lead-2": [{ queueId: "q-9", headline: "Other", kind: "other", createdAt: null }] } });
-    expect(html).toContain("No queued drafts linked to this lead.");
-    expect(html).toContain("href=\"/dashboard/queue");
-    expect(html).not.toContain("Other");
+    expect(html).toBe("");
   });
 
   it("lists this lead's items with label, headline, age and a queue link", () => {

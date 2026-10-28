@@ -15,6 +15,7 @@ import { logActivity } from "@/lib/matters/activity";
 import {
   REVIEW_SOURCE,
   decidedSuggestionIds,
+  evidenceOwnDate,
   isAgentMoveRow,
   parseAgentMove,
   parseSuggestion,
@@ -50,7 +51,7 @@ function refresh(leadId: string) {
 
 /** The date a person's accept stamps as when the lead entered the stage: the mail's own date. A future or unusable date is ignored downstream. */
 function evidenceDateOfStored(evidence: MoveEvidence | null): string | null {
-  return evidence && (evidence.kind === "mail" || evidence.kind === "payment") ? evidence.at : null;
+  return evidenceOwnDate(evidence);
 }
 
 // ── Undo ─────────────────────────────────────────────────────────────────────

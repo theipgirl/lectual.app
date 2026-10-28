@@ -32,12 +32,12 @@ import {
 import { resolveFirmSession } from "@/lib/firm/session";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { CAN_WRITE_LEAD } from "@/lib/pipeline/leads";
-import { createDraft } from "@/lib/queue/api";
-import { activeQueueOrgKey } from "@/lib/queue/org";
 import { getSiteOrigin } from "@/lib/site-origin";
 import { clientLinkOrigin, clientLinkUrl } from "@/lib/proposals/client-link-origin";
 import { runManualEmail } from "@/lib/consult-proposal/manual-email";
 import { runCreateLink } from "@/lib/proposal-editor/create-link";
+import { createDraft, listQueue } from "@/lib/queue/api";
+import { activeQueueOrgKey } from "@/lib/queue/org";
 import { EDIT_AGAIN_DONE, LINK_TURNED_ON } from "@/lib/proposal-editor/vocabulary";
 import { proposalActionError, type ActionState } from "../errors";
 import { gateStaffAction } from "../gate";
@@ -115,6 +115,18 @@ function withContent(next: Parsed<ProposalContent>): Parsed<UpdateProposalInput>
 
 /* ── the sections ───────────────────────────────────────────────────────── */
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Links an unlinked draft or approved proposal to a lead. The composite foreign key keeps it inside the firm. */
+export async function linkLeadAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  return edit(formData, (current) => {
+    const leadId = field(formData, "leadId");
+    if (!UUID_RE.test(leadId)) return { ok: false, error: "Choose a lead to link." };
+    if (current.lead_id) return { ok: false, error: "This proposal is already linked to a lead." };
+    return { ok: true, value: { leadId } };
+  });
+}
+
 export async function saveDetailsAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   return edit(formData, (current) => {
     const r = parseDetails(formData, current.content);
@@ -129,7 +141,10 @@ export async function saveMessageAction(_prev: ActionState, formData: FormData):
 export async function savePricingAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   return edit(formData, (current) => {
     const r = parsePricing(formData);
-    return r.ok ? { ok: true, value: { content: { ...current.content, pricing: r.value } } } : r;
+    if (!r.ok) return r;
+    // The pay link rides on this form (Step 3); a form that did not carry it leaves the stored one alone.
+    const payUrl = formData.has("payUrl") ? { payUrl: field(formData, "payUrl") || null } : {};
+    return { ok: true, value: { content: { ...current.content, pricing: r.value }, ...payUrl } };
   });
 }
 
@@ -261,8 +276,8 @@ export async function reviseAction(_prev: ActionState, formData: FormData): Prom
 /* ── the post-consult email ─────────────────────────────────────────────── */
 
 /**
- * "Create post-consult email": queues Rebecca's approved proposal-link email for THIS proposal in the
- * approval queue (the same email, link marker and approve gate as the consult agent's). Nothing is
+ * "Create post-consult email" (the ONE client-email button; it replaced Sprint 33's "Draft email to client"):
+ * once the link is live, queues Rebecca's approved proposal-link email for THIS proposal in the approval queue (the same email, link marker and approve gate as the consult agent's). Nothing is
  * sent; a named approver approves the email in the queue and a person sends the mailbox draft.
  * Re-checks the session, the lead-writing role, the `proposals` module and the proposal staff roles.
  */
@@ -291,6 +306,16 @@ export async function queuePostConsultEmailAction(_prev: ActionState, formData: 
         };
       },
       pendingFor: pendingProposalEmail,
+      pendingQueue: async () => {
+        const orgKey = await activeQueueOrgKey();
+        if (!orgKey) return { status: "unconfigured" };
+        try {
+          const items = await listQueue(orgKey, "pending");
+          return { status: "ok", items: items.map((i) => ({ type: i.type, draftBody: i.draft_body })) };
+        } catch {
+          return { status: "unavailable" };
+        }
+      },
       createDraft,
       writeMarker: async (row) => {
         const supabase = await getScopedClient();

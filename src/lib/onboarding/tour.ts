@@ -2,6 +2,7 @@ import { ROLES } from "@/lib/auth/roles";
 import { canApproveQueue } from "@/lib/queue/roles";
 import { canSeeSetup } from "@/lib/setup/roles";
 import { SETUP_PATH } from "@/lib/setup/routes";
+import { APPROVALS_NAME, COPILOT_NAME, LEADS_NAME } from "@/lib/ui/words";
 
 /**
  * The first-sign-in tour. The seen flag is `user_metadata.lectual_tour` on the
@@ -128,7 +129,7 @@ export function tourSteps({ role, navItems, aiConfigured, firmName }: TourStepsI
       id: "intake",
       target: navTourToken("intake"),
       side: "right",
-      title: "Intake",
+      title: LEADS_NAME,
       body: "Your leads, sorted by last touch. Open a lead to see its answers, files and timeline.",
     });
   }
@@ -148,7 +149,7 @@ export function tourSteps({ role, navItems, aiConfigured, firmName }: TourStepsI
       id: "queue",
       target: navTourToken("queue"),
       side: "right",
-      title: "Approval queue",
+      title: APPROVALS_NAME,
       body: approves
         ? "Drafts wait here for review. Nothing goes to a client until someone approves it."
         : "You can see the drafts waiting here but not approve them. Nothing goes to a client until someone approves it.",
@@ -160,7 +161,7 @@ export function tourSteps({ role, navItems, aiConfigured, firmName }: TourStepsI
       id: "copilot",
       target: "copilot",
       side: "left",
-      title: "AI copilot",
+      title: COPILOT_NAME,
       body: "Ask a question about your matters, leads or deadlines. Press Command-J (Ctrl-J elsewhere) to open it from any page.",
     });
   }
@@ -188,7 +189,7 @@ export function tourSteps({ role, navItems, aiConfigured, firmName }: TourStepsI
       target: slugs.has("settings") ? navTourToken("settings") : null,
       side: "right",
       title: "Setup and settings",
-      body: "The setup checklist shows what is left to switch on for your firm. Settings holds integrations, members and modules.",
+      body: "The setup checklist shows what is left to switch on for your firm. Settings holds integrations, members and features.",
       link: { href: SETUP_PATH, label: "Open the setup checklist" },
     });
   }

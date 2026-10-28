@@ -22,7 +22,7 @@ describe("shown", () => {
     const { html } = await renderCard(role, PARTLY);
     expect(html).toContain("Finish setting up · 3 of 10");
     expect(html).toContain("Next: Outlook mailbox connected");
-    expect(html).toMatch(/href="\/dashboard\/setup\/?"[^>]*>Continue setup</);
+    expect(html).toMatch(/href="\/dashboard\/settings\/setup\/?"[^>]*>Continue setup</);
     expect(html).not.toContain("couldn't be checked");
   });
 
@@ -65,14 +65,14 @@ describe("hidden", () => {
 });
 
 describe("one entry point", () => {
-  it("the card's link, the Settings redirect and the setup path are the same string", async () => {
+  it("the card's link, the old address's redirect and the setup path are the same string", async () => {
     const { SETUP_PATH } = await import("@/lib/setup/routes");
     const { html } = await renderCard("owner", NOTHING_DONE);
     expect(html).toContain(`href="${SETUP_PATH.replace(/\/$/, "")}`);
-    const redirectSrc = (await import("node:fs")).readFileSync("src/app/dashboard/settings/page.tsx", "utf8");
+    const redirectSrc = (await import("node:fs")).readFileSync("src/app/dashboard/setup/page.tsx", "utf8");
     const cardSrc = (await import("node:fs")).readFileSync("src/components/setup/FinishSetupCard.tsx", "utf8");
     expect(redirectSrc).toContain("SETUP_PATH");
     expect(cardSrc).toContain("SETUP_PATH");
-    expect(SETUP_PATH).toBe("/dashboard/setup/");
+    expect(SETUP_PATH).toBe("/dashboard/settings/setup/");
   });
 });

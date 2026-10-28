@@ -7,6 +7,9 @@ import { listMeetingConnections } from "@/lib/meetings/connection";
 import { PROVIDER_LABEL, isMeetingProvider } from "@/lib/meetings/types";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { reconnectSentence } from "@/lib/meetings/reconnect-copy";
+import { SectionTabs } from "@/components/shell/SectionTabs";
+import { REPORTS } from "@/lib/nav";
 
 export const metadata: Metadata = { title: pageTitle("Meetings") };
 
@@ -62,6 +65,7 @@ export default async function MeetingsPage({ searchParams }: { searchParams: Pro
         <div style={{ flex: 1, minWidth: 260 }}>
           <div className="lx-label">Communication</div>
           <h1 className="lx-h1" data-tour="meetings-head">Meetings</h1>
+          <SectionTabs active="list" listLabel="Meetings" listHref="/dashboard/meetings/" summaryHref={REPORTS.communication.href} />
           <p className="lx-sub">Consults and calls recorded in Fathom or Zoom, with the summary, the transcript and the client they were about.</p>
         </div>
         <Link href="/dashboard/settings/integrations/meetings/" className="lx-btn lx-btn-sec lx-btn-sm">
@@ -79,11 +83,7 @@ export default async function MeetingsPage({ searchParams }: { searchParams: Pro
 
       {conns.ok && connected.some((c) => c.status !== "active") && (
         <div role="alert" className="lx-banner lx-banner-risk">
-          {connected
-            .filter((c) => c.status !== "active")
-            .map((c) => PROVIDER_LABEL[c.provider])
-            .join(" and ")}{" "}
-          stopped accepting your firm&apos;s connection, so new meetings aren&apos;t coming in.{" "}
+          {reconnectSentence(connected.filter((c) => c.status !== "active").map((c) => PROVIDER_LABEL[c.provider]))}{" "}
           {canManage ? <Link href="/dashboard/settings/integrations/meetings/">Reconnect</Link> : "Ask an owner or admin to reconnect it."}
         </div>
       )}
@@ -91,7 +91,7 @@ export default async function MeetingsPage({ searchParams }: { searchParams: Pro
       {read.status === "unavailable" ? (
         <div className="lx-card lx-empty-card">
           <h2 className="lx-h2" style={{ fontSize: 25 }}>Meetings couldn&apos;t be loaded</h2>
-          <p className="lx-note" style={{ margin: 0 }}>This is a problem reaching the database, not an empty list. Try again in a moment.</p>
+          <p className="lx-note" style={{ margin: 0 }}>Can&apos;t show this right now. Refresh to try again.</p>
         </div>
       ) : meetings.length === 0 ? (
         <div className="lx-card lx-empty-card">

@@ -1296,8 +1296,10 @@ textarea.ifm-input {
 .ifm-table-title {
   padding: 16px 24px;
 }
-.ifm-tbl {
-  min-width: 760px;
+@media (min-width: 641px) {
+  .ifm-tbl {
+    min-width: 760px;
+  }
 }
 .ifm-tbl th {
   background: var(--paper);

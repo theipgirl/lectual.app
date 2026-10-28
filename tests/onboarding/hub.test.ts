@@ -187,7 +187,7 @@ describe("paths, targets and copy", () => {
       if (s.target === HUB_CENTERED) continue;
       const hook = s.target.startsWith("nav-")
         ? corpus.includes("navTourToken")
-        : new RegExp(`data-tour=(?:"|\\{["'\`])${s.target}\\b`).test(corpus) || corpus.includes(`data-tour="${s.target}"`);
+        : new RegExp(`(?:data-tour|\\btour)=(?:"|\\{["'\`])${s.target}\\b`).test(corpus) || corpus.includes(`data-tour="${s.target}"`);
       expect(hook, `${s.id}: ${s.target}`).toBe(true);
     }
   });

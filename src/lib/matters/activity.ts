@@ -1,6 +1,8 @@
 import { getScopedClient } from "@/lib/db/scoped-client";
 import type { Database, Json } from "@/lib/db/types";
 import { bumpLeadLastTouch } from "@/lib/leads/touch";
+import { ReadableError } from "@/lib/ui/readable-error";
+
 
 export type Activity = Database["public"]["Tables"]["crm_activity"]["Row"];
 
@@ -79,7 +81,7 @@ export type LogActivityInput = {
  */
 export async function logActivity(input: LogActivityInput): Promise<void> {
   if (!input.leadId && !input.matterId) {
-    throw new Error("logActivity requires at least one of leadId or matterId");
+    throw new ReadableError("logActivity requires at least one of leadId or matterId");
   }
 
   const supabase = await getScopedClient();

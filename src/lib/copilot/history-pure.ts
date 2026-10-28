@@ -86,7 +86,7 @@ export function nextDeleteStep(step: DeleteStep, event: "ask" | "cancel" | "conf
   return step === "confirming" ? { step: "idle", run: true } : { step, run: false };
 }
 
-export const SAVED_CHATS_NOT_SET_UP = "Saved chats aren't available until the database update.";
+export const SAVED_CHATS_NOT_SET_UP = "Saved chats aren't switched on for your firm yet. Lectual will turn them on.";
 export const SAVED_CHATS_UNAVAILABLE = "Saved chats couldn't be loaded.";
 export const SAVED_CHATS_EMPTY = "No saved chats yet.";
 export const SAVE_FAILED_NOTE = "This chat isn't being saved right now.";

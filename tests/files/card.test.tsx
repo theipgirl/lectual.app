@@ -114,7 +114,7 @@ describe("the empty state", () => {
 describe("the error state", () => {
   it("says the files could not be loaded and that this is a database problem, not an empty list", async () => {
     const html = await render({ files: { status: "unavailable" }, letters: null });
-    expect(html).toContain("Files couldn't be loaded. This is a problem reaching the database, not an empty list.");
+    expect(html).toContain("Files couldn't be loaded. Refresh to try again.");
     expect(html).toContain('role="alert"');
     expect(html).not.toContain("isn't set up");
   });
@@ -127,7 +127,7 @@ describe("the error state", () => {
     expect(a).toContain("Files couldn't be loaded");
     expect(a).toContain("LOE.docx");
     const b = await render({ files: okFiles([file("f1", "kept.pdf", "2026-10-20T10:00:00Z")]), letters: { status: "unavailable" } }, { parent: { kind: "matter", id: "22222222-2222-4222-8222-222222222222" } });
-    expect(b).toContain("Generated letters couldn't be loaded. This is a problem reaching the database, not an empty list.");
+    expect(b).toContain("Generated letters couldn't be loaded. Refresh to try again.");
     expect(b).toContain("kept.pdf");
     expect(b).not.toContain("Files couldn't be loaded");
   });
