@@ -121,6 +121,16 @@ describe("campaign page", () => {
     expect(html).toContain("Add these steps");
     expect(html).toContain("Add a step before you start this campaign.");
     expect(html).toContain("lx-upl");
+    // .lx-upl is a flex row: the whole sentence, link included, must be ONE child.
+    const upl = html.match(/<p class="lx-upl">([^]*?)<\/p>/)![1];
+    expect(upl).toMatch(/^<span>[^]*<\/span>$/);
+    expect(upl.match(/<span>/g)).toHaveLength(1);
+    expect(upl).toMatch(/<span>[^]*<a href="\/dashboard\/queue\/?">Approvals<\/a>[^]*<\/span>/);
+  });
+  it("says 'campaign' when stopping an enrollment fails", () => {
+    const src = fs.readFileSync(path.join(ROOT, "src/lib/automation/drips.ts"), "utf8");
+    expect(src).toContain("Couldn't stop this campaign. Try again shortly.");
+    expect(src).not.toMatch(/stop this sequence/);
   });
   it("shows no starter for a non-manager, when steps exist, or when the steps read failed", async () => {
     h.role = "paralegal";

@@ -159,8 +159,10 @@ export default async function CampaignsPage() {
       )}
 
       <p className="lx-upl">
-        Attorney advertising: every email step is written from a template in the firm&apos;s own library and held for
-        review before it reaches anyone. A campaign never emails or files anything on its own.
+        <span>
+          Attorney advertising: every email step is written from a template in the firm&apos;s own library and held for
+          review before it reaches anyone. A campaign never emails or files anything on its own.
+        </span>
       </p>
     </>
   );

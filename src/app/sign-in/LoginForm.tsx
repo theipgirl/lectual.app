@@ -2,11 +2,10 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { SIGN_IN_SPAM_HINT } from "@/lib/ui/words";
-import { sendMagicLink, type LoginState } from "./actions";
+import { sendMagicLink } from "./actions";
+import { nextSentState, type SentState } from "./sent-state";
 
 const RESEND_WAIT_SECONDS = 30;
-
-type SentState = LoginState & { sends?: number };
 
 /** Remounted (by key) after each send, so the 30-second wait starts again. */
 function ResendButton({ pending }: { pending: boolean }) {
@@ -24,14 +23,11 @@ function ResendButton({ pending }: { pending: boolean }) {
 
 export default function LoginForm({ next }: { next: string }) {
   const [state, action, pending] = useActionState<SentState, FormData>(async (prev, formData) => {
-    const result = await sendMagicLink(prev, formData);
-    // A refused resend keeps the confirmation on screen and shows its sentence there.
-    if (!result.ok && prev.ok) return { ...prev, error: result.error };
-    return { ...result, sends: result.ok ? (prev.sends ?? 0) + 1 : prev.sends };
+    return nextSentState(prev, await sendMagicLink(prev, formData), formData.get("resend") === "1");
   }, {});
   // "Use a different address" hides the confirmation without touching the action state.
   const [dismissedFor, setDismissedFor] = useState<number | null>(null);
-  const confirmed = state.ok && dismissedFor !== state.sends;
+  const confirmed = state.ok && dismissedFor !== state.round;
 
   if (confirmed) {
     return (
@@ -53,8 +49,9 @@ export default function LoginForm({ next }: { next: string }) {
         <form action={action} style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
           <input type="hidden" name="next" value={next} />
           <input type="hidden" name="email" value={state.email ?? ""} />
-          <ResendButton key={state.sends ?? 0} pending={pending} />
-          <button type="button" className="lx-btn" onClick={() => setDismissedFor(state.sends ?? null)}>
+          <input type="hidden" name="resend" value="1" />
+          <ResendButton key={state.round ?? 0} pending={pending} />
+          <button type="button" className="lx-btn" onClick={() => setDismissedFor(state.round ?? null)}>
             Use a different address
           </button>
         </form>

@@ -332,10 +332,12 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
       </section>
 
       <p className="lx-upl">
-        Nothing sends on its own. Running an email step drafts it into the approval queue from the template above —
-        review it on the <Link href="/dashboard/queue/">Approvals</Link> before it reaches anyone. A lead who signs, pays,
-        becomes a client, replies or has a call leaves the campaign the moment that is recorded, and every step
-        re-checks first.
+        <span>
+          Nothing sends on its own. Running an email step drafts it into the approval queue from the template above —
+          review it on the <Link href="/dashboard/queue/">Approvals</Link> before it reaches anyone. A lead who signs, pays,
+          becomes a client, replies or has a call leaves the campaign the moment that is recorded, and every step
+          re-checks first.
+        </span>
       </p>
     </>
   );

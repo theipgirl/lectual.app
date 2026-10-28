@@ -297,7 +297,7 @@ export async function enrollLead(leadId: string, sequenceId: string): Promise<Dr
       if (existingError) throw existingError;
       if (existing.status === "stopped") {
         throw new ReadableError(
-          `${stopLine({ reason: existing.stop_reason, at: existing.stopped_at }, await getFirmTimeZone())}. A stopped sequence can't be restarted for the same lead.`,
+          `${stopLine({ reason: existing.stop_reason, at: existing.stopped_at }, await getFirmTimeZone())}. A stopped campaign can't be restarted for the same lead.`,
         );
       }
       return existing;
@@ -350,7 +350,7 @@ export async function stopEnrollment(id: string, reason: StopReason): Promise<Dr
     actor: { type: "user", id: await sessionUserId(supabase) },
     evidence: { by_hand: true },
   });
-  if (outcome.status !== "ok") throw new ReadableError("Couldn't stop this sequence. Try again shortly.");
+  if (outcome.status !== "ok") throw new ReadableError("Couldn't stop this campaign. Try again shortly.");
   const { data: after, error } = await supabase.from("crm_drip_enrollment").select("*").eq("id", id).single();
   if (error) throw error;
   return after;

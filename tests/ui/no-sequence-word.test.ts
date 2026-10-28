@@ -7,7 +7,7 @@ import { candidatesOf, walk } from "./_scan";
  * are not hit. Allow-list entries each carry a reason.
  */
 const ALLOW: Array<{ file: RegExp; reason: string }> = [
-  { file: /^src\/lib\/(db\/types|automation\/(drips|rules|engine))\.ts$/, reason: "table names, select lists and developer errors" },
+  { file: /^src\/lib\/(db\/types|automation\/(rules|engine))\.ts$/, reason: "table names, select lists and developer errors (drips.ts is scanned: its ReadableError sentences reach the screen)" },
 ];
 
 const WORD = /\bsequences?\b/i;
