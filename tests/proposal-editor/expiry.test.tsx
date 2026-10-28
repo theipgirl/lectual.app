@@ -5,9 +5,10 @@ import { ExpiryField } from "@/components/proposal-editor/ExpiryField";
 import { EXPIRY_PASSED_WARNING, expiryWarning } from "@/lib/proposal-editor/expiry-warning";
 
 describe("the expiry date warning", () => {
-  it("warns for today and earlier, in plain words", () => {
+  it("warns only for a date before today, in plain words", () => {
     expect(EXPIRY_PASSED_WARNING).toBe("This date has passed. Pick a new expiry date before creating the link.");
-    expect(expiryWarning("2026-10-28", "2026-10-28")).toBe(EXPIRY_PASSED_WARNING);
+    expect(expiryWarning("2026-10-28", "2026-10-28")).toBeNull();
+    expect(expiryWarning("2026-10-27", "2026-10-28")).toBe(EXPIRY_PASSED_WARNING);
     expect(expiryWarning("2026-10-01", "2026-10-28")).toBe(EXPIRY_PASSED_WARNING);
   });
   it("says nothing for a later date, a blank or an unreadable one", () => {
