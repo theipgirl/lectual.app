@@ -491,6 +491,22 @@ describe("acceptPublicProposal", () => {
     expect(stored["p-c2"]).toBe(false);
   });
 
+  it("a fixed offer (one name, one mark, one class) accepts fully selected whatever was posted", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    const content = sevetri();
+    content.names = [content.names[0]];
+    content.names[0].marks = [{ ...content.names[0].marks[0], preselected: false }];
+    content.names[0].classes = [{ ...content.names[0].classes[0], preselected: false }];
+    for (const posted of [{}, "garbage", { "p-word": false, "p-c1": false, "evil-id": true }]) {
+      const { db, tables } = world({ proposal: { content } });
+      const r = await acceptPublicProposal(TOKEN, posted, NOW, db);
+      if (!r.ok) throw new Error(r.reason);
+      // Flat package (Sprint 28): one class of the 3-class Concierge is the full $4,950 (PR #4 pinned the old $3,300).
+      expect(r.quote.legal_total_cents).toBe(495_000);
+      expect(tables.client_proposal[0].accepted_selection).toEqual({ "p-word": true, "p-c1": true });
+    }
+  });
+
   it("ignores ids the proposal does not offer and non-boolean ticks", async () => {
     vi.spyOn(console, "info").mockImplementation(() => {});
     const { db, tables } = world();

@@ -860,6 +860,9 @@ Money sprint. Nothing here sends, moves a stage or opens a matter. No migration,
   of a ticked mark that has none; a brand with no class at all cannot be repaired. Used by the client page, the editor's class rows (a locked box is posted by a
   hidden twin, since a disabled box is not posted), `validateContent` (a mark that starts ticked needs a class that starts ticked: an error), `parseName`
   (repairs) and the accept path.
+- **No untick to $0, fixed offers (main's PR #4, merged on top).** `wouldEmptyQuote` / `lockedSelectionIds` (`pricing.ts`, over the content AS SHOWN, added classes included) hold
+  the last buyable mark/class with `KEEP_ONE_HINT`; the page disables a box held by EITHER that or `classLock`. `isFixedOffer` (one name, one mark, one class) draws plain rows,
+  no checkboxes, and `defaultSelection` / `normalizeSelection` always tick it; the "Add a class" field still shows on a fixed offer. PR #4's $3,300 expectations became $4,950 (flat rule).
 - **The client adds a class** (`src/lib/proposals/added-classes.ts`, pure). The browser sends DESCRIPTIONS only, `{ brandNameId: string[] }`: at most 5 per
   brand name, 1 to 200 characters after trimming, plain text (angle brackets and control characters are REFUSED, not cleaned). Each becomes one more ticked class
   (`id add-<nameId>-<n>`, `client_added: true`, label = the description) and is priced by `quoteProposal`: it is a class like any other, so past the package's
@@ -985,9 +988,12 @@ No migration, no dependency, nothing sends, no new service-role code. Pricing is
   (`commitmentSentence`, `commitment.ts`) names the profile display name, else the firm's name, never a hard-coded firm. RPB's footer keeps its own branded line.
 - **D2 USPTO line.** `usptoLine` (`uspto-line.ts`) only formats the engine's quote: "3 classes × 2 marks × $350" when one brand name's classes × marks equals the quote's own `class_count`
   and its `gov_cents` equals the total; otherwise "USPTO fees: $X ($350 per class per mark)". It does no money arithmetic (a guard test forbids multiplying cents outside `pricing.ts`).
-- **D3 Draft email to client.** `runDraftClientEmail` (`src/lib/proposal-editor/draft-email.ts`, deps injected; `draftClientEmailAction` wires it) queues ONE `CLIENT_EMAIL` draft carrying the
-  link (`clientLinkOrigin` + `clientLinkUrl`) through `createDraft`, only for a `sent` / `accepted` version. The queue's three states apply: no queue key / unconfigured / unreachable returns a fixed
-  sentence and creates nothing; a pending `CLIENT_EMAIL` whose body already holds the link is not duplicated. No send call, no mailbox read (spec D2). The page says "The client hasn't been emailed by Lectual."
+- **D3 The one client-email button (merged with main's PR #4).** "Create post-consult email" (`PostConsultEmail`, drawn by `Lifecycle` beside the link) ->
+  `queuePostConsultEmailAction` -> `runManualEmail` (`src/lib/consult-proposal/manual-email.ts`, deps injected). Sprint 33's separate "Draft email to client" (`draft-email.ts`)
+  was removed: both queued a `CLIENT_EMAIL` with the link. It queues Rebecca's approved template (`renderProposalEmail`) plus the `queue_drafted` marker `link.ts` gates
+  approval on, ONLY for a `sent` / `accepted` version, link via `clientLinkOrigin` + `clientLinkUrl`. Refused, creating nothing: no lead or matter (the marker needs one), no
+  real client email, no firm name, an email for this version pending (marker), any pending `CLIENT_EMAIL` whose body holds `/p/<token>` (three-state: unconfigured = no queue,
+  unreachable = fail closed). No send call, no mailbox read (spec D2). The page says "The client hasn't been emailed by Lectual." (`NOT_EMAILED`).
 - **D4 Withdraw** moved into a "More" menu (the shared Popover: Esc and outside click close it) with an in-page confirm and Cancel; the action and its roles are unchanged.
 - **D5 Documents.** `documents/page.tsx` is gated on `document-center` (`notFound()`, an unreadable module list too). `failureReason` (`src/lib/documents/failure-reason.ts`) maps the stored
   `error_message` to a fixed sentence and never prints it. Retry (`retryDocumentAction`, `src/lib/documents/retry.ts`) re-runs the existing `generateApprovedDocument` for the same approved queue item,

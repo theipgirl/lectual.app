@@ -7,7 +7,11 @@ vi.mock("next/font/google", () => ({
   Source_Serif_4: () => ({ variable: "serif-var" }),
 }));
 
-import { ProposalDocument, type ProposalDocumentProps } from "@/components/client-proposal/ProposalDocument";
+import {
+  KEEP_ONE_HINT,
+  ProposalDocument,
+  type ProposalDocumentProps,
+} from "@/components/client-proposal/ProposalDocument";
 import { defaultSelection, quoteProposal } from "@/lib/proposals/pricing";
 import { sevetri } from "../proposals/fixture";
 
@@ -84,5 +88,106 @@ describe("ProposalDocument", () => {
     expect(html).toContain('data-brand="neutral"');
     expect(html).not.toContain("rpb-logo-cream.png");
     expect(html).toContain("Acme IP");
+  });
+});
+
+const checkboxes = (html: string) => html.match(/<input[^>]*type="checkbox"[^>]*>/g) ?? [];
+
+/** One name, one mark, one class: nothing to choose. */
+function fixedOffer() {
+  const c = sevetri();
+  c.names = [c.names[0]];
+  c.names[0].marks = [c.names[0].marks[0]];
+  c.names[0].classes = [c.names[0].classes[0]];
+  return c;
+}
+
+describe("ProposalDocument: a fixed offer has no checkboxes", () => {
+  it("shows the mark and class plainly, priced, with Accept enabled", () => {
+    const html = render({ content: fixedOffer() });
+    expect(checkboxes(html)).toHaveLength(0);
+    // Sprint 28's "Add a class" text field stays (a fixed offer can still grow); no CHECKBOX is drawn.
+    expect(html).not.toContain('type="checkbox"');
+    expect(html).not.toContain("cp-box");
+    expect(html).not.toContain(KEEP_ONE_HINT);
+    expect(html).not.toContain("aria-describedby");
+    expect(html).toContain("Your trademark");
+    expect(html).toContain("Class 1 · Cloud-Based Software as a Service (SaaS)");
+    expect(html).toContain("$4,950");
+    expect(html).toMatch(/<button[^>]*class="cp-btn"[^>]*>Accept and pay my legal fee<\/button>/);
+    expect(html).not.toMatch(/<button[^>]*disabled[^>]*>Accept and pay my legal fee<\/button>/);
+  });
+
+  it("is fully selected even when nothing is preselected, and the preview renders it the same way", () => {
+    const c = fixedOffer();
+    c.names[0].marks[0].preselected = false;
+    c.names[0].classes[0].preselected = false;
+    const live = render({ content: c });
+    expect(live).toContain("$4,950");
+    expect(live).not.toMatch(/<button[^>]*disabled[^>]*>Accept and pay my legal fee<\/button>/);
+    const preview = render({ content: c, mode: "preview", onAccept: undefined });
+    expect(checkboxes(preview)).toHaveLength(0);
+    expect(preview).toContain("$4,950");
+  });
+});
+
+describe("ProposalDocument: the last mark and class stay selected", () => {
+  /** One name with word + logo and two classes, only the word mark and first class ticked. */
+  function lastLeft() {
+    const c = sevetri();
+    c.names = [c.names[0]];
+    c.names[0].marks[1].preselected = false;
+    c.names[0].classes[1].preselected = false;
+    return c;
+  }
+
+  it("the last ticked mark and class are checked and disabled, with the hint; the others stay free", () => {
+    const html = render({ content: lastLeft() });
+    const boxes = checkboxes(html);
+    expect(boxes).toHaveLength(4);
+    const locked = boxes.filter((b) => b.includes("disabled"));
+    expect(locked).toHaveLength(2);
+    for (const b of locked) {
+      expect(b).toContain("checked");
+      expect(b).toContain('aria-describedby="cp-keep-p"');
+    }
+    for (const b of boxes.filter((x) => !x.includes("disabled"))) expect(b).not.toContain("aria-describedby");
+    expect(html).toContain(KEEP_ONE_HINT);
+    expect(html).toContain('id="cp-keep-p"');
+  });
+
+  it("the full two-brand offer locks nothing and shows no hint", () => {
+    const html = render();
+    for (const b of checkboxes(html)) expect(b).not.toContain("disabled");
+    expect(html).not.toContain(KEEP_ONE_HINT);
+  });
+
+  it("the staff preview applies the same rule", () => {
+    const html = render({ content: lastLeft(), mode: "preview", onAccept: undefined });
+    expect(html).toContain(KEEP_ONE_HINT);
+  });
+
+  it("a page that loads with nothing selected leaves every box tickable", () => {
+    const c = lastLeft();
+    c.names[0].marks[0].preselected = false;
+    c.names[0].classes[0].preselected = false;
+    const html = render({ content: c });
+    expect(checkboxes(html)).toHaveLength(4);
+    for (const b of checkboxes(html)) expect(b).not.toContain("disabled");
+    expect(html).not.toContain(KEEP_ONE_HINT);
+    expect(html).toMatch(/<button[^>]*disabled[^>]*>Accept and pay my legal fee<\/button>/);
+  });
+
+  it("the accepted receipt shows no hint", () => {
+    const content = lastLeft();
+    const selection = defaultSelection(content);
+    const html = render({
+      content,
+      mode: "accepted",
+      onAccept: undefined,
+      initialSelection: selection,
+      acceptedQuote: quoteProposal(content, selection),
+    });
+    expect(html).not.toContain(KEEP_ONE_HINT);
   });
 });

@@ -40,6 +40,9 @@
 @media (max-width: 1080px) {
   .pe-cols { grid-template-columns: minmax(0, 1fr); }
   .pe-side { position: static; max-height: none; overflow: visible; }
+  /* One column: the page is the only scroller. A 70vh scroller of its own here swallows
+     the finger on a phone, and at its top edge an upward drag does not hand over to the page. */
+  .pe-preview-body { max-height: none; overflow: visible; }
 }
 
 /* ── cards and forms ───────────────────────────────────────── */

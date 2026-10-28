@@ -5,12 +5,12 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { FIRST_PROBLEM_ID, firstProblem, groupIssues } from "@/lib/proposal-editor/issues";
 import { IssueList } from "@/components/proposal-editor/ActionForm";
 import { Lifecycle } from "@/components/proposal-editor/Lifecycle";
-import { DRAFT_EMAIL_SENTENCES } from "@/lib/proposal-editor/draft-email";
+import { MANUAL_EMAIL_LABEL, NOT_EMAILED } from "@/lib/consult-proposal/manual-email";
 import type { ValidationIssue } from "@/lib/proposals/validate";
 
 vi.mock("@/app/dashboard/proposals/[id]/actions", () => ({
   createLinkAction: vi.fn(),
-  draftClientEmailAction: vi.fn(),
+  queuePostConsultEmailAction: vi.fn(),
   reviseAction: vi.fn(),
   sendAction: vi.fn(),
   unapproveAction: vi.fn(),
@@ -24,22 +24,22 @@ const life = (over: Partial<Parameters<typeof Lifecycle>[0]> = {}) =>
   );
 const page = readFileSync("src/app/dashboard/proposals/[id]/page.tsx", "utf8");
 
-describe("F9: Draft email to client in the editor", () => {
+describe("F9 + PR #4: the one client-email button in the editor", () => {
   it("shows the button and the not-emailed sentence once the link is live", () => {
     for (const status of ["sent", "accepted"] as const) {
       const html = life({ status, clientUrl: URL_ }).replaceAll("&#x27;", "'");
-      expect(html).toContain("Draft email to client");
-      expect(html).toContain(DRAFT_EMAIL_SENTENCES.notEmailed);
+      expect(html).toContain(MANUAL_EMAIL_LABEL);
+      expect(html).toContain(NOT_EMAILED);
     }
-    expect(DRAFT_EMAIL_SENTENCES.notEmailed).toBe("The client hasn't been emailed by Lectual.");
+    expect(NOT_EMAILED).toBe("The client hasn't been emailed by Lectual.");
   });
   it("has no button for draft or saved versions", () => {
-    for (const status of ["draft", "approved"] as const) expect(life({ status, clientUrl: null })).not.toContain("Draft email to client");
+    for (const status of ["draft", "approved"] as const) expect(life({ status, clientUrl: null })).not.toContain(MANUAL_EMAIL_LABEL);
   });
   it("a viewer sees the sentence but no button", () => {
     const html = life({ status: "sent", clientUrl: URL_, canWrite: false }).replaceAll("&#x27;", "'");
-    expect(html).not.toContain("Draft email to client");
-    expect(html).toContain(DRAFT_EMAIL_SENTENCES.notEmailed);
+    expect(html).not.toContain(MANUAL_EMAIL_LABEL);
+    expect(html).toContain(NOT_EMAILED);
   });
 });
 

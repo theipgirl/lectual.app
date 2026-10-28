@@ -4,11 +4,12 @@ import Link from "next/link";
 import { useState } from "react";
 import type { ProposalStatus } from "@/lib/proposals/types";
 import { joinOr } from "@/lib/proposal-editor/labels";
-import { createLinkAction, draftClientEmailAction, reviseAction, sendAction, unapproveAction, withdrawAction } from "@/app/dashboard/proposals/[id]/actions";
+import { createLinkAction, reviseAction, sendAction, unapproveAction, withdrawAction } from "@/app/dashboard/proposals/[id]/actions";
 import Popover from "@/components/list-page/Popover";
-import { DRAFT_EMAIL_SENTENCES } from "@/lib/proposal-editor/draft-email";
+import { NOT_EMAILED } from "@/lib/consult-proposal/manual-email";
 import { BUTTON_WORDS, LINK_NOT_LIVE_YET, askToCreateLink } from "@/lib/proposal-editor/vocabulary";
 import { ActionForm, Outcome } from "./ActionForm";
+import { PostConsultEmail } from "./PostConsultEmail";
 
 /**
  * The lifecycle buttons for one version. What is SHOWN follows the status; the
@@ -122,21 +123,9 @@ export function Lifecycle({
 
       {clientUrl && (status === "sent" || status === "accepted") && (
         <>
-          {canWrite && (
-            <ActionForm action={draftClientEmailAction} className="pe-act">
-              {({ state, pending }) => (
-                <>
-                  {hidden}
-                  <button type="submit" className="lx-btn lx-btn-sec" disabled={pending}>
-                    {pending ? "Queuing…" : "Draft email to client"}
-                  </button>
-                  <Outcome state={state} pending={pending} />
-                </>
-              )}
-            </ActionForm>
-          )}
+          {canWrite && <PostConsultEmail proposalId={proposalId} />}
           <span className="lx-note" role="note">
-            {DRAFT_EMAIL_SENTENCES.notEmailed}
+            {NOT_EMAILED}
           </span>
         </>
       )}

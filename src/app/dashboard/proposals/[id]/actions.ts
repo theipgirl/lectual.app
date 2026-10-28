@@ -15,7 +15,7 @@ import {
   type UpdateProposalInput,
 } from "@/lib/proposals/store";
 import type { ProposalContent, ProposalRow } from "@/lib/proposals/types";
-import { GOES_LIVE_ON_APPROVAL, proposalSendBlock } from "@/lib/consult-proposal/link";
+import { GOES_LIVE_ON_APPROVAL, pendingProposalEmail, proposalSendBlock } from "@/lib/consult-proposal/link";
 import {
   newBrandName,
   parseAdjustments,
@@ -29,13 +29,15 @@ import {
   takenIds,
   type Parsed,
 } from "@/lib/proposal-editor/form";
+import { resolveFirmSession } from "@/lib/firm/session";
+import { getScopedClient } from "@/lib/db/scoped-client";
+import { CAN_WRITE_LEAD } from "@/lib/pipeline/leads";
+import { getSiteOrigin } from "@/lib/site-origin";
+import { clientLinkOrigin, clientLinkUrl } from "@/lib/proposals/client-link-origin";
+import { runManualEmail } from "@/lib/consult-proposal/manual-email";
 import { runCreateLink } from "@/lib/proposal-editor/create-link";
-import { runDraftClientEmail } from "@/lib/proposal-editor/draft-email";
 import { createDraft, listQueue } from "@/lib/queue/api";
 import { activeQueueOrgKey } from "@/lib/queue/org";
-import { clientLinkOrigin, clientLinkUrl } from "@/lib/proposals/client-link-origin";
-import { getScopedClient } from "@/lib/db/scoped-client";
-import { resolveFirmSession } from "@/lib/firm/session";
 import { EDIT_AGAIN_DONE, LINK_TURNED_ON } from "@/lib/proposal-editor/vocabulary";
 import { proposalActionError, type ActionState } from "../errors";
 import { gateStaffAction } from "../gate";
@@ -271,52 +273,63 @@ export async function reviseAction(_prev: ActionState, formData: FormData): Prom
   redirect(`/dashboard/proposals/${nextId}/`);
 }
 
+/* ── the post-consult email ─────────────────────────────────────────────── */
 
 /**
- * "Draft email to client": queues a CLIENT_EMAIL draft carrying the live link in the approval queue.
- * Nothing is sent and no mailbox is read; the logic and its refusals are in draft-email.ts.
+ * "Create post-consult email" (the ONE client-email button; it replaced Sprint 33's "Draft email to client"):
+ * once the link is live, queues Rebecca's approved proposal-link email for THIS proposal in the approval queue (the same email, link marker and approve gate as the consult agent's). Nothing is
+ * sent; a named approver approves the email in the queue and a person sends the mailbox draft.
+ * Re-checks the session, the lead-writing role, the `proposals` module and the proposal staff roles.
  */
-export async function draftClientEmailAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  return runDraftClientEmail(
+export async function queuePostConsultEmailAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const result = await runManualEmail(
     {
-      gate: gateStaffAction,
-      loadProposal: async (id) => {
-        const row = (await getProposal(id))?.proposal ?? null;
-        if (!row) return null;
+      gate: async () => {
+        const refused = await gateStaffAction();
+        if (refused) return refused;
+        const session = await resolveFirmSession();
+        return session.kind === "ok" && CAN_WRITE_LEAD.includes(session.role) ? null : { error: "Your role can't draft client email." };
+      },
+      loadProposal: async (id) => (await getProposal(id))?.proposal ?? null,
+      context: async () => {
+        const session = await resolveFirmSession();
+        return session.kind === "ok"
+          ? { orgId: session.org.id, userId: session.user.id, firmName: session.org.name, firmSlug: session.org.slug }
+          : null;
+      },
+      queueOrgKey: activeQueueOrgKey,
+      links: async (orgId, publicToken, proposalId) => {
+        const origin = (await getSiteOrigin()).replace(/\/$/, "");
         return {
-          id: row.id,
-          status: row.status,
-          clientName: row.client_name,
-          firstName: row.content?.client?.first_name?.trim() || null,
-          clientEmail: row.client_email,
-          orgId: row.org_id,
-          publicToken: row.public_token,
-          matterId: row.matter_id,
-          leadId: row.lead_id,
+          clientUrl: clientLinkUrl(await clientLinkOrigin(orgId), publicToken),
+          staffUrl: `${origin}/dashboard/proposals/${proposalId}/`,
         };
       },
-      firm: async () => {
-        const session = await resolveFirmSession();
-        const supabase = await getScopedClient();
-        const { data } = await supabase.from("crm_org_profile").select("display_name, email_signature").maybeSingle();
-        const name = (data?.display_name as string | null | undefined)?.trim() || (session.kind === "ok" ? session.org.name : "our firm");
-        return { name, signOff: (data?.email_signature as string | null | undefined)?.trim() || null };
-      },
-      orgKey: activeQueueOrgKey,
-      pending: async () => {
+      pendingFor: pendingProposalEmail,
+      pendingQueue: async () => {
         const orgKey = await activeQueueOrgKey();
         if (!orgKey) return { status: "unconfigured" };
         try {
           const items = await listQueue(orgKey, "pending");
-          return { status: "ok", items: items.map((i) => ({ id: i.id, type: i.type, draftBody: i.draft_body })) };
+          return { status: "ok", items: items.map((i) => ({ type: i.type, draftBody: i.draft_body })) };
         } catch {
           return { status: "unavailable" };
         }
       },
-      linkUrl: async (orgId, token) => clientLinkUrl(await clientLinkOrigin(orgId), token),
       createDraft,
-      revalidate,
+      writeMarker: async (row) => {
+        const supabase = await getScopedClient();
+        const { error } = await supabase.from("crm_activity").insert(row);
+        return !error;
+      },
+      revalidate: (proposalId, leadId) => {
+        revalidate(proposalId);
+        revalidatePath("/dashboard/queue/");
+        if (leadId) revalidatePath(`/dashboard/leads/${leadId}/`);
+      },
+      testPrefix: process.env.VERCEL_ENV === "production" ? "" : "[TEST] ",
     },
     field(formData, "proposalId"),
   );
+  return result.ok ? { saved: true, notice: result.notice, queueId: result.queueId } : { error: result.error };
 }

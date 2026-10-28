@@ -6,7 +6,7 @@ import { SettingsForm } from "@/components/proposal-editor/SettingsForm";
 
 vi.mock("@/app/dashboard/proposals/[id]/actions", () => ({
   createLinkAction: vi.fn(),
-  draftClientEmailAction: vi.fn(),
+  queuePostConsultEmailAction: vi.fn(),
   reviseAction: vi.fn(),
   sendAction: vi.fn(),
   unapproveAction: vi.fn(),

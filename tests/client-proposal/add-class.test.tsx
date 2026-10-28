@@ -39,7 +39,8 @@ const COPY = "Add another class (category of goods or services) you’d like us 
 describe("the client page: one class is always included", () => {
   it("a one-class mark shows the class checked and disabled, with the word 'Included'", () => {
     const html = render({ content: oneClass() });
-    expect(html).toContain('<input type="checkbox" disabled="" checked=""/>');
+    // PR #4's $0 lock also holds it (unticking it would empty the proposal), so it points at that hint too.
+    expect(html).toContain('<input type="checkbox" disabled="" aria-describedby="cp-keep-p" checked=""/>');
     expect(html).toContain('<span class="cp-lock">Included</span>');
   });
 
@@ -113,7 +114,7 @@ describe("the client page: a class the client added", () => {
     const c = oneClass();
     c.names[0].classes[0].preselected = false;
     const html = render({ content: c, initialAddedClasses: { p: ["Online store services"] } });
-    expect(html).toMatch(/<button type="button" class="cp-link" disabled="" aria-label="Remove Online store services">/);
+    expect(html).toMatch(/<button type="button" class="cp-link" disabled="" aria-describedby="cp-keep-p" aria-label="Remove Online store services">/);
     expect(html).toContain("At least one class is included");
   });
 });
