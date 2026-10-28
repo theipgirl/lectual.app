@@ -1032,3 +1032,30 @@ No migration, no dependency, nothing sends, no new service-role code. Pricing is
 - **Compact tops under 640px** are CSS on the shared `.lx-page-head` / `.lp-header` / `.lp-toolbar` / chip classes (last block of `globals.css`, end of `list-page.css`). My Mail swaps its sidebar for one `<select>` built from the same link list (`folderSelect`).
 - **Sync new meetings** (`SyncMeetingsButton`, Meetings header and Proposals consults strip): `syncNewMeetingsAction` calls the existing `importNowAction` once per connected source and merges the structured `sync` outcomes (`mergeSyncResults`). `canSyncMeetings` is the one role test (admin tier). A failed source is never "No new meetings".
 - **Settings:** the admin tier is always `ADMIN_TIER_PHRASE`; confirms use `InlineConfirm` (no `window.confirm`); Today shows ONE get-set-up card (`GetSetUpCard`, `todaySetupCard`). "Invited, not signed in" rows and "Email me when a client accepts" are NOT built: the member directory has no invite status and no per-person notify field exists, and this repo adds no schema.
+
+## Approvals by person (Sprint 35, no schema)
+No migration, no dependency, no new service-role code. Nothing here sends: approving still only authorises, exactly as before.
+- **`src/lib/queue/routing.ts` is the ONE place** for the kind rules, the attorney-only list, the legal-advice phrases, the approval rule and the switch counts (a grep test
+  holds it). A KIND is derived from an item's type + agent + headline (`classifyQueueItem`): `stalled_followup`, `post_consult_email` (agent post-consult, or a body carrying a
+  `/p/<token>` proposal link), `welcome_email`, `engagement_letter`, `opinion_letter` (opinion + clearance), `internal_briefing`, `partnership_other` (a headline naming a partnership),
+  and `client_email_other`, which is where anything unknown lands (filing follow-ups, consult-prep client emails, an unknown agent or type) because it is attorney-only. **Decision:** the
+  contract let an unclassified item with no recipient fall to `partnership_other`; it does not, because that kind is routable to any staff member.
+- **Attorney-only (UPL):** post-consult/proposal, engagement, opinion/clearance, other client emails, and any item whose text `flagsLegalAdvice` matches (the repo had no other
+  legal-advice guard on the queue, so this small phrase table is it; a false positive only narrows who may approve). Such an item is for the usual approvers whatever its kind is routed to.
+- **Owner is derived, never stored** (the queue service has no owner column): `ownerOf(item, routing)`. Routing is `client_proposal_setting.pricing.approval_routing = { <kind>: <member user id> }`
+  (the one jsonb with an admin-tier write path; `parseApprovalRouting` drops unknown kinds, non-members, viewers/social media and attorney-only kinds routed to a non-approver). **Limit:**
+  that table is behind the `proposals` feature, so a firm without it cannot save routing and Settings -> Approvals says so; its approvals keep the default behaviour.
+  `saveApprovalRouting` re-reads the row and writes back approvers, pay link, notify address and every other pricing key untouched.
+- **The rule:** `canApproveItem`. With empty routing it equals "has an approver role" for all 10 roles. Routed to a person: that person (any staff role) or the admin tier (owner/admin/senior_admin,
+  the explicit override); an attorney-only item additionally needs an approver role. Viewer, social media and an unreadable role never approve. `reviewQueueAction` re-resolves role and user id on every
+  approve/reject, re-reads the item and the routing, and refuses with a fixed sentence before saving, resolving, mailbox-drafting or generating anything. A routing read that fails falls back to
+  the default rule and the page says "Assignments couldn't be loaded...". Save-edit is unchanged (`QUEUE_EDIT_ROLES`).
+- **Approvals page:** `?who=me|<user id>|all`; Mine is the default only for a staff role, everyone else starts on Everyone. Pills hold the numbers from the items loaded for the tab; an unrouted
+  item counts under every usual approver. Rows show kind and owner; the item page shows them and hides Approve/Reject (with the action's sentence) for a caller the rule refuses. The queue's
+  three states are untouched: no switch and no counts unless the read is `ok`.
+- **Today's tile and the rail** call `mineQueue` (`mine-load.ts` over pure `mine.ts`): staff roles count Mine, viewer/social media keep the full number, a failed routing read counts everything (never 0),
+  and only an `ok` load is touched. A paralegal with nothing routed to them therefore sees no count.
+- **Dismiss follow-ups older than 7 days** (`dismiss.ts`, `dismissStaleFollowupsAction`): the form posts only a confirm flag; the server re-reads the pending queue and rejects up to 50 pending,
+  more-than-7-day-old, non-attorney-only stalled follow-ups the caller owns (the admin tier owns all) with the note "Dismissed: follow-up older than 7 days" and the session email.
+- **Morning brief** keeps `FOLLOW_UP_CAP = 5`, a per-run cap (pinned by a test); the daily bound holds because the agent runs once a day and a lead followed up in 7 days is skipped. A Run now can add up to 5 more leads.
+- Existing assertions changed on purpose: `tests/proposals/pay-link.test.tsx` allows `routing-load.ts` (a pay-link pass-through).

@@ -3,6 +3,12 @@ import { loadActiveQueue } from "@/lib/queue/load";
 import { QueueUnavailable } from "@/components/queue/QueueUnavailable";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { markNearDuplicates } from "@/lib/queue/hygiene";
+import { loadQueueViewContext } from "@/lib/queue/view-context";
+import { classifyQueueItem, countsByPerson, filterByWho, kindLabel, ownerText, parseWho } from "@/lib/queue/routing";
+import { QUEUE_EDIT_ROLES } from "@/lib/queue/roles";
+import { dismissableFollowups } from "@/lib/queue/dismiss";
+import { PersonSwitch } from "@/components/queue/PersonSwitch";
+import { DismissFollowups } from "@/components/queue/DismissFollowups";
 import { STATUS_PILL, agentLabel, fmtWhen, parseQueueStatus, preview, typeLabel, type QueueStatus } from "@/components/queue/format";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
@@ -28,11 +34,22 @@ const EMPTY: Record<QueueStatus, { title: string; body: string }> = {
  * @/lib/queue/load, which returns ok / unconfigured / unavailable and never a
  * bare empty list, so an outage can't pass for "all caught up".
  */
-export default async function QueuePage({ searchParams }: { searchParams: Promise<{ status?: string | string[] }> }) {
-  const status = parseQueueStatus((await searchParams).status);
-  const [load, tz] = await Promise.all([loadActiveQueue(status), getFirmTimeZone()]);
+export default async function QueuePage({ searchParams }: { searchParams: Promise<{ status?: string | string[]; who?: string | string[] }> }) {
+  const params = await searchParams;
+  const status = parseQueueStatus(params.status);
+  const [load, tz, view] = await Promise.all([loadActiveQueue(status), getFirmTimeZone(), loadQueueViewContext()]);
+  const { viewer, routing } = view;
+  const members = view.members ?? [];
+  // Mine is the default only for someone who can hold work; anyone else starts on Everyone.
+  const mineEnabled = !!viewer && QUEUE_EDIT_ROLES.includes(viewer.role);
+  const who = parseWho(Array.isArray(params.who) ? params.who[0] : params.who, { mineEnabled, members });
+  const allItems = load.status === "ok" ? load.items : [];
+  const counts = countsByPerson(allItems, routing, members, viewer);
+  const shown = load.status === "ok" ? filterByWho(allItems, who, routing, members, viewer) : [];
+  const waitingOnOthers = allItems.length - shown.length;
+  const dismissable = status === "pending" && load.status === "ok" ? dismissableFollowups(allItems, { routing, viewer, now: view.now }).length : 0;
   // Only what is still waiting can be approved twice.
-  const possibleDuplicates = status === "pending" && load.status === "ok" ? markNearDuplicates(load.items) : new Set<string>();
+  const possibleDuplicates = status === "pending" && load.status === "ok" ? markNearDuplicates(allItems) : new Set<string>();
 
   return (
     <>
@@ -53,15 +70,37 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
         </nav>
       </div>
 
+      {load.status === "ok" && (
+        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <PersonSwitch status={status} who={who} counts={counts} mineEnabled={mineEnabled} />
+          {dismissable > 0 && <DismissFollowups count={dismissable} />}
+        </div>
+      )}
+      {view.routingFailed && load.status === "ok" && (
+        <p role="status" className="lx-note" style={{ margin: 0 }}>
+          Assignments couldn&apos;t be loaded. Showing everything to the usual approvers.
+        </p>
+      )}
+
       {load.status !== "ok" ? (
         <QueueUnavailable status={load.status} reason={load.reason} />
-      ) : load.items.length === 0 ? (
+      ) : allItems.length === 0 ? (
         <div className="lx-card lx-empty-card">
           <h2 className="lx-h2" style={{ fontSize: 25 }}>
             {EMPTY[status].title}
           </h2>
           <p className="lx-note" style={{ margin: 0 }}>
             {EMPTY[status].body}
+          </p>
+        </div>
+      ) : shown.length === 0 ? (
+        <div className="lx-card lx-empty-card">
+          <h2 className="lx-h2" style={{ fontSize: 25 }}>
+            {who.kind === "me" ? "Nothing for you right now" : "Nothing here"}
+          </h2>
+          <p className="lx-note" style={{ margin: 0 }}>
+            {who.kind === "me" ? `Nothing is waiting on you. ${waitingOnOthers} ${waitingOnOthers === 1 ? "is" : "are"} waiting on others.` : "Nothing is assigned to this person."}{" "}
+            <Link href={`/dashboard/queue/?status=${status}&who=all`}>Show everyone</Link>
           </p>
         </div>
       ) : (
@@ -77,7 +116,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
               </tr>
             </thead>
             <tbody>
-              {load.items.map((item) => (
+              {shown.map((item) => (
                 <tr key={item.id}>
                   <td className="wrap pri">
                     <Link href={`/dashboard/queue/${item.id}/`} className="lx-rowlink">
@@ -89,7 +128,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
                       </span>
                     )}
                     <div className="lx-note">
-                      {typeLabel(item.type)} · {preview(item, 90)}
+                      {kindLabel(classifyQueueItem(item))} · {ownerText(item, routing, members)} · {typeLabel(item.type)} · {preview(item, 90)}
                     </div>
                   </td>
                   <td data-label="Client">{item.client_name ?? "—"}</td>

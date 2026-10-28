@@ -2,6 +2,7 @@ import Link from "next/link";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { loadActiveQueue, type QueueLoad } from "@/lib/queue/load";
+import { mineQueue } from "@/lib/queue/mine-load";
 import { orgHasModule } from "@/lib/org/modules";
 import { listLeads, type Lead } from "@/lib/pipeline";
 import { listMatters, listTasks, listUpcomingDeadlines, summarizeDocket } from "@/lib/matters";
@@ -100,7 +101,7 @@ export default async function TodayPage() {
     ]);
 
   // loadActiveQueue never throws; a rejection would be a bug, shown as unavailable.
-  const queue: QueueLoad = queueS.status === "fulfilled" ? queueS.value : { status: "unavailable", items: [] };
+  const queue: QueueLoad = await mineQueue(queueS.status === "fulfilled" ? queueS.value : { status: "unavailable", items: [] }, { userId: session.user.id, role: session.role });
   const leads: Lead[] | null = leadsS.status === "fulfilled" ? leadsS.value : null;
   const matters = mattersS.status === "fulfilled" ? mattersS.value : null;
   const deadlines = deadlinesS.status === "fulfilled" ? deadlinesS.value : null;

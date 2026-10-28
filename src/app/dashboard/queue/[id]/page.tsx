@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getQueueItem, type QueueItem } from "@/lib/queue/api";
 import { activeQueueOrgKey } from "@/lib/queue/org";
 import { getScopedClient } from "@/lib/db/scoped-client";
-import { QUEUE_APPROVE_ROLES, QUEUE_EDIT_ROLES, resolveQueueRole } from "@/lib/queue/roles";
+import { QUEUE_EDIT_ROLES, resolveQueueRole } from "@/lib/queue/roles";
 import { QueueUnavailable } from "@/components/queue/QueueUnavailable";
 import { ReviewPanel } from "@/components/queue/ReviewPanel";
 import { getFirmTimeZone } from "@/lib/org/profile";
@@ -15,6 +15,8 @@ import { LinkedProposalPanel } from "@/components/queue/LinkedProposalPanel";
 import { ReviewerSummary } from "@/components/queue/ReviewerSummary";
 import "@/components/queue/review.css";
 import { loadLinkedPanel } from "@/lib/consult-proposal/link";
+import { loadQueueViewContext } from "@/lib/queue/view-context";
+import { approvalRefusal, canApproveItem, classifyQueueItem, kindLabel, ownerText } from "@/lib/queue/routing";
 import { loadAuditContext } from "@/lib/queue/audit-context";
 import type { Metadata } from "next";
 import { recordPageTitle } from "@/lib/ui/page-title";
@@ -67,10 +69,10 @@ export default async function QueueItemPage({
   }
 
   const supabase = await getScopedClient();
-  const [approveRole, editRole, tz] = await Promise.all([
-    resolveQueueRole(supabase, QUEUE_APPROVE_ROLES),
+  const [editRole, tz, view] = await Promise.all([
     resolveQueueRole(supabase, QUEUE_EDIT_ROLES),
     getFirmTimeZone(),
+    loadQueueViewContext(),
   ]);
 
   const back = (
@@ -88,6 +90,10 @@ export default async function QueueItemPage({
   }
   if (!item) notFound();
 
+  // The routing rule decides who may approve THIS item; the action decides again on submit.
+  const routeArgs = { role: editRole, userId: view.viewer?.userId, item, routing: view.routing, members: view.members ?? [] };
+  const mayApprove = canApproveItem(routeArgs);
+  const refusal = approvalRefusal(routeArgs);
   const outcome = outcomeText(justResolved, send);
   const resolved = item.status !== "pending";
 
@@ -147,14 +153,21 @@ export default async function QueueItemPage({
                 <Markdown text={item.final_body ?? item.draft_body} />
               </>
             ) : (
+              <>
+              {!mayApprove && editRole !== null && refusal && (
+                <p role="status" className="lx-note" data-queue-refusal style={{ margin: "0 0 12px" }}>
+                  {refusal}
+                </p>
+              )}
               <ReviewPanel
                 id={item.id}
                 initialBody={item.final_body ?? item.draft_body}
-                canApprove={approveRole !== null}
+                canApprove={mayApprove}
                 canEdit={editRole !== null}
                 confirmStale={warning ? warning.confirm : null}
                 audit={auditContext ? { type: item.type, ...auditContext } : undefined}
               />
+              </>
             )}
           </section>
         </div>
@@ -162,6 +175,9 @@ export default async function QueueItemPage({
           <span className={`lx-pill ${STATUS_PILL[item.status].tone}`} style={{ justifySelf: "start" }}>
             {STATUS_PILL[item.status].label}
           </span>
+          <p className="lx-note" data-queue-owner style={{ margin: 0 }}>
+            {kindLabel(classifyQueueItem(item))} · {ownerText(item, view.routing, view.members ?? [])}
+          </p>
           {/* Client, To, Subject, Send at and Queued as one compact definition list. */}
           <dl className="lx-dl" data-queue-details>
             <Meta label="Client" value={item.client_name} />
