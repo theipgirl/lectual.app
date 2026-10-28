@@ -25,3 +25,28 @@ describe("SectionTabs (F2)", () => {
     expect(readFileSync("src/components/shell/SectionTabs.tsx", "utf8")).not.toContain("lx-view-toggle");
   });
 });
+
+describe("every report is reachable (Sprint 32 fix)", () => {
+  it("links each REPORTS href from at least one non-report dashboard page or list component", async () => {
+    const { REPORTS } = await import("@/lib/nav");
+    const { readdirSync, statSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const walk = (dir: string): string[] =>
+      readdirSync(dir).flatMap((f) => {
+        const p = join(dir, f);
+        if (p.includes(join("dashboard", "reports"))) return [];
+        return statSync(p).isDirectory() ? walk(p) : p.endsWith(".tsx") ? [p] : [];
+      });
+    const pages = [...walk("src/app/dashboard"), ...walk("src/components/list-page"), ...walk("src/app/dashboard/intake/_components")].map((p) => readFileSync(p, "utf8"));
+    for (const [key, r] of Object.entries(REPORTS)) {
+      const linked = pages.some((src) => src.includes(`REPORTS.${key}.href`) || src.includes(r.href));
+      expect(linked, `${key} report is not linked from any list page`).toBe(true);
+    }
+  });
+
+  it("Mail, Meetings and Copilot draw the List | Summary strip", () => {
+    expect(readFileSync("src/app/dashboard/mail/page.tsx", "utf8")).toContain("REPORTS.communication.href");
+    expect(readFileSync("src/app/dashboard/meetings/page.tsx", "utf8")).toContain("REPORTS.communication.href");
+    expect(readFileSync("src/app/dashboard/copilot/page.tsx", "utf8")).toContain("REPORTS.ipos.href");
+  });
+});

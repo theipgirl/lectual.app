@@ -18,6 +18,8 @@ import "@/components/mailbox/mail-pane.css";
 import type { Metadata } from "next";
 import { matterDisplayTitle } from "@/lib/matters/display-title";
 import { pageTitle } from "@/lib/ui/page-title";
+import { SectionTabs } from "@/components/shell/SectionTabs";
+import { REPORTS, reportListLabel } from "@/lib/nav";
 
 export const metadata: Metadata = { title: pageTitle("My Mail") };
 
@@ -164,6 +166,7 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
           <div style={{ flex: 1, minWidth: 240 }}>
             <div className="lx-label">{selected ? `${PROVIDER_LABEL[selected.provider]} · ${selected.email}` : `${connections.length} mailbox${connections.length === 1 ? "" : "es"}`}</div>
             <h1 className="lx-h1">My Mail</h1>
+            <SectionTabs active="list" listLabel={reportListLabel("communication", { hasMailbox: true })} listHref="/dashboard/mail/" summaryHref={REPORTS.communication.href} />
             <p className="lx-sub">{inboxTab ? "The newest messages in the mailbox, read live. Nothing here is saved." : "Mail with your clients, already linked to their lead or matter. Everything else stays in your inbox."}</p>
           </div>
         </div>
