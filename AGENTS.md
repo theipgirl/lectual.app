@@ -264,7 +264,7 @@ the Today card only read; the "Set up" links go to pages that already exist and 
   can't be asked) is `couldnt-check`, never done and never to do, and no error text reaches the screen (the reading
   keeps only "could not be read"). The module list is read by the loader itself so a failed read isn't "module off".
   A module that is off is "to do" with a link to Settings → Modules, so the count is always N of 10.
-- **Settings redirect:** `/dashboard/settings` goes to the setup page for the admin tier until all ten are done (a
+- **Settings redirect (replaced in Sprint 32, see below):** `/dashboard/settings` goes to the setup page for the admin tier until all ten are done (a
   couldn't-check item counts as not done), then to Integrations as before. Every other role, signed out and an
   unresolvable role go to Integrations without the loader running. The setup page's "Go to Integrations" link is the
   escape for a firm whose remaining items are Lectual's to switch on (LawPay or Zoom not set up, no AI key, a module off).
@@ -938,3 +938,40 @@ No migration, no dependency, nothing sends. The Stage Keeper's rules from Sprint
   that payment. The Accepted segment lists accepted-and-not-paid first (`sortForSegment`). Under 760px a row stacks, with Accepted and Paid directly under the client's name.
 - **Existing assertions changed on purpose**: the importer and Reconcile tests that pinned a Lawmatics stage choosing a Lectual stage; the board test that pinned the chip text on the card
   (the card now says "Moved automatically ..."); the queue page tests that pinned the stacked Preview plus textarea; the proposals table's seven columns (now nine).
+
+## Shell, navigation, mobile, settings (Sprint 32, no schema)
+No migration, no dependency, nothing sends. Navigation changes are a courtesy: every page and action still gates itself.
+- **Rail open by default.** `railIsPinned(cookie)` (`src/lib/nav.ts`): a missing `lx_rail` cookie is open; only `collapsed` closes it. Pin still writes the cookie.
+- **Parent rows open the list.** A `RAIL_TREE` parent's `href` is its `link` child (Leads -> `/dashboard/intake/`, Active matters -> `/dashboard/matters/`) or, with
+  no list of its own, its first visible child (Communication -> Mail with the mailbox module, else Meetings; AI tools -> Copilot). The reports (`REPORTS`,
+  `/dashboard/reports/<key>/`) stay and are the section's **Summary** tab: `SectionTabs` ("<List name> | Summary", never the Table | Board toggle's class) sits on
+  Leads, Matters and the report pages; `reportListHref` / `reportListLabel` give the list side for a report.
+- **Approvals is top level**, right under Today, keeping `nav-queue` and the three queue states (`railCountFor`, shared by the rail and the phone bar). Communication
+  no longer counts it.
+- **One sign-out.** The rail's avatar/name/Profile/Sign out block is gone; `AccountMenu` is the only signed-in-shell place with Sign out (`NoFirmAccess` keeps its own,
+  there is no menu on that screen). The menu closes on Esc (focus back to the avatar) and on a pointer-down outside (`src/lib/shell/menu-behaviour.ts`, pure), uses
+  `role="menu"`/`menuitem`, groups Getting started + Show tips again + Send feedback under "Help and tips", and prints roles with `ROLE_LABEL` / `roleLabel`
+  (moved to `src/lib/auth/roles.ts`; `TeamForms` re-exports it). No source prints a role with `replace("_", " ")`.
+- **Section label** is drawn only where the h1 differs: `showSectionLabel` (`src/lib/section-label.ts`) hides it on the root of Today, Calendar, Meetings, Pipeline,
+  Notifications, Leads, Matters, Approvals, Documents, Proposals and Mail; deeper pages, reports and Settings keep it. `sectionLabelFor` is unchanged. The divider
+  now lives inside `SectionLabel`.
+- **Phone bar** (`MobileBar.tsx`, under 900px; the rail column is hidden there): Leads, Approvals, Mail, Matters, More, each with a text label. Mail is dropped
+  without the mailbox module. `moreSections` builds the More sheet from the same visible list, grouped by the rail's labels (Meetings, Calendar, Campaigns, Forms,
+  Proposals, Pipeline, Documents, Copilot, Assistants, Shortcuts, Firm notes, Settings), so a section the firm lacks never appears. The sheet is a modal dialog:
+  focus moves in, Tab wraps, Esc / an outside tap / navigating close it, focus returns to More.
+- **Stacked cards under 640px.** CSS only: `.lx-stack` tables (Matters, Documents, Approvals) and the Proposals table (its own 760px grid) show each cell's `data-label`
+  via `::before`; the header row is kept off-screen for screen readers; the Leads grid does the same through `.lp-table-min` / `data-label`. The 760/980/1000px minimums
+  apply only above those widths. `html, body, .lx-page, .lx-content` clip sideways overflow at <=640px. `@media (pointer: coarse)` sets 44px on buttons, nav items, chips,
+  the avatar and bell. Not verified in a real browser at 375px here; the CSS and markup are tested.
+- **Settings always opens Settings.** `/dashboard/settings` redirects to Integrations for every role and reads nothing. Setup is a tab: `SETUP_PATH` is now
+  `/dashboard/settings/setup/` (inside the Settings layout; the admin tier sees a "Setup · N of M" tab, the page still `notFound()`s for every other role). The old
+  `/dashboard/setup/` redirects there. The side list is a horizontally scrolling strip under 900px; the note uses `ADMIN_TIER_PHRASE`.
+- **Lectual sets this up.** Checklist items carry `owner`. AI (when off) and LawPay (when the deployment has no LawPay app) are Lectual's: the pill reads "Lectual sets
+  this up", no button, and they are left out of `total` and `complete` while not done (M can be below 10; a done one counts normally). The Zoom option inside the Meetings
+  item says "Zoom: Lectual sets this up." when the Zoom app is missing, but that item stays the firm's. A "couldn't check" item is never reclassified. The facts are
+  plain booleans on `SetupState.lectual` from `lawPayClientCredentials()` / `zoomClientCredentials()`; only an explicit `false` makes a step Lectual's, so a missing or failing
+  reader leaves it the firm's. Button labels: to-do "Set up", couldn't-check "Check again", done "Review"; the bar is a `role="progressbar"`.
+- **Getting started**: `recommendedFlow(tracks, done)` (first undone flow in track order) gets the only primary button and a "Start here" pill; done checks use `--ok`;
+  `hub.css` has a <=560px layout.
+- **Copilot launcher** lifts above a sticky Save bar (`data-save-bar`, today the Forms "Unsaved changes" bar) and hides on phones while one shows; the Esc hint shows
+  from 900px. The proposal editor's save rows are not sticky, so they are not marked.
