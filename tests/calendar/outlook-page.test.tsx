@@ -63,7 +63,7 @@ describe("Calendar page: Outlook events", () => {
     expect(html).toMatch(/<a [^>]*href="https:\/\/teams\.microsoft\.com\/l\/meetup-join\/strategy-1"[^>]*>Join<\/a>/);
     expect(html).toMatch(/<a [^>]*href="\/dashboard\/leads\/lead-amara\/"[^>]*>Strategy Session: Amara Nwosu<\/a>/);
     expect(html).not.toContain("Outlook events aren't available");
-    expect(html).not.toContain("Outlook events couldn't be loaded");
+    expect(html).not.toContain("We couldn't load your Outlook calendar");
   });
 
   it("agenda reads the next 30 days from today", async () => {
@@ -91,8 +91,8 @@ describe("Calendar page: Outlook events", () => {
     const html = await render({ outlook: { status: "database-update-needed" } });
     expect(html).toContain("Respond to office action");
     expect(html).toContain("Call the examiner");
-    expect(html).toContain("Outlook events aren't switched on for your firm yet. Lectual will turn them on.");
-    expect(html).not.toContain("Outlook events couldn't be loaded");
+    expect(html).toContain("Your Outlook calendar isn't showing yet. Lectual will turn it on.");
+    expect(html).not.toContain("We couldn't load your Outlook calendar");
     expect(html).not.toContain("Meetings and consults");
   });
 
@@ -100,14 +100,14 @@ describe("Calendar page: Outlook events", () => {
     const html = await render({ outlook: { status: "unavailable" } });
     expect(html).toContain("Respond to office action");
     expect(html).toContain("Call the examiner");
-    expect(html).toContain("Outlook events couldn't be loaded.");
-    expect(html).not.toContain("Outlook events aren't switched on");
+    expect(html).toContain("We couldn't load your Outlook calendar. Docket dates and tasks are shown.");
+    expect(html).not.toContain("Your Outlook calendar isn't showing yet");
   });
 
   it("a thrown Outlook read is the unavailable line, not a crashed page", async () => {
     const html = await render({ outlook: "throws" });
     expect(html).toContain("Respond to office action");
-    expect(html).toContain("Outlook events couldn't be loaded.");
+    expect(html).toContain("We couldn't load your Outlook calendar. Docket dates and tasks are shown.");
   });
 
   it("a firm without the mailbox module: no read, no Outlook line, and the header names only the docket and tasks", async () => {
@@ -129,7 +129,7 @@ describe("Calendar page: Outlook events", () => {
     }
     const withMailbox = await render({ mailbox: true });
     expect(withMailbox).toContain("Docket deadlines, task due dates, and events from your connected Outlook calendars.");
-    expect(withMailbox).toContain("Times are in America/New York.");
+    expect(withMailbox).toContain("Times are in Eastern time.");
   });
 
   it("an empty Outlook list on a successful read says nothing extra", async () => {

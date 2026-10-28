@@ -7,6 +7,7 @@ import { listMeetingConnections } from "@/lib/meetings/connection";
 import { PROVIDER_LABEL, isMeetingProvider } from "@/lib/meetings/types";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { reconnectSentence } from "@/lib/meetings/reconnect-copy";
 import { SectionTabs } from "@/components/shell/SectionTabs";
 import { REPORTS } from "@/lib/nav";
 
@@ -82,11 +83,7 @@ export default async function MeetingsPage({ searchParams }: { searchParams: Pro
 
       {conns.ok && connected.some((c) => c.status !== "active") && (
         <div role="alert" className="lx-banner lx-banner-risk">
-          {connected
-            .filter((c) => c.status !== "active")
-            .map((c) => PROVIDER_LABEL[c.provider])
-            .join(" and ")}{" "}
-          stopped accepting your firm&apos;s connection, so new meetings aren&apos;t coming in.{" "}
+          {reconnectSentence(connected.filter((c) => c.status !== "active").map((c) => PROVIDER_LABEL[c.provider]))}{" "}
           {canManage ? <Link href="/dashboard/settings/integrations/meetings/">Reconnect</Link> : "Ask an owner or admin to reconnect it."}
         </div>
       )}

@@ -17,10 +17,20 @@ import "@/components/queue/review.css";
 import { loadLinkedPanel } from "@/lib/consult-proposal/link";
 import { loadAuditContext } from "@/lib/queue/audit-context";
 import type { Metadata } from "next";
-import { pageTitle } from "@/lib/ui/page-title";
+import { recordPageTitle } from "@/lib/ui/page-title";
 import { APPROVALS_NAME } from "@/lib/ui/words";
 
-export const metadata: Metadata = { title: pageTitle("Approval item") };
+/** Tab title: the item's headline, so several open approvals can be told apart; "Approval" when it can't be read. */
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  return {
+    title: await recordPageTitle(async () => {
+      const key = await activeQueueOrgKey();
+      if (!key) return null;
+      return (await getQueueItem(key, id)).headline?.trim() || null;
+    }, "Approval"),
+  };
+}
 
 /** One row of the aside's detail list; nothing is drawn for a value the item doesn't have. */
 function Meta({ label, value }: { label: string; value: React.ReactNode }) {

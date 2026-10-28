@@ -1,3 +1,4 @@
+import { stepLabel, zoneLabel } from "@/lib/calendar/zone-label";
 import Link from "next/link";
 import { listTasks, listUpcomingDeadlines } from "@/lib/matters";
 import { buildCalendarRows, civilDate, civilDaysBetween, groupCalendarRows, type CalendarRow } from "@/lib/matters/calendar-rows";
@@ -372,9 +373,9 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const outlookEvents = outlook?.status === "ok" ? outlook.events : [];
   const outlookNote =
     outlook?.status === "database-update-needed"
-      ? "Outlook events aren't switched on for your firm yet. Lectual will turn them on."
+      ? "Your Outlook calendar isn't showing yet. Lectual will turn it on."
       : outlook?.status === "unavailable"
-        ? "Outlook events couldn't be loaded."
+        ? "We couldn't load your Outlook calendar. Docket dates and tasks are shown."
         : null;
 
   const readState = calendarReadState({ deadlines, tasks, events: view === "agenda" ? undefined : events });
@@ -405,19 +406,19 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
             {hasMailbox
               ? "Docket deadlines, task due dates, and events from your connected Outlook calendars."
               : "Docket deadlines and task due dates."}{" "}
-            Times are in {timeZone.replaceAll("_", " ")}.
+            Times are in {zoneLabel(timeZone)}.
           </p>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           {view !== "agenda" && (
             <div className="lx-cal-nav">
-              <Link prefetch={false} href={calendarHref(view, stepAnchor(view, anchor, -1))} className="lx-btn lx-btn-sec lx-btn-sm" aria-label="Previous">
+              <Link prefetch={false} href={calendarHref(view, stepAnchor(view, anchor, -1))} className="lx-btn lx-btn-sec lx-btn-sm" aria-label={stepLabel("previous", view)}>
                 ‹
               </Link>
               <Link prefetch={false} href={calendarHref(view, today)} className="lx-btn lx-btn-sec lx-btn-sm">
                 Today
               </Link>
-              <Link prefetch={false} href={calendarHref(view, stepAnchor(view, anchor, 1))} className="lx-btn lx-btn-sec lx-btn-sm" aria-label="Next">
+              <Link prefetch={false} href={calendarHref(view, stepAnchor(view, anchor, 1))} className="lx-btn lx-btn-sec lx-btn-sm" aria-label={stepLabel("next", view)}>
                 ›
               </Link>
             </div>
