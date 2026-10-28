@@ -185,11 +185,13 @@ describe("a brand name form", () => {
     expect(off.ok && "client_entry" in off.value.classes[0]).toBe(false);
   });
 
-  it("Spec 3: 'Let the client add classes' is client_add.max 1..10; blank or 0 is off; anything else is refused", () => {
+  it("Spec 3: 'Let the client add classes' is client_add.max 0..10; blank is the default (no client_add); anything else is refused", () => {
     const three = parseName(form({ clientAddMax: "3" }), content, rand);
     expect(three.ok && three.value.client_add).toEqual({ max: 3 });
-    for (const off of ["", "0"]) {
-      const r = parseName(form({ clientAddMax: off }), content, rand);
+    const none = parseName(form({ clientAddMax: "0" }), content, rand);
+    expect(none.ok && none.value.client_add).toEqual({ max: 0 });
+    for (const blank of [{}, { clientAddMax: "" }] as Record<string, string>[]) {
+      const r = parseName(form(blank), content, rand);
       expect(r.ok && "client_add" in r.value).toBe(false);
     }
     for (const bad of ["11", "-1", "1.5", "two"]) {

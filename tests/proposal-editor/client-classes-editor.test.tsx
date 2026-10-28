@@ -87,10 +87,11 @@ describe("editor: Client describes this class / Let the client add classes", () 
     expect(r.value.client_add).toEqual({ max: 3 });
   });
 
-  it("off by default: no open class and 0 posts no client_add", () => {
-    const value: NameValues = { ...VALUE, classes: [{ id: "p-c1", label: "Software", preselected: true }], clientAddMax: undefined };
+  it("the default: no open class and a blank number post no client_add (5, or none on a fixed offer)", () => {
+    const value: NameValues = { ...VALUE, classes: [{ id: "p-c1", label: "Software", preselected: true }], clientAddMax: "" };
     const html = render(value);
-    expect(html).toMatch(/name="clientAddMax"[^>]*value="0"/);
+    expect(html).toMatch(/<input[^>]*name="clientAddMax"[^>]*value=""/);
+    expect(html).toContain("Blank is the default: up to 5");
     const form = postedForm(html);
     form.set("nameId", "p");
     form.set("name", "Prosperall");

@@ -20,9 +20,7 @@ function snapshotWithAdded() {
 
 afterEach(() => vi.restoreAllMocks());
 
-// Spec 3 (2026-10-28): the Lawmatics note, which goes to the firm's own CRM, names what the client wrote, marked as theirs.
-// The in-app notice, the timeline events and the logs still carry only the count and the legal total.
-describe("accept follow-ups: the count and the new legal total everywhere; the client's words only in the firm's Lawmatics note", () => {
+describe("accept follow-ups name the number of added classes and the new legal total, never the client's words", () => {
   const snap = snapshotWithAdded();
 
   it("the headline and the note carry the count and the legal total", () => {
@@ -34,11 +32,11 @@ describe("accept follow-ups: the count and the new legal total everywhere; the c
     expect(body).toContain("Classes added by the client: 1");
     expect(body).toContain("Legal fee, due when accepted: $2,775");
     expect(body).toContain("USPTO fees, due at filing: $700");
-    expect(body).toContain(`${SECRET} (added by the client)`);
+    expect(body).not.toContain(SECRET);
     expect(body).not.toContain("Not ticked");
   });
 
-  it("the notice payload, the timeline events and every log call omit the client's text; the Lawmatics note names it", async () => {
+  it("the notice payload, the Lawmatics request, the timeline events and every log call omit the client's text", async () => {
     const logs = [vi.spyOn(console, "log"), vi.spyOn(console, "info"), vi.spyOn(console, "warn"), vi.spyOn(console, "error")].map((s) => s.mockImplementation(() => {}));
     const { db, tables } = fakeFollowupDb({
       client_proposal: [{ id: "prop-1", org_id: "org-1", family_id: "fam-1", status: "accepted", client_name: "Sevetri Wilson", client_email: null, lead_id: "lead-1", matter_id: null, accepted_snapshot: snap }],
@@ -57,7 +55,7 @@ describe("accept follow-ups: the count and the new legal total everywhere; the c
     await runAcceptanceFollowups(db as FollowupDb, { proposalId: "prop-1", orgId: "org-1" }, { getToken: async () => "tok", fetchImpl });
 
     expect(sent).toHaveLength(1);
-    expect(sent[0]).toContain(SECRET);
+    expect(sent[0]).not.toContain(SECRET);
     expect(sent[0]).toContain("Classes added by the client: 1");
     expect(JSON.stringify(tables.crm_notification)).not.toContain(SECRET);
     expect(JSON.stringify(tables.crm_notification)).toContain("1 class added by the client");
@@ -77,7 +75,7 @@ describe("accept follow-ups: the count and the new legal total everywhere; the c
 });
 
 describe("Spec 3: an open class the client described", () => {
-  it("is named in the Lawmatics note as described by the client, with no added-class count", () => {
+  it("is COUNTED in the Lawmatics note, never quoted, and its question is not repeated", () => {
     const c = sevetri();
     c.pricing = { ...c.pricing, package: "Essential", base_cents: 195_000, included_classes: 1, per_class_cents: 82_500 };
     c.names = [{ ...c.names[0], classes: [{ id: "o1", label: "Describe what you sell", preselected: true, client_entry: true }] }];
@@ -85,7 +83,8 @@ describe("Spec 3: an open class the client described", () => {
     if (!priced.ok) throw new Error("priced");
     const snap = buildAcceptedSnapshot({ version: 1, content: priced.content, selection: priced.selection, quote: priced.quote, acceptedAt: "2026-10-28T15:00:00.000Z" });
     const { body } = acceptanceNoteBody(snap, "Sevetri");
-    expect(body).toContain("classes: Scented candles (described by the client)");
+    expect(body).not.toContain("Scented candles");
+    expect(body).toContain("Classes described by the client: 1");
     expect(body).not.toContain("Classes added by the client");
     expect(body).not.toContain("Describe what you sell");
   });

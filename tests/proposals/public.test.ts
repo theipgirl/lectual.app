@@ -769,9 +769,11 @@ describe("acceptPublicProposal: classes the client describes or adds", () => {
     expect(calls.some((c) => c.op === "update")).toBe(false);
   });
 
-  it("drops adds for a brand name without client_add, unknown ids, and entries for classes that are not open", async () => {
+  it("drops adds for a brand name whose max is 0, unknown ids, and entries for classes that are not open", async () => {
     vi.spyOn(console, "info").mockImplementation(() => {});
-    const { db, tables } = world();
+    const content = sevetri();
+    content.names[0].client_add = { max: 0 };
+    const { db, tables } = world({ proposal: { content } });
     const r = await acceptPublicProposal(TOKEN, ticks(["p-word", "p-c1"]), NOW, db, {
       entries: { "p-c1": "Renamed by the client", zzz: "x" },
       added: { p: [{ text: "Not allowed", on: true }], zzz: [{ text: "x", on: true }] },
@@ -780,6 +782,29 @@ describe("acceptPublicProposal: classes the client describes or adds", () => {
     const row = accepted(tables);
     expect(row.accepted_snapshot.content.names[0].classes.map((c) => c.label)).toEqual(sevetri().names[0].classes.map((c) => c.label));
     expect(Object.keys(row.accepted_selection).some((k) => k.startsWith("ca-"))).toBe(false);
+  });
+
+  it("still takes the Sprint 28 post shape { nameId: string[] } (default 5, no client_add needed)", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    const content = essentialContent();
+    delete content.names[0].client_add;
+    const { db, tables } = world({ proposal: { content } });
+    const r = await acceptPublicProposal(TOKEN, ticks(["p-word", "p-c1"]), NOW, db, { p: ["Online store services"] });
+    expect(r.ok).toBe(true);
+    expect(accepted(tables).accepted_snapshot.content.names[0].classes[1]).toMatchObject({ id: "ca-p-1", client_added: true, label: "Online store services" });
+    expect(accepted(tables).accepted_snapshot.quote.legal_total_cents).toBe(277_500);
+  });
+
+  it("a fixed offer with no client_add takes no added class", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    const content = essentialContent();
+    delete content.names[0].client_add;
+    content.names[0].marks = [content.names[0].marks[0]];
+    const { db, tables } = world({ proposal: { content } });
+    const r = await acceptPublicProposal(TOKEN, ticks(["p-word", "p-c1"]), NOW, db, { p: ["Online store services"] });
+    expect(r.ok).toBe(true);
+    expect(accepted(tables).accepted_snapshot.content.names[0].classes).toHaveLength(1);
+    expect(accepted(tables).accepted_snapshot.quote.legal_total_cents).toBe(195_000);
   });
 
   it("ignores forged price, total, per-class and class-count fields", async () => {

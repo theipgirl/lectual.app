@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { classLock } from "@/lib/proposals/class-lock";
-import { DEFAULT_CLIENT_ENTRY_PROMPT, MAX_CLIENT_ADD } from "@/lib/proposals/client-classes";
+import { DEFAULT_CLIENT_ADD, DEFAULT_CLIENT_ENTRY_PROMPT, MAX_CLIENT_ADD } from "@/lib/proposals/client-classes";
 import { MARK_KIND_DEFAULT_DESC, MARK_KIND_LABEL, MARK_KINDS, type MarkKind, type ProposalInclude } from "@/lib/proposals/types";
 import {
   addNameAction,
@@ -256,7 +256,7 @@ export type NameValues = {
   overridePerClass: string;
   marks: { id: string; kind: MarkKind; desc: string; preselected: boolean }[];
   classes: { id: string; label: string; preselected: boolean; clientEntry?: boolean }[];
-  /** "Let the client add classes": the most they may add, "0" (or "") when off. */
+  /** "Let the client add classes": the firm's own max ("0" = none), or "" for the default (5, none on a fixed offer). */
   clientAddMax?: string;
 };
 
@@ -479,11 +479,13 @@ export function NameCard({ proposalId, updatedAt, editable, issues, value }: Com
                   max={MAX_CLIENT_ADD}
                   step={1}
                   inputMode="numeric"
-                  defaultValue={value.clientAddMax && value.clientAddMax !== "0" ? value.clientAddMax : "0"}
+                  defaultValue={value.clientAddMax ?? ""}
+                  placeholder="Default"
                   aria-describedby={`pe-client-add-${value.id}`}
                 />
                 <span className="lx-note" id={`pe-client-add-${value.id}`}>
-                  0 is off. Each class the client adds is priced like any other class, and they describe it in their own words.
+                  Blank is the default: up to {DEFAULT_CLIENT_ADD}, or none when the proposal is one brand name, one mark and one class. 0 is none.
+                  Each class the client adds is priced like any other class, and they describe it in their own words.
                 </span>
               </label>
             </div>

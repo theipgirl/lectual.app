@@ -225,7 +225,8 @@ export function isFixedOffer(content: ProposalContent): boolean {
   const marks = arr<unknown>(nm.marks);
   const classes = arr<unknown>(nm.classes);
   // Spec 3: a class the client describes, or room to add classes, IS a choice, so it is never a fixed offer.
-  // (`client_add` with a max of 0 lets the client add nothing, the same as no `client_add`: `clientAddMax`.)
+  // Only an EXPLICIT max above 0 counts here; an absent `client_add` is the firm saying nothing, and its default
+  // (`clientAddMax`: 5, or 0 on a fixed offer) is worked out from this function, never fed into it.
   const addMax = obj(nm.client_add).max;
   if (typeof addMax === "number" && Number.isInteger(addMax) && addMax > 0) return false;
   if (classes.some((c) => obj(c).client_entry === true)) return false;

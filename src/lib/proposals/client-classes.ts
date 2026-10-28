@@ -6,26 +6,29 @@
  *  - an OPEN class (`ProposalClass.client_entry: true`): its `label` is the PROMPT the client reads
  *    ("Describe what you sell or offer under this mark"), and they type the description under it;
  *  - `ProposalName.client_add: { max }`: the client may add up to `max` more open classes to that brand name.
+ *    With no `client_add` the default is 5, or 0 on a fixed offer (`clientAddMax`).
  * Either is a class like any other: it is priced by `quoteProposal`, through the ONE effective-content builder
  * below, which the page's live total and the accept path both call. There is no second price calculation.
  *
  * ── WHAT THE BROWSER SENDS ──────────────────────────────────────────────────
  *   { entries: { <open class id>: "<text>" }, added: { <brand name id>: [{ text, on }] } }
- * The server is the authority (`parseClientClassInput`): unknown ids, entries for classes that are not open,
- * adds for a brand name without `client_add`, and adds past its `max` are DROPPED; every text is cleaned
+ * The Sprint 28 shape `{ <brand name id>: string[] }` is still read, as `added`. The server is the authority
+ * (`parseClientClassInput`): unknown ids, entries for classes that are not open, and adds past a brand name's
+ * `clientAddMax` (0 on a fixed offer, or when the firm set 0) are DROPPED; every text is cleaned
  * (`cleanClientText`). A ticked open or added class with no text is refused by the caller (`missing`).
  *
  * ── THE EFFECTIVE CONTENT ───────────────────────────────────────────────────
  * Open classes carry the client's text as their `label` (the prompt kept in `prompt`, the `client_entry`
  * marker kept); added classes are appended with server-made ids `ca-<nameId>-<n>` and `client_added: true`.
- * That content is what is quoted and what `accepted_snapshot.content` stores, so the receipt, the staff view,
- * the LOE adapter and the Lawmatics note read the client's words from the class labels with no extra step.
+ * That content is what is quoted and what `accepted_snapshot.content` stores, so the receipt, the staff view and
+ * the LOE adapter read the client's words from the class labels. The Lawmatics note, the in-app notice and the
+ * timeline carry only COUNTS (Sprint 28: what the client typed never leaves the staff pages).
  *
  * Client text is untrusted: React renders it as text, it is never logged, and it reaches no model prompt here.
  */
 
 import { repairSelection } from "./class-lock";
-import { quoteProposal } from "./pricing";
+import { isFixedOffer, quoteProposal } from "./pricing";
 import type { ProposalClass, ProposalContent, ProposalName, ProposalQuote, Selection } from "./types";
 
 /** The longest description a client may type for one class. */
@@ -55,11 +58,29 @@ function isObj(v: unknown): v is Record<string, unknown> {
   return !!v && typeof v === "object" && !Array.isArray(v);
 }
 
-/** How many classes the client may add to this brand name: an integer 0..10, anything unreadable is 0. */
-export function clientAddMax(name: Pick<ProposalName, "client_add"> | null | undefined): number {
+/** Added classes a brand name allows when the firm set nothing (`client_add` absent): Sprint 28's limit. */
+export const DEFAULT_CLIENT_ADD = 5;
+
+/**
+ * The firm's own `client_add.max` for this brand name, clamped to 0..10; `null` when the firm set nothing
+ * (absent, or not a whole number), so the default applies.
+ */
+export function explicitClientAddMax(name: Pick<ProposalName, "client_add"> | null | undefined): number | null {
   const raw = isObj(name?.client_add) ? (name.client_add as Record<string, unknown>).max : undefined;
-  if (typeof raw !== "number" || !Number.isInteger(raw)) return 0;
+  if (typeof raw !== "number" || !Number.isInteger(raw)) return null;
   return Math.min(MAX_CLIENT_ADD, Math.max(0, raw));
+}
+
+/**
+ * How many classes the client may add to this brand name. An explicit `client_add.max` wins. With none, the
+ * default is Sprint 28's 5 for any offer that is NOT fixed, and 0 for a fixed offer (one name, one mark, one class,
+ * no open class: "just show the proposal"). `isFixedOffer` reads only the firm's content and ignores an absent
+ * `client_add`, so the default never feeds back into it.
+ */
+export function clientAddMax(content: ProposalContent, name: Pick<ProposalName, "client_add"> | null | undefined): number {
+  const explicit = explicitClientAddMax(name);
+  if (explicit !== null) return explicit;
+  return isFixedOffer(content) ? 0 : DEFAULT_CLIENT_ADD;
 }
 
 export function isOpenClass(c: Pick<ProposalClass, "client_entry"> | null | undefined): boolean {
@@ -103,8 +124,10 @@ export function cleanClientText(raw: unknown): string {
 export function parseClientClassInput(content: ProposalContent, raw: unknown): ClientClassInput {
   const out = emptyClientClassInput();
   const body = isObj(raw) ? raw : {};
-  const entries = isObj(body.entries) ? body.entries : {};
-  const added = isObj(body.added) ? body.added : {};
+  // The Sprint 28 shape, `{ <brand name id>: string[] }`, posted by a page loaded before Spec 3: read as `added`.
+  const legacy = isObj(raw) && !("entries" in body) && !("added" in body);
+  const entries = !legacy && isObj(body.entries) ? body.entries : {};
+  const added = legacy ? body : isObj(body.added) ? body.added : {};
   for (const nm of Array.isArray(content?.names) ? content.names : []) {
     for (const c of Array.isArray(nm?.classes) ? nm.classes : []) {
       if (isOpenClass(c) && typeof c.id === "string" && Object.prototype.hasOwnProperty.call(entries, c.id)) {
@@ -112,7 +135,7 @@ export function parseClientClassInput(content: ProposalContent, raw: unknown): C
         if (text) out.entries[c.id] = text;
       }
     }
-    const max = clientAddMax(nm);
+    const max = clientAddMax(content, nm);
     const list = typeof nm?.id === "string" && Object.prototype.hasOwnProperty.call(added, nm.id) ? added[nm.id] : undefined;
     if (max === 0 || !Array.isArray(list)) continue;
     const kept: ClientAddedEntry[] = [];

@@ -4,8 +4,10 @@ import {
   MAX_CLIENT_TEXT_CHARS,
   addedClassCount,
   buildEffectiveContent,
+  DEFAULT_CLIENT_ADD,
   clientAddMax,
   cleanClientText,
+  explicitClientAddMax,
   missingClientText,
   parseClientClassInput,
   quoteWithClientClasses,
@@ -62,14 +64,52 @@ describe("cleanClientText", () => {
   });
 });
 
-describe("clientAddMax", () => {
-  it("is an integer 0..10, anything else 0", () => {
-    expect(clientAddMax({ client_add: { max: 3 } })).toBe(3);
-    expect(clientAddMax({ client_add: { max: 99 } })).toBe(10);
-    expect(clientAddMax({ client_add: { max: -1 } })).toBe(0);
-    expect(clientAddMax({ client_add: { max: 1.5 } })).toBe(0);
-    expect(clientAddMax({ client_add: "x" as unknown as { max: number } })).toBe(0);
-    expect(clientAddMax({})).toBe(0);
+describe("clientAddMax: an explicit max wins, else 5, else 0 on a fixed offer", () => {
+  const fixed = () => {
+    const c = essential();
+    c.names[0].marks = [c.names[0].marks[0]];
+    return c;
+  };
+
+  it("explicit: an integer 0..10 (clamped); not a whole number is the firm saying nothing", () => {
+    const c = sevetri();
+    expect(explicitClientAddMax({ client_add: { max: 3 } })).toBe(3);
+    expect(explicitClientAddMax({ client_add: { max: 99 } })).toBe(10);
+    expect(explicitClientAddMax({ client_add: { max: -1 } })).toBe(0);
+    expect(explicitClientAddMax({ client_add: { max: 1.5 } })).toBeNull();
+    expect(explicitClientAddMax({})).toBeNull();
+    expect(clientAddMax(c, { client_add: { max: 0 } })).toBe(0);
+    expect(clientAddMax(c, { client_add: { max: 3 } })).toBe(3);
+  });
+
+  it("absent: Sprint 28's 5 for an offer with a choice in it", () => {
+    const c = sevetri();
+    expect(clientAddMax(c, c.names[0])).toBe(DEFAULT_CLIENT_ADD);
+    expect(DEFAULT_CLIENT_ADD).toBe(5);
+    // two marks, one class: still a choice
+    expect(clientAddMax(essential(), essential().names[0])).toBe(5);
+  });
+
+  it("absent on a fixed offer (one name, one mark, one class, no open class): 0, so it just shows the proposal", () => {
+    const c = fixed();
+    expect(isFixedOffer(c)).toBe(true);
+    expect(clientAddMax(c, c.names[0])).toBe(0);
+    // An explicit max still wins, and then it is no longer fixed.
+    const room = fixed();
+    room.names[0].client_add = { max: 2 };
+    expect(clientAddMax(room, room.names[0])).toBe(2);
+    expect(isFixedOffer(room)).toBe(false);
+    // An open class is a choice: not fixed, default 5.
+    const open = fixed();
+    open.names[0].classes[0].client_entry = true;
+    expect(clientAddMax(open, open.names[0])).toBe(5);
+  });
+
+  it("the default never feeds back into fixed-ness", () => {
+    const c = fixed();
+    expect(isFixedOffer(c)).toBe(true);
+    expect(clientAddMax(c, c.names[0])).toBe(0);
+    expect(isFixedOffer(c)).toBe(true);
   });
 });
 
@@ -85,9 +125,10 @@ describe("parseClientClassInput: the server is the authority", () => {
     expect(parseClientClassInput(essential(), { entries: { "p-c1": "Bakery" } }).entries).toEqual({});
   });
 
-  it("drops adds for unknown names, for names without client_add, and past max", () => {
+  it("drops adds for unknown names, for names whose max is 0, and past max", () => {
     const two = sevetri();
     two.names[0].client_add = { max: 2 };
+    two.names[1].client_add = { max: 0 };
     const got = parseClientClassInput(two, {
       added: {
         p: [{ text: "One", on: true }, { text: "Two", on: false }, { text: "Three", on: true }],
@@ -106,6 +147,20 @@ describe("parseClientClassInput: the server is the authority", () => {
   it("only `on: true` ticks; a plain string (the Sprint 28 shape) reads as ticked", () => {
     const got = parseClientClassInput(c, { added: { p: [{ text: "A", on: "true" }, "B"] } });
     expect(got.added).toEqual({ p: [{ text: "A", on: false }, { text: "B", on: true }] });
+  });
+
+  it("reads the Sprint 28 shape { nameId: string[] } as ticked added classes, up to the default 5", () => {
+    const c = sevetri();
+    const got = parseClientClassInput(c, { p: ["Online store", " <b>Events</b> ", "c", "d", "e", "f"] });
+    expect(got.added.p).toEqual(["Online store", "bEvents/b", "c", "d", "e"].map((text) => ({ text, on: true })));
+    expect(got.entries).toEqual({});
+  });
+
+  it("a fixed offer with no client_add takes no added class", () => {
+    const c = essential();
+    c.names[0].marks = [c.names[0].marks[0]];
+    expect(parseClientClassInput(c, { p: ["Online store"] }).added).toEqual({});
+    expect(parseClientClassInput(c, { added: { p: [{ text: "Online store", on: true }] } }).added).toEqual({});
   });
 
   it("garbage is nothing", () => {

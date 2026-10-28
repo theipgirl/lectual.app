@@ -78,11 +78,30 @@ describe("the client page: one class is always included", () => {
   });
 });
 
-describe("the client page: Add a class (only where the firm allows it)", () => {
-  it("no brand name without client_add has the control", () => {
+describe("the client page: Add a class (explicit max, else 5, else none on a fixed offer)", () => {
+  it("with no client_add, each ticked brand name of an offer with a choice has the control (Sprint 28's default)", () => {
     const html = render();
-    expect(html).not.toContain("Add a class</h4>");
-    expect(html).not.toContain("cp-add-btn");
+    expect(html.match(/Add a class<\/h4>/g)?.length).toBe(2);
+    expect(html.match(/<button type="button" class="cp-add-btn">Add a class<\/button>/g)?.length).toBe(2);
+  });
+
+  it("a brand name whose marks are all unticked has no control", () => {
+    const c = sevetri();
+    c.names[1].marks.forEach((m) => (m.preselected = false));
+    expect(render({ content: c }).match(/Add a class<\/h4>/g)?.length).toBe(1);
+  });
+
+  it("a fixed offer just shows the proposal: no checkboxes and no Add a class, unless the firm set a max", () => {
+    const c = oneClass();
+    c.names[0].marks = [c.names[0].marks[0]];
+    const html = render({ content: c });
+    expect(html).toContain("cp-fixed");
+    expect(html).not.toContain("Add a class");
+    expect(html).not.toContain('type="checkbox"');
+    const room = oneClass();
+    room.names[0].marks = [room.names[0].marks[0]];
+    room.names[0].client_add = { max: 1 };
+    expect(render({ content: room })).toContain("cp-add-btn");
   });
 
   it("a brand name with client_add has the heading, the helper lines and an Add a class button", () => {

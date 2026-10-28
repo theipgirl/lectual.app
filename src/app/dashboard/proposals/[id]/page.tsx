@@ -18,7 +18,7 @@ import { firstNameOf, joinOr, statusLabel, statusTone } from "@/lib/proposal-edi
 import { moneyInput } from "@/lib/proposal-editor/form";
 import { editorChangedCount, shouldOpenMore } from "@/lib/proposal-editor/more-options";
 import { addedClassesPhrase, clientAddedClasses, clientDescribedClasses } from "@/lib/proposals/added-view";
-import { clientAddMax } from "@/lib/proposals/client-classes";
+import { explicitClientAddMax } from "@/lib/proposals/client-classes";
 import { findPackage, normalisePackages } from "@/lib/proposals/package-list";
 import { loadLeadLink } from "@/lib/proposals/lead-link";
 import { loadLeadOptions } from "@/lib/proposals/lead-options";
@@ -222,7 +222,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
       overridePerClass: moneyInput(n.price_override?.per_class_cents),
       marks: (n.marks ?? []).map((m) => ({ id: m.id, kind: m.kind, desc: m.desc, preselected: m.preselected })),
       classes: (n.classes ?? []).map((c) => ({ id: c.id, label: c.label, preselected: c.preselected, clientEntry: c.client_entry === true })),
-      clientAddMax: String(clientAddMax(n)),
+      clientAddMax: explicitClientAddMax(n) === null ? "" : String(explicitClientAddMax(n)),
     }),
   );
 

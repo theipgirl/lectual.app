@@ -82,21 +82,16 @@ export function acceptanceNoteBody(snapshot: AcceptedSnapshot, clientName: strin
   const { content, quote } = snapshot;
   const allClasses = (content.names ?? []).flatMap((n) => n.classes ?? []);
   const addedIds = new Set(allClasses.filter((c) => c.client_added === true && snapshot.selection?.[c.id] === true).map((c) => c.id));
-  const describedIds = new Set(allClasses.filter((c) => c.client_entry === true).map((c) => c.id));
+  const describedIds = new Set(allClasses.filter((c) => c.client_entry === true && c.client_added !== true && snapshot.selection?.[c.id] === true).map((c) => c.id));
   const pkg = text(content.pricing?.package) || "Proposal";
   const lines: string[] = [`${text(clientName) || "The client"} accepted this proposal. Accepted ${snapshot.accepted_at}.`, `Package: ${pkg}`];
   for (const n of (Array.isArray(quote.names) ? quote.names : []).filter((x) => x.included)) {
     const marks = n.marks.map((m) => MARK_KIND_LABEL[m.kind] ?? m.kind).join(" + ");
-    // Spec 3: the class labels in the snapshot are what was accepted, including the client's own words for an open or
-    // added class (cleaned plain text, at most 200 characters), each marked so the firm can tell them from its own.
+    // What the client typed is never copied into the firm's CRM (Sprint 28, kept by Spec 3): only the firm's own class
+    // labels are named; an open or added class is counted below, never quoted.
     const classes = n.classes
-      .map((c) => {
-        const label = text(c.label);
-        if (!label) return "";
-        if (addedIds.has(c.id)) return `${label} (added by the client)`;
-        if (describedIds.has(c.id)) return `${label} (described by the client)`;
-        return label;
-      })
+      .filter((c) => !addedIds.has(c.id) && !describedIds.has(c.id))
+      .map((c) => text(c.label))
       .filter(Boolean)
       .join("; ");
     lines.push(`- ${text(n.name)}: ${marks}${classes ? `; classes: ${classes}` : ""}`);
@@ -104,6 +99,7 @@ export function acceptanceNoteBody(snapshot: AcceptedSnapshot, clientName: strin
   for (const a of (Array.isArray(quote.adjustments) ? quote.adjustments : []).filter((x) => x.discount_cents > 0)) {
     lines.push(`Adjustment: ${text(a.label) || "Adjustment"} −${formatDollars(a.discount_cents)}`);
   }
+  if (describedIds.size > 0) lines.push(`Classes described by the client: ${describedIds.size} (their words are on the proposal page in Lectual)`);
   if (addedIds.size > 0) lines.push(`Classes added by the client: ${addedIds.size} (priced into the totals below)`);
   lines.push(`Legal fee, due when accepted: ${formatDollars(quote.legal_total_cents)}`);
   lines.push(`USPTO fees, due at filing: ${formatDollars(quote.gov_total_cents)} (separate; not part of the legal fee)`);

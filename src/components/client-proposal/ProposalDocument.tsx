@@ -391,7 +391,8 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                   const mine = nm.classes.filter((c) => c.client_added === true);
                   const staffClasses = nm.classes.filter((c) => c.client_added !== true);
                   const perClass = nm.price_override?.per_class_cents ?? pricing.per_class_cents;
-                  const addMax = clientAddMax(nm);
+                  // The firm's content decides (an explicit max, else 5, else 0 on a fixed offer), never what was added.
+                  const addMax = clientAddMax(content, nm);
                   const holdsLast = [...nm.marks, ...nm.classes].some((x) => locked.has(x.id));
                   return (
                     <article className="cp-card" key={nm.id} aria-labelledby={`cp-h-${nm.id}`}>
@@ -582,7 +583,7 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                         })}
                       </div>
 
-                      {readOnly || addMax === 0 ? null : (
+                      {readOnly || addMax === 0 || pickedMarks === 0 ? null : (
                         <div className="cp-part cp-add">
                           <h4>Add a class</h4>
                           <p className="cp-how-add">Add another class (category of goods or services) you&rsquo;d like us to include, and describe it in your own words.</p>

@@ -258,9 +258,10 @@ export function parseName(form: FormData, existing: ProposalContent, rand: () =>
     };
   });
 
-  // "Let the client add classes": blank or 0 is off. The total with the listed classes is checked by validateContent.
+  // "Let the client add classes": blank is the default (no `client_add`: 5, none on a fixed offer); 0..10 is the firm's
+  // own max, 0 included. The total with the listed classes is checked by validateContent.
   const addRaw = text(form, "clientAddMax");
-  let clientAdd = 0;
+  let clientAdd: number | null = null;
   if (addRaw) {
     if (!/^\d{1,2}$/.test(addRaw) || Number(addRaw) > MAX_CLIENT_ADD) {
       return fail(`Classes the client may add: enter a whole number from 0 to ${MAX_CLIENT_ADD}.`);
@@ -285,7 +286,7 @@ export function parseName(form: FormData, existing: ProposalContent, rand: () =>
     ...(Object.keys(override).length > 0 ? { price_override: override } : {}),
     marks,
     classes,
-    ...(clientAdd > 0 ? { client_add: { max: clientAdd } } : {}),
+    ...(clientAdd !== null ? { client_add: { max: clientAdd } } : {}),
   });
 }
 
