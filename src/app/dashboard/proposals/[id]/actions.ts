@@ -7,6 +7,7 @@ import {
   PROPOSAL_SAVE_CONFLICT,
   approveProposal,
   changeLivePayLink,
+  deleteProposalFamily,
   getProposal,
   reviseProposal,
   sendProposal,
@@ -38,11 +39,13 @@ import { clientLinkOrigin, clientLinkUrl } from "@/lib/proposals/client-link-ori
 import { runManualEmail } from "@/lib/consult-proposal/manual-email";
 import { runCreateLink } from "@/lib/proposal-editor/create-link";
 import { runChangePayLink } from "@/lib/proposal-editor/pay-link";
+import { DELETE_OWNER_ONLY, canDeleteProposal } from "@/lib/proposal-editor/delete-proposal";
+import { currentRole } from "@/lib/auth/current-role";
 import { createDraft, listQueue } from "@/lib/queue/api";
 import { activeQueueOrgKey } from "@/lib/queue/org";
 import { EDIT_AGAIN_DONE, LINK_TURNED_ON } from "@/lib/proposal-editor/vocabulary";
 import { proposalActionError, type ActionState } from "../errors";
-import { gateStaffAction } from "../gate";
+import { gateStaffAction, requireProposalsModule } from "../gate";
 
 /**
  * The proposal editor's write surface. Every function is its own POST entry
@@ -275,6 +278,24 @@ async function lifecycle(
   }
   revalidate(id);
   return { saved: true, notice };
+}
+
+/**
+ * "Delete proposal" (needs lectual 0102): the firm's OWNER removes the whole offer, every version, in any
+ * status. Not undoable; the client link then reads like an unknown one. The module gate (notFound) first,
+ * then the owner check here, then the store re-reads the role and the row through the scoped client and
+ * deletes the family in one statement. Nothing is sent; nothing touches Lawmatics or LawPay.
+ */
+export async function deleteProposalAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requireProposalsModule();
+  if (!canDeleteProposal(await currentRole())) return { error: DELETE_OWNER_ONLY };
+  const id = field(formData, "proposalId");
+  const result = await deleteProposalFamily(id);
+  revalidatePath("/dashboard/proposals/");
+  // On a refusal the page is not revalidated, so the sentence stays on screen (a partial delete before
+  // 0102 may already have removed the version this page shows).
+  if (!result.ok) return { error: result.error };
+  redirect("/dashboard/proposals/?deleted=1");
 }
 
 /** Sent -> the next version, as a draft. Redirects to it. */

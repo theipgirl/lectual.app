@@ -26,6 +26,7 @@ import {
 } from "./types";
 import { MAX_CONTENT_BYTES, hasErrors, isCivilDate, isPlausibleEmail, validateContent, validateSettingInput } from "./validate";
 import { PAY_LINK_NEEDS_DB_UPDATE, PAY_LINK_NOT_HTTPS, PAY_LINK_NOT_LIVE, PAY_LINK_UNCHANGED } from "@/lib/proposal-editor/pay-link";
+import { runDeleteProposalFamily, type DeleteFamilyResult } from "@/lib/proposal-editor/delete-proposal";
 
 /**
  * The proposal data layer — every read and write the signed-in firm makes.
@@ -79,6 +80,7 @@ export interface ProposalsDbQuery<T = unknown> extends PromiseLike<ProposalsDbRe
   select(columns?: string): ProposalsDbQuery<T>;
   insert(rows: unknown): ProposalsDbQuery<T>;
   update(patch: unknown): ProposalsDbQuery<T>;
+  delete(): ProposalsDbQuery<T>;
   upsert(rows: unknown, options?: { onConflict?: string }): ProposalsDbQuery<T>;
   eq(column: string, value: unknown): ProposalsDbQuery<T>;
   in(column: string, values: readonly unknown[]): ProposalsDbQuery<T>;
@@ -872,6 +874,44 @@ export async function changeLivePayLink(id: string, payUrl: string, options: Upd
   }
   if (!data) throw new ProposalError("conflict", PROPOSAL_SAVE_CONFLICT);
   return data as ProposalRow;
+}
+
+/**
+ * "Delete proposal" (needs lectual 0102): the OWNER removes a whole offer, every version, in ONE statement
+ * (`delete ... where family_id`; the family foreign key is NO ACTION, so v1 alone could not go while v2
+ * exists). Scoped client only, never the service role: the row and the family are read through RLS, the
+ * role is re-read on every call, and RLS decides what the delete may touch (0102 owner, any status; 0089
+ * drafts only for the admin tier). Events go by cascade. The rules and sentences are in delete-proposal.ts.
+ */
+export async function deleteProposalFamily(proposalId: string): Promise<DeleteFamilyResult> {
+  const supabase = await getScopedClient();
+  const db = proposalsDb(supabase);
+  return runDeleteProposalFamily(
+    {
+      role: async () => {
+        const { data, error } = await supabase.rpc("current_org_role");
+        if (error) throw new ProposalError("unavailable", "role");
+        return isRole(data) ? data : null;
+      },
+      readRow: async (id) => {
+        const { data, error } = await db.from("client_proposal").select("id, family_id, status").eq("id", id).maybeSingle();
+        if (error) throw new ProposalError("unavailable", "read");
+        const row = data as { id: string; family_id: string; status: ProposalStatus } | null;
+        return row ? { id: row.id, familyId: row.family_id, status: row.status } : null;
+      },
+      readFamily: async (familyId) => {
+        const { data, error } = await db.from("client_proposal").select("id, status").eq("family_id", familyId);
+        if (error) throw new ProposalError("unavailable", "read");
+        return (data as { id: string; status: ProposalStatus }[] | null) ?? [];
+      },
+      deleteFamily: async (familyId) => {
+        const { data, error } = await db.from("client_proposal").delete().eq("family_id", familyId).select("id");
+        if (error) throw new ProposalError("unavailable", "delete");
+        return ((data as { id: string }[] | null) ?? []).map((r) => r.id);
+      },
+    },
+    proposalId,
+  );
 }
 
 /* ─────────────────────────── lifecycle ───────────────────────────────────── */

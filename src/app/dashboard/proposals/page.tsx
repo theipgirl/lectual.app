@@ -36,6 +36,7 @@ import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 import { FEE_SENTENCE, PROPOSALS_NAME, PROPOSALS_SUBLINE } from "@/lib/ui/words";
 import { emptySegmentSentence } from "@/lib/proposals/list-copy";
+import { DELETE_DONE } from "@/lib/proposal-editor/delete-proposal";
 
 export const metadata: Metadata = { title: pageTitle(PROPOSALS_NAME) };
 
@@ -63,7 +64,7 @@ export const dynamic = "force-dynamic";
  * Reading is for the whole firm (0089's select policy is org members); starting a proposal is
  * for the staff roles, and the actions re-check that.
  */
-export default async function ProposalsPage({ searchParams }: { searchParams: Promise<{ segment?: string; status?: string; lead?: string | string[] }> }) {
+export default async function ProposalsPage({ searchParams }: { searchParams: Promise<{ segment?: string; status?: string; lead?: string | string[]; deleted?: string }> }) {
   await requireProposalsModule();
   const sp = await searchParams;
   const segment: ProposalSegment = parseSegment(sp.segment) ?? parseSegment(sp.status) ?? "everything";
@@ -142,6 +143,11 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
           <div style={{ flex: 1, minWidth: 260 }}>
             <h1 className="lx-h1" data-tour="proposals-head">{PROPOSALS_NAME}</h1>
             <p className="lx-sub">{PROPOSALS_SUBLINE}</p>
+            {sp.deleted === "1" && (
+              <p className="lx-note" role="status" style={{ margin: "6px 0 0" }}>
+                {DELETE_DONE}
+              </p>
+            )}
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {role && PROPOSAL_ADMIN_ROLES.includes(role) && (

@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useState } from "react";
 import type { ProposalStatus } from "@/lib/proposals/types";
 import { joinOr } from "@/lib/proposal-editor/labels";
-import { createLinkAction, reviseAction, sendAction, unapproveAction, withdrawAction } from "@/app/dashboard/proposals/[id]/actions";
+import { createLinkAction, deleteProposalAction, reviseAction, sendAction, unapproveAction, withdrawAction } from "@/app/dashboard/proposals/[id]/actions";
+import { DELETE_CONFIRM, DELETE_LABEL, moreMenuItems } from "@/lib/proposal-editor/delete-proposal";
 import Popover from "@/components/list-page/Popover";
 import { NOT_EMAILED } from "@/lib/consult-proposal/manual-email";
 import { BUTTON_WORDS, LINK_NOT_LIVE_YET, askToCreateLink } from "@/lib/proposal-editor/vocabulary";
@@ -31,6 +32,7 @@ export function Lifecycle({
   approverNames,
   clientUrl,
   queueNote = null,
+  canDelete = false,
 }: {
   proposalId: string;
   status: ProposalStatus;
@@ -44,9 +46,12 @@ export function Lifecycle({
   clientUrl: string | null;
   /** Set when this proposal's email is still pending in the approval queue (or can't be read): shown instead of "Turn on the link". */
   queueNote?: { text: string; queueId: string | null } | null;
+  /** The firm's owner (lectual 0102): "Delete proposal" is drawn in More only then. Everyone else never sees it. */
+  canDelete?: boolean;
 }) {
   const hidden = <input type="hidden" name="proposalId" value={proposalId} />;
   const approvers = approverNames.length > 0 ? joinOr(approverNames) : "a named approver";
+  const menu = moreMenuItems({ status, canWrite, canDelete });
 
   return (
     <div className="pe-bar" role="group" aria-label="Proposal actions">
@@ -130,9 +135,7 @@ export function Lifecycle({
         </>
       )}
 
-      {canWrite && (status === "draft" || status === "approved" || status === "sent") && (
-        <MoreMenu proposalId={proposalId} status={status} />
-      )}
+      {menu.length > 0 && <MoreMenu proposalId={proposalId} status={status} items={menu} />}
     </div>
   );
 }
@@ -169,8 +172,8 @@ function CopyLink({ url }: { url: string }) {
  * "More": the rare, destructive action. Withdraw asks first, in the page, with an explicit Cancel;
  * the menu itself closes on Esc or a click outside (the shared Popover).
  */
-function MoreMenu({ proposalId, status }: { proposalId: string; status: ProposalStatus }) {
-  const [confirming, setConfirming] = useState(false);
+function MoreMenu({ proposalId, status, items }: { proposalId: string; status: ProposalStatus; items: ("withdraw" | "delete")[] }) {
+  const [confirming, setConfirming] = useState<"withdraw" | "delete" | null>(null);
   return (
     <div className="pe-more-menu">
       <Popover
@@ -185,20 +188,37 @@ function MoreMenu({ proposalId, status }: { proposalId: string; status: Proposal
         )}
       >
         {(close) => (
-          <button
-            type="button"
-            role="menuitem"
-            className="lp-pop-item"
-            onClick={() => {
-              setConfirming(true);
-              close();
-            }}
-          >
-            <span className="lp-pop-text">{BUTTON_WORDS.withdraw}…</span>
-          </button>
+          <>
+            {items.includes("withdraw") && (
+              <button
+                type="button"
+                role="menuitem"
+                className="lp-pop-item"
+                onClick={() => {
+                  setConfirming("withdraw");
+                  close();
+                }}
+              >
+                <span className="lp-pop-text">{BUTTON_WORDS.withdraw}…</span>
+              </button>
+            )}
+            {items.includes("delete") && (
+              <button
+                type="button"
+                role="menuitem"
+                className="lp-pop-item"
+                onClick={() => {
+                  setConfirming("delete");
+                  close();
+                }}
+              >
+                <span className="lp-pop-text">{DELETE_LABEL}…</span>
+              </button>
+            )}
+          </>
         )}
       </Popover>
-      {confirming && (
+      {confirming === "withdraw" && (
         <ActionForm action={withdrawAction} className="pe-act pe-confirm">
           {({ state, pending }) => (
             <>
@@ -209,7 +229,7 @@ function MoreMenu({ proposalId, status }: { proposalId: string; status: Proposal
               <button type="submit" className="lx-btn lx-btn-danger" disabled={pending}>
                 {pending ? "Withdrawing…" : "Yes, withdraw"}
               </button>
-              <button type="button" className="lx-btn lx-btn-sec" onClick={() => setConfirming(false)} disabled={pending}>
+              <button type="button" className="lx-btn lx-btn-sec" onClick={() => setConfirming(null)} disabled={pending}>
                 Cancel
               </button>
               <Outcome state={state} pending={pending} />
@@ -217,6 +237,30 @@ function MoreMenu({ proposalId, status }: { proposalId: string; status: Proposal
           )}
         </ActionForm>
       )}
+      {confirming === "delete" && <DeleteConfirm proposalId={proposalId} onCancel={() => setConfirming(null)} />}
     </div>
+  );
+}
+
+/** The in-page confirm for "Delete proposal" (owner only). Says plainly that it removes every version and can't be undone. */
+export function DeleteConfirm({ proposalId, onCancel }: { proposalId: string; onCancel: () => void }) {
+  return (
+    <ActionForm action={deleteProposalAction} className="pe-act pe-confirm">
+      {({ state, pending }) => (
+        <>
+          <input type="hidden" name="proposalId" value={proposalId} />
+          <p className="lx-note" role="alert" style={{ margin: 0 }}>
+            {DELETE_CONFIRM}
+          </p>
+          <button type="submit" className="lx-btn lx-btn-danger" disabled={pending}>
+            {pending ? "Deleting…" : DELETE_LABEL}
+          </button>
+          <button type="button" className="lx-btn lx-btn-sec" onClick={onCancel} disabled={pending}>
+            Cancel
+          </button>
+          <Outcome state={state} pending={pending} />
+        </>
+      )}
+    </ActionForm>
   );
 }

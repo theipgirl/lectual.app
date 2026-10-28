@@ -33,6 +33,7 @@ import { LinkLeadForm } from "@/components/proposal-editor/LinkLeadForm";
 import { ProposalCard } from "@/components/proposal-editor/ProposalCard";
 import { IssueList, type ShownIssue } from "@/components/proposal-editor/ActionForm";
 import { Lifecycle } from "@/components/proposal-editor/Lifecycle";
+import { canDeleteProposal } from "@/lib/proposal-editor/delete-proposal";
 import { PaidPanel } from "@/components/proposal-editor/PaidPanel";
 import { ChangePayLink } from "@/components/proposal-editor/ChangePayLink";
 import {
@@ -357,6 +358,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
                   approverNames={approverNames}
                   clientUrl={clientUrl}
                   queueNote={sendBlock.blocked ? { text: GOES_LIVE_ON_APPROVAL, queueId: sendBlock.queueId } : null}
+                  canDelete={canDeleteProposal(session.role)}
                 />
               }
               more={
