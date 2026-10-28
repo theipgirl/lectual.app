@@ -198,6 +198,7 @@ describe("what the model receives", () => {
       "list_stalled_matters",
       "search_leads",
       "get_recent_activity",
+      "draft_proposal",
     ]);
     expect(typeof req.onText).toBe("function");
   });

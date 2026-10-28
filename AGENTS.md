@@ -276,8 +276,24 @@ the Today card only read; the "Set up" links go to pages that already exist and 
   The Zoom card on Meetings says Zoom isn't switched on when `zoomSetup()` isn't ready (copy in `lib/integrations/copy.ts`).
 
 ## Copilot (`/dashboard/copilot`, the floating drawer; no schema)
-Read-only Q&A over the firm's own matters, leads, deadlines and activity. It changes nothing and sends nothing; the
-tool set (six reads) and the retrieval-only UPL system prompt are in `src/lib/agents/matters-chat.ts`.
+Q&A over the firm's own matters, leads, deadlines and activity: six reads plus ONE draft-only write (`draft_proposal`). It
+sends nothing; the tool set and the retrieval-only UPL system prompt are in `src/lib/agents/matters-chat.ts`.
+- **`draft_proposal`** (rules `src/lib/copilot/draft-proposal.ts`, pure; executor `src/lib/agents/copilot-draft-proposal.ts`) creates a
+  DRAFT `client_proposal` and nothing else: never approves, makes a client link, sends or queues mail. Input: lead (id, or a name that must
+  match exactly ONE lead through `listLeads`; several or none = ask), package name (must be on the firm's CURRENT list via
+  `normalisePackages` / `findPackage`; else the list is returned and the user asked), brand names with marks (word/logo) and up to 3
+  plain-language classes each, optional discount (dollars or percent) and https pay link. Content is built with New proposal's own helpers
+  (`clientFromLead`, `buildBrandNames`, `buildNewContent`), checked with `validateContent` (an error in what the user said, e.g. a class
+  number, is sent back to reword; other issues ride along to fix in the editor), and written by `createProposal(..., source: "agent")`
+  through the scoped client. Gate on every call, before any read: `proposals` module AND a proposal-writing role, unreadable = no, one
+  neutral sentence either way.
+- **Confirmation is enforced in code, not only by the prompt.** No call runs unless a user turn in the thread mentions a proposal (or
+  quote). A call without `confirmed` writes nothing; the SERVER appends the exact summary and "Create this draft? (draft ref <12 hex>)"
+  (sha256 of org, lead, package, brands, discount, pay link) to the answer. A `confirmed: true` call creates only when the user's CURRENT
+  message is a plain yes (`isConfirmation`: "yes but..." is not) AND the previous answer in the thread carries that same ref; otherwise it
+  is shown again. At most one draft per question; the one-shot `answerMattersChatQuestion` has no thread and never creates. The thread
+  comes from the browser, i.e. the signed-in person, so they can only confirm for themselves; what this stops is the model, or text in
+  a record, creating a draft nobody saw. The created draft is cited as `type: "proposal"` (`/dashboard/proposals/<id>/`).
 - **The route streams.** `POST /api/matters-chat` answers Server-Sent Events: `tool` (status, in plain words),
   `delta` (text as the model writes it), `context` (only when the drawer sent a lead or matter page: found /
   not-found / unavailable), then one closing `final` (`answer`, `citations`, `declined`, `readFailed`) or `error` (a fixed
