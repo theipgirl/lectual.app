@@ -190,3 +190,24 @@ describe("Agents page: honest 'On' (S4)", () => {
     expect(src).toContain("@/lib/queue/load");
   });
 });
+
+describe("Agents page: Assistants naming and the run log (Sprint 31)", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  it("is titled Assistants under the AI tools group, never IP.OS or Agents", async () => {
+    const { html } = await render({ settings: [on("email-intel")] });
+    expect(html).toMatch(/<h1[^>]*>Assistants<\/h1>/);
+    expect(html).toContain("AI tools");
+    expect(html).not.toContain("IP.OS");
+    expect(html).not.toMatch(/<h1[^>]*>Agents<\/h1>/);
+  });
+
+  it("a failed run's stored error never reaches the run log, only the fixed sentence", async () => {
+    const run = { id: "r1", agent: "email-intel", trigger: "cron", status: "error", started_at: new Date().toISOString(), finished_at: new Date().toISOString(), items_in: 0, drafts_out: 0, summary: null, error: "SENTINEL raw provider text" };
+    const { html } = await render({ settings: [on("email-intel")], runs: [run] });
+    expect(html).toContain("This run failed. Lectual has been told and is looking into it.");
+    expect(html).not.toContain("SENTINEL");
+  });
+});

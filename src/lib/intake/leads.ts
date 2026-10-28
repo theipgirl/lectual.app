@@ -43,7 +43,7 @@ export async function listIntakeLeads(stages?: Stage[]): Promise<Lead[]> {
   // pipeline at all, so there is nothing to ask the database for. Returned
   // early rather than issuing `in.()`, which is a valid-but-odd PostgREST URL
   // for "match nothing". The page reports "no stages configured" separately,
-  // so this empty array is never mistaken for a broken read.
+  // so this empty array is never mistaken for a failed read.
   if (stageIds.length === 0) return [];
 
   const supabase = await getScopedClient();

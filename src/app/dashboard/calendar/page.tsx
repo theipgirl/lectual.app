@@ -340,7 +340,7 @@ function AgendaView({
  * events are placed in the firm's own time zone (Settings → Firm profile).
  *
  * Each source is read separately and a failed read is SAID, never drawn as an
- * empty day: a blank grid over a broken read would tell a firm nothing is due.
+ * empty day: a blank grid over a failed read would tell a firm nothing is due.
  * The Outlook read has its own three states (ok / database-update-needed /
  * unavailable) and a quiet one-line note; it never blanks the other sources.
  */

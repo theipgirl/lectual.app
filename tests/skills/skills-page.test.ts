@@ -77,6 +77,9 @@ describe("Skills page: render", () => {
   it("is titled Shortcuts, and shows the seven cards in order", async () => {
     const { html } = await render({ leads: [lead(1)], matters: [matter(1)] });
     expect(html).toMatch(/<h1[^>]*>Shortcuts<\/h1>/);
+    expect(html).toContain("AI tools");
+    expect(html).not.toContain("IP.OS");
+    expect(html).not.toMatch(/<h1[^>]*>Skills<\/h1>/);
     const at = NAMES.map((n) => html.indexOf(`>${n}<`));
     expect(at.every((i) => i > -1)).toBe(true);
     expect([...at].sort((a, b) => a - b)).toEqual(at);

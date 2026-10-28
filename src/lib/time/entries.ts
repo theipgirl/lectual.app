@@ -387,7 +387,7 @@ export async function deleteEntry(id: string): Promise<void> {
  *
  * Throws on a query error, never returns an empty array for a failed read:
  * the chip's three states (a total, "nothing yet", "we couldn't tell") depend
- * on the failure being distinguishable, and "0m" on a broken read would tell a
+ * on the failure being distinguishable, and "0m" on a failed read would tell a
  * firm nobody has touched a lead all week when somebody has.
  *
  * A timer that started BEFORE `since` is outside the window by definition;

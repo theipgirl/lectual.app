@@ -173,7 +173,7 @@ export default async function IntakePage({
   //
   // Best-effort, but with an EXPLICIT unknown rather than a silent zero: a
   // failure leaves `time` null and every chip renders an em dash. "0m" over a
-  // broken read would tell the firm nobody has touched a lead all week when
+  // failed read would tell the firm nobody has touched a lead all week when
   // somebody has — the same three-state rule the queue taught us (AGENTS.md).
   const leadNames: Record<string, string> = {};
   for (const lead of leads) {

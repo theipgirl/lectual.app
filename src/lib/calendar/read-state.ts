@@ -2,7 +2,7 @@
  * Did the calendar's own reads land? A null means that read failed (a read that
  * found nothing is an empty array, not null). When every read the view needed
  * failed, the page says so instead of drawing a blank week: an empty grid over
- * a broken read tells a firm nothing is due.
+ * a failed read tells a firm nothing is due.
  */
 export type CalendarReadState =
   | { kind: "ok" }

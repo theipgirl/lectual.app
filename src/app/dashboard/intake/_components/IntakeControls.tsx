@@ -16,10 +16,8 @@ import {
 import { memberLabel, stageCodeFor, stageLabelFor } from "@/lib/intake/views";
 import Popover, { PopoverItem } from "./Popover";
 import { chipClass } from "@/components/list-page/Chips";
-import { COPIED, COPY_VIEW_LINK, MOVED_AUTOMATICALLY, NOT_RATED, TEMPERATURE_TOOLTIP } from "@/lib/ui/words";
-
-/** How long "Copy link to this view" says "Copied" before going back to itself. */
-const COPIED_MS = 1500;
+import { MOVED_AUTOMATICALLY, NOT_RATED, TEMPERATURE_TOOLTIP } from "@/lib/ui/words";
+import { COPIED_MS, copyViewLabel, viewUrl } from "@/lib/intake/copy-view";
 
 /**
  * `?reply=` has no chip of its own — §11's control row is Stage · Owner · Source
@@ -129,8 +127,7 @@ export default function IntakeControls({
         (filters.owner ? "Owner" : null));
 
   async function saveView() {
-    const url =
-      typeof window === "undefined" ? currentHref : new URL(currentHref, window.location.origin).href;
+    const url = viewUrl(currentHref, typeof window === "undefined" ? null : window.location.origin);
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
@@ -449,7 +446,7 @@ export default function IntakeControls({
         onClick={saveView}
         className="lp-link-button lp-chips-end"
       >
-        {copied ? COPIED : COPY_VIEW_LINK}
+        {copyViewLabel(copied)}
       </button>
     </div>
   );

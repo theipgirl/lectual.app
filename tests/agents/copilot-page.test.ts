@@ -51,6 +51,9 @@ describe("CopilotPage", () => {
     const html = await render();
 
     expect(html).toContain("Ask Copilot");
+    expect(html).toContain(">Copilot</h1>");
+    expect(html).not.toContain("IP.OS");
+    expect(html).not.toContain("AI copilot");
     expect(html).toContain("What&#x27;s due in the next two weeks?");
   });
 

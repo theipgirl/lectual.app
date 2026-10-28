@@ -173,7 +173,7 @@ export async function setAutopilotAction(_prev: AgentActionState, formData: Form
   );
   if (error) return { error: `Couldn't ${pause ? "pause" : "resume"} the assistants. Nothing was changed. Refresh to try again.` };
   refresh();
-  return { ok: true, message: pause ? "Assistants paused. None will run until they are resumed." : "Assistants resumed." };
+  return { ok: true, message: pause ? `${ASSISTANTS_PAUSED}. None will run until they are resumed.` : "Assistants resumed." };
 }
 
 /** The firm's minutes-per-task estimate behind "Hours saved (est.)". Admins only. */

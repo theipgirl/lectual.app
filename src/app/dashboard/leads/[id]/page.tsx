@@ -141,7 +141,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const renderedAt = new Date().getTime();
   const proposals = pendingProposals(rows);
   const canWrite = CAN_WRITE_LEAD.includes(session.role);
-  // The Stage Keeper's suggestions waiting for a person, and who may act on them (the stage-move roles).
+  // The automatic stage moves suggestions waiting for a person, and who may act on them (the stage-move roles).
   const canMove = CAN_MOVE_STAGE.includes(session.role);
   const stageSuggestions = pendingStageSuggestions(rows);
   const name = `${lead.first_name} ${lead.last_name}`.trim() || lead.email;

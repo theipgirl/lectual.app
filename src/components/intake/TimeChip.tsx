@@ -37,7 +37,7 @@ import TimeEntryDialog, { type TimeEntrySubmit } from "./TimeEntryDialog";
  *
  * Three states, never two (AGENTS.md): a number, "0m" when nobody has logged
  * anything this week, and an em dash when the time read FAILED — `summary`
- * undefined with `unavailable` set. "0m" over a broken read would tell a firm
+ * undefined with `unavailable` set. "0m" over a failed read would tell a firm
  * nobody has touched a lead all week when somebody has.
  *
  * Time here is INTERNAL EFFORT. It is never a client invoice, never sent

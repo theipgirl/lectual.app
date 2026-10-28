@@ -803,6 +803,37 @@ No migration, no dependency, nothing sends. The only sealed-token reads are the 
   Gmail yet" state. The sidebar's old "Inbox" folder is now "Received" (the client-matched list) so the tab name is unambiguous.
 - **D2 and this sprint:** Taylor's "no email body or mailbox reading for proposals" is about proposals. The reading pane is a staff-facing My Mail feature and feeds nothing else (no agent, no proposal, no model call).
 
+## Plain language, one vocabulary, one list-page pattern (Sprint 31, no schema)
+No migration, no dependency, nothing sends. Words and layout only; every state rule (three-state reads, fail-closed modules, no send) is untouched.
+- **The glossary is `src/lib/ui/words.ts`** (pure). One export per firm-facing name: Copilot (ask questions), **Assistants** (the background agents, was Agents/Autopilot),
+  **Shortcuts** (was Skills), **Firm notes** (was Firm brain), the rail group **AI tools** (was IP.OS), **Approvals** (was Queue), **Leads** (was Intake/PNC for the list),
+  **Our turn**, **Temperature** (was lane), **Not rated** (was Not routed), **Moved automatically**, **Copy link to this view**, **Features** (was Modules),
+  **From their emails** / **Automatic stage moves** / **First read of this lead** (lead-page cards), `NOT_SWITCHED_ON` / `notReadyYet(feature)` / `notReadyPlural(...)`
+  ("This isn't switched on for your firm yet. Lectual will turn it on."), `CANT_SHOW`, the sign-in and feedback sentences. A name is changed there and nowhere else
+  (`tests/ui/words.test.ts` fails on a second whole-string copy). URLs, slugs, `data-tour` tokens, anchors (`#prep-consult`), DB values, agent ids, `orgHasModule` and the
+  `/dashboard/settings/modules/` route are NOT renamed; only the words a person reads.
+- **Platform voice vs firm voice.** Anything Lectual has to switch on (AI, Mailboxes, Zoom, LawPay, a table not yet there) says "isn't switched on for your firm yet. Lectual will
+  turn it on." Never "administrator", "deployment", "environment", "migration 0xxx", "database update", "AI key", "partner app", "schema", "module", "scope" (OAuth sense).
+  A failed read still says what could not load and what to do ("Can't show this right now. Refresh to try again."), never as empty or zero.
+- **Grep gate:** `tests/ui/no-build-words.test.ts` walks `src/app`, `src/components` and `src/lib` (comments stripped, string literals and JSX text only; `tests/ui/_scan.ts`)
+  and fails on the build vocabulary. The allow-list in the test has a reason on every entry: model prompts and letter text ("scope" as the legal term), `env.ts`, internal
+  email to Lectual (`failure-alert.ts`, `feedback/email.ts`), the firm's own Lawmatics stage names and spreadsheet vocabulary ("PNC"), and comma lists of column names (database selects).
+- **No raw error text:** `tests/ui/no-raw-error-text.test.ts` fails on `err.message` / `String(err)` under `src/app/dashboard` and `src/components` unless the line only logs or tests it.
+  The documented exceptions are the `friendly*Error` helpers and typed errors whose message is a sentence written for a person. Pages use fixed sentences: Brain, Leads
+  (`LeadsLoadFailed`), Campaigns (`campaignLoadError`), sign-in (`signInErrorMessage` maps `otp_expired` / `access_denied`, nothing else is echoed), the Assistants run log
+  (`friendlyRunError`, also used by the digest's reason line; unknown text becomes "This run failed. Lectual has been told and is looking into it.").
+- **One list-page pattern** (`src/components/list-page/`): `ListHeader` (one h1, one sub-line, no eyebrow), `ListToolbar` (search with a Search button and a Clear link only when a term
+  is set, the Table | Board toggle, a primary slot, a `MoreMenu` for rare actions), `Chip`/`FilterChips`, the shared `Popover`, and `list-page.css` (tokens only, text at least 12.5px, one
+  row height `--lp-row-h`, `.lp-pill`, `.lp-board-card`). Leads (`IntakeWorkspace`) and Matters (`matters/page.tsx`) both use it; Pipeline uses the toolbar and chips. `intake.css` keeps only
+  cell, board and drag rules. Leads keeps its behaviour: URL-driven filters, drag, stage menu, bulk move, the "Moved automatically" filter.
+- **Leads page:** the status strip is gone; the sub-line carries the counts and one hint (`leadsSubline`). Import and Reconcile stages are in More (`leadsMoreItems`; Reconcile only for the
+  admin tier). The three warning lines are ONE note (`detailsNote`): "Some details couldn't load (approvals, automatic moves). Refresh to try again." with a Refresh button, naming only the reads
+  that failed or were cut short; the chips and filters that depend on a failed read stay off. Empty states: no leads (Add a lead and a link to the intake form) and "No lead matches these
+  filters." (Clear filters). The Last touch header carries the arrow legend; each row's arrow has a title and a hidden label.
+- **Pipeline** says "This is a view-only overview. To move a lead, open it in Leads." and its column headers link to the Leads board (lead columns) or the Matters board (the rest).
+- Existing assertions changed on purpose: every test that pinned an old name or sentence (the agents, readiness, run-now, digest, nav, shell, reports, copilot, files, integrations,
+  consult-proposal failure, intake, matters-header and feedback tests) now pins the glossary wording.
+
 ## JSX text spacing: keep the `{" "}`
 Next 16.2.7's compiler DROPS the leading space of JSX text that contains an HTML entity
 (`&apos;`, `&amp;`, `&rsquo;`…) and runs onto another line, even if that is only the line
