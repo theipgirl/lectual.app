@@ -2,7 +2,14 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { NOT_A_LAW_FIRM_DISCLAIMER } from "@/lib/legal/disclaimer";
-import { defaultSelection, normalizeSelection, quoteHasItems, quoteProposal } from "@/lib/proposals/pricing";
+import {
+  defaultSelection,
+  isFixedOffer,
+  lockedSelectionIds,
+  normalizeSelection,
+  quoteHasItems,
+  quoteProposal,
+} from "@/lib/proposals/pricing";
 import {
   MARK_KIND_DEFAULT_DESC,
   MARK_KIND_LABEL,
@@ -61,6 +68,9 @@ export type ProposalDocumentProps = {
 
 const DEFAULT_TITLE = "Trademark Proposal";
 
+/** Shown on a card whose last mark or class is held on, so a client can't untick to $0. */
+export const KEEP_ONE_HINT = "At least one class and one mark must stay selected.";
+
 function Rich({ text }: { text: string | undefined }): ReactNode {
   return richSegments(text).map((seg, i) => (seg.bold ? <b key={i}>{seg.text}</b> : seg.text));
 }
@@ -98,6 +108,37 @@ export function ProposalDocument(props: ProposalDocumentProps) {
     [mode, acceptedQuote, content, selection],
   );
   const display = useMemo(() => markDisplayPrices(content, selection), [content, selection]);
+  // One name, one mark, one class: nothing to choose, so no checkboxes at all.
+  const fixed = isFixedOffer(content);
+  // Boxes the client may not untick: doing so would leave nothing to accept.
+  const locked = useMemo(
+    () => (readOnly || fixed ? new Set<string>() : lockedSelectionIds(content, selection)),
+    [readOnly, fixed, content, selection],
+  );
+
+  /** One mark or class row: a checkbox when the client has a choice, a plain row for a fixed offer. */
+  function option(nameId: string, id: string, on: boolean, body: ReactNode) {
+    if (fixed) {
+      return (
+        <div className="cp-opt cp-fixed" key={id}>
+          {body}
+        </div>
+      );
+    }
+    return (
+      <label className={`cp-opt${on ? "" : " cp-off"}`} key={id}>
+        <input
+          type="checkbox"
+          checked={on}
+          disabled={readOnly || locked.has(id)}
+          aria-describedby={locked.has(id) ? `cp-keep-${nameId}` : undefined}
+          onChange={(e) => toggle(id, e.target.checked)}
+        />
+        <span className="cp-box" aria-hidden="true" />
+        {body}
+      </label>
+    );
+  }
 
   const canAccept = quoteHasItems(quote);
   const pricing = content.pricing;
@@ -110,7 +151,8 @@ export function ProposalDocument(props: ProposalDocumentProps) {
   const recHeading = brand === "rpb" ? "Rebecca’s recommendation" : "Our recommendation";
 
   function toggle(id: string, on: boolean) {
-    if (readOnly) return;
+    if (readOnly || fixed) return;
+    if (!on && locked.has(id)) return;
     setOverrides((prev) => ({ ...prev, [id]: on }));
   }
 
@@ -212,11 +254,15 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                   1
                 </span>
                 <div>
-                  <h2 id="cp-s1">{accepted ? "What you accepted" : "Select your trademarks"}</h2>
+                  <h2 id="cp-s1">
+                    {accepted ? "What you accepted" : fixed ? "Your trademark" : "Select your trademarks"}
+                  </h2>
                   <p>
                     {accepted
                       ? "These are the marks and classes in your accepted proposal."
-                      : "Please select the marks you would like to protect and the corresponding classes."}
+                      : fixed
+                        ? "This is the mark and class in your proposal."
+                        : "Please select the marks you would like to protect and the corresponding classes."}
                   </p>
                 </div>
               </div>
@@ -226,6 +272,7 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                   const qn = quote.names.find((q) => q.id === nm.id);
                   const pickedMarks = nm.marks.filter((m) => selection[m.id] === true).length;
                   const pickedClasses = nm.classes.filter((c) => selection[c.id] === true).length;
+                  const holdsLast = [...nm.marks, ...nm.classes].some((x) => locked.has(x.id));
                   return (
                     <article className="cp-card" key={nm.id} aria-labelledby={`cp-h-${nm.id}`}>
                       <div className="cp-card-h">
@@ -245,19 +292,15 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                       ) : null}
 
                       <div className="cp-part">
-                        <h4>Marks</h4>
+                        <h4>{fixed ? "Mark" : "Marks"}</h4>
                         {nm.marks.map((m) => {
                           const d = display[m.id];
                           const on = selection[m.id] === true;
-                          return (
-                            <label className={`cp-opt${on ? "" : " cp-off"}`} key={m.id}>
-                              <input
-                                type="checkbox"
-                                checked={on}
-                                disabled={readOnly}
-                                onChange={(e) => toggle(m.id, e.target.checked)}
-                              />
-                              <span className="cp-box" aria-hidden="true" />
+                          return option(
+                            nm.id,
+                            m.id,
+                            on,
+                            <>
                               <span className="cp-t">
                                 <b>{MARK_KIND_LABEL[m.kind] ?? m.kind}</b>
                                 <span>{m.desc}</span>
@@ -271,26 +314,26 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                                     : `${plural(d?.class_count ?? 0, "class", "classes")} included`}
                                 </small>
                               </span>
-                            </label>
+                            </>,
                           );
                         })}
                       </div>
 
                       <div className="cp-part">
-                        <h4>
-                          Classes <span>(apply to each mark selected above)</span>
-                        </h4>
+                        {fixed ? (
+                          <h4>Class</h4>
+                        ) : (
+                          <h4>
+                            Classes <span>(apply to each mark selected above)</span>
+                          </h4>
+                        )}
                         {nm.classes.map((c, ci) => {
                           const on = selection[c.id] === true;
-                          return (
-                            <label className={`cp-opt${on ? "" : " cp-off"}`} key={c.id}>
-                              <input
-                                type="checkbox"
-                                checked={on}
-                                disabled={readOnly}
-                                onChange={(e) => toggle(c.id, e.target.checked)}
-                              />
-                              <span className="cp-box" aria-hidden="true" />
+                          return option(
+                            nm.id,
+                            c.id,
+                            on,
+                            <>
                               <span className="cp-t">
                                 <b>{`Class ${ci + 1} · ${c.label}`}</b>
                               </span>
@@ -298,7 +341,7 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                                 + {money(pricing.gov_per_class_cents)}
                                 <small>filing fee per mark</small>
                               </span>
-                            </label>
+                            </>,
                           );
                         })}
                       </div>
@@ -306,6 +349,11 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                       {!readOnly && pickedMarks > 0 && pickedClasses === 0 ? (
                         <p className="cp-warn" role="status">
                           Please select at least one class to include {nm.name}.
+                        </p>
+                      ) : null}
+                      {holdsLast ? (
+                        <p className="cp-keep" id={`cp-keep-${nm.id}`}>
+                          {KEEP_ONE_HINT}
                         </p>
                       ) : null}
                     </article>

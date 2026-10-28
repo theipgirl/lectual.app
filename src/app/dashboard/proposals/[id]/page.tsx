@@ -24,6 +24,7 @@ import { ConsultStrip } from "@/components/proposal-editor/ConsultStrip";
 import { ProposalCard } from "@/components/proposal-editor/ProposalCard";
 import { IssueList, type ShownIssue } from "@/components/proposal-editor/ActionForm";
 import { Lifecycle } from "@/components/proposal-editor/Lifecycle";
+import { PostConsultEmail } from "@/components/proposal-editor/PostConsultEmail";
 import { PaidPanel } from "@/components/proposal-editor/PaidPanel";
 import {
   AddNameForm,
@@ -217,6 +218,12 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
         clientUrl={clientUrl}
         queueNote={sendBlock.blocked ? { text: GOES_LIVE_ON_APPROVAL, queueId: sendBlock.queueId } : null}
       />
+
+      {canWrite && (proposal.status === "draft" || proposal.status === "approved" || proposal.status === "sent") && (
+        <div className="pe-bar" role="group" aria-label="Post-consult email">
+          <PostConsultEmail proposalId={proposal.id} />
+        </div>
+      )}
 
       {readOnlyNote && (
         <div className="pe-readonly" role="note">
