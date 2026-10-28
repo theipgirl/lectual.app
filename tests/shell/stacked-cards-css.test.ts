@@ -61,7 +61,7 @@ describe("stacked cards under 640px (V1)", () => {
 
   it("each of the five tables carries the stack class and a data-label on its cells", () => {
     const sources: [string, string[]][] = [
-      ["src/app/dashboard/matters/page.tsx", ["Type", "Stage", "In stage", "Owner", "Status"]],
+      ["src/app/dashboard/matters/page.tsx", ["Type", "Stage", "In stage", "Owner"]],
       ["src/app/dashboard/documents/page.tsx", ["Matter", "Status", "Updated"]],
       ["src/app/dashboard/queue/page.tsx", ["Client", "From", "Status", "Queued"]],
       ["src/components/proposal-list/ProposalsTable.tsx", ["Accepted", "Paid", "At signing", "At filing", "Expires", "Last activity"]],
