@@ -16,6 +16,7 @@
 import { describeStepEvent } from "@/lib/proposals/paid";
 import { EVENT_WORDS } from "./vocabulary";
 import { describePayLinkEvent } from "./pay-link";
+import { describeResetEvent } from "./reset-acceptance";
 import type { ProposalChange, ProposalEventRow } from "@/lib/proposals/types";
 
 export type EventContext = {
@@ -35,6 +36,8 @@ export type EventLine = {
   version: number | null;
   /** ISO instant, for the caller to format. */
   at: string;
+  /** A whole sentence that replaces "<who> <what>" when set ("Acceptance reset by Taylor"). */
+  text?: string;
 };
 
 /** "$4,950", or "$4,950.50" when there are cents. */
@@ -222,6 +225,11 @@ export function describeProposalEvent(event: ProposalEventRow, ctx: EventContext
       return { ...base, what: "accepted the proposal", details: [] };
     case "withdrawn":
       return { ...base, what: "withdrew it", details: [] };
+    case "reset": {
+      // lectual 0101: {from: "accepted", to: "sent", version, previous_accepted_at, previous_snapshot}.
+      const reset = describeResetEvent(p, who, formatDollars);
+      return { ...base, what: "reset the client's acceptance", text: reset.text, details: reset.details };
+    }
     case "superseded":
       // The trigger's payload is {from, to, version}, and `version` is the
       // SUPERSEDED row's own number, not the one that replaced it: sending a

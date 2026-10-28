@@ -13,7 +13,7 @@
  *
  * ── PAID IS DERIVED, NOT STORED ─────────────────────────────────────────────
  * There is no paid column. A version is paid when its newest `paid_marked` /
- * `paid_undone` event is `paid_marked`. The read is three-state (paid / not paid /
+ * `paid_undone` event of the current round (after its newest reset, lectual 0101) is `paid_marked`. The read is three-state (paid / not paid /
  * couldn't be read): a failed read of the events is never "Not paid" and never "Paid".
  */
 
@@ -105,6 +105,51 @@ function ms(iso: string): number {
   return Number.isNaN(t) ? 0 : t;
 }
 
+/* ─────────────────────────── rounds (lectual 0101) ───────────────────────── */
+
+/**
+ * A RESET (lectual 0101: staff move an accepted version back to "Link live") starts a fresh
+ * round: the client can accept again, and every step (the firm notice, the Lawmatics note, the
+ * paid mark, the LOE draft, the uploads) must run again for that new acceptance. So only step
+ * events AFTER the version's newest `reset` event count. Readers that feed these functions must
+ * include the version's `reset` events (type `reset`, no `step`) in the list they pass in.
+ * The database judges "is it paid" the same way before it allows a reset.
+ */
+export const RESET_EVENT_TYPE = "reset";
+
+/** When the current round began: the newest `reset` event of this version (any version when no id is given), or null. */
+export function roundStartedAt(events: readonly StepEventInput[], proposalId?: string): string | null {
+  let newest: string | null = null;
+  for (const e of events) {
+    if (e.type !== RESET_EVENT_TYPE) continue;
+    if (proposalId !== undefined && e.proposal_id !== undefined && e.proposal_id !== proposalId) continue;
+    if (newest === null || ms(e.created_at) > ms(newest)) newest = e.created_at;
+  }
+  return newest;
+}
+
+/** The events of the current round: everything strictly after the newest reset (all of them when there is none). */
+export function currentRound<T extends StepEventInput>(events: readonly T[], proposalId?: string): T[] {
+  const start = roundStartedAt(events, proposalId);
+  if (start === null) return [...events];
+  const at = ms(start);
+  return events.filter((e) => e.type !== RESET_EVENT_TYPE && ms(e.created_at) > at);
+}
+
+/**
+ * The drafts of the current round: every one when the version was never reset; after a reset only
+ * the ones created after it. A draft with no readable date is kept (a second letter is worse than none).
+ */
+export function draftsInRound<T extends { created_at?: string | null }>(drafts: readonly T[], roundStart: string | null): T[] {
+  if (!roundStart) return [...drafts];
+  const start = Date.parse(roundStart);
+  if (Number.isNaN(start)) return [...drafts];
+  return drafts.filter((d) => {
+    const at = typeof d.created_at === "string" ? Date.parse(d.created_at) : Number.NaN;
+    return Number.isNaN(at) || at > start;
+  });
+}
+
 /* ─────────────────────────── paid state ─────────────────────────────────── */
 
 export type PaidState =
@@ -118,7 +163,7 @@ export type PaidState =
  */
 export function paidStateFromEvents(events: readonly StepEventInput[]): PaidState {
   let newest: { step: ProposalStep; at: string; by: string | null } | null = null;
-  for (const e of events) {
+  for (const e of currentRound(events)) {
     const parsed = readStep(e.payload);
     if (!parsed || (parsed.step !== "paid_marked" && parsed.step !== "paid_undone")) continue;
     if (parsed.outcome !== STEP_SUCCESS[parsed.step]) continue;
@@ -139,7 +184,7 @@ export type StepState = { step: ProposalStep; outcome: string; reason: string | 
  */
 export function stepStates(events: readonly StepEventInput[], proposalId: string): Partial<Record<ProposalStep, StepState>> {
   const out: Partial<Record<ProposalStep, StepState>> = {};
-  for (const e of events) {
+  for (const e of currentRound(events, proposalId)) {
     if (e.proposal_id !== undefined && e.proposal_id !== proposalId) continue;
     const parsed = readStep(e.payload);
     if (!parsed) continue;
@@ -153,7 +198,7 @@ export function stepStates(events: readonly StepEventInput[], proposalId: string
 
 /** True when ANY event of this step for this proposal ended in the step's success word. */
 export function stepSucceeded(events: readonly StepEventInput[], proposalId: string, step: ProposalStep): boolean {
-  return events.some((e) => {
+  return currentRound(events, proposalId).some((e) => {
     if (e.proposal_id !== undefined && e.proposal_id !== proposalId) return false;
     const parsed = readStep(e.payload);
     return !!parsed && parsed.step === step && parsed.outcome === STEP_SUCCESS[step];
