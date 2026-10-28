@@ -15,6 +15,7 @@
 
 import { describeStepEvent } from "@/lib/proposals/paid";
 import { EVENT_WORDS } from "./vocabulary";
+import { describePayLinkEvent } from "./pay-link";
 import type { ProposalChange, ProposalEventRow } from "@/lib/proposals/types";
 
 export type EventContext = {
@@ -239,6 +240,9 @@ export function describeProposalEvent(event: ProposalEventRow, ctx: EventContext
       // Sprint 19: paid marks, the firm notice, Lawmatics notes and uploads are `edited` events with a `step`.
       const step = describeStepEvent(p);
       if (step) return { ...base, what: step, details: [] };
+      // lectual 0100: the live pay link changed ({field: "pay_url", from_host, to_host}, written by the trigger).
+      const payLink = describePayLinkEvent(p);
+      if (payLink) return { ...base, what: payLink, details: [] };
       if (event.actor === "agent" && p.source === CONSULT_SOURCE) return describeConsultDraft(p, base);
       const changes = Array.isArray(p.changes) ? p.changes.filter(isChange) : [];
       const sentences = changes.map(describeChange);

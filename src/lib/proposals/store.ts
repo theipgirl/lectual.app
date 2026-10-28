@@ -25,6 +25,7 @@ import {
   type ProposalStatus,
 } from "./types";
 import { MAX_CONTENT_BYTES, hasErrors, isCivilDate, isPlausibleEmail, validateContent, validateSettingInput } from "./validate";
+import { PAY_LINK_NEEDS_DB_UPDATE, PAY_LINK_NOT_HTTPS, PAY_LINK_NOT_LIVE, PAY_LINK_UNCHANGED } from "@/lib/proposal-editor/pay-link";
 
 /**
  * The proposal data layer — every read and write the signed-in firm makes.
@@ -827,6 +828,50 @@ export async function updateProposal(
   };
   await writeProposalEventSafe(db, updated, "edited", "staff", userId, payload as unknown as Record<string, unknown>);
   return updated;
+}
+
+/**
+ * Change the pay link of a LIVE (sent) version: the one change lectual 0100 lets through on a frozen
+ * row. Only `pay_url` is written; the trigger stamps updated_by / updated_at and writes the `edited`
+ * event itself (hosts only), so this function writes no event. Refused here, before the database, for
+ * any other status. Fenced on status `sent` and on the `updated_at` the page was rendered with.
+ *
+ * Before 0100 is applied the 0089 trigger answers `client_proposal_frozen` for exactly this write (a
+ * pay_url-only change on a sent row, which 0100 never refuses that way), so that answer is reported as
+ * PAY_LINK_NEEDS_DB_UPDATE rather than "already gone out".
+ */
+export async function changeLivePayLink(id: string, payUrl: string, options: UpdateProposalOptions): Promise<ProposalRow> {
+  const expected = typeof options?.expectedUpdatedAt === "string" ? options.expectedUpdatedAt.trim() : "";
+  if (!expected || Number.isNaN(Date.parse(expected))) throw new ProposalError("conflict", PROPOSAL_SAVE_CONFLICT);
+  const next = payUrl.trim();
+  const issues = validateContent({}, { pay_url: next }).filter((i) => i.path === "pay_url");
+  if (!next || hasErrors(issues)) throw new ProposalError("validation", PAY_LINK_NOT_HTTPS);
+
+  const supabase = await getScopedClient();
+  await requireProposalWriteRole(supabase);
+  const db = proposalsDb(supabase);
+
+  const current = await loadRow(db, id);
+  if (Date.parse(current.updated_at) !== Date.parse(expected)) throw new ProposalError("conflict", PROPOSAL_SAVE_CONFLICT);
+  if (current.status !== "sent") throw new ProposalError("frozen", PAY_LINK_NOT_LIVE);
+  if (current.pay_url === next) throw new ProposalError("validation", PAY_LINK_UNCHANGED);
+
+  const { data, error } = await db
+    .from("client_proposal")
+    .update({ pay_url: next })
+    .eq("id", current.id)
+    .eq("status", "sent")
+    .eq("updated_at", expected)
+    .select(PROPOSAL_COLUMNS)
+    .maybeSingle();
+  if (error) {
+    if ((error.message ?? "").toLowerCase().includes("client_proposal_frozen")) {
+      throw new ProposalError("unavailable", PAY_LINK_NEEDS_DB_UPDATE);
+    }
+    throw friendlyProposalError(error, "change the pay link");
+  }
+  if (!data) throw new ProposalError("conflict", PROPOSAL_SAVE_CONFLICT);
+  return data as ProposalRow;
 }
 
 /* ─────────────────────────── lifecycle ───────────────────────────────────── */
