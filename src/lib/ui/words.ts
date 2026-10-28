@@ -14,6 +14,7 @@ export const SHORTCUTS_NAME = "Shortcuts";
 /** What the firm has told Lectual about how it works (was "Firm brain"). */
 export const FIRM_NOTES_NAME = "Firm notes";
 /** The rail group holding Copilot, Assistants, Shortcuts and Firm notes (was "IP.OS"). */
+export const FIRM_NOTES_PURPOSE = "Your assistants use these to match your tone, prices and rules. Nothing here is sent to clients.";
 export const AI_TOOLS_GROUP = "AI tools";
 /** Drafts waiting for a person's OK (was "Queue"). */
 export const APPROVALS_NAME = "Approvals";
@@ -73,6 +74,10 @@ export const FEEDBACK_DISCLOSURE =
 /** Sign-in. */
 export const SIGN_IN_EXPIRED = "That sign-in link has expired or was already used. Enter your email to get a new one.";
 export const SIGN_IN_GENERIC = "We couldn't send the link. Check the address and try again.";
+export const SIGN_IN_WAIT = "Please wait a little before asking for another link.";
+export const SIGN_IN_INVITED_HELP = "Use the email your firm invited.";
+export const SIGN_IN_NOT_INVITED = "Not invited yet? Ask your firm's owner to invite you.";
+export const SIGN_IN_SPAM_HINT = "Can't find it? Check your spam or junk folder.";
 export const SIGN_IN_ERROR_FALLBACK = "That sign-in didn't work. Enter your email to get a new link.";
 
 /** Plain permission wording (was "scope"). */

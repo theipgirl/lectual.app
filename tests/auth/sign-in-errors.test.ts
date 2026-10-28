@@ -46,7 +46,7 @@ describe("sendMagicLink", () => {
   it("still succeeds when the link is sent", async () => {
     signInWithOtp.mockResolvedValue({ error: null });
     const { sendMagicLink } = await import("@/app/sign-in/actions");
-    expect(await sendMagicLink({}, form("a@example.com"))).toEqual({ ok: true });
+    expect(await sendMagicLink({}, form("a@example.com"))).toEqual({ ok: true, email: "a@example.com" });
   });
 });
 

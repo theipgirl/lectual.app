@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { safeNext } from "@/lib/auth/safe-next";
 import LoginForm from "./LoginForm";
 import { signInErrorMessage } from "@/lib/auth/sign-in-errors";
+import { SIGN_IN_INVITED_HELP, SIGN_IN_NOT_INVITED } from "@/lib/ui/words";
 import { NOT_A_LAW_FIRM_DISCLAIMER } from "@/lib/legal/disclaimer";
 
 export const metadata: Metadata = { title: "Sign in — Lectual" };
@@ -51,7 +52,9 @@ export default async function SignInPage({
             {signInErrorMessage(error)}
           </p>
         )}
+        <p style={{ margin: 0, fontSize: 14 }}>{SIGN_IN_INVITED_HELP}</p>
         <LoginForm next={safeNext} />
+        <p style={{ margin: 0, fontSize: 14 }}>{SIGN_IN_NOT_INVITED}</p>
         <p className="lx-note" style={{ margin: 0, fontSize: 12 }}>
           {NOT_A_LAW_FIRM_DISCLAIMER}
         </p>
