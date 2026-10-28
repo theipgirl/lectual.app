@@ -7,7 +7,7 @@ import { getLawmaticsConnection } from "@/lib/lawmatics/connection";
 import { relativeTime } from "@/lib/relative-time";
 import { orgHasModule } from "@/lib/org/modules";
 import { loadLawmaticsCustomFields, loadLoeFieldsConfig } from "@/lib/proposals/loe-fields-load";
-import { ClientsImport, ConnectLawmatics, DisconnectLawmatics, MattersImport } from "@/components/lawmatics/LawmaticsImport";
+import { ClientsImport, ConnectLawmatics, DisconnectLawmatics, MattersImport, HiredMattersSync } from "@/components/lawmatics/LawmaticsImport";
 import { LoeFieldsForm } from "@/components/lawmatics/LoeFieldsForm";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
@@ -109,6 +109,12 @@ export default async function LawmaticsPage() {
               Matters
             </h2>
             <MattersImport />
+          </section>
+          <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }}>
+            <h2 className="lx-h2" style={{ fontSize: 23 }}>
+              Hired matters
+            </h2>
+            <HiredMattersSync />
           </section>
         </>
       )}

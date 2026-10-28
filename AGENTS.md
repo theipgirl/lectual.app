@@ -959,7 +959,7 @@ No migration, no dependency, nothing sends. The Stage Keeper's rules from Sprint
   new-enquiry stage, flags a person Lawmatics gave a stage (or "Hired") with the Lawmatics text as read-only evidence (`lawmatics_stage_unmapped` on the `lead_created` row), and
   never moves an existing lead: the "move existing leads" option, the divergence report and `stage-map` use in the planner are gone. Reconcile's Lawmatics source is always
   "unmapped" text (a `needs_matter` pointer for "Hired" only) and its stage-name milestones are undated, so they are cited and never acted on. `stage-map.ts` itself is untouched
-  (the matters importer still uses it). **The ON HOLD new RPB intake board is NOT built**: no new aliases ("Discovery Call Scheduled" and "Strategy Session Scheduled" stay as
+  (the matters importer still uses it; that importer is update-only and never creates a matter. Matters are CREATED from Lawmatics only by the separate hired-matter sync, see "Hired-matter sync" below). **The ON HOLD new RPB intake board is NOT built**: no new aliases ("Discovery Call Scheduled" and "Strategy Session Scheduled" stay as
   they were), no "Consult Held - Proposal in Progress" or "Proposal Sent" names, no milestone-order change, no Lost / Nurture change.
 - **The new-enquiry stage** (`src/lib/pipeline/new-enquiry.ts`, the ONE rule): the open stage named like "Potential New Client", "New Lead", "New Inquiry" / "New Enquiry" (one alias
   list), else the first open stage in pipeline order; never `won`, `lost` or `nurture`, and never "Follow-Up" just because it sorts first. Used by the importer, Reconcile's Create
@@ -1171,3 +1171,26 @@ An ACCEPTED version can go back to "Link live" so the same client link can be ac
   The history reads "Acceptance reset by <name>" (`describeResetEvent`; `EventLine.text`), with the earlier legal fee in the details; the list's Last activity says
   "Acceptance reset". Only the NEWEST accepted line of a version carries what the client typed.
 - Not verified against a live database: the 0101 trigger and its event payload (lectual's DB cases skip without `.env.test`).
+
+## Hired-matter sync (Lawmatics -> Lectual)
+A person marked **Hired** in a firm's OWN Lawmatics gets a `crm_matter` here. A separate create path: `matters-import*.ts` stays update-only and is unchanged. No schema.
+- **Pieces:** `src/lib/lawmatics/hired-sync-plan.ts` (pure planner), `hired-sync-normalize.ts` (prospect -> sanitized candidate), `hired-sync.ts` (runner, `server-only`),
+  `GET /api/cron/lawmatics-matters/` (daily `18 11 * * *`, `CRON_SECRET`, counts only), and a "Sync hired matters now" button on Settings -> Integrations -> Lawmatics
+  (`syncHiredMattersAction`: admin tier re-resolved inside the action, runs for the SESSION's org only).
+- **Which records:** Lawmatics `status` = hired (case-insensitive) AND `converted_date` on/after `HIRED_SYNC_CUTOFF` (`2026-10-28`). Older hired people were reconciled by hand or came from the
+  sheet, and Lawmatics re-stamped `converted_date` on ~20 old clients on 2026-09-21, so an older cutoff would duplicate them. A hired record with no `converted_date` is skipped ("needs a look").
+- **Decisions, in order:** Lawmatics id already on a matter -> skip. No usable title (no `case_title`, no "Name of Trademark") and the owner already has any matter -> skip, needs a look
+  (never a generic duplicate). Owner AND title match matters with `lawmatics_id` NULL: exactly one -> **link** (fills `lawmatics_id` only, guarded by `.is('lawmatics_id', null)`), several -> skip as
+  ambiguous. Owner AND title match a matter linked to a DIFFERENT Lawmatics id -> skip ("already in Lectual under another Lawmatics record"), never create. Otherwise **create**. Same owner with a
+  different title is a new matter.
+- **Matching is loose on purpose:** owners match when first and last tokens are equal or one normalized name contains the other ("Vivian Olodun Anderson" ~ "Vivian Anderson", "Eli Chazin (Eli Levi)" ~
+  "Eli Chazin"; parentheticals dropped); titles match when normalized-equal or one contains the other (decoration such as "(word mark)" and a "word mark -" prefix is stripped; containment needs 3+ characters).
+- **Created fields:** type from the practice area (Trademark -> TM, Copyright -> CR, Patent -> PATENT, Litigation -> LIT, Contracts / General Counsel Services / Business Law / Other -> BL; none -> TM when
+  the "Practice Area" custom field says Trademark or "Name of Trademark" exists, else BL). Title = `case_title`, else "Name of Trademark", else the practice area, else "Lawmatics matter #<case number>".
+  `mark_text` only for TM. `matter_number` = `<TYPE>-<owner slug>-<title slug>`, plus `-<case number or id>` on a collision. Stage for TM = the firm's "Signed LOE / Deposit Received" (null if the firm
+  has none). `lead_id` = the one lead with that `lawmatics_id`, else exactly one lead with that email, else null. At most 50 creates per firm per run; the rest are skipped "over the per-run limit".
+- **Runner rules:** service role, per ACTIVE `lawmatics_connection`, token from `firmToken(admin, orgId)` (the firm's own, never a deployment token). `org_id` is stamped from the connection row.
+  `/prospects` is swept with `listAll`; a truncated, failed or unrecognised read (or an unreadable matter / lead / stage list) creates NOTHING for that firm and counts a failed firm. Each created matter
+  logs `matter_opened` (`actor_type system`, payload `source: "lawmatics-sync"`); a link logs `matter_updated`. One failed insert is counted and does not stop the others. Nothing is written to Lawmatics;
+  no names, emails or titles are logged.
+- **NOT verified against a live Lawmatics:** the attribute names `status`, `converted_date`, `case_title`, `case_number` and the shape of `custom_fields` come from the public API reference. Check the first run's counts.
