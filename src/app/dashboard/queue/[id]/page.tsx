@@ -18,6 +18,7 @@ import { loadLinkedPanel } from "@/lib/consult-proposal/link";
 import { loadAuditContext } from "@/lib/queue/audit-context";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { APPROVALS_NAME } from "@/lib/ui/words";
 
 export const metadata: Metadata = { title: pageTitle("Approval item") };
 
@@ -64,7 +65,7 @@ export default async function QueueItemPage({
 
   const back = (
     <Link href="/dashboard/queue/" className="lx-back">
-      ← Approval queue
+      ← {APPROVALS_NAME}
     </Link>
   );
   if (loadError) {

@@ -261,7 +261,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
             </span>
             <span>{proposal.title}</span>
             {proposal.expires_on && <span>Open until {formatShortFirmDate(`${proposal.expires_on}T12:00:00Z`, "UTC")}</span>}
-            {proposal.source === "agent" && <span className="lx-note">Drafted by the agent</span>}
+            {proposal.source === "agent" && <span className="lx-note">Drafted by an assistant</span>}
           </div>
           <LeadLink
             lead={leadLink}

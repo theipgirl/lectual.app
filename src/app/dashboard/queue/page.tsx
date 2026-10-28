@@ -17,7 +17,7 @@ const TABS: { status: QueueStatus; label: string }[] = [
 ];
 
 const EMPTY: Record<QueueStatus, { title: string; body: string }> = {
-  pending: { title: "All caught up", body: "Nothing is waiting for review. New drafts from the agents land here." },
+  pending: { title: "All caught up", body: "Nothing is waiting for review. New drafts from the assistants land here." },
   approved: { title: "Nothing approved yet", body: "Approved drafts show up here once something has been reviewed." },
   rejected: { title: "Nothing rejected", body: "Rejected drafts and their notes show up here." },
 };

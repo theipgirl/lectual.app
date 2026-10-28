@@ -79,7 +79,7 @@ export async function setLane(leadId: string, lane: Lane | null): Promise<Lead> 
   const supabase = await getScopedClient();
   const role = await resolveCurrentRole(supabase);
   if (!CAN_WRITE_LEAD.includes(role)) {
-    throw forbiddenLeadWrite(role, "set a lead's lane");
+    throw forbiddenLeadWrite(role, "set a lead's temperature");
   }
 
   const {

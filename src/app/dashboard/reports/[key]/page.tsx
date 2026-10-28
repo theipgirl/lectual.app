@@ -44,7 +44,7 @@ const REPORT_COPY: Record<ReportKey, { sub: string; waitingTitle: string; waitin
     waitingEmpty: "Nothing is waiting on the firm right now.",
   },
   ipos: {
-    sub: "What the firm's agents ran, what they drafted, and what needs a look.",
+    sub: "What the firm's assistants ran, what they drafted, and what needs a look.",
     waitingTitle: "Needs attention",
     waitingEmpty: "Nothing needs your attention right now.",
   },

@@ -14,9 +14,9 @@ describe("WaitingOnRebecca", () => {
     expect(WaitingOnRebecca({ leadId: "lead-1", approvals: { status: "unconfigured" }, now: NOW })).toBeNull();
   });
 
-  it("says the queue could not be reached, and that it is not an empty queue", () => {
+  it("says what is waiting for approval can't be shown, never an empty queue", () => {
     const html = render({ status: "unavailable" });
-    expect(html).toContain("Couldn&#x27;t reach the approval queue — this isn&#x27;t an empty queue.");
+    expect(html).toContain("Can&#x27;t show what&#x27;s waiting for approval right now. Refresh to try again.");
     expect(html).not.toContain("Nothing waiting");
   });
 

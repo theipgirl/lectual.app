@@ -7,7 +7,7 @@ import { isInPeriod, isInPreviousPeriod, type ReportPeriod } from "./period";
 import { oldestFirst, type LinkTile, type WaitingItem } from "./waiting";
 import { relativeTime } from "@/lib/relative-time";
 import { loadActiveQueue, type QueueLoad } from "@/lib/queue/load";
-import { ASSISTANTS_NAME, COPILOT_NAME, FIRM_NOTES_NAME } from "@/lib/ui/words";
+import { ASSISTANTS_NAME, COPILOT_NAME, FIRM_NOTES_NAME, notReadyPlural } from "@/lib/ui/words";
 
 export type IposReport = {
   kpis: Metric[];
@@ -60,15 +60,15 @@ export async function loadIposReport(period: ReportPeriod, opts: { hasAgents: bo
   const prevRunsInPeriod = runs.status === "ok" ? runs.rows.filter((r) => isInPreviousPeriod(r.started_at, period)) : [];
 
   const runsMetric: Metric = !opts.hasAgents
-    ? unavailableMetric("Agent runs", "Agents aren't turned on for this firm")
+    ? unavailableMetric("Assistant runs", notReadyPlural(ASSISTANTS_NAME))
     : runs.status !== "ok"
-      ? unavailableMetric("Agent runs", runs.status === "missing" ? "Assistant runs aren't switched on for your firm yet" : "Couldn't be read just now")
+      ? unavailableMetric("Assistant runs", runs.status === "missing" ? "Assistant runs aren't switched on for your firm yet" : "Couldn't be read just now")
       : { label: "Assistant runs", value: runsInPeriod.length, ...comparisonFields(runsInPeriod.length, prevRunsInPeriod.length, period.range), sub: "across every assistant" };
 
   const queueMetric = waitingInQueueMetric(queue);
 
   const draftsOut: Metric = !opts.hasAgents
-    ? unavailableMetric("Drafts out", "Agents aren't turned on for this firm")
+    ? unavailableMetric("Drafts out", notReadyPlural(ASSISTANTS_NAME))
     : runs.status !== "ok"
       ? unavailableMetric("Drafts out", runs.status === "missing" ? "Assistant runs aren't switched on for your firm yet" : "Couldn't be read just now")
       : (() => {

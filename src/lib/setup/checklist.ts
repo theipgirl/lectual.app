@@ -1,4 +1,5 @@
 import { isOfferablePackage } from "@/lib/intake-forms/packages";
+import { ASSISTANTS_NAME, notReadyPlural } from "@/lib/ui/words";
 import { INTEGRATIONS_PATH, MODULES_PATH } from "./routes";
 import type { Reading, SetupChecklist, SetupItem, SetupState } from "./types";
 
@@ -77,14 +78,14 @@ function agentsVerdict(modules: SetupState["modules"], r: SetupState["agents"]):
   const gate = moduleGate(
     modules,
     "agents",
-    "whether agents are switched on",
-    "Agents aren't switched on for your firm yet. Lectual turns them on.",
+    "whether assistants are switched on",
+    notReadyPlural(ASSISTANTS_NAME),
   );
   if (gate) return gate;
-  if (!r.ok) return unchecked("your agent settings");
+  if (!r.ok) return unchecked("your assistant settings");
   const on = r.value.filter((a) => a.enabled).length;
-  if (on > 0) return done(on === 1 ? "One agent is on." : `${on} agents are on.`);
-  return notYet("No agent is switched on. Turn on at least one.");
+  if (on > 0) return done(on === 1 ? "One assistant is on." : `${on} assistants are on.`);
+  return notYet("No assistant is switched on. Turn on at least one.");
 }
 
 function intakeVerdict(r: SetupState["intakeForms"]): Verdict {
@@ -115,7 +116,7 @@ const SPECS: Spec[] = [
   { id: "lawmatics", label: "Lawmatics connected", href: "/dashboard/settings/integrations/lawmatics/", verdict: (s) => lawmaticsVerdict(s.lawmatics) },
   { id: "meetings", label: "Fathom or Zoom connected", href: "/dashboard/settings/integrations/meetings/", verdict: (s) => meetingsVerdict(s.meetings) },
   { id: "lawpay", label: "LawPay connected", href: "/dashboard/settings/integrations/lawpay/", verdict: (s) => lawpayVerdict(s.lawpay) },
-  { id: "agents", label: "At least one agent on", href: "/dashboard/agents/", verdict: (s) => agentsVerdict(s.modules, s.agents) },
+  { id: "agents", label: "At least one assistant on", href: "/dashboard/agents/", verdict: (s) => agentsVerdict(s.modules, s.agents) },
   { id: "intake", label: "An intake form live", href: "/dashboard/forms/", verdict: (s) => intakeVerdict(s.intakeForms) },
   { id: "packages", label: "Packages saved", href: "/dashboard/settings/services/", verdict: (s) => packagesVerdict(s.services) },
   { id: "ai", label: "AI configured", href: "/dashboard/copilot/", verdict: (s) => aiVerdict(s.aiConfigured) },

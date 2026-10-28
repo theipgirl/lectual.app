@@ -19,7 +19,7 @@ import { ModeBadge, StatusPill } from "@/components/integrations/StatusPill";
 import { stateForStatus, type IntegrationState } from "@/components/integrations/states";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
-import { integrationErrorLine, LAWPAY_NOT_ISSUED } from "@/lib/ui/words";
+import { FROM_THEIR_EMAILS, integrationErrorLine, LAWPAY_NOT_ISSUED } from "@/lib/ui/words";
 
 export const metadata: Metadata = { title: pageTitle("Integrations") };
 
@@ -226,7 +226,7 @@ export default async function IntegrationsPage({
         </h2>
         <p className="lx-hero-sub">
           Gmail or Outlook. Mail from your clients lands on their lead or matter automatically, and
-          the intel agent fills in what&apos;s missing. Everything else stays in your inbox.
+          the &ldquo;{FROM_THEIR_EMAILS}&rdquo; assistant fills in what&apos;s missing. Everything else stays in your inbox.
         </p>
         <div className="lx-hero-actions">
           {PROVIDERS.map((p) =>
@@ -377,7 +377,7 @@ export default async function IntegrationsPage({
           <div className="lx-label">What we read</div>
           <p>
             The sender, recipients, subject, date and a short preview. Full bodies are read only by
-            the intel agent, for messages already matched to a client. From an Outlook calendar: the
+            the &ldquo;{FROM_THEIR_EMAILS}&rdquo; assistant, for messages already matched to a client. From an Outlook calendar: the
             title, time, place, organizer and attendees of upcoming events, never the event notes.
           </p>
         </div>

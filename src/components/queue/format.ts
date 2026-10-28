@@ -60,7 +60,7 @@ export const STATUS_PILL: Record<QueueStatus, { label: string; tone: string }> =
  * message look handled, so every outcome says where the message is now.
  */
 export function outcomeText(resolved: string | undefined, send: string | undefined): { tone: "ok" | "warn" | "risk"; text: string } | null {
-  if (resolved === "reject") return { tone: "risk", text: "Rejected. The note goes back to the drafting agent — nothing was sent." };
+  if (resolved === "reject") return { tone: "risk", text: "Rejected. The note goes back to the drafting assistant — nothing was sent." };
   if (resolved !== "approve") return null;
   switch (send) {
     case "drafted":

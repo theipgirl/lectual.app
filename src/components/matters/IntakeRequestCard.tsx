@@ -56,7 +56,7 @@ export function IntakeRequestCard(props: { matterId: string; origin: string; req
       <div className="lx-label">Intake questions</div>
       {!props.formReady ? (
         <p className="lx-note" style={{ margin: 0 }}>
-          Set up your intake questions in Intake → Forms, then send them to a client from here.
+          Set up your intake questions in Leads → Forms, then send them to a client from here.
         </p>
       ) : props.canSend ? (
         <>

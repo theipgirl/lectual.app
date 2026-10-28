@@ -48,7 +48,7 @@ export function LeadProposalsCard({
               <span className={`lx-pill lx-pill-${statusTone(p.status)}`}>{statusLabel(p.status)}</span>
               <span className="lx-note">
                 v{p.version} · {formatCents(p.legal_total_cents)} legal · {formatCents(p.gov_total_cents)} USPTO
-                {p.source === "agent" ? " · drafted by the consult agent" : ""}
+                {p.source === "agent" ? " · drafted by an assistant" : ""}
               </span>
             </li>
           ))}

@@ -22,7 +22,7 @@ describe("shape", () => {
         "Lawmatics connected",
         "Fathom or Zoom connected",
         "LawPay connected",
-        "At least one agent on",
+        "At least one assistant on",
         "An intake form live",
         "Packages saved",
         "AI configured",
@@ -215,13 +215,13 @@ describe("couldn't check", () => {
 describe("a module that is off", () => {
   it.each([
     ["outlook", "mailbox", "Mailboxes"],
-    ["agents", "agents", "Agents"],
+    ["agents", "agents", "Assistants"],
   ] as const)("%s is to-do, says it is not switched on for the firm, and links to Modules", (id, mod, noun) => {
     const modules = ok(["mailbox", "agents"].filter((m) => m !== mod));
     const i = item({ ...ALL_DONE, modules }, id);
     expect(i.status).toBe("to-do");
     expect(i.why).toContain(`${noun} aren't switched on for your firm`);
-    expect(i.why).toContain("Lectual turns them on");
+    expect(i.why).toMatch(/Lectual (turns|will turn) them on/);
     expect(i.href).toBe(MODULES_PATH);
     expect(statuses({ ...ALL_DONE, modules })[id === "outlook" ? "agents" : "outlook"]).toBe("done");
   });

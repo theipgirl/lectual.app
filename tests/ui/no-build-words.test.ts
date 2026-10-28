@@ -12,7 +12,7 @@ import { ROOT, candidatesOf, jsxText, stripAndCollect, walk } from "./_scan";
  * module whose strings reach a screen; the allow-list below names the ones that do not, each with its
  * reason). Identifiers, route paths, data-* tokens and agent ids are never text, so they are not hit.
  */
-const RULES: Array<{ name: string; re: RegExp; sentenceOnly?: boolean }> = [
+const RULES: Array<{ name: string; re: RegExp; sentenceOnly?: boolean; stripExpr?: boolean }> = [
   { name: "deployment", re: /deployment/i },
   { name: "environment", re: /\benvironment\b/i },
   { name: "migration", re: /migration/i },
@@ -21,7 +21,8 @@ const RULES: Array<{ name: string; re: RegExp; sentenceOnly?: boolean }> = [
   { name: "AI key", re: /\bAI (provider )?key\b/i },
   { name: "partner app", re: /partner app/i },
   { name: "administrator", re: /administrator/i },
-  { name: "three-state phrasing", re: /not an empty|unknown \(not empty|This is not an empty|reaching the database/i },
+  { name: "three-state phrasing", re: /(?:is ?n['’]t|isn&apos;t|not) an empty|unknown \(not empty|This is not an empty|reaching the database/i },
+  { name: "lane", re: /\blanes?\b/i, stripExpr: true },
   { name: "not the same as", re: /not the same as/i },
   { name: "not empty", re: /\bit is not empty\b|\bnot empty\b/i },
   { name: "ask an admin to set", re: /ask an admin to set/i },
@@ -49,6 +50,7 @@ const ALLOW: Allow[] = [
   { file: /^src\/lib\/(documents\/(loe|loe-prefill|opinion-letter|trademark-clearance)|prep-consult\/drafts|consult-proposal\/draft|agents\/matters-chat)\.ts$/, rules: ["scope"], reason: "model prompts and letter text: 'scope' is the legal term (scope of work), not OAuth vocabulary" },
   { file: /^src\/lib\/quotes\/engagement-terms\.ts$/, rules: ["scope"], reason: "legal term in a letter, not OAuth vocabulary" },
   { file: /^src\/app\/dashboard\/documents\/new\//, rules: ["scope"], reason: "legal term in a letter, not OAuth vocabulary (the LOE form's 'Scope' field)" },
+  { file: /^src\/lib\/agents\/intake-triage\.ts$/, rules: ["lane"], reason: "model instructions (the triage prompt names the routing lane), not text for a person" },
   { file: /^src\/lib\/env\.ts$/, rules: ["environment"], reason: "developer error thrown at server start-up, never rendered to a person" },
   { file: /^src\/lib\/(agents\/failure-alert|feedback\/email)\.ts$/, rules: ["deployment"], reason: "internal email to Lectual staff (Resend), never shown to a firm" },
   { file: /^src\/lib\/(lawmatics\/stage-map|reconcile\/milestones)\.ts$/, rules: ["PNC"], reason: "names of stages in the firm's Lawmatics account, matched as data" },
@@ -73,7 +75,7 @@ export function scanForBuildWords(files: string[]): string[] {
       for (const rule of RULES) {
         // A setting name alone (a lookup key, a header) is not text; one inside a sentence is. A template's
         // own ${CONSTANT} is a code reference, so it is taken out first.
-        const subject = rule.sentenceOnly ? text.replace(/\$\{[^}]*\}/g, "") : text;
+        const subject = rule.sentenceOnly || rule.stripExpr ? text.replace(/\$\{[^}]*\}/g, "") : text;
         if (!rule.re.test(subject)) continue;
         if (rule.sentenceOnly && (!/\s/.test(subject.trim()) || /&&|=|:$|^\(/.test(subject.trim()))) continue;
         if (ALLOW.some((a) => a.file.test(file) && a.rules.includes(rule.name))) continue;
@@ -108,6 +110,8 @@ describe("no build vocabulary in what a firm reads", () => {
       "This is a problem reaching the database, not an empty list.",
       "The AI key isn't set on this deployment, so agents won't run until an administrator adds it.",
       "Not available until the database update (lectual migration 0098).",
+      "Couldn't reach the approval queue — this isn't an empty queue.",
+      "Intake lanes — next steps",
       "IP.OS",
       "Stage Keeper",
       "Firm brain",

@@ -8,7 +8,7 @@ import { isInPeriod, isInPreviousPeriod, type ReportPeriod } from "./period";
 import { isWaitingOnUs, leadLabel, waitingSince } from "./leads";
 import { oldestFirst, type LinkTile, type WaitingItem } from "./waiting";
 import { relativeTime } from "@/lib/relative-time";
-import { APPROVALS_NAME } from "@/lib/ui/words";
+import { APPROVALS_NAME, ASSISTANTS_NAME, notReadyPlural } from "@/lib/ui/words";
 
 export type CommunicationReport = {
   kpis: Metric[];
@@ -80,10 +80,10 @@ export async function loadCommunicationReport(
   // --- Agent drafts ------------------------------------------------------
   let draftsOut: Metric;
   if (!opts.hasAgents) {
-    draftsOut = unavailableMetric("Agent drafts", "Agents aren't turned on for this firm");
+    draftsOut = unavailableMetric("Assistant drafts", notReadyPlural(ASSISTANTS_NAME));
   } else if (runs.status !== "ok") {
     draftsOut = unavailableMetric(
-      "Agent drafts",
+      "Assistant drafts",
       runs.status === "missing" ? "Assistant runs aren't switched on for your firm yet" : "Couldn't be read just now",
     );
   } else {

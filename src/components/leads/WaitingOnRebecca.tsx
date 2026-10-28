@@ -38,7 +38,7 @@ export function WaitingOnRebecca({
       </h2>
       {approvals.status === "unavailable" ? (
         <p role="alert" className="lx-note" style={{ margin: 0, color: "var(--wine)" }}>
-          Couldn&apos;t reach the approval queue — this isn&apos;t an empty queue.
+          Can&apos;t show what&apos;s waiting for approval right now. Refresh to try again.
         </p>
       ) : items.length === 0 ? (
         <p className="lx-note" style={{ margin: 0 }}>

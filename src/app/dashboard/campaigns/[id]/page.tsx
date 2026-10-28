@@ -224,8 +224,9 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
         {canOperate &&
           (leadsFailed || enrollmentsRead.error ? (
             <p className="lx-note lx-campaigns-inlineerror" style={{ paddingBottom: 14 }}>
-              {leadsFailed ? "Intake couldn't be loaded" : "Who's already enrolled couldn't be loaded"}, so leads can&apos;t be
-              enrolled right now. Try again shortly.
+              {leadsFailed
+                ? "Leads couldn't be loaded, so leads can't be enrolled right now. Refresh to try again."
+                : "Who's already enrolled couldn't be loaded, so leads can't be enrolled right now. Try again shortly."}
             </p>
           ) : (
             <div style={{ padding: "0 18px 14px" }}>
