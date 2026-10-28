@@ -12,7 +12,7 @@ import { ROOT, candidatesOf, jsxText, stripAndCollect, walk } from "./_scan";
  * module whose strings reach a screen; the allow-list below names the ones that do not, each with its
  * reason). Identifiers, route paths, data-* tokens and agent ids are never text, so they are not hit.
  */
-const RULES: Array<{ name: string; re: RegExp }> = [
+const RULES: Array<{ name: string; re: RegExp; sentenceOnly?: boolean }> = [
   { name: "deployment", re: /deployment/i },
   { name: "environment", re: /\benvironment\b/i },
   { name: "migration", re: /migration/i },
@@ -22,6 +22,10 @@ const RULES: Array<{ name: string; re: RegExp }> = [
   { name: "partner app", re: /partner app/i },
   { name: "administrator", re: /administrator/i },
   { name: "three-state phrasing", re: /not an empty|unknown \(not empty|This is not an empty|reaching the database/i },
+  { name: "not the same as", re: /not the same as/i },
+  { name: "not empty", re: /\bit is not empty\b|\bnot empty\b/i },
+  { name: "ask an admin to set", re: /ask an admin to set/i },
+  { name: "setting name", re: /\b[A-Z][A-Z0-9]+_[A-Z0-9_]{2,}\b/, sentenceOnly: true },
   { name: "schema", re: /\bschema\b/i },
   { name: "IP.OS", re: /IP\.OS/ },
   { name: "Stage Keeper", re: /Stage Keeper/ },
@@ -51,6 +55,10 @@ const ALLOW: Allow[] = [
   { file: /^src\/lib\/intake\/(sheet-import|sheet-sections)\.ts$/, rules: ["PNC"], reason: "the firm's own spreadsheet vocabulary (an 'PNC' opener / section name), matched as data" },
   { file: /^src\/lib\/(agents\/prompts|ai)\//, rules: ["schema"], reason: "JSON schema for the model, not text for a person" },
   { file: /^src\/lib\/agents\/(prompt|policy|[a-z-]+\/prompt)/, rules: ["schema", "scope"], reason: "model instructions, not text for a person" },
+  { file: /^src\/app\/api\/cron\//, rules: ["setting name"], reason: "JSON for the scheduler (Vercel cron) when its own setting is missing, never drawn to a firm" },
+  { file: /^src\/lib\/(mailbox\/crypto|ai\/claude)\.ts$/, rules: ["setting name"], reason: "developer errors thrown on the server; a run's stored error reaches a screen only through friendlyRunError, which shows a fixed sentence" },
+  { file: /^src\/lib\/intake-forms\/screening\.ts$/, rules: ["setting name"], reason: "model instructions (the FIT / NON_FIT answer format), not text for a person" },
+  { file: /^src\/lib\/queue\/api\.ts$/, rules: ["setting name"], reason: "the queue client's developer error; the friendly*Error helpers and the queue pages replace it with a fixed sentence (tests/ui/no-raw-error-text.test.ts proves it)" },
 ];
 
 /** A string that is only a comma list of lowercase column names is a database select, not text. */
@@ -63,7 +71,11 @@ export function scanForBuildWords(files: string[]): string[] {
       const text = c.text.replace(/\s+/g, " ").trim();
       if (COLUMN_LIST.test(text)) continue;
       for (const rule of RULES) {
-        if (!rule.re.test(text)) continue;
+        // A setting name alone (a lookup key, a header) is not text; one inside a sentence is. A template's
+        // own ${CONSTANT} is a code reference, so it is taken out first.
+        const subject = rule.sentenceOnly ? text.replace(/\$\{[^}]*\}/g, "") : text;
+        if (!rule.re.test(subject)) continue;
+        if (rule.sentenceOnly && (!/\s/.test(subject.trim()) || /&&|=|:$|^\(/.test(subject.trim()))) continue;
         if (ALLOW.some((a) => a.file.test(file) && a.rules.includes(rule.name))) continue;
         hits.push(`${rule.name}\t${file}:${c.line}\t${text.slice(0, 120)}`);
       }
@@ -114,6 +126,22 @@ describe("no build vocabulary in what a firm reads", () => {
     const texts = jsxText(code).map((c) => c.text);
     expect(texts).toContain("this deployment");
     expect(texts.some((t) => RULES.find((r) => r.name === "deployment")!.re.test(t))).toBe(true);
+  });
+
+  it("keeps prose that holds a common code word beside an {expression}", () => {
+    const { code } = stripAndCollect("const a = <p>{n} saved for the firm, ask an admin to set it {y}</p>;");
+    const texts = jsxText(code).map((c) => c.text);
+    expect(texts).toContain("saved for the firm, ask an admin to set it");
+    expect(jsxText(stripAndCollect("const a = <p>{ok}\n} else {\n</p>;").code).map((c) => c.text)).not.toContain("else");
+  });
+
+  it("the new rules catch the three-state, ask-an-admin and setting-name sentences", () => {
+    const rule = (n: string) => RULES.find((r) => r.name === n)!.re;
+    expect(rule("not the same as").test('This is not the same as "to do".')).toBe(true);
+    expect(rule("not empty").test("This calendar is not empty. Try again.")).toBe(true);
+    expect(rule("not empty").test("It is not empty")).toBe(true);
+    expect(rule("ask an admin to set").test("Ask an admin to set QUEUE_API_URL")).toBe(true);
+    expect(rule("setting name").test("Ask someone to set QUEUE_API_URL for this firm")).toBe(true);
   });
 
   it("the Integrations LawPay mode banner comes from the glossary and says neither build word", () => {

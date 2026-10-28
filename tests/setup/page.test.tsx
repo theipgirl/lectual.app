@@ -100,8 +100,8 @@ describe("rendering a mix of states", () => {
     expect(row.html).toContain("Couldn't check");
     expect(row.html).not.toContain(">To do<");
     expect(row.html).not.toContain(">Done<");
-    expect(text(row.html)).toContain("We couldn't check your Lawmatics connection just now. Try again shortly.");
-    expect(text(row.html)).toContain('not the same as "to do"');
+    expect(text(row.html)).toContain("We couldn't check your Lawmatics connection just now. Try again in a minute.");
+    expect(text(row.html)).not.toMatch(/not the same as/i);
   });
 
   it("a module that is off links to Modules and says it is not switched on", async () => {

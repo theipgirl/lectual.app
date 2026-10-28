@@ -2,6 +2,8 @@ import { getScopedClient } from "@/lib/db/scoped-client";
 import type { Database } from "@/lib/db/types";
 import { requireMatterWriteRole } from "./matters";
 import { logActivity } from "./activity";
+import { ReadableError } from "@/lib/ui/readable-error";
+
 
 export type LitigationDetail =
   Database["public"]["Tables"]["crm_litigation_detail"]["Row"];
@@ -150,7 +152,7 @@ export async function upsertLitigationDetail(
   await requireMatterWriteRole(supabase);
 
   if (!(await hasLitigationModule(supabase))) {
-    throw new Error("Litigation isn't enabled for your firm.");
+    throw new ReadableError("Litigation isn't enabled for your firm.");
   }
 
   // org_id comes from here and nowhere else.
@@ -163,7 +165,7 @@ export async function upsertLitigationDetail(
     // PGRST116 = no row: either the matter does not exist or it belongs to
     // another tenant and RLS hid it. Those two must be indistinguishable.
     if ((matterError as { code?: string }).code === "PGRST116") {
-      throw new Error("Matter not found.");
+      throw new ReadableError("Matter not found.");
     }
     throw matterError;
   }
@@ -172,7 +174,7 @@ export async function upsertLitigationDetail(
   // for that type alone), so writing them onto a trademark file would store
   // data nobody can see. Refuse rather than accept a write into the dark.
   if (matter.type !== "LIT") {
-    throw new Error("Litigation details can only be recorded on a litigation matter.");
+    throw new ReadableError("Litigation details can only be recorded on a litigation matter.");
   }
 
   const columns = litigationColumns(fields);
@@ -194,7 +196,7 @@ export async function upsertLitigationDetail(
     // 23514 here is crm_litigation_detail_text_len (0043): caps only, no format
     // rules. Say which way it failed rather than surfacing a constraint name.
     if ((error as { code?: string }).code === "23514") {
-      throw new Error("One of those entries is too long to save — shorten it and try again.");
+      throw new ReadableError("One of those entries is too long to save — shorten it and try again.");
     }
     throw error;
   }

@@ -100,3 +100,52 @@ describe("no raw error text on a screen", () => {
     expect(src).not.toMatch(/\{c\.last_error\}/);
   });
 });
+
+describe("the allow-listed friendly*Error helpers pass only typed, person-written errors", async () => {
+  const { friendlyCampaignError } = await import("@/app/dashboard/campaigns/errors");
+  const { friendlyQuoteError } = await import("@/app/dashboard/quotes/errors");
+  const { friendlyMatterError } = await import("@/app/dashboard/matters/errors");
+  const { friendlySettingsError } = await import("@/app/dashboard/settings/team/errors");
+  const { CampaignAdvanceError } = await import("@/lib/campaigns/advance");
+  const { ReadableError } = await import("@/lib/ui/readable-error");
+  const { APPROVALS_NOT_READY } = await import("@/lib/ui/words");
+
+  const helpers = {
+    friendlyCampaignError,
+    friendlyQuoteError,
+    friendlyMatterError,
+    friendlySettingsError,
+  } as const;
+  const ENV_NAME = /\b[A-Z][A-Z0-9]+_[A-Z0-9_]{2,}\b/;
+
+  for (const [name, fn] of Object.entries(helpers)) {
+    it(`${name}: a queue 502 never shows its text or the sentinel`, () => {
+      const out = fn(new Error("SENTINEL Queue API 502: detail"), "Couldn't save.");
+      expect(out).not.toContain("SENTINEL");
+      expect(out).not.toMatch(/Queue API|502/);
+      expect(out).toBe(APPROVALS_NOT_READY);
+    });
+
+    it(`${name}: a missing-setting error shows no environment-variable name`, () => {
+      const out = fn(new Error("Queue API not configured — set QUEUE_API_URL and DASHBOARD_API_TOKEN"), "Couldn't save.");
+      expect(out).not.toMatch(ENV_NAME);
+      expect(out).not.toMatch(/Queue API/);
+    });
+
+    it(`${name}: TypeError, TimeoutError and any other plain Error become the fallback`, () => {
+      expect(fn(new TypeError("fetch failed: ECONNRESET"), "FALLBACK")).toBe("FALLBACK");
+      expect(fn(Object.assign(new Error("The operation timed out"), { name: "TimeoutError" }), "FALLBACK")).toBe("FALLBACK");
+      expect(fn(new Error("SENTINEL something internal"), "FALLBACK")).toBe("FALLBACK");
+      expect(fn("boom", "FALLBACK")).toBe("FALLBACK");
+    });
+
+    it(`${name}: a typed ReadableError passes its sentence, unless it carries a setting name or a queue message`, () => {
+      expect(fn(new ReadableError("Enter an email address."), "FALLBACK")).toBe("Enter an email address.");
+      expect(fn(new ReadableError("Set QUEUE_API_URL first."), "FALLBACK")).toBe("FALLBACK");
+    });
+  }
+
+  it("a CampaignAdvanceError is typed and passes through the campaign helper", () => {
+    expect(friendlyCampaignError(new CampaignAdvanceError("This campaign is paused."), "x")).toBe("This campaign is paused.");
+  });
+});

@@ -88,6 +88,8 @@ export const PIPELINE_VIEW_ONLY = "This is a view-only overview. To move a lead,
 export function notReadyPlural(features: string): string {
   return `${features.trim()} aren't switched on for your firm yet. Lectual will turn them on.`;
 }
+/** Drafting needs the approvals queue; until Lectual switches it on, nothing is drafted. */
+export const APPROVALS_NOT_READY = `${notReadyPlural("Approvals")} Nothing was drafted.`;
 /** LawPay's card payments are Lectual's to switch on; until then the firm records payments by hand. */
 export const LAWPAY_NOT_ISSUED = "LawPay card payments aren't switched on yet. Until then, record payments by hand on each quote.";
 

@@ -446,7 +446,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
 
       {unavailable && (
         <p className="lx-banner lx-banner-warn" role="alert" style={{ margin: 0 }}>
-          This calendar couldn&apos;t be loaded, so nothing is shown. It is not empty. Try again shortly.
+          Can&apos;t show this calendar right now. Refresh to try again.
         </p>
       )}
 

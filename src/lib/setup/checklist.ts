@@ -8,7 +8,7 @@ const done = (why: string): Verdict => ({ status: "done", why });
 const notYet = (why: string, href?: string): Verdict => ({ status: "to-do", why, href });
 const unchecked = (what: string): Verdict => ({
   status: "couldnt-check",
-  why: `We couldn't check ${what} just now. Try again shortly. This is not the same as "to do".`,
+  why: `We couldn't check ${what} just now. Try again in a minute.`,
 });
 
 const RECONNECT = "needs reconnecting";

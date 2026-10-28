@@ -744,7 +744,7 @@ export function QuoteBuilder(props: BuilderProps) {
           <div className="qb-kicker">Activity</div>
           {props.eventsError ? (
             <p role="alert" className="lx-note" style={{ margin: 0, color: "var(--wine)" }}>
-              The activity for this quote couldn&rsquo;t be loaded. That is not the same as there being none.
+              Can&rsquo;t show this quote&rsquo;s activity right now. Refresh to try again.
             </p>
           ) : props.events.length === 0 ? (
             <p className="lx-note" style={{ margin: 0 }}>

@@ -160,8 +160,8 @@ describe("couldn't check", () => {
       const i = item({ ...base, [key]: bad }, id);
       expect(i.status).toBe("couldnt-check");
       expect(i.why).toMatch(/couldn't check/i);
-      expect(i.why).toMatch(/Try again shortly/);
-      expect(i.why).toContain('not the same as "to do"');
+      expect(i.why).toMatch(/Try again in a minute\.$/);
+      expect(i.why).not.toMatch(/not the same as/i);
       expect(i.why).not.toBe(item(ALL_DONE, id).why);
     }
   });

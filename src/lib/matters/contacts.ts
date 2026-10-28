@@ -13,6 +13,8 @@ import {
   validateContactFields,
   type ContactFieldsInput,
 } from "./contact-input";
+import { ReadableError } from "@/lib/ui/readable-error";
+
 
 /**
  * crm_contact / crm_matter_contact data access (0048_crm_contact.sql). See
@@ -44,7 +46,7 @@ export async function createContact(input: CreateContactInput): Promise<Contact>
 
   const { data: orgId, error: orgError } = await supabase.rpc("current_org_id");
   if (orgError) throw orgError;
-  if (!orgId) throw new Error("No active organization for the current session.");
+  if (!orgId) throw new ReadableError("No active organization for the current session.");
 
   const { data, error } = await supabase
     .from("crm_contact")
@@ -188,7 +190,7 @@ export async function addContactToMatter(matterId: string, input: ContactFieldsI
   await requireMatterWriteRole(supabase);
 
   const checked = validateContactFields(input, null);
-  if (!checked.ok) throw new Error(checked.error);
+  if (!checked.ok) throw new ReadableError(checked.error);
 
   const { data: matter, error: matterError } = await supabase
     .from("crm_matter")
@@ -226,7 +228,7 @@ export async function addContactToMatter(matterId: string, input: ContactFieldsI
   try {
     await ensureMatterContactLink(matterId, contact.id);
   } catch {
-    throw new Error(
+    throw new ReadableError(
       "The contact was saved, but couldn't be linked to this matter. Search for them under Link or add contact and choose Link.",
     );
   }
@@ -272,7 +274,7 @@ export async function updateContact(
   if (!current) throw recordNotFoundError("contact");
 
   const checked = validateContactFields(input, current);
-  if (!checked.ok) throw new Error(checked.error);
+  if (!checked.ok) throw new ReadableError(checked.error);
   if (checked.fields.length === 0) return { contact: current, fields: [] };
 
   const { data, error } = await supabase

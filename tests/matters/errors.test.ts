@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { ReadableError } from "../../src/lib/ui/readable-error";
 import { friendlyMatterError } from "../../src/app/dashboard/matters/errors";
 
 describe("friendlyMatterError", () => {
@@ -12,7 +13,8 @@ describe("friendlyMatterError", () => {
     expect(friendlyMatterError({ code: "23505" }, "x")).toMatch(/already in use/);
   });
   it("keeps messages the app wrote to be read, and softens the role gate", () => {
-    expect(friendlyMatterError(new Error("Enter the due date."), "x")).toBe("Enter the due date.");
+    expect(friendlyMatterError(new ReadableError("Enter the due date."), "x")).toBe("Enter the due date.");
+    expect(friendlyMatterError(new Error("Enter the due date."), "x")).toBe("x");
     expect(friendlyMatterError(new Error("Forbidden: role 'viewer' cannot write matters"), "x")).toMatch(/permission/);
     expect(friendlyMatterError("boom", "x")).toBe("x");
   });

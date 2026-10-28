@@ -134,7 +134,9 @@ export function jsxText(code: string): Candidate[] {
   return out;
 }
 
-const CODE_LIKE = /[=()[\]]|\b(function|const|let|var|return|else|if|for|while|switch|case|import|export|from|type|interface|async|await|catch|try|finally|default|extends|implements)\b/;
+// Code punctuation, or text that STARTS with a keyword that prose never opens with. A common word
+// such as for / if / from / type / default inside a sentence beside an {expression} is prose.
+const CODE_LIKE = /[=()[\]]|^(?:else|try|finally|function|const|let|var|return|import|export|async|await|case|catch|switch|interface|while)\b/;
 
 export function candidatesOf(file: string): Candidate[] {
   const src = fs.readFileSync(path.join(ROOT, file), "utf8");

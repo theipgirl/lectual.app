@@ -2,6 +2,9 @@
 // functions, so the shared refusal/error helpers live here — same split as
 // src/app/dashboard/quotes/errors.ts.
 
+import { isQueueError, readableMessage } from "@/lib/ui/readable-error";
+import { APPROVALS_NOT_READY } from "@/lib/ui/words";
+
 export type ActionState = { error?: string; saved?: boolean; message?: string };
 
 /** Shown when a caller below the automation admin tier hits a config-write action. Mirrors AUTOMATION_ADMIN_ROLES (@/lib/automation/rules). */
@@ -17,11 +20,10 @@ export const NOT_STAFF: ActionState = {
 /**
  * Turns a campaign write failure into something safe to show.
  *
- * `drips.ts` and `advance.ts` already throw plain `Error`s written to be
- * read (the role-gate messages, "this lead has no email address", the
- * queue-not-configured message) — those pass through as-is. Only a raw
- * database error (anything carrying a `code`) is translated, the same rule
- * `friendlyQuoteError` uses, so PostgREST internals never reach the screen.
+ * Only typed ReadableErrors (CampaignAdvanceError, and the refusals in `drips.ts` and
+ * `rules.ts`) pass their sentence through. A raw database error (anything carrying a
+ * `code`) is translated, and every other Error (a queue 502, a missing setting, a
+ * timeout) becomes `fallback`, so no transport or env text reaches the screen.
  */
 export function friendlyCampaignError(err: unknown, fallback: string): string {
   const code = (err as { code?: unknown } | null)?.code;
@@ -32,6 +34,6 @@ export function friendlyCampaignError(err: unknown, fallback: string): string {
     if (code === "PGRST116") return "That record couldn't be found. It may have been removed.";
     return fallback;
   }
-  if (!(err instanceof Error)) return fallback;
-  return err.message || fallback;
+  if (isQueueError(err)) return APPROVALS_NOT_READY;
+  return readableMessage(err) ?? fallback;
 }

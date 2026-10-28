@@ -47,6 +47,7 @@
  * TZ=America/New_York.
  */
 
+import { ReadableError } from "@/lib/ui/readable-error";
 import { FIRM_TIME_ZONE, civilDaysBetween, firmCivilDate } from "./firm-time";
 
 /** `crm_quote.status` (spec §4.1). `viewed` is an EVENT, not a status. */
@@ -143,7 +144,7 @@ export function canTransitionQuote(from: string, to: string): boolean {
  * message text — the mistake `loadCalendarEvents` avoids by branching on
  * PostgREST error codes instead of strings.
  */
-export class QuoteTransitionError extends Error {
+export class QuoteTransitionError extends ReadableError {
   readonly from: string;
   readonly to: string;
 

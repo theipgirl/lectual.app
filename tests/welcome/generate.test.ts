@@ -106,7 +106,7 @@ describe("generateWelcomeEmail", () => {
     baseMocks({ matter: trademarkMatter, lead, orgKey: null });
     const { generateWelcomeEmail } = await import("@/lib/welcome/generate");
 
-    await expect(generateWelcomeEmail({ matterId: "matter-1" })).rejects.toThrow(/approval queue/i);
+    await expect(generateWelcomeEmail({ matterId: "matter-1" })).rejects.toThrow(/switched on for your firm/i);
   });
 
   it("returns not-found when the matter is invisible under RLS", async () => {

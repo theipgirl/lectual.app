@@ -1,6 +1,9 @@
 // Plain module (NOT "use server"): a "use server" file may only export async
 // functions, so this pure helper lives here and the actions import it.
 
+import { isQueueError, readableMessage } from "@/lib/ui/readable-error";
+import { APPROVALS_NOT_READY } from "@/lib/ui/words";
+
 const FORBIDDEN_COPY = "You don't have permission to do that. Ask an attorney or an admin.";
 
 /**
@@ -10,8 +13,9 @@ const FORBIDDEN_COPY = "You don't have permission to do that. Ask an attorney or
  * PostgREST/RLS text on screen. Here a database error (anything carrying a
  * `code`) never passes its message through: a few codes map to something a
  * person can act on and the rest become `fallback`. Errors the app raises on
- * purpose (a bad date, a malformed class list, the role gate) are plain
- * Errors with no code, and their message was written to be read.
+ * purpose (a bad date, a malformed class list, the role gate) are
+ * ReadableErrors, and their message was written to be read; any other Error
+ * becomes `fallback`.
  */
 export function friendlyMatterError(err: unknown, fallback: string): string {
   const code = (err as { code?: unknown } | null)?.code;
@@ -23,7 +27,8 @@ export function friendlyMatterError(err: unknown, fallback: string): string {
     if (code === "PGRST116") return "That record couldn't be found. It may have been removed.";
     return fallback;
   }
-  if (!(err instanceof Error)) return fallback;
-  if (/forbidden|permission|cannot write|not allowed/i.test(err.message)) return FORBIDDEN_COPY;
-  return err.message || fallback;
+  // A permission refusal is replaced by a fixed sentence, so its own text never shows.
+  if (err instanceof Error && /forbidden|permission|cannot write|not allowed/i.test(err.message)) return FORBIDDEN_COPY;
+  if (isQueueError(err)) return APPROVALS_NOT_READY;
+  return readableMessage(err) ?? fallback;
 }

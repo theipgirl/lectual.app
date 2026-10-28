@@ -7,6 +7,7 @@ import { activeQueueOrgKey } from "@/lib/queue/org";
 import { createDraft } from "@/lib/queue/api";
 import { WelcomeFlowError } from "./errors";
 import { buildWelcomeEmailDraft } from "./welcome-email";
+import { APPROVALS_NOT_READY } from "@/lib/ui/words";
 
 /**
  * `welcome-client` skill trigger — same "build content, then queue it"
@@ -55,7 +56,7 @@ export async function generateWelcomeEmail(
   const orgKey = await activeQueueOrgKey();
   if (!orgKey) {
     throw new WelcomeFlowError(
-      "Approvals aren't enabled for this firm yet — ask an admin to set up the approval queue before drafting the welcome email.",
+      APPROVALS_NOT_READY,
     );
   }
 
