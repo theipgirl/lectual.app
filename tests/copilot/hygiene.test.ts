@@ -27,6 +27,7 @@ const COPILOT_FILES = [
   "src/lib/agents/matters-chat.ts",
   "src/lib/agents/copilot-context.ts",
   "src/lib/agents/copilot-cost.ts",
+  "src/lib/agents/copilot-draft-proposal.ts",
   ...readdirSync("src/lib/copilot").map((f) => `src/lib/copilot/${f}`),
 ];
 const read = (f: string) => readFileSync(f, "utf8");
@@ -77,10 +78,28 @@ describe("the copilot stays read-only, firm-scoped and free of send paths", () =
     expect(SRC.filter((f) => read(f).includes("dangerouslySetInnerHTML"))).toEqual([]);
   });
 
-  it("the tool set is unchanged: the same six reads", () => {
+  it("the tool set is the six reads plus one draft-only write, draft_proposal", () => {
     const src = read("src/lib/agents/matters-chat.ts");
     const names = [...src.matchAll(/^    ([a-z_]+): \{\n      description:/gm)].map((m) => m[1]);
-    expect(names).toEqual(["search_matters", "get_matter_detail", "get_upcoming_deadlines", "list_stalled_matters", "search_leads", "get_recent_activity"]);
+    expect(names).toEqual([
+      "search_matters",
+      "get_matter_detail",
+      "get_upcoming_deadlines",
+      "list_stalled_matters",
+      "search_leads",
+      "get_recent_activity",
+      "draft_proposal",
+    ]);
+  });
+
+  it("the draft tool's one write is createProposal with source 'agent': never approve, link, send, withdraw, revise or queue", () => {
+    const src = read("src/lib/agents/copilot-draft-proposal.ts");
+    expect(src).toContain('store.createProposal({ ...input, source: "agent" })');
+    expect(src.match(/store\.[a-zA-Z]+/g)?.sort()).toEqual(["store.createProposal", "store.getProposalSettings"]);
+    expect(src).not.toMatch(/approveProposal|sendProposal|withdrawProposal|reviseProposal|updateProposal|createLink|insertAgentProposal|client_proposal_send/);
+    // The gate is checked on every call, before any read, and fails closed.
+    expect(src).toContain('orgHasModule("proposals")');
+    expect(src).toContain("PROPOSAL_STAFF_WRITE_ROLES.includes(role)");
   });
 });
 
