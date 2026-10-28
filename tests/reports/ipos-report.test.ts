@@ -45,49 +45,49 @@ async function load(opts: {
 const kpi = (report: Awaited<ReturnType<typeof load>>, label: string) => report.kpis.find((k) => k.label === label)!;
 const items = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `q${i}` }));
 
-describe("IP.OS report: Waiting in queue (S5)", () => {
+describe("AI tools report: Waiting in Approvals (S5)", () => {
   beforeEach(() => {
     vi.resetModules();
   });
 
   it("shows the queue's real count when it was reached", async () => {
     const report = await load({ queue: { status: "ok", items: items(4) } });
-    expect(kpi(report, "Waiting in queue").value).toBe(4);
+    expect(kpi(report, "Waiting in Approvals").value).toBe(4);
   });
 
   it("an empty queue that was reached is 0, a real zero", async () => {
     const report = await load({ queue: { status: "ok", items: [] } });
-    expect(kpi(report, "Waiting in queue").value).toBe(0);
+    expect(kpi(report, "Waiting in Approvals").value).toBe(0);
   });
 
   it("an unreachable queue is unavailable with the reason, never 0", async () => {
     const report = await load({ queue: { status: "unavailable", items: [] } });
-    const k = kpi(report, "Waiting in queue");
+    const k = kpi(report, "Waiting in Approvals");
     expect(k.value).toBeNull();
-    expect(k.note).toBe("Queue unreachable");
+    expect(k.note).toBe("Couldn't check approvals");
   });
 
   it("no queue connected is unavailable with its own reason", async () => {
     const report = await load({ queue: { status: "unconfigured", items: [] } });
-    const k = kpi(report, "Waiting in queue");
+    const k = kpi(report, "Waiting in Approvals");
     expect(k.value).toBeNull();
-    expect(k.note).toBe("No queue connected yet");
+    expect(k.note).toBe("No approvals connected yet");
   });
 
-  it("keeps the Agent runs KPI and the Firm brain tile as they were", async () => {
+  it("keeps the Assistant runs KPI and the Firm notes tile as they were", async () => {
     const report = await load({ queue: { status: "ok", items: [] }, runs: [run("intake-triage", 0), run("email-intel", 0)] });
-    expect(kpi(report, "Agent runs").value).toBe(2);
-    expect(report.links.find((l) => l.label === "Firm brain")?.count).toBe(7);
-    expect(report.links.map((l) => l.label)).toEqual(["AI copilot", "Agents", "Firm brain"]);
+    expect(kpi(report, "Assistant runs").value).toBe(2);
+    expect(report.links.find((l) => l.label === "Firm notes")?.count).toBe(7);
+    expect(report.links.map((l) => l.label)).toEqual(["Copilot", "Assistants", "Firm notes"]);
   });
 });
 
-describe("IP.OS report: the Agents tile (S5)", () => {
+describe("AI tools report: the Agents tile (S5)", () => {
   beforeEach(() => {
     vi.resetModules();
   });
 
-  const agentsTile = (r: Awaited<ReturnType<typeof load>>) => r.links.find((l) => l.label === "Agents")!;
+  const agentsTile = (r: Awaited<ReturnType<typeof load>>) => r.links.find((l) => l.label === "Assistants")!;
 
   it("counts enabled agents, not runs", async () => {
     const report = await load({
@@ -95,7 +95,7 @@ describe("IP.OS report: the Agents tile (S5)", () => {
       settings: { data: [{ agent: "intake-triage", enabled: true }, { agent: "email-intel", enabled: true }, { agent: "post-consult", enabled: false }], error: null },
       runs: [run("intake-triage", 0), run("intake-triage", 0), run("intake-triage", 0), run("email-intel", 0), run("email-intel", 0)],
     });
-    expect(kpi(report, "Agent runs").value).toBe(5);
+    expect(kpi(report, "Assistant runs").value).toBe(5);
     expect(agentsTile(report).count).toBe(2);
   });
 
@@ -115,7 +115,7 @@ describe("IP.OS report: the Agents tile (S5)", () => {
   });
 });
 
-describe("IP.OS report: Drafts out says what it counts (S5)", () => {
+describe("AI tools report: Drafts out says what it counts (S5)", () => {
   beforeEach(() => {
     vi.resetModules();
   });

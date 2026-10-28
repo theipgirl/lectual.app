@@ -12,11 +12,11 @@ describe("the Email / calendar cell (Sprint 16, F19)", () => {
   });
 
   it("an agent move or a pending suggestion reads with its stage and its wording", () => {
-    const move = text(renderToStaticMarkup(<SourceCell source="email" signal={stageSignal(S.loe, "Stage Keeper: LOE sent", "2026-09-09T10:00:00Z")} />));
+    const move = text(renderToStaticMarkup(<SourceCell source="email" signal={stageSignal(S.loe, "Automatic move: LOE sent", "2026-09-09T10:00:00Z")} />));
     expect(move).toContain("LOE &amp; Invoice Sent");
-    expect(move).toContain('Email / calendar says "Stage Keeper: LOE sent"');
-    const suggestion = text(renderToStaticMarkup(<SourceCell source="email" signal={stageSignal(S.post, "Stage Keeper suggests: Post-consult sent")} />));
-    expect(suggestion).toContain('Email / calendar says "Stage Keeper suggests: Post-consult sent"');
+    expect(move).toContain('Email / calendar says "Automatic move: LOE sent"');
+    const suggestion = text(renderToStaticMarkup(<SourceCell source="email" signal={stageSignal(S.post, "Automatic move suggested: Post-consult sent")} />));
+    expect(suggestion).toContain('Email / calendar says "Automatic move suggested: Post-consult sent"');
   });
 
   it("an unreadable source is Unavailable with its reason, never None", () => {

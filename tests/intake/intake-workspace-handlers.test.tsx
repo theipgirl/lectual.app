@@ -100,7 +100,7 @@ const leadRow = (id: string, over: Record<string, unknown> = {}) =>
     ...over,
   }) as unknown as Lead;
 
-/** l-1 replied yesterday (derived hot); l-2 has nothing recorded (Not routed). */
+/** l-1 replied yesterday (derived hot); l-2 has nothing recorded (Not rated). */
 const LEADS = [leadRow("l-1", { last_inbound_at: daysBefore(1) }), leadRow("l-2")];
 
 function mount(params: Record<string, string> = {}) {
@@ -141,7 +141,15 @@ function find<T = Record<string, unknown>>(tree: ReactNode, type: unknown): { pr
   if (!tree || typeof tree !== "object" || !("props" in tree)) return undefined;
   const el = tree as ReactElement<{ children?: ReactNode }>;
   if (el.type === type) return el as unknown as { props: T };
-  return find<T>(el.props.children, type);
+  const inChildren = find<T>(el.props.children, type);
+  if (inChildren) return inChildren;
+  // A slot prop (the toolbar's toggle / primary / more) holds an element too.
+  for (const [key, value] of Object.entries(el.props as Record<string, unknown>)) {
+    if (key === "children" || !value || typeof value !== "object") continue;
+    const found = find<T>(value as ReactNode, type);
+    if (found) return found;
+  }
+  return undefined;
 }
 
 type TableProps = {
@@ -285,7 +293,7 @@ describe("clicking a column header", () => {
     const view = mount();
     expect(table(view.tree()).rows.map((r) => r.lead.id)).toEqual(["l-1", "l-2"]);
     table(view.tree()).onSort("temperature");
-    // hot first, Not routed last
+    // hot first, Not rated last
     expect(table(view.tree()).rows.map((r) => r.lead.id)).toEqual(["l-1", "l-2"]);
     table(view.tree()).onSort("temperature");
     expect(table(view.tree()).rows.map((r) => r.lead.id)).toEqual(["l-1", "l-2"]);

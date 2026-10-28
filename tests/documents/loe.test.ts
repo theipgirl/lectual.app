@@ -204,6 +204,6 @@ describe("buildGeneralLoeDraft — AI bullets, human-entered fee math", () => {
         depositPercent: null,
         quotedAmount: null,
       }),
-    ).rejects.toThrow(/no ai provider is configured/i);
+    ).rejects.toThrow(/AI isn't switched on for your firm yet/);
   });
 });

@@ -20,7 +20,7 @@ export type IposReport = {
 function waitingInQueueMetric(queue: QueueLoad): Metric {
   if (queue.status === "ok") return { label: "Waiting in Approvals", value: queue.items.length, sub: "drafts waiting for a person to review" };
   return unavailableMetric(
-    "Waiting in queue",
+    "Waiting in Approvals",
     queue.status === "unconfigured" ? "No approvals connected yet" : "Couldn't check approvals",
   );
 }

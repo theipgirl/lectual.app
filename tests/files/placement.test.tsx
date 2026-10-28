@@ -138,7 +138,7 @@ describe("lead page placement", () => {
     const world = leadWorld();
     world.db.fail("crm_file", "select");
     const html = await leadPage(world);
-    expect(html).toContain("Files couldn't be loaded. This is a problem reaching the database, not an empty list.");
+    expect(html).toContain("Files couldn't be loaded. Refresh to try again.");
     expect(html).not.toContain("Nothing here yet");
     expect(html).not.toContain("boom");
     expect(html).toContain(">Timeline<");

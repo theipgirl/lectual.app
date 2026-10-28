@@ -52,7 +52,7 @@ describe("ConsultBookedView", () => {
     const unavailable = text(renderToStaticMarkup(<ConsultBookedView read={{ status: "unavailable" }} timeZone="UTC" />));
     const waiting = text(renderToStaticMarkup(<ConsultBookedView read={{ status: "database-update-needed" }} timeZone="UTC" />));
     expect(unavailable).toContain("couldn't check whether a consult is booked");
-    expect(waiting).toContain("aren't available until the database update");
+    expect(waiting).toContain("aren't switched on for your firm yet");
     expect(unavailable).not.toBe(waiting);
     for (const html of [unavailable, waiting]) {
       expect(html).not.toContain("Consult booked");
@@ -186,7 +186,7 @@ describe("lead page: Consult booked", () => {
     vi.resetModules();
     mockPage({ mailbox: true, read: { status: "database-update-needed" } });
     const b = await render();
-    expect(b).toContain("until the database update");
+    expect(b).toContain("switched on for your firm yet");
     expect(b).not.toContain("Consult booked");
   });
 
@@ -195,7 +195,7 @@ describe("lead page: Consult booked", () => {
     const html = await render();
     expect(loadBookedConsult).not.toHaveBeenCalled();
     expect(html).not.toContain("Consult booked");
-    expect(html).not.toContain("database update");
+    expect(html).not.toContain("switched on for your firm yet");
     expect(html).not.toContain("consult is booked");
     expect(html).toContain("Timeline");
   });

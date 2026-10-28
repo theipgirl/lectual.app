@@ -76,7 +76,7 @@ describe("the paid line", () => {
     expect(html).not.toContain("Not paid");
     expect(html).not.toContain("Paid ·");
     expect(buttons(html)).toEqual([]);
-    expect(html).toContain("not a sign that it hasn&#x27;t been paid");
+    expect(html).toContain("Can&#x27;t show whether this was paid right now");
   });
 
   it("a role that may not act sees the state and no buttons", () => {

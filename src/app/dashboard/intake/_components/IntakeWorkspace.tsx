@@ -25,7 +25,8 @@ import { detailsNote } from "@/lib/intake/details-note";
 import type { IntakeTime } from "@/lib/time";
 import { ListHeader } from "@/components/list-page/ListHeader";
 import { ListToolbar } from "@/components/list-page/ListToolbar";
-import { MoreMenu, type MoreItem } from "@/components/list-page/MoreMenu";
+import { MoreMenu } from "@/components/list-page/MoreMenu";
+import { leadsMoreItems } from "@/lib/intake/more-items";
 import "@/components/list-page/list-page.css";
 import { LEADS_NAME } from "@/lib/ui/words";
 import { ViewToggle } from "@/components/ViewToggle";
@@ -357,10 +358,7 @@ export default function IntakeWorkspace({
   const board = viewState.view === "board";
   const router = useRouter();
   const note = detailsNote({ approvals: pendingApprovals, agentMoves, stageDecisions });
-  const moreItems: MoreItem[] = [
-    ...(showReconcile ? [{ label: "Reconcile stages", href: "/dashboard/intake/reconcile/" }] : []),
-    { label: "Import", href: "/dashboard/settings/integrations/lawmatics/" },
-  ];
+  const moreItems = leadsMoreItems({ showReconcile });
   const clearFilters = () => setFilters(() => ({ ...EMPTY_INTAKE_FILTERS }));
 
   return (

@@ -412,7 +412,7 @@ describe("runConsultProposal failure handling", () => {
     (t.input.createDraft as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("Queue API 401: Unauthorized"));
     const r = await runConsultProposal(t.input);
     expect(r).toMatchObject({ ok: false, reason: "queue_failed" });
-    if (!r.ok) expect(r.message).toMatch(/approval queue didn't accept the draft \(it answered HTTP 401\)/);
+    if (!r.ok) expect(r.message).toMatch(/Approvals didn't accept the draft \(it answered HTTP 401\)/);
     expect(logged(spy)[0]).toMatchObject({ stage: "queue" });
     expect(writes(t.db.log, "client_proposal", "update")[0].values).toEqual({ status: "withdrawn" });
     spy.mockRestore();

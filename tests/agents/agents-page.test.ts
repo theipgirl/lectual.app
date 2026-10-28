@@ -77,8 +77,8 @@ describe("Agents page: a failed settings read (S3)", () => {
 
   it("says it couldn't read the settings instead of drawing every agent Off", async () => {
     const { html } = await render({ settings: "error" });
-    expect(html).toContain("couldn&#x27;t read agent settings");
-    expect(html).toContain("Agent settings unavailable");
+    expect(html).toContain("couldn&#x27;t read the assistant settings");
+    expect(html).toContain("Assistant settings unavailable");
     expect(html).not.toContain("0 of 7 on");
     expect(html).not.toContain(">Off<");
     expect(html).not.toContain("lx-agent off");
@@ -88,9 +88,9 @@ describe("Agents page: a failed settings read (S3)", () => {
 
   it("still renders the rest of the page", async () => {
     const { html } = await render({ settings: "error" });
-    expect(html).toContain("Autopilot");
+    expect(html).toContain("Assistants on or off");
     expect(html).toContain("Recent runs");
-    expect(html).toContain("Email → client intel");
+    expect(html).toContain("From their emails");
     expect(html).toContain("Intake triage");
   });
 
@@ -108,26 +108,26 @@ describe("Agents page: honest 'On' (S4)", () => {
 
   it("email-intel enabled with no active mailbox is waiting for one", async () => {
     const { html } = await render({ settings: [on("email-intel")], connections: { ok: true, connections: [] } });
-    const c = card(html, "Email → client intel");
+    const c = card(html, "From their emails");
     expect(c).toContain("On · waiting for a mailbox");
     expect(c).toContain("Blocked");
   });
 
   it("a reconnect-needed mailbox is not an active one", async () => {
     const { html } = await render({ settings: [on("email-intel")], connections: { ok: true, connections: [{ status: "reauth" }] } });
-    expect(card(html, "Email → client intel")).toContain("waiting for a mailbox");
+    expect(card(html, "From their emails")).toContain("waiting for a mailbox");
   });
 
   it("an unreadable mailbox list is 'couldn't check', not 'waiting' and not 'On'", async () => {
     const { html } = await render({ settings: [on("email-intel")], connections: { ok: false, error: "x" } });
-    const c = card(html, "Email → client intel");
+    const c = card(html, "From their emails");
     expect(c).toContain("couldn&#x27;t check mailboxes");
     expect(c).not.toContain("waiting for a mailbox");
   });
 
   it("a firm without the Mailboxes module sees that on the card, without asking for mailboxes", async () => {
     const { html, listConnections } = await render({ settings: [on("email-intel")], modules: ["agents"] });
-    expect(card(html, "Email → client intel")).toContain("Needs the Mailboxes module");
+    expect(card(html, "From their emails")).toContain("Needs the Mailboxes feature");
     expect(listConnections).not.toHaveBeenCalled();
   });
 
@@ -180,7 +180,7 @@ describe("Agents page: honest 'On' (S4)", () => {
 
   it("a switched-on agent without the AI key is blocked", async () => {
     const { html } = await render({ settings: [on("intake-triage")], ai: false });
-    expect(card(html, "Intake triage")).toContain("On · needs the AI key");
+    expect(card(html, "Intake triage")).toContain("On · waiting for Lectual to switch on AI");
     expect(html).toContain("1 on but blocked");
   });
 

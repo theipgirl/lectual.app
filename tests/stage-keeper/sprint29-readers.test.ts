@@ -33,11 +33,11 @@ describe("the new kinds read back without raw ids or an unknown kind", () => {
   it("moves.ts parses all three and the chip names the evidence's own date", () => {
     const meeting = parseAgentMove(moveRow(meetingEvidence, "consult-held"))!;
     expect(meeting.evidence).toEqual(meetingEvidence);
-    expect(chipFor(meeting, NOW, "America/New_York").text).toBe("Moved by agent · Consult held Oct 23");
+    expect(chipFor(meeting, NOW, "America/New_York").text).toBe("Moved automatically · Consult held Oct 23");
     expect(chipFor(meeting, NOW, "America/New_York").tooltip).toBe('Evidence: Zoom meeting "Strategy session" on Oct 23.');
 
     const proposal = parseAgentMove(moveRow(proposalEvidence, "post-consult-sent"))!;
-    expect(chipFor(proposal, NOW, "America/New_York").text).toBe("Moved by agent · Post-consult sent Oct 25");
+    expect(chipFor(proposal, NOW, "America/New_York").text).toBe("Moved automatically · Post-consult sent Oct 25");
     expect(chipFor(proposal, NOW, "America/New_York").tooltip).toBe("Evidence: proposal version 2 link live Oct 25.");
 
     const queue = parseAgentMove(moveRow(queueEvidence, "post-consult-sent"))!;
@@ -94,9 +94,9 @@ describe("the reconcile Email / calendar source and proposeStage cite them as da
     const rows = [moveRow(meetingEvidence, "consult-held", S.consult), { ...moveRow(proposalEvidence, "post-consult-sent"), id: "move-2", created_at: "2026-10-27T14:30:00Z" }];
     // Only the latest stage change counts as the lead's current agent move; evidence is read per row set.
     const meetingOnly = agentEvidenceFor([rows[0]]);
-    expect(meetingOnly).toEqual([{ stageId: S.consult, wording: "Stage Keeper: Consult held", date: meetingEvidence.starts_at }]);
+    expect(meetingOnly).toEqual([{ stageId: S.consult, wording: "Automatic move: Consult held", date: meetingEvidence.starts_at }]);
     const proposalOnly = agentEvidenceFor([rows[1]]);
-    expect(proposalOnly).toEqual([{ stageId: S.post, wording: "Stage Keeper: Post-consult sent", date: proposalEvidence.at }]);
+    expect(proposalOnly).toEqual([{ stageId: S.post, wording: "Automatic move: Post-consult sent", date: proposalEvidence.at }]);
 
     const email = emailSignalFor([], FIRM, proposalOnly);
     expect(email).toMatchObject({ kind: "stage", stageId: S.post, date: proposalEvidence.at });
@@ -107,7 +107,7 @@ describe("the reconcile Email / calendar source and proposeStage cite them as da
     );
     expect(proposal.stage?.id).toBe(S.post);
     expect(proposal.evidenceDate).toBe(proposalEvidence.at);
-    expect(proposal.reasons.join(" ")).toContain("Stage Keeper");
+    expect(proposal.reasons.join(" ")).toContain("Automatic move");
     expect(proposal.reasons.join(" ")).toContain("Oct 25");
   });
 });

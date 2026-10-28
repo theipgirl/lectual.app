@@ -361,7 +361,7 @@ describe("F8: before lectual 0098 is applied", () => {
     expect(w.stored).toHaveLength(1);
     const lastRun = w.log.filter((q) => q.table === "agent_run" && q.action === "update").at(-1)!.values as Record<string, unknown>;
     expect(lastRun).toMatchObject({ status: "skipped" });
-    expect(String(lastRun.summary)).toContain("database update");
+    expect(String(lastRun.summary)).toContain("switched on for your firm yet");
   });
 
   it("PostgREST's schema-cache wording counts too", async () => {

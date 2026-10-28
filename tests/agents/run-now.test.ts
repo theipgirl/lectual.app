@@ -24,12 +24,12 @@ const ready = (over: Partial<RunNowInput> = {}): RunNowInput => ({
 describe("decideRunNow: the seven outcomes, exact sentences", () => {
   it.each([
     ["running", { running: true }, "Running. This can take a minute."],
-    ["role", { role: "paralegal" as const }, "Only an owner, admin or senior admin can run agents."],
-    ["database update", { agent: "morning-brief" as AgentId, databaseUpdate: "pending" as const }, "Not available until the database update (lectual 0098)."],
-    ["off", { enabled: false }, "Switch the agent on first."],
-    ["Autopilot paused", { autopilot: "paused" as const }, "Autopilot is paused for the firm, so no agent runs. Resume Autopilot first."],
-    ["Autopilot unreadable", { autopilot: "unreadable" as const }, "We couldn't check whether Autopilot is paused, so nothing will run."],
-    ["AI key", { aiConfigured: false }, "The AI key isn't configured on this deployment."],
+    ["role", { role: "paralegal" as const }, "Only an owner, admin or senior admin can run assistants."],
+    ["database update", { agent: "morning-brief" as AgentId, databaseUpdate: "pending" as const }, "This isn't switched on for your firm yet. Lectual will turn it on."],
+    ["off", { enabled: false }, "Switch the assistant on first."],
+    ["Autopilot paused", { autopilot: "paused" as const }, "Assistants paused for your firm, so none of them run. Resume them first."],
+    ["Autopilot unreadable", { autopilot: "unreadable" as const }, "We couldn't check whether assistants are paused, so nothing will run."],
+    ["AI key", { aiConfigured: false }, "AI isn't switched on for your firm yet. Lectual will turn it on."],
   ])("%s", (_name, over, sentence) => {
     const d = decideRunNow(ready(over));
     expect(d.canRun).toBe(false);
@@ -138,7 +138,7 @@ describe("decideRunNow: the database update", () => {
   });
   it("shares its wording with the readiness label", () => {
     const readiness = agentReadiness({ agent: "morning-brief", enabled: true, hasMailboxModule: true, mailbox: "ok", aiConfigured: true, queue: "ok", databaseUpdate: "pending" });
-    expect(RUN_NOW_REASON["database-update"].startsWith(readiness.label)).toBe(true);
+    expect(RUN_NOW_REASON["database-update"]).toBe(readiness.reason);
   });
 });
 

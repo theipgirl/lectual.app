@@ -100,7 +100,7 @@ const leadRow = (id: string, over: Record<string, unknown> = {}) =>
     ...over,
   }) as unknown as Lead;
 
-/** l-1 replied yesterday (derived hot); l-2 has nothing recorded (Not routed). */
+/** l-1 replied yesterday (derived hot); l-2 has nothing recorded (Not rated). */
 const LEADS = [leadRow("l-1", { last_inbound_at: daysBefore(1) }), leadRow("l-2"), leadRow("l-3")];
 
 function mount(params: Record<string, string> = {}) {

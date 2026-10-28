@@ -276,7 +276,7 @@ describe("the summary and the empty states", () => {
   it("a failed lead read shows the error sentence and no table", () => {
     const html = text(renderToStaticMarkup(<UploadPanel busy={false} error={MSG.leadsUnreadable} />));
     expect(html).toContain('role="alert"');
-    expect(html).toContain("problem reaching the database, not an empty pipeline");
+    expect(html).toContain("couldn't read your leads");
     expect(html).not.toContain("<table");
   });
 });

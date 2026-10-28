@@ -125,7 +125,7 @@ describe("Paste or upload a transcript on the proposals page", () => {
 
   it("explains why drafting is unavailable instead of offering a form that would be refused", async () => {
     const html = await render({}, { block: "no-ai" });
-    expect(html).toContain("AI key");
+    expect(html).toContain("isn&#x27;t switched on for your firm yet");
     expect(html).not.toContain('name="leadId"');
   });
 

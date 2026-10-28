@@ -165,11 +165,11 @@ async function drive(entry: "cron" | "run-now", agent: (typeof THREE)[number], w
 describe.each(["cron", "run-now"] as const)("F21: the Mailboxes module gate at run time, through %s", (entry) => {
   const only = (agent: (typeof THREE)[number]): Array<[string, boolean]> => AGENT_IDS.map((a): [string, boolean] => [a, a === agent]);
 
-  it("(i) inbox-summary: skipped with 'the Mailboxes module is off', ZERO provider requests, no Outlook draft, no queue draft", async () => {
+  it("(i) inbox-summary: skipped with 'Mailboxes isn't switched on for your firm', ZERO provider requests, no Outlook draft, no queue draft", async () => {
     const w = world({ modules: ["agents"], settings: only("inbox-summary") });
     const out = await drive(entry, "inbox-summary", w);
     expect(out.status).toBe("skipped");
-    expect(out.result!.summary).toContain("the Mailboxes module is off");
+    expect(out.result!.summary).toContain("Mailboxes isn't switched on for your firm");
     expect(w.requests).toHaveLength(0);
     expect(w.createDraft).not.toHaveBeenCalled();
     expect(w.log.some((q) => q.table === "mailbox_connection")).toBe(false);
@@ -179,7 +179,7 @@ describe.each(["cron", "run-now"] as const)("F21: the Mailboxes module gate at r
     const w = world({ modules: ["agents"], settings: only("consult-prep") });
     const out = await drive(entry, "consult-prep", w);
     expect(out.status).toBe("skipped");
-    expect(out.result!.summary).toContain("the Mailboxes module is off");
+    expect(out.result!.summary).toContain("Mailboxes isn't switched on for your firm");
     expect(out.result!.summary).not.toMatch(/no consults/i);
     expect(w.log.filter((q) => ["crm_calendar_event", "crm_lead", "crm_intake_submission", "crm_activity", "crm_meeting"].includes(q.table))).toHaveLength(0);
     expect(w.createDraft).not.toHaveBeenCalled();
@@ -192,7 +192,7 @@ describe.each(["cron", "run-now"] as const)("F21: the Mailboxes module gate at r
     const brief = w.createDraft.mock.calls.map((c) => c[0] as unknown as { type: string; draftBody: string }).find((d) => d.type === "BRIEFING")!;
     const body = brief.draftBody;
     expect(body).toContain("Today's consults (not read)");
-    expect(body).toContain("Not read: the Mailboxes module is off.");
+    expect(body).toContain("Not read: Mailboxes isn't switched on for your firm.");
     expect(body).not.toContain("Nothing today.\n\nLeads waiting"); // the consults section is neither empty...
     expect(body).not.toMatch(/Today's consults \(could not be read\)/); // ...nor failed
     expect(w.log.some((q) => q.table === "crm_calendar_event")).toBe(false);
@@ -225,7 +225,7 @@ describe.each(["cron", "run-now"] as const)("F21: the Mailboxes module gate at r
   it.each([
     ["the read fails", "error" as const],
     ["the firm has no row", "missing" as const],
-  ])("(v) when %s the modules reading is 'could not be read': all three act as if the module were off and say 'couldn't check the Mailboxes module'", async (_name, modules) => {
+  ])("(v) when %s the modules reading is 'could not be read': all three act as if the module were off and say 'couldn't check whether Mailboxes is switched on'", async (_name, modules) => {
     const w = world({ modules, settings: THREE.map((a): [string, boolean] => [a, true]) });
     const outcomes: Array<{ agent: string; status: string; summary: string }> = [];
     for (const agent of THREE) {
@@ -234,14 +234,14 @@ describe.each(["cron", "run-now"] as const)("F21: the Mailboxes module gate at r
     }
     const by = Object.fromEntries(outcomes.map((o) => [o.agent, o]));
     expect(by["inbox-summary"].status).toBe("skipped");
-    expect(by["inbox-summary"].summary).toContain("couldn't check the Mailboxes module");
+    expect(by["inbox-summary"].summary).toContain("couldn't check whether Mailboxes is switched on");
     expect(by["consult-prep"].status).toBe("skipped");
-    expect(by["consult-prep"].summary).toContain("couldn't check the Mailboxes module");
+    expect(by["consult-prep"].summary).toContain("couldn't check whether Mailboxes is switched on");
     expect(w.requests).toHaveLength(0);
     expect(w.log.some((q) => q.table === "crm_calendar_event")).toBe(false);
     // The same read that failed also carried the queue key, so the brief cannot be filed: it says why, in the same words.
     expect(by["morning-brief"].status).toBe("skipped");
-    expect(by["morning-brief"].summary).toContain("couldn't check the Mailboxes module");
+    expect(by["morning-brief"].summary).toContain("couldn't check whether Mailboxes is switched on");
     expect(w.createDraft).not.toHaveBeenCalled();
   });
 
@@ -266,11 +266,11 @@ describe.each(["cron", "run-now"] as const)("F21: the Mailboxes module gate at r
     await drive(entry, "inbox-summary", w);
     const [row] = updates(w.log);
     expect(row).toMatchObject({ status: "skipped", items_in: 0, drafts_out: 0, error: null });
-    expect(row.summary).toBe("Skipped: the Mailboxes module is off.");
+    expect(row.summary).toBe("Skipped: Mailboxes isn't switched on for your firm.");
     const digest = buildRunDigest([{ agent: "inbox-summary", status: row.status, started_at: new Date(NOW - 60_000).toISOString(), items_in: 0, drafts_out: 0, summary: row.summary, error: null }], new Date(NOW));
     expect(digest).toMatchObject({ status: "ok" });
     const lines = (digest as { lines: Array<{ text: string }> }).lines;
-    expect(lines[0].text).toBe("didn't run: Skipped: the Mailboxes module is off.");
+    expect(lines[0].text).toBe("didn't run: Skipped: Mailboxes isn't switched on for your firm.");
   });
 });
 
@@ -335,15 +335,15 @@ describe("F20: Run now for each new agent", () => {
     const w = world({ modules: ["agents", "mailbox"], settings: THREE.map((a): [string, boolean] => [a, true]) });
 
     state.ai = false;
-    expect(await runAgentNowAction({}, form({ agent }))).toEqual({ error: "The AI key isn't configured on this deployment." });
+    expect(await runAgentNowAction({}, form({ agent }))).toEqual({ error: "AI isn't switched on for your firm yet. Lectual will turn it on." });
     state.ai = true;
 
     state.settingEnabled = false;
-    expect(await runAgentNowAction({}, form({ agent }))).toEqual({ error: "Switch the agent on first." });
+    expect(await runAgentNowAction({}, form({ agent }))).toEqual({ error: "Switch the assistant on first." });
     state.settingEnabled = true;
 
     state.autopilot = { status: "ok", state: { paused: true } };
-    expect((await runAgentNowAction({}, form({ agent }))).error).toMatch(/Autopilot is paused/);
+    expect((await runAgentNowAction({}, form({ agent }))).error).toMatch(/paused for your firm/);
     state.autopilot = { status: "ok", state: { paused: false } };
     expect(w.createDraft).not.toHaveBeenCalled();
 

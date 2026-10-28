@@ -226,11 +226,11 @@ describe("buildPlan: the Email / calendar source with the Stage Keeper's rows (S
       status: "ok",
       byLead: new Map(),
       total: 0,
-      agent: new Map([[L.amara, [{ stageId: S.loe, wording: "Stage Keeper: LOE sent", date: "2026-09-09T10:00:00Z" }]]]),
+      agent: new Map([[L.amara, [{ stageId: S.loe, wording: "Automatic move: LOE sent", date: "2026-09-09T10:00:00Z" }]]]),
     });
     const { view } = await run({ readEmail });
     const amara = view.rows.find((r) => r.leadId === L.amara)!;
-    expect(amara.email).toEqual({ kind: "stage", stageId: S.loe, stageName: "LOE & Invoice Sent", wording: "Stage Keeper: LOE sent", date: "2026-09-09T10:00:00Z" });
+    expect(amara.email).toEqual({ kind: "stage", stageId: S.loe, stageName: "LOE & Invoice Sent", wording: "Automatic move: LOE sent", date: "2026-09-09T10:00:00Z" });
     // It only corroborates: the sheet's proposal is unchanged.
     expect(amara.proposal.kind).toBe("stage");
   });

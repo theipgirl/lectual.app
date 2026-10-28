@@ -184,7 +184,7 @@ describe("Integrations index: nothing existing is lost", () => {
 
   it("a provider that is not set up on the deployment keeps its disabled button and banner", async () => {
     const html = await index({ connectable: { google: false, microsoft: false } });
-    expect(html).toContain("Mailbox connections aren't set up on this deployment yet");
+    expect(html).toContain("Connecting a mailbox isn't switched on yet");
     expect(html).toContain("Gmail · not set up yet");
   });
 
@@ -254,7 +254,7 @@ describe("Meetings page: Fathom and failed reads", () => {
   it("keeps the back link, the encryption-key note and the Fathom key form", async () => {
     const html = await meetings({ fathomReady: false });
     expect(html).toMatch(/href="\/dashboard\/settings\/integrations\/?"[^>]*>← Integrations</);
-    expect(html).toContain("Not available yet: this deployment has no encryption key for stored credentials.");
+    expect(html).toContain("Not available yet. Lectual will turn it on.");
     expect(await meetings({})).toContain('data-stub="connect-fathom"');
   });
 });

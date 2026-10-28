@@ -138,7 +138,7 @@ describe("each item", () => {
   });
 
   it("the AI item says Lectual sets the key", () => {
-    expect(item({ ...ALL_DONE, aiConfigured: false }, "ai").why).toBe("The AI key isn't set on this deployment. Lectual sets it.");
+    expect(item({ ...ALL_DONE, aiConfigured: false }, "ai").why).toBe("AI isn't switched on for your firm yet. Lectual will turn it on.");
   });
 });
 

@@ -1,3 +1,4 @@
+import { leadsMoreItems } from "@/lib/intake/more-items";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import IntakeWorkspace from "@/app/dashboard/intake/_components/IntakeWorkspace";
@@ -105,21 +106,23 @@ describe("the link on the Intake page", () => {
       />,
     );
 
-  it("is there for the admin tier, pointing at the screen", () => {
-    expect(render(true)).toMatch(/href="\/dashboard\/intake\/reconcile\/?"[^>]*>Reconcile stages</);
+  it("is in the More menu for the admin tier, pointing at the screen (and the toolbar itself carries a More control)", () => {
+    expect(leadsMoreItems({ showReconcile: true })).toContainEqual({ label: "Reconcile stages", href: "/dashboard/intake/reconcile/" });
+    expect(render(true)).toContain(">More<");
   });
 
-  it("is absent otherwise, and by default", () => {
+  it("is absent otherwise, and by default; Import stays for everyone", () => {
+    expect(leadsMoreItems({ showReconcile: false }).map((i) => i.label)).toEqual(["Import"]);
     expect(render(false)).not.toContain("/dashboard/intake/reconcile");
     expect(render()).not.toContain("Reconcile stages");
   });
 });
 
 describe("the Email / calendar source label (Sprint 16, F19)", () => {
-  it("the availability line before an upload is named Email / calendar and says the Stage Keeper's moves are used", async () => {
+  it("the availability line before an upload is named Email / calendar and says automatic stage moves are used", async () => {
     const html = text(await renderPage({ kind: "ok", role: "owner" }));
     expect(html).toContain("Email / calendar");
-    expect(html).toContain("what the Stage Keeper did from mail and calendar consults, will be used");
+    expect(html).toContain("what automatic stage moves did from mail and calendar consults, will be used");
   });
 
   it("with no mailbox it says there may be no mail or calendar consults, and that is not an error", async () => {

@@ -276,7 +276,7 @@ describe("morning-brief: the consults section and the Mailboxes module (F21 iii,
     await runMorningBrief(ctx);
     const body = briefOf(createDraft).draftBody;
     expect(body).toContain("Today's consults (not read)");
-    expect(section(body, "Today's consults")).toContain("Not read: the Mailboxes module is off.");
+    expect(section(body, "Today's consults")).toContain("Not read: Mailboxes isn't switched on for your firm.");
     expect(log.some((q) => q.table === "crm_calendar_event")).toBe(false);
     expect(body).toContain("Leads waiting on a reply (1)");
     expect(body).toContain("The queue (1)");
@@ -294,7 +294,7 @@ describe("morning-brief: the consults section and the Mailboxes module (F21 iii,
       const { ctx, createDraft, log } = setup({ tables: consultTables(), modules: modules as never });
       ctx.orgModules = modules;
       await runMorningBrief(ctx);
-      expect(section(briefOf(createDraft).draftBody, "Today's consults")).toContain("Not read: couldn't check the Mailboxes module.");
+      expect(section(briefOf(createDraft).draftBody, "Today's consults")).toContain("Not read: couldn't check whether Mailboxes is switched on.");
       expect(log.some((q) => q.table === "crm_calendar_event")).toBe(false);
     }
   });
@@ -310,7 +310,7 @@ describe("morning-brief: the consults section and the Mailboxes module (F21 iii,
     ctx.queueOrgKey = null;
     const result = await runMorningBrief(ctx);
     expect(result.skipped).toBe(true);
-    expect(result.summary).toContain("couldn't check the Mailboxes module");
+    expect(result.summary).toContain("couldn't check whether Mailboxes is switched on");
     expect(createDraft).not.toHaveBeenCalled();
   });
 });
@@ -358,11 +358,11 @@ describe("morning-brief (F4): a failed read is reported, never an empty section"
     expect(section(briefOf(createDraft).draftBody, "The queue")).toMatch(/Couldn't be read/);
   });
 
-  it("before lectual 0098 the consults section says it is not available until the database update", async () => {
+  it("before lectual 0098 the consults section says it is isn't switched on for your firm yet", async () => {
     const { ctx, createDraft } = setup({ failures: failing(calendar, "42703") });
     await runMorningBrief(ctx);
     const sec = section(briefOf(createDraft).draftBody, "Today's consults");
-    expect(sec).toContain("Not available until the database update.");
+    expect(sec).toContain("Not switched on for your firm yet.");
     expect(sec).not.toContain(NOTHING);
     expect(sec).not.toMatch(/Couldn't be read/);
   });

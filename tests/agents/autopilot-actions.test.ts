@@ -56,7 +56,7 @@ describe("Run now", () => {
   it("explains the firm is paused and runs nothing", async () => {
     state.autopilot = { status: "ok", state: { paused: true } };
     const res = await runAgentNowAction({}, form({ agent: "intake-triage" }));
-    expect(res.error).toMatch(/Autopilot is paused/);
+    expect(res.error).toMatch(/paused for your firm/);
     expect(state.runs).toBe(0);
   });
 

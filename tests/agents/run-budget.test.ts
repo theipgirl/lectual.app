@@ -208,7 +208,7 @@ describe("a run row left 'running' reads as Didn't finish after 15 minutes", () 
     expect(digest.status).toBe("ok");
     if (digest.status !== "ok") return;
     expect(digest.failures).toHaveLength(1);
-    expect(digest.failures[0]).toMatchObject({ agent: "morning-brief", text: "Morning brief didn't finish its last run", reason: DID_NOT_FINISH_ERROR });
+    expect(digest.failures[0]).toMatchObject({ agent: "morning-brief", text: "Morning brief didn't finish its last run", reason: "It ran out of time before it finished. Try Run now again later." });
     expect(digest.failures[0].action.label).toBe("Try Run now later");
   });
 

@@ -91,7 +91,7 @@ describe("Calendar page: Outlook events", () => {
     const html = await render({ outlook: { status: "database-update-needed" } });
     expect(html).toContain("Respond to office action");
     expect(html).toContain("Call the examiner");
-    expect(html).toContain("Outlook events aren't available until the database update.");
+    expect(html).toContain("Outlook events aren't switched on for your firm yet. Lectual will turn them on.");
     expect(html).not.toContain("Outlook events couldn't be loaded");
     expect(html).not.toContain("Meetings and consults");
   });
@@ -101,7 +101,7 @@ describe("Calendar page: Outlook events", () => {
     expect(html).toContain("Respond to office action");
     expect(html).toContain("Call the examiner");
     expect(html).toContain("Outlook events couldn't be loaded.");
-    expect(html).not.toContain("until the database update");
+    expect(html).not.toContain("Outlook events aren't switched on");
   });
 
   it("a thrown Outlook read is the unavailable line, not a crashed page", async () => {

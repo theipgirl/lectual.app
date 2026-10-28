@@ -236,12 +236,12 @@ describe("Results tab, intake form (F12)", () => {
 
   it("when the read failed, says so, and draws neither an empty list nor zero", async () => {
     const html = await renderResults({ read: { status: "unavailable" } });
-    expect(html).toContain("Results couldn't be loaded. This is a problem reaching the database, not an empty result.");
+    expect(html).toContain("Results couldn't be loaded. Refresh to try again.");
     expect(html).not.toContain("No answers to this question");
     expect(html).not.toContain("people sent answers");
     expect(html).not.toContain("0 answers");
     const missing = await renderResults({ read: { status: "unconfigured" } });
-    expect(missing).toContain("Results aren't set up in this environment");
+    expect(missing).toContain("Results aren't switched on for your firm yet");
   });
 
   it("says the latest 5,000 are covered when the read was capped", async () => {

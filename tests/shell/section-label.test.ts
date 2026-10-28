@@ -5,18 +5,18 @@ import { sectionLabelFor } from "@/lib/section-label";
 
 describe("sectionLabelFor (F17)", () => {
   it.each([
-    ["/dashboard/leads/abc/", "Intake"],
-    ["/dashboard/leads/abc", "Intake"],
+    ["/dashboard/leads/abc/", "Leads"],
+    ["/dashboard/leads/abc", "Leads"],
     ["/dashboard/", "Today"],
     ["/dashboard", "Today"],
-    ["/dashboard/reports/ipos/", "IP.OS · Report"],
-    ["/dashboard/reports/ipos", "IP.OS · Report"],
+    ["/dashboard/reports/ipos/", "AI tools · Report"],
+    ["/dashboard/reports/ipos", "AI tools · Report"],
     ["/dashboard/reports/matters/", "Active matters · Report"],
     ["/dashboard/reports/nope/", "Report"],
     ["/dashboard/reports/", "Report"],
-    ["/dashboard/queue/abc/", "Queue"],
+    ["/dashboard/queue/abc/", "Approvals"],
     ["/dashboard/settings/modules/", "Settings"],
-    ["/dashboard/intake/", "Intake"],
+    ["/dashboard/intake/", "Leads"],
     ["/dashboard/proposals/new/", "Client proposals"],
     ["/dashboard/matters/m1/", "Matters"],
   ])("%s -> %s", (pathname, label) => {
@@ -33,8 +33,8 @@ describe("sectionLabelFor (F17)", () => {
     for (const slug of ["sms", "portals"]) expect(sectionLabelFor(`/dashboard/${slug}/`)).toBe("Workspace");
   });
 
-  it("labels the Skills page Skills (built in Sprint 18)", () => {
-    expect(sectionLabelFor("/dashboard/skills/")).toBe("Skills");
+  it("labels the Shortcuts page Shortcuts (built in Sprint 18)", () => {
+    expect(sectionLabelFor("/dashboard/skills/")).toBe("Shortcuts");
   });
 
   it("treats a missing pathname as Today", () => {

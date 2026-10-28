@@ -62,7 +62,7 @@ describe("buildTrademarkClearanceDraft", () => {
     }));
     const { buildTrademarkClearanceDraft } = await import("@/lib/documents/trademark-clearance");
     await expect(buildTrademarkClearanceDraft(facts, "findings")).rejects.toThrow(
-      /no ai provider is configured/i,
+      /AI isn't switched on for your firm yet/,
     );
   });
 

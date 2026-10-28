@@ -85,7 +85,7 @@ beforeEach(() => vi.resetModules());
 describe("the Stage Keeper card", () => {
   it("shows '3 leads moved today' linking to the filtered board", async () => {
     const html = await render({ settings: [on("stage-keeper")], activity: [move("a", 1), move("b", 2), move("c", 3), move("d", 80)] });
-    const c = card(html, "Stage Keeper");
+    const c = card(html, "Automatic stage moves");
     expect(text(c)).toContain("3 leads moved today");
     // Next may print the path without its trailing slash outside the app; the target is the same either way.
     const href = /href="([^"]+)"/.exec(c.slice(c.indexOf("3 leads moved today") - 120))![1].replaceAll("&amp;", "&");
@@ -103,18 +103,18 @@ describe("the Stage Keeper card", () => {
   });
 
   it("says '1 lead moved today' in the singular and '0 leads' when none", async () => {
-    expect(text(card(await render({ settings: [on("stage-keeper")], activity: [move("a", 1)] }), "Stage Keeper"))).toContain("1 lead moved today");
-    expect(text(card(await render({ settings: [on("stage-keeper")] }), "Stage Keeper"))).toContain("0 leads moved today");
+    expect(text(card(await render({ settings: [on("stage-keeper")], activity: [move("a", 1)] }), "Automatic stage moves"))).toContain("1 lead moved today");
+    expect(text(card(await render({ settings: [on("stage-keeper")] }), "Automatic stage moves"))).toContain("0 leads moved today");
   });
 
   it("a lead the agent moved and a person moved after is not counted", async () => {
     const person = { id: "p", lead_id: "a", type: "stage_changed", actor_type: "user", created_at: "2026-09-25T14:30:00Z", payload: { to_stage: "Elsewhere" } };
     const html = await render({ settings: [on("stage-keeper")], activity: [move("a", 3), person, move("b", 3)] });
-    expect(text(card(html, "Stage Keeper"))).toContain("1 lead moved today");
+    expect(text(card(html, "Automatic stage moves"))).toContain("1 lead moved today");
   });
 
   it("a failed read says it couldn't be loaded and never shows 0", async () => {
-    const c = text(card(await render({ settings: [on("stage-keeper")], activity: "error" }), "Stage Keeper"));
+    const c = text(card(await render({ settings: [on("stage-keeper")], activity: "error" }), "Automatic stage moves"));
     expect(c).toContain("couldn't be loaded");
     expect(c).not.toContain("0 leads moved today");
     expect(c).not.toContain("moved today<");
@@ -123,47 +123,47 @@ describe("the Stage Keeper card", () => {
   it("'today' is the firm's civil day: a move at 11pm New York time the night before is not today", async () => {
     // 03:30Z on the 25th is 11:30pm on the 24th in New York; "now" is 15:00Z on the 25th.
     const early = move("a", 0, { created_at: "2026-09-25T03:30:00Z" });
-    expect(text(card(await render({ settings: [on("stage-keeper")], activity: [early] }), "Stage Keeper"))).toContain("0 leads moved today");
+    expect(text(card(await render({ settings: [on("stage-keeper")], activity: [early] }), "Automatic stage moves"))).toContain("0 leads moved today");
   });
 });
 
 describe("readiness and the header", () => {
   it("is ready without the AI key", async () => {
     const html = await render({ settings: [on("stage-keeper")], ai: false });
-    expect(card(html, "Stage Keeper")).not.toContain("needs the AI key");
+    expect(card(html, "Automatic stage moves")).not.toContain("needs the AI key");
     expect(html).toContain("1 of 7 on");
     expect(html).not.toContain("on but blocked");
   });
 
   it("is blocked, with a clear label, with no active mailbox and no readable consult", async () => {
     const html = await render({ settings: [on("stage-keeper")], connections: { ok: true, connections: [] }, calendar: [] });
-    const c = card(html, "Stage Keeper");
+    const c = card(html, "Automatic stage moves");
     expect(c).toContain("On · waiting for a mailbox");
     expect(c).toContain("Blocked");
   });
 
   it("is ready on readable consults alone", async () => {
     const html = await render({ settings: [on("stage-keeper")], connections: { ok: true, connections: [] }, calendar: [{ id: "e1" }] });
-    expect(card(html, "Stage Keeper")).not.toContain("Blocked");
+    expect(card(html, "Automatic stage moves")).not.toContain("Blocked");
   });
 
   it("a failed mailbox or calendar read is 'couldn't check', not 'waiting'", async () => {
     const html = await render({ settings: [on("stage-keeper")], connections: { ok: false, error: "x" }, calendar: "error" });
-    const c = text(card(html, "Stage Keeper"));
+    const c = text(card(html, "Automatic stage moves"));
     expect(c).toContain("couldn't check");
     expect(c).not.toContain("waiting for a mailbox");
   });
 
   it("without the Mailboxes module it says so", async () => {
-    expect(card(await render({ settings: [on("stage-keeper")], modules: ["agents"] }), "Stage Keeper")).toContain("Needs the Mailboxes module");
+    expect(card(await render({ settings: [on("stage-keeper")], modules: ["agents"] }), "Automatic stage moves")).toContain("Needs the Mailboxes feature");
   });
 
   it("the card says plainly that it moves leads and never sends, and shows its autonomy hint", async () => {
-    const c = text(card(await render({ settings: [on("stage-keeper", "act")] }), "Stage Keeper"));
+    const c = text(card(await render({ settings: [on("stage-keeper", "act")] }), "Automatic stage moves"));
     expect(c).toContain("moves the lead forward");
     expect(c).toContain("never sends anything");
     expect(c).toContain("Moves the lead forward itself and logs it");
-    const s = text(card(await render({ settings: [on("stage-keeper", "suggest")] }), "Stage Keeper"));
+    const s = text(card(await render({ settings: [on("stage-keeper", "suggest")] }), "Automatic stage moves"));
     expect(s).toContain("Writes a suggestion card on the lead instead of moving it");
   });
 });
@@ -174,7 +174,7 @@ describe("the run log and the minutes form", () => {
     const html = await render({ settings: [on("stage-keeper")], runs: [run] });
     expect(html).toContain("3 lead(s) read: 1 moved, 1 suggestion(s) written.");
     const row = html.slice(html.indexOf("<tbody>"), html.indexOf("</tbody>"));
-    expect(row).toContain("Stage Keeper");
+    expect(row).toContain("Automatic stage moves");
     expect(row).toContain("Event");
   });
 
@@ -183,7 +183,7 @@ describe("the run log and the minutes form", () => {
     const { MinutesPerTaskForm } = await import("../../src/components/agents/MinutesPerTaskForm");
     const { DEFAULT_MINUTES_PER_TASK } = await import("../../src/lib/agents/autopilot-rules");
     const html = text(renderToStaticMarkup(<MinutesPerTaskForm minutes={DEFAULT_MINUTES_PER_TASK} canManage />));
-    expect(html).toContain("Stage Keeper");
+    expect(html).toContain("Automatic stage moves");
     expect(html).toContain("Minutes per lead placed");
     expect(html).toContain('name="minutes-stage-keeper"');
   });

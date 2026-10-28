@@ -82,7 +82,7 @@ describe("Run now on the Agents page: the enabled regression", () => {
     expect(button).not.toContain("disabled");
     expect(button).not.toContain("aria-describedby");
     expect(c).not.toContain("run-reason-");
-    expect(c).not.toContain("Switch the agent on first.");
+    expect(c).not.toContain("Switch the assistant on first.");
     expect(c).not.toContain("Only an owner");
   });
 
@@ -93,7 +93,7 @@ describe("Run now on the Agents page: the enabled regression", () => {
   });
 
   it("the Stage Keeper with the AI key missing is still enabled", async () => {
-    const c = card(await render({ settings: [on("stage-keeper")], ai: false }), "Stage Keeper");
+    const c = card(await render({ settings: [on("stage-keeper")], ai: false }), "Automatic stage moves");
     expect(runButton(c)).not.toContain("disabled");
     expect(c).not.toContain("run-reason-");
   });
@@ -124,38 +124,38 @@ describe("Run now on the Agents page: each blocked state is a disabled button wi
     const { html, button } = await blockedCard({ settings: [off("intake-triage")] });
     expect(button).toContain("disabled");
     expect(button).toContain('aria-describedby="run-reason-intake-triage"');
-    expect(reasonOf(html, "intake-triage")).toBe("Switch the agent on first.");
+    expect(reasonOf(html, "intake-triage")).toBe("Switch the assistant on first.");
   });
 
   it("an agent with no setting row is off", async () => {
     const { html, button } = await blockedCard({ settings: [] });
     expect(button).toContain("disabled");
-    expect(reasonOf(html, "intake-triage")).toBe("Switch the agent on first.");
+    expect(reasonOf(html, "intake-triage")).toBe("Switch the assistant on first.");
   });
 
   it("Autopilot paused", async () => {
     const { html, button } = await blockedCard({ settings: [on("intake-triage")], autopilot: paused });
     expect(button).toContain("disabled");
-    expect(reasonOf(html, "intake-triage")).toBe("Autopilot is paused for the firm, so no agent runs. Resume Autopilot first.");
+    expect(reasonOf(html, "intake-triage")).toBe("Assistants paused for your firm, so none of them run. Resume them first.");
   });
 
   it("Autopilot unreadable is a warning line", async () => {
     const { html, button } = await blockedCard({ settings: [on("intake-triage")], autopilot: { status: "unavailable" } });
     expect(button).toContain("disabled");
-    expect(reasonOf(html, "intake-triage")).toBe("We couldn't check whether Autopilot is paused, so nothing will run.");
+    expect(reasonOf(html, "intake-triage")).toBe("We couldn't check whether assistants are paused, so nothing will run.");
     expect(html).toMatch(/<p id="run-reason-intake-triage"[^>]*color:var\(--warn\)/);
   });
 
   it("AI not configured", async () => {
     const { html, button } = await blockedCard({ settings: [on("intake-triage")], ai: false });
     expect(button).toContain("disabled");
-    expect(reasonOf(html, "intake-triage")).toBe("The AI key isn't configured on this deployment.");
+    expect(reasonOf(html, "intake-triage")).toBe("AI isn't switched on for your firm yet. Lectual will turn it on.");
   });
 
   it("role: a viewer sees the button, disabled, with the role sentence", async () => {
     const { html, button } = await blockedCard({ settings: [on("intake-triage")], role: "viewer" });
     expect(button).toContain("disabled");
-    expect(reasonOf(html, "intake-triage")).toBe("Only an owner, admin or senior admin can run agents.");
+    expect(reasonOf(html, "intake-triage")).toBe("Only an owner, admin or senior admin can run assistants.");
   });
 
   it("database update pending: the three newest agents, with the shared wording", async () => {
@@ -163,7 +163,7 @@ describe("Run now on the Agents page: each blocked state is a disabled button wi
       vi.resetModules();
       const { html, button } = await blockedCard({ settings: [on(agent)], update: "pending" }, name);
       expect(button, agent).toContain("disabled");
-      expect(reasonOf(html, agent), agent).toBe("Not available until the database update (lectual 0098).");
+      expect(reasonOf(html, agent), agent).toBe("This isn't switched on for your firm yet. Lectual will turn it on.");
     }
   });
 
@@ -180,10 +180,10 @@ describe("Run now on the Agents page: each blocked state is a disabled button wi
 
   it("two causes at once: off beats paused, role beats off", async () => {
     const a = await blockedCard({ settings: [off("intake-triage")], autopilot: paused });
-    expect(reasonOf(a.html, "intake-triage")).toBe("Switch the agent on first.");
+    expect(reasonOf(a.html, "intake-triage")).toBe("Switch the assistant on first.");
     vi.resetModules();
     const b = await blockedCard({ settings: [off("intake-triage")], role: "viewer" });
-    expect(reasonOf(b.html, "intake-triage")).toBe("Only an owner, admin or senior admin can run agents.");
+    expect(reasonOf(b.html, "intake-triage")).toBe("Only an owner, admin or senior admin can run assistants.");
   });
 
   it("the same card shows four different sentences across off, paused, no AI key and role", async () => {

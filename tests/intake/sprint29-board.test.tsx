@@ -215,7 +215,7 @@ describe("the 'Needs a stage decision' filter and the column badge", () => {
 
   it("an unreadable flag list is said out loud: no filter, no badge, no reason line, and a bookmarked filter shows everyone", () => {
     const html = text(render({ ...BOARD, decision: "1" }, { decisions: { status: "unavailable" }, withFlags: false }));
-    expect(html).toMatch(/Stage decisions couldn.t be loaded/);
+    expect(html).toContain("Some details couldn't load (stage decisions). Refresh to try again.");
     expect(html).not.toContain(NEEDS_DECISION_LABEL + "<");
     expect(html).not.toContain("data-decision-count");
     expect(html).not.toContain("Lawmatics: ");

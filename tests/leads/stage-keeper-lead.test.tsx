@@ -53,9 +53,9 @@ const render = (rows: unknown[], undo?: { leadId: string; canMove: boolean; curr
   text(renderToStaticMarkup(<Timeline rows={rows as never} timeZone={ZONE} undo={undo} />));
 
 describe("the timeline line", () => {
-  it("reads 'Stage Keeper moved this lead from X to Y because ...' with the subject as the detail", () => {
+  it("reads 'Moved this lead automatically from X to Y because ...' with the subject as the detail", () => {
     const html = render([MOVE, NOTE], { leadId: "lead-1", canMove: true, currentStageId: "s-loe" });
-    expect(html).toContain("Stage Keeper moved this lead from New PNC to LOE & Invoice Sent because an LOE and invoice email was sent on Oct 20");
+    expect(html).toContain("Moved this lead automatically from New PNC to LOE & Invoice Sent because an LOE and invoice email was sent on Oct 20");
     expect(html).toContain("<p>Your engagement letter</p>");
   });
 
@@ -79,7 +79,7 @@ describe("the timeline line", () => {
 
   it("no Undo for a role that may not move stages", () => {
     const html = render([MOVE], { leadId: "lead-1", canMove: false, currentStageId: "s-loe" });
-    expect(html).toContain("Stage Keeper moved this lead");
+    expect(html).toContain("Moved this lead automatically");
     expect(html).not.toContain("Undo");
   });
 
@@ -97,12 +97,12 @@ describe("the timeline line", () => {
     expect(html).toContain("Undone");
     expect(html).not.toMatch(/>Undo</);
     expect(html).toContain("Moved back to New PNC");
-    expect(html).toContain("undid a Stage Keeper move");
+    expect(html).toContain("undid an automatic move");
   });
 
   it("without the undo prop (a matter's timeline) the line stands with no button", () => {
     const html = render([MOVE]);
-    expect(html).toContain("Stage Keeper moved this lead");
+    expect(html).toContain("Moved this lead automatically");
     expect(html).not.toContain("Undo");
   });
 
@@ -135,7 +135,7 @@ describe("suggestion rows on the timeline", () => {
   const REVIEW = { id: "rev-1", lead_id: "lead-1", type: "ai_insight", actor_type: "user", created_at: "2026-10-21T10:00:00.000Z", payload: { source: "stage-keeper-review", suggestion_id: "sug-1", decision: "dismiss" } };
 
   it("describes a suggestion and its review", () => {
-    expect(describeActivity(SUGGESTION, { timeZone: ZONE }).title).toBe("Stage Keeper suggested moving this lead from New PNC to Signed LOE / Deposit Received because an LOE and invoice email was sent on Oct 20");
+    expect(describeActivity(SUGGESTION, { timeZone: ZONE }).title).toBe("Suggested moving this lead from New PNC to Signed LOE / Deposit Received because an LOE and invoice email was sent on Oct 20");
     expect(describeActivity(REVIEW).title).toBe("Stage suggestion dismissed");
     expect(describeActivity({ ...REVIEW, payload: { ...REVIEW.payload, decision: "apply" } }).title).toBe("Stage suggestion accepted");
   });
@@ -294,26 +294,26 @@ describe("the lead page", () => {
   it("D1: the timeline shows the Stage Keeper's line with Undo, and a pending suggestion shows as a card", async () => {
     mockPage({ role: "attorney", activity: [PENDING, { ...MOVE, lead_id: "lead-amara" }] });
     const html = await page();
-    expect(html).toContain("Stage Keeper moved this lead from New PNC to LOE & Invoice Sent because an LOE and invoice email was sent on Oct 20");
+    expect(html).toContain("Moved this lead automatically from New PNC to LOE & Invoice Sent because an LOE and invoice email was sent on Oct 20");
     expect(html).toMatch(/>Undo<\/button>/);
-    expect(html).toContain("Stage Keeper · waiting on you");
+    expect(html).toContain("Automatic stage moves · waiting on you");
     expect(html).toContain("1 stage suggestion");
     expect(html).toMatch(/>Accept<\/button>/);
-    expect(html.indexOf("Stage Keeper · waiting on you")).toBeLessThan(html.indexOf("Timeline"));
+    expect(html.indexOf("Automatic stage moves · waiting on you")).toBeLessThan(html.indexOf("Timeline"));
   });
 
   it("a paralegal sees the line and the card but no Undo, Accept or Dismiss", async () => {
     mockPage({ role: "paralegal", activity: [PENDING, { ...MOVE, lead_id: "lead-amara" }] });
     const html = await page();
-    expect(html).toContain("Stage Keeper moved this lead");
-    expect(html).toContain("Stage Keeper · waiting on you");
+    expect(html).toContain("Moved this lead automatically");
+    expect(html).toContain("Automatic stage moves · waiting on you");
     expect(html).not.toMatch(/>Undo<|>Accept<|>Dismiss</);
   });
 
   it("with nothing from the Stage Keeper, none of it is drawn", async () => {
     mockPage({ role: "attorney", activity: [NOTE] });
     const html = await page();
-    expect(html).not.toContain("Stage Keeper");
+    expect(html).not.toContain("Automatic stage moves");
     expect(html).not.toContain("Undo");
   });
 });

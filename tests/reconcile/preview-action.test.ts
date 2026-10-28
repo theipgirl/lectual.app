@@ -184,7 +184,7 @@ describe("previewReconcileAction: a failed lead or stage read is an error, never
     const { previewReconcileAction } = await loadActions(w);
     const r = await previewReconcileAction(formWith(csvFile()));
     expect(r).toEqual({ ok: false, error: MSG.leadsUnreadable });
-    expect(MSG.leadsUnreadable).toMatch(/problem reaching the database/);
+    expect(MSG.leadsUnreadable).toMatch(/couldn't read your leads/);
     expect(JSON.stringify(r)).not.toContain(SECRET);
     expect(logged()).not.toContain(SECRET);
   });
