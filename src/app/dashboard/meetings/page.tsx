@@ -91,7 +91,7 @@ export default async function MeetingsPage({ searchParams }: { searchParams: Pro
       {read.status === "unavailable" ? (
         <div className="lx-card lx-empty-card">
           <h2 className="lx-h2" style={{ fontSize: 25 }}>Meetings couldn&apos;t be loaded</h2>
-          <p className="lx-note" style={{ margin: 0 }}>This is a problem reaching the database, not an empty list. Try again in a moment.</p>
+          <p className="lx-note" style={{ margin: 0 }}>Can&apos;t show this right now. Refresh to try again.</p>
         </div>
       ) : meetings.length === 0 ? (
         <div className="lx-card lx-empty-card">

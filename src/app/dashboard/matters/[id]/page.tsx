@@ -475,7 +475,7 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
             <section className="lx-card lx-aside">
               <div className="lx-label">Intake questions</div>
               <p className="lx-note" style={{ margin: 0 }}>
-                The intake links for this matter couldn&rsquo;t be loaded. This is a problem reaching the database, not an empty list.
+                The intake links for this matter couldn&rsquo;t be loaded. Refresh to try again.
               </p>
             </section>
           ) : null}

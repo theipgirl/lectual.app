@@ -372,7 +372,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const outlookEvents = outlook?.status === "ok" ? outlook.events : [];
   const outlookNote =
     outlook?.status === "database-update-needed"
-      ? "Outlook events aren't available until the database update."
+      ? "Outlook events aren't switched on for your firm yet. Lectual will turn them on."
       : outlook?.status === "unavailable"
         ? "Outlook events couldn't be loaded."
         : null;

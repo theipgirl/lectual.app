@@ -1,4 +1,5 @@
 import type { QueueItem } from "@/lib/queue/api";
+import { FROM_THEIR_EMAILS } from "@/lib/ui/words";
 import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
 import { markdownToPlainText } from "@/lib/markdown";
 
@@ -33,7 +34,7 @@ export function isUnconfiguredError(err: unknown): boolean {
 }
 
 const AGENT_LABEL: Record<string, string> = {
-  "email-intel": "Email intel",
+  "email-intel": FROM_THEIR_EMAILS,
   "intake-triage": "Intake triage",
   "post-consult": "Post-consult",
   "prep-consult": "Prep consult",

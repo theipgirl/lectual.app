@@ -1,0 +1,268 @@
+/* ============================================================
+   LIST PAGE: the one header, toolbar, chip, table and board-card look
+   that Leads and Matters share (Sprint 31). Design tokens from
+   globals.css only. Row height, pill and spacing are defined once
+   here and used by both pages.
+   ============================================================ */
+
+.lp-root {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  --lp-row-h: 46px;
+  --lp-gap: 12px;
+  --lp-radius: 10px;
+  --lp-tint: color-mix(in srgb, var(--ox) 10%, transparent);
+  --lp-warn-tint: color-mix(in srgb, var(--warn) 12%, transparent);
+  --lp-risk-tint: color-mix(in srgb, var(--wine) 12%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: var(--lp-gap);
+}
+
+/* ---- header: h1 + one sub-line, no eyebrow ---- */
+.lp-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 12px;
+  row-gap: 2px;
+}
+.lp-header .lx-h1 { margin: 0; }
+.lp-header .lp-count { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.lp-header .lp-sub { flex-basis: 100%; margin: 0; }
+
+/* ---- toolbar: search, view toggle, primary action, More ---- */
+.lp-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+.lp-toolbar-spacer { flex: 1 1 0; min-width: 0; }
+.lp-search { display: flex; align-items: center; gap: 6px; flex: 0 1 380px; min-width: 220px; }
+.lp-search .lx-input { flex: 1; min-width: 0; height: 36px; }
+.lp-search-submit,
+.lp-btn {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--body);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.lp-search-submit:hover,
+.lp-btn:hover { color: var(--ink); text-decoration: none; }
+.lp-btn-primary { background: var(--ox); border-color: var(--ox); color: var(--cream); font-weight: 500; }
+.lp-btn-primary:hover { background: var(--ox-hover); color: var(--cream); }
+.lp-clear {
+  border: 0;
+  background: transparent;
+  padding: 0 4px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ox);
+  cursor: pointer;
+  text-decoration: underline;
+  white-space: nowrap;
+}
+
+/* ---- filter chips ---- */
+.lp-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.lp-chip {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--body);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.lp-chip:hover { color: var(--ink); text-decoration: none; }
+.lp-chip-on { border-color: var(--ox); background: var(--lp-tint); color: var(--ox); }
+.lp-chip-count { font-family: var(--mono); font-size: 12.5px; opacity: 0.8; }
+.lp-chips-end { margin-left: auto; }
+.lp-link-button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--wine);
+  cursor: pointer;
+}
+
+/* ---- popover / More menu ---- */
+.lp-pop { position: relative; display: inline-flex; min-width: 0; }
+.lp-pop-panel {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 5px);
+  max-width: min(78vw, 300px);
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--lp-radius);
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow: var(--shadow);
+}
+.lp-pop-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  width: 100%;
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  text-decoration: none;
+}
+.lp-pop-item:hover { background: var(--well); text-decoration: none; }
+.lp-pop-item-on { background: var(--lp-tint); color: var(--ox); }
+.lp-pop-item-muted { color: var(--muted); }
+.lp-pop-dot { width: 6px; height: 6px; border-radius: 999px; flex: 0 0 auto; border: 1px solid var(--line); }
+.lp-pop-item-on .lp-pop-dot { background: var(--ox); border: 0; }
+.lp-pop-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---- a note above the table (one, not three) ---- */
+.lp-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--lp-warn-tint);
+  color: var(--body);
+  font-size: 13px;
+}
+
+/* ---- table: panel, header strip, rows ---- */
+.lp-panel {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.lp-table-head {
+  display: grid;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--well);
+  font-family: var(--mono);
+  font-size: 12.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.lp-row { height: var(--lp-row-h); border-bottom: 1px solid var(--line); }
+.lp-row-grid { display: grid; gap: 12px; align-items: center; padding: 0 18px; font-size: 13px; }
+.lp-legend { font-family: var(--mono); font-size: 12.5px; letter-spacing: 0; text-transform: none; color: var(--muted); }
+.lp-foot { padding: 10px 18px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; border-top: 1px solid var(--line); font-family: var(--mono); font-size: 12.5px; color: var(--muted); }
+.lp-empty {
+  margin: 18px;
+  border: 1px dashed var(--line);
+  border-radius: var(--lp-radius);
+  padding: 22px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+}
+
+/* ---- pills ---- */
+.lp-pill {
+  display: inline-block;
+  max-width: 100%;
+  padding: 3px 8px;
+  border-radius: 5px;
+  background: var(--well);
+  color: var(--body);
+  font-family: var(--mono);
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lp-pill-warn { background: var(--lp-warn-tint); color: var(--warn); }
+.lp-pill-risk { background: var(--lp-risk-tint); color: var(--wine); }
+
+/* ---- board cards ---- */
+.lp-board-card {
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--lp-radius);
+  padding: 11px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+@media (max-width: 640px) {
+  .lp-search { flex-basis: 100%; }
+}
+
+/* ---- Table | Board toggle in its button (controlled) form ---- */
+/* ViewToggle draws anchors on server pages and buttons on pages that swap views in the browser. */
+.lp-root .lx-view-toggle button {
+  height: 32px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  font: inherit;
+  font-size: 14px;
+  color: var(--body);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.lp-root .lx-view-toggle button:hover { color: var(--ink); }
+.lp-root .lx-view-toggle button.on {
+  background: var(--card);
+  color: var(--ink);
+  font-weight: 500;
+  box-shadow: var(--shadow);
+}
+.lp-link-button:hover { text-decoration: underline; }

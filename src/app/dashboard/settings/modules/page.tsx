@@ -3,8 +3,9 @@ import { activeOrgModules, type OrgModule } from "@/lib/org/modules";
 import { listConnections } from "@/lib/mailbox/connections";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { ASSISTANTS_NAME, FEATURES_NAME, FEATURES_SUBLINE } from "@/lib/ui/words";
 
-export const metadata: Metadata = { title: pageTitle("Modules") };
+export const metadata: Metadata = { title: pageTitle(FEATURES_NAME) };
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +18,8 @@ export const dynamic = "force-dynamic";
  */
 const MODULES: Array<{ key: OrgModule; name: string; what: string }> = [
   { key: "mailbox", name: "Mailboxes", what: "Connect Gmail and Outlook, match client mail to leads and matters, and use My Mail." },
-  { key: "agents", name: "Agents", what: "Scheduled agents that triage intake, pull client details from email and draft post-consult follow-ups into the approval queue." },
-  { key: "document-center", name: "Document Center", what: "Generate engagement and opinion letters from your firm's templates, into the approval queue." },
+  { key: "agents", name: ASSISTANTS_NAME, what: "Scheduled assistants that read new leads, pull client details from email and draft post-consult follow-ups into Approvals." },
+  { key: "document-center", name: "Document Center", what: "Generate engagement and opinion letters from your firm's templates, into Approvals." },
   { key: "agent-toolkit", name: "Agent toolkit", what: "Welcome emails and filing follow-ups on matters, written in your firm's voice." },
   { key: "proposals", name: "Client proposals", what: "The trademark proposal a client reviews and accepts after their strategy call: brand names, marks and classes, approved by a named approver before it is sent." },
   { key: "litigation", name: "Litigation", what: "Litigation matters, with court case numbers, hearings and case details." },
@@ -48,10 +49,10 @@ export default async function ModulesPage() {
     <>
       <div>
         <div className="lx-label">Settings</div>
-        <h1 className="lx-h1" data-tour="modules-head">Modules</h1>
-        <p className="lx-sub">Parts of Lectual that are switched on firm by firm. To add one, contact Lectual and we&apos;ll set it up with you.</p>
+        <h1 className="lx-h1" data-tour="modules-head">{FEATURES_NAME}</h1>
+        <p className="lx-sub">{FEATURES_SUBLINE}</p>
       </div>
-      <section className="lx-card lx-int" aria-label="Modules">
+      <section className="lx-card lx-int" aria-label={FEATURES_NAME}>
         {MODULES.map((m) => {
           const enabled = on.includes(m.key);
           const status: ModuleStatus = m.key === "mailbox" ? mailbox : { label: enabled ? "On" : "Off", tone: enabled ? "ok" : "mute" };
@@ -82,7 +83,7 @@ export default async function ModulesPage() {
         })}
       </section>
       <p className="lx-note" style={{ margin: 0 }}>
-        Integrations with your own accounts, like Lawmatics, don&apos;t need a module: connect them in Integrations.
+        Integrations with your own accounts, like Lawmatics, don&apos;t need to be switched on by Lectual: connect them in Integrations.
       </p>
     </>
   );

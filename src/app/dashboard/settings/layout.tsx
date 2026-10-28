@@ -1,4 +1,5 @@
 import { activeOrgModules } from "@/lib/org/modules";
+import { ASSISTANTS_NAME, FEATURES_NAME } from "@/lib/ui/words";
 import { SettingsNav, type SettingsTab } from "@/components/settings/SettingsNav";
 
 type Tab = SettingsTab & { module?: string };
@@ -6,12 +7,12 @@ type Tab = SettingsTab & { module?: string };
 // Agents lives on the rail (it's also a daily surface); the tab points there.
 const TABS: Tab[] = [
   { label: "Integrations", href: "/dashboard/settings/integrations/" },
-  { label: "Agents", href: "/dashboard/agents/", module: "agents" },
+  { label: ASSISTANTS_NAME, href: "/dashboard/agents/", module: "agents" },
   { label: "Team & roles", href: "/dashboard/settings/team/" },
   { label: "Firm profile", href: "/dashboard/settings/firm/" },
   { label: "Service library", href: "/dashboard/settings/services/" },
   { label: "Client proposals", href: "/dashboard/settings/proposals/", module: "proposals" },
-  { label: "Modules", href: "/dashboard/settings/modules/" },
+  { label: FEATURES_NAME, href: "/dashboard/settings/modules/" },
 ];
 
 export default async function SettingsLayout({ children }: { children: React.ReactNode }) {

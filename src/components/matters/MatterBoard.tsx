@@ -1,4 +1,5 @@
 import Link from "next/link";
+import "@/components/list-page/list-page.css";
 import type { Matter } from "@/lib/matters";
 import type { MatterStage } from "@/lib/matters/stages";
 import { buildBoard } from "@/lib/matters/board";
@@ -26,14 +27,14 @@ export function MatterBoard(props: {
     const age = stageAge(m);
     const owner = props.ownerName(m.assigned_to);
     return (
-      <li key={m.id} className="lx-board-card">
+      <li key={m.id} className="lp-board-card">
         <Link href={`/dashboard/matters/${m.id}/`} className="lx-rowlink">
           {matterLabel(m)}
         </Link>
         <span className="lx-note lx-num">{m.matter_number}</span>
         <span style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-          {age.days !== null && <span className={`lx-pill ${age.stale ? "lx-pill-risk" : "lx-pill-mute"}`}>{age.days}d</span>}
-          {props.reviewIds.has(m.id) && <span className="lx-pill lx-pill-warn">Review</span>}
+          {age.days !== null && <span className={`lp-pill${age.stale ? " lp-pill-risk" : ""}`}>{age.days}d</span>}
+          {props.reviewIds.has(m.id) && <span className="lp-pill lp-pill-warn">Review</span>}
           {owner && <span className="lx-note">{owner}</span>}
         </span>
         {props.canMove && (

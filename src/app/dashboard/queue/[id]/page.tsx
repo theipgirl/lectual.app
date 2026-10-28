@@ -19,7 +19,7 @@ import { loadAuditContext } from "@/lib/queue/audit-context";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 
-export const metadata: Metadata = { title: pageTitle("Queue item") };
+export const metadata: Metadata = { title: pageTitle("Approval item") };
 
 /** One row of the aside's detail list; nothing is drawn for a value the item doesn't have. */
 function Meta({ label, value }: { label: string; value: React.ReactNode }) {

@@ -6,8 +6,9 @@ import { markNearDuplicates } from "@/lib/queue/hygiene";
 import { STATUS_PILL, agentLabel, fmtWhen, parseQueueStatus, preview, typeLabel, type QueueStatus } from "@/components/queue/format";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { APPROVALS_NAME } from "@/lib/ui/words";
 
-export const metadata: Metadata = { title: pageTitle("Queue") };
+export const metadata: Metadata = { title: pageTitle(APPROVALS_NAME) };
 
 const TABS: { status: QueueStatus; label: string }[] = [
   { status: "pending", label: "Waiting on you" },
@@ -37,14 +38,13 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
     <>
       <div className="lx-page-head">
         <div style={{ flex: 1, minWidth: 260 }}>
-          <div className="lx-label">Review</div>
-          <h1 className="lx-h1" data-tour="queue-head">Approval queue</h1>
+          <h1 className="lx-h1" data-tour="queue-head">{APPROVALS_NAME}</h1>
           <p className="lx-sub">
-            Everything an agent drafted for a client, newest first. Approving puts the message in a mail client for a
+            Everything an assistant drafted for a client, newest first. Approving puts the message in a mail client for a
             person to send — nothing reaches a client on its own.
           </p>
         </div>
-        <nav aria-label="Queue status" className="lx-segs">
+        <nav aria-label="Approval status" className="lx-segs">
           {TABS.map((t) => (
             <Link key={t.status} href={`/dashboard/queue/?status=${t.status}`} aria-current={t.status === status ? "page" : undefined}>
               {t.label}

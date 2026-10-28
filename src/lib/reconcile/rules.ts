@@ -14,7 +14,7 @@ export const RECONCILE_MESSAGES = {
   signedOut: "Sign in again to use this page.",
   roleUnknown: "We couldn't check your role, so nothing was done. Try again shortly.",
   notAllowed: "Only an owner or admin can reconcile stages.",
-  leadsUnreadable: "We couldn't reach the database to read your leads, so no comparison was made. This is a problem reaching the database, not an empty pipeline. Try again shortly.",
+  leadsUnreadable: "We couldn't read your leads, so no comparison was made. Refresh to try again.",
   stagesUnreadable: "We couldn't reach the database to read your pipeline stages, so no comparison was made. Try again shortly.",
   nothingChosen: "No moves were chosen.",
   badRequest: "That request wasn't understood, so nothing was moved. Upload the sheet again.",

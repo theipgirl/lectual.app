@@ -35,6 +35,7 @@ import {
 import "../campaigns.css";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { campaignLoadError } from "@/lib/campaigns/load-errors";
 
 export const metadata: Metadata = { title: pageTitle("Campaign") };
 
@@ -78,11 +79,11 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
   const [stepsRead, enrollmentsRead, templatesRead, leadsRead] = await Promise.all([
     listSteps(id).then((steps) => ({ steps, error: null as string | null })).catch((err) => ({
       steps: [],
-      error: err instanceof Error ? err.message : "Couldn't load this campaign's steps.",
+      error: campaignLoadError("steps", err),
     })),
     listEnrollments({ sequenceId: id }).then((enrollments) => ({ enrollments, error: null as string | null })).catch((err) => ({
       enrollments: [],
-      error: err instanceof Error ? err.message : "Couldn't load who's enrolled.",
+      error: campaignLoadError("enrollments", err),
     })),
     // Templates and leads are reads too: a failure must say so, never pass
     // for "no templates" (every email step would claim it has none attached)
@@ -191,7 +192,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
                     )}
                     {step.type === "wait" && <div className="lx-note">No action — just a delay before the next step.</div>}
                     {step.type === "condition" && (
-                      <div className="lx-note">Logged only — this schema has no branch target, so a condition step never skips ahead on its own.</div>
+                      <div className="lx-note">This step is a note only. It doesn&apos;t change what happens next.</div>
                     )}
                   </div>
                   {canManage && <DeleteStepButton sequenceId={sequence.id} stepId={step.id} />}
@@ -327,7 +328,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
 
       <p className="lx-note lx-campaigns-firmnote">
         Nothing sends on its own. Running an email step drafts it into the approval queue from the template above —
-        review it on the <Link href="/dashboard/queue/">Queue</Link> before it reaches anyone. A lead who signs, pays,
+        review it on the <Link href="/dashboard/queue/">Approvals</Link> before it reaches anyone. A lead who signs, pays,
         becomes a client, replies or has a call leaves the sequence the moment that is recorded, and every step
         re-checks first.
       </p>

@@ -5,6 +5,7 @@ import type { DrawerSteps } from "@/lib/intake-forms/load-steps";
 import type { Load } from "@/lib/intake-forms/load-results";
 import { stoppedAtLabel } from "@/lib/intake-forms/step-funnel";
 import { IntakeStatusForm } from "./IntakeStatusForm";
+import { notReadyPlural } from "@/lib/ui/words";
 
 /**
  * The Performance tab's pieces that the Results tab shares: the three-state
@@ -22,12 +23,12 @@ export const STATUS_TONE: Record<string, string> = {
   stopped: "mute",
 };
 
-export function Unreadable({ what, unconfigured, migration = "0079" }: { what: string; unconfigured: boolean; migration?: string }) {
+export function Unreadable({ what, unconfigured }: { what: string; unconfigured: boolean }) {
   return (
     <div className="lx-banner lx-banner-warn" role="status">
       {unconfigured
-        ? `${what} aren't set up in this environment (lectual migration ${migration}). Nothing is broken; it needs the migration.`
-        : `${what} couldn't be loaded. This is a problem reaching the database, not an empty result. Try again shortly.`}
+        ? notReadyPlural(what)
+        : `${what} couldn't be loaded. Refresh to try again.`}
     </div>
   );
 }
@@ -118,7 +119,7 @@ function DrawerStepsNote({ steps, questions }: { steps: Load<DrawerSteps>; quest
     return (
       <div className="ifm-note ifm-stepnote">
         <div className="ifm-caps">Where they stopped</div>
-        <div>{"Couldn't load step data. This is a problem reaching the database, not an empty result."}</div>
+        <div>{"Couldn't load step data. Refresh to try again."}</div>
       </div>
     );
   }

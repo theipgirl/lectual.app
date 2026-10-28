@@ -69,7 +69,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       {error ? (
         <div className="lx-card lx-empty-card">
           <h2 className="lx-h2" style={{ fontSize: 25 }}>Documents couldn&apos;t be loaded</h2>
-          <p className="lx-note" style={{ margin: 0 }}>This is a problem reaching the database, not an empty list. Try again shortly.</p>
+          <p className="lx-note" style={{ margin: 0 }}>Can&apos;t show this right now. Refresh to try again.</p>
         </div>
       ) : rows.length === 0 ? (
         <div className="lx-card lx-empty-card">

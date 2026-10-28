@@ -136,11 +136,10 @@ export default async function CopilotPage(props?: { searchParams?: Promise<{ c?:
       ) : (
         <div className="lx-card lx-empty-card">
           <h2 className="lx-h2" style={{ fontSize: 25 }}>
-            The copilot isn&apos;t configured for this deployment yet
+            Copilot isn&apos;t switched on for your firm yet
           </h2>
           <p className="lx-note" style={{ margin: 0 }}>
-            An administrator needs to set an AI provider key before this page can answer
-            questions. Nothing here is broken — there is simply nothing to ask yet.
+            Lectual will turn it on. Nothing here is broken: there is simply nothing to ask yet.
           </p>
         </div>
       )}

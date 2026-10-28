@@ -28,8 +28,6 @@ import {
   NEXT_HOT,
   OWNER_CHIP,
   OWNER_CHIP_NONE,
-  STAGE_PILL,
-  STAGE_WARN,
   TEMP_PILL,
   TOUCH_IN_SMALL,
   TOUCH_OUT_SMALL,
@@ -177,17 +175,10 @@ export default function IntakeCard({
   return (
     <div
       data-lead-id={lead.id}
-      className={selected ? "intake-card-selected" : undefined}
+      className={`lp-board-card${selected ? " intake-card-selected" : ""}`}
       draggable
       onDragStart={(event) => event.dataTransfer.setData("text/plain", lead.id)}
       style={{
-        padding: variant === "owner" ? 12 : 11,
-        border: "1px solid var(--line)",
-        borderRadius: 10,
-        background: "var(--ground)",
-        display: "flex",
-        flexDirection: "column",
-        gap: variant === "owner" ? 7 : 6,
         cursor: "grab",
         opacity: pending ? 0.55 : 1,
       }}
@@ -252,7 +243,7 @@ export default function IntakeCard({
       )}
       {openDecision && (
         <div style={{ minWidth: 0 }}>
-          <span className="intake-decision-pill" data-needs-decision title="Nobody has chosen this person's stage yet. Move the card, or let the Stage Keeper or Reconcile place it from evidence.">
+          <span className="intake-decision-pill" data-needs-decision title="Nobody has chosen this person's stage yet. Move the card, or let automatic moves or Reconcile place it from evidence.">
             {decisionPillText(openDecision)}
           </span>
         </div>
@@ -265,7 +256,7 @@ export default function IntakeCard({
       )}
 
       {/* One temperature line. A person's reads as a fact, in its own colour; a
-          derived one reads as a suggestion, in words; with neither, "Not routed".
+          derived one reads as a suggestion, in words; with neither, "Not rated".
           The reason is the tooltip. */}
       <div
         style={{
@@ -289,7 +280,7 @@ export default function IntakeCard({
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         {variant === "owner" ? (
           <span
-            style={{ ...(row.stage ? STAGE_PILL : STAGE_WARN), ...ellipsis, display: "inline-block" }}
+            className={`lp-pill${row.stage ? "" : " lp-pill-warn"}`}
           >
             {stageCodeFor(row.stage)} · {stageLabelFor(row.stage)}
           </span>

@@ -104,7 +104,7 @@ async function runDraftPrompt(system: string, prompt: string, where: string, gen
   const result = await askClaude({ system, prompt, maxTokens: 1024, agent: "staff" });
   if ("skipped" in result) {
     throw new PrepConsultFlowError(
-      `The ${where} couldn't be drafted right now: either no AI key is set up on this deployment (ANTHROPIC_API_KEY) or the model didn't return a draft. Nothing was queued.`,
+      `The ${where} couldn't be drafted right now: either AI isn't switched on for your firm yet or the model didn't return a draft. Nothing was queued.`,
     );
   }
   const text = result.text.trim();

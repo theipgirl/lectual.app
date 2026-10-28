@@ -100,7 +100,7 @@ export default async function Page({
       )}
       {load.status === "unconfigured" && (
         <p className="lx-note" style={{ margin: 0 }}>
-          Quotes aren&apos;t set up in this environment, so there is nothing to pre-fill from.
+          Quotes aren&apos;t switched on for your firm yet, so there is nothing to pre-fill from.
         </p>
       )}
       {choice.invalidParam && (

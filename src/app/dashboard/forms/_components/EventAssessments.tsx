@@ -22,14 +22,14 @@ export function EventAssessments({ read }: { read: Awaited<ReturnType<typeof loa
   if (read.status === "unconfigured") {
     return (
       <p className="ifm-help">
-        Event assessments aren&apos;t set up in this environment (lectual migration 0086). Nothing is broken; it needs the migration.
+        Event assessments aren&apos;t switched on for your firm yet. Lectual will turn them on.
       </p>
     );
   }
   if (read.status === "unavailable") {
     return (
       <div role="status" className="lx-banner lx-banner-warn" style={{ fontSize: 14 }}>
-        Event assessments couldn&apos;t be loaded. This is a problem reaching the database, not an empty list. Try again shortly.
+        Event assessments couldn&apos;t be loaded. Refresh to try again.
       </div>
     );
   }

@@ -26,7 +26,7 @@ const CARDS: Array<Pick<StatCardData, "id" | "label" | "href"> & { note: string;
     label: "Approvals waiting",
     href: "/dashboard/queue/",
     note: "drafts waiting for your review",
-    unconfiguredNote: "Queue isn't connected",
+    unconfiguredNote: "Approvals aren't connected",
   },
 ];
 

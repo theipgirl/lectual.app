@@ -125,7 +125,7 @@ export default async function LawmaticsPage() {
           </div>
           {loeConfig.status === "unavailable" ? (
             <p role="alert" className="lx-banner lx-banner-risk" style={{ margin: 0 }}>
-              We couldn&apos;t read your proposal settings. This is a problem reaching the database, not a sign that the setting is off. Try again shortly.
+              We couldn&apos;t read your proposal settings. Refresh to try again.
             </p>
           ) : (
             <>

@@ -6,6 +6,7 @@
 import { STOP_REASON_LABEL, isStopReason } from "@/lib/campaigns/stops";
 import { CONSULT_OUTCOME_LABEL, isConsultOutcome } from "@/lib/pipeline/consult-outcome-labels";
 import { formatFileSize } from "@/lib/files/rules";
+import { AUTOMATIC_STAGE_MOVES, FIRST_READ, FROM_THEIR_EMAILS } from "@/lib/ui/words";
 import { reasonText } from "@/lib/stage-keeper/format";
 import { AGENT_ACTOR, REVIEW_SOURCE, SUGGESTION_SOURCE, WHY_TEXT, parseAgentMove, parseSuggestion } from "@/lib/stage-keeper/moves";
 
@@ -17,11 +18,11 @@ const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null
 const cap = (v: string) => v.charAt(0).toUpperCase() + v.slice(1);
 
 const AI_SOURCES: Record<string, string> = {
-  "intake-triage": "Intake triage",
-  "email-intel": "Email intel",
+  "intake-triage": FIRST_READ,
+  "email-intel": FROM_THEIR_EMAILS,
   "email-intel-review": "Proposal reviewed",
   "post-consult": "Post-consult drafter",
-  "stage-keeper": "Stage Keeper",
+  "stage-keeper": AUTOMATIC_STAGE_MOVES,
 };
 
 const MATTER_CHANGE: Record<string, string> = {
@@ -129,7 +130,7 @@ export function describeActivity(row: Row & { id?: string }, options: DescribeOp
         const move = parseAgentMove({ id: row.id ?? "", type: row.type, created_at: row.created_at, payload: row.payload });
         const subject = move?.evidence?.kind === "mail" ? move.evidence.subject : null;
         return {
-          title: `Stage Keeper moved this lead from ${str(p.from_stage) ?? "its earlier stage"} to ${str(p.to_stage) ?? "a later stage"} because ${reasonText(move?.evidence ?? null, zone)}`,
+          title: `Moved this lead automatically from ${str(p.from_stage) ?? "its earlier stage"} to ${str(p.to_stage) ?? "a later stage"} because ${reasonText(move?.evidence ?? null, zone)}`,
           detail: subject,
           tone: "ai",
           link: null,
@@ -138,7 +139,7 @@ export function describeActivity(row: Row & { id?: string }, options: DescribeOp
       if (str(p.undoes_activity_id)) {
         return {
           title: `Moved back to ${str(p.to_stage) ?? "its earlier stage"}`,
-          detail: [str(p.from_stage) ? `from ${str(p.from_stage)}` : null, "undid a Stage Keeper move"].filter(Boolean).join(" · "),
+          detail: [str(p.from_stage) ? `from ${str(p.from_stage)}` : null, "undid an automatic move"].filter(Boolean).join(" · "),
           tone: "system",
           link: null,
         };
@@ -148,7 +149,7 @@ export function describeActivity(row: Row & { id?: string }, options: DescribeOp
       const to = str(p.to_stage) ?? str(p.to_stage_name) ?? str(p.to_label) ?? str(p.to);
       const from = str(p.from_stage) ?? str(p.from_stage_name) ?? str(p.from_label);
       const why =
-        str(p.source) === "quote_accepted" ? "Proposal signed" : str(p.source) === "stage-keeper-accept" ? "accepted a Stage Keeper suggestion" : null;
+        str(p.source) === "quote_accepted" ? "Proposal signed" : str(p.source) === "stage-keeper-accept" ? "accepted a suggested automatic move" : null;
       return {
         title: `Moved to ${to ?? "a new stage"}`,
         detail: [from ? `from ${from}` : null, why].filter(Boolean).join(" · ") || null,
@@ -171,7 +172,7 @@ export function describeActivity(row: Row & { id?: string }, options: DescribeOp
           from ? `was ${cap(from)}` : "was not set",
           str(p.suggested) ? `triage suggested ${cap(str(p.suggested) as string)}` : null,
         ];
-        return { title: to ? `Lane set to ${cap(to)}` : "Lane cleared", detail: parts.filter(Boolean).join(" · "), tone: "note", link: null };
+        return { title: to ? `Temperature set to ${cap(to)}` : "Temperature cleared", detail: parts.filter(Boolean).join(" · "), tone: "note", link: null };
       }
       return { title: "Details updated", detail: Array.isArray(p.fields) ? (p.fields as string[]).join(", ") : null, tone: "system", link: null };
     case "drip_enrolled":
@@ -209,13 +210,13 @@ export function describeActivity(row: Row & { id?: string }, options: DescribeOp
     case "ai_insight": {
       const source = str(p.source) ?? "";
       if (source === "intake-triage") {
-        return { title: `Triage: ${String(p.lane ?? "").toUpperCase() || "scored"}`, detail: str(p.reason), tone: "ai", link: null };
+        return { title: `First read: ${String(p.lane ?? "").toUpperCase() || "scored"}`, detail: str(p.reason), tone: "ai", link: null };
       }
       if (source === SUGGESTION_SOURCE) {
         const s = parseSuggestion({ id: row.id ?? "", type: row.type, created_at: row.created_at, payload: row.payload });
         if (s) {
           return {
-            title: `Stage Keeper suggested moving this lead from ${s.fromStage ?? "its stage"} to ${s.toStage ?? "a later stage"} because ${reasonText(s.evidence, zone)}`,
+            title: `Suggested moving this lead from ${s.fromStage ?? "its stage"} to ${s.toStage ?? "a later stage"} because ${reasonText(s.evidence, zone)}`,
             detail: s.why ? WHY_TEXT[s.why] : null,
             tone: "ai",
             link: null,

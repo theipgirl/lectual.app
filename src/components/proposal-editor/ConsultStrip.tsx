@@ -32,7 +32,7 @@ export function ConsultStrip({ state, leadId, tz }: { state: ConsultStripState; 
         <span>
           {state.unreadable
             ? "The details saved on the newest consult couldn't be read, so none are shown. "
-            : "This is a problem reaching the database, not a lead with no consult. "}
+            : "Can't show this right now. Refresh to try again. "}
           {lead}
         </span>
       </section>

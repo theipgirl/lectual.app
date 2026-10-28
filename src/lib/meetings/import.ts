@@ -218,7 +218,7 @@ export async function zoomAccessToken(deps: ImportDeps, conn: ConnectionSecrets)
   if (!conn.access_token_enc || !conn.refresh_token_enc) throw new MeetingAuthError("No Zoom sign-in is stored. Reconnect Zoom.");
   const expires = conn.token_expires_at ? Date.parse(conn.token_expires_at) : 0;
   if (expires - now > 120_000) return openToken(deps.root, conn.access_token_enc, "lectual-meetings");
-  if (!deps.zoomCreds) throw new Error("Zoom sign-in isn't configured on this deployment.");
+  if (!deps.zoomCreds) throw new Error("Zoom isn't switched on for your firm yet. Lectual will turn it on.");
   const fresh = await refreshZoomToken({
     creds: deps.zoomCreds,
     refreshToken: openToken(deps.root, conn.refresh_token_enc, "lectual-meetings"),

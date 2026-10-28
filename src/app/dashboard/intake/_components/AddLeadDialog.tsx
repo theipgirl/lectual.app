@@ -6,7 +6,6 @@ import type { Stage } from "@/lib/pipeline";
 import type { MemberIdentity } from "@/lib/members/directory";
 import { memberLabel, stageCodeFor, stageLabelFor } from "@/lib/intake/views";
 import { createLeadAction, type CreateLeadState } from "@/app/dashboard/leads/actions";
-import { PRIMARY_BUTTON } from "./styles";
 
 const fieldStyle: React.CSSProperties = {
   fontSize: 13,
@@ -119,7 +118,7 @@ export default function AddLeadDialog({
     <>
       <button
         type="button"
-        style={PRIMARY_BUTTON}
+        className="lp-btn lp-btn-primary"
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
         aria-expanded={open}
@@ -272,7 +271,8 @@ export default function AddLeadDialog({
                 <button
                   type="submit"
                   disabled={pending}
-                  style={{ ...PRIMARY_BUTTON, opacity: pending ? 0.6 : 1 }}
+                  className="lp-btn lp-btn-primary"
+                  style={{ opacity: pending ? 0.6 : 1 }}
                 >
                   {pending ? "Adding…" : "Add lead"}
                 </button>

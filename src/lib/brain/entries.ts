@@ -31,7 +31,7 @@ export async function requireBrainAdminRole(supabase: ScopedClient): Promise<Rol
   const { data, error } = await supabase.rpc("current_org_role");
   if (error) throw error;
   if (!isRole(data) || !BRAIN_ADMIN_ROLES.includes(data)) {
-    throw new Error("You don't have permission to change the firm brain.");
+    throw new Error("You don't have permission to change the firm notes.");
   }
   return data;
 }

@@ -51,5 +51,5 @@ export function isMissingFunctionError(error: RpcError | null | undefined): bool
 }
 
 /** Operator-facing hint appended to errors caused by the unapplied migration. */
-export const MEMBER_RPC_MIGRATION_HINT =
-  "Apply supabase/migrations/0031_member_identity.sql to the database to enable this.";
+export const MEMBER_RPC_SWITCH_ON_HINT =
+  "Lectual will switch this on for your firm.";

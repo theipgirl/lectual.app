@@ -15,9 +15,10 @@ import {
 } from "@/lib/intake/rows";
 import { memberLabel, stageCodeFor, stageLabelFor } from "@/lib/intake/views";
 import Popover, { PopoverItem } from "./Popover";
-import { CHIP_COUNT, filterChip, groupPill } from "./styles";
+import { chipClass } from "@/components/list-page/Chips";
+import { COPIED, COPY_VIEW_LINK, MOVED_AUTOMATICALLY, NOT_RATED, TEMPERATURE_TOOLTIP } from "@/lib/ui/words";
 
-/** How long "Save this view" says "Copied" before going back to itself. */
+/** How long "Copy link to this view" says "Copied" before going back to itself. */
 const COPIED_MS = 1500;
 
 /**
@@ -40,7 +41,7 @@ const TEMP_OPTIONS: Array<{ value: TempFilter; label: string }> = [
   { value: "hot", label: "Hot" },
   { value: "warm", label: "Warm" },
   { value: "cold", label: "Cold" },
-  { value: "none", label: "Not routed" },
+  { value: "none", label: NOT_RATED },
 ];
 
 /** The "Agent moves" filter: leads the Stage Keeper placed today (the firm's day) or in the last 7 days. */
@@ -60,7 +61,7 @@ function Divider() {
  *
  * Holds no filter state of its own — the workspace owns it and mirrors it into
  * the URL, which is the whole point: every arrangement of this row is a link
- * someone can bookmark or paste into Slack, and "Save this view" is nothing
+ * someone can bookmark or paste into Slack, and "Copy link to this view" is nothing
  * more than copying that link.
  */
 export default function IntakeControls({
@@ -142,13 +143,13 @@ export default function IntakeControls({
   }
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+    <div className="lp-chips">
       {view === "board" && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }} role="group" aria-label="Group by">
-          <span className="intake-eyebrow">Group by</span>
+        <div className="lp-chips" role="group" aria-label="Group by">
+          <span className="lp-legend">Group by</span>
           <button
             type="button"
-            style={groupPill(group === "stage")}
+            className={chipClass(group === "stage")}
             aria-pressed={group === "stage"}
             onClick={() => onGroup("stage")}
           >
@@ -156,7 +157,7 @@ export default function IntakeControls({
           </button>
           <button
             type="button"
-            style={groupPill(group === "owner")}
+            className={chipClass(group === "owner")}
             aria-pressed={group === "owner"}
             onClick={() => onGroup("owner")}
           >
@@ -170,9 +171,9 @@ export default function IntakeControls({
       <Popover
         label="Filter by stage"
         trigger={({ onClick, ref, ...aria }) => (
-          <button {...aria} ref={ref} type="button" onClick={onClick} style={filterChip(true)}>
+          <button {...aria} ref={ref} type="button" onClick={onClick} className={chipClass(true)}>
             {selectedStage ? `${stageCodeFor(selectedStage)} · ${stageLabelFor(selectedStage)}` : stageSummary}
-            <span style={CHIP_COUNT}>{visibleCount}</span>
+            <span className="lp-chip-count">{visibleCount}</span>
           </button>
         )}
       >
@@ -213,7 +214,7 @@ export default function IntakeControls({
             ref={ref}
             type="button"
             onClick={onClick}
-            style={filterChip(filters.owner !== null)}
+            className={chipClass(filters.owner !== null)}
           >
             {selectedOwner ?? "Owner"}
           </button>
@@ -264,7 +265,7 @@ export default function IntakeControls({
             ref={ref}
             type="button"
             onClick={onClick}
-            style={filterChip(filters.source.length > 0)}
+            className={chipClass(filters.source.length > 0)}
           >
             {filters.source.length === 0
               ? "Source"
@@ -318,8 +319,8 @@ export default function IntakeControls({
             ref={ref}
             type="button"
             onClick={onClick}
-            style={filterChip(filters.temp !== null)}
-            title="Hot / Warm / Cold match the temperature a person set, or the suggested one where nobody has. Not routed is neither."
+            className={chipClass(filters.temp !== null)}
+            title={TEMPERATURE_TOOLTIP}
           >
             {filters.temp ? (TEMP_OPTIONS.find((option) => option.value === filters.temp)?.label ?? "Temperature") : "Temperature"}
           </button>
@@ -355,7 +356,7 @@ export default function IntakeControls({
 
       {agentMoveCounts != null && (
         <Popover
-          label="Filter by agent moves"
+          label="Filter by automatic moves"
           width={170}
           trigger={({ onClick, ref, ...aria }) => (
             <button
@@ -363,13 +364,13 @@ export default function IntakeControls({
               ref={ref}
               type="button"
               onClick={onClick}
-              style={filterChip(Boolean(filters.agent))}
-              title="Show only leads the Stage Keeper moved, and that nobody has moved since."
+              className={chipClass(Boolean(filters.agent))}
+              title={`Show only leads that were moved automatically, and that nobody has moved since.`}
             >
               {filters.agent
-                ? `Agent moves · ${AGENT_OPTIONS.find((option) => option.value === filters.agent)?.label ?? ""}`
-                : "Agent moves"}
-              <span style={CHIP_COUNT}>{filters.agent === "today" ? agentMoveCounts.today : agentMoveCounts.week}</span>
+                ? `${MOVED_AUTOMATICALLY} · ${AGENT_OPTIONS.find((option) => option.value === filters.agent)?.label ?? ""}`
+                : MOVED_AUTOMATICALLY}
+              <span className="lp-chip-count">{filters.agent === "today" ? agentMoveCounts.today : agentMoveCounts.week}</span>
             </button>
           )}
         >
@@ -407,33 +408,33 @@ export default function IntakeControls({
       {decisionCount != null && (
         <button
           type="button"
-          style={filterChip(Boolean(filters.decision))}
+          className={chipClass(Boolean(filters.decision))}
           aria-pressed={Boolean(filters.decision)}
           title="Show only leads imported from Lawmatics whose stage nobody has chosen yet."
           onClick={() => onFilters({ ...filters, decision: filters.decision ? undefined : true })}
         >
           Needs a stage decision
-          {decisionCount > 0 && <span style={CHIP_COUNT}>{decisionCount}</span>}
+          {decisionCount > 0 && <span className="lp-chip-count">{decisionCount}</span>}
         </button>
       )}
 
       {needsRebeccaCount != null && (
         <button
           type="button"
-          style={filterChip(filters.needsRebecca)}
+          className={chipClass(filters.needsRebecca)}
           aria-pressed={filters.needsRebecca}
           title="Show only leads with a draft waiting for an attorney's review in the approval queue."
           onClick={() => onFilters({ ...filters, needsRebecca: !filters.needsRebecca })}
         >
           Needs attorney
-          {needsRebeccaCount > 0 && <span style={CHIP_COUNT}>{needsRebeccaCount}</span>}
+          {needsRebeccaCount > 0 && <span className="lp-chip-count">{needsRebeccaCount}</span>}
         </button>
       )}
 
       {filters.reply !== null && (
         <button
           type="button"
-          style={filterChip(true)}
+          className={chipClass(true)}
           aria-label={`Clear the “${REPLY_LABEL[filters.reply]}” filter`}
           onClick={() => onFilters({ ...filters, reply: null })}
         >
@@ -442,22 +443,13 @@ export default function IntakeControls({
         </button>
       )}
 
-      <span style={{ flex: 1 }} />
 
       <button
         type="button"
         onClick={saveView}
-        className="intake-mono"
-        style={{
-          border: "none",
-          background: "transparent",
-          padding: 0,
-          fontSize: 11.5,
-          color: "var(--burg)",
-          cursor: "pointer",
-        }}
+        className="lp-link-button lp-chips-end"
       >
-        {copied ? "Copied" : "Save this view"}
+        {copied ? COPIED : COPY_VIEW_LINK}
       </button>
     </div>
   );

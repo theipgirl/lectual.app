@@ -134,7 +134,7 @@ async function readFirmSenders(supabase: Scoped): Promise<FirmSenders> {
 
 /**
  * The mail the sync already stored on these leads' timelines (`email_sent` / `email_received`, each
- * with its classification in the payload), and what the Stage Keeper did for them (its moves and its
+ * with its classification in the payload), and what automatic stage moves did for them (its moves and its
  * pending suggestions). No mail is fetched. A lead with neither is simply absent from the maps; a
  * failed read of EITHER is `unavailable`, never an empty result.
  */
@@ -207,7 +207,7 @@ export async function readStoredMail(supabase: Scoped, leadIds: readonly string[
     }
   } catch (err) {
     console.error("[reconcile] stored mail read failed", err instanceof Error ? err.name : "error");
-    return { status: "unavailable", reason: "The synced mail and the Stage Keeper's moves on the timeline could not be read. Try again shortly." };
+    return { status: "unavailable", reason: "The synced mail and automatic stage moves on the timeline could not be read. Try again shortly." };
   }
   // `agent` is present only when the Stage Keeper left something to read, so a read without it is unchanged.
   return { status: "ok", byLead, total, ...(agent.size > 0 ? { agent } : {}) };

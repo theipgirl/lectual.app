@@ -105,7 +105,7 @@ export function ClientContactCard({ matterId, read, canWrite }: { matterId: stri
       <div className="lx-label">Client contact</div>
       {read.status === "unavailable" ? (
         <p className="lx-banner lx-banner-warn" style={{ margin: 0 }}>
-          The client contact couldn&apos;t be loaded. This is a problem reaching the database, not an empty card.
+          The client contact couldn&apos;t be loaded. Refresh to try again.
         </p>
       ) : read.status === "none" ? (
         <p className="lx-note" style={{ margin: 0 }}>

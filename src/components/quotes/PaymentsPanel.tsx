@@ -49,7 +49,7 @@ export function PaymentsPanel(props: {
 
       {props.payments === null ? (
         <div role="alert" className="lx-banner lx-banner-risk">
-          We couldn&apos;t load this quote&apos;s payments. That&apos;s a problem reaching the database — it doesn&apos;t mean nothing was paid.
+          Can&apos;t show this quote&apos;s payments right now. Refresh to try again. That doesn&apos;t mean nothing was paid.
         </div>
       ) : props.payments.length === 0 ? (
         <div className="lx-empty">No payments recorded on this quote.</div>

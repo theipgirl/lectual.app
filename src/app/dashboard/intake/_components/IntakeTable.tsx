@@ -17,15 +17,8 @@ import NeedsRebeccaBadge from "./NeedsRebeccaBadge";
 import AgentMoveChip from "./AgentMoveChip";
 import SourceCell from "./SourceCell";
 import type { Lane } from "@/lib/leads/lane";
-import {
-  NEXT,
-  NEXT_HOT,
-  PANEL,
-  STAGE_PILL,
-  STAGE_WARN,
-  TOUCH_IN,
-  TOUCH_OUT,
-} from "./styles";
+import { NEXT, NEXT_HOT, TOUCH_IN, TOUCH_OUT } from "./styles";
+import { NO_LEADS_YET, NO_LEAD_MATCHES } from "@/lib/ui/words";
 
 /**
  * The canvas's column widths. The checkbox column is omitted (§11), and the
@@ -33,10 +26,13 @@ import {
  * a "Suggested: Warm" chip never runs into its neighbour. Seven columns, in
  * the header strip and in every row.
  */
-const GRID = "2.1fr 1.15fr 1.6fr .95fr 64px 1.15fr 1.5fr";
+const GRID = "2fr 1.1fr 1.5fr .95fr 64px 1.6fr 1.35fr";
 
 /** Below this the columns would be unreadable, so the table scrolls instead. */
 const MIN_TABLE_WIDTH = 1000;
+
+/** What the ← and → in the Last touch column mean. */
+const ARROW_LEGEND = "← waiting on us, → waiting on them";
 
 const COLUMNS: Array<{ key: SortKey; label: string }> = [
   { key: "lead", label: "Lead" },
@@ -79,6 +75,8 @@ export default function IntakeTable({
   onSetLane,
   onAssign,
   onSetSource,
+  onClearFilters,
+  emptyAction,
 }: {
   rows: IntakeRow[];
   /** Rows before filtering — the footer's "of M". */
@@ -98,34 +96,24 @@ export default function IntakeTable({
   onSetLane: (leadId: string, lane: Lane | null) => void;
   onAssign: (leadId: string, userId: string | null) => void;
   onSetSource: (leadId: string, source: ReferralSource | null) => void;
+  /** Resets every filter, for the "No lead matches these filters" state. */
+  onClearFilters?: () => void;
+  /** The Add lead control, offered when there are no leads at all. */
+  emptyAction?: React.ReactNode;
 }) {
   const router = useRouter();
 
   return (
-    <div style={PANEL}>
+    <div className="lp-panel">
       <div className="intake-scroll" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
         <div style={{ minWidth: MIN_TABLE_WIDTH, display: "flex", flexDirection: "column", flex: 1 }}>
           {/* No role="row": there is no table/grid role around it, and a lone
               row role is worse for a screen reader than none. It is a strip of
               sort buttons, each of which says what it sorts. */}
-          <div
-            className="intake-eyebrow"
-            style={{
-              display: "grid",
-              gridTemplateColumns: GRID,
-              gap: 12,
-              padding: "11px 18px",
-              borderBottom: "1px solid var(--line)",
-              background: "var(--surface2)",
-              alignItems: "center",
-              position: "sticky",
-              top: 0,
-              zIndex: 2,
-            }}
-          >
+          <div className="lp-table-head" style={{ gridTemplateColumns: GRID }}>
             {COLUMNS.map((column) => {
               const active = sortKey === column.key;
-              return (
+              const button = (
                 <button
                   key={column.key}
                   type="button"
@@ -148,6 +136,17 @@ export default function IntakeTable({
                   {active ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
                 </button>
               );
+              return column.key === "lastTouch" ? (
+                // The arrows' meaning sits beside the column it explains, not in a footer.
+                <div key={column.key} style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+                  {button}
+                  <span className="lp-legend" data-arrow-legend>
+                    {ARROW_LEGEND}
+                  </span>
+                </div>
+              ) : (
+                button
+              );
             })}
           </div>
 
@@ -169,15 +168,9 @@ export default function IntakeTable({
                     if ((event.target as HTMLElement).closest("button, a, input, select")) return;
                     router.push(`/dashboard/leads/${lead.id}`);
                   }}
+                  className="lp-row lp-row-grid"
                   style={{
-                    display: "grid",
                     gridTemplateColumns: GRID,
-                    gap: 12,
-                    padding: "0 18px",
-                    alignItems: "center",
-                    height: "var(--rowh)",
-                    borderBottom: "1px solid var(--line)",
-                    fontSize: 13,
                     cursor: "pointer",
                     opacity: pending ? 0.55 : 1,
                     // Waiting on us is the one thing the canvas colours a whole
@@ -210,13 +203,7 @@ export default function IntakeTable({
 
                   <div style={{ minWidth: 0 }}>
                     <span
-                      style={{
-                        ...(row.stage ? STAGE_PILL : STAGE_WARN),
-                        display: "inline-block",
-                        maxWidth: "100%",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
+                      className={`lp-pill${row.stage ? "" : " lp-pill-warn"}`}
                       title={row.stage?.name ?? "This lead's stage no longer exists"}
                     >
                       {stageCodeFor(row.stage)} · {stageLabelFor(row.stage)}
@@ -249,7 +236,10 @@ export default function IntakeTable({
                     onAssign={(userId) => onAssign(lead.id, userId)}
                   />
 
-                  <div style={touch.waitingOnUs ? TOUCH_IN : TOUCH_OUT}>{touch.text}</div>
+                  <div style={touch.waitingOnUs ? TOUCH_IN : TOUCH_OUT} title={touch.waitingOnUs ? "Waiting on us" : "Waiting on them"}>
+                    <span className="lx-sr">{touch.waitingOnUs ? "Waiting on us: " : "Waiting on them: "}</span>
+                    {touch.text}
+                  </div>
 
                   {/* §13.1 — the ⏱ rides at the end of the last cell rather
                       than in a column of its own, so GRID and the table's
@@ -297,43 +287,35 @@ export default function IntakeTable({
           {rows.length === 0 && (
             // Only reachable when the read SUCCEEDED — a failed read never gets
             // this far (see the page's three-state branch).
-            <p
-              style={{
-                margin: "18px",
-                border: "1px dashed var(--line)",
-                borderRadius: 10,
-                padding: 26,
-                textAlign: "center",
-                color: "var(--mute)",
-                fontSize: 12.5,
-              }}
-            >
-              {totalCount === 0
-                ? "Nobody is in intake right now. New leads land here as soon as they enter a pre-conversion stage."
-                : "No lead matches these filters."}
-            </p>
+            <div className="lp-empty" data-empty={totalCount === 0 ? "none" : "filtered"}>
+              {totalCount === 0 ? (
+                <>
+                  <p style={{ margin: 0 }}>{NO_LEADS_YET}</p>
+                  <span style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
+                    {emptyAction}
+                    <Link href="/dashboard/forms/">Open your intake form</Link>
+                  </span>
+                </>
+              ) : (
+                <>
+                  <p style={{ margin: 0 }}>{NO_LEAD_MATCHES}</p>
+                  {onClearFilters && (
+                    <button type="button" className="lp-clear" onClick={onClearFilters}>
+                      Clear filters
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
           )}
 
           <div style={{ flex: 1 }} />
         </div>
       </div>
 
-      <div
-        style={{
-          padding: "11px 18px",
-          display: "flex",
-          alignItems: "center",
-          gap: 14,
-          flexWrap: "wrap",
-          borderTop: "1px solid var(--line)",
-        }}
-      >
-        <span className="intake-mono" style={{ fontSize: 11, color: "var(--mute)" }}>
+      <div className="lp-foot">
+        <span>
           Showing {rows.length} of {totalCount}
-        </span>
-        <span style={{ flex: 1 }} />
-        <span className="intake-mono" style={{ fontSize: 11, color: "var(--mute)" }}>
-          ← waiting on us · → waiting on them
         </span>
       </div>
     </div>

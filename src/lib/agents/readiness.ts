@@ -1,4 +1,5 @@
 import { agentNeedsAi, type AgentId } from "./types";
+import { NOT_SWITCHED_ON } from "@/lib/ui/words";
 
 /**
  * Whether an agent that is switched on can actually do anything. Pure: the
@@ -42,7 +43,7 @@ export type DatabaseUpdate = "applied" | "pending" | "unknown";
 const NEEDS_DATABASE_UPDATE: ReadonlySet<AgentId> = new Set<AgentId>(["morning-brief", "consult-prep", "inbox-summary"]);
 export const agentNeedsDatabaseUpdate = (agent: AgentId): boolean => NEEDS_DATABASE_UPDATE.has(agent);
 /** The state's name, shared by the readiness label and the "Run now" reason so the two cannot drift apart. */
-export const NOT_AVAILABLE_UNTIL_UPDATE = "Not available until the database update";
+export const NOT_AVAILABLE_UNTIL_UPDATE = "Not switched on yet";
 /** The agents that read connected mailboxes or the Outlook calendar, and so need the Mailboxes module. */
 const NEEDS_MAILBOX_MODULE: ReadonlySet<AgentId> = new Set<AgentId>(["email-intel", "stage-keeper", "consult-prep", "inbox-summary"]);
 
@@ -57,8 +58,8 @@ export type AgentReadiness = {
 };
 
 /**
- * Precedence for a switched-on agent: a pending database update (the three newest agents), a missing
- * module, then the AI key, then the agent's own requirement (a mailbox, calendar events), then the
+ * Precedence for a switched-on agent: a feature Lectual hasn't switched on yet (the three newest assistants), a missing
+ * feature, then AI, then the assistant's own requirement (a mailbox, calendar events), then the
  * queue, then ready. Intake triage depends only on the AI key: the queue only decides whether it can
  * write the hot-lead briefing.
  */
@@ -69,15 +70,15 @@ export function agentReadiness(input: AgentReadinessInput): AgentReadiness {
     return {
       label: NOT_AVAILABLE_UNTIL_UPDATE,
       tone: enabled ? "warn" : "mute",
-      reason: "This agent needs a database update (lectual 0098) that hasn't been applied yet. Ask Lectual to apply the database update, then switch it on.",
+      reason: NOT_SWITCHED_ON,
     };
   }
 
   if (NEEDS_MAILBOX_MODULE.has(agent) && !hasMailboxModule) {
     return {
-      label: "Needs the Mailboxes module",
+      label: "Needs the Mailboxes feature",
       tone: enabled ? "warn" : "mute",
-      reason: "This agent reads connected mailboxes or the Outlook calendar, and this firm doesn't have the Mailboxes module. Contact Lectual to add it.",
+      reason: "This assistant reads connected mailboxes or the Outlook calendar, and Mailboxes isn't switched on for your firm yet. Lectual will turn it on.",
     };
   }
   if (!enabled) return { label: "Off", tone: "mute", reason: "Switched off." };
@@ -85,9 +86,9 @@ export function agentReadiness(input: AgentReadinessInput): AgentReadiness {
   // The Stage Keeper is rule-based: it calls no model, so a missing AI key never blocks it.
   if (agentNeedsAi(agent) && !input.aiConfigured) {
     return {
-      label: "On · needs the AI key",
+      label: "On · waiting for Lectual to switch on AI",
       tone: "warn",
-      reason: "The AI key isn't set on this deployment, so this agent can't run until an administrator adds it.",
+      reason: "AI isn't switched on for your firm yet, so this assistant can't run. Lectual will turn it on.",
     };
   }
 
@@ -103,7 +104,7 @@ export function agentReadiness(input: AgentReadinessInput): AgentReadiness {
       return {
         label: "On · couldn't check mailboxes",
         tone: "warn",
-        reason: "The mailbox connections couldn't be read just now, so it isn't known whether this agent has any mail to read.",
+        reason: "The mailbox connections couldn't be read just now, so it isn't known whether this assistant has any mail to read.",
       };
     }
   }
@@ -116,7 +117,7 @@ export function agentReadiness(input: AgentReadinessInput): AgentReadiness {
         return {
           label: "On · couldn't check its sources",
           tone: "warn",
-          reason: "The mailbox connections or the calendar couldn't be read just now, so it isn't known whether this agent has anything to read.",
+          reason: "The mailbox connections or the calendar couldn't be read just now, so it isn't known whether this assistant has anything to read.",
         };
       }
       return {
@@ -140,7 +141,7 @@ export function agentReadiness(input: AgentReadinessInput): AgentReadiness {
       return {
         label: "On · couldn't check the calendar",
         tone: "warn",
-        reason: "The Outlook calendar couldn't be read just now, so it isn't known whether this agent has any consults to prepare.",
+        reason: "The Outlook calendar couldn't be read just now, so it isn't known whether this assistant has any consults to prepare.",
       };
     }
   }
@@ -151,14 +152,14 @@ export function agentReadiness(input: AgentReadinessInput): AgentReadiness {
       return {
         label: "On · needs an approval queue",
         tone: "warn",
-        reason: "This firm has no approval queue connected, and this agent never writes a draft anywhere else.",
+        reason: "This firm has no approval queue connected, and this assistant never writes a draft anywhere else.",
       };
     }
     if (queue === "unavailable") {
       return {
         label: "On · couldn't reach the queue",
         tone: "warn",
-        reason: "The approval queue couldn't be reached just now, so it isn't known whether this agent can queue its drafts.",
+        reason: "The approval queue couldn't be reached just now, so it isn't known whether this assistant can queue its drafts.",
       };
     }
   }

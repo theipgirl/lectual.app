@@ -192,7 +192,7 @@ export async function buildPlan(input: PlanInput): Promise<{ view: ReconcileView
     try {
       reads.notes = await input.readLawmaticsNotes(notesTargets);
     } catch {
-      reads.notesFailed = "Lawmatics notes couldn't be read. This is not an empty notes list.";
+      reads.notesFailed = "Lawmatics notes couldn't be read, so none are shown. Refresh to try again.";
     }
   }
 

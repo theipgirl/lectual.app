@@ -6,7 +6,7 @@ import { ROLES, hasRole, type Role } from "@/lib/auth/roles";
 import {
   callMemberRpc,
   isMissingFunctionError,
-  MEMBER_RPC_MIGRATION_HINT,
+  MEMBER_RPC_SWITCH_ON_HINT,
 } from "@/lib/members/rpc";
 import { normalizeEmail, isEmailAddress } from "@/lib/members/email";
 import { requireSettingsAdminRole, currentOrgId } from "./admin";
@@ -133,7 +133,7 @@ export async function inviteMember(emailInput: string, role: Role): Promise<Invi
   if (lookupError) {
     throw new Error(
       isMissingFunctionError(lookupError)
-        ? `Member invites aren't available yet. ${MEMBER_RPC_MIGRATION_HINT}`
+        ? `Member invites aren't switched on yet. ${MEMBER_RPC_SWITCH_ON_HINT}`
         : lookupError.message,
     );
   }
@@ -240,8 +240,8 @@ export async function removeMember(userId: string): Promise<RemoveMemberResult> 
   });
   if (revokeError) {
     warning = isMissingFunctionError(revokeError)
-      ? `Removed, but their existing session could not be ended — it may keep working until the token expires. ${MEMBER_RPC_MIGRATION_HINT}`
-      : `Removed, but their existing session could not be ended (${revokeError.message}) — it may keep working until the token expires.`;
+      ? `Removed, but their existing session could not be ended — it may keep working until the token expires. ${MEMBER_RPC_SWITCH_ON_HINT}`
+      : `Removed, but their existing session could not be ended — it may keep working until the token expires.`;
   }
 
   // e) Delete the membership. RLS (member_delete_admin) re-checks org + role.

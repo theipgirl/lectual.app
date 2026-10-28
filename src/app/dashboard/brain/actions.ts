@@ -13,6 +13,15 @@ import { isBrainCategory, isClaimStatus } from "./enums";
 
 export type ActionState = { error?: string };
 
+/**
+ * Only the permission refusals written for a person pass through; anything else (a database
+ * message, a thrown string) becomes the fixed fallback, so provider text never reaches the screen.
+ */
+function friendlyBrainError(err: unknown, fallback: string): string {
+  if (err instanceof Error && /^You don't have permission to /.test(err.message)) return err.message;
+  return fallback;
+}
+
 const BRAIN_PATH = "/dashboard/brain/";
 
 // ── Brain entries ────────────────────────────────────────────────────────────
@@ -36,7 +45,7 @@ export async function createBrainEntryAction(
   try {
     await createBrainEntry({ category: categoryRaw, key, title, body });
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Couldn't create this entry." };
+    return { error: friendlyBrainError(err, "Couldn't create this entry.") };
   }
 
   revalidatePath(BRAIN_PATH);
@@ -56,7 +65,7 @@ export async function updateBrainEntryAction(
   try {
     await updateBrainEntry(entryId, { title, body });
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Couldn't update this entry." };
+    return { error: friendlyBrainError(err, "Couldn't update this entry.") };
   }
 
   revalidatePath(BRAIN_PATH);
@@ -73,7 +82,7 @@ export async function deleteBrainEntryAction(
   try {
     await deleteBrainEntry(entryId);
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Couldn't delete this entry." };
+    return { error: friendlyBrainError(err, "Couldn't delete this entry.") };
   }
 
   revalidatePath(BRAIN_PATH);
@@ -102,7 +111,7 @@ export async function proposeClaimAction(
       source: source || undefined,
     });
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Couldn't propose this claim." };
+    return { error: friendlyBrainError(err, "Couldn't propose this claim.") };
   }
 
   revalidatePath(BRAIN_PATH);
@@ -124,7 +133,7 @@ export async function reviewClaimAction(
   try {
     await reviewClaim(claimId, statusRaw, notes || undefined);
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Couldn't review this claim." };
+    return { error: friendlyBrainError(err, "Couldn't review this claim.") };
   }
 
   revalidatePath(BRAIN_PATH);
@@ -141,7 +150,7 @@ export async function deleteClaimAction(
   try {
     await deleteClaim(claimId);
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Couldn't delete this claim." };
+    return { error: friendlyBrainError(err, "Couldn't delete this claim.") };
   }
 
   revalidatePath(BRAIN_PATH);

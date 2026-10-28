@@ -35,7 +35,7 @@ export async function draftProposalForStaff(args: {
   try {
     const orgKey = await activeQueueOrgKey();
     if (!orgKey) return { ok: false, error: "No approval queue is connected for your firm, so nothing was drafted." };
-    if (!aiConfigured()) return { ok: false, error: "Drafting isn't set up on this deployment yet." };
+    if (!aiConfigured()) return { ok: false, error: "Drafting isn't switched on for your firm yet. Lectual will turn it on." };
 
     const db = await getScopedClient();
     const admin = getAdminClient();

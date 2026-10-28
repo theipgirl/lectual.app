@@ -39,6 +39,7 @@ import { TemperatureCard } from "@/components/leads/TemperatureCard";
 import { WaitingOnRebecca } from "@/components/leads/WaitingOnRebecca";
 import { ConsultBookedView } from "@/components/calendar/ConsultBookedLine";
 import { recordPageTitle } from "@/lib/ui/page-title";
+import { AUTOMATIC_STAGE_MOVES, FIRST_READ, FROM_THEIR_EMAILS, LEADS_NAME } from "@/lib/ui/words";
 import { loadBookedConsult } from "@/lib/calendar/outlook-read";
 import { loadPendingApprovalsByLead } from "@/lib/queue/lead-pending";
 import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
@@ -155,7 +156,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   return (
     <>
       <Link href="/dashboard/intake/" className="lx-back">
-        ← Intake
+        ← {LEADS_NAME}
       </Link>
       <div className="lx-page-head">
         <div style={{ flex: 1, minWidth: 260 }}>
@@ -182,7 +183,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           {proposals.length > 0 && (
             <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }}>
               <div>
-                <div className="lx-label">Email intel · waiting on you</div>
+                <div className="lx-label">{FROM_THEIR_EMAILS} · waiting on you</div>
                 <h2 className="lx-h2" style={{ fontSize: 23 }}>
                   {proposals.length} proposal{proposals.length === 1 ? "" : "s"} from client email
                 </h2>
@@ -196,7 +197,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           {stageSuggestions.length > 0 && (
             <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }}>
               <div>
-                <div className="lx-label">Stage Keeper · waiting on you</div>
+                <div className="lx-label">{AUTOMATIC_STAGE_MOVES} · waiting on you</div>
                 <h2 className="lx-h2" style={{ fontSize: 23 }}>
                   {stageSuggestions.length} stage suggestion{stageSuggestions.length === 1 ? "" : "s"}
                 </h2>
@@ -229,10 +230,10 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           />
           <AnswersCard read={answersRead} tz={tz} />
           {lead.ai_summary && !lane.suggested && (
-            // A triage summary that carries no lane (an older format) is still shown, as the agent's words.
+            // A first-read summary that carries no temperature (an older format) is still shown, as the assistant's words.
             <section className="lx-card" style={{ padding: 18 }}>
               <div className="lx-label" style={{ marginBottom: 6 }}>
-                Triage agent
+                {FIRST_READ}
               </div>
               <p style={{ margin: 0, color: "var(--body)", lineHeight: 1.55 }}>{lead.ai_summary}</p>
             </section>

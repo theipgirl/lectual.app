@@ -22,13 +22,14 @@ import { getFirmTimeZone } from "@/lib/org/profile";
 import { loadAgentMoves, type AgentMovesRead } from "@/lib/stage-keeper/read";
 import { loadStageDecisions, type StageDecisionsRead } from "@/lib/intake/stage-decisions-read";
 import { canReconcile } from "@/lib/reconcile/roles";
-import { IntakeTopBar } from "@/components/intake/IntakeTopBar";
+import { LeadsLoadFailed, NoLeadStages } from "./_components/LeadsNotices";
+import { LEADS_NAME } from "@/lib/ui/words";
 import IntakeWorkspace from "./_components/IntakeWorkspace";
 import "./intake.css";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 
-export const metadata: Metadata = { title: pageTitle("Intake") };
+export const metadata: Metadata = { title: pageTitle(LEADS_NAME) };
 
 export const dynamic = "force-dynamic";
 
@@ -66,20 +67,6 @@ function latestNotesByLead(activities: Activity[]): Record<string, string> {
     if (text) byLead[leadId] = text;
   }
   return byLead;
-}
-
-/** A card in the canvas tokens — the error and no-stages states both use it. */
-function IntakeNotice({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="intake-card" style={{ padding: 26, display: "flex", flexDirection: "column", gap: 8 }}>
-      <h2 className="intake-serif" style={{ margin: 0, fontSize: 26, lineHeight: 1.1 }}>
-        {title}
-      </h2>
-      <p style={{ margin: 0, fontSize: 13, lineHeight: 1.55, color: "var(--ink2)", maxWidth: "68ch" }}>
-        {body}
-      </p>
-    </div>
-  );
 }
 
 /**
@@ -146,7 +133,7 @@ export default async function IntakePage({
 
   let stages: Stage[] = [];
   let leads: Lead[] = [];
-  let loadError: string | null = null;
+  let loadFailed = false;
 
   // Stages and leads share one try: intake scope is derived FROM the stages, so
   // without them there is no honest list to draw — only a misleading one.
@@ -154,21 +141,17 @@ export default async function IntakePage({
     stages = await listStages();
     leads = await listIntakeLeads(stages);
   } catch (err) {
-    loadError = err instanceof Error ? err.message : String(err);
+    // The cause is for the server log only; the page says one fixed sentence.
+    console.error("[intake] the lead list could not be read:", err instanceof Error ? err.message : "unknown error");
+    loadFailed = true;
   }
 
   const [members, noteActivity, pendingApprovals, agentMoves, decisions] = await Promise.all([membersPromise, notesPromise, approvalsPromise, agentMovesPromise, decisionsPromise]);
 
-  if (loadError) {
+  if (loadFailed) {
     return (
       <div className="intake-root">
-        <IntakeTopBar eyebrow="Intake">Couldn&apos;t reach the list</IntakeTopBar>
-        <div className="intake-content">
-          <IntakeNotice
-            title="Couldn't load intake"
-            body={`This is a broken read, not an empty pipeline — there may well be leads waiting. ${loadError}`}
-          />
-        </div>
+        <LeadsLoadFailed />
       </div>
     );
   }
@@ -178,13 +161,7 @@ export default async function IntakePage({
   if (columns.length === 0) {
     return (
       <div className="intake-root">
-        <IntakeTopBar eyebrow="Intake">No intake stages</IntakeTopBar>
-        <div className="intake-content">
-          <IntakeNotice
-            title="No intake stages yet"
-            body="This firm has no pre-conversion stage configured, so there is nothing for a lead to sit in. An owner or admin can set the pipeline up in Settings, and everyone in those stages shows up here."
-          />
-        </div>
+        <NoLeadStages />
       </div>
     );
   }

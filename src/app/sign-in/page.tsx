@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import LoginForm from "./LoginForm";
+import { signInErrorMessage } from "@/lib/auth/sign-in-errors";
 import { NOT_A_LAW_FIRM_DISCLAIMER } from "@/lib/legal/disclaimer";
 
 export const metadata: Metadata = { title: "Sign in — Lectual" };
@@ -48,7 +49,7 @@ export default async function SignInPage({
               padding: "10px 12px",
             }}
           >
-            {error} — sign-in links are single-use and expire, so request a fresh one below.
+            {signInErrorMessage(error)}
           </p>
         )}
         <LoginForm next={safeNext} />

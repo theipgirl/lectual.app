@@ -16,10 +16,10 @@ export const INTAKE_PRACTICE_AREA_FILTER = "practice_area.is.null,practice_area.
 
 /** Tooltip on a rail badge, keyed by nav slug. */
 export const RAIL_COUNT_TITLE: Readonly<Record<string, string>> = {
-  intake: "Trademark leads in an intake stage, consult stages included (the PNC list)",
+  intake: "Trademark leads in a lead stage, consult stages included (the Leads list)",
   matters: "Open matters",
 };
 
 /** The Pipeline's first column: what it holds and why it can differ from the rail's Intake badge. */
 export const PIPELINE_INTAKE_HINT =
-  "Leads not yet at a consult (any practice area) plus form submissions not yet leads. The rail's Intake count also includes consult stages and only trademark leads.";
+  "Leads not yet at a consult (any practice area) plus form submissions not yet leads. The number beside Leads in the left menu also counts consult stages and only trademark leads.";

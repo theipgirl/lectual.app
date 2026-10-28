@@ -6,6 +6,7 @@ import { NewTemplateForm } from "./_components/TemplateForms";
 import "../campaigns.css";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { campaignLoadError } from "@/lib/campaigns/load-errors";
 
 export const metadata: Metadata = { title: pageTitle("Campaign templates") };
 
@@ -26,7 +27,7 @@ export default async function CampaignTemplatesPage() {
   try {
     templates = await listTemplates();
   } catch (err) {
-    loadError = err instanceof Error ? err.message : "Couldn't load templates.";
+    loadError = campaignLoadError("templates", err);
   }
 
   return (
@@ -59,7 +60,7 @@ export default async function CampaignTemplatesPage() {
             Templates couldn&apos;t be loaded
           </h2>
           <p className="lx-note" style={{ margin: 0 }}>
-            This is a problem reaching the database, not an empty library. Try again shortly.
+            {loadError}
           </p>
         </div>
       ) : templates.length === 0 ? (

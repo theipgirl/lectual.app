@@ -72,7 +72,7 @@ export default async function ProposalSettingsPage() {
       <>
         {head}
         <div role="alert" className="lx-banner lx-banner-risk">
-          We couldn&apos;t load the proposal settings. This is a problem reaching the database, not empty settings. Try again shortly.
+          We couldn&apos;t load the proposal settings. Refresh to try again.
         </div>
       </>
     );

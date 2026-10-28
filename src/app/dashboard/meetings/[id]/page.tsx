@@ -35,7 +35,7 @@ export default async function MeetingPage({ params }: { params: Promise<{ id: st
         </Link>
         <div className="lx-card lx-empty-card">
           <h1 className="lx-h2" style={{ fontSize: 25 }}>This meeting couldn&apos;t be loaded</h1>
-          <p className="lx-note" style={{ margin: 0 }}>This is a problem reaching the database. Try again in a moment.</p>
+          <p className="lx-note" style={{ margin: 0 }}>Can&apos;t show this right now. Refresh to try again.</p>
         </div>
       </>
     );

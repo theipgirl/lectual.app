@@ -266,6 +266,22 @@ export function topBarCounts(rows: IntakeRow[]): TopBarCounts {
   };
 }
 
+/**
+ * The Leads page's sub-line: the former status strip folded into one short sentence, then one short
+ * hint for the current view. `board` and `group` are the view state's own fields.
+ */
+export const LEADS_VIEW_HINT = {
+  table: "Newest activity first.",
+  stage: "Drag a card to move it, or use the stage menu on the card.",
+  owner: "Leads with no owner are in the first column.",
+} as const;
+
+export function leadsSubline(counts: TopBarCounts, view: { board: boolean; group: "stage" | "owner" }): string {
+  const hint = view.board ? LEADS_VIEW_HINT[view.group] : LEADS_VIEW_HINT.table;
+  const total = `${counts.inIntake} ${counts.inIntake === 1 ? "lead" : "leads"}`;
+  return `${total} · ${counts.needFirstReply} need a first reply · ${counts.unassigned} unassigned. ${hint}`;
+}
+
 /** The counts as the one mono line the top bar renders. */
 export function topBarLine(counts: TopBarCounts): string {
   return [

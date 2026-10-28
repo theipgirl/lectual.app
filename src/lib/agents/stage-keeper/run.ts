@@ -96,7 +96,7 @@ async function readMapping(admin: SupabaseClient, orgId: string): Promise<StageM
     .select("key, body, data")
     .eq("org_id", orgId)
     .eq("category", "stage_mapping");
-  if (error) throw new Error(`firm brain read failed: ${error.message}`);
+  if (error) throw new Error(`firm notes read failed: ${error.message}`);
   return parseStageMapping((data ?? []) as Array<{ key?: unknown; body?: unknown; data?: unknown }>);
 }
 
@@ -493,7 +493,7 @@ function summaryOf(leads: number, counts: Counts, extra: string[]): string {
 }
 
 const CALENDAR_NOTE: Record<Exclude<CalendarState, "ok">, string> = {
-  "database-update-needed": "Calendar consults: not available until the database update.",
+  "database-update-needed": "Calendar consults: not switched on for your firm yet.",
   unavailable: "Calendar consults couldn't be read this run.",
 };
 

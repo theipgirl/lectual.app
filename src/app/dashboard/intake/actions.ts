@@ -142,12 +142,12 @@ export async function bulkMoveStageAction(leadIds: string[], stageId: string): P
  */
 export async function setLaneAction(leadId: string, lane: Lane | null): Promise<IntakeActionResult> {
   if (!leadId) return { ok: false, error: "Missing lead." };
-  if (lane !== null && !isLane(lane)) return { ok: false, error: "That isn't a lane." };
+  if (lane !== null && !isLane(lane)) return { ok: false, error: "That isn't a temperature." };
 
   try {
     await setLane(leadId, lane);
   } catch (err) {
-    return { ok: false, error: friendlyLeadWriteError(err, "Couldn't set this lead's lane.") };
+    return { ok: false, error: friendlyLeadWriteError(err, "Couldn't set this lead's temperature.") };
   }
 
   revalidatePath("/dashboard/intake/");

@@ -11,13 +11,14 @@ import { DisconnectLawPayButton, MapAccountForm, RefreshAccountsButton, UnmapBut
 import { NOT_A_LAW_FIRM_DISCLAIMER } from "@/lib/legal/disclaimer";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { LAWPAY_NOT_ISSUED } from "@/lib/ui/words";
 
 export const metadata: Metadata = { title: pageTitle("LawPay") };
 
 export const dynamic = "force-dynamic";
 
 const ERRORS: Record<string, string> = {
-  unconfigured: "LawPay sign-in isn't set up on this deployment yet, so nothing was connected.",
+  unconfigured: "LawPay card payments aren't switched on yet, so nothing was connected. Until then, record payments by hand on each quote.",
   forbidden: "Only owners and admins can connect LawPay.",
   denied: "LawPay sign-in was cancelled. Nothing was connected.",
   expired: "That LawPay sign-in expired or couldn't be verified. Start again with Connect LawPay.",
@@ -99,8 +100,7 @@ export default async function LawPayPage({
       )}
       {!read.ok && (
         <div role="alert" className="lx-banner lx-banner-risk">
-          We couldn&apos;t check your firm&apos;s LawPay connection just now. This is a problem reaching the database, not a disconnection — try
-          again shortly.
+          We couldn&apos;t check your firm&apos;s LawPay connection just now. Refresh to try again.
         </div>
       )}
 
@@ -150,10 +150,7 @@ export default async function LawPayPage({
               Connect LawPay
             </span>
             <p className="lx-note" style={{ margin: 0 }}>
-              {setup.missing === "partner-app"
-                ? "Not available yet: signing in with LawPay needs Lectual's LawPay partner app, which LawPay (8am) hasn't issued for this deployment yet. You don't need to do anything — and you'll never be asked to paste a LawPay key."
-                : "Not available yet: this deployment is missing the encryption key that protects stored connections."}{" "}
-              Until then, record payments by hand on each quote (Quotes → a signed quote → Payments).
+              {LAWPAY_NOT_ISSUED}{" "}You don&apos;t need to do anything, and you&apos;ll never be asked to paste a LawPay key.
             </p>
           </div>
         ) : !conn ? (

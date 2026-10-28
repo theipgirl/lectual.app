@@ -103,7 +103,7 @@ function packagesVerdict(r: SetupState["services"]): Verdict {
 }
 
 function aiVerdict(configured: boolean): Verdict {
-  return configured ? done("The AI key is set on this deployment.") : notYet("The AI key isn't set on this deployment. Lectual sets it.");
+  return configured ? done("AI is switched on for your firm.") : notYet("AI isn't switched on for your firm yet. Lectual will turn it on.");
 }
 
 type Spec = { id: SetupItem["id"]; label: string; href: string; verdict: (s: SetupState) => Verdict };

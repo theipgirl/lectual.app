@@ -60,7 +60,7 @@ export async function EventPage({ code, range, now = new Date() }: { code: strin
     return (
       <div className="ifm-root">
         {header}
-        <Unreadable what="This event's scorecards" unconfigured={read.status === "unconfigured"} migration="0086" />
+        <Unreadable what="This event's scorecards" unconfigured={read.status === "unconfigured"} />
       </div>
     );
   }

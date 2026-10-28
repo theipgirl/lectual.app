@@ -215,7 +215,7 @@ export async function buildGeneralLoeDraft(input: GeneralLoeInput): Promise<LoeD
   });
   if ("skipped" in result) {
     throw new DocumentFlowError(
-      "No AI provider is configured for this deployment (VERCEL_AI_GATEWAY_KEY or ANTHROPIC_API_KEY) — the scope bullets can't be summarized right now.",
+      "AI isn't switched on for your firm yet, so the scope bullets can't be summarized right now. Lectual will turn it on.",
     );
   }
   const scopeBullets = result.text.trim();

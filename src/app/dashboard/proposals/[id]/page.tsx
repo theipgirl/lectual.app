@@ -98,7 +98,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
           </h2>
           <p className="lx-note" style={{ margin: 0 }}>
             {err instanceof ProposalError && err.code === "unavailable"
-              ? "This is a problem reaching the database, not a missing proposal. Try again shortly."
+              ? "Can't show this right now. Refresh to try again."
               : "Try again shortly."}
           </p>
         </div>

@@ -192,7 +192,7 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
         {error ? (
           <div className="lx-card lx-empty-card lx-mail-list">
             <h2 className="lx-h2" style={{ fontSize: 25 }}>Mail couldn&apos;t be loaded</h2>
-            <p className="lx-note" style={{ margin: 0 }}>This is a problem reaching the database, not an empty mailbox. Try again shortly.</p>
+            <p className="lx-note" style={{ margin: 0 }}>Can&apos;t show this right now. Refresh to try again.</p>
           </div>
         ) : groups.length === 0 ? (
           <div className="lx-card lx-empty-card lx-mail-list">

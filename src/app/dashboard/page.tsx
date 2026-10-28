@@ -37,6 +37,7 @@ import { AddNameLink } from "@/components/account/AddNameLink";
 import { TodayConsults } from "@/components/calendar/TodayConsults";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { ASSISTANTS_NAME, OUR_TURN } from "@/lib/ui/words";
 
 export const metadata: Metadata = { title: pageTitle("Today") };
 
@@ -181,7 +182,7 @@ export default async function TodayPage() {
   const pausedByName = pausedBy ? (members.find((m) => m.userId === pausedBy)?.displayName ?? members.find((m) => m.userId === pausedBy)?.email ?? null) : null;
 
   const queueValue = queue.status === "ok" ? queue.items.length : null;
-  const queueFailed = queue.status === "unavailable" ? "Queue unreachable, so we can't say" : "No queue connected yet";
+  const queueFailed = queue.status === "unavailable" ? "Couldn't check approvals" : "No approvals connected yet";
   const firstName = greetingName({ userId: session.user.id, members, metadata: session.user.user_metadata, email: session.user.email });
 
   return (
@@ -199,13 +200,13 @@ export default async function TodayPage() {
       <div className="lx-kpis">
         <Kpi label="Waiting on you" value={queueValue} sub="drafts to approve" href="/dashboard/queue/" failed={queueFailed} />
         <Kpi label="Overdue" value={deadlines === null && tasks === null ? null : overdue} sub="deadlines and tasks past due" href="/dashboard/calendar/" />
-        <Kpi label="Our move" value={docket ? docket.waitingOn.firm : null} sub={docket ? `of ${docket.open} open matters` : ""} href="/dashboard/matters/?seg=firm" />
+        <Kpi label={OUR_TURN} value={docket ? docket.waitingOn.firm : null} sub={docket ? `of ${docket.open} open matters` : ""} href="/dashboard/matters/?seg=firm" />
         <Kpi label="New leads" value={newLeads ? newLeads.length : null} sub="in the last 7 days" href="/dashboard/intake/" />
       </div>
 
       {queue.status === "unavailable" && (
         <p className="lx-banner lx-banner-risk" style={{ margin: 0 }}>
-          We couldn&apos;t reach the approval queue, so we don&apos;t know what&apos;s waiting. This is not an empty queue. Check again shortly.
+          We couldn&apos;t reach the approval queue, so we don&apos;t know what&apos;s waiting. Refresh to try again.
         </p>
       )}
 
@@ -263,12 +264,12 @@ export default async function TodayPage() {
                 />
               ) : autopilot?.status === "unavailable" ? (
                 <p className="lx-note" role="alert" style={{ margin: 0, color: "var(--warn)" }}>
-                  We couldn&apos;t read whether Autopilot is paused. Until we can, no agent runs.
+                  We couldn&apos;t read whether assistants are paused. Until we can, none of them run.
                 </p>
               ) : null}
               <RunDigestList digest={digest} paused={paused} />
               <Link href="/dashboard/agents/" className="lx-note">
-                Agents →
+                {ASSISTANTS_NAME} →
               </Link>
             </section>
           )}
@@ -300,8 +301,8 @@ export default async function TodayPage() {
           <div className="lx-upl">
             <span aria-hidden="true">§</span>
             <div>
-              <b style={{ color: "var(--ox)" }}>The one rule.</b> Nothing reaches a client without a person approving it. Agents draft; the
-              approval queue is the only way out of the firm.
+              <b style={{ color: "var(--ox)" }}>The one rule.</b> Nothing reaches a client without a person approving it. Assistants draft;
+              Approvals is the only way out of the firm.
             </div>
           </div>
         </aside>

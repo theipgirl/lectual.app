@@ -4,7 +4,7 @@ import { getLawmaticsConnection } from "@/lib/lawmatics/connection";
 import { listConnections } from "@/lib/mailbox/connections";
 import { describeAvailability, type ConnectionCheck } from "@/lib/reconcile/availability";
 import { canReconcile } from "@/lib/reconcile/roles";
-import { IntakeTopBar } from "@/components/intake/IntakeTopBar";
+import { ListHeader } from "@/components/list-page/ListHeader";
 import { Explanation } from "@/components/reconcile/Explanation";
 import { ReconcileScreen } from "@/components/reconcile/ReconcileScreen";
 import "../intake.css";
@@ -51,18 +51,12 @@ export default async function ReconcilePage() {
 
   return (
     <div className="intake-root">
-      <IntakeTopBar eyebrow="Intake">Reconcile stages</IntakeTopBar>
       <div className="intake-content">
-        <div className="lx-page-head">
-          <div style={{ flex: 1, minWidth: 260 }}>
-            <div className="lx-label">Intake</div>
-            <h1 className="lx-h1" data-tour="reconcile-head">Reconcile stages</h1>
-            <p className="lx-sub">
-              Check each lead&apos;s stage against your intake sheet, Lawmatics and synced mail, then move the ones you
-              agree with.
-            </p>
-          </div>
-        </div>
+        <ListHeader
+          title="Reconcile stages"
+          tour="reconcile-head"
+          sub="Check each lead's stage against your intake sheet, Lawmatics and synced mail, then move the ones you agree with."
+        />
         <Explanation availability={describeAvailability(lawmatics, mailboxes)} />
         <ReconcileScreen />
       </div>

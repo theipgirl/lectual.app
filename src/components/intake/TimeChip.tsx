@@ -152,7 +152,7 @@ export default function TimeChip({
       (total.lastNote ? ` — ${total.lastNote}` : ""),
   );
   const base = unavailable
-    ? "Couldn't read time entries — this is a broken read, not an empty week."
+    ? "Can't show this week's time right now. Refresh to try again."
     : breakdown.length > 0
       ? `This week: ${formatDuration(weekSeconds)}\n${breakdown.join("\n")}`
       : "No time logged on this lead this week";

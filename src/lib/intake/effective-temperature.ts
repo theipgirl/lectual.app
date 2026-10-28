@@ -1,4 +1,5 @@
 import type { Lead, Stage } from "@/lib/pipeline";
+import { NOT_RATED } from "@/lib/ui/words";
 import { LANE_LABEL, isLane, laneReason } from "@/lib/leads/lane";
 import {
   NEVER_TOUCHED_REASON,
@@ -25,7 +26,7 @@ import {
  * value would pin a lead hot forever. The column is left in the database.
  */
 export type EffectiveTemperature = {
-  /** null = "Not routed": no person's lane and nothing recorded to derive from. */
+  /** null = "Not rated": no person's lane and nothing recorded to derive from. */
   value: Temperature | null;
   source: "person" | "suggested";
   reason: string;
@@ -92,7 +93,7 @@ export function effectiveTemperature(
   const triage = laneReason(lead.ai_summary);
   const reason = triage ? `${derived.reason} · Triage: ${triage}` : derived.reason;
   // No touch, no recorded fact, no nurture stage: the derivation's last-resort
-  // "cold" says nothing about the lead, so it is shown as Not routed instead.
+  // "cold" says nothing about the lead, so it is shown as Not rated instead.
   const nothingKnown = lastTouchAt(lead) == null && derived.reason === NEVER_TOUCHED_REASON;
   return {
     value: nothingKnown ? null : derived.level,
@@ -102,9 +103,9 @@ export function effectiveTemperature(
   };
 }
 
-/** The chip text: "Hot" for a person's, "Suggested: Hot" for a derived one, "Not routed" for neither. */
+/** The chip text: "Hot" for a person's, "Suggested: Hot" for a derived one, "Not rated" for neither. */
 export function temperatureLabel(temperature: Pick<EffectiveTemperature, "value" | "source">): string {
-  if (temperature.value === null) return "Not routed";
+  if (temperature.value === null) return NOT_RATED;
   const level = LANE_LABEL[temperature.value];
   return temperature.source === "person" ? level : `Suggested: ${level}`;
 }

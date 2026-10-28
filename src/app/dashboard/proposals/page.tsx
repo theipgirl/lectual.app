@@ -138,7 +138,7 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
         <TranscriptDraft leads={leadsRead.leads} maxChars={MAX_PASTED_TRANSCRIPT_CHARS} defaultLeadId={preselected} />
       ) : (
         <p className="lx-note" style={{ margin: 0 }}>
-          The leads couldn&apos;t be loaded just now, so this form isn&apos;t offered. This is a problem reaching the database, not an empty list. Try again shortly.
+          The leads couldn&apos;t be loaded just now, so this form isn&apos;t offered. Refresh to try again.
         </p>
       )
     : null;
@@ -175,7 +175,7 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
               Proposals couldn&apos;t be loaded
             </h2>
             <p className="lx-note" style={{ margin: 0 }}>
-              This is a problem reaching the database, not an empty list. Try again shortly.
+              Can&apos;t show this right now. Refresh to try again.
             </p>
           </div>
         ) : rows.length === 0 ? (

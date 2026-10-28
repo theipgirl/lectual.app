@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { AUTOMATIC_STAGE_MOVES, FROM_THEIR_EMAILS } from "@/lib/ui/words";
 import type { StructuredCall } from "@/lib/ai/claude";
 import type { NewQueueDraft, QueueItem } from "@/lib/queue/api";
 
@@ -18,7 +19,7 @@ export const AGENT_IDS: readonly AgentId[] = [
 
 export const AGENT_DEFS: Record<AgentId, { name: string; reads: string; description: string; defaultAutonomy: Autonomy }> = {
   "email-intel": {
-    name: "Email → client intel",
+    name: FROM_THEIR_EMAILS,
     reads: "Connected mailboxes",
     description:
       "Reads mail already matched to a lead and pulls out what the record is missing: business name, phone, website, mark, practice area. It proposes those as changes, and flags any legal question for the attorney.",
@@ -28,28 +29,28 @@ export const AGENT_DEFS: Record<AgentId, { name: string; reads: string; descript
     name: "Intake triage",
     reads: "New leads",
     description:
-      "Scores each new lead for readiness, value, urgency and practice fit, suggests a lane with the reason on the card (a person sets the lane). Hot leads get a briefing in the queue.",
+      "Scores each new lead for readiness, value, urgency and practice fit, suggests a temperature with the reason on the card (a person sets the temperature). Hot leads get a briefing in Approvals.",
     defaultAutonomy: "draft",
   },
   "post-consult": {
     name: "Post-consult drafter",
     reads: "Consult notes",
     description:
-      "After a consult, drafts the follow-up email and an internal summary from the call notes, into the approval queue. An attorney edits and sends it.",
+      "After a consult, drafts the follow-up email and an internal summary from the call notes, into Approvals. An attorney edits and sends it.",
     defaultAutonomy: "draft",
   },
   "stage-keeper": {
-    name: "Stage Keeper",
+    name: AUTOMATIC_STAGE_MOVES,
     reads: "Matched mail and calendar consults",
     description:
-      "Reads the mail already matched to each lead and the consults on the Outlook calendar, and moves the lead forward on the board when the record shows it has moved on: a consult booked, a questionnaire, post-consult or LOE email sent. Every move is logged and can be undone. It never moves a lead into a client, lost or nurture stage, never sets the lane, and never sends anything.",
+      "Reads the mail already matched to each lead and the consults on the Outlook calendar, and moves the lead forward on the board when the record shows it has moved on: a consult booked, a questionnaire, post-consult or LOE email sent. Every move is logged and can be undone. It never moves a lead into a client, lost or nurture stage, never sets the temperature, and never sends anything.",
     defaultAutonomy: "act",
   },
   "morning-brief": {
     name: "Morning brief",
-    reads: "Leads, matters, consults and the queue",
+    reads: "Leads, matters, consults and Approvals",
     description:
-      "Writes the attorney a daily briefing into the approval queue: today's consults, leads waiting on a reply, stage suggestions, stalled leads, deadlines in the next 14 days and the queue count. For up to five stalled leads a day it also drafts a follow-up email. It only drafts: an attorney reviews and sends everything.",
+      "Writes the attorney a daily briefing into Approvals: today's consults, leads waiting on a reply, stage suggestions, stalled leads, deadlines in the next 14 days and the Approvals count. For up to five stalled leads a day it also drafts a follow-up email. It only drafts: an attorney reviews and sends everything.",
     defaultAutonomy: "draft",
   },
   "consult-prep": {
@@ -63,18 +64,18 @@ export const AGENT_DEFS: Record<AgentId, { name: string; reads: string; descript
     name: "Inbox summary",
     reads: "Connected mailboxes",
     description:
-      "Reads the last 24 hours of mail in the connected mailboxes, sorts it into what needs the attorney, what to route and what can wait, and writes one digest into the approval queue. For mail that needs the attorney in a personal Outlook mailbox it also leaves a reply in that mailbox's Drafts folder. It only drafts: an attorney reviews and sends everything, and disputes and suspected scams get no reply.",
+      "Reads the last 24 hours of mail in the connected mailboxes, sorts it into what needs the attorney, what to route and what can wait, and writes one digest into Approvals. For mail that needs the attorney in a personal Outlook mailbox it also leaves a reply in that mailbox's Drafts folder. It only drafts: an attorney reviews and sends everything, and disputes and suspected scams get no reply.",
     defaultAutonomy: "draft",
   },
 };
 
-/** Agents that call a model. The rest are rule-based and need no AI key to run. */
+/** Assistants that call a model. The rest are rule-based and need no AI key to run. */
 const NO_AI_AGENTS: ReadonlySet<AgentId> = new Set<AgentId>(["stage-keeper"]);
 export const agentNeedsAi = (agent: AgentId): boolean => !NO_AI_AGENTS.has(agent);
 
 export const AUTONOMY_HINT: Record<Autonomy, string> = {
   suggest: "Notes what it would do on the record. You do the work.",
-  draft: "Writes it and holds it for review. Client-facing work goes to the approval queue.",
+  draft: "Writes it and holds it for review. Client-facing work goes to Approvals.",
   act: "Updates internal records itself, filling only empty fields, and logs every change. Client-facing work still waits for you.",
 };
 
@@ -90,13 +91,13 @@ const AGENT_AUTONOMY_HINT: Partial<Record<AgentId, Record<Autonomy, string>>> = 
   },
   "morning-brief": {
     suggest: "Writes only the internal briefing. No follow-up emails are drafted.",
-    draft: "Writes the internal briefing and a follow-up email draft for each stalled lead. Everything waits in the approval queue; nothing is sent.",
-    act: "Writes the internal briefing and a follow-up email draft for each stalled lead. Everything waits in the approval queue; nothing is sent.",
+    draft: "Writes the internal briefing and a follow-up email draft for each stalled lead. Everything waits in Approvals; nothing is sent.",
+    act: "Writes the internal briefing and a follow-up email draft for each stalled lead. Everything waits in Approvals; nothing is sent.",
   },
   "consult-prep": {
     suggest: "Writes only the internal heads-up. No client email is drafted.",
-    draft: "Writes the internal heads-up and, if the Agent toolkit is on for this firm, a client email about what to have ready. Both wait in the approval queue; nothing is sent.",
-    act: "Writes the internal heads-up and, if the Agent toolkit is on for this firm, a client email about what to have ready. Both wait in the approval queue; nothing is sent.",
+    draft: "Writes the internal heads-up and, if the Agent toolkit is on for this firm, a client email about what to have ready. Both wait in Approvals; nothing is sent.",
+    act: "Writes the internal heads-up and, if the Agent toolkit is on for this firm, a client email about what to have ready. Both wait in Approvals; nothing is sent.",
   },
   "inbox-summary": {
     suggest: "Writes only the digest. No reply is left in Outlook.",

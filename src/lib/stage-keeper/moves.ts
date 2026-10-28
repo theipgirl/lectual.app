@@ -1,4 +1,5 @@
 import { civilDay, evidenceTooltip, monthDay } from "./format";
+import { MOVED_AUTOMATICALLY } from "@/lib/ui/words";
 import { SIGNAL_LABEL, isSignalId, type MoveEvidence, type SignalId } from "./signals";
 
 /**
@@ -163,8 +164,8 @@ export function chipFor(move: AgentMove, now: Date, timeZone: string): AgentMove
   const date = chipDate(move, timeZone);
   return {
     activityId: move.activityId,
-    text: `Moved by agent · ${label}${date ? ` ${date}` : ""}`,
-    why: `Moved automatically · ${lowerFirst(label)}${date ? ` ${date}` : ""}`,
+    text: `${MOVED_AUTOMATICALLY} · ${label}${date ? ` ${date}` : ""}`,
+    why: `${MOVED_AUTOMATICALLY} · ${lowerFirst(label)}${date ? ` ${date}` : ""}`,
     tooltip: evidenceTooltip(move.evidence, timeZone),
     movedAt: move.at,
     today: civilDay(move.at, timeZone) === civilDay(now.toISOString(), timeZone),
@@ -213,7 +214,7 @@ export const WHY_TEXT: Record<SuggestionWhy, string> = {
   lost: "This is a closing stage, so a person decides.",
   nurture: "This is a holding stage, so a person decides.",
   "welcome-or-payment": "A welcome or payment signal never moves a lead on its own.",
-  "current-stage": "This lead is in a closing or holding stage, so the Stage Keeper only suggests.",
+  "current-stage": "This lead is in a closing or holding stage, so automatic moves only suggest.",
   "recent-person-move": "A person moved this lead in the last 7 days, so their placement stands.",
   autonomy: "This agent is set to suggest, so it left the move to a person.",
 };

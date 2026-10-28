@@ -17,7 +17,7 @@ export function ConsultBookedView({
   if (read.status === "database-update-needed") {
     return (
       <p className="lx-note" style={{ margin: 0 }}>
-        Consult bookings from Outlook aren&apos;t available until the database update.
+        Consult bookings from Outlook aren&apos;t switched on for your firm yet. Lectual will turn them on.
       </p>
     );
   }

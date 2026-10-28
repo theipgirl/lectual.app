@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { Stage } from "@/lib/pipeline";
 import type { MemberIdentity } from "@/lib/members/directory";
 import type { ReferralSource } from "@/lib/intake";
@@ -9,6 +9,7 @@ import { effectiveTemperature } from "@/lib/intake/effective-temperature";
 import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
 import { approvalsShown, filterNeedsRebecca, leadsNeedingApproval } from "@/lib/intake/needs-rebecca";
 import {
+  EMPTY_INTAKE_FILTERS,
   applyFilters,
   intakeHref,
   naturalDir,
@@ -19,9 +20,14 @@ import {
   type IntakeViewState,
   type SortKey,
 } from "@/lib/intake/rows";
-import { topBarCounts, topBarLine } from "@/lib/intake/views";
+import { leadsSubline, topBarCounts } from "@/lib/intake/views";
+import { detailsNote } from "@/lib/intake/details-note";
 import type { IntakeTime } from "@/lib/time";
-import { IntakeTopBar } from "@/components/intake/IntakeTopBar";
+import { ListHeader } from "@/components/list-page/ListHeader";
+import { ListToolbar } from "@/components/list-page/ListToolbar";
+import { MoreMenu, type MoreItem } from "@/components/list-page/MoreMenu";
+import "@/components/list-page/list-page.css";
+import { LEADS_NAME } from "@/lib/ui/words";
 import { ViewToggle } from "@/components/ViewToggle";
 import { assignLeadAction, bulkMoveStageAction, moveStageAction, setLaneAction, setSourceAction } from "../actions";
 import { BULK_MOVE_MAX, bulkMoveSummary } from "@/lib/pipeline/bulk-move";
@@ -32,23 +38,10 @@ import AddLeadDialog from "./AddLeadDialog";
 import BulkMoveBar from "./BulkMoveBar";
 import IntakeBoard from "./IntakeBoard";
 import IntakeControls from "./IntakeControls";
-import IntakeSearch from "./IntakeSearch";
 import IntakeTable from "./IntakeTable";
-import { ImportIcon } from "./icons";
-import { OUTLINE_BUTTON } from "./styles";
 
 /** How long the URL lags the controls, so typing in Search isn't one push per key. */
 const URL_SYNC_DELAY_MS = 300;
-
-/** The sub-line under "Leads", per view (canvas 10a / 10b / 10c). */
-const SUBLINE: Record<string, string> = {
-  table:
-    "Sorted by the last thing that happened, not by when the lead arrived. A row in burgundy has been waiting on us.",
-  stage:
-    "One column per intake stage, in the order this firm numbers them. Drag a card to move it; the stage menu on the card does the same thing without a mouse.",
-  owner:
-    "Unassigned is the first column on purpose — a lead nobody is carrying is the one thing this view exists to surface.",
-};
 
 /**
  * Client orchestrator for /intake (blueprint §11) — three views of one list.
@@ -64,8 +57,7 @@ const SUBLINE: Record<string, string> = {
  * optimistic change and prints the action's friendly message on that row,
  * rather than leaving the screen claiming something that didn't happen.
  *
- * It renders the top bar too, because the status line is page data — see
- * IntakeTopBar for why that lives here and not in the layout.
+ * The status counts ride in the header's sub-line, which is page data, so the header lives here too.
  */
 export default function IntakeWorkspace({
   rows: initialRows,
@@ -363,38 +355,30 @@ export default function IntakeWorkspace({
   );
 
   const board = viewState.view === "board";
-  const subline = SUBLINE[board ? viewState.group : "table"];
+  const router = useRouter();
+  const note = detailsNote({ approvals: pendingApprovals, agentMoves, stageDecisions });
+  const moreItems: MoreItem[] = [
+    ...(showReconcile ? [{ label: "Reconcile stages", href: "/dashboard/intake/reconcile/" }] : []),
+    { label: "Import", href: "/dashboard/settings/integrations/lawmatics/" },
+  ];
+  const clearFilters = () => setFilters(() => ({ ...EMPTY_INTAKE_FILTERS }));
 
   return (
-    <>
-      <IntakeTopBar eyebrow="Intake">
-        {board && viewState.group === "owner"
-          ? "Drag a card to reassign"
-          : board
-            ? "Drag a card to move it between stages"
-            : topBarLine(counts)}
-      </IntakeTopBar>
+    <div className="lp-root">
+      <ListHeader title={LEADS_NAME} sub={leadsSubline(counts, { board, group: viewState.group })} />
 
-      <div className="intake-content">
-        <div className="lx-page-head">
-          <div style={{ flex: 1, minWidth: 260 }}>
-            <div className="lx-label">Intake</div>
-            <h1 className="lx-h1">Leads</h1>
-            <p className="lx-sub">{subline}</p>
-          </div>
-          <IntakeSearch value={filters.q} onChange={(q) => setFilters((current) => ({ ...current, q }))} />
-          <ViewToggle value={viewState.view} onChange={(view) => setViewState((state) => ({ ...state, view }))} />
-          {showReconcile && (
-            <Link href="/dashboard/intake/reconcile/" style={OUTLINE_BUTTON}>
-              Reconcile stages
-            </Link>
-          )}
-          <Link href="/dashboard/settings/integrations/lawmatics/" style={OUTLINE_BUTTON}>
-            <ImportIcon />
-            Import
-          </Link>
-          <AddLeadDialog stages={intakeStages} members={members} />
-        </div>
+      <ListToolbar
+        search={{
+          label: "Search leads",
+          placeholder: "Name, mark, or note",
+          value: filters.q,
+          onChange: (q) => setFilters((current) => ({ ...current, q })),
+          onClear: () => setFilters((current) => ({ ...current, q: "" })),
+        }}
+        toggle={<ViewToggle value={viewState.view} onChange={(view) => setViewState((state) => ({ ...state, view }))} />}
+        more={<MoreMenu items={moreItems} />}
+        primary={<AddLeadDialog stages={intakeStages} members={members} />}
+      />
 
         <IntakeControls
           filters={filters}
@@ -411,47 +395,12 @@ export default function IntakeWorkspace({
           onGroup={(group: IntakeGroup) => setViewState((state) => ({ ...state, group }))}
         />
 
-        {pendingApprovals?.status === "unavailable" && (
-          <p
-            role="status"
-            style={{
-              margin: 0,
-              fontSize: 12,
-              color: "var(--ink2)",
-              background: "var(--warnbg)",
-              borderRadius: 6,
-              padding: "6px 10px",
-            }}
-          >
-            Couldn&rsquo;t reach the approval queue — approvals not shown.
-          </p>
-        )}
-
-        {agentMoves?.status === "unavailable" && (
-          <p
-            role="status"
-            style={{
-              margin: 0,
-              fontSize: 12,
-              color: "var(--ink2)",
-              background: "var(--warnbg)",
-              borderRadius: 6,
-              padding: "6px 10px",
-            }}
-          >
-            Agent moves couldn&rsquo;t be loaded, so the &ldquo;Moved by agent&rdquo; chips and the Agent moves filter are off.
-          </p>
-        )}
-
-        {stageDecisions?.status === "unavailable" && (
-          <p role="status" className="lx-banner lx-banner-warn" style={{ margin: 0 }}>
-            Stage decisions couldn&rsquo;t be loaded, so the &ldquo;Needs a stage decision&rdquo; filter and badges are off.
-          </p>
-        )}
-
-        {stageDecisions?.status === "ok" && stageDecisions.truncated && (
-          <p role="status" className="lx-note" style={{ margin: 0 }}>
-            There were more imported leads than could be read, so only the newest are marked as needing a stage decision.
+        {note && (
+          <p role="status" className="lp-note" data-details-note>
+            <span>{note.text}</span>
+            <button type="button" className="lp-btn" onClick={() => router.refresh()}>
+              Refresh
+            </button>
           </p>
         )}
 
@@ -472,12 +421,6 @@ export default function IntakeWorkspace({
             }}
             onMove={bulkMove}
           />
-        )}
-
-        {agentMoves?.status === "ok" && agentMoves.truncated && (
-          <p role="status" className="lx-note" style={{ margin: 0 }}>
-            There were more agent moves than could be read, so only the most recent are marked.
-          </p>
         )}
 
         {board ? (
@@ -513,9 +456,10 @@ export default function IntakeWorkspace({
             onSetLane={setLane}
             onAssign={assign}
             onSetSource={setSource}
+            onClearFilters={clearFilters}
+            emptyAction={<AddLeadDialog stages={intakeStages} members={members} />}
           />
         )}
-      </div>
-    </>
+    </div>
   );
 }

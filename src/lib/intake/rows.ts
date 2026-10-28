@@ -98,7 +98,7 @@ export type IntakeFilters = {
    */
   needsRebecca: boolean;
   /**
-   * Only leads the Stage Keeper moved (and nobody has moved since). Applied by applyFilters, so
+   * Only leads that were moved automatically (and nobody has moved since). Applied by applyFilters, so
    * the workspace turns it off when the moves couldn't be read: an unreadable list must never
    * filter to "no leads". Absent = no agent filter.
    */

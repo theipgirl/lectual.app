@@ -166,7 +166,8 @@ export async function reviewQueueAction(_prev: ReviewState, formData: FormData):
       return { error: "Unknown action." };
     }
   } catch (err) {
-    return { error: err instanceof Error ? err.message : String(err) };
+    console.error("[queue] the action failed:", err instanceof Error ? err.name : typeof err);
+    return { error: "That didn't go through. Nothing was sent. Refresh to try again." };
   }
 
   revalidatePath("/dashboard/queue/");

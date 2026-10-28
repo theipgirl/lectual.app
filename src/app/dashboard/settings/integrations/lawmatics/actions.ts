@@ -94,7 +94,7 @@ export async function connectLawmaticsAction(_prev: ConnectState, formData: Form
     return { error: "Only owners and admins can connect Lawmatics." };
   }
   const root = rootKeyOrNull();
-  if (!root) return { error: "Integrations aren't set up on this deployment yet (no encryption key)." };
+  if (!root) return { error: "Integrations aren't switched on for your firm yet. Lectual will turn them on." };
   const session = await resolveFirmSession();
   if (session.kind !== "ok") return { error: "Sign in again to connect Lawmatics." };
 

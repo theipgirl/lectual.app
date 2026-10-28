@@ -19,7 +19,7 @@ export function NewSequenceForm() {
     <form action={action} className="lx-form-grid">
       <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
         <span className="lx-label">Name</span>
-        <input className="lx-input" name="name" required maxLength={200} placeholder="e.g. PNC nurture — didn't book a strategy session" />
+        <input className="lx-input" name="name" required maxLength={200} placeholder="e.g. New lead nurture — didn't book a strategy session" />
       </label>
       <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
         <span className="lx-label">Description</span>

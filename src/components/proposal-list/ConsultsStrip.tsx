@@ -100,7 +100,7 @@ export function ConsultsStrip({
       {meetings.status === "unavailable" ? (
         <div className="pq-consults-empty" role="status">
           <b>Couldn&apos;t load consults</b>
-          <span className="lx-note">This is a problem reaching the database, not an empty list. Try again shortly.</span>
+          <span className="lx-note">Can&apos;t show this right now. Refresh to try again.</span>
         </div>
       ) : meetings.rows.length === 0 ? (
         <div className="pq-consults-empty">

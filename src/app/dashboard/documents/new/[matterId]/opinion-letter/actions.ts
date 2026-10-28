@@ -56,7 +56,7 @@ export async function generateOpinionLetterAction(
       error:
         err instanceof DocumentFlowError
           ? err.message
-          : "Something went wrong generating the opinion letter. Try again, or check that this deployment has an AI provider configured.",
+          : "Something went wrong generating the opinion letter. Try again in a minute. If it keeps happening, use Send feedback.",
     };
   }
 

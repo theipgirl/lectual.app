@@ -4,6 +4,7 @@ import { canApproveQueue } from "@/lib/queue/roles";
 import { canSeeSetup } from "@/lib/setup/roles";
 import { SETUP_PATH } from "@/lib/setup/routes";
 import type { TourSide } from "./tour";
+import { APPROVALS_NAME, ASSISTANTS_NAME, COPILOT_NAME, FEATURES_NAME, LEADS_NAME } from "@/lib/ui/words";
 
 /**
  * The Getting started hub: guided flows over the real screens. This file is the
@@ -54,7 +55,7 @@ type CatalogFlow = Omit<HubFlow, "steps"> & { steps: CatalogStep[] };
 export type HubTrack = { id: HubTrackId; title: string; summary: string; flows: HubFlow[] };
 
 export const HUB_TRACKS: readonly { id: HubTrackId; title: string; summary: string }[] = [
-  { id: "intake", title: "Intake", summary: "Leads, the board, forms and stages." },
+  { id: "intake", title: LEADS_NAME, summary: "Leads, the board, forms and stages." },
   { id: "consults", title: "Consults to proposals", summary: "From a booked call to an accepted proposal." },
   { id: "matters", title: "Matters", summary: "Open matters, their pages, files and client updates." },
   { id: "approvals", title: "Approvals and agents", summary: "What waits for a person, and what drafts for you." },
@@ -264,7 +265,7 @@ const FLOWS: readonly CatalogFlow[] = [
         target: "meetings-head",
         side: "bottom",
         title: "Recorded meetings",
-        body: "Calls recorded in Fathom or Zoom are listed here. Link one to a lead or matter and, where the Agents module is on, draft a follow-up for the approval queue.",
+        body: "Calls recorded in Fathom or Zoom are listed here. Link one to a lead or matter and, where Assistants is switched on for your firm, draft a follow-up for Approvals.",
       },
     ],
   },
@@ -376,15 +377,15 @@ const FLOWS: readonly CatalogFlow[] = [
         path: "/dashboard/queue/",
         target: "nav-queue",
         side: "right",
-        title: "Queue",
-        body: "The number on the Queue entry is how many drafts are waiting.",
+        title: APPROVALS_NAME,
+        body: "The number on the Approvals entry is how many drafts are waiting.",
       },
       {
         id: "queue",
         path: "/dashboard/queue/",
         target: "queue-head",
         side: "bottom",
-        title: "Approval queue",
+        title: APPROVALS_NAME,
         body: "Review each draft, edit it if it needs it, then approve or reject it. Nothing goes to a client until someone approves it.",
         bodyReadOnly: "You can look at the drafts waiting here, and edit them if your role allows, but approving them is for others. Nothing goes to a client until someone approves it.",
       },
@@ -393,8 +394,8 @@ const FLOWS: readonly CatalogFlow[] = [
   {
     id: "approvals-agents",
     track: "approvals",
-    title: "Agents",
-    summary: "What each agent drafts, Run now and Autopilot.",
+    title: ASSISTANTS_NAME,
+    summary: "What each assistant drafts, Run now and the pause switch.",
     requires: { nav: ["agents"] },
     steps: [
       {
@@ -402,15 +403,15 @@ const FLOWS: readonly CatalogFlow[] = [
         path: "/dashboard/agents/",
         target: "agents-head",
         side: "bottom",
-        title: "Agents draft, people decide",
-        body: "Each agent drafts into the approval queue or writes an internal note. Run now runs one agent when your role allows it, and Autopilot can be paused to stop them all.",
+        title: "Assistants draft, people decide",
+        body: "Each assistant drafts into Approvals or writes an internal note. Run now runs one assistant when your role allows it, and all assistants can be paused at once.",
       },
     ],
   },
   {
     id: "approvals-copilot",
     track: "approvals",
-    title: "AI copilot",
+    title: COPILOT_NAME,
     summary: "Ask a question about your matters and leads.",
     requires: { nav: ["copilot"], ai: true },
     steps: [
@@ -497,7 +498,7 @@ const FLOWS: readonly CatalogFlow[] = [
   {
     id: "admin-modules",
     track: "admin",
-    title: "Modules",
+    title: FEATURES_NAME,
     summary: "Which features the firm has switched on.",
     requires: { nav: ["settings"], admin: true },
     steps: [
@@ -506,8 +507,8 @@ const FLOWS: readonly CatalogFlow[] = [
         path: "/dashboard/settings/modules/",
         target: "modules-head",
         side: "bottom",
-        title: "Modules",
-        body: "Some sections only exist for a firm that has their module on. A section whose module is off does not appear in the rail.",
+        title: FEATURES_NAME,
+        body: "Some sections only exist for a firm that has that feature switched on. A section whose feature is off does not appear in the left menu.",
       },
     ],
   },

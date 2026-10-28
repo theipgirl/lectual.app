@@ -19,6 +19,7 @@ import { ModeBadge, StatusPill } from "@/components/integrations/StatusPill";
 import { stateForStatus, type IntegrationState } from "@/components/integrations/states";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { LAWPAY_NOT_ISSUED } from "@/lib/ui/words";
 
 export const metadata: Metadata = { title: pageTitle("Integrations") };
 
@@ -61,7 +62,7 @@ function ConnectButton(props: {
     <span
       className="lx-btn lx-btn-sec lx-btn-sm"
       aria-disabled="true"
-      title={`${PROVIDER_LABEL[props.provider]} isn't set up on this deployment yet`}
+      title={`${PROVIDER_LABEL[props.provider]} isn't switched on yet. Lectual is setting it up.`}
       style={{ opacity: 0.5, cursor: "not-allowed" }}
     >
       {inner}
@@ -203,14 +204,12 @@ export default async function IntegrationsPage({
       )}
       {!list.ok && (
         <div role="alert" className="lx-banner lx-banner-risk">
-          We couldn&apos;t load your mailbox connections, so this list may be incomplete. Try again
-          shortly.
+          We couldn&apos;t load your mailbox connections, so this list may be incomplete. Refresh to try again.
         </div>
       )}
       {nothingConfigured && (
         <div className="lx-banner lx-banner-mute">
-          Mailbox connections aren&apos;t set up on this deployment yet. An administrator needs to
-          add the Google and Microsoft sign-in credentials.
+          Connecting a mailbox isn&apos;t switched on yet. Lectual is setting it up.
         </div>
       )}
 
@@ -236,7 +235,7 @@ export default async function IntegrationsPage({
                 <span aria-hidden="true">↗</span> Connect {PROVIDER_LABEL[p]}
               </a>
             ) : (
-              <span key={p} className={`lx-btn ${p === "google" ? "lx-btn-cream" : "lx-btn-glass"}`} aria-disabled="true" title={`${PROVIDER_LABEL[p]} isn't set up on this deployment yet`} style={{ opacity: 0.55, cursor: "not-allowed" }}>
+              <span key={p} className={`lx-btn ${p === "google" ? "lx-btn-cream" : "lx-btn-glass"}`} aria-disabled="true" title={`${PROVIDER_LABEL[p]} isn't switched on yet. Lectual is setting it up.`} style={{ opacity: 0.55, cursor: "not-allowed" }}>
                 {PROVIDER_LABEL[p]} · not set up yet
               </span>
             ),
@@ -284,7 +283,7 @@ export default async function IntegrationsPage({
                   ? "LawPay stopped accepting your firm's connection. Reconnect to take card payments again."
                   : lawpayReady
                     ? "Sign in to your firm's LawPay account so clients can pay the amount due at signing by card."
-                    : "Not available yet — Lectual's LawPay sign-in isn't set up on this deployment. Payments can be recorded by hand on each quote."
+                    : LAWPAY_NOT_ISSUED
           }
         >
           <Link href="/dashboard/settings/integrations/lawpay/" className={`lx-btn ${lp?.status === "active" || !lawpayReady ? "lx-btn-sec" : "lx-btn-pri"}`}>

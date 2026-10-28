@@ -1,4 +1,5 @@
 import { zonedParts } from "@/lib/calendar/grid";
+import { MOVED_AUTOMATICALLY } from "@/lib/ui/words";
 import type { MoveEvidence } from "./signals";
 
 /**
@@ -87,7 +88,7 @@ export function reasonText(evidence: MoveEvidence | null, timeZone: string = DEF
 
 /** The tooltip on the chip: the evidence and nothing else. */
 export function evidenceTooltip(evidence: MoveEvidence | null, timeZone: string = DEFAULT_ZONE): string {
-  if (!evidence) return "Moved by the Stage Keeper.";
+  if (!evidence) return `${MOVED_AUTOMATICALLY}.`;
   if (evidence.kind === "mail") {
     const day = monthDay(evidence.at, timeZone);
     return `Evidence: ${MAIL_NOUN[evidence.type] ?? "email"} sent${day ? ` ${day}` : ""}.`;

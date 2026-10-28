@@ -204,12 +204,12 @@ export function buildNeedsYou(input: NeedsYouInput): NeedsYou {
     items.push({
       key: "queue-unreachable",
       kind: "queue-unreachable",
-      action: "We couldn't reach the approval queue. Drafts may be waiting",
-      subject: "Approval queue",
-      detail: "This is not an empty queue. Check again shortly.",
+      action: "We couldn't reach your approvals. Drafts may be waiting.",
+      subject: "Approvals",
+      detail: "Refresh to try again.",
       forYou: false,
       href: "/dashboard/queue/",
-      cta: "Open Queue",
+      cta: "Open Approvals",
       tone: "risk",
       score: 900,
     });
@@ -275,19 +275,19 @@ export function buildNeedsYou(input: NeedsYouInput): NeedsYou {
   }
 
   // ── Agents that couldn't finish ──────────────────────────────────────────
-  if (input.agentFailures === null) unavailable.push("agent runs");
+  if (input.agentFailures === null) unavailable.push("assistant runs");
   else {
     for (const f of input.agentFailures) {
       items.push({
         key: `af-${f.agent}`,
         kind: "agent-failed",
-        action: `Agent couldn't finish. ${f.action.label}`,
+        action: `An assistant couldn't finish. ${f.action.label}`,
         subject: f.name,
         detail: f.reason,
         forYou: false,
         // A failure with no firm-side fix has no link of its own: Today points at the Agents page.
         href: f.action.href ?? "/dashboard/agents/",
-        cta: f.action.href ? f.action.label : "See Agents",
+        cta: f.action.href ? f.action.label : "See what happened",
         tone: "risk",
         score: 700,
       });

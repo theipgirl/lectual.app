@@ -127,10 +127,10 @@ export default async function QuotesPage({ searchParams }: { searchParams: Promi
       {load.status === "unconfigured" ? (
         <div className="lx-card lx-empty-card">
           <h2 className="lx-h2" style={{ fontSize: 25 }}>
-            Quotes aren&apos;t set up in this environment
+            Quotes aren&apos;t switched on for your firm yet
           </h2>
           <p className="lx-note" style={{ margin: 0 }}>
-            The quote tables (lectual migration 0068) are not in this database. Nothing is broken — it needs the migration.
+            Lectual will turn them on. Nothing is broken.
           </p>
         </div>
       ) : load.status === "unavailable" ? (
@@ -139,7 +139,7 @@ export default async function QuotesPage({ searchParams }: { searchParams: Promi
             Quotes couldn&apos;t be loaded
           </h2>
           <p className="lx-note" style={{ margin: 0 }}>
-            This is a problem reaching the database, not an empty list. Try again shortly.
+            Can&apos;t show this right now. Refresh to try again.
           </p>
         </div>
       ) : rows.length === 0 ? (

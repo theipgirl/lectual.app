@@ -1,5 +1,6 @@
 import type { OrgModule } from "@/lib/org/modules";
 import { hasRole, type Role } from "@/lib/auth/roles";
+import { AI_TOOLS_GROUP, APPROVALS_NAME, ASSISTANTS_NAME, COPILOT_NAME, FIRM_NOTES_NAME, LEADS_GROUP, LEADS_NAME, SHORTCUTS_NAME } from "@/lib/ui/words";
 
 /**
  * Sections of the workspace. One flat list of PAGES, read by the rail and the
@@ -11,7 +12,7 @@ import { hasRole, type Role } from "@/lib/auth/roles";
 export type NavItem = {
   slug: string;
   label: string;
-  /** Shorter name when shown under its parent in the rail ("PNC" under Intake). */
+  /** Shorter name when shown under its parent in the rail ("Leads" under the Leads group). */
   railLabel?: string;
   href: string;
   /** SVG path data, drawn at 24×24 with a 1.5 stroke (design/Rail.dc.html). */
@@ -54,13 +55,13 @@ export const ICON = {
 export const NAV: readonly NavItem[] = [
   { slug: "", label: "Today", href: "/dashboard/", icon: ICON.clock, step: 6 },
   { slug: "mail", label: "My Mail", href: "/dashboard/mail/", icon: ICON.env, module: "mailbox", step: 4 },
-  { slug: "queue", label: "Queue", href: "/dashboard/queue/", icon: ICON.tray, step: 6 },
+  { slug: "queue", label: APPROVALS_NAME, href: "/dashboard/queue/", icon: ICON.tray, step: 6 },
   { slug: "campaigns", label: "Campaigns", href: "/dashboard/campaigns/", icon: ICON.send, step: 6 },
   { slug: "sms", label: "SMS", href: "/dashboard/sms/", icon: ICON.sms, step: 7, built: false },
   // No module: each firm imports only from the Fathom / Zoom account it connected itself (lectual 0081).
   { slug: "meetings", label: "Meetings", href: "/dashboard/meetings/", icon: ICON.video, step: 7 },
   { slug: "calendar", label: "Calendar", href: "/dashboard/calendar/", icon: ICON.cal, step: 6 },
-  { slug: "intake", label: "Intake", railLabel: "PNC", href: "/dashboard/intake/", also: ["/dashboard/leads/"], icon: ICON.users, step: 6 },
+  { slug: "intake", label: LEADS_NAME, railLabel: LEADS_NAME, href: "/dashboard/intake/", also: ["/dashboard/leads/"], icon: ICON.users, step: 6 },
   { slug: "forms", label: "Intake forms", railLabel: "Forms", href: "/dashboard/forms/", icon: ICON.file, step: 7 },
   { slug: "quotes", label: "Quotes & proposals", href: "/dashboard/quotes/", icon: ICON.file, step: 7 },
   // The client trademark proposal (brand names x marks x classes, a named approver, a /p/<token> page). Opt-in per firm.
@@ -70,10 +71,10 @@ export const NAV: readonly NavItem[] = [
   { slug: "matters", label: "Matters", railLabel: "All matters", href: "/dashboard/matters/", icon: ICON.case, step: 6 },
   { slug: "documents", label: "Documents", href: "/dashboard/documents/", icon: ICON.file, step: 6 },
   { slug: "portals", label: "Client portals", href: "/dashboard/portals/", icon: ICON.users, step: 6, built: false },
-  { slug: "copilot", label: "AI copilot", href: "/dashboard/copilot/", icon: ICON.spark, step: 7 },
-  { slug: "agents", label: "Agents", href: "/dashboard/agents/", icon: ICON.bolt, module: "agents", step: 5 },
-  { slug: "skills", label: "Skills", href: "/dashboard/skills/", icon: ICON.cycle, module: "agent-toolkit", step: 7 },
-  { slug: "brain", label: "Firm brain", href: "/dashboard/brain/", icon: ICON.globe, step: 7 },
+  { slug: "copilot", label: COPILOT_NAME, href: "/dashboard/copilot/", icon: ICON.spark, step: 7 },
+  { slug: "agents", label: ASSISTANTS_NAME, href: "/dashboard/agents/", icon: ICON.bolt, module: "agents", step: 5 },
+  { slug: "skills", label: SHORTCUTS_NAME, href: "/dashboard/skills/", icon: ICON.cycle, module: "agent-toolkit", step: 7 },
+  { slug: "brain", label: FIRM_NOTES_NAME, href: "/dashboard/brain/", icon: ICON.globe, step: 7 },
   { slug: "settings", label: "Settings", href: "/dashboard/settings/", icon: ICON.sliders, step: 3 },
 ];
 
@@ -103,12 +104,12 @@ export const RAIL_TREE: readonly (readonly RailNode[])[] = [
     { slug: "calendar" },
   ],
   [
-    { label: "Intake", icon: ICON.tray, report: "intake", link: "intake", kids: ["intake", "forms"] },
+    { label: LEADS_GROUP, icon: ICON.tray, report: "intake", link: "intake", kids: ["intake", "forms"] },
     { slug: "quotes" },
     { slug: "proposals" },
     { label: "Active matters", icon: ICON.case, report: "matters", link: "matters", kids: ["matters", "pipeline", "documents", "portals"] },
   ],
-  [{ label: "IP.OS", icon: ICON.shield, report: "ipos", kids: ["copilot", "agents", "skills", "brain"] }],
+  [{ label: AI_TOOLS_GROUP, icon: ICON.shield, report: "ipos", kids: ["copilot", "agents", "skills", "brain"] }],
 ];
 
 /**
@@ -118,9 +119,9 @@ export const RAIL_TREE: readonly (readonly RailNode[])[] = [
  */
 export const REPORTS = {
   communication: { label: "Communication", href: "/dashboard/reports/communication/" },
-  intake: { label: "Intake", href: "/dashboard/reports/intake/" },
+  intake: { label: LEADS_GROUP, href: "/dashboard/reports/intake/" },
   matters: { label: "Active matters", href: "/dashboard/reports/matters/" },
-  ipos: { label: "IP.OS", href: "/dashboard/reports/ipos/" },
+  ipos: { label: AI_TOOLS_GROUP, href: "/dashboard/reports/ipos/" },
 } as const;
 export type ReportKey = keyof typeof REPORTS;
 

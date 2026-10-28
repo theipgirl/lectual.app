@@ -175,7 +175,7 @@ export function firmClock(iso: string, now: Date, tz: string): string {
 
 /**
  * The one-line state beside the Pause/Resume control:
- *   "Autopilot on · last run 6:02 AM"
+ *   "Assistants on · last run 6:02 AM"
  *   "Paused by Dana Ruiz at 9:14 AM"
  */
 export function autopilotStateLine(
@@ -186,5 +186,5 @@ export function autopilotStateLine(
     const who = opts.pausedByName ? `Paused by ${opts.pausedByName}` : "Paused";
     return state.pausedAt ? `${who} at ${firmClock(state.pausedAt, opts.now, opts.tz)}` : who;
   }
-  return opts.lastRunAt ? `Autopilot on · last run ${firmClock(opts.lastRunAt, opts.now, opts.tz)}` : "Autopilot on · no runs yet";
+  return opts.lastRunAt ? `Assistants on · last run ${firmClock(opts.lastRunAt, opts.now, opts.tz)}` : "Assistants on · no runs yet";
 }

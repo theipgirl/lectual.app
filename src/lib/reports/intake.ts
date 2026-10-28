@@ -1,4 +1,5 @@
 import "server-only";
+import { LEADS_NAME } from "@/lib/ui/words";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { listLeads, listStages } from "@/lib/pipeline";
 import { listIntakeLeads } from "@/lib/intake/leads";
@@ -49,7 +50,7 @@ export async function loadIntakeReport(period: ReportPeriod): Promise<IntakeRepo
       ? { label: "Intake completions", value: submissions.rows.filter((r) => isInPeriod(r.submitted_at, period)).length, sub: "from the public intake form" }
       : unavailableMetric(
           "Intake completions",
-          submissions.status === "missing" ? "The intake-form tables aren't in this environment yet" : "Couldn't be read just now",
+          submissions.status === "missing" ? "Intake forms aren't switched on for your firm yet" : "Couldn't be read just now",
         );
 
   // --- Hired this period: leads whose CURRENT stage is a 'won' stage, --------
@@ -69,8 +70,8 @@ export async function loadIntakeReport(period: ReportPeriod): Promise<IntakeRepo
   // --- Waiting on us, right now (a backlog snapshot, not a period figure) ---
   const waitingLeads = pnc ? pnc.filter(isWaitingOnUs) : null;
   const waitingCount: Metric = waitingLeads
-    ? { label: "Waiting on us", value: waitingLeads.length, sub: "open PNCs we haven't answered" }
-    : unavailableMetric("Waiting on us", "PNC leads couldn't be loaded");
+    ? { label: "Waiting on us", value: waitingLeads.length, sub: "open leads we haven't answered" }
+    : unavailableMetric("Waiting on us", "Leads couldn't be loaded");
 
   const waiting: WaitingItem[] = waitingLeads
     ? oldestFirst(waitingLeads, waitingSince, 5).map((l) => ({
@@ -83,7 +84,7 @@ export async function loadIntakeReport(period: ReportPeriod): Promise<IntakeRepo
     : [];
 
   const links: LinkTile[] = [
-    { label: "PNC", sub: "Every potential client not yet signed", href: "/dashboard/intake/", count: pnc ? pnc.length : null },
+    { label: LEADS_NAME, sub: "Every potential client not yet signed", href: "/dashboard/intake/", count: pnc ? pnc.length : null },
     { label: "Intake forms", sub: "Public intake and custom forms", href: "/dashboard/forms/", count: null },
     {
       label: "Quotes & proposals",

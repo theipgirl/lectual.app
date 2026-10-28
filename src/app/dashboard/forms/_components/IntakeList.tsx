@@ -114,7 +114,7 @@ export function IntakeList({
       )}
       {statsFailed && (
         <div role="status" className="lx-banner lx-banner-warn" style={{ fontSize: 14 }}>
-          The numbers couldn&apos;t be loaded just now. This is a problem reaching the database, not empty intakes.
+          The numbers couldn&apos;t be loaded just now. Refresh to try again.
         </div>
       )}
 

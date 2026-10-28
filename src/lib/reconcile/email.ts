@@ -52,12 +52,12 @@ export function agentEvidenceFor(rows: readonly ActivityRow[]): AgentEvidence[] 
   for (const move of currentAgentMoves(rows, new Date(), Number.POSITIVE_INFINITY).values()) {
     if (!move.toStageId) continue;
     const evidenceDate = evidenceOwnDate(move.evidence);
-    out.push({ stageId: move.toStageId, wording: `Stage Keeper: ${label(move.signal)}`, date: evidenceDate ?? move.at });
+    out.push({ stageId: move.toStageId, wording: `Automatic move: ${label(move.signal)}`, date: evidenceDate ?? move.at });
   }
   for (const s of pendingStageSuggestions(rows)) {
     if (!s.toStageId) continue;
     const evidenceDate = evidenceOwnDate(s.evidence);
-    out.push({ stageId: s.toStageId, wording: `Stage Keeper suggests: ${label(s.signal)}`, date: evidenceDate ?? s.at });
+    out.push({ stageId: s.toStageId, wording: `Automatic move suggested: ${label(s.signal)}`, date: evidenceDate ?? s.at });
   }
   return out;
 }

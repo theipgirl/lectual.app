@@ -128,7 +128,7 @@ export async function setLane(leadId: string, lane: Lane | null): Promise<Lead> 
       to: lane,
       suggested: suggestedLane(before.ai_summary),
       by,
-      summary: lane ? `Lane set to ${lane}` : "Lane cleared",
+      summary: lane ? `Temperature set to ${lane}` : "Temperature cleared",
     },
   });
 
