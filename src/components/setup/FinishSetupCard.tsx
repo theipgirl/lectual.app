@@ -23,7 +23,8 @@ export async function FinishSetupCard({ role }: { role: string | null | undefine
   }
   if (checklist.complete) return null;
 
-  const next = checklist.items.find((i) => i.status !== "done");
+  // A step only Lectual can switch on is never "next" for the firm.
+  const next = checklist.items.find((i) => i.status !== "done" && !(i.owner === "lectual" && i.status === "to-do"));
   const unchecked = checklist.items.filter((i) => i.status === "couldnt-check").length;
   return (
     <section className="lx-card su-card" aria-labelledby="finish-setup-h">

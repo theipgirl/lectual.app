@@ -7,19 +7,9 @@ import {
   setMemberRoleAction,
   type MemberActionState,
 } from "@/app/dashboard/settings/team/actions";
+import { ROLE_LABEL } from "@/lib/auth/roles";
 
-export const ROLE_LABEL: Record<string, string> = {
-  owner: "Owner",
-  admin: "Admin",
-  senior_admin: "Senior admin",
-  attorney: "Attorney",
-  intake: "Intake",
-  paralegal: "Paralegal",
-  law_clerk: "Law clerk",
-  social_media: "Social media",
-  clerk: "Clerk",
-  viewer: "Viewer",
-};
+export { ROLE_LABEL };
 
 function Msg({ state }: { state: MemberActionState }) {
   if (state.error) return <span role="alert" className="lx-note" style={{ color: "var(--wine)" }}>{state.error}</span>;

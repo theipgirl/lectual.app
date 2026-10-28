@@ -593,6 +593,19 @@ export function hubTracks(ctx: HubContext): HubTrack[] {
   return HUB_TRACKS.map((t) => ({ ...t, flows: flows.filter((f) => f.track === t.id) })).filter((t) => t.flows.length > 0);
 }
 
+/**
+ * The one guide the hub points a person at first: the first flow not yet done, taking tracks in
+ * their order (so the first visible track's first undone flow, until that track is finished).
+ * `null` when every visible flow is done. It only chooses what to emphasise; it hides nothing.
+ */
+export function recommendedFlow(tracks: readonly HubTrack[], done: readonly string[]): HubFlow | null {
+  for (const track of tracks) {
+    const flow = track.flows.find((f) => !done.includes(f.id));
+    if (flow) return flow;
+  }
+  return null;
+}
+
 export function visibleFlows(ctx: HubContext): HubFlow[] {
   return hubTracks(ctx).flatMap((t) => t.flows);
 }

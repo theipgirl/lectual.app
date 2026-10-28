@@ -66,7 +66,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
         </div>
       ) : (
         <div className="lx-card" style={{ overflow: "auto" }}>
-          <table className="lx-tbl">
+          <table className="lx-tbl lx-stack">
             <thead>
               <tr>
                 <th>Draft</th>
@@ -92,12 +92,12 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
                       {typeLabel(item.type)} · {preview(item, 90)}
                     </div>
                   </td>
-                  <td>{item.client_name ?? "—"}</td>
-                  <td>{agentLabel(item.agent)}</td>
-                  <td>
+                  <td data-label="Client">{item.client_name ?? "—"}</td>
+                  <td data-label="From">{agentLabel(item.agent)}</td>
+                  <td data-label="Status">
                     <span className={`lx-pill ${STATUS_PILL[item.status].tone}`}>{STATUS_PILL[item.status].label}</span>
                   </td>
-                  <td className="lx-num">{fmtWhen(item.created_at, tz)}</td>
+                  <td className="lx-num" data-label="Queued">{fmtWhen(item.created_at, tz)}</td>
                 </tr>
               ))}
             </tbody>

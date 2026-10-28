@@ -22,6 +22,8 @@ function readers(over: Partial<SetupReaders> = {}): SetupReaders {
     listIntakeForms: async () => ({ status: "ok", value: [{ status: "live" }] }),
     listServiceItems: async () => [{ active: true, kind: "legal_fee" }],
     aiConfigured: () => true,
+    lawpayAppConfigured: () => true,
+    zoomAppConfigured: () => true,
     ...over,
   };
 }
@@ -81,9 +83,11 @@ describe("a failing reader is isolated to its own reading", () => {
     listIntakeForms: "intakeForms",
     listServiceItems: "services",
     aiConfigured: "aiConfigured",
+    lawpayAppConfigured: "lectual",
+    zoomAppConfigured: "lectual",
   };
 
-  it.each(KEYS.filter((k) => k !== "aiConfigured"))("%s throwing gives 'could not be read' for that item only, and the loader does not throw", async (key) => {
+  it.each(KEYS.filter((k) => !["aiConfigured", "lawpayAppConfigured", "zoomAppConfigured"].includes(k)))("%s throwing gives 'could not be read' for that item only, and the loader does not throw", async (key) => {
     const state = await buildSetupState(readers(THROWS[key]));
     const expected = { ...ALL_DONE, [STATE_KEY[key]]: { ok: false } };
     expect(state).toEqual(expected);
@@ -117,7 +121,7 @@ describe("a failing reader is isolated to its own reading", () => {
   });
 
   it("every reader failing at once still returns a state, and none of the ten items is done but AI", async () => {
-    const all = Object.fromEntries(KEYS.filter((k) => k !== "aiConfigured").map((k) => [k, () => Promise.reject(new Error(SECRET))]));
+    const all = Object.fromEntries(KEYS.filter((k) => !["aiConfigured", "lawpayAppConfigured", "zoomAppConfigured"].includes(k)).map((k) => [k, () => Promise.reject(new Error(SECRET))]));
     const state = await buildSetupState(readers(all));
     const c = setupChecklist(state);
     expect(c.items.filter((i) => i.status === "done").map((i) => i.id)).toEqual(["ai"]);
@@ -127,7 +131,7 @@ describe("a failing reader is isolated to its own reading", () => {
   });
 
   it("the rendered why-lines never carry the error text", async () => {
-    const all = Object.fromEntries(KEYS.filter((k) => k !== "aiConfigured").map((k) => [k, () => Promise.reject(new Error(SECRET))]));
+    const all = Object.fromEntries(KEYS.filter((k) => !["aiConfigured", "lawpayAppConfigured", "zoomAppConfigured"].includes(k)).map((k) => [k, () => Promise.reject(new Error(SECRET))]));
     const c = setupChecklist(await buildSetupState(readers(all)));
     expect(JSON.stringify(c)).not.toMatch(/org_9f3a1c77|violates|crm_org_profile_pkey/);
   });

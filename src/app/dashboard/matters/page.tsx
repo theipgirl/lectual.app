@@ -18,6 +18,8 @@ import {
 } from "@/lib/matters/worklist";
 import { ViewToggle } from "@/components/ViewToggle";
 import { ListHeader } from "@/components/list-page/ListHeader";
+import { SectionTabs } from "@/components/shell/SectionTabs";
+import { REPORTS } from "@/lib/nav";
 import { ListToolbar } from "@/components/list-page/ListToolbar";
 import { Chip, FilterChips } from "@/components/list-page/Chips";
 import "@/components/list-page/list-page.css";
@@ -95,6 +97,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
   return (
     <div className="lp-root">
       <ListHeader title="Matters" tour="matters-head" sub="Every engaged matter, grouped by whose move it is. Longest in its stage first." />
+      <SectionTabs active="list" listLabel="Matters" listHref="/dashboard/matters/" summaryHref={REPORTS.matters.href} />
 
       <ListToolbar
         search={{
@@ -159,7 +162,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
               </span>
             </header>
             <div style={{ overflow: "auto" }}>
-              <table className="lx-tbl">
+              <table className="lx-tbl lx-stack">
                 <colgroup>
                   <col style={{ width: "32%" }} />
                   <col style={{ width: "12%" }} />
@@ -193,13 +196,13 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
                             {reviewIds.has(m.id) && <span className="lp-pill lp-pill-warn" style={{ marginLeft: 6 }}>Review</span>}
                           </div>
                         </td>
-                        <td>{MATTER_TYPE_LABEL[m.type]}</td>
-                        <td>{m.stage ? <span className="lp-pill">{`${m.stage.code}. ${m.stage.label}`}</span> : <span className="lx-note">—</span>}</td>
-                        <td className="lx-num">
+                        <td data-label="Type">{MATTER_TYPE_LABEL[m.type]}</td>
+                        <td data-label="Stage">{m.stage ? <span className="lp-pill">{`${m.stage.code}. ${m.stage.label}`}</span> : <span className="lx-note">—</span>}</td>
+                        <td className="lx-num" data-label="In stage">
                           {age.days === null ? "—" : age.stale ? <span className="lp-pill lp-pill-risk">{age.days}d</span> : `${age.days}d`}
                         </td>
-                        <td>{m.assigned_to ? memberName.get(m.assigned_to) ?? "Teammate" : <span className="lx-note">Unassigned</span>}</td>
-                        <td>{matterStatusLabel(m.status)}</td>
+                        <td data-label="Owner">{m.assigned_to ? memberName.get(m.assigned_to) ?? "Teammate" : <span className="lx-note">Unassigned</span>}</td>
+                        <td data-label="Status">{matterStatusLabel(m.status)}</td>
                       </tr>
                     );
                   })}

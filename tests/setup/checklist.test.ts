@@ -11,7 +11,7 @@ const item = (state: SetupState, id: SetupItemId) => setupChecklist(state).items
 const statuses = (state: SetupState) => Object.fromEntries(setupChecklist(state).items.map((i) => [i.id, i.status]));
 
 describe("shape", () => {
-  it("is exactly ten items in the contract's order, total 10", () => {
+  it("is exactly ten items in the contract's order, total 10 when none is Lectual's to do", () => {
     for (const state of [NOTHING_DONE, ALL_DONE]) {
       const c = setupChecklist(state);
       expect(c.items.map((i) => i.id)).toEqual([...ITEM_IDS]);
@@ -27,15 +27,16 @@ describe("shape", () => {
         "Packages saved",
         "AI configured",
       ]);
-      expect(c.total).toBe(10);
+      // NOTHING_DONE has no AI key: that one item is Lectual's and is left out of the count.
+      expect(c.total).toBe(state === ALL_DONE ? 10 : 9);
     }
   });
 
   it("counts done items, and is complete only when all ten are done", () => {
     expect(setupChecklist(NOTHING_DONE)).toMatchObject({ doneCount: 0, complete: false });
     expect(setupChecklist(ALL_DONE)).toMatchObject({ doneCount: 10, complete: true });
-    const nine = setupChecklist({ ...ALL_DONE, aiConfigured: false });
-    expect(nine).toMatchObject({ doneCount: 9, complete: false });
+    const nine = setupChecklist({ ...ALL_DONE, lawmatics: ok(null) });
+    expect(nine).toMatchObject({ doneCount: 9, total: 10, complete: false });
   });
 
   it("is pure: the same input gives the same output twice, and the input is not changed", () => {

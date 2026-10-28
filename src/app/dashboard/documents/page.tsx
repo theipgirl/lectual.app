@@ -80,7 +80,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
         </div>
       ) : (
         <div className="lx-card" style={{ overflow: "auto" }}>
-          <table className="lx-tbl" style={{ minWidth: 720 }}>
+          <table className="lx-tbl lx-stack">
             <thead>
               <tr>
                 <th>Document</th>
@@ -105,7 +105,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
                         </div>
                       </div>
                     </td>
-                    <td>
+                    <td data-label="Matter">
                       {m ? (
                         <Link href={`/dashboard/matters/${m.id}/`}>{matterDisplayTitle(m).title}</Link>
                       ) : (
@@ -113,11 +113,11 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
                       )}
                       {m && <div className="lx-note lx-num">{m.matter_number}{m.owner_name ? ` · ${m.owner_name}` : ""}</div>}
                     </td>
-                    <td>
+                    <td data-label="Status">
                       <span className={`lx-pill ${st.tone}`}>{st.label}</span>
                     </td>
-                    <td className="lx-num">{relativeTime(d.updated_at)}</td>
-                    <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                    <td className="lx-num" data-label="Updated">{relativeTime(d.updated_at)}</td>
+                    <td className="lx-stack-actions" data-label="Actions" style={{ textAlign: "right", whiteSpace: "nowrap" }}>
                       {d.status === "queued" && d.queue_item_id && (
                         <Link href={`/dashboard/queue/${d.queue_item_id}/`} className="lx-btn lx-btn-sec lx-btn-sm">
                           Review

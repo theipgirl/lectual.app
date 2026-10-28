@@ -121,7 +121,7 @@ describe("Quotes & proposals page", () => {
       const heads = [...html.slice(html.indexOf("<thead")).matchAll(/<th[^>]*>([^<]*)<\/th>/g)].map((m) => m[1]).slice(0, 9);
       expect(heads).toEqual(["Proposal", "Client", "Status", "Accepted", "Paid", "At signing", "At filing", "Expires", "Last activity"]);
       const row = rowOf(html, "Client s1<");
-      expect([...row.matchAll(/<td class="pq-money[^"]*">([^<]*)<\/td>/g)].map((m) => m[1])).toEqual(["$4,950.00", "$700.00"]);
+      expect([...row.matchAll(/<td class="pq-money[^"]*"[^>]*>([^<]*)<\/td>/g)].map((m) => m[1])).toEqual(["$4,950.00", "$700.00"]);
       expect(html.toLowerCase()).not.toContain("total");
       expect(html).not.toContain("$5,650.00");
     });
@@ -170,7 +170,7 @@ describe("Quotes & proposals page", () => {
     it("a failed events read still renders every Last activity cell, with a derived line", async () => {
       const html = await go({}, { events: "fail" });
       expect(html).toContain('class="wrap pq-activity pq-c-activity"');
-      for (const id of ["a1", "a2", "s1"]) expect(rowOf(html, `Client ${id}<`)).toMatch(/pq-c-activity">Updated 1d ago</);
+      for (const id of ["a1", "a2", "s1"]) expect(rowOf(html, `Client ${id}<`)).toMatch(/pq-c-activity"[^>]*>Updated 1d ago</);
       expect(rowOf(html, "Client e1<")).toContain("Stored status still says sent");
       expect(rowOf(html, "Client b1<")).toContain("Add the pay link before creating the link.");
       expect(html).not.toContain('pq-activity"><');

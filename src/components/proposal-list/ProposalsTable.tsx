@@ -16,7 +16,7 @@ export function ProposalsTable({ rows, footerLeft, footerRight }: { rows: Propos
   return (
     <div className="lx-card pq-table-card">
       <div className="pq-table-scroll">
-        <table className="lx-tbl pq-tbl">
+        <table className="lx-tbl pq-tbl lx-stack">
           <thead>
             <tr>
               <th>Proposal</th>
@@ -44,16 +44,16 @@ export function ProposalsTable({ rows, footerLeft, footerRight }: { rows: Propos
                   <span className={`lx-pill lx-pill-${r.statusTone}`}>{r.statusLabel}</span>
                   {r.statusSub && <div className="pq-mono pq-sub">{r.statusSub}</div>}
                 </td>
-                <td className="pq-c-accepted" data-accepted={r.accepted === "Not yet" ? "no" : "yes"}>
+                <td className="pq-c-accepted" data-label="Accepted" data-accepted={r.accepted === "Not yet" ? "no" : "yes"}>
                   {r.accepted}
                 </td>
-                <td className="wrap pq-c-paid">
+                <td className="wrap pq-c-paid" data-label="Paid">
                   <PaidCell proposalId={r.id} cell={r.paidCell} />
                 </td>
-                <td className="pq-money pq-c-signing">{formatCents(r.atSigningCents)}</td>
-                <td className="pq-money pq-filing pq-c-filing">{formatCents(r.atFilingCents)}</td>
-                <td className="pq-mono pq-expires pq-c-expires">{r.expires}</td>
-                <td className="wrap pq-activity pq-c-activity">{r.activity}</td>
+                <td className="pq-money pq-c-signing" data-label="At signing">{formatCents(r.atSigningCents)}</td>
+                <td className="pq-money pq-filing pq-c-filing" data-label="At filing">{formatCents(r.atFilingCents)}</td>
+                <td className="pq-mono pq-expires pq-c-expires" data-label="Expires">{r.expires}</td>
+                <td className="wrap pq-activity pq-c-activity" data-label="Last activity">{r.activity}</td>
               </tr>
             ))}
           </tbody>

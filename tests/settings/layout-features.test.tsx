@@ -8,6 +8,8 @@ describe("Settings tabs (Sprint 31: Modules is Features)", () => {
 
   it("the tab list says Features and Assistants, never Modules or Agents; the routes are unchanged", async () => {
     vi.doMock("@/lib/org/modules", () => ({ activeOrgModules: vi.fn(async () => ["agents", "proposals"]) }));
+    vi.doMock("@/lib/firm/session", () => ({ resolveFirmSession: vi.fn(async () => ({ kind: "ok", role: "viewer" })) }));
+    vi.doMock("@/lib/setup/load", () => ({ loadSetupState: vi.fn(async () => ({})) }));
     const { default: Layout } = await import("@/app/dashboard/settings/layout");
     const html = renderToStaticMarkup(await Layout({ children: null }));
     expect(html).toContain(">Features<");

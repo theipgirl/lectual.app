@@ -15,7 +15,7 @@ async function renderPage(session: Session, state: SetupState = ALL_DONE) {
   const loadSetupState = vi.fn(async () => state);
   vi.doMock("@/lib/firm/session", () => ({ resolveFirmSession: vi.fn(async () => session) }));
   vi.doMock("@/lib/setup/load", () => ({ loadSetupState }));
-  const { default: Page } = await import("../../src/app/dashboard/setup/page");
+  const { default: Page } = await import("../../src/app/dashboard/settings/setup/page");
   const html = renderToStaticMarkup(await Page());
   return { html: text(html), loadSetupState };
 }
@@ -31,7 +31,7 @@ const MIXED: SetupState = {
 
 /** Each <li> as { status, text }, in order. */
 function items(html: string) {
-  return [...html.matchAll(/<li class="su-item" data-item="([a-z]+)" data-status="([a-z-]+)">(.*?)<\/li>/g)].map((m) => ({ id: m[1], status: m[2], html: m[3] }));
+  return [...html.matchAll(/<li class="su-item" data-item="([a-z]+)" data-status="([a-z-]+)" data-owner="[a-z]+">(.*?)<\/li>/g)].map((m) => ({ id: m[1], status: m[2], html: m[3] }));
 }
 
 describe("the role gate", () => {
@@ -47,7 +47,7 @@ describe("the role gate", () => {
     const loadSetupState = vi.fn(async () => ALL_DONE);
     vi.doMock("@/lib/firm/session", () => ({ resolveFirmSession: vi.fn(async () => ({ kind: "ok", role })) }));
     vi.doMock("@/lib/setup/load", () => ({ loadSetupState }));
-    const { default: Page } = await import("../../src/app/dashboard/setup/page");
+    const { default: Page } = await import("../../src/app/dashboard/settings/setup/page");
     await expect(Page()).rejects.toThrow(NOT_FOUND);
     expect(loadSetupState).not.toHaveBeenCalled();
   });
@@ -60,7 +60,7 @@ describe("the role gate", () => {
   it("is dynamic", async () => {
     vi.doMock("@/lib/firm/session", () => ({ resolveFirmSession: vi.fn() }));
     vi.doMock("@/lib/setup/load", () => ({ loadSetupState: vi.fn() }));
-    expect((await import("../../src/app/dashboard/setup/page")).dynamic).toBe("force-dynamic");
+    expect((await import("../../src/app/dashboard/settings/setup/page")).dynamic).toBe("force-dynamic");
   });
 });
 
@@ -80,7 +80,7 @@ describe("rendering a mix of states", () => {
     const { html } = await renderPage({ kind: "ok", role: "admin" }, MIXED);
     const rows = items(html);
     const hrefs = Object.fromEntries(
-      rows.filter((r) => r.html.includes(">Set up<")).map((r) => [r.id, /href="([^"]+?)\/?"/.exec(r.html)![1] + "/"]),
+      rows.filter((r) => r.html.includes(">Set up<") || r.html.includes(">Check again<")).map((r) => [r.id, /href="([^"]+?)\/?"/.exec(r.html)![1] + "/"]),
     );
     expect(hrefs).toEqual({
       outlook: "/dashboard/settings/integrations/",
@@ -91,7 +91,13 @@ describe("rendering a mix of states", () => {
       intake: "/dashboard/forms/",
       packages: "/dashboard/settings/services/",
     });
-    for (const done of rows.filter((r) => r.status === "done")) expect(done.html).not.toContain("Set up");
+    for (const done of rows.filter((r) => r.status === "done")) {
+      expect(done.html).not.toContain(">Set up<");
+      expect(done.html).toContain(">Review<");
+    }
+    // Button labels follow the status (Sprint 32).
+    expect(rows.find((r) => r.id === "lawmatics")!.html).toContain(">Check again<");
+    expect(rows.find((r) => r.id === "outlook")!.html).toContain(">Set up<");
   });
 
   it("a couldn't-check item never reads as To do or Done, and says the check failed and not to treat it as to do", async () => {
@@ -114,22 +120,23 @@ describe("rendering a mix of states", () => {
 });
 
 describe("the complete and the all-unreadable pages", () => {
-  it("complete: 10 of 10, 'Everything is set up', the items stay listed, and no Set up links", async () => {
+  it("complete: 10 of 10, 'All set', the items stay listed, and no Set up links", async () => {
     const { html } = await renderPage({ kind: "ok", role: "senior_admin" }, ALL_DONE);
     expect(html).toContain("10 of 10 done");
-    expect(html).toContain("Everything is set up");
+    expect(html).toContain("All set. Next: try the");
+    expect(html).toMatch(/href="\/dashboard\/getting-started\/?"[^>]*>Getting started guides</);
     expect(items(html)).toHaveLength(10);
     expect(html).not.toContain(">Set up<");
     expect(items(html).every((r) => r.status === "done")).toBe(true);
   });
 
-  it("not complete: no 'Everything is set up'", async () => {
-    const { html } = await renderPage({ kind: "ok", role: "owner" }, { ...ALL_DONE, aiConfigured: false });
-    expect(html).not.toContain("Everything is set up");
+  it("not complete: no 'All set'", async () => {
+    const { html } = await renderPage({ kind: "ok", role: "owner" }, { ...ALL_DONE, lawmatics: ok(null) });
+    expect(html).not.toContain("All set");
     expect(html).toContain("9 of 10 done");
   });
 
-  it("every read failed: still ten items, none done except AI, never 'Everything is set up'", async () => {
+  it("every read failed: still ten items, none done except AI, never 'All set'", async () => {
     const allBad: SetupState = { profile: bad, members: bad, modules: bad, mailboxes: bad, lawmatics: bad, meetings: bad, lawpay: bad, agents: bad, intakeForms: bad, services: bad, aiConfigured: true };
     const { html } = await renderPage({ kind: "ok", role: "owner" }, allBad);
     const rows = items(html);
@@ -137,14 +144,15 @@ describe("the complete and the all-unreadable pages", () => {
     expect(rows.filter((r) => r.status === "done").map((r) => r.id)).toEqual(["ai"]);
     expect(rows.filter((r) => r.status === "couldnt-check")).toHaveLength(9);
     expect(html).toContain("1 of 10 done");
-    expect(html).not.toContain("Everything is set up");
+    expect(html).not.toContain("All set");
     expect(html).not.toContain(">To do<");
   });
 
   it("with the AI key unset and everything unreadable, nothing is done", async () => {
     const allBad: SetupState = { profile: bad, members: bad, modules: bad, mailboxes: bad, lawmatics: bad, meetings: bad, lawpay: bad, agents: bad, intakeForms: bad, services: bad, aiConfigured: false };
     const { html } = await renderPage({ kind: "ok", role: "owner" }, allBad);
-    expect(html).toContain("0 of 10 done");
+    // AI is Lectual's and not done, so it is left out of the count.
+    expect(html).toContain("0 of 9 done");
   });
 });
 

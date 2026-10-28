@@ -200,7 +200,9 @@
 /* table */
 .pq-table-card { overflow: hidden; display: flex; flex-direction: column; }
 .pq-table-scroll { overflow: auto; }
-.pq-tbl { min-width: 980px; }
+@media (min-width: 761px) {
+  .pq-tbl { min-width: 980px; }
+}
 .pq-tbl th { background: var(--well); }
 .pq-tbl td { height: 56px; vertical-align: middle; }
 .pq-tbl td.wrap { min-width: 0; }
@@ -265,6 +267,15 @@
   .pq-tbl td.pq-c-filing { grid-area: filing; text-align: left; }
   .pq-tbl td.pq-c-expires { grid-area: expires; }
   .pq-tbl td.pq-c-activity { grid-area: activity; }
+  .pq-tbl td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
 }
 
 /* ── New proposal: who it is for (Sprint 20) ──────────────── */

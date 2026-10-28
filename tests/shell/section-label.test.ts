@@ -44,7 +44,8 @@ describe("sectionLabelFor (F17)", () => {
 
   it("SectionLabel renders what sectionLabelFor returns", () => {
     const src = readFileSync(path.resolve(__dirname, "../../src/components/shell/SectionLabel.tsx"), "utf8");
-    expect(src).toContain("sectionLabelFor(usePathname())");
+    expect(src).toContain("sectionLabelFor(pathname)");
+    expect(src).toContain("usePathname()");
     expect(src).not.toContain("?? \"Today\"");
   });
 });

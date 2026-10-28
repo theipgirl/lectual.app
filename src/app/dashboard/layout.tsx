@@ -4,8 +4,9 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { loadActiveQueue } from "@/lib/queue/load";
-import { RAIL_PIN_COOKIE, visibleNav } from "@/lib/nav";
+import { RAIL_PIN_COOKIE, railIsPinned, visibleNav } from "@/lib/nav";
 import { Rail } from "@/components/shell/Rail";
+import { MobileBar } from "@/components/shell/MobileBar";
 import { loadRailCounts } from "@/lib/nav-counts";
 import { SectionLabel } from "@/components/shell/SectionLabel";
 import { AccountMenu } from "@/components/shell/AccountMenu";
@@ -51,7 +52,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     loadRailCounts().catch(() => ({})),
     cookies(),
   ]);
-  const railPinned = cookieStore.get(RAIL_PIN_COOKIE)?.value === "pinned";
+  const railPinned = railIsPinned(cookieStore.get(RAIL_PIN_COOKIE)?.value);
 
   return (
     <div className="lx-app">
@@ -78,7 +79,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <div className="lx-wordmark" title={org.name}>
           <FirmWordmark org={org} />
         </div>
-        <div className="lx-vr" />
         <SectionLabel />
         <div style={{ flex: 1 }} />
         <NotificationBell />
@@ -99,13 +99,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
           pendingCount={queue.items.length}
           counts={counts}
           initialPinned={railPinned}
-          initials={initialsOf(displayName)}
-          name={displayName}
         />
         <div className="lx-content">
           <div className="lx-page">{children}</div>
         </div>
       </div>
+      <MobileBar items={items} queueStatus={queue.status} pendingCount={queue.items.length} counts={counts} />
       <CopilotLauncher configured={aiConfigured()} />
       <FeedbackTrailRecorder />
       <FeedbackDialog />

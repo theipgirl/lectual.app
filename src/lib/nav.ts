@@ -84,12 +84,10 @@ export type RailNode =
   | {
       label: string;
       icon: string;
-      /** The section's report view (/dashboard/reports/<report>/), which the parent opens. */
+      /** The section's Summary view (/dashboard/reports/<report>/), a tab beside its list. */
       report: ReportKey;
-      /** Which child's page is the section's main list (drawn "open" with the parent). */
+      /** Which child's page is the section's main list: the parent opens it. Absent = the first visible child. */
       link?: string;
-      /** Whose count the parent shows (defaults to `link`). */
-      countFrom?: string;
       kids: readonly string[];
     };
 
@@ -100,7 +98,9 @@ export type RailNode =
 export const RAIL_TREE: readonly (readonly RailNode[])[] = [
   [
     { slug: "" },
-    { label: "Communication", icon: ICON.chat, report: "communication", countFrom: "queue", kids: ["mail", "meetings", "queue", "campaigns", "sms"] },
+    // Approvals is a daily destination, so it sits at the top level (Sprint 32).
+    { slug: "queue" },
+    { label: "Communication", icon: ICON.chat, report: "communication", kids: ["mail", "meetings", "campaigns", "sms"] },
     { slug: "calendar" },
   ],
   [
@@ -113,9 +113,10 @@ export const RAIL_TREE: readonly (readonly RailNode[])[] = [
 ];
 
 /**
- * Each parent section opens a REPORT view of itself (the prototype's
+ * Each parent section has a Summary view of itself (the prototype's
  * isReport pages): KPIs for the period, what is waiting on the firm, and a
- * link to each child with its count. There is no separate Reports section.
+ * link to each child with its count. It is a tab beside the section's list
+ * (`SectionTabs`), not what the rail row opens. There is no separate Reports section.
  */
 export const REPORTS = {
   communication: { label: "Communication", href: "/dashboard/reports/communication/" },
@@ -136,6 +137,14 @@ export function isReportKey(value: unknown): value is ReportKey {
  * "use client" module.
  */
 export const RAIL_PIN_COOKIE = "lx_rail";
+
+/**
+ * The rail is open unless the person collapsed it: a missing cookie (a new
+ * visitor) is open, and only an explicit "collapsed" closes it.
+ */
+export function railIsPinned(cookieValue: string | null | undefined): boolean {
+  return cookieValue !== "collapsed";
+}
 
 /** Whether `item` exists for a firm holding `modules`, viewed by `role`. Fails closed; an unbuilt section never exists. */
 export function navItemAllowed(item: NavItem, modules: readonly string[], role: Role): boolean {
@@ -176,8 +185,8 @@ export type RailEntry = {
 
 /**
  * RAIL_TREE resolved against what this firm and role may see. A parent with
- * no visible children disappears; a parent's count is its own page's count,
- * or its first counted child's.
+ * no visible children disappears; a parent opens its list child (or its first
+ * visible child) and shows that list's count.
  */
 export function railGroups(visible: readonly NavItem[], pathname: string): RailEntry[][] {
   const bySlug = new Map(visible.filter((item) => item.built !== false).map((item) => [item.slug, item]));
@@ -194,19 +203,111 @@ export function railGroups(visible: readonly NavItem[], pathname: string): RailE
       });
       if (kids.length === 0) return [];
       const report = REPORTS[node.report];
+      // The parent opens its list; with no list child of its own, its first visible child.
+      const listKid = (node.link && kids.find((k) => k.key === node.link)) || kids[0];
       const path = pathname.endsWith("/") ? pathname : `${pathname}/`;
       return [
         {
           key: node.label,
           label: node.label,
           icon: node.icon,
-          href: report.href,
+          href: listKid.href,
           active: path.startsWith(report.href),
           childActive: kids.some((k) => k.active),
-          countKey: node.countFrom ?? node.link ?? null,
+          countKey: node.link ?? null,
           kids,
         },
       ];
     }),
   ).filter((group) => group.length > 0);
+}
+
+/** The count a rail or bar item shows: the queue's three states, then section counts. Absent = nothing (never a false 0). */
+export function railCountFor(
+  key: string | null,
+  queueStatus: "ok" | "unconfigured" | "unavailable",
+  pendingCount: number,
+  counts: Partial<Record<string, number>>,
+): string | null {
+  if (!key) return null;
+  if (key === "queue") {
+    if (queueStatus === "unavailable") return "!";
+    return queueStatus === "ok" && pendingCount > 0 ? String(pendingCount > 99 ? "99+" : pendingCount) : null;
+  }
+  const n = counts[key];
+  return n === undefined || n === 0 ? null : String(n > 999 ? "999+" : n);
+}
+
+/** The phone bar's own buttons, in order; "More" follows them. */
+export const MOBILE_BAR = ["intake", "queue", "mail", "matters"] as const;
+
+/** Short names for the phone bar, where the rail's longer ones would not fit under an icon. */
+const MOBILE_LABEL: Record<string, string> = { intake: LEADS_NAME, queue: APPROVALS_NAME, mail: "Mail", matters: "Matters" };
+
+export type MobileBarItem = { slug: string; label: string; icon: string; href: string; active: boolean; countKey: string };
+
+/** The bar's buttons that exist for this firm and role. Mail drops out without the mailbox module. */
+export function mobileBarItems(visible: readonly NavItem[], pathname: string): MobileBarItem[] {
+  const bySlug = new Map(visible.filter((i) => i.built !== false).map((i) => [i.slug, i]));
+  return MOBILE_BAR.flatMap((slug) => {
+    const item = bySlug.get(slug);
+    return item ? [{ slug, label: MOBILE_LABEL[slug] ?? item.label, icon: item.icon, href: item.href, active: isNavActive(pathname, item), countKey: slug }] : [];
+  });
+}
+
+/** The More sheet, grouped as the rail groups its sections. Group labels are the rail's. */
+const MORE_GROUPS: readonly { label: string; slugs: readonly string[] }[] = [
+  { label: "Workspace", slugs: ["", "calendar"] },
+  { label: "Communication", slugs: ["meetings", "campaigns"] },
+  { label: LEADS_GROUP, slugs: ["forms", "quotes", "proposals"] },
+  { label: "Active matters", slugs: ["pipeline", "documents"] },
+  { label: AI_TOOLS_GROUP, slugs: ["copilot", "agents", "skills", "brain"] },
+  { label: "Firm", slugs: ["settings"] },
+];
+
+export type MoreSection = { label: string; items: { slug: string; label: string; href: string; active: boolean }[] };
+
+/** Everything the bar does not carry, filtered through the same visibility the rail uses (fails closed); empty groups vanish. */
+export function moreSections(visible: readonly NavItem[], pathname: string): MoreSection[] {
+  const bySlug = new Map(visible.filter((i) => i.built !== false).map((i) => [i.slug, i]));
+  return MORE_GROUPS.map((group) => ({
+    label: group.label,
+    items: group.slugs.flatMap((slug) => {
+      const item = bySlug.get(slug);
+      return item ? [{ slug, label: item.label, href: item.href, active: isNavActive(pathname, item) }] : [];
+    }),
+  })).filter((g) => g.items.length > 0);
+}
+
+/**
+ * Where a section's List tab goes, for the Summary page's List | Summary
+ * strip. Communication and AI tools have no list of their own, so the tab
+ * opens their first page (Mail when the firm has the mailbox module, else
+ * Meetings; Copilot), exactly as their rail parent row does.
+ */
+export function reportListHref(key: ReportKey, opts: { hasMailbox: boolean }): string {
+  switch (key) {
+    case "communication":
+      return opts.hasMailbox ? "/dashboard/mail/" : "/dashboard/meetings/";
+    case "intake":
+      return "/dashboard/intake/";
+    case "matters":
+      return "/dashboard/matters/";
+    case "ipos":
+      return "/dashboard/copilot/";
+  }
+}
+
+/** The name of a section's list tab: the page it opens. */
+export function reportListLabel(key: ReportKey, opts: { hasMailbox: boolean }): string {
+  switch (key) {
+    case "communication":
+      return opts.hasMailbox ? "Mail" : "Meetings";
+    case "intake":
+      return LEADS_NAME;
+    case "matters":
+      return "Matters";
+    case "ipos":
+      return COPILOT_NAME;
+  }
 }

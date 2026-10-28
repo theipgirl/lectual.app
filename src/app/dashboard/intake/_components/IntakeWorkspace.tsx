@@ -24,6 +24,8 @@ import { leadsSubline, topBarCounts } from "@/lib/intake/views";
 import { detailsNote } from "@/lib/intake/details-note";
 import type { IntakeTime } from "@/lib/time";
 import { ListHeader } from "@/components/list-page/ListHeader";
+import { SectionTabs } from "@/components/shell/SectionTabs";
+import { REPORTS } from "@/lib/nav";
 import { ListToolbar } from "@/components/list-page/ListToolbar";
 import { MoreMenu } from "@/components/list-page/MoreMenu";
 import { leadsMoreItems } from "@/lib/intake/more-items";
@@ -364,6 +366,7 @@ export default function IntakeWorkspace({
   return (
     <div className="lp-root">
       <ListHeader title={LEADS_NAME} sub={leadsSubline(counts, { board, group: viewState.group })} />
+      <SectionTabs active="list" listLabel={LEADS_NAME} listHref="/dashboard/intake/" summaryHref={REPORTS.intake.href} />
 
       <ListToolbar
         search={{

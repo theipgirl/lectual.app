@@ -263,7 +263,7 @@ describe("the table", () => {
 
   it("shows the legal fee and the USPTO fees as two separate cells, and never a sum or a 'total'", () => {
     const first = html.slice(html.indexOf("<tr", html.indexOf("<tbody")), html.indexOf("</tr>", html.indexOf("<tbody")));
-    const money = [...first.matchAll(/<td class="pq-money[^"]*">([^<]*)<\/td>/g)].map((m) => m[1]);
+    const money = [...first.matchAll(/<td class="pq-money[^"]*"[^>]*>([^<]*)<\/td>/g)].map((m) => m[1]);
     expect(money).toEqual([formatCents(660_000), formatCents(175_000)]);
     expect(html.toLowerCase()).not.toContain("total");
     expect(html).not.toContain(formatCents(660_000 + 175_000));

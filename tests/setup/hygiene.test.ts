@@ -19,6 +19,7 @@ const NEW_FILES = [
   ...walk("src/lib/setup"),
   ...walk("src/components/setup"),
   ...walk("src/components/integrations"),
+  ...walk("src/app/dashboard/settings/setup"),
   ...walk("src/app/dashboard/setup"),
   "src/lib/integrations/copy.ts",
   "src/app/dashboard/settings/page.tsx",
@@ -62,7 +63,7 @@ describe("what the new files may not do", () => {
   });
 
   it("writes nothing: no insert, update, upsert, delete or rpc in the setup loader, page, redirect and card", () => {
-    for (const f of [...walk("src/lib/setup"), "src/app/dashboard/setup/page.tsx", "src/app/dashboard/settings/page.tsx", "src/components/setup/FinishSetupCard.tsx", "src/components/setup/SetupChecklistView.tsx"]) {
+    for (const f of [...walk("src/lib/setup"), "src/app/dashboard/settings/setup/page.tsx", "src/app/dashboard/settings/page.tsx", "src/components/setup/FinishSetupCard.tsx", "src/components/setup/SetupChecklistView.tsx"]) {
       expect(read(f), f).not.toMatch(/\.(insert|update|upsert|delete|rpc)\(/);
     }
   });
@@ -83,7 +84,7 @@ describe("what the new files may not do", () => {
   });
 
   it("every role check goes through canSeeSetup", () => {
-    for (const f of ["src/app/dashboard/setup/page.tsx", "src/app/dashboard/settings/page.tsx", "src/components/setup/FinishSetupCard.tsx"]) {
+    for (const f of ["src/app/dashboard/settings/setup/page.tsx", "src/app/dashboard/settings/layout.tsx", "src/components/setup/FinishSetupCard.tsx"]) {
       expect(read(f), f).toContain("canSeeSetup(");
     }
   });

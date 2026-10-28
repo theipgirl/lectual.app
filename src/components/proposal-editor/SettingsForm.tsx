@@ -1,5 +1,6 @@
 "use client";
 
+import { roleLabel } from "@/lib/auth/roles";
 import type { ProposalInclude } from "@/lib/proposals/types";
 import { saveProposalSettingsAction } from "@/app/dashboard/settings/proposals/actions";
 import { SETTINGS_APPROVERS_HEADING } from "@/lib/proposal-editor/vocabulary";
@@ -35,7 +36,7 @@ export function SettingsForm({ members, values }: { members: SettingsMember[]; v
                   <span>
                     {m.name}
                     {m.email && m.email !== m.name && <span className="lx-note"> · {m.email}</span>}
-                    <span className="lx-note"> · {m.role.replace(/_/g, " ")}</span>
+                    <span className="lx-note"> · {roleLabel(m.role)}</span>
                   </span>
                 </label>
               ))}

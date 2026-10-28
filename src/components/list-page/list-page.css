@@ -266,3 +266,45 @@
   box-shadow: var(--shadow);
 }
 .lp-link-button:hover { text-decoration: underline; }
+
+/* ---- Leads table: wide keeps a minimum and scrolls inside the panel; small screens stack (Sprint 32) ---- */
+@media (min-width: 641px) {
+  .lp-table-min { min-width: 1000px; }
+}
+@media (max-width: 640px) {
+  .lp-table-min { min-width: 0; width: 100%; }
+  /* The header strip keeps its sort buttons for screen readers and keyboards, but is not drawn. */
+  .lp-table-min > .lp-table-head { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; padding: 0; border: 0; }
+  .lp-table-min .lp-row-grid {
+    display: block !important;
+    height: auto;
+    padding: 12px 14px;
+  }
+  .lp-table-min .lp-row-grid > [data-label] {
+    display: flex !important;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    min-width: 0;
+    padding: 4px 0;
+    text-align: right;
+  }
+  .lp-table-min .lp-row-grid > [data-label]::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: left;
+  }
+  .lp-table-min .lp-row-grid > [data-primary] { padding-bottom: 6px; }
+}
+
+@media (pointer: coarse) {
+  .lp-chip,
+  .lp-clear,
+  .lp-link-button,
+  .lp-root .lx-view-toggle button { min-height: 44px; min-width: 44px; }
+}

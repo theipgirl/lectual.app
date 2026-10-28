@@ -28,9 +28,6 @@ import { NO_LEADS_YET, NO_LEAD_MATCHES } from "@/lib/ui/words";
  */
 const GRID = "2fr 1.1fr 1.5fr .95fr 64px 1.6fr 1.35fr";
 
-/** Below this the columns would be unreadable, so the table scrolls instead. */
-const MIN_TABLE_WIDTH = 1000;
-
 /** What the ← and → in the Last touch column mean. */
 const ARROW_LEGEND = "← waiting on us, → waiting on them";
 
@@ -106,7 +103,8 @@ export default function IntakeTable({
   return (
     <div className="lp-panel">
       <div className="intake-scroll" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-        <div style={{ minWidth: MIN_TABLE_WIDTH, display: "flex", flexDirection: "column", flex: 1 }}>
+        {/* Wide screens keep a minimum width and scroll inside the panel (.lp-table-min in list-page.css); under 640px each row is a stacked card. */}
+        <div className="lp-table-min" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
           {/* No role="row": there is no table/grid role around it, and a lone
               row role is worse for a screen reader than none. It is a strip of
               sort buttons, each of which says what it sorts. */}
@@ -178,7 +176,7 @@ export default function IntakeTable({
                     color: touch.waitingOnUs ? "var(--burg)" : "var(--ink)",
                   }}
                 >
-                  <div style={{ minWidth: 0 }}>
+                  <div style={{ minWidth: 0 }} data-primary="true">
                     <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
                       <Link
                         href={`/dashboard/leads/${lead.id}`}
@@ -201,7 +199,7 @@ export default function IntakeTable({
                     </div>
                   </div>
 
-                  <div style={{ minWidth: 0 }}>
+                  <div style={{ minWidth: 0 }} data-label="Stage">
                     <span
                       className={`lp-pill${row.stage ? "" : " lp-pill-warn"}`}
                       title={row.stage?.name ?? "This lead's stage no longer exists"}
@@ -210,14 +208,16 @@ export default function IntakeTable({
                     </span>
                   </div>
 
-                  <TemperatureCell
-                    leadName={name}
-                    temperature={row.temperature}
-                    pending={pending}
-                    onSet={(lane) => onSetLane(lead.id, lane)}
-                  />
+                  <div style={{ minWidth: 0 }} data-label="Temperature">
+                    <TemperatureCell
+                      leadName={name}
+                      temperature={row.temperature}
+                      pending={pending}
+                      onSet={(lane) => onSetLane(lead.id, lane)}
+                    />
+                  </div>
 
-                  <div style={{ minWidth: 0, display: "flex" }}>
+                  <div style={{ minWidth: 0, display: "flex" }} data-label="Source">
                     <SourceCell
                       leadName={name}
                       source={lead.referral_source}
@@ -227,16 +227,18 @@ export default function IntakeTable({
                     />
                   </div>
 
-                  <OwnerCell
-                    leadName={name}
-                    owner={row.owner}
-                    assignedTo={lead.assigned_to}
-                    members={members}
-                    pending={pending}
-                    onAssign={(userId) => onAssign(lead.id, userId)}
-                  />
+                  <div style={{ minWidth: 0 }} data-label="Owner">
+                    <OwnerCell
+                      leadName={name}
+                      owner={row.owner}
+                      assignedTo={lead.assigned_to}
+                      members={members}
+                      pending={pending}
+                      onAssign={(userId) => onAssign(lead.id, userId)}
+                    />
+                  </div>
 
-                  <div style={touch.waitingOnUs ? TOUCH_IN : TOUCH_OUT} title={touch.waitingOnUs ? "Waiting on us" : "Waiting on them"}>
+                  <div data-label="Last touch" style={touch.waitingOnUs ? TOUCH_IN : TOUCH_OUT} title={touch.waitingOnUs ? "Waiting on us" : "Waiting on them"}>
                     <span className="lx-sr">{touch.waitingOnUs ? "Waiting on us: " : "Waiting on them: "}</span>
                     {touch.text}
                   </div>
@@ -245,7 +247,7 @@ export default function IntakeTable({
                       than in a column of its own, so GRID and the table's
                       minimum width are untouched and the chip can never push
                       the row past its container. */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                  <div data-label="Next step" style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                     <span
                       style={{ ...(step.urgent ? NEXT_HOT : NEXT), ...ellipsis, flex: 1 }}
                       title={step.text}

@@ -55,7 +55,7 @@ describe("rail tree (design/Rail.dc.html)", () => {
     expect(intake.childActive).toBe(true);
     expect(intake.kids.find((k) => k.label === "Leads")?.active).toBe(true);
     expect(intake.active).toBe(false);
-    expect(intake.href).toBe("/dashboard/reports/intake/");
+    expect(intake.href).toBe("/dashboard/intake/");
   });
 
   it("marks Today active only on the home page", () => {
@@ -64,13 +64,20 @@ describe("rail tree (design/Rail.dc.html)", () => {
     expect(today("/dashboard/matters/")).toBe(false);
   });
 
-  it("opens each parent's report view, and there is no Reports section", () => {
+  it("a parent opens its list (Sprint 32); its Summary is a tab, and there is no Reports section", () => {
     const groups = railGroups(visibleNav(["mailbox", "agents"], "owner"), "/dashboard/reports/matters/");
     const matters = groups.flat().find((e) => e.label === "Active matters")!;
     expect(matters.active).toBe(true);
     expect(groups.flat().map((e) => e.label)).not.toContain("Reports");
     expect(navItemBySlug("reports")).toBeUndefined();
-    for (const e of groups.flat().filter((x) => x.kids.length)) expect(e.href).toMatch(/^\/dashboard\/reports\/[a-z]+\/$/);
+    const hrefs = Object.fromEntries(groups.flat().filter((x) => x.kids.length).map((e) => [e.label, e.href]));
+    expect(hrefs).toEqual({
+      Communication: "/dashboard/mail/",
+      Leads: "/dashboard/intake/",
+      "Active matters": "/dashboard/matters/",
+      "AI tools": "/dashboard/copilot/",
+    });
+    for (const e of groups.flat()) expect(e.href).not.toMatch(/\/reports\//);
   });
 });
 
@@ -108,7 +115,7 @@ describe("unbuilt sections are hidden (built: false)", () => {
   it("keeps the parents and their other children", () => {
     const groups = railGroups(visibleNav(everything, "owner"), "/dashboard/");
     const find = (label: string) => groups.flat().find((e) => e.label === label)!;
-    expect(find("Communication").kids.map((k) => k.key)).toEqual(["mail", "meetings", "queue", "campaigns"]);
+    expect(find("Communication").kids.map((k) => k.key)).toEqual(["mail", "meetings", "campaigns"]);
     expect(find("Active matters").kids.map((k) => k.key)).toEqual(["matters", "pipeline", "documents"]);
     expect(find("AI tools").kids.map((k) => k.key)).toEqual(["copilot", "agents", "skills", "brain"]);
   });
