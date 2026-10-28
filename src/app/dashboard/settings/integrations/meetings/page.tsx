@@ -1,3 +1,4 @@
+import { integrationErrorLine } from "@/lib/ui/words";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveFirmSession } from "@/lib/firm/session";
@@ -99,7 +100,7 @@ export default async function MeetingsIntegrationPage({ searchParams }: { search
           </p>
         )}
         {fathom?.last_error && fathom.status === "active" && (
-          <HelpText tone="problem">Last run: {fathom.last_error}</HelpText>
+          <HelpText tone="problem">{integrationErrorLine(fathom.status, fathom.last_error)}</HelpText>
         )}
         {!canManage ? (
           <HelpText>Owners and admins connect Fathom and run imports.</HelpText>
@@ -133,7 +134,7 @@ export default async function MeetingsIntegrationPage({ searchParams }: { search
         >
           {zoom && canManage && <DisconnectSourceButton provider="zoom" label="Zoom" />}
         </IntegrationHeader>
-        {zoom?.last_error && <HelpText tone="problem">{`${zoom.status === "active" ? "Last run: " : ""}${zoom.last_error}`}</HelpText>}
+        {zoom?.last_error && <HelpText tone="problem">{integrationErrorLine(zoom.status, zoom.last_error)}</HelpText>}
         {!zoomReady ? (
           <HelpText>{ZOOM_NOT_SWITCHED_ON}</HelpText>
         ) : !canManage ? (

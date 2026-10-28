@@ -10,6 +10,9 @@ import { ROOT, stripAndCollect, walk } from "./_scan";
  */
 const RAW = /\b(?:[A-Za-z_]*[eE]rr(?:or)?|e|ex|exception)\??\.message\b|\bString\((?:err|error|e|ex)\)/;
 
+/** A stored `last_error` or an import failure's `f.message` is data, never a sentence for the screen. */
+const STORED = /\{[\w?.]*\blast_error\s*\}|\bf\.message\b/;
+
 type Allow = { file: RegExp; reason: string };
 
 const ALLOW: Allow[] = [
@@ -31,6 +34,11 @@ export function rawErrorHits(file: string, source: string): string[] {
   const { code } = stripAndCollect(source, true);
   const hits: string[] = [];
   code.split("\n").forEach((line, i) => {
+    if (STORED.test(line)) {
+      // A stored error is drawn only through the fixed-sentence picker.
+      if (!/integrationErrorLine\(/.test(line) && !/console\./.test(line) && !/^\s*(last_error|\w+\??:)/.test(line)) hits.push(`${file}:${i + 1}\t${line.trim().slice(0, 140)}`);
+      return;
+    }
     if (!RAW.test(line)) return;
     if (/console\.(error|warn|info|log)\(/.test(line)) return;
     if (/\.(test|includes|startsWith)\(/.test(line) && !/[{`]\s*\$?\{?[^}]*\.message/.test(line.replace(/\.(test|includes|startsWith)\([^)]*\)/g, ""))) return;
@@ -69,5 +77,26 @@ describe("no raw error text on a screen", () => {
   it("does not flag a log line or a message that is only tested", () => {
     expect(rawErrorHits("x.ts", 'console.error("failed", err.message);')).toEqual([]);
     expect(rawErrorHits("x.ts", "if (/forbid/i.test(err.message)) return null;")).toEqual([]);
+  });
+
+  it("catches a stored last_error or an import failure message drawn verbatim", () => {
+    for (const s of ["<div>{c.last_error}</div>", "<p>Last run: {conn.last_error}</p>", "<Row detail={f.message} />", "{`: ${conn.last_error}`}"]) {
+      expect(rawErrorHits("x.tsx", s), s).toHaveLength(1);
+    }
+    expect(rawErrorHits("x.tsx", "<div>{integrationErrorLine(c.status, c.last_error)}</div>")).toEqual([]);
+  });
+
+  it("an Integrations mailbox row never draws a sentinel stored error", async () => {
+    const { integrationErrorLine } = await import("@/lib/ui/words");
+    const sentinel = "SENTINEL pg: duplicate key value violates unique constraint crm_lead_x";
+    for (const status of ["active", "reauth", "error", "revoked"]) {
+      const line = integrationErrorLine(status, sentinel);
+      expect(line).toBeTruthy();
+      expect(line).not.toContain("SENTINEL");
+    }
+    expect(integrationErrorLine("active", null)).toBeNull();
+    const src = fs.readFileSync(path.join(ROOT, "src/app/dashboard/settings/integrations/page.tsx"), "utf8");
+    expect(src).toContain("integrationErrorLine(c.status, c.last_error)");
+    expect(src).not.toMatch(/\{c\.last_error\}/);
   });
 });

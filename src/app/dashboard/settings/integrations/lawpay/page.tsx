@@ -11,7 +11,7 @@ import { DisconnectLawPayButton, MapAccountForm, RefreshAccountsButton, UnmapBut
 import { NOT_A_LAW_FIRM_DISCLAIMER } from "@/lib/legal/disclaimer";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
-import { LAWPAY_NOT_ISSUED } from "@/lib/ui/words";
+import { integrationErrorLine, LAWPAY_NOT_ISSUED, lawpayModeMismatch } from "@/lib/ui/words";
 
 export const metadata: Metadata = { title: pageTitle("LawPay") };
 
@@ -133,13 +133,12 @@ export default async function LawPayPage({
         )}
         {conn && conn.mode !== deploymentMode && (
           <p className="lx-banner lx-banner-warn" style={{ margin: 0 }}>
-            This connection is in {conn.mode} mode and this deployment charges in {deploymentMode}{" "}mode, so clients won&apos;t see a card form.
-            Disconnect and connect again to switch.
+            {lawpayModeMismatch(conn.mode, deploymentMode)}
           </p>
         )}
         {conn && conn.status !== "active" && (
           <p className="lx-banner lx-banner-risk" style={{ margin: 0 }}>
-            LawPay stopped accepting this connection{conn.last_error ? `: ${conn.last_error}` : "."}{" "}Clients see &ldquo;the firm will send a way to
+            LawPay stopped accepting this connection. {integrationErrorLine(conn.status, conn.last_error)}{" "}Clients see &ldquo;the firm will send a way to
             pay&rdquo; until you reconnect.
           </p>
         )}

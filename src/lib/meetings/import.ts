@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Json } from "@/lib/db/types";
 import { openToken, sealToken } from "@/lib/mailbox/crypto";
+import { MEETINGS_MORE_THAN_ONE_RUN } from "@/lib/ui/words";
 import { listFathomMeetings } from "./fathom";
 import { listZoomMeetings, refreshZoomToken, type ZoomClientCredentials } from "./zoom";
 import { decideLinks, NO_LINK, type MatchContext } from "./match";
@@ -274,7 +275,7 @@ export async function importConnection(deps: ImportDeps, conn: ConnectionSecrets
       import_cursor: nextCursor(conn.import_cursor, pull.meetings),
       last_import_at: new Date(now).toISOString(),
       last_import_count: counts.inserted,
-      last_error: pull.truncated ? "More meetings than one run reads: the newest were imported, and the rest will follow on later runs where the provider allows." : null,
+      last_error: pull.truncated ? MEETINGS_MORE_THAN_ONE_RUN : null,
     });
     return { ok: true, ...base, counts, truncated: pull.truncated };
   } catch (err) {

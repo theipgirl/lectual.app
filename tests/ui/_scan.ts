@@ -110,21 +110,31 @@ export function stripAndCollect(src: string, keepStrings = false): { code: strin
   return { code, strings };
 }
 
-/** JSX text: runs between > and < that hold a letter and no braces. */
+/**
+ * JSX text: runs that hold a letter and sit between tags. A run is bounded on the left by ">" or by
+ * the "}" that closes an expression, and on the right by "<" or by the "{" that opens one, so
+ * `<p>a {x} this deployment {y} b</p>` yields "a", "this deployment" and "b". A run bounded by a brace
+ * on a side is dropped when it reads like code ("} else {", "} function f() {").
+ */
 export function jsxText(code: string): Candidate[] {
   const out: Candidate[] = [];
-  const re = />([^<>{}]*[A-Za-z][^<>{}]*)</g;
+  const re = /([>}])([^<>{}]*[A-Za-z][^<>{}]*)(?=[<{])/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(code))) {
     const before = code.slice(0, m.index);
     const line = before.split("\n").length;
-    const text = m[1].replace(/\s+/g, " ").trim();
+    const raw = m[2];
+    const text = raw.replace(/\s+/g, " ").trim();
     // An arrow function or a comparison between a ">" and a "<" is code, not text.
     if (/=>|==|\breturn\b/.test(text) || /;/.test(text.replace(/&[a-z#0-9]+;/gi, ""))) continue;
+    const next = code[m.index + m[0].length];
+    if ((m[1] === "}" || next === "{") && CODE_LIKE.test(text)) continue;
     if (text) out.push({ text, line, kind: "jsx" });
   }
   return out;
 }
+
+const CODE_LIKE = /[=()[\]]|\b(function|const|let|var|return|else|if|for|while|switch|case|import|export|from|type|interface|async|await|catch|try|finally|default|extends|implements)\b/;
 
 export function candidatesOf(file: string): Candidate[] {
   const src = fs.readFileSync(path.join(ROOT, file), "utf8");

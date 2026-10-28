@@ -90,3 +90,22 @@ export function notReadyPlural(features: string): string {
 }
 /** LawPay's card payments are Lectual's to switch on; until then the firm records payments by hand. */
 export const LAWPAY_NOT_ISSUED = "LawPay card payments aren't switched on yet. Until then, record payments by hand on each quote.";
+
+/** LawPay connected in one mode while Lectual charges in the other: card payments are paused. */
+export function lawpayModeMismatch(connectionMode: string, lectualMode: string): string {
+  return `Card payments are paused: your LawPay is in ${connectionMode} mode but Lectual is still in ${lectualMode} mode. Contact Lectual.`;
+}
+
+/** Integrations show a fixed sentence chosen by status; a stored error's own text is never drawn. */
+export const SYNC_DID_NOT_FINISH = "The last sync didn't finish. Reconnect if it keeps happening.";
+export const RECONNECT_TO_KEEP_SYNCING = "Reconnect to keep syncing.";
+/** Written by the meetings importer when a pull is cut short; the one stored sentence that passes by exact match. */
+export const MEETINGS_MORE_THAN_ONE_RUN =
+  "More meetings than one run reads: the newest were imported, and the rest will follow on later runs where the provider allows.";
+export function integrationErrorLine(status: string, lastError: string | null | undefined): string | null {
+  if (!lastError) return null;
+  if (lastError === MEETINGS_MORE_THAN_ONE_RUN) return lastError;
+  return status === "active" ? SYNC_DID_NOT_FINISH : RECONNECT_TO_KEEP_SYNCING;
+}
+/** One lead that Lawmatics import could not save (the database's own text stays in the logs). */
+export const IMPORT_PERSON_NOT_SAVED = "This person couldn't be saved.";

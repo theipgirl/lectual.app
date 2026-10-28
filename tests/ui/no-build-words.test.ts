@@ -1,5 +1,8 @@
+import fs from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { candidatesOf, walk } from "./_scan";
+import { lawpayModeMismatch } from "@/lib/ui/words";
+import { ROOT, candidatesOf, jsxText, stripAndCollect, walk } from "./_scan";
 
 /**
  * Sprint 31: no build vocabulary on a firm-facing screen. This walks the sources that draw text to a
@@ -104,5 +107,21 @@ describe("no build vocabulary in what a firm reads", () => {
       "scope missing",
     ];
     for (const text of old) expect(RULES.some((r) => r.re.test(text)), text).toBe(true);
+  });
+
+  it("reads JSX text that sits beside a {expression}", () => {
+    const { code } = stripAndCollect("const a = <p>a {x} this deployment {y} b</p>;");
+    const texts = jsxText(code).map((c) => c.text);
+    expect(texts).toContain("this deployment");
+    expect(texts.some((t) => RULES.find((r) => r.name === "deployment")!.re.test(t))).toBe(true);
+  });
+
+  it("the Integrations LawPay mode banner comes from the glossary and says neither build word", () => {
+    const src = fs.readFileSync(path.join(ROOT, "src/app/dashboard/settings/integrations/lawpay/page.tsx"), "utf8");
+    expect(src).toContain("conn.mode !== deploymentMode");
+    expect(src).toContain("lawpayModeMismatch(conn.mode, deploymentMode)");
+    const sentence = lawpayModeMismatch("live", "test");
+    expect(sentence).toBe("Card payments are paused: your LawPay is in live mode but Lectual is still in test mode. Contact Lectual.");
+    expect(/deployment|environment/i.test(sentence)).toBe(false);
   });
 });

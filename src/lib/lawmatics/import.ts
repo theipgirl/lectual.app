@@ -1,3 +1,4 @@
+import { IMPORT_PERSON_NOT_SAVED } from "@/lib/ui/words";
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -407,10 +408,11 @@ export async function applyImport(
     for (const row of chunk) {
       const { error: rowError } = await supabase.from("crm_lead").insert(row);
       if (rowError) {
+        console.error("[lawmatics-import] create failed", rowError.code);
         failures.push({
           lawmaticsId: row.lawmatics_id ?? "(unknown)",
           action: "create",
-          message: rowError.message,
+          message: IMPORT_PERSON_NOT_SAVED,
         });
       } else {
         created += 1;
@@ -446,7 +448,8 @@ export async function applyImport(
     // that same policy, so this cannot reach another tenant's lead.
     const { error } = await supabase.from("crm_lead").update(patch).eq("id", u.leadId);
     if (error) {
-      failures.push({ lawmaticsId: u.lawmaticsId, action: "update", message: error.message });
+      console.error("[lawmatics-import] update failed", error.code);
+      failures.push({ lawmaticsId: u.lawmaticsId, action: "update", message: IMPORT_PERSON_NOT_SAVED });
       continue;
     }
     updated += 1;

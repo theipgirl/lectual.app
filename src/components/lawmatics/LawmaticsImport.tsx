@@ -1,5 +1,6 @@
 "use client";
 
+import { IMPORT_PERSON_NOT_SAVED } from "@/lib/ui/words";
 import { useActionState, useState, type ReactNode } from "react";
 import {
   applyMattersImportAction,
@@ -348,7 +349,7 @@ export function ClientsImport() {
           <Notices truncated={r.truncated} truncatedReason={r.truncatedReason} />
           <Section title="Failed" count={r.failures.length}>
             {r.failures.map((f, i) => (
-              <Row key={i} title={f.lawmaticsId} detail={f.message} />
+              <Row key={i} title={f.lawmaticsId} detail={IMPORT_PERSON_NOT_SAVED} />
             ))}
           </Section>
         </>
@@ -442,7 +443,7 @@ export function MattersImport() {
           )}
           <Section title="Failed" count={r.failures.length}>
             {r.failures.map((f, i) => (
-              <Row key={i} title={f.lawmaticsId} detail={f.message} />
+              <Row key={i} title={f.lawmaticsId} detail={IMPORT_PERSON_NOT_SAVED} />
             ))}
           </Section>
         </>

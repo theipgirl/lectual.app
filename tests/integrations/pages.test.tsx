@@ -176,7 +176,7 @@ describe("Integrations index: nothing existing is lost", () => {
     );
     expect(html).toContain("Gmail connected.");
     expect(html).toContain('role="alert"');
-    expect(html).toContain("Token expired");
+    expect(html).toContain("Reconnect to keep syncing.");
     expect(html).toContain("microsoft@firm.test");
     expect(html).toContain("Disconnect");
     expect(html).toMatch(/href="\/api\/mailbox\/connect\/microsoft\/?\?scope=personal"[^>]*>Reconnect</);
@@ -230,7 +230,7 @@ describe("Meetings page: the Zoom card", () => {
     const off = await meetings({ meetings: { ok: true, connections: [conn("zoom", "reauth", { last_error: "Zoom rejected the token" })] } });
     expect(pillIn(off, "zoom-title")).toBe("Reconnect");
     expect(off).toMatch(/href="\/api\/meetings\/zoom\/connect\/?"[^>]*>Reconnect Zoom</);
-    expect(off).toContain("Zoom rejected the token");
+    expect(off).toContain("Reconnect to keep syncing.");
   });
 });
 

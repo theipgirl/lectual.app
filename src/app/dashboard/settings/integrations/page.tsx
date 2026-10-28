@@ -19,7 +19,7 @@ import { ModeBadge, StatusPill } from "@/components/integrations/StatusPill";
 import { stateForStatus, type IntegrationState } from "@/components/integrations/states";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
-import { LAWPAY_NOT_ISSUED } from "@/lib/ui/words";
+import { integrationErrorLine, LAWPAY_NOT_ISSUED } from "@/lib/ui/words";
 
 export const metadata: Metadata = { title: pageTitle("Integrations") };
 
@@ -94,7 +94,7 @@ function MailboxRow({ c, canManage }: { c: MailboxConnection; canManage: boolean
         </div>
         {c.status !== "active" && c.last_error && (
           <div className="lx-note" style={{ color: "var(--wine)" }}>
-            {c.last_error}
+            {integrationErrorLine(c.status, c.last_error)}
           </div>
         )}
         {needsCalendar && (
