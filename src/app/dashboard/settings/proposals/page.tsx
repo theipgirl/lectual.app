@@ -48,7 +48,7 @@ export default async function ProposalSettingsPage() {
         {head}
         <div className="lx-card lx-empty-card">
           <h2 className="lx-h2" style={{ fontSize: 25 }}>
-            Restricted to the firm&apos;s admins
+            Restricted
           </h2>
           <p className="lx-note" style={{ margin: 0 }}>
             {ADMIN_TIER_PHRASE} can manage the proposal settings. Anyone on the team can open the proposals themselves.

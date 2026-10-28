@@ -332,7 +332,7 @@ export default async function IntegrationsPage({
                     <b style={{ color: "var(--ink)" }}>Firm mailboxes</b>
                     <div className="lx-note">
                       Shared inboxes like intake@. Connect one by signing in as that mailbox.{" "}
-                      {canManageFirm ? "" : "Senior admins and owners manage these."}
+                      {canManageFirm ? "" : `${ADMIN_TIER_PHRASE} can manage these.`}
                     </div>
                   </div>
                   {canManageFirm && <ConnectButton provider={p} scope="firm" enabled={connectable[p]} label="Add shared mailbox" />}

@@ -61,7 +61,7 @@ export default async function ServiceLibraryPage() {
       {!canRead ? (
         <div className="lx-card lx-empty-card">
           <h2 className="lx-h2" style={{ fontSize: 25 }}>
-            Restricted to the firm&apos;s principals
+            Restricted
           </h2>
           <p className="lx-note" style={{ margin: 0 }}>
             {`${ADMIN_TIER_PHRASE} can manage the service library. Ask one of them for access.`}

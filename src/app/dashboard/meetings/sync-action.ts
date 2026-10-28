@@ -31,8 +31,14 @@ export async function syncNewMeetingsAction(): Promise<SyncMeetingsState> {
     }
     const form = new FormData();
     form.set("provider", provider);
-    const state = await importNowAction({}, form);
-    results.push({ provider, outcome: state.sync ?? { kind: "failed" } });
+    try {
+      const state = await importNowAction({}, form);
+      // The provider is known to be connected, so "not-connected" from the import is a failure, not a quiet skip.
+      const sync = state.sync;
+      results.push({ provider, outcome: !sync || sync.kind === "not-connected" ? { kind: "failed" } : sync });
+    } catch {
+      results.push({ provider, outcome: { kind: "failed" } });
+    }
   }
   return { summary: mergeSyncResults(results) };
 }

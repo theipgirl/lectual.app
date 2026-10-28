@@ -42,7 +42,7 @@ describe("item 1: the Settings side menu is a sideways-scrolling strip under 900
 
 describe("item 2: one phrase for who may change settings", () => {
   const dirs = ["src/app/dashboard/settings", "src/components/integrations", "src/components/settings", "src/components/agents", "src/app/dashboard/forms", "src/lib/payments/accounts.ts", "src/app/dashboard/proposals/gate.ts"];
-  const BAD = /\bowners? (and|or) admins?\b|\bowners?, admins?\b|\ban administrator\b|\ban owner or admin\b|\bowner,? admin or senior admin\b/i;
+  const BAD = /\bsenior admins and owners\b|\bfirm(?:&apos;|'|’)s (?:admins|principals)\b|\bowners? (and|or) admins?\b|\bowners?, admins?\b|\ban administrator\b|\ban owner or admin\b|\bowner,? admin or senior admin\b/i;
 
   it("no settings page, action or component says it another way", () => {
     const hits = dirs

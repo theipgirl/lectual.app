@@ -216,7 +216,7 @@ describe("Settings -> Client proposals page: the Package prices card", () => {
 
   it("is not shown to a role that can't change the settings", async () => {
     const html = await render({}, "paralegal");
-    expect(html).toContain("Restricted to the firm");
+    expect(html).toContain("Restricted");
     expect(html).not.toContain("Packages");
   });
 });

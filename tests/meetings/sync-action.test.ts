@@ -97,6 +97,25 @@ describe("syncNewMeetingsAction", () => {
     expect(out.summary?.text).not.toContain("No new meetings");
   });
 
+  it("a connected source that importNowAction calls not-connected is a failure, not a skip", async () => {
+    h.secrets = null;
+    const out = await run();
+    expect(h.importConnection).not.toHaveBeenCalled();
+    expect(out.summary?.tone).toBe("error");
+    expect(out.summary?.text).toContain("Couldn't import from Zoom.");
+  });
+
+  it("one source throwing does not reject the action or lose the other source's result", async () => {
+    h.conns = { ok: true, connections: [{ provider: "fathom", status: "active" }, { provider: "zoom", status: "active" }] };
+    h.importConnection.mockReset()
+      .mockImplementationOnce(async () => { throw new Error("boom"); })
+      .mockImplementationOnce(async () => h.importOut);
+    const out = await run();
+    expect(out.summary?.inserted).toBe(2);
+    expect(out.summary?.tone).toBe("error");
+    expect(out.summary?.text).toContain("Couldn't import from Fathom.");
+  });
+
   it("an unreadable connection list fails every source", async () => {
     h.conns = { ok: false };
     const out = await run();
