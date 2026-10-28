@@ -85,7 +85,7 @@ describe("proposals list page", () => {
     expect(html).toContain("Proposals couldn&#x27;t be loaded");
     expect(segments(html)).toEqual(["Everything", "Out with a client", "Drafts and blocked", "Accepted", "Expired"]);
     expect(html).not.toContain("No proposals yet");
-    expect(html).not.toContain("Nothing matches");
+    expect(html).not.toContain("No accepted proposals yet.");
   });
 
   it("an empty list reads as empty only when the read worked", async () => {
@@ -96,8 +96,8 @@ describe("proposals list page", () => {
 
   it("a segment with no rows says so, and points back to Everything", async () => {
     const html = await render({ segment: "accepted" }, { rows: [item("a1")] });
-    expect(html).toContain("Nothing matches");
-    expect(html).toContain("Every proposal is still under Everything");
+    expect(html).toContain("No accepted proposals yet.");
+    expect(html).toMatch(/<a href="\/dashboard\/proposals\/?">Show all<\/a>/);
   });
 });
 

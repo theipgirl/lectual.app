@@ -17,7 +17,7 @@ const proposal = (o: Partial<DraftEmailProposal> = {}): DraftEmailProposal => ({
 });
 
 function deps(over: Partial<DraftEmailDeps> = {}, p: DraftEmailProposal | null = proposal()) {
-  const createDraft = vi.fn(async () => ({ id: "q-1" }));
+  const createDraft = vi.fn(async (_input: unknown) => ({ id: "q-1" }));
   const d: DraftEmailDeps = {
     gate: async () => null,
     loadProposal: async () => p,

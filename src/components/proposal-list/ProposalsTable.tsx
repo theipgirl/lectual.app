@@ -26,7 +26,7 @@ export function ProposalsTable({ rows, footerLeft, footerRight }: { rows: Propos
               <th>Paid</th>
               <th className="pq-money">At signing</th>
               <th className="pq-money">At filing</th>
-              <th>Expires</th>
+              <th className="pq-th-expires">Expires</th>
               <th>Last activity</th>
             </tr>
           </thead>
@@ -43,6 +43,7 @@ export function ProposalsTable({ rows, footerLeft, footerRight }: { rows: Propos
                 <td className="pq-c-status">
                   <span className={`lx-pill lx-pill-${r.statusTone}`}>{r.statusLabel}</span>
                   {r.statusSub && <div className="pq-mono pq-sub">{r.statusSub}</div>}
+                  {r.expires && r.expires !== "—" && <div className="pq-mono pq-sub pq-exp-inline">Expires {r.expires}</div>}
                 </td>
                 <td className="pq-c-accepted" data-label="Accepted" data-accepted={r.accepted === "Not yet" ? "no" : "yes"}>
                   {r.accepted}

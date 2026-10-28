@@ -2,14 +2,12 @@ import Link from "next/link";
 import { currentRole } from "@/lib/auth/current-role";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { firmCivilDate } from "@/lib/quotes/firm-time";
-import { formatDollars } from "@/lib/proposal-editor/events";
 import { firstNameOf } from "@/lib/proposal-editor/labels";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { CAN_WRITE_LEAD } from "@/lib/pipeline/leads";
-import { getProposalSettings, listLatestProposalEvents, listProposals, listStepActivity, type ProposalListItem, type StepActivity } from "@/lib/proposals/store";
+import { listLatestProposalEvents, listProposals, listStepActivity, type ProposalListItem, type StepActivity } from "@/lib/proposals/store";
 import { PROPOSAL_PAID_ROLES } from "@/lib/proposals/paid";
 import { PROPOSAL_ADMIN_ROLES, PROPOSAL_STAFF_WRITE_ROLES } from "@/lib/proposals/types";
-import { normalisePackages } from "@/lib/proposals/package-list";
 import { buildProposalRowView, sortForSegment, type ProposalRowView } from "@/lib/proposals/list-rows";
 import type { ActivityEvent } from "@/lib/proposals/list-labels";
 import {
@@ -34,13 +32,15 @@ import { requireProposalsModule } from "./gate";
 import "./proposals.css";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { FEE_SENTENCE, PROPOSALS_NAME, PROPOSALS_SUBLINE } from "@/lib/ui/words";
+import { emptySegmentSentence } from "@/lib/proposals/list-copy";
 
-export const metadata: Metadata = { title: pageTitle("Client proposals") };
+export const metadata: Metadata = { title: pageTitle(PROPOSALS_NAME) };
 
 export const dynamic = "force-dynamic";
 
 /**
- * Quotes & proposals — one row per client offer (its newest version), over a three-state
+ * Proposals — one row per client offer (its newest version), over a three-state
  * read: rows, empty, or "couldn't load". An unreachable database never renders as "No
  * proposals yet", an unreachable queue of proposals never as "$0.00".
  *
@@ -72,14 +72,10 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
 
   const nowDate = new Date();
   const now = nowDate.getTime();
-  const [tz, listedRead, settingsRead] = await Promise.all([
+  const [tz, listedRead] = await Promise.all([
     getFirmTimeZone(),
     listProposals().then(
       (rows) => ({ ok: true as const, rows }),
-      () => ({ ok: false as const }),
-    ),
-    getProposalSettings().then(
-      (row) => ({ ok: true as const, row }),
       () => ({ ok: false as const }),
     ),
   ]);
@@ -109,16 +105,7 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
   // The Accepted segment lists accepted-and-not-paid first (what still needs a person); every other segment keeps the list's order.
   const rows: ProposalRowView[] = sortForSegment(segment, all.filter((r) => inSegment(segment, r.view.key)).map((r) => r.view));
 
-  // The default package's figures, from the firm's own settings; none (never defaults) when they couldn't be read.
-  const packages = settingsRead.ok ? normalisePackages(settingsRead.row?.pricing ?? {}) : null;
-  const first = packages?.[0] ?? null;
-  const subtitle = `${packages ? `${packages.length} published ${packages.length === 1 ? "package" : "packages"}, priced` : "Published packages, priced"} per class. Legal fees fall due at signing, USPTO fees at filing, and the two never add into one number.`;
-  const note = first
-    ? `Legal fees and USPTO fees never add into one number. Every class past the package adds ${formatDollars(first.per_class_cents)} legal and ${formatDollars(first.gov_per_class_cents)} government.`
-    : "Legal fees and USPTO fees never add into one number.";
-  const footerRight = first
-    ? `Government filing fees are ${formatDollars(first.gov_per_class_cents)} per class, paid before the application goes in.`
-    : "Government filing fees are paid before the application goes in.";
+  // The fee sentence is said once on the page, in the table's footer.
   const footerLeft = segment === "everything" ? `All ${all.length} proposals` : `${rows.length} of ${all.length} proposals`;
 
   // Opened from a lead (`?lead=<id>`): that lead is chosen in the transcript form, and the form is open.
@@ -145,13 +132,13 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
 
   return (
     <div className="pq-layout">
-      <SegmentColumn active={segment} counts={counts} out={out} note={note} />
+      <SegmentColumn active={segment} counts={counts} out={out} />
 
       <div className="pq-main">
         <div className="lx-page-head">
           <div style={{ flex: 1, minWidth: 260 }}>
-            <h1 className="lx-h1" data-tour="proposals-head">Quotes &amp; proposals</h1>
-            <p className="lx-sub">{subtitle}</p>
+            <h1 className="lx-h1" data-tour="proposals-head">{PROPOSALS_NAME}</h1>
+            <p className="lx-sub">{PROPOSALS_SUBLINE}</p>
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {role && PROPOSAL_ADMIN_ROLES.includes(role) && (
@@ -167,8 +154,6 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
           </div>
         </div>
 
-        <ConsultsStrip data={strip} canDraft={canDraftFromTranscript} draftNote={draftBlock ? DRAFT_BLOCK_NOTE[draftBlock] : null} paste={paste} pasteOpen={preselected !== "" && !draftBlock} />
-
         {failed ? (
           <div className="lx-card lx-empty-card">
             <h2 className="lx-h2" style={{ fontSize: 25 }}>
@@ -181,19 +166,32 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
         ) : rows.length === 0 ? (
           <div className="lx-card lx-empty-card">
             <h2 className="lx-h2" style={{ fontSize: 25 }}>
-              {all.length === 0 ? "No proposals yet" : "Nothing matches"}
+              {all.length === 0 ? "No proposals yet" : emptySegmentSentence(segment)}
             </h2>
             <p className="lx-note" style={{ margin: 0 }}>
-              {all.length === 0
-                ? canWrite
-                  ? "Start one from a consult above, a lead, or with New proposal. It stays a draft until a named approver creates its client link."
-                  : "When one is started it will be listed here."
-                : `Nothing is under ${SEGMENT_LABEL[segment]}. Every proposal is still under Everything.`}
+              {all.length === 0 ? (
+                canWrite ? (
+                  "Start one from a consult below, a lead, or with New proposal. It stays a draft until a named approver creates its client link."
+                ) : (
+                  "When one is started it will be listed here."
+                )
+              ) : (
+                <Link href="/dashboard/proposals/">Show all</Link>
+              )}
             </p>
           </div>
         ) : (
-          <ProposalsTable rows={rows} footerLeft={footerLeft} footerRight={footerRight} />
+          <ProposalsTable rows={rows} footerLeft={footerLeft} footerRight={FEE_SENTENCE} />
         )}
+
+        <ConsultsStrip
+          data={strip}
+          canDraft={canDraftFromTranscript}
+          draftNote={draftBlock ? DRAFT_BLOCK_NOTE[draftBlock] : null}
+          paste={paste}
+          pasteOpen={preselected !== "" && !draftBlock}
+          leads={canDraftFromTranscript ? (leadsRead?.status === "ok" ? leadsRead.leads : null) : undefined}
+        />
       </div>
     </div>
   );

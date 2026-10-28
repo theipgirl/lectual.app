@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { formatCents } from "@/lib/quotes/money";
+import { OPEN_OFFERS_LABEL } from "@/lib/proposals/list-copy";
 import { PROPOSAL_SEGMENTS, SEGMENT_LABEL, type OutWithClients, type ProposalSegment } from "@/lib/proposals/segments";
 
 /** "1 proposal is out with a client, counted at the cheapest package offered." */
@@ -10,8 +11,8 @@ export function outTileSentence(count: number): string {
 }
 
 /**
- * The page's left column: the five segments with their counts (from the unfiltered set), the
- * "Out with clients" dollar tile, and the note that fees never add into one number. `counts` and
+ * The page's left column: "Show", the five segments with their counts (from the unfiltered set), and the
+ * "Open offers" dollar tile. Under 760px the segments lie down as a row of chips. `counts` and
  * `out` are null/unavailable when the proposals read failed: the page then shows "—" and
  * "couldn't be loaded", never 0 and never "$0.00".
  */
@@ -19,17 +20,15 @@ export function SegmentColumn({
   active,
   counts,
   out,
-  note,
 }: {
   active: ProposalSegment;
   counts: Record<ProposalSegment, number> | null;
   out: OutWithClients;
-  note: string;
 }) {
   return (
     <aside className="pq-side" aria-label="Proposal segments">
-      <nav aria-label="Segments" className="pq-segs">
-        <div className="lx-label pq-segs-label">Segments</div>
+      <nav aria-label="Show" className="pq-segs">
+        <div className="lx-label pq-segs-label">Show</div>
         {PROPOSAL_SEGMENTS.map((seg) => (
           <Link
             key={seg}
@@ -44,7 +43,7 @@ export function SegmentColumn({
       </nav>
 
       <div className="pq-out">
-        <div className="lx-label">Out with clients</div>
+        <div className="lx-label">{OPEN_OFFERS_LABEL}</div>
         {out.status === "ok" ? (
           <>
             <div className="pq-out-figure">{formatCents(out.cents)}</div>
@@ -53,12 +52,10 @@ export function SegmentColumn({
         ) : (
           <>
             <div className="pq-out-figure">—</div>
-            <p className="lx-note">Out with clients couldn&apos;t be loaded.</p>
+            <p className="lx-note">Open offers couldn&apos;t be loaded.</p>
           </>
         )}
       </div>
-
-      <p className="lx-note pq-note">{note}</p>
     </aside>
   );
 }
