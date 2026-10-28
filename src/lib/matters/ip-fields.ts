@@ -10,6 +10,8 @@
  */
 
 import type { Database } from "@/lib/db/types";
+import { ReadableError } from "@/lib/ui/readable-error";
+
 
 export type FilingBasis = Database["public"]["Enums"]["crm_filing_basis"];
 
@@ -59,11 +61,11 @@ export function parseInternationalClasses(input: string | null | undefined): num
   const classes: number[] = [];
   for (const token of tokens) {
     if (!/^\d{1,3}$/.test(token)) {
-      throw new Error(`"${token}" is not an international class number.`);
+      throw new ReadableError(`"${token}" is not an international class number.`);
     }
     const n = Number(token);
     if (n < MIN_NICE_CLASS || n > MAX_NICE_CLASS) {
-      throw new Error(
+      throw new ReadableError(
         `International class ${n} is out of range — classes run ${MIN_NICE_CLASS}–${MAX_NICE_CLASS}.`,
       );
     }
@@ -97,7 +99,7 @@ export function parseCivilDate(value: FormDataEntryValue | null | undefined): st
   const raw = blankToNull(value);
   if (raw === null) return null;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-    throw new Error(`"${raw}" is not a valid date (expected YYYY-MM-DD).`);
+    throw new ReadableError(`"${raw}" is not a valid date (expected YYYY-MM-DD).`);
   }
   const [y, m, d] = raw.split("-").map(Number);
   const probe = new Date(Date.UTC(y, m - 1, d));
@@ -106,7 +108,7 @@ export function parseCivilDate(value: FormDataEntryValue | null | undefined): st
     probe.getUTCMonth() !== m - 1 ||
     probe.getUTCDate() !== d
   ) {
-    throw new Error(`"${raw}" is not a real calendar date.`);
+    throw new ReadableError(`"${raw}" is not a real calendar date.`);
   }
   return raw;
 }

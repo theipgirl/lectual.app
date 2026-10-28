@@ -17,6 +17,7 @@ export function productionRunnerDeps(): RunnerDeps {
     llm: callClaude,
     createDraft,
     listPending: (orgKey) => listQueue(orgKey, "pending"),
+    listApproved: (orgKey) => listQueue(orgKey, "approved"),
     // The cron request's own host, else SITE_URL; null when neither is usable.
     siteOrigin: async () => {
       try {

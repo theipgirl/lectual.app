@@ -103,7 +103,7 @@ describe("BrainPage", () => {
     const html = renderToStaticMarkup(element);
 
     expect(html).toContain("New entry");
-    expect(html).toContain("No brain entries yet");
+    expect(html).toContain("No firm notes yet");
     expect(html).toContain("No claims proposed yet");
   });
 
@@ -173,8 +173,12 @@ describe("BrainPage", () => {
     const element = await BrainPage();
     const html = renderToStaticMarkup(element);
 
-    expect(html).toContain("Couldn&#x27;t load the firm brain");
-    expect(html).toContain("connection refused");
-    expect(html).not.toContain("No brain entries yet");
+    expect(html).toContain("Couldn&#x27;t load your firm notes");
+    expect(html).toContain(">Firm notes</h1>");
+    expect(html).not.toContain("IP.OS");
+    // The thrown message is a sentinel for database text: it is logged, never drawn.
+    expect(html).not.toContain("connection refused");
+    expect(html).toContain("Can&#x27;t show this right now. Refresh to try again.");
+    expect(html).not.toContain("No firm notes yet");
   });
 });

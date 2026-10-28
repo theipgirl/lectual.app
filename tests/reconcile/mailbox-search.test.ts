@@ -142,7 +142,7 @@ describe("searchPersonMail: every other state is named and none is 'no mail'", (
     expectUnavailable(await searchPersonMail(null, deps()), "no-address", MAILBOX_REASONS.noAddress);
   });
 
-  it("the Mailboxes module is off, or could not be checked", async () => {
+  it("Mailboxes isn't switched on for your firm, or could not be checked", async () => {
     const g = graph();
     expectUnavailable(await searchPersonMail("a@b.example", deps({ moduleOn: false, fetchImpl: g.fetchImpl })), "module-off", MAILBOX_REASONS.moduleOff);
     expectUnavailable(await searchPersonMail("a@b.example", deps({ moduleOn: null, fetchImpl: g.fetchImpl })), "module-off", MAILBOX_REASONS.moduleOff);

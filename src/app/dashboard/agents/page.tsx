@@ -17,6 +17,7 @@ import { relativeTime } from "@/lib/relative-time";
 import { AgentControls } from "@/components/agents/AgentControls";
 import { AutopilotControl } from "@/components/agents/AutopilotControl";
 import { MinutesPerTaskForm } from "@/components/agents/MinutesPerTaskForm";
+import { RunResultCell } from "@/components/agents/RunResultCell";
 import { RunDigestList } from "@/components/agents/RunDigestList";
 import { loadAutopilot } from "@/lib/agents/autopilot";
 import {
@@ -27,6 +28,7 @@ import {
   estimateAssumption,
   estimateHoursSaved,
 } from "@/lib/agents/autopilot-rules";
+import { assistantHealth } from "@/lib/agents/health-line";
 import { buildRunDigest, type DigestRun } from "@/lib/agents/digest";
 import { displayRunStatus, RUN_STATUS_LABEL, runDurationLabel } from "@/lib/agents/run-status";
 import { listMemberDirectory } from "@/lib/members/directory";
@@ -34,8 +36,9 @@ import { getFirmTimeZone } from "@/lib/org/profile";
 import { monthQueryFloor, monthStartCivil, civilInZone } from "@/lib/today/outcomes";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { ASSISTANTS_NAME, AI_TOOLS_GROUP } from "@/lib/ui/words";
 
-export const metadata: Metadata = { title: pageTitle("Agents") };
+export const metadata: Metadata = { title: pageTitle(ASSISTANTS_NAME) };
 
 // "Run now" executes inside the page's server action.
 export const maxDuration = 300;
@@ -139,45 +142,57 @@ export default async function AgentsPage() {
   const enabledAgents = AGENT_IDS.filter(isOn);
   const readyCount = enabledAgents.filter((a) => readiness.get(a)?.tone === "ok").length;
   const blockedCount = enabledAgents.length - readyCount;
+  const health = assistantHealth({
+    settingsKnown,
+    runsKnown: !runsError,
+    paused,
+    enabled: enabledAgents,
+    blocked: new Set(enabledAgents.filter((a) => readiness.get(a)?.tone !== "ok")),
+    lastRun,
+    now: now.getTime(),
+  });
 
   return (
     <>
       <div className="lx-page-head">
         <div style={{ flex: 1, minWidth: 260 }}>
-          <div className="lx-label">IP.OS</div>
-          <h1 className="lx-h1" data-tour="agents-head">Agents</h1>
+          <div className="lx-label">{AI_TOOLS_GROUP}</div>
+          <h1 className="lx-h1" data-tour="agents-head">{ASSISTANTS_NAME}</h1>
           <p className="lx-sub">
-            Each agent reads one source and writes one kind of thing. Anything addressed to a client
-            goes into the approval queue, so switching an agent on can never put a word in front of a
+            Each assistant reads one source and writes one kind of thing. Anything addressed to a client
+            goes to Approvals first, so switching an assistant on can never put a word in front of a
             client.
           </p>
         </div>
         <div className="lx-note">
           {settingsKnown
             ? `${readyCount} of ${AGENT_IDS.length} on${blockedCount > 0 ? ` · ${blockedCount} on but blocked` : ""}`
-            : "Agent settings unavailable"}
+            : "Assistant settings unavailable"}
         </div>
       </div>
 
+      <p className={`lx-banner lx-banner-${health.tone === "risk" ? "risk" : health.tone === "ok" ? "ok" : health.tone === "warn" ? "warn" : "mute"}`} role="status" style={{ margin: 0 }} data-health={health.tone}>
+        {health.text}
+      </p>
+
       {!settingsKnown && (
         <div role="alert" className="lx-banner lx-banner-risk">
-          We couldn&apos;t read agent settings, so whether each agent is on or off isn&apos;t shown. Nothing has been switched off. Try again shortly.
+          We couldn&apos;t read the assistant settings, so whether each one is on or off isn&apos;t shown. Nothing has been switched off. Refresh to try again.
         </div>
       )}
 
       {!aiConfigured() && (
         <div className="lx-banner lx-banner-mute">
-          The AI key isn&apos;t set on this deployment, so agents won&apos;t run until an
-          administrator adds it.
+          AI isn&apos;t switched on for your firm yet, so assistants won&apos;t run. Lectual will turn it on.
         </div>
       )}
 
       <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }}>
         <div className="lx-card-head" style={{ alignItems: "center", padding: 0 }}>
           <h2 className="lx-h2" style={{ fontSize: 23, flex: 1 }}>
-            Autopilot
+            {ASSISTANTS_NAME} on or off
           </h2>
-          <span className="lx-note">One switch over every agent. Each agent keeps its own setting.</span>
+          <span className="lx-note">One switch over every assistant. Each assistant keeps its own setting.</span>
         </div>
         {autopilot.status === "ok" ? (
           <AutopilotControl
@@ -189,11 +204,11 @@ export default async function AgentsPage() {
           />
         ) : autopilot.status === "missing" ? (
           <p className="lx-note" style={{ margin: 0 }}>
-            The Autopilot switch isn&apos;t set up in this environment yet (lectual migration 0082). Agents follow their own switches.
+            The all-assistants switch isn&apos;t set up for your firm yet. Each assistant follows its own switch.
           </p>
         ) : (
           <p className="lx-note" role="alert" style={{ margin: 0, color: "var(--warn)" }}>
-            We couldn&apos;t read whether Autopilot is paused. Until we can, no agent runs.
+            We couldn&apos;t read whether assistants are paused. Until we can, none of them run.
           </p>
         )}
         <div>
@@ -260,7 +275,7 @@ export default async function AgentsPage() {
                   {agentMoves.status === "ok" ? (
                     <Link href={AGENT_MOVES_TODAY_HREF}>{`${agentMoves.movedToday} ${agentMoves.movedToday === 1 ? "lead" : "leads"} moved today`}</Link>
                   ) : (
-                    "Today's agent moves couldn't be loaded."
+                    "Today's automatic moves couldn't be loaded."
                   )}
                 </p>
               )}
@@ -279,7 +294,7 @@ export default async function AgentsPage() {
           <h2 className="lx-h2" style={{ fontSize: 23, flex: 1 }}>
             Recent runs
           </h2>
-          <span className="lx-note">Every run is logged for the firm</span>
+          <span className="lx-note">Every run is logged for your firm</span>
         </div>
         {runsError ? (
           <div className="lx-empty" role="alert">
@@ -291,7 +306,7 @@ export default async function AgentsPage() {
           <table className="lx-tbl">
             <thead>
               <tr>
-                <th>Agent</th>
+                <th>Assistant</th>
                 <th>Trigger</th>
                 <th>Result</th>
                 <th>When</th>
@@ -307,14 +322,13 @@ export default async function AgentsPage() {
                   <tr key={r.id}>
                     <td className="pri">{RUN_AGENT_LABEL[r.agent] ?? r.agent}</td>
                     <td>{TRIGGER_LABEL[r.trigger] ?? r.trigger}</td>
-                    <td className="wrap" style={failed ? { color: "var(--wine)" } : undefined}>
-                      {status === "unfinished" ? "Didn't finish. It was stopped before it could report back." : status === "error" ? r.error ?? "Failed" : r.summary ?? "—"}
-                    </td>
+                    <RunResultCell status={status} run={r} failed={failed} />
                     <td className="lx-num">
                       {relativeTime(r.started_at)} <span className="lx-note">· {runDurationLabel(r, now.getTime())}</span>
                     </td>
                     <td>
-                      <span className="lx-dot" style={{ background: STATUS_TONE[status] ?? "#7A5A5E" }} title={RUN_STATUS_LABEL[status] ?? status} />
+                      <span className="lx-dot" aria-hidden="true" style={{ background: STATUS_TONE[status] ?? "#7A5A5E" }} />{" "}
+                      <span className="lx-note">{RUN_STATUS_LABEL[status] ?? status}</span>
                     </td>
                   </tr>
                 );
@@ -344,8 +358,8 @@ export default async function AgentsPage() {
       <div className="lx-upl">
         <span aria-hidden="true">§</span>
         <div>
-          <b style={{ color: "var(--ox)" }}>The one rule.</b> No agent can send to a client. The
-          approval queue is the only way anything leaves this firm. Agents never answer a legal
+          <b style={{ color: "var(--ox)" }}>The one rule.</b> No assistant can send to a client.
+          Approvals is the only way anything leaves this firm. Assistants never answer a legal
           question; they route it to the attorney.
         </div>
       </div>

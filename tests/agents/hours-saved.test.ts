@@ -76,7 +76,7 @@ describe("Autopilot rules", () => {
   it("writes the state line on the firm's clock", () => {
     const now = new Date("2026-09-29T15:00:00Z");
     expect(autopilotStateLine({ paused: false, pausedAt: null }, { lastRunAt: "2026-09-29T10:02:00Z", pausedByName: null, now, tz: "America/New_York" })).toBe(
-      "Autopilot on · last run 6:02 AM",
+      "Assistants on · last run 6:02 AM",
     );
     expect(autopilotStateLine({ paused: true, pausedAt: "2026-09-29T13:14:00Z" }, { lastRunAt: null, pausedByName: "Dana Ruiz", now, tz: "America/New_York" })).toBe(
       "Paused by Dana Ruiz at 9:14 AM",

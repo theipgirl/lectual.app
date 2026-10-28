@@ -8,6 +8,7 @@ import { isInPeriod, isInPreviousPeriod, type ReportPeriod } from "./period";
 import { isWaitingOnUs, leadLabel, waitingSince } from "./leads";
 import { oldestFirst, type LinkTile, type WaitingItem } from "./waiting";
 import { relativeTime } from "@/lib/relative-time";
+import { APPROVALS_NAME, ASSISTANTS_NAME, notReadyPlural } from "@/lib/ui/words";
 
 export type CommunicationReport = {
   kpis: Metric[];
@@ -48,7 +49,7 @@ export async function loadCommunicationReport(
   if (activity.status !== "ok") {
     emails = unavailableMetric(
       "Emails",
-      activity.status === "missing" ? "Activity isn't recorded in this environment yet" : "Couldn't be read just now",
+      activity.status === "missing" ? "Activity isn't switched on for your firm yet" : "Couldn't be read just now",
     );
   } else {
     const received = activity.rows.filter((r) => r.type === "email_received" && isInPeriod(r.created_at, period)).length;
@@ -66,29 +67,29 @@ export async function loadCommunicationReport(
   // --- Queue waiting ---------------------------------------------------------
   let queueMetric: Metric;
   if (queue.status === "ok") {
-    queueMetric = { label: "Queue waiting", value: queue.items.length, sub: "drafts held for approval" };
+    queueMetric = { label: "Waiting in Approvals", value: queue.items.length, sub: "drafts held for approval" };
   } else if (queue.status === "unconfigured") {
     queueMetric = unavailableMetric(
-      "Queue waiting",
-      queue.reason === "org-key" ? "No queue connected for this firm" : "The queue isn't configured for this deployment",
+      "Waiting in Approvals",
+      queue.reason === "org-key" ? "No approvals connected for this firm" : "Approvals aren't connected for your firm yet",
     );
   } else {
-    queueMetric = unavailableMetric("Queue waiting", "The approval queue can't be reached right now");
+    queueMetric = unavailableMetric("Waiting in Approvals", "The approval queue can't be reached right now");
   }
 
   // --- Agent drafts ------------------------------------------------------
   let draftsOut: Metric;
   if (!opts.hasAgents) {
-    draftsOut = unavailableMetric("Agent drafts", "Agents aren't turned on for this firm");
+    draftsOut = unavailableMetric("Assistant drafts", notReadyPlural(ASSISTANTS_NAME));
   } else if (runs.status !== "ok") {
     draftsOut = unavailableMetric(
-      "Agent drafts",
-      runs.status === "missing" ? "Agent runs aren't recorded in this environment yet" : "Couldn't be read just now",
+      "Assistant drafts",
+      runs.status === "missing" ? "Assistant runs aren't switched on for your firm yet" : "Couldn't be read just now",
     );
   } else {
     const current = runs.rows.filter((r) => isInPeriod(r.started_at, period)).reduce((sum, r) => sum + (r.drafts_out ?? 0), 0);
     const prev = runs.rows.filter((r) => isInPreviousPeriod(r.started_at, period)).reduce((sum, r) => sum + (r.drafts_out ?? 0), 0);
-    draftsOut = { label: "Agent drafts", value: current, ...comparisonFields(current, prev, period.range), sub: "written by agents, held for approval" };
+    draftsOut = { label: "Assistant drafts", value: current, ...comparisonFields(current, prev, period.range), sub: "written by assistants, held for approval" };
   }
 
   // --- Active sequences (a snapshot, not a period aggregate) ---------------
@@ -97,7 +98,7 @@ export async function loadCommunicationReport(
       ? { label: "Sequences running", value: drips.rows.length, sub: "nurture and follow-up, right now" }
       : unavailableMetric(
           "Sequences running",
-          drips.status === "missing" ? "Sequences aren't recorded in this environment yet" : "Couldn't be read just now",
+          drips.status === "missing" ? "Sequences aren't switched on for your firm yet" : "Couldn't be read just now",
         );
 
   // --- Waiting on the firm: leads we haven't answered ------------------------
@@ -113,7 +114,7 @@ export async function loadCommunicationReport(
 
   const links: LinkTile[] = [
     ...(opts.hasMailbox ? [{ label: "My Mail", sub: "Your Outlook or Gmail inbox", href: "/dashboard/mail/", count: null }] : []),
-    { label: "Queue", sub: "Agent-triaged intake and drafts to approve", href: "/dashboard/queue/", count: queue.status === "ok" ? queue.items.length : null },
+    { label: APPROVALS_NAME, sub: "Drafts waiting for your approval", href: "/dashboard/queue/", count: queue.status === "ok" ? queue.items.length : null },
     { label: "Campaigns", sub: "Nurture and follow-up sequences", href: "/dashboard/campaigns/", count: drips.status === "ok" ? drips.rows.length : null },
   ];
 

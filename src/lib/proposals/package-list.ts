@@ -175,6 +175,30 @@ export function classCountLabel(n: number): string {
   return `${n} ${n === 1 ? "class" : "classes"}`;
 }
 
+/** "Essential package", "the essential", " ESSENTIAL " -> "essential". Used to match what was said on a call against the firm's list. */
+export function packageSpokenKey(name: string): string {
+  return name
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^(?:the|a|an|our|your)\s+/, "")
+    .replace(/\s+(?:package|plan|tier|option)$/, "")
+    .trim();
+}
+
+/**
+ * The firm's package a spoken or typed name means: the same name once case, spaces, a leading
+ * "the" and a trailing "package" are set aside. Whole-name matches only, so "Essential" never
+ * matches an unrelated package, and nothing is guessed from part of a name.
+ */
+export function findPackageSpoken(list: readonly ProposalPricing[], asked: string | null | undefined): ProposalPricing | undefined {
+  const key = packageSpokenKey(asked ?? "");
+  if (!key) return undefined;
+  return list.find((p) => packageSpokenKey(p.package) === key);
+}
+
 /** The package whose name matches `name`, ignoring case and outer spaces. */
 export function findPackage(list: readonly ProposalPricing[], name: string): ProposalPricing | undefined {
   const key = name.trim().toLowerCase();

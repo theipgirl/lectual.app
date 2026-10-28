@@ -157,7 +157,7 @@ describe("queueMonthlyStatusUpdate", () => {
     baseMocks({ orgKey: null });
     const { queueMonthlyStatusUpdate } = await import("@/lib/matters/filing-followup-action");
 
-    await expect(queueMonthlyStatusUpdate("matter-1")).rejects.toThrow(/approval queue/i);
+    await expect(queueMonthlyStatusUpdate("matter-1")).rejects.toThrow(/switched on for your firm/i);
   });
 
   it("returns not-found when the matter is invisible under RLS", async () => {

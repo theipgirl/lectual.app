@@ -1,5 +1,6 @@
 import type { ProposalRow } from "@/lib/proposals/types";
 import type { ActionState } from "@/app/dashboard/proposals/errors";
+import { notReadyYet } from "@/lib/ui/words";
 
 /**
  * "Change pay link" on a LIVE (sent) proposal (lectual 0100).
@@ -15,7 +16,7 @@ import type { ActionState } from "@/app/dashboard/proposals/errors";
 
 export const PAY_LINK_LABEL = "Change pay link";
 export const PAY_LINK_UPDATED = "Pay link updated.";
-export const PAY_LINK_NEEDS_DB_UPDATE = "Changing the pay link needs a database update.";
+export const PAY_LINK_NEEDS_DB_UPDATE = notReadyYet("Changing the pay link");
 export const PAY_LINK_NOT_LIVE = "Only a proposal whose link is live can have its pay link changed.";
 export const PAY_LINK_REQUIRED = "Enter the pay link.";
 export const PAY_LINK_NOT_HTTPS = "The pay link must be an https:// address.";

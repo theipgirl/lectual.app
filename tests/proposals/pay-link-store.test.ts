@@ -96,11 +96,11 @@ describe("changeLivePayLink", () => {
     expect(updates).toHaveLength(0);
   });
 
-  it("before 0100 is applied the trigger's client_proposal_frozen reads as 'needs a database update'", async () => {
+  it("before 0100 is applied the trigger's client_proposal_frozen reads as 'isn't switched on yet'", async () => {
     dbError = { code: "23514", message: "client_proposal_frozen: a sent proposal is frozen and cannot be edited; revise it as a new version" };
     const err = await fail(changeLivePayLink(ID, "https://ok.example.com/p", { expectedUpdatedAt: T0 }));
     expect(err).toMatchObject({ code: "unavailable", message: PAY_LINK_NEEDS_DB_UPDATE });
-    expect(err!.message).toBe("Changing the pay link needs a database update.");
+    expect(err!.message).toBe("Changing the pay link isn't switched on for your firm yet. Lectual will turn it on.");
   });
 
   it("maps the 0100 refusals to fixed sentences, never the raw text", async () => {

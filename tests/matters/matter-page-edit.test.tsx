@@ -77,6 +77,8 @@ function between(html: string, from: string, to: string): string {
   return html.slice(start, end === -1 ? undefined : end);
 }
 
+/** The second line of the sub-line (days in stage, package, came from). */
+const factsLine = (html: string) => html.match(/<p class="lx-note" style="margin:2px 0 0">(.*?)<\/p>/)?.[1] ?? "";
 const subLine = (html: string) => html.match(/<p class="lx-note" style="margin:6px 0 0">(.*?)<\/p>/)?.[1] ?? "";
 const count = (html: string, needle: RegExp) => (html.match(needle) ?? []).length;
 const link = { id: "l-1", org_id: "org-1", matter_id: "matter-1", contact_id: "contact-1", role: "client", created_at: "2026-02-01T00:00:00Z" };
@@ -111,15 +113,15 @@ describe("matter header", () => {
 
   it("shows 'Came from' in the sub-line only when it has a value", async () => {
     const { render } = await load();
-    expect(subLine(await render())).toContain("Came from Booth");
+    expect(factsLine(await render())).toContain("Came from Booth");
     db.rows("crm_matter").find((m) => m.id === "matter-1")!.referral_source = null;
-    expect(subLine(await render())).not.toContain("Came from");
+    expect(factsLine(await render())).not.toContain("Came from");
   });
 
   it("shows 'Came from' in the sub-line to a read-only role", async () => {
     setRole("viewer");
     const { render } = await load();
-    expect(subLine(await render())).toContain("Came from Booth");
+    expect(factsLine(await render())).toContain("Came from Booth");
   });
 
   it("offers only Litigation on a litigation matter, with the reason", async () => {
@@ -140,7 +142,7 @@ describe("matter header", () => {
 
     const after = await render();
     expect(after).toContain('<h1 class="lx-h1">Acme Rebrand</h1>');
-    expect(text(subLine(after))).toContain("Came from Dawn's referral");
+    expect(text(factsLine(after))).toContain("Came from Dawn's referral");
     expect(after).toContain('value="Acme Rebrand"'); // the edit form is pre-filled with the saved value
     expect(after).toContain("Matter details updated");
     expect(after).toContain("title, came from");
@@ -157,7 +159,7 @@ describe("read-only role sees no new controls (V3)", () => {
     "Add to timeline",
     "Records something that happened",
     "Reopen",
-    "Docket a deadline",
+    "Add a deadline",
     "Save deadline",
     ">Edit<",
     ">Delete<",
@@ -311,7 +313,7 @@ describe("typed timeline entries", () => {
 // ── F9, D4: deadlines ─────────────────────────────────────────────────────────
 
 describe("deadline controls", () => {
-  const docket = (html: string) => between(html, ">Deadlines<", ">The filing<");
+  const docket = (html: string) => between(html, ">Deadlines<", ">Filing details<");
 
   it("lifecycle (D4): close, see it closed with Reopen, reopen, see it open with Edit", async () => {
     const { render, actions } = await load();

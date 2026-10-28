@@ -1,6 +1,9 @@
 // Plain module (NOT "use server"): a "use server" file may only export async
 // functions, so the shared refusal and error helper live here.
 
+import { isQueueError, readableMessage } from "@/lib/ui/readable-error";
+import { APPROVALS_NOT_READY } from "@/lib/ui/words";
+
 export type ActionState = { error?: string; saved?: boolean };
 
 /**
@@ -21,9 +24,9 @@ export const NOT_ENTITLED: ActionState = {
  * `friendlyMatterError`. `lectual`'s quote actions returned `err.message` as-is,
  * which put raw PostgREST text on screen whenever the database refused. A
  * database error (anything carrying a `code`) never passes its message
- * through; the store's own refusals are plain Errors written to be read (the
+ * through; the store's own refusals are ReadableErrors written to be read (the
  * USPTO-at-signing rule, "this quote is accepted and can no longer be edited",
- * the lost-race message), and those do.
+ * the lost-race message), and only those do. Any other Error becomes `fallback`.
  */
 export function friendlyQuoteError(err: unknown, fallback: string): string {
   const code = (err as { code?: unknown } | null)?.code;
@@ -34,6 +37,6 @@ export function friendlyQuoteError(err: unknown, fallback: string): string {
     if (code === "PGRST116") return "That quote couldn't be found. It may have been removed.";
     return fallback;
   }
-  if (!(err instanceof Error)) return fallback;
-  return err.message || fallback;
+  if (isQueueError(err)) return APPROVALS_NOT_READY;
+  return readableMessage(err) ?? fallback;
 }

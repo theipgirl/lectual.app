@@ -60,7 +60,7 @@ describe("draftProposalForStaff", () => {
     const r = await draftProposalForStaff(args);
     expect(r).toEqual({
       ok: false,
-      error: "The proposal couldn't be drafted because the server key (SUPABASE_SERVICE_ROLE_KEY) isn't set on this deployment. Nothing was sent.",
+      error: "The proposal couldn't be drafted because a setting on Lectual's side is missing. Use Send feedback so Lectual can fix it. Nothing was sent.",
     });
     expect(mocks.runConsultProposal).not.toHaveBeenCalled();
     expect(spy).toHaveBeenCalledTimes(1);
@@ -74,7 +74,7 @@ describe("draftProposalForStaff", () => {
     mocks.getSiteOrigin.mockRejectedValue(new Error("headers() outside a request"));
     const r = await draftProposalForStaff(args);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toMatch(/step: env.*Nothing was sent\./);
+    if (!r.ok) expect(r.error).toMatch(/Lectual's setup for your firm isn't finished.*Nothing was sent\./);
     expect(JSON.parse(String(spy.mock.calls[0][0]))).toMatchObject({ stage: "env", message: "headers() outside a request" });
   });
 

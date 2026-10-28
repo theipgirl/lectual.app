@@ -74,10 +74,10 @@ describe("changePayLinkAction (runChangePayLink)", () => {
     expect(d.change).not.toHaveBeenCalled();
   });
 
-  it("before 0100: the store's refusal reads 'Changing the pay link needs a database update.'", async () => {
+  it("before 0100: the store's refusal reads as not switched on yet", async () => {
     const d = deps({ change: vi.fn(async () => { throw new ProposalError("unavailable", PAY_LINK_NEEDS_DB_UPDATE); }) });
     const r = await runChangePayLink(d, { id: "p1", payUrl: "https://ok.example.com/p", updatedAt: T });
-    expect(r).toEqual({ error: "Changing the pay link needs a database update." });
+    expect(r).toEqual({ error: "Changing the pay link isn't switched on for your firm yet. Lectual will turn it on." });
     expect(d.revalidate).not.toHaveBeenCalled();
   });
 

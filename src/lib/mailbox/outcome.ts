@@ -8,7 +8,7 @@ export const OUTCOME_MESSAGES = {
   expired: "That connection attempt expired or was started in another tab. Please try again.",
   "wrong-session":
     "You switched account or firm partway through. Nothing was saved — start again from this page.",
-  unconfigured: "Mailbox connections aren't set up on this deployment yet.",
+  unconfigured: "Connecting a mailbox isn't switched on yet. Lectual is setting it up.",
   forbidden: "Only an owner, admin or senior admin can connect a firm mailbox.",
   "missing-permission":
     "Some permissions weren't granted. Lectual needs to read mail and create drafts; please allow both.",

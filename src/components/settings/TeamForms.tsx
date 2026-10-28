@@ -1,25 +1,16 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import {
   inviteMemberAction,
   removeMemberAction,
   setMemberRoleAction,
   type MemberActionState,
 } from "@/app/dashboard/settings/team/actions";
+import { ROLE_LABEL } from "@/lib/auth/roles";
+import { roleChangeQuestion } from "@/lib/team/role-change";
 
-export const ROLE_LABEL: Record<string, string> = {
-  owner: "Owner",
-  admin: "Admin",
-  senior_admin: "Senior admin",
-  attorney: "Attorney",
-  intake: "Intake",
-  paralegal: "Paralegal",
-  law_clerk: "Law clerk",
-  social_media: "Social media",
-  clerk: "Clerk",
-  viewer: "Viewer",
-};
+export { ROLE_LABEL };
 
 function Msg({ state }: { state: MemberActionState }) {
   if (state.error) return <span role="alert" className="lx-note" style={{ color: "var(--wine)" }}>{state.error}</span>;
@@ -28,20 +19,37 @@ function Msg({ state }: { state: MemberActionState }) {
   return null;
 }
 
-/** Only roles at or below the caller's own rank are offered; the server re-checks. */
-export function RoleSelect({ userId, role, grantable }: { userId: string; role: string; grantable: string[] }) {
+/**
+ * Only roles at or below the caller's own rank are offered; the server re-checks. Choosing a
+ * different role does NOT save: it asks first, with Confirm and Cancel (Cancel puts the old role
+ * back). The action only fires from Confirm.
+ */
+export function RoleSelect({ userId, role, grantable, name = "this person" }: { userId: string; role: string; grantable: string[]; name?: string }) {
   const [state, action, pending] = useActionState<MemberActionState, FormData>(setMemberRoleAction, {});
+  const [chosen, setChosen] = useState(role);
   const options = grantable.includes(role) ? grantable : [role, ...grantable];
+  const asking = chosen !== role;
   return (
     <form action={action} className="lx-inline-form">
       <input type="hidden" name="userId" value={userId} />
-      <select name="role" className="lx-input" defaultValue={role} aria-label="Role" disabled={pending} onChange={(e) => e.currentTarget.form?.requestSubmit()}>
+      <select name="role" className="lx-input" value={chosen} aria-label="Role" disabled={pending} onChange={(e) => setChosen(e.currentTarget.value)}>
         {options.map((r) => (
           <option key={r} value={r} disabled={!grantable.includes(r)}>
             {ROLE_LABEL[r] ?? r}
           </option>
         ))}
       </select>
+      {asking && (
+        <span role="alert" className="lx-note" style={{ display: "inline-flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          {roleChangeQuestion(name, role, chosen)}
+          <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={pending}>
+            {pending ? "Saving…" : "Confirm"}
+          </button>
+          <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending} onClick={() => setChosen(role)}>
+            Cancel
+          </button>
+        </span>
+      )}
       <Msg state={state} />
     </form>
   );

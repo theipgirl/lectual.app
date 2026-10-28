@@ -12,6 +12,8 @@ import {
   type ProfileInput,
 } from "./profile-rules";
 import { NO_LANE_LINKS, type LaneLinks } from "@/lib/leads/lane";
+import { ReadableError } from "@/lib/ui/readable-error";
+
 
 export type { OrgProfile, ProfileInput } from "./profile-rules";
 
@@ -50,9 +52,9 @@ export const getFirmTimeZone = cache(async (): Promise<string> => {
 
 export async function saveOrgProfile(input: ProfileInput & { laneLinks?: LaneLinksInput }): Promise<void> {
   const checked = checkProfileInput(input);
-  if (!checked.ok) throw new Error(checked.reason);
+  if (!checked.ok) throw new ReadableError(checked.reason);
   const links = input.laneLinks ? checkLaneLinksInput(input.laneLinks) : null;
-  if (links && !links.ok) throw new Error(links.reason);
+  if (links && !links.ok) throw new ReadableError(links.reason);
   const supabase = await getScopedClient();
   await requireSettingsAdminRole(supabase);
   const orgId = await currentOrgId(supabase);
@@ -62,7 +64,7 @@ export async function saveOrgProfile(input: ProfileInput & { laneLinks?: LaneLin
   if (nurtureId) {
     const { data: seq, error: seqError } = await supabase.from("crm_drip_sequence").select("id").eq("id", nurtureId).maybeSingle();
     if (seqError) throw seqError;
-    if (!seq) throw new Error("That nurture campaign couldn't be found. Refresh and choose it again.");
+    if (!seq) throw new ReadableError("That nurture campaign couldn't be found. Refresh and choose it again.");
   }
   const { data: user } = await supabase.auth.getUser();
   const { error } = await supabase.from("crm_org_profile").upsert(

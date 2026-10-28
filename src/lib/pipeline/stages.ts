@@ -1,5 +1,6 @@
 import { getScopedClient } from "@/lib/db/scoped-client";
 import type { Database } from "@/lib/db/types";
+import { inPipelineOrder } from "./stage-order";
 
 export type Stage = Database["public"]["Tables"]["crm_stage"]["Row"];
 
@@ -15,5 +16,6 @@ export async function listStages(): Promise<Stage[]> {
     .select("*")
     .order("order_index", { ascending: true });
   if (error) throw error;
-  return data ?? [];
+  // order_index is not unique: ties are broken the same way everywhere (name, then id) so a board never reshuffles.
+  return inPipelineOrder(data ?? []);
 }

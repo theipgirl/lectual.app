@@ -82,12 +82,12 @@ export default async function QuoteBuilderPage({ params }: { params: Promise<{ i
         </Link>
         <div className="lx-card lx-empty-card">
           <h2 className="lx-h2" style={{ fontSize: 25 }}>
-            {load.status === "unconfigured" ? "Quotes aren't set up in this environment" : "This quote couldn't be loaded"}
+            {load.status === "unconfigured" ? "Quotes aren't switched on for your firm yet" : "This quote couldn't be loaded"}
           </h2>
           <p className="lx-note" style={{ margin: 0 }}>
             {load.status === "unconfigured"
-              ? "The quote tables (lectual migration 0068) are not in this database."
-              : "This is a problem reaching the database, not a missing quote. Try again shortly."}
+              ? "Lectual will turn them on."
+              : "Can't show this right now. Refresh to try again."}
           </p>
         </div>
       </>

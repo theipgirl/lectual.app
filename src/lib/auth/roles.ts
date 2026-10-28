@@ -52,3 +52,21 @@ export function requireRole(actual: Role, required: Role): void {
     throw new Error(`Forbidden: requires ${required}, has ${actual}`);
   }
 }
+
+/** Roles as a person reads them ("Senior admin", "Law clerk"). Never print the stored value. */
+export const ROLE_LABEL: Record<string, string> = {
+  owner: "Owner",
+  admin: "Admin",
+  senior_admin: "Senior admin",
+  attorney: "Attorney",
+  intake: "Intake",
+  paralegal: "Paralegal",
+  law_clerk: "Law clerk",
+  social_media: "Social media",
+  clerk: "Clerk",
+  viewer: "Viewer",
+};
+
+export function roleLabel(role: string): string {
+  return ROLE_LABEL[role] ?? role.replace(/_/g, " ");
+}

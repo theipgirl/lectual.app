@@ -7,6 +7,7 @@ import { LinkedProposalPanel } from "@/components/queue/LinkedProposalPanel";
 import { buildProposalCard } from "@/lib/proposals/card";
 import type { LinkedPanel } from "@/lib/consult-proposal/link";
 import { sevetri } from "./fixture";
+import { acceptedSnapshot } from "./accepted-fixture";
 
 /**
  * D3/D4: the approver sees the proposal card above the editor, the consult strip
@@ -101,11 +102,20 @@ async function render(proposal: ProposalRow, events: ProposalEventRow[], strip: 
     AddNameForm: stub("add-name"),
     AdjustmentsForm: stub("adjustments"),
     DetailsForm: stub("details"),
+    DetailsMoreFields: stub("details-more"),
     IncludesForm: stub("includes"),
     MessageForm: stub("message"),
     NameCard: stub("name-card"),
+    NameMoreFields: stub("name-more"),
+    NameRowsProvider: ({ children }: { children: unknown }) => children,
     PricingForm: stub("pricing"),
+    PricingMoreFields: stub("pricing-more"),
   }));
+  vi.doMock("@/lib/proposals/lead-link", () => ({
+    loadLeadLink: vi.fn(async (id: string | null) => (id ? { state: "linked", id, name: "Sevetri Wilson" } : { state: "none" })),
+  }));
+  vi.doMock("@/lib/proposals/lead-options", () => ({ loadLeadOptions: vi.fn(async () => ({ status: "ok", leads: [] })) }));
+  vi.doMock("@/components/proposal-editor/LinkLeadForm", () => ({ LinkLeadForm: stub("link-lead") }));
   const { default: Page } = await import("../../src/app/dashboard/proposals/[id]/page");
   const html = renderToStaticMarkup(createElement("div", null, await Page({ params: Promise.resolve({ id: ID }) })));
   return { html, loadStrip };
@@ -114,13 +124,15 @@ async function render(proposal: ProposalRow, events: ProposalEventRow[], strip: 
 describe("proposal detail page", () => {
   beforeEach(() => vi.resetModules());
 
-  it("puts the card above the editor, with both fees under their own labels", async () => {
+  it("puts the card above the editor; the fees are shown once, in the one totals box", async () => {
     const { html } = await render(row(), [EVIDENCE]);
     const card = html.indexOf("Proposal at a glance");
     expect(card).toBeGreaterThan(-1);
     expect(card).toBeLessThan(html.indexOf('data-stub="details"'));
-    expect(html).toContain("At signing (legal fee)");
-    expect(html).toContain("At filing (USPTO fees)");
+    expect(html).not.toContain("At signing (legal fee)");
+    expect(html).not.toContain("pre-ticked");
+    expect(html).toContain("What the client pays");
+    expect(html.match(/USPTO fees, due at filing/g)).toHaveLength(1);
     expect(html).toContain("Heard on the call");
     expect(html).toContain("a word mark and a logo");
   });
@@ -151,6 +163,49 @@ describe("proposal detail page", () => {
     const { html } = await render(row({ source: "manual" }), []);
     expect(html).toContain("Proposal at a glance");
     expect(html).not.toContain("Heard on the call");
+  });
+});
+
+describe("proposal detail page: classes the client added", () => {
+  beforeEach(() => vi.resetModules());
+
+  function addedSnapshot() {
+    const snap = acceptedSnapshot({ classes: 1 });
+    const nm = snap.content.names[0];
+    nm.classes.push({ id: "p-added", label: "Podcast production services", preselected: false, client_added: true });
+    snap.selection["p-added"] = true;
+    return { snap, brand: nm.name };
+  }
+
+  const ACCEPTED: ProposalEventRow = {
+    id: "e-acc",
+    org_id: "o",
+    proposal_id: ID,
+    family_id: ID,
+    type: "accepted",
+    actor: "client",
+    actor_user_id: null,
+    payload: {},
+    created_at: "2026-10-21T15:00:00Z",
+  } as ProposalEventRow;
+
+  it("lists them in the aside and in the accepted line of the activity log", async () => {
+    const { snap, brand } = addedSnapshot();
+    const { html } = await render(
+      row({ status: "accepted", accepted_at: "2026-10-21T15:00:00Z", accepted_snapshot: snap, accepted_selection: snap.selection }),
+      [ACCEPTED],
+    );
+    expect(html).toContain("Classes the client added (1)");
+    expect(html).toContain(`<strong>${brand}</strong>: Podcast production services`);
+    expect(html).toContain("adding 1 class");
+    expect(html).toContain(`Added for ${brand}: Podcast production services`);
+  });
+
+  it("shows neither when the client added nothing", async () => {
+    const snap = acceptedSnapshot({ classes: 1 });
+    const { html } = await render(row({ status: "accepted", accepted_at: "2026-10-21T15:00:00Z", accepted_snapshot: snap, accepted_selection: snap.selection }), [ACCEPTED]);
+    expect(html).not.toContain("Classes the client added");
+    expect(html).not.toContain("adding 1 class");
   });
 });
 

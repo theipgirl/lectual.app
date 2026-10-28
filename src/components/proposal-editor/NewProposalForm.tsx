@@ -4,7 +4,9 @@ import { useState, type ReactNode } from "react";
 import { createProposalAction } from "@/app/dashboard/proposals/actions";
 import type { PackageOption } from "@/lib/proposals/package-list";
 import { USE_CONSULT_LABEL } from "@/lib/proposals/prefill-words";
+import { countChangedFields, messageInMoreOptions } from "@/lib/proposal-editor/more-options";
 import { ActionForm, Outcome } from "./ActionForm";
+import { BuilderLayout } from "./BuilderLayout";
 
 export type NewProposalDefaults = {
   leadId: string;
@@ -67,6 +69,25 @@ export function NewProposalForm({
       : { base: "", includedClasses: "", perClass: "", secondMarkPct: "", govPerClass: "" },
   );
   const set = (key: keyof PackageFields) => (e: { target: { value: string } }) => setFields((f) => ({ ...f, [key]: e.target.value }));
+  // The More options fields are controlled so the section can say how many differ from their defaults.
+  const [more, setMore] = useState({ firstName: defaults.firstName, company: defaults.company, title: defaults.title, expiresOn: defaults.expiresOn });
+  const setMoreField = (key: keyof typeof more) => (e: { target: { value: string } }) => setMore((m) => ({ ...m, [key]: e.target.value }));
+  const chosenOption = options.find((o) => o.name === chosen);
+  const changed = countChangedFields([
+    { current: more.firstName, baseline: defaults.firstName },
+    { current: more.company, baseline: defaults.company },
+    { current: more.title, baseline: defaults.title },
+    { current: more.expiresOn, baseline: defaults.expiresOn },
+    ...(chosenOption
+      ? [
+          { current: fields.base, baseline: chosenOption.base },
+          { current: fields.includedClasses, baseline: chosenOption.includedClasses },
+          { current: fields.perClass, baseline: chosenOption.perClass },
+          { current: fields.secondMarkPct, baseline: chosenOption.secondMarkPct },
+          { current: fields.govPerClass, baseline: chosenOption.govPerClass },
+        ]
+      : []),
+  ]);
 
   return (
     <ActionForm action={createProposalAction} className="lx-card pe-card">
@@ -74,107 +95,130 @@ export function NewProposalForm({
         <>
           <input type="hidden" name="leadId" value={defaults.leadId} />
           <input type="hidden" name="matterId" value={defaults.matterId} />
-          <div className="lx-form-grid">
-            <label className="lx-field">
-              <span className="lx-label">Client full name</span>
-              <input className="lx-input" name="fullName" required maxLength={300} defaultValue={defaults.fullName} />
-            </label>
-            <label className="lx-field">
-              <span className="lx-label">First name (greeting)</span>
-              <input className="lx-input" name="firstName" maxLength={120} defaultValue={defaults.firstName} />
-            </label>
-            <label className="lx-field">
-              <span className="lx-label">Company (optional)</span>
-              <input className="lx-input" name="company" maxLength={200} defaultValue={defaults.company} />
-            </label>
-            <label className="lx-field">
-              <span className="lx-label">Client email</span>
-              <input className="lx-input" name="clientEmail" type="email" maxLength={320} defaultValue={defaults.clientEmail} />
-            </label>
-            <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
-              <span className="lx-label">Title</span>
-              <input className="lx-input" name="title" maxLength={300} defaultValue={defaults.title} />
-            </label>
-            <label className="lx-field">
-              <span className="lx-label">Open until</span>
-              <input className="lx-input" name="expiresOn" type="date" defaultValue={defaults.expiresOn} />
-            </label>
-            <label className="lx-field">
-              <span className="lx-label">First brand name (optional)</span>
-              <input className="lx-input" name="brandName" maxLength={200} defaultValue={defaults.brandName} placeholder="e.g. Prosperall" />
-            </label>
-            {consult && (
-              <div className="pe-consult-use" style={{ gridColumn: "1 / -1" }}>
-                <label className="pe-check" style={{ whiteSpace: "normal" }}>
-                  <input type="checkbox" name="useConsult" defaultChecked /> {USE_CONSULT_LABEL}
+          <BuilderLayout
+            changed={changed}
+            moreOpen={messageInMoreOptions(state.error)}
+            who={
+              <div className="lx-form-grid">
+                <label className="lx-field">
+                  <span className="lx-label">Client full name</span>
+                  <input className="lx-input" name="fullName" required maxLength={300} defaultValue={defaults.fullName} />
                 </label>
-                {consult}
+                <label className="lx-field">
+                  <span className="lx-label">Client email</span>
+                  <input className="lx-input" name="clientEmail" type="email" maxLength={320} defaultValue={defaults.clientEmail} />
+                </label>
               </div>
-            )}
-            {packages !== null && options.length > 0 && (
-              <>
+            }
+            names={
+              <div className="lx-form-grid">
+                <label className="lx-field">
+                  <span className="lx-label">First brand name (optional)</span>
+                  <input className="lx-input" name="brandName" maxLength={200} defaultValue={defaults.brandName} placeholder="e.g. Prosperall" />
+                  <span className="lx-note">Marks, classes and more brand names are added on the next page.</span>
+                </label>
+                {consult && (
+                  <div className="pe-consult-use" style={{ gridColumn: "1 / -1" }}>
+                    <label className="pe-check" style={{ whiteSpace: "normal" }}>
+                      <input type="checkbox" name="useConsult" defaultChecked /> {USE_CONSULT_LABEL}
+                    </label>
+                    {consult}
+                  </div>
+                )}
+              </div>
+            }
+            packageStep={
+              <div className="lx-form-grid">
+                {packages !== null && options.length > 0 && (
+                  <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
+                    <span className="lx-label">Package</span>
+                    <select
+                      className="lx-input"
+                      name="package"
+                      value={chosen}
+                      onChange={(e) => {
+                        setChosen(e.target.value);
+                        setFields((f) => fieldsForPackage(options, e.target.value, f));
+                      }}
+                    >
+                      {options.map((o) => (
+                        <option key={o.name} value={o.name}>
+                          {o.name} — {o.summary}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="lx-note">Fills in the prices under More options. You can change any of them for this proposal, and it will say it was edited from the package.</span>
+                  </label>
+                )}
                 <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
-                  <span className="lx-label">Package</span>
-                  <select
-                    className="lx-input"
-                    name="package"
-                    value={chosen}
-                    onChange={(e) => {
-                      setChosen(e.target.value);
-                      setFields((f) => fieldsForPackage(options, e.target.value, f));
-                    }}
-                  >
-                    {options.map((o) => (
-                      <option key={o.name} value={o.name}>
-                        {o.name} — {o.summary}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="lx-note">Fills in the prices below. You can change any of them for this proposal, and it will say it was edited from the package.</span>
+                  <span className="lx-label">Pay link</span>
+                  <input className="lx-input" name="payUrl" type="url" maxLength={2000} defaultValue={defaults.payUrl} placeholder="Enter custom pay link" />
                 </label>
-                <label className="lx-field">
-                  <span className="lx-label">Price with the included classes ($)</span>
-                  <input className="lx-input" name="base" inputMode="decimal" required value={fields.base} onChange={set("base")} />
-                </label>
-                <label className="lx-field">
-                  <span className="lx-label">Classes included</span>
-                  <input className="lx-input" name="includedClasses" inputMode="numeric" required value={fields.includedClasses} onChange={set("includedClasses")} />
-                </label>
-                <label className="lx-field">
-                  <span className="lx-label">Per class over / under ($)</span>
-                  <input className="lx-input" name="perClass" inputMode="decimal" required value={fields.perClass} onChange={set("perClass")} />
-                </label>
-                <label className="lx-field">
-                  <span className="lx-label">Second mark discount (%)</span>
-                  <input className="lx-input" name="secondMarkPct" inputMode="decimal" required value={fields.secondMarkPct} onChange={set("secondMarkPct")} />
-                </label>
-                <label className="lx-field">
-                  <span className="lx-label">USPTO fee per class per mark ($)</span>
-                  <input className="lx-input" name="govPerClass" inputMode="decimal" required value={fields.govPerClass} onChange={set("govPerClass")} />
-                </label>
+                {packages === null && (
+                  <p className="lx-note" role="status" style={{ margin: "12px 0 0" }}>
+                    Your packages couldn&apos;t be loaded just now, so no package is offered and the standard prices will be used. You can change them on the next page.
+                  </p>
+                )}
+                {!hasSettings && (
+                  <p className="lx-note" style={{ margin: "12px 0 0" }}>
+                    Your firm hasn’t saved its standard prices yet, so this starts from the default Concierge prices. An admin can change them in Settings.
+                  </p>
+                )}
+              </div>
+            }
+            create={
+              <>
+                <button type="submit" className="lx-btn lx-btn-pri" disabled={pending}>
+                  {pending ? "Creating…" : "Create draft"}
+                </button>
+                <Outcome state={state} pending={pending} />
               </>
-            )}
-            <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
-              <span className="lx-label">Pay link</span>
-              <input className="lx-input" name="payUrl" type="url" maxLength={2000} defaultValue={defaults.payUrl} placeholder="Enter custom pay link" />
-            </label>
-          </div>
-          {packages === null && (
-            <p className="lx-note" role="status" style={{ margin: "12px 0 0" }}>
-              Your packages couldn&apos;t be loaded just now, so no package is offered and the standard prices will be used. You can change them on the next page.
-            </p>
-          )}
-          {!hasSettings && (
-            <p className="lx-note" style={{ margin: "12px 0 0" }}>
-              Your firm hasn’t saved its standard prices yet, so this starts from the default Concierge prices. An admin can change them in Settings.
-            </p>
-          )}
-          <div className="pe-save">
-            <button type="submit" className="lx-btn lx-btn-pri" disabled={pending}>
-              {pending ? "Creating…" : "Create draft"}
-            </button>
-            <Outcome state={state} pending={pending} />
-          </div>
+            }
+            more={
+              <div className="lx-form-grid">
+                <label className="lx-field">
+                  <span className="lx-label">First name (greeting)</span>
+                  <input className="lx-input" name="firstName" maxLength={120} value={more.firstName} onChange={setMoreField("firstName")} />
+                </label>
+                <label className="lx-field">
+                  <span className="lx-label">Company (optional)</span>
+                  <input className="lx-input" name="company" maxLength={200} value={more.company} onChange={setMoreField("company")} />
+                </label>
+                <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
+                  <span className="lx-label">Title</span>
+                  <input className="lx-input" name="title" maxLength={300} value={more.title} onChange={setMoreField("title")} />
+                </label>
+                <label className="lx-field">
+                  <span className="lx-label">Open until</span>
+                  <input className="lx-input" name="expiresOn" type="date" value={more.expiresOn} onChange={setMoreField("expiresOn")} />
+                </label>
+                {packages !== null && options.length > 0 && (
+                  <>
+                    <label className="lx-field">
+                      <span className="lx-label">Price with the included classes ($)</span>
+                      <input className="lx-input" name="base" inputMode="decimal" required value={fields.base} onChange={set("base")} />
+                    </label>
+                    <label className="lx-field">
+                      <span className="lx-label">Classes included</span>
+                      <input className="lx-input" name="includedClasses" inputMode="numeric" required value={fields.includedClasses} onChange={set("includedClasses")} />
+                    </label>
+                    <label className="lx-field">
+                      <span className="lx-label">Price per extra class ($)</span>
+                      <input className="lx-input" name="perClass" inputMode="decimal" required value={fields.perClass} onChange={set("perClass")} />
+                    </label>
+                    <label className="lx-field">
+                      <span className="lx-label">Second mark discount (%)</span>
+                      <input className="lx-input" name="secondMarkPct" inputMode="decimal" required value={fields.secondMarkPct} onChange={set("secondMarkPct")} />
+                    </label>
+                    <label className="lx-field">
+                      <span className="lx-label">USPTO fee per class per mark ($)</span>
+                      <input className="lx-input" name="govPerClass" inputMode="decimal" required value={fields.govPerClass} onChange={set("govPerClass")} />
+                    </label>
+                  </>
+                )}
+              </div>
+            }
+          />
         </>
       )}
     </ActionForm>

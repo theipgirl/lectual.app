@@ -17,6 +17,9 @@ import { StatCards } from "./stat-cards";
 import "./copilot.css";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { SectionTabs } from "@/components/shell/SectionTabs";
+import { REPORTS } from "@/lib/nav";
+import { COPILOT_NAME } from "@/lib/ui/words";
 
 export const metadata: Metadata = { title: pageTitle("Copilot") };
 
@@ -121,6 +124,7 @@ export default async function CopilotPage(props?: { searchParams?: Promise<{ c?:
   return (
     <>
       <h1 className="cpw-sr">Copilot</h1>
+      <SectionTabs active="list" listLabel={COPILOT_NAME} listHref="/dashboard/copilot/" summaryHref={REPORTS.ipos.href} />
 
       {configured && saved ? (
         <CopilotWorkspace
@@ -136,11 +140,10 @@ export default async function CopilotPage(props?: { searchParams?: Promise<{ c?:
       ) : (
         <div className="lx-card lx-empty-card">
           <h2 className="lx-h2" style={{ fontSize: 25 }}>
-            The copilot isn&apos;t configured for this deployment yet
+            Copilot isn&apos;t switched on for your firm yet
           </h2>
           <p className="lx-note" style={{ margin: 0 }}>
-            An administrator needs to set an AI provider key before this page can answer
-            questions. Nothing here is broken — there is simply nothing to ask yet.
+            Lectual will turn it on. Nothing here is broken: there is simply nothing to ask yet.
           </p>
         </div>
       )}

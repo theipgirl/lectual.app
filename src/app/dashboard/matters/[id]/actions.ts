@@ -48,6 +48,7 @@ import { generateWelcomeEmail } from "@/lib/welcome/generate";
 import { queueMonthlyStatusUpdate } from "@/lib/matters/filing-followup-action";
 import { DocumentFlowError } from "@/lib/documents/errors";
 import { friendlyMatterError } from "../errors";
+import { ReadableError } from "@/lib/ui/readable-error";
 
 export type FollowUpActionState = { error?: string; queueItemId?: string };
 
@@ -64,7 +65,7 @@ export async function requireMatterWriteRole(): Promise<Role> {
   const { data, error } = await supabase.rpc("current_org_role");
   if (error) throw error;
   if (!isRole(data) || !MATTER_WRITE_ROLES.includes(data)) {
-    throw new Error("You don't have permission to edit matters.");
+    throw new ReadableError("You don't have permission to edit matters.");
   }
   return data;
 }
@@ -103,7 +104,7 @@ function readIpFields(formData: FormData): MatterIpFields {
   if (has("registrationNumber")) fields.registrationNumber = blankToNull(formData.get("registrationNumber"));
   if (has("filingBasis")) {
     const raw = blankToNull(formData.get("filingBasis"));
-    if (raw !== null && !isFilingBasis(raw)) throw new Error("Choose a valid filing basis.");
+    if (raw !== null && !isFilingBasis(raw)) throw new ReadableError("Choose a valid filing basis.");
     fields.filingBasis = raw;
   }
   if (has("filingDate")) fields.filingDate = parseCivilDate(formData.get("filingDate"));
@@ -120,7 +121,7 @@ function readIpFields(formData: FormData): MatterIpFields {
     const status = blankToNull(formData.get("usptoStatus"));
     const asOf = parseCivilDate(formData.get("usptoStatusAsOf"));
     if (status !== null && asOf === null) {
-      throw new Error("Add the date the USPTO status was read, so it can't go stale unnoticed.");
+      throw new ReadableError("Add the date the USPTO status was read, so it can't go stale unnoticed.");
     }
     fields.usptoStatus = status;
     fields.usptoStatusAsOf = status === null ? null : asOf;
@@ -401,14 +402,14 @@ function parseHearingInstant(value: FormDataEntryValue | null | undefined): stri
   if (raw === null) return null;
   const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::\d{2})?$/.exec(raw);
   if (!match) {
-    throw new Error(`"${raw}" is not a valid date and time.`);
+    throw new ReadableError(`"${raw}" is not a valid date and time.`);
   }
   // Validates the calendar date itself (Feb 30 would otherwise roll silently).
   parseCivilDate(match[1]);
   const hours = Number(match[2]);
   const minutes = Number(match[3]);
   if (hours > 23 || minutes > 59) {
-    throw new Error(`"${raw}" is not a valid time of day.`);
+    throw new ReadableError(`"${raw}" is not a valid time of day.`);
   }
   const [y, mo, d] = match[1].split("-").map(Number);
   return courtWallClockToUtcIso(y, mo, d, hours, minutes);

@@ -37,7 +37,6 @@ import type {
   PlannedCreate,
   PlannedUpdate,
   SkippedRecord,
-  StageDivergence,
   WithheldFields,
   UnmappedRecord,
 } from "@/lib/lawmatics/import-plan";
@@ -95,7 +94,7 @@ export async function connectLawmaticsAction(_prev: ConnectState, formData: Form
     return { error: "Only owners and admins can connect Lawmatics." };
   }
   const root = rootKeyOrNull();
-  if (!root) return { error: "Integrations aren't set up on this deployment yet (no encryption key)." };
+  if (!root) return { error: "Integrations aren't switched on for your firm yet. Lectual will turn them on." };
   const session = await resolveFirmSession();
   if (session.kind !== "ok") return { error: "Sign in again to connect Lawmatics." };
 
@@ -147,7 +146,6 @@ export type PreviewView = {
     contactOnly: number;
     update: number;
     unchanged: number;
-    divergent: number;
     withheld: number;
     unmapped: number;
     skipped: number;
@@ -162,7 +160,6 @@ export type PreviewView = {
   stageDecisions: PlannedCreate[];
   contactCreates: PlannedContactCreate[];
   updates: PlannedUpdate[];
-  divergences: StageDivergence[];
   withheld: WithheldFields[];
   unmapped: UnmappedRecord[];
   skipped: SkippedRecord[];
@@ -174,7 +171,6 @@ export type PreviewView = {
     stageDecisions: number;
     contactCreates: number;
     updates: number;
-    divergences: number;
     withheld: number;
     unmapped: number;
     skipped: number;
@@ -182,7 +178,7 @@ export type PreviewView = {
 };
 
 export type ReportView = ImportReport & {
-  omitted: { divergences: number; unmapped: number; skipped: number };
+  omitted: { unmapped: number; skipped: number };
 };
 
 export type ImportState = {
@@ -213,7 +209,6 @@ function toPreviewView(preview: PreviewResult): PreviewView {
     stageDecisions: p.creates.filter((c) => c.stageDecision).slice(0, LIST_CAP),
     contactCreates: p.contactCreates.slice(0, LIST_CAP),
     updates: p.updates.slice(0, LIST_CAP),
-    divergences: p.divergences.slice(0, LIST_CAP),
     withheld: p.withheld.slice(0, LIST_CAP),
     unmapped: p.unmapped.slice(0, LIST_CAP),
     skipped: p.skipped.slice(0, LIST_CAP),
@@ -224,7 +219,6 @@ function toPreviewView(preview: PreviewResult): PreviewView {
       stageDecisions: Math.max(0, p.creates.filter((c) => c.stageDecision).length - LIST_CAP),
       contactCreates: Math.max(0, p.contactCreates.length - LIST_CAP),
       updates: Math.max(0, p.updates.length - LIST_CAP),
-      divergences: Math.max(0, p.divergences.length - LIST_CAP),
       withheld: Math.max(0, p.withheld.length - LIST_CAP),
       unmapped: Math.max(0, p.unmapped.length - LIST_CAP),
       skipped: Math.max(0, p.skipped.length - LIST_CAP),
@@ -235,12 +229,10 @@ function toPreviewView(preview: PreviewResult): PreviewView {
 function toReportView(report: ImportReport): ReportView {
   return {
     ...report,
-    divergences: report.divergences.slice(0, LIST_CAP),
     unmapped: report.unmapped.slice(0, LIST_CAP),
     skipped: report.skipped.slice(0, LIST_CAP),
     failures: report.failures.slice(0, LIST_CAP),
     omitted: {
-      divergences: Math.max(0, report.divergences.length - LIST_CAP),
       unmapped: Math.max(0, report.unmapped.length - LIST_CAP),
       skipped: Math.max(0, report.skipped.length - LIST_CAP),
     },
@@ -255,7 +247,6 @@ function readOptions(formData: FormData): PlanOptions {
   // operator who unticks it gets every practice area, exactly like the two
   // existing checkboxes' off state.
   return {
-    moveExistingStages: formData.get("moveExistingStages") === "on",
     overwriteEditedFields: formData.get("overwriteEditedFields") === "on",
     practiceAreaFilter: formData.get("trademarkOnly") === "on" ? "Trademark" : null,
   };
@@ -340,8 +331,8 @@ export async function importAction(
 // separately-named exported actions rather than one `intent`-branching
 // action — the task calls for two distinct entry points, and this importer
 // has no options to carry between them (every write is null-only-guarded by
-// construction, so there is nothing equivalent to moveExistingStages /
-// overwriteEditedFields to thread through a hidden field).
+// construction, so there is nothing equivalent to overwriteEditedFields to
+// thread through a hidden field).
 
 export type MattersPreviewView = {
   fetchedAt: string;

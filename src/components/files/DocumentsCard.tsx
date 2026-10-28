@@ -22,9 +22,9 @@ export const DOCS_TITLE = "Documents & files";
 export const EMPTY_LINE = "Nothing here yet";
 export const INTERNAL_NOTE = "Files are internal to the firm. Nothing here is shared with a client.";
 export const FILES_ERROR_LINE =
-  "Files couldn't be loaded. This is a problem reaching the database, not an empty list. Try again shortly.";
+  "Files couldn't be loaded. Refresh to try again.";
 export const LETTERS_ERROR_LINE =
-  "Generated letters couldn't be loaded. This is a problem reaching the database, not an empty list. Try again shortly.";
+  "Generated letters couldn't be loaded. Refresh to try again.";
 
 function Entry({ entry, now, canDelete }: { entry: DocEntry; now?: number; canDelete: boolean }) {
   const href = entry.kind === "file" ? `/dashboard/files/${entry.id}/download/` : `/dashboard/documents/${entry.id}/download/`;

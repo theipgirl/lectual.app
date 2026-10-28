@@ -74,18 +74,21 @@ describe("queue item page renders Markdown (F8)", () => {
     expect(html).toContain("Final, as approved");
   });
 
-  it("gives a pending item a labelled Preview with rendered Markdown, and keeps the textarea", async () => {
+  it("gives a pending item the rendered Markdown view with an Edit button, and no editor until Edit", async () => {
     const body = "Hi **Ana**,\n\n| Service | Fee |\n|---|---|\n| Filing | $850 |\n\n## Next steps";
     const html = await render(item({ status: "pending", draft_body: body, resolved_by: null, resolved_at: null }));
-    const region = html.slice(html.indexOf('aria-labelledby="draft-preview-label"'), html.indexOf("<label"));
-    expect(region).toContain(">Preview<");
+    const region = html.slice(html.indexOf('aria-labelledby="draft-view-label"'), html.indexOf("Note <span"));
+    expect(region).toContain(">Draft");
     expect(region).toContain("<strong>Ana</strong>");
     expect(region).toContain("<table>");
     expect(region).toContain("<h2>Next steps</h2>");
-    expect(html).toContain("<textarea");
-    // The editable source keeps the raw text.
-    expect(html).toContain("Hi **Ana**,");
-    expect(html).toContain('class="lx-input lx-draft"');
+    expect(region).toMatch(/<button[^>]*type="button"[^>]*>Edit<\/button>/);
+    // The draft is drawn once: the editor is not stacked under the view.
+    expect(html).not.toContain("<textarea");
+    expect(html).not.toContain("Done editing");
+    expect(html).not.toContain(">Preview<");
+    expect(html.match(/<strong>Ana<\/strong>/g)).toHaveLength(1);
+    expect(html.match(/Filing/g)).toHaveLength(1);
   });
 
   it("keeps Approve, Save edit and Reject for an approver", async () => {
@@ -95,14 +98,15 @@ describe("queue item page renders Markdown (F8)", () => {
     expect(html).toContain(">Reject</button>");
   });
 
-  it("behaves as before for a read-only role: preview and a read-only textarea, no buttons", async () => {
+  it("for a read-only role: the rendered draft, no Edit button, no editor, no action buttons", async () => {
     const html = await render(item({ status: "pending", resolved_by: null, resolved_at: null }), { approve: false, edit: false });
     expect(html).toContain("Your role is read-only for the approval queue.");
-    expect(html).toContain("readOnly");
+    expect(html).toContain("<strong>Approved</strong>");
+    expect(html).not.toContain("<textarea");
+    expect(html).not.toContain(">Edit</button>");
     expect(html).not.toContain(">Approve</button>");
     expect(html).not.toContain(">Save edit</button>");
     expect(html).not.toContain(">Reject</button>");
-    expect(html).toContain(">Preview<");
   });
 });
 
@@ -132,8 +136,8 @@ describe("queue item page: draft hygiene warnings (H8)", () => {
     expect(html).toContain("banner line");
     expect(html).toContain("internal worksheet text");
     expect(html).toContain("Remove internal notes");
-    expect(html).toContain(">Preview<");
-    expect(html).toContain("<textarea");
+    expect(html).toContain(">Edit</button>");
+    expect(html).not.toContain("<textarea");
   });
 
   it("a clean body shows neither the warnings nor the button", async () => {

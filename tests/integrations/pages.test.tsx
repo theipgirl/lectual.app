@@ -95,14 +95,16 @@ describe("Integrations index: a pill on every card", () => {
     expect(pillIn(html, "meetings-title")).toBe("Not connected");
     expect(rowPill(html, "Google Workspace")).toBe("Connected");
     expect(rowPill(html, "Microsoft 365")).toBe("Not connected");
-    expect(rowPill(html, "Email \\(IMAP\\)")).toBe("Coming soon");
-    expect(rowPill(html, "AI assistants")).toBe("Coming soon");
+    // Sprint 33: the IMAP and AI-assistant placeholder rows are gone.
+    expect(html).not.toContain("Email (IMAP)");
+    expect(html).not.toContain("AI assistants");
+    expect(html).not.toContain("Coming soon");
   });
 
   it("a failed Lawmatics, LawPay and meetings read shows Couldn't check, never Not connected, on those three", async () => {
     const html = await index({ ...SEEDED, lawmatics: { ok: false }, lawpay: { ok: false }, meetings: { ok: false } });
     for (const id of ["lawmatics-title", "lawpay-title", "meetings-title"]) expect(pillIn(html, id), id).toBe("Couldn't check");
-    const cards = html.slice(html.indexOf('id="lawmatics-title"'), html.indexOf('aria-label="Services"'));
+    const cards = html.slice(html.indexOf('id="lawmatics-title"'), html.indexOf('id="meetings-title"') + 400);
     expect(cards).not.toContain("Not connected");
   });
 
@@ -166,7 +168,7 @@ describe("Integrations index: nothing existing is lost", () => {
     expect(without).not.toContain("What we read");
     // The cards that do not depend on the module are still there.
     expect(pillIn(without, "lawmatics-title")).toBe("Not connected");
-    expect(rowPill(without, "AI assistants")).toBe("Coming soon");
+    expect(without).not.toContain("Coming soon");
   });
 
   it("keeps the connected and error banners and the mailbox row controls", async () => {
@@ -176,7 +178,7 @@ describe("Integrations index: nothing existing is lost", () => {
     );
     expect(html).toContain("Gmail connected.");
     expect(html).toContain('role="alert"');
-    expect(html).toContain("Token expired");
+    expect(html).toContain("Reconnect to keep syncing.");
     expect(html).toContain("microsoft@firm.test");
     expect(html).toContain("Disconnect");
     expect(html).toMatch(/href="\/api\/mailbox\/connect\/microsoft\/?\?scope=personal"[^>]*>Reconnect</);
@@ -184,7 +186,7 @@ describe("Integrations index: nothing existing is lost", () => {
 
   it("a provider that is not set up on the deployment keeps its disabled button and banner", async () => {
     const html = await index({ connectable: { google: false, microsoft: false } });
-    expect(html).toContain("Mailbox connections aren't set up on this deployment yet");
+    expect(html).toContain("Connecting a mailbox isn't switched on yet");
     expect(html).toContain("Gmail · not set up yet");
   });
 
@@ -230,7 +232,7 @@ describe("Meetings page: the Zoom card", () => {
     const off = await meetings({ meetings: { ok: true, connections: [conn("zoom", "reauth", { last_error: "Zoom rejected the token" })] } });
     expect(pillIn(off, "zoom-title")).toBe("Reconnect");
     expect(off).toMatch(/href="\/api\/meetings\/zoom\/connect\/?"[^>]*>Reconnect Zoom</);
-    expect(off).toContain("Zoom rejected the token");
+    expect(off).toContain("Reconnect to keep syncing.");
   });
 });
 
@@ -254,7 +256,7 @@ describe("Meetings page: Fathom and failed reads", () => {
   it("keeps the back link, the encryption-key note and the Fathom key form", async () => {
     const html = await meetings({ fathomReady: false });
     expect(html).toMatch(/href="\/dashboard\/settings\/integrations\/?"[^>]*>← Integrations</);
-    expect(html).toContain("Not available yet: this deployment has no encryption key for stored credentials.");
+    expect(html).toContain("Not available yet. Lectual will turn it on.");
     expect(await meetings({})).toContain('data-stub="connect-fathom"');
   });
 });
@@ -264,8 +266,9 @@ describe("the pages draw their integration cards through the shared components",
   const meet = fs.readFileSync("src/app/dashboard/settings/integrations/meetings/page.tsx", "utf8");
 
   it("import the shared header in both, and no hand-written pill or card heading remains", () => {
+    expect(index).toContain("@/components/integrations/IntegrationRow");
     for (const src of [index, meet]) {
-      expect(src).toContain("@/components/integrations/IntegrationHeader");
+      if (src === meet) expect(src).toContain("@/components/integrations/IntegrationHeader");
       expect(src).not.toMatch(/lx-pill/);
       expect(src).not.toMatch(/<h2[^>]*lx-h2/);
     }

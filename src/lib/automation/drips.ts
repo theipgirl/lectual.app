@@ -7,6 +7,8 @@ import { loadClientLeads, loadStopFactsForPerson, type ClientLeadsRead } from "@
 import { stopLeadSequences } from "@/lib/campaigns/stop";
 import { sessionUserId } from "@/lib/campaigns/stop-staff";
 import type { StopDb } from "@/lib/campaigns/stop-db";
+import { ReadableError } from "@/lib/ui/readable-error";
+
 
 export type DripSequence = Database["public"]["Tables"]["crm_drip_sequence"]["Row"];
 export type DripStep = Database["public"]["Tables"]["crm_drip_step"]["Row"];
@@ -270,12 +272,12 @@ export async function enrollLead(leadId: string, sequenceId: string): Promise<Dr
 
   const facts = await loadStopFactsForPerson(supabase as unknown as StopDb, { leadId });
   if (facts.status !== "ok") {
-    throw new Error("Couldn't confirm this lead isn't already a client, so nothing was enrolled. Try again shortly.");
+    throw new ReadableError("Couldn't confirm this lead isn't already a client, so nothing was enrolled. Try again shortly.");
   }
   const client = clientFact(facts.facts);
   if (client) {
     const name = lead.business_name?.trim() || `${lead.first_name} ${lead.last_name}`.trim() || "This lead";
-    throw new Error(enrollRefusal(name, client, await getFirmTimeZone()));
+    throw new ReadableError(enrollRefusal(name, client, await getFirmTimeZone()));
   }
 
   const { data, error } = await supabase
@@ -294,7 +296,7 @@ export async function enrollLead(leadId: string, sequenceId: string): Promise<Dr
         .single();
       if (existingError) throw existingError;
       if (existing.status === "stopped") {
-        throw new Error(
+        throw new ReadableError(
           `${stopLine({ reason: existing.stop_reason, at: existing.stopped_at }, await getFirmTimeZone())}. A stopped sequence can't be restarted for the same lead.`,
         );
       }
@@ -336,9 +338,9 @@ export async function stopEnrollment(id: string, reason: StopReason): Promise<Dr
     .eq("id", id)
     .maybeSingle();
   if (readError) throw readError;
-  if (!current) throw new Error("That enrollment couldn't be found. Refresh and try again.");
+  if (!current) throw new ReadableError("That enrollment couldn't be found. Refresh and try again.");
   if (current.status !== "active" && current.status !== "paused") {
-    throw new Error(`This enrollment is already ${current.status}.`);
+    throw new ReadableError(`This enrollment is already ${current.status}.`);
   }
   const outcome = await stopLeadSequences(supabase as unknown as StopDb, {
     orgId: current.org_id,
@@ -348,7 +350,7 @@ export async function stopEnrollment(id: string, reason: StopReason): Promise<Dr
     actor: { type: "user", id: await sessionUserId(supabase) },
     evidence: { by_hand: true },
   });
-  if (outcome.status !== "ok") throw new Error("Couldn't stop this sequence. Try again shortly.");
+  if (outcome.status !== "ok") throw new ReadableError("Couldn't stop this sequence. Try again shortly.");
   const { data: after, error } = await supabase.from("crm_drip_enrollment").select("*").eq("id", id).single();
   if (error) throw error;
   return after;

@@ -5,12 +5,14 @@ import { requireAutomationStaffRole, currentOrgId } from "@/lib/automation/rules
 import { listSteps, type DripEnrollment, type DripStep } from "@/lib/automation/drips";
 import { activeQueueOrgKey } from "@/lib/queue/org";
 import { createDraft } from "@/lib/queue/api";
+import { ReadableError } from "@/lib/ui/readable-error";
 import { addDelay, leadDisplayName, leadTemplateVars, renderTemplate } from "./steps";
 import { STOP_REASON_LABEL, isStopReason, stopFor, type StopDecision } from "./stops";
 import { loadStopFactsForPerson } from "./stop-facts";
 import { stopLeadSequences } from "./stop";
 import { sessionUserId } from "./stop-staff";
 import type { StopDb } from "./stop-db";
+import { APPROVALS_NOT_READY } from "@/lib/ui/words";
 
 /**
  * Advances ONE enrollment by exactly one step. This is the only place a drip
@@ -33,7 +35,7 @@ import type { StopDb } from "./stop-db";
  * `setEnrollmentStatus` use, mirroring `crm_drip_enrollment`'s own
  * `*_staff` RLS policies.
  */
-export class CampaignAdvanceError extends Error {}
+export class CampaignAdvanceError extends ReadableError {}
 
 type Lead = Database["public"]["Tables"]["crm_lead"]["Row"];
 type EmailTemplateRow = Database["public"]["Tables"]["crm_email_template"]["Row"];
@@ -236,7 +238,7 @@ export async function advanceEnrollment(enrollmentId: string): Promise<AdvanceRe
     const orgKey = await activeQueueOrgKey();
     if (!orgKey) {
       throw new CampaignAdvanceError(
-        "Approvals aren't enabled for this firm yet — ask an admin to set up the approval queue before drafting campaign emails.",
+        APPROVALS_NOT_READY,
       );
     }
     const template = await loadTemplate(supabase, step.template_id);

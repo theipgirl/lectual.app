@@ -325,6 +325,9 @@
   cursor: pointer;
   box-shadow: 0 14px 30px -12px rgba(35, 8, 16, 0.6);
 }
+@media (pointer: coarse) {
+  .cpd-launcher, .cpd-close { min-width: 44px; min-height: 44px; }
+}
 .cpd-launcher:hover {
   background: var(--ox-hover);
 }
@@ -332,6 +335,18 @@
 .cpd-close:focus-visible {
   outline: 2px solid var(--ox);
   outline-offset: 3px;
+}
+
+/* The launcher never covers a sticky Save bar (marked data-save-bar): it lifts above it,
+   and on a phone, where the bar is full width, it steps out of the way. On a phone it also
+   clears the bottom navigation bar. */
+body:has([data-save-bar]) .cpd-launcher { bottom: 86px; }
+@media (max-width: 900px) {
+  .cpd-launcher { bottom: 88px; }
+  body:has([data-save-bar]) .cpd-launcher { bottom: 150px; }
+}
+@media (max-width: 640px) {
+  body:has([data-save-bar]) .cpd-launcher { display: none; }
 }
 
 .cpd-scrim {
@@ -376,9 +391,14 @@
   color: var(--ox);
 }
 .cpd-kbd {
+  display: none;
   font-family: var(--mono);
   font-size: 11.5px;
   color: var(--muted);
+}
+/* The Esc hint only means something with a keyboard, so it is shown on wide screens. */
+@media (min-width: 900px) {
+  .cpd-kbd { display: inline; }
 }
 .cpd-close {
   font: inherit;

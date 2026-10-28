@@ -26,6 +26,7 @@ import {
   type TrademarkLoeInput,
   type GeneralLoeInput,
 } from "./loe";
+import { APPROVALS_NOT_READY } from "@/lib/ui/words";
 
 /**
  * Shared "build content, then queue it" plumbing for both Document Center
@@ -56,7 +57,7 @@ async function queueBuiltDraft(args: {
   const orgKey = await activeQueueOrgKey();
   if (!orgKey) {
     throw new DocumentFlowError(
-      "Approvals aren't enabled for this firm yet — ask an admin to set up the approval queue before generating documents.",
+      APPROVALS_NOT_READY,
     );
   }
 

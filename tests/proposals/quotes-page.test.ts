@@ -15,7 +15,7 @@ const THREE = [
   { package: "Essential", base_cents: 195_000, included_classes: 1, per_class_cents: 60_000, second_mark_discount_pct: 10, gov_per_class_cents: 35_000 },
 ];
 
-describe("Quotes & proposals page", () => {
+describe("Proposals page", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.useFakeTimers({ toFake: ["Date"] });
@@ -26,24 +26,13 @@ describe("Quotes & proposals page", () => {
   const go = (search: { segment?: string; status?: string } = {}, opts: Opts = {}) => render(search, opts);
 
   describe("header", () => {
-    it("shows the title, the subtitle with the package count (plural), and New proposal", async () => {
+    it("shows the one name, the one-line subtitle, and New proposal", async () => {
       const html = await go({}, { settings: settingsWith(THREE) });
-      expect(html).toContain("Quotes &amp; proposals");
-      expect(html).toContain("3 published packages, priced per class. Legal fees fall due at signing, USPTO fees at filing, and the two never add into one number.");
+      expect(html).toContain(">Proposals</h1>");
+      expect(html).not.toContain("Quotes &amp; proposals");
+      expect(html).toContain("Every proposal you&#x27;ve sent or started, newest first.");
       expect(html).toMatch(/href="\/dashboard\/proposals\/new\/?"[^>]*>New proposal</);
       expect(html).not.toContain("Client proposals</h1>");
-    });
-
-    it("uses the singular for one package", async () => {
-      const html = await go({}, { settings: settingsWith([PACKAGES[0]]) });
-      expect(html).toContain("1 published package, priced per class.");
-      expect(html).not.toContain("1 published packages");
-    });
-
-    it("a legacy firm (flat fields) has one package; a firm with no settings row has the default one", async () => {
-      expect(await go({}, { settings: { pricing: { package: "Signature", base_cents: 650_000 }, default_pay_url: null } })).toContain("1 published package,");
-      vi.resetModules();
-      expect(await go({}, { settings: null })).toContain("1 published package,");
     });
 
     it("hides New proposal from a role that can't start one, and shows Settings only to admins", async () => {
@@ -57,9 +46,10 @@ describe("Quotes & proposals page", () => {
   });
 
   describe("segments and the Out with clients tile", () => {
-    it("shows the five segments with counts from the unfiltered set, under a SEGMENTS label", async () => {
+    it("shows the five segments with counts from the unfiltered set, under a Show label", async () => {
       const html = await go();
-      expect(html).toContain(">Segments<");
+      expect(html).toContain(">Show<");
+      expect(html).not.toContain(">Segments<");
       expect(segments(html)).toEqual(["Everything:8", "Out with a client:1", "Drafts and blocked:3", "Accepted:1", "Expired:2"]);
     });
 
@@ -91,7 +81,7 @@ describe("Quotes & proposals page", () => {
       const html = await go({}, { rows });
       expect(html).toContain("$8,550.00");
       expect(html).toContain("2 proposals are out with a client, counted at the cheapest package offered.");
-      expect(html).toContain(">Out with clients<");
+      expect(html).toContain(">Open offers (lowest package each)<");
     });
 
     it("one proposal out reads in the singular, as in the design", async () => {
@@ -109,19 +99,19 @@ describe("Quotes & proposals page", () => {
     it("a failed proposals read shows — and 'couldn't be loaded', never $0.00, and no counts", async () => {
       const html = await go({}, { rows: "fail" });
       expect(html).not.toContain("$0.00");
-      expect(html).toContain("Out with clients couldn&#x27;t be loaded.");
+      expect(html).toContain("Open offers couldn&#x27;t be loaded.");
       expect(html).toContain('class="pq-out-figure">—<');
       expect(html).not.toContain("pq-count");
     });
   });
 
   describe("the table", () => {
-    it("has the seven columns in order, with the legal fee and the USPTO fees in two cells and no total", async () => {
+    it("has the nine columns in order (Accepted and Paid after Status), with the legal fee and the USPTO fees in two cells and no total", async () => {
       const html = await go();
-      const heads = [...html.slice(html.indexOf("<thead")).matchAll(/<th[^>]*>([^<]*)<\/th>/g)].map((m) => m[1]).slice(0, 7);
-      expect(heads).toEqual(["Proposal", "Client", "Status", "At signing", "At filing", "Expires", "Last activity"]);
+      const heads = [...html.slice(html.indexOf("<thead")).matchAll(/<th[^>]*>([^<]*)<\/th>/g)].map((m) => m[1]).slice(0, 9);
+      expect(heads).toEqual(["Proposal", "Client", "Status", "Accepted", "Paid", "At signing", "At filing", "Expires", "Last activity"]);
       const row = rowOf(html, "Client s1<");
-      expect([...row.matchAll(/<td class="pq-money[^"]*">([^<]*)<\/td>/g)].map((m) => m[1])).toEqual(["$4,950.00", "$700.00"]);
+      expect([...row.matchAll(/<td class="pq-money[^"]*"[^>]*>([^<]*)<\/td>/g)].map((m) => m[1])).toEqual(["$4,950.00", "$700.00"]);
       expect(html.toLowerCase()).not.toContain("total");
       expect(html).not.toContain("$5,650.00");
     });
@@ -169,8 +159,8 @@ describe("Quotes & proposals page", () => {
 
     it("a failed events read still renders every Last activity cell, with a derived line", async () => {
       const html = await go({}, { events: "fail" });
-      expect(html).toContain('class="wrap pq-activity"');
-      for (const id of ["a1", "a2", "s1"]) expect(rowOf(html, `Client ${id}<`)).toMatch(/pq-activity">Updated 1d ago</);
+      expect(html).toContain('class="wrap pq-activity pq-c-activity"');
+      for (const id of ["a1", "a2", "s1"]) expect(rowOf(html, `Client ${id}<`)).toMatch(/pq-c-activity"[^>]*>Updated 1d ago</);
       expect(rowOf(html, "Client e1<")).toContain("Stored status still says sent");
       expect(rowOf(html, "Client b1<")).toContain("Add the pay link before creating the link.");
       expect(html).not.toContain('pq-activity"><');
@@ -189,29 +179,17 @@ describe("Quotes & proposals page", () => {
       expect(await go({ segment: "drafts" })).toContain("3 of 8 proposals");
     });
 
-    it("reads the default package's per-class and USPTO amounts from the settings", async () => {
+    it("says the fee sentence exactly once, with no per-class dollar figures from the settings", async () => {
       const html = await go({}, { settings: settingsWith(THREE) });
-      expect(html).toContain("Government filing fees are $400 per class, paid before the application goes in.");
-      expect(html).toContain("Legal fees and USPTO fees never add into one number. Every class past the package adds $900 legal and $400 government.");
-    });
-
-    it("the design's figures: $350 government and $825 legal for Concierge", async () => {
-      const html = await go();
-      expect(html).toContain("Government filing fees are $350 per class");
-      expect(html).toContain("adds $825 legal and $350 government.");
-    });
-
-    it("a failed settings read drops the dollar figures instead of inventing defaults", async () => {
-      const html = await go({}, { settings: "fail" });
-      expect(html).toContain("Published packages, priced per class.");
-      expect(html).not.toMatch(/\d+ published package/);
-      expect(html).toContain("Government filing fees are paid before the application goes in.");
-      expect(html).toContain("Legal fees and USPTO fees never add into one number.");
-      expect(html).not.toContain("$825");
-      expect(html).not.toContain("$350 per class");
+      expect(html.match(/Legal fee is due at signing\. USPTO fees are paid at filing\./g)).toHaveLength(1);
+      expect(html).not.toContain("never add into one number");
       expect(html).not.toContain("adds $");
-      // the page itself still works
+    });
+
+    it("the page still works when the settings can't be read", async () => {
+      const html = await go({}, { settings: "fail" });
       expect(html).toContain("Client a1");
+      expect(html.match(/Legal fee is due at signing\. USPTO fees are paid at filing\./g)).toHaveLength(1);
     });
   });
 
@@ -226,7 +204,7 @@ describe("Quotes & proposals page", () => {
     it("an empty successful read is the empty state", async () => {
       const html = await go({}, { rows: [] });
       expect(html).toContain("No proposals yet");
-      expect(html).toContain("Start one from a consult above");
+      expect(html).toContain("Start one from a consult below");
     });
 
     it("still lists every proposal under Everything, Closed included", async () => {

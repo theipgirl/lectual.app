@@ -70,7 +70,7 @@ describe("connectLawmaticsAction", () => {
   it("stores nothing without an encryption key", async () => {
     state.root = null;
     const res = await connectLawmaticsAction({}, form({ token: TOKEN }));
-    expect(res.error).toMatch(/encryption key/);
+    expect(res.error).toMatch(/aren't switched on for your firm yet/);
     expect(state.saves).toHaveLength(0);
   });
 });

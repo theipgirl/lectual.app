@@ -98,7 +98,7 @@ beforeEach(() => {
 });
 
 describe("lead page placement", () => {
-  it("renders the card in the main column, after Consult details and immediately before the Timeline", async () => {
+  it("renders the card in the main column, after the consult material and before the Sequences and Temperature cards (Sprint 33 order)", async () => {
     const html = await leadPage(leadWorld());
     const consult = html.indexOf('data-marker="consult-details"');
     const card = html.indexOf('aria-label="Documents & files"');
@@ -106,13 +106,9 @@ describe("lead page placement", () => {
     const aside = html.indexOf("<aside");
     expect(consult).toBeGreaterThan(-1);
     expect(card).toBeGreaterThan(consult);
-    expect(timeline).toBeGreaterThan(card);
-    expect(aside).toBeGreaterThan(timeline); // the card is not in the aside
-    // Nothing but the card sits between Consult details and the Timeline section.
-    const between = html.slice(consult, timeline);
-    // The card, then the Timeline section's own opening tag (the marker's tag opened just before `consult`).
-    expect(between.match(/<section/g)).toHaveLength(2);
-    expect(between).toContain("Documents & files");
+    expect(timeline).toBeGreaterThan(-1);
+    expect(timeline).toBeLessThan(consult); // the Timeline now comes before the consult material
+    expect(aside).toBeGreaterThan(card); // the card is not in the aside
     expect(html.match(/aria-label="Documents & files"/g)).toHaveLength(1);
     expect(html).toContain("Toussaint Studio");
   });
@@ -138,7 +134,7 @@ describe("lead page placement", () => {
     const world = leadWorld();
     world.db.fail("crm_file", "select");
     const html = await leadPage(world);
-    expect(html).toContain("Files couldn't be loaded. This is a problem reaching the database, not an empty list.");
+    expect(html).toContain("Files couldn't be loaded. Refresh to try again.");
     expect(html).not.toContain("Nothing here yet");
     expect(html).not.toContain("boom");
     expect(html).toContain(">Timeline<");
@@ -202,7 +198,7 @@ describe("a just-uploaded file, end to end (request, direct upload, confirm, lis
 
     // 4. the real page shows both
     const html = await leadPage(world, { role: "admin" });
-    const card = html.slice(html.indexOf('aria-label="Documents & files"'), html.indexOf(">Timeline<"));
+    const card = html.slice(html.indexOf('aria-label="Documents & files"'), html.indexOf("<aside"));
     expect(card).toContain("Specimen photo.PNG");
     expect(card).toContain("2.3 MB · Dawn Reyes");
     expect(card).toContain(`href="/dashboard/files/${requested.fileId}/download/"`);
@@ -216,7 +212,7 @@ describe("a just-uploaded file, end to end (request, direct upload, confirm, lis
     expect(await deleteFileAction(requested.fileId)).toEqual({ ok: true });
     expect(world.storage.objects.has(path)).toBe(false);
     const after = await leadPage(world, { role: "admin" });
-    const afterCard = after.slice(after.indexOf('aria-label="Documents & files"'), after.indexOf(">Timeline<"));
+    const afterCard = after.slice(after.indexOf('aria-label="Documents & files"'), after.indexOf("<aside"));
     expect(afterCard).not.toContain("Specimen photo.PNG");
     expect(afterCard).toContain("Nothing here yet");
     // The timeline keeps its record (the activity table is append-only) and still names the file.

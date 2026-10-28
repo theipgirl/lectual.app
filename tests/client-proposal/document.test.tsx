@@ -106,13 +106,14 @@ describe("ProposalDocument: a fixed offer has no checkboxes", () => {
   it("shows the mark and class plainly, priced, with Accept enabled", () => {
     const html = render({ content: fixedOffer() });
     expect(checkboxes(html)).toHaveLength(0);
-    expect(html).not.toContain("<input");
+    // Sprint 28's "Add a class" text field stays (a fixed offer can still grow); no CHECKBOX is drawn.
+    expect(html).not.toContain('type="checkbox"');
     expect(html).not.toContain("cp-box");
     expect(html).not.toContain(KEEP_ONE_HINT);
     expect(html).not.toContain("aria-describedby");
     expect(html).toContain("Your trademark");
     expect(html).toContain("Class 1 · Cloud-Based Software as a Service (SaaS)");
-    expect(html).toContain("$3,300");
+    expect(html).toContain("$4,950");
     expect(html).toMatch(/<button[^>]*class="cp-btn"[^>]*>Accept and pay my legal fee<\/button>/);
     expect(html).not.toMatch(/<button[^>]*disabled[^>]*>Accept and pay my legal fee<\/button>/);
   });
@@ -122,11 +123,11 @@ describe("ProposalDocument: a fixed offer has no checkboxes", () => {
     c.names[0].marks[0].preselected = false;
     c.names[0].classes[0].preselected = false;
     const live = render({ content: c });
-    expect(live).toContain("$3,300");
+    expect(live).toContain("$4,950");
     expect(live).not.toMatch(/<button[^>]*disabled[^>]*>Accept and pay my legal fee<\/button>/);
     const preview = render({ content: c, mode: "preview", onAccept: undefined });
     expect(checkboxes(preview)).toHaveLength(0);
-    expect(preview).toContain("$3,300");
+    expect(preview).toContain("$4,950");
   });
 });
 

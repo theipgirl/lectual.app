@@ -3,6 +3,11 @@ import { notFound } from "next/navigation";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { loadPipeline } from "@/lib/lifecycle/load";
 import { COLUMN_HINT, COLUMN_LABEL, filterCards, groupColumns, type PipelineCard, type PipelineColumn } from "@/lib/lifecycle/columns";
+import { ListHeader } from "@/components/list-page/ListHeader";
+import { ListToolbar } from "@/components/list-page/ListToolbar";
+import { Chip, FilterChips } from "@/components/list-page/Chips";
+import "@/components/list-page/list-page.css";
+import { PIPELINE_VIEW_ONLY } from "@/lib/ui/words";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 
@@ -13,10 +18,13 @@ export const dynamic = "force-dynamic";
 /** How many cards a column draws before "and N more". */
 const CARDS_PER_COLUMN = 40;
 const PRE: readonly PipelineColumn[] = ["intake", "consult"];
+/** Where a column header goes: the Leads board for the lead columns, the Matters board for the rest. */
+const LEADS_BOARD_HREF = "/dashboard/intake/?view=board";
+const MATTERS_BOARD_HREF = "/dashboard/matters/?view=board";
 
 function Card({ c }: { c: PipelineCard }) {
   return (
-    <li className="lx-board-card">
+    <li className="lp-board-card">
       <Link href={c.href} className="lx-rowlink" style={{ fontWeight: 600 }}>
         {c.client}
       </Link>
@@ -62,50 +70,47 @@ export default async function PipelinePage({ searchParams }: { searchParams: Pro
   };
 
   return (
-    <>
-      <div className="lx-page-head">
-        <div style={{ flex: 1, minWidth: 260 }}>
-          <div className="lx-label">Active matters</div>
-          <h1 className="lx-h1">Pipeline</h1>
-          <p className="lx-sub">
-            Every client from first contact to registration. Leads fill the first columns by your intake stages; matters fill the rest by
-            their docket stage.
-          </p>
-        </div>
-        <form method="get" className="lx-search-form" role="search">
-          {owner && <input type="hidden" name="owner" value={owner} />}
-          <input className="lx-input" type="search" name="q" defaultValue={q} placeholder="Search client, mark or matter" aria-label="Search the pipeline" />
-        </form>
-      </div>
+    <div className="lp-root">
+      <ListHeader title="Pipeline" sub={`Every client from first contact to registration. ${PIPELINE_VIEW_ONLY}`} />
+
+      <ListToolbar
+        search={{
+          label: "Search the pipeline",
+          placeholder: "Search client, mark or matter",
+          defaultValue: q,
+          hidden: owner ? { owner } : {},
+          clearHref: `/dashboard/pipeline/${owner ? `?owner=${encodeURIComponent(owner)}` : ""}`,
+        }}
+      />
 
       {load.owners.length > 0 && (
-        <nav className="lx-chips" aria-label="Owner">
-          <Link href={ownerHref("")} aria-current={!owner ? "page" : undefined}>
+        <FilterChips as="nav" label="Owner">
+          <Chip href={ownerHref("")} active={!owner}>
             Everyone
-          </Link>
-          <Link href={ownerHref(session.user.id)} aria-current={owner === session.user.id ? "page" : undefined}>
+          </Chip>
+          <Chip href={ownerHref(session.user.id)} active={owner === session.user.id}>
             Mine
-          </Link>
+          </Chip>
           {load.owners
             .filter((o) => o.id !== session.user.id)
             .map((o) => (
-              <Link key={o.id} href={ownerHref(o.id)} aria-current={owner === o.id ? "page" : undefined}>
+              <Chip key={o.id} href={ownerHref(o.id)} active={owner === o.id}>
                 {o.name}
-              </Link>
+              </Chip>
             ))}
-          <Link href={ownerHref("none")} aria-current={owner === "none" ? "page" : undefined}>
+          <Chip href={ownerHref("none")} active={owner === "none"}>
             No owner
-          </Link>
-        </nav>
+          </Chip>
+        </FilterChips>
       )}
 
       {(load.leads !== "ok" || load.matters !== "ok") && (
         <p className="lx-banner lx-banner-warn" role="alert" style={{ margin: 0 }}>
           {load.leads !== "ok" && load.matters !== "ok"
-            ? "Neither leads nor matters could be loaded, so the pipeline can't be shown. Try again shortly."
+            ? "Can't show the pipeline right now. Refresh to try again."
             : load.leads !== "ok"
-              ? "Leads couldn't be loaded, so the intake and consult columns are unknown (not empty)."
-              : "Matters couldn't be loaded, so the columns from Engaged on are unknown (not empty)."}
+              ? "Leads couldn't be loaded, so the first two columns can't be shown. Refresh to try again."
+              : "Matters couldn't be loaded, so the columns from Engaged on can't be shown. Refresh to try again."}
         </p>
       )}
       {load.notes.map((n) => (
@@ -121,7 +126,7 @@ export default async function PipelinePage({ searchParams }: { searchParams: Pro
             <>
               {isFailed ? (
                 <p className="lx-note" style={{ margin: 0 }}>
-                  Couldn&apos;t be loaded.
+                  Can&apos;t show this column right now.
                 </p>
               ) : cards.length === 0 ? (
                 <p className="lx-note" style={{ margin: 0 }}>
@@ -140,7 +145,10 @@ export default async function PipelinePage({ searchParams }: { searchParams: Pro
           const header = (
             <header>
               <span className="lx-board-title">
-                {COLUMN_LABEL[column]} <span className="lx-num lx-note">{isFailed ? "—" : count}</span>
+                <Link href={PRE.includes(column) ? LEADS_BOARD_HREF : MATTERS_BOARD_HREF} className="lx-rowlink" data-column-link={column}>
+                  {COLUMN_LABEL[column]}
+                </Link>{" "}
+                <span className="lx-num lx-note">{isFailed ? "—" : count}</span>
               </span>
               <span className="lx-note" style={{ fontSize: 12 }}>
                 {COLUMN_HINT[column]}
@@ -160,6 +168,6 @@ export default async function PipelinePage({ searchParams }: { searchParams: Pro
           );
         })}
       </div>
-    </>
+    </div>
   );
 }

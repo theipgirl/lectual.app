@@ -15,6 +15,8 @@ import { autopilotForRun, canRunAgents, decideRunNow, RUN_NOW_REASON, RUN_NOW_TI
 import { readCalendarProbe } from "@/lib/stage-keeper/readiness-read";
 import { canPauseAutopilot, canResumeAutopilot, parseMinutesForm } from "@/lib/agents/autopilot-rules";
 import { loadAutopilot } from "@/lib/agents/autopilot";
+import { friendlyRunError } from "@/lib/agents/friendly-run-error";
+import { ASSISTANTS_PAUSED, AUTOMATIC_STAGE_MOVES, notReadyYet } from "@/lib/ui/words";
 
 export type AgentActionState = {
   ok?: boolean;
@@ -28,12 +30,12 @@ export type AgentActionState = {
 };
 
 const AUTONOMIES: readonly Autonomy[] = ["suggest", "draft", "act"];
-/** The agents the database's settings CHECK only accepts once lectual 0098 is applied, as the refusal names them. */
+/** The assistants Lectual has to switch on for a firm, as the refusal names them. */
 const UPDATE_AGENT_NAME: Partial<Record<AgentId, string>> = {
-  "stage-keeper": "The Stage Keeper",
-  "morning-brief": "The Morning brief",
+  "stage-keeper": AUTOMATIC_STAGE_MOVES,
+  "morning-brief": "Morning brief",
   "consult-prep": "Consult prep",
-  "inbox-summary": "The Inbox summary",
+  "inbox-summary": "Inbox summary",
 };
 const isAgent = (v: unknown): v is AgentId => typeof v === "string" && (AGENT_IDS as readonly string[]).includes(v);
 
@@ -51,7 +53,7 @@ async function adminSession() {
 
 export async function saveAgentSettingAction(_prev: AgentActionState, formData: FormData): Promise<AgentActionState> {
   const session = await adminSession();
-  if (!session) return { error: "Only an owner, admin or senior admin can change agents." };
+  if (!session) return { error: "Only an owner, admin or senior admin can change assistants." };
   const agent = formData.get("agent");
   const autonomy = formData.get("autonomy");
   const enabled = formData.get("enabled") === "true";
@@ -74,9 +76,9 @@ export async function saveAgentSettingAction(_prev: AgentActionState, formData: 
     // lectual 0098 is applied. Say that, not a raw Postgres message. Other agents' messages are unchanged.
     const waitingOnUpdate = UPDATE_AGENT_NAME[agent];
     if (waitingOnUpdate && (error.code === "23514" || /agent_setting_agent|check constraint/i.test(error.message ?? ""))) {
-      return { error: `${waitingOnUpdate} isn't available until the database update (lectual 0098) is applied. Nothing was changed.` };
+      return { error: `${notReadyYet(waitingOnUpdate)} Nothing was changed.` };
     }
-    return { error: `Couldn't save: ${error.message}` };
+    return { error: "Couldn't save. Nothing was changed. Refresh to try again." };
   }
   refresh();
   return { ok: true };
@@ -88,7 +90,7 @@ export async function runAgentNowAction(_prev: AgentActionState, formData: FormD
   const session = await resolveFirmSession();
   if (session.kind !== "ok" || !canRunAgents(session.role)) return { error: RUN_NOW_REASON.role };
   const agent = formData.get("agent");
-  if (!isAgent(agent)) return { error: "Unknown agent." };
+  if (!isAgent(agent)) return { error: "Unknown assistant." };
 
   // Read the setting as the caller, through RLS: the firm is the caller's own.
   const supabase = await getScopedClient();
@@ -98,7 +100,7 @@ export async function runAgentNowAction(_prev: AgentActionState, formData: FormD
     .eq("agent", agent)
     .maybeSingle();
   // A failed read is not "off": the page draws no Run now for it either.
-  if (settingError) return { error: "We couldn't read this agent's setting, so nothing ran. Try again shortly." };
+  if (settingError) return { error: "We couldn't read this assistant's setting, so nothing ran. Refresh to try again." };
 
   // The firm-wide pause, read as the caller for a clear message. runOneAgent
   // checks it again with the service role, so this is not the only guard.
@@ -129,10 +131,10 @@ export async function runAgentNowAction(_prev: AgentActionState, formData: FormD
   });
   refresh();
   if (outcome.reason === "paused") {
-    return { error: "Autopilot is paused for the firm (or its state couldn't be read), so nothing ran." };
+    return { error: `${ASSISTANTS_PAUSED} for your firm (or that couldn't be checked), so nothing ran.` };
   }
   if (outcome.reason === "time-limit") return { error: RUN_NOW_TIME_LIMIT };
-  if (outcome.status === "error") return { error: `The run failed: ${outcome.error}` };
+  if (outcome.status === "error") return { error: `The run failed. ${friendlyRunError(outcome.error)}` };
   return {
     ok: true,
     skipped: outcome.status === "skipped",
@@ -158,10 +160,10 @@ async function autopilotSession() {
  */
 export async function setAutopilotAction(_prev: AgentActionState, formData: FormData): Promise<AgentActionState> {
   const session = await autopilotSession();
-  if (!session) return { error: "Agents aren't available for this firm." };
+  if (!session) return { error: "Assistants aren't available for this firm." };
   const pause = formData.get("paused") === "true";
-  if (pause && !canPauseAutopilot(session.role)) return { error: "Only an attorney or an admin can pause Autopilot." };
-  if (!pause && !canResumeAutopilot(session.role)) return { error: "Only an owner, admin or senior admin can resume Autopilot." };
+  if (pause && !canPauseAutopilot(session.role)) return { error: "Only an attorney or an admin can pause assistants." };
+  if (!pause && !canResumeAutopilot(session.role)) return { error: "Only an owner, admin or senior admin can resume assistants." };
   const reasonRaw = String(formData.get("reason") ?? "").trim().slice(0, 280);
 
   const supabase = await getScopedClient();
@@ -169,9 +171,9 @@ export async function setAutopilotAction(_prev: AgentActionState, formData: Form
     { org_id: session.org.id, paused: pause, reason: pause ? reasonRaw || null : null },
     { onConflict: "org_id" },
   );
-  if (error) return { error: `Couldn't ${pause ? "pause" : "resume"} Autopilot: ${error.message}` };
+  if (error) return { error: `Couldn't ${pause ? "pause" : "resume"} the assistants. Nothing was changed. Refresh to try again.` };
   refresh();
-  return { ok: true, message: pause ? "Autopilot paused. No agent will run until it is resumed." : "Autopilot resumed." };
+  return { ok: true, message: pause ? `${ASSISTANTS_PAUSED}. None will run until they are resumed.` : "Assistants resumed." };
 }
 
 /** The firm's minutes-per-task estimate behind "Hours saved (est.)". Admins only. */
@@ -193,7 +195,7 @@ export async function saveMinutesPerTaskAction(_prev: AgentActionState, formData
   if (!error && (updated ?? []).length === 0) {
     ({ error } = await supabase.from("agent_autopilot").insert({ org_id: session.org.id, minutes_per_task: parsed.value }));
   }
-  if (error) return { error: `Couldn't save: ${error.message}` };
+  if (error) return { error: "Couldn't save. Nothing was changed. Refresh to try again." };
   refresh();
   return { ok: true, message: "Saved." };
 }

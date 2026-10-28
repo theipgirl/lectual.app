@@ -9,8 +9,10 @@ import {
   type ProposalContent,
   type ProposalName,
 } from "@/lib/proposals/types";
+import { defaultSelection, quoteProposal } from "@/lib/proposals/pricing";
 import { isCivilDate, validateContent } from "@/lib/proposals/validate";
 import { buildReasoningBlock, proposalEmailSubject } from "./email";
+import { choosePackage, type PackageSource } from "./package-choice";
 import type {
   ConsultLead,
   ConsultProposalDraft,
@@ -70,6 +72,7 @@ export const MAX_QUOTE_CHARS = 600;
 
 const MAX_BRANDS = 10;
 const MAX_CLASSES_KEPT = 10;
+const CONSULT_CREDIT_LABEL = "Consult credit";
 const MAX_CREDITS = 5;
 const MAX_NAME = 120;
 const MAX_WHAT = 120;
@@ -141,7 +144,20 @@ export const ConsultProposalExtractSchema = z.object({
   recommended_package: z
     .string()
     .nullable()
-    .describe("The package the attorney recommended, ONLY if it is the firm package named in <firm_pricing>; otherwise null (and say what was said in recommendation_summary)"),
+    .describe("The package the attorney recommended, named as she named it (for example \"Essential\" or \"the Concierge package\"). Prefer one of the packages listed in <firm_pricing>. null if she named none"),
+  second_mark_discount: z
+    .object({
+      percent: z.number().describe("The percentage off the SECOND mark of the same brand that the attorney stated, for example 10 for '10% off the second'"),
+      quote: quote("the attorney stating that percentage off the second mark"),
+    })
+    .nullable()
+    .describe("ONLY a percentage off the second mark of a brand that the attorney explicitly stated. null if she did not. Never compute or suggest one"),
+  reduced_package: z
+    .object({
+      quote: quote("the attorney recommending a reduced or custom package, or fewer classes than the package includes for a lower price"),
+    })
+    .nullable()
+    .describe("ONLY when the attorney explicitly recommended a reduced or custom package, or fewer classes for a lower price. null otherwise. Choosing fewer classes inside a package is NOT this"),
   price_changes: z
     .array(
       z.object({
@@ -190,7 +206,7 @@ How to report:
 - If the call was not about protecting trademarks, set is_trademark_matter to false. If the attorney did not recommend or offer specific trademark filings, set recommendation_found to false. In either case leave the lists empty.
 - brands: one entry per brand the attorney recommended protecting, spelled as in the record. marks: "word" (the name itself) and/or "logo" (the design), as she recommended or offered. classes: the goods or services for each brand, at most 3, each as a short label in plain business language (for example "Cloud-Based Software as a Service (SaaS)" or "Charitable Services"). Never write a class number, never "Class" followed by a number, and never "IC". preselected is true for what she recommended and false for what she offered only as an option.
 - Every mark and class needs why_quote, and every price change, credit and reasoning part needs its quote: words copied exactly from the record, one sentence at most. Quotes are checked word for word against the record, and anything whose quote is not found is left out of the proposal.
-- Prices come from the firm's standard pricing automatically. recommended_package is the firm package named in <firm_pricing> if that is what she recommended, otherwise null. price_changes only when the attorney explicitly stated a different legal fee for a brand, with that amount; credits only when she explicitly offered a credit or discount (for example a consultation credit), with that amount or percentage. Something the client asked for that the attorney did not agree to does not count. Never infer, compute, round or suggest an amount.
+- Prices come from the firm's standard pricing automatically. recommended_package is the package she recommended, named as she named it, otherwise null. second_mark_discount only when she explicitly stated a percentage off the second mark of a brand (for example \"10% off the second one\"), with the words she used; reduced_package only when she explicitly recommended a reduced or custom package, or fewer classes for a lower price. price_changes only when the attorney explicitly stated a different legal fee for a brand, with that amount; credits only when she explicitly offered a credit or discount (for example a consultation credit), with that amount or percentage. Something the client asked for that the attorney did not agree to does not count. Never infer, compute, round or suggest an amount.
 - The substantive office action response is never part of a package. Do not offer it.
 - reasoning_parts records which of the attorney's points she actually made: the best-practice principle, a word-mark registration risk for a brand, and the logo mark as the stronger single option for a brand.
 - recommendation_summary is for the reviewing attorney only.
@@ -294,6 +310,7 @@ export function consultProposalPrompt(input: DraftConsultProposalInput, record: 
     `Record: ${neutralise(record.label)}`,
     "",
     "<firm_pricing>",
+    ...(input.packages && input.packages.length > 0 ? [`Packages offered: ${input.packages.map((x) => x.package).join(", ")}`] : []),
     `Package: ${p.package}`,
     `Classes included per brand: up to ${p.included_classes}`,
     `Second mark of the same brand: ${p.second_mark_discount_pct > 0 ? "discounted" : "no discount"}`,
@@ -343,6 +360,12 @@ export function quoteInSource(quote: string | null | undefined, source: string):
 
 function key(text: string | null | undefined): string {
   return (text ?? "").normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+}
+
+/** A package name counts as in the record when its letters appear there, ignoring "the", "package" and "plan" around it. */
+function nameSpokenInRecord(name: string, record: ConsultRecord): boolean {
+  const k = key(name.replace(/\b(?:the|a|an|package|plan|tier|option)\b/gi, " "));
+  return k.length >= 3 && key(record.text).includes(k);
 }
 
 /** A brand name counts as in the record when its letters and digits appear there, in order. */
@@ -695,6 +718,8 @@ export async function draftProposalFromConsult(input: DraftConsultProposalInput)
     let label = clientText(cr.label, MAX_NAME);
     label = stripClassNumbers(label).text;
     if (!label || MONEY_OR_LINK.test(label)) label = isPercent ? "Discount" : "Credit";
+    // An amount taken from the call is always the fixed "Consult credit" line; the model's wording is only for percent discounts.
+    if (isAmount) label = CONSULT_CREDIT_LABEL;
     const path = `Credit › ${label}`;
     const verified = quoteInSource(cr.quote, record.text);
     evidence.push({ path, quote: oneLine(cr.quote, MAX_QUOTE_CHARS), verified });
@@ -736,13 +761,57 @@ export async function draftProposalFromConsult(input: DraftConsultProposalInput)
     }
   }
 
-  /* ── package: always the firm's; a mismatch is flagged, never priced by the model ── */
-  const pricing = { ...input.pricing.pricing };
-  const named = oneLine(extract.recommended_package, 100);
-  if (named && key(named) !== key(pricing.package)) {
-    flags.push(`CHECK FIRST: the AI reported the package "${named}", but the firm's standard package is "${pricing.package}". The proposal uses ${pricing.package} pricing. Make sure that is what the attorney recommended.`);
-  } else if (!named) {
-    flags.push(`No package was named on the call. The proposal uses the firm's standard ${pricing.package} pricing.`);
+  /* ── package: the one the call (or the reviewed details) names, from the firm's current list ── */
+  const reviewed = input.reviewedConsult;
+  const reviewedDetails = reviewed && reviewed.status === "ok" && !reviewed.unreadable && !reviewed.unreviewed ? reviewed.details : null;
+  if (reviewed && reviewed.status !== "ok") flags.push("The lead's reviewed consult details couldn't be read, so only the call was used to choose the package.");
+  if (reviewed && reviewed.status === "ok" && reviewed.unreadable) flags.push("The lead's newest consult details couldn't be read, so only the call was used to choose the package.");
+  const calledName = oneLine(extract.recommended_package, 100) || null;
+  const chosen = choosePackage({
+    packages: input.packages,
+    flat: input.pricing.pricing,
+    reviewedName: reviewedDetails?.review ? oneLine(reviewedDetails.recommended_package, 100) || null : null,
+    reviewedBy: reviewedDetails?.review?.reviewed_by_name?.trim() || null,
+    callName: calledName,
+    callNameInRecord: calledName ? nameSpokenInRecord(calledName, record) : false,
+  });
+  flags.push(...chosen.flags);
+  const pricing = chosen.pricing;
+  const packageSource = chosen.source;
+
+  /* ── second-mark percent: only the attorney's words, 0 to 50 ── */
+  const smd = extract.second_mark_discount;
+  if (smd) {
+    const q = oneLine(smd.quote, 200);
+    const pct = smd.percent;
+    evidence.push({ path: "Second-mark discount", quote: oneLine(smd.quote, MAX_QUOTE_CHARS), verified: quoteInSource(smd.quote, record.text) });
+    const problem = !Number.isFinite(pct) || pct <= 0
+      ? "it is not a usable percentage"
+      : pct > 50
+        ? "it is more than 50%, which is more than a second-mark discount is allowed to be here"
+        : priceEvidenceProblem(smd.quote, percentsInQuote(smd.quote).includes(pct));
+    if (problem) {
+      flags.push(`Second-mark discount of ${pct}% was ignored, because ${problem} ("${q}"). The firm's ${pricing.second_mark_discount_pct}% stays.`);
+    } else {
+      pricing.second_mark_discount_pct = pct;
+      flags.push(`CHECK: second-mark discount set to ${pct}% (the firm's is ${input.pricing.pricing.second_mark_discount_pct}%), from the call: "${q}".`);
+    }
+  } else {
+    flags.push(`No second-mark discount was stated on the call, so the firm's ${pricing.second_mark_discount_pct}% stays.`);
+  }
+
+  /* ── a reduced / custom package: only the attorney's words ── */
+  const rp0 = extract.reduced_package;
+  if (rp0) {
+    const q = oneLine(rp0.quote, 200);
+    evidence.push({ path: "Reduced package", quote: oneLine(rp0.quote, MAX_QUOTE_CHARS), verified: quoteInSource(rp0.quote, record.text) });
+    const problem = priceEvidenceProblem(rp0.quote, true);
+    if (problem) {
+      flags.push(`Not applied: a reduced or custom package, because ${problem} ("${q}"). The package is a flat price up to its included classes.`);
+    } else {
+      pricing.reduce_under_included = true;
+      flags.push(`CHECK FIRST: priced as a custom package: ${fmtCents(pricing.per_class_cents)} less for each class under the ${pricing.included_classes} included, because the attorney said: "${q}". Confirm that is what was agreed, or turn it off under More options.`);
+    }
   }
 
   /* ── reasoning: Rebecca's canned paragraphs, only with verified evidence ── */
@@ -817,6 +886,22 @@ export async function draftProposalFromConsult(input: DraftConsultProposalInput)
     office_action_note: input.pricing.office_action_note,
   };
 
+  // A credit is never more than the legal fee it comes off: capped here, and said so.
+  const subtotal = quoteProposal({ ...content, adjustments: [] }, defaultSelection(content)).legal_subtotal_cents;
+  let room = subtotal;
+  content.adjustments = adjustments.map((a) => {
+    if (a.kind !== "amount") return a;
+    if (a.value > room) {
+      flags.push(`The credit "${a.label}" of ${fmtCents(a.value)} is more than the legal fee it comes off (${fmtCents(room)}), so it was capped at ${fmtCents(room)}.`);
+      const capped = { ...a, value: room };
+      room = 0;
+      return capped;
+    }
+    room -= a.value;
+    return a;
+  });
+  adjustments.splice(0, adjustments.length, ...content.adjustments);
+
   const title = "Trademark Proposal";
   const expiresOn = addDays(input.today, PROPOSAL_VALID_DAYS);
   const rawEmail = oneLine(input.lead.email, 320);
@@ -839,6 +924,7 @@ export async function draftProposalFromConsult(input: DraftConsultProposalInput)
     names,
     adjustments,
     packageName: pricing.package,
+    packageSource,
     flags,
     evidence,
     suggestedNotes: usable.filter((b) => b.suggestedNote).map((b) => ({ name: b.name, note: b.suggestedNote as string })),
@@ -862,12 +948,20 @@ export async function draftProposalFromConsult(input: DraftConsultProposalInput)
   };
 }
 
+const SOURCE_WORDS: Record<PackageSource, string> = {
+  reviewed: "the package named in the reviewed consult details",
+  call: "the package named on the call",
+  default: "the firm's default package, because the call named none on your list",
+  flat: "the firm's flat pricing, because its package list couldn't be read",
+};
+
 function buildReviewerNotes(args: {
   recordLabel: string;
   summary: string;
   names: ProposalName[];
   adjustments: ProposalAdjustment[];
   packageName: string;
+  packageSource: PackageSource;
   flags: string[];
   evidence: EvidenceItem[];
   suggestedNotes: Array<{ name: string; note: string }>;
@@ -881,7 +975,7 @@ function buildReviewerNotes(args: {
     "What the AI says was recommended (for you, not the client):",
     args.summary || "(no summary)",
     "",
-    `Proposal (${args.packageName}, the firm's standard pricing):`,
+    `Proposal (${args.packageName}, ${SOURCE_WORDS[args.packageSource]}):`,
   ];
   for (const n of args.names) {
     lines.push(`- ${n.name}${n.price_override?.base_cents != null ? ` (base price ${fmtCents(n.price_override.base_cents)})` : ""}`);

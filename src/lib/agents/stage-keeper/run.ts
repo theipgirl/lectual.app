@@ -1,7 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isDatabaseUpdateNeeded } from "@/lib/calendar/outlook-errors";
 import { SENSITIVE_PHRASES } from "@/lib/intake/email-match";
+import { NO_FIRM_SENDERS, effectiveDirection, firmSendersFrom, type FirmSenders } from "@/lib/mailbox/firm-sender";
 import { moveLeadStageAs } from "@/lib/pipeline/move-as";
+import { resolveBatch } from "@/lib/queue/resolve-batch";
+import type { QueueItem } from "@/lib/queue/api";
 import type { StageOpt } from "@/lib/reconcile/types";
 import {
   AGENT_ACTOR,
@@ -14,7 +17,8 @@ import {
   type ActivityRow,
   type SuggestionWhy,
 } from "@/lib/stage-keeper/moves";
-import { evidenceDateOf, evidenceOf, signalIdFor, signalKeyFor, type KeeperSignal } from "@/lib/stage-keeper/signals";
+import { evidenceDateOf, evidenceOf, isSensitiveSignal, signalIdFor, signalKeyFor, type KeeperSignal } from "@/lib/stage-keeper/signals";
+import { orgFencedReader } from "../shared";
 import type { AgentContext, AgentResult } from "../types";
 import { parseStageMapping, type StageMapping } from "./mapping";
 import { targetStageFromSignals } from "./target";
@@ -23,8 +27,11 @@ import { targetStageFromSignals } from "./target";
  * Stage Keeper: places each lead on the board from facts the firm already recorded.
  *
  * It reads the mail the mailbox sync matched to leads (`email_sent` / `email_received` rows,
- * with their stored type, direction, date, subject and sensitive flag) and the Outlook consults
- * linked to leads, works out the furthest-forward stage the signals support
+ * with their stored type, direction, date, subject and sensitive flag), the Outlook consults
+ * linked to leads, the Zoom / Fathom meetings linked to leads (`crm_meeting.lead_id`, never a
+ * suggestion) that have taken place, the client proposals whose link is live, and the approved
+ * post-consult emails in the approval queue. Inbound mail whose sender is one of the firm's own
+ * addresses counts as sent by the firm (a cc into a shared inbox). It works out the furthest-forward stage the signals support
  * (`targetStageFromSignals`, pure) and then:
  *   autonomy `act`             moves the lead (`moveLeadStageAs`, service role, org-fenced)
  *   autonomy `suggest`/`draft` writes a suggestion card (an `ai_insight` row) instead
@@ -62,6 +69,10 @@ function chunk<T>(items: readonly T[], size: number): T[][] {
   return out;
 }
 
+const MEETING_CAP = 500;
+const PROPOSAL_CAP = 1000;
+const ALSO_KEYS_CAP = 50;
+
 const text = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v : null);
 
 /** True when a calendar title reads like a dispute, the same phrases that mark mail sensitive. */
@@ -70,8 +81,6 @@ export function isSensitiveTitle(title: string | null): boolean {
   const folded = title.toLowerCase().replace(/[-_/]+/g, " ").replace(/\s+/g, " ");
   return SENSITIVE_PHRASES.some((p) => folded.includes(p));
 }
-
-const isSensitiveSignal = (s: KeeperSignal): boolean => s.source !== "payment" && s.sensitive;
 
 // ── reads ────────────────────────────────────────────────────────────────────
 
@@ -87,17 +96,19 @@ async function readMapping(admin: SupabaseClient, orgId: string): Promise<StageM
     .select("key, body, data")
     .eq("org_id", orgId)
     .eq("category", "stage_mapping");
-  if (error) throw new Error(`firm brain read failed: ${error.message}`);
+  if (error) throw new Error(`firm notes read failed: ${error.message}`);
   return parseStageMapping((data ?? []) as Array<{ key?: unknown; body?: unknown; data?: unknown }>);
 }
 
 type MailRead = { signals: Map<string, KeeperSignal[]>; truncated: boolean };
 
-function mailSignal(row: ActivityRow): { leadId: string; signal: KeeperSignal } | null {
+function mailSignal(row: ActivityRow, firm: FirmSenders): { leadId: string; signal: KeeperSignal } | null {
   const p = (row.payload ?? {}) as Record<string, unknown>;
   const messageId = text(p.message_id);
   if (!row.lead_id || !messageId) return null;
-  const direction = p.direction === "outbound" ? "outbound" : p.direction === "inbound" ? "inbound" : row.type === "email_sent" ? "outbound" : "inbound";
+  const stored = p.direction === "outbound" ? "outbound" : p.direction === "inbound" ? "inbound" : row.type === "email_sent" ? "outbound" : "inbound";
+  // Only the sender's address is compared, and it is not kept: a cc'd copy of the firm's own email is the firm's.
+  const direction = effectiveDirection(stored, text(p.from), firm);
   return {
     leadId: row.lead_id,
     signal: {
@@ -117,7 +128,7 @@ function mailSignal(row: ActivityRow): { leadId: string; signal: KeeperSignal } 
  * window whatever the cap: "sensitive mail never moves anything" must not depend on how busy the
  * inbox was, so those rows are asked for on their own.
  */
-async function readMail(admin: SupabaseClient, orgId: string, sinceIso: string): Promise<MailRead> {
+async function readMail(admin: SupabaseClient, orgId: string, sinceIso: string, firm: FirmSenders): Promise<MailRead> {
   const base = () =>
     admin
       .from("crm_activity")
@@ -136,7 +147,7 @@ async function readMail(admin: SupabaseClient, orgId: string, sinceIso: string):
   const signals = new Map<string, KeeperSignal[]>();
   const seen = new Set<string>();
   for (const row of [...rows, ...((flagged ?? []) as ActivityRow[])]) {
-    const made = mailSignal(row);
+    const made = mailSignal(row, firm);
     if (!made || made.signal.source !== "mail") continue;
     const key = `${made.leadId}:${made.signal.messageId}`;
     if (seen.has(key)) continue;
@@ -178,6 +189,167 @@ async function readConsults(admin: SupabaseClient, orgId: string, nowIso: string
     return { state: "ok", signals };
   } catch {
     return none("unavailable");
+  }
+}
+
+type FirmRead = { senders: FirmSenders; ok: boolean };
+
+/** The addresses of the firm's own connected mailboxes. A failed read turns the firm-sender rule off for this run and says so. */
+async function readFirmSenders(admin: SupabaseClient, orgId: string): Promise<FirmRead> {
+  try {
+    const { data, error } = await admin.from("mailbox_connection").select("email, status").eq("org_id", orgId);
+    if (error) return { senders: NO_FIRM_SENDERS, ok: false };
+    const emails = ((data ?? []) as Array<{ email?: unknown; status?: unknown }>)
+      .filter((c) => c.status !== "revoked")
+      .map((c) => (typeof c.email === "string" ? c.email : null));
+    return { senders: firmSendersFrom(emails), ok: true };
+  } catch {
+    return { senders: NO_FIRM_SENDERS, ok: false };
+  }
+}
+
+type OptionalRead = { ok: boolean; signals: Map<string, KeeperSignal[]> };
+
+function addSignal(into: Map<string, KeeperSignal[]>, leadId: string, signal: KeeperSignal): void {
+  into.set(leadId, [...(into.get(leadId) ?? []), signal]);
+}
+
+type MeetingRow = { id: string; lead_id: string | null; provider: string | null; title: string | null; started_at: string | null };
+
+/**
+ * Zoom / Fathom meetings linked to a lead (`lead_id`; a `suggested_lead_id` is a guess and never counts)
+ * that have taken place: started in the past, or already holding a transcript. The transcript itself is
+ * never selected, only whether the column is set. An unreadable table skips this half of the input.
+ */
+async function readMeetings(admin: SupabaseClient, orgId: string, sinceIso: string, nowIso: string): Promise<OptionalRead> {
+  try {
+    const columns = "id, lead_id, provider, title, started_at";
+    const past = await admin
+      .from("crm_meeting")
+      .select(columns)
+      .eq("org_id", orgId)
+      .not("lead_id", "is", null)
+      .gte("started_at", sinceIso)
+      .lt("started_at", nowIso)
+      .order("started_at", { ascending: false })
+      .limit(MEETING_CAP);
+    if (past.error) return { ok: false, signals: new Map() };
+    const transcribed = await admin
+      .from("crm_meeting")
+      .select(columns)
+      .eq("org_id", orgId)
+      .not("lead_id", "is", null)
+      .not("transcript", "is", null)
+      .gte("started_at", sinceIso)
+      .order("started_at", { ascending: false })
+      .limit(MEETING_CAP);
+    if (transcribed.error) return { ok: false, signals: new Map() };
+
+    const signals = new Map<string, KeeperSignal[]>();
+    const seen = new Set<string>();
+    for (const row of [...((past.data ?? []) as MeetingRow[]), ...((transcribed.data ?? []) as MeetingRow[])]) {
+      if (!row.lead_id || !row.started_at || seen.has(row.id)) continue;
+      seen.add(row.id);
+      addSignal(signals, row.lead_id, {
+        source: "meeting",
+        meetingId: row.id,
+        provider: row.provider === "fathom" ? "fathom" : "zoom",
+        title: row.title,
+        startsAt: row.started_at,
+        sensitive: isSensitiveTitle(row.title),
+      });
+    }
+    return { ok: true, signals };
+  } catch {
+    return { ok: false, signals: new Map() };
+  }
+}
+
+type ProposalRow = {
+  id: string;
+  lead_id: string | null;
+  family_id: string | null;
+  version: number | null;
+  status: string;
+  sent_at: string | null;
+  accepted_at: string | null;
+};
+
+/**
+ * Client proposals whose link is live (`sent`) or that the client accepted, one signal per family. A draft,
+ * an approved-but-not-live version, a replaced one and a withdrawn one place nobody. Only status, version
+ * and dates are selected: not the content, the client's address or the pay link.
+ */
+async function readProposals(admin: SupabaseClient, orgId: string, sinceMs: number): Promise<OptionalRead> {
+  try {
+    const { data, error } = await admin
+      .from("client_proposal")
+      .select("id, lead_id, family_id, version, status, sent_at, accepted_at")
+      .eq("org_id", orgId)
+      .in("status", ["sent", "accepted"])
+      .not("lead_id", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(PROPOSAL_CAP);
+    if (error) return { ok: false, signals: new Map() };
+
+    const newest = new Map<string, { leadId: string; row: ProposalRow; at: string | null; ms: number }>();
+    for (const row of (data ?? []) as ProposalRow[]) {
+      if (!row.lead_id || (row.status !== "sent" && row.status !== "accepted")) continue;
+      const at = row.accepted_at ?? row.sent_at;
+      const ms = at ? Date.parse(at) : NaN;
+      if (!Number.isFinite(ms) || ms < sinceMs) continue;
+      const family = row.family_id ?? row.id;
+      const key = `${row.lead_id}:${family}`;
+      const have = newest.get(key);
+      if (!have || ms > have.ms) newest.set(key, { leadId: row.lead_id, row, at, ms });
+    }
+    const signals = new Map<string, KeeperSignal[]>();
+    for (const { leadId, row, at } of newest.values()) {
+      addSignal(signals, leadId, {
+        source: "proposal",
+        familyId: row.family_id ?? row.id,
+        version: typeof row.version === "number" ? row.version : null,
+        status: row.status,
+        at,
+      });
+    }
+    return { ok: true, signals };
+  } catch {
+    return { ok: false, signals: new Map() };
+  }
+}
+
+/** True for the post-consult client email the queue holds (the drafter writes agent `post-consult`, type `CLIENT_EMAIL`). */
+function isPostConsultEmail(item: QueueItem): boolean {
+  return item.type === "CLIENT_EMAIL" && (item.agent === "post-consult" || /post[- ]consult/i.test(item.headline ?? ""));
+}
+
+type QueueRead = OptionalRead & { configured: boolean };
+
+/**
+ * Approved post-consult client emails, matched to a lead by the queue's own linking rules (`resolveBatch`),
+ * and only when they name exactly ONE lead. A queue that can't be read, or a link lookup that fails, gives no
+ * signal and is reported: "none approved" is only ever said about a queue that answered.
+ */
+async function readApprovedQueue(ctx: AgentContext, sinceMs: number): Promise<QueueRead> {
+  if (!ctx.listApproved) return { configured: false, ok: true, signals: new Map() };
+  try {
+    const approved = (await ctx.listApproved()).filter((item) => {
+      if (item.status !== "approved" || !isPostConsultEmail(item)) return false;
+      const ms = item.resolved_at ? Date.parse(item.resolved_at) : NaN;
+      return Number.isFinite(ms) && ms >= sinceMs;
+    });
+    const signals = new Map<string, KeeperSignal[]>();
+    if (approved.length === 0) return { configured: true, ok: true, signals };
+    const resolved = await resolveBatch(orgFencedReader(ctx.admin, ctx.orgId), approved);
+    for (const item of approved) {
+      const leadIds = resolved.get(item.id)?.leadIds ?? [];
+      if (leadIds.length !== 1) continue; // none, or several people: never a guess
+      addSignal(signals, leadIds[0], { source: "queue", itemId: item.id, type: item.type, at: item.resolved_at });
+    }
+    return { configured: true, ok: true, signals };
+  } catch {
+    return { configured: true, ok: false, signals: new Map() };
   }
 }
 
@@ -269,6 +441,7 @@ async function writeSuggestion(
     to: StageOpt;
     why: SuggestionWhy;
     signalKey: string;
+    alsoSignalKeys: readonly string[];
     signal: KeeperSignal;
     signalId: string;
     autonomy: string;
@@ -284,6 +457,7 @@ async function writeSuggestion(
       source: SUGGESTION_SOURCE,
       kind: SUGGESTION_KIND,
       signal_key: args.signalKey,
+      ...(args.alsoSignalKeys.length > 0 ? { also_signal_keys: [...args.alsoSignalKeys] } : {}),
       signal: args.signalId,
       from_stage_id: args.from.id,
       to_stage_id: args.to.id,
@@ -319,7 +493,7 @@ function summaryOf(leads: number, counts: Counts, extra: string[]): string {
 }
 
 const CALENDAR_NOTE: Record<Exclude<CalendarState, "ok">, string> = {
-  "database-update-needed": "Calendar consults: not available until the database update.",
+  "database-update-needed": "Calendar consults: not switched on for your firm yet.",
   unavailable: "Calendar consults couldn't be read this run.",
 };
 
@@ -332,14 +506,27 @@ export async function runStageKeeper(ctx: AgentContext): Promise<AgentResult> {
   // Required reads: any failure ends the run as an error before a lead is touched.
   const stages = await readStages(admin, orgId);
   const mapping = await readMapping(admin, orgId);
-  const mail = await readMail(admin, orgId, new Date(nowMs - SIGNAL_WINDOW_DAYS * DAY_MS).toISOString());
+  const sinceMs = nowMs - SIGNAL_WINDOW_DAYS * DAY_MS;
+  const sinceIso = new Date(sinceMs).toISOString();
+  const firm = await readFirmSenders(admin, orgId);
+  const mail = await readMail(admin, orgId, sinceIso, firm.senders);
   // The calendar half is optional: before lectual 0098 its columns do not exist.
   const calendar = await readConsults(admin, orgId, nowIso);
   if (calendar.state !== "ok") notes.push(CALENDAR_NOTE[calendar.state]);
+  // Held meetings, live proposals and approved post-consult emails are optional halves too: each failure is said, never "none".
+  const meetings = await readMeetings(admin, orgId, sinceIso, nowIso);
+  if (!meetings.ok) notes.push("Linked meetings couldn't be read this run.");
+  const proposals = await readProposals(admin, orgId, sinceMs);
+  if (!proposals.ok) notes.push("Proposals couldn't be read this run.");
+  const queue = await readApprovedQueue(ctx, sinceMs);
+  if (!queue.ok) notes.push("Approved post-consult emails couldn't be read this run.");
+  if (!firm.ok) notes.push("The firm's mailbox addresses couldn't be read, so mail copied into a shared inbox wasn't counted as sent.");
   if (mail.truncated) notes.push("Mail read cut short; the newest was used.");
 
   const signalsByLead = new Map<string, KeeperSignal[]>(mail.signals);
-  for (const [leadId, list] of calendar.signals) signalsByLead.set(leadId, [...(signalsByLead.get(leadId) ?? []), ...list]);
+  for (const extra of [calendar.signals, meetings.signals, proposals.signals, queue.signals]) {
+    for (const [leadId, list] of extra) signalsByLead.set(leadId, [...(signalsByLead.get(leadId) ?? []), ...list]);
+  }
 
   const leadIds = [...signalsByLead.keys()].sort();
   if (leadIds.length === 0) {
@@ -367,6 +554,7 @@ export async function runStageKeeper(ctx: AgentContext): Promise<AgentResult> {
     const from = stageById.get(lead.current_stage_id);
     if (!from) continue;
     const signalKey = signalKeyFor(lead.id, target.signal);
+    const alsoSignalKeys = [...new Set(target.covered.map((c) => signalKeyFor(lead.id, c)))].filter((k) => k !== signalKey).slice(0, ALSO_KEYS_CAP);
 
     let suggestWhy: SuggestionWhy | null = null;
     if (target.kind === "suggest") suggestWhy = target.why;
@@ -387,6 +575,7 @@ export async function runStageKeeper(ctx: AgentContext): Promise<AgentResult> {
         to: target.stage,
         why: suggestWhy,
         signalKey,
+        alsoSignalKeys,
         signal: target.signal,
         signalId: target.signalId,
         autonomy,
@@ -402,6 +591,7 @@ export async function runStageKeeper(ctx: AgentContext): Promise<AgentResult> {
         fromStageId: from.id,
         toStageId: target.stage.id,
         signalKey,
+        alsoSignalKeys,
         signalId: target.signalId,
         evidence: evidenceOf(target.signal),
         evidenceAt: evidenceDateOf(target.signal),

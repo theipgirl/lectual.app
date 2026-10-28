@@ -1,5 +1,7 @@
 "use client";
 
+import { createContext, useContext, useState, type ReactNode } from "react";
+import { classLock } from "@/lib/proposals/class-lock";
 import { MARK_KIND_DEFAULT_DESC, MARK_KIND_LABEL, MARK_KINDS, type MarkKind, type ProposalInclude } from "@/lib/proposals/types";
 import {
   addNameAction,
@@ -13,8 +15,8 @@ import {
 } from "@/app/dashboard/proposals/[id]/actions";
 import { ActionForm, IssueList, SaveRow, type ShownIssue } from "./ActionForm";
 import { IncludesFields } from "./IncludesFields";
-import { PricingFields, type PricingValues } from "./PricingFields";
-import { newRowId, useRows } from "./rows";
+import type { PricingValues } from "./PricingFields";
+import { newRowId, useRows, type Keyed } from "./rows";
 
 /**
  * The editor's section forms. One form per section, each posting to its own
@@ -61,13 +63,18 @@ export type DetailsValues = {
   clientEmail: string;
   title: string;
   expiresOn: string;
-  payUrl: string;
 };
 
+/** The form ids that let More options fields belong to a step's form. */
+export const detailsFormId = (proposalId: string) => `pe-details-${proposalId}`;
+export const pricingFormId = (proposalId: string) => `pe-pricing-${proposalId}`;
+export const nameFormId = (proposalId: string, nameId: string) => `pe-name-${proposalId}-${nameId}`;
+
+/** Step 1: who the proposal is for. The rest of this form's fields are in More options (`DetailsMoreFields`). */
 export function DetailsForm({ proposalId, updatedAt, editable, issues, values }: Common & { values: DetailsValues }) {
   return (
-    <Section title="Client and link" hint="Who this is for, when it stops being open, and where “Accept” sends them to pay.">
-      <ActionForm action={saveDetailsAction}>
+    <Section title="Client" hint="Who this is for. Its title, greeting name and expiry date are under More options.">
+      <ActionForm action={saveDetailsAction} id={detailsFormId(proposalId)}>
         {({ state, pending }) => (
           <fieldset className="pe-fieldset" disabled={!editable}>
             <Hidden values={{ proposalId, updatedAt }} />
@@ -77,36 +84,44 @@ export function DetailsForm({ proposalId, updatedAt, editable, issues, values }:
                 <input className="lx-input" name="fullName" required maxLength={300} defaultValue={values.fullName} />
               </label>
               <label className="lx-field">
-                <span className="lx-label">First name (greeting)</span>
-                <input className="lx-input" name="firstName" maxLength={120} defaultValue={values.firstName} />
-              </label>
-              <label className="lx-field">
-                <span className="lx-label">Company (optional)</span>
-                <input className="lx-input" name="company" maxLength={200} defaultValue={values.company} />
-              </label>
-              <label className="lx-field">
                 <span className="lx-label">Client email</span>
                 <input className="lx-input" name="clientEmail" type="email" maxLength={320} defaultValue={values.clientEmail} />
               </label>
-              <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
-                <span className="lx-label">Title</span>
-                <input className="lx-input" name="title" required maxLength={300} defaultValue={values.title} />
-              </label>
-              <label className="lx-field">
-                <span className="lx-label">Open until</span>
-                <input className="lx-input" name="expiresOn" type="date" defaultValue={values.expiresOn} />
-              </label>
-              <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
-                <span className="lx-label">Pay link</span>
-                <input className="lx-input" name="payUrl" type="url" maxLength={2000} defaultValue={values.payUrl} placeholder="Enter custom pay link" />
-              </label>
             </div>
             <IssueList issues={issues} />
-            <SaveRow editable={editable} state={state} pending={pending} label="Save client and link" />
+            <SaveRow editable={editable} state={state} pending={pending} label="Save client" />
           </fieldset>
         )}
       </ActionForm>
     </Section>
+  );
+}
+
+/** More options: the rest of the client form (greeting name, company, title, expiry date). Saved with Step 1's button. */
+export function DetailsMoreFields({ proposalId, editable, values }: { proposalId: string; editable: boolean; values: DetailsValues }) {
+  const form = detailsFormId(proposalId);
+  return (
+    <div className="lx-form-grid" role="group" aria-label="Client details, title and expiry">
+      <label className="lx-field">
+        <span className="lx-label">First name (greeting)</span>
+        <input className="lx-input" name="firstName" form={form} disabled={!editable} maxLength={120} defaultValue={values.firstName} />
+      </label>
+      <label className="lx-field">
+        <span className="lx-label">Company (optional)</span>
+        <input className="lx-input" name="company" form={form} disabled={!editable} maxLength={200} defaultValue={values.company} />
+      </label>
+      <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
+        <span className="lx-label">Title</span>
+        <input className="lx-input" name="title" form={form} disabled={!editable} required maxLength={300} defaultValue={values.title} />
+      </label>
+      <label className="lx-field">
+        <span className="lx-label">Open until</span>
+        <input className="lx-input" name="expiresOn" form={form} disabled={!editable} type="date" defaultValue={values.expiresOn} />
+      </label>
+      <p className="lx-note" style={{ gridColumn: "1 / -1", margin: 0 }}>
+        Saved with the Client step&apos;s button.
+      </p>
+    </div>
   );
 }
 
@@ -141,27 +156,91 @@ export function MessageForm({ proposalId, updatedAt, editable, issues, values }:
   );
 }
 
-/* ── package pricing ────────────────────────────────────────────────────── */
+/* ── package and pay link ──────────────────────────────────────────────── */
 
 export type { PricingValues };
 
-export function PricingForm({ proposalId, updatedAt, editable, issues, values }: Common & { values: PricingValues }) {
+/** Step 3: the package name and where "Accept" sends the client to pay. The prices are in More options (`PricingMoreFields`). */
+export function PricingForm({ proposalId, updatedAt, editable, issues, values, payUrl }: Common & { values: PricingValues; payUrl: string }) {
   return (
-    <Section
-      title="Package prices"
-      hint="Dollars here, whole cents underneath. Totals are always worked out from these, never typed. USPTO fees are due at filing and are shown to the client separately."
-    >
-      <ActionForm action={savePricingAction}>
+    <Section title="Package and pay link" hint="Totals are always worked out from the package prices, never typed. The prices themselves are under More options.">
+      <ActionForm action={savePricingAction} id={pricingFormId(proposalId)}>
         {({ state, pending }) => (
           <fieldset className="pe-fieldset" disabled={!editable}>
             <Hidden values={{ proposalId, updatedAt }} />
-            <PricingFields values={values} />
+            <div className="lx-form-grid">
+              <label className="lx-field">
+                <span className="lx-label">Package name</span>
+                <input className="lx-input" name="package" required maxLength={120} defaultValue={values.package} />
+              </label>
+              <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
+                <span className="lx-label">Pay link</span>
+                <input className="lx-input" name="payUrl" type="url" maxLength={2000} defaultValue={payUrl} placeholder="Enter custom pay link" />
+              </label>
+            </div>
             <IssueList issues={issues} />
-            <SaveRow editable={editable} state={state} pending={pending} label="Save prices" />
+            <SaveRow editable={editable} state={state} pending={pending} label="Save package and pay link" />
           </fieldset>
         )}
       </ActionForm>
     </Section>
+  );
+}
+
+/**
+ * More options: the five package numbers and the custom-package switch. They belong to Step 3's form and
+ * are saved with its button. `oneClassFlat` / `oneClassCustom` are the legal fee for one class under each
+ * rule, worked out by the pricing engine (the page passes them as words).
+ */
+export function PricingMoreFields({
+  proposalId,
+  editable,
+  values,
+  reduceUnderIncluded,
+  customLabel,
+  customHelp,
+}: {
+  proposalId: string;
+  editable: boolean;
+  values: PricingValues;
+  reduceUnderIncluded: boolean;
+  customLabel: string;
+  customHelp: string;
+}) {
+  const form = pricingFormId(proposalId);
+  const common = { form, disabled: !editable } as const;
+  return (
+    <div className="lx-form-grid" role="group" aria-label="Package prices">
+      <label className="lx-field">
+        <span className="lx-label">Price with the included classes ($)</span>
+        <input className="lx-input" name="base" {...common} inputMode="decimal" required defaultValue={values.base} />
+      </label>
+      <label className="lx-field">
+        <span className="lx-label">Classes included</span>
+        <input className="lx-input" name="includedClasses" {...common} inputMode="numeric" required defaultValue={values.includedClasses} />
+      </label>
+      <label className="lx-field">
+        <span className="lx-label">Price per extra class ($)</span>
+        <input className="lx-input" name="perClass" {...common} inputMode="decimal" required defaultValue={values.perClass} />
+      </label>
+      <label className="lx-field">
+        <span className="lx-label">Second mark discount (%)</span>
+        <input className="lx-input" name="secondMarkPct" {...common} inputMode="decimal" required defaultValue={values.secondMarkPct} />
+      </label>
+      <label className="lx-field">
+        <span className="lx-label">USPTO fee per class per mark ($)</span>
+        <input className="lx-input" name="govPerClass" {...common} inputMode="decimal" required defaultValue={values.govPerClass} />
+      </label>
+      <div className="lx-field" style={{ gridColumn: "1 / -1" }}>
+        <label className="pe-check" style={{ whiteSpace: "normal" }}>
+          <input type="checkbox" name="reduceUnderIncluded" {...common} defaultChecked={reduceUnderIncluded} /> {customLabel}
+        </label>
+        <span className="lx-note">{customHelp}</span>
+      </div>
+      <p className="lx-note" style={{ gridColumn: "1 / -1", margin: 0 }}>
+        Saved with the Package and pay link step&apos;s button.
+      </p>
+    </div>
   );
 }
 
@@ -178,14 +257,75 @@ export type NameValues = {
   classes: { id: string; label: string; preselected: boolean }[];
 };
 
-export function NameCard({ proposalId, updatedAt, editable, issues, value, packageName }: Common & { value: NameValues; packageName: string }) {
-  const marks = useRows(value.marks);
-  const classes = useRows(value.classes);
+/* The marks and classes of every brand name are held in one place, because Step 2 draws their pickers and
+ * More options draws the same marks' descriptions: both must agree on which row is which. */
+
+type MarkRow = NameValues["marks"][number];
+type ClassRow = NameValues["classes"][number];
+type NameRows = { marks: Keyed<MarkRow>[]; classes: Keyed<ClassRow>[]; next: number };
+
+const NameRowsContext = createContext<{
+  rows: Record<string, NameRows>;
+  change: (nameId: string, fn: (r: NameRows) => NameRows) => void;
+} | null>(null);
+
+/** Wrap the builder once. Give it a `key` that changes when a brand name is added or removed. */
+export function NameRowsProvider({ names, children }: { names: NameValues[]; children: ReactNode }) {
+  const [rows, setRows] = useState<Record<string, NameRows>>(() =>
+    Object.fromEntries(
+      names.map((n) => [
+        n.id,
+        {
+          marks: n.marks.map((m, i) => ({ ...m, key: `m${i}` })),
+          classes: n.classes.map((c, i) => ({ ...c, key: `c${i}` })),
+          next: Math.max(n.marks.length, n.classes.length),
+        },
+      ]),
+    ),
+  );
+  const change = (nameId: string, fn: (r: NameRows) => NameRows) => setRows((all) => (all[nameId] ? { ...all, [nameId]: fn(all[nameId]) } : all));
+  return <NameRowsContext.Provider value={{ rows, change }}>{children}</NameRowsContext.Provider>;
+}
+
+function useNameRows(value: NameValues) {
+  const ctx = useContext(NameRowsContext);
+  if (!ctx) throw new Error("NameCard needs a NameRowsProvider above it.");
+  const mine = ctx.rows[value.id] ?? { marks: [], classes: [], next: 0 };
+  const move = <T extends object>(list: Keyed<T>[], key: string, by: -1 | 1): Keyed<T>[] => {
+    const i = list.findIndex((r) => r.key === key);
+    const j = i + by;
+    if (i < 0 || j < 0 || j >= list.length) return list;
+    const next = [...list];
+    [next[i], next[j]] = [next[j], next[i]];
+    return next;
+  };
+  return {
+    marks: mine.marks,
+    classes: mine.classes,
+    addMark: (row: MarkRow) => ctx.change(value.id, (r) => ({ ...r, marks: [...r.marks, { ...row, key: `n${r.next}` }], next: r.next + 1 })),
+    removeMark: (key: string) => ctx.change(value.id, (r) => ({ ...r, marks: r.marks.filter((x) => x.key !== key) })),
+    moveMark: (key: string, by: -1 | 1) => ctx.change(value.id, (r) => ({ ...r, marks: move(r.marks, key, by) })),
+    setMarkDesc: (key: string, desc: string) => ctx.change(value.id, (r) => ({ ...r, marks: r.marks.map((x) => (x.key === key ? { ...x, desc } : x)) })),
+    addClass: (row: ClassRow) => ctx.change(value.id, (r) => ({ ...r, classes: [...r.classes, { ...row, key: `n${r.next}` }], next: r.next + 1 })),
+    removeClass: (key: string) => ctx.change(value.id, (r) => ({ ...r, classes: r.classes.filter((x) => x.key !== key) })),
+    setClassTicked: (key: string, preselected: boolean) =>
+      ctx.change(value.id, (r) => ({ ...r, classes: r.classes.map((x) => (x.key === key ? { ...x, preselected } : x)) })),
+  };
+}
+
+/** Step 2: one brand name, its marks and its classes. Its note, own price and mark descriptions are under More options (`NameMoreFields`). */
+export function NameCard({ proposalId, updatedAt, editable, issues, value }: Common & { value: NameValues; packageName: string }) {
+  const rows = useNameRows(value);
+  // Every package includes one class: the class that is the only one ticked cannot be unticked.
+  const lock = classLock(
+    { marks: [], classes: rows.classes },
+    Object.fromEntries(rows.classes.map((c) => [c.id, c.preselected])),
+  );
 
   return (
     <section className="lx-card pe-card" aria-label={`Brand name ${value.name}`}>
       <header className="pe-card-head pe-card-head-row">
-        <h2 className="pe-h">{value.name || "Brand name"}</h2>
+        <h3 className="pe-h">{value.name || "Brand name"}</h3>
         {editable && (
           <ActionForm action={removeNameAction} confirm={`Remove ${value.name || "this brand name"} and its marks and classes? Unsaved changes in this card are lost.`}>
             {({ state, pending }) => (
@@ -205,7 +345,7 @@ export function NameCard({ proposalId, updatedAt, editable, issues, value, packa
         )}
       </header>
 
-      <ActionForm action={saveNameAction}>
+      <ActionForm action={saveNameAction} id={nameFormId(proposalId, value.id)}>
         {({ state, pending }) => (
           <fieldset className="pe-fieldset" disabled={!editable}>
             <Hidden values={{ proposalId, updatedAt, nameId: value.id }} />
@@ -214,36 +354,13 @@ export function NameCard({ proposalId, updatedAt, editable, issues, value, packa
                 <span className="lx-label">Brand name</span>
                 <input className="lx-input" name="name" required maxLength={200} defaultValue={value.name} />
               </label>
-              <label className="lx-field">
-                <span className="lx-label">What it is (optional)</span>
-                <input className="lx-input" name="what" maxLength={200} defaultValue={value.what} placeholder="Your company name" />
-              </label>
-              <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
-                <span className="lx-label">Note on this brand’s card (optional)</span>
-                <textarea className="lx-input" name="note" rows={2} maxLength={2000} defaultValue={value.note} />
-                <span className="lx-note">Wrap words in **double asterisks** for bold. Nothing else is formatted.</span>
-              </label>
-            </div>
-
-            <div className="pe-sub">
-              <div className="lx-label">A different price for this brand (optional)</div>
-              <div className="lx-form-grid">
-                <label className="lx-field">
-                  <span className="lx-label">{packageName || "Package"} price with the included classes ($)</span>
-                  <input className="lx-input" name="overrideBase" inputMode="decimal" defaultValue={value.overrideBase} placeholder="Package price" />
-                </label>
-                <label className="lx-field">
-                  <span className="lx-label">Per class over / under ($)</span>
-                  <input className="lx-input" name="overridePerClass" inputMode="decimal" defaultValue={value.overridePerClass} placeholder="Package price" />
-                </label>
-              </div>
             </div>
 
             <div className="pe-sub">
               <div className="lx-label">Marks</div>
               <p className="lx-note pe-hint">The first ticked mark is full price. Each later ticked mark of this brand gets the second-mark discount, so order matters.</p>
               <div className="pe-rows">
-                {marks.rows.map((m, i) => (
+                {rows.marks.map((m, i) => (
                   <div key={m.key} className="pe-mark-row">
                     <input type="hidden" name={`mark.${i}.id`} value={m.id} />
                     <select className="lx-input" name={`mark.${i}.kind`} defaultValue={m.kind} aria-label="Mark type">
@@ -253,20 +370,19 @@ export function NameCard({ proposalId, updatedAt, editable, issues, value, packa
                         </option>
                       ))}
                     </select>
-                    <input className="lx-input" name={`mark.${i}.desc`} defaultValue={m.desc} aria-label="What this mark protects" maxLength={600} />
                     <label className="pe-check">
                       <input type="checkbox" name={`mark.${i}.preselected`} defaultChecked={m.preselected} />
                       <span>Starts ticked</span>
                     </label>
                     {editable && (
                       <span className="pe-row-tools">
-                        <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={() => marks.move(m.key, -1)} aria-label="Move mark up" disabled={i === 0}>
+                        <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={() => rows.moveMark(m.key, -1)} aria-label="Move mark up" disabled={i === 0}>
                           ↑
                         </button>
-                        <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={() => marks.move(m.key, 1)} aria-label="Move mark down" disabled={i === marks.rows.length - 1}>
+                        <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={() => rows.moveMark(m.key, 1)} aria-label="Move mark down" disabled={i === rows.marks.length - 1}>
                           ↓
                         </button>
-                        <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={() => marks.remove(m.key)}>
+                        <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={() => rows.removeMark(m.key)}>
                           Remove
                         </button>
                       </span>
@@ -280,7 +396,7 @@ export function NameCard({ proposalId, updatedAt, editable, issues, value, packa
                         key={k}
                         type="button"
                         className="lx-btn lx-btn-ghost lx-btn-sm"
-                        onClick={() => marks.add({ id: newRowId("m"), kind: k, desc: MARK_KIND_DEFAULT_DESC[k], preselected: true })}
+                        onClick={() => rows.addMark({ id: newRowId("m"), kind: k, desc: MARK_KIND_DEFAULT_DESC[k], preselected: true })}
                       >
                         + Add {MARK_KIND_LABEL[k].toLowerCase()}
                       </button>
@@ -292,26 +408,38 @@ export function NameCard({ proposalId, updatedAt, editable, issues, value, packa
 
             <div className="pe-sub">
               <div className="lx-label">Classes (what the brand is used for)</div>
-              <p className="lx-note pe-hint">Describe each in plain business language, like “Cloud-based software”. Never an International Class number.</p>
+              <p className="lx-note pe-hint">Describe each in plain business language, like “Cloud-based software”. Never an International Class number. Every package includes one class.</p>
               <div className="pe-rows">
-                {classes.rows.map((c, i) => (
-                  <div key={c.key} className="pe-class-row">
-                    <input type="hidden" name={`class.${i}.id`} value={c.id} />
-                    <input className="lx-input" name={`class.${i}.label`} defaultValue={c.label} aria-label="Class description" maxLength={300} />
-                    <label className="pe-check">
-                      <input type="checkbox" name={`class.${i}.preselected`} defaultChecked={c.preselected} />
-                      <span>Starts ticked</span>
-                    </label>
-                    {editable && (
-                      <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={() => classes.remove(c.key)}>
-                        Remove
-                      </button>
-                    )}
-                  </div>
-                ))}
+                {rows.classes.map((c, i) => {
+                  const locked = lock?.classId === c.id;
+                  return (
+                    <div key={c.key} className="pe-class-row">
+                      <input type="hidden" name={`class.${i}.id`} value={c.id} />
+                      <input className="lx-input" name={`class.${i}.label`} defaultValue={c.label} aria-label="Class description" maxLength={300} />
+                      <label className="pe-check">
+                        {/* A disabled box is not posted, so a locked one is posted by the hidden twin beside it. */}
+                        {locked ? <input type="hidden" name={`class.${i}.preselected`} value="on" /> : null}
+                        <input
+                          type="checkbox"
+                          name={locked ? undefined : `class.${i}.preselected`}
+                          checked={c.preselected}
+                          disabled={locked}
+                          onChange={(e) => rows.setClassTicked(c.key, e.target.checked)}
+                        />
+                        <span>Starts ticked</span>
+                        {locked ? <span className="pe-lock">{lock.text}</span> : null}
+                      </label>
+                      {editable && (
+                        <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={() => rows.removeClass(c.key)}>
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
                 {editable && (
                   <div className="pe-add">
-                    <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={() => classes.add({ id: newRowId("c"), label: "", preselected: true })}>
+                    <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={() => rows.addClass({ id: newRowId("c"), label: "", preselected: true })}>
                       + Add class
                     </button>
                   </div>
@@ -325,6 +453,51 @@ export function NameCard({ proposalId, updatedAt, editable, issues, value, packa
         )}
       </ActionForm>
     </section>
+  );
+}
+
+/** More options, per brand name: what it is, its note, its own price, and what each mark protects. Saved with that brand's button in Step 2. */
+export function NameMoreFields({ proposalId, editable, value, packageName }: { proposalId: string; editable: boolean; value: NameValues; packageName: string }) {
+  const rows = useNameRows(value);
+  const form = nameFormId(proposalId, value.id);
+  const common = { form, disabled: !editable } as const;
+  return (
+    <fieldset className="pe-fieldset" style={{ border: 0, padding: 0, margin: 0 }} aria-label={`More about ${value.name || "this brand name"}`}>
+      <div className="lx-label">{value.name || "Brand name"}</div>
+      <div className="lx-form-grid">
+        <label className="lx-field">
+          <span className="lx-label">What it is (optional)</span>
+          <input className="lx-input" name="what" {...common} maxLength={200} defaultValue={value.what} placeholder="Your company name" />
+        </label>
+        <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
+          <span className="lx-label">Note on this brand’s card (optional)</span>
+          <textarea className="lx-input" name="note" {...common} rows={2} maxLength={2000} defaultValue={value.note} />
+          <span className="lx-note">Wrap words in **double asterisks** for bold. Nothing else is formatted.</span>
+        </label>
+        <label className="lx-field">
+          <span className="lx-label">{packageName || "Package"} price with the included classes ($)</span>
+          <input className="lx-input" name="overrideBase" {...common} inputMode="decimal" defaultValue={value.overrideBase} placeholder="Package price" />
+        </label>
+        <label className="lx-field">
+          <span className="lx-label">Price per extra class ($)</span>
+          <input className="lx-input" name="overridePerClass" {...common} inputMode="decimal" defaultValue={value.overridePerClass} placeholder="Package price" />
+        </label>
+        {rows.marks.map((m, i) => (
+          <label key={m.key} className="lx-field" style={{ gridColumn: "1 / -1" }}>
+            <span className="lx-label">{`${MARK_KIND_LABEL[m.kind]} ${i + 1}: what it protects`}</span>
+            <input
+              className="lx-input"
+              name={`mark.${i}.desc`}
+              {...common}
+              aria-label="What this mark protects"
+              maxLength={600}
+              value={m.desc}
+              onChange={(e) => rows.setMarkDesc(m.key, e.target.value)}
+            />
+          </label>
+        ))}
+      </div>
+    </fieldset>
   );
 }
 

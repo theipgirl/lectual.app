@@ -1,5 +1,6 @@
 "use client";
 
+import { IMPORT_PERSON_NOT_SAVED, LAWMATICS_TOKEN_HELP } from "@/lib/ui/words";
 import { useActionState, useState, type ReactNode } from "react";
 import {
   applyMattersImportAction,
@@ -46,8 +47,12 @@ export function ConnectLawmatics({ reconnect }: { reconnect: boolean }) {
           spellCheck={false}
           placeholder="Paste the token from Lawmatics"
           required
+          aria-describedby="lawmatics-token-help"
         />
       </label>
+      <p id="lawmatics-token-help" className="lx-note" style={{ margin: 0 }}>
+        {LAWMATICS_TOKEN_HELP}
+      </p>
       <p className="lx-note" style={{ margin: 0 }}>
         We check the token with one read-only request, then store it encrypted. No one at your firm can see it again, including you.
         Lectual only ever reads from Lawmatics; it never changes anything there.
@@ -160,10 +165,6 @@ function OptionBoxes({ options }: { options?: PreviewView["options"] }) {
         <span>Trademark matters only (leaves out everyone whose practice area isn&apos;t Trademark, including people with none; each is listed by name)</span>
       </label>
       <label className="lx-proposal-row">
-        <input type="checkbox" name="moveExistingStages" defaultChecked={options?.moveExistingStages ?? false} />
-        <span>Move existing leads to the stage Lawmatics has them in</span>
-      </label>
-      <label className="lx-proposal-row">
         <input type="checkbox" name="overwriteEditedFields" defaultChecked={options?.overwriteEditedFields ?? false} />
         <span>Overwrite details someone here has already edited</span>
       </label>
@@ -226,7 +227,6 @@ export function PreviewBody({ p, action, pending }: { p: PreviewView; action: (f
         ["from contacts with no matter", p.totals.contactOnly],
         ["updated", p.totals.update],
         ["already current", p.totals.unchanged],
-        ["stage differs", p.totals.divergent],
         ["not imported (no stage to file in)", p.totals.unmapped],
         ["skipped", p.totals.skipped],
       ]}
@@ -263,13 +263,8 @@ export function PreviewBody({ p, action, pending }: { p: PreviewView; action: (f
         <Row
           key={u.lawmaticsId}
           title={u.matterName ?? u.lawmaticsId}
-          detail={[u.linksRecord ? "links the record" : null, ...u.changes.map((c) => `${c.field.replaceAll("_", " ")}: ${c.from ?? "—"} → ${c.to}`), u.stageWillMove ? `stage → ${u.targetStageName}` : null].filter(Boolean).join(" · ")}
+          detail={[u.linksRecord ? "links the record" : null, ...u.changes.map((c) => `${c.field.replaceAll("_", " ")}: ${c.from ?? "—"} → ${c.to}`)].filter(Boolean).join(" · ")}
         />
-      ))}
-    </Section>
-    <Section title="Stage differs (left as is)" count={p.totals.divergent} omitted={p.omitted.divergences}>
-      {p.divergences.map((d) => (
-        <Row key={d.lawmaticsId} title={d.matterName ?? d.lawmaticsId} detail={`Lawmatics: ${d.sourceStageName ?? "—"} · here: ${d.targetStageName ?? "—"}`} />
       ))}
     </Section>
     <Section title="Details kept because someone edited them here" count={p.totals.withheld} omitted={p.omitted.withheld}>
@@ -292,7 +287,6 @@ export function PreviewBody({ p, action, pending }: { p: PreviewView; action: (f
       <input type="hidden" name="intent" value="confirm" />
       <input type="hidden" name="fingerprint" value={p.fingerprint} />
       {p.options.practiceAreaFilter === "Trademark" && <input type="hidden" name="trademarkOnly" value="on" />}
-      {p.options.moveExistingStages && <input type="hidden" name="moveExistingStages" value="on" />}
       {p.options.overwriteEditedFields && <input type="hidden" name="overwriteEditedFields" value="on" />}
       <Acknowledge label={`Write ${p.totals.create} new and ${p.totals.update} updated leads into Lectual.`} />
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -343,7 +337,6 @@ export function ClientsImport() {
               ["from contacts", r.contactsCreated],
               ["updated", r.updated],
               ["linked", r.linked],
-              ["stages moved", r.stageMoves],
               ["failed", r.failures.length, r.failures.length ? "var(--wine)" : undefined],
             ]}
           />
@@ -354,13 +347,13 @@ export function ClientsImport() {
           )}
           {r.flagsNotRecorded > 0 && (
             <p className="lx-banner lx-banner-warn" style={{ margin: 0 }}>
-              {`${r.flagsNotRecorded} of the leads filed in a stand-in stage could not be flagged on their timeline. They were created; find them in the first open stage.`}
+              {`${r.flagsNotRecorded} of the leads whose Lawmatics stage needs a decision could not be flagged on their timeline. They were created; find them in the new-enquiry stage.`}
             </p>
           )}
           <Notices truncated={r.truncated} truncatedReason={r.truncatedReason} />
           <Section title="Failed" count={r.failures.length}>
             {r.failures.map((f, i) => (
-              <Row key={i} title={f.lawmaticsId} detail={f.message} />
+              <Row key={i} title={f.lawmaticsId} detail={IMPORT_PERSON_NOT_SAVED} />
             ))}
           </Section>
         </>
@@ -454,7 +447,7 @@ export function MattersImport() {
           )}
           <Section title="Failed" count={r.failures.length}>
             {r.failures.map((f, i) => (
-              <Row key={i} title={f.lawmaticsId} detail={f.message} />
+              <Row key={i} title={f.lawmaticsId} detail={IMPORT_PERSON_NOT_SAVED} />
             ))}
           </Section>
         </>

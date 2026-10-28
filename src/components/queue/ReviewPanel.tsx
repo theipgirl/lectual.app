@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import "./review.css";
 import { reviewQueueAction, type ReviewState } from "@/app/dashboard/queue/actions";
 import { Markdown } from "@/components/markdown/Markdown";
 // The pure module only: this component ships to the browser.
@@ -9,6 +10,10 @@ import { auditDraft, removeInternalNotes, type AuditContext } from "@/lib/queue/
 /**
  * Edit / approve / reject for one pending item. `canApprove` / `canEdit` only
  * decide what is rendered; the action re-checks the role on every submit.
+ *
+ * The draft is drawn ONCE. By default it is the rendered view with an Edit button; Edit swaps the view for the
+ * editor (never both), and "Done editing" or Cancel swap back. Done keeps what was typed (the view then shows the
+ * edit, marked "edited", and Approve / Save edit post it); Cancel puts back what the editor opened with.
  */
 export function ReviewPanel(props: {
   id: string;
@@ -25,6 +30,9 @@ export function ReviewPanel(props: {
   const { id, initialBody, canApprove, canEdit, confirmStale, audit } = props;
   const [state, action, pending] = useActionState<ReviewState, FormData>(reviewQueueAction, {});
   const [body, setBody] = useState(initialBody);
+  const [editing, setEditing] = useState(false);
+  // What the editor opened with, so Cancel can put it back.
+  const [openedWith, setOpenedWith] = useState(initialBody);
   const [staleConfirmed, setStaleConfirmed] = useState(false);
   const dirty = body !== initialBody;
   const approveBlocked = !!confirmStale && !staleConfirmed;
@@ -57,27 +65,64 @@ export function ReviewPanel(props: {
           )}
         </div>
       )}
-      <section aria-labelledby="draft-preview-label" className="lx-voice" style={{ display: "grid", gap: 8 }}>
-        <div id="draft-preview-label" className="lx-label">
-          Preview
+      {editing && canEdit ? (
+        <div className="lx-view-draft" data-draft-mode="edit">
+          <div className="lx-view-draft-head">
+            <label htmlFor="body" className="lx-label">
+              Draft {dirty && <span style={{ color: "var(--warn)" }}>· edited</span>}
+            </label>
+            <span style={{ display: "flex", gap: 8 }}>
+              <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" onClick={() => setEditing(false)}>
+                Done editing
+              </button>
+              <button
+                type="button"
+                className="lx-btn lx-btn-ghost lx-btn-sm"
+                onClick={() => {
+                  setBody(openedWith);
+                  setEditing(false);
+                }}
+              >
+                Cancel
+              </button>
+            </span>
+          </div>
+          <textarea
+            id="body"
+            name={dirty ? "body" : undefined}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            rows={Math.min(24, Math.max(10, body.split("\n").length + 2))}
+            className="lx-input lx-draft"
+          />
         </div>
-        {body.trim() ? <Markdown text={body} /> : <p className="lx-note" style={{ margin: 0 }}>Nothing to preview yet.</p>}
-        <p className="lx-note" style={{ margin: 0 }}>
-          Preview of how this text reads. An email may show formatting marks as plain characters.
-        </p>
-      </section>
-      <label htmlFor="body" className="lx-label">
-        Draft {dirty && <span style={{ color: "var(--warn)" }}>· edited</span>}
-      </label>
-      <textarea
-        id="body"
-        name={dirty ? "body" : undefined}
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        readOnly={!canEdit}
-        rows={Math.min(24, Math.max(10, body.split("\n").length + 2))}
-        className="lx-input lx-draft"
-      />
+      ) : (
+        <section aria-labelledby="draft-view-label" className="lx-view-draft lx-voice" data-draft-mode="view">
+          <div className="lx-view-draft-head">
+            <div id="draft-view-label" className="lx-label">
+              Draft {dirty && <span style={{ color: "var(--warn)" }}>· edited</span>}
+            </div>
+            {canEdit && (
+              <button
+                type="button"
+                className="lx-btn lx-btn-sec lx-btn-sm"
+                onClick={() => {
+                  setOpenedWith(body);
+                  setEditing(true);
+                }}
+              >
+                Edit
+              </button>
+            )}
+          </div>
+          {body.trim() ? <Markdown text={body} /> : <p className="lx-note" style={{ margin: 0 }}>Nothing to show yet.</p>}
+          <p className="lx-note" style={{ margin: 0 }}>
+            How this text reads. An email may show formatting marks as plain characters.
+          </p>
+          {/* An edit made in the editor is posted from here, so Approve and Save edit carry it whichever view is showing. */}
+          {dirty && <input type="hidden" name="body" value={body} />}
+        </section>
+      )}
 
       {canApprove && (
         <>

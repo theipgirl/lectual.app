@@ -29,9 +29,9 @@ describe("buildRunDigest", () => {
     );
     if (d.status !== "ok") throw new Error("expected ok");
     const text = Object.fromEntries(d.lines.map((l) => [l.agent, l.text]));
-    expect(text["intake-triage"]).toBe("screened 12 new leads · 3 hot, need your review · 3 briefings in the Queue");
-    expect(text["email-intel"]).toBe("read 6 client emails · filled in 4 client records · 1 legal question flagged for the attorney (in the Queue)");
-    expect(text["post-consult"]).toBe("drafted 2 follow-ups (in the Queue)");
+    expect(text["intake-triage"]).toBe("screened 12 new leads · 3 hot, need your review · 3 briefings in Approvals");
+    expect(text["email-intel"]).toBe("read 6 client emails · filled in 4 client records · 1 legal question flagged for the attorney (in Approvals)");
+    expect(text["post-consult"]).toBe("drafted 2 follow-ups (in Approvals)");
     expect(d.failures).toEqual([]);
     expect(d.runs).toBe(4);
     expect(d.lastRunAt).toBe("2026-09-29T10:00:00Z");
@@ -56,8 +56,8 @@ describe("buildRunDigest", () => {
     if (d.status !== "ok") throw new Error();
     expect(d.failures.map((f) => f.agent)).toEqual(["email-intel"]);
     expect(d.failures[0]).toMatchObject({
-      text: "Email → client intel couldn't finish its last run",
-      reason: "Access to this mailbox was withdrawn.",
+      text: "From their emails couldn't finish its last run",
+      reason: "A mailbox needs to be reconnected. Reconnect it in Settings, then try again.",
       action: { label: "Reconnect the mailbox", href: "/dashboard/settings/mailboxes/" },
     });
   });
@@ -101,7 +101,7 @@ describe("buildRunDigest: the Stage Keeper (Sprint 16, F16)", () => {
     const line = d([run({ agent: "stage-keeper", items_in: 4, drafts_out: 1, summary: "counts" })]).lines[0];
     expect(line).toMatchObject({
       agent: "stage-keeper",
-      name: "Stage Keeper",
+      name: "Automatic stage moves",
       text: "moved 3 leads · 1 suggestion waiting on the lead page",
       tone: "attention",
       href: "/dashboard/intake/?view=board&agent=today",
@@ -116,6 +116,6 @@ describe("buildRunDigest: the Stage Keeper (Sprint 16, F16)", () => {
 
   it("a failed run Lectual must fix says Lectual has been told, with no link", () => {
     const out = d([run({ agent: "stage-keeper", status: "error", error: "3 lead move(s) failed. 3 lead(s) read: 0 moved." })]);
-    expect(out.failures[0]).toMatchObject({ agent: "stage-keeper", text: "Stage Keeper couldn't finish its last run", action: { label: "Lectual has been told and is looking into it.", href: null } });
+    expect(out.failures[0]).toMatchObject({ agent: "stage-keeper", text: "Automatic stage moves couldn't finish its last run", action: { label: "Lectual has been told and is looking into it.", href: null } });
   });
 });

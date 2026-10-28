@@ -43,7 +43,7 @@ export async function listIntakeLeads(stages?: Stage[]): Promise<Lead[]> {
   // pipeline at all, so there is nothing to ask the database for. Returned
   // early rather than issuing `in.()`, which is a valid-but-odd PostgREST URL
   // for "match nothing". The page reports "no stages configured" separately,
-  // so this empty array is never mistaken for a broken read.
+  // so this empty array is never mistaken for a failed read.
   if (stageIds.length === 0) return [];
 
   const supabase = await getScopedClient();
@@ -79,7 +79,7 @@ export async function setLane(leadId: string, lane: Lane | null): Promise<Lead> 
   const supabase = await getScopedClient();
   const role = await resolveCurrentRole(supabase);
   if (!CAN_WRITE_LEAD.includes(role)) {
-    throw forbiddenLeadWrite(role, "set a lead's lane");
+    throw forbiddenLeadWrite(role, "set a lead's temperature");
   }
 
   const {
@@ -128,7 +128,7 @@ export async function setLane(leadId: string, lane: Lane | null): Promise<Lead> 
       to: lane,
       suggested: suggestedLane(before.ai_summary),
       by,
-      summary: lane ? `Lane set to ${lane}` : "Lane cleared",
+      summary: lane ? `Temperature set to ${lane}` : "Temperature cleared",
     },
   });
 

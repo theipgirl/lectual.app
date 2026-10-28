@@ -54,20 +54,20 @@ describe("report link tiles hide unbuilt sections (F12)", () => {
     expect(labels(report.links)).toEqual(["All matters", "Pipeline", "Documents"]);
   });
 
-  it("IP.OS report: no Skills tile, other tiles kept", async () => {
+  it("AI tools report: no Skills tile, other tiles kept", async () => {
     mockCommon();
     const { loadIposReport } = await import("@/lib/reports/ipos");
     const report = await loadIposReport(period, { hasAgents: true });
-    expect(labels(report.links)).toEqual(["AI copilot", "Agents", "Firm brain"]);
+    expect(labels(report.links)).toEqual(["Copilot", "Assistants", "Firm notes"]);
     const noAgents = await loadIposReport(period, { hasAgents: false });
-    expect(labels(noAgents.links)).toEqual(["AI copilot", "Firm brain"]);
+    expect(labels(noAgents.links)).toEqual(["Copilot", "Firm notes"]);
   });
 
   it("communication report: no SMS tile, other tiles kept", async () => {
     mockCommon();
     const { loadCommunicationReport } = await import("@/lib/reports/communication");
     const report = await loadCommunicationReport(period, { hasMailbox: true, hasAgents: true });
-    expect(labels(report.links)).toEqual(["My Mail", "Queue", "Campaigns"]);
+    expect(labels(report.links)).toEqual(["My Mail", "Approvals", "Campaigns"]);
   });
 
   it("no report link points at an unbuilt section", async () => {

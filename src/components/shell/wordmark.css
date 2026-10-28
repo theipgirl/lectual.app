@@ -1,0 +1,8 @@
+/* The firm logo in the rail wordmark, when the firm has one (src/lib/org/logo.ts). */
+.lx-wordmark-logo {
+  display: block;
+  height: 44px;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+}

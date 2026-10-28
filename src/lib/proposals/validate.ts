@@ -366,6 +366,16 @@ export function validateContent(content: unknown, options: ValidateOptions = {})
         `Use at most ${MAX_CLASSES_PER_BRAND} classes per brand name, since class labels past ${MAX_CLASSES_PER_BRAND} would read as class numbers. Split the rest into a second brand name or a separate proposal.`,
       );
     }
+    // Every package includes one class per brand name (Sprint 28): a mark that starts ticked needs a class that starts ticked.
+    const markStartsTicked = marks.some((m) => isObj(m) && m.preselected === true);
+    if (markStartsTicked && !classes.some((c) => isObj(c) && c.preselected === true)) {
+      err(
+        `${p}.classes`,
+        classes.length > 0
+          ? "Keep at least one class ticked. Every package includes one class for each brand name."
+          : "Add a class. Every package includes one class for each brand name.",
+      );
+    }
     if (marks.length > 0 && classes.length > 0) buyable = true;
   });
   if (names && !buyable) err("names", "Add at least one brand name with a mark and a class.");

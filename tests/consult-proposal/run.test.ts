@@ -46,6 +46,8 @@ const EXTRACT = {
     },
   ],
   recommended_package: "Concierge",
+  second_mark_discount: null,
+  reduced_package: null,
   price_changes: [],
   credits: [],
   recommendation_summary: "Rebecca recommended word and logo marks for both brands.",
@@ -410,7 +412,7 @@ describe("runConsultProposal failure handling", () => {
     (t.input.createDraft as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("Queue API 401: Unauthorized"));
     const r = await runConsultProposal(t.input);
     expect(r).toMatchObject({ ok: false, reason: "queue_failed" });
-    if (!r.ok) expect(r.message).toMatch(/approval queue didn't accept the draft \(it answered HTTP 401\)/);
+    if (!r.ok) expect(r.message).toMatch(/Approvals didn't accept the draft \(it answered HTTP 401\)/);
     expect(logged(spy)[0]).toMatchObject({ stage: "queue" });
     expect(writes(t.db.log, "client_proposal", "update")[0].values).toEqual({ status: "withdrawn" });
     spy.mockRestore();
@@ -455,5 +457,73 @@ describe("queueSummary", () => {
     expect(s).toContain("[notes shortened]");
     expect(s).toContain(`Proposal (review, edit, approve): ${url}`);
     expect(s.endsWith("- Fix: Add a class.")).toBe(true);
+  });
+});
+
+/* ───────────── Sprint 28: the recommended package, and the lead, on both entry points ───────────── */
+
+describe("runConsultProposal: the package from the firm's list and the lead on both paths", () => {
+  const PACKAGES = [
+    { package: "Concierge", base_cents: 495_000, included_classes: 3, per_class_cents: 82_500, second_mark_discount_pct: 20, gov_per_class_cents: 35_000 },
+    { package: "Essential", base_cents: 195_000, included_classes: 1, per_class_cents: 82_500, second_mark_discount_pct: 20, gov_per_class_cents: 35_000 },
+  ];
+  const SETTING = { approver_user_ids: ["rebecca"], pricing: { ...PACKAGES[0], packages: PACKAGES } };
+  const ESSENTIAL_TALK = [
+    "Rebecca: Based on what you've told me I'd file the word mark for Prosperall and the logo too.",
+    "Rebecca: For Prosperall the right category is cloud based software as a service, so I'd cover that class.",
+    "Rebecca: I think the Essential package is the right fit. And I'll give you a $150 credit, plus 10% off the second mark.",
+    "Sevetri: Please send me the proposal and I'll look at it tonight. ".repeat(3),
+  ].join("\n");
+  const essentialExtract = {
+    ...EXTRACT,
+    brands: [EXTRACT.brands[0]],
+    recommended_package: "Essential",
+    credits: [{ label: "Consultation credit", amount_usd: 150, percent: null, quote: "I'll give you a $150 credit" }],
+    second_mark_discount: { percent: 10, quote: "10% off the second mark" },
+  };
+  const insertedContent = (t: ReturnType<typeof setup>) =>
+    (writes(t.db.log, "client_proposal", "insert")[0].values as { content: { pricing: Record<string, unknown>; adjustments: unknown[] }; lead_id: string });
+
+  it("transcript path: priced with the package the call named, carrying the form's chosen lead", async () => {
+    const t = setup({ setting: SETTING }, { source: { kind: "pasted", text: ESSENTIAL_TALK } }, essentialExtract);
+    const res = await runConsultProposal(t.input);
+    if (!res.ok) throw new Error(res.message);
+    const row = insertedContent(t);
+    expect(row.lead_id).toBe("lead-1");
+    expect(row.content.pricing).toMatchObject({ package: "Essential", base_cents: 195_000, included_classes: 1, second_mark_discount_pct: 10 });
+    expect(row.content.adjustments).toEqual([{ id: "adj-1", label: "Consult credit", kind: "amount", value: 15_000 }]);
+  });
+
+  it("meeting path: the same drafter, the meeting's lead on the proposal and the meeting id on the marker", async () => {
+    const source = {
+      kind: "meeting" as const,
+      meetingId: "mtg-9",
+      title: "Strategy call",
+      startedAt: "2026-10-23T15:00:00Z",
+      summary: null,
+      transcript: ESSENTIAL_TALK.split("\n").map((l) => ({ speaker: l.split(":")[0], text: l.slice(l.indexOf(":") + 2) })),
+    };
+    const t = setup({ setting: SETTING }, { source, lead: { ...LEAD, id: "lead-from-meeting" } }, essentialExtract);
+    expect((await runConsultProposal(t.input)).ok).toBe(true);
+    const row = insertedContent(t);
+    expect(row.lead_id).toBe("lead-from-meeting");
+    expect(row.content.pricing).toMatchObject({ package: "Essential" });
+    const [marker] = writes(t.db.log, "crm_activity", "insert");
+    expect(marker.values).toMatchObject({ lead_id: "lead-from-meeting", payload: { meeting_id: "mtg-9" } });
+  });
+
+  it("a package not on the firm's current list is priced with the default and flagged in the queue summary", async () => {
+    const t = setup({ setting: SETTING }, { source: { kind: "pasted", text: ESSENTIAL_TALK } }, { ...essentialExtract, recommended_package: "Platinum" });
+    expect((await runConsultProposal(t.input)).ok).toBe(true);
+    expect(insertedContent(t).content.pricing).toMatchObject({ package: "Concierge" });
+    const queued = (t.createDraft.mock.calls[0] as unknown as [Record<string, unknown>])[0];
+    expect(String(queued.summary)).toContain(`CHECK FIRST: "Platinum" isn't on your list`);
+  });
+
+  it("no email or mailbox is read: the run touches only the tables it always did", async () => {
+    const t = setup({ setting: SETTING }, { source: { kind: "pasted", text: ESSENTIAL_TALK } }, essentialExtract);
+    await runConsultProposal(t.input);
+    const tables = new Set(t.db.log.map((q) => q.table));
+    for (const t2 of tables) expect(t2).not.toMatch(/mail|inbox|message/i);
   });
 });

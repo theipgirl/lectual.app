@@ -67,7 +67,7 @@ export async function freshAccessToken(deps: SyncDeps, row: ConnectionRow): Prom
   if (current && expires - now > 120_000) return current;
 
   const creds = deps.credentials(row.provider);
-  if (!creds) throw new ProviderError(`${row.provider} sign-in isn't configured on this deployment.`, "refresh-failed");
+  if (!creds) throw new ProviderError(`${row.provider} sign-in isn't switched on yet. Lectual is setting it up.`, "refresh-failed");
   const refreshed = await refreshAccessToken({
     provider: row.provider,
     creds,

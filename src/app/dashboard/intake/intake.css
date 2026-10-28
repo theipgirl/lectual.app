@@ -129,51 +129,6 @@
   border-radius: 6px;
 }
 
-/* ---- Table | Board toggle, controlled mode ------------------------- */
-
-/* The shared <ViewToggle> draws anchors on Matters and buttons here. The
-   design's .lx-view-toggle rules style anchors only, and that file is the
-   design session's, so the button twin lives here and reproduces the same
-   pill, hover and "on" look from the same tokens: no new colour or face. */
-.intake-root .lx-view-toggle button {
-  height: 32px;
-  padding: 6px 12px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  display: flex;
-  align-items: center;
-  font: inherit;
-  font-size: 14px;
-  color: var(--body);
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.intake-root .lx-view-toggle button:hover {
-  color: var(--ink);
-}
-
-.intake-root .lx-view-toggle button.on {
-  background: var(--card);
-  color: var(--ink);
-  font-weight: 500;
-  box-shadow: 0 1px 2px rgba(20, 4, 8, 0.08);
-}
-
-/* The status line the intake top bar carried ("25 in intake · 6 need a
-   first reply · 3 unassigned"), now the first line of the page. */
-.intake-statusline {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 12px;
-  font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 11.5px;
-  color: var(--mute);
-  min-height: 18px;
-}
-
 /* The page's own column. min-height:0 so a table inside it can be the
    thing that scrolls (see .intake-scroll) instead of the document. */
 .intake-content {
@@ -187,13 +142,7 @@
   box-sizing: border-box;
 }
 
-@media (max-width: 640px) {
-  .intake-statusline {
-    justify-content: flex-start;
-  }
-}
-
-/* ---- Stage Keeper: the "Moved by agent" chip --------------------- */
+/* ---- Moved automatically: the chip --------------------- */
 
 .intake-root .intake-agent-chip {
   display: inline-flex;
@@ -215,4 +164,92 @@
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* ---- Sprint 29: why a card is in its column, stage decisions, bulk select ---- */
+
+.intake-root .intake-why {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--ink2);
+}
+
+.intake-root .intake-decision-pill {
+  display: inline-block;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: var(--warnbg);
+  color: var(--warn);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.intake-root .intake-column-badge {
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: var(--warnbg);
+  color: var(--warn);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 10px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.intake-root .intake-select {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--ox);
+  cursor: pointer;
+}
+
+.intake-root .intake-select:focus-visible {
+  outline: 2px solid var(--ox);
+  outline-offset: 2px;
+}
+
+.intake-root .intake-card-selected {
+  border-color: var(--ox);
+  background: var(--oxbg);
+}
+
+.intake-root .intake-bulk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--ox);
+  border-radius: 10px;
+  background: var(--cream);
+  font-size: 12.5px;
+  color: var(--ink);
+}
+
+.intake-root .intake-bulk select {
+  min-width: 0;
+  max-width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
+
+.intake-root .intake-bulk select:focus-visible,
+.intake-root .intake-bulk button:focus-visible {
+  outline: 2px solid var(--ox);
+  outline-offset: 2px;
 }

@@ -13,6 +13,7 @@ import {
   type IntakeSearchParams,
 } from "@/lib/intake/rows";
 import { intakeStages } from "@/lib/intake/scope";
+import { leadsMoreItems } from "@/lib/intake/more-items";
 import IntakeWorkspace from "@/app/dashboard/intake/_components/IntakeWorkspace";
 import IntakeCard from "@/app/dashboard/intake/_components/IntakeCard";
 
@@ -135,20 +136,26 @@ describe("default last-touch sort, rendered", () => {
     expect(render(THREE)).toMatch(/aria-label="Sort by Last touch"[^>]*>Last touch ↓</);
   });
 
-  it("the table subtitle is unchanged", () => {
-    expect(render(THREE)).toContain("Sorted by the last thing that happened, not by when the lead arrived.");
+  it("the table sub-line folds the status counts into one short sentence", () => {
+    expect(render(THREE)).toContain("3 leads · 0 need a first reply · 3 unassigned. Newest activity first.");
+  });
+
+  it("the board sub-lines are the short ones, by stage and by owner", () => {
+    expect(render(THREE, { view: "board" })).toContain("Drag a card to move it, or use the stage menu on the card.");
+    expect(render(THREE, { view: "board", group: "owner" })).toContain("Leads with no owner are in the first column.");
   });
 });
 
-describe("the page header", () => {
+describe("the page header and toolbar (shared list-page components)", () => {
   const html = render(THREE);
-  const head = html.slice(html.indexOf('class="lx-page-head"'), html.indexOf('aria-label="Filter by stage"'));
+  const head = html.slice(html.indexOf('class="lp-header"'), html.indexOf('aria-label="Filter by stage"'));
 
-  it("uses the same class set as Matters", () => {
-    expect(html).toContain('class="lx-page-head"');
-    expect(head).toContain('<div class="lx-label">Intake</div>');
+  it("uses the shared header: one h1, one sub-line, no eyebrow label", () => {
+    expect(html).toContain('class="lp-header"');
     expect(head).toContain('<h1 class="lx-h1">Leads</h1>');
-    expect(head).toContain('class="lx-sub"');
+    expect(head).toContain('class="lx-sub lp-sub"');
+    expect(head).not.toContain("lx-label");
+    expect(head.match(/<h1/g)).toHaveLength(1);
   });
 
   it("carries no intake-only serif class or inline font size on the h1", () => {
@@ -159,32 +166,48 @@ describe("the page header", () => {
     expect(source).not.toMatch(/fontSize: 36/);
   });
 
-  it("orders search, then the toggle, then Import and Add a lead", () => {
+  it("orders search (with its submit button), then the toggle, then More, then Add a lead", () => {
     const search = head.indexOf('aria-label="Search leads"');
+    const submit = head.indexOf(">Search</button>");
     const toggle = head.indexOf("lx-view-toggle");
-    const importLink = head.indexOf("Import");
+    const more = head.indexOf("More");
     const add = head.indexOf("Add a lead");
     expect(search).toBeGreaterThan(0);
-    expect(toggle).toBeGreaterThan(search);
-    expect(importLink).toBeGreaterThan(toggle);
-    expect(add).toBeGreaterThan(importLink);
+    expect(submit).toBeGreaterThan(search);
+    expect(toggle).toBeGreaterThan(submit);
+    expect(more).toBeGreaterThan(toggle);
+    expect(add).toBeGreaterThan(more);
   });
 
-  it("puts the search in the header as the same lx-search-form markup Matters uses", () => {
-    expect(head).toContain('class="lx-search-form" role="search"');
+  it("keeps Import and Reconcile stages out of the toolbar row and in the More menu", () => {
+    expect(head).not.toContain("Import");
+    expect(head).not.toContain("Reconcile stages");
+    expect(leadsMoreItems({ showReconcile: true }).map((i) => i.label)).toEqual(["Reconcile stages", "Import"]);
+    expect(leadsMoreItems({ showReconcile: false }).map((i) => i.label)).toEqual(["Import"]);
+    expect(read("src/app/dashboard/intake/_components/IntakeWorkspace.tsx")).toContain("leadsMoreItems({ showReconcile })");
+  });
+
+  it("puts the search in the toolbar as the shared lp-search form", () => {
+    expect(head).toContain('class="lp-search" role="search"');
     expect(head).toMatch(/<input class="lx-input"[^>]*aria-label="Search leads"/);
   });
 
-  it("renders the toggle once, in the header, and not in the control row", () => {
+  it("shows Clear only when a search term is set", () => {
+    expect(head).not.toContain(">Clear<");
+    const withTerm = render(THREE, { q: "today" });
+    expect(withTerm).toContain(">Clear</button>");
+  });
+
+  it("renders the toggle once, in the toolbar, and not in the control row", () => {
     expect(html.match(/lx-view-toggle/g)).toHaveLength(1);
     const controls = html.slice(html.indexOf('aria-label="Filter by stage"'));
     expect(controls).not.toContain("lx-view-toggle");
     expect(controls).not.toContain("How to arrange the list");
   });
 
-  it("keeps the status line above the header", () => {
-    expect(html.indexOf('role="status"')).toBeGreaterThanOrEqual(0);
-    expect(html.indexOf('role="status"')).toBeLessThan(html.indexOf('class="lx-page-head"'));
+  it("has no separate status strip above the header", () => {
+    expect(html).not.toContain("intake-statusline");
+    expect(html.startsWith('<div class="lp-root"><header class="lp-header">')).toBe(true);
   });
 
   it("marks the current view on the controlled toggle", () => {
@@ -198,7 +221,7 @@ describe("the page header", () => {
     expect(render(THREE)).not.toContain("Group by");
     const board = render(THREE, { view: "board" });
     expect(board).toContain("Group by");
-    expect(board.indexOf("Group by")).toBeGreaterThan(board.indexOf('class="lx-page-head"'));
+    expect(board.indexOf("Group by")).toBeGreaterThan(board.indexOf('class="lp-header"'));
     expect(board.indexOf("Group by")).toBeGreaterThan(board.indexOf("Add a lead"));
   });
 });
@@ -241,9 +264,9 @@ describe("the Temperature column, rendered", () => {
     expect(html).toMatch(/<button[^>]*title="Replied 1 day ago — waiting on us"[^>]*data-testid="temperature-cell"/);
   });
 
-  it("shows a lead with nothing recorded as a dashed neutral 'Not routed'", () => {
+  it("shows a lead with nothing recorded as a dashed neutral 'Not rated'", () => {
     const html = render([blank]);
-    expect(html).toMatch(/data-testid="temperature-cell"[^>]*>Not routed</);
+    expect(html).toMatch(/data-testid="temperature-cell"[^>]*>Not rated</);
     expect(html).toContain("border:1px dashed var(--line)");
     expect(html).not.toMatch(/data-testid="temperature-cell"[^>]*>Suggested/);
   });
@@ -269,9 +292,9 @@ describe("the Temperature column, rendered", () => {
     expect(source).not.toContain("Sort by Lane");
   });
 
-  it("offers the effective-temperature filter: Hot, Warm, Cold, Not routed", () => {
+  it("offers the effective-temperature filter: Hot, Warm, Cold, Not rated", () => {
     const source = read("src/app/dashboard/intake/_components/IntakeControls.tsx");
-    for (const label of ["Hot", "Warm", "Cold", "Not routed", "Any temperature"]) expect(source).toContain(label);
+    for (const label of ["Hot", "Warm", "Cold", "NOT_RATED", "Any temperature"]) expect(source).toContain(label);
     expect(source).not.toMatch(/LaneFilter|LANE_OPTIONS|Any lane/);
   });
 });
@@ -288,7 +311,7 @@ describe("the temperature filter, rendered", () => {
     expect(order(render(leads, { temp: "hot" }), names)).toEqual(["Replied"]);
   });
 
-  it("?temp=none keeps only the Not routed row, and ?lane=none reads the same", () => {
+  it("?temp=none keeps only the Not rated row, and ?lane=none reads the same", () => {
     expect(order(render(leads, { temp: "none" }), names)).toEqual(["Blank"]);
     expect(order(render(leads, { lane: "none" }), names)).toEqual(["Blank"]);
   });
@@ -302,8 +325,8 @@ describe("the temperature filter, rendered", () => {
     expect(order(render(leads, { temp: "lukewarm" }), names)).toHaveLength(3);
   });
 
-  it("the top-bar counts follow the filtered rows", () => {
-    expect(render(leads, { temp: "none" })).toContain("1 in intake");
+  it("the sub-line counts follow the filtered rows", () => {
+    expect(render(leads, { temp: "none" })).toContain("1 lead · ");
   });
 });
 
@@ -337,8 +360,8 @@ describe("the board card's one temperature line", () => {
     expect(html).toContain(">Suggested: Hot<");
   });
 
-  it("reads 'Not routed' for neither", () => {
-    expect(card(lead("a", "Ana"))).toContain(">Not routed<");
+  it("reads 'Not rated' for neither", () => {
+    expect(card(lead("a", "Ana"))).toContain(">Not rated<");
   });
 
   it("has no 'Lane:' text, no dot beside the name, and exactly one temperature line", () => {
@@ -352,7 +375,7 @@ describe("the board card's one temperature line", () => {
       // The name row is the link and nothing else: no dot beside the name.
       expect(html).toMatch(/^<div[^>]*><div style="display:flex;align-items:center;gap:7px"><a [^>]*>[^<]*<\/a><\/div>/);
       expect(html).not.toMatch(/width:7px;height:7px/);
-      const lines = html.match(/>(Hot|Warm|Cold|Suggested: (Hot|Warm|Cold)|Not routed)</g) ?? [];
+      const lines = html.match(/>(Hot|Warm|Cold|Suggested: (Hot|Warm|Cold)|Not rated)</g) ?? [];
       expect(lines).toHaveLength(1);
     }
   });

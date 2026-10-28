@@ -1,4 +1,5 @@
 import type { QueueItem } from "@/lib/queue/api";
+import { FROM_THEIR_EMAILS } from "@/lib/ui/words";
 import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
 import { markdownToPlainText } from "@/lib/markdown";
 
@@ -33,7 +34,7 @@ export function isUnconfiguredError(err: unknown): boolean {
 }
 
 const AGENT_LABEL: Record<string, string> = {
-  "email-intel": "Email intel",
+  "email-intel": FROM_THEIR_EMAILS,
   "intake-triage": "Intake triage",
   "post-consult": "Post-consult",
   "prep-consult": "Prep consult",
@@ -59,7 +60,7 @@ export const STATUS_PILL: Record<QueueStatus, { label: string; tone: string }> =
  * message look handled, so every outcome says where the message is now.
  */
 export function outcomeText(resolved: string | undefined, send: string | undefined): { tone: "ok" | "warn" | "risk"; text: string } | null {
-  if (resolved === "reject") return { tone: "risk", text: "Rejected. The note goes back to the drafting agent — nothing was sent." };
+  if (resolved === "reject") return { tone: "risk", text: "Rejected. The note goes back to the drafting assistant — nothing was sent." };
   if (resolved !== "approve") return null;
   switch (send) {
     case "drafted":

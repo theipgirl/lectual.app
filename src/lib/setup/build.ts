@@ -28,6 +28,9 @@ export type SetupReaders = {
   >;
   listServiceItems: () => Promise<Pick<ServiceItemRow, "active" | "kind">[]>;
   aiConfigured: () => boolean;
+  /** Whether the deployment holds the LawPay / Zoom OAuth app. Optional so a fake reader set need not name them. */
+  lawpayAppConfigured?: () => boolean;
+  zoomAppConfigured?: () => boolean;
 };
 
 const FAILED = { ok: false } as const;
@@ -74,12 +77,26 @@ export async function buildSetupState(r: SetupReaders): Promise<SetupState> {
     intakeForms,
     services,
     aiConfigured: safeBoolean(r.aiConfigured),
+    // A reader that is absent or throws means "switched on", so the item stays the firm's to finish.
+    lectual: {
+      lawpayApp: appSwitchedOn(r.lawpayAppConfigured),
+      zoomApp: appSwitchedOn(r.zoomAppConfigured),
+    },
   };
 }
 
 /** Readers whose "no row" answer is `null` wrap it as `{ value }` so `null` can't be confused with "failed". */
 function unwrap<T>(reading: Reading<{ value: T }>): Reading<T> {
   return reading.ok ? { ok: true, value: reading.value.value } : FAILED;
+}
+
+/** Only an explicit `false` makes a step Lectual's; a missing or failing reader leaves it the firm's to finish. */
+function appSwitchedOn(fn: (() => boolean) | undefined): boolean {
+  try {
+    return fn ? fn() !== false : true;
+  } catch {
+    return true;
+  }
 }
 
 function safeBoolean(fn: () => boolean): boolean {

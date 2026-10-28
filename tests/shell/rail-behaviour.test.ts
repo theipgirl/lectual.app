@@ -10,12 +10,13 @@ const rail = readFileSync(path.resolve(__dirname, "../../src/components/shell/Ra
 describe("rail CSS (F9)", () => {
   it("no longer opens on :focus-within, and opens on keyboard focus instead", () => {
     expect(css.match(/\.lx-rail:focus-within/g)).toBeNull();
-    expect((css.match(/\.lx-rail:has\(:focus-visible\)/g) ?? []).length).toBeGreaterThanOrEqual(6);
+    expect((css.match(/\.lx-rail:has\(:focus-visible\)/g) ?? []).length).toBeGreaterThanOrEqual(5);
   });
 
-  it("keeps the keyboard-open selector inside the phone media query", () => {
-    const phone = css.slice(css.indexOf("/* Phone: the rail lies down"));
-    expect(phone).toContain(".lx-rail:has(:focus-visible)");
+  it("hands the phone over to the bottom bar: the rail column is not drawn under 900px (Sprint 32)", () => {
+    const phone = css.slice(css.indexOf("/* Phone (under 900px)"));
+    expect(phone).toMatch(/\.lx-rail-slot,\s*\.lx-rail-slot\.is-pinned \{ display: none; \}/);
+    expect(phone).toContain(".lx-mbar {");
   });
 
   it("delays the collapse transition by 120-150ms", () => {
@@ -69,7 +70,7 @@ describe("rail helpers (F10)", () => {
 
   it("is wired into every rail link, the pin button and the nav", () => {
     expect(rail).toContain("closeRailOnEscape(e.key");
-    expect((rail.match(/onClick=\{releaseFocus\}/g) ?? []).length).toBeGreaterThanOrEqual(4);
+    expect((rail.match(/onClick=\{releaseFocus\}/g) ?? []).length).toBeGreaterThanOrEqual(3);
     expect(rail).toContain("releaseFocus()");
   });
 });

@@ -162,6 +162,13 @@ describe("a brand name form", () => {
     if (r.ok) expect(r.value.marks[1].id).not.toBe("t-word");
   });
 
+  it("keeps the first class ticked when a posted brand has a ticked mark and no ticked class (every package includes one)", () => {
+    const r = parseName(form({ "class.0.preselected": "" }), content, rand);
+    if (!r.ok) throw new Error("parse");
+    expect(r.value.classes.some((c) => c.preselected)).toBe(true);
+    expect(r.value.classes[0].preselected).toBe(true);
+  });
+
   it("refuses an unknown mark kind", () => {
     expect(parseName(form({ "mark.0.kind": "sound" }), content, rand).ok).toBe(false);
   });
@@ -184,8 +191,8 @@ describe("a brand name form", () => {
     if (!next.ok) throw new Error("replace");
     const q = quoteProposal(next.value, defaultSelection(next.value));
     const p = q.names.find((x) => x.id === "p")!;
-    // 2 classes at an override of $4,500 base: 4500 + 825 * (2 - 3) = 3675; second mark 20% off
-    expect(p.marks.map((m) => m.price_cents)).toEqual([367500, 294000]);
+    // 2 classes at an override of $4,500 base: flat $4,500 (under the 3 included); second mark 20% off
+    expect(p.marks.map((m) => m.price_cents)).toEqual([450000, 360000]);
   });
 });
 

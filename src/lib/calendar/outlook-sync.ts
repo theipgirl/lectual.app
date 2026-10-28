@@ -271,7 +271,7 @@ async function finishRun(deps: CalendarSyncDeps, runId: string | null, orgId: st
       finished_at: new Date(deps.now).toISOString(),
       items_in: r.eventsRead,
       drafts_out: 0,
-      summary: waiting ? "Calendar sync is waiting for the database update." : runSummary(r),
+      summary: waiting ? "Calendar sync isn't switched on for your firm yet." : runSummary(r),
       error: r.state === "error" ? `${r.failed} calendar(s) could not be read; see Settings → Integrations.` : null,
     })
     .eq("id", runId)

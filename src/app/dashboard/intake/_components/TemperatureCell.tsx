@@ -1,6 +1,7 @@
 "use client";
 
 import { LANES, LANE_LABEL, type Lane } from "@/lib/leads/lane";
+import { NOT_RATED } from "@/lib/ui/words";
 import { temperatureLabel, temperatureTitle, type EffectiveTemperature } from "@/lib/intake/effective-temperature";
 import Popover, { PopoverItem } from "./Popover";
 import { TEMP_NONE, TEMP_PILL } from "./styles";
@@ -13,7 +14,7 @@ import { TEMP_NONE, TEMP_PILL } from "./styles";
  * that says "Suggested" in words, never the same chip in a different shade,
  * because "a routing suggestion once rendered as an assignment status on the
  * dashboard and read as fact". A lead with neither shows a dashed neutral
- * "Not routed". The tooltip is the reason, so the team can see why someone
+ * "Not rated". The tooltip is the reason, so the team can see why someone
  * went cold without asking anyone.
  *
  * Choosing Hot, Warm or Cold sets the person's lane (recorded on the timeline,
@@ -89,7 +90,7 @@ export default function TemperatureCell({
                 onSet(null);
               }}
             >
-              Clear
+              {NOT_RATED}
             </PopoverItem>
           </>
         )}

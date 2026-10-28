@@ -50,8 +50,8 @@ const unavailable = (code: Extract<MailboxSearchState, { status: "unavailable" }
 
 export const MAILBOX_REASONS = {
   noAddress: "This person has no real email address to search for.",
-  moduleOff: "The Mailboxes module isn't switched on for this firm, or it couldn't be checked, so no mailbox was searched.",
-  failed: "The mailboxes couldn't be searched. Try again shortly. This is not an empty mailbox.",
+  moduleOff: "Mailboxes isn't switched on for your firm yet (or that couldn't be checked), so no mailbox was searched.",
+  failed: "The mailboxes couldn't be searched. Refresh to try again.",
   noMailbox: "No mailbox is connected, so no mail was searched.",
   gmailOnly: "Only Gmail mailboxes are connected and they aren't searched here. Connect an Outlook mailbox to search mail.",
   scopeMissing: "The connected Outlook mailbox hasn't granted permission to read mail. Reconnect it.",

@@ -4,7 +4,6 @@ import { listLeads } from "@/lib/pipeline";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { loadActiveQueue } from "@/lib/queue/load";
 import { orgHasModule } from "@/lib/org/modules";
-import { matterStatusLabel } from "@/lib/matters/status";
 import { matterLabel } from "@/lib/matters/docket-summary";
 import {
   BAND_COPY,
@@ -17,12 +16,20 @@ import {
   type SegmentKey,
 } from "@/lib/matters/worklist";
 import { ViewToggle } from "@/components/ViewToggle";
+import { ListHeader } from "@/components/list-page/ListHeader";
+import { SectionTabs } from "@/components/shell/SectionTabs";
+import { REPORTS } from "@/lib/nav";
+import { ListToolbar } from "@/components/list-page/ListToolbar";
+import { Chip, FilterChips } from "@/components/list-page/Chips";
+import "@/components/list-page/list-page.css";
 import { NewMatterForm } from "@/components/matters/MatterForms";
 import { MatterBoard } from "@/components/matters/MatterBoard";
 import { listMatterStages } from "@/lib/matters/stages";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import { matterIdsNeedingReview } from "./list-utils";
+import { LIST_CHIPS, mattersSubtitle, reviewHref, reviewItemByMatter, stageDisplayName, statusNote } from "@/lib/matters/list-view";
+import { OPEN_MATTER_PANEL_ID, OpenMatterButton } from "@/components/matters/OpenMatterButton";
 import { MATTER_TYPE_LABEL } from "./labels";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
@@ -62,11 +69,12 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
   // "Needs your review" means something only when the queue was reached.
   // Unconfigured or unavailable is never shown as "nothing to review".
   const reviewIds = queue.status === "ok" ? matterIdsNeedingReview(queue.items) : new Set<string>();
+  const reviewItems = queue.status === "ok" ? reviewItemByMatter(queue.items) : new Map<string, string>();
   const stalledIds = new Set(summarizeDocket(all).stalled.map((m) => m.id));
   const sets = { review: reviewIds, stalled: stalledIds };
   const counts = new Map(SEGMENTS.map((s) => [s.key, filterBySegment(all, s.key, sets).length]));
-  // Review only when the queue was reached; court only for a firm that has court matters.
-  const segments = SEGMENTS.filter((s) => (s.key !== "review" || queue.status === "ok") && (s.key !== "court" || (counts.get("court") ?? 0) > 0 || seg === "court"));
+  // Four chips. Review only when the queue was reached; the bands stay as headings below.
+  const segments = LIST_CHIPS.filter((s) => s.key !== "review" || queue.status === "ok");
 
   const shown = searchMatters(filterBySegment(all, seg, sets), search);
   const bands = groupIntoBands(shown);
@@ -89,36 +97,36 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
   };
 
   return (
-    <>
-      <div className="lx-page-head">
-        <div style={{ flex: 1, minWidth: 260 }}>
-          <div className="lx-label">Docket</div>
-          <h1 className="lx-h1" data-tour="matters-head">Matters</h1>
-          <p className="lx-sub">Every engaged matter, grouped by whose move it is. Longest in its stage first.</p>
-        </div>
-        <form className="lx-search-form" role="search">
-          {boardView && <input type="hidden" name="view" value="board" />}
-          {seg !== "open" && <input type="hidden" name="seg" value={seg} />}
-          <input className="lx-input" name="q" defaultValue={search} placeholder="Mark, number, owner or serial" aria-label="Search matters" />
-        </form>
-        <ViewToggle value={boardView ? "board" : "table"} hrefFor={(next) => href({ view: next === "board" ? "board" : null })} />
-      </div>
+    <div className="lp-root">
+      <ListHeader title="Matters" tour="matters-head" sub={mattersSubtitle(boardView ? "board" : "table")} />
+      <SectionTabs active="list" listLabel="Matters" listHref="/dashboard/matters/" summaryHref={REPORTS.matters.href} />
 
-      <nav aria-label="Filter matters" className="lx-chips">
+      <ListToolbar
+        search={{
+          label: "Search matters",
+          placeholder: "Mark, number, owner or serial",
+          defaultValue: search,
+          hidden: { ...(boardView ? { view: "board" } : {}), ...(seg !== "open" ? { seg } : {}) },
+          clearHref: href({ q: "" }),
+        }}
+        toggle={<ViewToggle value={boardView ? "board" : "table"} hrefFor={(next) => href({ view: next === "board" ? "board" : null })} />}
+        primary={<OpenMatterButton />}
+      />
+
+      <FilterChips as="nav" label="Filter matters">
         {segments.map((s) => (
-          <Link key={s.key} href={href({ seg: s.key })} aria-current={seg === s.key ? "page" : undefined}>
+          <Chip key={s.key} href={href({ seg: s.key })} active={seg === s.key} count={counts.get(s.key) ?? 0}>
             {s.label}
-            <span className="lx-chip-count">{counts.get(s.key) ?? 0}</span>
-          </Link>
+          </Chip>
         ))}
-      </nav>
+      </FilterChips>
       {queue.status === "unavailable" && (
-        <p className="lx-note" style={{ margin: 0 }}>
+        <p className="lx-banner lx-banner-warn" role="status" style={{ margin: 0 }}>
           The approval queue can&apos;t be reached right now, so matters can&apos;t be checked for drafts waiting on review.
         </p>
       )}
 
-      <details className="lx-card lx-disclosure">
+      <details id={OPEN_MATTER_PANEL_ID} className="lx-card lx-disclosure">
         <summary>Open a matter</summary>
         <NewMatterForm leads={leadOptions} canCreateLitigation={canCreateLitigation} />
       </details>
@@ -127,7 +135,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
         <div className="lx-card lx-empty-card">
           <h2 className="lx-h2" style={{ fontSize: 25 }}>Matters couldn&apos;t be loaded</h2>
           <p className="lx-note" style={{ margin: 0 }}>
-            This is a problem reaching the database, not an empty docket. Try again in a moment.
+            Can&apos;t show this right now. Refresh to try again.
           </p>
         </div>
       ) : boardView && shown.length > 0 ? (
@@ -136,6 +144,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
           matters={shown}
           canMove={!!role && MATTER_WRITE_ROLES.includes(role)}
           reviewIds={reviewIds}
+          reviewItems={reviewItems}
           ownerName={(id) => (id ? memberName.get(id) ?? "Teammate" : null)}
         />
       ) : bands.length === 0 ? (
@@ -157,14 +166,13 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
               </span>
             </header>
             <div style={{ overflow: "auto" }}>
-              <table className="lx-tbl">
+              <table className="lx-tbl lx-stack">
                 <colgroup>
-                  <col style={{ width: "32%" }} />
-                  <col style={{ width: "12%" }} />
-                  <col style={{ width: "26%" }} />
-                  <col style={{ width: "9%" }} />
-                  <col style={{ width: "12%" }} />
-                  <col style={{ width: "9%" }} />
+                  <col style={{ width: "36%" }} />
+                  <col style={{ width: "13%" }} />
+                  <col style={{ width: "27%" }} />
+                  <col style={{ width: "10%" }} />
+                  <col style={{ width: "14%" }} />
                 </colgroup>
                 <thead>
                   <tr>
@@ -173,14 +181,15 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
                     <th>Stage</th>
                     <th>In stage</th>
                     <th>Owner</th>
-                    <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {band.matters.map((m) => {
                     const age = stageAge(m);
+                    const note = statusNote(m.status);
+                    const reviewId = reviewItems.get(m.id);
                     return (
-                      <tr key={m.id}>
+                      <tr key={m.id} className="lp-row">
                         <td className="pri">
                           <Link href={`/dashboard/matters/${m.id}/`} className="lx-rowlink">
                             {matterLabel(m)}
@@ -188,16 +197,23 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
                           <div className="lx-note lx-num">
                             {m.matter_number}
                             {m.owner_name ? ` · ${m.owner_name}` : ""}
-                            {reviewIds.has(m.id) && <span className="lx-pill lx-pill-warn" style={{ marginLeft: 6 }}>Review</span>}
+                            {note ? ` · ${note}` : ""}
+                            {reviewIds.has(m.id) &&
+                              (reviewId ? (
+                                <Link href={reviewHref(reviewId)} className="lp-pill lp-pill-warn" style={{ marginLeft: 6, position: "relative", zIndex: 1 }}>
+                                  Review
+                                </Link>
+                              ) : (
+                                <span className="lp-pill lp-pill-warn" style={{ marginLeft: 6 }}>Review</span>
+                              ))}
                           </div>
                         </td>
-                        <td>{MATTER_TYPE_LABEL[m.type]}</td>
-                        <td>{m.stage ? `${m.stage.code}. ${m.stage.label}` : <span className="lx-note">—</span>}</td>
-                        <td className="lx-num">
-                          {age.days === null ? "—" : age.stale ? <span className="lx-pill lx-pill-risk">{age.days}d</span> : `${age.days}d`}
+                        <td data-label="Type">{MATTER_TYPE_LABEL[m.type]}</td>
+                        <td data-label="Stage">{m.stage ? <span className="lp-pill">{stageDisplayName(m.stage.label)}</span> : <span className="lx-note">—</span>}</td>
+                        <td className="lx-num" data-label="In stage">
+                          {age.days === null ? "—" : age.stale ? <span className="lp-pill lp-pill-risk">{age.days}d</span> : <span>{age.days}d</span>}
                         </td>
-                        <td>{m.assigned_to ? memberName.get(m.assigned_to) ?? "Teammate" : <span className="lx-note">Unassigned</span>}</td>
-                        <td>{matterStatusLabel(m.status)}</td>
+                        <td data-label="Owner">{m.assigned_to ? memberName.get(m.assigned_to) ?? "Teammate" : <span className="lx-note">Unassigned</span>}</td>
                       </tr>
                     );
                   })}
@@ -207,6 +223,6 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
           </section>
         ))
       )}
-    </>
+    </div>
   );
 }

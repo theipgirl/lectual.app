@@ -138,7 +138,7 @@ export async function buildOpinionLetterDraft(
 
   if ("skipped" in result) {
     throw new DocumentFlowError(
-      "No AI provider is configured for this deployment (VERCEL_AI_GATEWAY_KEY or ANTHROPIC_API_KEY) — the opinion letter can't be drafted right now.",
+      "AI isn't switched on for your firm yet, so the opinion letter can't be drafted right now. Lectual will turn it on.",
     );
   }
 

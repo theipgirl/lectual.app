@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SetupState } from "@/lib/setup/types";
 import { ADMIN_TIER, ALL_DONE, NOTHING_DONE, OTHER_ROLES, bad } from "./helpers";
@@ -26,27 +28,25 @@ async function run(session: Session, state: SetupState = ALL_DONE) {
   return { target, loadSetupState };
 }
 
-const SETUP = "/dashboard/setup/";
 const INTEGRATIONS = "/dashboard/settings/integrations/";
 
+// Sprint 32: Settings always opens Settings. Setup is a tab inside it, never a takeover.
 describe("Settings index", () => {
-  it.each([...ADMIN_TIER])("%s with an incomplete checklist goes to the setup page", async (role) => {
-    expect((await run({ kind: "ok", role }, NOTHING_DONE)).target).toBe(SETUP);
-    expect((await run({ kind: "ok", role }, { ...ALL_DONE, aiConfigured: false })).target).toBe(SETUP);
+  it.each([...ADMIN_TIER])("%s goes to Integrations with an incomplete checklist, and reads nothing", async (role) => {
+    for (const state of [NOTHING_DONE, { ...ALL_DONE, aiConfigured: false }, { ...ALL_DONE, lawpay: bad }]) {
+      const { target, loadSetupState } = await run({ kind: "ok", role }, state);
+      expect(target).toBe(INTEGRATIONS);
+      expect(loadSetupState).toHaveBeenCalledTimes(0);
+    }
   });
 
-  it.each([...ADMIN_TIER])("%s with a complete checklist goes to Integrations, as before", async (role) => {
+  it.each([...ADMIN_TIER])("%s goes to Integrations with a complete checklist too", async (role) => {
     expect((await run({ kind: "ok", role }, ALL_DONE)).target).toBe(INTEGRATIONS);
   });
 
-  it.each([...ADMIN_TIER])("%s with one item couldn't-check and the other nine done still goes to setup", async (role) => {
-    const { target } = await run({ kind: "ok", role }, { ...ALL_DONE, lawpay: bad });
-    expect(target).toBe(SETUP);
-  });
-
-  it("every read failing is not 'complete'", async () => {
+  it("every read failing makes no difference", async () => {
     const allBad: SetupState = { profile: bad, members: bad, modules: bad, mailboxes: bad, lawmatics: bad, meetings: bad, lawpay: bad, agents: bad, intakeForms: bad, services: bad, aiConfigured: true };
-    expect((await run({ kind: "ok", role: "owner" }, allBad)).target).toBe(SETUP);
+    expect((await run({ kind: "ok", role: "owner" }, allBad)).target).toBe(INTEGRATIONS);
   });
 
   it.each([...OTHER_ROLES, null, "not-a-role", ""])("%j goes to Integrations and the setup loader is never called", async (role) => {
@@ -63,7 +63,8 @@ describe("Settings index", () => {
     }
   });
 
-  it("reads setup once for the admin tier", async () => {
-    expect((await run({ kind: "ok", role: "owner" }, NOTHING_DONE)).loadSetupState).toHaveBeenCalledTimes(1);
+  it("does not even resolve the session", () => {
+    const src = readFileSync(path.resolve(__dirname, "../../src/app/dashboard/settings/page.tsx"), "utf8");
+    expect(src).not.toMatch(/resolveFirmSession|loadSetupState/);
   });
 });

@@ -11,9 +11,8 @@ export const FEEDBACK_TYPE_LABELS: Record<FeedbackType, string> = {
 export const FEEDBACK_MAX_CHARS = 5_000;
 export const FEEDBACK_SUBJECT_CHARS = 60;
 
-/** Shown in the dialog exactly as written; a test compares it with a literal. */
-export const FEEDBACK_DISCLOSURE =
-  "This report will include your description and the current session transcript. We may use these to debug related issues and improve Lectual.";
+/** Shown in the dialog exactly as written (the glossary holds it); a test compares it with a literal. */
+export { FEEDBACK_DISCLOSURE } from "@/lib/ui/words";
 
 /** Dispatched on `window` by the account menu and the Getting started footer; the one dialog listens. */
 export const SHOW_FEEDBACK_EVENT = "lectual:show-feedback";

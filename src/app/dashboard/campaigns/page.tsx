@@ -8,6 +8,7 @@ import { NewSequenceForm } from "./_components/CampaignForms";
 import "./campaigns.css";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { campaignLoadError } from "@/lib/campaigns/load-errors";
 
 export const metadata: Metadata = { title: pageTitle("Campaigns") };
 
@@ -60,7 +61,7 @@ export default async function CampaignsPage() {
     }
     activeEnrolledBySequence = counts;
   } catch (err) {
-    loadError = err instanceof Error ? err.message : "Couldn't load campaigns.";
+    loadError = campaignLoadError("list", err);
   }
 
   const queue = await loadActiveQueue();
@@ -129,7 +130,7 @@ export default async function CampaignsPage() {
             Campaigns couldn&apos;t be loaded
           </h2>
           <p className="lx-note" style={{ margin: 0 }}>
-            This is a problem reaching the database, not an empty list. Try again shortly.
+            {loadError}
           </p>
         </div>
       ) : sequences.length === 0 ? (

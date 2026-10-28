@@ -6,10 +6,12 @@ import { ROLES, hasRole, type Role } from "@/lib/auth/roles";
 import {
   callMemberRpc,
   isMissingFunctionError,
-  MEMBER_RPC_MIGRATION_HINT,
+  MEMBER_RPC_SWITCH_ON_HINT,
 } from "@/lib/members/rpc";
 import { normalizeEmail, isEmailAddress } from "@/lib/members/email";
 import { requireSettingsAdminRole, currentOrgId } from "./admin";
+import { ReadableError } from "@/lib/ui/readable-error";
+
 
 /**
  * Onboarding and off-boarding firm staff — the two things that previously
@@ -74,7 +76,7 @@ async function assertNotLastOwner(supabase: ScopedClient, current: Role): Promis
     .eq("role", "owner");
   if (error) throw error;
   if ((count ?? 0) <= 1) {
-    throw new Error("An org must keep at least one owner.");
+    throw new ReadableError("An org must keep at least one owner.");
   }
 }
 
@@ -106,11 +108,11 @@ async function firmNameForInvite(supabase: Awaited<ReturnType<typeof getScopedCl
 
 export async function inviteMember(emailInput: string, role: Role): Promise<InviteMemberResult> {
   if (!isRole(role)) {
-    throw new Error(`Invalid role: ${String(role)}`);
+    throw new ReadableError(`Invalid role: ${String(role)}`);
   }
   const email = normalizeEmail(String(emailInput ?? ""));
-  if (!email) throw new Error("Enter an email address.");
-  if (!isEmailAddress(email)) throw new Error(`"${emailInput}" doesn't look like an email address.`);
+  if (!email) throw new ReadableError("Enter an email address.");
+  if (!isEmailAddress(email)) throw new ReadableError(`"${emailInput}" doesn't look like an email address.`);
 
   const supabase = await getScopedClient();
   const callerRole = await requireSettingsAdminRole(supabase);
@@ -118,7 +120,7 @@ export async function inviteMember(emailInput: string, role: Role): Promise<Invi
   // Granted-role ceiling — identical to setMemberRole's guard (d). An admin
   // must never be able to mint an owner via the invite door.
   if (!hasRole(callerRole, role)) {
-    throw new Error(`You can't grant a role above your own (${callerRole} cannot grant ${role}).`);
+    throw new ReadableError(`You can't grant a role above your own (${callerRole} cannot grant ${role}).`);
   }
 
   const orgId = await currentOrgId(supabase);
@@ -131,9 +133,9 @@ export async function inviteMember(emailInput: string, role: Role): Promise<Invi
     { p_email: email },
   );
   if (lookupError) {
-    throw new Error(
+    throw new ReadableError(
       isMissingFunctionError(lookupError)
-        ? `Member invites aren't available yet. ${MEMBER_RPC_MIGRATION_HINT}`
+        ? `Member invites aren't switched on yet. ${MEMBER_RPC_SWITCH_ON_HINT}`
         : lookupError.message,
     );
   }
@@ -161,7 +163,7 @@ export async function inviteMember(emailInput: string, role: Role): Promise<Invi
       ...(firmName ? { data: { firm_name: firmName } } : {}),
     });
     if (error || !data?.user?.id) {
-      throw new Error(`Couldn't send the invite: ${error?.message ?? "no user returned"}`);
+      throw new ReadableError("Couldn't send the invite. Check the address and try again.");
     }
     userId = data.user.id;
     sentInvite = true;
@@ -204,7 +206,7 @@ export async function inviteMember(emailInput: string, role: Role): Promise<Invi
  * an invisible one.
  */
 export async function removeMember(userId: string): Promise<RemoveMemberResult> {
-  if (!userId) throw new Error("Missing member.");
+  if (!userId) throw new ReadableError("Missing member.");
 
   const supabase = await getScopedClient();
   const callerRole = await requireSettingsAdminRole(supabase);
@@ -216,16 +218,16 @@ export async function removeMember(userId: string): Promise<RemoveMemberResult> 
   } = await supabase.auth.getUser();
   if (userError) throw userError;
   if (user?.id === userId) {
-    throw new Error("You can't remove yourself. Ask another firm admin to do it.");
+    throw new ReadableError("You can't remove yourself. Ask another firm admin to do it.");
   }
 
   // b) Target-rank ceiling — only act on members at or below your own rank.
   const current = await targetRole(supabase, userId);
   if (!current) {
-    throw new Error("That person isn't a member of your firm.");
+    throw new ReadableError("That person isn't a member of your firm.");
   }
   if (!hasRole(callerRole, current)) {
-    throw new Error(
+    throw new ReadableError(
       `You can only remove members at or below your own rank (${callerRole} cannot remove ${current}).`,
     );
   }
@@ -240,8 +242,8 @@ export async function removeMember(userId: string): Promise<RemoveMemberResult> 
   });
   if (revokeError) {
     warning = isMissingFunctionError(revokeError)
-      ? `Removed, but their existing session could not be ended — it may keep working until the token expires. ${MEMBER_RPC_MIGRATION_HINT}`
-      : `Removed, but their existing session could not be ended (${revokeError.message}) — it may keep working until the token expires.`;
+      ? `Removed, but their existing session could not be ended — it may keep working until the token expires. ${MEMBER_RPC_SWITCH_ON_HINT}`
+      : `Removed, but their existing session could not be ended — it may keep working until the token expires.`;
   }
 
   // e) Delete the membership. RLS (member_delete_admin) re-checks org + role.

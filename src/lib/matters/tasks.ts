@@ -5,6 +5,8 @@ import { requireMatterWriteRole } from "./matters";
 import { logActivitySafe } from "./activity";
 import { recordNotFoundError } from "./not-found";
 import { validateTaskEdit, type TaskEditInput } from "./task-edit";
+import { ReadableError } from "@/lib/ui/readable-error";
+
 
 export type Task = Database["public"]["Tables"]["crm_task"]["Row"];
 
@@ -63,7 +65,7 @@ export type CreateTaskInput = {
  */
 export async function createTask(input: CreateTaskInput): Promise<Task> {
   if (!input.leadId && !input.matterId) {
-    throw new Error("createTask requires at least one of leadId or matterId");
+    throw new ReadableError("createTask requires at least one of leadId or matterId");
   }
 
   const supabase = await getScopedClient();
@@ -155,7 +157,7 @@ export async function updateTask(id: string, input: TaskEditInput): Promise<{ ta
   if (!current) throw recordNotFoundError("task");
 
   const checked = validateTaskEdit(input, current);
-  if (!checked.ok) throw new Error(checked.error);
+  if (!checked.ok) throw new ReadableError(checked.error);
   if (checked.fields.length === 0) return { task: current, fields: [] };
 
   const newAssignee = checked.patch.assignee_id;
@@ -164,10 +166,10 @@ export async function updateTask(id: string, input: TaskEditInput): Promise<{ ta
     try {
       members = await listMemberDirectory();
     } catch {
-      throw new Error("Couldn't check the team list right now, so the task wasn't reassigned. Try again.");
+      throw new ReadableError("Couldn't check the team list right now, so the task wasn't reassigned. Try again.");
     }
     if (!members.some((m) => m.userId === newAssignee)) {
-      throw new Error("That person isn't a member of your firm.");
+      throw new ReadableError("That person isn't a member of your firm.");
     }
   }
 
@@ -219,7 +221,7 @@ export async function deleteTask(id: string): Promise<void> {
   const { data: removed, error } = await supabase.from("crm_task").delete().eq("id", id).select("id");
   if (error) throw error;
   // RLS filters a delete it doesn't allow down to zero rows without an error.
-  if (!removed || removed.length === 0) throw new Error("That task couldn't be deleted.");
+  if (!removed || removed.length === 0) throw new ReadableError("That task couldn't be deleted.");
 
   const target = taskActivityTarget(current);
   if (target) {

@@ -3,9 +3,11 @@ import "server-only";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { getAdminClient } from "@/lib/db/admin";
 import { openToken, sealToken } from "@/lib/mailbox/crypto";
+import { zoomClientCredentials } from "./config";
+import { rootKeyOrNull } from "@/lib/mailbox/config";
 import { revokeZoomToken, type ZoomClientCredentials, type ZoomTokenSet } from "./zoom";
-import { SECRET_COLUMNS, type ConnectionSecrets } from "./import";
-import type { MeetingProvider } from "./types";
+import { SECRET_COLUMNS, zoomAccessToken, type ConnectionSecrets } from "./import";
+import { MeetingAuthError, type MeetingProvider } from "./types";
 
 /**
  * A firm's own Fathom / Zoom connections (lectual 0081,
@@ -136,4 +138,37 @@ export async function disconnectMeetingSource(provider: MeetingProvider, opts: {
   const { data, error } = await supabase.from("meeting_source_connection").delete().eq("id", own.row.id).select("id");
   if (error || !data?.length) return { ok: false, reason: "You don't have permission to disconnect this." };
   return { ok: true, reconnected: false };
+}
+
+export type ZoomAccess =
+  | { state: "ok"; accessToken: string; orgId: string }
+  | { state: "not-connected" }
+  /** The stored sign-in is dead (or the connection is flagged for reconnect). */
+  | { state: "reconnect" }
+  /** Not configured here, or the secrets could not be read: "couldn't be read", never "no meetings". */
+  | { state: "unreadable" };
+
+/**
+ * A live Zoom access token for the calling firm's connection, for Today's upcoming-meetings read.
+ * The caller's scoped read decides whether the connection is visible at all; the sealed secrets are then read
+ * by (id, org_id) through ownConnectionSecrets, and the same refresh path the importer uses persists a rotated
+ * refresh token. Any role that can see the connection gets it (the firm-level row is visible to members).
+ */
+export async function ownZoomAccess(): Promise<ZoomAccess> {
+  try {
+    const own = await ownRow("zoom");
+    if (!own.ok) return { state: "unreadable" };
+    if (!own.row) return { state: "not-connected" };
+    const root = rootKeyOrNull();
+    const creds = zoomClientCredentials();
+    if (!root || !creds) return { state: "unreadable" };
+    const secrets = await ownConnectionSecrets("zoom");
+    if (!secrets) return { state: "unreadable" };
+    if (secrets.status === "reauth") return { state: "reconnect" };
+    if (secrets.status !== "active") return { state: "not-connected" };
+    const accessToken = await zoomAccessToken({ admin: getAdminClient(), root, zoomCreds: creds }, secrets);
+    return { state: "ok", accessToken, orgId: secrets.org_id };
+  } catch (e) {
+    return e instanceof MeetingAuthError ? { state: "reconnect" } : { state: "unreadable" };
+  }
 }

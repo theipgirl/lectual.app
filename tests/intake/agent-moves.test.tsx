@@ -129,32 +129,42 @@ describe("which moves are still the agent's", () => {
 });
 
 describe("the chip", () => {
-  it("reads 'Moved by agent · LOE sent Oct 20' with the evidence as its tooltip", () => {
-    expect(chips["l-today"].text).toBe("Moved by agent · LOE sent Oct 20");
+  it("reads 'Moved automatically · LOE sent Oct 20' with the evidence as its tooltip", () => {
+    expect(chips["l-today"].text).toBe("Moved automatically · LOE sent Oct 20");
     expect(chips["l-today"].tooltip).toBe("Evidence: LOE and invoice email sent Oct 20.");
   });
 
   it("has a natural label for all four signals", () => {
     const label = (signal: string, evidence: Record<string, unknown>) => chipFor({ ...currentAgentMoves([agentRow("a", 1, { signal, evidence })], NOW).get("a")! }, NOW, ZONE).text;
-    expect(label("loe-invoice-sent", { kind: "mail", type: "loe-invoice", direction: "outbound", at: "2026-10-20T14:00:00Z", subject: null })).toBe("Moved by agent · LOE sent Oct 20");
-    expect(label("questionnaire-sent", { kind: "mail", type: "questionnaire", direction: "outbound", at: "2026-10-18T14:00:00Z", subject: null })).toBe("Moved by agent · Questionnaire sent Oct 18");
-    expect(label("post-consult-sent", { kind: "mail", type: "post-consult", direction: "outbound", at: "2026-10-19T14:00:00Z", subject: null })).toBe("Moved by agent · Post-consult sent Oct 19");
-    expect(label("consult-scheduled", { kind: "calendar", title: "Strategy session", starts_at: "2026-10-24T18:00:00Z" })).toBe("Moved by agent · Consult booked Oct 20");
+    expect(label("loe-invoice-sent", { kind: "mail", type: "loe-invoice", direction: "outbound", at: "2026-10-20T14:00:00Z", subject: null })).toBe("Moved automatically · LOE sent Oct 20");
+    expect(label("questionnaire-sent", { kind: "mail", type: "questionnaire", direction: "outbound", at: "2026-10-18T14:00:00Z", subject: null })).toBe("Moved automatically · Questionnaire sent Oct 18");
+    expect(label("post-consult-sent", { kind: "mail", type: "post-consult", direction: "outbound", at: "2026-10-19T14:00:00Z", subject: null })).toBe("Moved automatically · Post-consult sent Oct 19");
+    expect(label("consult-scheduled", { kind: "calendar", title: "Strategy session", starts_at: "2026-10-24T18:00:00Z" })).toBe("Moved automatically · Consult booked Oct 20");
   });
 
   it("a consult's tooltip carries the event title and time, in the firm's zone", () => {
     expect(chips["l-old"].tooltip).toBe('Evidence: calendar event "Strategy session" on Oct 24 at 2:00 PM.');
   });
 
-  it("the board card and the table row both draw it, with a drawn icon hidden from screen readers", () => {
-    for (const params of [{}, { view: "board" }, { view: "board", group: "owner" }] as IntakeSearchParams[]) {
+  it("the table row draws the chip, with a drawn icon hidden from screen readers", () => {
+    const html = text(render({}));
+    expect(html).toContain("Moved automatically · LOE sent Oct 20");
+    expect(html).toContain("Moved automatically · Consult booked Oct 17");
+    expect(html).toContain('title="Evidence: LOE and invoice email sent Oct 20."');
+    expect(html).toMatch(/class="intake-agent-chip"[^>]*><svg[^>]*aria-hidden="true"/);
+    // The lead a person moved afterwards, and the one never moved, carry no chip.
+    expect(html.match(/intake-agent-chip/g)).toHaveLength(2);
+  });
+
+  it("the board card says the same thing as its one-line reason (Sprint 29), with the evidence as the tooltip", () => {
+    for (const params of [{ view: "board" }, { view: "board", group: "owner" }] as IntakeSearchParams[]) {
       const html = text(render(params));
-      expect(html, JSON.stringify(params)).toContain("Moved by agent · LOE sent Oct 20");
-      expect(html).toContain("Moved by agent · Consult booked Oct 17");
+      expect(html, JSON.stringify(params)).toContain("Moved automatically · LOE sent Oct 20");
+      expect(html).toContain("Moved automatically · consult booked Oct 17");
       expect(html).toContain('title="Evidence: LOE and invoice email sent Oct 20."');
-      expect(html).toMatch(/class="intake-agent-chip"[^>]*><svg[^>]*aria-hidden="true"/);
-      // The lead a person moved afterwards, and the one never moved, carry no chip.
-      expect(html.match(/intake-agent-chip/g)).toHaveLength(2);
+      // One line per moved lead, and the lead a person moved afterwards, and the one never moved, carry none.
+      expect(html.match(/data-why="agent"/g)).toHaveLength(2);
+      expect(html).not.toContain("intake-agent-chip");
     }
   });
 
@@ -201,10 +211,10 @@ describe("the Agent moves filter", () => {
 
   it("is offered as a control with the counts, and shows which window is on", () => {
     const html = text(render());
-    expect(html).toContain('aria-label="Filter by agent moves"');
-    expect(html).toContain("Agent moves");
-    expect(text(render({ agent: "today" }))).toContain("Agent moves · Today");
-    expect(text(render({ agent: "7d" }))).toContain("Agent moves · 7 days");
+    expect(html).toContain('aria-label="Filter by automatic moves"');
+    expect(html).toContain("Moved automatically");
+    expect(text(render({ agent: "today" }))).toContain("Moved automatically · Today");
+    expect(text(render({ agent: "7d" }))).toContain("Moved automatically · 7 days");
   });
 
   it("D5: the rows the Today filter keeps, the chips drawn for today and the Agents-page count are one set", () => {
@@ -235,9 +245,9 @@ describe("when the moves couldn't be read", () => {
   it("shows a one-line note, no chip and no filter control, and the list is never filtered to nobody", () => {
     for (const view of [{}, { view: "board" }] as IntakeSearchParams[]) {
       const html = text(render({ ...view, agent: "today" }, unavailable));
-      expect(html).toMatch(/Agent moves couldn.t be loaded/);
+      expect(html).toContain("Some details couldn't load (automatic moves). Refresh to try again.");
       expect(html).not.toContain("intake-agent-chip");
-      expect(html).not.toContain('aria-label="Filter by agent moves"');
+      expect(html).not.toContain('aria-label="Filter by automatic moves"');
       expect(names(html)).toEqual(["Today", "Older", "Nobody", "Overridden"]);
       expect(html).not.toContain("No lead matches these filters");
     }
@@ -251,12 +261,12 @@ describe("when the moves couldn't be read", () => {
   it("with the prop absent (an older caller) nothing about agent moves shows", () => {
     const html = text(render({}, { agentMoves: undefined, withChips: false }));
     expect(html).not.toContain("intake-agent-chip");
-    expect(html).not.toMatch(/Agent moves/);
+    expect(html).not.toMatch(/Moved automatically/);
   });
 
   it("a read that hit its row cap says only the most recent moves are marked", () => {
-    expect(text(render({}, { agentMoves: { status: "ok", truncated: true } }))).toContain("only the most recent are marked");
-    expect(text(render())).not.toContain("only the most recent are marked");
+    expect(text(render({}, { agentMoves: { status: "ok", truncated: true } }))).toContain("Some details couldn't load (automatic moves). Refresh to try again.");
+    expect(text(render())).not.toContain("Some details couldn't load");
   });
 });
 

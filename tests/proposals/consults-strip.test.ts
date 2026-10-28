@@ -62,10 +62,10 @@ describe("each row's pill and call to action", () => {
     expect(html).toMatch(/href="\/dashboard\/leads\/lead-1\/?"[^>]*>Open the draft/);
   });
 
-  it("Unlinked: 'Link a lead first' linking to the meeting", () => {
+  it("Unlinked: 'Link to a lead' linking to the meeting (a role that can't link)", () => {
     const html = render(data([row({ state: "unlinked", leadId: null, company: null })]));
     expect(html).toContain(">Not linked<");
-    expect(html).toMatch(new RegExp(`<a[^>]*href="/dashboard/meetings/${MEETING}/?"[^>]*>Link a lead first</a>`));
+    expect(html).toMatch(new RegExp(`<a[^>]*href="/dashboard/meetings/${MEETING}/?"[^>]*>Link to a lead</a>`));
   });
 
   it("a role that can't draft sees the pill but no Draft button", () => {
@@ -150,7 +150,8 @@ describe("Paste or upload a transcript", () => {
     const html = render(data([row()]), { paste: createElement("form", { id: "paste-form" }, createElement("textarea", { name: "transcript" })) });
     expect(html).toContain('<details class="pq-paste">');
     expect(html).toContain("Paste or upload a transcript");
-    const summary = html.slice(html.indexOf("<summary"), html.indexOf("</summary>"));
+    const paste = html.slice(html.indexOf('<details class="pq-paste">'));
+    const summary = paste.slice(paste.indexOf("<summary"), paste.indexOf("</summary>"));
     expect(summary).toContain("Paste or upload a transcript");
     expect(summary).toContain("Zoom consults");
     expect(html.slice(html.indexOf("</summary>"))).toContain('id="paste-form"');
@@ -159,6 +160,6 @@ describe("Paste or upload a transcript", () => {
   it("is absent without the form (a role that can't draft)", () => {
     const html = render(data([row()]), { paste: null });
     expect(html).not.toContain("Paste or upload a transcript");
-    expect(html).not.toContain("<details");
+    expect(html).not.toContain("pq-paste");
   });
 });

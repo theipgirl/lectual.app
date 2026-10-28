@@ -4,6 +4,8 @@ import { ROLES, type Role } from "@/lib/auth/roles";
 import { isQuoteChargeAt, isQuoteLineKind } from "./pricing";
 import { assertLineAmountSign, assertLineKindChargeAt, QUOTE_LIBRARY_ADMIN_ROLES, type ServiceItemRow } from "./types";
 import { quotesDb } from "./store";
+import { ReadableError } from "@/lib/ui/readable-error";
+
 
 /**
  * `crm_service_item` CRUD — Anchor's "pre-built service library" (spec §3.1):
@@ -30,7 +32,7 @@ export async function requireQuoteLibraryAdminRole(supabase: ScopedClient): Prom
   const { data, error } = await supabase.rpc("current_org_role");
   if (error) throw error;
   if (!isRole(data) || !QUOTE_LIBRARY_ADMIN_ROLES.includes(data)) {
-    throw new Error("You don't have permission to edit the service library.");
+    throw new ReadableError("You don't have permission to edit the service library.");
   }
   return data;
 }
@@ -68,10 +70,10 @@ export type CreateServiceItemInput = {
 export async function createServiceItem(input: CreateServiceItemInput): Promise<ServiceItemRow> {
   const label = input.label?.trim();
   if (!label || label.length > 200) {
-    throw new Error("A service item needs a label of 1-200 characters.");
+    throw new ReadableError("A service item needs a label of 1-200 characters.");
   }
-  if (!isQuoteLineKind(input.kind)) throw new Error(`'${input.kind}' isn't a valid line kind.`);
-  if (!isQuoteChargeAt(input.chargeAt)) throw new Error(`'${input.chargeAt}' isn't a valid charge schedule.`);
+  if (!isQuoteLineKind(input.kind)) throw new ReadableError(`'${input.kind}' isn't a valid line kind.`);
+  if (!isQuoteChargeAt(input.chargeAt)) throw new ReadableError(`'${input.chargeAt}' isn't a valid charge schedule.`);
   // §0, enforced here a second time before it ever reaches the identical
   // crm_service_item_gov_fee_not_at_signing constraint: a library item that
   // declared a USPTO fee at signing is a loaded gun sitting in the picker.
@@ -84,7 +86,7 @@ export async function createServiceItem(input: CreateServiceItemInput): Promise<
 
   const { data: orgId, error: orgError } = await supabase.rpc("current_org_id");
   if (orgError) throw orgError;
-  if (!orgId) throw new Error("No active organization for the current session.");
+  if (!orgId) throw new ReadableError("No active organization for the current session.");
 
   let sortIndex = input.sortIndex;
   if (sortIndex === undefined) {
@@ -138,17 +140,17 @@ export async function updateServiceItem(id: string, patch: UpdateServiceItemInpu
     .eq("id", id)
     .maybeSingle();
   if (fetchError) throw fetchError;
-  if (!existing) throw new Error("That service isn't in your firm's library.");
+  if (!existing) throw new ReadableError("That service isn't in your firm's library.");
   const item = existing as ServiceItemRow;
 
   if (patch.kind !== undefined && !isQuoteLineKind(patch.kind)) {
-    throw new Error(`'${patch.kind}' isn't a valid line kind.`);
+    throw new ReadableError(`'${patch.kind}' isn't a valid line kind.`);
   }
   if (patch.chargeAt !== undefined && !isQuoteChargeAt(patch.chargeAt)) {
-    throw new Error(`'${patch.chargeAt}' isn't a valid charge schedule.`);
+    throw new ReadableError(`'${patch.chargeAt}' isn't a valid charge schedule.`);
   }
   if (patch.label !== undefined && (!patch.label.trim() || patch.label.length > 200)) {
-    throw new Error("A service item needs a label of 1-200 characters.");
+    throw new ReadableError("A service item needs a label of 1-200 characters.");
   }
 
   const merged = {

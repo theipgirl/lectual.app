@@ -4,6 +4,7 @@ import { ROLES, hasRole } from "@/lib/auth/roles";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { QUEUE_APPROVE_ROLES } from "@/lib/queue/roles";
 import { InviteForm, RemoveMember, ROLE_LABEL, RoleSelect } from "@/components/settings/TeamForms";
+import { RoleTable } from "@/components/settings/RoleTable";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 
@@ -78,7 +79,7 @@ export default async function TeamPage() {
                       {self && <span className="lx-note"> (you)</span>}
                       {m.email && m.displayName && <div className="lx-note">{m.email}</div>}
                     </td>
-                    <td>{manageable ? <RoleSelect userId={m.userId} role={m.role} grantable={grantable} /> : ROLE_LABEL[m.role] ?? m.role}</td>
+                    <td>{manageable ? <RoleSelect userId={m.userId} role={m.role} grantable={grantable} name={name} /> : ROLE_LABEL[m.role] ?? m.role}</td>
                     <td>
                       {QUEUE_APPROVE_ROLES.includes(m.role) ? <span className="lx-pill lx-pill-ok">Yes</span> : <span className="lx-pill lx-pill-mute">No</span>}
                     </td>
@@ -91,6 +92,8 @@ export default async function TeamPage() {
         </div>
       )}
       {!isAdmin && <p className="lx-note">Owners, admins and senior admins manage the team.</p>}
+
+      <RoleTable />
     </>
   );
 }

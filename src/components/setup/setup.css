@@ -40,7 +40,7 @@
 
 .su-item {
   display: grid;
-  grid-template-columns: 28px 118px minmax(0, 1fr) auto;
+  grid-template-columns: 28px minmax(0, 1fr) 150px auto;
   gap: 12px;
   align-items: center;
   padding: 14px 0;
@@ -56,6 +56,8 @@
   color: var(--muted);
 }
 
+.su-text { min-width: 0; }
+
 .su-label {
   color: var(--ink);
   font-weight: 500;
@@ -66,14 +68,23 @@
   margin: 2px 0 0;
 }
 
+/* At 720px and under: number in column 1, then label and why in column 2, with the pill and the button
+   following in column 2 (DOM order is label, pill, action), so a long label never squeezes the pill. */
 @media (max-width: 720px) {
   .su-item {
     grid-template-columns: 24px minmax(0, 1fr);
   }
+  .su-item > div,
   .su-item > .su-state,
   .su-item > .su-action {
     grid-column: 2;
+  }
+  .su-item > .su-state,
+  .su-item > .su-action {
     justify-self: start;
+  }
+  .su-num {
+    grid-row: 1;
   }
 }
 

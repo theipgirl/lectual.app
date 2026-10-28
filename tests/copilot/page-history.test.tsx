@@ -54,7 +54,7 @@ describe("C6: the page", () => {
     expect(html).toContain("Past conversations");
     expect(html).toContain('aria-label="New chat"');
     expect(html).toContain("Nothing sends without your approval.");
-    expect(html).toContain("Ask the copilot");
+    expect(html).toContain("Ask Copilot");
     expect(html).toContain("What is due this week?");
     expect(html).toContain("Stalled matters");
     expect(html).toContain(`aria-label="Delete chat: What is due this week?"`);
@@ -72,7 +72,7 @@ describe("C6: the page", () => {
 
   it("with AI not configured it draws the plain not-configured state and no chat", async () => {
     const html = await render({ configured: false });
-    expect(html).toContain("isn't configured for this deployment yet");
+    expect(html).toContain("isn't switched on for your firm yet");
     expect(html).not.toContain("cpl-composer");
     expect(html).not.toContain("Past conversations");
   });
@@ -96,12 +96,12 @@ describe("C5: the three states of the history list", () => {
     expect(await render()).toContain("No saved chats yet.");
   });
 
-  it("table missing says saved chats are not available until the database update, and New chat still shows", async () => {
+  it("table missing says saved chats are isn't switched on for your firm yet, and New chat still shows", async () => {
     const html = await render({ handler: () => ({ data: null, error: { code: "42P01", message: "x" } }) });
-    expect(html).toContain("Saved chats aren't available until the database update.");
+    expect(html).toContain("Saved chats aren't switched on for your firm yet. Lectual will turn them on.");
     expect(html).not.toContain("No saved chats yet.");
     expect(html).toContain('aria-label="New chat"');
-    expect(html).toContain("Ask the copilot");
+    expect(html).toContain("Ask Copilot");
   });
 
   it("an unreadable list says it couldn't be loaded (never 'No saved chats yet.'), and New chat still works", async () => {
@@ -112,7 +112,7 @@ describe("C5: the three states of the history list", () => {
       expect(html).toContain("Saved chats couldn't be loaded.");
       expect(html).not.toContain("No saved chats yet.");
       expect(html).toContain('aria-label="New chat"');
-      expect(html).toContain("Ask the copilot");
+      expect(html).toContain("Ask Copilot");
     }
   });
 });
@@ -136,7 +136,7 @@ describe("opening a past chat", () => {
   it("a chat id that is not there or is not an id gives a short note and a fresh chat", async () => {
     const html = await render({ c: "66666666-6666-4666-8666-666666666666", handler: healthyDb({ existing }) });
     expect(html).toContain("That saved chat couldn't be found.");
-    expect(html).toContain("Ask the copilot");
+    expect(html).toContain("Ask Copilot");
     expect(html).not.toContain("Two deadlines are due.");
     expect(await render({ c: "not-an-id", handler: healthyDb({ existing }) })).not.toContain("Two deadlines");
   });

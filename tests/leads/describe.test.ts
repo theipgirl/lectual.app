@@ -13,7 +13,7 @@ describe("timeline wording", () => {
     });
   });
   it("shows the triage lane and reason", () => {
-    expect(describeActivity(row("ai_insight", { source: "intake-triage", lane: "hot", reason: "Ready to file." }))).toMatchObject({ title: "Triage: HOT", detail: "Ready to file.", tone: "ai" });
+    expect(describeActivity(row("ai_insight", { source: "intake-triage", lane: "hot", reason: "Ready to file." }))).toMatchObject({ title: "First read: HOT", detail: "Ready to file.", tone: "ai" });
   });
   it("records a proposal decision", () => {
     expect(describeActivity(row("ai_insight", { source: "email-intel-review", decision: "apply", applied: ["phone"] })).title).toBe("Proposal applied");

@@ -10,6 +10,14 @@ import { ConsultOutcomeForm } from "@/components/leads/ConsultOutcomeForm";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { pendingProposals } from "@/lib/agents/proposals";
 import { relativeTime } from "@/lib/relative-time";
+import "@/components/leads/lead-page.css";
+import { LeadStatusRow } from "@/components/leads/LeadStatusRow";
+import { ContactActions } from "@/components/leads/ContactActions";
+import { NeedsAttentionCard } from "@/components/leads/NeedsAttentionCard";
+import { ComposerTabs } from "@/components/leads/ComposerTabs";
+import { CollapsibleAside } from "@/components/leads/CollapsibleAside";
+import { needsAttention } from "@/lib/leads/needs-attention";
+import { LANE_LABEL } from "@/lib/leads/lane";
 import { AssignSelect, EditLeadForm, NoteComposer, ProposalCard, StageSelect } from "@/components/leads/LeadForms";
 import { LeadTags, PrepConsult } from "@/components/leads/LeadExtras";
 import { LeadMattersLine } from "@/components/leads/LeadMatters";
@@ -39,6 +47,7 @@ import { TemperatureCard } from "@/components/leads/TemperatureCard";
 import { WaitingOnRebecca } from "@/components/leads/WaitingOnRebecca";
 import { ConsultBookedView } from "@/components/calendar/ConsultBookedLine";
 import { recordPageTitle } from "@/lib/ui/page-title";
+import { AUTOMATIC_STAGE_MOVES, FIRST_READ, FROM_THEIR_EMAILS, LEADS_NAME } from "@/lib/ui/words";
 import { loadBookedConsult } from "@/lib/calendar/outlook-read";
 import { loadPendingApprovalsByLead } from "@/lib/queue/lead-pending";
 import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
@@ -140,7 +149,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const renderedAt = new Date().getTime();
   const proposals = pendingProposals(rows);
   const canWrite = CAN_WRITE_LEAD.includes(session.role);
-  // The Stage Keeper's suggestions waiting for a person, and who may act on them (the stage-move roles).
+  // The automatic stage moves suggestions waiting for a person, and who may act on them (the stage-move roles).
   const canMove = CAN_MOVE_STAGE.includes(session.role);
   const stageSuggestions = pendingStageSuggestions(rows);
   const name = `${lead.first_name} ${lead.last_name}`.trim() || lead.email;
@@ -152,10 +161,21 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     practice_area: lead.practice_area,
   };
 
+  const stageName = stages.find((s) => s.id === lead.current_stage_id)?.name ?? null;
+  const owner = lead.assigned_to ? members.find((m) => m.userId === lead.assigned_to) : undefined;
+  const ownerName = owner ? (owner.displayName ?? owner.email ?? null) : null;
+  const showAttention = needsAttention({
+    leadId: lead.id,
+    consult: consultRead,
+    approvals,
+    clientEmailProposals: proposals.length,
+    stageSuggestions: stageSuggestions.length,
+  });
+
   return (
     <>
       <Link href="/dashboard/intake/" className="lx-back">
-        ← Intake
+        ← {LEADS_NAME}
       </Link>
       <div className="lx-page-head">
         <div style={{ flex: 1, minWidth: 260 }}>
@@ -166,6 +186,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             {lead.phone ? ` · ${lead.phone}` : ""}
             {lead.mark_text ? ` · ${lead.mark_text}` : ""}
           </p>
+          <ContactActions phone={lead.phone} email={lead.email} />
         </div>
         {canWrite && (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -175,44 +196,118 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
         )}
       </div>
 
-      <div className="lx-split">
+      <LeadStatusRow
+        stageName={stageName}
+        temperatureLabel={temperature.value ? LANE_LABEL[temperature.value] : null}
+        ownerName={ownerName}
+        lastInboundAt={lead.last_inbound_at}
+        now={renderedAt}
+      />
+
+      <div className="lx-split lx-split-lead">
         <div className="lx-col">
-          {consultRead && <ConsultBookedView read={consultRead} timeZone={tz} />}
+          {showAttention && (
+            <NeedsAttentionCard>
+              {consultRead && <ConsultBookedView read={consultRead} timeZone={tz} bare />}
 
-          {proposals.length > 0 && (
-            <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }}>
-              <div>
-                <div className="lx-label">Email intel · waiting on you</div>
-                <h2 className="lx-h2" style={{ fontSize: 23 }}>
-                  {proposals.length} proposal{proposals.length === 1 ? "" : "s"} from client email
-                </h2>
-              </div>
-              {proposals.map((p) => (
-                <ProposalCard key={p.activityId} leadId={lead.id} proposal={p} current={current} canWrite={canWrite} />
-              ))}
+              <WaitingOnRebecca leadId={lead.id} approvals={approvals} now={renderedAt} bare />
+
+              {proposals.length > 0 && (
+                <div style={{ display: "grid", gap: 12 }}>
+                  <div>
+                    <div className="lx-label">{FROM_THEIR_EMAILS} · waiting on you</div>
+                    <h3 className="lx-h2" style={{ fontSize: 18, margin: 0 }}>
+                      {proposals.length} proposal{proposals.length === 1 ? "" : "s"} from client email
+                    </h3>
+                  </div>
+                  {proposals.map((p) => (
+                    <ProposalCard key={p.activityId} leadId={lead.id} proposal={p} current={current} canWrite={canWrite} />
+                  ))}
+                </div>
+              )}
+
+              {stageSuggestions.length > 0 && (
+                <div style={{ display: "grid", gap: 12 }}>
+                  <div>
+                    <div className="lx-label">{AUTOMATIC_STAGE_MOVES} · waiting on you</div>
+                    <h3 className="lx-h2" style={{ fontSize: 18, margin: 0 }}>
+                      {stageSuggestions.length} stage suggestion{stageSuggestions.length === 1 ? "" : "s"}
+                    </h3>
+                  </div>
+                  {stageSuggestions.map((s) => (
+                    <StageSuggestionCard
+                      key={s.activityId}
+                      leadId={lead.id}
+                      suggestion={s}
+                      currentStageId={lead.current_stage_id}
+                      canDecide={canMove}
+                      timeZone={tz}
+                    />
+                  ))}
+                </div>
+              )}
+            </NeedsAttentionCard>
+          )}
+
+          {canWrite && (
+            <section className="lx-card" style={{ padding: 18 }} aria-label="Add to the timeline">
+              <ComposerTabs
+                text={<NoteComposer leadId={lead.id} />}
+                voice={<VoiceNoteRecorder target={{ kind: "lead", id: lead.id }} action={addVoiceNoteAction} />}
+              />
             </section>
           )}
 
-          {stageSuggestions.length > 0 && (
-            <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }}>
-              <div>
-                <div className="lx-label">Stage Keeper · waiting on you</div>
-                <h2 className="lx-h2" style={{ fontSize: 23 }}>
-                  {stageSuggestions.length} stage suggestion{stageSuggestions.length === 1 ? "" : "s"}
-                </h2>
+          <section className="lx-card" style={{ padding: 18 }} data-tour="lead-timeline">
+            <h2 className="lx-h2" style={{ fontSize: 23, marginBottom: 10 }}>
+              Timeline
+            </h2>
+            <Timeline rows={rows} mediaUrls={voiceUrls} timeZone={tz} undo={{ leadId: lead.id, canMove, currentStageId: lead.current_stage_id }} />
+          </section>
+
+          {canWrite && hasAgentToolkit && (
+            <details id="prep-consult" className="lx-card lx-disclosure" data-tour="lead-prep">
+              <summary>Prep this consult</summary>
+              <div style={{ padding: "0 18px 18px" }}>
+                <PrepConsult leadId={lead.id} practiceArea={lead.practice_area} />
               </div>
-              {stageSuggestions.map((s) => (
-                <StageSuggestionCard
-                  key={s.activityId}
-                  leadId={lead.id}
-                  suggestion={s}
-                  currentStageId={lead.current_stage_id}
-                  canDecide={canMove}
-                  timeZone={tz}
-                />
-              ))}
-            </section>
+            </details>
           )}
+
+          <ConsultDetailsSection leadId={lead.id} canWrite={canWrite} />
+
+          <LinkedMeetings read={meetings} />
+
+          {proposalRead && (
+            <LeadProposalsCard
+              leadId={lead.id}
+              read={proposalRead}
+              canWrite={proposalCanWrite}
+              draftBlock={draftBlock}
+              maxChars={MAX_PASTED_TRANSCRIPT_CHARS}
+            />
+          )}
+
+          {canWrite && (
+            <details className="lx-card lx-disclosure" id="log-consult-outcome">
+              <summary>Log a consult outcome</summary>
+              <div style={{ padding: "0 18px 18px" }}>
+                <ConsultOutcomeForm leadId={lead.id} />
+              </div>
+            </details>
+          )}
+
+          <AnswersCard read={answersRead} tz={tz} />
+
+          <DocumentsCard
+            parent={{ kind: "lead", id: lead.id }}
+            read={documentsRead}
+            directory={members.map((m) => ({ userId: m.userId, name: m.displayName ?? m.email ?? "" }))}
+            canUpload={FILE_UPLOAD_ROLES.includes(session.role)}
+            canDelete={FILE_DELETE_ROLES.includes(session.role)}
+          />
+
+          <SequencesCard leadId={lead.id} rows={sequenceRows} canOperate={canOperate} />
 
           <TemperatureCard
             leadId={lead.id}
@@ -227,107 +322,49 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             linksFailed={linksFailed}
             canWrite={canWrite}
           />
-          <AnswersCard read={answersRead} tz={tz} />
           {lead.ai_summary && !lane.suggested && (
-            // A triage summary that carries no lane (an older format) is still shown, as the agent's words.
+            // A first-read summary that carries no temperature (an older format) is still shown, as the assistant's words.
             <section className="lx-card" style={{ padding: 18 }}>
               <div className="lx-label" style={{ marginBottom: 6 }}>
-                Triage agent
+                {FIRST_READ}
               </div>
               <p style={{ margin: 0, color: "var(--body)", lineHeight: 1.55 }}>{lead.ai_summary}</p>
             </section>
           )}
-
-          <SequencesCard leadId={lead.id} rows={sequenceRows} canOperate={canOperate} />
-
-          <WaitingOnRebecca leadId={lead.id} approvals={approvals} now={renderedAt} />
-
-          {canWrite && hasAgentToolkit && (
-            <details id="prep-consult" className="lx-card lx-disclosure" data-tour="lead-prep">
-              <summary>Prep this consult</summary>
-              <div style={{ padding: "0 18px 18px" }}>
-                <PrepConsult leadId={lead.id} practiceArea={lead.practice_area} />
-              </div>
-            </details>
-          )}
-
-          {canWrite && (
-            <section className="lx-card" style={{ padding: 18 }}>
-              <NoteComposer leadId={lead.id} />
-            </section>
-          )}
-
-          {canWrite && (
-            <section className="lx-card" style={{ padding: 18 }}>
-              <ConsultOutcomeForm leadId={lead.id} />
-            </section>
-          )}
-
-          <LinkedMeetings read={meetings} />
-
-          {proposalRead && (
-            <LeadProposalsCard
-              leadId={lead.id}
-              read={proposalRead}
-              canWrite={proposalCanWrite}
-              draftBlock={draftBlock}
-              maxChars={MAX_PASTED_TRANSCRIPT_CHARS}
-            />
-          )}
-
-          <ConsultDetailsSection leadId={lead.id} canWrite={canWrite} />
-
-          <DocumentsCard
-            parent={{ kind: "lead", id: lead.id }}
-            read={documentsRead}
-            directory={members.map((m) => ({ userId: m.userId, name: m.displayName ?? m.email ?? "" }))}
-            canUpload={FILE_UPLOAD_ROLES.includes(session.role)}
-            canDelete={FILE_DELETE_ROLES.includes(session.role)}
-          />
-
-          <section className="lx-card" style={{ padding: 18 }} data-tour="lead-timeline">
-            <h2 className="lx-h2" style={{ fontSize: 23, marginBottom: 10 }}>
-              Timeline
-            </h2>
-            {canWrite && (
-              <div style={{ marginBottom: 14 }}>
-                <VoiceNoteRecorder target={{ kind: "lead", id: lead.id }} action={addVoiceNoteAction} />
-              </div>
-            )}
-            <Timeline rows={rows} mediaUrls={voiceUrls} timeZone={tz} undo={{ leadId: lead.id, canMove, currentStageId: lead.current_stage_id }} />
-          </section>
         </div>
 
         <aside className="lx-card lx-aside" style={{ width: 340 }}>
-          <div className="lx-label">Tags</div>
-          <LeadTags
-            leadId={lead.id}
-            applied={applied.map((t) => ({ id: t.id, label: t.label, color: t.color }))}
-            catalog={catalog.map((t) => ({ id: t.id, label: t.label, color: t.color }))}
-            canWrite={canWrite}
-          />
-          <div className="lx-label">Details</div>
-          {canWrite ? (
-            <EditLeadForm
+          <CollapsibleAside>
+            <div className="lx-label">Tags</div>
+            <LeadTags
               leadId={lead.id}
-              values={{ firstName: lead.first_name, lastName: lead.last_name, email: lead.email, phone: lead.phone, businessName: lead.business_name, website: lead.website }}
+              applied={applied.map((t) => ({ id: t.id, label: t.label, color: t.color }))}
+              catalog={catalog.map((t) => ({ id: t.id, label: t.label, color: t.color }))}
+              canWrite={canWrite}
             />
-          ) : (
-            <p className="lx-note">Your role can view this lead but not change it.</p>
-          )}
-          <div className="lx-meta">
-            <span>Last heard from</span>
-            <span>{lead.last_inbound_at ? relativeTime(lead.last_inbound_at) : "—"}</span>
-          </div>
-          <div className="lx-meta">
-            <span>Last reached out</span>
-            <span>{lead.last_outbound_at ? relativeTime(lead.last_outbound_at) : "—"}</span>
-          </div>
-          <div className="lx-meta">
-            <span>Came from</span>
-            <span>{[lead.referral_source, lead.referral_detail].filter(Boolean).join(" — ") || "—"}</span>
-          </div>
-          <LeadMattersLine read={mattersRead} />
+            <div className="lx-label">Details</div>
+            {canWrite ? (
+              <EditLeadForm
+                leadId={lead.id}
+                values={{ firstName: lead.first_name, lastName: lead.last_name, email: lead.email, phone: lead.phone, businessName: lead.business_name, website: lead.website }}
+              />
+            ) : (
+              <p className="lx-note">Your role can view this lead but not change it.</p>
+            )}
+            <div className="lx-meta">
+              <span>Last heard from</span>
+              <span>{lead.last_inbound_at ? relativeTime(lead.last_inbound_at) : "—"}</span>
+            </div>
+            <div className="lx-meta">
+              <span>Last reached out</span>
+              <span>{lead.last_outbound_at ? relativeTime(lead.last_outbound_at) : "—"}</span>
+            </div>
+            <div className="lx-meta">
+              <span>Came from</span>
+              <span>{[lead.referral_source, lead.referral_detail].filter(Boolean).join(" — ") || "—"}</span>
+            </div>
+            <LeadMattersLine read={mattersRead} />
+          </CollapsibleAside>
         </aside>
       </div>
     </>

@@ -2,38 +2,52 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { OutlookRead, TodayConsult } from "@/lib/calendar/outlook-read";
 import { storedConsult } from "../calendar/fixtures";
+import type { ConsultDeps } from "@/lib/calendar/consult-sources";
+import type { UpcomingZoom } from "@/lib/meetings/zoom";
 
 // next.config.ts sets trailingSlash: true, which <Link> reads from this variable.
 process.env.__NEXT_TRAILING_SLASH = "true";
 
 /** Today's Consults card (Sprint 15, F13): three states, and nothing for a firm without the mailbox module. */
-
 const text = (html: string) => html.replaceAll("&#x27;", "'").replaceAll("&apos;", "'").replaceAll("<!-- -->", "").replaceAll(" ", " ");
 const loadConsultsForToday = vi.fn();
-const orgHasModule = vi.fn();
 
 function consult(over: Partial<TodayConsult> = {}): TodayConsult {
   return { ...storedConsult(), lead_name: "Amara Nwosu", ...over };
 }
 
-async function render(opts: { mailbox: boolean; read?: OutlookRead<{ consults: TodayConsult[] }> }) {
+type Opts = {
+  mailbox?: boolean;
+  read?: OutlookRead<{ consults: TodayConsult[] }>;
+  outlookConns?: { ok: true; active: number; withCalendar: number } | { ok: false };
+  zoom?: { state: "ok"; accessToken: string } | { state: "not-connected" | "reconnect" | "unreadable" };
+  zoomRead?: UpcomingZoom;
+};
+
+/** Renders the self-loading card with every read faked: Outlook ok and Zoom not connected unless told otherwise. */
+async function render(opts: Opts = {}) {
   vi.resetModules();
   loadConsultsForToday.mockReset();
-  orgHasModule.mockReset();
   loadConsultsForToday.mockResolvedValue(opts.read ?? { status: "ok", consults: [] });
-  orgHasModule.mockImplementation(async (m: string) => m === "mailbox" && opts.mailbox);
-  vi.doMock("@/lib/org/modules", () => ({ orgHasModule }));
+  const deps: ConsultDeps = {
+    hasMailboxModule: async () => opts.mailbox ?? true,
+    outlookConnections: async () => opts.outlookConns ?? { ok: true, active: 1, withCalendar: 1 },
+    outlook: loadConsultsForToday,
+    zoomAccess: async () => opts.zoom ?? { state: "ok", accessToken: "tok" },
+    zoomUpcoming: async () => opts.zoomRead ?? { status: "ok", meetings: [] },
+    zoomLeads: async () => new Map(),
+  };
   vi.doMock("@/lib/org/profile", () => ({ getFirmTimeZone: vi.fn(async () => "America/New_York") }));
-  vi.doMock("@/lib/calendar/outlook-read", async (orig) => ({ ...(await orig<typeof import("@/lib/calendar/outlook-read")>()), loadConsultsForToday }));
+  vi.doMock("@/lib/calendar/consult-sources-live", () => ({ liveConsultDeps: deps }));
   const { TodayConsults } = await import("@/components/calendar/TodayConsults");
-  return text(renderToStaticMarkup((await TodayConsults()) ?? <></>));
+  return text(renderToStaticMarkup(await TodayConsults()));
 }
 
 beforeEach(() => vi.resetModules());
 
 describe("Today: Consults card", () => {
   it("lists time in the firm zone, title, a lead link and Join, for the row shape the sync stores", async () => {
-    const html = await render({ mailbox: true, read: { status: "ok", consults: [consult()] } });
+    const html = await render({ read: { status: "ok", consults: [consult()] } });
     expect(html).toContain(">Consults<");
     expect(html).toContain("Strategy Session: Amara Nwosu");
     expect(html).toContain("Thu, Oct 22, 2:00 PM");
@@ -44,27 +58,27 @@ describe("Today: Consults card", () => {
   });
 
   it("a consult with no linked lead has no lead link, and one with no join URL has no Join", async () => {
-    const html = await render({ mailbox: true, read: { status: "ok", consults: [consult({ lead_id: null, lead_name: null, join_url: null })] } });
+    const html = await render({ read: { status: "ok", consults: [consult({ lead_id: null, lead_name: null, join_url: null })] } });
     expect(html).toContain("Strategy Session");
     expect(html).not.toContain("/dashboard/leads/");
     expect(html).not.toContain("Join");
   });
 
   it("a linked lead whose name couldn't be read still links, as 'Open lead'", async () => {
-    const html = await render({ mailbox: true, read: { status: "ok", consults: [consult({ lead_name: null })] } });
+    const html = await render({ read: { status: "ok", consults: [consult({ lead_name: null })] } });
     expect(html).toMatch(/<a href="\/dashboard\/leads\/lead-amara\/">Open lead<\/a>/);
   });
 
-  it("a real empty list says there are no consults in the next 7 days", async () => {
-    const html = await render({ mailbox: true, read: { status: "ok", consults: [] } });
+  it("a real empty list says there are no consults in the next 7 days only when every source was read", async () => {
+    const html = await render({ read: { status: "ok", consults: [] } });
     expect(html).toContain("No consults in the next 7 days.");
   });
 
-  it("unavailable and database-update-needed render distinct messages and never the empty-list sentence", async () => {
-    const unavailable = await render({ mailbox: true, read: { status: "unavailable" } });
-    const waiting = await render({ mailbox: true, read: { status: "database-update-needed" } });
-    expect(unavailable).toContain("Consults couldn't be loaded. This is not an empty calendar.");
-    expect(waiting).toContain("Consults from Outlook aren't available until the database update.");
+  it("an unreadable or pending Outlook read says so in its own words and never the empty-list sentence", async () => {
+    const unavailable = await render({ read: { status: "unavailable" } });
+    const waiting = await render({ read: { status: "database-update-needed" } });
+    expect(unavailable).toContain("Outlook consults couldn't be read just now.");
+    expect(waiting).toContain("aren't switched on for your firm yet");
     for (const html of [unavailable, waiting]) {
       expect(html).not.toContain("No consults in the next");
       expect(html).toContain(">Consults<");
@@ -72,9 +86,11 @@ describe("Today: Consults card", () => {
     expect(unavailable).not.toBe(waiting);
   });
 
-  it("a firm without the mailbox module gets nothing and no read is made", async () => {
-    const html = await render({ mailbox: false, read: { status: "ok", consults: [consult()] } });
-    expect(html).toBe("");
+  it("a firm without the mailbox module still gets a card with a sentence and a next step, and no Outlook read", async () => {
+    const html = await render({ mailbox: false });
+    expect(html).toContain(">Consults<");
+    expect(html).toContain("Outlook calendar isn't switched on for your firm.");
+    expect(html).toContain("/dashboard/settings/integrations/");
     expect(loadConsultsForToday).not.toHaveBeenCalled();
   });
 });

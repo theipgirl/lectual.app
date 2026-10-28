@@ -75,7 +75,7 @@ describe("Settings → Modules: Mailboxes row (S2)", () => {
     expect(mailboxRow(html)).not.toContain("private to them");
     expect(html).toContain("Document Center");
     expect(html).toContain("Litigation");
-    const agentsRow = html.slice(html.indexOf("Agents</span>"), html.indexOf("Document Center"));
+    const agentsRow = html.slice(html.indexOf("Assistants</span>"), html.indexOf("Document Center"));
     expect(agentsRow).toContain(">On<");
   });
 });

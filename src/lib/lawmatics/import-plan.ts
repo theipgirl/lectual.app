@@ -3,7 +3,8 @@ import { createHash } from "node:crypto";
 import { classifyReferralSource } from "@/lib/intake/referral-source";
 
 import type { LawmaticsSourceContact, LawmaticsSourceRecord } from "./normalize";
-import { isHiredStageName, resolveStage, type StageRef } from "./stage-map";
+import { newEnquiryStage } from "@/lib/pipeline/new-enquiry";
+import { isHiredStageName, type StageRef } from "./stage-map";
 
 /**
  * The importer's decision engine — PURE. Given sanitized Lawmatics records,
@@ -14,12 +15,14 @@ import { isHiredStageName, resolveStage, type StageRef } from "./stage-map";
  * separate code path that can drift from what the write actually does.
  *
  * Three rules the planner never breaks:
- *   1. Never invent a stage. A person whose Lawmatics stage the firm has no
- *      stage for ("Proposal Sent", "Consult Completed", "Hired") is still
- *      IMPORTED: into the firm's first open stage, flagged with the Lawmatics
- *      stage name (`stageDecision`) so a human places them. "Hired" never lands
- *      in a `won` stage. Only a firm with no open stage at all leaves them in
- *      `unmapped`, with that reason.
+ *   1. Lawmatics stage names NEVER choose a lead's stage (Taylor, Oct 27: they are
+ *      not RPB's stages; the Lectual intake stages are the agreed workflow). A new
+ *      lead goes to the firm's new-enquiry stage (`newEnquiryStage`), whatever
+ *      Lawmatics calls it, flagged with the Lawmatics stage name (`stageDecision`)
+ *      as read-only text so a person, the Reconcile screen or the Stage Keeper
+ *      places them from real evidence. An existing lead is never moved. "Hired"
+ *      never lands in a `won` stage. Only a firm with no open stage at all leaves
+ *      them in `unmapped`, with that reason.
  *   2. Never silently drop a record. Everything lands in exactly one bucket —
  *      create / update / unchanged / unmapped / skipped — and every non-import
  *      bucket carries a human-readable reason. A Lawmatics contact with no
@@ -32,11 +35,10 @@ import { isHiredStageName, resolveStage, type StageRef } from "./stage-map";
 /** A stage row as the planner needs it. Category and order are optional: without them no "first open stage" exists. */
 export type PlanStage = StageRef & { category?: string; orderIndex?: number };
 
-/** The firm's first open stage: the lowest-ordered stage whose category is `open`. */
-export function firstOpenPlanStage(stages: readonly PlanStage[]): PlanStage | null {
-  const open = stages.filter((s) => s.category === "open");
-  open.sort((a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0));
-  return open[0] ?? null;
+/** The firm's new-enquiry stage (see `newEnquiryStage`): where a person with no evidence about their stage is filed. */
+export function newEnquiryPlanStage(stages: readonly PlanStage[]): PlanStage | null {
+  const hit = newEnquiryStage(stages.map((s) => ({ id: s.id, name: s.name, category: s.category ?? null, order_index: s.orderIndex ?? null })));
+  return hit ? (stages.find((s) => s.id === hit.id) ?? null) : null;
 }
 
 /** An existing crm_lead row, reduced to the fields matching needs. */
@@ -75,8 +77,8 @@ export type LeadWriteFields = {
 export type FieldChange = { field: keyof LeadWriteFields; from: string | null; to: string };
 
 /**
- * This person's Lawmatics stage is not one of the firm's stages (or is "Hired"), so they were filed in the
- * first open stage for a human to place. Recorded on the lead's timeline row as `lawmatics_stage_unmapped`.
+ * Lawmatics gave this person a stage (or "Hired"). It is kept as read-only text and the person was filed in the
+ * new-enquiry stage for a human to place. Recorded on the lead's timeline row as `lawmatics_stage_unmapped`.
  */
 export type StageDecision = {
   lawmaticsStage: string | null;
@@ -105,12 +107,11 @@ export type PlannedCreate = {
   fields: LeadWriteFields;
   stageId: string;
   stageName: string;
-  /** How the stage was resolved — "alias" means a documented equivalence. */
-  stageVia: "exact" | "alias";
+  /** The Lawmatics stage text, shown for reference only. It never chose `stageId`. */
   sourceStageName: string | null;
   createdAt: string | null;
   lastActivityAt: string | null;
-  /** Non-null when the stage above is the first open stage standing in for one the firm doesn't have. */
+  /** Non-null when Lawmatics named a stage (or "Hired"): the person is in the new-enquiry stage until someone places them. */
   stageDecision: StageDecision | null;
 };
 
@@ -131,16 +132,8 @@ export type PlannedUpdate = {
    * never written — the update-vs-report split the stage already had.
    */
   heldBackChanges: FieldChange[];
+  /** The Lawmatics stage text, for reference. An existing lead's stage is never changed by an import. */
   sourceStageName: string | null;
-  /** Resolved target stage, when the Lawmatics stage maps to one. */
-  targetStageId: string | null;
-  targetStageName: string | null;
-  /** Lawmatics and Lectual disagree about where this lead sits. */
-  stageDiverges: boolean;
-  /** Only true when the operator explicitly opted into stage moves. */
-  stageWillMove: boolean;
-  /** Set when the stage could not be resolved (informational on an update). */
-  stageNote: string | null;
 };
 
 export type UnmappedRecord = {
@@ -164,21 +157,14 @@ export type SkippedRecord = {
 
 export type PlanOptions = {
   /**
-   * Move already-imported leads to their Lawmatics stage. OFF by default: a
-   * re-run must not undo a stage change an attorney made inside Lectual. When
-   * off, divergences are reported so a human can decide.
-   */
-  moveExistingStages: boolean;
-  /**
    * Overwrite a lead field that already holds a DIFFERENT non-empty value in
-   * Lectual. OFF by default, for exactly the reason `moveExistingStages` is
-   * off: a re-run must not undo an edit a human made here.
+   * Lectual. OFF by default: a re-run must not undo an edit a human made here.
    *
-   * The stage was protected from the start; the other fields were not, so a
-   * re-import silently reverted every correction staff had typed into the
-   * dashboard — a fixed phone number, a corrected business name — back to
+   * A re-import once silently reverted every correction staff had typed into
+   * the dashboard — a fixed phone number, a corrected business name — back to
    * whatever Lawmatics still held. That is destroyed work, and it is invisible
-   * because the row still looks populated.
+   * because the row still looks populated. (A lead's stage is not in this list
+   * at all: an import never changes it.)
    *
    * Filling a BLANK is always allowed and is not affected by this flag: there
    * is no local edit to lose. Only a real disagreement is held back, and held-
@@ -199,20 +185,6 @@ export type PlanOptions = {
    * rather than disappearing — see the two reason strings in `planImport`.
    */
   practiceAreaFilter: string | null;
-};
-
-/**
- * Lawmatics and Lectual disagree about where a matched lead sits, and the
- * operator did NOT opt into stage moves. Reported, never acted on — the whole
- * point of the default is that an attorney's stage change here survives a
- * re-import.
- */
-export type StageDivergence = {
-  lawmaticsId: string;
-  leadId: string;
-  matterName: string | null;
-  sourceStageName: string | null;
-  targetStageName: string | null;
 };
 
 /**
@@ -240,8 +212,6 @@ export type ImportPlan = {
   updates: PlannedUpdate[];
   /** Matched, already current — nothing to write. */
   unchanged: Array<{ lawmaticsId: string; leadId: string; matterName: string | null; name?: string | null; business?: string | null; email?: string | null }>;
-  /** Informational: stage disagreements left alone. Not a write. */
-  divergences: StageDivergence[];
   /** Informational: field disagreements left alone. Not a write. */
   withheld: WithheldFields[];
   unmapped: UnmappedRecord[];
@@ -251,13 +221,12 @@ export type ImportPlan = {
     sourceRecords: number;
     /** Prospect creates plus contact creates. */
     create: number;
-    /** Of `create`: filed in the first open stage for a human to place. */
+    /** Of `create`: Lawmatics named a stage, so the person waits in the new-enquiry stage for a human to place. */
     stageDecision: number;
     /** Of `create`: Lawmatics contacts with no prospect. */
     contactOnly: number;
     update: number;
     unchanged: number;
-    divergent: number;
     /** Records with at least one field change held back. Not a write. */
     withheld: number;
     unmapped: number;
@@ -272,7 +241,6 @@ export type ImportPlan = {
 };
 
 export const DEFAULT_PLAN_OPTIONS: PlanOptions = {
-  moveExistingStages: false,
   overwriteEditedFields: false,
   practiceAreaFilter: null,
 };
@@ -326,8 +294,7 @@ export function planImport(
 ): ImportPlan {
   const creates: PlannedCreate[] = [];
   const contactCreates: PlannedContactCreate[] = [];
-  const openStage = firstOpenPlanStage(stages);
-  const categoryOf = new Map(stages.map((s) => [s.id, s.category]));
+  const openStage = newEnquiryPlanStage(stages);
   const updates: PlannedUpdate[] = [];
   const unchanged: ImportPlan["unchanged"] = [];
   const unmapped: UnmappedRecord[] = [];
@@ -427,7 +394,6 @@ export function planImport(
       referral_detail: rec.referralSource,
     };
 
-    const stageResult = resolveStage(rec.stageName, stages);
     const existingByfId = byLawmaticsId.get(rec.lawmaticsId);
 
     // ── Already linked → update ────────────────────────────────────────────
@@ -438,7 +404,7 @@ export function planImport(
       }
       claimedLeadIds.add(existingByfId.id);
       updates.push(
-        buildUpdate(existingByfId, rec, fields, stageResult, options, "lawmatics_id", false),
+        buildUpdate(existingByfId, rec, fields, options, "lawmatics_id", false),
       );
       continue;
     }
@@ -487,33 +453,28 @@ export function planImport(
         continue;
       }
       claimedLeadIds.add(emailMatch.id);
-      updates.push(buildUpdate(emailMatch, rec, fields, stageResult, options, "email", true));
+      updates.push(buildUpdate(emailMatch, rec, fields, options, "email", true));
       continue;
     }
 
     // ── Brand new → create ──────────────────────────────────────────────────
-    // A stage the firm has (and that does not open a matter) is used as it is. Anything else -- a Lawmatics
-    // stage with no match, "Hired", a stage that opens a matter -- is IMPORTED into the first open stage and
-    // flagged, never dropped and never put in a `won` stage.
+    // The Lawmatics stage never chooses the stage. Everybody lands in the firm's new-enquiry stage; when Lawmatics
+    // named a stage (or "Hired") that name rides along as read-only text and the person is flagged for a human, the
+    // Reconcile screen or the Stage Keeper to place. "Hired" is also flagged as one to open a matter for.
     const hired = rec.stageName !== null && isHiredStageName(rec.stageName);
-    const opensMatter = stageResult.ok && categoryOf.get(stageResult.stage.id) === "won";
-    let stageDecision: StageDecision | null = null;
-    let target: { id: string; name: string; via: "exact" | "alias" };
-    if (stageResult.ok && !hired && !opensMatter) {
-      target = { id: stageResult.stage.id, name: stageResult.stage.name, via: stageResult.via };
-    } else {
-      if (!openStage) {
-        const why = stageResult.ok ? `Lawmatics stage "${rec.stageName}" opens a matter here.` : stageResult.reason;
-        unmapped.push({ ...base, sourceStageName: rec.stageName, reason: `${why} This firm has no open stage to file them in, so a person has to decide.` });
-        continue;
-      }
-      stageDecision = {
-        lawmaticsStage: rec.stageName,
-        hired: hired || opensMatter,
-        label: hired || opensMatter ? HIRED_LABEL : stageDecisionLabel(rec.stageName),
-      };
-      target = { id: openStage.id, name: openStage.name, via: "exact" };
+    if (!openStage) {
+      unmapped.push({
+        ...base,
+        sourceStageName: rec.stageName,
+        reason: "This firm has no open stage to file them in, so a person has to decide.",
+      });
+      continue;
     }
+    const stageDecision: StageDecision | null =
+      hired || rec.stageName
+        ? { lawmaticsStage: rec.stageName, hired, label: hired ? HIRED_LABEL : stageDecisionLabel(rec.stageName) }
+        : null;
+    const target = { id: openStage.id, name: openStage.name };
     if (claimedEmails.has(rec.email)) {
       skipped.push({
         ...base,
@@ -529,7 +490,6 @@ export function planImport(
       fields,
       stageId: target.id,
       stageName: target.name,
-      stageVia: target.via,
       sourceStageName: rec.stageName,
       createdAt: rec.createdAt,
       lastActivityAt: rec.updatedAt,
@@ -607,7 +567,6 @@ export function planImport(
   // operator didn't opt into is reported separately rather than being turned
   // into one — so a re-run of unchanged data really does write nothing.
   const realUpdates: PlannedUpdate[] = [];
-  const divergences: StageDivergence[] = [];
   const withheld: WithheldFields[] = [];
   for (const update of updates) {
     if (update.heldBackChanges.length > 0) {
@@ -618,16 +577,7 @@ export function planImport(
         changes: update.heldBackChanges,
       });
     }
-    if (update.stageDiverges && !update.stageWillMove) {
-      divergences.push({
-        lawmaticsId: update.lawmaticsId,
-        leadId: update.leadId,
-        matterName: update.matterName,
-        sourceStageName: update.sourceStageName,
-        targetStageName: update.targetStageName,
-      });
-    }
-    if (update.changes.length === 0 && !update.stageWillMove && !update.linksRecord) {
+    if (update.changes.length === 0 && !update.linksRecord) {
       unchanged.push({
         lawmaticsId: update.lawmaticsId,
         leadId: update.leadId,
@@ -647,7 +597,6 @@ export function planImport(
     contactCreates,
     updates: realUpdates,
     unchanged,
-    divergences,
     withheld,
     unmapped,
     skipped,
@@ -658,7 +607,6 @@ export function planImport(
       contactOnly: contactCreates.length,
       update: realUpdates.length,
       unchanged: unchanged.length,
-      divergent: divergences.length,
       withheld: withheld.length,
       unmapped: unmapped.length,
       skipped: skipped.length,
@@ -672,7 +620,6 @@ function buildUpdate(
   lead: ExistingLead,
   rec: LawmaticsSourceRecord,
   fields: LeadWriteFields,
-  stageResult: ReturnType<typeof resolveStage>,
   options: PlanOptions,
   matchedBy: "lawmatics_id" | "email",
   linksRecord: boolean,
@@ -700,10 +647,6 @@ function buildUpdate(
     else changes.push(change);
   }
 
-  const targetStageId = stageResult.ok ? stageResult.stage.id : null;
-  const targetStageName = stageResult.ok ? stageResult.stage.name : null;
-  const stageDiverges = targetStageId !== null && targetStageId !== lead.current_stage_id;
-
   return {
     lawmaticsId: rec.lawmaticsId,
     leadId: lead.id,
@@ -716,11 +659,6 @@ function buildUpdate(
     changes,
     heldBackChanges,
     sourceStageName: rec.stageName,
-    targetStageId,
-    targetStageName,
-    stageDiverges,
-    stageWillMove: stageDiverges && options.moveExistingStages,
-    stageNote: stageResult.ok ? null : stageResult.reason,
   };
 }
 
@@ -732,7 +670,6 @@ function buildUpdate(
  */
 export function fingerprintPlan(plan: Omit<ImportPlan, "fingerprint">): string {
   const lines: string[] = [
-    `opts:moveExistingStages=${plan.options.moveExistingStages}`,
     `opts:overwriteEditedFields=${plan.options.overwriteEditedFields}`,
     `opts:practiceAreaFilter=${plan.options.practiceAreaFilter ?? ""}`,
   ];
@@ -749,11 +686,8 @@ export function fingerprintPlan(plan: Omit<ImportPlan, "fingerprint">): string {
       // heldBackChanges is part of what the operator is SHOWN, so it belongs in
       // the hash: flipping overwriteEditedFields moves a change between the two
       // buckets and must invalidate a previously-approved plan.
-      `update|${u.lawmaticsId}|${u.leadId}|${u.linksRecord}|${u.stageWillMove ? u.targetStageId : ""}|${JSON.stringify(u.changes)}|held:${JSON.stringify(u.heldBackChanges)}`,
+      `update|${u.lawmaticsId}|${u.leadId}|${u.linksRecord}|${JSON.stringify(u.changes)}|held:${JSON.stringify(u.heldBackChanges)}`,
     );
-  }
-  for (const d of plan.divergences) {
-    lines.push(`diverge|${d.lawmaticsId}|${d.sourceStageName ?? ""}|${d.targetStageName ?? ""}`);
   }
   for (const w of plan.withheld) {
     lines.push(`withheld|${w.lawmaticsId}|${JSON.stringify(w.changes)}`);

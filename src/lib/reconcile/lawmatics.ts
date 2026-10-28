@@ -1,16 +1,18 @@
-import { isHiredStageName, resolveStage } from "@/lib/lawmatics/stage-map";
+import { isHiredStageName } from "@/lib/lawmatics/stage-map";
 import type { LawmaticsSourceRecord } from "@/lib/lawmatics/normalize";
 import { isPlaceholderEmail } from "@/lib/intake/email-match";
-import type { SourceSignal, StageOpt } from "./types";
+import type { SourceSignal } from "./types";
 
 /**
  * What the firm's Lawmatics says about a lead's stage (read-only; see sources.ts).
  *
  * A lead finds its Lawmatics record by the Lawmatics id stored on it, else by ONE unambiguous email.
- * Two records sharing an email, or a placeholder address, never match. "Hired" and "Hired Client" are
- * the two names `stage-map.ts` deliberately leaves unmapped; here they mean the person is a client,
- * which is a `needs_matter` signal and never a stage. Any other name that does not map is shown as
- * unmapped and does not vote: "Discovery Call No Show" is not a client.
+ * Two records sharing an email, or a placeholder address, never match.
+ *
+ * A Lawmatics stage NAME never chooses a Lectual stage (Taylor, Oct 27: Lawmatics' stages are not RPB's
+ * workflow). It is shown as read-only text ("unmapped": cited on the row, never a vote), and the lead is
+ * placed from the sheet, the notes, the mail and the Stage Keeper. The one thing a name still says is
+ * "Hired" / "Hired Client": the person is a client, a `needs_matter` pointer to open a matter, never a stage.
  */
 
 export type LawmaticsIndex = {
@@ -60,14 +62,11 @@ export function matchLawmatics(
 export function lawmaticsSignalFor(
   lead: { lawmaticsId: string | null; email: string | null },
   index: LawmaticsIndex,
-  stages: readonly StageOpt[],
 ): SourceSignal {
   const match = matchLawmatics(lead, index);
   if (match.kind === "none") return { kind: "none", note: match.note };
   const name = match.record.stageName?.trim();
   if (!name) return { kind: "none", note: "the Lawmatics record has no stage" };
   if (isHiredStage(name)) return { kind: "needs_matter", wording: name };
-  const resolved = resolveStage(name, stages);
-  if (!resolved.ok) return { kind: "unmapped", wording: name };
-  return { kind: "stage", stageId: resolved.stage.id, stageName: resolved.stage.name, wording: name, date: null };
+  return { kind: "unmapped", wording: name };
 }

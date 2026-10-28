@@ -1,3 +1,4 @@
+import { roleLabel } from "@/lib/auth/roles";
 import type { ReactNode } from "react";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { loadConsultEntries, type ConsultDb, type ConsultEntry } from "@/lib/consult/store";
@@ -140,7 +141,7 @@ export async function ConsultDetailsSection({ leadId, canWrite }: { leadId: stri
           {entry.read.kind === "ok" && entry.read.details.review && (
             <span className="lx-note">
               Reviewed by {entry.read.details.review.reviewed_by_name ?? "a teammate"}
-              {entry.read.details.review.reviewed_by_role ? ` (${entry.read.details.review.reviewed_by_role.replaceAll("_", " ")})` : ""} ·{" "}
+              {entry.read.details.review.reviewed_by_role ? ` (${roleLabel(entry.read.details.review.reviewed_by_role)})` : ""} ·{" "}
               {relativeTime(entry.read.details.review.reviewed_at)}
             </span>
           )}

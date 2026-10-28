@@ -63,7 +63,7 @@ describe("F1 each signal maps to its stage", () => {
   });
 
   it("signalIdFor and signalKeyFor", () => {
-    expect(SIGNAL_IDS).toHaveLength(6);
+    expect(SIGNAL_IDS).toHaveLength(7);
     expect(signalIdFor(mail("loe-invoice"))).toBe("loe-invoice-sent");
     expect(signalIdFor(mail("loe-invoice", { direction: "inbound" }))).toBeNull();
     expect(signalKeyFor("lead-1", mail("loe-invoice", { messageId: "abc" }))).toBe("lead-1:mail:abc");

@@ -148,7 +148,8 @@ export type DetailsPatch = {
   clientEmail: string | null;
   title: string;
   expiresOn: string | null;
-  payUrl: string | null;
+  /** Left out when the form did not carry the field (the pay link is on the Package step), so saving the client never clears it. */
+  payUrl?: string | null;
   content: ProposalContent;
 };
 
@@ -166,7 +167,7 @@ export function parseDetails(form: FormData, current: ProposalContent): Parsed<D
     clientEmail: text(form, "clientEmail") || null,
     title,
     expiresOn: expires.value,
-    payUrl: text(form, "payUrl") || null,
+    ...(form.has("payUrl") ? { payUrl: text(form, "payUrl") || null } : {}),
     content: {
       ...current,
       client: { first_name: text(form, "firstName"), full_name: fullName, ...(company ? { company } : {}) },
@@ -186,7 +187,7 @@ export function parseMessage(form: FormData, current: ProposalContent): Parsed<P
   return ok(next);
 }
 
-/** Package name and the six prices. */
+/** Package name and the six prices, plus the custom-package switch (a checkbox: absent is off). */
 export function parsePricing(form: FormData): Parsed<ProposalPricing> {
   const base = parseMoney(text(form, "base"), "Base price");
   if (!base.ok) return base;
@@ -207,6 +208,7 @@ export function parsePricing(form: FormData): Parsed<ProposalPricing> {
     per_class_cents: perClass.value,
     second_mark_discount_pct: pct.value,
     gov_per_class_cents: gov.value,
+    ...(form.get("reduceUnderIncluded") === "on" ? { reduce_under_included: true } : {}),
   });
 }
 
@@ -249,6 +251,9 @@ export function parseName(form: FormData, existing: ProposalContent, rand: () =>
     label: row.label,
     preselected: row.preselected === "on",
   }));
+
+  // Every package includes one class: a brand whose mark starts ticked keeps its first class ticked.
+  if (classes.length > 0 && marks.some((m) => m.preselected) && !classes.some((c) => c.preselected)) classes[0].preselected = true;
 
   const what = optionalText(form, "what");
   const note = optionalText(form, "note");

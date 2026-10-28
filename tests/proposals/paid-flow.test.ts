@@ -262,7 +262,7 @@ describe("the LOE draft step: blocked and failed, never silent", () => {
   it("no queue configured: the DocumentFlowError sentence is shown as it is", async () => {
     const t = await setupFlow({ generate: "flow-error" });
     await t.flow.markProposalPaid(PROPOSAL_ID);
-    expect(draftLine(t)).toMatchObject({ outcome: "blocked", reason: expect.stringContaining("Approvals aren't enabled for this firm yet") });
+    expect(draftLine(t)).toMatchObject({ outcome: "blocked", reason: expect.stringContaining("Approvals aren't switched on for your firm yet") });
   });
 
   it("any other error shows a fixed sentence, never the raw text", async () => {

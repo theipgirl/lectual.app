@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { isReportKey, REPORTS, type ReportKey } from "@/lib/nav";
+import { isReportKey, reportListHref, reportListLabel, REPORTS, type ReportKey } from "@/lib/nav";
+import { SectionTabs } from "@/components/shell/SectionTabs";
 import { orgHasModule } from "@/lib/org/modules";
 import { REPORT_RANGES, parseReportRange, reportPeriod } from "@/lib/reports/period";
 import { loadCommunicationReport } from "@/lib/reports/communication";
@@ -44,7 +45,7 @@ const REPORT_COPY: Record<ReportKey, { sub: string; waitingTitle: string; waitin
     waitingEmpty: "Nothing is waiting on the firm right now.",
   },
   ipos: {
-    sub: "What the firm's agents ran, what they drafted, and what needs a look.",
+    sub: "What the firm's assistants ran, what they drafted, and what needs a look.",
     waitingTitle: "Needs attention",
     waitingEmpty: "Nothing needs your attention right now.",
   },
@@ -129,6 +130,8 @@ export default async function ReportPage({
           {data.banner}
         </p>
       )}
+
+      <SectionTabs active="summary" listLabel={reportListLabel(key, { hasMailbox })} listHref={reportListHref(key, { hasMailbox })} summaryHref={base} />
 
       <div className="lx-kpis">
         {data.kpis.map((m) => (

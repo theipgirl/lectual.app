@@ -6,8 +6,9 @@ import { markNearDuplicates } from "@/lib/queue/hygiene";
 import { STATUS_PILL, agentLabel, fmtWhen, parseQueueStatus, preview, typeLabel, type QueueStatus } from "@/components/queue/format";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { APPROVALS_NAME } from "@/lib/ui/words";
 
-export const metadata: Metadata = { title: pageTitle("Queue") };
+export const metadata: Metadata = { title: pageTitle(APPROVALS_NAME) };
 
 const TABS: { status: QueueStatus; label: string }[] = [
   { status: "pending", label: "Waiting on you" },
@@ -16,7 +17,7 @@ const TABS: { status: QueueStatus; label: string }[] = [
 ];
 
 const EMPTY: Record<QueueStatus, { title: string; body: string }> = {
-  pending: { title: "All caught up", body: "Nothing is waiting for review. New drafts from the agents land here." },
+  pending: { title: "All caught up", body: "Nothing is waiting for review. New drafts from the assistants land here." },
   approved: { title: "Nothing approved yet", body: "Approved drafts show up here once something has been reviewed." },
   rejected: { title: "Nothing rejected", body: "Rejected drafts and their notes show up here." },
 };
@@ -37,14 +38,13 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
     <>
       <div className="lx-page-head">
         <div style={{ flex: 1, minWidth: 260 }}>
-          <div className="lx-label">Review</div>
-          <h1 className="lx-h1" data-tour="queue-head">Approval queue</h1>
+          <h1 className="lx-h1" data-tour="queue-head">{APPROVALS_NAME}</h1>
           <p className="lx-sub">
-            Everything an agent drafted for a client, newest first. Approving puts the message in a mail client for a
+            Everything an assistant drafted for a client, newest first. Approving puts the message in a mail client for a
             person to send — nothing reaches a client on its own.
           </p>
         </div>
-        <nav aria-label="Queue status" className="lx-segs">
+        <nav aria-label="Approval status" className="lx-segs">
           {TABS.map((t) => (
             <Link key={t.status} href={`/dashboard/queue/?status=${t.status}`} aria-current={t.status === status ? "page" : undefined}>
               {t.label}
@@ -66,7 +66,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
         </div>
       ) : (
         <div className="lx-card" style={{ overflow: "auto" }}>
-          <table className="lx-tbl">
+          <table className="lx-tbl lx-stack">
             <thead>
               <tr>
                 <th>Draft</th>
@@ -92,12 +92,12 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
                       {typeLabel(item.type)} · {preview(item, 90)}
                     </div>
                   </td>
-                  <td>{item.client_name ?? "—"}</td>
-                  <td>{agentLabel(item.agent)}</td>
-                  <td>
+                  <td data-label="Client">{item.client_name ?? "—"}</td>
+                  <td data-label="From">{agentLabel(item.agent)}</td>
+                  <td data-label="Status">
                     <span className={`lx-pill ${STATUS_PILL[item.status].tone}`}>{STATUS_PILL[item.status].label}</span>
                   </td>
-                  <td className="lx-num">{fmtWhen(item.created_at, tz)}</td>
+                  <td className="lx-num" data-label="Queued">{fmtWhen(item.created_at, tz)}</td>
                 </tr>
               ))}
             </tbody>

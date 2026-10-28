@@ -135,12 +135,12 @@ export function AnswersCard({ read, tz = FIRM_TIME_ZONE }: { read: AnswersRead; 
       </div>
       {failed.length > 0 && (
         <div className="lx-banner lx-banner-warn" role="alert">
-          {`Couldn't load answers: ${failed.map((s) => s.name).join(", ")}. This is a problem reaching the database, not an empty result. Try again shortly.`}
+          {`Couldn't load answers: ${failed.map((s) => s.name).join(", ")}. Refresh to try again.`}
         </div>
       )}
       {missing.map((s) => (
         <p key={s.key} className="lx-note" style={{ margin: 0 }}>
-          {`${s.name} aren't set up in this environment.`}
+          {`${s.name} aren't switched on for your firm yet. Lectual will turn them on.`}
         </p>
       ))}
       {allEmpty && (

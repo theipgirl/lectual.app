@@ -2,6 +2,8 @@ import { getScopedClient } from "@/lib/db/scoped-client";
 import type { Database } from "@/lib/db/types";
 import { ROLES, type Role } from "@/lib/auth/roles";
 import type { Condition, AutomationAction } from "./engine";
+import { ReadableError } from "@/lib/ui/readable-error";
+
 
 export type AutomationRule = Database["public"]["Tables"]["crm_automation_rule"]["Row"];
 type AutomationTrigger = Database["public"]["Enums"]["crm_automation_trigger"];
@@ -50,7 +52,7 @@ export async function requireAutomationAdminRole(supabase: ScopedClient): Promis
   const { data, error } = await supabase.rpc("current_org_role");
   if (error) throw error;
   if (!isRole(data) || !AUTOMATION_ADMIN_ROLES.includes(data)) {
-    throw new Error("You don't have permission to manage automation.");
+    throw new ReadableError("You don't have permission to manage automation.");
   }
   return data;
 }
@@ -64,7 +66,7 @@ export async function requireAutomationStaffRole(supabase: ScopedClient): Promis
   const { data, error } = await supabase.rpc("current_org_role");
   if (error) throw error;
   if (!isRole(data) || !AUTOMATION_STAFF_ROLES.includes(data)) {
-    throw new Error("You don't have permission to do this.");
+    throw new ReadableError("You don't have permission to do this.");
   }
   return data;
 }
@@ -73,7 +75,7 @@ export async function requireAutomationStaffRole(supabase: ScopedClient): Promis
 export async function currentOrgId(supabase: ScopedClient): Promise<string> {
   const { data, error } = await supabase.rpc("current_org_id");
   if (error) throw error;
-  if (!data) throw new Error("No active organization for the current session.");
+  if (!data) throw new ReadableError("No active organization for the current session.");
   return data;
 }
 

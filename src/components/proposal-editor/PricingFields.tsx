@@ -26,7 +26,7 @@ export function PricingFields({ values }: { values: PricingValues }) {
         <input className="lx-input" name="includedClasses" inputMode="numeric" required defaultValue={values.includedClasses} />
       </label>
       <label className="lx-field">
-        <span className="lx-label">Per class over / under ($)</span>
+        <span className="lx-label">Price per extra class ($)</span>
         <input className="lx-input" name="perClass" inputMode="decimal" required defaultValue={values.perClass} />
       </label>
       <label className="lx-field">

@@ -4,8 +4,10 @@
  * hides the first, and the person is told nothing that tells them apart.
  * The wording passes through friendlyMatterError unchanged.
  */
+import { ReadableError } from "@/lib/ui/readable-error";
+
 export type MatterRecordKind = "matter" | "contact" | "deadline" | "task";
 
 export function recordNotFoundError(kind: MatterRecordKind): Error {
-  return new Error(`That ${kind} couldn't be found. It may have been removed.`);
+  return new ReadableError(`That ${kind} couldn't be found. It may have been removed.`);
 }

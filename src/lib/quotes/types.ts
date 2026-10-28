@@ -35,6 +35,8 @@ import type { QuoteChargeAt, QuoteLineKind, QuoteLineSelection } from "./pricing
 export type { QuoteChargeAt, QuoteLineKind, QuoteLineSelection } from "./pricing";
 export type { QuoteStatus } from "./status";
 import type { QuoteStatus } from "./status";
+import { ReadableError } from "@/lib/ui/readable-error";
+
 
 /* ─────────────────────────── role gates ──────────────────────────────────
  * Mirror the RLS policy role lists in 0068, verbatim. RLS is the real
@@ -195,7 +197,7 @@ export type QuoteEventRow = {
  * message to explain to a caller what went wrong.
  */
 
-export class QuoteLineConstraintError extends Error {
+export class QuoteLineConstraintError extends ReadableError {
   constructor(message: string) {
     super(message);
     this.name = "QuoteLineConstraintError";
@@ -270,16 +272,16 @@ export function assertIncludedIsSelected(selection: string, selected: boolean): 
 export function assertIdsMatchSet(existingIds: readonly string[], requestedIds: readonly string[]): void {
   const requestedSet = new Set(requestedIds);
   if (requestedSet.size !== requestedIds.length) {
-    throw new Error("A line id was listed more than once in the new order.");
+    throw new ReadableError("A line id was listed more than once in the new order.");
   }
   const existingSet = new Set(existingIds);
   for (const id of requestedIds) {
     if (!existingSet.has(id)) {
-      throw new Error(`Line ${id} does not belong to this quote.`);
+      throw new ReadableError(`Line ${id} does not belong to this quote.`);
     }
   }
   if (existingSet.size !== requestedSet.size) {
-    throw new Error("The new order is missing one or more of this quote's existing lines.");
+    throw new ReadableError("The new order is missing one or more of this quote's existing lines.");
   }
 }
 

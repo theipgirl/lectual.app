@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { DOC_FILTERS, DOC_KIND, DOC_TYPE_LABEL, docStatus, isDocFilter, type DocFilter } from "@/lib/documents/list";
 import { relativeTime } from "@/lib/relative-time";
@@ -6,6 +7,8 @@ import { orgHasModule } from "@/lib/org/modules";
 import type { Metadata } from "next";
 import { matterDisplayTitle } from "@/lib/matters/display-title";
 import { pageTitle } from "@/lib/ui/page-title";
+import { DOCUMENT_LIST_LIMIT, failureReason, listCutNotice } from "@/lib/documents/failure-reason";
+import { RetryButton } from "@/components/documents/RetryButton";
 
 export const metadata: Metadata = { title: pageTitle("Documents") };
 
@@ -23,14 +26,16 @@ type Row = { id: string; matter_id: string; doc_type: string; status: string; fi
 export default async function DocumentsPage({ searchParams }: { searchParams: Promise<{ f?: string }> }) {
   const { f } = await searchParams;
   const filter: DocFilter = isDocFilter(f) ? f : "all";
+  // The letter templates carry one firm's letterhead and voice, so the whole area is a module: a firm
+  // without Document Center (or whose module list can't be read) gets the same not-found as any unknown page.
+  if (!(await orgHasModule("document-center").catch(() => false))) notFound();
   const supabase = await getScopedClient();
-  const canGenerate = await orgHasModule("document-center");
 
   const { data, error } = await supabase
     .from("crm_document_draft")
     .select("id, matter_id, doc_type, status, file_name, queue_item_id, error_message, created_at, updated_at")
     .order("created_at", { ascending: false })
-    .limit(300);
+    .limit(DOCUMENT_LIST_LIMIT);
   const all = (data ?? []) as Row[];
   const matterIds = [...new Set(all.map((d) => d.matter_id))];
   const { data: matters } = matterIds.length
@@ -50,11 +55,9 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
             Every letter drafted for a matter, on the matter it belongs to. Nothing leaves the firm until an attorney approves it in the queue.
           </p>
         </div>
-        {canGenerate && (
-          <Link href="/dashboard/documents/new/" className="lx-btn lx-btn-pri">
-            New letter
-          </Link>
-        )}
+        <Link href="/dashboard/documents/new/" className="lx-btn lx-btn-pri">
+          New letter
+        </Link>
       </div>
 
       <nav aria-label="Filter documents" className="lx-chips">
@@ -66,10 +69,16 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
         ))}
       </nav>
 
+      {!error && listCutNotice(all.length) && (
+        <p className="lx-banner lx-banner-warn" role="status" style={{ margin: 0 }}>
+          {listCutNotice(all.length)}
+        </p>
+      )}
+
       {error ? (
         <div className="lx-card lx-empty-card">
           <h2 className="lx-h2" style={{ fontSize: 25 }}>Documents couldn&apos;t be loaded</h2>
-          <p className="lx-note" style={{ margin: 0 }}>This is a problem reaching the database, not an empty list. Try again shortly.</p>
+          <p className="lx-note" style={{ margin: 0 }}>Can&apos;t show this right now. Refresh to try again.</p>
         </div>
       ) : rows.length === 0 ? (
         <div className="lx-card lx-empty-card">
@@ -80,7 +89,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
         </div>
       ) : (
         <div className="lx-card" style={{ overflow: "auto" }}>
-          <table className="lx-tbl" style={{ minWidth: 720 }}>
+          <table className="lx-tbl lx-stack">
             <thead>
               <tr>
                 <th>Document</th>
@@ -105,7 +114,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
                         </div>
                       </div>
                     </td>
-                    <td>
+                    <td data-label="Matter">
                       {m ? (
                         <Link href={`/dashboard/matters/${m.id}/`}>{matterDisplayTitle(m).title}</Link>
                       ) : (
@@ -113,16 +122,18 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
                       )}
                       {m && <div className="lx-note lx-num">{m.matter_number}{m.owner_name ? ` · ${m.owner_name}` : ""}</div>}
                     </td>
-                    <td>
+                    <td data-label="Status">
                       <span className={`lx-pill ${st.tone}`}>{st.label}</span>
+                      {d.status === "failed" && <div className="lx-note" style={{ marginTop: 4 }}>{failureReason(d.error_message)}</div>}
                     </td>
-                    <td className="lx-num">{relativeTime(d.updated_at)}</td>
-                    <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                    <td className="lx-num" data-label="Updated">{relativeTime(d.updated_at)}</td>
+                    <td className="lx-stack-actions" data-label="Actions" style={{ textAlign: "right", whiteSpace: "nowrap" }}>
                       {d.status === "queued" && d.queue_item_id && (
                         <Link href={`/dashboard/queue/${d.queue_item_id}/`} className="lx-btn lx-btn-sec lx-btn-sm">
                           Review
                         </Link>
                       )}
+                      {d.status === "failed" && d.queue_item_id && <RetryButton draftId={d.id} />}
                       {d.status === "generated" && (
                         <a href={`/dashboard/documents/${d.id}/download/`} className="lx-btn lx-btn-sec lx-btn-sm">
                           Download
