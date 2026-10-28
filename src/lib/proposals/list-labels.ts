@@ -132,6 +132,7 @@ const EVENT_VERB: Record<string, string> = {
   withdrawn: "Withdrawn",
   superseded: "Replaced",
   viewed: "Opened by the client",
+  reset: "Acceptance reset",
 };
 
 /**

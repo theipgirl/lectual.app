@@ -79,6 +79,8 @@ export const PROPOSAL_EVENT_TYPES = [
   "withdrawn",
   "superseded",
   "revised",
+  /** lectual 0101: staff moved an accepted version back to "Link live". Written by the trigger only. */
+  "reset",
 ] as const;
 export type ProposalEventType = (typeof PROPOSAL_EVENT_TYPES)[number];
 

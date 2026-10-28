@@ -6,7 +6,7 @@ import { downloadStoredDocument, getDocumentDraftByQueueItemId } from "@/lib/doc
 import type { DocumentDraftRow } from "@/lib/documents/types";
 import { uploadMatterFile } from "@/lib/lawmatics/writes";
 import { lawmaticsMatterAccess, resolveProposalMatter, signedInLawmaticsToken } from "./lawmatics-access";
-import { stepPayload } from "./paid";
+import { currentRound, stepPayload } from "./paid";
 import { STEP_TEXT } from "./step-text";
 import { getProposalRow, listProposalStepEvents, recordProposalStep } from "./store";
 import type { ProposalRow } from "./types";
@@ -69,7 +69,8 @@ export async function retryLoeFileUpload(proposal: ProposalRow): Promise<LoeUplo
   try {
     const events = await listProposalStepEvents(proposal.id);
     if (!events.ok) return fail(STEP_TEXT.draftsUnreadable);
-    const queued = events.events
+    // lectual 0101: only a letter queued in the current round (after the newest reset).
+    const queued = currentRound(events.events, proposal.id)
       .map((e) => (e.payload && typeof e.payload === "object" ? (e.payload as Record<string, unknown>) : {}))
       .find((p) => p.step === "loe_draft" && p.outcome === "queued" && typeof p.queue_item_id === "string");
     if (!queued) return fail(STEP_TEXT.noDraftToRetry);
