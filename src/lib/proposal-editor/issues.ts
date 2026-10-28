@@ -29,7 +29,8 @@ export function groupIssues(issues: readonly ValidationIssue[]): IssueGroups {
     if (nameIndex) {
       const i = Number(nameIndex[1]);
       g.names.set(i, [...(g.names.get(i) ?? []), issue]);
-    } else if (/^(title|client_email|expires_on|pay_url|client)(\.|$)/.test(p)) g.details.push(issue);
+    } else if (/^(title|client_email|pay_url|client)(\.|$)/.test(p)) g.details.push(issue);
+    else if (/^expires_on$/.test(p)) g.pricing.push(issue);
     else if (/^(greeting|recommendation|office_action_note)$/.test(p)) g.message.push(issue);
     else if (/^pricing(\.|$)/.test(p)) g.pricing.push(issue);
     else if (/^adjustments(\[|$)/.test(p)) g.adjustments.push(issue);

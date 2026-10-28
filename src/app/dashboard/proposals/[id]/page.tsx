@@ -4,6 +4,7 @@ import { resolveFirmSession } from "@/lib/firm/session";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { listMemberDirectory, type MemberIdentity } from "@/lib/members/directory";
 import { clientLinkOrigin, clientLinkUrl } from "@/lib/proposals/client-link-origin";
+import { firmCivilDate } from "@/lib/quotes/firm-time";
 import { formatCents } from "@/lib/quotes/money";
 import { formatFirmStamp, formatShortFirmDate } from "@/lib/quotes/labels";
 import { ProposalError } from "@/lib/proposals/errors";
@@ -258,7 +259,6 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
     company: content.client?.company ?? "",
     clientEmail: proposal.client_email ?? "",
     title: proposal.title,
-    expiresOn: proposal.expires_on ?? "",
   };
 
   return (
@@ -345,7 +345,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
                   <AddNameForm proposalId={proposal.id} updatedAt={proposal.updated_at} editable={editable} />
                 </>
               }
-              packageStep={<PricingForm {...common} issues={shown(groups.pricing)} values={pricingValues} payUrl={proposal.pay_url ?? ""} />}
+              packageStep={<PricingForm {...common} issues={shown(groups.pricing)} values={pricingValues} payUrl={proposal.pay_url ?? ""} expiresOn={proposal.expires_on ?? ""} today={firmCivilDate(new Date(), tz)} />}
               create={
                 <Lifecycle
                   proposalId={proposal.id}

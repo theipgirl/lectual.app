@@ -20,7 +20,7 @@ export function countChangedFields(fields: ReadonlyArray<{ current: string; base
 
 /** The validation paths whose fields live inside More options. */
 const MORE_PATH =
-  /^(pricing\.(base_cents|included_classes|per_class_cents|second_mark_discount_pct|gov_per_class_cents|reduce_under_included)|greeting|recommendation|office_action_note|adjustments(\[|$|\.)|includes(\[|$|\.)|title|expires_on|client\.(first_name|company)|names\[\d+\]\.(what|note|price_override|marks\[\d+\]\.desc))/;
+  /^(pricing\.(base_cents|included_classes|per_class_cents|second_mark_discount_pct|gov_per_class_cents|reduce_under_included)|greeting|recommendation|office_action_note|adjustments(\[|$|\.)|includes(\[|$|\.)|title|client\.(first_name|company)|names\[\d+\]\.(what|note|price_override|marks\[\d+\]\.desc))/;
 
 export function pathInMoreOptions(path: string): boolean {
   return MORE_PATH.test(path);
@@ -43,7 +43,6 @@ const MORE_LABELS = [
   "second-mark discount",
   "second mark discount",
   "uspto fee",
-  "expiry date",
   "title",
   "this brand",
 ];

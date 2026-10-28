@@ -20,6 +20,7 @@ import { GOES_LIVE_ON_APPROVAL, pendingProposalEmail, proposalSendBlock } from "
 import {
   newBrandName,
   parseAdjustments,
+  parseDateInput,
   parseDetails,
   parseIncludes,
   parseMessage,
@@ -146,7 +147,14 @@ export async function savePricingAction(_prev: ActionState, formData: FormData):
     if (!r.ok) return r;
     // The pay link rides on this form (Step 3); a form that did not carry it leaves the stored one alone.
     const payUrl = formData.has("payUrl") ? { payUrl: field(formData, "payUrl") || null } : {};
-    return { ok: true, value: { content: { ...current.content, pricing: r.value }, ...payUrl } };
+    // So does the expiry date; a form that did not carry it leaves the stored one alone.
+    let expiresOn: { expiresOn: string | null } | Record<string, never> = {};
+    if (formData.has("expiresOn")) {
+      const e = parseDateInput(field(formData, "expiresOn"), "Expiry date");
+      if (!e.ok) return e;
+      expiresOn = { expiresOn: e.value };
+    }
+    return { ok: true, value: { content: { ...current.content, pricing: r.value }, ...payUrl, ...expiresOn } };
   });
 }
 
