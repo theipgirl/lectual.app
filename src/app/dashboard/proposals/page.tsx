@@ -12,7 +12,6 @@ import { buildProposalRowView, sortForSegment, type ProposalRowView } from "@/li
 import type { ActivityEvent } from "@/lib/proposals/list-labels";
 import {
   PROPOSAL_SEGMENTS,
-  SEGMENT_LABEL,
   inSegment,
   outWithClientsCents,
   parseSegment,
