@@ -4,6 +4,8 @@ import { after } from "next/server";
 import { getAdminClient } from "@/lib/db/admin";
 import { resolveTimeZone } from "@/lib/org/profile-rules";
 import { runAcceptanceFollowups, type FollowupDb } from "./accept-followups";
+import { firmDisplayName } from "./commitment";
+import { contactLine, firmContactFromSignoff } from "./firm-contact";
 import { isProposalExpired } from "./expiry";
 import { ADDED_CLASS_REFUSAL, parseAddedClasses, quoteWithAddedClasses } from "./added-classes";
 import { normalizeSelection, quoteHasItems } from "./pricing";
@@ -134,8 +136,12 @@ export const PUBLIC_ORG_COLUMNS = ["name", "slug", "modules"] as const;
 /** The `crm_org.modules` entry that switches client proposals on for a firm. */
 export const PROPOSALS_MODULE = "proposals";
 
-/** From the firm's profile: only the clock its dates are shown on. */
-export const PUBLIC_PROFILE_COLUMNS = ["time_zone"] as const;
+/**
+ * From the firm's profile: the clock its dates are shown on, its display name, and the email
+ * sign-off, read ONLY to derive a contact line (first email address and phone number in it).
+ * The raw sign-off never reaches `PublicProposalFirm` or the view.
+ */
+export const PUBLIC_PROFILE_COLUMNS = ["time_zone", "display_name", "email_signature"] as const;
 
 const PROPOSAL_SELECT = PUBLIC_PROPOSAL_COLUMNS.join(", ");
 const ORG_SELECT = PUBLIC_ORG_COLUMNS.join(", ");
@@ -152,6 +158,10 @@ export type PublicProposalFirm = {
   slug: string;
   /** The firm's own zone (Settings -> Firm profile): every date on the page is shown in it. */
   timeZone: string;
+  /** The profile's display name, else the firm's name: what the commitment sentence calls the firm. */
+  displayName: string;
+  /** "(305) 555-0100 · info@firm.com" from the profile's sign-off, or null (the page omits the line). */
+  contactLine: string | null;
 };
 
 /**
@@ -358,12 +368,13 @@ export async function readPublicProposal(
     const firmName = readString(org?.name);
     // A proposal with no firm behind it cannot be presented honestly.
     if (!firmName) return { status: "unavailable" };
+    const profile = profileResult.error || !isObject(profileResult.data) ? null : profileResult.data;
     const firm: PublicProposalFirm = {
       name: firmName,
       slug: readString(org?.slug) ?? "",
-      timeZone: resolveTimeZone(
-        profileResult.error || !isObject(profileResult.data) ? null : readString(profileResult.data.time_zone),
-      ),
+      timeZone: resolveTimeZone(profile ? readString(profile.time_zone) : null),
+      displayName: firmDisplayName(profile ? readString(profile.display_name) : null, firmName),
+      contactLine: contactLine(firmContactFromSignoff(profile ? readString(profile.email_signature) : null)),
     };
 
     // FAIL CLOSED when the firm's proposals module is off (or its module list

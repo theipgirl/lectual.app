@@ -20,6 +20,8 @@ import {
   type ProposalQuote,
   type Selection,
 } from "@/lib/proposals/types";
+import { commitmentSentence } from "@/lib/proposals/commitment";
+import { usptoLine } from "@/lib/proposals/uspto-line";
 import { markDisplayPrices } from "./display";
 import { RPB_FONT_VARS } from "./fonts";
 import {
@@ -57,7 +59,14 @@ export type ProposalDocumentProps = {
   clientName: string;
   /** Civil date, "YYYY-MM-DD". */
   expiresOn: string | null;
-  firm: { name: string; slug: string };
+  firm: {
+    name: string;
+    slug: string;
+    /** What the commitment sentence calls the firm (the profile's display name). Defaults to `name`. */
+    displayName?: string;
+    /** From the firm's profile; absent = no contact line. */
+    contactLine?: string | null;
+  };
   mode: "live" | "preview" | "accepted";
   /** Starting ticks (accepted mode: what was accepted). Defaults to the firm's preselected offer. */
   initialSelection?: Selection;
@@ -552,10 +561,7 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                   <div className="cp-row">
                     <div className="cp-l">
                       <b>USPTO filing fees, due at filing</b>
-                      <span>
-                        {plural(quote.gov_class_count, "class", "classes")} &times; {money(pricing.gov_per_class_cents)},
-                        paid before filing, not today
-                      </span>
+                      <span>{usptoLine(quote, pricing.gov_per_class_cents, money)}, paid before filing, not today</span>
                     </div>
                     <div className="cp-mid cp-num">{money(quote.gov_total_cents)}</div>
                   </div>
@@ -585,6 +591,7 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                   </>
                 ) : (
                   <>
+                    <p className="cp-commit">{commitmentSentence(firm.displayName ?? firm.name)}</p>
                     {mode === "preview" ? (
                       <button type="button" className="cp-btn" disabled>
                         Preview
@@ -661,7 +668,7 @@ export function ProposalDocument(props: ProposalDocumentProps) {
               </p>
             </>
           ) : (
-            <p className="cp-c">{firm.name}</p>
+            <p className="cp-c">{[firm.name, firm.contactLine].filter(Boolean).join(" \u00b7 ")}</p>
           )}
           <p className="cp-d">
             {NOT_A_LAW_FIRM_DISCLAIMER} Lectual provides the software this proposal is presented in; the proposal itself is

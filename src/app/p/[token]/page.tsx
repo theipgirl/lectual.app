@@ -74,7 +74,7 @@ export default async function PublicProposalPage({ params }: { params: Promise<{
         title={view.title}
         clientName={view.clientName}
         expiresOn={view.expiresOn}
-        firm={{ name: view.firm.name, slug: view.firm.slug }}
+        firm={{ name: view.firm.name, slug: view.firm.slug, displayName: view.firm.displayName, contactLine: view.firm.contactLine }}
         initialSelection={view.acceptedSelection ?? undefined}
         acceptedQuote={view.acceptedQuote ?? undefined}
         payUrl={view.payUrl}
@@ -89,7 +89,7 @@ export default async function PublicProposalPage({ params }: { params: Promise<{
       title={view.title}
       clientName={view.clientName}
       expiresOn={view.expiresOn}
-      firm={{ name: view.firm.name, slug: view.firm.slug }}
+      firm={{ name: view.firm.name, slug: view.firm.slug, displayName: view.firm.displayName, contactLine: view.firm.contactLine }}
       // The token is bound here, server-side, so the browser calls the action
       // with the ticks only.
       onAccept={acceptProposalAction.bind(null, token)}
