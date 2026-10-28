@@ -110,7 +110,7 @@ export function MobileBar({ items, queueStatus, pendingCount, counts }: Props) {
           const count = railCountFor(item.countKey, queueStatus, pendingCount, counts);
           return (
             <Link
-              key={item.slug}
+              key={item.slug || "today"}
               href={item.href}
               className={`lx-mbar-item${item.active ? " is-active" : ""}`}
               aria-current={item.active ? "page" : undefined}

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { RAIL_PIN_COOKIE, railCountFor, railGroups, railIsPinned, reportListHref, reportListLabel, visibleNav } from "@/lib/nav";
+import { RAIL_PIN_COOKIE, railCountFor, railGroups, railIsPinned, REPORTS, REPORTS_INDEX, visibleNav, visibleReports } from "@/lib/nav";
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/dashboard/" }));
 
@@ -50,19 +50,35 @@ describe("parent rows open the list (F2)", () => {
     expect(parents([]).Communication).toBe("/dashboard/meetings/");
   });
 
-  it("no rail row links to a report page", () => {
+  it("only the single Reports row links to the reports", () => {
     const html = rail(true, ["mailbox", "agents"]);
-    expect(html).not.toContain("/dashboard/reports/");
+    const hrefs = [...html.matchAll(/href="([^"]*\/dashboard\/reports[^"]*)"/g)].map((m) => m[1]);
+    expect(hrefs).toEqual([REPORTS_INDEX.replace(/\/$/, "")]);
   });
 
-  it("the Summary tabs resolve to the same lists", () => {
-    expect(reportListHref("communication", { hasMailbox: true })).toBe("/dashboard/mail/");
-    expect(reportListHref("communication", { hasMailbox: false })).toBe("/dashboard/meetings/");
-    expect(reportListHref("intake", { hasMailbox: false })).toBe("/dashboard/intake/");
-    expect(reportListHref("matters", { hasMailbox: false })).toBe("/dashboard/matters/");
-    expect(reportListHref("ipos", { hasMailbox: false })).toBe("/dashboard/copilot/");
-    expect(reportListLabel("communication", { hasMailbox: true })).toBe("Mail");
-    expect(reportListLabel("intake", { hasMailbox: true })).toBe("Leads");
+  it("the Reports row sits directly above Settings", () => {
+    const html = rail(true, ["mailbox"]);
+    expect(html.indexOf('href="/dashboard/reports"')).toBeGreaterThan(0);
+    expect(html.indexOf('href="/dashboard/reports"')).toBeLessThan(html.indexOf('href="/dashboard/settings"'));
+  });
+
+  it("each visible report is linked from the Reports index", () => {
+    const keys = visibleReports(visibleNav(["mailbox", "agents"], "owner"));
+    expect(keys).toEqual(["communication", "intake", "matters", "ipos"]);
+    const page = read("src/app/dashboard/reports/page.tsx");
+    expect(page).toContain("REPORTS[key].href");
+    expect(page).toContain("visibleReports");
+    for (const key of keys) expect(REPORTS[key].href).toBe(`/dashboard/reports/${key}/`);
+  });
+
+  it("a report whose sections the firm cannot see is not offered (fails closed)", () => {
+    expect(visibleReports([])).toEqual([]);
+  });
+
+  it("no List | Summary strip remains anywhere", () => {
+    for (const f of ["src/app/dashboard/intake/_components/IntakeWorkspace.tsx", "src/app/dashboard/matters/page.tsx", "src/app/dashboard/mail/page.tsx", "src/app/dashboard/meetings/page.tsx", "src/app/dashboard/copilot/page.tsx", "src/app/dashboard/reports/[key]/page.tsx"]) {
+      expect(read(f)).not.toContain("SectionTabs");
+    }
   });
 });
 
@@ -100,7 +116,7 @@ describe("one sign-out and avatar block (F4)", () => {
 
   it("signOutAction is used by exactly one shell component, the account menu", () => {
     // NoFirmAccess is the screen for a signed-in person with no firm: there is no account menu there, so it keeps its own button.
-    const files = ["Rail", "MobileBar", "AccountMenu", "SectionLabel", "SectionTabs", "NavProgress"].map((n) => [n, read(`src/components/shell/${n}.tsx`)] as const);
+    const files = ["Rail", "MobileBar", "AccountMenu", "SectionLabel", "NavProgress"].map((n) => [n, read(`src/components/shell/${n}.tsx`)] as const);
     expect(files.filter(([, s]) => s.includes("signOutAction")).map(([n]) => n)).toEqual(["AccountMenu"]);
   });
 });

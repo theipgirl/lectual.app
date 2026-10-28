@@ -1,14 +1,13 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { safeNext } from "@/lib/auth/safe-next";
 import LoginForm from "./LoginForm";
 import { signInErrorMessage } from "@/lib/auth/sign-in-errors";
 import { NOT_A_LAW_FIRM_DISCLAIMER } from "@/lib/legal/disclaimer";
 
 export const metadata: Metadata = { title: "Sign in — Lectual" };
 
-function safeNextOf(next: string | undefined): string {
-  return next && next.startsWith("/") && !next.startsWith("//") && next !== "/" ? next : "/dashboard/";
-}
+const safeNextOf = safeNext;
 
 export default async function SignInPage({
   searchParams,

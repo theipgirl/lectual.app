@@ -8,8 +8,6 @@ import { PROVIDER_LABEL, isMeetingProvider } from "@/lib/meetings/types";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 import { reconnectSentence } from "@/lib/meetings/reconnect-copy";
-import { SectionTabs } from "@/components/shell/SectionTabs";
-import { REPORTS } from "@/lib/nav";
 
 export const metadata: Metadata = { title: pageTitle("Meetings") };
 
@@ -65,7 +63,6 @@ export default async function MeetingsPage({ searchParams }: { searchParams: Pro
         <div style={{ flex: 1, minWidth: 260 }}>
           <div className="lx-label">Communication</div>
           <h1 className="lx-h1" data-tour="meetings-head">Meetings</h1>
-          <SectionTabs active="list" listLabel="Meetings" listHref="/dashboard/meetings/" summaryHref={REPORTS.communication.href} />
           <p className="lx-sub">Consults and calls recorded in Fathom or Zoom, with the summary, the transcript and the client they were about.</p>
         </div>
         <Link href="/dashboard/settings/integrations/meetings/" className="lx-btn lx-btn-sec lx-btn-sm">

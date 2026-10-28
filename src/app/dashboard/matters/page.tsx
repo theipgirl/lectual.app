@@ -17,8 +17,6 @@ import {
 } from "@/lib/matters/worklist";
 import { ViewToggle } from "@/components/ViewToggle";
 import { ListHeader } from "@/components/list-page/ListHeader";
-import { SectionTabs } from "@/components/shell/SectionTabs";
-import { REPORTS } from "@/lib/nav";
 import { ListToolbar } from "@/components/list-page/ListToolbar";
 import { Chip, FilterChips } from "@/components/list-page/Chips";
 import "@/components/list-page/list-page.css";
@@ -99,7 +97,6 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
   return (
     <div className="lp-root">
       <ListHeader title="Matters" tour="matters-head" sub={mattersSubtitle(boardView ? "board" : "table")} />
-      <SectionTabs active="list" listLabel="Matters" listHref="/dashboard/matters/" summaryHref={REPORTS.matters.href} />
 
       <ListToolbar
         search={{

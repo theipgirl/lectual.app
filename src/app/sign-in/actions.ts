@@ -1,5 +1,6 @@
 "use server";
 
+import { safeNext } from "@/lib/auth/safe-next";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { getSiteOrigin } from "@/lib/site-origin";
 import { SIGN_IN_GENERIC } from "@/lib/ui/words";
@@ -20,11 +21,7 @@ export async function sendMagicLink(
   const email = String(formData.get("email") ?? "")
     .trim()
     .toLowerCase();
-  const nextParam = String(formData.get("next") ?? "/dashboard");
-  const next =
-    nextParam.startsWith("/") && !nextParam.startsWith("//") && nextParam !== "/"
-      ? nextParam
-      : "/dashboard";
+  const next = safeNext(String(formData.get("next") ?? ""));
 
   if (!email) return { error: "Enter your email." };
 

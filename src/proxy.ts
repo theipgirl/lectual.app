@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { frameAncestors, frameTarget } from "@/lib/intake-forms/frame-policy";
+import { safeNext } from "@/lib/auth/safe-next";
 import { readFrameDomains } from "@/lib/intake-forms/frame-lookup";
 
 /**
@@ -29,14 +30,10 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   // reads to the user as "nothing happened".
   const code = request.nextUrl.searchParams.get("code");
   if (code && (request.nextUrl.pathname === "/" || request.nextUrl.pathname === "")) {
-    const next = request.nextUrl.searchParams.get("next");
-    const safeNext =
-      next && next.startsWith("/") && !next.startsWith("//") && next !== "/"
-        ? next
-        : "/dashboard";
+    const safeNextPath = safeNext(request.nextUrl.searchParams.get("next"));
     const target = new URL("/auth/callback/", request.url);
     target.searchParams.set("code", code);
-    target.searchParams.set("next", safeNext);
+    target.searchParams.set("next", safeNextPath);
     return NextResponse.redirect(target);
   }
 

@@ -17,8 +17,6 @@ import { StatCards } from "./stat-cards";
 import "./copilot.css";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
-import { SectionTabs } from "@/components/shell/SectionTabs";
-import { REPORTS } from "@/lib/nav";
 import { COPILOT_NAME } from "@/lib/ui/words";
 
 export const metadata: Metadata = { title: pageTitle("Copilot") };
@@ -124,7 +122,6 @@ export default async function CopilotPage(props?: { searchParams?: Promise<{ c?:
   return (
     <>
       <h1 className="cpw-sr">Copilot</h1>
-      <SectionTabs active="list" listLabel={COPILOT_NAME} listHref="/dashboard/copilot/" summaryHref={REPORTS.ipos.href} />
 
       {configured && saved ? (
         <CopilotWorkspace

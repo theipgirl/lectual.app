@@ -114,7 +114,6 @@ export const IMPORT_PERSON_NOT_SAVED = "This person couldn't be saved.";
 
 /** Sprint 32 shell names. */
 export const MORE_NAME = "More";
-export const SUMMARY_TAB = "Summary";
 export const SETUP_NAME = "Setup";
 export const HELP_AND_TIPS = "Help and tips";
 /** A setup step only Lectual can switch on: shown, never counted against the firm. */
