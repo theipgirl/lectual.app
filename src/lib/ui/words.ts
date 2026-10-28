@@ -119,3 +119,13 @@ export const SETUP_NAME = "Setup";
 export const HELP_AND_TIPS = "Help and tips";
 /** A setup step only Lectual can switch on: shown, never counted against the firm. */
 export const LECTUAL_SETS_UP = "Lectual sets this up";
+
+/** One name for the proposals area (was "Quotes & proposals" / "Client proposals" on its own pages). */
+export const PROPOSALS_NAME = "Proposals";
+export const PROPOSALS_SUBLINE = "Every proposal you've sent or started, newest first.";
+/** Said once on the proposals list. */
+export const FEE_SENTENCE = "Legal fee is due at signing. USPTO fees are paid at filing.";
+/** A connect or run button that is disabled because the part isn't switched on. */
+export const SWITCH_ON_WORDS = "Lectual needs to switch this on";
+/** Where a Lawmatics token comes from. */
+export const LAWMATICS_TOKEN_HELP = "In Lawmatics: Settings \u2192 API \u2192 create a token, then paste it here";

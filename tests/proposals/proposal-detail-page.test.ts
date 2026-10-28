@@ -124,13 +124,15 @@ async function render(proposal: ProposalRow, events: ProposalEventRow[], strip: 
 describe("proposal detail page", () => {
   beforeEach(() => vi.resetModules());
 
-  it("puts the card above the editor, with both fees under their own labels", async () => {
+  it("puts the card above the editor; the fees are shown once, in the one totals box", async () => {
     const { html } = await render(row(), [EVIDENCE]);
     const card = html.indexOf("Proposal at a glance");
     expect(card).toBeGreaterThan(-1);
     expect(card).toBeLessThan(html.indexOf('data-stub="details"'));
-    expect(html).toContain("At signing (legal fee)");
-    expect(html).toContain("At filing (USPTO fees)");
+    expect(html).not.toContain("At signing (legal fee)");
+    expect(html).not.toContain("pre-ticked");
+    expect(html).toContain("What the client pays");
+    expect(html.match(/USPTO fees, due at filing/g)).toHaveLength(1);
     expect(html).toContain("Heard on the call");
     expect(html).toContain("a word mark and a logo");
   });

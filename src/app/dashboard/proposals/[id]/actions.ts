@@ -30,6 +30,12 @@ import {
   type Parsed,
 } from "@/lib/proposal-editor/form";
 import { runCreateLink } from "@/lib/proposal-editor/create-link";
+import { runDraftClientEmail } from "@/lib/proposal-editor/draft-email";
+import { createDraft, listQueue } from "@/lib/queue/api";
+import { activeQueueOrgKey } from "@/lib/queue/org";
+import { clientLinkOrigin, clientLinkUrl } from "@/lib/proposals/client-link-origin";
+import { getScopedClient } from "@/lib/db/scoped-client";
+import { resolveFirmSession } from "@/lib/firm/session";
 import { EDIT_AGAIN_DONE, LINK_TURNED_ON } from "@/lib/proposal-editor/vocabulary";
 import { proposalActionError, type ActionState } from "../errors";
 import { gateStaffAction } from "../gate";
@@ -263,4 +269,54 @@ export async function reviseAction(_prev: ActionState, formData: FormData): Prom
   revalidate(id);
   revalidate(nextId);
   redirect(`/dashboard/proposals/${nextId}/`);
+}
+
+
+/**
+ * "Draft email to client": queues a CLIENT_EMAIL draft carrying the live link in the approval queue.
+ * Nothing is sent and no mailbox is read; the logic and its refusals are in draft-email.ts.
+ */
+export async function draftClientEmailAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  return runDraftClientEmail(
+    {
+      gate: gateStaffAction,
+      loadProposal: async (id) => {
+        const row = (await getProposal(id))?.proposal ?? null;
+        if (!row) return null;
+        return {
+          id: row.id,
+          status: row.status,
+          clientName: row.client_name,
+          firstName: row.content?.client?.first_name?.trim() || null,
+          clientEmail: row.client_email,
+          orgId: row.org_id,
+          publicToken: row.public_token,
+          matterId: row.matter_id,
+          leadId: row.lead_id,
+        };
+      },
+      firm: async () => {
+        const session = await resolveFirmSession();
+        const supabase = await getScopedClient();
+        const { data } = await supabase.from("crm_org_profile").select("display_name, email_signature").maybeSingle();
+        const name = (data?.display_name as string | null | undefined)?.trim() || (session.kind === "ok" ? session.org.name : "our firm");
+        return { name, signOff: (data?.email_signature as string | null | undefined)?.trim() || null };
+      },
+      orgKey: activeQueueOrgKey,
+      pending: async () => {
+        const orgKey = await activeQueueOrgKey();
+        if (!orgKey) return { status: "unconfigured" };
+        try {
+          const items = await listQueue(orgKey, "pending");
+          return { status: "ok", items: items.map((i) => ({ id: i.id, type: i.type, draftBody: i.draft_body })) };
+        } catch {
+          return { status: "unavailable" };
+        }
+      },
+      linkUrl: async (orgId, token) => clientLinkUrl(await clientLinkOrigin(orgId), token),
+      createDraft,
+      revalidate,
+    },
+    field(formData, "proposalId"),
+  );
 }

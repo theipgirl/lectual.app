@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useState } from "react";
 import type { ProposalStatus } from "@/lib/proposals/types";
 import { joinOr } from "@/lib/proposal-editor/labels";
-import { createLinkAction, reviseAction, sendAction, unapproveAction, withdrawAction } from "@/app/dashboard/proposals/[id]/actions";
+import { createLinkAction, draftClientEmailAction, reviseAction, sendAction, unapproveAction, withdrawAction } from "@/app/dashboard/proposals/[id]/actions";
+import Popover from "@/components/list-page/Popover";
+import { DRAFT_EMAIL_SENTENCES } from "@/lib/proposal-editor/draft-email";
 import { BUTTON_WORDS, LINK_NOT_LIVE_YET, askToCreateLink } from "@/lib/proposal-editor/vocabulary";
 import { ActionForm, Outcome } from "./ActionForm";
 
@@ -118,22 +120,29 @@ export function Lifecycle({
         </ActionForm>
       )}
 
-      {canWrite && (status === "draft" || status === "approved" || status === "sent") && (
-        <ActionForm
-          action={withdrawAction}
-          className="pe-act"
-          confirm={status === "sent" ? "Withdraw this version? The client’s link will stop opening it." : "Withdraw this version? It can’t be brought back."}
-        >
-          {({ state, pending }) => (
-            <>
-              {hidden}
-              <button type="submit" className="lx-btn lx-btn-danger" disabled={pending}>
-                {BUTTON_WORDS.withdraw}
-              </button>
-              <Outcome state={state} pending={pending} />
-            </>
+      {clientUrl && (status === "sent" || status === "accepted") && (
+        <>
+          {canWrite && (
+            <ActionForm action={draftClientEmailAction} className="pe-act">
+              {({ state, pending }) => (
+                <>
+                  {hidden}
+                  <button type="submit" className="lx-btn lx-btn-sec" disabled={pending}>
+                    {pending ? "Queuing…" : "Draft email to client"}
+                  </button>
+                  <Outcome state={state} pending={pending} />
+                </>
+              )}
+            </ActionForm>
           )}
-        </ActionForm>
+          <span className="lx-note" role="note">
+            {DRAFT_EMAIL_SENTENCES.notEmailed}
+          </span>
+        </>
+      )}
+
+      {canWrite && (status === "draft" || status === "approved" || status === "sent") && (
+        <MoreMenu proposalId={proposalId} status={status} />
       )}
     </div>
   );
@@ -163,6 +172,62 @@ function CopyLink({ url }: { url: string }) {
       <span className="lx-note" role="status">
         {copied === "no" ? "Couldn’t copy. Select the link and copy it." : ""}
       </span>
+    </div>
+  );
+}
+
+/**
+ * "More": the rare, destructive action. Withdraw asks first, in the page, with an explicit Cancel;
+ * the menu itself closes on Esc or a click outside (the shared Popover).
+ */
+function MoreMenu({ proposalId, status }: { proposalId: string; status: ProposalStatus }) {
+  const [confirming, setConfirming] = useState(false);
+  return (
+    <div className="pe-more-menu">
+      <Popover
+        label="More actions"
+        align="right"
+        width={190}
+        trigger={({ onClick, ref, ...aria }) => (
+          <button {...aria} ref={ref} type="button" onClick={onClick} className="lx-btn lx-btn-sec">
+            More
+            <span aria-hidden> ▾</span>
+          </button>
+        )}
+      >
+        {(close) => (
+          <button
+            type="button"
+            role="menuitem"
+            className="lp-pop-item"
+            onClick={() => {
+              setConfirming(true);
+              close();
+            }}
+          >
+            <span className="lp-pop-text">{BUTTON_WORDS.withdraw}…</span>
+          </button>
+        )}
+      </Popover>
+      {confirming && (
+        <ActionForm action={withdrawAction} className="pe-act pe-confirm">
+          {({ state, pending }) => (
+            <>
+              <input type="hidden" name="proposalId" value={proposalId} />
+              <p className="lx-note" role="alert" style={{ margin: 0 }}>
+                {status === "sent" ? "Withdraw this version? The client’s link will stop opening it." : "Withdraw this version? It can’t be brought back."}
+              </p>
+              <button type="submit" className="lx-btn lx-btn-danger" disabled={pending}>
+                {pending ? "Withdrawing…" : "Yes, withdraw"}
+              </button>
+              <button type="button" className="lx-btn lx-btn-sec" onClick={() => setConfirming(false)} disabled={pending}>
+                Cancel
+              </button>
+              <Outcome state={state} pending={pending} />
+            </>
+          )}
+        </ActionForm>
+      )}
     </div>
   );
 }

@@ -13,7 +13,7 @@ import { buildPaidPanelView } from "@/lib/proposals/paid-view";
 import { PROPOSAL_STAFF_WRITE_ROLES, isProposalEditable, type ProposalRow } from "@/lib/proposals/types";
 import { validateContent } from "@/lib/proposals/validate";
 import { describeProposalEvent, formatDollars } from "@/lib/proposal-editor/events";
-import { describeIssuePath, groupIssues } from "@/lib/proposal-editor/issues";
+import { FIRST_PROBLEM_ID, describeIssuePath, firstProblem, groupIssues } from "@/lib/proposal-editor/issues";
 import { firstNameOf, joinOr, statusLabel, statusTone } from "@/lib/proposal-editor/labels";
 import { moneyInput } from "@/lib/proposal-editor/form";
 import { editorChangedCount, shouldOpenMore } from "@/lib/proposal-editor/more-options";
@@ -51,9 +51,14 @@ import { GOES_LIVE_ON_APPROVAL, proposalSendBlock } from "@/lib/consult-proposal
 import { requireProposalsModule } from "../gate";
 import "../proposals.css";
 import type { Metadata } from "next";
-import { pageTitle } from "@/lib/ui/page-title";
+import { recordPageTitle } from "@/lib/ui/page-title";
+import { PROPOSALS_NAME } from "@/lib/ui/words";
 
-export const metadata: Metadata = { title: pageTitle("Client proposal") };
+/** Tab title: the client's name through the scoped getter; "Proposal" when the read fails or finds nothing. */
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  return { title: await recordPageTitle(async () => (await getProposal(id))?.proposal.client_name?.trim() || null, "Proposal") };
+}
 
 export const dynamic = "force-dynamic";
 
@@ -90,7 +95,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
     return (
       <>
         <Link href="/dashboard/proposals/" className="lx-back">
-          ← Client proposals
+          ← {PROPOSALS_NAME}
         </Link>
         <div className="lx-card lx-empty-card">
           <h2 className="lx-h2" style={{ fontSize: 25 }}>
@@ -144,11 +149,12 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
     : [];
   const errors = issues.filter((i) => i.level === "error").length;
   const warnings = issues.length - errors;
-  const shown = (list: typeof issues): ShownIssue[] =>
-    list.map((i) => ({ level: i.level, message: i.message, where: describeIssuePath(i.path, content) }));
   const groups = groupIssues(issues);
+  const first = firstProblem(groups);
+  const shown = (list: typeof issues): ShownIssue[] =>
+    list.map((i) => ({ level: i.level, message: i.message, where: describeIssuePath(i.path, content), ...(i === first ? { anchor: true } : {}) }));
 
-  /* ── the figures at the firm's own pre-ticked offer ── */
+  /* ── the figures the client starts from ── */
   const quote = quoteProposal(content, defaultSelection(content));
   const latest = versions[0];
   const newer = latest && latest.version > proposal.version ? latest : null;
@@ -246,12 +252,12 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
   return (
     <div className="pe-page">
       <Link href="/dashboard/proposals/" className="lx-back">
-        ← Client proposals
+        ← {PROPOSALS_NAME}
       </Link>
 
       <div className="pe-head">
         <div className="pe-head-main">
-          <div className="lx-label">Client proposal</div>
+          <div className="lx-label">{PROPOSALS_NAME}</div>
           <h1 className="lx-h1">{proposal.client_name}</h1>
           <div className="pe-meta">
             <span className={`lx-pill lx-pill-${statusTone(proposal.status)}`}>{statusLabel(proposal.status)}</span>
@@ -289,14 +295,15 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
 
       {paidView && <PaidPanel proposalId={proposal.id} view={paidView} />}
 
-      <ProposalCard card={card} />
+      <ProposalCard card={card} showFees={false} />
       {consult && proposal.lead_id && <ConsultStrip state={consult} leadId={proposal.lead_id} tz={tz} />}
 
       {statusEditable && (errors > 0 || warnings > 0) && (
         <div className={`lx-banner ${errors > 0 ? "lx-banner-risk" : "lx-banner-mute"}`} role="status">
           {errors > 0
             ? `${errors} ${errors === 1 ? "problem blocks" : "problems block"} creating the link${warnings > 0 ? `, and ${warnings} to check` : ""}. Each is listed in the section that can fix it.`
-            : `${warnings} ${warnings === 1 ? "thing" : "things"} to check before creating the link. None blocks it.`}
+            : `${warnings} ${warnings === 1 ? "thing" : "things"} to check before creating the link. None blocks it.`}{" "}
+          <a href={`#${FIRST_PROBLEM_ID}`}>Go to first problem</a>
         </div>
       )}
       {statusEditable && errors === 0 && warnings === 0 && (
@@ -372,8 +379,8 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
         </div>
 
         <aside className="pe-side" aria-label="Figures and preview">
-          <section className="lx-card pe-totals" aria-label="What the client pays at the pre-ticked offer">
-            <div className="lx-label">At the pre-ticked offer</div>
+          <section className="lx-card pe-totals" aria-label="What the client pays">
+            <div className="lx-label">What the client pays</div>
             <dl>
               {quote.names.map((n) => (
                 <div key={n.id} className="pe-line">
@@ -453,10 +460,12 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
         </aside>
       </div>
 
-      <section className="lx-card pe-card" aria-label="Versions">
+      <section className="lx-card pe-card" aria-label="History">
         <header className="pe-card-head">
-          <h2 className="pe-h">Versions</h2>
-          <p className="lx-note pe-hint">Every change after the link is live is a new version, so what the client saw is never rewritten.</p>
+          <h2 className="pe-h">History</h2>
+          <p className="lx-note pe-hint">
+            Every change after the link is live is a new version, so what the client saw is never rewritten. Times are in the firm&apos;s time zone.
+          </p>
         </header>
         <ul className="pe-versions">
           {versions.map((v) => (
@@ -471,13 +480,6 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
             </li>
           ))}
         </ul>
-      </section>
-
-      <section className="lx-card pe-card" aria-label="Activity">
-        <header className="pe-card-head">
-          <h2 className="pe-h">Activity</h2>
-          <p className="lx-note pe-hint">Every version of this offer, newest first. Times are in the firm&apos;s time zone.</p>
-        </header>
         {log.length === 0 ? (
           <p className="lx-note" style={{ margin: 0 }}>
             No activity yet.

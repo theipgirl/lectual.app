@@ -2,9 +2,10 @@
 
 import { startTransition, useActionState, type FormEvent, type ReactNode } from "react";
 import type { ActionState } from "@/app/dashboard/proposals/errors";
+import { FIRST_PROBLEM_ID } from "@/lib/proposal-editor/issues";
 
 /** A validation problem as the editor shows it: plain words, no path. */
-export type ShownIssue = { level: "error" | "warning"; message: string; where: string };
+export type ShownIssue = { level: "error" | "warning"; message: string; where: string; /** The one "Go to first problem" lands on. */ anchor?: boolean };
 
 type Action = (prev: ActionState, formData: FormData) => Promise<ActionState>;
 
@@ -88,7 +89,7 @@ export function IssueList({ issues }: { issues: ShownIssue[] }) {
   return (
     <ul className="pe-issues" aria-label="Problems in this section">
       {sorted.map((i, n) => (
-        <li key={n} data-level={i.level}>
+        <li key={n} data-level={i.level} id={i.anchor ? FIRST_PROBLEM_ID : undefined}>
           <span className="pe-issue-tag">{i.level === "error" ? "Fix" : "Check"}</span>
           {i.where && <span className="pe-issue-where">{i.where}: </span>}
           {i.message}
