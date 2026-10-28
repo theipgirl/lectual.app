@@ -5,6 +5,7 @@ import type { getAdminClient } from "@/lib/db/admin";
 import { checkMappingRequest } from "./lawpay-accounts";
 import { getLawPayConnection } from "./lawpay-connection";
 import type { PaymentAccountKind, PaymentRecordProvider } from "./types";
+import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 
 /**
  * Where a charge's `account_id` comes from: `crm_org_payment_account` (0068),
@@ -102,7 +103,7 @@ export async function mapLawPayAccount(input: { kind: unknown; accountId: unknow
     { onConflict: "org_id,provider,account_kind" },
   );
   if (error) {
-    if (error.code === "42501") return { ok: false, reason: "Only owners and admins can choose payment accounts." };
+    if (error.code === "42501") return { ok: false, reason: `${ADMIN_TIER_PHRASE} can choose payment accounts.` };
     if (error.code === "23505") return { ok: false, reason: "One account can't be both the operating and the trust account." };
     if (error.code === "23514") return { ok: false, reason: "LawPay's details for that account don't allow this mapping. Refresh accounts and try again." };
     return { ok: false, reason: "Couldn't save that account. Try again shortly." };

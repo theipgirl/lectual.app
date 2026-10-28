@@ -6,6 +6,7 @@ import { mapLawPayAccount, unmapLawPayAccount } from "@/lib/payments/accounts";
 import { lawPayClientCredentials, lawPaySetup } from "@/lib/payments/lawpay-config";
 import { disconnectLawPay, refreshLawPayAccounts } from "@/lib/payments/lawpay-connection";
 import { LAWPAY_NOT_ISSUED } from "@/lib/ui/words";
+import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 
 /**
  * Settings → Integrations → LawPay. Every function is its own POST entry point
@@ -16,7 +17,7 @@ import { LAWPAY_NOT_ISSUED } from "@/lib/ui/words";
 
 export type LawPayActionState = { ok?: boolean; error?: string; message?: string };
 
-const FORBIDDEN: LawPayActionState = { error: "Only owners and admins can manage LawPay." };
+const FORBIDDEN: LawPayActionState = { error: `${ADMIN_TIER_PHRASE} can manage LawPay.` };
 
 export async function mapAccountAction(_prev: LawPayActionState, formData: FormData): Promise<LawPayActionState> {
   if (!(await callerHasRole("senior_admin"))) return FORBIDDEN;

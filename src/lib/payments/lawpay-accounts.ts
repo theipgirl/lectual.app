@@ -92,6 +92,11 @@ export function checkMappingRequest(input: {
   return { ok: true, account };
 }
 
+/** The account as a person names it: no id, no mode. The full label (with the last digits of the id) is `accountLabel`. */
+export function accountShortLabel(account: LawPayAccount): string {
+  return account.name ?? (account.type === "AchAccount" ? "eCheck account" : "Card account");
+}
+
 export function accountLabel(account: LawPayAccount): string {
   const name = account.name ?? (account.type === "AchAccount" ? "eCheck account" : "Card account");
   return `${name} · ${account.type === "AchAccount" ? "eCheck" : "card"} · ···${account.id.slice(-4)}`;

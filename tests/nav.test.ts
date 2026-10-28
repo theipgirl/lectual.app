@@ -64,10 +64,11 @@ describe("rail tree (design/Rail.dc.html)", () => {
     expect(today("/dashboard/matters/")).toBe(false);
   });
 
-  it("a parent opens its list (Sprint 32); its Summary is a tab, and there is no Reports section", () => {
+  it("a parent opens its list (Sprint 32); Reports is one row beside Settings (Sprint 34), not a tree entry", () => {
     const groups = railGroups(visibleNav(["mailbox", "agents"], "owner"), "/dashboard/reports/matters/");
     const matters = groups.flat().find((e) => e.label === "Active matters")!;
-    expect(matters.active).toBe(true);
+    // A report page belongs to the Reports row, so no section parent is selected on it.
+    expect(matters.active).toBe(false);
     expect(groups.flat().map((e) => e.label)).not.toContain("Reports");
     expect(navItemBySlug("reports")).toBeUndefined();
     const hrefs = Object.fromEntries(groups.flat().filter((x) => x.kids.length).map((e) => [e.label, e.href]));

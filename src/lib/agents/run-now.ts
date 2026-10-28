@@ -2,6 +2,7 @@ import { ASSISTANTS_PAUSED, NOT_SWITCHED_ON } from "@/lib/ui/words";
 import { hasRole, type Role } from "@/lib/auth/roles";
 import { agentNeedsAi, type AgentId } from "./types";
 import { agentNeedsDatabaseUpdate, type DatabaseUpdate } from "./readiness";
+import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 
 /**
  * Whether "Run now" can run, and if not, the exact sentence to say. Pure: the Agents page and the run
@@ -35,7 +36,7 @@ export type RunNowDecision =
 
 export const RUN_NOW_REASON: Record<RunNowBlock, string> = {
   running: "Running. This can take a minute.",
-  role: "Only an owner, admin or senior admin can run assistants.",
+  role: `${ADMIN_TIER_PHRASE} can run assistants.`,
   "database-update": NOT_SWITCHED_ON,
   off: "Switch the assistant on first.",
   "autopilot-paused": `${ASSISTANTS_PAUSED} for your firm, so none of them run. Resume them first.`,

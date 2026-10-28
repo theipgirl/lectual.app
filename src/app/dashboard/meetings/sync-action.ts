@@ -15,7 +15,7 @@ import { importNowAction } from "@/app/dashboard/settings/integrations/meetings/
 
 export type SyncMeetingsState = { summary?: SyncSummary };
 
-export async function syncNewMeetingsAction(_prev: SyncMeetingsState, _formData: FormData): Promise<SyncMeetingsState> {
+export async function syncNewMeetingsAction(): Promise<SyncMeetingsState> {
   const session = await resolveFirmSession();
   if (session.kind !== "ok" || !canSyncMeetings(session.role)) return { summary: mergeSyncResults([{ provider: "fathom", outcome: { kind: "refused" } }]) };
 

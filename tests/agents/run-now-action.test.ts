@@ -71,17 +71,17 @@ describe("Run now action: every refusal returns the shared sentence and never re
   it("a role below senior admin (a forged request)", async () => {
     for (const role of ["viewer", "attorney", "paralegal", "intake", "social_media"]) {
       state.role = role;
-      expect(await run()).toEqual({ error: "Only an owner, admin or senior admin can run assistants." });
+      expect(await run()).toEqual({ error: "Senior admin or above can run assistants." });
     }
     expect(state.runOneAgent).not.toHaveBeenCalled();
   });
 
   it("a firm without the agents module, and a signed-out caller", async () => {
     state.modules = [];
-    expect(await run()).toEqual({ error: "Only an owner, admin or senior admin can run assistants." });
+    expect(await run()).toEqual({ error: "Senior admin or above can run assistants." });
     state.modules = ["agents"];
     state.signedIn = false;
-    expect(await run()).toEqual({ error: "Only an owner, admin or senior admin can run assistants." });
+    expect(await run()).toEqual({ error: "Senior admin or above can run assistants." });
     expect(state.runOneAgent).not.toHaveBeenCalled();
   });
 
@@ -141,7 +141,7 @@ describe("Run now action: every refusal returns the shared sentence and never re
     state.autopilot = { status: "ok", state: { paused: true } };
     expect(await run()).toEqual({ error: "Switch the assistant on first." });
     state.role = "viewer";
-    expect(await run()).toEqual({ error: "Only an owner, admin or senior admin can run assistants." });
+    expect(await run()).toEqual({ error: "Senior admin or above can run assistants." });
   });
 
   it("refuses without refreshing the page", async () => {

@@ -50,8 +50,7 @@ async function renderToday(opts: { items?: NeedsYouItem[]; unavailable?: string[
     ...(await orig<typeof import("@/lib/today/needs-you")>()),
     buildNeedsYou: vi.fn(() => ({ items, unavailable: opts.unavailable ?? [] })),
   }));
-  vi.doMock("@/components/setup/FinishSetupCard", () => ({ FinishSetupCard: () => null }));
-  vi.doMock("@/components/onboarding/GettingStartedCard", () => ({ GettingStartedCard: () => null }));
+  vi.doMock("@/components/setup/GetSetUpCard", () => ({ GetSetUpCard: () => null }));
   vi.doMock("@/components/calendar/TodayConsults", () => ({ TodayConsults: () => <section aria-label="consults-stub">Consults card</section> }));
   const { default: TodayPage } = await import("@/app/dashboard/page");
   const html = text(renderToStaticMarkup(await TodayPage()));

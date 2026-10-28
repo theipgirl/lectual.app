@@ -52,6 +52,7 @@ import type {
   SkippedMatterRecord,
   UnmappedMatterRecord,
 } from "@/lib/lawmatics/matters-import-plan";
+import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 
 const PAGE = "/dashboard/settings/integrations/lawmatics/";
 
@@ -65,7 +66,7 @@ async function requireImportAdmin(): Promise<void> {
   const role: Role | null =
     typeof data === "string" && (ROLES as readonly string[]).includes(data) ? (data as Role) : null;
   if (!role || !hasRole(role, REQUIRED_ROLE)) {
-    throw new Error("Forbidden: importing client records requires an owner or admin role.");
+    throw new Error(`Forbidden: importing client records requires ${ADMIN_TIER_PHRASE}.`);
   }
 }
 
@@ -91,7 +92,7 @@ export async function connectLawmaticsAction(_prev: ConnectState, formData: Form
   try {
     await requireImportAdmin();
   } catch {
-    return { error: "Only owners and admins can connect Lawmatics." };
+    return { error: `${ADMIN_TIER_PHRASE} can connect Lawmatics.` };
   }
   const root = rootKeyOrNull();
   if (!root) return { error: "Integrations aren't switched on for your firm yet. Lectual will turn them on." };
@@ -116,7 +117,7 @@ export async function disconnectLawmaticsAction(_prev: ConnectState, _formData: 
   try {
     await requireImportAdmin();
   } catch {
-    return { error: "Only owners and admins can disconnect Lawmatics." };
+    return { error: `${ADMIN_TIER_PHRASE} can disconnect Lawmatics.` };
   }
   const result = await disconnectLawmatics();
   if (!result.ok) return { error: result.reason };

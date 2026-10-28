@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { approverPick } from "@/lib/proposals/approver-pick";
 import { roleLabel } from "@/lib/auth/roles";
 import type { ProposalInclude } from "@/lib/proposals/types";
 import { saveProposalSettingsAction } from "@/app/dashboard/settings/proposals/actions";
@@ -24,6 +26,8 @@ export type SettingsValues = {
  * `packages` is omitted when the prices aren't being edited here.
  */
 export function SettingsForm({ members, values, packages }: { members: SettingsMember[]; values: SettingsValues; packages?: PricingValues[] }) {
+  const [chosen, setChosen] = useState<string[]>(values.approverUserIds);
+  const pick = approverPick(chosen);
   return (
     <ActionForm action={saveProposalSettingsAction} className="pe-settings">
       {({ state, pending }) => (
@@ -32,13 +36,23 @@ export function SettingsForm({ members, values, packages }: { members: SettingsM
             <header className="pe-card-head">
               <h2 className="pe-h">{SETTINGS_APPROVERS_HEADING}</h2>
               <p className="lx-note pe-hint">
-                Only these people can save a proposal and create its client link, and no link opens for a client until one of them has. The database enforces this; owners and admins who aren’t listed can’t. Up to 10.
+                Only these people can save a proposal and create its client link, and no link opens for a client until one of them has. The database enforces this, whatever a person’s role. Up to 10.
               </p>
             </header>
+            <p className="lx-note pe-approver-count" role="status">
+              {pick.summary}
+            </p>
             <div className="pe-approvers">
               {members.map((m) => (
                 <label key={m.userId} className="pe-check pe-approver">
-                  <input type="checkbox" name="approver" value={m.userId} defaultChecked={values.approverUserIds.includes(m.userId)} />
+                  <input
+                    type="checkbox"
+                    name="approver"
+                    value={m.userId}
+                    checked={chosen.includes(m.userId)}
+                    disabled={pick.disabled(m.userId)}
+                    onChange={(e) => setChosen((prev) => (e.target.checked ? [...prev, m.userId] : prev.filter((id) => id !== m.userId)))}
+                  />
                   <span>
                     {m.name}
                     {m.email && m.email !== m.name && <span className="lx-note"> · {m.email}</span>}

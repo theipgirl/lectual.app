@@ -5,7 +5,7 @@ import { SCOPES_MAIL_ONLY, SCOPES_WITH_CALENDAR } from "../calendar/world";
 afterEach(() => vi.resetModules());
 
 const text = (html: string) => html.replaceAll("&#x27;", "'").replaceAll("&amp;", "&").replaceAll("<!-- -->", "");
-const PHRASE = "Reconnect to read the calendar";
+const PHRASE = "Allow calendar";
 
 const row = (provider: string, status: string, over: Record<string, unknown> = {}) => ({
   id: `${provider}-${status}`,
@@ -36,11 +36,11 @@ async function render(connections: unknown[], role = "owner") {
   return text(renderToStaticMarkup(await Page({ searchParams: Promise.resolve({}) })));
 }
 
-describe("F11: Settings → Integrations, Reconnect to read the calendar", () => {
+describe("F11: Settings → Integrations, Allow calendar", () => {
   it("an active Microsoft mailbox without Calendars.Read shows a link for a manager, to the same connect URL Reconnect uses", async () => {
     const html = await render([row("microsoft", "active", { scopes: SCOPES_MAIL_ONLY })]);
     expect(html).toContain(PHRASE);
-    expect(html).toMatch(/<a href="\/api\/mailbox\/connect\/microsoft\/\?scope=personal"[^>]*>Reconnect to read the calendar<\/a>/);
+    expect(html).toMatch(/<a href="\/api\/mailbox\/connect\/microsoft\/\?scope=personal"[^>]*>Allow calendar<\/a>/);
     expect(html).toContain("Mail keeps working");
     // The existing Reconnect (for a dead token) is not shown for an active row.
     expect(html).not.toMatch(/>Reconnect<\/a>/);
@@ -54,7 +54,7 @@ describe("F11: Settings → Integrations, Reconnect to read the calendar", () =>
   it("a non-manager sees the sentence but no link (a shared mailbox viewed by a viewer)", async () => {
     const html = await render([row("microsoft", "active", { scope: "firm", scopes: SCOPES_MAIL_ONLY })], "viewer");
     expect(html).toContain(PHRASE);
-    expect(html).not.toMatch(/<a [^>]*>Reconnect to read the calendar<\/a>/);
+    expect(html).not.toMatch(/<a [^>]*>Allow calendar<\/a>/);
     expect(html).toContain("Mail keeps working meanwhile");
   });
 

@@ -30,8 +30,7 @@ import { civilDate } from "@/lib/matters/calendar-rows";
 import { deadlineKindLabel, deadlineNeedsReview } from "@/lib/matters/deadline-rules";
 import { AutopilotControl } from "@/components/agents/AutopilotControl";
 import { RunDigestList } from "@/components/agents/RunDigestList";
-import { FinishSetupCard } from "@/components/setup/FinishSetupCard";
-import { GettingStartedCard } from "@/components/onboarding/GettingStartedCard";
+import { GetSetUpCard } from "@/components/setup/GetSetUpCard";
 import { NeedsYouSection } from "@/components/today/NeedsYouSection";
 import { AddNameLink } from "@/components/account/AddNameLink";
 import { TodayConsults } from "@/components/calendar/TodayConsults";
@@ -210,8 +209,7 @@ export default async function TodayPage() {
         </p>
       )}
 
-      <FinishSetupCard role={session.role} />
-      <GettingStartedCard />
+      <GetSetUpCard role={session.role} />
 
       <div className="lx-split">
         <div className="lx-col">

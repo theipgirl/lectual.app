@@ -1,3 +1,4 @@
+import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 // The glossary: ONE name per thing, as a firm sees it. Every firm-facing string that
 // names one of these things imports it from here (tests/ui/words.test.ts and
 // tests/ui/no-build-words.test.ts hold that line). Pure: no imports from components.
@@ -39,8 +40,9 @@ export const FIRST_READ = "First read of this lead";
 export const ASSISTANTS_PAUSED = "Assistants paused";
 /** Settings tab for the parts of Lectual switched on firm by firm (was "Modules"). */
 export const FEATURES_NAME = "Features";
-export const FEATURES_SUBLINE =
-  "Parts of Lectual that are switched on firm by firm. To add one, contact Lectual and we'll set it up with you.";
+export const FEATURES_SUBLINE_START = "Parts of Lectual that are switched on firm by firm. To add one,";
+export const CONTACT_LECTUAL = "contact Lectual";
+export const FEATURES_SUBLINE_END = "and we'll set it up with you.";
 
 /** The Leads list temperature filter tooltip. */
 export const TEMPERATURE_TOOLTIP =
@@ -128,3 +130,6 @@ export const FEE_SENTENCE = "Legal fee is due at signing. USPTO fees are paid at
 export const SWITCH_ON_WORDS = "Lectual needs to switch this on";
 /** Where a Lawmatics token comes from. */
 export const LAWMATICS_TOKEN_HELP = "In Lawmatics: Settings \u2192 API \u2192 create a token, then paste it here";
+
+/** Sprint 34: the one sentence a read-only member sees on the Service library, instead of a wall of disabled fields. */
+export const SERVICE_LIBRARY_READ_ONLY = `You can use these on quotes. ${ADMIN_TIER_PHRASE} can change the list.`;

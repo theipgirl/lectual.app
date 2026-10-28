@@ -7,6 +7,7 @@ import { FirmProfileForm } from "@/components/settings/FirmProfileForm";
 import { listSequences } from "@/lib/automation/drips";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { FeedbackLink } from "@/components/feedback/SendFeedbackButton";
 
 export const metadata: Metadata = { title: pageTitle("Firm profile") };
 
@@ -59,7 +60,7 @@ export default async function FirmProfilePage() {
         />
       )}
       <p className="lx-note" style={{ margin: 0 }}>
-        The firm&apos;s account name ({session.org.name}) and its web address are set by Lectual. Ask us to change them.
+        The firm&apos;s account name ({session.org.name}) and its web address are set by Lectual. <FeedbackLink>Ask us</FeedbackLink> to change them.
       </p>
     </>
   );

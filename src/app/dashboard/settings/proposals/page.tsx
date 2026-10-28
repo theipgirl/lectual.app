@@ -10,6 +10,7 @@ import { requireProposalsModule } from "../../proposals/gate";
 import "../../proposals/proposals.css";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 
 export const metadata: Metadata = { title: pageTitle("Proposal settings") };
 
@@ -50,7 +51,7 @@ export default async function ProposalSettingsPage() {
             Restricted to the firm&apos;s admins
           </h2>
           <p className="lx-note" style={{ margin: 0 }}>
-            Owners, admins and senior admins manage the proposal settings. Anyone on the team can open the proposals themselves.
+            {ADMIN_TIER_PHRASE} can manage the proposal settings. Anyone on the team can open the proposals themselves.
           </p>
         </div>
       </>

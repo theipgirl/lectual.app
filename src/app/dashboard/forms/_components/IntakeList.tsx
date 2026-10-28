@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { createIntakeFormAction, duplicateIntakeFormAction, setIntakeArchivedAction } from "../actions";
 import { IntakeQrButton } from "./IntakeQr";
+import { InlineConfirm } from "@/components/ui/InlineConfirm";
 import { NOT_LIVE_MESSAGE, shareState } from "@/lib/intake-forms/share";
+import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 
 /**
  * Intake → Forms, the list: every intake the firm keeps (one per event,
@@ -187,17 +189,20 @@ export function IntakeList({
                   <button type="button" className="ifl-act" disabled={pending} onClick={() => run(() => duplicateIntakeFormAction(i.id), true)}>
                     Duplicate
                   </button>
-                  <button
-                    type="button"
-                    className="ifl-act"
-                    disabled={pending}
-                    onClick={() => {
-                      if (i.status !== "archived" && !window.confirm(`Archive “${i.name}”? Its link stops taking new people. Its leads and numbers are kept.`)) return;
-                      run(() => setIntakeArchivedAction(i.id, i.status !== "archived"), false);
-                    }}
-                  >
-                    {i.status === "archived" ? "Restore" : "Archive"}
-                  </button>
+                  {i.status === "archived" ? (
+                    <button type="button" className="ifl-act" disabled={pending} onClick={() => run(() => setIntakeArchivedAction(i.id, false), false)}>
+                      Restore
+                    </button>
+                  ) : (
+                    <InlineConfirm
+                      label="Archive"
+                      question={`Archive “${i.name}”? Its link stops taking new people. Its leads and numbers are kept.`}
+                      confirmLabel="Archive"
+                      className="ifl-act"
+                      pending={pending}
+                      onConfirm={() => run(() => setIntakeArchivedAction(i.id, true), false)}
+                    />
+                  )}
                 </>
               )}
             </div>
@@ -206,7 +211,7 @@ export function IntakeList({
         {shown.length === 0 && (
           <div className="lx-card lx-empty-card">
             <p className="lx-note" style={{ margin: 0 }}>
-              {canEdit ? "No intakes yet. Name one above to start." : "No intakes yet. An owner, admin or senior admin sets them up."}
+              {canEdit ? "No intakes yet. Name one above to start." : `No intakes yet. ${ADMIN_TIER_PHRASE} can set them up.`}
             </p>
           </div>
         )}

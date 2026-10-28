@@ -17,6 +17,7 @@ import { canPauseAutopilot, canResumeAutopilot, parseMinutesForm } from "@/lib/a
 import { loadAutopilot } from "@/lib/agents/autopilot";
 import { friendlyRunError } from "@/lib/agents/friendly-run-error";
 import { ASSISTANTS_PAUSED, AUTOMATIC_STAGE_MOVES, notReadyYet } from "@/lib/ui/words";
+import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 
 export type AgentActionState = {
   ok?: boolean;
@@ -53,7 +54,7 @@ async function adminSession() {
 
 export async function saveAgentSettingAction(_prev: AgentActionState, formData: FormData): Promise<AgentActionState> {
   const session = await adminSession();
-  if (!session) return { error: "Only an owner, admin or senior admin can change assistants." };
+  if (!session) return { error: `${ADMIN_TIER_PHRASE} can change assistants.` };
   const agent = formData.get("agent");
   const autonomy = formData.get("autonomy");
   const enabled = formData.get("enabled") === "true";
@@ -163,7 +164,7 @@ export async function setAutopilotAction(_prev: AgentActionState, formData: Form
   if (!session) return { error: "Assistants aren't available for this firm." };
   const pause = formData.get("paused") === "true";
   if (pause && !canPauseAutopilot(session.role)) return { error: "Only an attorney or an admin can pause assistants." };
-  if (!pause && !canResumeAutopilot(session.role)) return { error: "Only an owner, admin or senior admin can resume assistants." };
+  if (!pause && !canResumeAutopilot(session.role)) return { error: `${ADMIN_TIER_PHRASE} can resume assistants.` };
   const reasonRaw = String(formData.get("reason") ?? "").trim().slice(0, 280);
 
   const supabase = await getScopedClient();
@@ -179,7 +180,7 @@ export async function setAutopilotAction(_prev: AgentActionState, formData: Form
 /** The firm's minutes-per-task estimate behind "Hours saved (est.)". Admins only. */
 export async function saveMinutesPerTaskAction(_prev: AgentActionState, formData: FormData): Promise<AgentActionState> {
   const session = await adminSession();
-  if (!session) return { error: "Only an owner, admin or senior admin can change this." };
+  if (!session) return { error: `${ADMIN_TIER_PHRASE} can change this.` };
   const parsed = parseMinutesForm(formData);
   if (!parsed.ok) return { error: parsed.reason };
 

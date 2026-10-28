@@ -17,7 +17,6 @@ import { StatCards } from "./stat-cards";
 import "./copilot.css";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
-import { COPILOT_NAME } from "@/lib/ui/words";
 
 export const metadata: Metadata = { title: pageTitle("Copilot") };
 

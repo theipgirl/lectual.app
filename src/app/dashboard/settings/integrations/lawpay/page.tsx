@@ -6,12 +6,13 @@ import { relativeTime } from "@/lib/relative-time";
 import { lawPayDeploymentMode, lawPaySetup } from "@/lib/payments/lawpay-config";
 import { getLawPayConnection } from "@/lib/payments/lawpay-connection";
 import { listLawPayMappings } from "@/lib/payments/accounts";
-import { accountLabel, candidateAccounts } from "@/lib/payments/lawpay-accounts";
+import { accountLabel, accountShortLabel, candidateAccounts } from "@/lib/payments/lawpay-accounts";
 import { DisconnectLawPayButton, MapAccountForm, RefreshAccountsButton, UnmapButton } from "@/components/lawpay/LawPayForms";
 import { NOT_A_LAW_FIRM_DISCLAIMER } from "@/lib/legal/disclaimer";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 import { integrationErrorLine, LAWPAY_NOT_ISSUED, lawpayModeMismatch } from "@/lib/ui/words";
+import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 
 export const metadata: Metadata = { title: pageTitle("LawPay") };
 
@@ -19,7 +20,7 @@ export const dynamic = "force-dynamic";
 
 const ERRORS: Record<string, string> = {
   unconfigured: "LawPay card payments aren't switched on yet, so nothing was connected. Until then, record payments by hand on each quote.",
-  forbidden: "Only owners and admins can connect LawPay.",
+  forbidden: `${ADMIN_TIER_PHRASE} can connect LawPay.`,
   denied: "LawPay sign-in was cancelled. Nothing was connected.",
   expired: "That LawPay sign-in expired or couldn't be verified. Start again with Connect LawPay.",
   "wrong-session": "You switched firm or account during LawPay sign-in, so nothing was connected. Start again from this firm.",
@@ -69,7 +70,7 @@ export default async function LawPayPage({
         {header}
         <section className="lx-card" style={{ padding: 18 }}>
           <p className="lx-note" style={{ margin: 0 }}>
-            Owners and admins connect LawPay and choose the firm&apos;s payment accounts.
+            {ADMIN_TIER_PHRASE}{" "}can connect LawPay and choose the firm&apos;s payment accounts.
           </p>
         </section>
       </>
@@ -112,24 +113,23 @@ export default async function LawPayPage({
             </h2>
             <div className="lx-note">
               {conn
-                ? `${conn.display_hint ?? "LawPay merchant"} · connected ${relativeTime(conn.created_at)}${conn.last_verified_at ? ` · checked ${relativeTime(conn.last_verified_at)}` : ""}`
+                ? `${conn.display_hint ?? "LawPay merchant"} · connected ${relativeTime(conn.created_at)}`
                 : read.ok
                   ? "Not connected."
                   : "Status unknown."}
             </div>
           </div>
-          {conn && (
-            <span className={`lx-pill ${conn.mode === "live" ? "lx-pill-ox" : "lx-pill-warn"}`} title="Which of your LawPay credentials charges use">
-              {conn.mode === "live" ? "Live mode" : "Test mode"}
-            </span>
-          )}
           {conn && <span className={`lx-pill ${conn.status === "active" ? "lx-pill-ok" : "lx-pill-risk"}`}>{conn.status === "active" ? "Connected" : "Reconnect"}</span>}
         </div>
 
-        {conn && conn.mode === "test" && (
-          <p className="lx-note" style={{ margin: 0 }}>
-            Test mode: cards are charged against LawPay&apos;s test credentials, and no real money moves.
-          </p>
+        {conn && (
+          <details className="lx-disclosure">
+            <summary>Details</summary>
+            <p className="lx-note" style={{ margin: "6px 0 0" }}>
+              {conn.last_verified_at ? `Checked ${relativeTime(conn.last_verified_at)}. ` : ""}
+              {conn.mode === "test" ? "Test mode: cards are charged against LawPay's test credentials, and no real money moves." : "Live mode: cards are charged for real."}
+            </p>
+          </details>
         )}
         {conn && conn.mode !== deploymentMode && (
           <p className="lx-banner lx-banner-warn" style={{ margin: 0 }}>
@@ -202,17 +202,23 @@ export default async function LawPayPage({
                     {kind === "operating"
                       ? "Where the amount due at signing goes. It's an earned flat fee, so it always goes to operating — never trust."
                       : "Lectual never charges a signing fee into trust. Choosing it here records which account it is, so nothing is ever mixed up."}{" "}
-                    Only accounts LawPay itself lists as {kind === "trust" ? "trust" : "not trust"}, in {conn.mode} mode, are offered.
+                    Only accounts LawPay lists as {kind === "trust" ? "trust" : "not trust"} are offered.
                   </p>
                 </div>
                 {current && (
                   <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                     <span style={{ flex: 1, minWidth: 200 }}>
-                      <b style={{ color: "var(--ink)" }}>{currentAccount ? accountLabel(currentAccount) : `Account ···${current.provider_account_id.slice(-4)}`}</b>
+                      <b style={{ color: "var(--ink)" }}>{currentAccount ? accountShortLabel(currentAccount) : "An account LawPay no longer lists"}</b>
                       <span className="lx-note" style={{ display: "block" }}>
                         {current.verified_at ? `Confirmed ${relativeTime(current.verified_at)}` : "Not confirmed"}
                         {currentAccount ? "" : " · no longer listed by LawPay"}
                       </span>
+                      <details className="lx-disclosure">
+                        <summary>Account details</summary>
+                        <span className="lx-note" style={{ display: "block", margin: "6px 0 0" }}>
+                          {currentAccount ? accountLabel(currentAccount) : `Account ···${current.provider_account_id.slice(-4)}`} · {conn.mode} mode
+                        </span>
+                      </details>
                     </span>
                     <UnmapButton kind={kind} />
                   </div>

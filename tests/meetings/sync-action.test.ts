@@ -39,7 +39,7 @@ beforeEach(() => {
   h.importConnection.mockReset().mockImplementation(async () => h.importOut);
 });
 
-const run = () => syncNewMeetingsAction({}, new FormData());
+const run = () => syncNewMeetingsAction();
 
 describe("syncNewMeetingsAction", () => {
   it("imports once per connected source through importNowAction and reports the count", async () => {

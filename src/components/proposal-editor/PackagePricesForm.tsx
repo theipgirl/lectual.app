@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 import type { PricingValues } from "./PricingFields";
+import { packageExample } from "@/lib/proposals/package-example";
 
 type PackageRow = PricingValues & { key: number };
 
+
 /**
- * Settings → Client proposals → "Package prices": one fieldset per package, with
+ * Settings → Proposals → "Packages": one fieldset per package, with
  * the six fields the proposal editor uses, in dollars (whole cents are stored).
  * The first package is the default a new proposal starts from. "Add package"
  * starts from a copy of the last one's numbers, with a blank name that has to
@@ -29,6 +31,11 @@ export function PackagePricesSection({ packages }: { packages: PricingValues[] }
     setNextKey((k) => k + 1);
   }
 
+  // The typed value of one field, kept so the example line follows what is in the box.
+  function edit(key: number, field: keyof PricingValues, value: string) {
+    setRows((prev) => prev.map((r) => (r.key === key ? { ...r, [field]: value } : r)));
+  }
+
   function remove(key: number) {
     setRows((prev) => (prev.length > 1 ? prev.filter((r) => r.key !== key) : prev));
   }
@@ -38,7 +45,7 @@ export function PackagePricesSection({ packages }: { packages: PricingValues[] }
         <section className="lx-card pe-card pe-pkgs" aria-labelledby="package-prices-h">
           <header className="pe-card-head">
             <h2 className="pe-h" id="package-prices-h">
-              Package prices
+              Packages
             </h2>
             <p className="lx-note pe-hint">
               Dollars here, whole cents underneath. Totals are always worked out from these, never typed. USPTO fees are due at filing and are shown to the
@@ -56,29 +63,32 @@ export function PackagePricesSection({ packages }: { packages: PricingValues[] }
               <div className="lx-form-grid">
                 <label className="lx-field">
                   <span className="lx-label">Package name</span>
-                  <input className="lx-input" name={`pkg.${n}.package`} required maxLength={120} defaultValue={row.package} />
+                  <input className="lx-input" name={`pkg.${n}.package`} onChange={(e) => edit(row.key, "package", e.target.value)} required maxLength={120} defaultValue={row.package} />
                 </label>
                 <label className="lx-field">
                   <span className="lx-label">Price with the included classes ($)</span>
-                  <input className="lx-input" name={`pkg.${n}.base`} inputMode="decimal" required defaultValue={row.base} />
+                  <input className="lx-input" name={`pkg.${n}.base`} onChange={(e) => edit(row.key, "base", e.target.value)} inputMode="decimal" required defaultValue={row.base} />
                 </label>
                 <label className="lx-field">
                   <span className="lx-label">Classes included</span>
-                  <input className="lx-input" name={`pkg.${n}.includedClasses`} inputMode="numeric" required defaultValue={row.includedClasses} />
+                  <input className="lx-input" name={`pkg.${n}.includedClasses`} onChange={(e) => edit(row.key, "includedClasses", e.target.value)} inputMode="numeric" required defaultValue={row.includedClasses} />
                 </label>
                 <label className="lx-field">
                   <span className="lx-label">Price per extra class ($)</span>
-                  <input className="lx-input" name={`pkg.${n}.perClass`} inputMode="decimal" required defaultValue={row.perClass} />
+                  <input className="lx-input" name={`pkg.${n}.perClass`} onChange={(e) => edit(row.key, "perClass", e.target.value)} inputMode="decimal" required defaultValue={row.perClass} />
                 </label>
                 <label className="lx-field">
                   <span className="lx-label">Second mark discount (%)</span>
-                  <input className="lx-input" name={`pkg.${n}.secondMarkPct`} inputMode="decimal" required defaultValue={row.secondMarkPct} />
+                  <input className="lx-input" name={`pkg.${n}.secondMarkPct`} onChange={(e) => edit(row.key, "secondMarkPct", e.target.value)} inputMode="decimal" required defaultValue={row.secondMarkPct} />
                 </label>
                 <label className="lx-field">
                   <span className="lx-label">USPTO fee per class per mark ($)</span>
-                  <input className="lx-input" name={`pkg.${n}.govPerClass`} inputMode="decimal" required defaultValue={row.govPerClass} />
+                  <input className="lx-input" name={`pkg.${n}.govPerClass`} onChange={(e) => edit(row.key, "govPerClass", e.target.value)} inputMode="decimal" required defaultValue={row.govPerClass} />
                 </label>
               </div>
+              <p className="lx-note pe-example" aria-live="polite">
+                {packageExample(row).text}
+              </p>
             </fieldset>
           ))}
           <div className="pe-save">

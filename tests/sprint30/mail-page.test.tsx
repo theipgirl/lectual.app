@@ -33,6 +33,7 @@ async function renderMail(search: Record<string, string>, deps: Partial<import("
         return () => chain(rows);
       },
     });
+  vi.doMock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => "/dashboard/mail/", notFound: vi.fn() }));
   vi.doMock("@/lib/org/modules", () => ({ orgHasModule: vi.fn(async () => true) }));
   vi.doMock("@/lib/firm/session", () => ({ resolveFirmSession: vi.fn(async () => ({ kind: "ok", role: "owner", org: { id: "o" }, user: { id: "u" } })) }));
   vi.doMock("@/lib/db/scoped-client", () => ({

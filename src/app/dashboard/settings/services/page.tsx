@@ -6,6 +6,8 @@ import type { ServiceItemRow } from "@/lib/quotes/types";
 import { NewServiceItemForm, ServiceItemRowEditor } from "@/components/quotes/ServiceLibraryForms";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
+import { SERVICE_LIBRARY_READ_ONLY } from "@/lib/ui/words";
 
 export const metadata: Metadata = { title: pageTitle("Service library") };
 
@@ -62,7 +64,7 @@ export default async function ServiceLibraryPage() {
             Restricted to the firm&apos;s principals
           </h2>
           <p className="lx-note" style={{ margin: 0 }}>
-            The service library is managed by owners, admins and senior admins. Ask one of them for access.
+            {`${ADMIN_TIER_PHRASE} can manage the service library. Ask one of them for access.`}
           </p>
         </div>
       ) : loadError ? (
@@ -78,7 +80,7 @@ export default async function ServiceLibraryPage() {
             </details>
           ) : (
             <p className="lx-note" style={{ margin: 0 }}>
-              You can use these on quotes. Owners, admins and senior admins change the list.
+              {SERVICE_LIBRARY_READ_ONLY}
             </p>
           )}
           <section className="lx-card" style={{ padding: 18, display: "grid", gap: 8 }}>

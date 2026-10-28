@@ -9,6 +9,7 @@ import { pageTitle } from "@/lib/ui/page-title";
 import { SyncMeetingsControl } from "@/components/meetings/SyncMeetingsButton";
 import { canSyncMeetings, syncControl } from "@/lib/meetings/sync-access";
 import { reconnectSentence } from "@/lib/meetings/reconnect-copy";
+import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 
 export const metadata: Metadata = { title: pageTitle("Meetings") };
 
@@ -85,7 +86,7 @@ export default async function MeetingsPage({ searchParams }: { searchParams: Pro
       {conns.ok && connected.some((c) => c.status !== "active") && (
         <div role="alert" className="lx-banner lx-banner-risk">
           {reconnectSentence(connected.filter((c) => c.status !== "active").map((c) => PROVIDER_LABEL[c.provider]))}{" "}
-          {canManage ? <Link href="/dashboard/settings/integrations/meetings/">Reconnect</Link> : "Ask an owner or admin to reconnect it."}
+          {canManage ? <Link href="/dashboard/settings/integrations/meetings/">Reconnect</Link> : `${ADMIN_TIER_PHRASE} can reconnect it.`}
         </div>
       )}
 
@@ -123,7 +124,7 @@ export default async function MeetingsPage({ searchParams }: { searchParams: Pro
                   </Link>
                 </div>
               ) : (
-                <p className="lx-note" style={{ margin: 0 }}>An owner or admin connects it in Settings → Integrations.</p>
+                <p className="lx-note" style={{ margin: 0 }}>{ADMIN_TIER_PHRASE} can connect it in Settings → Integrations.</p>
               )}
             </>
           )}

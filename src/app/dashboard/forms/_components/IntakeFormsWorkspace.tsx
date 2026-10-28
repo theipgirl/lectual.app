@@ -29,6 +29,7 @@ import { IntakeQrButton } from "./IntakeQr";
 import { AssessmentPreview, AssessmentSettingsCard } from "./AssessmentSettings";
 import { OptionsEditor, QuestionTypeSelect } from "./ChoiceEditor";
 import { isChoice, questionType } from "@/lib/intake-forms/choice";
+import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 
 /**
  * Intake → Forms (design/Intake_Forms.dc.html): the header, the two tabs,
@@ -365,7 +366,7 @@ export function IntakeFormsWorkspace(props: Props) {
           <fieldset className="ifm-editor" disabled={!canEdit}>
             {!canEdit && (
               <div className="lx-banner lx-banner-mute" style={{ fontSize: 14 }}>
-                You can look but not change. Owners, admins and senior admins edit the intake.
+                You can look but not change. {ADMIN_TIER_PHRASE} can edit the intake.
               </div>
             )}
             {saveError && (

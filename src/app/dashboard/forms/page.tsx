@@ -19,6 +19,7 @@ import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import "./forms.css";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 
 export const metadata: Metadata = { title: pageTitle("Intake forms") };
 
@@ -183,7 +184,7 @@ function IntakeEmpty({ status }: { status: "none" | "unconfigured" | "unavailabl
               ? "Lectual will turn them on. Nothing is broken."
               : status === "unavailable"
                 ? "Can't show this intake right now. Nothing was changed. Refresh to try again."
-                : "An owner, admin or senior admin sets it up here."}
+                : `${ADMIN_TIER_PHRASE} can set it up here.`}
           </p>
         </div>
       </>

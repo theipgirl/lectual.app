@@ -21,14 +21,14 @@ describe("shown", () => {
   it.each([...ADMIN_TIER])("%s sees 'Finish setting up · N of 10', the first open item and a Continue setup link", async (role) => {
     const { html } = await renderCard(role, PARTLY);
     expect(html).toContain("Finish setting up · 3 of 10");
-    expect(html).toContain("Next: Outlook mailbox connected");
+    expect(html).toContain("Next: Connect Outlook");
     expect(html).toMatch(/href="\/dashboard\/settings\/setup\/?"[^>]*>Continue setup</);
     expect(html).not.toContain("couldn't be checked");
   });
 
   it("names the first item that is not done, even when it is a couldn't-check", async () => {
     const { html } = await renderCard("owner", { ...PARTLY, profile: bad });
-    expect(html).toContain("Next: Firm profile and sign-off");
+    expect(html).toContain("Next: Add your firm name and sign-off");
   });
 
   it("with two items unreadable it still shows, counts only done items, and says 2 couldn't be checked", async () => {
