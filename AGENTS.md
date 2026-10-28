@@ -1099,3 +1099,29 @@ No migration, no dependency, nothing sends. Pricing is untouched.
 - **Results "Where they came from"** (`WhereTheyCameFrom`, `where-from.ts`): counts by source then campaign, "Direct (no tag)", three states, the 5,000-row cap noted.
 - **Closed link:** `readPublicIntake` returns `closed` ONLY for an archived slug (firm display name, else org name, plus the oldest live intake's slug); draft and unknown stay identical `not_found`. No firm-website link: the profile has no website column.
 - **Public small print:** the disclaimer constant is unchanged and renders after the frame on every state; `.ipub-upl`, `.ipub-small` and the consent are >= 13.5px.
+
+## Classes the client describes on the proposal page (Spec 3, 2026-10-28, no schema)
+"We don't know which classes they want": the firm can leave a class blank for the client to fill in, and let them add more. Nothing sends; pricing rules are unchanged.
+**Supersedes Sprint 28's "client adds a class"**: adding is now only where the firm allows it, text is cleaned rather than refused, and the client's words go into the firm's Lawmatics note.
+- **Content (jsonb, no migration):** `ProposalClass.client_entry: true` is an OPEN class; its `label` is the question the client reads (default
+  `DEFAULT_CLIENT_ENTRY_PROMPT`, "Describe what you sell or offer under this mark"). `ProposalName.client_add: { max }` (0..10) lets the client add that many open classes.
+  `validateContent`: `client_entry` true or absent; `max` an integer 0..10; listed classes (still at most 3) + `max` <= 10. `isFixedOffer` is false with an open class or
+  `max > 0` (`max: 0` adds nothing and stays fixed). `publicContent` keeps `client_add.max`, `client_entry`, `prompt`.
+- **One builder, one price path** (`src/lib/proposals/client-classes.ts`, pure): `quoteWithClientClasses(content, selection, input, { repair? })` builds the EFFECTIVE content
+  (open classes take the client's text as `label`, the question kept in `prompt`; added classes appended as `ca-<nameId>-<n>` with `client_added: true`), prices it with
+  `quoteProposal`, and reports `missing` (ticked open/added classes with no text). The page's live total, the `$0` lock and the accept path all go through it.
+- **Accept** (`acceptProposalAction(token, selection, clientClasses)`; `clientClasses` = `{ entries: { <classId>: text }, added: { <nameId>: [{ text, on }] } }`, nothing money-shaped).
+  `parseClientClassInput` drops unknown ids, entries for classes that are not open, adds for names without `client_add` and past `max`, and unticked empty adds; `cleanClientText`
+  turns control characters into spaces, removes `<` `>`, collapses whitespace, trims, caps at 200. A ticked open/added class with no text is refused with `DESCRIBE_BEFORE_ACCEPT`
+  ("Describe each selected class before accepting.", reason `missing_description`), writing nothing. The effective content is `accepted_snapshot.content`, the effective selection
+  is `accepted_selection`, the quote is recomputed from them and `quoteHasItems` is checked again.
+- **Client page:** an open class is its checkbox row plus a labelled text box under it (outside the label); "Add a class" (only with `client_add`, until `max`) adds a ticked row with
+  its own checkbox, text box and Remove. Accept is disabled with the sentence while a ticked one is empty; unticked ones need nothing. A receipt shows the stored words read-only.
+  Preview (the editor) uses the same component, typing allowed, Accept stays "Preview".
+- **Where the words appear:** the receipt, the staff proposal page ("Classes described by the client" / "Classes the client added", labelled as the client's own words) and the
+  accepted log line, the LOE adapter (class labels from the snapshot quote) and the Lawmatics note (marked "(described by the client)" / "(added by the client)"). The in-app accept
+  notice, the timeline step payloads and every log carry only the count and the legal total. Client text is React text, never HTML, reaches no model prompt here, and is never logged.
+- **Editor:** per class "Client describes this class" (`class.<n>.clientEntry`; blank question = the default prompt), per brand name "Let the client add classes" (`clientAddMax`, 0 to 10,
+  blank or 0 = off) in `parseName`. Not verified in a real browser at phone width: CSS and markup are tested only.
+- Existing assertions changed on purpose: Sprint 28's add-class page, accept, follow-up (the note now names the client's words), LOE and source-guard tests moved to the new shapes;
+  `tests/client-proposal/commitment.test.tsx`'s "leaves pricing.ts untouched" compares with HEAD, so it passes once `isFixedOffer`'s change is committed.

@@ -62,13 +62,15 @@ describe("closed client proposal pages carry no add-class control", () => {
   });
 
   it("a superseded version's token resolves to the family's live view, which offers add-class", async () => {
+    const content = sevetri();
+    content.names[0].client_add = { max: 2 };
     mocks.read.mockResolvedValue({
       status: "ok",
       handle: { orgId: "o", proposalId: "p2" },
-      view: { status: "sent", version: 2, title: "Trademark Proposal", clientName: "Sevetri Wilson", expiresOn: "2026-12-01", firm: FIRM, content: sevetri(), payUrl: null },
+      view: { status: "sent", version: 2, title: "Trademark Proposal", clientName: "Sevetri Wilson", expiresOn: "2026-12-01", firm: FIRM, content, payUrl: null },
     });
     const html = await renderPage();
-    expect(html).toContain("cp-add-input");
+    expect(html).toContain("cp-add-btn");
   });
 
   it("the accepted view is read-only: no add-class control", async () => {

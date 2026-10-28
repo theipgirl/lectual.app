@@ -7,7 +7,7 @@ import { runAcceptanceFollowups, type FollowupDb } from "./accept-followups";
 import { firmDisplayName } from "./commitment";
 import { contactLine, firmContactFromSignoff } from "./firm-contact";
 import { isProposalExpired } from "./expiry";
-import { ADDED_CLASS_REFUSAL, parseAddedClasses, quoteWithAddedClasses } from "./added-classes";
+import { DESCRIBE_BEFORE_ACCEPT, parseClientClassInput, quoteWithClientClasses } from "./client-classes";
 import { normalizeSelection, quoteHasItems } from "./pricing";
 import {
   isWellFormedProposalToken,
@@ -281,8 +281,9 @@ export function publicContent(raw: unknown): ProposalContent {
   out.names = objects(c.names).map((nm) => {
     const name = pick(nm, ["id", "name", "what", "note"]);
     if (isObject(nm.price_override)) name.price_override = pick(nm.price_override, ["base_cents", "per_class_cents"]);
+    if (isObject(nm.client_add)) name.client_add = pick(nm.client_add, ["max"]);
     name.marks = objects(nm.marks).map((m) => pick(m, ["id", "kind", "desc", "preselected"]));
-    name.classes = objects(nm.classes).map((cl) => pick(cl, ["id", "label", "preselected", "client_added"]));
+    name.classes = objects(nm.classes).map((cl) => pick(cl, ["id", "label", "preselected", "client_added", "client_entry", "prompt"]));
     return name;
   });
   out.adjustments = objects(c.adjustments).map((a) => pick(a, ["id", "label", "kind", "value"]));
@@ -514,8 +515,8 @@ export type AcceptRefusal =
   | "already_resolved"
   /** The selection has no brand name with both a mark and a class ticked. */
   | "nothing_selected"
-  /** An added class is over the limits, malformed, or names a brand name the proposal does not have. */
-  | "invalid_added"
+  /** A ticked class the client describes (open or added) has no description. */
+  | "missing_description"
   | "unconfigured"
   | "unavailable";
 
@@ -537,7 +538,7 @@ const REFUSAL_MESSAGE: Record<AcceptRefusal, string> = {
   closed: "This proposal is no longer open. Please contact the firm.",
   already_resolved: "This proposal has already been accepted.",
   nothing_selected: "Choose at least one mark and one class to accept.",
-  invalid_added: ADDED_CLASS_REFUSAL,
+  missing_description: DESCRIBE_BEFORE_ACCEPT,
   unconfigured: "This page isn't available right now. Please try again later.",
   unavailable: "We couldn't record your acceptance. Please try again.",
 };
@@ -562,8 +563,12 @@ export async function acceptPublicProposal(
   selection: unknown,
   now: Date,
   db?: PublicProposalsDb,
-  /** Added-class DESCRIPTIONS by brand name id: the only other thing the browser may send. */
-  addedClasses?: unknown,
+  /**
+   * What the client wrote, the only other thing the browser may send:
+   * `{ entries: { <open class id>: text }, added: { <brand name id>: [{ text, on }] } }`. Checked and cleaned by
+   * `parseClientClassInput`, never trusted.
+   */
+  clientClasses?: unknown,
 ): Promise<AcceptResult> {
   const read = await readPublicProposal(token, now, db);
   if (read.status === "unconfigured") return refuse("unconfigured");
@@ -573,14 +578,17 @@ export async function acceptPublicProposal(
   if (read.handle.storedStatus !== "sent") return refuse("already_resolved");
 
   const picked = normalizeSelection(read.view.content, selection);
-  const parsed = parseAddedClasses(read.view.content, picked, addedClasses);
-  if (!parsed.ok) return refuse("invalid_added");
-  // One price path: the stored content plus the ticks plus the added descriptions,
-  // through the helper the page uses. A mark ticked with no class is repaired to
-  // its first class; one with no class to fall back on is refused.
-  const priced = quoteWithAddedClasses(read.view.content, picked, parsed.added, { repair: true });
+  // Unknown ids, entries for classes that are not open, adds past a brand name's max (or for a brand
+  // name without one) are dropped; every description is cleaned.
+  const input = parseClientClassInput(read.view.content, clientClasses);
+  // One price path: the stored content plus the ticks plus what the client wrote, through the
+  // helper the page uses. The result is the EFFECTIVE content (open classes carry the client's
+  // words, added classes have server-made ids), and that is what is quoted and stored. A mark
+  // ticked with no class is repaired to its first class; one with no class to fall back on is refused.
+  const priced = quoteWithClientClasses(read.view.content, picked, input, { repair: true });
   if (!priced.ok) return refuse("nothing_selected");
   const { content, selection: finalSelection, quote } = priced;
+  if (priced.missing.length > 0) return refuse("missing_description");
   if (!quoteHasItems(quote)) return refuse("nothing_selected");
 
   const acceptedAt = now.toISOString();

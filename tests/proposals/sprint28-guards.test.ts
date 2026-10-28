@@ -22,30 +22,30 @@ describe("one price calculation", () => {
     expect(hits).toEqual([]);
   });
 
-  it("the page and the accept path both price through quoteWithAddedClasses", () => {
-    expect(read("src/components/client-proposal/ProposalDocument.tsx")).toContain("quoteWithAddedClasses(");
-    expect(read("src/lib/proposals/public.ts")).toContain("quoteWithAddedClasses(");
-    expect(read("src/lib/proposals/added-classes.ts")).toContain("quoteProposal(");
+  it("the page and the accept path both price through quoteWithClientClasses (Spec 3's one effective-content builder)", () => {
+    expect(read("src/components/client-proposal/ProposalDocument.tsx")).toContain("quoteWithClientClasses(");
+    expect(read("src/lib/proposals/public.ts")).toContain("quoteWithClientClasses(");
+    expect(read("src/lib/proposals/client-classes.ts")).toContain("quoteProposal(");
   });
 });
 
 describe("nothing money-shaped is read from the browser in the accept action", () => {
-  it("acceptProposalAction takes the token, the ticks and the added descriptions only", () => {
+  it("acceptProposalAction takes the token, the ticks and what the client wrote only", () => {
     const src = read("src/app/p/[token]/actions.ts");
-    expect(src).toMatch(/acceptProposalAction\(token: string, selection: unknown, addedClasses\?: unknown\)/);
+    expect(src).toMatch(/acceptProposalAction\(token: string, selection: unknown, clientClasses\?: unknown\)/);
     expect((src.split("export async function")[1] ?? "").match(/price|total|cents|classCount/i)).toBeNull();
   });
 
   it("acceptPublicProposal's signature has no money parameter", () => {
     const src = read("src/lib/proposals/public.ts");
     const sig = src.slice(src.indexOf("export async function acceptPublicProposal("), src.indexOf("): Promise<AcceptResult>"));
-    expect(sig.replace(/addedClasses/g, "").match(/price|total|cents|class_?count/i)).toBeNull();
+    expect(sig.replace(/clientClasses/g, "").match(/price|total|cents|class_?count/i)).toBeNull();
   });
 });
 
 describe("client-added text", () => {
   it("is never logged by the modules that handle it", () => {
-    for (const f of ["src/lib/proposals/added-classes.ts", "src/lib/proposals/class-lock.ts", "src/lib/proposals/added-view.ts", "src/lib/proposals/public.ts"]) {
+    for (const f of ["src/lib/proposals/client-classes.ts", "src/lib/proposals/class-lock.ts", "src/lib/proposals/added-view.ts", "src/lib/proposals/public.ts"]) {
       expect(read(f), f).not.toMatch(/console\.(log|info|warn|error)/);
     }
   });
@@ -53,7 +53,7 @@ describe("client-added text", () => {
 
 describe("hard rules", () => {
   const touched = [
-    "src/lib/proposals/added-classes.ts",
+    "src/lib/proposals/client-classes.ts",
     "src/lib/proposals/class-lock.ts",
     "src/lib/proposals/added-view.ts",
     "src/lib/proposals/lead-link.ts",

@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { classLock } from "@/lib/proposals/class-lock";
+import { DEFAULT_CLIENT_ENTRY_PROMPT, MAX_CLIENT_ADD } from "@/lib/proposals/client-classes";
 import { MARK_KIND_DEFAULT_DESC, MARK_KIND_LABEL, MARK_KINDS, type MarkKind, type ProposalInclude } from "@/lib/proposals/types";
 import {
   addNameAction,
@@ -254,7 +255,9 @@ export type NameValues = {
   overrideBase: string;
   overridePerClass: string;
   marks: { id: string; kind: MarkKind; desc: string; preselected: boolean }[];
-  classes: { id: string; label: string; preselected: boolean }[];
+  classes: { id: string; label: string; preselected: boolean; clientEntry?: boolean }[];
+  /** "Let the client add classes": the most they may add, "0" (or "") when off. */
+  clientAddMax?: string;
 };
 
 /* The marks and classes of every brand name are held in one place, because Step 2 draws their pickers and
@@ -310,6 +313,8 @@ function useNameRows(value: NameValues) {
     removeClass: (key: string) => ctx.change(value.id, (r) => ({ ...r, classes: r.classes.filter((x) => x.key !== key) })),
     setClassTicked: (key: string, preselected: boolean) =>
       ctx.change(value.id, (r) => ({ ...r, classes: r.classes.map((x) => (x.key === key ? { ...x, preselected } : x)) })),
+    setClassOpen: (key: string, clientEntry: boolean) =>
+      ctx.change(value.id, (r) => ({ ...r, classes: r.classes.map((x) => (x.key === key ? { ...x, clientEntry } : x)) })),
   };
 }
 
@@ -408,14 +413,33 @@ export function NameCard({ proposalId, updatedAt, editable, issues, value }: Com
 
             <div className="pe-sub">
               <div className="lx-label">Classes (what the brand is used for)</div>
-              <p className="lx-note pe-hint">Describe each in plain business language, like “Cloud-based software”. Never an International Class number. Every package includes one class.</p>
+              <p className="lx-note pe-hint">
+                Describe each in plain business language, like “Cloud-based software”. Never an International Class number. Every package includes one
+                class. Not sure what they sell? Tick “Client describes this class” and the box becomes the question the client answers.
+              </p>
               <div className="pe-rows">
                 {rows.classes.map((c, i) => {
                   const locked = lock?.classId === c.id;
                   return (
                     <div key={c.key} className="pe-class-row">
                       <input type="hidden" name={`class.${i}.id`} value={c.id} />
-                      <input className="lx-input" name={`class.${i}.label`} defaultValue={c.label} aria-label="Class description" maxLength={300} />
+                      <input
+                        className="lx-input"
+                        name={`class.${i}.label`}
+                        defaultValue={c.label}
+                        aria-label={c.clientEntry ? "Question the client answers" : "Class description"}
+                        placeholder={c.clientEntry ? DEFAULT_CLIENT_ENTRY_PROMPT : undefined}
+                        maxLength={300}
+                      />
+                      <label className="pe-check">
+                        <input
+                          type="checkbox"
+                          name={`class.${i}.clientEntry`}
+                          checked={c.clientEntry === true}
+                          onChange={(e) => rows.setClassOpen(c.key, e.target.checked)}
+                        />
+                        <span>Client describes this class</span>
+                      </label>
                       <label className="pe-check">
                         {/* A disabled box is not posted, so a locked one is posted by the hidden twin beside it. */}
                         {locked ? <input type="hidden" name={`class.${i}.preselected`} value="on" /> : null}
@@ -439,12 +463,29 @@ export function NameCard({ proposalId, updatedAt, editable, issues, value }: Com
                 })}
                 {editable && (
                   <div className="pe-add">
-                    <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={() => rows.addClass({ id: newRowId("c"), label: "", preselected: true })}>
+                    <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={() => rows.addClass({ id: newRowId("c"), label: "", preselected: true, clientEntry: false })}>
                       + Add class
                     </button>
                   </div>
                 )}
               </div>
+              <label className="lx-field pe-client-add">
+                <span className="lx-label">Let the client add classes (how many, 0 to {MAX_CLIENT_ADD})</span>
+                <input
+                  className="lx-input"
+                  name="clientAddMax"
+                  type="number"
+                  min={0}
+                  max={MAX_CLIENT_ADD}
+                  step={1}
+                  inputMode="numeric"
+                  defaultValue={value.clientAddMax && value.clientAddMax !== "0" ? value.clientAddMax : "0"}
+                  aria-describedby={`pe-client-add-${value.id}`}
+                />
+                <span className="lx-note" id={`pe-client-add-${value.id}`}>
+                  0 is off. Each class the client adds is priced like any other class, and they describe it in their own words.
+                </span>
+              </label>
             </div>
 
             <IssueList issues={issues} />

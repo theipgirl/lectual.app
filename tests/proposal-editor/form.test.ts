@@ -20,6 +20,7 @@ import {
 import { standardProposalPricing } from "@/lib/proposals/types";
 import { quoteProposal, defaultSelection } from "@/lib/proposals/pricing";
 import { validateContent } from "@/lib/proposals/validate";
+import { DEFAULT_CLIENT_ENTRY_PROMPT } from "@/lib/proposals/client-classes";
 import { sevetri } from "../proposals/fixture";
 
 function fd(entries: Record<string, string>): FormData {
@@ -171,6 +172,37 @@ describe("a brand name form", () => {
 
   it("refuses an unknown mark kind", () => {
     expect(parseName(form({ "mark.0.kind": "sound" }), content, rand).ok).toBe(false);
+  });
+
+  it("Spec 3: 'Client describes this class' sets client_entry, and a blank question gets the default prompt", () => {
+    const r = parseName(form({ "class.0.clientEntry": "on", "class.0.label": "" }), content, rand);
+    if (!r.ok) throw new Error("parse");
+    expect(r.value.classes[0]).toEqual({ id: "p-c1", label: DEFAULT_CLIENT_ENTRY_PROMPT, preselected: true, client_entry: true });
+    const own = parseName(form({ "class.0.clientEntry": "on", "class.0.label": "What do you sell online?" }), content, rand);
+    expect(own.ok && own.value.classes[0]).toEqual({ id: "p-c1", label: "What do you sell online?", preselected: true, client_entry: true });
+    // off: no marker at all
+    const off = parseName(form(), content, rand);
+    expect(off.ok && "client_entry" in off.value.classes[0]).toBe(false);
+  });
+
+  it("Spec 3: 'Let the client add classes' is client_add.max 1..10; blank or 0 is off; anything else is refused", () => {
+    const three = parseName(form({ clientAddMax: "3" }), content, rand);
+    expect(three.ok && three.value.client_add).toEqual({ max: 3 });
+    for (const off of ["", "0"]) {
+      const r = parseName(form({ clientAddMax: off }), content, rand);
+      expect(r.ok && "client_add" in r.value).toBe(false);
+    }
+    for (const bad of ["11", "-1", "1.5", "two"]) {
+      expect(parseName(form({ clientAddMax: bad }), content, rand)).toEqual({ ok: false, error: "Classes the client may add: enter a whole number from 0 to 10." });
+    }
+  });
+
+  it("Spec 3: an open class and client_add pass the validator once saved", () => {
+    const r = parseName(form({ "class.0.clientEntry": "on", "class.0.label": "", clientAddMax: "2" }), content, rand);
+    if (!r.ok) throw new Error("parse");
+    const replaced = replaceName(content, r.value);
+    if (!replaced.ok) throw new Error("replace");
+    expect(validateContent(replaced.value).filter((i) => i.level === "error" && i.path.startsWith("names[0]"))).toEqual([]);
   });
 
   it("replaces only that brand name, and refuses if it was removed meanwhile", () => {

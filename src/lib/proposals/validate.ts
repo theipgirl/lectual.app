@@ -29,6 +29,7 @@
  */
 
 import { isMarkKind } from "./types";
+import { MAX_CLASSES_TOTAL_PER_BRAND, MAX_CLIENT_ADD } from "./client-classes";
 import { validatePackages } from "./package-list";
 
 export type ValidationLevel = "error" | "warning";
@@ -356,10 +357,32 @@ export function validateContent(content: unknown, options: ValidateOptions = {})
       const cp = `${p}.classes[${j}]`;
       if (!isObj(c)) return err(cp, "This class is not readable.");
       claim(str(c.id).trim(), cp);
-      if (!str(c.label).trim()) err(`${cp}.label`, "Describe this class in plain business language.");
+      if (!str(c.label).trim()) {
+        err(
+          `${cp}.label`,
+          c.client_entry === true
+            ? "Write the question the client answers for this class."
+            : "Describe this class in plain business language.",
+        );
+      }
       textIssues(`${cp}.label`, str(c.label), out);
       if (typeof c.preselected !== "boolean") err(`${cp}.preselected`, "Say whether this class starts ticked.");
+      if (c.client_entry != null && c.client_entry !== true) err(`${cp}.client_entry`, "Say whether the client describes this class.");
     });
+    // Spec 3: the client may add up to `client_add.max` open classes to this brand name.
+    let addMax = 0;
+    if (raw.client_add != null) {
+      const max = isObj(raw.client_add) ? raw.client_add.max : undefined;
+      if (typeof max !== "number" || !Number.isInteger(max) || max < 0 || max > MAX_CLIENT_ADD) {
+        err(`${p}.client_add`, `Classes the client may add must be a whole number from 0 to ${MAX_CLIENT_ADD}.`);
+      } else addMax = max;
+    }
+    if (classes.length + addMax > MAX_CLASSES_TOTAL_PER_BRAND) {
+      err(
+        `${p}.client_add`,
+        `This brand name could reach ${classes.length + addMax} classes. Keep the listed classes plus the ones the client may add to ${MAX_CLASSES_TOTAL_PER_BRAND} or fewer.`,
+      );
+    }
     if (classes.length > MAX_CLASSES_PER_BRAND) {
       err(
         `${p}.classes`,

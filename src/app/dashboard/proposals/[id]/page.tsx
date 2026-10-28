@@ -17,7 +17,8 @@ import { FIRST_PROBLEM_ID, describeIssuePath, firstProblem, groupIssues } from "
 import { firstNameOf, joinOr, statusLabel, statusTone } from "@/lib/proposal-editor/labels";
 import { moneyInput } from "@/lib/proposal-editor/form";
 import { editorChangedCount, shouldOpenMore } from "@/lib/proposal-editor/more-options";
-import { addedClassesPhrase, clientAddedClasses } from "@/lib/proposals/added-view";
+import { addedClassesPhrase, clientAddedClasses, clientDescribedClasses } from "@/lib/proposals/added-view";
+import { clientAddMax } from "@/lib/proposals/client-classes";
 import { findPackage, normalisePackages } from "@/lib/proposals/package-list";
 import { loadLeadLink } from "@/lib/proposals/lead-link";
 import { loadLeadOptions } from "@/lib/proposals/lead-options";
@@ -188,14 +189,23 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
   const versionOf = new Map(versions.map((v) => [v.id, v.version]));
   // What the client added on the page (accepted versions only), for staff.
   const clientAdded = clientAddedClasses(proposal.accepted_snapshot);
+  const clientDescribed = clientDescribedClasses(proposal.accepted_snapshot);
   const addedPhrase = addedClassesPhrase(clientAdded);
 
   const log = events.map((e) => {
     const line = describeProposalEvent(e, { names: nameOf, versions: versionOf });
     // The accepted line of THIS version also says what the client added.
-    if (e.type === "accepted" && e.proposal_id === proposal.id && clientAdded.length > 0) {
+    if (e.type === "accepted" && e.proposal_id === proposal.id && (clientAdded.length > 0 || clientDescribed.length > 0)) {
       return {
-        line: { ...line, what: `${line.what}, ${addedPhrase}`, details: [...line.details, ...clientAdded.map((a) => `Added for ${a.brand}: ${a.description}`)] },
+        line: {
+          ...line,
+          what: addedPhrase ? `${line.what}, ${addedPhrase}` : line.what,
+          details: [
+            ...line.details,
+            ...clientDescribed.map((d) => `Described by the client for ${d.brand}: ${d.description}`),
+            ...clientAdded.map((a) => `Added for ${a.brand}: ${a.description}`),
+          ],
+        },
         type: e.type,
       };
     }
@@ -211,7 +221,8 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
       overrideBase: moneyInput(n.price_override?.base_cents),
       overridePerClass: moneyInput(n.price_override?.per_class_cents),
       marks: (n.marks ?? []).map((m) => ({ id: m.id, kind: m.kind, desc: m.desc, preselected: m.preselected })),
-      classes: (n.classes ?? []).map((c) => ({ id: c.id, label: c.label, preselected: c.preselected })),
+      classes: (n.classes ?? []).map((c) => ({ id: c.id, label: c.label, preselected: c.preselected, clientEntry: c.client_entry === true })),
+      clientAddMax: String(clientAddMax(n)),
     }),
   );
 
@@ -432,6 +443,20 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
                   <dd>{formatCents(proposal.accepted_snapshot.quote.gov_total_cents)}</dd>
                 </div>
               </dl>
+              {clientDescribed.length > 0 && (
+                <div className="pe-client-added">
+                  <div className="lx-label">Classes described by the client ({clientDescribed.length})</div>
+                  <ul>
+                    {clientDescribed.map((d, n) => (
+                      <li key={n}>
+                        <strong>{d.brand}</strong>: {d.description}
+                        {d.prompt ? <span className="lx-note"> (asked: {d.prompt})</span> : null}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="lx-note">Entered by the client on the proposal page, in their own words.</p>
+                </div>
+              )}
               {clientAdded.length > 0 && (
                 <div className="pe-client-added">
                   <div className="lx-label">Classes the client added ({clientAdded.length})</div>

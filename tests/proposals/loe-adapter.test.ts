@@ -11,7 +11,7 @@ import {
   loeVariantFor,
   LOE_REFUSAL_TEXT,
 } from "@/lib/proposals/loe-adapter";
-import { quoteWithAddedClasses } from "@/lib/proposals/added-classes";
+import { quoteWithClientClasses } from "@/lib/proposals/client-classes";
 import { sevetri } from "./fixture";
 import { acceptedSnapshot, CONCIERGE } from "./accepted-fixture";
 
@@ -238,7 +238,8 @@ describe("Sprint 28: a snapshot with a client-added class", () => {
   it("gives the LOE the larger class count, the added class in the class list and the higher amount paid", () => {
     const base = acceptedSnapshot({ classes: 3, packageName: "Concierge" });
     const plain = adapt(base);
-    const priced = quoteWithAddedClasses(base.content, base.selection, { p: ["Online store services"] });
+    const content = { ...base.content, names: base.content.names.map((n) => (n.id === "p" ? { ...n, client_add: { max: 1 } } : n)) };
+    const priced = quoteWithClientClasses(content, base.selection, { entries: {}, added: { p: [{ text: "Online store services", on: true }] } });
     if (!priced.ok) throw new Error("priced");
     const added = { ...base, content: priced.content, selection: priced.selection, quote: priced.quote };
     const input = adapt(added);
