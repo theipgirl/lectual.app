@@ -95,14 +95,16 @@ describe("Integrations index: a pill on every card", () => {
     expect(pillIn(html, "meetings-title")).toBe("Not connected");
     expect(rowPill(html, "Google Workspace")).toBe("Connected");
     expect(rowPill(html, "Microsoft 365")).toBe("Not connected");
-    expect(rowPill(html, "Email \\(IMAP\\)")).toBe("Coming soon");
-    expect(rowPill(html, "AI assistants")).toBe("Coming soon");
+    // Sprint 33: the IMAP and AI-assistant placeholder rows are gone.
+    expect(html).not.toContain("Email (IMAP)");
+    expect(html).not.toContain("AI assistants");
+    expect(html).not.toContain("Coming soon");
   });
 
   it("a failed Lawmatics, LawPay and meetings read shows Couldn't check, never Not connected, on those three", async () => {
     const html = await index({ ...SEEDED, lawmatics: { ok: false }, lawpay: { ok: false }, meetings: { ok: false } });
     for (const id of ["lawmatics-title", "lawpay-title", "meetings-title"]) expect(pillIn(html, id), id).toBe("Couldn't check");
-    const cards = html.slice(html.indexOf('id="lawmatics-title"'), html.indexOf('aria-label="Services"'));
+    const cards = html.slice(html.indexOf('id="lawmatics-title"'), html.indexOf('id="meetings-title"') + 400);
     expect(cards).not.toContain("Not connected");
   });
 
@@ -166,7 +168,7 @@ describe("Integrations index: nothing existing is lost", () => {
     expect(without).not.toContain("What we read");
     // The cards that do not depend on the module are still there.
     expect(pillIn(without, "lawmatics-title")).toBe("Not connected");
-    expect(rowPill(without, "AI assistants")).toBe("Coming soon");
+    expect(without).not.toContain("Coming soon");
   });
 
   it("keeps the connected and error banners and the mailbox row controls", async () => {
@@ -264,8 +266,9 @@ describe("the pages draw their integration cards through the shared components",
   const meet = fs.readFileSync("src/app/dashboard/settings/integrations/meetings/page.tsx", "utf8");
 
   it("import the shared header in both, and no hand-written pill or card heading remains", () => {
+    expect(index).toContain("@/components/integrations/IntegrationRow");
     for (const src of [index, meet]) {
-      expect(src).toContain("@/components/integrations/IntegrationHeader");
+      if (src === meet) expect(src).toContain("@/components/integrations/IntegrationHeader");
       expect(src).not.toMatch(/lx-pill/);
       expect(src).not.toMatch(/<h2[^>]*lx-h2/);
     }

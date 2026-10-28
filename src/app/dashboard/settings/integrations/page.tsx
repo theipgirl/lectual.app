@@ -14,28 +14,14 @@ import { PROVIDER_LABEL, PROVIDERS, hasCalendarScope, isProvider, type MailboxPr
 import { relativeTime } from "@/lib/relative-time";
 import { ProviderMark } from "@/components/mailbox/ProviderMark";
 import { DisconnectButton } from "@/components/mailbox/DisconnectButton";
-import { IntegrationHeader } from "@/components/integrations/IntegrationHeader";
+import { IntegrationRow, ROW_ICON, RowIcon } from "@/components/integrations/IntegrationRow";
 import { ModeBadge, StatusPill } from "@/components/integrations/StatusPill";
 import { stateForStatus, type IntegrationState } from "@/components/integrations/states";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
-import { FROM_THEIR_EMAILS, integrationErrorLine, LAWPAY_NOT_ISSUED } from "@/lib/ui/words";
+import { FROM_THEIR_EMAILS, integrationErrorLine, LAWPAY_NOT_ISSUED, SWITCH_ON_WORDS } from "@/lib/ui/words";
 
 export const metadata: Metadata = { title: pageTitle("Integrations") };
-
-/** Shown so the section has its full shape; none of these connect to anything yet. */
-const SOON = [
-  {
-    name: "Email (IMAP)",
-    sub: "Connect any other mailbox with an app password, for firms not on Gmail or Outlook.",
-    icon: "M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM16 12v1.5a2.5 2.5 0 0 0 5 0V12a9 9 0 1 0-3.5 7.1",
-  },
-  {
-    name: "AI assistants",
-    sub: "Connect Claude, ChatGPT or any MCP client to your workspace.",
-    icon: "M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM18 15l.9 2.1L21 18l-2.1.9L18 21l-.9-2.1L15 18l2.1-.9z",
-  },
-];
 
 function connectHref(provider: MailboxProvider, scope: "personal" | "firm") {
   return `/api/mailbox/connect/${provider}/?scope=${scope}`;
@@ -59,14 +45,19 @@ function ConnectButton(props: {
       {inner}
     </a>
   ) : (
-    <span
-      className="lx-btn lx-btn-sec lx-btn-sm"
-      aria-disabled="true"
-      title={`${PROVIDER_LABEL[props.provider]} isn't switched on yet. Lectual is setting it up.`}
-      style={{ opacity: 0.5, cursor: "not-allowed" }}
-    >
-      {inner}
-    </span>
+    <>
+      <span
+        className="lx-btn lx-btn-sec lx-btn-sm"
+        aria-disabled="true"
+        aria-describedby={`switch-on-${props.provider}-${props.scope}`}
+        style={{ opacity: 0.5, cursor: "not-allowed" }}
+      >
+        {inner}
+      </span>
+      <span id={`switch-on-${props.provider}-${props.scope}`} className="lx-note">
+        {SWITCH_ON_WORDS}
+      </span>
+    </>
   );
 }
 
@@ -235,8 +226,11 @@ export default async function IntegrationsPage({
                 <span aria-hidden="true">↗</span> Connect {PROVIDER_LABEL[p]}
               </a>
             ) : (
-              <span key={p} className={`lx-btn ${p === "google" ? "lx-btn-cream" : "lx-btn-glass"}`} aria-disabled="true" title={`${PROVIDER_LABEL[p]} isn't switched on yet. Lectual is setting it up.`} style={{ opacity: 0.55, cursor: "not-allowed" }}>
+              <span key={p} className={`lx-btn ${p === "google" ? "lx-btn-cream" : "lx-btn-glass"}`} aria-disabled="true" aria-describedby={`switch-on-hero-${p}`} style={{ opacity: 0.55, cursor: "not-allowed" }}>
                 {PROVIDER_LABEL[p]} · not set up yet
+                <span id={`switch-on-hero-${p}`} className="lx-sr">
+                  {SWITCH_ON_WORDS}
+                </span>
               </span>
             ),
           )}
@@ -247,11 +241,12 @@ export default async function IntegrationsPage({
       </section>
       )}
 
-      <section className="lx-int-import" aria-labelledby="lawmatics-title">
-        <IntegrationHeader
+      <section className="lx-card lx-int" aria-label="Services">
+        <IntegrationRow
           id="lawmatics-title"
           title="Import from Lawmatics"
           state={lawmaticsState}
+          icon={<RowIcon path={ROW_ICON.lawmatics} />}
           help={
             !lawmatics.ok
               ? "We couldn't check your Lawmatics connection just now."
@@ -261,18 +256,17 @@ export default async function IntegrationsPage({
                   ? "Lawmatics stopped accepting your firm's token. Reconnect to keep importing."
                   : "Bring over your contacts and matters, and re-run it any time while you move over."
           }
-        >
-          <Link href="/dashboard/settings/integrations/lawmatics/" className={`lx-btn ${lm?.status === "active" ? "lx-btn-sec" : "lx-btn-pri"}`}>
-            {lm?.status === "active" ? "Open Lawmatics import" : lm ? "Reconnect" : "Connect Lawmatics"}
-          </Link>
-        </IntegrationHeader>
-      </section>
-
-      <section className="lx-int-import" aria-labelledby="lawpay-title">
-        <IntegrationHeader
+          actions={
+            <Link href="/dashboard/settings/integrations/lawmatics/" className={`lx-btn ${lm?.status === "active" ? "lx-btn-sec" : "lx-btn-pri"}`}>
+              {lm?.status === "active" ? "Open Lawmatics import" : lm ? "Reconnect" : "Connect Lawmatics"}
+            </Link>
+          }
+        />
+        <IntegrationRow
           id="lawpay-title"
           title="LawPay"
           state={lawpayState}
+          icon={<RowIcon path={ROW_ICON.lawpay} />}
           badge={lp ? <ModeBadge live={lp.mode === "live"} /> : null}
           help={
             !lawpay.ok
@@ -285,18 +279,17 @@ export default async function IntegrationsPage({
                     ? "Sign in to your firm's LawPay account so clients can pay the amount due at signing by card."
                     : LAWPAY_NOT_ISSUED
           }
-        >
-          <Link href="/dashboard/settings/integrations/lawpay/" className={`lx-btn ${lp?.status === "active" || !lawpayReady ? "lx-btn-sec" : "lx-btn-pri"}`}>
-            {lp?.status === "active" ? "Manage LawPay" : lp ? "Reconnect" : lawpayReady ? "Connect LawPay" : "About LawPay"}
-          </Link>
-        </IntegrationHeader>
-      </section>
-
-      <section className="lx-int-import" aria-labelledby="meetings-title">
-        <IntegrationHeader
+          actions={
+            <Link href="/dashboard/settings/integrations/lawpay/" className={`lx-btn ${lp?.status === "active" || !lawpayReady ? "lx-btn-sec" : "lx-btn-pri"}`}>
+              {lp?.status === "active" ? "Manage LawPay" : lp ? "Reconnect" : lawpayReady ? "Connect LawPay" : "About LawPay"}
+            </Link>
+          }
+        />
+        <IntegrationRow
           id="meetings-title"
           title="Meetings"
           state={meetingsState}
+          icon={<RowIcon path={ROW_ICON.meetings} />}
           help={
             !meetingConns.ok
               ? "We couldn't check your meeting connections just now."
@@ -304,31 +297,25 @@ export default async function IntegrationsPage({
                 ? `Connected: ${meetingSources.map((c) => (c.provider === "fathom" ? "Fathom" : "Zoom")).join(" and ")}. Consult recordings, summaries and transcripts land in Meetings.`
                 : "Connect Fathom or Zoom to bring consult recordings, summaries and transcripts into Meetings."
           }
-        >
-          <Link href="/dashboard/settings/integrations/meetings/" className={`lx-btn ${meetingSources.length > 0 ? "lx-btn-sec" : "lx-btn-pri"}`}>
-            {meetingSources.length > 0 ? "Manage meetings" : "Connect Fathom or Zoom"}
-          </Link>
-        </IntegrationHeader>
-      </section>
-
-      <section className="lx-card lx-int" aria-label="Services">
+          actions={
+            <Link href="/dashboard/settings/integrations/meetings/" className={`lx-btn ${meetingSources.length > 0 ? "lx-btn-sec" : "lx-btn-pri"}`}>
+              {meetingSources.length > 0 ? "Manage meetings" : "Connect Fathom or Zoom"}
+            </Link>
+          }
+        />
         {hasMailbox && PROVIDERS.map((p) => {
           const rows = byProvider(p);
           const mineHere = rows.filter((c) => c.scope === "personal");
           const firmHere = rows.filter((c) => c.scope === "firm");
           return (
-            <details key={p} className="lx-int-row" open={rows.length > 0}>
-              <summary>
-                <IntegrationHeader
-                  size="row"
-                  title={p === "google" ? "Google Workspace" : "Microsoft 365"}
-                  state={providerState(list.ok, rows)}
-                  icon={<ProviderMark provider={p} size={24} />}
-                  help={`${p === "google" ? "Gmail" : "Outlook"}${rows.length > 0 ? ` · ${rows.length} connected` : ""}`}
-                />
-                <span className="lx-int-chev" aria-hidden="true">›</span>
-              </summary>
-              <div className="lx-int-body">
+            <IntegrationRow
+              key={p}
+              title={p === "google" ? "Google Workspace" : "Microsoft 365"}
+              state={providerState(list.ok, rows)}
+              icon={<ProviderMark provider={p} size={24} />}
+              help={`${p === "google" ? "Gmail" : "Outlook"}${rows.length > 0 ? ` · ${rows.length} connected` : ""}`}
+              defaultOpen={rows.length > 0}
+            >
                 <div className="lx-card-head">
                   <div style={{ flex: 1, minWidth: 220 }}>
                     <b style={{ color: "var(--ink)" }}>My mailbox</b>
@@ -348,27 +335,9 @@ export default async function IntegrationsPage({
                   {canManageFirm && <ConnectButton provider={p} scope="firm" enabled={connectable[p]} label="Add shared mailbox" />}
                 </div>
                 {firmHere.length > 0 ? firmHere.map((c) => <MailboxRow key={c.id} c={c} canManage={canManageFirm} />) : <div className="lx-empty">No shared {PROVIDER_LABEL[p]} mailbox.</div>}
-              </div>
-            </details>
+            </IntegrationRow>
           );
         })}
-        {SOON.map((x) => (
-          <div key={x.name} className="lx-int-row lx-int-soon">
-            <div className="lx-int-summary">
-              <IntegrationHeader
-                size="row"
-                title={x.name}
-                state="coming-soon"
-                help={x.sub}
-                icon={
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                    <path d={x.icon} />
-                  </svg>
-                }
-              />
-            </div>
-          </div>
-        ))}
       </section>
 
       {hasMailbox && (

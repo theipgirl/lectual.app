@@ -1,6 +1,6 @@
 "use client";
 
-import { IMPORT_PERSON_NOT_SAVED } from "@/lib/ui/words";
+import { IMPORT_PERSON_NOT_SAVED, LAWMATICS_TOKEN_HELP } from "@/lib/ui/words";
 import { useActionState, useState, type ReactNode } from "react";
 import {
   applyMattersImportAction,
@@ -47,8 +47,12 @@ export function ConnectLawmatics({ reconnect }: { reconnect: boolean }) {
           spellCheck={false}
           placeholder="Paste the token from Lawmatics"
           required
+          aria-describedby="lawmatics-token-help"
         />
       </label>
+      <p id="lawmatics-token-help" className="lx-note" style={{ margin: 0 }}>
+        {LAWMATICS_TOKEN_HELP}
+      </p>
       <p className="lx-note" style={{ margin: 0 }}>
         We check the token with one read-only request, then store it encrypted. No one at your firm can see it again, including you.
         Lectual only ever reads from Lawmatics; it never changes anything there.
