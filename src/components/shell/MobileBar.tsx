@@ -141,7 +141,7 @@ export function MobileBar({ items, queueStatus, pendingCount, counts }: Props) {
       </nav>
       {open && (
         <div onKeyDown={onKeyDown}>
-          <div className="lx-more-scrim" onPointerDown={() => close(false)} aria-hidden="true" />
+          <div className="lx-more-scrim" onPointerDown={() => close(true)} aria-hidden="true" />
           <MoreSheet sections={sections} sheetRef={sheet} onClose={() => setOpen(false)} />
         </div>
       )}

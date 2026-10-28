@@ -81,3 +81,11 @@ describe("rendering (F6)", () => {
     expect(html).toMatch(/href="\/dashboard\/settings\/?"/);
   });
 });
+
+describe("the scrim (F6)", () => {
+  it("an outside tap closes the sheet and returns focus to the More button", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync("src/components/shell/MobileBar.tsx", "utf8");
+    expect(src).toMatch(/className="lx-more-scrim" onPointerDown=\{\(\) => close\(true\)\}/);
+  });
+});

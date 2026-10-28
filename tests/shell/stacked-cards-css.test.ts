@@ -91,6 +91,8 @@ describe("touch targets (V2)", () => {
   it("coarse pointers get 44px on buttons, nav, chips and menu items", () => {
     const coarse = media(globals, "pointer: coarse");
     for (const sel of [".lx-btn", ".lx-fi", ".lx-mbar-item", ".lx-more-link", ".lx-rail-item", ".lx-avatar"]) expect(coarse, sel).toContain(sel);
+    for (const sel of [".lx-toggle", ".lx-lv button", ".lx-chips a", ".lx-tbl td a"]) expect(coarse, sel).toContain(sel);
+    expect(coarse).not.toMatch(/\.lx-chip[,\s{]/);
     expect(coarse).toContain("min-height: 44px; min-width: 44px");
     expect(media(listPage, "pointer: coarse")).toContain("min-height: 44px");
   });

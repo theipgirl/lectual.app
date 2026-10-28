@@ -1433,7 +1433,8 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
   .lx-btn-sm,
   .lx-fi,
   .lx-segs a,
-  .lx-chip,
+  .lx-chips a,
+  .lx-lv button,
   .lx-more-link,
   .lx-mbar-item,
   .lx-avatar,
@@ -1443,4 +1444,9 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
   .lx-rail-pin { min-height: 44px; min-width: 44px; }
   .lx-input,
   select.lx-input { min-height: 44px; }
+  /* The switch keeps its look; its hit area grows to 44px. */
+  .lx-toggle { position: relative; }
+  .lx-toggle::after { content: ""; position: absolute; inset: -11px -2px; }
+  .lx-tbl td a,
+  .lp-row-grid a { display: inline-flex; align-items: center; min-height: 44px; }
 }
