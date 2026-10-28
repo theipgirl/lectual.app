@@ -28,6 +28,7 @@ import {
   estimateAssumption,
   estimateHoursSaved,
 } from "@/lib/agents/autopilot-rules";
+import { assistantHealth } from "@/lib/agents/health-line";
 import { buildRunDigest, type DigestRun } from "@/lib/agents/digest";
 import { displayRunStatus, RUN_STATUS_LABEL, runDurationLabel } from "@/lib/agents/run-status";
 import { listMemberDirectory } from "@/lib/members/directory";
@@ -141,6 +142,15 @@ export default async function AgentsPage() {
   const enabledAgents = AGENT_IDS.filter(isOn);
   const readyCount = enabledAgents.filter((a) => readiness.get(a)?.tone === "ok").length;
   const blockedCount = enabledAgents.length - readyCount;
+  const health = assistantHealth({
+    settingsKnown,
+    runsKnown: !runsError,
+    paused,
+    enabled: enabledAgents,
+    blocked: new Set(enabledAgents.filter((a) => readiness.get(a)?.tone !== "ok")),
+    lastRun,
+    now: now.getTime(),
+  });
 
   return (
     <>
@@ -160,6 +170,10 @@ export default async function AgentsPage() {
             : "Assistant settings unavailable"}
         </div>
       </div>
+
+      <p className={`lx-banner lx-banner-${health.tone === "risk" ? "risk" : health.tone === "ok" ? "ok" : health.tone === "warn" ? "warn" : "mute"}`} role="status" style={{ margin: 0 }} data-health={health.tone}>
+        {health.text}
+      </p>
 
       {!settingsKnown && (
         <div role="alert" className="lx-banner lx-banner-risk">
@@ -313,7 +327,8 @@ export default async function AgentsPage() {
                       {relativeTime(r.started_at)} <span className="lx-note">· {runDurationLabel(r, now.getTime())}</span>
                     </td>
                     <td>
-                      <span className="lx-dot" style={{ background: STATUS_TONE[status] ?? "#7A5A5E" }} title={RUN_STATUS_LABEL[status] ?? status} />
+                      <span className="lx-dot" aria-hidden="true" style={{ background: STATUS_TONE[status] ?? "#7A5A5E" }} />{" "}
+                      <span className="lx-note">{RUN_STATUS_LABEL[status] ?? status}</span>
                     </td>
                   </tr>
                 );

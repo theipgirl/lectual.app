@@ -152,10 +152,11 @@ describe("Run now on the Agents page: each blocked state is a disabled button wi
     expect(reasonOf(html, "intake-triage")).toBe("AI isn't switched on for your firm yet. Lectual will turn it on.");
   });
 
-  it("role: a viewer sees the button, disabled, with the role sentence", async () => {
+  it("role (Sprint 33): a viewer sees no Run now button and no reason", async () => {
     const { html, button } = await blockedCard({ settings: [on("intake-triage")], role: "viewer" });
-    expect(button).toContain("disabled");
-    expect(reasonOf(html, "intake-triage")).toBe("Only an owner, admin or senior admin can run assistants.");
+    expect(button).toBeNull();
+    expect(reasonOf(html, "intake-triage")).toBeNull();
+    expect(html).not.toContain("Run now");
   });
 
   it("database update pending: the three newest agents, with the shared wording", async () => {
@@ -178,27 +179,27 @@ describe("Run now on the Agents page: each blocked state is a disabled button wi
     expect(runButton(html)).not.toContain("title=");
   });
 
-  it("two causes at once: off beats paused, role beats off", async () => {
+  it("two causes at once: off beats paused; a role that can't run gets no button at all", async () => {
     const a = await blockedCard({ settings: [off("intake-triage")], autopilot: paused });
     expect(reasonOf(a.html, "intake-triage")).toBe("Switch the assistant on first.");
     vi.resetModules();
     const b = await blockedCard({ settings: [off("intake-triage")], role: "viewer" });
-    expect(reasonOf(b.html, "intake-triage")).toBe("Only an owner, admin or senior admin can run assistants.");
+    expect(b.button).toBeNull();
+    expect(reasonOf(b.html, "intake-triage")).toBeNull();
   });
 
-  it("the same card shows four different sentences across off, paused, no AI key and role", async () => {
+  it("the same card shows three different sentences across off, paused and no AI key", async () => {
     const cases: Case[] = [
       { settings: [off("intake-triage")] },
       { settings: [on("intake-triage")], autopilot: paused },
       { settings: [on("intake-triage")], ai: false },
-      { settings: [on("intake-triage")], role: "viewer" },
     ];
     const seen = new Set<string | null>();
     for (const c of cases) {
       vi.resetModules();
       seen.add(reasonOf((await blockedCard(c)).html, "intake-triage"));
     }
-    expect(seen.size).toBe(4);
+    expect(seen.size).toBe(3);
     expect(seen.has(null)).toBe(false);
   });
 });
