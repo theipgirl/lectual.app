@@ -185,7 +185,7 @@ describe("Settings -> Client proposals page: the Package prices card", () => {
       expect(html).toContain(label);
     }
     expect(html).toContain("Add package");
-    expect(html).toContain("Save prices");
+    expect(html).toContain("Save proposal settings"); // Sprint 33: one form, one Save
     expect(html).toContain("Remove");
     expect(html).not.toContain("Standard prices");
   });

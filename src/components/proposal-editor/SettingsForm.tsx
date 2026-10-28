@@ -6,6 +6,8 @@ import { saveProposalSettingsAction } from "@/app/dashboard/settings/proposals/a
 import { SETTINGS_APPROVERS_HEADING } from "@/lib/proposal-editor/vocabulary";
 import { ActionForm, Outcome } from "./ActionForm";
 import { IncludesFields } from "./IncludesFields";
+import { PackagePricesSection } from "./PackagePricesForm";
+import type { PricingValues } from "./PricingFields";
 
 export type SettingsMember = { userId: string; name: string; email: string | null; role: string };
 
@@ -16,8 +18,12 @@ export type SettingsValues = {
   includes: ProposalInclude[];
 };
 
-/** Approvers, links and the standard includes table. Admins only (the action re-checks). The package prices are their own card, `PackagePricesForm`. */
-export function SettingsForm({ members, values }: { members: SettingsMember[]; values: SettingsValues }) {
+/**
+ * The proposal settings as ONE form with ONE Save: who may create client links first, then the package
+ * prices, where acceptance notices go, and the standard includes table. Admins only (the action re-checks).
+ * `packages` is omitted when the prices aren't being edited here.
+ */
+export function SettingsForm({ members, values, packages }: { members: SettingsMember[]; values: SettingsValues; packages?: PricingValues[] }) {
   return (
     <ActionForm action={saveProposalSettingsAction} className="pe-settings">
       {({ state, pending }) => (
@@ -43,6 +49,8 @@ export function SettingsForm({ members, values }: { members: SettingsMember[]; v
               {members.length === 0 && <p className="lx-note">Your team couldn’t be listed.</p>}
             </div>
           </section>
+
+          {packages ? <PackagePricesSection packages={packages} /> : null}
 
           <section className="lx-card pe-card">
             <header className="pe-card-head">

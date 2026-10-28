@@ -1,22 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { savePackagesAction } from "@/app/dashboard/settings/proposals/actions";
-import { ActionForm, Outcome } from "./ActionForm";
 import type { PricingValues } from "./PricingFields";
 
 type PackageRow = PricingValues & { key: number };
 
 /**
- * Settings → Client proposals → "Package prices": one card per package, with
+ * Settings → Client proposals → "Package prices": one fieldset per package, with
  * the six fields the proposal editor uses, in dollars (whole cents are stored).
  * The first package is the default a new proposal starts from. "Add package"
  * starts from a copy of the last one's numbers, with a blank name that has to
  * be filled in; "Remove" is disabled on the last package, and the action refuses
  * it as well. Posted as `pkg.<n>.<field>`; the server action re-parses and
  * validates everything, and re-checks the admin gate.
+ *
+ * Since Sprint 33 this is a SECTION of the one settings form (`SettingsForm`), not a form of its
+ * own: the settings page has one form and one Save button.
  */
-export function PackagePricesForm({ packages }: { packages: PricingValues[] }) {
+export function PackagePricesSection({ packages }: { packages: PricingValues[] }) {
   const [rows, setRows] = useState<PackageRow[]>(() => packages.map((p, key) => ({ ...p, key })));
   const [nextKey, setNextKey] = useState(packages.length);
 
@@ -33,9 +34,8 @@ export function PackagePricesForm({ packages }: { packages: PricingValues[] }) {
   }
 
   return (
-    <ActionForm action={savePackagesAction} className="pe-pkgs">
-      {({ state, pending }) => (
-        <section className="lx-card pe-card" aria-labelledby="package-prices-h">
+    <>
+        <section className="lx-card pe-card pe-pkgs" aria-labelledby="package-prices-h">
           <header className="pe-card-head">
             <h2 className="pe-h" id="package-prices-h">
               Package prices
@@ -49,7 +49,7 @@ export function PackagePricesForm({ packages }: { packages: PricingValues[] }) {
             <fieldset key={row.key} className="pe-fieldset pe-pkg" aria-label={`Package ${n + 1}`}>
               <div className="pe-pkg-head">
                 <span className="lx-label">{n === 0 ? "Package 1 · default for new proposals" : `Package ${n + 1}`}</span>
-                <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={() => remove(row.key)} disabled={rows.length <= 1 || pending}>
+                <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={() => remove(row.key)} disabled={rows.length <= 1}>
                   Remove
                 </button>
               </div>
@@ -82,17 +82,12 @@ export function PackagePricesForm({ packages }: { packages: PricingValues[] }) {
             </fieldset>
           ))}
           <div className="pe-save">
-            <button type="button" className="lx-btn lx-btn-sec" onClick={add} disabled={pending}>
+            <button type="button" className="lx-btn lx-btn-sec" onClick={add}>
               Add package
             </button>
-            <button type="submit" className="lx-btn lx-btn-sec" disabled={pending}>
-              {pending ? "Saving…" : "Save prices"}
-            </button>
-            <Outcome state={state} pending={pending} />
           </div>
         </section>
-      )}
-    </ActionForm>
+    </>
   );
 }
 

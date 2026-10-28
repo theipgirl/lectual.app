@@ -6,7 +6,6 @@ import { normalisePackages } from "@/lib/proposals/package-list";
 import { moneyInput } from "@/lib/proposal-editor/form";
 import { firstNameOf } from "@/lib/proposal-editor/labels";
 import { SettingsForm } from "@/components/proposal-editor/SettingsForm";
-import { PackagePricesForm } from "@/components/proposal-editor/PackagePricesForm";
 import { requireProposalsModule } from "../../proposals/gate";
 import "../../proposals/proposals.css";
 import type { Metadata } from "next";
@@ -17,7 +16,7 @@ export const metadata: Metadata = { title: pageTitle("Proposal settings") };
 export const dynamic = "force-dynamic";
 
 /**
- * Proposal settings — who may approve, the default pay link, where acceptance
+ * Proposal settings — who may approve,  where acceptance
  * notices go, the firm's named packages and their prices (the "Package prices"
  * card, its own form), and the "what's included" table a new proposal starts
  * from (`client_proposal_setting`).
@@ -91,7 +90,7 @@ export default async function ProposalSettingsPage() {
           Nothing is saved yet. The values below are the defaults a new proposal uses until you save. Name at least one person who may create client links, or no one can.
         </p>
       )}
-      <PackagePricesForm
+      <SettingsForm
         packages={packages.map((p) => ({
           package: p.package,
           base: moneyInput(p.base_cents),
@@ -100,8 +99,6 @@ export default async function ProposalSettingsPage() {
           secondMarkPct: String(p.second_mark_discount_pct),
           govPerClass: moneyInput(p.gov_per_class_cents),
         }))}
-      />
-      <SettingsForm
         members={members.map((m) => ({
           userId: m.userId,
           name: m.displayName ?? firstNameOf(m.email) ?? m.email ?? "Teammate",
