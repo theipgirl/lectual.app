@@ -200,7 +200,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
         stageName={stageName}
         temperatureLabel={temperature.value ? LANE_LABEL[temperature.value] : null}
         ownerName={ownerName}
-        lastActivityAt={lead.last_activity_at}
+        lastInboundAt={lead.last_inbound_at}
         now={renderedAt}
       />
 

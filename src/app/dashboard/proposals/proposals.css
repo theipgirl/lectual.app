@@ -339,3 +339,8 @@
   .pq-seg[aria-current="page"] { border-color: var(--ox); }
   .pq-tbl tr { grid-template-areas: "proposal proposal" "client client" "accepted paid" "status status" "signing filing" "activity activity"; }
 }
+
+@media (pointer: coarse) {
+  .pq-seg { min-height: 44px; }
+  .pq-strip > summary { min-height: 44px; display: flex; align-items: center; }
+}

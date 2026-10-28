@@ -10,14 +10,14 @@ export function LeadStatusRow({
   stageName,
   temperatureLabel,
   ownerName,
-  lastActivityAt,
+  lastInboundAt,
   now,
 }: {
   stageName: string | null;
   /** "Hot" / "Warm" / "Cold", or null for a lead nobody has rated. */
   temperatureLabel: string | null;
   ownerName: string | null;
-  lastActivityAt: string | null;
+  lastInboundAt: string | null;
   now: number;
 }): ReactNode {
   return (
@@ -33,7 +33,7 @@ export function LeadStatusRow({
           Owner: <b>{ownerName}</b>
         </li>
       )}
-      <li className="lx-note">{lastHeardLabel(lastActivityAt, now)}</li>
+      <li className="lx-note">{lastHeardLabel(lastInboundAt, now)}</li>
     </ul>
   );
 }

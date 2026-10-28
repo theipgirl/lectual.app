@@ -42,3 +42,7 @@
   .lx-split-lead > .lx-col { display: contents; }
   .lx-split-lead > .lx-aside { order: -1; width: auto; }
 }
+
+@media (pointer: coarse) {
+  .lx-segs button { min-height: 44px; min-width: 44px; }
+}

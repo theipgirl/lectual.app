@@ -10,3 +10,7 @@
   .lx-split-matter .lx-matter-timeline { order: 5; }
   .lx-split-matter > .lx-col-aside > * { width: auto; }
 }
+
+@media (pointer: coarse) {
+  .lx-board-move .lp-btn { min-height: 44px; }
+}

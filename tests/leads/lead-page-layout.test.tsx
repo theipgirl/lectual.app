@@ -38,13 +38,13 @@ describe("F1: lead page order", () => {
 
   it("status row: Stage pill, Temperature, Owner when known, last heard", () => {
     const html = renderToStaticMarkup(
-      <LeadStatusRow stageName="Consult Held" temperatureLabel="Hot" ownerName="Dawn Reyes" lastActivityAt="2026-10-24T12:00:00Z" now={NOW} />,
+      <LeadStatusRow stageName="Consult Held" temperatureLabel="Hot" ownerName="Dawn Reyes" lastInboundAt="2026-10-24T12:00:00Z" now={NOW} />,
     );
     expect(html).toContain("Consult Held");
     expect(html).toContain("Temperature: <b>Hot</b>");
     expect(html).toContain("Owner: <b>Dawn Reyes</b>");
     expect(html).toContain("Last heard from 3 days ago");
-    const none = renderToStaticMarkup(<LeadStatusRow stageName={null} temperatureLabel={null} ownerName={null} lastActivityAt={null} now={NOW} />);
+    const none = renderToStaticMarkup(<LeadStatusRow stageName={null} temperatureLabel={null} ownerName={null} lastInboundAt={null} now={NOW} />);
     expect(none).not.toContain("Owner");
     expect(none).toContain("Not rated");
     expect(none).toContain("No contact yet");
@@ -141,5 +141,24 @@ describe("P1: composer tabs", () => {
   it("handles arrow keys", () => {
     const src = readFileSync(path.join(root, "src/components/leads/ComposerTabs.tsx"), "utf8");
     for (const k of ["ArrowRight", "ArrowLeft", "Home", "End"]) expect(src).toContain(k);
+  });
+
+  it("status row reads last_inbound_at, the same field as the aside", () => {
+    expect(page).toContain("lastInboundAt={lead.last_inbound_at}");
+    expect(page).not.toContain("lastActivityAt=");
+    expect(page).toContain("lead.last_inbound_at ? relativeTime(lead.last_inbound_at)");
+  });
+
+  it("V1: coarse-pointer rules give the new controls 44px targets", () => {
+    const rd = (f: string) => readFileSync(path.join(root, f), "utf8");
+    const coarse = (src: string, rule: RegExp) => {
+      const m = src.match(/@media \(pointer: coarse\) \{[\s\S]*?\n\}/g) ?? [];
+      return m.some((b) => rule.test(b));
+    };
+    expect(coarse(css, /\.lx-segs button \{ min-height: 44px; min-width: 44px; \}/)).toBe(true);
+    expect(coarse(rd("src/components/matters/matter-page.css"), /\.lx-board-move \.lp-btn \{ min-height: 44px; \}/)).toBe(true);
+    const pq = rd("src/app/dashboard/proposals/proposals.css");
+    expect(coarse(pq, /\.pq-seg \{ min-height: 44px; \}/)).toBe(true);
+    expect(coarse(pq, /\.pq-strip > summary \{ min-height: 44px; display: flex; align-items: center; \}/)).toBe(true);
   });
 });
