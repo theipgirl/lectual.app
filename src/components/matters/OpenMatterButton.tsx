@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { ButtonLabel } from "@/components/list-page/ListToolbar";
 
 /** The id of the closed panel that holds the existing "Open a matter" form. */
 export const OPEN_MATTER_PANEL_ID = "open-matter";
@@ -19,8 +20,8 @@ export function OpenMatterButton() {
     if (window.location.hash === `#${OPEN_MATTER_PANEL_ID}`) openPanel(false);
   }, []);
   return (
-    <button type="button" className="lx-btn lx-btn-pri lx-btn-sm" aria-controls={OPEN_MATTER_PANEL_ID} onClick={() => openPanel(true)}>
-      Open a matter
+    <button type="button" className="lx-btn lx-btn-pri lx-btn-sm" aria-controls={OPEN_MATTER_PANEL_ID} aria-label="Open a matter" onClick={() => openPanel(true)}>
+      <ButtonLabel icon="+" label="Open a matter" short="Open" />
     </button>
   );
 }

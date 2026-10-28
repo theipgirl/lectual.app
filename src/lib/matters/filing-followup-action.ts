@@ -76,7 +76,7 @@ export async function queueMonthlyStatusUpdate(matterId: string): Promise<{ queu
       status.kind === "already_queued"
         ? "the next update is already queued or approved"
         : status.kind === "stale"
-          ? "this matter looks past the ~5-month sequence — verify its stage before drafting"
+          ? "this matter looks past the ~5-month timeline — verify its stage before drafting"
           : status.kind === "no_filing_date"
             ? "this matter has no filing date on file"
             : "no update is due yet";

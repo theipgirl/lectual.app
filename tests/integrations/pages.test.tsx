@@ -221,7 +221,7 @@ describe("Meetings page: the Zoom card", () => {
 
   it("with Zoom ready, a member below the admin tier is told who connects it", async () => {
     const html = await meetings({ role: "attorney", zoom: { ready: true } });
-    expect(html).toContain("Owners and admins connect Zoom and run imports.");
+    expect(html).toContain("Senior admin or above can connect Zoom and run imports.");
     expect(html).not.toContain("Connect Zoom");
   });
 

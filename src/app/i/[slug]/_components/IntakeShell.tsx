@@ -17,6 +17,28 @@ export function IntakeDisclaimer({ firmName, existingClient = false }: { firmNam
   );
 }
 
+/** An archived intake's link: the firm's name and, if it has a live intake, a way in. Nothing about the closed intake itself. */
+export function ClosedIntakeNotice({ firmName, contactSlug }: { firmName: string; contactSlug: string | null }) {
+  return (
+    <div className="ipub" data-theme="light">
+      <div className="ipub-frame ipub-notice">
+        <div className="ipub-firm">{firmName}</div>
+        <h1 className="ipub-headline">This form has closed.</h1>
+        <p className="ipub-small">
+          {contactSlug ? (
+            <a className="ipub-link" href={`/i/${contactSlug}/`}>
+              Get in touch with {firmName}
+            </a>
+          ) : (
+            `Please contact ${firmName} directly.`
+          )}
+        </p>
+      </div>
+      <IntakeDisclaimer firmName={firmName} />
+    </div>
+  );
+}
+
 /** A message in place of the intake: not found, or not reachable. */
 export function IntakeNotice({ title, body }: { title: string; body: string }) {
   return (
@@ -26,8 +48,8 @@ export function IntakeNotice({ title, body }: { title: string; body: string }) {
         <p className="ipub-small" style={{ fontSize: 14 }}>
           {body}
         </p>
-        <IntakeDisclaimer />
       </div>
+      <IntakeDisclaimer />
     </div>
   );
 }

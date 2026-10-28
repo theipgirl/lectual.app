@@ -45,7 +45,7 @@ export function isStopReason(value: unknown): value is StopReason {
   return typeof value === "string" && (STOP_REASONS as readonly string[]).includes(value);
 }
 
-/** The phrase after "Sequence stopped —". Lower case; it sits mid-sentence. */
+/** The phrase after "Campaign stopped —". Lower case; it sits mid-sentence. */
 export const STOP_REASON_LABEL: Record<StopReason, string> = {
   signed: "signed quote",
   paid: "payment recorded",
@@ -199,11 +199,11 @@ export function shortDate(iso: string | null, timeZone?: string): string {
   }
 }
 
-/** "Sequence stopped — signed quote, Oct 3". A stopped row with no recorded reason still says it stopped. */
+/** "Campaign stopped — signed quote, Oct 3". A stopped row with no recorded reason still says it stopped. */
 export function stopLine(stop: { reason: string | null; at: string | null }, timeZone?: string): string {
   const label = isStopReason(stop.reason) ? STOP_REASON_LABEL[stop.reason] : null;
   const date = shortDate(stop.at, timeZone);
-  return ["Sequence stopped", [label, date].filter(Boolean).join(", ")].filter(Boolean).join(" — ");
+  return ["Campaign stopped", [label, date].filter(Boolean).join(", ")].filter(Boolean).join(" — ");
 }
 
 /** "Signed Oct 3" — the headline of the approval warning. */

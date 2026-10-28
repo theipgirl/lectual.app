@@ -64,7 +64,10 @@ export function ConsultsStrip({
   paste,
   pasteOpen = false,
   leads,
+  sync = null,
 }: {
+  /** The "Sync new meetings" control (or null when this role can't run an import). */
+  sync?: ReactNode;
   data: ConsultsStripData;
   canDraft: boolean;
   /** Why drafting isn't available right now (no queue, no AI key, no settings), or null. */
@@ -101,6 +104,7 @@ export function ConsultsStrip({
     <details className="pq-strip" open={pasteOpen || undefined}>
       <summary className="pq-strip-sum">{consultsSummary({ status: meetings.status === "ok" ? "ok" : "unavailable", ready })}</summary>
     <section className="lx-card pq-consults" aria-label="Recent consults">
+      {sync && <div className="pq-sync">{sync}</div>}
       {paste ? (
         <details className="pq-paste" open={pasteOpen || undefined}>
           <summary className="pq-consults-head">

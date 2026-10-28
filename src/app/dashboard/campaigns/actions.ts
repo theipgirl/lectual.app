@@ -17,12 +17,12 @@ import { friendlyCampaignError, type ActionState } from "./errors";
  */
 export async function createSequenceAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const name = String(formData.get("name") ?? "").trim();
-  if (!name) return { error: "Enter a name for this sequence." };
+  if (!name) return { error: "Enter a name for this campaign." };
   const description = String(formData.get("description") ?? "").trim();
 
   let sequenceId: string;
   try {
-    const sequence = await createSequence({ name, description: description || undefined, active: true });
+    const sequence = await createSequence({ name, description: description || undefined, active: false });
     sequenceId = sequence.id;
   } catch (err) {
     return { error: friendlyCampaignError(err, "Couldn't create this campaign.") };

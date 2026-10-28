@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ICON, RAIL_PIN_COOKIE, isNavActive, navItemBySlug, railCountFor, railGroups, type NavItem } from "@/lib/nav";
+import { ICON, RAIL_PIN_COOKIE, isNavActive, navItemBySlug, railCountFor, railGroups, visibleReports, REPORTS_INDEX, type NavItem } from "@/lib/nav";
 import { RAIL_COUNT_TITLE } from "@/lib/intake/counts";
 import { navTourToken } from "@/lib/onboarding/tour";
 import { closeRailOnEscape, releaseRailFocus } from "@/lib/rail-behaviour";
@@ -58,6 +58,9 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned }
   const groups = railGroups(items, pathname);
   const settings = items.find((i) => i.slug === "settings") ?? navItemBySlug("settings")!;
   const settingsActive = isNavActive(pathname, settings);
+  // One Reports row above Settings, only for a firm and role that can see at least one report.
+  const showReports = visibleReports(items).length > 0;
+  const reportsActive = pathname.startsWith(REPORTS_INDEX);
 
   return (
     <div className={`lx-rail-slot${pinned ? " is-pinned" : ""}`}>
@@ -139,6 +142,21 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned }
         </div>
 
         <div className="lx-rail-rule" aria-hidden="true" />
+
+        {showReports && (
+          <Link
+            href={REPORTS_INDEX}
+            onClick={releaseFocus}
+            className={`lx-rail-item lx-rail-reports${reportsActive ? " is-active" : ""}`}
+            aria-current={reportsActive ? "page" : undefined}
+            aria-label="Reports"
+          >
+            <span className="lx-rail-icon">
+              <Icon d={ICON.bars} size={17} />
+            </span>
+            <span className="lx-rail-label">Reports</span>
+          </Link>
+        )}
 
         <Link
           href={settings.href}

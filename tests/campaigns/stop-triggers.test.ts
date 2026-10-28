@@ -227,7 +227,7 @@ describe("enrolling refuses a lead who is already a client — and says why", ()
       { id: "e-s", org_id: ORG, lead_id: "lead-2", sequence_id: "seq-1", status: "stopped", stop_reason: "replied", stopped_at: "2026-10-04T10:00:00Z" },
     ];
     db.unique.crm_drip_enrollment = [["lead_id", "sequence_id"]];
-    await expect(enrollLead("lead-2", "seq-1")).rejects.toThrow("Sequence stopped — replied, Oct 4");
+    await expect(enrollLead("lead-2", "seq-1")).rejects.toThrow("Campaign stopped — replied, Oct 4");
   });
 });
 

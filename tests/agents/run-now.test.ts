@@ -24,7 +24,7 @@ const ready = (over: Partial<RunNowInput> = {}): RunNowInput => ({
 describe("decideRunNow: the seven outcomes, exact sentences", () => {
   it.each([
     ["running", { running: true }, "Running. This can take a minute."],
-    ["role", { role: "paralegal" as const }, "Only an owner, admin or senior admin can run assistants."],
+    ["role", { role: "paralegal" as const }, "Senior admin or above can run assistants."],
     ["database update", { agent: "morning-brief" as AgentId, databaseUpdate: "pending" as const }, "This isn't switched on for your firm yet. Lectual will turn it on."],
     ["off", { enabled: false }, "Switch the assistant on first."],
     ["Autopilot paused", { autopilot: "paused" as const }, "Assistants paused for your firm, so none of them run. Resume them first."],

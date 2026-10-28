@@ -3,13 +3,17 @@
 import { revalidatePath } from "next/cache";
 import {
   createBrainEntry,
+  listBrainEntries,
   updateBrainEntry,
   deleteBrainEntry,
   proposeClaim,
   reviewClaim,
   deleteClaim,
 } from "@/lib/brain";
-import { isBrainCategory, isClaimStatus } from "./enums";
+import { listStages } from "@/lib/pipeline/stages";
+import { generateEntryKey } from "@/lib/brain/entry-key";
+import { isSignalId, SIGNAL_LABEL } from "@/lib/stage-keeper/signals";
+import { entryTypeOf, isClaimStatus } from "./enums";
 
 export type ActionState = { error?: string };
 
@@ -33,21 +37,64 @@ export async function createBrainEntryAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const categoryRaw = String(formData.get("category") ?? "");
-  const key = String(formData.get("key") ?? "").trim();
-  const title = String(formData.get("title") ?? "").trim();
+  // A posted "key" or "category" is ignored on purpose: the Type decides both.
+  const type = entryTypeOf(String(formData.get("entryType") ?? ""));
+  const titleRaw = String(formData.get("title") ?? "").trim();
   const body = String(formData.get("body") ?? "").trim();
-
-  if (!isBrainCategory(categoryRaw)) return { error: "Choose a category." };
-  if (!key) return { error: "Enter a key." };
-  if (!title) return { error: "Enter a title." };
+  if (!type) return { error: "Choose a type." };
 
   try {
-    await createBrainEntry({ category: categoryRaw, key, title, body });
+    if (type.value === "stage_rules") return await createStageRule(formData, titleRaw);
+    if (!titleRaw) return { error: "Enter a title." };
+    await createBrainEntry({
+      category: type.category,
+      key: generateEntryKey(type.value, titleRaw),
+      title: titleRaw,
+      body,
+    });
   } catch (err) {
     return { error: friendlyBrainError(err, "Couldn't create this entry.") };
   }
 
+  revalidatePath(BRAIN_PATH);
+  return {};
+}
+
+/**
+ * A stage rule's key is the signal id the Stage Keeper reads, and its stage is one of the firm's live
+ * stages. Both are re-validated here: the browser only offers lists, it is not trusted.
+ */
+async function createStageRule(formData: FormData, titleRaw: string): Promise<ActionState> {
+  const signal = String(formData.get("signal") ?? "");
+  const stageId = String(formData.get("stageId") ?? "");
+  if (!isSignalId(signal)) return { error: "Choose what happened." };
+
+  let stages: Awaited<ReturnType<typeof listStages>>;
+  try {
+    stages = await listStages();
+  } catch {
+    return { error: "Your stages couldn't be loaded, so a stage rule can't be saved right now." };
+  }
+  const stage = stages.find((s) => s.id === stageId);
+  if (!stage) return { error: "Choose one of your stages." };
+
+  let existing: Awaited<ReturnType<typeof listBrainEntries>>;
+  try {
+    existing = await listBrainEntries("stage_mapping");
+  } catch {
+    return { error: "Your existing rules couldn't be loaded, so a new one can't be saved right now." };
+  }
+  if (existing.some((e) => e.key.trim().toLowerCase() === signal)) {
+    return { error: `There's already a rule for ${SIGNAL_LABEL[signal]}. Edit that one.` };
+  }
+
+  await createBrainEntry({
+    category: "stage_mapping",
+    key: signal,
+    title: titleRaw || `${SIGNAL_LABEL[signal]} rule`,
+    body: stage.name,
+    data: { stage: stage.name },
+  });
   revalidatePath(BRAIN_PATH);
   return {};
 }

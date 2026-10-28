@@ -6,7 +6,11 @@ import { getScopedClient } from "@/lib/db/scoped-client";
 import { getQueueItem, resolveQueueItem, saveQueueEdit } from "@/lib/queue/api";
 import { generateApprovedDocument } from "@/lib/documents/approve-hook";
 import { activeQueueOrgKey } from "@/lib/queue/org";
-import { QUEUE_APPROVE_ROLES, QUEUE_EDIT_ROLES, resolveQueueRole } from "@/lib/queue/roles";
+import { QUEUE_EDIT_ROLES, resolveQueueRole } from "@/lib/queue/roles";
+import { approvalRefusal, ROUTING_ADMIN_ROLES } from "@/lib/queue/routing";
+import { loadApprovalRouting } from "@/lib/queue/routing-load";
+import { loadActiveQueue } from "@/lib/queue/load";
+import { dismissStale, dismissableFollowups, type DismissResult } from "@/lib/queue/dismiss";
 import { draftInMyMailbox } from "@/lib/mailbox/my-mailbox";
 import type { Role } from "@/lib/auth/roles";
 import { checkDraftStaleness, stalenessRequiresConfirm } from "@/lib/queue/stale";
@@ -34,7 +38,7 @@ export type ReviewState = { error?: string };
  * mailbox (src/lib/mailbox/my-mailbox.ts). Still never sent — the approver
  * presses Send in Gmail or Outlook.
  */
-async function requireFirmReviewer(allowed: Role[], verb: string): Promise<{ email: string }> {
+async function requireFirmReviewer(allowed: Role[], verb: string): Promise<{ email: string; userId: string; role: Role }> {
   const supabase = await getScopedClient();
   const {
     data: { user },
@@ -42,7 +46,7 @@ async function requireFirmReviewer(allowed: Role[], verb: string): Promise<{ ema
   if (!user?.email) throw new Error("You must be signed in to review queue items.");
   const role = await resolveQueueRole(supabase, allowed);
   if (!role) throw new Error(`You don't have permission to ${verb} client communications.`);
-  return { email: user.email };
+  return { email: user.email, userId: user.id, role };
 }
 
 export async function reviewQueueAction(_prev: ReviewState, formData: FormData): Promise<ReviewState> {
@@ -56,13 +60,37 @@ export async function reviewQueueAction(_prev: ReviewState, formData: FormData):
   const qKey = await activeQueueOrgKey();
   if (!qKey) return { error: "No approval queue is configured for this firm." };
 
-  const allowed = intent === "save" ? QUEUE_EDIT_ROLES : QUEUE_APPROVE_ROLES;
+  // Staff roles get through the door; WHICH items they may approve is the routing rule below (src/lib/queue/routing.ts).
   const verb = intent === "save" ? "edit" : "approve or reject";
   let resolvedBy: string;
+  let caller: { userId: string; role: Role };
   try {
-    ({ email: resolvedBy } = await requireFirmReviewer(allowed, verb));
+    const reviewer = await requireFirmReviewer(QUEUE_EDIT_ROLES, verb);
+    resolvedBy = reviewer.email;
+    caller = { userId: reviewer.userId, role: reviewer.role };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "You must be signed in." };
+  }
+
+  // Approve and reject: the item's kind and owner decide who may. Re-read here on every submit; the role and the
+  // owner never come from the form. A routing read that fails means the default rule (the usual approvers).
+  if (intent === "approve" || intent === "reject") {
+    let target: Awaited<ReturnType<typeof getQueueItem>>;
+    try {
+      target = await getQueueItem(qKey, id);
+    } catch {
+      return { error: "That didn't go through. Nothing was sent. Refresh to try again." };
+    }
+    const routed = await loadApprovalRouting();
+    // An approval covers the text that would go out, so an edit in this form is checked too, not only the stored item.
+    const checked = intent === "approve" && editedBody ? { ...target, final_body: editedBody } : target;
+    const refusal = approvalRefusal({
+      ...caller,
+      item: checked,
+      routing: routed.status === "ok" ? routed.routing : {},
+      members: routed.status === "ok" ? routed.members : [],
+    });
+    if (refusal) return { error: refusal };
   }
 
   let sendStatus: string | null = null;
@@ -174,4 +202,56 @@ export async function reviewQueueAction(_prev: ReviewState, formData: FormData):
   revalidatePath(`/dashboard/queue/${id}/`);
   const sendParam = sendStatus ? `&send=${encodeURIComponent(sendStatus)}` : "";
   redirect(`/dashboard/queue/${id}/?resolved=${intent}${sendParam}`);
+}
+
+export type DismissState = { message?: string; error?: string };
+
+/**
+ * "Dismiss follow-ups older than 7 days": rejects the stale stalled-lead follow-ups the caller owns (any, for the
+ * admin tier). The form posts a confirm flag and nothing else; the list is re-read and the eligible set chosen here.
+ */
+export async function dismissStaleFollowupsAction(_prev: DismissState, formData: FormData): Promise<DismissState> {
+  if (formData.get("confirm") !== "yes") return { error: "Confirm first, then try again." };
+  const qKey = await activeQueueOrgKey();
+  if (!qKey) return { error: "No approval queue is configured for this firm." };
+
+  let reviewer: { email: string; userId: string; role: Role };
+  try {
+    reviewer = await requireFirmReviewer(QUEUE_EDIT_ROLES, "dismiss");
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "You must be signed in." };
+  }
+
+  const load = await loadActiveQueue("pending");
+  if (load.status !== "ok") return { error: "The approval queue can't be reached right now, so nothing was dismissed. Refresh to try again." };
+  const routed = await loadApprovalRouting();
+  const routing = routed.status === "ok" ? routed.routing : {};
+  const viewer = { userId: reviewer.userId, role: reviewer.role };
+
+  // Stale follow-ups exist but none are this caller's: say so rather than "Nothing to dismiss."
+  if (!ROUTING_ADMIN_ROLES.includes(reviewer.role)) {
+    const now = Date.now();
+    const exist = dismissableFollowups(load.items, { routing, viewer: { ...viewer, role: "owner" }, now });
+    const mine = dismissableFollowups(load.items, { routing, viewer, now });
+    if (exist.length > 0 && mine.length === 0) return { error: "These follow-ups are for someone else. Ask them, or an owner or admin." };
+  }
+
+  const result = await dismissStale({
+    items: load.items,
+    routing,
+    viewer,
+    now: Date.now(),
+    reject: async (itemId, note) => {
+      await resolveQueueItem({ orgKey: qKey, id: itemId, action: "reject", resolvedBy: reviewer.email, note });
+    },
+  });
+  revalidatePath("/dashboard/queue/");
+  return dismissMessage(result);
+}
+
+function dismissMessage(r: DismissResult): DismissState {
+  const rest = r.remaining > 0 ? ` ${r.remaining} more are left. Run it again to clear them.` : "";
+  if (r.attempted === 0) return { message: "Nothing to dismiss." };
+  if (r.failed > 0) return { error: `Dismissed ${r.done}, ${r.failed} couldn't be dismissed. Refresh to try again.${rest}` };
+  return { message: `Dismissed ${r.done} ${r.done === 1 ? "follow-up" : "follow-ups"}.${rest}` };
 }

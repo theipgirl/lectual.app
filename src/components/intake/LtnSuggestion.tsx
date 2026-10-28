@@ -39,7 +39,7 @@ export function LtnSuggestion({
     >
       Long-Term Nurture suggested{" "}
       <Link href={href} style={{ color: "var(--ox)", textDecoration: "underline" }}>
-        {target === "sequences" ? "See sequences" : "Open lead"}
+        {target === "sequences" ? "See campaigns" : "Open lead"}
       </Link>
     </span>
   );

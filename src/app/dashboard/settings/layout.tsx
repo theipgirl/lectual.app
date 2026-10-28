@@ -4,10 +4,10 @@ import { loadSetupState } from "@/lib/setup/load";
 import { setupChecklist } from "@/lib/setup/checklist";
 import { ADMIN_TIER_PHRASE, canSeeSetup } from "@/lib/setup/roles";
 import { SETUP_PATH } from "@/lib/setup/routes";
-import { ASSISTANTS_NAME, FEATURES_NAME, SETUP_NAME } from "@/lib/ui/words";
+import { APPROVALS_NAME, ASSISTANTS_NAME, FEATURES_NAME, SETUP_NAME } from "@/lib/ui/words";
 import { SettingsNav, type SettingsTab } from "@/components/settings/SettingsNav";
 
-type Tab = SettingsTab & { module?: string };
+type Tab = SettingsTab & { module?: string; adminOnly?: boolean };
 
 // Agents lives on the rail (it's also a daily surface); the tab points there.
 const TABS: Tab[] = [
@@ -16,6 +16,7 @@ const TABS: Tab[] = [
   { label: "Team & roles", href: "/dashboard/settings/team/" },
   { label: "Firm profile", href: "/dashboard/settings/firm/" },
   { label: "Service library", href: "/dashboard/settings/services/" },
+  { label: APPROVALS_NAME, href: "/dashboard/settings/approvals/", adminOnly: true },
   { label: "Client proposals", href: "/dashboard/settings/proposals/", module: "proposals" },
   { label: FEATURES_NAME, href: "/dashboard/settings/modules/" },
 ];
@@ -38,7 +39,7 @@ async function setupTab(): Promise<Tab[]> {
 
 export default async function SettingsLayout({ children }: { children: React.ReactNode }) {
   const [modules, setup] = await Promise.all([activeOrgModules(), setupTab()]);
-  const tabs = [...setup, ...TABS.filter((t) => !t.module || modules.includes(t.module))].map(({ label, href, detail }) => ({ label, href, detail }));
+  const tabs = [...setup, ...TABS.filter((t) => (!t.module || modules.includes(t.module)) && (!t.adminOnly || setup.length > 0))].map(({ label, href, detail }) => ({ label, href, detail }));
 
   return (
     <div className="lx-split">

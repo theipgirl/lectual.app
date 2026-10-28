@@ -23,8 +23,8 @@ describe("F15: one form, one Save, approvers first", () => {
     expect(html).toContain("Save proposal settings");
     expect(html).not.toContain("Save prices");
     expect(html.indexOf("Who may create client links")).toBeGreaterThan(-1);
-    expect(html.indexOf("Who may create client links")).toBeLessThan(html.indexOf("Package prices"));
-    expect(html.indexOf("Package prices")).toBeLessThan(html.indexOf("Links and notifications"));
+    expect(html.indexOf("Who may create client links")).toBeLessThan(html.indexOf("Packages"));
+    expect(html.indexOf("Packages")).toBeLessThan(html.indexOf("Links and notifications"));
     expect(html).toContain('name="pkg.0.package"');
     expect(html).toContain('name="approver"');
   });

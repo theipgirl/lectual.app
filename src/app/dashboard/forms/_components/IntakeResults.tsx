@@ -13,6 +13,7 @@ import { AssessmentBlocks } from "./AssessmentBlocks";
 import { IntakeDrawer, Unreadable } from "./IntakeDrawer";
 import { drawerStepsFor, questionTexts } from "./IntakePerformance";
 import { StepDropOff } from "./StepTables";
+import { WhereTheyCameFrom, type WhereFromState } from "./WhereTheyCameFrom";
 
 /**
  * The Results tab (server-rendered, handed to the workspace as a slot, as
@@ -107,6 +108,7 @@ export async function IntakeResults({
       ) : (
         <PerQuestion form={form} range={range} intakeId={intakeId} tz={tz} rows={read.value.rows} />
       )}
+      <WhereTheyCameFrom state={whereFrom(read)} />
       <StepDropOff state={steps} range={range} />
       {read.status === "ok" && read.value.capped && <p className="ifm-help">{`Results cover the latest ${RESULT_ROW_LIMIT.toLocaleString("en-US")} people in this range.`}</p>}
 
@@ -123,6 +125,10 @@ export async function IntakeResults({
       )}
     </div>
   );
+}
+
+function whereFrom(read: Awaited<ReturnType<typeof loadResultSubmissions>>): WhereFromState {
+  return read.status === "ok" ? { status: "ok", rows: read.value.rows, capped: read.value.capped } : { status: read.status };
 }
 
 function PerQuestion({
@@ -143,7 +149,7 @@ function PerQuestion({
   const unfinished = rows.length - sent;
   if (questions.length === 0) {
     return (
-      <div className="ifm-perf-empty">This intake has no questions yet. Add them in Form setup, and answers will be listed here.</div>
+      <div className="ifm-perf-empty">This intake has no questions yet. Add them under Setup, and answers will be listed here.</div>
     );
   }
   return (

@@ -1,15 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveFirmSession } from "@/lib/firm/session";
-import { hasRole } from "@/lib/auth/roles";
 import { formatDuration, formatWhen, linkLabels, listMeetings, type MeetingFilters } from "@/lib/meetings/read";
 import { listMeetingConnections } from "@/lib/meetings/connection";
 import { PROVIDER_LABEL, isMeetingProvider } from "@/lib/meetings/types";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { SyncMeetingsControl } from "@/components/meetings/SyncMeetingsButton";
+import { canSyncMeetings, syncControl } from "@/lib/meetings/sync-access";
 import { reconnectSentence } from "@/lib/meetings/reconnect-copy";
-import { SectionTabs } from "@/components/shell/SectionTabs";
-import { REPORTS } from "@/lib/nav";
+import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 
 export const metadata: Metadata = { title: pageTitle("Meetings") };
 
@@ -40,7 +40,7 @@ export default async function MeetingsPage({ searchParams }: { searchParams: Pro
     meetings.flatMap((m) => (m.matter_id ? [m.matter_id] : [])),
   );
   const connected = conns.ok ? conns.connections : [];
-  const canManage = hasRole(session.role, "senior_admin");
+  const canManage = canSyncMeetings(session.role);
 
   const href = (next: { provider?: string | null; link?: string | null }) => {
     const p = new URLSearchParams();
@@ -61,16 +61,20 @@ export default async function MeetingsPage({ searchParams }: { searchParams: Pro
 
   return (
     <>
-      <div className="lx-page-head">
+      <div className="lx-page-head lx-page-head-list">
         <div style={{ flex: 1, minWidth: 260 }}>
           <div className="lx-label">Communication</div>
           <h1 className="lx-h1" data-tour="meetings-head">Meetings</h1>
-          <SectionTabs active="list" listLabel="Meetings" listHref="/dashboard/meetings/" summaryHref={REPORTS.communication.href} />
           <p className="lx-sub">Consults and calls recorded in Fathom or Zoom, with the summary, the transcript and the client they were about.</p>
         </div>
-        <Link href="/dashboard/settings/integrations/meetings/" className="lx-btn lx-btn-sec lx-btn-sm">
-          {connected.length ? "Manage sources" : "Connect Fathom or Zoom"}
-        </Link>
+        <div className="lx-head-actions">
+          <SyncMeetingsControl control={syncControl(session.role, conns.ok ? connected : null)} />
+          {(connected.length > 0 || !canSyncMeetings(session.role)) && (
+            <Link href="/dashboard/settings/integrations/meetings/" className="lx-btn lx-btn-sec lx-btn-sm">
+              {connected.length ? "Manage sources" : "Connect Fathom or Zoom"}
+            </Link>
+          )}
+        </div>
       </div>
 
       <nav aria-label="Filter meetings" className="lx-chips">
@@ -84,7 +88,7 @@ export default async function MeetingsPage({ searchParams }: { searchParams: Pro
       {conns.ok && connected.some((c) => c.status !== "active") && (
         <div role="alert" className="lx-banner lx-banner-risk">
           {reconnectSentence(connected.filter((c) => c.status !== "active").map((c) => PROVIDER_LABEL[c.provider]))}{" "}
-          {canManage ? <Link href="/dashboard/settings/integrations/meetings/">Reconnect</Link> : "Ask an owner or admin to reconnect it."}
+          {canManage ? <Link href="/dashboard/settings/integrations/meetings/">Reconnect</Link> : `${ADMIN_TIER_PHRASE} can reconnect it.`}
         </div>
       )}
 
@@ -122,7 +126,7 @@ export default async function MeetingsPage({ searchParams }: { searchParams: Pro
                   </Link>
                 </div>
               ) : (
-                <p className="lx-note" style={{ margin: 0 }}>An owner or admin connects it in Settings → Integrations.</p>
+                <p className="lx-note" style={{ margin: 0 }}>{ADMIN_TIER_PHRASE} can connect it in Settings → Integrations.</p>
               )}
             </>
           )}

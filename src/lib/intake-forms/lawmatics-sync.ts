@@ -8,6 +8,7 @@ import { attachTags, createProspect, updateProspect } from "@/lib/lawmatics/writ
 import { splitName } from "./public-submit";
 import type { IntakeHandle } from "./public";
 import type { IntakeContact } from "./submission";
+import { hasUtm, utmFromContact, utmTags, type Utm } from "./utm";
 
 /**
  * Every intake's person, pushed to the firm's OWN Lawmatics (lectual 0077),
@@ -56,16 +57,18 @@ export async function firmToken(admin: Admin, orgId: string): Promise<string | n
 }
 
 /** The tags a person from this intake carries; the temperature only once known. */
-export function intakeTags(sourceTag: string | null, temperature?: LawmaticsTemperature | null): string[] {
+export function intakeTags(sourceTag: string | null, temperature?: LawmaticsTemperature | null, utm?: Utm | null): string[] {
   const tags: string[] = [];
   const src = (sourceTag ?? "").trim();
   if (src) tags.push(src);
+  // "UTM: <source>" / "Campaign: <campaign>": the Lawmatics API can't set its own UTM fields, so tags carry the source.
+  if (utm && hasUtm(utm)) tags.push(...utmTags(utm));
   if (temperature) tags.push(temperatureTagFor(temperature));
   return tags;
 }
 
 /** Contact step: create the prospect and attach the source tag. */
-export async function syncIntakeStart(handle: IntakeHandle, submissionId: string, contact: IntakeContact): Promise<void> {
+export async function syncIntakeStart(handle: IntakeHandle, submissionId: string, contact: IntakeContact, utm?: Utm): Promise<void> {
   try {
     const admin = getAdminClient();
     const token = await firmToken(admin, handle.orgId);
@@ -81,7 +84,7 @@ export async function syncIntakeStart(handle: IntakeHandle, submissionId: string
       source: `Intake — ${label}`,
     });
     if (!created.ok) return;
-    const tagged = await attachTags(token, created.contactId, intakeTags(handle.sourceTag));
+    const tagged = await attachTags(token, created.contactId, intakeTags(handle.sourceTag, null, utm));
     const { error } = await admin
       .from("crm_intake_submission")
       .update({
@@ -114,7 +117,7 @@ export async function syncIntakeCompletion(
     if (!token) return;
     const { data: row, error } = await admin
       .from("crm_intake_submission")
-      .select("lawmatics_contact_id")
+      .select("lawmatics_contact_id, contact")
       .eq("id", submissionId)
       .eq("org_id", handle.orgId)
       .eq("form_id", handle.formId)
@@ -136,7 +139,7 @@ export async function syncIntakeCompletion(
       contactId = created.contactId;
     }
 
-    const tags = intakeTags(handle.sourceTag, input.temperature);
+    const tags = intakeTags(handle.sourceTag, input.temperature, utmFromContact(row.contact));
     const attached = await attachTags(token, contactId, tags);
     const updated = await updateProspect(token, contactId, { tags, notes: [input.note] });
     const now = new Date().toISOString();

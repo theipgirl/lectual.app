@@ -91,7 +91,8 @@ describe("F5: Matters list", () => {
 
   it("has an Open a matter header button, stage without a code, no Status column, In stage always, and a Review link", async () => {
     const html = await render({ queue: ok, matters: [m({ status: "on_hold" })] });
-    expect(html).toContain(">Open a matter</button>");
+    expect(html).toContain("Open a matter</span>");
+    expect(html).toContain('aria-label="Open a matter"');
     expect(html).toContain('id="open-matter"');
     expect(html).toContain(">Filed<");
     expect(html).not.toContain("3. Filed");

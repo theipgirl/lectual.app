@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { SIGN_IN_HOME, safeNext } from "@/lib/auth/safe-next";
 import { getScopedClient } from "@/lib/db/scoped-client";
 
 /**
@@ -9,9 +10,8 @@ import { getScopedClient } from "@/lib/db/scoped-client";
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
-  const nextParam = url.searchParams.get("next") ?? "/dashboard";
-  // Only ever redirect within the app.
-  const next = nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : "/dashboard";
+  // Only ever redirect within the app; the default is Today.
+  const next = safeNext(url.searchParams.get("next"));
 
   if (code) {
     const supabase = await getScopedClient();
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       // ever clicks it.
       const params = new URLSearchParams({ error: error.message });
       // Keep the intended destination so a fresh link resumes the journey.
-      if (next !== "/dashboard") params.set("next", next);
+      if (next !== SIGN_IN_HOME) params.set("next", next);
       return NextResponse.redirect(new URL(`/sign-in/?${params}`, url.origin));
     }
   }

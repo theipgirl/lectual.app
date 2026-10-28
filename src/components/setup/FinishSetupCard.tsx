@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { loadSetupState } from "@/lib/setup/load";
 import { setupChecklist } from "@/lib/setup/checklist";
+import type { SetupChecklist } from "@/lib/setup/types";
 import { canSeeSetup } from "@/lib/setup/roles";
 import { SETUP_PATH } from "@/lib/setup/routes";
 import "./setup.css";
@@ -22,7 +23,11 @@ export async function FinishSetupCard({ role }: { role: string | null | undefine
     return null;
   }
   if (checklist.complete) return null;
+  return <FinishSetupView checklist={checklist} />;
+}
 
+/** The card itself, for a checklist that has items left. `GetSetUpCard` reads once and draws this or Getting started. */
+export function FinishSetupView({ checklist }: { checklist: SetupChecklist }) {
   // A step only Lectual can switch on is never "next" for the firm.
   const next = checklist.items.find((i) => i.status !== "done" && !(i.owner === "lectual" && i.status === "to-do"));
   const unchecked = checklist.items.filter((i) => i.status === "couldnt-check").length;

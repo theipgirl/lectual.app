@@ -3,13 +3,15 @@
  * query parameter. Codes only — never a provider's raw text or anything from
  * the callback URL — so nothing an attacker puts in a link is echoed back.
  */
+import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
+
 export const OUTCOME_MESSAGES = {
   denied: "The connection was cancelled on the sign-in screen. Nothing was saved.",
   expired: "That connection attempt expired or was started in another tab. Please try again.",
   "wrong-session":
     "You switched account or firm partway through. Nothing was saved — start again from this page.",
   unconfigured: "Connecting a mailbox isn't switched on yet. Lectual is setting it up.",
-  forbidden: "Only an owner, admin or senior admin can connect a firm mailbox.",
+  forbidden: `${ADMIN_TIER_PHRASE} can connect a firm mailbox.`,
   "missing-permission":
     "Some permissions weren't granted. Lectual needs to read mail and create drafts; please allow both.",
   "no-refresh-token": "The provider didn't allow background access. Please try connecting again.",

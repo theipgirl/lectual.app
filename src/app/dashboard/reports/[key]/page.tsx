@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { isReportKey, reportListHref, reportListLabel, REPORTS, type ReportKey } from "@/lib/nav";
-import { SectionTabs } from "@/components/shell/SectionTabs";
+import { isReportKey, REPORTS, REPORTS_INDEX, type ReportKey } from "@/lib/nav";
 import { orgHasModule } from "@/lib/org/modules";
 import { REPORT_RANGES, parseReportRange, reportPeriod } from "@/lib/reports/period";
 import { loadCommunicationReport } from "@/lib/reports/communication";
@@ -112,7 +111,9 @@ export default async function ReportPage({
     <>
       <div className="lx-page-head">
         <div style={{ flex: 1, minWidth: 260 }}>
-          <div className="lx-label">Report</div>
+          <Link href={REPORTS_INDEX} className="lx-label">
+            Reports
+          </Link>
           <h1 className="lx-h1">{REPORTS[key].label}</h1>
           <p className="lx-sub">{copy.sub}</p>
         </div>
@@ -131,7 +132,6 @@ export default async function ReportPage({
         </p>
       )}
 
-      <SectionTabs active="summary" listLabel={reportListLabel(key, { hasMailbox })} listHref={reportListHref(key, { hasMailbox })} summaryHref={base} />
 
       <div className="lx-kpis">
         {data.kpis.map((m) => (

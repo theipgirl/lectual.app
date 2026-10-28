@@ -120,7 +120,7 @@ export async function IntakePerformance({
                 { label: "Gave contact details", value: stats.captured.toLocaleString("en-US"), sub: "Asked first, before any question" },
                 { label: "Finished", value: stats.completed.toLocaleString("en-US"), sub: `${stats.completionRate} of those` },
                 { label: "Didn't finish", value: stats.unfinished.toLocaleString("en-US"), sub: "Still leads: worth a follow-up" },
-                { label: "Median time to finish", value: formatDuration(stats.medianMs), sub: "From opening the page to sending" },
+                { label: "Typical time (median)", value: formatDuration(stats.medianMs), sub: "From opening the page to sending" },
                 {
                   label: "Page to contact details",
                   value: formatDuration(split?.medianToContactMs ?? null),

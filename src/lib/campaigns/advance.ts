@@ -129,7 +129,7 @@ function notActiveMessage(enrollment: Pick<DripEnrollment, "status" | "stop_reas
       return "This enrollment is paused, not active — resume it first.";
     case "stopped": {
       const reason = isStopReason(enrollment.stop_reason) ? STOP_REASON_LABEL[enrollment.stop_reason] : null;
-      return `This sequence was stopped${reason ? ` (${reason})` : ""} and can't be restarted.`;
+      return `This campaign was stopped${reason ? ` (${reason})` : ""} and can't be restarted.`;
     }
     case "completed":
       return "This enrollment is already completed — every step has run.";
@@ -203,7 +203,7 @@ export async function advanceEnrollment(enrollmentId: string): Promise<AdvanceRe
     });
     if (outcome.status !== "ok" || !outcome.stopped.some((s) => s.enrollmentId === enrollment.id)) {
       throw new CampaignAdvanceError(
-        `This sequence should stop (${STOP_REASON_LABEL[stop.reason]}), so nothing was drafted — but the stop couldn't be recorded. Refresh and try again.`,
+        `This campaign should stop (${STOP_REASON_LABEL[stop.reason]}), so nothing was drafted — but the stop couldn't be recorded. Refresh and try again.`,
       );
     }
     return { queueItemId: null, completed: false, stepType: index < steps.length ? steps[index].type : "wait", stopped: stop };
@@ -291,7 +291,7 @@ export async function advanceEnrollment(enrollmentId: string): Promise<AdvanceRe
         type: "CLIENT_EMAIL",
         headline: emailDraft.subject || `Campaign email — ${emailDraft.clientName}`,
         draftBody: emailDraft.body,
-        summary: `Sequence step ${index + 1} of ${steps.length}`,
+        summary: `Campaign step ${index + 1} of ${steps.length}`,
         recipient: emailDraft.recipient,
         subject: emailDraft.subject,
         clientName: emailDraft.clientName,
@@ -303,7 +303,7 @@ export async function advanceEnrollment(enrollmentId: string): Promise<AdvanceRe
       const title =
         typeof config.title === "string" && config.title.trim()
           ? config.title.trim()
-          : `Follow up with ${leadDisplayName(lead)} — sequence step ${index + 1}`;
+          : `Follow up with ${leadDisplayName(lead)} — campaign step ${index + 1}`;
       const { error } = await supabase.from("crm_task").insert({
         org_id: orgId,
         lead_id: lead.id,

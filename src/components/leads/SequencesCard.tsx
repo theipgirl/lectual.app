@@ -13,7 +13,7 @@ export type SequenceRow = {
   statusLabel: string;
   statusTone: string;
   step: string;
-  /** "Sequence stopped — signed quote, Oct 3" for a stopped row. */
+  /** "Campaign stopped — signed quote, Oct 3" for a stopped row. */
   stopLine: string | null;
 };
 
@@ -30,7 +30,7 @@ function StopForm({ leadId, enrollmentId }: { leadId: string; enrollmentId: stri
     <form action={action} style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
       <input type="hidden" name="leadId" value={leadId} />
       <input type="hidden" name="enrollmentId" value={enrollmentId} />
-      <select className="lx-input" name="reason" defaultValue="manual" aria-label="Why stop this sequence" style={{ width: "auto", padding: "4px 8px" }}>
+      <select className="lx-input" name="reason" defaultValue="manual" aria-label="Why stop this campaign" style={{ width: "auto", padding: "4px 8px" }}>
         {MANUAL_STOP_REASONS.map((r) => (
           <option key={r} value={r}>
             {MANUAL_LABEL[r] ?? STOP_REASON_LABEL[r]}
@@ -38,7 +38,7 @@ function StopForm({ leadId, enrollmentId }: { leadId: string; enrollmentId: stri
         ))}
       </select>
       <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending}>
-        {pending ? "Stopping…" : "Stop sequence"}
+        {pending ? "Stopping…" : "Stop campaign"}
       </button>
       {state.error && (
         <span role="alert" className="lx-note" style={{ color: "var(--wine)", flexBasis: "100%" }}>
@@ -51,7 +51,7 @@ function StopForm({ leadId, enrollmentId }: { leadId: string; enrollmentId: stri
 
 /**
  * The lead's campaign enrollments (intake SOP rule 1): which sequences are
- * running, and for any that stopped, WHY — "Sequence stopped — signed quote,
+ * running, and for any that stopped, WHY — "Campaign stopped — signed quote,
  * Oct 3" — read from the recorded stop, never re-derived. A person can stop a
  * running one by hand and say why; it's recorded with their name and is final.
  */
@@ -60,7 +60,7 @@ export function SequencesCard(props: { leadId: string; rows: SequenceRow[] | nul
   return (
     <section className="lx-card" style={{ padding: 18, display: "grid", gap: 10 }} aria-labelledby="sequences-heading">
       <h2 id="sequences-heading" className="lx-h2" style={{ fontSize: 23, margin: 0 }}>
-        Sequences
+        Campaigns
       </h2>
       {rows === null ? (
         <p role="alert" className="lx-note" style={{ margin: 0, color: "var(--wine)" }}>

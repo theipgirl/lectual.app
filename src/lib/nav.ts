@@ -62,7 +62,7 @@ export const NAV: readonly NavItem[] = [
   { slug: "meetings", label: "Meetings", href: "/dashboard/meetings/", icon: ICON.video, step: 7 },
   { slug: "calendar", label: "Calendar", href: "/dashboard/calendar/", icon: ICON.cal, step: 6 },
   { slug: "intake", label: LEADS_NAME, railLabel: LEADS_NAME, href: "/dashboard/intake/", also: ["/dashboard/leads/"], icon: ICON.users, step: 6 },
-  { slug: "forms", label: "Intake forms", railLabel: "Forms", href: "/dashboard/forms/", icon: ICON.file, step: 7 },
+  { slug: "forms", label: "Forms", railLabel: "Forms", href: "/dashboard/forms/", icon: ICON.file, step: 7 },
   { slug: "quotes", label: "Quotes & proposals", href: "/dashboard/quotes/", icon: ICON.file, step: 7 },
   // The client trademark proposal (brand names x marks x classes, a named approver, a /p/<token> page). Opt-in per firm.
   { slug: "proposals", label: "Client proposals", railLabel: "Proposals", href: "/dashboard/proposals/", icon: ICON.send, module: "proposals", step: 7 },
@@ -84,8 +84,6 @@ export type RailNode =
   | {
       label: string;
       icon: string;
-      /** The section's Summary view (/dashboard/reports/<report>/), a tab beside its list. */
-      report: ReportKey;
       /** Which child's page is the section's main list: the parent opens it. Absent = the first visible child. */
       link?: string;
       kids: readonly string[];
@@ -100,23 +98,23 @@ export const RAIL_TREE: readonly (readonly RailNode[])[] = [
     { slug: "" },
     // Approvals is a daily destination, so it sits at the top level (Sprint 32).
     { slug: "queue" },
-    { label: "Communication", icon: ICON.chat, report: "communication", kids: ["mail", "meetings", "campaigns", "sms"] },
+    { label: "Communication", icon: ICON.chat, kids: ["mail", "meetings", "campaigns", "sms"] },
     { slug: "calendar" },
   ],
   [
-    { label: LEADS_GROUP, icon: ICON.tray, report: "intake", link: "intake", kids: ["intake", "forms"] },
+    { label: LEADS_GROUP, icon: ICON.tray, link: "intake", kids: ["intake", "forms"] },
     { slug: "quotes" },
     { slug: "proposals" },
-    { label: "Active matters", icon: ICON.case, report: "matters", link: "matters", kids: ["matters", "pipeline", "documents", "portals"] },
+    { label: "Active matters", icon: ICON.case, link: "matters", kids: ["matters", "pipeline", "documents", "portals"] },
   ],
-  [{ label: AI_TOOLS_GROUP, icon: ICON.shield, report: "ipos", kids: ["copilot", "agents", "skills", "brain"] }],
+  [{ label: AI_TOOLS_GROUP, icon: ICON.shield, kids: ["copilot", "agents", "skills", "brain"] }],
 ];
 
 /**
- * Each parent section has a Summary view of itself (the prototype's
- * isReport pages): KPIs for the period, what is waiting on the firm, and a
- * link to each child with its count. It is a tab beside the section's list
- * (`SectionTabs`), not what the rail row opens. There is no separate Reports section.
+ * Each parent section has a report of itself (the prototype's isReport pages):
+ * KPIs for the period, what is waiting on the firm, and a link to each child
+ * with its count. They are reached from one "Reports" index (`REPORTS_INDEX`),
+ * one row in the rail above Settings and one group in the phone More sheet.
  */
 export const REPORTS = {
   communication: { label: "Communication", href: "/dashboard/reports/communication/" },
@@ -125,6 +123,30 @@ export const REPORTS = {
   ipos: { label: AI_TOOLS_GROUP, href: "/dashboard/reports/ipos/" },
 } as const;
 export type ReportKey = keyof typeof REPORTS;
+
+export const REPORTS_INDEX = "/dashboard/reports/";
+
+/** One line per report on the Reports index. */
+export const REPORT_BLURB: Record<ReportKey, string> = {
+  communication: "How fast the firm answers and what is still waiting on a reply.",
+  intake: "Where new clients come from and how many reach a signed engagement.",
+  matters: "The book of work: where each matter sits and what is due.",
+  ipos: "What the assistants ran, what they drafted and what needs a look.",
+};
+
+/** The sections each report summarises: a report is offered only when the firm can see one of them. */
+const REPORT_SECTIONS: Record<ReportKey, readonly string[]> = {
+  communication: ["mail", "meetings", "campaigns", "sms"],
+  intake: ["intake", "forms"],
+  matters: ["matters", "pipeline", "documents", "portals"],
+  ipos: ["copilot", "agents", "skills", "brain"],
+};
+
+/** The reports this firm and role may see, in order. Fails closed: no visible section, no report. */
+export function visibleReports(visible: readonly NavItem[]): ReportKey[] {
+  const slugs = new Set(visible.filter((i) => i.built !== false).map((i) => i.slug));
+  return (Object.keys(REPORTS) as ReportKey[]).filter((key) => REPORT_SECTIONS[key].some((slug) => slugs.has(slug)));
+}
 
 export function isReportKey(value: unknown): value is ReportKey {
   return typeof value === "string" && Object.prototype.hasOwnProperty.call(REPORTS, value);
@@ -202,17 +224,15 @@ export function railGroups(visible: readonly NavItem[], pathname: string): RailE
         return item ? [{ key: item.slug, label: item.railLabel ?? item.label, icon: item.icon, href: item.href, active: isNavActive(pathname, item), countKey: item.slug }] : [];
       });
       if (kids.length === 0) return [];
-      const report = REPORTS[node.report];
       // The parent opens its list; with no list child of its own, its first visible child.
       const listKid = (node.link && kids.find((k) => k.key === node.link)) || kids[0];
-      const path = pathname.endsWith("/") ? pathname : `${pathname}/`;
       return [
         {
           key: node.label,
           label: node.label,
           icon: node.icon,
           href: listKid.href,
-          active: path.startsWith(report.href),
+          active: false,
           childActive: kids.some((k) => k.active),
           countKey: node.link ?? null,
           kids,
@@ -238,18 +258,23 @@ export function railCountFor(
   return n === undefined || n === 0 ? null : String(n > 999 ? "999+" : n);
 }
 
-/** The phone bar's own buttons, in order; "More" follows them. */
-export const MOBILE_BAR = ["intake", "queue", "mail", "matters"] as const;
+/**
+ * The phone bar's own buttons, in order; "More" follows them. Today comes first
+ * (the app's landing page). Mail takes the last slot when the firm has it,
+ * else Matters does; the one that loses the slot lives in the More sheet.
+ */
+export const MOBILE_BAR = ["", "intake", "queue", "mail", "matters"] as const;
 
 /** Short names for the phone bar, where the rail's longer ones would not fit under an icon. */
-const MOBILE_LABEL: Record<string, string> = { intake: LEADS_NAME, queue: APPROVALS_NAME, mail: "Mail", matters: "Matters" };
+const MOBILE_LABEL: Record<string, string> = { "": "Today", intake: LEADS_NAME, queue: APPROVALS_NAME, mail: "Mail", matters: "Matters" };
 
 export type MobileBarItem = { slug: string; label: string; icon: string; href: string; active: boolean; countKey: string };
 
-/** The bar's buttons that exist for this firm and role. Mail drops out without the mailbox module. */
+/** The bar's buttons that exist for this firm and role: Today, Leads, Approvals, then Mail (mailbox module) or Matters. */
 export function mobileBarItems(visible: readonly NavItem[], pathname: string): MobileBarItem[] {
   const bySlug = new Map(visible.filter((i) => i.built !== false).map((i) => [i.slug, i]));
-  return MOBILE_BAR.flatMap((slug) => {
+  const slugs = MOBILE_BAR.filter((slug) => slug !== "matters" || !bySlug.has("mail"));
+  return slugs.flatMap((slug) => {
     const item = bySlug.get(slug);
     return item ? [{ slug, label: MOBILE_LABEL[slug] ?? item.label, icon: item.icon, href: item.href, active: isNavActive(pathname, item), countKey: slug }] : [];
   });
@@ -260,54 +285,34 @@ const MORE_GROUPS: readonly { label: string; slugs: readonly string[] }[] = [
   { label: "Workspace", slugs: ["", "calendar"] },
   { label: "Communication", slugs: ["meetings", "campaigns"] },
   { label: LEADS_GROUP, slugs: ["forms", "quotes", "proposals"] },
-  { label: "Active matters", slugs: ["pipeline", "documents"] },
+  { label: "Active matters", slugs: ["matters", "pipeline", "documents"] },
   { label: AI_TOOLS_GROUP, slugs: ["copilot", "agents", "skills", "brain"] },
   { label: "Firm", slugs: ["settings"] },
 ];
+
+/** The More sheet's Reports group sits just before Firm. */
+const REPORTS_GROUP_LABEL = "Reports";
 
 export type MoreSection = { label: string; items: { slug: string; label: string; href: string; active: boolean }[] };
 
 /** Everything the bar does not carry, filtered through the same visibility the rail uses (fails closed); empty groups vanish. */
 export function moreSections(visible: readonly NavItem[], pathname: string): MoreSection[] {
   const bySlug = new Map(visible.filter((i) => i.built !== false).map((i) => [i.slug, i]));
-  return MORE_GROUPS.map((group) => ({
+  // Whatever the bar carries for this firm is not repeated here (Today always; Mail or Matters).
+  const inBar = new Set(mobileBarItems(visible, pathname).map((i) => i.slug));
+  const groups: MoreSection[] = MORE_GROUPS.map((group) => ({
     label: group.label,
     items: group.slugs.flatMap((slug) => {
       const item = bySlug.get(slug);
-      return item ? [{ slug, label: item.label, href: item.href, active: isNavActive(pathname, item) }] : [];
+      return item && !inBar.has(slug) ? [{ slug, label: item.label, href: item.href, active: isNavActive(pathname, item) }] : [];
     }),
-  })).filter((g) => g.items.length > 0);
-}
-
-/**
- * Where a section's List tab goes, for the Summary page's List | Summary
- * strip. Communication and AI tools have no list of their own, so the tab
- * opens their first page (Mail when the firm has the mailbox module, else
- * Meetings; Copilot), exactly as their rail parent row does.
- */
-export function reportListHref(key: ReportKey, opts: { hasMailbox: boolean }): string {
-  switch (key) {
-    case "communication":
-      return opts.hasMailbox ? "/dashboard/mail/" : "/dashboard/meetings/";
-    case "intake":
-      return "/dashboard/intake/";
-    case "matters":
-      return "/dashboard/matters/";
-    case "ipos":
-      return "/dashboard/copilot/";
-  }
-}
-
-/** The name of a section's list tab: the page it opens. */
-export function reportListLabel(key: ReportKey, opts: { hasMailbox: boolean }): string {
-  switch (key) {
-    case "communication":
-      return opts.hasMailbox ? "Mail" : "Meetings";
-    case "intake":
-      return LEADS_NAME;
-    case "matters":
-      return "Matters";
-    case "ipos":
-      return COPILOT_NAME;
-  }
+  }));
+  const path = pathname.endsWith("/") ? pathname : `${pathname}/`;
+  const reports: MoreSection = {
+    label: REPORTS_GROUP_LABEL,
+    items: visibleReports(visible).map((key) => ({ slug: `report-${key}`, label: REPORTS[key].label, href: REPORTS[key].href, active: path.startsWith(REPORTS[key].href) })),
+  };
+  const firm = groups.findIndex((g) => g.label === "Firm");
+  groups.splice(firm < 0 ? groups.length : firm, 0, reports);
+  return groups.filter((g) => g.items.length > 0);
 }

@@ -50,7 +50,7 @@ describe("connectLawmaticsAction", () => {
   it.each(["intake", "paralegal", "attorney", "viewer"])("refuses %s", async (role) => {
     state.role = role;
     const res = await connectLawmaticsAction({}, form({ token: TOKEN }));
-    expect(res.error).toMatch(/owners and admins/i);
+    expect(res.error).toMatch(/senior admin or above/i);
     expect(state.saves).toHaveLength(0);
   });
 

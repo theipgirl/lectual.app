@@ -1,10 +1,12 @@
 "use server";
 
+import { safeNext } from "@/lib/auth/safe-next";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { getSiteOrigin } from "@/lib/site-origin";
-import { SIGN_IN_GENERIC } from "@/lib/ui/words";
+import { magicLinkLimiter } from "@/lib/auth/magic-link-limit";
+import { SIGN_IN_GENERIC, SIGN_IN_WAIT } from "@/lib/ui/words";
 
-export type LoginState = { ok?: boolean; error?: string };
+export type LoginState = { ok?: boolean; error?: string; email?: string };
 
 /**
  * Sends a Supabase magic link. There is no email allowlist here — anyone can
@@ -20,13 +22,11 @@ export async function sendMagicLink(
   const email = String(formData.get("email") ?? "")
     .trim()
     .toLowerCase();
-  const nextParam = String(formData.get("next") ?? "/dashboard");
-  const next =
-    nextParam.startsWith("/") && !nextParam.startsWith("//") && nextParam !== "/"
-      ? nextParam
-      : "/dashboard";
+  const next = safeNext(String(formData.get("next") ?? ""));
 
   if (!email) return { error: "Enter your email." };
+
+  if (!magicLinkLimiter.take(email)) return { error: SIGN_IN_WAIT };
 
   const origin = await getSiteOrigin();
 
@@ -40,5 +40,5 @@ export async function sendMagicLink(
     console.error("[sign-in] the magic link could not be sent:", error.status ?? "unknown status");
     return { error: SIGN_IN_GENERIC };
   }
-  return { ok: true };
+  return { ok: true, email };
 }

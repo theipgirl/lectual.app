@@ -13,13 +13,14 @@ import { stateForStatus, type IntegrationState } from "@/components/integrations
 import { ZOOM_NOT_SWITCHED_ON } from "@/lib/integrations/copy";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 
 export const metadata: Metadata = { title: pageTitle("Meetings integration") };
 
 export const dynamic = "force-dynamic";
 
 const ERRORS: Record<string, string> = {
-  forbidden: "Only owners and admins can connect Zoom.",
+  forbidden: `${ADMIN_TIER_PHRASE} can connect Zoom.`,
   unconfigured: "Zoom isn't switched on for your firm yet. Lectual will turn it on.",
   denied: "Zoom sign-in was cancelled. Nothing was connected.",
   expired: "That sign-in took too long or was started elsewhere. Try again.",
@@ -103,7 +104,7 @@ export default async function MeetingsIntegrationPage({ searchParams }: { search
           <HelpText tone="problem">{integrationErrorLine(fathom.status, fathom.last_error)}</HelpText>
         )}
         {!canManage ? (
-          <HelpText>Owners and admins connect Fathom and run imports.</HelpText>
+          <HelpText>{ADMIN_TIER_PHRASE} can connect Fathom and run imports.</HelpText>
         ) : !canSeal ? (
           <HelpText>Not available yet. Lectual will turn it on.</HelpText>
         ) : fathom?.status === "active" ? (
@@ -138,7 +139,7 @@ export default async function MeetingsIntegrationPage({ searchParams }: { search
         {!zoomReady ? (
           <HelpText>{ZOOM_NOT_SWITCHED_ON}</HelpText>
         ) : !canManage ? (
-          <HelpText>Owners and admins connect Zoom and run imports.</HelpText>
+          <HelpText>{ADMIN_TIER_PHRASE} can connect Zoom and run imports.</HelpText>
         ) : (
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-start" }}>
             {zoom?.status === "active" && <ImportNowButton provider="zoom" />}

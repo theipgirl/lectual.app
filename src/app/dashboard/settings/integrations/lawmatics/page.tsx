@@ -11,6 +11,7 @@ import { ClientsImport, ConnectLawmatics, DisconnectLawmatics, MattersImport } f
 import { LoeFieldsForm } from "@/components/lawmatics/LoeFieldsForm";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 
 export const metadata: Metadata = { title: pageTitle("Lawmatics") };
 
@@ -80,7 +81,7 @@ export default async function LawmaticsPage() {
         {canManage ? (
           (!conn || !active) && <ConnectLawmatics reconnect={!!conn} />
         ) : (
-          <p className="lx-note" style={{ margin: 0 }}>Owners and admins connect Lawmatics and run imports.</p>
+          <p className="lx-note" style={{ margin: 0 }}>{ADMIN_TIER_PHRASE} can connect Lawmatics and run imports.</p>
         )}
         {canManage && conn && active && (
           <details className="lx-disclosure-inline">
@@ -113,6 +114,8 @@ export default async function LawmaticsPage() {
       )}
 
       {showLoeFields && loeConfig && (
+        <details className="lx-card lx-disclosure lx-advanced">
+          <summary>Advanced</summary>
         <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }} aria-label="LOE fields">
           <div>
             <h2 className="lx-h2" style={{ fontSize: 23 }}>
@@ -141,6 +144,7 @@ export default async function LawmaticsPage() {
             </>
           )}
         </section>
+        </details>
       )}
     </>
   );

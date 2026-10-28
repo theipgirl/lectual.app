@@ -220,13 +220,13 @@ describe("advanceEnrollment on an enrollment that isn't active", () => {
 
   it("a stopped enrollment says it was stopped and can't be restarted, naming the reason", async () => {
     const message = await refusal({ status: "stopped", stop_reason: "signed" });
-    expect(message).toBe("This sequence was stopped (signed quote) and can't be restarted.");
+    expect(message).toBe("This campaign was stopped (signed quote) and can't be restarted.");
     expect(message).not.toMatch(/resume/i);
   });
 
   it("a stopped enrollment with no recorded reason (or one we don't know) still says so, without inventing one", async () => {
-    expect(await refusal({ status: "stopped", stop_reason: null })).toBe("This sequence was stopped and can't be restarted.");
-    expect(await refusal({ status: "stopped", stop_reason: "something-new" })).toBe("This sequence was stopped and can't be restarted.");
+    expect(await refusal({ status: "stopped", stop_reason: null })).toBe("This campaign was stopped and can't be restarted.");
+    expect(await refusal({ status: "stopped", stop_reason: "something-new" })).toBe("This campaign was stopped and can't be restarted.");
   });
 
   it("a completed enrollment says it's completed, with no resume hint", async () => {

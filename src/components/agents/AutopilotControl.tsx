@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { setAutopilotAction, type AgentActionState } from "@/app/dashboard/agents/actions";
+import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 
 /**
  * Pause / Resume Autopilot. Drawn on Today (compact) and on the Agents page.
@@ -48,7 +49,7 @@ export function AutopilotControl(props: {
         )}
       </div>
       {paused && props.reason && <span className="lx-note">“{props.reason}”</span>}
-      {paused && !canResume && <span className="lx-note">An owner or admin can resume it.</span>}
+      {paused && !canResume && <span className="lx-note">{ADMIN_TIER_PHRASE} can resume it.</span>}
       {state.error && (
         <span role="alert" className="lx-note" style={{ color: "var(--wine)" }}>
           {state.error}

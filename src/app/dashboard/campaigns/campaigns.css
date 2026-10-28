@@ -66,3 +66,37 @@
 .lx-campaigns-stepform {
   margin-top: 4px;
 }
+
+/* Two compact KPI tiles on one row, down to a phone. */
+.lx-kpis-compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.lx-kpis-compact .lx-kpi {
+  padding: 10px 14px;
+  gap: 2px;
+}
+.lx-kpis-compact .lx-kpi-value {
+  font-size: 28px;
+}
+
+/* Starter suggestion on an empty campaign. */
+.lx-campaigns-starter {
+  display: grid;
+  gap: 10px;
+  margin: 0 18px 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.lx-campaigns-starter-list {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 8px;
+}
+.lx-campaigns-starter-list select {
+  display: block;
+  margin-top: 4px;
+  max-width: 420px;
+}

@@ -40,6 +40,8 @@
   gap: 8px 10px;
 }
 .lp-toolbar-spacer { flex: 1 1 0; min-width: 0; }
+.lp-toolbar-actions { display: contents; }
+.lp-btn-icon, .lp-label-short { display: none; }
 .lp-search { display: flex; align-items: center; gap: 6px; flex: 0 1 380px; min-width: 220px; }
 .lp-search .lx-input { flex: 1; min-width: 0; height: 36px; }
 .lp-search-submit,
@@ -307,4 +309,23 @@
   .lp-clear,
   .lp-link-button,
   .lp-root .lx-view-toggle button { min-height: 44px; min-width: 44px; }
+}
+
+/* ---- Compact top under 640px (Sprint 34): one row of buttons, one scrolling row of chips ---- */
+@media (max-width: 640px) {
+  .lp-root { --lp-gap: 8px; }
+  .lp-header { row-gap: 0; }
+  .lp-toolbar { flex-wrap: wrap; gap: 6px; }
+  .lp-toolbar-spacer { display: none; }
+  .lp-toolbar > :not(.lp-search) { flex: 0 0 auto; }
+  /* The Table | Board toggle, More and the primary action share ONE row that scrolls rather than wraps. */
+  .lp-toolbar-actions { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; flex: 1 1 100%; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .lp-toolbar-actions > * { flex: 0 0 auto; }
+  .lp-btn-icon { display: inline; margin-right: 4px; }
+  .lp-label-short { display: inline; }
+  .lp-label-long { display: none; }
+  .lp-toolbar .lp-btn,
+  .lp-toolbar .lp-search-submit { padding: 0 10px; font-size: 13px; }
+  .lp-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  .lp-chip { flex: 0 0 auto; white-space: nowrap; }
 }

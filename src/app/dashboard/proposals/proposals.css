@@ -347,3 +347,10 @@
   .pq-seg { min-height: 44px; }
   .pq-strip > summary { min-height: 44px; display: flex; align-items: center; }
 }
+
+/* "Sync new meetings" sits on its own row at the top of the consults card. */
+.pq-sync {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 0 8px;
+}

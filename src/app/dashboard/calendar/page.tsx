@@ -398,7 +398,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
 
   return (
     <>
-      <div className="lx-page-head">
+      <div className="lx-page-head lx-page-head-list">
         <div style={{ flex: 1, minWidth: 260 }}>
           <div className="lx-label">Calendar</div>
           <h1 className="lx-h1" data-tour="calendar-head">{title}</h1>

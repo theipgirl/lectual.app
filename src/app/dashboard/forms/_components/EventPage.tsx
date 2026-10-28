@@ -82,7 +82,7 @@ export async function EventPage({ code, range, now = new Date() }: { code: strin
             { label: "Started", value: stats.started.toLocaleString("en-US"), sub: "Gave contact details at the booth" },
             { label: "Finished", value: stats.finished.toLocaleString("en-US"), sub: "Completed the card" },
             { label: "Completion rate", value: stats.completionRate, sub: "Of those who started" },
-            { label: "Median time to finish", value: formatDuration(stats.medianMs), sub: "From contact details to the last answer" },
+            { label: "Typical time (median)", value: formatDuration(stats.medianMs), sub: "From contact details to the last answer" },
           ].map((k) => (
             <div key={k.label} className="ifm-card ifm-kpi">
               <div className="ifm-field-label">{k.label}</div>

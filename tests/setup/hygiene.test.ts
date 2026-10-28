@@ -29,15 +29,17 @@ const CODE = NEW_FILES.filter((f) => /\.(ts|tsx)$/.test(f));
 describe("Today wiring", () => {
   const today = read("src/app/dashboard/page.tsx");
 
-  it("has exactly one FinishSetupCard element and one import for it", () => {
-    expect(today.match(/<FinishSetupCard\b/g)).toHaveLength(1);
-    expect(today.match(/import \{ FinishSetupCard \} from "@\/components\/setup\/FinishSetupCard";/g)).toHaveLength(1);
-    expect(today).toContain("<FinishSetupCard role={session.role} />");
+  it("has exactly one get-set-up card element and one import for it (Sprint 34: Setup or Getting started, never both)", () => {
+    expect(today.match(/<GetSetUpCard\b/g)).toHaveLength(1);
+    expect(today.match(/import \{ GetSetUpCard \} from "@\/components\/setup\/GetSetUpCard";/g)).toHaveLength(1);
+    expect(today).toContain("<GetSetUpCard role={session.role} />");
+    expect(today).not.toContain("<FinishSetupCard");
+    expect(today).not.toContain("<GettingStartedCard");
   });
 
   it("places the card between the unreachable banner and the main split", () => {
     const banner = today.indexOf("We couldn&apos;t reach the approval");
-    const card = today.indexOf("<FinishSetupCard");
+    const card = today.indexOf("<GetSetUpCard");
     const split = today.indexOf('<div className="lx-split">');
     expect(banner).toBeGreaterThan(-1);
     expect(card).toBeGreaterThan(banner);

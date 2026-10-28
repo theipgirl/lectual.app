@@ -16,16 +16,16 @@ describe("shape", () => {
       const c = setupChecklist(state);
       expect(c.items.map((i) => i.id)).toEqual([...ITEM_IDS]);
       expect(c.items.map((i) => i.label)).toEqual([
-        "Firm profile and sign-off",
-        "Team invited",
-        "Outlook mailbox connected",
-        "Lawmatics connected",
-        "Fathom or Zoom connected",
-        "LawPay connected",
-        "At least one assistant on",
-        "An intake form live",
-        "Packages saved",
-        "AI configured",
+        "Add your firm name and sign-off",
+        "Invite your team",
+        "Connect Outlook",
+        "Connect Lawmatics",
+        "Connect Fathom or Zoom",
+        "Connect LawPay",
+        "Turn on an assistant",
+        "Publish an intake form",
+        "Save a fee package",
+        "Turn on AI",
       ]);
       // NOTHING_DONE has no AI key: that one item is Lectual's and is left out of the count.
       expect(c.total).toBe(state === ALL_DONE ? 10 : 9);

@@ -18,8 +18,16 @@ export function MoreMenu({ items }: { items: readonly MoreItem[] }) {
       width={200}
       trigger={({ onClick, ref, ...aria }) => (
         <button {...aria} ref={ref} type="button" onClick={onClick} className="lp-btn">
-          More
-          <span aria-hidden>▾</span>
+          <span className="lp-btn-icon" aria-hidden>
+            ⋯
+          </span>
+          <span className="lp-label-long">More</span>
+          <span className="lp-label-short" aria-hidden>
+            More
+          </span>
+          <span aria-hidden className="lp-label-long">
+            ▾
+          </span>
         </button>
       )}
     >

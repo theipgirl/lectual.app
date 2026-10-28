@@ -6,6 +6,7 @@ import type { Stage } from "@/lib/pipeline";
 import type { MemberIdentity } from "@/lib/members/directory";
 import { memberLabel, stageCodeFor, stageLabelFor } from "@/lib/intake/views";
 import { createLeadAction, type CreateLeadState } from "@/app/dashboard/leads/actions";
+import { ButtonLabel } from "@/components/list-page/ListToolbar";
 
 const fieldStyle: React.CSSProperties = {
   fontSize: 13,
@@ -122,8 +123,9 @@ export default function AddLeadDialog({
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
         aria-expanded={open}
+        aria-label="Add a lead"
       >
-        Add a lead
+        <ButtonLabel icon="+" label="Add a lead" short="Add" />
       </button>
 
       {open && (

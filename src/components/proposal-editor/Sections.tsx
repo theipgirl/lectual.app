@@ -163,7 +163,7 @@ export type { PricingValues };
 /** Step 3: the package name and where "Accept" sends the client to pay. The prices are in More options (`PricingMoreFields`). */
 export function PricingForm({ proposalId, updatedAt, editable, issues, values, payUrl }: Common & { values: PricingValues; payUrl: string }) {
   return (
-    <Section title="Package and pay link" hint="Totals are always worked out from the package prices, never typed. The prices themselves are under More options.">
+    <Section title="Package and pay link" hint="Totals are always worked out from the package, never typed. Packages are edited in Settings → Proposals; this proposal can change its own numbers under More options.">
       <ActionForm action={savePricingAction} id={pricingFormId(proposalId)}>
         {({ state, pending }) => (
           <fieldset className="pe-fieldset" disabled={!editable}>

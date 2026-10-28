@@ -50,8 +50,7 @@ async function renderToday(opts: { items?: NeedsYouItem[]; unavailable?: string[
     ...(await orig<typeof import("@/lib/today/needs-you")>()),
     buildNeedsYou: vi.fn(() => ({ items, unavailable: opts.unavailable ?? [] })),
   }));
-  vi.doMock("@/components/setup/FinishSetupCard", () => ({ FinishSetupCard: () => null }));
-  vi.doMock("@/components/onboarding/GettingStartedCard", () => ({ GettingStartedCard: () => null }));
+  vi.doMock("@/components/setup/GetSetUpCard", () => ({ GetSetUpCard: () => null }));
   vi.doMock("@/components/calendar/TodayConsults", () => ({ TodayConsults: () => <section aria-label="consults-stub">Consults card</section> }));
   const { default: TodayPage } = await import("@/app/dashboard/page");
   const html = text(renderToStaticMarkup(await TodayPage()));
@@ -64,7 +63,7 @@ beforeEach(() => vi.resetModules());
 describe("Today header (A)", () => {
   it("starts with the h1, and repeats neither the firm name nor the date", async () => {
     const html = await renderToday({ metadata: { full_name: "Rebecca Pearl" } });
-    expect(html.indexOf("<h1")).toBe(html.indexOf("<div class=\"lx-page-head\"><div style=\"flex:1;min-width:260px\">") + "<div class=\"lx-page-head\"><div style=\"flex:1;min-width:260px\">".length);
+    expect(html.indexOf("<h1")).toBe(html.indexOf("<div class=\"lx-page-head lx-page-head-list\"><div style=\"flex:1;min-width:260px\">") + "<div class=\"lx-page-head lx-page-head-list\"><div style=\"flex:1;min-width:260px\">".length);
     expect(html).toContain("Good afternoon, Rebecca.");
     expect(html).not.toContain("Pearl Law Firm");
     expect(html).not.toMatch(/Tuesday|October 27/);

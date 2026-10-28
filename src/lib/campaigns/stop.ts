@@ -115,7 +115,7 @@ export async function stopLeadSequences(db: StopDb, input: StopInput): Promise<S
         sequence_id: s.sequenceId,
         sequence_name: s.sequenceName,
         reason: input.reason,
-        summary: `Sequence stopped — ${STOP_REASON_LABEL[input.reason]}`,
+        summary: `Campaign stopped — ${STOP_REASON_LABEL[input.reason]}`,
         fact_at: input.factAt ?? null,
         ...(input.evidence ?? {}),
       },

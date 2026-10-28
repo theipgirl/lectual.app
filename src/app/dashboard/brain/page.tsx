@@ -1,4 +1,6 @@
 import "./brain.css";
+import Link from "next/link";
+import { notFound } from "next/navigation";
 import { resolveFirmSession } from "@/lib/firm/session";
 import {
   listBrainEntries,
@@ -17,6 +19,8 @@ import {
   canManageBrainEntries,
   canProposeClaims,
   canReviewClaims,
+  claimsHelp,
+  knowledgeHelp,
 } from "./enums";
 import NewEntryForm from "./_components/NewEntryForm";
 import EntryRow from "./_components/EntryRow";
@@ -24,7 +28,9 @@ import ProposeClaimForm from "./_components/ProposeClaimForm";
 import ClaimRow from "./_components/ClaimRow";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
-import { AI_TOOLS_GROUP, CANT_SHOW, FIRM_NOTES_NAME } from "@/lib/ui/words";
+import { listStages } from "@/lib/pipeline/stages";
+import { isSignalId } from "@/lib/stage-keeper/signals";
+import { CANT_SHOW, FIRM_NOTES_NAME, FIRM_NOTES_PURPOSE } from "@/lib/ui/words";
 
 export const metadata: Metadata = { title: pageTitle(FIRM_NOTES_NAME) };
 
@@ -101,25 +107,17 @@ function latestUpdate(rows: { updated_at: string }[]): string | null {
  * lectual.app-only tables. A failed read still surfaces honestly, as an
  * explicit "couldn't load" card — never as an empty list.
  */
-export default async function BrainPage() {
+export default async function BrainPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ tab?: string }>;
+} = {}) {
+  const { tab: tabRaw } = (await searchParams) ?? {};
+  // Anything but "claims" is Knowledge.
+  const tab: "knowledge" | "claims" = tabRaw === "claims" ? "claims" : "knowledge";
   const session = await resolveFirmSession();
-  if (session.kind !== "ok") {
-    return (
-      <>
-        <div className="lx-page-head">
-          <div style={{ flex: 1, minWidth: 260 }}>
-            <div className="lx-label">{AI_TOOLS_GROUP}</div>
-            <h1 className="lx-h1">{FIRM_NOTES_NAME}</h1>
-          </div>
-        </div>
-        <div className="lx-card lx-empty-card">
-          <h2 className="lx-h2" style={{ fontSize: 25 }}>
-            Sign in to see your firm notes
-          </h2>
-        </div>
-      </>
-    );
-  }
+  // The dashboard layout gates sign-in; a session that isn't ok here fails closed with no explanation.
+  if (session.kind !== "ok") notFound();
 
   const role = session.role;
   const canManageEntries = canManageBrainEntries(role);
@@ -137,6 +135,20 @@ export default async function BrainPage() {
     loadFailed = true;
   }
 
+  // Stage choices for the stage-rule type: null means the stages could not be read.
+  let stageChoices: { id: string; name: string }[] | null = null;
+  if (!loadFailed && tab === "knowledge" && canManageEntries) {
+    try {
+      stageChoices = (await listStages()).map((s) => ({ id: s.id, name: s.name }));
+    } catch {
+      stageChoices = null;
+    }
+  }
+  const ruledSignals = entries
+    .filter((e) => e.category === "stage_mapping")
+    .map((e) => e.key.trim().toLowerCase())
+    .filter(isSignalId);
+
   const entriesByCategory = groupBy(entries, (e) => e.category as BrainCategory);
   const claimsByStatus = groupBy(claims, (c) => c.status as ClaimStatus);
   const usedCategories = BRAIN_CATEGORIES.filter((c) => entriesByCategory.has(c));
@@ -146,13 +158,13 @@ export default async function BrainPage() {
     <>
       <div className="lx-page-head">
         <div style={{ flex: 1, minWidth: 260 }}>
-          <div className="lx-label">
-            {AI_TOOLS_GROUP} · {entries.length} {entries.length === 1 ? "entry" : "entries"} · {claims.length}{" "}
+          <h1 className="lx-h1">{FIRM_NOTES_NAME}</h1>
+          <p className="lx-sub">
+            {entries.length} {entries.length === 1 ? "entry" : "entries"} · {claims.length}{" "}
             {claims.length === 1 ? "claim" : "claims"}
             {lastTouched ? ` · updated ${lastTouched}` : ""}
-          </div>
-          <h1 className="lx-h1">{FIRM_NOTES_NAME}</h1>
-          <p className="lx-sub">Everything the firm has written down about itself — internal only, nothing here sends.</p>
+          </p>
+          <p className="lx-note" style={{ margin: 0 }}>{FIRM_NOTES_PURPOSE}</p>
         </div>
       </div>
 
@@ -165,38 +177,32 @@ export default async function BrainPage() {
         </div>
       ) : (
         <>
-          <div className="lx-card lx-brain-banner">
-            <div className="lx-brain-banner-row">
-              <span className="lx-brain-badge" aria-hidden>
-                ✦
-              </span>
-              <span className="lx-label" style={{ margin: 0 }}>
-                Firm memory
-              </span>
-              <span style={{ marginLeft: "auto" }} className="lx-note">
-                Internal only · nothing on this page sends
-              </span>
-            </div>
-            <p className="lx-brain-lede">
-              The firm&apos;s shared internal reference — identity, voice, pricing, engagement norms,
-              decision log, client language, templates, and stage mapping — plus a library of proposed
-              marketing claims.
-            </p>
-            <p className="lx-brain-fine">
-              Everything here is memory the firm wrote down itself, scoped to this organization. Nothing on
-              this page sends an email, files anything, or goes to a client.
-            </p>
-          </div>
+          <nav className="lx-brain-tabs" role="tablist" aria-label="Firm notes sections">
+            <Link
+              href="/dashboard/brain/"
+              role="tab"
+              aria-selected={tab === "knowledge"}
+              aria-current={tab === "knowledge" ? "page" : undefined}
+              className={tab === "knowledge" ? "lx-brain-tab lx-brain-tab-on" : "lx-brain-tab"}
+            >
+              Knowledge
+            </Link>
+            <Link
+              href="/dashboard/brain/?tab=claims"
+              role="tab"
+              aria-selected={tab === "claims"}
+              aria-current={tab === "claims" ? "page" : undefined}
+              className={tab === "claims" ? "lx-brain-tab lx-brain-tab-on" : "lx-brain-tab"}
+            >
+              Claim library
+            </Link>
+          </nav>
 
-          {(canManageEntries || canPropose) && (
-            <div className="lx-brain-forms">
-              {canManageEntries && <NewEntryForm />}
-              {canPropose && <ProposeClaimForm />}
-            </div>
-          )}
-
+          {tab === "knowledge" && (
           <div className="lx-brain-collections">
             <h2 className="lx-h2">Knowledge</h2>
+            <p className="lx-note" style={{ margin: 0 }}>{knowledgeHelp(role)}</p>
+            {canManageEntries && <NewEntryForm stages={stageChoices} ruledSignals={ruledSignals} />}
             {usedCategories.length === 0 ? (
               <div className="lx-card lx-empty-card">
                 <h2 className="lx-h2" style={{ fontSize: 20 }}>
@@ -204,7 +210,7 @@ export default async function BrainPage() {
                 </h2>
                 <p className="lx-note" style={{ margin: 0 }}>
                   {canManageEntries
-                    ? "Add one above to start building the firm's shared memory."
+                    ? "Use New entry above to start building the firm's shared memory."
                     : "Nothing has been recorded yet. Ask a firm admin to add entries."}
                 </p>
               </div>
@@ -233,8 +239,13 @@ export default async function BrainPage() {
             )}
           </div>
 
+          )}
+
+          {tab === "claims" && (
           <div className="lx-brain-collections">
             <h2 className="lx-h2">Claim library</h2>
+            <p className="lx-note" style={{ margin: 0 }}>{claimsHelp(role)}</p>
+            {canPropose && <ProposeClaimForm />}
             <p className="lx-brain-fine">
               Approved/forbidden status here is an attorney-advertising compliance aid for this firm&apos;s
               own marketing copy — it is not legal advice. Route case-specific questions to a licensed
@@ -246,7 +257,7 @@ export default async function BrainPage() {
                   No claims proposed yet
                 </h2>
                 <p className="lx-note" style={{ margin: 0 }}>
-                  {canPropose ? "Propose a claim above — an admin or attorney will review it." : "Nothing has been proposed yet."}
+                  {canPropose ? "Use Propose a claim above — an admin or attorney will review it." : "Nothing has been proposed yet."}
                 </p>
               </div>
             ) : (
@@ -272,6 +283,7 @@ export default async function BrainPage() {
               })
             )}
           </div>
+          )}
         </>
       )}
     </>

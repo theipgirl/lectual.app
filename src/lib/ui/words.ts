@@ -1,3 +1,4 @@
+import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 // The glossary: ONE name per thing, as a firm sees it. Every firm-facing string that
 // names one of these things imports it from here (tests/ui/words.test.ts and
 // tests/ui/no-build-words.test.ts hold that line). Pure: no imports from components.
@@ -12,6 +13,8 @@ export const ASSISTANTS_NAME = "Assistants";
 export const SHORTCUTS_NAME = "Shortcuts";
 /** What the firm has told Lectual about how it works (was "Firm brain"). */
 export const FIRM_NOTES_NAME = "Firm notes";
+/** What the Firm notes page says they are for. */
+export const FIRM_NOTES_PURPOSE = "Your assistants use these to match your tone, prices and rules. Nothing here is sent to clients.";
 /** The rail group holding Copilot, Assistants, Shortcuts and Firm notes (was "IP.OS"). */
 export const AI_TOOLS_GROUP = "AI tools";
 /** Drafts waiting for a person's OK (was "Queue"). */
@@ -39,8 +42,9 @@ export const FIRST_READ = "First read of this lead";
 export const ASSISTANTS_PAUSED = "Assistants paused";
 /** Settings tab for the parts of Lectual switched on firm by firm (was "Modules"). */
 export const FEATURES_NAME = "Features";
-export const FEATURES_SUBLINE =
-  "Parts of Lectual that are switched on firm by firm. To add one, contact Lectual and we'll set it up with you.";
+export const FEATURES_SUBLINE_START = "Parts of Lectual that are switched on firm by firm. To add one,";
+export const CONTACT_LECTUAL = "contact Lectual";
+export const FEATURES_SUBLINE_END = "and we'll set it up with you.";
 
 /** The Leads list temperature filter tooltip. */
 export const TEMPERATURE_TOOLTIP =
@@ -71,6 +75,10 @@ export const FEEDBACK_DISCLOSURE =
 /** Sign-in. */
 export const SIGN_IN_EXPIRED = "That sign-in link has expired or was already used. Enter your email to get a new one.";
 export const SIGN_IN_GENERIC = "We couldn't send the link. Check the address and try again.";
+export const SIGN_IN_WAIT = "Please wait a little before asking for another link.";
+export const SIGN_IN_INVITED_HELP = "Use the email your firm invited.";
+export const SIGN_IN_NOT_INVITED = "Not invited yet? Ask your firm's owner to invite you.";
+export const SIGN_IN_SPAM_HINT = "Can't find it? Check your spam or junk folder.";
 export const SIGN_IN_ERROR_FALLBACK = "That sign-in didn't work. Enter your email to get a new link.";
 
 /** Plain permission wording (was "scope"). */
@@ -114,7 +122,6 @@ export const IMPORT_PERSON_NOT_SAVED = "This person couldn't be saved.";
 
 /** Sprint 32 shell names. */
 export const MORE_NAME = "More";
-export const SUMMARY_TAB = "Summary";
 export const SETUP_NAME = "Setup";
 export const HELP_AND_TIPS = "Help and tips";
 /** A setup step only Lectual can switch on: shown, never counted against the firm. */
@@ -129,3 +136,6 @@ export const FEE_SENTENCE = "Legal fee is due at signing. USPTO fees are paid at
 export const SWITCH_ON_WORDS = "Lectual needs to switch this on";
 /** Where a Lawmatics token comes from. */
 export const LAWMATICS_TOKEN_HELP = "In Lawmatics: Settings \u2192 API \u2192 create a token, then paste it here";
+
+/** Sprint 34: the one sentence a read-only member sees on the Service library, instead of a wall of disabled fields. */
+export const SERVICE_LIBRARY_READ_ONLY = `You can use these on quotes. ${ADMIN_TIER_PHRASE} can change the list.`;

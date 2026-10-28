@@ -1,5 +1,6 @@
 "use client";
 
+import type { Utm } from "@/lib/intake-forms/utm";
 import { useEffect, useMemo, useRef, useState, useTransition, type CSSProperties } from "react";
 import { answerText, labelsOf, questionType, type AnswerValue } from "@/lib/intake-forms/choice";
 import { createStepTracker } from "@/lib/intake-forms/step-tracking";
@@ -38,7 +39,7 @@ type Step = ChatStep;
 
 const RESIZE_MESSAGE = "lectual-intake:resize";
 
-export function PublicIntake(props: { slug: string; view: PublicIntakeConfig; packages: Pkg[]; stamp: string; embed: boolean }) {
+export function PublicIntake(props: { slug: string; view: PublicIntakeConfig; packages: Pkg[]; stamp: string; embed: boolean; utm?: Utm }) {
   const { view, packages, slug } = props;
   const [mode, setMode] = useState<IntakeMode>(view.mode);
   const [contact, setContact] = useState<Contact>({ name: "", email: "", phone: "", company: "" });
@@ -121,7 +122,7 @@ export function PublicIntake(props: { slug: string; view: PublicIntakeConfig; pa
     setBadFields([]);
     startTransition(async () => {
       try {
-        const res = await startIntakeAction(slug, { mode, contact, consent, honeypot, stamp: props.stamp });
+        const res = await startIntakeAction(slug, { mode, contact, consent, honeypot, stamp: props.stamp, utm: props.utm });
         if (res.ok) {
           setToken(res.token);
           setStarted(true);

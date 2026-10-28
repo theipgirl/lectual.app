@@ -211,3 +211,26 @@
   font-size: 12px;
   color: var(--wine);
 }
+
+/* Knowledge | Claim library tabs. */
+.lx-brain-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+}
+.lx-brain-tab {
+  padding: 8px 14px;
+  font-size: 14.5px;
+  color: var(--body);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.lx-brain-tab:hover {
+  text-decoration: none;
+  color: var(--ink);
+}
+.lx-brain-tab-on {
+  color: var(--ink);
+  font-weight: 500;
+  border-bottom-color: var(--ox);
+}

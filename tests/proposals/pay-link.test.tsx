@@ -159,6 +159,8 @@ describe("A5/A6: no code path reads the default for behaviour", () => {
       "src/lib/proposals/validate.ts",
       "src/app/dashboard/settings/proposals/actions.ts",
       "src/app/dashboard/settings/integrations/lawmatics/loe-fields-actions.ts",
+      // Sprint 35: the approval-routing save writes the row back with the stored pay link untouched (a pass-through, like the two above).
+      "src/lib/queue/routing-load.ts",
     ];
     const hits = walk("src").filter((f) => /default_pay_url|defaultPayUrl/.test(readFileSync(f, "utf8")) && !allowed.includes(f));
     expect(hits).toEqual([]);

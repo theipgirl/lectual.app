@@ -6,6 +6,7 @@ import { PROPOSAL_PAID_ROLES } from "@/lib/proposals/paid";
 import { MARK_PAID_WORDS } from "@/lib/proposals/step-text";
 import { PROPOSAL_ADMIN_ROLES, PROPOSAL_STAFF_WRITE_ROLES } from "@/lib/proposals/types";
 import { NOT_ALLOWED, type ActionState } from "./errors";
+import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 
 /**
  * The gates every proposals PAGE and every proposals ACTION calls first.
@@ -40,7 +41,7 @@ export async function gateAdminAction(): Promise<ActionState | null> {
   const role = await currentRole();
   return role && PROPOSAL_ADMIN_ROLES.includes(role)
     ? null
-    : { error: "Only owners, admins and senior admins can change the proposal settings." };
+    : { error: `${ADMIN_TIER_PHRASE} can change the proposal settings.` };
 }
 
 /** Module on, and the caller is owner / admin / senior_admin / intake: who may mark a proposal paid, undo it, or retry a step. Null means go ahead. */

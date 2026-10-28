@@ -161,7 +161,7 @@ describe("write side and read side agree (D3)", () => {
   it("the Performance tab reads the same people: medians per step and each person's reading", async () => {
     const { w } = await story();
     const html = await w.performance();
-    expect(tableRows(html, "Median time per step")).toEqual([
+    expect(tableRows(html, "Typical time per step (median)")).toEqual([
       [`Q1. ${FIRST_Q}`, "20 sec", "3"],
       ["Q2. Have you used it publicly?", "15 sec", "2"],
       ["Q3. Which of these do you have?", "15 sec", "1"],
@@ -175,7 +175,7 @@ describe("the surfaces agree (D4)", () => {
     const { w, B } = await story();
     const results = tableRows(await w.results(), "Drop-off by question");
     const perf = await w.performance();
-    const medians = tableRows(perf, "Median time per step");
+    const medians = tableRows(perf, "Typical time per step (median)");
     // Same questions, same order, same number of people who reached each.
     expect(medians.map((r) => r[0])).toEqual(results.map((r) => r[0]));
     expect(medians.map((r) => r[2])).toEqual(results.map((r) => r[1]));
@@ -248,7 +248,7 @@ describe("the range (D5)", () => {
     expect(await reached(90)).toEqual(["3", "3", "0"]);
     const perf = await w.performance({ range: 7 });
     expect(perf).toContain("Last 7 days");
-    expect(tableRows(perf, "Median time per step")[0]).toEqual([`Q1. ${FIRST_Q}`, "30 sec", "1"]);
+    expect(tableRows(perf, "Typical time per step (median)")[0]).toEqual([`Q1. ${FIRST_Q}`, "30 sec", "1"]);
   });
 });
 

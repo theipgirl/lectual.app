@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { hasRole } from "@/lib/auth/roles";
 import { getAdminClient } from "@/lib/db/admin";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { rootKeyOrNull } from "@/lib/mailbox/config";
@@ -9,6 +8,9 @@ import { checkFathomKeyShape, verifyFathomKey } from "@/lib/meetings/fathom";
 import { disconnectMeetingSource, ownConnectionSecrets, saveFathomKey } from "@/lib/meetings/connection";
 import { zoomClientCredentials } from "@/lib/meetings/config";
 import { importConnection } from "@/lib/meetings/import";
+import { canSyncMeetings } from "@/lib/meetings/sync-access";
+import type { SyncOutcome } from "@/lib/meetings/sync-result";
+import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 import { PROVIDER_LABEL, isMeetingProvider } from "@/lib/meetings/types";
 
 /**
@@ -19,11 +21,17 @@ import { PROVIDER_LABEL, isMeetingProvider } from "@/lib/meetings/types";
 
 const PAGE = "/dashboard/settings/integrations/meetings/";
 
-export type MeetingsSettingsState = { ok?: boolean; error?: string; notice?: string };
+export type MeetingsSettingsState = {
+  ok?: boolean;
+  error?: string;
+  notice?: string;
+  /** Set by importNowAction: the structured outcome, for "Sync new meetings" to merge without reading the sentences. */
+  sync?: SyncOutcome;
+};
 
 async function adminSession() {
   const session = await resolveFirmSession();
-  if (session.kind !== "ok" || !hasRole(session.role, "senior_admin")) return null;
+  if (session.kind !== "ok" || !canSyncMeetings(session.role)) return null;
   return session;
 }
 
@@ -35,7 +43,7 @@ function refresh() {
 
 export async function connectFathomAction(_prev: MeetingsSettingsState, formData: FormData): Promise<MeetingsSettingsState> {
   const session = await adminSession();
-  if (!session) return { error: "Only owners and admins can connect Fathom." };
+  if (!session) return { error: `${ADMIN_TIER_PHRASE} can connect Fathom.` };
   const root = rootKeyOrNull();
   if (!root) return { error: "Integrations aren't switched on for your firm yet. Lectual will turn them on." };
 
@@ -53,7 +61,7 @@ export async function connectFathomAction(_prev: MeetingsSettingsState, formData
 export async function disconnectMeetingSourceAction(_prev: MeetingsSettingsState, formData: FormData): Promise<MeetingsSettingsState> {
   const provider = formData.get("provider");
   if (!isMeetingProvider(provider)) return { error: "Unknown connection." };
-  if (!(await adminSession())) return { error: `Only owners and admins can disconnect ${PROVIDER_LABEL[provider]}.` };
+  if (!(await adminSession())) return { error: `${ADMIN_TIER_PHRASE} can disconnect ${PROVIDER_LABEL[provider]}.` };
   const result = await disconnectMeetingSource(provider, { root: rootKeyOrNull(), zoomCreds: zoomClientCredentials() });
   if (!result.ok) return { error: result.reason };
   refresh();
@@ -64,15 +72,15 @@ export async function importNowAction(_prev: MeetingsSettingsState, formData: Fo
   const provider = formData.get("provider");
   if (!isMeetingProvider(provider)) return { error: "Unknown connection." };
   const session = await adminSession();
-  if (!session) return { error: "Only owners and admins can run an import." };
+  if (!session) return { error: `${ADMIN_TIER_PHRASE} can run an import.`, sync: { kind: "refused" } };
   const root = rootKeyOrNull();
-  if (!root) return { error: "Integrations aren't switched on for your firm yet. Lectual will turn them on." };
+  if (!root) return { error: "Integrations aren't switched on for your firm yet. Lectual will turn them on.", sync: { kind: "not-switched-on" } };
 
   // The connection row comes from the caller's own RLS read; its secrets are
   // then read by that row's (id, org_id), and every write stamps that org_id.
   const conn = await ownConnectionSecrets(provider);
-  if (!conn) return { error: `${PROVIDER_LABEL[provider]} isn't connected for your firm.` };
-  if (conn.status !== "active") return { error: `${PROVIDER_LABEL[provider]} needs reconnecting before it can import.` };
+  if (!conn) return { error: `${PROVIDER_LABEL[provider]} isn't connected for your firm.`, sync: { kind: "not-connected" } };
+  if (conn.status !== "active") return { error: `${PROVIDER_LABEL[provider]} needs reconnecting before it can import.`, sync: { kind: "reauth" } };
 
   const out = await importConnection({ admin: getAdminClient(), root, zoomCreds: zoomClientCredentials() }, conn, { importedBy: session.user.id });
   refresh();
@@ -82,6 +90,7 @@ export async function importNowAction(_prev: MeetingsSettingsState, formData: Fo
         out.status === "reauth"
           ? `${PROVIDER_LABEL[provider]} no longer accepts your firm's connection. Reconnect it above.`
           : `The import didn't finish: ${out.error}`,
+      sync: { kind: out.status === "reauth" ? "reauth" : "failed" },
     };
   }
   const { inserted, updated, linked, suggested } = out.counts;
@@ -89,5 +98,9 @@ export async function importNowAction(_prev: MeetingsSettingsState, formData: Fo
   if (updated) parts.push(`${updated} refreshed`);
   if (linked) parts.push(`${linked} linked to a client automatically`);
   if (suggested) parts.push(`${suggested} with a suggested link to check`);
-  return { ok: true, notice: `Imported: ${parts.join(", ")}.${out.truncated ? " There were more than one run reads; the rest follow on the next run." : ""}` };
+  return {
+    ok: true,
+    notice: `Imported: ${parts.join(", ")}.${out.truncated ? " There were more than one run reads; the rest follow on the next run." : ""}`,
+    sync: { kind: "imported", inserted },
+  };
 }

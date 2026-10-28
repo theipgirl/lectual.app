@@ -26,9 +26,11 @@ import { DETAIL_LIMITS, type IntakeDetails } from "@/lib/intake-forms/details";
 import { saveIntakeFormAction } from "../actions";
 import { IntakePreview } from "./IntakePreview";
 import { IntakeQrButton } from "./IntakeQr";
+import { IntakeLinksForChannels } from "./IntakeLinksForChannels";
 import { AssessmentPreview, AssessmentSettingsCard } from "./AssessmentSettings";
 import { OptionsEditor, QuestionTypeSelect } from "./ChoiceEditor";
 import { isChoice, questionType } from "@/lib/intake-forms/choice";
+import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 
 /**
  * Intake → Forms (design/Intake_Forms.dc.html): the header, the two tabs,
@@ -299,7 +301,7 @@ export function IntakeFormsWorkspace(props: Props) {
       <div className="lx-page-head ifm-head">
         <div style={{ flex: 1, minWidth: 240 }}>
           <Link href="/dashboard/forms/" className="ifm-back">
-            ← All intakes
+            ← All forms
           </Link>
           <h1 className="lx-h1">{saved.details.name}</h1>
           <p className="lx-sub">
@@ -311,30 +313,9 @@ export function IntakeFormsWorkspace(props: Props) {
             <i />
             {live ? "Live" : archived ? "Archived" : "Draft"}
           </span>
-          {shareable ? (
-            <>
-              <IntakeQrButton url={publicUrl} name={saved.details.name} slug={saved.details.slug} />
-              <button type="button" className="lx-btn lx-btn-sec" onClick={() => copy(publicUrl, "Link copied")}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />
-                </svg>
-                Copy link
-              </button>
-              <a className="lx-btn lx-btn-sec" href={publicUrl} target="_blank" rel="noopener noreferrer">
-                Preview
-              </a>
-            </>
-          ) : (
-            <>
-              <IntakeQrButton url={publicUrl} name={saved.details.name} slug={saved.details.slug} shareable={false} describedBy="ifm-notlive" />
-              <button type="button" className="lx-btn lx-btn-sec" disabled aria-describedby="ifm-notlive">
-                Copy link
-              </button>
-              <span id="ifm-notlive" className="ifm-help">
-                {NOT_LIVE_MESSAGE}
-              </span>
-            </>
-          )}
+          <a className="lx-btn lx-btn-sec" href="#ifm-sec-share">
+            Share
+          </a>
           {canEdit && (
             <button type="button" className="lx-btn lx-btn-pri" onClick={save} disabled={saving || !dirty} aria-busy={saving}>
               {saving && <span className="ifm-spin" aria-hidden />}
@@ -344,15 +325,15 @@ export function IntakeFormsWorkspace(props: Props) {
         </div>
       </div>
 
-      <nav className="ifm-tabs" aria-label="Intake forms">
+      <nav className="ifm-tabs" aria-label="Forms">
         <Link href={tabHref("setup")} scroll={false} aria-current={props.tab === "setup" ? "page" : undefined}>
-          Form setup
-        </Link>
-        <Link href={tabHref("performance")} scroll={false} aria-current={props.tab === "performance" ? "page" : undefined}>
-          Performance
+          Setup
         </Link>
         <Link href={tabHref("results")} scroll={false} aria-current={props.tab === "results" ? "page" : undefined}>
           Results
+        </Link>
+        <Link href={tabHref("performance")} scroll={false} aria-current={props.tab === "performance" ? "page" : undefined}>
+          Performance
         </Link>
       </nav>
 
@@ -362,10 +343,11 @@ export function IntakeFormsWorkspace(props: Props) {
         props.results
       ) : (
         <div className="ifm-setup">
+          <div className="ifm-editor-col">
           <fieldset className="ifm-editor" disabled={!canEdit}>
             {!canEdit && (
               <div className="lx-banner lx-banner-mute" style={{ fontSize: 14 }}>
-                You can look but not change. Owners, admins and senior admins edit the intake.
+                You can look but not change. {ADMIN_TIER_PHRASE} can edit the intake.
               </div>
             )}
             {saveError && (
@@ -533,26 +515,7 @@ export function IntakeFormsWorkspace(props: Props) {
                   onChange={(e) => edit({ opening: e.target.value })}
                 />
               </label>
-              <label className="ifm-field">
-                <span className="ifm-field-head">
-                  <span className="ifm-field-label">What the assistant knows about your firm</span>
-                  <span className="ifm-private">{LOCK} Only you see this</span>
-                  <span style={{ flex: 1 }} />
-                  <Counter n={config.knows.length} max={LIMITS.knows} />
-                </span>
-                <textarea
-                  className="ifm-input"
-                  rows={5}
-                  value={config.knows}
-                  maxLength={LIMITS.knows}
-                  placeholder="e.g. We're a trademark boutique. We file US federal trademarks and handle office actions. Consults are 30 minutes by video."
-                  onChange={(e) => edit({ knows: e.target.value })}
-                />
-                <span className="ifm-help">
-                  Practice areas, how consults work, response times. The assistant never gives legal advice: case-specific questions go to
-                  your attorneys. Today it asks your questions in order and doesn&apos;t chat freely.
-                </span>
-              </label>
+              {/* "What the assistant knows" is saved with the form but nothing reads it yet (no screening or chat code uses it), so it is not offered; any stored text is left as it is. */}
             </section>
 
               </>
@@ -838,6 +801,7 @@ export function IntakeFormsWorkspace(props: Props) {
             {form.receivesReferrals && (
               <section id="ifm-sec-compliance" className="ifm-card">
                 <h2 className="ifm-title">Compliance</h2>
+                <p className="ifm-help">This applies because your firm receives referred founders from Lectual.</p>
                 <label className="ifm-field">
                   <span className="ifm-field-label">Office location</span>
                   <input
@@ -904,8 +868,9 @@ export function IntakeFormsWorkspace(props: Props) {
               </div>
               <p className="ifm-help">Applies to your public link and the embedded widget.</p>
             </section>
+          </fieldset>
 
-            <section id="ifm-sec-share" className="ifm-card">
+          <section id="ifm-sec-share" className="ifm-card">
               <h2 className="ifm-title">Share</h2>
               {shareable ? (
                 <>
@@ -914,29 +879,48 @@ export function IntakeFormsWorkspace(props: Props) {
                     <div className="ifm-row">
                       <input className="ifm-input ifm-readonly" value={publicUrl} readOnly aria-label="Direct link" />
                       <button type="button" className="lx-btn lx-btn-sec" onClick={() => copy(publicUrl, "Link copied")}>
-                        Copy
+                        Copy link
                       </button>
+                      <IntakeQrButton url={publicUrl} name={saved.details.name} slug={saved.details.slug} />
+                      <a className="lx-btn lx-btn-sec" href={publicUrl} target="_blank" rel="noopener noreferrer">
+                        Preview
+                      </a>
                     </div>
                   </div>
-                  <div className="ifm-field">
+                  <IntakeLinksForChannels slug={saved.details.slug} name={saved.details.name} sourceTag={saved.details.sourceTag} origin={props.origin} shareable />
+                  <details className="ifm-field ifm-embed">
+                    <summary className="ifm-field-label">Embed on a website (for your web person)</summary>
                     <span className="ifm-field-head">
                       <span className="ifm-field-label" style={{ flex: 1 }}>
-                        Embed snippet
+                        Put this on your website
                       </span>
-                      <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" onClick={() => copy(embed, "Embed snippet copied")}>
+                      <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" onClick={() => copy(embed, "Website code copied")}>
                         Copy
                       </button>
                     </span>
                     <pre className="ifm-code">{embed}</pre>
-                  </div>
+                  </details>
                 </>
               ) : (
-                <p className="ifm-help" role="status">
-                  {NOT_LIVE_MESSAGE}
-                </p>
+                <>
+                  <p id="ifm-notlive" className="ifm-help" role="status">
+                    {NOT_LIVE_MESSAGE}
+                  </p>
+                  <div className="ifm-row">
+                    <button type="button" className="lx-btn lx-btn-sec" disabled aria-describedby="ifm-notlive">
+                      Copy link
+                    </button>
+                    <IntakeQrButton url={publicUrl} name={saved.details.name} slug={saved.details.slug} shareable={false} describedBy="ifm-notlive" />
+                    <button type="button" className="lx-btn lx-btn-sec" disabled aria-describedby="ifm-notlive">
+                      Preview
+                    </button>
+                  </div>
+                  <IntakeLinksForChannels slug={saved.details.slug} name={saved.details.name} sourceTag={saved.details.sourceTag} origin={props.origin} shareable={false} />
+                </>
               )}
+              <fieldset className="ifm-bare" disabled={!canEdit}>
               <div className="ifm-field">
-                <span className="ifm-field-label">Allowed domains</span>
+                <span className="ifm-field-label">Websites allowed to show this form</span>
                 <div className="ifm-domains">
                   {domains.map((d) => (
                     <span key={d} className="ifm-domain">
@@ -950,8 +934,8 @@ export function IntakeFormsWorkspace(props: Props) {
                   ))}
                   <input
                     value={domInput}
-                    placeholder="example.com or *.example.com"
-                    aria-label="Add domain"
+                    placeholder="yourfirm.com"
+                    aria-label="Add a website"
                     onChange={(e) => setDomInput(e.target.value)}
                     onBlur={() => domInput.trim() && addDomain()}
                     onKeyDown={(e) => {
@@ -964,10 +948,19 @@ export function IntakeFormsWorkspace(props: Props) {
                     }}
                   />
                 </div>
-                {domains.length === 0 && <span className="ifm-help">Any site can embed this.</span>}
+                <span className="ifm-help">Leave empty to allow any website. Add your own website to stop others from embedding it.</span>
               </div>
+              </fieldset>
             </section>
-          </fieldset>
+              {canEdit && (
+                <div className="ifm-row ifm-save-row">
+                  <button type="button" className="lx-btn lx-btn-pri" onClick={save} disabled={saving || !dirty} aria-busy={saving}>
+                    {saving ? "Saving…" : "Save changes"}
+                  </button>
+                </div>
+              )}
+
+          </div>
 
           {isAssessment ? (
             <AssessmentPreview settings={config.assessment} />

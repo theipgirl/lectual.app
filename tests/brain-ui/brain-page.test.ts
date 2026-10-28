@@ -76,22 +76,24 @@ describe("BrainPage", () => {
     mockBrainLib([entry()], [claim()]);
 
     const { default: BrainPage } = await import("../../src/app/dashboard/brain/page");
-    const element = await BrainPage();
-    const html = renderToStaticMarkup(element);
+    const html = renderToStaticMarkup(await BrainPage());
 
-    // Brain entries, grouped by category
+    // Brain entries, grouped by category (Knowledge is the default tab)
     expect(html).toContain("Brand voice");
     expect(html).toContain("brand-voice-tone");
     expect(html).toContain("Warm, direct, no legalese.");
+    expect(html).not.toContain("48 hours");
+    expect(html).not.toContain("New entry");
 
-    // Claim library, grouped by status
-    expect(html).toContain("48 hours");
-    expect(html).toContain("Proposed");
+    // Claim library, grouped by status, on its own tab
+    const claimsHtml = renderToStaticMarkup(await BrainPage({ searchParams: Promise.resolve({ tab: "claims" }) }));
+    expect(claimsHtml).toContain("48 hours");
+    expect(claimsHtml).toContain("Proposed");
+    expect(claimsHtml).not.toContain("brand-voice-tone");
 
     // A non-admin, non-viewer role can propose but not manage entries or review claims
-    expect(html).toContain("Propose a claim");
-    expect(html).not.toContain("New entry");
-    expect(html).not.toContain("Mark forbidden");
+    expect(claimsHtml).toContain("Propose a claim");
+    expect(claimsHtml).not.toContain("Mark forbidden");
   });
 
   it("renders the New entry form and empty states for an admin with nothing recorded yet", async () => {
@@ -104,7 +106,8 @@ describe("BrainPage", () => {
 
     expect(html).toContain("New entry");
     expect(html).toContain("No firm notes yet");
-    expect(html).toContain("No claims proposed yet");
+    const claimsHtml = renderToStaticMarkup(await BrainPage({ searchParams: Promise.resolve({ tab: "claims" }) }));
+    expect(claimsHtml).toContain("No claims proposed yet");
   });
 
   it("shows claim review actions for an attorney but not a paralegal", async () => {
@@ -112,8 +115,7 @@ describe("BrainPage", () => {
     mockBrainLib([], [claim()]);
 
     const { default: BrainPage } = await import("../../src/app/dashboard/brain/page");
-    const element = await BrainPage();
-    const html = renderToStaticMarkup(element);
+    const html = renderToStaticMarkup(await BrainPage({ searchParams: Promise.resolve({ tab: "claims" }) }));
 
     expect(html).toContain("Approve");
     expect(html).toContain("Mark forbidden");

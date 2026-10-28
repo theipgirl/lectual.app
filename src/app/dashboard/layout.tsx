@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { loadActiveQueue } from "@/lib/queue/load";
+import { mineQueue } from "@/lib/queue/mine-load";
 import { RAIL_PIN_COOKIE, railIsPinned, visibleNav } from "@/lib/nav";
 import { Rail } from "@/components/shell/Rail";
 import { MobileBar } from "@/components/shell/MobileBar";
@@ -47,11 +48,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   // Three states, carried to the rail badge — an unreachable queue must never
   // render like an empty one (src/lib/queue/load.ts).
-  const [queue, counts, cookieStore] = await Promise.all([
+  const [allQueue, counts, cookieStore] = await Promise.all([
     loadActiveQueue(),
     loadRailCounts().catch(() => ({})),
     cookies(),
   ]);
+  // The badge counts what is the viewer's own (a routing read that fails counts every pending item).
+  const queue = await mineQueue(allQueue, { userId: user.id, role });
   const railPinned = railIsPinned(cookieStore.get(RAIL_PIN_COOKIE)?.value);
 
   return (

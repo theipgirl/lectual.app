@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, useTransition } from "react";
+import { InlineConfirm } from "@/components/ui/InlineConfirm";
 import {
   inviteMemberAction,
   removeMemberAction,
@@ -57,20 +58,22 @@ export function RoleSelect({ userId, role, grantable, name = "this person" }: { 
 
 export function RemoveMember({ userId, name }: { userId: string; name: string }) {
   const [state, action, pending] = useActionState<MemberActionState, FormData>(removeMemberAction, {});
+  const [, startTransition] = useTransition();
   return (
-    <form
-      action={action}
-      className="lx-inline-form"
-      onSubmit={(e) => {
-        if (!confirm(`Remove ${name} from the firm? They're signed out straight away.`)) e.preventDefault();
-      }}
-    >
-      <input type="hidden" name="userId" value={userId} />
-      <button type="submit" className="lx-btn lx-btn-ghost lx-btn-sm" disabled={pending}>
-        {pending ? "…" : "Remove"}
-      </button>
+    <div className="lx-inline-form">
+      <InlineConfirm
+        label="Remove"
+        question={`Remove ${name} from the firm? They're signed out straight away.`}
+        confirmLabel="Remove"
+        pending={pending}
+        onConfirm={() => {
+          const form = new FormData();
+          form.set("userId", userId);
+          startTransition(() => action(form));
+        }}
+      />
       <Msg state={state} />
-    </form>
+    </div>
   );
 }
 

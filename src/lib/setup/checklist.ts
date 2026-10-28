@@ -118,16 +118,16 @@ function aiVerdict(configured: boolean): Verdict {
 type Spec = { id: SetupItem["id"]; label: string; href: string; verdict: (s: SetupState) => Verdict };
 
 const SPECS: Spec[] = [
-  { id: "profile", label: "Firm profile and sign-off", href: "/dashboard/settings/firm/", verdict: (s) => profileVerdict(s.profile) },
-  { id: "team", label: "Team invited", href: "/dashboard/settings/team/", verdict: (s) => teamVerdict(s.members) },
-  { id: "outlook", label: "Outlook mailbox connected", href: INTEGRATIONS_PATH, verdict: (s) => outlookVerdict(s.modules, s.mailboxes) },
-  { id: "lawmatics", label: "Lawmatics connected", href: "/dashboard/settings/integrations/lawmatics/", verdict: (s) => lawmaticsVerdict(s.lawmatics) },
-  { id: "meetings", label: "Fathom or Zoom connected", href: "/dashboard/settings/integrations/meetings/", verdict: (s) => meetingsVerdict(s.meetings, s.lectual?.zoomApp ?? true) },
-  { id: "lawpay", label: "LawPay connected", href: "/dashboard/settings/integrations/lawpay/", verdict: (s) => lawpayVerdict(s.lawpay, s.lectual?.lawpayApp ?? true) },
-  { id: "agents", label: "At least one assistant on", href: "/dashboard/agents/", verdict: (s) => agentsVerdict(s.modules, s.agents) },
-  { id: "intake", label: "An intake form live", href: "/dashboard/forms/", verdict: (s) => intakeVerdict(s.intakeForms) },
-  { id: "packages", label: "Packages saved", href: "/dashboard/settings/services/", verdict: (s) => packagesVerdict(s.services) },
-  { id: "ai", label: "AI configured", href: "/dashboard/copilot/", verdict: (s) => aiVerdict(s.aiConfigured) },
+  { id: "profile", label: "Add your firm name and sign-off", href: "/dashboard/settings/firm/", verdict: (s) => profileVerdict(s.profile) },
+  { id: "team", label: "Invite your team", href: "/dashboard/settings/team/", verdict: (s) => teamVerdict(s.members) },
+  { id: "outlook", label: "Connect Outlook", href: INTEGRATIONS_PATH, verdict: (s) => outlookVerdict(s.modules, s.mailboxes) },
+  { id: "lawmatics", label: "Connect Lawmatics", href: "/dashboard/settings/integrations/lawmatics/", verdict: (s) => lawmaticsVerdict(s.lawmatics) },
+  { id: "meetings", label: "Connect Fathom or Zoom", href: "/dashboard/settings/integrations/meetings/", verdict: (s) => meetingsVerdict(s.meetings, s.lectual?.zoomApp ?? true) },
+  { id: "lawpay", label: "Connect LawPay", href: "/dashboard/settings/integrations/lawpay/", verdict: (s) => lawpayVerdict(s.lawpay, s.lectual?.lawpayApp ?? true) },
+  { id: "agents", label: "Turn on an assistant", href: "/dashboard/agents/", verdict: (s) => agentsVerdict(s.modules, s.agents) },
+  { id: "intake", label: "Publish an intake form", href: "/dashboard/forms/", verdict: (s) => intakeVerdict(s.intakeForms) },
+  { id: "packages", label: "Save a fee package", href: "/dashboard/settings/services/", verdict: (s) => packagesVerdict(s.services) },
+  { id: "ai", label: "Turn on AI", href: "/dashboard/copilot/", verdict: (s) => aiVerdict(s.aiConfigured) },
 ];
 
 /**
@@ -136,7 +136,7 @@ const SPECS: Spec[] = [
  * `done` needs every fact the item depends on to have been READ and to say so.
  * A fact that could not be read gives `couldnt-check`, never `done` and never
  * `to-do`: a failed read must not tell a firm it has finished, or that it
- * hasn't started. The one item that cannot fail is "AI configured" (an
+ * hasn't started. The one item that cannot fail is "Turn on AI" (an
  * environment variable). A module that is off is `to-do` (with a link to
  * Modules), not hidden. Items only Lectual can switch on (AI, LawPay while
  * the deployment has no LawPay app) are drawn but left out of the count, so

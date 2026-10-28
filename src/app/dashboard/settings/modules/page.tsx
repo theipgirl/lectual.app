@@ -1,9 +1,11 @@
 import Link from "next/link";
-import { activeOrgModules, type OrgModule } from "@/lib/org/modules";
+import { activeOrgModules } from "@/lib/org/modules";
+import { MODULES } from "@/lib/settings/modules-copy";
+import { FeedbackLink } from "@/components/feedback/SendFeedbackButton";
 import { listConnections } from "@/lib/mailbox/connections";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
-import { ASSISTANTS_NAME, FEATURES_NAME, FEATURES_SUBLINE } from "@/lib/ui/words";
+import { CONTACT_LECTUAL, FEATURES_NAME, FEATURES_SUBLINE_END, FEATURES_SUBLINE_START } from "@/lib/ui/words";
 
 export const metadata: Metadata = { title: pageTitle(FEATURES_NAME) };
 
@@ -13,18 +15,8 @@ export const dynamic = "force-dynamic";
  * What's switched on for this firm. Read-only: crm_org.modules is Lectual's to
  * set (firms have no UPDATE policy on crm_org), because each module either
  * needs the firm's own setup or carries content written for one practice.
- * lectual-only modules (inbox, lawmatics-import) aren't listed: this app has
- * no surface behind them.
+ * The copy for each is in `src/lib/settings/modules-copy.ts`.
  */
-const MODULES: Array<{ key: OrgModule; name: string; what: string }> = [
-  { key: "mailbox", name: "Mailboxes", what: "Connect Gmail and Outlook, match client mail to leads and matters, and use My Mail." },
-  { key: "agents", name: ASSISTANTS_NAME, what: "Scheduled assistants that read new leads, pull client details from email and draft post-consult follow-ups into Approvals." },
-  { key: "document-center", name: "Document Center", what: "Generate engagement and opinion letters from your firm's templates, into Approvals." },
-  { key: "agent-toolkit", name: "Agent toolkit", what: "Welcome emails and filing follow-ups on matters, written in your firm's voice." },
-  { key: "proposals", name: "Client proposals", what: "The trademark proposal a client reviews and accepts after their strategy call: brand names, marks and classes, approved by a named approver before it is sent." },
-  { key: "litigation", name: "Litigation", what: "Litigation matters, with court case numbers, hearings and case details." },
-];
-
 type ModuleStatus = { label: string; tone: "ok" | "warn" | "risk" | "mute" };
 
 /**
@@ -50,7 +42,9 @@ export default async function ModulesPage() {
       <div>
         <div className="lx-label">Settings</div>
         <h1 className="lx-h1" data-tour="modules-head">{FEATURES_NAME}</h1>
-        <p className="lx-sub">{FEATURES_SUBLINE}</p>
+        <p className="lx-sub">
+          {FEATURES_SUBLINE_START} <FeedbackLink>{CONTACT_LECTUAL}</FeedbackLink> {FEATURES_SUBLINE_END}
+        </p>
       </div>
       <section className="lx-card lx-int" aria-label={FEATURES_NAME}>
         {MODULES.map((m) => {

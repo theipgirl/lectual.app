@@ -67,12 +67,12 @@ export function EventAssessments({ read }: { read: Awaited<ReturnType<typeof loa
                 </dd>
               </div>
               <div>
-                <dt>Median time</dt>
+                <dt>Typical time (median)</dt>
                 <dd>{formatDuration(e.medianMs)}</dd>
               </div>
             </dl>
             <div className="ifl-actions">
-              <Link className="ifl-act" href={eventHref(e.code)}>
+              <Link className="lx-btn lx-btn-sm lx-btn-ghost" href={eventHref(e.code)}>
                 Results
               </Link>
             </div>

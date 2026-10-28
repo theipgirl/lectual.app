@@ -15,11 +15,11 @@ import { liveMailReadDeps } from "@/lib/mailbox/read-message-live";
 import { MailReadingPane, MailPaneLoading } from "@/components/mailbox/MailReadingPane";
 import { LiveInboxList } from "@/components/mailbox/LiveInboxList";
 import "@/components/mailbox/mail-pane.css";
+import { MailFolderSelect } from "@/components/mailbox/MailFolderSelect";
+import { folderSelect, type MailNavLink } from "@/lib/mailbox/folder-select";
 import type { Metadata } from "next";
 import { matterDisplayTitle } from "@/lib/matters/display-title";
 import { pageTitle } from "@/lib/ui/page-title";
-import { SectionTabs } from "@/components/shell/SectionTabs";
-import { REPORTS, reportListLabel } from "@/lib/nav";
 
 export const metadata: Metadata = { title: pageTitle("My Mail") };
 
@@ -129,27 +129,36 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
   const paneState = m ? loadStoredMessage(m, liveMailReadDeps) : live ? loadLiveMessage(box, live, liveMailReadDeps) : null;
   const inbox = inboxTab ? await loadLiveInbox(box, liveMailReadDeps) : null;
 
+  // The sidebar links and the phone's select are built from this one list, so they cannot disagree.
+  const navLinks: MailNavLink[] = [
+    { key: "received", group: "Folders", label: "Received", href: href({ f: null, tab: null, m: null, live: null }), current: !sent && !inboxTab },
+    { key: "sent", group: "Folders", label: "Sent", href: href({ f: "sent", tab: null, m: null, live: null }), current: sent && !inboxTab },
+    { key: "all", group: "Mailboxes", label: "All mailboxes", href: href({ box: null, m: null, live: null }), current: !selected },
+    ...connections.map((c): MailNavLink => ({ key: c.id, group: "Mailboxes", label: c.email, href: href({ box: c.id, m: null, live: null }), current: selected?.id === c.id })),
+  ];
+  const folderLinks = navLinks.filter((l) => l.group === "Folders");
+  const boxLink = (key: string) => navLinks.find((l) => l.key === key)!;
+
   return (
     <div className="lx-split">
-      <aside className="lx-side" aria-label="Mailboxes">
+      <aside className="lx-side lx-mail-side" aria-label="Mailboxes">
         <div className="lx-label">Folders</div>
         <nav style={{ display: "grid", gap: 2 }}>
-          <Link href={href({ f: null, tab: null, m: null, live: null })} className="lx-fi" aria-current={!sent && !inboxTab ? "page" : undefined}>
-            Received
-          </Link>
-          <Link href={href({ f: "sent", tab: null, m: null, live: null })} className="lx-fi" aria-current={sent && !inboxTab ? "page" : undefined}>
-            Sent
-          </Link>
+          {folderLinks.map((l) => (
+            <Link key={l.key} href={l.href} className="lx-fi" aria-current={l.current ? "page" : undefined}>
+              {l.label}
+            </Link>
+          ))}
         </nav>
         <div className="lx-label" style={{ marginTop: 8 }}>
           Mailboxes
         </div>
         <nav style={{ display: "grid", gap: 2 }}>
-          <Link href={href({ box: null, m: null, live: null })} className="lx-fi" aria-current={!selected ? "page" : undefined}>
+          <Link href={boxLink("all").href} className="lx-fi" aria-current={!selected ? "page" : undefined}>
             All mailboxes
           </Link>
           {connections.map((c) => (
-            <Link key={c.id} href={href({ box: c.id, m: null, live: null })} className="lx-fi lx-fi-box" aria-current={selected?.id === c.id ? "page" : undefined} title={c.email}>
+            <Link key={c.id} href={boxLink(c.id).href} className="lx-fi lx-fi-box" aria-current={selected?.id === c.id ? "page" : undefined} title={c.email}>
               <ProviderMark provider={c.provider} size={14} />
               <span className="lx-fi-text">{c.email}</span>
               {c.status === "reauth" && <span className="lx-fi-n" style={{ color: "var(--wine)" }}>!</span>}
@@ -162,11 +171,10 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
       </aside>
 
       <div className="lx-col">
-        <div className="lx-page-head">
+        <div className="lx-page-head lx-page-head-list">
           <div style={{ flex: 1, minWidth: 240 }}>
             <div className="lx-label">{selected ? `${PROVIDER_LABEL[selected.provider]} · ${selected.email}` : `${connections.length} mailbox${connections.length === 1 ? "" : "es"}`}</div>
             <h1 className="lx-h1">My Mail</h1>
-            <SectionTabs active="list" listLabel={reportListLabel("communication", { hasMailbox: true })} listHref="/dashboard/mail/" summaryHref={REPORTS.communication.href} />
             <p className="lx-sub">{inboxTab ? "The newest messages in the mailbox, read live. Nothing here is saved." : "Mail with your clients, already linked to their lead or matter. Everything else stays in your inbox."}</p>
           </div>
         </div>
@@ -177,6 +185,8 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
             <Link href={INTEGRATIONS}>Reconnect</Link>
           </div>
         )}
+
+        <MailFolderSelect select={folderSelect(navLinks)} />
 
         <div className="lx-mail-tabs" role="navigation" aria-label="Mail views">
           <Link href={href({ tab: null, m: null, live: null })} className="lx-btn lx-btn-sm lx-btn-sec" aria-current={!inboxTab ? "page" : undefined}>

@@ -19,8 +19,9 @@ import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import "./forms.css";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 
-export const metadata: Metadata = { title: pageTitle("Intake forms") };
+export const metadata: Metadata = { title: pageTitle("Forms") };
 
 export const dynamic = "force-dynamic";
 
@@ -165,25 +166,24 @@ function IntakeEmpty({ status }: { status: "none" | "unconfigured" | "unavailabl
       <>
         <div className="lx-page-head">
           <div style={{ flex: 1, minWidth: 240 }}>
-            <div className="lx-label">Intake</div>
-            <h1 className="lx-h1" data-tour="forms-head">Intake forms</h1>
+            <h1 className="lx-h1" data-tour="forms-head">Forms</h1>
             <p className="lx-sub">Your public intake, how it looks, and where it lives.</p>
           </div>
         </div>
         <div className="lx-card lx-empty-card">
           <h2 className="lx-h2" style={{ fontSize: 25 }}>
             {status === "unconfigured"
-              ? "Intake forms aren't switched on for your firm yet"
+              ? "Forms isn't switched on for your firm yet"
               : status === "unavailable"
                 ? "Your intake couldn't be loaded"
                 : "Your firm hasn't set up its intake yet"}
           </h2>
           <p className="lx-note" style={{ margin: 0 }}>
             {status === "unconfigured"
-              ? "Lectual will turn them on. Nothing is broken."
+              ? "Lectual will turn it on. Nothing is broken."
               : status === "unavailable"
                 ? "Can't show this intake right now. Nothing was changed. Refresh to try again."
-                : "An owner, admin or senior admin sets it up here."}
+                : `${ADMIN_TIER_PHRASE} can set it up here.`}
           </p>
         </div>
       </>

@@ -7,6 +7,8 @@ import { InviteForm, RemoveMember, ROLE_LABEL, RoleSelect } from "@/components/s
 import { RoleTable } from "@/components/settings/RoleTable";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { inviteFormOpen } from "@/lib/team/invite-open";
+import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 
 export const metadata: Metadata = { title: pageTitle("Team") };
 
@@ -44,7 +46,7 @@ export default async function TeamPage() {
       </div>
 
       {isAdmin && (
-        <details className="lx-card lx-disclosure">
+        <details className="lx-card lx-disclosure" open={inviteFormOpen(members.length, loadError) || undefined}>
           <summary>Invite teammate</summary>
           <div style={{ padding: "0 18px 18px" }}>
             <InviteForm grantable={grantable} />
@@ -58,7 +60,7 @@ export default async function TeamPage() {
         </div>
       ) : (
         <div className="lx-card" style={{ overflow: "auto" }}>
-          <table className="lx-tbl" style={{ minWidth: 640 }}>
+          <table className="lx-tbl lx-team-tbl">
             <thead>
               <tr>
                 <th>Person</th>
@@ -74,16 +76,16 @@ export default async function TeamPage() {
                 const name = m.displayName ?? m.email ?? "Teammate";
                 return (
                   <tr key={m.userId}>
-                    <td className="pri">
+                    <td className="pri" data-label="Person">
                       {name}
                       {self && <span className="lx-note"> (you)</span>}
                       {m.email && m.displayName && <div className="lx-note">{m.email}</div>}
                     </td>
-                    <td>{manageable ? <RoleSelect userId={m.userId} role={m.role} grantable={grantable} name={name} /> : ROLE_LABEL[m.role] ?? m.role}</td>
-                    <td>
+                    <td data-label="Role">{manageable ? <RoleSelect userId={m.userId} role={m.role} grantable={grantable} name={name} /> : ROLE_LABEL[m.role] ?? m.role}</td>
+                    <td data-label="Can approve client mail">
                       {QUEUE_APPROVE_ROLES.includes(m.role) ? <span className="lx-pill lx-pill-ok">Yes</span> : <span className="lx-pill lx-pill-mute">No</span>}
                     </td>
-                    {isAdmin && <td style={{ textAlign: "right" }}>{manageable && <RemoveMember userId={m.userId} name={name} />}</td>}
+                    {isAdmin && <td className="lx-team-actions" style={{ textAlign: "right" }}>{manageable && <RemoveMember userId={m.userId} name={name} />}</td>}
                   </tr>
                 );
               })}
@@ -91,7 +93,7 @@ export default async function TeamPage() {
           </table>
         </div>
       )}
-      {!isAdmin && <p className="lx-note">Owners, admins and senior admins manage the team.</p>}
+      {!isAdmin && <p className="lx-note">{ADMIN_TIER_PHRASE} can manage the team.</p>}
 
       <RoleTable />
     </>

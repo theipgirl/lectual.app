@@ -2,6 +2,7 @@ import Link from "next/link";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { loadActiveQueue, type QueueLoad } from "@/lib/queue/load";
+import { mineQueue } from "@/lib/queue/mine-load";
 import { orgHasModule } from "@/lib/org/modules";
 import { listLeads, type Lead } from "@/lib/pipeline";
 import { listMatters, listTasks, listUpcomingDeadlines, summarizeDocket } from "@/lib/matters";
@@ -30,8 +31,7 @@ import { civilDate } from "@/lib/matters/calendar-rows";
 import { deadlineKindLabel, deadlineNeedsReview } from "@/lib/matters/deadline-rules";
 import { AutopilotControl } from "@/components/agents/AutopilotControl";
 import { RunDigestList } from "@/components/agents/RunDigestList";
-import { FinishSetupCard } from "@/components/setup/FinishSetupCard";
-import { GettingStartedCard } from "@/components/onboarding/GettingStartedCard";
+import { GetSetUpCard } from "@/components/setup/GetSetUpCard";
 import { NeedsYouSection } from "@/components/today/NeedsYouSection";
 import { AddNameLink } from "@/components/account/AddNameLink";
 import { TodayConsults } from "@/components/calendar/TodayConsults";
@@ -101,7 +101,7 @@ export default async function TodayPage() {
     ]);
 
   // loadActiveQueue never throws; a rejection would be a bug, shown as unavailable.
-  const queue: QueueLoad = queueS.status === "fulfilled" ? queueS.value : { status: "unavailable", items: [] };
+  const queue: QueueLoad = await mineQueue(queueS.status === "fulfilled" ? queueS.value : { status: "unavailable", items: [] }, { userId: session.user.id, role: session.role });
   const leads: Lead[] | null = leadsS.status === "fulfilled" ? leadsS.value : null;
   const matters = mattersS.status === "fulfilled" ? mattersS.value : null;
   const deadlines = deadlinesS.status === "fulfilled" ? deadlinesS.value : null;
@@ -187,7 +187,7 @@ export default async function TodayPage() {
 
   return (
     <>
-      <div className="lx-page-head">
+      <div className="lx-page-head lx-page-head-list">
         <div style={{ flex: 1, minWidth: 260 }}>
           <h1 className="lx-h1">
             Good {greeting(hourInZone(now, tz))}
@@ -210,8 +210,7 @@ export default async function TodayPage() {
         </p>
       )}
 
-      <FinishSetupCard role={session.role} />
-      <GettingStartedCard />
+      <GetSetUpCard role={session.role} />
 
       <div className="lx-split">
         <div className="lx-col">

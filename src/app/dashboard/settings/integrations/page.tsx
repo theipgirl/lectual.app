@@ -20,6 +20,8 @@ import { stateForStatus, type IntegrationState } from "@/components/integrations
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 import { FROM_THEIR_EMAILS, integrationErrorLine, LAWPAY_NOT_ISSUED, SWITCH_ON_WORDS } from "@/lib/ui/words";
+import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
+import { ClearResultParams } from "@/components/integrations/ClearResultParams";
 
 export const metadata: Metadata = { title: pageTitle("Integrations") };
 
@@ -91,8 +93,8 @@ function MailboxRow({ c, canManage }: { c: MailboxConnection; canManage: boolean
         {needsCalendar && (
           <div className="lx-note" style={{ color: "var(--warn)" }}>
             {canManage
-              ? "Mail keeps working. Consults from this calendar won't show in Lectual until you reconnect."
-              : "Reconnect to read the calendar: ask the mailbox's owner or an admin. Mail keeps working meanwhile."}
+              ? "Mail keeps working. Consults from this calendar won't show in Lectual until you allow the calendar."
+              : `Allow calendar: ask the mailbox's owner or ${ADMIN_TIER_PHRASE.toLowerCase()}. Mail keeps working meanwhile.`}
           </div>
         )}
       </div>
@@ -115,7 +117,7 @@ function MailboxRow({ c, canManage }: { c: MailboxConnection; canManage: boolean
           )}
           {needsCalendar && (
             <a href={connectHref(c.provider, c.scope)} className="lx-btn lx-btn-sec lx-btn-sm">
-              Reconnect to read the calendar
+              Allow calendar
             </a>
           )}
           <DisconnectButton id={c.id} email={c.email} />
@@ -182,6 +184,7 @@ export default async function IntegrationsPage({
         <p className="lx-sub">Connect outside services to your firm.</p>
       </div>
 
+      {(connected || reconnected || error) && <ClearResultParams />}
       {connected && isProvider(connected) && (
         <div role="status" className="lx-banner lx-banner-ok">
           {PROVIDER_LABEL[connected]} {reconnected ? "reconnected" : "connected"}. The first sync
@@ -329,7 +332,7 @@ export default async function IntegrationsPage({
                     <b style={{ color: "var(--ink)" }}>Firm mailboxes</b>
                     <div className="lx-note">
                       Shared inboxes like intake@. Connect one by signing in as that mailbox.{" "}
-                      {canManageFirm ? "" : "Senior admins and owners manage these."}
+                      {canManageFirm ? "" : `${ADMIN_TIER_PHRASE} can manage these.`}
                     </div>
                   </div>
                   {canManageFirm && <ConnectButton provider={p} scope="firm" enabled={connectable[p]} label="Add shared mailbox" />}

@@ -76,13 +76,30 @@ export function stepTypeLabel(type: DripStepType): string {
     case "wait":
       return "Wait";
     case "condition":
-      return "Condition";
+      return "Note (doesn't change timing)";
     default:
       return type;
   }
 }
 
+/** Every type a stored step may have (reads). */
 export const DRIP_STEP_TYPES: readonly DripStepType[] = ["email", "task", "wait", "condition"];
+
+/** What the Add step picker offers: a condition step does nothing, so no new one is made. */
+export const ADDABLE_STEP_TYPES: readonly DripStepType[] = ["email", "task", "wait"];
+
+/**
+ * The starter suggestion for an empty campaign. Delays are relative to the step before:
+ * Day 0, Day 3 (72 h later), Day 10 (168 h later). "Move to nurture" is an internal task:
+ * a person moves the lead, nothing here changes a stage or sends.
+ */
+export const STARTER_STEPS = [
+  { key: "thank-you", label: "Day 0: thank-you email", type: "email", delayHours: 0 },
+  { key: "follow-up", label: "Day 3: follow-up email", type: "email", delayHours: 72 },
+  { key: "nurture", label: "Day 10: move to nurture (internal task)", type: "task", delayHours: 168 },
+] as const;
+
+export const STARTER_TASK_TITLE = "Move to nurture";
 
 export function sequenceStatusLabel(active: boolean): string {
   return active ? "Active" : "Paused";
@@ -153,3 +170,6 @@ export function isStepDue(nextStepAt: string | null, now: Date = new Date()): bo
 export function addDelay(from: Date, delayHours: number): string {
   return new Date(from.getTime() + Math.max(0, delayHours) * 3600_000).toISOString();
 }
+
+export const START_NEEDS_STEP = "Add a step before you start this campaign.";
+export const START_UNREADABLE = "Steps couldn't be loaded, so this can't be started right now.";
