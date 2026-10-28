@@ -45,6 +45,10 @@ type DbErrorLike = { code?: string; message?: string } | null | undefined;
 const TRIGGER_MESSAGES: ReadonlyArray<readonly [prefix: string, code: ProposalErrorCode, message: string]> = [
   ["client_proposal_not_approver", "forbidden", "Only the firm's named approvers can create a client link."],
   ["client_proposal_accept_service_only", "forbidden", "Only the client can accept a proposal, from their own link."],
+  // lectual 0100: the pay link of a live (sent) version is the one field that may change.
+  ["client_proposal_pay_link_frozen", "frozen", "Only a proposal whose link is live can have its pay link changed, and only on its own."],
+  ["client_proposal_pay_link_staff_only", "forbidden", "Only a signed-in staff member can change a live proposal's pay link."],
+  ["client_proposal_pay_link_required", "validation", "Enter the pay link."],
   ["client_proposal_frozen", "frozen", "This version has already gone out and can't be changed. Start a new version instead."],
   ["client_proposal_immutable", "frozen", "This version has already gone out and can't be changed. Start a new version instead."],
   ["client_proposal_acceptance_final", "frozen", "The client's acceptance is a record and can't be changed."],

@@ -782,6 +782,19 @@ the letter destination. Leads | Matters (opens on Matters), search, 8 recent, "S
   proposals host; the logo is `/brand/rpb-logo-cream.png`). `tests/proposals/public-assets.test.ts` fails on any other `src="/..."` or `url(/...)`
   in `src/app/p` or `src/components/client-proposal`. A new asset type needs a rewrite in lectual's `next.config.ts` first.
 
+## Change the pay link on a live proposal (needs lectual 0100, no schema here)
+A version whose link is live ("Link live", status `sent`) shows a "Change pay link" card (input + Save) to the proposal-writing
+roles (`PROPOSAL_STAFF_WRITE_ROLES`). Never for accepted, replaced or withdrawn versions, and never to viewer / social_media.
+- `changePayLinkAction` -> `runChangePayLink` (`src/lib/proposal-editor/pay-link.ts`, pure, deps injected like `create-link.ts`):
+  `gateStaffAction` (module `notFound()`, role), `parseLivePayLink` (required, https, no whitespace, at most 2,000 characters, the
+  0089 CHECK's rules), then `changeLivePayLink` in the store: scoped client, role re-read, refuses any status but `sent`, writes
+  `pay_url` ALONE fenced on `status = sent` and the rendered `updated_at`. It writes no event: lectual 0100's trigger logs
+  `edited` `{field: "pay_url", from_host, to_host}` (hosts only), which the history reads as "changed the live pay link from A to B".
+- Fixed sentences: "Pay link updated.", the validation lines, and before 0100 is applied (the 0089 trigger answers
+  `client_proposal_frozen` for this exact write) "Changing the pay link isn't switched on for your firm yet. Lectual will turn it on." The 0100 refusal prefixes
+  (`client_proposal_pay_link_frozen` / `_staff_only` / `_required`) are mapped in `src/lib/proposals/errors.ts`.
+- Nothing is emailed and the offer itself (content, prices, expiry) stays frozen; any other change is still a new version.
+
 ## Today, names, consults, My Mail reading pane (Sprint 30, no schema)
 No migration, no dependency, nothing sends. The only sealed-token reads are the existing helpers (`ownConnectionSecrets` family in `src/lib/meetings/connection.ts`,
 `searchableMailboxAccess` in `src/lib/mailbox/my-mailbox.ts`); no new file imports the admin client (a test greps the list).

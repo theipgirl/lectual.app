@@ -33,6 +33,7 @@ import { ProposalCard } from "@/components/proposal-editor/ProposalCard";
 import { IssueList, type ShownIssue } from "@/components/proposal-editor/ActionForm";
 import { Lifecycle } from "@/components/proposal-editor/Lifecycle";
 import { PaidPanel } from "@/components/proposal-editor/PaidPanel";
+import { ChangePayLink } from "@/components/proposal-editor/ChangePayLink";
 import {
   AddNameForm,
   AdjustmentsForm,
@@ -293,6 +294,11 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
         </div>
       )}
 
+      {/* lectual 0100: on a live link only the pay link may change. Never for accepted, replaced or withdrawn. */}
+      {canWrite && proposal.status === "sent" && (
+        <ChangePayLink proposalId={proposal.id} updatedAt={proposal.updated_at} payUrl={proposal.pay_url ?? ""} />
+      )}
+
       {paidView && <PaidPanel proposalId={proposal.id} view={paidView} />}
 
       <ProposalCard card={card} showFees={false} />
@@ -530,7 +536,7 @@ function readOnlyText(
   switch (p.status) {
     case "sent":
       return {
-        text: `A proposal with a live link can't be edited. Start a new version creates version ${p.version + 1}; ${approverNames.length > 0 ? joinOr(approverNames) : "a named approver"} creates its link before the client sees it.`,
+        text: `A proposal with a live link can't be edited${canWrite ? ", except its pay link (below)" : ""}. Start a new version creates version ${p.version + 1}; ${approverNames.length > 0 ? joinOr(approverNames) : "a named approver"} creates its link before the client sees it.`,
       };
     case "accepted":
       return { text: "The client accepted this version, so it is the record of what they agreed to and can't be changed. Anything new is a separate proposal." };
