@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useState } from "react";
 import type { ProposalStatus } from "@/lib/proposals/types";
 import { joinOr } from "@/lib/proposal-editor/labels";
-import { createLinkAction, resetAcceptanceAction, reviseAction, sendAction, unapproveAction, withdrawAction } from "@/app/dashboard/proposals/[id]/actions";
+import { createLinkAction, deleteProposalAction, resetAcceptanceAction, reviseAction, sendAction, unapproveAction, withdrawAction } from "@/app/dashboard/proposals/[id]/actions";
+import { DELETE_CONFIRM, DELETE_LABEL, moreMenuItems, type MoreMenuItem } from "@/lib/proposal-editor/delete-proposal";
 import Popover from "@/components/list-page/Popover";
 import { NOT_EMAILED } from "@/lib/consult-proposal/manual-email";
 import { BUTTON_WORDS, LINK_NOT_LIVE_YET, askToCreateLink } from "@/lib/proposal-editor/vocabulary";
@@ -32,6 +33,7 @@ export function Lifecycle({
   approverNames,
   clientUrl,
   queueNote = null,
+  canDelete = false,
   canReset = false,
   updatedAt = "",
 }: {
@@ -47,6 +49,8 @@ export function Lifecycle({
   clientUrl: string | null;
   /** Set when this proposal's email is still pending in the approval queue (or can't be read): shown instead of "Turn on the link". */
   queueNote?: { text: string; queueId: string | null } | null;
+  /** The firm's owner (lectual 0102): "Delete proposal" is drawn in More only then. Everyone else never sees it. */
+  canDelete?: boolean;
   /** lectual 0101: an accepted version, the admin tier or a named approver, and read as not paid (`canResetAcceptance`). */
   canReset?: boolean;
   /** The row's `updated_at` as rendered; the reset is fenced on it. */
@@ -54,6 +58,7 @@ export function Lifecycle({
 }) {
   const hidden = <input type="hidden" name="proposalId" value={proposalId} />;
   const approvers = approverNames.length > 0 ? joinOr(approverNames) : "a named approver";
+  const menu = moreMenuItems({ status, canWrite, canDelete, canReset });
 
   return (
     <div className="pe-bar" role="group" aria-label="Proposal actions">
@@ -137,12 +142,7 @@ export function Lifecycle({
         </>
       )}
 
-      {canWrite && (status === "draft" || status === "approved" || status === "sent") && (
-        <MoreMenu proposalId={proposalId} status={status} kind="withdraw" />
-      )}
-      {canWrite && status === "accepted" && canReset && (
-        <MoreMenu proposalId={proposalId} status={status} kind="reset" updatedAt={updatedAt} />
-      )}
+      {menu.length > 0 && <MoreMenu proposalId={proposalId} status={status} items={menu} updatedAt={updatedAt} />}
     </div>
   );
 }
@@ -176,13 +176,25 @@ function CopyLink({ url }: { url: string }) {
 }
 
 /**
- * "More": the rare, destructive action. Withdraw (draft, saved, link live) or, on an accepted version,
- * Reset acceptance (lectual 0101). Each asks first, in the page, with an explicit Cancel; the menu itself
+ * "More": the rare, destructive actions. Withdraw (draft, saved, link live), on an accepted version
+ * Reset acceptance (lectual 0101), and for the owner Delete proposal (lectual 0102, any status). Each asks
+ * first, in the page, with an explicit Cancel, and only one confirm is open at a time; the menu itself
  * closes on Esc or a click outside (the shared Popover).
  */
-function MoreMenu({ proposalId, status, kind, updatedAt = "" }: { proposalId: string; status: ProposalStatus; kind: "withdraw" | "reset"; updatedAt?: string }) {
-  const [confirming, setConfirming] = useState(false);
-  const reset = kind === "reset";
+function MoreMenu({
+  proposalId,
+  status,
+  items,
+  updatedAt = "",
+}: {
+  proposalId: string;
+  status: ProposalStatus;
+  items: MoreMenuItem[];
+  updatedAt?: string;
+}) {
+  // One confirm open at a time: choosing another item replaces the one showing.
+  const [confirming, setConfirming] = useState<MoreMenuItem | null>(null);
+  const label: Record<MoreMenuItem, string> = { withdraw: BUTTON_WORDS.withdraw, reset: RESET_LABEL, delete: DELETE_LABEL };
   return (
     <div className="pe-more-menu">
       <Popover
@@ -197,43 +209,75 @@ function MoreMenu({ proposalId, status, kind, updatedAt = "" }: { proposalId: st
         )}
       >
         {(close) => (
-          <button
-            type="button"
-            role="menuitem"
-            className="lp-pop-item"
-            onClick={() => {
-              setConfirming(true);
-              close();
-            }}
-          >
-            <span className="lp-pop-text">{reset ? RESET_LABEL : BUTTON_WORDS.withdraw}…</span>
-          </button>
+          <>
+            {items.map((item) => (
+              <button
+                key={item}
+                type="button"
+                role="menuitem"
+                className="lp-pop-item"
+                onClick={() => {
+                  setConfirming(item);
+                  close();
+                }}
+              >
+                <span className="lp-pop-text">{label[item]}…</span>
+              </button>
+            ))}
+          </>
         )}
       </Popover>
-      {confirming && (
-        <ActionForm action={reset ? resetAcceptanceAction : withdrawAction} className="pe-act pe-confirm">
-          {({ state, pending }) => (
-            <>
-              <input type="hidden" name="proposalId" value={proposalId} />
-              {reset && <input type="hidden" name="updatedAt" value={updatedAt} />}
-              <p className="lx-note" role="alert" style={{ margin: 0 }}>
-                {reset
-                  ? RESET_CONFIRM
-                  : status === "sent"
-                    ? "Withdraw this version? The client’s link will stop opening it."
-                    : "Withdraw this version? It can’t be brought back."}
-              </p>
-              <button type="submit" className="lx-btn lx-btn-danger" disabled={pending}>
-                {reset ? (pending ? RESET_PENDING : RESET_CONFIRM_BUTTON) : pending ? "Withdrawing…" : "Yes, withdraw"}
-              </button>
-              <button type="button" className="lx-btn lx-btn-sec" onClick={() => setConfirming(false)} disabled={pending}>
-                Cancel
-              </button>
-              <Outcome state={state} pending={pending} />
-            </>
-          )}
+      {(confirming === "withdraw" || confirming === "reset") && (
+        <ActionForm key={confirming} action={confirming === "reset" ? resetAcceptanceAction : withdrawAction} className="pe-act pe-confirm">
+          {({ state, pending }) => {
+            const reset = confirming === "reset";
+            return (
+              <>
+                <input type="hidden" name="proposalId" value={proposalId} />
+                {reset && <input type="hidden" name="updatedAt" value={updatedAt} />}
+                <p className="lx-note" role="alert" style={{ margin: 0 }}>
+                  {reset
+                    ? RESET_CONFIRM
+                    : status === "sent"
+                      ? "Withdraw this version? The client’s link will stop opening it."
+                      : "Withdraw this version? It can’t be brought back."}
+                </p>
+                <button type="submit" className="lx-btn lx-btn-danger" disabled={pending}>
+                  {reset ? (pending ? RESET_PENDING : RESET_CONFIRM_BUTTON) : pending ? "Withdrawing…" : "Yes, withdraw"}
+                </button>
+                <button type="button" className="lx-btn lx-btn-sec" onClick={() => setConfirming(null)} disabled={pending}>
+                  Cancel
+                </button>
+                <Outcome state={state} pending={pending} />
+              </>
+            );
+          }}
         </ActionForm>
       )}
+      {confirming === "delete" && <DeleteConfirm proposalId={proposalId} onCancel={() => setConfirming(null)} />}
     </div>
+  );
+}
+
+/** The in-page confirm for "Delete proposal" (owner only). Says plainly that it removes every version and can't be undone. */
+export function DeleteConfirm({ proposalId, onCancel }: { proposalId: string; onCancel: () => void }) {
+  return (
+    <ActionForm action={deleteProposalAction} className="pe-act pe-confirm">
+      {({ state, pending }) => (
+        <>
+          <input type="hidden" name="proposalId" value={proposalId} />
+          <p className="lx-note" role="alert" style={{ margin: 0 }}>
+            {DELETE_CONFIRM}
+          </p>
+          <button type="submit" className="lx-btn lx-btn-danger" disabled={pending}>
+            {pending ? "Deleting…" : DELETE_LABEL}
+          </button>
+          <button type="button" className="lx-btn lx-btn-sec" onClick={onCancel} disabled={pending}>
+            Cancel
+          </button>
+          <Outcome state={state} pending={pending} />
+        </>
+      )}
+    </ActionForm>
   );
 }

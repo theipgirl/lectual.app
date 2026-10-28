@@ -795,6 +795,22 @@ roles (`PROPOSAL_STAFF_WRITE_ROLES`). Never for accepted, replaced or withdrawn 
   (`client_proposal_pay_link_frozen` / `_staff_only` / `_required`) are mapped in `src/lib/proposals/errors.ts`.
 - Nothing is emailed and the offer itself (content, prices, expiry) stays frozen; any other change is still a new version.
 
+## Owner deletes a proposal (lectual 0102, applied to dev and prod 2026-10-28; no schema here)
+Taylor (2026-10-28): the owner clears out test proposals herself. "Delete proposal" sits in the proposal page's ONE More menu (beside
+Withdraw and Reset acceptance, `moreMenuItems`; one confirm open at a time), drawn ONLY for role `owner` (`canDeleteProposal`; hidden, not disabled, for everyone else) and in EVERY status, so More
+also appears on accepted / replaced / withdrawn versions for the owner. In-page confirm (`DeleteConfirm`): "Delete this proposal and all its
+versions? The client link stops working and its history is removed. This can't be undone." with "Delete proposal" and Cancel.
+- `deleteProposalAction` (module gate `notFound()`, owner check) -> `deleteProposalFamily` in the store -> `runDeleteProposalFamily`
+  (`src/lib/proposal-editor/delete-proposal.ts`, pure, deps injected): role re-read through the scoped client, the row and its family read
+  through RLS, then ONE `delete().eq("family_id", ...).select("id")` (lectual 0089's family FK is NO ACTION, so the versions must go
+  together). Events go by cascade. Success redirects to `/dashboard/proposals/?deleted=1` ("Proposal deleted."). Never the service role.
+- Fixed sentences only: owner only, not found, any throw = "Couldn't delete this proposal." 0102 is applied to both projects
+  (2026-10-28, checked: another firm's owner 0 rows, paralegal 0, admin on a sent version 0, the owner removes a two-version family and every
+  event), so the two remaining sentences are fallbacks for a database without it: 0 rows = `notReadyYet("Deleting this proposal")`, fewer
+  rows than the family = only the drafts went (`DELETE_PARTIAL`; the drafts are already gone at that point).
+- Nothing is sent and nothing touches Lawmatics or LawPay. `/p/<token>` then reads like an unknown token; a notification naming the
+  proposal still renders and its link lands on the page's `notFound()`.
+
 ## Today, names, consults, My Mail reading pane (Sprint 30, no schema)
 No migration, no dependency, nothing sends. The only sealed-token reads are the existing helpers (`ownConnectionSecrets` family in `src/lib/meetings/connection.ts`,
 `searchableMailboxAccess` in `src/lib/mailbox/my-mailbox.ts`); no new file imports the admin client (a test greps the list).

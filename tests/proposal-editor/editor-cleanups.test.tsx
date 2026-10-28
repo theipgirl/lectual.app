@@ -15,6 +15,8 @@ vi.mock("@/app/dashboard/proposals/[id]/actions", () => ({
   sendAction: vi.fn(),
   unapproveAction: vi.fn(),
   withdrawAction: vi.fn(),
+  resetAcceptanceAction: vi.fn(),
+  deleteProposalAction: vi.fn(),
 }));
 
 const URL_ = "https://proposals.example.com/p/tok123/";
@@ -52,7 +54,7 @@ describe("F10/P2: Withdraw in a More menu with a confirm", () => {
   it("the menu is the shared Popover (Esc / outside click) and the confirm has an explicit Cancel", () => {
     const src = readFileSync("src/components/proposal-editor/Lifecycle.tsx", "utf8");
     expect(src).toContain("Popover");
-    expect(src).toMatch(/onClick=\{\(\) => setConfirming\(false\)\}[\s\S]*Cancel/);
+    expect(src).toMatch(/onClick=\{\(\) => setConfirming\(null\)\}[\s\S]*Cancel/);
     expect(src).toContain("Yes, withdraw");
   });
   it("Go to first problem points at the first issue's list item", () => {
