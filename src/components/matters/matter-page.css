@@ -1,0 +1,12 @@
+/* Matter page (Sprint 33). Tokens only. */
+.lx-add-deadline > summary { list-style: none; width: fit-content; cursor: pointer; }
+.lx-add-deadline > summary::-webkit-details-marker { display: none; }
+
+@media (max-width: 640px) {
+  /* On a phone the client's contact, tasks, notes and files read before the timeline. */
+  .lx-split-matter { display: flex; flex-direction: column; }
+  .lx-split-matter > .lx-col,
+  .lx-split-matter > .lx-col-aside { display: contents; }
+  .lx-split-matter .lx-matter-timeline { order: 5; }
+  .lx-split-matter > .lx-col-aside > * { width: auto; }
+}

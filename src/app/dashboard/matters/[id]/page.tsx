@@ -65,6 +65,8 @@ import { intakeOrigin } from "@/lib/intake-forms/origin";
 import { PROPOSAL_STAFF_WRITE_ROLES } from "@/lib/proposals/types";
 import { MatterProposalCard } from "@/components/matters/MatterProposalCard";
 import { MATTER_TYPE_LABEL } from "../labels";
+import "@/components/matters/matter-page.css";
+import { stageDisplayName } from "@/lib/matters/list-view";
 import { recordPageTitle } from "@/lib/ui/page-title";
 import { matterDisplayTitle } from "@/lib/matters/display-title";
 
@@ -163,6 +165,13 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
   const band = BAND_COPY[bandOf(matter)];
   const memberList = (members ?? []).map((m) => ({ userId: m.userId, name: m.displayName ?? m.email ?? "Teammate" }));
   const ownerName = matter.assigned_to ? memberList.find((m) => m.userId === matter.assigned_to)?.name ?? "Teammate" : "Unassigned";
+  // Each of these facts appears once on the page: here, and nowhere else.
+  const subLineFacts = [
+    age.days !== null ? `${age.days}d in stage` : null,
+    matter.package_name ? `Package: ${matter.package_name}` : null,
+    matter.referral_source ? `Came from ${matter.referral_source}` : null,
+  ].filter((x): x is string => !!x);
+  const showLetterButtons = hasDocumentCenter && canWrite;
   const assigneeName = (userId: string) => memberList.find((m) => m.userId === userId)?.name ?? "a teammate";
 
   return (
@@ -178,18 +187,18 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
           <h1 className="lx-h1">{matterLabel(matter)}</h1>
           <p className="lx-note" style={{ margin: "6px 0 0" }}>
             {client.name ? (
-              <>
-                {client.source === "lead" && matter.lead_id ? <Link href={`/dashboard/leads/${matter.lead_id}/`}>{client.name}</Link> : client.name}
-                {client.source === "owner_name" ? " (from the tracker)" : ""}
-              </>
+              client.source === "lead" && matter.lead_id ? <Link href={`/dashboard/leads/${matter.lead_id}/`}>{client.name}</Link> : client.name
             ) : (
               contactsRead.status === "unavailable" ? "Client contact couldn't be loaded" : "No client linked"
             )}
             {" · "}
             {band.label}
-            {age.days !== null ? ` · ${age.days}d in stage` : ""}
-            {matter.referral_source ? ` · Came from ${matter.referral_source}` : ""}
           </p>
+          {subLineFacts.length > 0 && (
+            <p className="lx-note" style={{ margin: "2px 0 0" }}>
+              {subLineFacts.join(" · ")}
+            </p>
+          )}
           {canWrite && (
             <HeaderEditForm
               matterId={matter.id}
@@ -197,19 +206,39 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
             />
           )}
         </div>
-        {canWrite ? (
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <StageSelect matterId={matter.id} stageId={matter.stage_id} stages={stages} />
-            <StatusSelect matterId={matter.id} status={matter.status} />
-            <OwnerSelect matterId={matter.id} assignedTo={matter.assigned_to} members={memberList} />
-          </div>
-        ) : (
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <span className="lx-pill lx-pill-mute">{matter.stage ? `${matter.stage.code}. ${matter.stage.label}` : "No stage"}</span>
-            <span className="lx-pill lx-pill-mute">{matterStatusLabel(matter.status)}</span>
-          </div>
-        )}
+        <div style={{ display: "grid", gap: 8, justifyItems: "end" }}>
+          {canWrite ? (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <StageSelect matterId={matter.id} stageId={matter.stage_id} stages={stages} />
+              <StatusSelect matterId={matter.id} status={matter.status} />
+              <OwnerSelect matterId={matter.id} assignedTo={matter.assigned_to} members={memberList} />
+            </div>
+          ) : (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <span className="lx-pill lx-pill-mute">{matter.stage ? stageDisplayName(matter.stage.label) : "No stage"}</span>
+              <span className="lx-pill lx-pill-mute">{matterStatusLabel(matter.status)}</span>
+              <span className="lx-pill lx-pill-mute">Owner: {ownerName}</span>
+            </div>
+          )}
+          {showLetterButtons && (
+            <div className="lx-head-actions" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {hasSignedQuote && (
+                <Link href={`/dashboard/documents/new/${matter.id}/loe/`} className="lx-btn lx-btn-pri lx-btn-sm">
+                  Draft engagement letter
+                </Link>
+              )}
+              <Link href={`/dashboard/documents/new/${matter.id}/`} className="lx-btn lx-btn-sec lx-btn-sm">
+                Draft a letter
+              </Link>
+            </div>
+          )}
+        </div>
       </div>
+      {!canWrite && (
+        <p className="lx-note" style={{ margin: 0 }}>
+          Your role can view this matter but not change it.
+        </p>
+      )}
 
       {age.stale && (
         <p className="lx-banner lx-banner-warn" style={{ margin: 0 }}>
@@ -217,7 +246,7 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
         </p>
       )}
 
-      <div className="lx-split">
+      <div className="lx-split lx-split-matter">
         <div className="lx-col">
           <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }} data-tour="matter-deadlines">
             <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
@@ -228,7 +257,7 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
             </div>
             {openDeadlines.length === 0 ? (
               <p className="lx-note" style={{ margin: 0 }}>
-                Nothing docketed. Nothing is ever docketed automatically; add dates below.
+                No deadlines yet. Nothing is ever docketed automatically.
               </p>
             ) : (
               <ul className="lx-list">
@@ -303,8 +332,8 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
               </details>
             )}
             {canWrite && (
-              <details className="lx-disclosure-inline">
-                <summary>Docket a deadline</summary>
+              <details className="lx-disclosure-inline lx-add-deadline">
+                <summary className="lx-btn lx-btn-sec lx-btn-sm">Add a deadline</summary>
                 <DeadlineComposer matterId={matter.id} filingBasis={matter.filing_basis} />
               </details>
             )}
@@ -313,7 +342,7 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
           {matter.type === "LIT" && hasLitigation && (
             <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }}>
               <h2 className="lx-h2" style={{ fontSize: 23 }}>
-                The case
+                Case details
               </h2>
               {canWrite ? (
                 <LitigationForm
@@ -367,7 +396,7 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
 
           <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }}>
             <h2 className="lx-h2" style={{ fontSize: 23 }}>
-              The filing
+              Filing details
             </h2>
             {canWrite ? (
               <FilingForm
@@ -407,7 +436,7 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
 
           <LinkedMeetings read={meetings} />
 
-          <section className="lx-card" style={{ padding: 18 }}>
+          <section className="lx-card lx-matter-timeline" style={{ padding: 18 }}>
             <h2 className="lx-h2" style={{ fontSize: 23, marginBottom: 10 }}>
               Timeline
             </h2>
@@ -493,34 +522,9 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
           <section className="lx-card lx-aside">
             <div className="lx-label">About</div>
             <div className="lx-meta">
-              <span>Owner</span>
-              <span>{ownerName}</span>
-            </div>
-            <div className="lx-meta">
               <span>Opened</span>
               <span>{formatCivilDate(matter.opened_at.slice(0, 10))}</span>
             </div>
-            <div className="lx-meta">
-              <span>Package</span>
-              <span>{matter.package_name ?? "—"}</span>
-            </div>
-            {hasDocumentCenter && canWrite && (
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {hasSignedQuote && (
-                  <Link href={`/dashboard/documents/new/${matter.id}/loe/`} className="lx-btn lx-btn-pri lx-btn-sm">
-                    Draft engagement letter
-                  </Link>
-                )}
-                <Link href={`/dashboard/documents/new/${matter.id}/`} className="lx-btn lx-btn-sec lx-btn-sm">
-                  Draft a letter
-                </Link>
-              </div>
-            )}
-            <div className="lx-meta">
-              <span>Came from</span>
-              <span>{matter.referral_source ?? "—"}</span>
-            </div>
-            {!canWrite && <p className="lx-note">Your role can view this matter but not change it.</p>}
           </section>
         </aside>
       </div>
