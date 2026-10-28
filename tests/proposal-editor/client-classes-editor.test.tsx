@@ -36,7 +36,10 @@ const VALUE: NameValues = {
 
 function render(value: NameValues = VALUE) {
   return renderToStaticMarkup(
-    createElement(NameRowsProvider, { names: [value] }, createElement(NameCard, { proposalId: "prop-1", updatedAt: "t", editable: true, issues: [], value, packageName: "Essential" })),
+    createElement(NameRowsProvider, {
+      names: [value],
+      children: createElement(NameCard, { proposalId: "prop-1", updatedAt: "t", editable: true, issues: [], value, packageName: "Essential" }),
+    }),
   );
 }
 
