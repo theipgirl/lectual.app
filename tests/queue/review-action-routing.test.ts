@@ -105,6 +105,17 @@ describe("reviewQueueAction: routing is enforced on the server", () => {
     untouched();
   });
 
+  it.each([
+    ["legal-advice wording", "Hi Bo, you should file now; it is likely to register."],
+    ["a proposal link", `Hi Bo, see https://x.example.com/p/${"a".repeat(40)}/`],
+  ])("an edit that adds %s is refused for a non-approver owner, before anything is saved or resolved", async (_n, body) => {
+    state.routed = routed({ stalled_followup: U.caitlyn });
+    as("paralegal", U.caitlyn);
+    const r = await act("approve", { body });
+    expect(r.error).toBe("Only an attorney can approve this kind of message.");
+    untouched();
+  });
+
   it("a forged approve by someone who is not the owner and not the admin tier is refused", async () => {
     state.routed = routed({ stalled_followup: U.caitlyn });
     as("attorney", U.rebecca);

@@ -157,7 +157,7 @@ describe("dismissStaleFollowupsAction", () => {
     state.load = { status: "ok", items: [followup({ id: "a", created_at: ago(9) })] };
     state.routed = { status: "ok", routing: { stalled_followup: U.caitlyn }, members: [] };
     const run = await action();
-    expect(await run({}, form({ confirm: "yes" }))).toEqual({ message: "Nothing to dismiss." });
+    expect(await run({}, form({ confirm: "yes" }))).toEqual({ error: "These follow-ups are for someone else. Ask them, or an owner or admin." });
     expect(state.resolve).not.toHaveBeenCalled();
     vi.useRealTimers();
   });

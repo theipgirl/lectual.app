@@ -7,10 +7,10 @@ import { getQueueItem, resolveQueueItem, saveQueueEdit } from "@/lib/queue/api";
 import { generateApprovedDocument } from "@/lib/documents/approve-hook";
 import { activeQueueOrgKey } from "@/lib/queue/org";
 import { QUEUE_EDIT_ROLES, resolveQueueRole } from "@/lib/queue/roles";
-import { approvalRefusal } from "@/lib/queue/routing";
+import { approvalRefusal, ROUTING_ADMIN_ROLES } from "@/lib/queue/routing";
 import { loadApprovalRouting } from "@/lib/queue/routing-load";
 import { loadActiveQueue } from "@/lib/queue/load";
-import { dismissStale, type DismissResult } from "@/lib/queue/dismiss";
+import { dismissStale, dismissableFollowups, type DismissResult } from "@/lib/queue/dismiss";
 import { draftInMyMailbox } from "@/lib/mailbox/my-mailbox";
 import type { Role } from "@/lib/auth/roles";
 import { checkDraftStaleness, stalenessRequiresConfirm } from "@/lib/queue/stale";
@@ -82,9 +82,11 @@ export async function reviewQueueAction(_prev: ReviewState, formData: FormData):
       return { error: "That didn't go through. Nothing was sent. Refresh to try again." };
     }
     const routed = await loadApprovalRouting();
+    // An approval covers the text that would go out, so an edit in this form is checked too, not only the stored item.
+    const checked = intent === "approve" && editedBody ? { ...target, final_body: editedBody } : target;
     const refusal = approvalRefusal({
       ...caller,
-      item: target,
+      item: checked,
       routing: routed.status === "ok" ? routed.routing : {},
       members: routed.status === "ok" ? routed.members : [],
     });
@@ -223,11 +225,21 @@ export async function dismissStaleFollowupsAction(_prev: DismissState, formData:
   const load = await loadActiveQueue("pending");
   if (load.status !== "ok") return { error: "The approval queue can't be reached right now, so nothing was dismissed. Refresh to try again." };
   const routed = await loadApprovalRouting();
+  const routing = routed.status === "ok" ? routed.routing : {};
+  const viewer = { userId: reviewer.userId, role: reviewer.role };
+
+  // Stale follow-ups exist but none are this caller's: say so rather than "Nothing to dismiss."
+  if (!ROUTING_ADMIN_ROLES.includes(reviewer.role)) {
+    const now = Date.now();
+    const exist = dismissableFollowups(load.items, { routing, viewer: { ...viewer, role: "owner" }, now });
+    const mine = dismissableFollowups(load.items, { routing, viewer, now });
+    if (exist.length > 0 && mine.length === 0) return { error: "These follow-ups are for someone else. Ask them, or an owner or admin." };
+  }
 
   const result = await dismissStale({
     items: load.items,
-    routing: routed.status === "ok" ? routed.routing : {},
-    viewer: { userId: reviewer.userId, role: reviewer.role },
+    routing,
+    viewer,
     now: Date.now(),
     reject: async (itemId, note) => {
       await resolveQueueItem({ orgKey: qKey, id: itemId, action: "reject", resolvedBy: reviewer.email, note });

@@ -132,9 +132,11 @@ export function classifyQueueItem(item: RoutableItem): QueueKind {
     if (/\b(opinion|clearance)\b/i.test(headline)) return "opinion_letter";
   }
   if (item.type === "CLIENT_EMAIL") {
+    // A proposal link makes it a post-consult email whatever else it looks like, so an edit cannot smuggle one into a follow-up.
+    if (PROPOSAL_LINK.test(bodyOf(item))) return "post_consult_email";
     if (item.agent === "morning-brief" && /^follow-up for a stalled lead/i.test(headline)) return "stalled_followup";
     if (item.agent === "welcome-client") return "welcome_email";
-    if (item.agent === "post-consult" || PROPOSAL_LINK.test(bodyOf(item))) return "post_consult_email";
+    if (item.agent === "post-consult") return "post_consult_email";
     if (/\bpartnership\b/i.test(headline)) return "partnership_other";
     return "client_email_other";
   }

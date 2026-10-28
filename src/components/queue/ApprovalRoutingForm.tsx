@@ -28,7 +28,7 @@ export function ApprovalRoutingForm({ rows }: { rows: RoutingRow[] }) {
           <p id={`route-${r.kind}-help`} className="lx-note" style={{ margin: 0 }}>
             {r.help}
           </p>
-          <select id={`route-${r.kind}`} name={`kind.${r.kind}`} defaultValue={r.current} aria-describedby={`route-${r.kind}-help`} style={{ minHeight: 40, maxWidth: 420 }}>
+          <select id={`route-${r.kind}`} name={`kind.${r.kind}`} defaultValue={r.current} aria-describedby={`route-${r.kind}-help`} className="lx-input" style={{ maxWidth: 420 }}>
             <option value="">Usual approvers (default)</option>
             {r.options.map((o) => (
               <option key={o.userId} value={o.userId}>
