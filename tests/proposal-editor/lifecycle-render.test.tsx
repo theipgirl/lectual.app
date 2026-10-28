@@ -6,6 +6,7 @@ import { SettingsForm } from "@/components/proposal-editor/SettingsForm";
 
 vi.mock("@/app/dashboard/proposals/[id]/actions", () => ({
   createLinkAction: vi.fn(),
+  queuePostConsultEmailAction: vi.fn(),
   reviseAction: vi.fn(),
   sendAction: vi.fn(),
   unapproveAction: vi.fn(),
@@ -34,7 +35,9 @@ describe("Lifecycle", () => {
     const html = render();
     expect(html).toContain("Save and create link");
     expect(html).not.toMatch(/Approve|Mark as sent|Back to draft|Client link/);
-    expect(html).toContain("Withdraw");
+    // Withdraw lives in the More menu (closed in a static render), never as a main button.
+    expect(html).toContain(">More<");
+    expect(html).not.toContain(">Withdraw<");
   });
 
   it("draft + approver is held back while problems remain", () => {
@@ -61,14 +64,15 @@ describe("Lifecycle", () => {
     expect(html).toMatch(/<a [^>]*href="https:\/\/proposals\.example\.com\/p\/tok123\/"[^>]*>\s*Open/);
     expect(html).toContain(`value="${URL_}"`);
     expect(html).toContain("Start a new version");
-    expect(html).toContain("Withdraw");
+    expect(html).toContain(">More<");
+    expect(html).not.toContain(">Withdraw<");
     expect(html).not.toMatch(/Revise|Turn on the link|Edit again/);
   });
 
   it("accepted: the link box is still shown, with no lifecycle buttons", () => {
     const html = render({ status: "accepted", clientUrl: URL_ });
     expect(html).toContain("Copy client link");
-    expect(html).not.toMatch(/Withdraw|Start a new version/);
+    expect(html).not.toMatch(/Withdraw|Start a new version|>More</);
   });
 
   it("a link is never drawn for a status that is not live, even if one is passed", () => {

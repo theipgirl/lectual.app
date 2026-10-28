@@ -317,7 +317,7 @@ describe("applyFilters", () => {
   it("filters by the effective temperature; a leftover hand-set column is ignored", () => {
     expect(ids(applyFilters(rows, { ...EMPTY_INTAKE_FILTERS, temp: "hot" }))).toEqual(["a"]);
     expect(ids(applyFilters(rows, { ...EMPTY_INTAKE_FILTERS, temp: "cold" }))).toEqual(["b"]);
-    // c has no touch, no facts and a stale `temperature: "hot"` column: Not routed, not hot.
+    // c has no touch, no facts and a stale `temperature: "hot"` column: Not rated, not hot.
     expect(ids(applyFilters(rows, { ...EMPTY_INTAKE_FILTERS, temp: "none" }))).toEqual(["c"]);
   });
 
@@ -361,7 +361,7 @@ describe("sortRows", () => {
     lead({ id: "warm", current_stage_id: "s1", last_activity_at: daysBefore(6), stage_entered_at: daysBefore(10) }),
     // hot (replied yesterday), touched recently
     lead({ id: "hotRecent", current_stage_id: "s1", last_inbound_at: daysBefore(1), stage_entered_at: daysBefore(1) }),
-    // never touched; the old hand-set `temperature` column is ignored, so this is Not routed
+    // never touched; the old hand-set `temperature` column is ignored, so this is Not rated
     lead({ id: "neverTouched", current_stage_id: "s1", temperature: "hot", stage_entered_at: daysBefore(40) }),
     // cold: a nurture stage, and untouched for 35 days besides.
     lead({ id: "cold", current_stage_id: "s3", last_activity_at: daysBefore(35), stage_entered_at: daysBefore(35) }),
@@ -390,7 +390,7 @@ describe("sortRows", () => {
     expect(ids(sortRows(three, DEFAULT_SORT.key, DEFAULT_SORT.dir))).toEqual(["today", "yesterday", "never"]);
   });
 
-  it("sorts temperature hot, warm, cold and puts Not routed last in both directions", () => {
+  it("sorts temperature hot, warm, cold and puts Not rated last in both directions", () => {
     expect(ids(sortRows(rows, "temperature", "desc"))).toEqual(["hotRecent", "warm", "cold", "neverTouched"]);
     expect(ids(sortRows(rows, "temperature", "asc"))).toEqual(["cold", "warm", "hotRecent", "neverTouched"]);
   });
@@ -596,7 +596,7 @@ describe("the sort in the URL", () => {
 });
 
 describe("the merged temperature filter", () => {
-  it("reads ?temp= including none (Not routed)", () => {
+  it("reads ?temp= including none (Not rated)", () => {
     expect(parseIntakeFilters({ temp: "none" }).temp).toBe("none");
     expect(parseIntakeFilters({ temp: "warm" }).temp).toBe("warm");
   });
@@ -621,12 +621,12 @@ describe("the merged temperature filter", () => {
 });
 
 describe("the KPI counts follow the effective temperature", () => {
-  it("counts a person's lane over what the activity says, and leaves Not routed out", () => {
+  it("counts a person's lane over what the activity says, and leaves Not rated out", () => {
     const rows = rowsFor([
       // replied yesterday: the activity says hot, but a person set cold
       lead({ id: "a", last_inbound_at: daysBefore(1), lane: "cold", lane_set_at: daysBefore(0) }),
       lead({ id: "b", lane: "hot", lane_set_at: daysBefore(0) }),
-      lead({ id: "c" }), // Not routed
+      lead({ id: "c" }), // Not rated
     ]);
     const kpis = computeIntakeKpis(rows);
     expect(kpis).toMatchObject({ hot: 1, warm: 0, cold: 1 });

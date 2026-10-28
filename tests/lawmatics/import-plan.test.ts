@@ -10,7 +10,8 @@ import type { LawmaticsSourceRecord } from "@/lib/lawmatics/normalize";
 
 import { RPB_STAGE_NAMES, stageRefs } from "../__fixtures__/lawmatics.fixture";
 
-const stages = stageRefs(RPB_STAGE_NAMES);
+// RPB's pipeline: the first seven stages are open (Follow-Up sorts first), everything after engagement opens a matter.
+const stages = stageRefs(RPB_STAGE_NAMES).map((s, i) => ({ ...s, category: i <= 6 ? "open" : "won", orderIndex: i + 1 }));
 const stageId = (name: string) => stages.find((s) => s.name === name)!.id;
 
 function source(overrides: Partial<LawmaticsSourceRecord> = {}): LawmaticsSourceRecord {
@@ -56,19 +57,20 @@ function existing(overrides: Partial<ExistingLead> = {}): ExistingLead {
   };
 }
 
-const MOVE: PlanOptions = { ...DEFAULT_PLAN_OPTIONS, moveExistingStages: true };
 const OVERWRITE: PlanOptions = { ...DEFAULT_PLAN_OPTIONS, overwriteEditedFields: true };
 const TRADEMARK_ONLY: PlanOptions = { ...DEFAULT_PLAN_OPTIONS, practiceAreaFilter: "Trademark" };
 
 describe("planImport — first run against an empty pipeline", () => {
-  it("creates a lead per prospect, mapped onto the firm's own stage row", () => {
+  it("creates a lead per prospect in the new-enquiry stage, whatever stage Lawmatics gives them", () => {
     const plan = planImport([source()], stages, []);
     expect(plan.totals).toMatchObject({ create: 1, update: 0, unmapped: 0, skipped: 0 });
     expect(plan.creates[0]).toMatchObject({
       lawmaticsId: "4207",
-      stageId: stageId("Application Filed"),
-      stageName: "Application Filed",
-      stageVia: "exact",
+      // Not "Application Filed" (Lawmatics' stage, which is also the name of one of this firm's), and not Follow-Up (which sorts first).
+      stageId: stageId("Potential New Client"),
+      stageName: "Potential New Client",
+      sourceStageName: "Application Filed",
+      stageDecision: { lawmaticsStage: "Application Filed", hired: false, label: "Imported, stage needs a decision: Application Filed" },
       fields: {
         first_name: "Marisol",
         last_name: "Vega",
@@ -86,26 +88,26 @@ describe("planImport — first run against an empty pipeline", () => {
 });
 
 describe("planImport — never guess, never drop", () => {
-  it("puts an unmappable stage in the unmapped bucket instead of importing it somewhere", () => {
-    const plan = planImport(
-      [source({ stageName: "Discovery Call No Show" })],
-      stages,
-      [],
-    );
-    expect(plan.totals.create).toBe(0);
-    expect(plan.unmapped).toHaveLength(1);
-    expect(plan.unmapped[0]).toMatchObject({
-      lawmaticsId: "4207",
-      sourceStageName: "Discovery Call No Show",
-      email: "marisol@verdantbloom.co",
-    });
-    expect(plan.unmapped[0].reason).toContain("Discovery Call No Show");
+  it("imports a stage the firm has no name for into the new-enquiry stage, flagged, instead of dropping it", () => {
+    const plan = planImport([source({ stageName: "Discovery Call No Show" })], stages, []);
+    expect(plan.unmapped).toHaveLength(0);
+    expect(plan.creates).toHaveLength(1);
+    expect(plan.creates[0]).toMatchObject({ stageId: stageId("Potential New Client"), sourceStageName: "Discovery Call No Show" });
+    expect(plan.creates[0].stageDecision?.label).toContain("Discovery Call No Show");
   });
 
-  it("reports a record with no stage rather than parking it in stage one", () => {
+  it("a record with no Lawmatics stage goes to the new-enquiry stage, not Follow-Up, with nothing to decide", () => {
     const plan = planImport([source({ stageName: null })], stages, []);
+    expect(plan.unmapped).toHaveLength(0);
+    expect(plan.creates).toHaveLength(1);
+    expect(plan.creates[0]).toMatchObject({ stageId: stageId("Potential New Client"), stageDecision: null });
+  });
+
+  it("a firm with no open stage leaves them in unmapped, with the reason", () => {
+    const plan = planImport([source()], stages.map((s) => ({ ...s, category: "won" })), []);
     expect(plan.creates).toHaveLength(0);
     expect(plan.unmapped).toHaveLength(1);
+    expect(plan.unmapped[0].reason).toMatch(/no open stage/i);
   });
 
   it("skips (and explains) a record with no usable email", () => {
@@ -266,44 +268,33 @@ describe("planImport — field updates are conservative", () => {
   });
 });
 
-describe("planImport — stage moves are opt-in", () => {
+describe("planImport — an import never moves an existing lead's stage", () => {
   const moved = [source({ stageName: "Trademark Registered" })];
   const local = [existing({ current_stage_id: stageId("Application Filed") })];
 
-  it("reports a divergence but leaves the stage alone — and writes nothing for it", () => {
+  it("a lead whose Lawmatics stage differs is unchanged: no write, no divergence report, no stage fields", () => {
     const plan = planImport(moved, stages, local);
     expect(plan.totals.update).toBe(0);
     expect(plan.totals.unchanged).toBe(1);
-    expect(plan.divergences).toEqual([
-      {
-        lawmaticsId: "4207",
-        leadId: "lead-1",
-        matterName: "Verdant Bloom Botanicals — VERDANT BLOOM",
-        sourceStageName: "Trademark Registered",
-        targetStageName: "Trademark Registered",
-      },
-    ]);
+    expect(plan).not.toHaveProperty("divergences");
+    expect(plan.totals).not.toHaveProperty("divergent");
   });
 
-  it("moves the stage only when the operator opted in", () => {
-    const plan = planImport(moved, stages, local, MOVE);
-    expect(plan.updates[0].stageWillMove).toBe(true);
-    expect(plan.updates[0].targetStageId).toBe(stageId("Trademark Registered"));
-  });
-
-  it("still updates the fields of a linked lead whose stage can't be mapped", () => {
+  it("a field update on a linked lead carries the Lawmatics stage as text only", () => {
     const plan = planImport(
       [source({ stageName: "Discovery Call Complete", phone: "+1 (305) 555-0199" })],
       stages,
       [existing()],
-      { ...DEFAULT_PLAN_OPTIONS, moveExistingStages: true, overwriteEditedFields: true },
+      { ...DEFAULT_PLAN_OPTIONS, overwriteEditedFields: true },
     );
     expect(plan.unmapped).toHaveLength(0);
-    expect(plan.updates[0].stageWillMove).toBe(false);
-    expect(plan.updates[0].stageNote).toContain("Discovery Call Complete");
-    // overwriteEditedFields is on here so this still asserts what it always
-    // did — that an unmappable stage does not block the field write.
+    expect(plan.updates[0].sourceStageName).toBe("Discovery Call Complete");
+    expect(Object.keys(plan.updates[0]).filter((k) => /target|diverge|willMove|stageNote/i.test(k))).toEqual([]);
     expect(plan.updates[0].changes).toHaveLength(1);
+  });
+
+  it("the options have no stage-move switch at all", () => {
+    expect(Object.keys(DEFAULT_PLAN_OPTIONS)).not.toContain("moveExistingStages");
   });
 });
 
@@ -330,7 +321,7 @@ describe("planImport — fingerprint", () => {
     expect(
       planImport([source({ stageName: "Trademark Registered" })], stages, []).fingerprint,
     ).not.toBe(base);
-    expect(planImport([source()], stages, [], MOVE).fingerprint).not.toBe(base);
+    expect(planImport([source()], stages, [], OVERWRITE).fingerprint).not.toBe(base);
   });
 
   it("changes when a record moves between buckets", () => {

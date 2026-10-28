@@ -4,7 +4,9 @@ import type { StructuredCall } from "@/lib/ai/claude";
 import type { NewQueueDraft } from "@/lib/queue/api";
 import { firmCivilDate } from "@/lib/quotes/firm-time";
 import { resolveTimeZone } from "@/lib/org/profile-rules";
+import { loadReviewedConsult, type ConsultDb, type ReviewedConsultRead } from "@/lib/consult/store";
 import { insertAgentProposal, recordConsultDraftEvent } from "@/lib/proposals/agent-create";
+import { normalisePackages } from "@/lib/proposals/package-list";
 import type { ProposalsDbClient } from "@/lib/proposals/store";
 import { standardProposalPricing } from "@/lib/proposals/types";
 import type { ValidationIssue } from "@/lib/proposals/validate";
@@ -215,6 +217,14 @@ async function runStages(input: ConsultProposalRunInput, progress: Progress): Pr
   const firmName = firmSignatureName(orgName, firmSlug) as string;
 
   progress.stage = "draft";
+  // The lead's reviewed consult details (a package named there wins over the call's). A read that
+  // fails is said so in the draft's flags, never read as "no consult". No email or mailbox is read.
+  let reviewedConsult: ReviewedConsultRead;
+  try {
+    reviewedConsult = await loadReviewedConsult(db as unknown as ConsultDb, lead.id, orgId);
+  } catch {
+    reviewedConsult = { status: "unavailable" };
+  }
   let draft: Awaited<ReturnType<typeof draftProposalFromConsult>>;
   try {
     draft = await draftProposalFromConsult({
@@ -222,6 +232,8 @@ async function runStages(input: ConsultProposalRunInput, progress: Progress): Pr
       lead,
       firm: { name: firmName, slug: firmSlug, teamSignOff },
       pricing: standardProposalPricing((setting as Row).pricing),
+      packages: normalisePackages((setting as Row).pricing),
+      reviewedConsult,
       today: firmCivilDate(new Date(now()), tz),
       llm: input.llm,
     });

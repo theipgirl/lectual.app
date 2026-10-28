@@ -194,7 +194,17 @@ export function describeStepEvent(payload: unknown): string | null {
   const parsed = readStep(payload);
   if (!parsed) return null;
   const text = pickWords(HISTORY_WORDS[parsed.step], parsed.outcome, parsed.step);
-  return parsed.reason ? `${text}: ${parsed.reason}` : text;
+  const base = parsed.reason ? `${text}: ${parsed.reason}` : text;
+  return base + addedClassesSuffix(parsed.payload);
+}
+
+/** " (2 classes added by the client; legal fee now $4,950)" for an acceptance step that carries them, else "". Counts and a total only. */
+function addedClassesSuffix(payload: Record<string, unknown>): string {
+  const n = payload.added_classes;
+  const total = payload.legal_total_cents;
+  if (typeof n !== "number" || !Number.isInteger(n) || n < 1) return "";
+  const dollars = typeof total === "number" && Number.isFinite(total) ? `; legal fee now $${(total / 100).toLocaleString("en-US", { minimumFractionDigits: total % 100 === 0 ? 0 : 2, maximumFractionDigits: 2 })}` : "";
+  return ` (${n} ${n === 1 ? "class" : "classes"} added by the client${dollars})`;
 }
 
 /** The short label for the list's Last activity cell ("Marked paid"), or null for a non-step payload. */

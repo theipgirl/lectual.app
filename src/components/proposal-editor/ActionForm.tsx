@@ -2,9 +2,10 @@
 
 import { startTransition, useActionState, type FormEvent, type ReactNode } from "react";
 import type { ActionState } from "@/app/dashboard/proposals/errors";
+import { FIRST_PROBLEM_ID } from "@/lib/proposal-editor/issues";
 
 /** A validation problem as the editor shows it: plain words, no path. */
-export type ShownIssue = { level: "error" | "warning"; message: string; where: string };
+export type ShownIssue = { level: "error" | "warning"; message: string; where: string; /** The one "Go to first problem" lands on. */ anchor?: boolean };
 
 type Action = (prev: ActionState, formData: FormData) => Promise<ActionState>;
 
@@ -26,12 +27,15 @@ export function ActionForm({
   children,
   confirm,
   className,
+  id,
 }: {
   action: Action;
   children: (s: { state: ActionState; pending: boolean }) => ReactNode;
   /** A question to ask before submitting (withdraw, remove). */
   confirm?: string;
   className?: string;
+  /** Lets fields placed elsewhere on the page (More options) belong to this form through their `form` attribute. */
+  id?: string;
 }) {
   const [state, dispatch, pending] = useActionState<ActionState, FormData>(action, {});
 
@@ -44,7 +48,7 @@ export function ActionForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className={className}>
+    <form id={id} onSubmit={onSubmit} className={className}>
       {children({ state, pending })}
     </form>
   );
@@ -85,7 +89,7 @@ export function IssueList({ issues }: { issues: ShownIssue[] }) {
   return (
     <ul className="pe-issues" aria-label="Problems in this section">
       {sorted.map((i, n) => (
-        <li key={n} data-level={i.level}>
+        <li key={n} data-level={i.level} id={i.anchor ? FIRST_PROBLEM_ID : undefined}>
           <span className="pe-issue-tag">{i.level === "error" ? "Fix" : "Check"}</span>
           {i.where && <span className="pe-issue-where">{i.where}: </span>}
           {i.message}

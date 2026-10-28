@@ -337,7 +337,7 @@ export async function prepConsultAction(
       error:
         err instanceof PrepConsultFlowError
           ? err.message
-          : "Something went wrong drafting the consult prep emails. Try again, or check that this deployment has an AI provider configured.",
+          : "Something went wrong drafting the consult prep emails. Try again in a minute. If it keeps happening, use Send feedback.",
     };
   }
 }

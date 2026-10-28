@@ -15,15 +15,16 @@ class EnvVarError extends Error {
 }
 
 describe("describeConsultFailure", () => {
-  it("names the missing service-role key", () => {
+  it("says a setting on Lectual's side is missing, without naming the key", () => {
     const m = describeConsultFailure("env", new EnvVarError("SUPABASE_SERVICE_ROLE_KEY"));
-    expect(m).toContain("the server key (SUPABASE_SERVICE_ROLE_KEY) isn't set on this deployment");
+    expect(m).toContain("a setting on Lectual's side is missing");
+    expect(m).not.toContain("SUPABASE_SERVICE_ROLE_KEY");
     expect(m).toContain("Nothing was sent.");
   });
 
-  it("names any other missing server setting, by name only", () => {
+  it("says a wrong server setting is missing or wrong, never by its variable name", () => {
     expect(describeConsultFailure("env", new EnvVarError("NEXT_PUBLIC_SUPABASE_URL", "invalid"))).toMatch(
-      /server setting \(NEXT_PUBLIC_SUPABASE_URL\) is invalid/,
+      /a setting on Lectual's side is missing or wrong/,
     );
   });
 
@@ -39,17 +40,17 @@ describe("describeConsultFailure", () => {
 
   it("maps queue failures to specific sentences", () => {
     expect(describeConsultFailure("queue", new Error("Queue API 502: Bad gateway"))).toMatch(
-      /approval queue didn't accept the draft \(it answered HTTP 502\)/,
+      /Approvals didn't accept the draft \(it answered HTTP 502\)/,
     );
     expect(describeConsultFailure("queue", new Error("Queue API not configured — set QUEUE_API_URL and DASHBOARD_API_TOKEN"))).toMatch(
-      /isn't configured on this deployment/,
+      /Approvals aren't connected for your firm yet/,
     );
     expect(describeConsultFailure("queue", new TypeError("fetch failed"))).toMatch(/couldn't be reached/);
     expect(describeConsultFailure("queue", new Error("weird"))).toMatch(/step: queue/);
   });
 
   it("gives database stages friendly text with the stage, and always the assurance", () => {
-    for (const stage of ["check", "settings", "insert", "event", "queue", "draft", "email", "env"] as const) {
+    for (const stage of ["check", "settings", "insert", "event", "queue", "draft", "email"] as const) {
       const m = describeConsultFailure(stage, new Error("boom"));
       expect(m).toContain(`step: ${stage}`.replace("step: insert", "database step: insert").replace("step: event", "database step: event"));
       expect(m).toContain("Nothing was sent.");
@@ -59,7 +60,7 @@ describe("describeConsultFailure", () => {
 
   it("unwraps a ConsultStageError", () => {
     const e = new ConsultStageError("env", new EnvVarError("SUPABASE_SERVICE_ROLE_KEY"));
-    expect(describeConsultFailure("env", e)).toContain("SUPABASE_SERVICE_ROLE_KEY");
+    expect(describeConsultFailure("env", e)).toContain("a setting on Lectual's side is missing");
   });
 });
 

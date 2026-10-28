@@ -67,7 +67,7 @@ export default async function ServiceLibraryPage() {
         </div>
       ) : loadError ? (
         <div role="alert" className="lx-banner lx-banner-risk">
-          The service library couldn&apos;t be loaded. That is a problem reaching the database, not an empty list.
+          The service library couldn&apos;t be loaded. Refresh to try again.
         </div>
       ) : (
         <>

@@ -37,7 +37,7 @@ export default async function FirmProfilePage() {
       <div>
         <div className="lx-label">Settings</div>
         <h1 className="lx-h1" data-tour="firm-head">Firm profile</h1>
-        <p className="lx-sub">How the firm appears on the drafts Lectual prepares for you, and where each intake lane&apos;s next step points.</p>
+        <p className="lx-sub">How the firm appears on the drafts Lectual prepares for you, and where each temperature&apos;s next step points.</p>
       </div>
       {loadError ? (
         <div role="alert" className="lx-banner lx-banner-risk">

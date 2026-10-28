@@ -41,7 +41,7 @@ describe("CopilotPage", () => {
     vi.doMock("next/navigation", () => ({ usePathname: () => "/dashboard/copilot/", useRouter: () => ({ push: () => {}, refresh: () => {} }) }));
     const html = await render();
 
-    expect(html).toContain("isn&#x27;t configured for this deployment yet");
+    expect(html).toContain("isn&#x27;t switched on for your firm yet");
     expect(html).not.toContain("cpl-composer");
   });
 
@@ -50,7 +50,10 @@ describe("CopilotPage", () => {
     vi.doMock("next/navigation", () => ({ usePathname: () => "/dashboard/copilot/", useRouter: () => ({ push: () => {}, refresh: () => {} }) }));
     const html = await render();
 
-    expect(html).toContain("Ask the copilot");
+    expect(html).toContain("Ask Copilot");
+    expect(html).toContain(">Copilot</h1>");
+    expect(html).not.toContain("IP.OS");
+    expect(html).not.toContain("AI copilot");
     expect(html).toContain("What&#x27;s due in the next two weeks?");
   });
 

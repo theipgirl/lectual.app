@@ -1,4 +1,5 @@
 import { milestoneRank, opensMatter, topMilestone } from "./milestones";
+import { AUTOMATIC_STAGE_MOVES } from "@/lib/ui/words";
 import {
   SOURCE_LABEL,
   type Confidence,
@@ -42,7 +43,7 @@ const ORDER: readonly SourceName[] = ["sheet", "lawmatics", "email"];
 const VIA_LABEL: Record<SourceName, Record<EvidenceItem["via"], string>> = {
   sheet: { status: "sheet status", note: "sheet note", stage: "sheet status", mail: "sheet", mailbox: "sheet", agent: "sheet" },
   lawmatics: { status: "Lawmatics", note: "Lawmatics note", stage: "Lawmatics stage", mail: "Lawmatics", mailbox: "Lawmatics", agent: "Lawmatics" },
-  email: { status: "email", note: "email", stage: "email", mail: "email", mailbox: "mailbox search", agent: "Stage Keeper" },
+  email: { status: "email", note: "email", stage: "email", mail: "email", mailbox: "mailbox search", agent: AUTOMATIC_STAGE_MOVES },
 };
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];

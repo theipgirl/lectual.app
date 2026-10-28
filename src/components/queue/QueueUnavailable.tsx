@@ -1,28 +1,29 @@
 import type { QueueLoad } from "@/lib/queue/load";
+import { notReadyYet } from "@/lib/ui/words";
 
 /**
  * Whenever the queue could not be read — any state that is not `ok`. Never an
- * empty queue. Three messages for three situations (ported verbatim from
- * lectual; its tests come with it).
+ * empty queue. Three messages for three situations, in the glossary's plain words
+ * (no setting names; the platform side is Lectual's to switch on).
  */
 export type QueueUnavailableState = Pick<QueueLoad, "status" | "reason">;
 
 export function queueUnavailableCopy(state: QueueUnavailableState): { title: string; body: string } {
   if (state.status === "unconfigured" && state.reason === "org-key") {
     return {
-      title: "Approvals aren't enabled for this firm yet.",
-      body: "Nothing is broken — this firm isn't connected to an approval queue, so there are no drafts to review here. We'll turn it on when the firm's agent workflows go live.",
+      title: "Approvals aren't switched on for your firm yet.",
+      body: "Nothing is broken. There are no drafts to review here yet. Lectual will turn this on when your assistants go live.",
     };
   }
   if (state.status === "unconfigured") {
     return {
-      title: "Approval queue isn't configured for this workspace yet.",
-      body: "Ask an admin to set QUEUE_API_URL and DASHBOARD_API_TOKEN for this firm's workspace.",
+      title: "Approvals aren't switched on for your firm yet.",
+      body: notReadyYet("Approvals"),
     };
   }
   return {
-    title: "Couldn't reach the approval queue right now.",
-    body: "The queue service didn't respond, so we can't tell you what's waiting. This is not the same as nothing waiting — try refreshing in a moment.",
+    title: "Can't reach approvals right now.",
+    body: "Can't show what's waiting right now. Refresh to try again.",
   };
 }
 

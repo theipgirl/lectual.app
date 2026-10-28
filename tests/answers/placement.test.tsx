@@ -143,15 +143,14 @@ beforeEach(() => {
 });
 
 describe("lead page placement (F6)", () => {
-  it("renders the card right after the temperature card, and keeps every other section", async () => {
+  it("renders the Answers card before the Temperature detail card (Sprint 33 order), and keeps every other section", async () => {
     const html = text(await leadPage(createFakeDb({ tables: leadTables() }), { status: "none" }));
     const temp = html.indexOf('data-marker="temperature-card"');
     const card = html.indexOf('aria-label="Intake & assessment answers"');
     expect(temp).toBeGreaterThan(-1);
-    expect(card).toBeGreaterThan(temp);
-    // The card is the very next section after the temperature card.
-    expect(html.slice(temp)).toMatch(/^[^>]*>Temperature<\/section><section[^>]*aria-label="Intake & assessment answers"/);
-    expect(html.indexOf("Timeline")).toBeGreaterThan(card);
+    expect(card).toBeGreaterThan(-1);
+    expect(card).toBeLessThan(temp);
+    expect(html.indexOf("Timeline")).toBeLessThan(card);
     expect(html).toContain(">Matters<");
     expect(html).toContain("No matters yet.");
     expect(html).toContain("Toussaint Studio");

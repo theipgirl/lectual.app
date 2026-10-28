@@ -100,7 +100,7 @@ describe("an accepted proposal's LOE through the real queue path", () => {
   it("no queue configured: refused with the existing sentence before any row is made", async () => {
     const m = mocks({ orgKey: null });
     const { generateTrademarkLoe } = await import("@/lib/documents/generate");
-    await expect(generateTrademarkLoe({ ...adapted(), matterId: "matter-1", proposalId: PROPOSAL })).rejects.toThrow(/Approvals aren't enabled for this firm yet/);
+    await expect(generateTrademarkLoe({ ...adapted(), matterId: "matter-1", proposalId: PROPOSAL })).rejects.toThrow(/Approvals aren't switched on for your firm yet/);
     expect(m.createDocumentDraft).not.toHaveBeenCalled();
     expect(m.createDraft).not.toHaveBeenCalled();
   });

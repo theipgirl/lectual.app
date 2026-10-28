@@ -227,7 +227,7 @@ describe("states (F5)", () => {
   it("names a failed source, still shows the sources that loaded, and never shows the empty line", () => {
     const html = render({ submissions: { status: "unavailable" }, booth: ok([finishedIntake]) });
     expect(html).toContain("Couldn't load answers: Intake submissions");
-    expect(html).toContain("not an empty result");
+    expect(html).toContain("Refresh to try again.");
     expect(html).toContain("SANKOFA");
     expect(html).not.toContain(EMPTY_LINE);
     expect(html).toContain('role="alert"');
@@ -248,7 +248,7 @@ describe("states (F5)", () => {
 
   it("gives a missing table its own quiet line, not the empty line", () => {
     const html = render({ submissions: ok([]), booth: { status: "unconfigured" } });
-    expect(html).toContain("Booth scorecards aren't set up in this environment.");
+    expect(html).toContain("Booth scorecards aren't switched on for your firm yet. Lectual will turn them on.");
     expect(html).not.toContain(EMPTY_LINE);
     expect(html).not.toContain("Couldn't load answers");
   });

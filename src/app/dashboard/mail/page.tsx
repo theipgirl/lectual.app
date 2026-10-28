@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { orgHasModule } from "@/lib/org/modules";
@@ -9,9 +10,16 @@ import { PROVIDER_LABEL } from "@/lib/mailbox/providers";
 import { groupMailByDay, mailTime, toMailRows, type MailActivity } from "@/lib/mailbox/my-mail";
 import { relativeTime } from "@/lib/relative-time";
 import { ProviderMark } from "@/components/mailbox/ProviderMark";
+import { loadLiveInbox, loadLiveMessage, loadStoredMessage, type ReadState } from "@/lib/mailbox/read-message";
+import { liveMailReadDeps } from "@/lib/mailbox/read-message-live";
+import { MailReadingPane, MailPaneLoading } from "@/components/mailbox/MailReadingPane";
+import { LiveInboxList } from "@/components/mailbox/LiveInboxList";
+import "@/components/mailbox/mail-pane.css";
 import type { Metadata } from "next";
 import { matterDisplayTitle } from "@/lib/matters/display-title";
 import { pageTitle } from "@/lib/ui/page-title";
+import { SectionTabs } from "@/components/shell/SectionTabs";
+import { REPORTS, reportListLabel } from "@/lib/nav";
 
 export const metadata: Metadata = { title: pageTitle("My Mail") };
 
@@ -41,16 +49,21 @@ function ConnectMailbox() {
   );
 }
 
+async function PaneLoader({ state, backHref }: { state: Promise<ReadState>; backHref: string }) {
+  return <MailReadingPane state={await state} backHref={backHref} />;
+}
+
 /**
  * My Mail: client mail matched from the mailboxes this person can see. Not a
  * full inbox, on purpose: mail that matched no client was never stored, and
  * bodies never are. Module-gated like every mailbox surface.
  */
-export default async function MyMailPage({ searchParams }: { searchParams: Promise<{ box?: string; f?: string }> }) {
+export default async function MyMailPage({ searchParams }: { searchParams: Promise<{ box?: string; f?: string; m?: string; tab?: string; live?: string }> }) {
   if (!(await orgHasModule("mailbox"))) notFound();
   const session = await resolveFirmSession();
   if (session.kind !== "ok") notFound();
-  const { box, f } = await searchParams;
+  const { box, f, m, tab, live } = await searchParams;
+  const inboxTab = tab === "inbox";
   const sent = f === "sent";
 
   const list = await listConnections();
@@ -69,14 +82,16 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
   const ids = selected ? [selected.id] : connections.map((c) => c.id);
 
   const supabase = await getScopedClient();
-  const { data, error } = await supabase
-    .from("crm_activity")
-    .select("id, type, created_at, lead_id, matter_id, payload")
-    .eq("type", sent ? "email_sent" : "email_received")
-    .eq("payload->>source", MAILBOX_ACTIVITY_SOURCE)
-    .in("payload->>connection_id", ids)
-    .order("created_at", { ascending: false })
-    .limit(200);
+  const { data, error } = inboxTab
+    ? { data: [], error: null }
+    : await supabase
+        .from("crm_activity")
+        .select("id, type, created_at, lead_id, matter_id, payload")
+        .eq("type", sent ? "email_sent" : "email_received")
+        .eq("payload->>source", MAILBOX_ACTIVITY_SOURCE)
+        .in("payload->>connection_id", ids)
+        .order("created_at", { ascending: false })
+        .limit(200);
   const activity = (data ?? []) as MailActivity[];
 
   const leadIds = [...new Set(activity.map((a) => a.lead_id).filter((x): x is string => !!x))];
@@ -91,27 +106,38 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
   };
   const now = new Date();
   const groups = groupMailByDay(toMailRows(activity, names), now);
+  const providerOf = new Map(connections.map((c) => [c.id, c.provider] as const));
   const needsReconnect = connections.filter((c) => c.status === "reauth");
 
-  const href = (next: { box?: string | null; f?: string | null }) => {
+  const href = (next: { box?: string | null; f?: string | null; m?: string | null; tab?: string | null; live?: string | null }) => {
     const q = new URLSearchParams();
     const b = next.box === undefined ? selected?.id : next.box;
     const ff = next.f === undefined ? (sent ? "sent" : null) : next.f;
+    const t = next.tab === undefined ? (inboxTab ? "inbox" : null) : next.tab;
     if (b) q.set("box", b);
     if (ff) q.set("f", ff);
+    if (t) q.set("tab", t);
+    if (next.m) q.set("m", next.m);
+    if (next.live) q.set("live", next.live);
     const qs = q.toString();
     return `/dashboard/mail/${qs ? `?${qs}` : ""}`;
   };
+
+  // The reading pane: `m` (a stored row) wins over `box` + `live`. Each re-checks access on this request.
+  const paneOpen = Boolean(m) || Boolean(live);
+  const backHref = href({ m: null, live: null });
+  const paneState = m ? loadStoredMessage(m, liveMailReadDeps) : live ? loadLiveMessage(box, live, liveMailReadDeps) : null;
+  const inbox = inboxTab ? await loadLiveInbox(box, liveMailReadDeps) : null;
 
   return (
     <div className="lx-split">
       <aside className="lx-side" aria-label="Mailboxes">
         <div className="lx-label">Folders</div>
         <nav style={{ display: "grid", gap: 2 }}>
-          <Link href={href({ f: null })} className="lx-fi" aria-current={!sent ? "page" : undefined}>
-            Inbox
+          <Link href={href({ f: null, tab: null, m: null, live: null })} className="lx-fi" aria-current={!sent && !inboxTab ? "page" : undefined}>
+            Received
           </Link>
-          <Link href={href({ f: "sent" })} className="lx-fi" aria-current={sent ? "page" : undefined}>
+          <Link href={href({ f: "sent", tab: null, m: null, live: null })} className="lx-fi" aria-current={sent && !inboxTab ? "page" : undefined}>
             Sent
           </Link>
         </nav>
@@ -119,11 +145,11 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
           Mailboxes
         </div>
         <nav style={{ display: "grid", gap: 2 }}>
-          <Link href={href({ box: null })} className="lx-fi" aria-current={!selected ? "page" : undefined}>
+          <Link href={href({ box: null, m: null, live: null })} className="lx-fi" aria-current={!selected ? "page" : undefined}>
             All mailboxes
           </Link>
           {connections.map((c) => (
-            <Link key={c.id} href={href({ box: c.id })} className="lx-fi lx-fi-box" aria-current={selected?.id === c.id ? "page" : undefined} title={c.email}>
+            <Link key={c.id} href={href({ box: c.id, m: null, live: null })} className="lx-fi lx-fi-box" aria-current={selected?.id === c.id ? "page" : undefined} title={c.email}>
               <ProviderMark provider={c.provider} size={14} />
               <span className="lx-fi-text">{c.email}</span>
               {c.status === "reauth" && <span className="lx-fi-n" style={{ color: "var(--wine)" }}>!</span>}
@@ -140,7 +166,8 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
           <div style={{ flex: 1, minWidth: 240 }}>
             <div className="lx-label">{selected ? `${PROVIDER_LABEL[selected.provider]} · ${selected.email}` : `${connections.length} mailbox${connections.length === 1 ? "" : "es"}`}</div>
             <h1 className="lx-h1">My Mail</h1>
-            <p className="lx-sub">Mail with your clients, already linked to their lead or matter. Everything else stays in your inbox.</p>
+            <SectionTabs active="list" listLabel={reportListLabel("communication", { hasMailbox: true })} listHref="/dashboard/mail/" summaryHref={REPORTS.communication.href} />
+            <p className="lx-sub">{inboxTab ? "The newest messages in the mailbox, read live. Nothing here is saved." : "Mail with your clients, already linked to their lead or matter. Everything else stays in your inbox."}</p>
           </div>
         </div>
 
@@ -151,13 +178,27 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
           </div>
         )}
 
+        <div className="lx-mail-tabs" role="navigation" aria-label="Mail views">
+          <Link href={href({ tab: null, m: null, live: null })} className="lx-btn lx-btn-sm lx-btn-sec" aria-current={!inboxTab ? "page" : undefined}>
+            Client mail
+          </Link>
+          <Link href={href({ tab: "inbox", m: null, live: null, f: null })} className="lx-btn lx-btn-sm lx-btn-sec" aria-current={inboxTab ? "page" : undefined}>
+            Inbox
+          </Link>
+        </div>
+
+        <div className="lx-mail-wrap" data-pane={paneOpen ? "open" : undefined}>
+          {inbox ? (
+            <LiveInboxList state={inbox} now={now} openHref={(id) => href({ box: inbox.status === "ok" ? inbox.mailbox.id : selected?.id ?? null, live: id, m: null })} />
+          ) : (
+            <>
         {error ? (
-          <div className="lx-card lx-empty-card">
+          <div className="lx-card lx-empty-card lx-mail-list">
             <h2 className="lx-h2" style={{ fontSize: 25 }}>Mail couldn&apos;t be loaded</h2>
-            <p className="lx-note" style={{ margin: 0 }}>This is a problem reaching the database, not an empty mailbox. Try again shortly.</p>
+            <p className="lx-note" style={{ margin: 0 }}>Can&apos;t show this right now. Refresh to try again.</p>
           </div>
         ) : groups.length === 0 ? (
-          <div className="lx-card lx-empty-card">
+          <div className="lx-card lx-empty-card lx-mail-list">
             <h2 className="lx-h2" style={{ fontSize: 25 }}>{sent ? "Nothing sent to clients yet" : "No client mail yet"}</h2>
             <p className="lx-note" style={{ margin: 0 }}>
               {connections.every((c) => !c.last_synced_at)
@@ -166,7 +207,7 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
             </p>
           </div>
         ) : (
-          <div className="lx-card lx-mail">
+          <div className="lx-card lx-mail lx-mail-list">
             {groups.map((g) => (
               <section key={g.key} aria-labelledby={`mail-${g.key}`}>
                 <h2 id={`mail-${g.key}`} className="lx-mail-group">
@@ -177,7 +218,9 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
                     <li key={r.id} className="lx-mail-row">
                       <span className="lx-mail-who">{r.direction === "out" ? `To ${r.to[0] ?? "client"}${r.to.length > 1 ? ` +${r.to.length - 1}` : ""}` : r.from}</span>
                       <span className="lx-mail-subj">
-                        {r.subject}
+                        <Link href={href({ m: r.id })} className="lx-mail-rowlink">
+                          {r.subject}
+                        </Link>
                         {r.client && (
                           <Link href={r.client.href} className="lx-pill lx-pill-ox lx-mail-tag">
                             {r.client.label}
@@ -188,7 +231,7 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
                         <span className="lx-num">{mailTime(r.at, now)}</span>
                         {r.link && (
                           <a href={r.link} target="_blank" rel="noreferrer noopener" className="lx-note">
-                            Open ↗
+                            Open in {providerOf.get(r.connectionId ?? "") === "google" ? "Gmail" : "Outlook"} ↗
                           </a>
                         )}
                       </span>
@@ -199,6 +242,14 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
             ))}
           </div>
         )}
+            </>
+          )}
+          {paneState && (
+            <Suspense fallback={<MailPaneLoading />}>
+              <PaneLoader state={paneState} backHref={backHref} />
+            </Suspense>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -3,8 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signOutAction } from "@/lib/auth/actions";
-import { ICON, RAIL_PIN_COOKIE, isNavActive, navItemBySlug, railGroups, type NavItem } from "@/lib/nav";
+import { ICON, RAIL_PIN_COOKIE, isNavActive, navItemBySlug, railCountFor, railGroups, type NavItem } from "@/lib/nav";
 import { RAIL_COUNT_TITLE } from "@/lib/intake/counts";
 import { navTourToken } from "@/lib/onboarding/tour";
 import { closeRailOnEscape, releaseRailFocus } from "@/lib/rail-behaviour";
@@ -17,8 +16,6 @@ type Props = {
   /** Section counts keyed by slug. Absent = unknown, and nothing is drawn (never a false 0). */
   counts: Partial<Record<string, number>>;
   initialPinned: boolean;
-  initials: string;
-  name: string;
 };
 
 const PIN = "M9 4h6M12 4v6M7 10h10l-1 5H8zM12 15v5";
@@ -34,14 +31,16 @@ function Icon({ d, size }: { d: string; size: number }) {
 /**
  * The navigation rail from design/Rail.dc.html: a 62px glass column that
  * opens to 262px while hovered (over the page) or stays open when pinned
- * (beside it). Sections are grouped as in the design, parents show their
+ * (beside it; pinned is the default, see railIsPinned). Who you are and Sign
+ * out live in the top-right account menu only. On a phone this column is
+ * hidden and MobileBar takes over. Sections are grouped as in the design, parents show their
  * children when open, and a collapsed section with a count shows a dot.
  *
- * The Queue count carries all three queue states: a number when we reached
+ * The Approvals count carries all three queue states: a number when we reached
  * it, "!" when we could not (an outage never reads as "nothing waiting"),
  * nothing when there is no queue.
  */
-export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, initials, name }: Props) {
+export function Rail({ items, queueStatus, pendingCount, counts, initialPinned }: Props) {
   const pathname = usePathname() ?? "/dashboard/";
   const [pinned, setPinned] = useState(initialPinned);
 
@@ -54,15 +53,7 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
   // A mouse click must not leave focus in the rail (it would stay open), and Escape closes it.
   const releaseFocus = () => releaseRailFocus(document.activeElement as HTMLElement | null);
 
-  function countFor(key: string | null): string | null {
-    if (!key) return null;
-    if (key === "queue") {
-      if (queueStatus === "unavailable") return "!";
-      return queueStatus === "ok" && pendingCount > 0 ? String(pendingCount > 99 ? "99+" : pendingCount) : null;
-    }
-    const n = counts[key];
-    return n === undefined || n === 0 ? null : String(n > 999 ? "999+" : n);
-  }
+  const countFor = (key: string | null) => railCountFor(key, queueStatus, pendingCount, counts);
 
   const groups = railGroups(items, pathname);
   const settings = items.find((i) => i.slug === "settings") ?? navItemBySlug("settings")!;
@@ -162,21 +153,6 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
           </span>
           <span className="lx-rail-label">Settings</span>
         </Link>
-
-        <div className="lx-rail-me">
-          <span className="lx-rail-avatar" title={name}>
-            {initials}
-          </span>
-          <span className="lx-rail-label lx-rail-mewho">
-            <span className="lx-rail-mename">{name}</span>
-            <span className="lx-rail-meact">
-              <Link href="/dashboard/settings/firm/" onClick={releaseFocus}>Profile</Link> ·{" "}
-              <form action={signOutAction} style={{ display: "inline" }}>
-                <button type="submit">Sign out</button>
-              </form>
-            </span>
-          </span>
-        </div>
       </nav>
     </div>
   );

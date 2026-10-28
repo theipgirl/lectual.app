@@ -1,3 +1,4 @@
+import { IMPORT_PERSON_NOT_SAVED } from "@/lib/ui/words";
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -15,7 +16,6 @@ import {
   type PlanStage,
   type PlanOptions,
   type SkippedRecord,
-  type StageDivergence,
   type UnmappedRecord,
 } from "./import-plan";
 import {
@@ -93,17 +93,13 @@ export type ImportReport = {
   updated: number;
   /** Existing local leads newly linked to a Lawmatics record. */
   linked: number;
-  /** Leads whose stage was moved (only when the operator opted in). */
-  stageMoves: number;
   unchanged: number;
   /** Of `created`: Lawmatics contacts with no prospect, filed as leads. */
   contactsCreated: number;
-  /** Of `created`: filed in the first open stage for a human to place. */
+  /** Of `created`: Lawmatics named a stage, so the person waits in the new-enquiry stage for a human to place. */
   stageDecisions: number;
   /** Stage-decision leads whose flag could not be written to the timeline. The leads themselves were created. */
   flagsNotRecorded: number;
-  /** Stage disagreements left alone (the operator didn't opt into moves). */
-  divergences: StageDivergence[];
   unmapped: UnmappedRecord[];
   skipped: SkippedRecord[];
   failures: ImportFailure[];
@@ -345,7 +341,6 @@ export async function applyImport(
   let contactsCreated = 0;
   let updated = 0;
   let linked = 0;
-  let stageMoves = 0;
 
   // ── Creates ────────────────────────────────────────────────────────────────
   // org_id is set explicitly because the column has no default; the RLS WITH
@@ -413,10 +408,11 @@ export async function applyImport(
     for (const row of chunk) {
       const { error: rowError } = await supabase.from("crm_lead").insert(row);
       if (rowError) {
+        console.error("[lawmatics-import] create failed", rowError.code);
         failures.push({
           lawmaticsId: row.lawmatics_id ?? "(unknown)",
           action: "create",
-          message: rowError.message,
+          message: IMPORT_PERSON_NOT_SAVED,
         });
       } else {
         created += 1;
@@ -447,21 +443,17 @@ export async function applyImport(
     for (const change of u.changes) {
       assignChange(patch, change.field, change.to);
     }
-    if (u.stageWillMove && u.targetStageId) {
-      patch.current_stage_id = u.targetStageId;
-      patch.stage_entered_at = syncedAt;
-    }
 
     // RLS scopes the row to the caller's org; the id came from a read through
     // that same policy, so this cannot reach another tenant's lead.
     const { error } = await supabase.from("crm_lead").update(patch).eq("id", u.leadId);
     if (error) {
-      failures.push({ lawmaticsId: u.lawmaticsId, action: "update", message: error.message });
+      console.error("[lawmatics-import] update failed", error.code);
+      failures.push({ lawmaticsId: u.lawmaticsId, action: "update", message: IMPORT_PERSON_NOT_SAVED });
       continue;
     }
     updated += 1;
     if (u.linksRecord) linked += 1;
-    if (u.stageWillMove) stageMoves += 1;
   }
 
   return {
@@ -471,12 +463,10 @@ export async function applyImport(
     created,
     updated,
     linked,
-    stageMoves,
     unchanged: plan.unchanged.length,
     contactsCreated,
     stageDecisions: flags.expected,
     flagsNotRecorded: flags.notRecorded,
-    divergences: plan.divergences,
     unmapped: plan.unmapped,
     skipped: plan.skipped,
     failures,

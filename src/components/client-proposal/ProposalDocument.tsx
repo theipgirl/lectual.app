@@ -3,20 +3,32 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { NOT_A_LAW_FIRM_DISCLAIMER } from "@/lib/legal/disclaimer";
 import {
+  ADDED_CLASS_REFUSAL,
+  MAX_ADDED_CLASSES_PER_NAME,
+  MAX_ADDED_CLASS_CHARS,
+  cleanAddedDescription,
+  quoteWithAddedClasses,
+  type AddedClasses,
+} from "@/lib/proposals/added-classes";
+import { classLock, markWithoutClass } from "@/lib/proposals/class-lock";
+import {
   defaultSelection,
   isFixedOffer,
   lockedSelectionIds,
   normalizeSelection,
+  priceForClassCount,
   quoteHasItems,
-  quoteProposal,
 } from "@/lib/proposals/pricing";
 import {
   MARK_KIND_DEFAULT_DESC,
   MARK_KIND_LABEL,
   type ProposalContent,
+  type ProposalPricing,
   type ProposalQuote,
   type Selection,
 } from "@/lib/proposals/types";
+import { commitmentSentence } from "@/lib/proposals/commitment";
+import { usptoLine } from "@/lib/proposals/uspto-line";
 import { markDisplayPrices } from "./display";
 import { RPB_FONT_VARS } from "./fonts";
 import {
@@ -54,7 +66,14 @@ export type ProposalDocumentProps = {
   clientName: string;
   /** Civil date, "YYYY-MM-DD". */
   expiresOn: string | null;
-  firm: { name: string; slug: string };
+  firm: {
+    name: string;
+    slug: string;
+    /** What the commitment sentence calls the firm (the profile's display name). Defaults to `name`. */
+    displayName?: string;
+    /** From the firm's profile; absent = no contact line. */
+    contactLine?: string | null;
+  };
   mode: "live" | "preview" | "accepted";
   /** Starting ticks (accepted mode: what was accepted). Defaults to the firm's preselected offer. */
   initialSelection?: Selection;
@@ -62,8 +81,10 @@ export type ProposalDocumentProps = {
   acceptedQuote?: ProposalQuote;
   /** accepted mode: where the legal fee is paid. Additive to the original prop list. */
   payUrl?: string | null;
-  /** live mode: records the acceptance on the server. Receives the ticks only, never a price. */
-  onAccept?: (selection: Selection) => Promise<ProposalAcceptResult>;
+  /** Descriptions already added (by brand name id) when the page opens. The page starts with none; tests and the editor preview may start with some. */
+  initialAddedClasses?: AddedClasses;
+  /** live mode: records the acceptance on the server. Receives the ticks and the added-class descriptions only, never a price. */
+  onAccept?: (selection: Selection, addedClasses: AddedClasses) => Promise<ProposalAcceptResult>;
 };
 
 const DEFAULT_TITLE = "Trademark Proposal";
@@ -75,18 +96,43 @@ function Rich({ text }: { text: string | undefined }): ReactNode {
   return richSegments(text).map((seg, i) => (seg.bold ? <b key={i}>{seg.text}</b> : seg.text));
 }
 
+function addedCount(content: ProposalContent, nameId: string): number {
+  return (content.names.find((n) => n.id === nameId)?.classes ?? []).filter((c) => c.client_added === true).length;
+}
+
 function plural(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`;
 }
 
+/**
+ * In words, what one more class costs on this package. Display only: the next-class legal figure is the
+ * difference between two `priceForClassCount` runs (the engine itself), so the words cannot disagree with the total.
+ */
+function classPriceWords(pricing: ProposalPricing, perClassCents: number, picked: number): string {
+  const included = pricing.included_classes;
+  const effective: ProposalPricing = { ...pricing, per_class_cents: perClassCents };
+  const nextLegal = priceForClassCount(effective, picked + 1) - priceForClassCount(effective, picked);
+  const head = `${pricing.package} includes ${plural(included, "class", "classes")}.`;
+  const left = Math.max(0, included - picked);
+  const tail = `${money(pricing.gov_per_class_cents)} USPTO per class`;
+  if (nextLegal <= 0) return `${head} ${left} more included at no extra legal fee; after that ${money(perClassCents)} legal + ${tail}.`;
+  return left > 0
+    ? `${head} The next class adds ${money(nextLegal)} legal + ${tail}.`
+    : `${head} Each class past that is ${money(nextLegal)} legal + ${tail}.`;
+}
+
 export function ProposalDocument(props: ProposalDocumentProps) {
-  const { content, title, clientName, expiresOn, firm, mode, initialSelection, acceptedQuote, payUrl, onAccept } = props;
+  const { content, title, clientName, expiresOn, firm, mode, initialSelection, acceptedQuote, payUrl, onAccept, initialAddedClasses } = props;
   const brand: ProposalBrand = brandForSlug(firm.slug);
 
   // Ticks the visitor changed. Layered over the firm's defaults (and any given
   // starting ticks), so editing the content in the preview never loses a tick
   // the viewer made and never keeps a tick for a mark that no longer exists.
   const [overrides, setOverrides] = useState<Selection>({});
+  // Classes the visitor added (descriptions only), by brand name id; the server keeps its own copy of the rules.
+  const [added, setAdded] = useState<AddedClasses>(initialAddedClasses ?? {});
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [addErrors, setAddErrors] = useState<Record<string, string>>({});
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ payUrl: string | null; opened: boolean } | null>(null);
@@ -103,18 +149,41 @@ export function ProposalDocument(props: ProposalDocumentProps) {
     return normalizeSelection(content, merged);
   }, [content, initialSelection, overrides, mode]);
 
+  // The page's own total: the SAME helper the accept path runs, over the stored content plus the
+  // visitor's added descriptions. A receipt shows the content it was accepted with (already carrying
+  // those classes) and the frozen quote, so nothing is added twice.
+  const priced = useMemo(() => {
+    const live = mode === "accepted" ? { added: {} as AddedClasses } : { added };
+    const result = quoteWithAddedClasses(content, selection, live.added);
+    if (!result.ok) throw new Error("unreachable: repair is off");
+    return result;
+  }, [mode, content, selection, added]);
+  const shown = priced.content;
+  const shownSelection = priced.selection;
   const quote = useMemo<ProposalQuote>(
-    () => (mode === "accepted" && acceptedQuote ? acceptedQuote : quoteProposal(content, selection)),
-    [mode, acceptedQuote, content, selection],
+    () => (mode === "accepted" && acceptedQuote ? acceptedQuote : priced.quote),
+    [mode, acceptedQuote, priced],
   );
-  const display = useMemo(() => markDisplayPrices(content, selection), [content, selection]);
-  // One name, one mark, one class: nothing to choose, so no checkboxes at all.
+  const display = useMemo(() => markDisplayPrices(shown, shownSelection), [shown, shownSelection]);
+  // One name, one mark, one class: nothing to choose, so no checkboxes at all (added classes still show, removable).
   const fixed = isFixedOffer(content);
-  // Boxes the client may not untick: doing so would leave nothing to accept.
+  // Boxes the client may not untick because doing so would leave nothing to accept (the whole proposal,
+  // over the content AS SHOWN, so a class the client added counts). Separate from the per-name class lock below.
   const locked = useMemo(
-    () => (readOnly || fixed ? new Set<string>() : lockedSelectionIds(content, selection)),
-    [readOnly, fixed, content, selection],
+    () => (readOnly || fixed ? new Set<string>() : lockedSelectionIds(shown, shownSelection)),
+    [readOnly, fixed, shown, shownSelection],
   );
+  /** Ids held on by either rule: the whole-proposal $0 lock or "one class is always included" per brand name. */
+  const held = useMemo(() => {
+    const ids = new Set(locked);
+    if (!readOnly) {
+      for (const nm of shown.names) {
+        const lock = classLock(nm, shownSelection);
+        if (lock) ids.add(lock.classId);
+      }
+    }
+    return ids;
+  }, [locked, readOnly, shown, shownSelection]);
 
   /** One mark or class row: a checkbox when the client has a choice, a plain row for a fixed offer. */
   function option(nameId: string, id: string, on: boolean, body: ReactNode) {
@@ -130,7 +199,7 @@ export function ProposalDocument(props: ProposalDocumentProps) {
         <input
           type="checkbox"
           checked={on}
-          disabled={readOnly || locked.has(id)}
+          disabled={readOnly || held.has(id)}
           aria-describedby={locked.has(id) ? `cp-keep-${nameId}` : undefined}
           onChange={(e) => toggle(id, e.target.checked)}
         />
@@ -140,7 +209,10 @@ export function ProposalDocument(props: ProposalDocumentProps) {
     );
   }
 
-  const canAccept = quoteHasItems(quote);
+  // A ticked mark with no class is warned about on the card and cannot be accepted (the server would
+  // repair it to the first class, which is not the price the visitor was looking at).
+  const missingClass = shown.names.some((nm) => markWithoutClass(nm, shownSelection));
+  const canAccept = quoteHasItems(quote) && !missingClass;
   const pricing = content.pricing;
   const firstName = content.client?.first_name?.trim() || "";
   const who = clientName?.trim() || content.client?.full_name || "";
@@ -152,8 +224,44 @@ export function ProposalDocument(props: ProposalDocumentProps) {
 
   function toggle(id: string, on: boolean) {
     if (readOnly || fixed) return;
-    if (!on && locked.has(id)) return;
+    if (!on && held.has(id)) return;
     setOverrides((prev) => ({ ...prev, [id]: on }));
+  }
+
+  function setDraft(nameId: string, value: string) {
+    setDrafts((prev) => ({ ...prev, [nameId]: value }));
+    setAddErrors((prev) => ({ ...prev, [nameId]: "" }));
+  }
+
+  function addClass(nameId: string) {
+    if (readOnly) return;
+    const one = cleanAddedDescription(drafts[nameId] ?? "");
+    const have = added[nameId] ?? [];
+    let message = "";
+    if (!one.ok) {
+      message =
+        one.reason === "empty"
+          ? "Write what the class should cover, then press Add."
+          : one.reason === "too_long"
+            ? `Please keep it to ${MAX_ADDED_CLASS_CHARS} characters or fewer.`
+            : "Please use plain words only (no symbols such as < or >).";
+    } else if (have.length >= MAX_ADDED_CLASSES_PER_NAME) {
+      message = `You can add up to ${MAX_ADDED_CLASSES_PER_NAME} classes for each name.`;
+    }
+    if (message || !one.ok) {
+      setAddErrors((prev) => ({ ...prev, [nameId]: message || ADDED_CLASS_REFUSAL }));
+      return;
+    }
+    setAdded((prev) => ({ ...prev, [nameId]: [...(prev[nameId] ?? []), one.text] }));
+    setDrafts((prev) => ({ ...prev, [nameId]: "" }));
+    setAddErrors((prev) => ({ ...prev, [nameId]: "" }));
+  }
+
+  function removeAdded(nameId: string, index: number) {
+    if (readOnly) return;
+    const id = shown.names.find((n) => n.id === nameId)?.classes.filter((c) => c.client_added === true)[index]?.id;
+    if (id && held.has(id)) return;
+    setAdded((prev) => ({ ...prev, [nameId]: (prev[nameId] ?? []).filter((_, i) => i !== index) }));
   }
 
   async function accept() {
@@ -171,7 +279,7 @@ export function ProposalDocument(props: ProposalDocumentProps) {
       tab = null;
     }
     try {
-      const result = await onAccept(selection);
+      const result = await onAccept(selection, added);
       if (!result.ok) {
         tab?.close();
         setError(result.message);
@@ -268,10 +376,14 @@ export function ProposalDocument(props: ProposalDocumentProps) {
               </div>
 
               <div className="cp-cards">
-                {content.names.map((nm) => {
+                {shown.names.map((nm) => {
                   const qn = quote.names.find((q) => q.id === nm.id);
-                  const pickedMarks = nm.marks.filter((m) => selection[m.id] === true).length;
-                  const pickedClasses = nm.classes.filter((c) => selection[c.id] === true).length;
+                  const pickedMarks = nm.marks.filter((m) => shownSelection[m.id] === true).length;
+                  const pickedClasses = nm.classes.filter((c) => shownSelection[c.id] === true).length;
+                  const lock = readOnly ? null : classLock(nm, shownSelection);
+                  const mine = nm.classes.filter((c) => c.client_added === true);
+                  const staffClasses = nm.classes.filter((c) => c.client_added !== true);
+                  const perClass = nm.price_override?.per_class_cents ?? pricing.per_class_cents;
                   const holdsLast = [...nm.marks, ...nm.classes].some((x) => locked.has(x.id));
                   return (
                     <article className="cp-card" key={nm.id} aria-labelledby={`cp-h-${nm.id}`}>
@@ -295,7 +407,7 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                         <h4>{fixed ? "Mark" : "Marks"}</h4>
                         {nm.marks.map((m) => {
                           const d = display[m.id];
-                          const on = selection[m.id] === true;
+                          const on = shownSelection[m.id] === true;
                           return option(
                             nm.id,
                             m.id,
@@ -327,8 +439,9 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                             Classes <span>(apply to each mark selected above)</span>
                           </h4>
                         )}
-                        {nm.classes.map((c, ci) => {
-                          const on = selection[c.id] === true;
+                        {staffClasses.map((c, ci) => {
+                          const on = shownSelection[c.id] === true;
+                          const classHeld = !fixed && lock?.classId === c.id;
                           return option(
                             nm.id,
                             c.id,
@@ -336,6 +449,7 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                             <>
                               <span className="cp-t">
                                 <b>{`Class ${ci + 1} · ${c.label}`}</b>
+                                {classHeld ? <span className="cp-lock">{lock.text}</span> : null}
                               </span>
                               <span className="cp-pr cp-num">
                                 + {money(pricing.gov_per_class_cents)}
@@ -344,7 +458,66 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                             </>,
                           );
                         })}
+                        {mine.map((c, ai) => {
+                          const classHeld = held.has(c.id);
+                          return (
+                            <div className="cp-opt cp-mine" key={c.id}>
+                              <span className="cp-t">
+                                <b>{`Added class · ${c.label}`}</b>
+                                <span className="cp-lock">{!readOnly && lock?.classId === c.id ? lock.text : "Added by you"}</span>
+                              </span>
+                              {readOnly ? null : (
+                                <button
+                                  type="button"
+                                  className="cp-link"
+                                  disabled={classHeld}
+                                  aria-describedby={locked.has(c.id) ? `cp-keep-${nm.id}` : undefined}
+                                  onClick={() => removeAdded(nm.id, ai)}
+                                  aria-label={`Remove ${c.label}`}
+                                >
+                                  Remove
+                                </button>
+                              )}
+                              <span className="cp-pr cp-num">
+                                + {money(pricing.gov_per_class_cents)}
+                                <small>filing fee per mark</small>
+                              </span>
+                            </div>
+                          );
+                        })}
                       </div>
+
+                      {readOnly || pickedMarks === 0 ? null : (
+                        <div className="cp-part cp-add">
+                          <h4>Add a class</h4>
+                          <p className="cp-how-add">Add another class (category of goods or services) you&rsquo;d like us to include.</p>
+                          <p className="cp-how-add">{classPriceWords(pricing, perClass, pickedClasses)}</p>
+                          <div className="cp-add-row">
+                            <input
+                              type="text"
+                              className="cp-add-input"
+                              value={drafts[nm.id] ?? ""}
+                              maxLength={MAX_ADDED_CLASS_CHARS + 50}
+                              aria-label={`Add a class for ${nm.name}`}
+                              onChange={(e) => setDraft(nm.id, e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  addClass(nm.id);
+                                }
+                              }}
+                            />
+                            <button type="button" className="cp-add-btn" onClick={() => addClass(nm.id)}>
+                              Add
+                            </button>
+                          </div>
+                          {addErrors[nm.id] ? (
+                            <p className="cp-error" role="alert">
+                              {addErrors[nm.id]}
+                            </p>
+                          ) : null}
+                        </div>
+                      )}
 
                       {!readOnly && pickedMarks > 0 && pickedClasses === 0 ? (
                         <p className="cp-warn" role="status">
@@ -415,6 +588,11 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                       ) : (
                         <p className="cp-empty">Not included</p>
                       )}
+                      {qn.included && addedCount(shown, qn.id) > 0 ? (
+                        <p className="cp-empty">
+                          Includes {plural(addedCount(shown, qn.id), "class", "classes")} {accepted ? "you added" : "you added, priced above"}
+                        </p>
+                      ) : null}
                     </div>
                   ))}
                   {quote.adjustments.some((a) => a.discount_cents > 0) ? (
@@ -446,10 +624,7 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                   <div className="cp-row">
                     <div className="cp-l">
                       <b>USPTO filing fees, due at filing</b>
-                      <span>
-                        {plural(quote.gov_class_count, "class", "classes")} &times; {money(pricing.gov_per_class_cents)},
-                        paid before filing, not today
-                      </span>
+                      <span>{usptoLine(quote, pricing.gov_per_class_cents, money)}, paid before filing, not today</span>
                     </div>
                     <div className="cp-mid cp-num">{money(quote.gov_total_cents)}</div>
                   </div>
@@ -479,6 +654,7 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                   </>
                 ) : (
                   <>
+                    <p className="cp-commit">{commitmentSentence(firm.displayName ?? firm.name)}</p>
                     {mode === "preview" ? (
                       <button type="button" className="cp-btn" disabled>
                         Preview
@@ -512,10 +688,20 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                   </p>
                 ) : null}
                 <p className="cp-how">
-                  Each trademark is a {pricing.package} package: {money(pricing.base_cents)} for{" "}
-                  {plural(pricing.included_classes, "class", "classes")}, adjusted by {money(pricing.per_class_cents)} for each
-                  class added or not needed. The second mark for the same name is {Math.round(pricing.second_mark_discount_pct)}%
-                  off.
+                  {pricing.reduce_under_included === true ? (
+                    <>
+                      Each trademark is a {pricing.package} package: {money(pricing.base_cents)} for{" "}
+                      {plural(pricing.included_classes, "class", "classes")}, adjusted by {money(pricing.per_class_cents)} for
+                      each class added or not needed.
+                    </>
+                  ) : (
+                    <>
+                      Each trademark is a {pricing.package} package: {money(pricing.base_cents)} for up to{" "}
+                      {plural(pricing.included_classes, "class", "classes")}, then {money(pricing.per_class_cents)} for each class
+                      added.
+                    </>
+                  )}{" "}
+                  The second mark for the same name is {Math.round(pricing.second_mark_discount_pct)}% off.
                 </p>
               </div>
             </div>
@@ -545,7 +731,7 @@ export function ProposalDocument(props: ProposalDocumentProps) {
               </p>
             </>
           ) : (
-            <p className="cp-c">{firm.name}</p>
+            <p className="cp-c">{[firm.name, firm.contactLine].filter(Boolean).join(" \u00b7 ")}</p>
           )}
           <p className="cp-d">
             {NOT_A_LAW_FIRM_DISCLAIMER} Lectual provides the software this proposal is presented in; the proposal itself is

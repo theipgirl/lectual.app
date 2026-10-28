@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
 /**
- * The Matters page header (Sprint 7): the shared Table | Board toggle sits in
- * the page-head, after the search, with "Table" (not "List") as its first label.
+ * The Matters page header (Sprint 7, now the shared list-page header and toolbar): the shared Table | Board toggle sits in
+ * the toolbar, after the search, with "Table" (not "List") as its first label.
  */
 
 function mockLoaders() {
@@ -29,9 +29,9 @@ async function render(params: { seg?: string; q?: string; view?: string } = {}) 
   return renderToStaticMarkup(await MattersPage({ searchParams: Promise.resolve(params) }));
 }
 
-/** The first page-head block (everything up to the filter chips). */
+/** The shared header and toolbar (everything up to the filter chips). */
 function pageHead(html: string): string {
-  return html.slice(html.indexOf('class="lx-page-head"'), html.indexOf('aria-label="Filter matters"'));
+  return html.slice(html.indexOf('class="lp-header"'), html.indexOf('aria-label="Filter matters"'));
 }
 
 const anchor = (html: string, label: string) => html.match(new RegExp(`<a [^>]*>${label}</a>`))?.[0] ?? "";
@@ -77,12 +77,21 @@ describe("Matters page header", () => {
     expect(anchor(head, "Board")).toContain("view=board");
   });
 
-  it("orders the header search, then the toggle, and carries the shared class set", async () => {
+  it("orders the search (with its Search button), then the toggle, and carries the shared class set", async () => {
     const head = pageHead(await render());
-    for (const cls of ["lx-label", "lx-h1", "lx-sub"]) expect(head).toContain(`class="${cls}"`);
-    expect(head.indexOf("lx-search-form")).toBeGreaterThan(0);
-    expect(head.indexOf("lx-view-toggle")).toBeGreaterThan(head.indexOf("lx-search-form"));
+    for (const cls of ["lx-h1", "lx-sub lp-sub", "lp-toolbar", "lp-search"]) expect(head).toContain(`class="${cls}"`);
+    expect(head).not.toContain("lx-label");
+    expect(head.indexOf("lp-search")).toBeGreaterThan(0);
+    expect(head.indexOf(">Search</button>")).toBeGreaterThan(head.indexOf("lp-search"));
+    expect(head.indexOf("lx-view-toggle")).toBeGreaterThan(head.indexOf(">Search</button>"));
     expect(head).toContain('aria-label="Search matters"');
+  });
+
+  it("shows a Clear link only when a search term is set, and it returns to the list without the term", async () => {
+    expect(pageHead(await render())).not.toContain(">Clear<");
+    const head = pageHead(await render({ q: "acme", seg: "court" }));
+    expect(head).toMatch(/<a class="lp-clear" href="[^"]*seg=court[^"]*">Clear<\/a>/);
+    expect(head.match(/<a class="lp-clear" href="([^"]*)"/)?.[1]).not.toContain("q=");
   });
 
   it("keeps view and seg as hidden fields on the search form", async () => {

@@ -1,6 +1,8 @@
 import { getScopedClient } from "@/lib/db/scoped-client";
 import type { Database } from "@/lib/db/types";
 import { requireMatterWriteRole } from "./matters";
+import { ReadableError } from "@/lib/ui/readable-error";
+
 
 /**
  * The prosecution docket's read layer (crm_matter_stage,
@@ -106,7 +108,7 @@ export async function updateMatterStage(matterId: string, stageId: string): Prom
     .eq("id", matterId)
     .maybeSingle();
   if (matterError) throw matterError;
-  if (!matter) throw new Error("Matter not found.");
+  if (!matter) throw new ReadableError("Matter not found.");
 
   const { data: toStage, error: toStageError } = await supabase
     .from("crm_matter_stage")
@@ -114,7 +116,7 @@ export async function updateMatterStage(matterId: string, stageId: string): Prom
     .eq("id", stageId)
     .maybeSingle();
   if (toStageError) throw toStageError;
-  if (!toStage) throw new Error("That stage isn't on this firm's docket.");
+  if (!toStage) throw new ReadableError("That stage isn't on this firm's docket.");
 
   // The stage being left, for the timeline entry. Absent when the matter was
   // not on the docket yet, which the payload records honestly as null rather

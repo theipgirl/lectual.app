@@ -10,8 +10,9 @@ import { CoworkSkills } from "@/components/skills/CoworkSkills";
 import type { PickerGroup } from "@/components/skills/SkillPicker";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { AI_TOOLS_GROUP, SHORTCUTS_NAME } from "@/lib/ui/words";
 
-export const metadata: Metadata = { title: pageTitle("Skills") };
+export const metadata: Metadata = { title: pageTitle(SHORTCUTS_NAME) };
 
 export const dynamic = "force-dynamic";
 
@@ -68,8 +69,8 @@ export default async function SkillsPage({ searchParams }: { searchParams: Promi
     <>
       <div className="lx-page-head">
         <div style={{ flex: 1, minWidth: 260 }}>
-          <div className="lx-label">IP.OS</div>
-          <h1 className="lx-h1">Skills</h1>
+          <div className="lx-label">{AI_TOOLS_GROUP}</div>
+          <h1 className="lx-h1">{SHORTCUTS_NAME}</h1>
           <p className="lx-sub">
             The drafting tools the staff already have, in one place. Pick a record and each one opens the form or panel where its
             work happens. Everything they write is held for review: nothing goes to a client until an attorney has read it.
@@ -94,7 +95,7 @@ export default async function SkillsPage({ searchParams }: { searchParams: Promi
       <div className="lx-upl">
         <span aria-hidden="true">§</span>
         <div>
-          <b style={{ color: "var(--ox)" }}>The one rule.</b> Skills draft; they never send. An attorney reviews every draft, and
+          <b style={{ color: "var(--ox)" }}>The one rule.</b> Shortcuts draft; they never send. An attorney reviews every draft, and
           nothing here answers a legal question.
         </div>
       </div>

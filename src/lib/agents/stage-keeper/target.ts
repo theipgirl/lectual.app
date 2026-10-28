@@ -1,6 +1,7 @@
 import type { StageOpt } from "@/lib/reconcile/types";
 import {
   SUGGEST_ONLY_SIGNALS,
+  isSensitiveSignal,
   signalIdFor,
   signalTime,
   type KeeperSignal,
@@ -39,8 +40,8 @@ export type TargetWhy = "won" | "lost" | "nurture" | "welcome-or-payment" | "cur
 
 export type TargetResult =
   | { kind: "nothing"; reason: NothingReason }
-  | { kind: "move"; stage: StageOpt; signalId: SignalId; signal: KeeperSignal }
-  | { kind: "suggest"; stage: StageOpt; why: TargetWhy; signalId: SignalId; signal: KeeperSignal };
+  | { kind: "move"; stage: StageOpt; signalId: SignalId; signal: KeeperSignal; covered: KeeperSignal[] }
+  | { kind: "suggest"; stage: StageOpt; why: TargetWhy; signalId: SignalId; signal: KeeperSignal; covered: KeeperSignal[] };
 
 export type TargetOptions = {
   /** When given, a consult that has already started is not a "booked future consult". */
@@ -48,10 +49,6 @@ export type TargetOptions = {
 };
 
 type Candidate = { stage: StageOpt; signalId: SignalId; signal: KeeperSignal; time: number };
-
-function isSensitive(signal: KeeperSignal): boolean {
-  return signal.source !== "payment" && signal.sensitive;
-}
 
 export function targetStageFromSignals(
   lead: TargetLead,
@@ -61,7 +58,7 @@ export function targetStageFromSignals(
   options: TargetOptions = {},
 ): TargetResult {
   // Sensitive mail (opposing counsel, a dispute, a bar complaint) never moves or suggests.
-  if (signals.some(isSensitive)) return { kind: "nothing", reason: "sensitive" };
+  if (signals.some(isSensitiveSignal)) return { kind: "nothing", reason: "sensitive" };
   if (signals.length === 0) return { kind: "nothing", reason: "no-signals" };
 
   const current = stages.find((s) => s.id === lead.currentStageId);
@@ -92,9 +89,13 @@ export function targetStageFromSignals(
     b.stage.orderIndex > a.stage.orderIndex || (b.stage.orderIndex === a.stage.orderIndex && b.time > a.time) ? b : a,
   );
 
+  // The other forward signals this placement already accounts for (a held consult, an approved email, a sent proposal
+  // that all point at or below the chosen stage). They are recorded with it, so undoing the move can't bring them back.
+  const covered = candidates.filter((c) => c !== best && c.stage.orderIndex <= best.stage.orderIndex).map((c) => c.signal);
+
   const why = suggestionWhy(best, current);
-  if (why) return { kind: "suggest", stage: best.stage, why, signalId: best.signalId, signal: best.signal };
-  return { kind: "move", stage: best.stage, signalId: best.signalId, signal: best.signal };
+  if (why) return { kind: "suggest", stage: best.stage, why, signalId: best.signalId, signal: best.signal, covered };
+  return { kind: "move", stage: best.stage, signalId: best.signalId, signal: best.signal, covered };
 }
 
 /** Why this placement is only a suggestion, or null when the agent may make it itself. */

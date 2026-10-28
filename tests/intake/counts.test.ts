@@ -22,7 +22,7 @@ describe("intake count definitions", () => {
   it("the rail badge and the Pipeline column each say what they count", () => {
     expect(RAIL_COUNT_TITLE.intake).toMatch(/trademark/i);
     expect(COLUMN_HINT.intake).toBe(PIPELINE_INTAKE_HINT);
-    expect(PIPELINE_INTAKE_HINT).toMatch(/rail/i);
+    expect(PIPELINE_INTAKE_HINT).toMatch(/left menu/i);
   });
   it("the rail draws the tooltip", () => {
     expect(readFileSync("src/components/shell/Rail.tsx", "utf8")).toContain("RAIL_COUNT_TITLE");

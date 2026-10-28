@@ -183,7 +183,7 @@ describe("generateOpinionLetter", () => {
         honorific: "",
         entityName: "",
       }),
-    ).rejects.toThrow(/approval queue/i);
+    ).rejects.toThrow(/switched on for your firm/i);
   });
 
   it("deletes the bookkeeping row and rethrows when the queue POST fails, rather than leaving an orphan row", async () => {
@@ -288,7 +288,7 @@ describe("generateTrademarkClearance", () => {
         entityName: "",
         searchFindings: "findings",
       }),
-    ).rejects.toThrow(/approval queue/i);
+    ).rejects.toThrow(/switched on for your firm/i);
   });
 
   it("returns not-found when the matter is invisible under RLS", async () => {

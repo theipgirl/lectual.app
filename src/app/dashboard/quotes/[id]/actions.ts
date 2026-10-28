@@ -28,6 +28,7 @@ import { endOfFirmDay } from "@/lib/quotes/firm-time";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { friendlyQuoteError, NOT_ENTITLED, type ActionState } from "../errors";
 import { reconcilePendingPayment, recordManualPayment } from "@/lib/payments/quote-payments";
+import { ReadableError } from "@/lib/ui/readable-error";
 
 /**
  * The quote BUILDER's own write surface — everything that mutates ONE
@@ -440,12 +441,12 @@ async function loadQuoteForTermsEdit(
     .eq("id", quoteId)
     .maybeSingle();
   if (error) throw error;
-  if (!data) throw new Error("Quote not found.");
+  if (!data) throw new ReadableError("Quote not found.");
   const quote = data as Pick<QuoteRow, "id" | "org_id" | "status" | "expires_at">;
 
   const effective = effectiveQuoteStatus(quote, new Date());
   if (!isQuoteEditable(effective)) {
-    throw new Error(`This quote is ${effective} — its engagement terms can no longer be changed.`);
+    throw new ReadableError(`This quote is ${effective} — its engagement terms can no longer be changed.`);
   }
   return quote;
 }
@@ -497,7 +498,7 @@ async function writeTermsBody(quoteId: string, termsBody: string | null): Promis
     // `revised` event below must not be recorded either: an audit row saying
     // the terms were revised, over a row whose terms did not move, is a worse
     // record than none.
-    throw new Error(
+    throw new ReadableError(
       "This quote changed while you were editing it — the terms were NOT saved. Reload the quote to see its current state.",
     );
   }
@@ -634,7 +635,7 @@ async function firmNameFor(
   const { data, error } = await supabase.from("crm_org").select("name").eq("id", orgId).maybeSingle();
   if (error) throw error;
   const name = typeof data?.name === "string" ? data.name.trim() : "";
-  if (!name) throw new Error("This firm has no name set, so the agreement's parties clause can't be written.");
+  if (!name) throw new ReadableError("This firm has no name set, so the agreement's parties clause can't be written.");
   return name;
 }
 

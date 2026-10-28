@@ -94,7 +94,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   }
 
   if (!aiConfigured()) {
-    return NextResponse.json({ error: "The copilot isn't configured for this deployment yet." }, { status: 503 });
+    return NextResponse.json({ error: "Copilot isn't switched on for your firm yet. Lectual will turn it on." }, { status: 503 });
   }
 
   const { question, history, context, conversationId } = parsed.data;

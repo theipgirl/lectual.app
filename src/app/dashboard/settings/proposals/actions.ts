@@ -40,12 +40,23 @@ export async function saveProposalSettingsAction(_prev: ActionState, formData: F
     const pricing = parseSettingsPricing(formData, existing?.pricing ?? {});
     if (!pricing.ok) return { error: pricing.error };
 
+    // The page's one form also carries the package prices (`pkg.<n>.<field>`). A post without them (an
+    // older caller) keeps the stored list exactly as it was.
+    let nextPricing: Record<string, unknown> = pricing.value;
+    if (formData.has("pkg.0.package")) {
+      const list = parsePackageList(formData);
+      if (!list.ok) return { error: list.error };
+      const problems = validatePackages(list.value);
+      if (problems.length > 0) return { error: problems[0].message };
+      nextPricing = withPackages(nextPricing, list.value);
+    }
+
     await saveProposalSettings({
       approverUserIds: approvers,
       // The Default pay link field was removed (Sprint 25); a stored value is kept as it was.
       defaultPayUrl: existing?.default_pay_url ?? null,
       notifyEmail: text("notifyEmail") || null,
-      pricing: pricing.value,
+      pricing: nextPricing,
     });
   } catch (err) {
     return proposalActionError(err, "Couldn't save the proposal settings.");
@@ -55,9 +66,8 @@ export async function saveProposalSettingsAction(_prev: ActionState, formData: F
 }
 
 /**
- * Save the firm's package prices: the named list of packages (the first is the
- * default a new proposal starts from). A form of its own, because the card sits
- * beside the settings form and has its own "Save prices" button.
+ * Save the firm's package prices alone. The settings page no longer uses it (its one form saves
+ * the prices too, through `saveProposalSettingsAction`); it stays as the prices-only entry point.
  *
  * It writes ONLY the price list: the stored approvers, pay link, notify address,
  * includes table and office-action note are read back and saved as they were, so

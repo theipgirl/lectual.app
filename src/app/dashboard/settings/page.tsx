@@ -1,27 +1,16 @@
 import { redirect } from "next/navigation";
-import { resolveFirmSession } from "@/lib/firm/session";
-import { loadSetupState } from "@/lib/setup/load";
-import { setupChecklist } from "@/lib/setup/checklist";
-import { canSeeSetup } from "@/lib/setup/roles";
-import { INTEGRATIONS_PATH, SETUP_PATH } from "@/lib/setup/routes";
 import type { Metadata } from "next";
+import { INTEGRATIONS_PATH } from "@/lib/setup/routes";
 import { pageTitle } from "@/lib/ui/page-title";
 
 export const metadata: Metadata = { title: pageTitle("Settings") };
 
-export const dynamic = "force-dynamic";
-
 /**
- * The Settings rail link. Until every setup item is done, the admin tier lands
- * on the setup checklist (a "couldn't check" item counts as not done); after
- * that, and for every other role, it goes to Integrations as it always has.
- * The setup page has a "Go to Integrations" link, so a firm whose remaining
- * items are Lectual's to switch on is never stuck behind this.
+ * The Settings rail link. It always opens Settings (Integrations), for every
+ * role. Setup is a tab inside Settings with its own progress; it no longer
+ * takes over this link, so an admin whose remaining steps are Lectual's to
+ * switch on is never held in the checklist. Nothing is read here.
  */
-export default async function SettingsIndex() {
-  const session = await resolveFirmSession();
-  if (session.kind !== "ok" || !canSeeSetup(session.role)) redirect(INTEGRATIONS_PATH);
-
-  const checklist = setupChecklist(await loadSetupState());
-  redirect(checklist.complete ? INTEGRATIONS_PATH : SETUP_PATH);
+export default function SettingsIndex() {
+  redirect(INTEGRATIONS_PATH);
 }

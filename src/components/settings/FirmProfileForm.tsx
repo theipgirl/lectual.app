@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { saveProfileAction, type ProfileState } from "@/app/dashboard/settings/firm/actions";
+import { TEMPERATURE_NAME } from "@/lib/ui/words";
 
 export function FirmProfileForm(props: {
   firmName: string;
@@ -45,14 +46,14 @@ export function FirmProfileForm(props: {
           disabled={disabled}
           placeholder={`${props.firmName}\nThis message is not legal advice until you have signed an engagement letter.`}
         />
-        <span className="lx-note">The drafting agents end client emails with this. Every draft still waits in the approval queue.</span>
+        <span className="lx-note">The assistants that draft end client emails with this. Every draft still waits in the approval queue.</span>
       </label>
       <fieldset style={{ gridColumn: "1 / -1", border: "none", padding: 0, margin: 0, display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
         <legend className="lx-label" style={{ marginBottom: 6 }}>
-          Intake lanes — next steps
+          {TEMPERATURE_NAME} — next steps
         </legend>
         <p className="lx-note" style={{ gridColumn: "1 / -1", margin: 0 }}>
-          A lead&apos;s lane decides the next step shown on its page: Hot → a strategy session, Warm → a discovery call,
+          A lead&apos;s temperature decides the next step shown on its page: Hot → a strategy session, Warm → a discovery call,
           Cold → your nurture campaign. These are links and buttons for your team; nothing is sent to a client
           automatically.
         </p>

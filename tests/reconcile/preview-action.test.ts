@@ -104,7 +104,7 @@ describe("previewReconcileAction: the preview", () => {
     const by = Object.fromEntries(r.view.rows.map((row) => [row.leadId, row]));
     // Her status says PNC and her note says a consult was scheduled: the furthest dated evidence is proposed.
     expect(by[L.amara].proposal).toMatchObject({ kind: "stage", stage: { id: S.consult }, confidence: "conflict" });
-    expect(by[L.margo].proposal).toMatchObject({ kind: "stage", stage: { id: S.consult }, confidence: "agree" });
+    expect(by[L.margo].proposal).toMatchObject({ kind: "stage", stage: { id: S.consult }, confidence: "sheet_only" });
     expect(by[L.priya].proposal.reasons[0]).toBe("Already in this stage.");
     expect(r.view.summary.fileName).toBe("sheet.csv");
     expect(r.view.summary.lawmatics).toMatchObject({ status: "ok" });
@@ -184,7 +184,7 @@ describe("previewReconcileAction: a failed lead or stage read is an error, never
     const { previewReconcileAction } = await loadActions(w);
     const r = await previewReconcileAction(formWith(csvFile()));
     expect(r).toEqual({ ok: false, error: MSG.leadsUnreadable });
-    expect(MSG.leadsUnreadable).toMatch(/problem reaching the database/);
+    expect(MSG.leadsUnreadable).toMatch(/couldn't read your leads/);
     expect(JSON.stringify(r)).not.toContain(SECRET);
     expect(logged()).not.toContain(SECRET);
   });

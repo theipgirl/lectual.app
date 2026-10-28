@@ -4,8 +4,11 @@ import { after } from "next/server";
 import { getAdminClient } from "@/lib/db/admin";
 import { resolveTimeZone } from "@/lib/org/profile-rules";
 import { runAcceptanceFollowups, type FollowupDb } from "./accept-followups";
+import { firmDisplayName } from "./commitment";
+import { contactLine, firmContactFromSignoff } from "./firm-contact";
 import { isProposalExpired } from "./expiry";
-import { normalizeSelection, quoteHasItems, quoteProposal } from "./pricing";
+import { ADDED_CLASS_REFUSAL, parseAddedClasses, quoteWithAddedClasses } from "./added-classes";
+import { normalizeSelection, quoteHasItems } from "./pricing";
 import {
   isWellFormedProposalToken,
   type AcceptedSnapshot,
@@ -133,8 +136,12 @@ export const PUBLIC_ORG_COLUMNS = ["name", "slug", "modules"] as const;
 /** The `crm_org.modules` entry that switches client proposals on for a firm. */
 export const PROPOSALS_MODULE = "proposals";
 
-/** From the firm's profile: only the clock its dates are shown on. */
-export const PUBLIC_PROFILE_COLUMNS = ["time_zone"] as const;
+/**
+ * From the firm's profile: the clock its dates are shown on, its display name, and the email
+ * sign-off, read ONLY to derive a contact line (first email address and phone number in it).
+ * The raw sign-off never reaches `PublicProposalFirm` or the view.
+ */
+export const PUBLIC_PROFILE_COLUMNS = ["time_zone", "display_name", "email_signature"] as const;
 
 const PROPOSAL_SELECT = PUBLIC_PROPOSAL_COLUMNS.join(", ");
 const ORG_SELECT = PUBLIC_ORG_COLUMNS.join(", ");
@@ -151,6 +158,10 @@ export type PublicProposalFirm = {
   slug: string;
   /** The firm's own zone (Settings -> Firm profile): every date on the page is shown in it. */
   timeZone: string;
+  /** The profile's display name, else the firm's name: what the commitment sentence calls the firm. */
+  displayName: string;
+  /** "(305) 555-0100 · info@firm.com" from the profile's sign-off, or null (the page omits the line). */
+  contactLine: string | null;
 };
 
 /**
@@ -265,12 +276,13 @@ export function publicContent(raw: unknown): ProposalContent {
     "per_class_cents",
     "second_mark_discount_pct",
     "gov_per_class_cents",
+    "reduce_under_included",
   ]);
   out.names = objects(c.names).map((nm) => {
     const name = pick(nm, ["id", "name", "what", "note"]);
     if (isObject(nm.price_override)) name.price_override = pick(nm.price_override, ["base_cents", "per_class_cents"]);
     name.marks = objects(nm.marks).map((m) => pick(m, ["id", "kind", "desc", "preselected"]));
-    name.classes = objects(nm.classes).map((cl) => pick(cl, ["id", "label", "preselected"]));
+    name.classes = objects(nm.classes).map((cl) => pick(cl, ["id", "label", "preselected", "client_added"]));
     return name;
   });
   out.adjustments = objects(c.adjustments).map((a) => pick(a, ["id", "label", "kind", "value"]));
@@ -356,12 +368,13 @@ export async function readPublicProposal(
     const firmName = readString(org?.name);
     // A proposal with no firm behind it cannot be presented honestly.
     if (!firmName) return { status: "unavailable" };
+    const profile = profileResult.error || !isObject(profileResult.data) ? null : profileResult.data;
     const firm: PublicProposalFirm = {
       name: firmName,
       slug: readString(org?.slug) ?? "",
-      timeZone: resolveTimeZone(
-        profileResult.error || !isObject(profileResult.data) ? null : readString(profileResult.data.time_zone),
-      ),
+      timeZone: resolveTimeZone(profile ? readString(profile.time_zone) : null),
+      displayName: firmDisplayName(profile ? readString(profile.display_name) : null, firmName),
+      contactLine: contactLine(firmContactFromSignoff(profile ? readString(profile.email_signature) : null)),
     };
 
     // FAIL CLOSED when the firm's proposals module is off (or its module list
@@ -501,6 +514,8 @@ export type AcceptRefusal =
   | "already_resolved"
   /** The selection has no brand name with both a mark and a class ticked. */
   | "nothing_selected"
+  /** An added class is over the limits, malformed, or names a brand name the proposal does not have. */
+  | "invalid_added"
   | "unconfigured"
   | "unavailable";
 
@@ -522,6 +537,7 @@ const REFUSAL_MESSAGE: Record<AcceptRefusal, string> = {
   closed: "This proposal is no longer open. Please contact the firm.",
   already_resolved: "This proposal has already been accepted.",
   nothing_selected: "Choose at least one mark and one class to accept.",
+  invalid_added: ADDED_CLASS_REFUSAL,
   unconfigured: "This page isn't available right now. Please try again later.",
   unavailable: "We couldn't record your acceptance. Please try again.",
 };
@@ -546,6 +562,8 @@ export async function acceptPublicProposal(
   selection: unknown,
   now: Date,
   db?: PublicProposalsDb,
+  /** Added-class DESCRIPTIONS by brand name id: the only other thing the browser may send. */
+  addedClasses?: unknown,
 ): Promise<AcceptResult> {
   const read = await readPublicProposal(token, now, db);
   if (read.status === "unconfigured") return refuse("unconfigured");
@@ -554,16 +572,22 @@ export async function acceptPublicProposal(
   if (read.status === "closed") return refuse("closed");
   if (read.handle.storedStatus !== "sent") return refuse("already_resolved");
 
-  const { content } = read.view;
-  const picked = normalizeSelection(content, selection);
-  const quote = quoteProposal(content, picked);
+  const picked = normalizeSelection(read.view.content, selection);
+  const parsed = parseAddedClasses(read.view.content, picked, addedClasses);
+  if (!parsed.ok) return refuse("invalid_added");
+  // One price path: the stored content plus the ticks plus the added descriptions,
+  // through the helper the page uses. A mark ticked with no class is repaired to
+  // its first class; one with no class to fall back on is refused.
+  const priced = quoteWithAddedClasses(read.view.content, picked, parsed.added, { repair: true });
+  if (!priced.ok) return refuse("nothing_selected");
+  const { content, selection: finalSelection, quote } = priced;
   if (!quoteHasItems(quote)) return refuse("nothing_selected");
 
   const acceptedAt = now.toISOString();
   const snapshot = buildAcceptedSnapshot({
     version: read.handle.version,
     content,
-    selection: picked,
+    selection: finalSelection,
     quote,
     acceptedAt,
   });
@@ -576,7 +600,7 @@ export async function acceptPublicProposal(
       .from("client_proposal")
       .update({
         status: "accepted",
-        accepted_selection: picked,
+        accepted_selection: finalSelection,
         accepted_snapshot: snapshot,
       })
       .eq("id", proposalId)

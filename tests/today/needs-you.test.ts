@@ -36,7 +36,7 @@ describe("buildNeedsYou", () => {
       ],
       payments: [{ quoteId: "qb", purpose: "legal_fee", status: "succeeded" }],
       agentFailures: [
-        { agent: "email-intel", name: "Email → client intel", text: "x", reason: "Access withdrawn.", action: { label: "Reconnect the mailbox", href: "/dashboard/settings/mailboxes/" }, at: "2026-09-29T06:00:00Z" },
+        { agent: "email-intel", name: "From their emails", text: "x", reason: "Access withdrawn.", action: { label: "Reconnect the mailbox", href: "/dashboard/settings/mailboxes/" }, at: "2026-09-29T06:00:00Z" },
       ],
       connections: [
         { key: "mail-1", service: "mailbox", label: "Your mailbox me@firm.com", ownerId: ME, href: "/dashboard/settings/mailboxes/" },
@@ -53,7 +53,7 @@ describe("buildNeedsYou", () => {
     expect(byKey["qp-qb"]).toBeUndefined();
     expect(byKey["qx-qc"]).toMatchObject({ kind: "quote-expiring", action: "Quote expires in 3 days, not signed yet. Follow up with the client" });
     expect(byKey["qx-qd"]).toBeUndefined();
-    expect(byKey["af-email-intel"]).toMatchObject({ action: "Agent couldn't finish. Reconnect the mailbox", href: "/dashboard/settings/mailboxes/" });
+    expect(byKey["af-email-intel"]).toMatchObject({ action: "An assistant couldn't finish. Reconnect the mailbox", href: "/dashboard/settings/mailboxes/" });
     expect(byKey["rc-mail-1"]).toMatchObject({ forYou: true, cta: "Reconnect" });
     expect(byKey["rc-lp-1"].detail).toMatch(/Card payments are paused/);
     expect(byKey["sub-s1"]).toMatchObject({ kind: "intake-review" });
@@ -83,7 +83,7 @@ describe("buildNeedsYou", () => {
       stalled: null,
     });
     expect(out.items).toEqual([]);
-    expect(out.unavailable).toEqual(["deadlines", "tasks", "payments", "agent runs", "connections", "intake submissions", "matters"]);
+    expect(out.unavailable).toEqual(["deadlines", "tasks", "payments", "assistant runs", "connections", "intake submissions", "matters"]);
     expect(emptyNeedsYouNote(out, "ok")).toMatch(/couldn't be read/);
   });
 

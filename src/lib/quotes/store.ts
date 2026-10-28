@@ -32,6 +32,8 @@ import {
   type ServiceItemApplyOverrides,
   type ServiceItemRow,
 } from "./types";
+import { ReadableError } from "@/lib/ui/readable-error";
+
 
 /**
  * The quote engine's scoped-client CRUD and mutations — the data layer spec
@@ -151,7 +153,7 @@ export async function requireQuoteWriteRole(supabase: ScopedClient): Promise<Rol
   const { data, error } = await supabase.rpc("current_org_role");
   if (error) throw error;
   if (!isRole(data) || !QUOTE_STAFF_WRITE_ROLES.includes(data)) {
-    throw new Error("You don't have permission to write quotes.");
+    throw new ReadableError("You don't have permission to write quotes.");
   }
   return data;
 }
@@ -193,12 +195,12 @@ async function loadEditableQuote(
     .eq("id", quoteId)
     .maybeSingle();
   if (error) throw error;
-  if (!data) throw new Error("Quote not found.");
+  if (!data) throw new ReadableError("Quote not found.");
   const quote = data as Pick<QuoteRow, "id" | "org_id" | "status" | "expires_at">;
 
   const effective = effectiveQuoteStatus(quote, new Date());
   if (!isQuoteEditable(effective)) {
-    throw new Error(`This quote is ${effective} and its lines can no longer be edited.`);
+    throw new ReadableError(`This quote is ${effective} and its lines can no longer be edited.`);
   }
   return { id: quote.id, org_id: quote.org_id, status: quote.status };
 }
@@ -218,7 +220,7 @@ async function fetchQuoteForTransition(
     .eq("id", quoteId)
     .maybeSingle();
   if (error) throw error;
-  if (!data) throw new Error("Quote not found.");
+  if (!data) throw new ReadableError("Quote not found.");
   return data as Pick<QuoteRow, "id" | "org_id" | "status">;
 }
 
@@ -377,16 +379,16 @@ export type CreateQuoteInput = {
 export async function createQuote(input: CreateQuoteInput): Promise<QuoteRow> {
   const title = input.title?.trim();
   if (!title || title.length > 300) {
-    throw new Error("A quote needs a title of 1-300 characters.");
+    throw new ReadableError("A quote needs a title of 1-300 characters.");
   }
   const currency = (input.currency ?? DEFAULT_CURRENCY).toUpperCase();
   if (!/^[A-Z]{3}$/.test(currency)) {
-    throw new Error(`'${input.currency}' isn't a valid currency code.`);
+    throw new ReadableError(`'${input.currency}' isn't a valid currency code.`);
   }
   if (currency !== DEFAULT_CURRENCY) {
     // §2: v1 renders USD only; mixed-currency quotes are rejected at write
     // time rather than accepted and silently mis-totalled downstream.
-    throw new Error("Lectual quotes are USD-only in this release.");
+    throw new ReadableError("Lectual quotes are USD-only in this release.");
   }
 
   const supabase = await getScopedClient();
@@ -395,7 +397,7 @@ export async function createQuote(input: CreateQuoteInput): Promise<QuoteRow> {
 
   const { data: orgId, error: orgError } = await supabase.rpc("current_org_id");
   if (orgError) throw orgError;
-  if (!orgId) throw new Error("No active organization for the current session.");
+  if (!orgId) throw new ReadableError("No active organization for the current session.");
 
   const {
     data: { user },
@@ -461,7 +463,7 @@ export async function sendQuote(quoteId: string): Promise<QuoteRow> {
       .order("sort_index", { ascending: true });
     if (lineError) throw lineError;
     const blocking = offerProblems((lineData as QuoteLineRow[] | null) ?? []).find((p) => p.blocksSending);
-    if (blocking) throw new Error(blocking.message);
+    if (blocking) throw new ReadableError(blocking.message);
   }
   return transitionQuote({
     db,
@@ -518,7 +520,7 @@ export type UpdateQuoteDetailsInput = {
 export async function updateQuoteDetails(quoteId: string, input: UpdateQuoteDetailsInput): Promise<void> {
   const title = input.title?.trim();
   if (!title || title.length > 300) {
-    throw new Error("A quote needs a title of 1-300 characters.");
+    throw new ReadableError("A quote needs a title of 1-300 characters.");
   }
 
   const supabase = await getScopedClient();
@@ -540,7 +542,7 @@ export async function updateQuoteDetails(quoteId: string, input: UpdateQuoteDeta
     .select("id");
   if (error) throw error;
   if (!Array.isArray(data) || data.length === 0) {
-    throw new Error(
+    throw new ReadableError(
       "This quote changed while you were editing it — nothing was saved. Reload the quote to see its current state.",
     );
   }
@@ -584,15 +586,15 @@ export async function addQuoteLine(quoteId: string, input: AddQuoteLineInput): P
 
   const quote = await loadEditableQuote(db, quoteId);
 
-  if (!isQuoteLineKind(input.kind)) throw new Error(`'${input.kind}' isn't a valid line kind.`);
-  if (!isQuoteChargeAt(input.chargeAt)) throw new Error(`'${input.chargeAt}' isn't a valid charge schedule.`);
+  if (!isQuoteLineKind(input.kind)) throw new ReadableError(`'${input.kind}' isn't a valid line kind.`);
+  if (!isQuoteChargeAt(input.chargeAt)) throw new ReadableError(`'${input.chargeAt}' isn't a valid charge schedule.`);
   const selection =
     input.selection !== undefined && isQuoteLineSelection(input.selection) ? input.selection : "included";
   if (input.selection !== undefined && !isQuoteLineSelection(input.selection)) {
-    throw new Error(`'${input.selection}' isn't a valid selection.`);
+    throw new ReadableError(`'${input.selection}' isn't a valid selection.`);
   }
   const label = input.label?.trim();
-  if (!label || label.length > 300) throw new Error("A line needs a label of 1-300 characters.");
+  if (!label || label.length > 300) throw new ReadableError("A line needs a label of 1-300 characters.");
 
   assertLineKindChargeAt(input.kind, input.chargeAt);
   assertLineAmountSign(input.kind, input.unitAmountCents);
@@ -612,7 +614,7 @@ export async function addQuoteLine(quoteId: string, input: AddQuoteLineInput): P
     // Never silently ignored: a caller that passed an id needs the row to carry
     // it (see `id` above), so a malformed one is a bug to surface, not a
     // default to fall back to.
-    throw new Error("A line id must be a uuid.");
+    throw new ReadableError("A line id must be a uuid.");
   }
 
   const { data, error } = await db
@@ -677,19 +679,19 @@ export async function updateQuoteLine(lineId: string, patch: UpdateQuoteLineInpu
     .eq("id", lineId)
     .maybeSingle();
   if (fetchError) throw fetchError;
-  if (!existing) throw new Error("That line isn't in your firm.");
+  if (!existing) throw new ReadableError("That line isn't in your firm.");
   const line = existing as QuoteLineRow;
 
   const quote = await loadEditableQuote(db, line.quote_id);
 
   if (patch.kind !== undefined && !isQuoteLineKind(patch.kind)) {
-    throw new Error(`'${patch.kind}' isn't a valid line kind.`);
+    throw new ReadableError(`'${patch.kind}' isn't a valid line kind.`);
   }
   if (patch.chargeAt !== undefined && !isQuoteChargeAt(patch.chargeAt)) {
-    throw new Error(`'${patch.chargeAt}' isn't a valid charge schedule.`);
+    throw new ReadableError(`'${patch.chargeAt}' isn't a valid charge schedule.`);
   }
   if (patch.selection !== undefined && !isQuoteLineSelection(patch.selection)) {
-    throw new Error(`'${patch.selection}' isn't a valid selection.`);
+    throw new ReadableError(`'${patch.selection}' isn't a valid selection.`);
   }
 
   const merged = {
@@ -742,7 +744,7 @@ export async function deleteQuoteLine(lineId: string): Promise<void> {
     .eq("id", lineId)
     .maybeSingle();
   if (fetchError) throw fetchError;
-  if (!existing) throw new Error("That line isn't in your firm.");
+  if (!existing) throw new ReadableError("That line isn't in your firm.");
   const line = existing as Pick<QuoteLineRow, "id" | "quote_id" | "label">;
 
   const quote = await loadEditableQuote(db, line.quote_id);
@@ -829,7 +831,7 @@ export async function applyServiceItem(
     .eq("id", serviceItemId)
     .maybeSingle();
   if (itemError) throw itemError;
-  if (!item) throw new Error("That service isn't in your firm's library.");
+  if (!item) throw new ReadableError("That service isn't in your firm's library.");
 
   const fields = serviceItemToLineFields(item as ServiceItemRow, overrides);
   assertLineKindChargeAt(fields.kind, fields.charge_at);
@@ -927,7 +929,7 @@ async function placementFields(db: QuotesDbClient, quoteId: string, placement: L
   if (placement.kind === "common") return { selection: "included", tierGroup: null, selected: true };
   if (placement.kind === "add_on") return { selection: "optional", tierGroup: null, selected: true };
   const name = normalizePackageName(placement.name);
-  if (!name) throw new Error("A package needs a name of 1-120 characters.");
+  if (!name) throw new ReadableError("A package needs a name of 1-120 characters.");
   const pkg = readOffer(await readOfferRows(db, quoteId)).packages.find((p) => p.name === name);
   return { selection: "tier_option", tierGroup: name, selected: pkg ? pkg.offered : true };
 }
@@ -970,9 +972,9 @@ export async function setPackageOffered(quoteId: string, packageName: string, of
   const name = normalizePackageName(packageName);
   const offer = readOffer(await readOfferRows(db, quoteId));
   const pkg = offer.packages.find((p) => p.name === name);
-  if (!name || !pkg) throw new Error("That package isn't on this quote.");
+  if (!name || !pkg) throw new ReadableError("That package isn't on this quote.");
   if (!offered && !offer.packages.some((p) => p.name !== name && p.offered)) {
-    throw new Error("At least one package has to be offered.");
+    throw new ReadableError("At least one package has to be offered.");
   }
 
   const { error } = await db
@@ -1004,8 +1006,8 @@ export async function setAddOnOffered(lineId: string, offered: boolean): Promise
     .maybeSingle();
   if (readError) throw readError;
   const line = data as Pick<QuoteLineRow, "id" | "quote_id" | "selection" | "label"> | null;
-  if (!line) throw new Error("That line isn't in your firm.");
-  if (line.selection !== "optional") throw new Error("Only an add-on can be offered on its own.");
+  if (!line) throw new ReadableError("That line isn't in your firm.");
+  if (line.selection !== "optional") throw new ReadableError("Only an add-on can be offered on its own.");
   const quote = await loadEditableQuote(db, line.quote_id);
 
   const { error } = await db
@@ -1032,12 +1034,12 @@ export async function renamePackage(quoteId: string, from: string, to: string): 
 
   const source = normalizePackageName(from);
   const target = normalizePackageName(to);
-  if (!source) throw new Error("That package isn't on this quote.");
-  if (!target) throw new Error("A package needs a name of 1-120 characters.");
+  if (!source) throw new ReadableError("That package isn't on this quote.");
+  if (!target) throw new ReadableError("A package needs a name of 1-120 characters.");
   if (source === target) return target;
   const offer = readOffer(await readOfferRows(db, quoteId));
-  if (!offer.packages.some((p) => p.name === source)) throw new Error("That package isn't on this quote.");
-  if (offer.packages.some((p) => p.name === target)) throw new Error(`There's already a package called “${target}”.`);
+  if (!offer.packages.some((p) => p.name === source)) throw new ReadableError("That package isn't on this quote.");
+  if (offer.packages.some((p) => p.name === target)) throw new ReadableError(`There's already a package called “${target}”.`);
 
   const { error } = await db
     .from("crm_quote_line")
@@ -1067,10 +1069,10 @@ export async function duplicatePackage(quoteId: string, from: string, to: string
 
   const source = normalizePackageName(from);
   const target = normalizePackageName(to);
-  if (!source) throw new Error("That package isn't on this quote.");
-  if (!target) throw new Error("A package needs a name of 1-120 characters.");
+  if (!source) throw new ReadableError("That package isn't on this quote.");
+  if (!target) throw new ReadableError("A package needs a name of 1-120 characters.");
   const offer = readOffer(await readOfferRows(db, quoteId));
-  if (offer.packages.some((p) => p.name === target)) throw new Error(`There's already a package called “${target}”.`);
+  if (offer.packages.some((p) => p.name === target)) throw new ReadableError(`There's already a package called “${target}”.`);
 
   const { data, error: readError } = await db
     .from("crm_quote_line")
@@ -1081,7 +1083,7 @@ export async function duplicatePackage(quoteId: string, from: string, to: string
     .order("sort_index", { ascending: true });
   if (readError) throw readError;
   const lines = (data as QuoteLineRow[] | null) ?? [];
-  if (lines.length === 0) throw new Error("That package isn't on this quote.");
+  if (lines.length === 0) throw new ReadableError("That package isn't on this quote.");
 
   const start = await nextLineSortIndex(db, quoteId);
   const { error } = await db.from("crm_quote_line").insert(
@@ -1124,10 +1126,10 @@ export async function deletePackage(quoteId: string, packageName: string): Promi
   const name = normalizePackageName(packageName);
   const offer = readOffer(await readOfferRows(db, quoteId));
   const pkg = offer.packages.find((p) => p.name === name);
-  if (!name || !pkg) throw new Error("That package isn't on this quote.");
+  if (!name || !pkg) throw new ReadableError("That package isn't on this quote.");
   const others = offer.packages.filter((p) => p.name !== name);
   if (others.length > 0 && !others.some((p) => p.offered)) {
-    throw new Error("At least one package has to be offered — switch another package on first.");
+    throw new ReadableError("At least one package has to be offered — switch another package on first.");
   }
 
   const { error } = await db

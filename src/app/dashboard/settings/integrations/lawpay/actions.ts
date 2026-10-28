@@ -5,6 +5,7 @@ import { callerHasRole } from "@/lib/auth/current-role";
 import { mapLawPayAccount, unmapLawPayAccount } from "@/lib/payments/accounts";
 import { lawPayClientCredentials, lawPaySetup } from "@/lib/payments/lawpay-config";
 import { disconnectLawPay, refreshLawPayAccounts } from "@/lib/payments/lawpay-connection";
+import { LAWPAY_NOT_ISSUED } from "@/lib/ui/words";
 
 /**
  * Settings → Integrations → LawPay. Every function is its own POST entry point
@@ -41,7 +42,7 @@ export async function unmapAccountAction(_prev: LawPayActionState, formData: For
 export async function refreshAccountsAction(): Promise<LawPayActionState> {
   if (!(await callerHasRole("senior_admin"))) return FORBIDDEN;
   const setup = lawPaySetup();
-  if (!setup.ready) return { error: "LawPay sign-in isn't set up on this deployment yet." };
+  if (!setup.ready) return { error: LAWPAY_NOT_ISSUED };
   const result = await refreshLawPayAccounts({ root: setup.root, creds: setup.creds });
   refresh();
   if (!result.ok) return { error: result.reason };

@@ -1,10 +1,13 @@
 import Link from "next/link";
+import "@/components/list-page/list-page.css";
 import type { Matter } from "@/lib/matters";
 import type { MatterStage } from "@/lib/matters/stages";
 import { buildBoard } from "@/lib/matters/board";
 import { matterLabel } from "@/lib/matters/docket-summary";
 import { stageAge } from "@/lib/matters/worklist";
-import { StageSelect } from "./MatterForms";
+import { matterCardId, reviewHref, stageDisplayName } from "@/lib/matters/list-view";
+import { MoveMenu } from "./MoveMenu";
+import { MovedCardScroller } from "./MovedCardScroller";
 
 /**
  * The docket as a board: one column per live stage (terminal stages fold into
@@ -17,30 +20,35 @@ export function MatterBoard(props: {
   matters: Matter[];
   canMove: boolean;
   reviewIds: ReadonlySet<string>;
+  /** matter id -> the queue item to review; the Review pill links to it. */
+  reviewItems?: ReadonlyMap<string, string>;
   ownerName: (id: string | null) => string | null;
 }) {
   const board = buildBoard(props.stages, props.matters);
-  const stageOptions = props.stages.map((s) => ({ id: s.id, code: s.code, label: s.label }));
+  const stageOptions = props.stages.map((s) => ({ id: s.id, label: s.label }));
 
   const card = (m: Matter) => {
     const age = stageAge(m);
     const owner = props.ownerName(m.assigned_to);
     return (
-      <li key={m.id} className="lx-board-card">
+      <li key={m.id} id={matterCardId(m.id)} className="lp-board-card">
         <Link href={`/dashboard/matters/${m.id}/`} className="lx-rowlink">
           {matterLabel(m)}
         </Link>
         <span className="lx-note lx-num">{m.matter_number}</span>
         <span style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-          {age.days !== null && <span className={`lx-pill ${age.stale ? "lx-pill-risk" : "lx-pill-mute"}`}>{age.days}d</span>}
-          {props.reviewIds.has(m.id) && <span className="lx-pill lx-pill-warn">Review</span>}
+          {age.days !== null && <span className={`lp-pill${age.stale ? " lp-pill-risk" : ""}`}>{age.days}d</span>}
+          {props.reviewIds.has(m.id) &&
+            (props.reviewItems?.get(m.id) ? (
+              <Link href={reviewHref(props.reviewItems.get(m.id)!)} className="lp-pill lp-pill-warn" style={{ position: "relative", zIndex: 1 }}>
+                Review
+              </Link>
+            ) : (
+              <span className="lp-pill lp-pill-warn">Review</span>
+            ))}
           {owner && <span className="lx-note">{owner}</span>}
         </span>
-        {props.canMove && (
-          <div className="lx-board-move">
-            <StageSelect matterId={m.id} stageId={m.stage_id} stages={stageOptions} />
-          </div>
-        )}
+        {props.canMove && stageOptions.length > 0 && <MoveMenu matterId={m.id} stageId={m.stage_id} stages={stageOptions} />}
       </li>
     );
   };
@@ -55,14 +63,15 @@ export function MatterBoard(props: {
           {sub ? ` · ${sub}` : ""}
         </span>
       </header>
-      {matters.length === 0 ? <p className="lx-note" style={{ margin: 0 }}>Clear</p> : <ul>{matters.map(card)}</ul>}
+      {matters.length === 0 ? <p className="lx-note" style={{ margin: 0 }}>None</p> : <ul>{matters.map(card)}</ul>}
     </section>
   );
 
   return (
     <div className="lx-board" role="region" aria-label="Docket board">
+      <MovedCardScroller />
       {board.unstaged.length > 0 && column("unstaged", "Not on the docket yet", null, board.unstaged)}
-      {board.open.map((c) => column(c.stage.id, `${c.stage.code}. ${c.stage.label}`, null, c.matters, c.stale))}
+      {board.open.map((c) => column(c.stage.id, stageDisplayName(c.stage.label), null, c.matters, c.stale))}
       {board.closedCount > 0 &&
         column(
           "closed",

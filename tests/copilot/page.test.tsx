@@ -95,9 +95,9 @@ describe("greeting", () => {
 });
 
 describe("hero, pill and chips", () => {
-  it("has the ask input labelled 'Ask the copilot' in the 640px pill", async () => {
+  it("has the ask input labelled 'Ask Copilot' in the 640px pill", async () => {
     const html = await renderPage();
-    expect(html).toContain('aria-label="Ask the copilot"');
+    expect(html).toContain('aria-label="Ask Copilot"');
     expect(html).toMatch(/<form[^>]*class="cpl-composer cpl-pill"/);
     expect(html).toContain("cph-hero");
   });
@@ -152,9 +152,9 @@ describe("the four stat cards", () => {
     expect(html).not.toMatch(/All caught up/i);
   });
 
-  it("an unconfigured queue says 'Queue isn't connected', never 0 or 'All caught up'", async () => {
+  it("an unconfigured queue says 'Approvals aren't connected', never 0 or 'All caught up'", async () => {
     const html = await renderPage({ reads: { queue: { status: "unconfigured", items: [] } } });
-    expect(cards(html)[3]).toMatchObject({ state: "unconfigured", value: "—", note: "Queue isn't connected" });
+    expect(cards(html)[3]).toMatchObject({ state: "unconfigured", value: "—", note: "Approvals aren't connected" });
     expect(html).not.toMatch(/All caught up/i);
   });
 
@@ -178,11 +178,11 @@ describe("the four stat cards", () => {
 describe("when AI is not configured", () => {
   it("shows the plain card: no composer, no hero, no stat cards, and reads nothing", async () => {
     const html = await renderPage({ configured: false });
-    expect(html).toContain("isn't configured for this deployment yet");
+    expect(html).toContain("isn't switched on for your firm yet");
     expect(html).not.toContain("cpl-composer");
     expect(html).not.toContain("cph-hero");
     expect(html).not.toContain("cph-stat");
-    expect(html).not.toContain("Ask the copilot");
+    expect(html).not.toContain("Ask Copilot");
     expect(html).toMatch(/never gives legal analysis/);
   });
 });

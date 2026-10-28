@@ -27,10 +27,10 @@ export async function setLeadLaneAction(_prev: LeadSequenceState, formData: Form
   const leadId = String(formData.get("leadId") ?? "");
   const raw = String(formData.get("lane") ?? "");
   if (!UUID.test(leadId)) return { error: "Missing lead." };
-  if (raw && !isLane(raw)) return { error: "That isn't a lane." };
+  if (raw && !isLane(raw)) return { error: "That isn't a temperature." };
   const result = await setLaneAction(leadId, isLane(raw) ? raw : null);
   if (!result.ok) return { error: result.error };
-  return { message: raw ? "Lane saved." : "Lane cleared." };
+  return { message: raw ? "Temperature saved." : "Temperature cleared." };
 }
 
 /** "Stop sequence" on one of the lead's enrollments, with the reason a person picked. */

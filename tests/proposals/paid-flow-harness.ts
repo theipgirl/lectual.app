@@ -3,6 +3,7 @@ import type { ProposalRow } from "@/lib/proposals/types";
 import type { StepPayload } from "@/lib/proposals/paid";
 import { acceptedSnapshot, CONCIERGE } from "./accepted-fixture";
 import { sevetri } from "./fixture";
+import { APPROVALS_NOT_READY } from "@/lib/ui/words";
 
 /**
  * Shared by the Sprint 19 flow, action and page tests: an accepted proposal row, an in-memory event
@@ -102,7 +103,7 @@ export async function setupFlow(opts: Opts = {}) {
   const { DocumentFlowError } = await import("@/lib/documents/errors");
   const queueItem = { draftId: "draft-1", queueItemId: "queue-1" };
   const generateTrademarkLoe = vi.fn(async () => {
-    if (opts.generate === "flow-error") throw new DocumentFlowError("Approvals aren't enabled for this firm yet — ask an admin to set up the approval queue before generating documents.");
+    if (opts.generate === "flow-error") throw new DocumentFlowError(APPROVALS_NOT_READY);
     if (opts.generate === "other-error") throw new Error("duplicate key value violates unique constraint for sevetri@example.com");
     return queueItem;
   });

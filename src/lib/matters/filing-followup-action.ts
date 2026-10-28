@@ -11,6 +11,7 @@ import {
   buildMonthlyStatusUpdateDraft,
 } from "./filing-followup";
 import { loadFollowUpQueueState, queuedMonthsLookupFor } from "./filing-followup-queue";
+import { APPROVALS_NOT_READY } from "@/lib/ui/words";
 
 /**
  * Drafts the next monthly status-update email for one matter and queues it —
@@ -60,7 +61,7 @@ export async function queueMonthlyStatusUpdate(matterId: string): Promise<{ queu
   const queueState = await loadFollowUpQueueState();
   if (queueState.status === "unconfigured" && queueState.reason === "org-key") {
     throw new DocumentFlowError(
-      "Approvals aren't enabled for this firm yet — ask an admin to set up the approval queue before drafting status updates.",
+      APPROVALS_NOT_READY,
     );
   }
   if (queueState.status !== "ok") {
@@ -92,7 +93,7 @@ export async function queueMonthlyStatusUpdate(matterId: string): Promise<{ queu
   const orgKey = await activeQueueOrgKey();
   if (!orgKey) {
     throw new DocumentFlowError(
-      "Approvals aren't enabled for this firm yet — ask an admin to set up the approval queue before drafting status updates.",
+      APPROVALS_NOT_READY,
     );
   }
 

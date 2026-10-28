@@ -11,13 +11,14 @@ import { DisconnectLawPayButton, MapAccountForm, RefreshAccountsButton, UnmapBut
 import { NOT_A_LAW_FIRM_DISCLAIMER } from "@/lib/legal/disclaimer";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { integrationErrorLine, LAWPAY_NOT_ISSUED, lawpayModeMismatch } from "@/lib/ui/words";
 
 export const metadata: Metadata = { title: pageTitle("LawPay") };
 
 export const dynamic = "force-dynamic";
 
 const ERRORS: Record<string, string> = {
-  unconfigured: "LawPay sign-in isn't set up on this deployment yet, so nothing was connected.",
+  unconfigured: "LawPay card payments aren't switched on yet, so nothing was connected. Until then, record payments by hand on each quote.",
   forbidden: "Only owners and admins can connect LawPay.",
   denied: "LawPay sign-in was cancelled. Nothing was connected.",
   expired: "That LawPay sign-in expired or couldn't be verified. Start again with Connect LawPay.",
@@ -99,8 +100,7 @@ export default async function LawPayPage({
       )}
       {!read.ok && (
         <div role="alert" className="lx-banner lx-banner-risk">
-          We couldn&apos;t check your firm&apos;s LawPay connection just now. This is a problem reaching the database, not a disconnection — try
-          again shortly.
+          We couldn&apos;t check your firm&apos;s LawPay connection just now. Refresh to try again.
         </div>
       )}
 
@@ -133,13 +133,12 @@ export default async function LawPayPage({
         )}
         {conn && conn.mode !== deploymentMode && (
           <p className="lx-banner lx-banner-warn" style={{ margin: 0 }}>
-            This connection is in {conn.mode} mode and this deployment charges in {deploymentMode}{" "}mode, so clients won&apos;t see a card form.
-            Disconnect and connect again to switch.
+            {lawpayModeMismatch(conn.mode, deploymentMode)}
           </p>
         )}
         {conn && conn.status !== "active" && (
           <p className="lx-banner lx-banner-risk" style={{ margin: 0 }}>
-            LawPay stopped accepting this connection{conn.last_error ? `: ${conn.last_error}` : "."}{" "}Clients see &ldquo;the firm will send a way to
+            LawPay stopped accepting this connection. {integrationErrorLine(conn.status, conn.last_error)}{" "}Clients see &ldquo;the firm will send a way to
             pay&rdquo; until you reconnect.
           </p>
         )}
@@ -150,10 +149,7 @@ export default async function LawPayPage({
               Connect LawPay
             </span>
             <p className="lx-note" style={{ margin: 0 }}>
-              {setup.missing === "partner-app"
-                ? "Not available yet: signing in with LawPay needs Lectual's LawPay partner app, which LawPay (8am) hasn't issued for this deployment yet. You don't need to do anything — and you'll never be asked to paste a LawPay key."
-                : "Not available yet: this deployment is missing the encryption key that protects stored connections."}{" "}
-              Until then, record payments by hand on each quote (Quotes → a signed quote → Payments).
+              {LAWPAY_NOT_ISSUED}{" "}You don&apos;t need to do anything, and you&apos;ll never be asked to paste a LawPay key.
             </p>
           </div>
         ) : !conn ? (

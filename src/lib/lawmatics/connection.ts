@@ -60,7 +60,7 @@ export class LawmaticsNotConnectedError extends Error {
  */
 export async function firmLawmaticsToken(): Promise<string> {
   const root = rootKeyOrNull();
-  if (!root) throw new LawmaticsNotConnectedError("Integrations aren't set up on this deployment yet (no encryption key).");
+  if (!root) throw new LawmaticsNotConnectedError("Integrations aren't switched on for your firm yet. Lectual will turn them on.");
 
   const read = await getLawmaticsConnection();
   if (!read.ok) throw new Error("Couldn't read your firm's Lawmatics connection. Try again shortly.");

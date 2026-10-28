@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { CopilotChat } from "./CopilotChat";
 import { FOCUSABLE_SELECTOR, focusFirstInput, launcherKeyAction, nextTabFocus, shouldShowLauncher } from "@/lib/copilot/launcher";
+import { COPILOT_NAME } from "@/lib/ui/words";
 import "./copilot.css";
 
 const DRAWER_TITLE_ID = "copilot-drawer-title";
@@ -23,7 +24,7 @@ export function CopilotDrawer(props: {
       <aside ref={drawerRef} className="cpd-drawer" role="dialog" aria-modal="true" aria-labelledby={DRAWER_TITLE_ID} hidden={!open} onKeyDown={onKeyDown}>
         <div className="cpd-head">
           <h2 id={DRAWER_TITLE_ID} className="cpd-title">
-            AI copilot
+            {COPILOT_NAME}
           </h2>
           <span className="cpd-kbd" aria-hidden="true">
             Esc to close
@@ -103,10 +104,10 @@ export function CopilotLauncher({ configured }: { configured: boolean }) {
         type="button"
         className="cpd-launcher"
         data-tour="copilot"
-        aria-label="Ask the copilot"
+        aria-label="Ask Copilot"
         aria-haspopup="dialog"
         aria-expanded={open}
-        title="Ask the copilot (Command-J)"
+        title="Ask Copilot (Command-J)"
         onClick={() => setOpenState(!open)}
       >
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

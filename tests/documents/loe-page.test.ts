@@ -284,7 +284,7 @@ describe("engagement letter page — the read fails", () => {
   it("says quotes aren't set up where the tables are missing", async () => {
     h.load = { status: "unconfigured" };
     const html = await render();
-    expect(html).toContain("Quotes aren&#x27;t set up in this environment");
+    expect(html).toContain("Quotes aren&#x27;t switched on for your firm yet");
     expect(html).toContain('name="packageName"');
   });
 });

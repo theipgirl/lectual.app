@@ -36,9 +36,9 @@ describe("TemperatureCell's menu", () => {
     return { popover, items, close };
   }
 
-  it("offers Hot, Warm, Cold and Clear, in that order", () => {
+  it("offers Hot, Warm, Cold and Not rated, in that order", () => {
     const { items } = menuOf(() => {});
-    expect(items.map((item) => (item.props as { children: ReactNode }).children)).toEqual(["Hot", "Warm", "Cold", "Clear"]);
+    expect(items.map((item) => (item.props as { children: ReactNode }).children)).toEqual(["Hot", "Warm", "Cold", "Not rated"]);
   });
 
   it("calls the set handler with hot, warm, cold and null, closing the menu each time", () => {
@@ -95,16 +95,17 @@ describe("the table row's refusal", () => {
 });
 
 describe("the merged control styling", () => {
-  it("keeps the controlled-mode toggle rules in intake.css, built from the design's own tokens", () => {
-    const css = read("src/app/dashboard/intake/intake.css");
-    expect(css).toContain(".intake-root .lx-view-toggle button");
-    expect(css).toContain(".intake-root .lx-view-toggle button.on");
-    const block = css.slice(css.indexOf(".intake-root .lx-view-toggle button {"), css.indexOf(".intake-statusline {"));
+  it("keeps the controlled-mode toggle rules in the shared list-page.css, built from the design's own tokens", () => {
+    const css = read("src/components/list-page/list-page.css");
+    expect(css).toContain(".lp-root .lx-view-toggle button");
+    expect(css).toContain(".lp-root .lx-view-toggle button.on");
+    const block = css.slice(css.indexOf(".lp-root .lx-view-toggle button {"), css.indexOf(".lp-link-button:hover"));
     // Same pill as the link mode: the design's tokens, no new colour or font.
     expect(block).toContain("var(--card)");
     expect(block).toContain("var(--body)");
     expect(block).not.toMatch(/#[0-9a-f]{3,8}\b/i);
     expect(block).not.toMatch(/font-family/);
+    expect(read("src/app/dashboard/intake/intake.css")).not.toContain("lx-view-toggle button");
   });
 
   it("leaves the design-owned stylesheet's toggle rules untouched", () => {

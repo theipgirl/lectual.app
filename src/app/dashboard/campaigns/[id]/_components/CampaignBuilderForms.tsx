@@ -160,7 +160,7 @@ export function EnrollLeadForm({ sequenceId, leads }: { sequenceId: string; lead
     <form action={action} style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
       <Hidden values={{ sequenceId }} />
       <label className="lx-field" style={{ minWidth: 260, flex: 1 }}>
-        <span className="lx-label">Enroll a lead from Intake</span>
+        <span className="lx-label">Enroll a lead</span>
         <select className="lx-input" name="leadId" defaultValue="" required>
           <option value="" disabled>
             {leads.length === 0 ? "No leads to enroll" : "Choose a lead"}

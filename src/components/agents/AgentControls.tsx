@@ -1,12 +1,13 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import {
   runAgentNowAction,
   saveAgentSettingAction,
   type AgentActionState,
 } from "@/app/dashboard/agents/actions";
 import { autonomyHint, type AgentId, type Autonomy } from "@/lib/agents/types";
+import { autonomyChangeQuestion } from "@/lib/agents/health-line";
 import { decideRunNow, runResultLine, RUN_NOW_NO_ANSWER, type RunNowInput } from "@/lib/agents/run-now";
 
 const LEVELS: { k: Autonomy; label: string }[] = [
@@ -44,7 +45,11 @@ export function AgentControls(props: {
   const [saveState, save, saving] = useActionState<AgentActionState, FormData>(saveAgentSettingAction, {});
   const [runState, run, running] = useActionState<AgentActionState, FormData>(runNowOrSay, {});
   const { agent, enabled, autonomy, canManage } = props;
+  // A different autonomy is asked about first (Confirm / Cancel); only Confirm saves it.
+  const [asking, setAsking] = useState<Autonomy | null>(null);
   const decision = decideRunNow({ ...props.runInput, running });
+  // A role that can't run assistants gets no Run now button at all (and no reason to read).
+  const showRun = decision.canRun || decision.block !== "role";
   const result = runResultLine(runState);
   const reasonId = `run-reason-${agent}`;
 
@@ -73,20 +78,31 @@ export function AgentControls(props: {
         <form action={save} className="lx-lv">
           <input type="hidden" name="agent" value={agent} />
           <input type="hidden" name="enabled" value={String(enabled)} />
-          {LEVELS.map((l) => (
-            <button
-              key={l.k}
-              type="submit"
-              name="autonomy"
-              value={l.k}
-              aria-pressed={autonomy === l.k}
-              className={autonomy === l.k ? "on" : undefined}
-              disabled={!canManage || !enabled || saving}
-              title={autonomyHint(agent, l.k)}
-            >
-              {l.label}
-            </button>
-          ))}
+          {asking === null ? (
+            LEVELS.map((l) => (
+              <button
+                key={l.k}
+                type="button"
+                aria-pressed={autonomy === l.k}
+                className={autonomy === l.k ? "on" : undefined}
+                disabled={!canManage || !enabled || saving}
+                title={autonomyHint(agent, l.k)}
+                onClick={() => l.k !== autonomy && setAsking(l.k)}
+              >
+                {l.label}
+              </button>
+            ))
+          ) : (
+            <span role="alert" className="lx-note" style={{ display: "inline-flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              {autonomyChangeQuestion(props.name, autonomy, asking)}
+              <button type="submit" name="autonomy" value={asking} className="on" disabled={saving} onClick={() => setTimeout(() => setAsking(null), 0)}>
+                {saving ? "Saving…" : "Confirm"}
+              </button>
+              <button type="button" disabled={saving} onClick={() => setAsking(null)}>
+                Cancel
+              </button>
+            </span>
+          )}
         </form>
         <div className="lx-note" style={{ marginTop: 6 }}>
           {autonomyHint(agent, autonomy)}
@@ -98,6 +114,7 @@ export function AgentControls(props: {
         )}
       </div>
 
+      {showRun && (
       <div className="lx-agent-slot-run">
         <form action={run}>
           <input type="hidden" name="agent" value={agent} />
@@ -111,9 +128,10 @@ export function AgentControls(props: {
           </button>
         </form>
       </div>
-      {(!decision.canRun || result) && (
+      )}
+      {((!decision.canRun && showRun) || result) && (
         <div style={{ gridColumn: "1 / -1", display: "grid", gap: 4 }}>
-          {!decision.canRun && (
+          {!decision.canRun && showRun && (
             <p id={reasonId} className="lx-note" style={{ margin: 0, ...(decision.tone === "warn" ? { color: "var(--warn)" } : {}) }}>
               {decision.reason}
             </p>

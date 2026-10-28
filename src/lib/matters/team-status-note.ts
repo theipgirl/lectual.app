@@ -1,6 +1,8 @@
 import { getScopedClient } from "@/lib/db/scoped-client";
 import type { Database } from "@/lib/db/types";
 import { requireMatterWriteRole } from "./matters";
+import { ReadableError } from "@/lib/ui/readable-error";
+
 
 /**
  * The "what did we say last time" reference (crm_team_status_note, 0044).
@@ -55,7 +57,7 @@ export async function saveTeamStatusNote(input: SaveTeamStatusNoteInput): Promis
 
   const { data: orgId, error: orgError } = await supabase.rpc("current_org_id");
   if (orgError) throw orgError;
-  if (!orgId) throw new Error("No active organization for the current session.");
+  if (!orgId) throw new ReadableError("No active organization for the current session.");
 
   const {
     data: { user },

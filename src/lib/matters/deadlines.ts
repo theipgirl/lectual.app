@@ -11,6 +11,8 @@ import {
   deadlineKindLabel,
   deadlineRule,
 } from "./deadline-rules";
+import { ReadableError } from "@/lib/ui/readable-error";
+
 
 export type MatterDeadline = Database["public"]["Tables"]["crm_matter_deadline"]["Row"];
 
@@ -187,7 +189,7 @@ export async function createDeadline(input: CreateDeadlineInput): Promise<Matter
     // this fires, `input.kind` is one of those; say so plainly instead of
     // surfacing a constraint name.
     if ((error as { code?: string }).code === "23505") {
-      throw new Error(
+      throw new ReadableError(
         `This matter already has an open "${deadlineKindLabel(input.kind)}" deadline. Close that one out or edit its date instead of adding a second.`,
       );
     }
@@ -224,7 +226,7 @@ export async function confirmDeadline(id: string): Promise<MatterDeadline> {
   const { data: role, error: roleError } = await supabase.rpc("current_org_role");
   if (roleError) throw roleError;
   if (typeof role !== "string" || !(DEADLINE_CONFIRM_ROLES as readonly string[]).includes(role)) {
-    throw new Error(
+    throw new ReadableError(
       "Only a licensed attorney can confirm a docket date. Ask the attorney of record to review it.",
     );
   }
@@ -313,13 +315,13 @@ export async function extendDeadline(id: string, newDueDate: string): Promise<Ma
   if (readError) throw readError;
 
   if (!current.is_extendable) {
-    throw new Error("This deadline isn't extendable.");
+    throw new ReadableError("This deadline isn't extendable.");
   }
   if (
     current.max_extensions != null &&
     current.extensions_used >= current.max_extensions
   ) {
-    throw new Error(
+    throw new ReadableError(
       `No extensions left — ${current.extensions_used} of ${current.max_extensions} already used.`,
     );
   }
@@ -376,11 +378,11 @@ export async function updateDeadline(id: string, input: DeadlineEditInput): Prom
   if (readError) throw readError;
   if (!current) throw recordNotFoundError("deadline");
   if (current.status !== "open") {
-    throw new Error("Only an open deadline can be edited. Reopen it first.");
+    throw new ReadableError("Only an open deadline can be edited. Reopen it first.");
   }
 
   const checked = validateDeadlineEdit(input, current);
-  if (!checked.ok) throw new Error(checked.error);
+  if (!checked.ok) throw new ReadableError(checked.error);
   if (checked.fields.length === 0) return current;
 
   const { data, error } = await supabase
@@ -428,7 +430,7 @@ export async function reopenDeadline(id: string): Promise<MatterDeadline> {
     .maybeSingle();
   if (readError) throw readError;
   if (!current) throw recordNotFoundError("deadline");
-  if (current.status === "open") throw new Error("This deadline is already open.");
+  if (current.status === "open") throw new ReadableError("This deadline is already open.");
 
   const { data, error } = await supabase
     .from("crm_matter_deadline")
@@ -438,7 +440,7 @@ export async function reopenDeadline(id: string): Promise<MatterDeadline> {
     .single();
   if (error) {
     if ((error as { code?: string }).code === "23505") {
-      throw new Error(
+      throw new ReadableError(
         `This matter already has another open "${deadlineKindLabel(current.kind)}" deadline. Close that one out or edit its date first.`,
       );
     }
@@ -468,7 +470,7 @@ export async function deleteDeadline(id: string): Promise<void> {
   const { data: role, error: roleError } = await supabase.rpc("current_org_role");
   if (roleError) throw roleError;
   if (typeof role !== "string" || !(DEADLINE_DELETE_ROLES as readonly string[]).includes(role)) {
-    throw new Error("Only an owner or an admin can delete a deadline.");
+    throw new ReadableError("Only an owner or an admin can delete a deadline.");
   }
 
   const { data: current, error: readError } = await supabase
@@ -479,7 +481,7 @@ export async function deleteDeadline(id: string): Promise<void> {
   if (readError) throw readError;
   if (!current) throw recordNotFoundError("deadline");
   if (current.attorney_confirmed) {
-    throw new Error("An attorney-confirmed deadline can't be deleted. Close it out instead.");
+    throw new ReadableError("An attorney-confirmed deadline can't be deleted. Close it out instead.");
   }
 
   const { data: removed, error } = await supabase
@@ -489,7 +491,7 @@ export async function deleteDeadline(id: string): Promise<void> {
     .select("id");
   if (error) throw error;
   // RLS filters a delete it doesn't allow down to zero rows without an error.
-  if (!removed || removed.length === 0) throw new Error("That deadline couldn't be deleted.");
+  if (!removed || removed.length === 0) throw new ReadableError("That deadline couldn't be deleted.");
 
   await logActivitySafe({
     type: "matter_updated",

@@ -152,7 +152,7 @@ describe("activityHint", () => {
   });
 });
 
-describe("no lane and no data is null (Not routed)", () => {
+describe("no lane and no data is null (Not rated)", () => {
   it("is null for a never-touched lead with no facts and a non-nurture stage", () => {
     const result = effectiveTemperature(lead({}), STAGES, NOW);
     expect(result.value).toBeNull();
@@ -196,10 +196,10 @@ describe("the Long-Term Nurture suggestion is passed through", () => {
 });
 
 describe("the words on the chip", () => {
-  it("says the level for a person's, 'Suggested: <level>' for a derived one and 'Not routed' for neither", () => {
+  it("says the level for a person's, 'Suggested: <level>' for a derived one and 'Not rated' for neither", () => {
     expect(temperatureLabel({ value: "hot", source: "person" })).toBe("Hot");
     expect(temperatureLabel({ value: "warm", source: "suggested" })).toBe("Suggested: Warm");
-    expect(temperatureLabel({ value: null, source: "suggested" })).toBe("Not routed");
+    expect(temperatureLabel({ value: null, source: "suggested" })).toBe("Not rated");
   });
 
   it("puts the activity hint under the reason in the tooltip", () => {

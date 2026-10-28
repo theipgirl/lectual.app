@@ -32,12 +32,14 @@ import { CONSULT_PROPOSAL_SOURCE, firmSignatureName, firmTeamSignOff } from "./s
  */
 
 export const MANUAL_EMAIL_LABEL = "Create post-consult email";
+/** Shown beside the button (Sprint 33): the link being live is not an email. */
+export const NOT_EMAILED = "The client hasn't been emailed by Lectual.";
 export const MANUAL_EMAIL_PENDING = "Creating email…";
 export const MANUAL_EMAIL_QUEUED = "Post-consult email queued for approval.";
 
 export const MANUAL_EMAIL_REFUSALS = {
   notFound: "Proposal not found.",
-  status: "Only a draft, saved or link-live proposal can have its email queued. Nothing was queued.",
+  status: "Create the client link first. Only a proposal whose link is live can have its email queued. Nothing was queued.",
   noEmail: "Add the client's email address to this proposal first. Nothing was queued.",
   noRecord:
     "Link this proposal to a lead or matter first, so the email can be tied to it for approval. Nothing was queued.",
@@ -47,14 +49,18 @@ export const MANUAL_EMAIL_REFUSALS = {
   pending: "A post-consult email for this proposal is already waiting in the approval queue. Review or reject it first.",
   pendingUnreadable: "Couldn't check the approval queue for an earlier email. Nothing was queued. Try again shortly.",
   queueFailed: "The approval queue couldn't be reached. Nothing was queued. Try again shortly.",
+  linkPending: "An email with this proposal's link is already waiting in the approval queue. Nothing new was queued.",
   deduped: "A proposal email for this client is already waiting in the approval queue. Review or reject that one first.",
   unlinked:
     "The email was queued but couldn't be linked to this proposal. Reject it in the approval queue now: it must not be approved. Then try again.",
   unexpected: "The email couldn't be queued. Nothing was sent. Try again shortly.",
 } as const;
 
-/** Statuses whose client link is, or can become, the one in the email. */
-const QUEUEABLE: ReadonlySet<ProposalRow["status"]> = new Set(["draft", "approved", "sent"]);
+/**
+ * Statuses whose client link is LIVE (Sprint 33: nothing to put in an email until it is). A draft or a
+ * saved-not-live version is refused; the consult agent's own email for those keeps its approve gate in link.ts.
+ */
+const QUEUEABLE: ReadonlySet<ProposalRow["status"]> = new Set(["sent", "accepted"]);
 
 /** The reasoning block this button may use: Rebecca's `principle` paragraph and nothing chosen by guesswork. */
 export function manualReasoning(content: Pick<ProposalContent, "names">): string | null {
@@ -110,6 +116,12 @@ export function manualMarker(args: {
 
 export type PendingRead = { status: "none" } | { status: "pending"; queueId: string } | { status: "unreadable" };
 
+/** The pending approval queue, three-state: a failed read is never "nothing pending". */
+export type PendingQueueRead =
+  | { status: "ok"; items: Array<{ type: string; draftBody: string }> }
+  | { status: "unconfigured" }
+  | { status: "unavailable" };
+
 export type ManualEmailDraftInput = {
   orgKey: string;
   agent: string;
@@ -138,6 +150,8 @@ export type ManualEmailDeps = {
   links: (orgId: string, publicToken: string, proposalId: string) => Promise<{ clientUrl: string; staffUrl: string }>;
   /** Is an email for this proposal already pending in the queue? */
   pendingFor: (proposalId: string) => Promise<PendingRead>;
+  /** The whole pending queue, so an email carrying the same client link (any version, any source) is not queued twice. */
+  pendingQueue: () => Promise<PendingQueueRead>;
   createDraft: (input: ManualEmailDraftInput) => Promise<{ id: string; deduped?: boolean }>;
   writeMarker: (row: ReturnType<typeof manualMarker>) => Promise<boolean>;
   revalidate: (proposalId: string, leadId: string | null) => void;
@@ -179,7 +193,12 @@ async function run(deps: ManualEmailDeps, proposalId: string): Promise<ManualEma
   // (crm_activity_target). Without one the email would sit in the queue ungated: refuse first.
   if (!proposal.lead_id && !proposal.matter_id) return fail(MANUAL_EMAIL_REFUSALS.noRecord);
 
-  const orgKey = await deps.queueOrgKey();
+  let orgKey: string | null;
+  try {
+    orgKey = await deps.queueOrgKey();
+  } catch {
+    return fail(MANUAL_EMAIL_REFUSALS.queueFailed);
+  }
   if (!orgKey) return fail(MANUAL_EMAIL_REFUSALS.noQueue);
 
   const signOff = firmTeamSignOff(ctx.firmName, ctx.firmSlug);
@@ -199,6 +218,22 @@ async function run(deps: ManualEmailDeps, proposalId: string): Promise<ManualEma
   } catch (err) {
     // ProposalEmailError messages are fixed sentences about the link or sign-off; anything else is not shown.
     return fail(err instanceof ProposalEmailError ? `${err.message} Nothing was queued.` : MANUAL_EMAIL_REFUSALS.noOrigin);
+  }
+
+  // A second click, or an email the consult agent already queued with this link (the token is shared by every
+  // version), must not queue another. If the queue can't be read we can't promise that, so nothing is queued.
+  let queue: PendingQueueRead;
+  try {
+    queue = await deps.pendingQueue();
+  } catch {
+    queue = { status: "unavailable" };
+  }
+  if (queue.status === "unconfigured") return fail(MANUAL_EMAIL_REFUSALS.noQueue);
+  if (queue.status === "unavailable") return fail(MANUAL_EMAIL_REFUSALS.pendingUnreadable);
+  // A substring to look for, not a URL (URLs are built only by clientLinkUrl).
+  const linkFragment = "/p/" + proposal.public_token;
+  if (queue.items.some((i) => i.type === "CLIENT_EMAIL" && typeof i.draftBody === "string" && i.draftBody.includes(linkFragment))) {
+    return fail(MANUAL_EMAIL_REFUSALS.linkPending);
   }
 
   let queueId: string;

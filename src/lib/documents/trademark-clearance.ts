@@ -169,7 +169,7 @@ export async function buildTrademarkClearanceDraft(
 
   if ("skipped" in result) {
     throw new DocumentFlowError(
-      "No AI provider is configured for this deployment (VERCEL_AI_GATEWAY_KEY or ANTHROPIC_API_KEY) — the trademark clearance opinion can't be drafted right now.",
+      "AI isn't switched on for your firm yet, so the trademark clearance opinion can't be drafted right now. Lectual will turn it on.",
     );
   }
 

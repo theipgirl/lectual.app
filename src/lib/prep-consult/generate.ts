@@ -7,6 +7,7 @@ import { createDraft } from "@/lib/queue/api";
 import { PrepConsultFlowError } from "./errors";
 import type { PrepConsultFacts } from "./prep-consult";
 import { buildHeadsUpDraft, buildClientPrepDraft } from "./drafts";
+import { APPROVALS_NOT_READY } from "@/lib/ui/words";
 
 /**
  * `prep-consult` skill trigger — staff-invoked from the lead detail page,
@@ -83,7 +84,7 @@ export async function queuePrepConsultDrafts(input: PrepConsultFormInput): Promi
   const orgKey = await activeQueueOrgKey();
   if (!orgKey) {
     throw new PrepConsultFlowError(
-      "Approvals aren't enabled for this firm yet — ask an admin to set up the approval queue before drafting consult prep emails.",
+      APPROVALS_NOT_READY,
     );
   }
 

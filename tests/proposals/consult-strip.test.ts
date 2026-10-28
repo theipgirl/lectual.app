@@ -86,7 +86,7 @@ describe("<ConsultStrip>", () => {
     expect(h).toContain("Word mark");
     expect(h).toContain("25: Clothing, namely t-shirts");
     expect(h).toContain("Intent to use");
-    expect(h).toContain("Reviewed by Rebecca Beliard (senior admin)");
+    expect(h).toContain("Reviewed by Rebecca Beliard (Senior admin)");
     expect(h).toContain("Oct 19");
     expect(h).toContain("Oct 18");
     expect(h).toContain("Zoom");

@@ -16,6 +16,7 @@ export const NOTHING_DONE: SetupState = {
   intakeForms: ok([]),
   services: ok([]),
   aiConfigured: false,
+  lectual: { lawpayApp: true, zoomApp: true },
 };
 
 /** All ten done. */
@@ -31,6 +32,7 @@ export const ALL_DONE: SetupState = {
   intakeForms: ok([{ status: "live" }]),
   services: ok([{ active: true, kind: "legal_fee" }]),
   aiConfigured: true,
+  lectual: { lawpayApp: true, zoomApp: true },
 };
 
 export const ITEM_IDS = ["profile", "team", "outlook", "lawmatics", "meetings", "lawpay", "agents", "intake", "packages", "ai"] as const;

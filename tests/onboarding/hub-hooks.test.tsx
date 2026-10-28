@@ -193,7 +193,7 @@ describe("styling and sources", () => {
       "intake-board": "src/app/dashboard/intake/page.tsx",
       "queue-head": "src/app/dashboard/queue/page.tsx",
       "agents-head": "src/app/dashboard/agents/page.tsx",
-      "setup-head": "src/app/dashboard/setup/page.tsx",
+      "setup-head": "src/app/dashboard/settings/setup/page.tsx",
       "proposal-new-head": "src/app/dashboard/proposals/new/page.tsx",
       "team-head": "src/app/dashboard/settings/team/page.tsx",
     };

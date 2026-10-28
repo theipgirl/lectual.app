@@ -61,7 +61,7 @@ export async function listMemberDirectory(): Promise<MemberIdentity[]> {
 
   console.warn(
     "[members] org_member_directory() is missing — falling back to ids. " +
-      "Apply supabase/migrations/0031_member_identity.sql.",
+      "Member names need the member-identity update.",
   );
 
   // RLS (member_select_own_org) scopes these rows to the caller's active org —

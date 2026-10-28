@@ -173,16 +173,16 @@ function IntakeEmpty({ status }: { status: "none" | "unconfigured" | "unavailabl
         <div className="lx-card lx-empty-card">
           <h2 className="lx-h2" style={{ fontSize: 25 }}>
             {status === "unconfigured"
-              ? "Intake forms aren't set up in this environment"
+              ? "Intake forms aren't switched on for your firm yet"
               : status === "unavailable"
                 ? "Your intake couldn't be loaded"
                 : "Your firm hasn't set up its intake yet"}
           </h2>
           <p className="lx-note" style={{ margin: 0 }}>
             {status === "unconfigured"
-              ? "The intake tables (lectual migration 0079) are not in this database. Nothing is broken; it needs the migration."
+              ? "Lectual will turn them on. Nothing is broken."
               : status === "unavailable"
-                ? "This is a problem reaching the database, not a missing intake. Nothing was changed. Try again shortly."
+                ? "Can't show this intake right now. Nothing was changed. Refresh to try again."
                 : "An owner, admin or senior admin sets it up here."}
           </p>
         </div>

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { resetHubProgressAction, pickHubRecordsAction, type HubRecordPicks } from "@/lib/onboarding/hub-actions";
-import { mergeLocalDone, overallCount, stepReset, trackCounts, type HubFlow, type HubTrack, type RecordPick, type ResetState } from "@/lib/onboarding/hub";
+import { mergeLocalDone, overallCount, recommendedFlow, stepReset, trackCounts, type HubFlow, type HubTrack, type RecordPick, type ResetState } from "@/lib/onboarding/hub";
 import {
   HUB_LOCAL_DONE_KEY,
   HUB_START_EVENT,
@@ -80,6 +80,7 @@ export function FlowList({ tracks, doneIds, picks, modulesUnreadable }: Props) {
   const done = mergeLocalDone(cleared ? [] : doneIds, local);
   const counts = trackCounts(tracks, done);
   const total = overallCount(tracks, done);
+  const recommended = recommendedFlow(tracks, done);
 
   async function start(flow: HubFlow) {
     setStarting(flow.id);
@@ -140,6 +141,7 @@ export function FlowList({ tracks, doneIds, picks, modulesUnreadable }: Props) {
             {track.flows.map((flow) => {
               const finished = done.includes(flow.id);
               const note = recordNote(flow, picks);
+              const isRecommended = recommended?.id === flow.id;
               return (
                 <li key={flow.id} className="gs-flow">
                   <span className={`gs-check${finished ? " is-done" : ""}`} aria-hidden="true">
@@ -149,13 +151,14 @@ export function FlowList({ tracks, doneIds, picks, modulesUnreadable }: Props) {
                     <div className="gs-flow-title">
                       {flow.title}
                       {finished && <span className="gs-sr"> (done)</span>}
+                      {isRecommended && <span className="lx-pill lx-pill-ok gs-rec">Start here</span>}
                     </div>
                     <div className="lx-note">{flow.summary}</div>
                     {note && <div className="lx-note gs-flow-note">{note}</div>}
                   </div>
                   <button
                     type="button"
-                    className={`lx-btn lx-btn-sm ${finished ? "lx-btn-sec" : "lx-btn-pri"}`}
+                    className={`lx-btn lx-btn-sm ${isRecommended ? "lx-btn-pri" : "lx-btn-sec"}`}
                     onClick={() => void start(flow)}
                     disabled={starting !== null}
                     aria-label={`${finished ? "Run again" : "Start"}: ${flow.title}`}

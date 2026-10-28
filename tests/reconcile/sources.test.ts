@@ -222,7 +222,7 @@ describe("readStoredMail: the Stage Keeper's rows (Sprint 16, F19)", () => {
     const { readStoredMail } = await load();
     const read = await readStoredMail(world.client as never, [L.amara, L.kwame]);
     if (read.status !== "ok") throw new Error("expected ok");
-    expect(read.agent?.get(L.amara)).toEqual([{ stageId: S.loe, wording: "Stage Keeper: LOE sent", date: "2026-09-09T10:00:00Z" }]);
+    expect(read.agent?.get(L.amara)).toEqual([{ stageId: S.loe, wording: "Automatic move: LOE sent", date: "2026-09-09T10:00:00Z" }]);
     expect(read.agent?.has(L.kwame)).toBe(false);
     expect(read.byLead.size).toBe(0);
     expect(read.total).toBe(0);
@@ -260,7 +260,7 @@ describe("readStoredMail: the Stage Keeper's rows (Sprint 16, F19)", () => {
     const read = await readStoredMail(failing as never, [L.amara]);
     expect(read.status).toBe("unavailable");
     if (read.status !== "unavailable") throw new Error();
-    expect(read.reason).toContain("Stage Keeper");
+    expect(read.reason).toContain("automatic stage moves");
     expect(read.reason).not.toContain(SECRET);
     expect(logged()).not.toContain(SECRET);
   });

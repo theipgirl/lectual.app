@@ -29,7 +29,7 @@ function proposal(over: Partial<ProposalRow> = {}): ProposalRow {
   return {
     id: PROPOSAL_ID,
     org_id: ORG,
-    status: "draft",
+    status: "sent",
     public_token: "tok_abcdefghijklmnopqrstuvwxyz0123456789",
     client_name: "Sevetri Wilson",
     client_email: "sevetri@example.com",
@@ -51,6 +51,7 @@ function deps(over: Partial<ManualEmailDeps> = {}) {
       staffUrl: `https://app.example.com/dashboard/proposals/${id}/`,
     })),
     pendingFor: vi.fn(async () => ({ status: "none" as const })),
+    pendingQueue: vi.fn(async () => ({ status: "ok" as const, items: [] })),
     createDraft: vi.fn(async () => ({ id: "q-1" })),
     writeMarker: vi.fn(async () => true),
     revalidate: vi.fn(),
@@ -142,8 +143,8 @@ describe("runManualEmail", () => {
     expect(d.revalidate).toHaveBeenCalledWith(PROPOSAL_ID, "lead-1");
   });
 
-  it("works for a saved and a link-live proposal", async () => {
-    for (const status of ["approved", "sent"] as const) {
+  it("works for a link-live and an accepted proposal (Sprint 33: only once the link is live)", async () => {
+    for (const status of ["sent", "accepted"] as const) {
       const d = deps({ loadProposal: vi.fn(async () => proposal({ status })) });
       expect((await runManualEmail(d, PROPOSAL_ID)).ok).toBe(true);
     }
@@ -181,8 +182,8 @@ describe("runManualEmail", () => {
     nothingQueued(d);
   });
 
-  it("accepted, replaced and withdrawn versions are refused", async () => {
-    for (const status of ["accepted", "superseded", "withdrawn"] as const) {
+  it("draft, saved-not-live, replaced and withdrawn versions are refused (the link isn't live)", async () => {
+    for (const status of ["draft", "approved", "superseded", "withdrawn"] as const) {
       const d = deps({ loadProposal: vi.fn(async () => proposal({ status })) });
       expect(await runManualEmail(d, PROPOSAL_ID)).toEqual({ ok: false, error: R.status });
       nothingQueued(d);
@@ -257,5 +258,48 @@ describe("runManualEmail", () => {
     expect(d.revalidate).not.toHaveBeenCalled();
     const thrown = deps({ writeMarker: vi.fn(async () => { throw new Error("x"); }) });
     expect(await runManualEmail(thrown, PROPOSAL_ID)).toEqual({ ok: false, error: R.unlinked });
+  });
+
+  it("an email already pending with this client link (any version or source) refuses a second one", async () => {
+    const d = deps({
+      pendingQueue: vi.fn(async () => ({
+        status: "ok" as const,
+        items: [{ type: "CLIENT_EMAIL", draftBody: "Hi,\nhttps://app.lectual.app/p/tok_abcdefghijklmnopqrstuvwxyz0123456789/\nBest" }],
+      })),
+    });
+    expect(await runManualEmail(d, PROPOSAL_ID)).toEqual({ ok: false, error: R.linkPending });
+    nothingQueued(d);
+    const other = deps({
+      pendingQueue: vi.fn(async () => ({
+        status: "ok" as const,
+        items: [
+          { type: "CLIENT_EMAIL", draftBody: "https://x.example.com/p/someone_elses_token_000000000000000/" },
+          { type: "ENGAGEMENT_LETTER", draftBody: "/p/tok_abcdefghijklmnopqrstuvwxyz0123456789/" },
+        ],
+      })),
+    });
+    expect((await runManualEmail(other, PROPOSAL_ID)).ok).toBe(true);
+  });
+
+  it("the queue is three-state: unconfigured says no queue, unreachable or a throwing key fails closed", async () => {
+    const cases: Array<[Partial<ManualEmailDeps>, string]> = [
+      [{ pendingQueue: vi.fn(async () => ({ status: "unconfigured" as const })) }, R.noQueue],
+      [{ pendingQueue: vi.fn(async () => ({ status: "unavailable" as const })) }, R.pendingUnreadable],
+      [{ pendingQueue: vi.fn(async () => { throw new Error("secret"); }) }, R.pendingUnreadable],
+      [{ queueOrgKey: vi.fn(async () => { throw new Error("secret"); }) }, R.queueFailed],
+    ];
+    for (const [over, error] of cases) {
+      const d = deps(over);
+      expect(await runManualEmail(d, PROPOSAL_ID)).toEqual({ ok: false, error });
+      nothingQueued(d);
+    }
+  });
+
+  it("the module has no send call (grep)", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync("src/lib/consult-proposal/manual-email.ts", "utf8");
+    expect(src).not.toMatch(/sendMail|send_mail|sendEmail|resend|nodemailer|fetch\(/i);
+    const action = readFileSync("src/app/dashboard/proposals/[id]/actions.ts", "utf8");
+    expect(action).not.toMatch(/sendMail|sendEmail|nodemailer|Resend/);
   });
 });

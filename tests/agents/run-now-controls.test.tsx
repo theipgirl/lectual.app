@@ -67,7 +67,7 @@ describe("Run now controls: the result line", () => {
   });
 
   it("a refusal the action sent back shows as the alert", async () => {
-    const html = await controls({ error: "Autopilot is paused for the firm, so no agent runs. Resume Autopilot first." });
+    const html = await controls({ error: "Assistants paused for your firm, so none of them run. Resume them first." });
     expect(html).toContain('role="alert"');
   });
 });
@@ -88,18 +88,18 @@ describe("Run now controls: running and blocked", () => {
     const html = await controls({}, { run: { enabled: false } });
     expect(runButton(html)).toContain("disabled");
     expect(runButton(html)).toContain('aria-describedby="run-reason-intake-triage"');
-    expect(html).toContain('<p id="run-reason-intake-triage" class="lx-note" style="margin:0">Switch the agent on first.</p>');
+    expect(html).toContain('<p id="run-reason-intake-triage" class="lx-note" style="margin:0">Switch the assistant on first.</p>');
   });
 
   it("the unreadable Autopilot reason is the warn note", async () => {
     const html = await controls({}, { run: { autopilot: "unreadable" } });
-    expect(decode(html)).toContain("We couldn't check whether Autopilot is paused, so nothing will run.");
+    expect(decode(html)).toContain("We couldn't check whether assistants are paused, so nothing will run.");
     expect(html).toMatch(/id="run-reason-intake-triage"[^>]*color:var\(--warn\)/);
   });
 
   it("a blocked button and a leftover result can show together; only the error is an alert", async () => {
     const html = await controls({ ok: true, message: "Ran.", itemsIn: 1, draftsOut: 0 }, { run: { enabled: false } });
-    expect(html).toContain("Switch the agent on first.");
+    expect(html).toContain("Switch the assistant on first.");
     expect(html).toContain("Ran. · 1 read, 0 drafts written");
     expect(html).not.toContain('role="alert"');
   });

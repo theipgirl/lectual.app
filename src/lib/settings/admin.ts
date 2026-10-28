@@ -1,6 +1,8 @@
 import { getScopedClient } from "@/lib/db/scoped-client";
 import type { Database } from "@/lib/db/types";
 import { ROLES, hasRole, type Role } from "@/lib/auth/roles";
+import { ReadableError } from "@/lib/ui/readable-error";
+
 
 export type Stage = Database["public"]["Tables"]["crm_stage"]["Row"];
 export type Tag = Database["public"]["Tables"]["crm_tag"]["Row"];
@@ -38,7 +40,7 @@ export async function requireSettingsAdminRole(supabase: ScopedClient): Promise<
   const { data, error } = await supabase.rpc("current_org_role");
   if (error) throw error;
   if (!isRole(data) || !SETTINGS_ADMIN_ROLES.includes(data)) {
-    throw new Error("You don't have permission to change firm settings.");
+    throw new ReadableError("You don't have permission to change firm settings.");
   }
   return data;
 }
@@ -47,7 +49,7 @@ export async function requireSettingsAdminRole(supabase: ScopedClient): Promise<
 export async function currentOrgId(supabase: ScopedClient): Promise<string> {
   const { data, error } = await supabase.rpc("current_org_id");
   if (error) throw error;
-  if (!data) throw new Error("No active organization for the current session.");
+  if (!data) throw new ReadableError("No active organization for the current session.");
   return data;
 }
 
@@ -290,7 +292,7 @@ export async function listMembers(): Promise<OrgMember[]> {
  */
 export async function setMemberRole(userId: string, role: Role): Promise<OrgMember> {
   if (!isRole(role)) {
-    throw new Error(`Invalid role: ${String(role)}`);
+    throw new ReadableError(`Invalid role: ${String(role)}`);
   }
 
   const supabase = await getScopedClient();
@@ -303,7 +305,7 @@ export async function setMemberRole(userId: string, role: Role): Promise<OrgMemb
   } = await supabase.auth.getUser();
   if (userError) throw userError;
   if (user?.id === userId) {
-    throw new Error("You can't change your own role.");
+    throw new ReadableError("You can't change your own role.");
   }
 
   // b) Target-rank ceiling — fetch the target's current role; RLS already
@@ -316,7 +318,7 @@ export async function setMemberRole(userId: string, role: Role): Promise<OrgMemb
   if (targetError) throw targetError;
   const targetCurrentRole = (target as { role?: Role } | null)?.role;
   if (!targetCurrentRole || !hasRole(callerRole, targetCurrentRole)) {
-    throw new Error(
+    throw new ReadableError(
       `You can only modify members at or below your own rank (${callerRole} cannot modify ${
         targetCurrentRole ?? "that member"
       }).`,
@@ -331,13 +333,13 @@ export async function setMemberRole(userId: string, role: Role): Promise<OrgMemb
       .eq("role", "owner");
     if (countError) throw countError;
     if ((count ?? 0) <= 1) {
-      throw new Error("An org must keep at least one owner.");
+      throw new ReadableError("An org must keep at least one owner.");
     }
   }
 
   // d) Granted-role ceiling (pre-existing).
   if (!hasRole(callerRole, role)) {
-    throw new Error(
+    throw new ReadableError(
       `You can't grant a role above your own (${callerRole} cannot grant ${role}).`,
     );
   }

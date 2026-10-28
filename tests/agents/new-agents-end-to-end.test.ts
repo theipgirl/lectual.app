@@ -133,7 +133,7 @@ describe("D1: switch on, run, and the drafts, the run row and the Overnight line
     expect(rows[0]).toMatchObject({ agent: "morning-brief", status: "ok", drafts_out: 3, error: null });
     const digest = buildRunDigest(digestRows(f), new Date(NOW + 60_000));
     expect(digest).toMatchObject({ status: "ok" });
-    expect((digest as { lines: Array<{ text: string; href: string }> }).lines[0]).toMatchObject({ text: "wrote the morning brief · 2 follow-ups drafted (in the Queue)", href: "/dashboard/queue/" });
+    expect((digest as { lines: Array<{ text: string; href: string }> }).lines[0]).toMatchObject({ text: "wrote the morning brief · 2 follow-ups drafted (in Approvals)", href: "/dashboard/queue/" });
   });
 
   it("consult-prep: two drafts per consult, and the prep is recorded", async () => {
@@ -143,7 +143,7 @@ describe("D1: switch on, run, and the drafts, the run row and the Overnight line
     expect(types(f, "consult-prep").sort()).toEqual(["BRIEFING", "BRIEFING", "CLIENT_EMAIL", "CLIENT_EMAIL"]);
     expect(f.db.tables.crm_activity.filter((r) => r.type === "queue_drafted")).toHaveLength(4);
     const digest = buildRunDigest(digestRows(f), new Date(NOW + 60_000)) as { lines: Array<{ text: string; href: string }> };
-    expect(digest.lines[0]).toMatchObject({ text: "prepped 2 consults · 4 drafts (in the Queue)", href: "/dashboard/queue/" });
+    expect(digest.lines[0]).toMatchObject({ text: "prepped 2 consults · 4 drafts (in Approvals)", href: "/dashboard/queue/" });
   });
 
   it("inbox-summary: one digest in the queue and Outlook drafts in the fake mailbox", async () => {

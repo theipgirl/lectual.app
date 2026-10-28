@@ -12,7 +12,7 @@ import { formatShortFirmDate } from "@/lib/quotes/labels";
  * Staff-facing. Receipts the agent could not check word for word are listed
  * apart, under their own heading, so a paraphrase is never read as a quote.
  */
-export function ProposalCard({ card }: { card: Card }) {
+export function ProposalCard({ card, showFees = true }: { card: Card; /** The editor shows the fees once, in its totals box, so it turns the card's own copy off. */ showFees?: boolean }) {
   const receipts = card.receipts;
   return (
     <section className="lx-card pe-pcard" aria-label="Proposal at a glance">
@@ -60,19 +60,23 @@ export function ProposalCard({ card }: { card: Card }) {
         </p>
       )}
 
-      <dl className="pe-pcard-fees">
-        <div>
-          <dt>At signing (legal fee)</dt>
-          <dd className="lx-num">{formatDollars(card.legalAtSigningCents)}</dd>
-        </div>
-        <div>
-          <dt>At filing (USPTO fees)</dt>
-          <dd className="lx-num">{formatDollars(card.usptoAtFilingCents)}</dd>
-        </div>
-      </dl>
-      <p className="lx-note" style={{ margin: 0 }}>
-        Worked out from the saved prices at the pre-ticked offer. The two fees are separate and are never added together.
-      </p>
+      {showFees && (
+        <>
+        <dl className="pe-pcard-fees">
+          <div>
+            <dt>At signing (legal fee)</dt>
+            <dd className="lx-num">{formatDollars(card.legalAtSigningCents)}</dd>
+          </div>
+          <div>
+            <dt>At filing (USPTO fees)</dt>
+            <dd className="lx-num">{formatDollars(card.usptoAtFilingCents)}</dd>
+          </div>
+        </dl>
+        <p className="lx-note" style={{ margin: 0 }}>
+          Worked out from the saved prices at the pre-ticked offer. The two fees are separate and are never added together.
+        </p>
+        </>
+      )}
 
       {receipts.status === "unavailable" && (
         <p role="status" className="lx-banner lx-banner-warn" style={{ margin: 0 }}>

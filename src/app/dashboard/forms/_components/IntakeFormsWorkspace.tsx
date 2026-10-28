@@ -978,7 +978,7 @@ export function IntakeFormsWorkspace(props: Props) {
       )}
 
       {canEdit && (dirty || saving) && (
-        <div className="ifm-unsaved" role="region" aria-label="Unsaved changes">
+        <div className="ifm-unsaved" data-save-bar role="region" aria-label="Unsaved changes">
           <i />
           <span style={{ flex: 1, minWidth: 0 }}>Unsaved changes</span>
           <button type="button" className="ifm-unsaved-discard" onClick={discard} disabled={saving}>

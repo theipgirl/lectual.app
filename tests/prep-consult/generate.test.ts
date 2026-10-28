@@ -195,7 +195,7 @@ describe("queuePrepConsultDrafts", () => {
     baseMocks({ lead, orgKey: null });
     const { queuePrepConsultDrafts } = await import("@/lib/prep-consult/generate");
 
-    await expect(queuePrepConsultDrafts(input)).rejects.toThrow(/approval queue/i);
+    await expect(queuePrepConsultDrafts(input)).rejects.toThrow(/switched on for your firm/i);
   });
 
   it("never builds or queues a draft when validation fails first", async () => {

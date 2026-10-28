@@ -13,7 +13,8 @@ import {
   proposalSubline,
   type ActivityEvent,
 } from "./list-labels";
-import { paidMarker, type PaidMarker } from "./paid-view";
+import { formatShortFirmDate } from "@/lib/quotes/labels";
+import { paidLine, paidMarker, type PaidMarker } from "./paid-view";
 import type { PaidState } from "./paid";
 import type { OfferedPackage } from "./segments";
 import type { ProposalPackageBasis, ProposalSource, ProposalStatus } from "./types";
@@ -39,6 +40,25 @@ export type ListRowInput = {
   package_basis: ProposalPackageBasis | null;
 };
 
+/**
+ * The Paid cell of a row (Sprint 29). Four states, never three: "—" for a row that is not accepted, "Paid <date>" (with
+ * Undo for the roles that may), "Not paid" (with Mark paid for them) and "Paid status couldn't be read", which is never
+ * "Not paid" and offers no button.
+ *
+ * PAID IS STILL BY HAND. Mark paid here is the same action the proposal page has, and it is a stopgap: it records that
+ * a person confirmed the payment in Lawmatics. Once the firm's LawPay connection takes payment on the proposal, the paid
+ * state comes from that payment and this button goes away (the state itself stays derived from events, `paid.ts`).
+ */
+export type PaidCellView =
+  | { kind: "none"; text: string }
+  | { kind: "paid"; text: string; /** "Paid · marked by Dawn · Oct 21": who and when, as the tooltip. */ title: string; canUndo: boolean }
+  | { kind: "not_paid"; text: string; canMark: boolean }
+  | { kind: "unreadable"; text: string };
+
+/** Shown beside Mark paid. */
+export const MARK_PAID_NOTE = "Mark paid after you've confirmed the payment in Lawmatics.";
+export const PAID_UNREADABLE_TEXT = "Paid status couldn't be read";
+
 export type ProposalRowView = {
   id: string;
   key: ProposalDisplayKey;
@@ -59,7 +79,20 @@ export type ProposalRowView = {
   paid: PaidMarker | null;
   /** Mark paid is offered: an accepted row that is read as not paid, for a role that may mark. Never while the read failed. */
   canMarkPaid: boolean;
+  /** The Accepted column: "Accepted Oct 21", or "Not yet". */
+  accepted: string;
+  /** The Paid column (see `PaidCellView`). */
+  paidCell: PaidCellView;
 };
+
+/** Where a row sits in "accepted, not paid first". Lower sorts earlier. */
+const PAID_RANK: Record<PaidCellView["kind"], number> = { not_paid: 0, unreadable: 1, paid: 2, none: 3 };
+
+/** The rows in the order a segment shows them. The Accepted segment lists accepted-and-not-paid first; the others keep the list's order. Stable. */
+export function sortForSegment<T extends Pick<ProposalRowView, "paidCell">>(segment: string, rows: readonly T[]): T[] {
+  if (segment !== "accepted") return [...rows];
+  return rows.map((row, index) => ({ row, index })).sort((a, b) => PAID_RANK[a.row.paidCell.kind] - PAID_RANK[b.row.paidCell.kind] || a.index - b.index).map((x) => x.row);
+}
 
 export function buildProposalRowView(
   item: ListRowInput,
@@ -80,11 +113,19 @@ export function buildProposalRowView(
   const display = proposalDisplayStatus(item, { today: ctx.today, issues: item.blocking_issue });
   let paid: PaidMarker | null = null;
   let canMarkPaid = false;
+  let paidCell: PaidCellView = { kind: "none", text: "—" };
   if (item.status === "accepted" && ctx.paid !== undefined) {
     const state = ctx.paid === "unavailable" ? "unreadable" : (ctx.paid.get(item.id) ?? ({ state: "not_paid", undoneAt: null } as const));
     paid = paidMarker(state, ctx.names, ctx.tz);
     canMarkPaid = !!ctx.canMarkPaid && paid.state === "not_paid";
+    if (state === "unreadable") paidCell = { kind: "unreadable", text: PAID_UNREADABLE_TEXT };
+    else if (state.state === "paid") {
+      const when = formatShortFirmDate(state.at, ctx.tz);
+      paidCell = { kind: "paid", text: when ? `Paid ${when}` : "Paid", title: paidLine(state, ctx.names, ctx.tz), canUndo: !!ctx.canMarkPaid };
+    } else paidCell = { kind: "not_paid", text: "Not paid", canMark: canMarkPaid };
   }
+  const acceptedWhen = item.accepted_at ? formatShortFirmDate(item.accepted_at, ctx.tz) : "";
+  const accepted = item.status === "accepted" || item.accepted_at ? (acceptedWhen ? `Accepted ${acceptedWhen}` : "Accepted") : "Not yet";
   const edited = item.package_basis && item.package_basis.edited.length > 0 ? item.package_basis.name : null;
   return {
     id: item.id,
@@ -118,5 +159,7 @@ export function buildProposalRowView(
     }),
     paid,
     canMarkPaid,
+    accepted,
+    paidCell,
   };
 }

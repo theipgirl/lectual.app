@@ -1,4 +1,5 @@
 import { civilDay, evidenceTooltip, monthDay } from "./format";
+import { MOVED_AUTOMATICALLY } from "@/lib/ui/words";
 import { SIGNAL_LABEL, isSignalId, type MoveEvidence, type SignalId } from "./signals";
 
 /**
@@ -48,6 +49,13 @@ function parseEvidence(raw: unknown): MoveEvidence | null {
   }
   if (e.kind === "calendar" && typeof e.starts_at === "string") return { kind: "calendar", title: str(e.title), starts_at: e.starts_at };
   if (e.kind === "payment") return { kind: "payment", at: str(e.at) };
+  if (e.kind === "meeting" && typeof e.starts_at === "string") {
+    return { kind: "meeting", provider: str(e.provider) ?? "meeting", title: str(e.title), starts_at: e.starts_at };
+  }
+  if (e.kind === "proposal" && typeof e.status === "string") {
+    return { kind: "proposal", version: typeof e.version === "number" && Number.isFinite(e.version) ? e.version : null, status: e.status, at: str(e.at) };
+  }
+  if (e.kind === "queue" && typeof e.type === "string") return { kind: "queue", type: e.type, at: str(e.at) };
   return null;
 }
 
@@ -117,9 +125,18 @@ export function currentAgentMoves(rows: readonly ActivityRow[], now: Date, windo
   return out;
 }
 
-/** The date the chip shows: the mail's own date, else the day the agent placed the lead. */
+/** The fact's own date, when its evidence carries one: a mail, proposal or approval date, or the day a held meeting began. */
+export function evidenceOwnDate(evidence: MoveEvidence | null): string | null {
+  if (!evidence) return null;
+  if (evidence.kind === "calendar") return null;
+  if (evidence.kind === "meeting") return evidence.starts_at;
+  return evidence.at;
+}
+
+/** The date the chip shows: the evidence's own date, else the day the agent placed the lead. */
 function chipDate(move: AgentMove, timeZone: string): string | null {
-  if (move.evidence?.kind === "mail" && move.evidence.at) return monthDay(move.evidence.at, timeZone) ?? monthDay(move.at, timeZone);
+  const own = evidenceOwnDate(move.evidence);
+  if (own) return monthDay(own, timeZone) ?? monthDay(move.at, timeZone);
   return monthDay(move.at, timeZone);
 }
 
@@ -128,6 +145,8 @@ export type AgentMoveChip = {
   activityId: string;
   /** "Moved by agent · LOE sent Oct 20" */
   text: string;
+  /** The board card's reason line: "Moved automatically · consult held Oct 23". */
+  why: string;
   /** The evidence, as a sentence. */
   tooltip: string;
   movedAt: string;
@@ -135,12 +154,18 @@ export type AgentMoveChip = {
   today: boolean;
 };
 
+/** "Consult held" -> "consult held"; "LOE sent" keeps its capitals. */
+function lowerFirst(text: string): string {
+  return /^[A-Z][a-z]/.test(text) ? text.charAt(0).toLowerCase() + text.slice(1) : text;
+}
+
 export function chipFor(move: AgentMove, now: Date, timeZone: string): AgentMoveChip {
   const label = move.signal ? SIGNAL_LABEL[move.signal] : "Stage moved";
   const date = chipDate(move, timeZone);
   return {
     activityId: move.activityId,
-    text: `Moved by agent · ${label}${date ? ` ${date}` : ""}`,
+    text: `${MOVED_AUTOMATICALLY} · ${label}${date ? ` ${date}` : ""}`,
+    why: `${MOVED_AUTOMATICALLY} · ${lowerFirst(label)}${date ? ` ${date}` : ""}`,
     tooltip: evidenceTooltip(move.evidence, timeZone),
     movedAt: move.at,
     today: civilDay(move.at, timeZone) === civilDay(now.toISOString(), timeZone),
@@ -189,7 +214,7 @@ export const WHY_TEXT: Record<SuggestionWhy, string> = {
   lost: "This is a closing stage, so a person decides.",
   nurture: "This is a holding stage, so a person decides.",
   "welcome-or-payment": "A welcome or payment signal never moves a lead on its own.",
-  "current-stage": "This lead is in a closing or holding stage, so the Stage Keeper only suggests.",
+  "current-stage": "This lead is in a closing or holding stage, so automatic moves only suggest.",
   "recent-person-move": "A person moved this lead in the last 7 days, so their placement stands.",
   autonomy: "This agent is set to suggest, so it left the move to a person.",
 };
@@ -257,7 +282,10 @@ export function consumedSignalKeys(rows: readonly ActivityRow[]): Set<string> {
     const p = obj(r.payload);
     const key = str(p.signal_key);
     if (!key) continue;
-    if (isAgentMoveRow(r) || isSuggestionRow(r)) out.add(key);
+    if (!isAgentMoveRow(r) && !isSuggestionRow(r)) continue;
+    out.add(key);
+    // The other signals the same decision accounted for (a held consult under a sent proposal).
+    if (Array.isArray(p.also_signal_keys)) for (const also of p.also_signal_keys) if (typeof also === "string" && also) out.add(also);
   }
   return out;
 }

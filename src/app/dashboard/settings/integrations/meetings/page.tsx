@@ -1,3 +1,4 @@
+import { integrationErrorLine } from "@/lib/ui/words";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveFirmSession } from "@/lib/firm/session";
@@ -19,7 +20,7 @@ export const dynamic = "force-dynamic";
 
 const ERRORS: Record<string, string> = {
   forbidden: "Only owners and admins can connect Zoom.",
-  unconfigured: "Zoom sign-in isn't set up on this deployment yet.",
+  unconfigured: "Zoom isn't switched on for your firm yet. Lectual will turn it on.",
   denied: "Zoom sign-in was cancelled. Nothing was connected.",
   expired: "That sign-in took too long or was started elsewhere. Try again.",
   "wrong-session": "You switched account or firm during sign-in, so nothing was connected. Try again.",
@@ -99,12 +100,12 @@ export default async function MeetingsIntegrationPage({ searchParams }: { search
           </p>
         )}
         {fathom?.last_error && fathom.status === "active" && (
-          <HelpText tone="problem">Last run: {fathom.last_error}</HelpText>
+          <HelpText tone="problem">{integrationErrorLine(fathom.status, fathom.last_error)}</HelpText>
         )}
         {!canManage ? (
           <HelpText>Owners and admins connect Fathom and run imports.</HelpText>
         ) : !canSeal ? (
-          <HelpText>Not available yet: this deployment has no encryption key for stored credentials.</HelpText>
+          <HelpText>Not available yet. Lectual will turn it on.</HelpText>
         ) : fathom?.status === "active" ? (
           <>
             <ImportNowButton provider="fathom" />
@@ -133,7 +134,7 @@ export default async function MeetingsIntegrationPage({ searchParams }: { search
         >
           {zoom && canManage && <DisconnectSourceButton provider="zoom" label="Zoom" />}
         </IntegrationHeader>
-        {zoom?.last_error && <HelpText tone="problem">{`${zoom.status === "active" ? "Last run: " : ""}${zoom.last_error}`}</HelpText>}
+        {zoom?.last_error && <HelpText tone="problem">{integrationErrorLine(zoom.status, zoom.last_error)}</HelpText>}
         {!zoomReady ? (
           <HelpText>{ZOOM_NOT_SWITCHED_ON}</HelpText>
         ) : !canManage ? (

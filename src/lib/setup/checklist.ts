@@ -1,14 +1,15 @@
 import { isOfferablePackage } from "@/lib/intake-forms/packages";
+import { ASSISTANTS_NAME, LECTUAL_SETS_UP, notReadyPlural } from "@/lib/ui/words";
 import { INTEGRATIONS_PATH, MODULES_PATH } from "./routes";
-import type { Reading, SetupChecklist, SetupItem, SetupState } from "./types";
+import type { Reading, SetupChecklist, SetupItem, SetupOwner, SetupState } from "./types";
 
-type Verdict = Pick<SetupItem, "status" | "why"> & { href?: string };
+type Verdict = Pick<SetupItem, "status" | "why"> & { href?: string; owner?: SetupOwner };
 
 const done = (why: string): Verdict => ({ status: "done", why });
 const notYet = (why: string, href?: string): Verdict => ({ status: "to-do", why, href });
 const unchecked = (what: string): Verdict => ({
   status: "couldnt-check",
-  why: `We couldn't check ${what} just now. Try again shortly. This is not the same as "to do".`,
+  why: `We couldn't check ${what} just now. Try again in a minute.`,
 });
 
 const RECONNECT = "needs reconnecting";
@@ -59,32 +60,40 @@ function lawmaticsVerdict(r: SetupState["lawmatics"]): Verdict {
   return notYet(`Lawmatics stopped accepting your token. It ${RECONNECT}.`);
 }
 
-function meetingsVerdict(r: SetupState["meetings"]): Verdict {
+/** The Zoom option needs Lectual's Zoom app; Fathom does not, so the item stays the firm's and only says so for Zoom. */
+function meetingsVerdict(r: SetupState["meetings"], zoomApp: boolean): Verdict {
   if (!r.ok) return unchecked("your meeting connections");
   if (r.value.some((c) => c.status === "active")) return done("A meeting source (Fathom or Zoom) is connected.");
-  if (r.value.length > 0) return notYet(`Your meeting source ${RECONNECT}.`);
-  return notYet("Not connected yet. Connect Fathom or Zoom to bring in your consult recordings.");
+  const zoomNote = zoomApp ? "" : ` Zoom: ${LECTUAL_SETS_UP}.`;
+  if (r.value.length > 0) return notYet(`Your meeting source ${RECONNECT}.${zoomNote}`);
+  return notYet(`Not connected yet. Connect Fathom or Zoom to bring in your consult recordings.${zoomNote}`);
 }
 
-function lawpayVerdict(r: SetupState["lawpay"]): Verdict {
+/** LawPay is Lectual's to switch on until the deployment has a LawPay app; a "couldn't check" is never reclassified. */
+function lawpayVerdict(r: SetupState["lawpay"], lawpayApp: boolean): Verdict {
   if (!r.ok) return unchecked("your LawPay connection");
-  if (!r.value) return notYet("Not connected yet. Sign in to your LawPay account so clients can pay by card at signing.");
+  const owner: SetupOwner = lawpayApp ? "firm" : "lectual";
+  if (!r.value) {
+    return lawpayApp
+      ? notYet("Not connected yet. Sign in to your LawPay account so clients can pay by card at signing.")
+      : { ...notYet("LawPay card payments aren't switched on yet. Lectual will turn them on."), owner };
+  }
   if (r.value.status === "active") return done("LawPay is connected.");
-  return notYet(`LawPay stopped accepting your connection. It ${RECONNECT}.`);
+  return { ...notYet(`LawPay stopped accepting your connection. It ${RECONNECT}.`), owner };
 }
 
 function agentsVerdict(modules: SetupState["modules"], r: SetupState["agents"]): Verdict {
   const gate = moduleGate(
     modules,
     "agents",
-    "whether agents are switched on",
-    "Agents aren't switched on for your firm yet. Lectual turns them on.",
+    "whether assistants are switched on",
+    notReadyPlural(ASSISTANTS_NAME),
   );
   if (gate) return gate;
-  if (!r.ok) return unchecked("your agent settings");
+  if (!r.ok) return unchecked("your assistant settings");
   const on = r.value.filter((a) => a.enabled).length;
-  if (on > 0) return done(on === 1 ? "One agent is on." : `${on} agents are on.`);
-  return notYet("No agent is switched on. Turn on at least one.");
+  if (on > 0) return done(on === 1 ? "One assistant is on." : `${on} assistants are on.`);
+  return notYet("No assistant is switched on. Turn on at least one.");
 }
 
 function intakeVerdict(r: SetupState["intakeForms"]): Verdict {
@@ -103,7 +112,7 @@ function packagesVerdict(r: SetupState["services"]): Verdict {
 }
 
 function aiVerdict(configured: boolean): Verdict {
-  return configured ? done("The AI key is set on this deployment.") : notYet("The AI key isn't set on this deployment. Lectual sets it.");
+  return configured ? done("AI is switched on for your firm.") : { ...notYet("AI isn't switched on for your firm yet. Lectual will turn it on."), owner: "lectual" };
 }
 
 type Spec = { id: SetupItem["id"]; label: string; href: string; verdict: (s: SetupState) => Verdict };
@@ -113,9 +122,9 @@ const SPECS: Spec[] = [
   { id: "team", label: "Team invited", href: "/dashboard/settings/team/", verdict: (s) => teamVerdict(s.members) },
   { id: "outlook", label: "Outlook mailbox connected", href: INTEGRATIONS_PATH, verdict: (s) => outlookVerdict(s.modules, s.mailboxes) },
   { id: "lawmatics", label: "Lawmatics connected", href: "/dashboard/settings/integrations/lawmatics/", verdict: (s) => lawmaticsVerdict(s.lawmatics) },
-  { id: "meetings", label: "Fathom or Zoom connected", href: "/dashboard/settings/integrations/meetings/", verdict: (s) => meetingsVerdict(s.meetings) },
-  { id: "lawpay", label: "LawPay connected", href: "/dashboard/settings/integrations/lawpay/", verdict: (s) => lawpayVerdict(s.lawpay) },
-  { id: "agents", label: "At least one agent on", href: "/dashboard/agents/", verdict: (s) => agentsVerdict(s.modules, s.agents) },
+  { id: "meetings", label: "Fathom or Zoom connected", href: "/dashboard/settings/integrations/meetings/", verdict: (s) => meetingsVerdict(s.meetings, s.lectual?.zoomApp ?? true) },
+  { id: "lawpay", label: "LawPay connected", href: "/dashboard/settings/integrations/lawpay/", verdict: (s) => lawpayVerdict(s.lawpay, s.lectual?.lawpayApp ?? true) },
+  { id: "agents", label: "At least one assistant on", href: "/dashboard/agents/", verdict: (s) => agentsVerdict(s.modules, s.agents) },
   { id: "intake", label: "An intake form live", href: "/dashboard/forms/", verdict: (s) => intakeVerdict(s.intakeForms) },
   { id: "packages", label: "Packages saved", href: "/dashboard/settings/services/", verdict: (s) => packagesVerdict(s.services) },
   { id: "ai", label: "AI configured", href: "/dashboard/copilot/", verdict: (s) => aiVerdict(s.aiConfigured) },
@@ -129,13 +138,17 @@ const SPECS: Spec[] = [
  * `to-do`: a failed read must not tell a firm it has finished, or that it
  * hasn't started. The one item that cannot fail is "AI configured" (an
  * environment variable). A module that is off is `to-do` (with a link to
- * Modules), not hidden, so the count is always "N of 10".
+ * Modules), not hidden. Items only Lectual can switch on (AI, LawPay while
+ * the deployment has no LawPay app) are drawn but left out of the count, so
+ * the count is "N of M" with M at most 10.
  */
 export function setupChecklist(state: SetupState): SetupChecklist {
   const items: SetupItem[] = SPECS.map((spec) => {
     const v = spec.verdict(state);
-    return { id: spec.id, label: spec.label, status: v.status, why: v.why, href: v.href ?? spec.href };
+    return { id: spec.id, label: spec.label, status: v.status, owner: v.owner ?? "firm", why: v.why, href: v.href ?? spec.href };
   });
-  const doneCount = items.filter((i) => i.status === "done").length;
-  return { items, doneCount, total: items.length, complete: doneCount === items.length };
+  // An item that is Lectual's and not done is shown, but is not the firm's to finish, so it is not counted.
+  const counted = items.filter((i) => !(i.owner === "lectual" && i.status !== "done"));
+  const doneCount = counted.filter((i) => i.status === "done").length;
+  return { items, doneCount, total: counted.length, complete: doneCount === counted.length };
 }

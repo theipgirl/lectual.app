@@ -42,20 +42,20 @@ describe("rail tree (design/Rail.dc.html)", () => {
   it("drops module-gated children for a firm without the module", () => {
     const shown = labels(railGroups(visibleNav([], "owner"), "/dashboard/"));
     expect(shown).not.toContain("My Mail");
-    expect(shown).not.toContain("Agents");
-    expect(shown).toContain("Queue");
+    expect(shown).not.toContain("Assistants");
+    expect(shown).toContain("Approvals");
     const withAll = labels(railGroups(visibleNav(["mailbox", "agents"], "owner"), "/dashboard/"));
     expect(withAll).toContain("My Mail");
-    expect(withAll).toContain("Agents");
+    expect(withAll).toContain("Assistants");
   });
 
-  it("opens the parent of the current page, and a lead's page belongs to Intake", () => {
+  it("opens the parent of the current page, and a lead's page belongs to Leads", () => {
     const groups = railGroups(visibleNav([], "owner"), "/dashboard/leads/abc/");
-    const intake = groups.flat().find((e) => e.label === "Intake")!;
+    const intake = groups.flat().find((e) => e.label === "Leads")!;
     expect(intake.childActive).toBe(true);
-    expect(intake.kids.find((k) => k.label === "PNC")?.active).toBe(true);
+    expect(intake.kids.find((k) => k.label === "Leads")?.active).toBe(true);
     expect(intake.active).toBe(false);
-    expect(intake.href).toBe("/dashboard/reports/intake/");
+    expect(intake.href).toBe("/dashboard/intake/");
   });
 
   it("marks Today active only on the home page", () => {
@@ -64,13 +64,20 @@ describe("rail tree (design/Rail.dc.html)", () => {
     expect(today("/dashboard/matters/")).toBe(false);
   });
 
-  it("opens each parent's report view, and there is no Reports section", () => {
+  it("a parent opens its list (Sprint 32); its Summary is a tab, and there is no Reports section", () => {
     const groups = railGroups(visibleNav(["mailbox", "agents"], "owner"), "/dashboard/reports/matters/");
     const matters = groups.flat().find((e) => e.label === "Active matters")!;
     expect(matters.active).toBe(true);
     expect(groups.flat().map((e) => e.label)).not.toContain("Reports");
     expect(navItemBySlug("reports")).toBeUndefined();
-    for (const e of groups.flat().filter((x) => x.kids.length)) expect(e.href).toMatch(/^\/dashboard\/reports\/[a-z]+\/$/);
+    const hrefs = Object.fromEntries(groups.flat().filter((x) => x.kids.length).map((e) => [e.label, e.href]));
+    expect(hrefs).toEqual({
+      Communication: "/dashboard/mail/",
+      Leads: "/dashboard/intake/",
+      "Active matters": "/dashboard/matters/",
+      "AI tools": "/dashboard/copilot/",
+    });
+    for (const e of groups.flat()) expect(e.href).not.toMatch(/\/reports\//);
   });
 });
 
@@ -108,9 +115,9 @@ describe("unbuilt sections are hidden (built: false)", () => {
   it("keeps the parents and their other children", () => {
     const groups = railGroups(visibleNav(everything, "owner"), "/dashboard/");
     const find = (label: string) => groups.flat().find((e) => e.label === label)!;
-    expect(find("Communication").kids.map((k) => k.key)).toEqual(["mail", "meetings", "queue", "campaigns"]);
+    expect(find("Communication").kids.map((k) => k.key)).toEqual(["mail", "meetings", "campaigns"]);
     expect(find("Active matters").kids.map((k) => k.key)).toEqual(["matters", "pipeline", "documents"]);
-    expect(find("IP.OS").kids.map((k) => k.key)).toEqual(["copilot", "agents", "skills", "brain"]);
+    expect(find("AI tools").kids.map((k) => k.key)).toEqual(["copilot", "agents", "skills", "brain"]);
   });
 
   it("every unbuilt section is still listed in NAV so its URL stays a known 404", () => {
@@ -120,7 +127,7 @@ describe("unbuilt sections are hidden (built: false)", () => {
 
 describe("the Skills section (Sprint 18)", () => {
   const rail = (modules: string[]) => railGroups(visibleNav(modules, "owner"), "/dashboard/");
-  const iposKids = (modules: string[]) => rail(modules).flat().find((e) => e.label === "IP.OS")!.kids.map((k) => k.key);
+  const iposKids = (modules: string[]) => rail(modules).flat().find((e) => e.label === "AI tools")!.kids.map((k) => k.key);
 
   it("is gated on agent-toolkit and is a built section", () => {
     const skills = navItemBySlug("skills")!;
@@ -136,7 +143,7 @@ describe("the Skills section (Sprint 18)", () => {
     expect(navItemAllowed(skills, [], "owner")).toBe(false);
   });
 
-  it("appears under IP.OS in the rail for a firm with agent-toolkit, and not for one without", () => {
+  it("appears under AI tools in the rail for a firm with agent-toolkit, and not for one without", () => {
     expect(iposKids(["agent-toolkit"])).toContain("skills");
     expect(iposKids(["agent-toolkit", "agents"])).toEqual(["copilot", "agents", "skills", "brain"]);
     expect(iposKids(["agents"])).not.toContain("skills");

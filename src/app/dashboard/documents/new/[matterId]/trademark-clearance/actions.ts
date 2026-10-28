@@ -55,7 +55,7 @@ export async function generateTrademarkClearanceAction(
       error:
         err instanceof DocumentFlowError
           ? err.message
-          : "Something went wrong generating the trademark clearance opinion. Try again, or check that this deployment has an AI provider configured.",
+          : "Something went wrong generating the trademark clearance opinion. Try again in a minute. If it keeps happening, use Send feedback.",
     };
   }
 

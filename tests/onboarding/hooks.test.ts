@@ -21,8 +21,6 @@ const rail = (modules: string[], role = "owner") =>
       pendingCount: 2,
       counts: {},
       initialPinned: false,
-      initials: "AB",
-      name: "Ada",
     }),
   );
 
@@ -38,9 +36,9 @@ describe("rail hooks", () => {
 
   it("a parent row carries its children's tokens so a collapsed rail can still be spotlighted", () => {
     const html = rail([]);
-    const parent = /<a[^>]*data-tour="([^"]*nav-queue[^"]*)"[^>]*lx-rail-item/.exec(html) ?? /data-tour="([^"]*nav-queue[^"]*)"[^>]*class="lx-rail-item/.exec(html);
-    expect(parent?.[1]).toContain("nav-queue");
-    expect(parent?.[1]).toContain("nav-calendar".replace("calendar", "campaigns"));
+    const parent = /<a[^>]*data-tour="([^"]*nav-meetings[^"]*)"[^>]*lx-rail-item/.exec(html) ?? /data-tour="([^"]*nav-meetings[^"]*)"[^>]*class="lx-rail-item/.exec(html);
+    expect(parent?.[1]).toContain("nav-meetings");
+    expect(parent?.[1]).toContain("nav-campaigns");
   });
 
   it("does not offer a token for a section the firm lacks", () => {

@@ -1,9 +1,16 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { sectionLabelFor } from "@/lib/section-label";
+import { sectionLabelFor, showSectionLabel } from "@/lib/section-label";
 
-/** The mono section name beside the wordmark, read off the current route. */
+/** The mono section name beside the wordmark, read off the current route. Hidden where the page's own title says the same. */
 export function SectionLabel() {
-  return <div className="lx-section">{sectionLabelFor(usePathname())}</div>;
+  const pathname = usePathname();
+  if (!showSectionLabel(pathname)) return null;
+  return (
+    <>
+      <div className="lx-vr" />
+      <div className="lx-section">{sectionLabelFor(pathname)}</div>
+    </>
+  );
 }

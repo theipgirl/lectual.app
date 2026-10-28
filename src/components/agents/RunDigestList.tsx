@@ -10,7 +10,7 @@ export function RunDigestList({ digest, paused }: { digest: RunDigest; paused: b
   if (digest.status === "unavailable") {
     return (
       <p className="lx-note" role="alert" style={{ margin: 0, color: "var(--warn)" }}>
-        The run log couldn&apos;t be read, so we can&apos;t say what the agents did. This is not &ldquo;nothing ran&rdquo;.
+        Can&apos;t show what the assistants did right now. Refresh to try again.
       </p>
     );
   }
@@ -18,8 +18,8 @@ export function RunDigestList({ digest, paused }: { digest: RunDigest; paused: b
     return (
       <p className="lx-note" style={{ margin: 0 }}>
         {paused
-          ? `Autopilot is paused, so no agent ran in the last ${digest.windowHours} hours.`
-          : `No agent ran in the last ${digest.windowHours} hours.`}
+          ? `Assistants are paused, so none ran in the last ${digest.windowHours} hours.`
+          : `No assistant ran in the last ${digest.windowHours} hours.`}
       </p>
     );
   }

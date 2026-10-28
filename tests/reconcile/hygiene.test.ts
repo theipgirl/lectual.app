@@ -86,7 +86,7 @@ describe("what the screen is allowed to touch", () => {
     const sources = read("src/lib/reconcile/sources.ts") + read("src/app/dashboard/intake/reconcile/actions.ts");
     expect(sources).not.toMatch(/select\(\s*["'`]\*/);
     const tables = [...sources.matchAll(/\.from\("([a-z_]+)"\)/g)].map((m) => m[1]);
-    expect([...new Set(tables)].sort()).toEqual(["crm_activity", "crm_firm_brain_entry", "crm_lead", "crm_stage"]);
+    expect([...new Set(tables)].sort()).toEqual(["crm_activity", "crm_firm_brain_entry", "crm_lead", "crm_stage", "mailbox_connection"]);
   });
 
   it("nothing is written to Lawmatics: no write module, no HTTP verb, no write call", () => {

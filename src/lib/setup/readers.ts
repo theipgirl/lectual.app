@@ -9,6 +9,8 @@ import { listMeetingConnections } from "@/lib/meetings/connection";
 import { getLawPayConnection } from "@/lib/payments/lawpay-connection";
 import { listIntakeForms } from "@/lib/intake-forms/store";
 import { listServiceItems } from "@/lib/quotes/service-library";
+import { lawPayClientCredentials } from "@/lib/payments/lawpay-config";
+import { zoomClientCredentials } from "@/lib/meetings/config";
 import type { SetupReaders } from "./build";
 
 /**
@@ -40,4 +42,6 @@ export const liveReaders: SetupReaders = {
   listIntakeForms,
   listServiceItems: () => listServiceItems(false),
   aiConfigured,
+  lawpayAppConfigured: () => lawPayClientCredentials() !== null,
+  zoomAppConfigured: () => zoomClientCredentials() !== null,
 };

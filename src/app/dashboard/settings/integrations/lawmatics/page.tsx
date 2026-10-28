@@ -1,3 +1,4 @@
+import { integrationErrorLine } from "@/lib/ui/words";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveFirmSession } from "@/lib/firm/session";
@@ -75,7 +76,7 @@ export default async function LawmaticsPage() {
             Lawmatics stopped accepting this token. Paste a new one to keep importing.
           </p>
         )}
-        {conn?.last_error && active && <p className="lx-note" style={{ margin: 0, color: "var(--wine)" }}>Last run: {conn.last_error}</p>}
+        {conn?.last_error && active && <p className="lx-note" style={{ margin: 0, color: "var(--wine)" }}>{integrationErrorLine(conn.status, conn.last_error)}</p>}
         {canManage ? (
           (!conn || !active) && <ConnectLawmatics reconnect={!!conn} />
         ) : (
@@ -125,7 +126,7 @@ export default async function LawmaticsPage() {
           </div>
           {loeConfig.status === "unavailable" ? (
             <p role="alert" className="lx-banner lx-banner-risk" style={{ margin: 0 }}>
-              We couldn&apos;t read your proposal settings. This is a problem reaching the database, not a sign that the setting is off. Try again shortly.
+              We couldn&apos;t read your proposal settings. Refresh to try again.
             </p>
           ) : (
             <>

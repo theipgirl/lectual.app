@@ -96,7 +96,7 @@ export async function draftFollowUpAction(_prev: ActionState, formData: FormData
 
   const orgKey = await activeQueueOrgKey();
   if (!orgKey) return { error: "No approval queue is connected for your firm, so no client email was drafted." };
-  if (!aiConfigured()) return { error: "Drafting isn't set up on this deployment yet." };
+  if (!aiConfigured()) return { error: "Drafting isn't switched on for your firm yet. Lectual will turn it on." };
 
   const read = await getMeeting(meetingId);
   if (read.status !== "ok") return { error: "Couldn't load the meeting. Try again shortly." };

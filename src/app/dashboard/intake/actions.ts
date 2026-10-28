@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { assignLead, moveLeadStage } from "@/lib/pipeline";
-import { CAN_WRITE_LEAD, resolveCurrentRole } from "@/lib/pipeline/leads";
+import { CAN_MOVE_STAGE, CAN_WRITE_LEAD, resolveCurrentRole } from "@/lib/pipeline/leads";
+import { runBulkMove, type BulkMoveResult } from "@/lib/pipeline/bulk-move";
 import { forbiddenLeadWrite } from "@/lib/pipeline/errors";
 import { setLane, setReferralSource } from "@/lib/intake/leads";
 import { isLane, type Lane } from "@/lib/leads/lane";
@@ -95,6 +96,45 @@ export async function moveStageAction(
 }
 
 /**
+ * "Move to..." for the cards selected on the board: up to 200 leads to one non-`won` stage, each through the same
+ * `moveLeadStage` the drag uses (so each is logged on its own timeline). The rules, and the per-lead result, are in
+ * `runBulkMove`; this only wires the real reads. Everything is through the caller's scoped client (RLS is the tenant
+ * boundary) and the role is re-resolved on this call.
+ */
+export async function bulkMoveStageAction(leadIds: string[], stageId: string): Promise<BulkMoveResult> {
+  const result = await runBulkMove(
+    { leadIds, stageId },
+    {
+      canMove: async () => {
+        const supabase = await getScopedClient();
+        return CAN_MOVE_STAGE.includes(await resolveCurrentRole(supabase));
+      },
+      readStage: async (id) => {
+        const supabase = await getScopedClient();
+        const { data, error } = await supabase.from("crm_stage").select("id, category").eq("id", id).maybeSingle();
+        if (error) throw error;
+        return data ? { id: data.id, category: String(data.category) } : null;
+      },
+      readLeads: async (ids) => {
+        const supabase = await getScopedClient();
+        const { data, error } = await supabase.from("crm_lead").select("id, current_stage_id").in("id", ids);
+        if (error) throw error;
+        return data ?? [];
+      },
+      move: async (leadId, id) => {
+        await moveLeadStage(leadId, id);
+      },
+      explain: friendlyMoveStageError,
+    },
+  );
+  if (result.ok && result.moved.length > 0) {
+    revalidatePath("/dashboard/intake/");
+    for (const leadId of result.moved) revalidatePath(`/dashboard/leads/${leadId}`);
+  }
+  return result;
+}
+
+/**
  * Sets or clears a lead's temperature, which is the routing lane — the
  * person's call, over what the activity rules and triage suggest (intake SOP
  * Stage 2). It is the only temperature write on this surface. The data layer
@@ -102,12 +142,12 @@ export async function moveStageAction(
  */
 export async function setLaneAction(leadId: string, lane: Lane | null): Promise<IntakeActionResult> {
   if (!leadId) return { ok: false, error: "Missing lead." };
-  if (lane !== null && !isLane(lane)) return { ok: false, error: "That isn't a lane." };
+  if (lane !== null && !isLane(lane)) return { ok: false, error: "That isn't a temperature." };
 
   try {
     await setLane(leadId, lane);
   } catch (err) {
-    return { ok: false, error: friendlyLeadWriteError(err, "Couldn't set this lead's lane.") };
+    return { ok: false, error: friendlyLeadWriteError(err, "Couldn't set this lead's temperature.") };
   }
 
   revalidatePath("/dashboard/intake/");

@@ -71,51 +71,51 @@ describe("Run now action: every refusal returns the shared sentence and never re
   it("a role below senior admin (a forged request)", async () => {
     for (const role of ["viewer", "attorney", "paralegal", "intake", "social_media"]) {
       state.role = role;
-      expect(await run()).toEqual({ error: "Only an owner, admin or senior admin can run agents." });
+      expect(await run()).toEqual({ error: "Only an owner, admin or senior admin can run assistants." });
     }
     expect(state.runOneAgent).not.toHaveBeenCalled();
   });
 
   it("a firm without the agents module, and a signed-out caller", async () => {
     state.modules = [];
-    expect(await run()).toEqual({ error: "Only an owner, admin or senior admin can run agents." });
+    expect(await run()).toEqual({ error: "Only an owner, admin or senior admin can run assistants." });
     state.modules = ["agents"];
     state.signedIn = false;
-    expect(await run()).toEqual({ error: "Only an owner, admin or senior admin can run agents." });
+    expect(await run()).toEqual({ error: "Only an owner, admin or senior admin can run assistants." });
     expect(state.runOneAgent).not.toHaveBeenCalled();
   });
 
   it("an agent that is off, and an agent with no setting row", async () => {
     state.setting = { enabled: false, autonomy: "draft" };
-    expect(await run()).toEqual({ error: "Switch the agent on first." });
+    expect(await run()).toEqual({ error: "Switch the assistant on first." });
     state.setting = null;
-    expect(await run()).toEqual({ error: "Switch the agent on first." });
+    expect(await run()).toEqual({ error: "Switch the assistant on first." });
     expect(state.runOneAgent).not.toHaveBeenCalled();
   });
 
   it("a setting that couldn't be read is not 'off'", async () => {
     state.settingError = { message: "boom" };
     const res = await run();
-    expect(res.error).toMatch(/couldn't read this agent's setting/);
+    expect(res.error).toMatch(/couldn't read this assistant's setting/);
     expect(res.error).not.toMatch(/Switch the agent on/);
     expect(state.runOneAgent).not.toHaveBeenCalled();
   });
 
   it("a paused firm", async () => {
     state.autopilot = { status: "ok", state: { paused: true } };
-    expect(await run()).toEqual({ error: "Autopilot is paused for the firm, so no agent runs. Resume Autopilot first." });
+    expect(await run()).toEqual({ error: "Assistants paused for your firm, so none of them run. Resume them first." });
     expect(state.runOneAgent).not.toHaveBeenCalled();
   });
 
   it("an Autopilot state that couldn't be read", async () => {
     state.autopilot = { status: "unavailable" };
-    expect(await run()).toEqual({ error: "We couldn't check whether Autopilot is paused, so nothing will run." });
+    expect(await run()).toEqual({ error: "We couldn't check whether assistants are paused, so nothing will run." });
     expect(state.runOneAgent).not.toHaveBeenCalled();
   });
 
   it("a missing AI key, except for the Stage Keeper", async () => {
     state.ai = false;
-    expect(await run()).toEqual({ error: "The AI key isn't configured on this deployment." });
+    expect(await run()).toEqual({ error: "AI isn't switched on for your firm yet. Lectual will turn it on." });
     expect(state.runOneAgent).not.toHaveBeenCalled();
     await run("stage-keeper");
     expect(state.runOneAgent).toHaveBeenCalledTimes(1);
@@ -124,7 +124,7 @@ describe("Run now action: every refusal returns the shared sentence and never re
   it("a pending database update, for the three agents that need it", async () => {
     state.update = "pending";
     for (const agent of ["morning-brief", "consult-prep", "inbox-summary"]) {
-      expect(await run(agent), agent).toEqual({ error: "Not available until the database update (lectual 0098)." });
+      expect(await run(agent), agent).toEqual({ error: "This isn't switched on for your firm yet. Lectual will turn it on." });
     }
     expect(state.runOneAgent).not.toHaveBeenCalled();
     await run("intake-triage");
@@ -132,16 +132,16 @@ describe("Run now action: every refusal returns the shared sentence and never re
   });
 
   it("an unknown agent", async () => {
-    expect(await run("nope")).toEqual({ error: "Unknown agent." });
+    expect(await run("nope")).toEqual({ error: "Unknown assistant." });
     expect(state.runOneAgent).not.toHaveBeenCalled();
   });
 
   it("two causes at once: the page's precedence", async () => {
     state.setting = { enabled: false, autonomy: "draft" };
     state.autopilot = { status: "ok", state: { paused: true } };
-    expect(await run()).toEqual({ error: "Switch the agent on first." });
+    expect(await run()).toEqual({ error: "Switch the assistant on first." });
     state.role = "viewer";
-    expect(await run()).toEqual({ error: "Only an owner, admin or senior admin can run agents." });
+    expect(await run()).toEqual({ error: "Only an owner, admin or senior admin can run assistants." });
   });
 
   it("refuses without refreshing the page", async () => {
@@ -167,7 +167,7 @@ describe("Run now action: the outcomes", () => {
 
   it("a failed run is 'The run failed: <error>'", async () => {
     state.outcome = { status: "error", error: "model overloaded" };
-    expect(await run()).toEqual({ error: "The run failed: model overloaded" });
+    expect(await run()).toEqual({ error: "The run failed. The AI service was busy or slow. Try Run now again later." });
     expect(state.refresh).toHaveBeenCalledTimes(1);
   });
 
@@ -175,6 +175,6 @@ describe("Run now action: the outcomes", () => {
     state.outcome = { status: "skipped", reason: "paused" };
     const res = await run();
     expect(res.ok).toBeUndefined();
-    expect(res.error).toMatch(/Autopilot is paused/);
+    expect(res.error).toMatch(/paused for your firm/);
   });
 });

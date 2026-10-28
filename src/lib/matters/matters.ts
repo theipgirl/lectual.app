@@ -10,6 +10,8 @@ import type { FilingBasis } from "./ip-fields";
 import { type MatterStage, listMatterStages } from "./stages";
 import { nextMatterNumber } from "./numbering";
 import { carryPayload, consultCarryForLead, type ConsultDb } from "@/lib/consult/store";
+import { ReadableError } from "@/lib/ui/readable-error";
+
 
 /** The crm_matter row exactly as the table stores it. */
 export type MatterRow = Database["public"]["Tables"]["crm_matter"]["Row"];
@@ -73,10 +75,10 @@ export async function requireMatterWriteRole(
   const { data, error } = await supabase.rpc("current_org_role");
   if (error) throw error;
   if (!isRole(data)) {
-    throw new Error("You don't have permission to edit matters.");
+    throw new ReadableError("You don't have permission to edit matters.");
   }
   if (!MATTER_WRITE_ROLES.includes(data)) {
-    throw new Error(`Forbidden: role '${data}' cannot write matters`);
+    throw new ReadableError(`Forbidden: role '${data}' cannot write matters`);
   }
   return data;
 }
@@ -203,7 +205,7 @@ export async function createMatter(input: CreateMatterInput): Promise<MatterRow>
   // single source of truth for the new matter's tenant.
   const { data: orgId, error: orgError } = await supabase.rpc("current_org_id");
   if (orgError) throw orgError;
-  if (!orgId) throw new Error("No active organization for the current session.");
+  if (!orgId) throw new ReadableError("No active organization for the current session.");
 
   let matterNumber = input.matterNumber;
   if (!matterNumber) {
@@ -266,7 +268,7 @@ export async function updateMatterIpFields(
   const columns = ipColumns(fields);
   if (Object.keys(columns).length === 0) {
     const existing = await getMatter(id);
-    if (!existing) throw new Error("Matter not found.");
+    if (!existing) throw new ReadableError("Matter not found.");
     return existing;
   }
 
@@ -379,7 +381,7 @@ export async function updateMatterStatus(id: string, status: MatterStatus): Prom
   await requireMatterWriteRole(supabase);
 
   if (!isMatterStatus(status)) {
-    throw new Error(`'${status}' isn't a valid matter status.`);
+    throw new ReadableError(`'${status}' isn't a valid matter status.`);
   }
 
   const { data, error } = await supabase
@@ -457,7 +459,7 @@ export async function updateMatterHeader(
   if (!current) throw recordNotFoundError("matter");
 
   const checked = validateMatterHeader(input, current);
-  if (!checked.ok) throw new Error(checked.error);
+  if (!checked.ok) throw new ReadableError(checked.error);
   if (checked.fields.length === 0) return { matter: current, fields: [] };
 
   const { data, error } = await supabase

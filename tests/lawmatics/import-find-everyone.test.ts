@@ -75,14 +75,14 @@ function existing(over: Partial<ExistingLead> = {}): ExistingLead {
 
 const FILTER_ON: PlanOptions = { ...DEFAULT_PLAN_OPTIONS, practiceAreaFilter: "Trademark" };
 
-describe("a stage the firm has no name for is imported, not dropped", () => {
-  it.each(["Proposal Sent", "Consult Completed", "Discovery Call No Show"])('"%s" is created in the first open stage with the flag', (stageName) => {
+describe("a stage Lawmatics names never chooses the lead's stage: everybody is imported into the new-enquiry stage, flagged", () => {
+  it.each(["Proposal Sent", "Consult Completed", "Discovery Call No Show"])('"%s" is created in the new-enquiry stage with the flag', (stageName) => {
     const plan = planImport([rec({ stageName })], STAGES, []);
     expect(plan.skipped).toEqual([]);
     expect(plan.unmapped).toEqual([]);
     expect(plan.creates).toHaveLength(1);
     const c = plan.creates[0];
-    // The lowest-ordered OPEN stage, though it is not first in the list.
+    // The new-enquiry stage (by name, and also the lowest-ordered OPEN stage), though it is not first in the list.
     expect(c.stageId).toBe("s-pnc");
     expect(c.stageDecision).toEqual({
       lawmaticsStage: stageName,
@@ -92,15 +92,27 @@ describe("a stage the firm has no name for is imported, not dropped", () => {
     expect(plan.totals).toMatchObject({ create: 1, stageDecision: 1, unmapped: 0, skipped: 0 });
   });
 
-  it("a person with no stage at all is flagged the same way, not parked silently", () => {
+  it("a person with no Lawmatics stage goes to the new-enquiry stage and has nothing to decide", () => {
     const plan = planImport([rec({ stageName: null })], STAGES, []);
-    expect(plan.creates[0].stageDecision?.label).toBe("Imported, stage needs a decision: no stage");
+    expect(plan.creates[0]).toMatchObject({ stageId: "s-pnc", stageDecision: null });
   });
 
-  it("a stage the firm does have is created there with no flag", () => {
+  it("even a Lawmatics stage that is also the name of one of the firm's stages does not place the lead there", () => {
     const plan = planImport([rec()], STAGES, []);
-    expect(plan.creates[0]).toMatchObject({ stageId: "s-consult", stageDecision: null });
-    expect(plan.totals.stageDecision).toBe(0);
+    expect(plan.creates[0]).toMatchObject({ stageId: "s-pnc", sourceStageName: "Consultation Scheduled" });
+    expect(plan.creates[0].stageDecision?.label).toBe("Imported, stage needs a decision: Consultation Scheduled");
+    expect(plan.totals.stageDecision).toBe(1);
+  });
+
+  it("the new-enquiry stage is found by name before position, and falls back to the first open stage", () => {
+    const named: PlanStage[] = [
+      { id: "s-first", name: "Follow-Up", category: "open", orderIndex: 1 },
+      { id: "s-new", name: "New Lead", category: "open", orderIndex: 4 },
+      { id: "s-won", name: "Signed", category: "won", orderIndex: 9 },
+    ];
+    expect(planImport([rec()], named, []).creates[0].stageId).toBe("s-new");
+    const unnamed = named.filter((s) => s.id !== "s-new");
+    expect(planImport([rec()], unnamed, []).creates[0].stageId).toBe("s-first");
   });
 
   it("never invents a mapping: the alias table still says Proposal Sent matches nothing", async () => {
@@ -115,7 +127,7 @@ describe("a stage the firm has no name for is imported, not dropped", () => {
     expect(plan.creates).toEqual([]);
     expect(plan.unmapped).toHaveLength(1);
     expect(plan.unmapped[0].reason).toMatch(/no open stage/i);
-    expect(plan.unmapped[0].reason).toContain("Proposal Sent");
+    expect(plan.unmapped[0].sourceStageName).toBe("Proposal Sent");
   });
 
   it("leaves a stage-less list (no categories known) in unmapped rather than guessing a stage", () => {
@@ -143,10 +155,11 @@ describe('"Hired" and "Hired Client" are imported as leads and never put in a wo
     expect(plan.creates[0].stageDecision?.hired).toBe(true);
   });
 
-  it("and a Lawmatics stage that is one of the firm's matter-opening stages", () => {
+  it("a Lawmatics stage that happens to be named like one of the firm's matter-opening stages still places nobody there", () => {
     const plan = planImport([rec({ stageName: "Signed LOE / Deposit Received" })], STAGES, []);
     expect(plan.creates[0].stageId).toBe("s-pnc");
-    expect(plan.creates[0].stageDecision?.label).toBe(HIRED_LABEL);
+    expect(plan.creates[0].stageDecision?.hired).toBe(false);
+    expect(plan.creates[0].stageDecision?.label).toBe("Imported, stage needs a decision: Signed LOE / Deposit Received");
   });
 });
 
@@ -428,14 +441,14 @@ describe("applyImport writes the contact leads and flags the stand-in stages", (
     return { mod: await import("@/lib/lawmatics/import"), fetchMock };
   }
 
-  it("creates the prospects and the contact lead; flags exactly the two stand-in stages", async () => {
+  it("creates the prospects and the contact lead; flags every lead Lawmatics gave a stage", async () => {
     const db = fakeDb();
     const { mod, fetchMock } = await load(db);
     const preview = await mod.previewImport();
-    expect(preview.plan.totals).toMatchObject({ create: 4, stageDecision: 2, contactOnly: 1 });
+    expect(preview.plan.totals).toMatchObject({ create: 4, stageDecision: 3, contactOnly: 1 });
 
     const report = await mod.applyImport(preview.plan.fingerprint, undefined, 60_000);
-    expect(report).toMatchObject({ created: 4, contactsCreated: 1, stageDecisions: 2, flagsNotRecorded: 0, partial: false });
+    expect(report).toMatchObject({ created: 4, contactsCreated: 1, stageDecisions: 3, flagsNotRecorded: 0, partial: false });
 
     const contactLead = db.leads.find((l) => l.email === "lone@x.example")!;
     expect(contactLead).toMatchObject({ referral_detail: "Lawmatics contact", current_stage_id: "s-pnc" });
@@ -445,7 +458,10 @@ describe("applyImport writes the contact leads and flags the stand-in stages", (
     expect(db.leads.every((l) => l.current_stage_id !== "s-won")).toBe(true);
 
     const flags = db.activity.map((a) => a.payload as Record<string, unknown>).sort((a, b) => String(a.lawmatics_stage_unmapped).localeCompare(String(b.lawmatics_stage_unmapped)));
+    // Everybody is filed in the new-enquiry stage; the Lawmatics stage is only recorded as text.
+    expect(db.leads.filter((l) => l.lawmatics_id).every((l) => l.current_stage_id === "s-pnc")).toBe(true);
     expect(flags).toEqual([
+      expect.objectContaining({ source: "lawmatics_import", lawmatics_stage_unmapped: "Consultation Scheduled", hired_in_lawmatics: false }),
       expect.objectContaining({ source: "lawmatics_import", lawmatics_stage_unmapped: "Hired Client", hired_in_lawmatics: true }),
       expect.objectContaining({ source: "lawmatics_import", lawmatics_stage_unmapped: "Proposal Sent", hired_in_lawmatics: false }),
     ]);
