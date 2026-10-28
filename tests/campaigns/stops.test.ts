@@ -70,11 +70,11 @@ describe("staleSince — the approval-time warning rule", () => {
 });
 
 describe("the words", () => {
-  it("Sequence stopped — signed quote, Oct 3 (in the firm's zone)", () => {
-    expect(stopLine({ reason: "signed", at: "2026-10-03T21:10:00Z" }, "America/New_York")).toBe("Sequence stopped — signed quote, Oct 3");
+  it("Campaign stopped — signed quote, Oct 3 (in the firm's zone)", () => {
+    expect(stopLine({ reason: "signed", at: "2026-10-03T21:10:00Z" }, "America/New_York")).toBe("Campaign stopped — signed quote, Oct 3");
     // 01:00 UTC on the 4th is still the 3rd in New York.
-    expect(stopLine({ reason: "paid", at: "2026-10-04T01:00:00Z" }, "America/New_York")).toBe("Sequence stopped — payment recorded, Oct 3");
-    expect(stopLine({ reason: null, at: null })).toBe("Sequence stopped");
+    expect(stopLine({ reason: "paid", at: "2026-10-04T01:00:00Z" }, "America/New_York")).toBe("Campaign stopped — payment recorded, Oct 3");
+    expect(stopLine({ reason: null, at: null })).toBe("Campaign stopped");
   });
   it("Signed Oct 3 — the warning headline", () => {
     expect(staleHeadline({ reason: "signed", at: "2026-10-03T21:10:00Z" }, "America/New_York")).toBe("Signed Oct 3");
@@ -92,7 +92,7 @@ describe("the words", () => {
         created_at: "2026-10-03T21:10:00Z",
         payload: { reason: "signed", sequence_name: "UGW nurture" },
       }),
-    ).toMatchObject({ title: "Sequence stopped — signed quote", detail: "UGW nurture" });
+    ).toMatchObject({ title: "Campaign stopped — signed quote", detail: "UGW nurture" });
     expect(
       describeActivity({
         type: "lead_updated",

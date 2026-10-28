@@ -39,7 +39,7 @@ export async function stopLeadSequenceAction(_prev: LeadSequenceState, formData:
   const enrollmentId = String(formData.get("enrollmentId") ?? "");
   const reason = String(formData.get("reason") ?? "manual");
   if (!UUID.test(leadId) || !UUID.test(enrollmentId)) return { error: "Missing enrollment." };
-  if (!isStopReason(reason) || !MANUAL_STOP_REASONS.includes(reason)) return { error: "Choose why this sequence is stopping." };
+  if (!isStopReason(reason) || !MANUAL_STOP_REASONS.includes(reason)) return { error: "Choose why this campaign is stopping." };
   try {
     // Must be one of THIS lead's enrollments (read through RLS), so a posted
     // id from another lead or firm is refused rather than stopped.
@@ -48,10 +48,10 @@ export async function stopLeadSequenceAction(_prev: LeadSequenceState, formData:
     const after = await stopEnrollment(enrollmentId, reason);
     revalidatePath(`/dashboard/campaigns/${after.sequence_id}/`);
   } catch (err) {
-    return { error: friendlyCampaignError(err, "Couldn't stop this sequence.") };
+    return { error: friendlyCampaignError(err, "Couldn't stop this campaign.") };
   }
   revalidatePath(`/dashboard/leads/${leadId}`);
-  return { message: "Sequence stopped." };
+  return { message: "Campaign stopped." };
 }
 
 /**

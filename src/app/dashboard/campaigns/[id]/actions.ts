@@ -16,7 +16,13 @@ import {
   type DripStepType,
 } from "@/lib/automation/drips";
 import { advanceEnrollment } from "@/lib/campaigns/advance";
-import { DRIP_STEP_TYPES } from "@/lib/campaigns/steps";
+import {
+  ADDABLE_STEP_TYPES,
+  START_NEEDS_STEP,
+  START_UNREADABLE,
+  STARTER_STEPS,
+  STARTER_TASK_TITLE,
+} from "@/lib/campaigns/steps";
 import { stopLine } from "@/lib/campaigns/stops";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { friendlyCampaignError, type ActionState } from "../errors";
@@ -61,7 +67,7 @@ async function requireVisibleSequence(sequenceId: string): Promise<void> {
 }
 
 function isStepType(value: unknown): value is DripStepType {
-  return typeof value === "string" && (DRIP_STEP_TYPES as readonly string[]).includes(value);
+  return typeof value === "string" && (ADDABLE_STEP_TYPES as readonly string[]).includes(value);
 }
 
 // ── Sequence details ─────────────────────────────────────────────────────
@@ -88,6 +94,16 @@ export async function toggleSequenceAction(_prev: ActionState, formData: FormDat
   if (!sequenceId) return { error: "Missing campaign." };
 
   try {
+    // Pausing is always allowed; starting needs at least one step that was read successfully.
+    if (nextActive) {
+      let stepCount: number;
+      try {
+        stepCount = (await listSteps(sequenceId)).length;
+      } catch {
+        return { error: START_UNREADABLE };
+      }
+      if (stepCount === 0) return { error: START_NEEDS_STEP };
+    }
     await toggleSequenceActive(sequenceId, nextActive);
   } catch (err) {
     return errorState(err, "Couldn't update this campaign.");
@@ -123,10 +139,7 @@ export async function addStepAction(_prev: ActionState, formData: FormData): Pro
     if (typeRaw === "email" && !(await listTemplates()).some((t) => t.id === templateId)) {
       return { error: "That template couldn't be found. Refresh and try again." };
     }
-    const existing = await listSteps(sequenceId);
-    const nextIndex = existing.reduce((max, step) => Math.max(max, step.order_index + 1), 0);
-    await addStep(sequenceId, {
-      orderIndex: nextIndex,
+    await appendStep(sequenceId, {
       type: typeRaw,
       delayHours: Math.round(delayHours),
       templateId: typeRaw === "email" ? templateId : null,
@@ -137,6 +150,59 @@ export async function addStepAction(_prev: ActionState, formData: FormData): Pro
   }
   revalidateCampaign(sequenceId);
   return {};
+}
+
+/** The one append path: next order_index from a fresh read, then the admin-gated `addStep`. */
+async function appendStep(
+  sequenceId: string,
+  step: { type: DripStepType; delayHours: number; templateId: string | null; config: Record<string, unknown> },
+): Promise<void> {
+  const existing = await listSteps(sequenceId);
+  const nextIndex = existing.reduce((max, s) => Math.max(max, s.order_index + 1), 0);
+  await addStep(sequenceId, { orderIndex: nextIndex, ...step });
+}
+
+/**
+ * "Add these steps" on an empty campaign: the starter suggestion as DRAFT steps through the same
+ * append path. Everything is validated before the first insert. Nothing is enrolled, started,
+ * drafted into the queue or sent.
+ */
+export async function addStarterStepsAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const sequenceId = String(formData.get("sequenceId") ?? "");
+  const thankYou = String(formData.get("templateThankYou") ?? "").trim();
+  const followUp = String(formData.get("templateFollowUp") ?? "").trim();
+  if (!sequenceId) return { error: "Missing campaign." };
+  if (!thankYou || !followUp) return { error: "Choose an email template for each email step." };
+
+  let added = 0;
+  try {
+    await requireVisibleSequence(sequenceId);
+    const templates = await listTemplates();
+    if (![thankYou, followUp].every((id) => templates.some((t) => t.id === id))) {
+      return { error: "That template couldn't be found. Refresh and try again." };
+    }
+    if ((await listSteps(sequenceId)).length > 0) {
+      return { error: "This campaign already has steps. Refresh to see them." };
+    }
+    const templateFor: Record<string, string | null> = { "thank-you": thankYou, "follow-up": followUp, nurture: null };
+    for (const step of STARTER_STEPS) {
+      await appendStep(sequenceId, {
+        type: step.type,
+        delayHours: step.delayHours,
+        templateId: templateFor[step.key],
+        config: step.type === "task" ? { title: STARTER_TASK_TITLE } : {},
+      });
+      added += 1;
+    }
+  } catch (err) {
+    revalidateCampaign(sequenceId);
+    if (added > 0) {
+      return { error: `Only ${added} of ${STARTER_STEPS.length} steps were added. Add the rest by hand.` };
+    }
+    return errorState(err, "Couldn't add these steps.");
+  }
+  revalidateCampaign(sequenceId);
+  return { saved: true, message: "Steps added. Start the campaign when you are ready." };
 }
 
 export async function deleteStepAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -195,10 +261,10 @@ export async function stopEnrollmentAction(_prev: ActionState, formData: FormDat
     await stopEnrollment(enrollmentId, "manual");
     revalidatePath(`/dashboard/leads/${current.lead_id}`);
   } catch (err) {
-    return errorState(err, "Couldn't stop this sequence.");
+    return errorState(err, "Couldn't stop this campaign.");
   }
   revalidateCampaign(sequenceId);
-  return { saved: true, message: "Sequence stopped." };
+  return { saved: true, message: "Campaign stopped." };
 }
 
 async function setStatusAction(formData: FormData, status: "active" | "paused"): Promise<ActionState> {
@@ -251,7 +317,7 @@ export async function advanceEnrollmentAction(_prev: ActionState, formData: Form
     if (result.stepType === "task") {
       return { saved: true, message: "Task created for this lead." };
     }
-    return { saved: true, message: result.completed ? "Sequence completed for this lead." : "Advanced to the next step." };
+    return { saved: true, message: result.completed ? "Campaign completed for this lead." : "Advanced to the next step." };
   } catch (err) {
     return errorState(err, "Couldn't run this step.");
   }

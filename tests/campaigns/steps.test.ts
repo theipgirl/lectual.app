@@ -65,7 +65,7 @@ describe("stepTypeLabel", () => {
     expect(stepTypeLabel("email")).toBe("Email");
     expect(stepTypeLabel("task")).toBe("Internal task");
     expect(stepTypeLabel("wait")).toBe("Wait");
-    expect(stepTypeLabel("condition")).toBe("Condition");
+    expect(stepTypeLabel("condition")).toBe("Note (doesn't change timing)");
   });
 });
 

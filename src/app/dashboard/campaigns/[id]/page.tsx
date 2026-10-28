@@ -30,6 +30,7 @@ import {
   EditSequenceForm,
   EnrollLeadForm,
   EnrollmentActions,
+  StarterSteps,
   ToggleSequenceButton,
 } from "./_components/CampaignBuilderForms";
 import "../campaigns.css";
@@ -138,11 +139,11 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
           <h1 className="lx-h1">{sequence.name}</h1>
           {sequence.description && <p className="lx-sub">{sequence.description}</p>}
         </div>
-        {canManage && <ToggleSequenceButton sequenceId={sequence.id} active={sequence.active} />}
+        {canManage && <ToggleSequenceButton sequenceId={sequence.id} active={sequence.active} stepCount={stepsRead.error ? null : steps.length} />}
       </div>
 
       {canManage && (
-        <details className="lx-card lx-disclosure-inline" style={{ padding: 16 }}>
+        <details className="lx-card lx-disclosure">
           <summary>Edit name &amp; description</summary>
           <EditSequenceForm sequenceId={sequence.id} name={sequence.name} description={sequence.description} />
         </details>
@@ -150,15 +151,18 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
 
       <section className="lx-card lx-band">
         <header className="lx-band-head">
-          <h2 className="lx-h2">Sequence</h2>
+          <h2 className="lx-h2">Steps</h2>
           <span className="lx-note">{stepsRead.error ? "—" : `${steps.length} step${steps.length === 1 ? "" : "s"}`}</span>
         </header>
         {stepsRead.error ? (
           <p className="lx-note lx-campaigns-inlineerror">{stepsRead.error}</p>
         ) : steps.length === 0 ? (
-          <p className="lx-note" style={{ padding: "0 18px 14px" }}>
-            No steps yet. {canManage ? "Add the first one below." : "An admin hasn't added any yet."}
-          </p>
+          <>
+            <p className="lx-note" style={{ padding: "0 18px 14px" }}>
+              No steps yet. {canManage ? "Add the first one below." : "An admin hasn't added any yet."}
+            </p>
+            {canManage && !templatesFailed && <StarterSteps sequenceId={sequence.id} templates={templateOptions} />}
+          </>
         ) : (
           <ol className="lx-campaigns-steps">
             {steps.map((step, index) => {
@@ -285,7 +289,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
                         <span className={`lx-pill ${enrollmentStatusTone(enrollment.status)}`}>{enrollmentStatusLabel(enrollment.status)}</span>
                         {enrollment.status === "stopped" && (
                           // The recorded reason, in the firm's words of the
-                          // SOP: "Sequence stopped — signed quote, Oct 3".
+                          // SOP: "Campaign stopped — signed quote, Oct 3".
                           <div className="lx-note" style={{ marginTop: 4 }}>
                             {stopLine({ reason: enrollment.stop_reason, at: enrollment.stopped_at }, tz)}
                           </div>
@@ -327,10 +331,10 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
         )}
       </section>
 
-      <p className="lx-note lx-campaigns-firmnote">
+      <p className="lx-upl">
         Nothing sends on its own. Running an email step drafts it into the approval queue from the template above —
         review it on the <Link href="/dashboard/queue/">Approvals</Link> before it reaches anyone. A lead who signs, pays,
-        becomes a client, replies or has a call leaves the sequence the moment that is recorded, and every step
+        becomes a client, replies or has a call leaves the campaign the moment that is recorded, and every step
         re-checks first.
       </p>
     </>

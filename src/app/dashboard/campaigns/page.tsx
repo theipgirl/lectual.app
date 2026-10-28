@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { currentRole } from "@/lib/auth/current-role";
-import { AUTOMATION_ADMIN_ROLES, listEnrollments, listSequences, listTemplates, type DripSequence } from "@/lib/automation";
+import { AUTOMATION_ADMIN_ROLES, listEnrollments, listSequences, type DripSequence } from "@/lib/automation";
 import { loadActiveQueue } from "@/lib/queue/load";
 import { sequenceStatusLabel, sequenceStatusTone } from "@/lib/campaigns/steps";
 import { relativeTime } from "@/lib/relative-time";
@@ -43,16 +43,10 @@ export default async function CampaignsPage() {
   let sequences: DripSequence[] = [];
   let activeEnrolledBySequence = new Map<string, number>();
   let totalActiveEnrolled = 0;
-  let templateCount: number | null = null;
   let loadError: string | null = null;
   try {
-    const [seq, enrollments, templates] = await Promise.all([
-      listSequences(),
-      listEnrollments(),
-      listTemplates(),
-    ]);
+    const [seq, enrollments] = await Promise.all([listSequences(), listEnrollments()]);
     sequences = seq;
-    templateCount = templates.length;
     const counts = new Map<string, number>();
     for (const enrollment of enrollments) {
       if (enrollment.status !== "active") continue;
@@ -75,7 +69,7 @@ export default async function CampaignsPage() {
           <div className="lx-label">Nurture &amp; follow-up</div>
           <h1 className="lx-h1">Campaigns</h1>
           <p className="lx-sub">
-            Sequences for leads who haven&apos;t signed yet, and for existing clients. Every email step drafts into
+            Campaigns for leads who haven&apos;t signed yet, and for existing clients. Every email step drafts into
             the approval queue from the firm&apos;s own templates — nothing sends until a person approves it.
           </p>
         </div>
@@ -84,7 +78,7 @@ export default async function CampaignsPage() {
         </Link>
       </div>
 
-      <div className="lx-kpis">
+      <div className="lx-kpis lx-kpis-compact">
         <div className="lx-card lx-kpi">
           <span className="lx-label">Enrolled</span>
           <span className="lx-kpi-value">{loadError ? "—" : totalActiveEnrolled}</span>
@@ -92,7 +86,7 @@ export default async function CampaignsPage() {
             {loadError ? "Couldn't load" : `across ${activeSequences} active campaign${activeSequences === 1 ? "" : "s"}`}
           </span>
         </div>
-        <div className="lx-card lx-kpi">
+        <Link href="/dashboard/queue/" className="lx-card lx-kpi">
           <span className="lx-label">Held for approval</span>
           <span className="lx-kpi-value">{campaignDrafts === null ? "—" : campaignDrafts}</span>
           <span className="lx-note">
@@ -102,18 +96,6 @@ export default async function CampaignsPage() {
                 ? "approvals aren't set up for this firm"
                 : "couldn't reach the approval queue"}
           </span>
-        </div>
-        <div className="lx-card lx-kpi">
-          <span className="lx-label">Campaigns</span>
-          <span className="lx-kpi-value">{loadError ? "—" : sequences.length}</span>
-          <span className="lx-note">
-            {loadError ? "Couldn't load" : `${activeSequences} active · ${sequences.length - activeSequences} paused`}
-          </span>
-        </div>
-        <Link href="/dashboard/campaigns/templates/" className="lx-card lx-kpi">
-          <span className="lx-label">Email templates</span>
-          <span className="lx-kpi-value">{templateCount === null ? "—" : templateCount}</span>
-          <span className="lx-note">in the library</span>
         </Link>
       </div>
 
@@ -176,7 +158,7 @@ export default async function CampaignsPage() {
         </div>
       )}
 
-      <p className="lx-note lx-campaigns-firmnote">
+      <p className="lx-upl">
         Attorney advertising: every email step is written from a template in the firm&apos;s own library and held for
         review before it reaches anyone. A campaign never emails or files anything on its own.
       </p>

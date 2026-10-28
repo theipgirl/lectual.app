@@ -183,7 +183,7 @@ export function describeActivity(row: Row & { id?: string }, options: DescribeOp
       const campaign = str(p.sequence_name);
       const how = p.by_hand === true ? "stopped by a person" : str(p.detected_by) === "advance_guard" ? "caught before a step ran" : null;
       return {
-        title: `Sequence stopped — ${reason ?? "stopped"}`,
+        title: `Campaign stopped — ${reason ?? "stopped"}`,
         detail: [campaign, how].filter(Boolean).join(" · ") || null,
         tone: "system",
         link: null,

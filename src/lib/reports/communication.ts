@@ -95,10 +95,10 @@ export async function loadCommunicationReport(
   // --- Active sequences (a snapshot, not a period aggregate) ---------------
   const sequences: Metric =
     drips.status === "ok"
-      ? { label: "Sequences running", value: drips.rows.length, sub: "nurture and follow-up, right now" }
+      ? { label: "Campaigns running", value: drips.rows.length, sub: "nurture and follow-up, right now" }
       : unavailableMetric(
-          "Sequences running",
-          drips.status === "missing" ? "Sequences aren't switched on for your firm yet" : "Couldn't be read just now",
+          "Campaigns running",
+          drips.status === "missing" ? "Campaigns aren't switched on for your firm yet" : "Couldn't be read just now",
         );
 
   // --- Waiting on the firm: leads we haven't answered ------------------------
@@ -115,7 +115,7 @@ export async function loadCommunicationReport(
   const links: LinkTile[] = [
     ...(opts.hasMailbox ? [{ label: "My Mail", sub: "Your Outlook or Gmail inbox", href: "/dashboard/mail/", count: null }] : []),
     { label: APPROVALS_NAME, sub: "Drafts waiting for your approval", href: "/dashboard/queue/", count: queue.status === "ok" ? queue.items.length : null },
-    { label: "Campaigns", sub: "Nurture and follow-up sequences", href: "/dashboard/campaigns/", count: drips.status === "ok" ? drips.rows.length : null },
+    { label: "Campaigns", sub: "Nurture and follow-up campaigns", href: "/dashboard/campaigns/", count: drips.status === "ok" ? drips.rows.length : null },
   ];
 
   return {

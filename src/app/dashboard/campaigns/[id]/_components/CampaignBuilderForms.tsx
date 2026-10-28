@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import {
+  addStarterStepsAction,
   addStepAction,
   advanceEnrollmentAction,
   deleteStepAction,
@@ -13,7 +14,8 @@ import {
   updateSequenceDetailsAction,
 } from "@/app/dashboard/campaigns/[id]/actions";
 import type { ActionState } from "@/app/dashboard/campaigns/errors";
-import { DRIP_STEP_TYPES, stepTypeLabel } from "@/lib/campaigns/steps";
+import { STARTER_STEPS } from "@/lib/campaigns/steps";
+import { ADDABLE_STEP_TYPES, START_NEEDS_STEP, START_UNREADABLE, stepTypeLabel } from "@/lib/campaigns/steps";
 
 /**
  * The campaign builder's client forms. Every one posts to a server action
@@ -75,14 +77,30 @@ export function EditSequenceForm({ sequenceId, name, description }: { sequenceId
   );
 }
 
-export function ToggleSequenceButton({ sequenceId, active }: { sequenceId: string; active: boolean }) {
+export function ToggleSequenceButton({
+  sequenceId,
+  active,
+  stepCount,
+}: {
+  sequenceId: string;
+  active: boolean;
+  /** Null when the steps could not be read. */
+  stepCount: number | null;
+}) {
   const [state, action, pending] = useActionState<ActionState, FormData>(toggleSequenceAction, {});
+  const blockedReason = !active && (stepCount === null ? START_UNREADABLE : stepCount === 0 ? START_NEEDS_STEP : null);
+  const reasonId = `start-reason-${sequenceId}`;
   return (
     <form action={action} style={{ display: "inline-flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
       <Hidden values={{ sequenceId, nextActive: String(!active) }} />
-      <button type="submit" className={active ? "lx-btn lx-btn-sec" : "lx-btn lx-btn-pri"} disabled={pending}>
+      <button type="submit" className={active ? "lx-btn lx-btn-sec" : "lx-btn lx-btn-pri"} disabled={pending || !!blockedReason} aria-describedby={blockedReason ? reasonId : undefined}>
         {pending ? "Working…" : active ? "Pause campaign" : "Start campaign"}
       </button>
+      {blockedReason && (
+        <p id={reasonId} className="lx-note" style={{ margin: 0 }}>
+          {blockedReason}
+        </p>
+      )}
       {state.error && <Err state={state} />}
     </form>
   );
@@ -100,7 +118,7 @@ export function AddStepForm({ sequenceId, templates }: { sequenceId: string; tem
       <label className="lx-field">
         <span className="lx-label">Step type</span>
         <select className="lx-input" name="type" defaultValue="email">
-          {DRIP_STEP_TYPES.map((t) => (
+          {ADDABLE_STEP_TYPES.map((t) => (
             <option key={t} value={t}>
               {stepTypeLabel(t)}
             </option>
@@ -238,7 +256,7 @@ export function EnrollmentActions({
               type="submit"
               className="lx-btn lx-btn-ghost lx-btn-sm"
               disabled={stopping}
-              title="Stop this sequence for this lead. It's recorded with your name, and can't be restarted."
+              title="Stop this campaign for this lead. It's recorded with your name, and can't be restarted."
             >
               {stopping ? "…" : "Stop"}
             </button>
@@ -250,5 +268,66 @@ export function EnrollmentActions({
       <Err state={resumeState} />
       <Err state={stopState} />
     </div>
+  );
+}
+
+/* ── starter suggestion for an empty campaign ───────────────────────────── */
+
+export function StarterSteps({ sequenceId, templates }: { sequenceId: string; templates: TemplateOption[] }) {
+  const [state, action, pending] = useActionState<ActionState, FormData>(addStarterStepsAction, {});
+  const [thankYou, setThankYou] = useState("");
+  const [followUp, setFollowUp] = useState("");
+  const reason =
+    templates.length === 0
+      ? "Add an email template first, then these steps can use it."
+      : !thankYou || !followUp
+        ? "Choose a template for each email step."
+        : null;
+  const options = (
+    <>
+      <option value="">Choose a template</option>
+      {templates.map((t) => (
+        <option key={t.id} value={t.id}>
+          {t.name} — {t.subject}
+        </option>
+      ))}
+    </>
+  );
+  return (
+    <form action={action} className="lx-campaigns-starter">
+      <Hidden values={{ sequenceId }} />
+      <h3 className="lx-h3">A good way to start</h3>
+      <p className="lx-note" style={{ margin: 0 }}>
+        Three steps, added as drafts. Nothing is sent or enrolled, and the campaign stays paused until you start it.
+      </p>
+      <ol className="lx-campaigns-starter-list">
+        {STARTER_STEPS.map((step) => (
+          <li key={step.key}>
+            {step.label}
+            {step.key === "thank-you" && (
+              <select className="lx-input" name="templateThankYou" value={thankYou} onChange={(e) => setThankYou(e.target.value)} aria-label="Template for the thank-you email">
+                {options}
+              </select>
+            )}
+            {step.key === "follow-up" && (
+              <select className="lx-input" name="templateFollowUp" value={followUp} onChange={(e) => setFollowUp(e.target.value)} aria-label="Template for the follow-up email">
+                {options}
+              </select>
+            )}
+          </li>
+        ))}
+      </ol>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={pending || !!reason} aria-describedby={reason ? "starter-reason" : undefined}>
+          {pending ? "Adding…" : "Add these steps"}
+        </button>
+        {reason && (
+          <span id="starter-reason" className="lx-note">
+            {reason}
+          </span>
+        )}
+        <Err state={state} />
+      </div>
+    </form>
   );
 }
