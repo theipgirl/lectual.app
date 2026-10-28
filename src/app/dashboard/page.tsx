@@ -186,7 +186,7 @@ export default async function TodayPage() {
 
   return (
     <>
-      <div className="lx-page-head">
+      <div className="lx-page-head lx-page-head-list">
         <div style={{ flex: 1, minWidth: 260 }}>
           <h1 className="lx-h1">
             Good {greeting(hourInZone(now, tz))}

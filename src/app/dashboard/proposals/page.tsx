@@ -138,7 +138,7 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
       <SegmentColumn active={segment} counts={counts} out={out} />
 
       <div className="pq-main">
-        <div className="lx-page-head">
+        <div className="lx-page-head lx-page-head-list">
           <div style={{ flex: 1, minWidth: 260 }}>
             <h1 className="lx-h1" data-tour="proposals-head">{PROPOSALS_NAME}</h1>
             <p className="lx-sub">{PROPOSALS_SUBLINE}</p>

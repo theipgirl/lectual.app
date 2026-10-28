@@ -29,7 +29,7 @@ describe("compact page tops under 640px (Sprint 34 B)", () => {
   it("the sub-line is one line with an ellipsis, the eyebrow is hidden and no gap is stacked", () => {
     expect(globals).toMatch(/\.lx-page-head \.lx-sub[^{]*\{[^}]*white-space:\s*nowrap[^}]*text-overflow:\s*ellipsis/);
     expect(globals).toMatch(/\.lp-header \.lp-sub[^{]*\{[^}]*white-space:\s*nowrap/);
-    expect(globals).toMatch(/\.lx-page-head \.lx-label\s*\{\s*display:\s*none/);
+    expect(globals).toMatch(/\.lx-page-head-list \.lx-label\s*\{\s*display:\s*none/);
     expect(globals).toMatch(/\.lx-page\s*\{[^}]*gap:\s*10px/);
   });
 
@@ -69,5 +69,12 @@ describe("compact page tops under 640px (Sprint 34 B)", () => {
     ]) {
       expect(read(f), f).toMatch(shared);
     }
+  });
+
+  it("record pages and links keep their labels under 640px", () => {
+    expect(globals).not.toMatch(/\.lx-page-head \.lx-label/);
+    expect(read("src/app/dashboard/reports/[key]/page.tsx")).not.toMatch(/lx-page-head-list/);
+    expect(read("src/app/dashboard/matters/[id]/page.tsx")).not.toMatch(/lx-page-head-list/);
+    expect(read("src/app/dashboard/leads/[id]/page.tsx")).not.toMatch(/lx-page-head-list/);
   });
 });

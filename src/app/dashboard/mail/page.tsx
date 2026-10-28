@@ -171,7 +171,7 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
       </aside>
 
       <div className="lx-col">
-        <div className="lx-page-head">
+        <div className="lx-page-head lx-page-head-list">
           <div style={{ flex: 1, minWidth: 240 }}>
             <div className="lx-label">{selected ? `${PROVIDER_LABEL[selected.provider]} · ${selected.email}` : `${connections.length} mailbox${connections.length === 1 ? "" : "es"}`}</div>
             <h1 className="lx-h1">My Mail</h1>

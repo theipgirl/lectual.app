@@ -61,7 +61,7 @@ export default async function MeetingsPage({ searchParams }: { searchParams: Pro
 
   return (
     <>
-      <div className="lx-page-head">
+      <div className="lx-page-head lx-page-head-list">
         <div style={{ flex: 1, minWidth: 260 }}>
           <div className="lx-label">Communication</div>
           <h1 className="lx-h1" data-tour="meetings-head">Meetings</h1>
@@ -69,9 +69,11 @@ export default async function MeetingsPage({ searchParams }: { searchParams: Pro
         </div>
         <div className="lx-head-actions">
           <SyncMeetingsControl control={syncControl(session.role, conns.ok ? connected : null)} />
-          <Link href="/dashboard/settings/integrations/meetings/" className="lx-btn lx-btn-sec lx-btn-sm">
-            {connected.length ? "Manage sources" : "Connect Fathom or Zoom"}
-          </Link>
+          {(connected.length > 0 || !canSyncMeetings(session.role)) && (
+            <Link href="/dashboard/settings/integrations/meetings/" className="lx-btn lx-btn-sec lx-btn-sm">
+              {connected.length ? "Manage sources" : "Connect Fathom or Zoom"}
+            </Link>
+          )}
         </div>
       </div>
 

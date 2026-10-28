@@ -36,7 +36,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
 
   return (
     <>
-      <div className="lx-page-head">
+      <div className="lx-page-head lx-page-head-list">
         <div style={{ flex: 1, minWidth: 260 }}>
           <h1 className="lx-h1" data-tour="queue-head">{APPROVALS_NAME}</h1>
           <p className="lx-sub">

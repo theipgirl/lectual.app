@@ -29,6 +29,7 @@ vi.mock("@/lib/meetings/import", () => ({ importConnection: (...a: unknown[]) =>
 import { importNowAction } from "@/app/dashboard/settings/integrations/meetings/actions";
 import { syncNewMeetingsAction } from "@/app/dashboard/meetings/sync-action";
 import { SyncMeetingsControl, SyncResult } from "@/components/meetings/SyncMeetingsButton";
+import { syncControl } from "@/lib/meetings/sync-access";
 
 beforeEach(() => {
   h.session = { kind: "ok", role: "owner", user: { id: "u1" }, org: { id: "o1" } };
@@ -118,6 +119,10 @@ describe("rendering", () => {
     expect(connect).toContain("Connect a meeting source");
     expect(connect).toContain("/dashboard/settings/integrations/meetings");
     expect(renderToStaticMarkup(createElement(SyncMeetingsControl, { control: "none" }))).toBe("");
+    // an unreadable connections list is not "none connected"
+    const unreadable = renderToStaticMarkup(createElement(SyncMeetingsControl, { control: syncControl("owner", null) }));
+    expect(unreadable).not.toContain("Connect a meeting source");
+    expect(unreadable).toContain("Sync new meetings");
   });
 
   it("an error is an alert with a Reconnect link; a clean run is a status", () => {

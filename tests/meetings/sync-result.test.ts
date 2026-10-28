@@ -43,7 +43,7 @@ describe("who sees the button", () => {
   it("nothing for other roles; a connect link with no source (or an unreadable list); the button otherwise", () => {
     expect(syncControl("viewer", [{ provider: "zoom", status: "active" }])).toBe("none");
     expect(syncControl("owner", [])).toBe("connect");
-    expect(syncControl("owner", null)).toBe("connect");
+    expect(syncControl("owner", null)).toBe("sync");
     expect(syncControl("admin", [{ provider: "zoom", status: "active" }])).toBe("sync");
   });
 });

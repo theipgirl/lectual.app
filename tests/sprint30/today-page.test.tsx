@@ -63,7 +63,7 @@ beforeEach(() => vi.resetModules());
 describe("Today header (A)", () => {
   it("starts with the h1, and repeats neither the firm name nor the date", async () => {
     const html = await renderToday({ metadata: { full_name: "Rebecca Pearl" } });
-    expect(html.indexOf("<h1")).toBe(html.indexOf("<div class=\"lx-page-head\"><div style=\"flex:1;min-width:260px\">") + "<div class=\"lx-page-head\"><div style=\"flex:1;min-width:260px\">".length);
+    expect(html.indexOf("<h1")).toBe(html.indexOf("<div class=\"lx-page-head lx-page-head-list\"><div style=\"flex:1;min-width:260px\">") + "<div class=\"lx-page-head lx-page-head-list\"><div style=\"flex:1;min-width:260px\">".length);
     expect(html).toContain("Good afternoon, Rebecca.");
     expect(html).not.toContain("Pearl Law Firm");
     expect(html).not.toMatch(/Tuesday|October 27/);

@@ -1466,7 +1466,7 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
   .lx-h1 { font-size: 24px; line-height: 1.15; margin: 0; }
   .lx-page-head { gap: 8px; align-items: center; }
   .lx-page-head > div { min-width: 0 !important; flex: 1 1 100% !important; }
-  .lx-page-head .lx-label { display: none; }
+  .lx-page-head-list .lx-label { display: none; }
   .lx-page-head .lx-sub,
   .lp-header .lp-sub {
     margin: 2px 0 0;
