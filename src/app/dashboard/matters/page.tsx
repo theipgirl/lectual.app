@@ -4,7 +4,6 @@ import { listLeads } from "@/lib/pipeline";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { loadActiveQueue } from "@/lib/queue/load";
 import { orgHasModule } from "@/lib/org/modules";
-import { matterStatusLabel } from "@/lib/matters/status";
 import { matterLabel } from "@/lib/matters/docket-summary";
 import {
   BAND_COPY,
@@ -29,6 +28,8 @@ import { listMatterStages } from "@/lib/matters/stages";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import { matterIdsNeedingReview } from "./list-utils";
+import { LIST_CHIPS, mattersSubtitle, reviewHref, reviewItemByMatter, stageDisplayName, statusNote } from "@/lib/matters/list-view";
+import { OPEN_MATTER_PANEL_ID, OpenMatterButton } from "@/components/matters/OpenMatterButton";
 import { MATTER_TYPE_LABEL } from "./labels";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
@@ -68,11 +69,12 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
   // "Needs your review" means something only when the queue was reached.
   // Unconfigured or unavailable is never shown as "nothing to review".
   const reviewIds = queue.status === "ok" ? matterIdsNeedingReview(queue.items) : new Set<string>();
+  const reviewItems = queue.status === "ok" ? reviewItemByMatter(queue.items) : new Map<string, string>();
   const stalledIds = new Set(summarizeDocket(all).stalled.map((m) => m.id));
   const sets = { review: reviewIds, stalled: stalledIds };
   const counts = new Map(SEGMENTS.map((s) => [s.key, filterBySegment(all, s.key, sets).length]));
-  // Review only when the queue was reached; court only for a firm that has court matters.
-  const segments = SEGMENTS.filter((s) => (s.key !== "review" || queue.status === "ok") && (s.key !== "court" || (counts.get("court") ?? 0) > 0 || seg === "court"));
+  // Four chips. Review only when the queue was reached; the bands stay as headings below.
+  const segments = LIST_CHIPS.filter((s) => s.key !== "review" || queue.status === "ok");
 
   const shown = searchMatters(filterBySegment(all, seg, sets), search);
   const bands = groupIntoBands(shown);
@@ -96,7 +98,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
 
   return (
     <div className="lp-root">
-      <ListHeader title="Matters" tour="matters-head" sub="Every engaged matter, grouped by whose move it is. Longest in its stage first." />
+      <ListHeader title="Matters" tour="matters-head" sub={mattersSubtitle(boardView ? "board" : "table")} />
       <SectionTabs active="list" listLabel="Matters" listHref="/dashboard/matters/" summaryHref={REPORTS.matters.href} />
 
       <ListToolbar
@@ -108,6 +110,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
           clearHref: href({ q: "" }),
         }}
         toggle={<ViewToggle value={boardView ? "board" : "table"} hrefFor={(next) => href({ view: next === "board" ? "board" : null })} />}
+        primary={<OpenMatterButton />}
       />
 
       <FilterChips as="nav" label="Filter matters">
@@ -118,12 +121,12 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
         ))}
       </FilterChips>
       {queue.status === "unavailable" && (
-        <p className="lx-note" style={{ margin: 0 }}>
+        <p className="lx-banner lx-banner-warn" role="status" style={{ margin: 0 }}>
           The approval queue can&apos;t be reached right now, so matters can&apos;t be checked for drafts waiting on review.
         </p>
       )}
 
-      <details className="lx-card lx-disclosure">
+      <details id={OPEN_MATTER_PANEL_ID} className="lx-card lx-disclosure">
         <summary>Open a matter</summary>
         <NewMatterForm leads={leadOptions} canCreateLitigation={canCreateLitigation} />
       </details>
@@ -141,6 +144,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
           matters={shown}
           canMove={!!role && MATTER_WRITE_ROLES.includes(role)}
           reviewIds={reviewIds}
+          reviewItems={reviewItems}
           ownerName={(id) => (id ? memberName.get(id) ?? "Teammate" : null)}
         />
       ) : bands.length === 0 ? (
@@ -164,12 +168,11 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
             <div style={{ overflow: "auto" }}>
               <table className="lx-tbl lx-stack">
                 <colgroup>
-                  <col style={{ width: "32%" }} />
-                  <col style={{ width: "12%" }} />
-                  <col style={{ width: "26%" }} />
-                  <col style={{ width: "9%" }} />
-                  <col style={{ width: "12%" }} />
-                  <col style={{ width: "9%" }} />
+                  <col style={{ width: "36%" }} />
+                  <col style={{ width: "13%" }} />
+                  <col style={{ width: "27%" }} />
+                  <col style={{ width: "10%" }} />
+                  <col style={{ width: "14%" }} />
                 </colgroup>
                 <thead>
                   <tr>
@@ -178,12 +181,13 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
                     <th>Stage</th>
                     <th>In stage</th>
                     <th>Owner</th>
-                    <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {band.matters.map((m) => {
                     const age = stageAge(m);
+                    const note = statusNote(m.status);
+                    const reviewId = reviewItems.get(m.id);
                     return (
                       <tr key={m.id} className="lp-row">
                         <td className="pri">
@@ -193,16 +197,23 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
                           <div className="lx-note lx-num">
                             {m.matter_number}
                             {m.owner_name ? ` · ${m.owner_name}` : ""}
-                            {reviewIds.has(m.id) && <span className="lp-pill lp-pill-warn" style={{ marginLeft: 6 }}>Review</span>}
+                            {note ? ` · ${note}` : ""}
+                            {reviewIds.has(m.id) &&
+                              (reviewId ? (
+                                <Link href={reviewHref(reviewId)} className="lp-pill lp-pill-warn" style={{ marginLeft: 6, position: "relative", zIndex: 1 }}>
+                                  Review
+                                </Link>
+                              ) : (
+                                <span className="lp-pill lp-pill-warn" style={{ marginLeft: 6 }}>Review</span>
+                              ))}
                           </div>
                         </td>
                         <td data-label="Type">{MATTER_TYPE_LABEL[m.type]}</td>
-                        <td data-label="Stage">{m.stage ? <span className="lp-pill">{`${m.stage.code}. ${m.stage.label}`}</span> : <span className="lx-note">—</span>}</td>
+                        <td data-label="Stage">{m.stage ? <span className="lp-pill">{stageDisplayName(m.stage.label)}</span> : <span className="lx-note">—</span>}</td>
                         <td className="lx-num" data-label="In stage">
-                          {age.days === null ? "—" : age.stale ? <span className="lp-pill lp-pill-risk">{age.days}d</span> : `${age.days}d`}
+                          {age.days === null ? "—" : age.stale ? <span className="lp-pill lp-pill-risk">{age.days}d</span> : <span>{age.days}d</span>}
                         </td>
                         <td data-label="Owner">{m.assigned_to ? memberName.get(m.assigned_to) ?? "Teammate" : <span className="lx-note">Unassigned</span>}</td>
-                        <td data-label="Status">{matterStatusLabel(m.status)}</td>
                       </tr>
                     );
                   })}
