@@ -12,7 +12,11 @@ const ALLOW: Array<{ file: RegExp; reason: string }> = [
 
 const WORD = /\bsequences?\b/i;
 // A snake_case or camelCase code token (table, column, field) is not text.
-const CODE_TOKEN = /^[A-Za-z0-9_.\-/]+$/;
+const CODE_TOKEN = /^(?=.*[_./]|.*[a-z][A-Z])[A-Za-z0-9_.\-/]+$/;
+
+export function isHit(text: string): boolean {
+  return WORD.test(text) && !CODE_TOKEN.test(text);
+}
 
 export function sequenceHits(): string[] {
   const files = ["src/app", "src/components", "src/lib"].flatMap((r) => walk(r)).filter((f) => !f.endsWith(".d.ts"));
@@ -23,7 +27,7 @@ export function sequenceHits(): string[] {
       // A template's own ${expression} is code; a "[campaigns] ..." string is a server log line.
       const text = c.text.replace(/\$\{[^}]*\}/g, "").replace(/\s+/g, " ").trim();
       if (text.startsWith("[")) continue;
-      if (!WORD.test(text) || CODE_TOKEN.test(text)) continue;
+      if (!isHit(text)) continue;
       // A comma list of column names in a select is not text either.
       if (/^[a-z0-9_, *().:!>-]+$/.test(text)) continue;
       hits.push(`${file}:${c.line}\t${text.slice(0, 120)}`);
@@ -33,6 +37,13 @@ export function sequenceHits(): string[] {
 }
 
 describe("no visible 'Sequence' word", () => {
+  it("catches one-word visible text and ignores code tokens", () => {
+    expect(isHit("Sequences")).toBe(true);
+    expect(isHit("Sequence")).toBe(true);
+    expect(isHit("crm_drip_sequence")).toBe(false);
+    expect(isHit("sequenceId")).toBe(false);
+  });
+
   it("finds none in strings or JSX text", () => {
     const hits = sequenceHits();
     expect(hits, hits.join("\n")).toEqual([]);

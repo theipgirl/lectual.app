@@ -23,7 +23,8 @@ export function createMagicLinkLimiter(now: () => number = () => Date.now()): Ma
         (last !== undefined && t - last < MAGIC_LINK_GAP_MS) ||
         kept.length >= MAGIC_LINK_MAX_PER_WINDOW
       ) {
-        hits.set(email, kept);
+        if (kept.length) hits.set(email, kept);
+        else hits.delete(email);
         return false;
       }
       kept.push(t);

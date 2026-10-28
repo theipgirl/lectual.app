@@ -13,8 +13,9 @@ export const ASSISTANTS_NAME = "Assistants";
 export const SHORTCUTS_NAME = "Shortcuts";
 /** What the firm has told Lectual about how it works (was "Firm brain"). */
 export const FIRM_NOTES_NAME = "Firm notes";
-/** The rail group holding Copilot, Assistants, Shortcuts and Firm notes (was "IP.OS"). */
+/** What the Firm notes page says they are for. */
 export const FIRM_NOTES_PURPOSE = "Your assistants use these to match your tone, prices and rules. Nothing here is sent to clients.";
+/** The rail group holding Copilot, Assistants, Shortcuts and Firm notes (was "IP.OS"). */
 export const AI_TOOLS_GROUP = "AI tools";
 /** Drafts waiting for a person's OK (was "Queue"). */
 export const APPROVALS_NAME = "Approvals";
