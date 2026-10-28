@@ -91,3 +91,19 @@
     display: none;
   }
 }
+
+/* The phone's one compact select replaces the folder list and mailbox switcher (the sidebar). */
+.lx-mail-select { display: none; }
+@media (max-width: 640px) {
+  .lx-mail-side { display: none; }
+  .lx-mail-select { display: block; }
+  .lx-mail-select-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .lx-mail-select select { width: 100%; }
+}

@@ -24,6 +24,9 @@ import { loadDraftBlock } from "@/lib/consult-proposal/draft-gate";
 import { DRAFT_BLOCK_NOTE } from "@/lib/consult-proposal/draft-availability";
 import { MAX_PASTED_TRANSCRIPT_CHARS } from "@/lib/consult-proposal/types";
 import { TranscriptDraft } from "@/components/proposal-editor/TranscriptDraft";
+import { SyncMeetingsControl } from "@/components/meetings/SyncMeetingsButton";
+import { listMeetingConnections } from "@/lib/meetings/connection";
+import { syncControl } from "@/lib/meetings/sync-access";
 import { ConsultsStrip } from "@/components/proposal-list/ConsultsStrip";
 import { ProposalsTable } from "@/components/proposal-list/ProposalsTable";
 import { SegmentColumn } from "@/components/proposal-list/SegmentColumn";
@@ -82,13 +85,14 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
   const failed = !listedRead.ok;
   const today = firmCivilDate(nowDate, tz);
 
-  const [eventsRead, names, strip, leadsRead, draftBlock, stepRead] = await Promise.all([
+  const [eventsRead, names, strip, leadsRead, draftBlock, stepRead, syncConns] = await Promise.all([
     listedRead.ok && listed.length > 0 ? readEvents(listed) : Promise.resolve(new Map<string, ActivityEvent>() as ReadonlyMap<string, ActivityEvent> | "unavailable"),
     readNames(),
     loadStrip(listed, now, tz),
     canDraftFromTranscript ? loadLeadOptions() : Promise.resolve(null),
     canDraftFromTranscript ? loadDraftBlock() : Promise.resolve(null),
     readStepActivity(listed),
+    listMeetingConnections().then((r) => (r.ok ? r.connections : null), () => null),
   ]);
   const events = withStepActivity(eventsRead, stepRead);
   const canMarkPaid = !!role && PROPOSAL_PAID_ROLES.includes(role);
@@ -189,6 +193,7 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
           draftNote={draftBlock ? DRAFT_BLOCK_NOTE[draftBlock] : null}
           paste={paste}
           pasteOpen={preselected !== "" && !draftBlock}
+          sync={<SyncMeetingsControl control={syncControl(role, syncConns)} />}
           leads={canDraftFromTranscript ? (leadsRead?.status === "ok" ? leadsRead.leads : null) : undefined}
         />
       </div>

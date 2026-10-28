@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveFirmSession } from "@/lib/firm/session";
-import { hasRole } from "@/lib/auth/roles";
 import { formatDuration, formatWhen, linkLabels, listMeetings, type MeetingFilters } from "@/lib/meetings/read";
 import { listMeetingConnections } from "@/lib/meetings/connection";
 import { PROVIDER_LABEL, isMeetingProvider } from "@/lib/meetings/types";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { SyncMeetingsControl } from "@/components/meetings/SyncMeetingsButton";
+import { canSyncMeetings, syncControl } from "@/lib/meetings/sync-access";
 import { reconnectSentence } from "@/lib/meetings/reconnect-copy";
 
 export const metadata: Metadata = { title: pageTitle("Meetings") };
@@ -38,7 +39,7 @@ export default async function MeetingsPage({ searchParams }: { searchParams: Pro
     meetings.flatMap((m) => (m.matter_id ? [m.matter_id] : [])),
   );
   const connected = conns.ok ? conns.connections : [];
-  const canManage = hasRole(session.role, "senior_admin");
+  const canManage = canSyncMeetings(session.role);
 
   const href = (next: { provider?: string | null; link?: string | null }) => {
     const p = new URLSearchParams();
@@ -65,9 +66,12 @@ export default async function MeetingsPage({ searchParams }: { searchParams: Pro
           <h1 className="lx-h1" data-tour="meetings-head">Meetings</h1>
           <p className="lx-sub">Consults and calls recorded in Fathom or Zoom, with the summary, the transcript and the client they were about.</p>
         </div>
-        <Link href="/dashboard/settings/integrations/meetings/" className="lx-btn lx-btn-sec lx-btn-sm">
-          {connected.length ? "Manage sources" : "Connect Fathom or Zoom"}
-        </Link>
+        <div className="lx-head-actions">
+          <SyncMeetingsControl control={syncControl(session.role, conns.ok ? connected : null)} />
+          <Link href="/dashboard/settings/integrations/meetings/" className="lx-btn lx-btn-sec lx-btn-sm">
+            {connected.length ? "Manage sources" : "Connect Fathom or Zoom"}
+          </Link>
+        </div>
       </div>
 
       <nav aria-label="Filter meetings" className="lx-chips">

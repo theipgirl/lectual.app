@@ -1450,3 +1450,37 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
   .lx-tbl td a,
   .lp-row-grid a { display: inline-flex; align-items: center; min-height: 44px; }
 }
+
+/* ── Page header actions and "Sync new meetings" (Sprint 34) ───────── */
+.lx-head-actions { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; }
+.lx-sync { display: grid; gap: 6px; justify-items: start; }
+
+/* ── Compact page tops under 640px (Sprint 34) ────────────────────────
+   The top of every list page took too much of a phone. Today, Leads, Matters, Mail, Meetings,
+   Approvals, Proposals and Calendar all use .lx-page-head / .lx-h1 / .lx-sub (or the shared list
+   header), so one block compacts them: a 24px h1, a one-line sub, no eyebrow, one row of buttons,
+   and filter chips in one sideways-scrolling row. Placed last so it wins over earlier h1 sizes. */
+@media (max-width: 640px) {
+  .lx-content { padding: 10px 12px 84px; }
+  .lx-page { gap: 10px; padding-right: 0; }
+  .lx-h1 { font-size: 24px; line-height: 1.15; margin: 0; }
+  .lx-page-head { gap: 8px; align-items: center; }
+  .lx-page-head > div { min-width: 0 !important; flex: 1 1 100% !important; }
+  .lx-page-head .lx-label { display: none; }
+  .lx-page-head .lx-sub,
+  .lp-header .lp-sub {
+    margin: 2px 0 0;
+    font-size: 13.5px;
+    line-height: 1.4;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-wrap: nowrap;
+  }
+  .lx-page-head .lx-btn,
+  .lx-head-actions .lx-btn { white-space: nowrap; }
+  .lx-head-actions { flex-wrap: nowrap; gap: 6px; }
+  .lx-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  .lx-chips a { flex: 0 0 auto; white-space: nowrap; }
+}

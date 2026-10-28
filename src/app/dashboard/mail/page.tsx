@@ -15,6 +15,8 @@ import { liveMailReadDeps } from "@/lib/mailbox/read-message-live";
 import { MailReadingPane, MailPaneLoading } from "@/components/mailbox/MailReadingPane";
 import { LiveInboxList } from "@/components/mailbox/LiveInboxList";
 import "@/components/mailbox/mail-pane.css";
+import { MailFolderSelect } from "@/components/mailbox/MailFolderSelect";
+import { folderSelect, type MailNavLink } from "@/lib/mailbox/folder-select";
 import type { Metadata } from "next";
 import { matterDisplayTitle } from "@/lib/matters/display-title";
 import { pageTitle } from "@/lib/ui/page-title";
@@ -127,27 +129,36 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
   const paneState = m ? loadStoredMessage(m, liveMailReadDeps) : live ? loadLiveMessage(box, live, liveMailReadDeps) : null;
   const inbox = inboxTab ? await loadLiveInbox(box, liveMailReadDeps) : null;
 
+  // The sidebar links and the phone's select are built from this one list, so they cannot disagree.
+  const navLinks: MailNavLink[] = [
+    { key: "received", group: "Folders", label: "Received", href: href({ f: null, tab: null, m: null, live: null }), current: !sent && !inboxTab },
+    { key: "sent", group: "Folders", label: "Sent", href: href({ f: "sent", tab: null, m: null, live: null }), current: sent && !inboxTab },
+    { key: "all", group: "Mailboxes", label: "All mailboxes", href: href({ box: null, m: null, live: null }), current: !selected },
+    ...connections.map((c): MailNavLink => ({ key: c.id, group: "Mailboxes", label: c.email, href: href({ box: c.id, m: null, live: null }), current: selected?.id === c.id })),
+  ];
+  const folderLinks = navLinks.filter((l) => l.group === "Folders");
+  const boxLink = (key: string) => navLinks.find((l) => l.key === key)!;
+
   return (
     <div className="lx-split">
-      <aside className="lx-side" aria-label="Mailboxes">
+      <aside className="lx-side lx-mail-side" aria-label="Mailboxes">
         <div className="lx-label">Folders</div>
         <nav style={{ display: "grid", gap: 2 }}>
-          <Link href={href({ f: null, tab: null, m: null, live: null })} className="lx-fi" aria-current={!sent && !inboxTab ? "page" : undefined}>
-            Received
-          </Link>
-          <Link href={href({ f: "sent", tab: null, m: null, live: null })} className="lx-fi" aria-current={sent && !inboxTab ? "page" : undefined}>
-            Sent
-          </Link>
+          {folderLinks.map((l) => (
+            <Link key={l.key} href={l.href} className="lx-fi" aria-current={l.current ? "page" : undefined}>
+              {l.label}
+            </Link>
+          ))}
         </nav>
         <div className="lx-label" style={{ marginTop: 8 }}>
           Mailboxes
         </div>
         <nav style={{ display: "grid", gap: 2 }}>
-          <Link href={href({ box: null, m: null, live: null })} className="lx-fi" aria-current={!selected ? "page" : undefined}>
+          <Link href={boxLink("all").href} className="lx-fi" aria-current={!selected ? "page" : undefined}>
             All mailboxes
           </Link>
           {connections.map((c) => (
-            <Link key={c.id} href={href({ box: c.id, m: null, live: null })} className="lx-fi lx-fi-box" aria-current={selected?.id === c.id ? "page" : undefined} title={c.email}>
+            <Link key={c.id} href={boxLink(c.id).href} className="lx-fi lx-fi-box" aria-current={selected?.id === c.id ? "page" : undefined} title={c.email}>
               <ProviderMark provider={c.provider} size={14} />
               <span className="lx-fi-text">{c.email}</span>
               {c.status === "reauth" && <span className="lx-fi-n" style={{ color: "var(--wine)" }}>!</span>}
@@ -174,6 +185,8 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
             <Link href={INTEGRATIONS}>Reconnect</Link>
           </div>
         )}
+
+        <MailFolderSelect select={folderSelect(navLinks)} />
 
         <div className="lx-mail-tabs" role="navigation" aria-label="Mail views">
           <Link href={href({ tab: null, m: null, live: null })} className="lx-btn lx-btn-sm lx-btn-sec" aria-current={!inboxTab ? "page" : undefined}>

@@ -308,3 +308,16 @@
   .lp-link-button,
   .lp-root .lx-view-toggle button { min-height: 44px; min-width: 44px; }
 }
+
+/* ---- Compact top under 640px (Sprint 34): one row of buttons, one scrolling row of chips ---- */
+@media (max-width: 640px) {
+  .lp-root { --lp-gap: 8px; }
+  .lp-header { row-gap: 0; }
+  .lp-toolbar { flex-wrap: wrap; gap: 6px; }
+  .lp-toolbar-spacer { display: none; }
+  .lp-toolbar > :not(.lp-search) { flex: 0 0 auto; }
+  .lp-toolbar .lp-btn,
+  .lp-toolbar .lp-search-submit { padding: 0 10px; font-size: 13px; }
+  .lp-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  .lp-chip { flex: 0 0 auto; white-space: nowrap; }
+}
