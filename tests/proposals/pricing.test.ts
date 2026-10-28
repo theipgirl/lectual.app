@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import {
   defaultSelection,
+  isFixedOffer,
   lockedSelectionIds,
   normalizeSelection,
   quoteHasItems,
@@ -335,6 +336,54 @@ describe("defaultSelection and normalizeSelection", () => {
   });
 });
 
+describe("isFixedOffer: no checkboxes when there is nothing to choose", () => {
+  const one = (): ProposalContent => {
+    const c = sevetri();
+    c.names = [c.names[0]];
+    c.names[0].marks = [c.names[0].marks[0]];
+    c.names[0].classes = [c.names[0].classes[0]];
+    return c;
+  };
+
+  it("one name, one mark, one class is fixed", () => {
+    expect(isFixedOffer(one())).toBe(true);
+  });
+
+  it("two classes is a choice", () => {
+    const c = one();
+    c.names[0].classes.push({ id: "p-c2", label: "Consulting", preselected: false });
+    expect(isFixedOffer(c)).toBe(false);
+  });
+
+  it("word + logo is a choice", () => {
+    const c = sevetri();
+    c.names = [c.names[0]];
+    c.names[0].classes = [c.names[0].classes[0]];
+    expect(isFixedOffer(c)).toBe(false);
+  });
+
+  it("two brand names is a choice", () => {
+    const c = sevetri();
+    for (const nm of c.names) {
+      nm.marks = [nm.marks[0]];
+      nm.classes = [nm.classes[0]];
+    }
+    expect(isFixedOffer(c)).toBe(false);
+  });
+
+  it("malformed content is not fixed", () => {
+    expect(isFixedOffer({} as ProposalContent)).toBe(false);
+    expect(isFixedOffer(null as unknown as ProposalContent)).toBe(false);
+    expect(isFixedOffer({ names: "x" } as unknown as ProposalContent)).toBe(false);
+    const noId = one() as unknown as { names: { marks: unknown[] }[] };
+    noId.names[0].marks = [{ kind: "word" }];
+    expect(isFixedOffer(noId as unknown as ProposalContent)).toBe(false);
+    const noClasses = one();
+    noClasses.names[0].classes = [];
+    expect(isFixedOffer(noClasses)).toBe(false);
+  });
+});
+
 describe("wouldEmptyQuote / lockedSelectionIds: a client can never untick to $0", () => {
   /** One brand name, one mark, one class. */
   function single(): ProposalContent {
@@ -393,6 +442,18 @@ describe("wouldEmptyQuote / lockedSelectionIds: a client can never untick to $0"
     expect(locked(c, s)).toEqual([]);
     // A mark ticked but no class yet: still empty, still nothing locked.
     expect(locked(c, { ...s, "p-word": true })).toEqual([]);
+  });
+
+  it("a fixed offer: defaultSelection and normalizeSelection tick its mark and class regardless of input", () => {
+    const c = single();
+    c.names[0].marks[0].preselected = false;
+    c.names[0].classes[0].preselected = false;
+    const full = { "p-word": true, "p-c1": true };
+    expect(defaultSelection(c)).toEqual(full);
+    expect(normalizeSelection(c, {})).toEqual(full);
+    expect(normalizeSelection(c, "garbage")).toEqual(full);
+    expect(normalizeSelection(c, { "p-word": false, "evil-id": true })).toEqual(full);
+    expect(quoteProposal(c, normalizeSelection(c, {})).legal_total_cents).toBe(330_000);
   });
 
   it("an unticked id is never locked, and garbage reads as not locked", () => {

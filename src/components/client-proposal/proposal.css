@@ -153,6 +153,8 @@
 .cp-opt:has(input:disabled) { cursor: default; }
 .cp-opt:has(input:disabled):hover .cp-box { border-color: var(--cp-line-2); }
 .cp-opt:has(input:disabled:checked):hover .cp-box { border-color: var(--cp-brand); }
+/* A fixed offer (one name, one mark, one class): a plain row, no box column. */
+.cp-opt.cp-fixed { grid-template-columns: minmax(0, 1fr) auto; cursor: default; }
 .cp-t { min-width: 0; }
 .cp-t b { display: block; font-size: 18px; font-weight: 600; overflow-wrap: anywhere; }
 .cp-t span { display: block; font-size: 15px; color: var(--cp-soft); line-height: 1.4; }
@@ -260,6 +262,8 @@ footer.cp-footer { background: var(--cp-ink); color: var(--cp-on-brand); padding
      description to two or three words a line at phone width. */
   .cp-opt { grid-template-columns: 26px minmax(0, 1fr); gap: 4px 10px; }
   .cp-opt .cp-box { grid-row: 1 / span 2; }
+  .cp-opt.cp-fixed { grid-template-columns: minmax(0, 1fr); }
+  .cp-opt.cp-fixed .cp-pr { grid-column: 1; }
   .cp-pr { grid-column: 2; text-align: left; font-size: 16px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; }
   .cp-pr small { display: inline; }
   .cp-pr s { margin-right: 0; }

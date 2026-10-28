@@ -154,9 +154,10 @@ export function quoteProposal(content: ProposalContent, selection: Selection): P
   };
 }
 
-/** The firm's offer as first shown: every `preselected` mark and class ticked, the rest explicitly off. */
+/** The firm's offer as first shown: every `preselected` mark and class ticked, the rest explicitly off (a fixed offer: all of it). */
 export function defaultSelection(content: ProposalContent): Selection {
   const selection: Selection = {};
+  if (isFixedOffer(content)) return fixedOfferSelection(content);
   for (const nm of arr<ProposalContent["names"][number]>(content?.names)) {
     for (const m of arr<ProposalContent["names"][number]["marks"][number]>(nm?.marks)) {
       selection[m.id] = m.preselected === true;
@@ -173,8 +174,13 @@ export function defaultSelection(content: ProposalContent): Selection {
  * id appears once, as a real boolean, and anything else a caller sent is dropped.
  * Used on the way into `accepted_selection` so a hand-built request cannot stash
  * arbitrary keys in the firm's record.
+ *
+ * A fixed offer (`isFixedOffer`) has no choice in it, so whatever was sent it
+ * normalizes to its one mark and one class ticked: the server is the authority,
+ * and an empty or odd body from the client can't turn it into "nothing selected".
  */
 export function normalizeSelection(content: ProposalContent, raw: unknown): Selection {
+  if (isFixedOffer(content)) return fixedOfferSelection(content);
   const given = obj(raw);
   const selection: Selection = {};
   for (const nm of arr<ProposalContent["names"][number]>(content?.names)) {
@@ -186,6 +192,33 @@ export function normalizeSelection(content: ProposalContent, raw: unknown): Sele
     }
   }
   return selection;
+}
+
+function hasStringId(value: unknown): boolean {
+  return typeof obj(value).id === "string" && (obj(value).id as string).length > 0;
+}
+
+/**
+ * A "fixed offer" leaves the client nothing to choose: exactly one brand name
+ * with exactly one mark and exactly one class (an Essential package, word mark
+ * only, one class). The page shows it as written, with no checkboxes, and it is
+ * always priced and accepted fully selected, whatever `preselected` says.
+ * Anything malformed (no names array, a mark or class without an id) is not
+ * fixed and keeps the ordinary checkboxes.
+ */
+export function isFixedOffer(content: ProposalContent): boolean {
+  const names = arr<unknown>(content?.names);
+  if (names.length !== 1) return false;
+  const nm = obj(names[0]);
+  const marks = arr<unknown>(nm.marks);
+  const classes = arr<unknown>(nm.classes);
+  return marks.length === 1 && classes.length === 1 && hasStringId(marks[0]) && hasStringId(classes[0]);
+}
+
+/** A fixed offer's only selection: its one mark and one class ticked. Call only when `isFixedOffer`. */
+function fixedOfferSelection(content: ProposalContent): Selection {
+  const nm = content.names[0];
+  return { [nm.marks[0].id]: true, [nm.classes[0].id]: true };
 }
 
 /** True when the quote has at least one brand name in it (something to accept). */
