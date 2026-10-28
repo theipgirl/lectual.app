@@ -20,11 +20,9 @@ describe("WaitingOnRebecca", () => {
     expect(html).not.toContain("Nothing waiting");
   });
 
-  it("says nothing is waiting only when the queue was read and had nothing for this lead", () => {
+  it("renders nothing (no empty card) when the queue was read and had nothing for this lead", () => {
     const html = render({ status: "ok", byLead: { "lead-2": [{ queueId: "q-9", headline: "Other", kind: "other", createdAt: null }] } });
-    expect(html).toContain("No queued drafts linked to this lead.");
-    expect(html).toContain("href=\"/dashboard/queue");
-    expect(html).not.toContain("Other");
+    expect(html).toBe("");
   });
 
   it("lists this lead's items with label, headline, age and a queue link", () => {

@@ -14,36 +14,37 @@ export function approvalLabel(kind: LeadPendingApproval["kind"]): string {
  * each linking to the queue item where it is reviewed. Nothing is approved or
  * sent from here.
  *
- * THREE-STATE (AGENTS.md): `ok` with nothing for this lead says so;
- * `unavailable` says the queue could not be reached and that this is not an
- * empty queue; `unconfigured` renders nothing (this firm has no queue, so
- * there is nothing for it to be waiting on).
+ * THREE-STATE (AGENTS.md): `ok` with nothing for this lead renders nothing (an
+ * empty card is clutter); `unavailable` says the queue could not be reached and
+ * that this is not an empty queue; `unconfigured` renders nothing (this firm has
+ * no queue, so there is nothing for it to be waiting on).
  */
 export function WaitingOnRebecca({
   leadId,
   approvals,
   now,
+  bare = false,
 }: {
   leadId: string;
+  /** Inside the lead page's "Needs attention" card: no card of its own. */
+  bare?: boolean;
   approvals: LeadPendingApprovals;
   /** The server's render clock (ms), so the ages agree with the rest of the page. */
   now: number;
 }) {
   if (approvals.status === "unconfigured") return null;
   const items = approvals.status === "ok" ? (approvals.byLead[leadId] ?? []) : [];
+  if (approvals.status === "ok" && items.length === 0) return null;
+  const Wrapper = bare ? "div" : "section";
+  const Heading = bare ? "h3" : "h2";
   return (
-    <section className="lx-card" style={{ padding: 18, display: "grid", gap: 10 }} aria-labelledby="waiting-on-rebecca-heading">
-      <h2 id="waiting-on-rebecca-heading" className="lx-h2" style={{ fontSize: 23, margin: 0 }}>
+    <Wrapper className={bare ? undefined : "lx-card"} style={{ padding: bare ? 0 : 18, display: "grid", gap: 10 }} aria-labelledby="waiting-on-rebecca-heading">
+      <Heading id="waiting-on-rebecca-heading" className={bare ? "lx-label" : "lx-h2"} style={bare ? { margin: 0 } : { fontSize: 23, margin: 0 }}>
         Waiting on attorney review
-      </h2>
+      </Heading>
       {approvals.status === "unavailable" ? (
         <p role="alert" className="lx-note" style={{ margin: 0, color: "var(--wine)" }}>
           Can&apos;t show what&apos;s waiting for approval right now. Refresh to try again.
-        </p>
-      ) : items.length === 0 ? (
-        <p className="lx-note" style={{ margin: 0 }}>
-          No queued drafts linked to this lead. A draft the queue can&apos;t tie to a lead still shows on the{" "}
-          <Link href="/dashboard/queue/">approval queue</Link>.
         </p>
       ) : (
         <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 10 }}>
@@ -60,6 +61,6 @@ export function WaitingOnRebecca({
           ))}
         </ul>
       )}
-    </section>
+    </Wrapper>
   );
 }

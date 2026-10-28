@@ -10,9 +10,12 @@ import { formatEventWhen, joinHref } from "@/lib/calendar/outlook-format";
 export function ConsultBookedView({
   read,
   timeZone,
+  bare = false,
 }: {
   read: OutlookRead<{ event: OutlookCalendarEvent | null }>;
   timeZone: string;
+  /** Inside the lead page's "Needs attention" card: a plain row, not a card of its own. */
+  bare?: boolean;
 }) {
   if (read.status === "database-update-needed") {
     return (
@@ -30,8 +33,13 @@ export function ConsultBookedView({
   }
   if (!read.event) return null;
   const join = joinHref(read.event.join_url);
+  const Wrapper = bare ? "div" : "section";
   return (
-    <section className="lx-card" style={{ padding: "12px 18px", display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }} aria-label="Consult booked">
+    <Wrapper
+      className={bare ? undefined : "lx-card"}
+      style={{ padding: bare ? 0 : "12px 18px", display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}
+      aria-label="Consult booked"
+    >
       <b style={{ color: "var(--ink)" }}>Consult booked</b>
       <span className="lx-note">
         {" · "}
@@ -45,6 +53,6 @@ export function ConsultBookedView({
           </a>
         </>
       )}
-    </section>
+    </Wrapper>
   );
 }

@@ -1,0 +1,44 @@
+/* Lead page (Sprint 33): status row, Needs attention, composer tabs, phone order. Tokens only. */
+.lx-status-row {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+}
+.lx-status-row b { color: var(--ink); font-weight: 500; }
+.lx-needs > * + * { border-top: 1px solid var(--line); padding-top: 14px; }
+.lx-needs > h2 + * { border-top: 0; padding-top: 0; }
+.lx-segs button {
+  height: 32px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  color: var(--body);
+  cursor: pointer;
+}
+.lx-segs button.on {
+  background: var(--card);
+  color: var(--ink);
+  font-weight: 500;
+  box-shadow: 0 1px 2px rgba(20, 4, 8, 0.08);
+}
+.lx-segs button:focus-visible { outline: 2px solid var(--ox); outline-offset: 2px; }
+.lx-contact-actions { display: none; gap: 8px; margin-top: 10px; }
+.lx-aside-details > summary { display: none; cursor: pointer; font-weight: 500; color: var(--ink); }
+.lx-aside-body { display: grid; gap: 12px; }
+
+@media (max-width: 640px) {
+  .lx-contact-actions { display: flex; }
+  .lx-aside-details > summary { min-height: 44px; display: flex; align-items: center; }
+  .lx-aside-details[open] > summary { margin-bottom: 12px; }
+  /* The side column reads right after the status row: the main column's cards join the split's flow so the aside can go first. */
+  .lx-split-lead { display: flex; flex-direction: column; }
+  .lx-split-lead > .lx-col { display: contents; }
+  .lx-split-lead > .lx-aside { order: -1; width: auto; }
+}
