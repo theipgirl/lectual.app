@@ -9,6 +9,7 @@ import {
   changeLivePayLink,
   deleteProposalFamily,
   getProposal,
+  getProposalSettings,
   isCurrentUserApprover,
   listProposalStepEvents,
   resetProposalAcceptance,
@@ -45,6 +46,7 @@ import { runCreateLink } from "@/lib/proposal-editor/create-link";
 import { runChangePayLink } from "@/lib/proposal-editor/pay-link";
 import { DELETE_OWNER_ONLY, canDeleteProposal } from "@/lib/proposal-editor/delete-proposal";
 import { runResetAcceptance } from "@/lib/proposal-editor/reset-acceptance";
+import { withPackageSnapshot } from "@/lib/proposals/package-snapshot";
 import { paidStateFromEvents } from "@/lib/proposals/paid";
 import { currentRole } from "@/lib/auth/current-role";
 import { createDraft, listQueue } from "@/lib/queue/api";
@@ -167,10 +169,22 @@ export async function savePricingAction(_prev: ActionState, formData: FormData):
 }
 
 export async function saveNameAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  // Spec 6: a brand name whose package the client chooses snapshots the firm's CURRENT package list into the
+  // proposal. Read through the scoped client; an unreadable list saves nothing rather than guess at prices.
+  let settingPricing: unknown = null;
+  if (formData.get("pkgFields") === "1" && formData.get("pkgChoice") === "on") {
+    try {
+      settingPricing = (await getProposalSettings())?.pricing ?? {};
+    } catch {
+      return { error: "Couldn't load the firm's packages. Try again." };
+    }
+  }
   return edit(formData, (current) => {
     const name = parseName(formData, current.content, rand);
     if (!name.ok) return name;
-    return withContent(replaceName(current.content, name.value));
+    const replaced = replaceName(current.content, name.value);
+    if (!replaced.ok) return replaced;
+    return withContent({ ok: true, value: settingPricing === null ? replaced.value : withPackageSnapshot(replaced.value, settingPricing) });
   });
 }
 

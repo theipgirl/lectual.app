@@ -132,7 +132,17 @@ export function loeInputFromAcceptedProposal(snapshot: AcceptedSnapshot, facts: 
   if (brands.length > 1) return { ok: false, reason: "multiple_brands" };
   const brand = brands[0];
 
-  const packageName = trimmed(content.pricing?.package);
+  // Spec 6: a brand name priced under a package the client chose names THAT package; it is looked up on the firm's
+  // current list like any other ("Choose the LOE template" when it isn't there).
+  const offer = brand.package ? (Array.isArray(content.packages) ? content.packages : []).find((p) => p?.package === brand.package) : undefined;
+  const packageName = trimmed(brand.package) || trimmed(content.pricing?.package);
+  const chartContent: ProposalContent = offer
+    ? {
+        ...content,
+        pricing: { ...content.pricing, package: offer.package, included_classes: offer.included_classes },
+        includes: Array.isArray(offer.includes) && offer.includes.length > 0 ? offer.includes : content.includes,
+      }
+    : content;
   const variant = loeVariantFor(packageName, facts.packages);
   if (!variant.ok) return { ok: false, reason: variant.reason };
 
@@ -146,13 +156,13 @@ export function loeInputFromAcceptedProposal(snapshot: AcceptedSnapshot, facts: 
       entityName: company || null,
       markText: trimmed(brand.name),
       packageName,
-      benefitRowsText: chartRowsFor(content).join("\n"),
+      benefitRowsText: chartRowsFor(chartContent).join("\n"),
       classSelected: brand.classes.map((c) => trimmed(c.label)).filter(Boolean).join(", "),
       classCount: brand.class_count,
       amountPaid: formatDollars(quote.legal_total_cents),
       amountPaidMath: amountPaidMath(quote),
       sendDateIso: facts.todayIso,
-      govFeesText: govFeesText(quote, content.pricing?.gov_per_class_cents ?? 0, brand.class_count),
+      govFeesText: govFeesText(quote, offer ? offer.gov_per_class_cents : content.pricing?.gov_per_class_cents ?? 0, brand.class_count),
     },
   };
 }

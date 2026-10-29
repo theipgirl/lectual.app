@@ -282,12 +282,22 @@ export function publicContent(raw: unknown): ProposalContent {
     const name = pick(nm, ["id", "name", "what", "note"]);
     if (isObject(nm.price_override)) name.price_override = pick(nm.price_override, ["base_cents", "per_class_cents"]);
     if (isObject(nm.client_add)) name.client_add = pick(nm.client_add, ["max"]);
+    // Spec 6: the client's package choice for this brand name, and its own discount.
+    if (isObject(nm.package_choice)) name.package_choice = pick(nm.package_choice, ["options", "default"]);
+    if (nm.discount_pct !== undefined) name.discount_pct = nm.discount_pct;
     name.marks = objects(nm.marks).map((m) => pick(m, ["id", "kind", "desc", "preselected"]));
     name.classes = objects(nm.classes).map((cl) => pick(cl, ["id", "label", "preselected", "client_added", "client_entry", "prompt"]));
     return name;
   });
   out.adjustments = objects(c.adjustments).map((a) => pick(a, ["id", "label", "kind", "value"]));
   out.includes = objects(c.includes).map((r) => pick(r, ["label", "value", "included", "note", "highlight"]));
+  if (Array.isArray(c.packages)) {
+    out.packages = objects(c.packages).map((pk) => {
+      const offer = pick(pk, ["package", "base_cents", "per_class_cents", "included_classes", "gov_per_class_cents", "second_mark_discount_pct"]);
+      if (Array.isArray(pk.includes)) offer.includes = objects(pk.includes).map((r) => pick(r, ["label", "value", "included", "note", "highlight"]));
+      return offer;
+    });
+  }
   return out as unknown as ProposalContent;
 }
 
