@@ -1230,7 +1230,8 @@ Lectual when a proposal has been viewed". Money logic: `quoteProposal` stays the
   select and price line appear only once it is ticked. Locks, the class lock and fixed offers are unchanged. The review panel, receipt, staff page,
   accept notice and Lawmatics note name the package per mark ("The Fold — word mark, Enhanced; design mark, Essential", `packageLineTitle` /
   `chosenPackagesText`, `MARK_PACKAGE_WORDS`). The LOE adapter drafts when the accepted marks share one package; two different ones are
-  `mixed_mark_packages` ("Choose the LOE template", the same LOE-form link as `unknown_package`), never a guess.
+  `mixed_mark_packages` ("Choose the LOE template", never a guess). `paid-flow.ts` writes that line with `code: "unknown_package"` (plus
+  `detail: "mixed_mark_packages"` and its own sentence), so the payment panel's LOE-form link works with `paid-view.ts` untouched (the Sprint 29 hygiene test pins it).
 - **Editor (More options, per mark):** "Let the client choose a package for this mark" with a checkbox per firm package and "Starts selected"
   (`mark.<n>.pkgChoice` / `pkgOption` / `pkgDefault`, read by `parseName` with the row's own number via `rowIndexes`). Hidden while the brand name's own
   choice is on; an unreadable package list posts the saved choice back unchanged.
