@@ -2,6 +2,7 @@ import Link from "next/link";
 import { formatCents } from "@/lib/quotes/money";
 import type { ProposalRowView } from "@/lib/proposals/list-rows";
 import { PaidCell } from "./PaidCell";
+import { OpensLine } from "./OpensLine";
 
 /**
  * The proposals table, to the Quotes & proposals design: PROPOSAL, CLIENT, STATUS, ACCEPTED, PAID, AT SIGNING,
@@ -11,6 +12,8 @@ import { PaidCell } from "./PaidCell";
  * Accepted and Paid are on every row (Sprint 29): "Accepted Oct 21" or "Not yet", and the Paid cell (`PaidCell`).
  * Marking paid is by hand, a stopgap until the firm's LawPay connection takes payment on the proposal. Under 760px
  * each row becomes a stack and those two cells sit directly under the client's name (proposals.css).
+ *
+ * Spec 7: under Accepted, whether the client has opened the link ("Opened Oct 29, 3:12 PM · 4 times").
  */
 export function ProposalsTable({ rows, footerLeft, footerRight }: { rows: ProposalRowView[]; footerLeft: string; footerRight: string }) {
   return (
@@ -47,6 +50,7 @@ export function ProposalsTable({ rows, footerLeft, footerRight }: { rows: Propos
                 </td>
                 <td className="pq-c-accepted" data-label="Accepted" data-accepted={r.accepted === "Not yet" ? "no" : "yes"}>
                   {r.accepted}
+                  {r.opens ? <OpensLine opens={r.opens} /> : null}
                 </td>
                 <td className="wrap pq-c-paid" data-label="Paid">
                   <PaidCell proposalId={r.id} cell={r.paidCell} />

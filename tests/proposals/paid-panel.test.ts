@@ -119,6 +119,13 @@ describe("one line per follow-up step", () => {
     expect(without).not.toContain("/dashboard/documents/new/");
   });
 
+  it("Spec 7: marks accepted under different packages also say 'Choose the LOE template', linking to the LOE form", () => {
+    const events = paid(ev("loe_draft", "blocked", "2026-10-21T15:01:00Z", { code: "mixed_mark_packages", matter_id: "matter-from-lead" }, "The marks were accepted under different packages, so no engagement letter was drafted."));
+    const html = render(events, { matterId: null });
+    expect(html).toContain("Choose the LOE template");
+    expect(html).toContain('href="/dashboard/documents/new/matter-from-lead/loe/"');
+  });
+
   it("unknown package with no matter on the proposal but one recorded on the line: links to that matter's LOE form", () => {
     const events = paid(ev("loe_draft", "blocked", "2026-10-21T15:01:00Z", { code: "unknown_package", matter_id: "matter-from-lead" }, "This package isn't on the firm's current package list, so no engagement letter was drafted."));
     const html = render(events, { matterId: null });

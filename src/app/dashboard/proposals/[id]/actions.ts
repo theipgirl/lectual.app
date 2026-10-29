@@ -169,10 +169,12 @@ export async function savePricingAction(_prev: ActionState, formData: FormData):
 }
 
 export async function saveNameAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  // Spec 6: a brand name whose package the client chooses snapshots the firm's CURRENT package list into the
+  // Spec 6: a brand name (Spec 7: or a mark) whose package the client chooses snapshots the firm's CURRENT package list into the
   // proposal. Read through the scoped client; an unreadable list saves nothing rather than guess at prices.
   let settingPricing: unknown = null;
-  if (formData.get("pkgFields") === "1" && formData.get("pkgChoice") === "on") {
+  // Spec 7: a mark's own choice (`mark.<n>.pkgChoice`) needs the same snapshot.
+  const anyMarkChoice = [...formData.keys()].some((k) => /^mark\.\d+\.pkgChoice$/.test(k) && formData.get(k) === "on");
+  if (formData.get("pkgFields") === "1" && (formData.get("pkgChoice") === "on" || anyMarkChoice)) {
     try {
       settingPricing = (await getProposalSettings())?.pricing ?? {};
     } catch {

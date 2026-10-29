@@ -4,6 +4,7 @@
  * so the table component is only markup and the cell rules are tested without a database.
  */
 
+import { opensKind, opensListText, type OpensKind, type OpensRead } from "./opens";
 import { proposalDisplayStatus, proposalDisplayTone, type ProposalDisplayKey } from "./display-status";
 import {
   expiresLabel,
@@ -83,6 +84,8 @@ export type ProposalRowView = {
   accepted: string;
   /** The Paid column (see `PaidCellView`). */
   paidCell: PaidCellView;
+  /** Spec 7: "Opened Oct 29, 3:12 PM · 4 times" / "Not opened yet" / "Couldn't load opens" / "—". Absent when not asked. */
+  opens?: { kind: OpensKind; text: string };
 };
 
 /** Where a row sits in "accepted, not paid first". Lower sorts earlier. */
@@ -108,6 +111,8 @@ export function buildProposalRowView(
     paid?: ReadonlyMap<string, PaidState> | "unavailable";
     /** Owner / admin / senior admin / intake. */
     canMarkPaid?: boolean;
+    /** Spec 7: the client's opens per version, or "unavailable" when that read failed. Absent = not asked (no line). */
+    opens?: OpensRead;
   },
 ): ProposalRowView {
   const display = proposalDisplayStatus(item, { today: ctx.today, issues: item.blocking_issue });
@@ -161,5 +166,8 @@ export function buildProposalRowView(
     canMarkPaid,
     accepted,
     paidCell,
+    ...(ctx.opens !== undefined
+      ? { opens: { kind: opensKind(item.status, ctx.opens, item.id), text: opensListText(item.status, ctx.opens, item.id, ctx.tz) } }
+      : {}),
   };
 }

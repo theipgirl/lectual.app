@@ -7,6 +7,7 @@ import { friendlyProposalError, ProposalError } from "./errors";
 import { defaultSelection, quoteProposal } from "./pricing";
 import { PROPOSAL_STEPS, RESET_EVENT_TYPE, currentRound, paidStateFromEvents, readStep, type PaidState, type StepEventInput, type StepPayload } from "./paid";
 import { offeredPackages, type OfferedPackage } from "./segments";
+import { summarizeOpens, type OpensSummary } from "./opens";
 import {
   PROPOSAL_ADMIN_ROLES,
   PROPOSAL_STAFF_WRITE_ROLES,
@@ -622,6 +623,38 @@ export async function listLatestProposalEvents(proposalIds: readonly string[]): 
     }
   }
   return out;
+}
+
+/**
+ * Spec 7: how often the CLIENT opened each version, and when last. One read of the `viewed` events by the client
+ * (chunked like the activity read so the id list stays short), through the scoped client, RLS only. The payload (the
+ * coarse browser family) is never selected. Throws on a failed read: the caller shows "Couldn't load opens".
+ */
+export async function listProposalOpens(proposalIds: readonly string[]): Promise<Map<string, OpensSummary>> {
+  const ids = [...new Set(proposalIds)].filter((id) => UUID_PATTERN.test(id));
+  if (ids.length === 0) return new Map();
+  const supabase = await getScopedClient();
+  const db = proposalsDb(supabase);
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += EVENT_ID_CHUNK) chunks.push(ids.slice(i, i + EVENT_ID_CHUNK));
+  const reads = await Promise.all(
+    chunks.map((chunk) =>
+      db
+        .from("client_proposal_event")
+        .select("proposal_id, type, actor, created_at")
+        .in("proposal_id", chunk)
+        .eq("type", "viewed")
+        .eq("actor", "client")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+    ),
+  );
+  const rows: Array<Record<string, unknown>> = [];
+  for (const { data, error } of reads) {
+    if (error) throw friendlyProposalError(error, "load when the client opened the proposal");
+    if (Array.isArray(data)) rows.push(...(data as Array<Record<string, unknown>>));
+  }
+  return summarizeOpens(rows);
 }
 
 export type ProposalLatestEvent = { type: string; actor: string; actor_user_id: string | null; created_at: string };

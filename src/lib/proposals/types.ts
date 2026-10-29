@@ -164,6 +164,12 @@ export type ProposalMark = {
   kind: MarkKind;
   desc: string;
   preselected: boolean;
+  /**
+   * Spec 7: the client picks THIS mark's package on /p/<token> (word mark on one package, the design mark on another).
+   * Same rules as `ProposalName.package_choice` (1 to 3 names from `content.packages`, the default one of them). A brand
+   * name uses either its own `package_choice` or mark-level choices, never both. Picked in `selection.packages[<mark id>]`.
+   */
+  package_choice?: { options: string[]; default: string };
 };
 
 export type ProposalClass = {
@@ -261,7 +267,7 @@ export type ProposalContent = {
   packages?: PackageOffer[];
 };
 
-/** Spec 6: brand name id -> the package NAME the client chose. Never a price. */
+/** Spec 6: brand name id (Spec 7: or mark id, for a mark-level choice) -> the package NAME the client chose. Never a price. */
 export type PackagePicks = Record<string, string>;
 
 /**
@@ -379,6 +385,10 @@ export type QuotedMark = {
   second: boolean;
   /** Legal fee for this mark, cents, after any second-mark discount. */
   price_cents: number;
+  /** Spec 7: the package this mark was priced under (only for a mark with its own `package_choice`). */
+  package?: string;
+  /** Spec 7: this mark's package price before any second-mark discount (only with `package`). */
+  base_cents?: number;
 };
 
 export type QuotedName = {

@@ -5,7 +5,8 @@ import { firmCivilDate } from "@/lib/quotes/firm-time";
 import { firstNameOf } from "@/lib/proposal-editor/labels";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { CAN_WRITE_LEAD } from "@/lib/pipeline/leads";
-import { listLatestProposalEvents, listProposals, listStepActivity, type ProposalListItem, type StepActivity } from "@/lib/proposals/store";
+import { listLatestProposalEvents, listProposalOpens, listProposals, listStepActivity, type ProposalListItem, type StepActivity } from "@/lib/proposals/store";
+import type { OpensRead } from "@/lib/proposals/opens";
 import { PROPOSAL_PAID_ROLES } from "@/lib/proposals/paid";
 import { PROPOSAL_ADMIN_ROLES, PROPOSAL_STAFF_WRITE_ROLES } from "@/lib/proposals/types";
 import { buildProposalRowView, sortForSegment, type ProposalRowView } from "@/lib/proposals/list-rows";
@@ -86,7 +87,7 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
   const failed = !listedRead.ok;
   const today = firmCivilDate(nowDate, tz);
 
-  const [eventsRead, names, strip, leadsRead, draftBlock, stepRead, syncConns] = await Promise.all([
+  const [eventsRead, names, strip, leadsRead, draftBlock, stepRead, syncConns, opensRead] = await Promise.all([
     listedRead.ok && listed.length > 0 ? readEvents(listed) : Promise.resolve(new Map<string, ActivityEvent>() as ReadonlyMap<string, ActivityEvent> | "unavailable"),
     readNames(),
     loadStrip(listed, now, tz),
@@ -94,13 +95,14 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
     canDraftFromTranscript ? loadDraftBlock() : Promise.resolve(null),
     readStepActivity(listed),
     listMeetingConnections().then((r) => (r.ok ? r.connections : null), () => null),
+    readOpens(listed),
   ]);
   const events = withStepActivity(eventsRead, stepRead);
   const canMarkPaid = !!role && PROPOSAL_PAID_ROLES.includes(role);
 
   const all = listed.map((item) => ({
     item,
-    view: buildProposalRowView(item, { today, tz, now, events, names, paid: stepRead === "unavailable" ? "unavailable" : new Map([...stepRead].map(([id, a]) => [id, a.paid])), canMarkPaid }),
+    view: buildProposalRowView(item, { today, tz, now, events, names, paid: stepRead === "unavailable" ? "unavailable" : new Map([...stepRead].map(([id, a]) => [id, a.paid])), canMarkPaid, opens: opensRead }),
   }));
   const counts = failed
     ? null
@@ -211,6 +213,17 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
 async function readEvents(listed: ProposalListItem[]): Promise<ReadonlyMap<string, ActivityEvent> | "unavailable"> {
   try {
     return await listLatestProposalEvents(listed.map((r) => r.id));
+  } catch {
+    return "unavailable";
+  }
+}
+
+/** Spec 7: how often the client opened each listed version; "unavailable" when the read fails, never "not opened". */
+async function readOpens(listed: ProposalListItem[]): Promise<OpensRead> {
+  const live = listed.filter((r) => r.status !== "draft" && r.status !== "approved").map((r) => r.id);
+  if (live.length === 0) return new Map();
+  try {
+    return await listProposalOpens(live);
   } catch {
     return "unavailable";
   }

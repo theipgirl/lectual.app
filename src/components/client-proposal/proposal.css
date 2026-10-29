@@ -383,3 +383,10 @@ footer.cp-footer { background: var(--cp-ink); color: var(--cp-on-brand); padding
   .cp-cmp th.cp-vcell, .cp-cmp td.cp-vcell { min-width: 72px; }
   .cp-pkg-sel { max-width: none; }
 }
+
+/* Spec 7: a mark's own package, under that mark's row. Tokens only. */
+.cp-mark-pkg { display: grid; gap: 6px; }
+.cp-pkg-mark { padding: 0 0 10px 36px; }
+@container cp (max-width: 560px) {
+  .cp-pkg-mark { padding-left: 0; }
+}

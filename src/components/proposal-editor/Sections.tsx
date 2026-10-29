@@ -251,7 +251,8 @@ export type NameValues = {
   note: string;
   overrideBase: string;
   overridePerClass: string;
-  marks: { id: string; kind: MarkKind; desc: string; preselected: boolean }[];
+  /** Spec 7: `packageChoice` is the packages the client may choose between for THIS mark, when set. */
+  marks: { id: string; kind: MarkKind; desc: string; preselected: boolean; packageChoice?: { options: string[]; default: string } | null }[];
   classes: { id: string; label: string; preselected: boolean; clientEntry?: boolean }[];
   /** "Let the client add classes": the firm's own max ("0" = none), or "" for the default (5, none on a fixed offer). */
   clientAddMax?: string;
@@ -626,21 +627,118 @@ export function NameMoreFields({
           </span>
         </label>
         {rows.marks.map((m, i) => (
-          <label key={m.key} className="lx-field" style={{ gridColumn: "1 / -1" }}>
-            <span className="lx-label">{`${MARK_KIND_LABEL[m.kind]} ${i + 1}: what it protects`}</span>
-            <input
-              className="lx-input"
-              name={`mark.${i}.desc`}
-              {...common}
-              aria-label="What this mark protects"
-              maxLength={600}
-              value={m.desc}
-              onChange={(e) => rows.setMarkDesc(m.key, e.target.value)}
+          <div key={m.key} style={{ gridColumn: "1 / -1", display: "grid", gap: 8 }}>
+            <label className="lx-field">
+              <span className="lx-label">{`${MARK_KIND_LABEL[m.kind]} ${i + 1}: what it protects`}</span>
+              <input
+                className="lx-input"
+                name={`mark.${i}.desc`}
+                {...common}
+                aria-label="What this mark protects"
+                maxLength={600}
+                value={m.desc}
+                onChange={(e) => rows.setMarkDesc(m.key, e.target.value)}
+              />
+            </label>
+            <MarkPackageChoice
+              form={form}
+              editable={editable}
+              index={i}
+              label={`${MARK_KIND_LABEL[m.kind]} ${i + 1}`}
+              saved={value.marks.find((x) => x.id === m.id)?.packageChoice ?? null}
+              firmPackages={firmPackages ?? null}
+              nameChoiceOn={choiceOn}
             />
-          </label>
+          </div>
         ))}
       </div>
     </fieldset>
+  );
+}
+
+/**
+ * Spec 7, under More options per mark: "Let the client choose a package for this mark" (a checkbox per firm package and
+ * the one that starts selected). Hidden while the brand name itself lets the client choose (one or the other, never
+ * both). With the firm's list unreadable the saved choice is posted as it is, so a save never drops it.
+ */
+function MarkPackageChoice({
+  form,
+  editable,
+  index,
+  label,
+  saved,
+  firmPackages,
+  nameChoiceOn,
+}: {
+  form: string;
+  editable: boolean;
+  index: number;
+  label: string;
+  saved: { options: string[]; default: string } | null;
+  firmPackages: string[] | null;
+  nameChoiceOn: boolean;
+}) {
+  const [on, setOn] = useState(!!saved);
+  const [ticked, setTicked] = useState<string[]>(saved?.options ?? []);
+  const [def, setDef] = useState(saved?.default ?? "");
+  const common = { form, disabled: !editable } as const;
+  const key = `mark.${index}`;
+  if (firmPackages === null) {
+    return saved ? (
+      <>
+        <input type="hidden" name={`${key}.pkgChoice`} value="on" form={form} />
+        {saved.options.map((o) => (
+          <input key={o} type="hidden" name={`${key}.pkgOption`} value={o} form={form} />
+        ))}
+        <input type="hidden" name={`${key}.pkgDefault`} value={saved.default} form={form} />
+      </>
+    ) : null;
+  }
+  if (nameChoiceOn) return null;
+  const tickedInOrder = firmPackages.filter((p) => ticked.includes(p));
+  const shownDefault = tickedInOrder.includes(def) ? def : tickedInOrder[0] ?? "";
+  const noteId = `pe-mpkg-${form}-${index}`;
+  return (
+    <div className="pe-pkg-choice">
+      <label className="pe-check">
+        <input type="checkbox" name={`${key}.pkgChoice`} {...common} checked={on} onChange={(e) => setOn(e.target.checked)} />
+        <span>{`Let the client choose a package for this mark (${label})`}</span>
+      </label>
+      {on ? (
+        <>
+          <span className="lx-note" id={noteId}>
+            Tick 1 to 3 packages. This mark is priced at the package the client picks; a second mark still gets that package&rsquo;s
+            second-mark discount.
+          </span>
+          <div className="pe-pkg-options" role="group" aria-describedby={noteId}>
+            {firmPackages.map((p) => (
+              <label key={p} className="pe-check">
+                <input
+                  type="checkbox"
+                  name={`${key}.pkgOption`}
+                  value={p}
+                  {...common}
+                  checked={ticked.includes(p)}
+                  onChange={(e) => setTicked((prev) => (e.target.checked ? [...prev.filter((x) => x !== p), p] : prev.filter((x) => x !== p)))}
+                />
+                <span>{p}</span>
+              </label>
+            ))}
+          </div>
+          <label className="lx-field">
+            <span className="lx-label">Starts selected</span>
+            <select className="lx-input" name={`${key}.pkgDefault`} {...common} value={shownDefault} onChange={(e) => setDef(e.target.value)}>
+              {tickedInOrder.length === 0 ? <option value="">Tick a package first</option> : null}
+              {tickedInOrder.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          </label>
+        </>
+      ) : null}
+    </div>
   );
 }
 

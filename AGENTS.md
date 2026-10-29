@@ -1204,3 +1204,42 @@ before (tickable, plus Spec 3's "Add a class"). Money logic: `quoteProposal` sta
   and the Lawmatics note name each chosen package (firm text; client-typed class words still never leave the staff pages). The LOE adapter looks
   up the accepted name's chosen package on the firm's current list ("Choose the LOE template" when it isn't there) and charts that offer's includes.
 - Not verified in a real browser at 375px: the markup and CSS (`.cp-pkg*`, `.cp-cmp*`) are tested only.
+
+## A package per mark, and "Opened" in Lectual (Spec 7, 2026-10-29, no schema)
+Taylor: "a selector for word mark and design mark … an option to add on the design mark and then select the package for that", and "show in
+Lectual when a proposal has been viewed". Money logic: `quoteProposal` stays the ONE price engine; the browser sends package NAMES only. Nothing sends.
+- **Content (jsonb, additive):** `ProposalMark.package_choice: { options, default }`, the same rules as Spec 6's name-level choice (1 to 3 names in
+  `content.packages`, the default one of them). A brand name uses EITHER its own `package_choice` OR mark-level choices, never both;
+  `validateContent` refuses the pair, a mark-level choice beside a `price_override`, and a mark id with a choice that is also a brand name's id
+  (the picks share one map). A mark-level choice makes the offer not fixed. `publicContent` keeps each mark's choice; `withPackageSnapshot` and
+  `saveNameAction` snapshot the firm's list when only a mark uses a choice.
+- **Selection:** `selection.packages[<mark id>]` for a mark-level choice (by name id, as before, for a name-level one). `chosenMarkPackage` /
+  `normalizeSelection` keep a pick only when it is one of THAT mark's options; anything else is the mark's default. Re-validated at accept exactly like Spec 6.
+- **Price (`pricing.ts`, decision):** each ticked mark with a choice is priced on its own under its chosen package, ALWAYS the flat rule over the NAME's
+  ticked classes (`base + per_class * max(0, n - included)`). **The firm's second-mark discount still applies**: the second and later ticked marks of
+  the name take their chosen package's `second_mark_discount_pct` off that price, so Rebecca's "second mark is discounted" policy holds when the
+  design mark is an add-on on its own package. USPTO = n x that package's per-class fee per ticked mark, never discounted. A mark without a choice
+  on such a name keeps the proposal's ordinary price. The name's `discount_pct` still comes off the name's total. `QuotedMark.package` and
+  `QuotedMark.base_cents` (that mark's undiscounted package price) appear only for marks priced this way; names and marks without any choice quote byte
+  for byte as before (`tests/proposals/mark-packages.test.ts` compares against the pre-Spec 7 engine from commit 2b9c95d).
+- **Figures pinned (fixture `tests/proposals/mark-fixture.ts`, 2 classes):** word mark only on Enhanced $3,250, USPTO $700; plus the design mark on
+  Essential (second mark, 20% off $2,775 = $2,220) $5,470, USPTO $1,400; one added class: word Enhanced $4,075 + design Essential $2,880 = $6,955,
+  USPTO $2,100 (and every word x design package pair).
+- **Client page:** on a name that prices per mark, the first mark keeps its row with its own "Select your package" (`.cp-pkg-sel`) and a price line
+  ("Enhanced: $3,250 legal fee for the word mark · includes …"); every later mark is an add-on row ("Add the design mark (logo)", `addMarkLabel`) whose
+  select and price line appear only once it is ticked. Locks, the class lock and fixed offers are unchanged. The review panel, receipt, staff page,
+  accept notice and Lawmatics note name the package per mark ("The Fold — word mark, Enhanced; design mark, Essential", `packageLineTitle` /
+  `chosenPackagesText`, `MARK_PACKAGE_WORDS`). The LOE adapter drafts when the accepted marks share one package; two different ones are
+  `mixed_mark_packages` ("Choose the LOE template", the same LOE-form link as `unknown_package`), never a guess.
+- **Editor (More options, per mark):** "Let the client choose a package for this mark" with a checkbox per firm package and "Starts selected"
+  (`mark.<n>.pkgChoice` / `pkgOption` / `pkgDefault`, read by `parseName` with the row's own number via `rowIndexes`). Hidden while the brand name's own
+  choice is on; an unreadable package list posts the saved choice back unchanged.
+- **"Opened" (Part B, no new tracking):** the `viewed` events `recordProposalViewed` already writes (at most one per 5 minutes; staff skipped) with
+  `actor = 'client'` ONLY. `listProposalOpens(ids)` (store, scoped client, RLS, one read per page of rows in the activity read's chunks; selects
+  `proposal_id, type, actor, created_at`, never the payload) feeds `src/lib/proposals/opens.ts` (pure). The list shows a line under Accepted
+  (`OpensLine`): "Opened Oct 29, 3:12 PM · 4 times" / "Not opened yet" (live link) / "Couldn't load opens" / "—" (draft or saved). The proposal page
+  shows "Opened by the client 4 times · last opened Oct 29, 3:12 PM" under the lifecycle buttons, in the firm's time zone, with the same states. A failed
+  read is never "Not opened yet". The count is per version and comes from at most 5,000 rows per chunk.
+- Not verified in a real browser at 375px: the markup and CSS (`.cp-mark-pkg`, `.cp-pkg-mark`, `.pe-opens`) are tested only.
+- Existing assertions changed on purpose: none of the pricing tests. `tests/proposals/proposal-detail-page.test.ts` and `list-page-harness.ts` mock the
+  new store read; `tests/client-proposal/commitment.test.tsx`'s "leaves pricing.ts untouched" compares with HEAD, so it passes once this is committed.
