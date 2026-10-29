@@ -41,6 +41,19 @@
  *   legal = round(sum of marks * (100 - pct) / 100). The USPTO fee is never
  *   discounted. A name with neither prices exactly as before, byte for byte.
  *
+ * ── SPEC 7: A PACKAGE PER MARK ──────────────────────────────────────────────
+ *   A brand name WITHOUT its own choice may give its marks one each
+ *   (`mark.package_choice`, picked in `selection.packages[markId]`; missing or
+ *   unknown = that mark's default). Each ticked mark with a choice is priced on
+ *   its own under its chosen package with the flat rule over the NAME's ticked
+ *   classes (`base + per_class * max(0, n - included)`); the second and later
+ *   ticked marks of the name take the chosen package's own second-mark percent
+ *   off that price, as before (the firm's "second mark is discounted" policy).
+ *   Its USPTO fee is n x that package's per-class fee, never discounted. A mark
+ *   without a choice on such a name keeps the name's ordinary price. The name's
+ *   `discount_pct` still comes off the name's total. `QuotedMark.package` /
+ *   `base_cents` appear only for marks priced this way.
+ *
  * ── MONEY ───────────────────────────────────────────────────────────────────
  * Integer cents. Rounding happens in exactly two places, both here and both
  * once per figure: a second mark's discounted price and a percent adjustment.
@@ -147,8 +160,8 @@ export function defaultPackageName(content: ProposalContent, name: unknown): str
 }
 
 /**
- * The package a brand name is priced under for this selection: the client's pick when it is one of the
- * name's options, otherwise the default. `null` for a name without a (readable) `package_choice`.
+ * The package a brand name (Spec 7: or a mark, keyed by the mark's id) is priced under for this selection: the
+ * client's pick when it is one of its options, otherwise the default. `null` without a (readable) `package_choice`.
  */
 export function chosenPackage(content: ProposalContent, name: unknown, selection: Selection | null | undefined): PackageOffer | null {
   const options = packageChoiceOptions(content, name);
@@ -160,6 +173,26 @@ export function chosenPackage(content: ProposalContent, name: unknown, selection
   if (picked) return picked;
   const fallback = defaultPackageName(content, name);
   return options.find((o) => o.package === fallback) ?? options[0];
+}
+
+/**
+ * Spec 7: the package a MARK is priced under, or `null` when the mark has no (readable) choice or its brand name
+ * has its own choice (the name's choice wins; `validateContent` refuses the pair).
+ */
+export function chosenMarkPackage(
+  content: ProposalContent,
+  name: unknown,
+  mark: unknown,
+  selection: Selection | null | undefined,
+): PackageOffer | null {
+  if (packageChoiceOptions(content, name).length > 0) return null;
+  return chosenPackage(content, mark, selection);
+}
+
+/** Spec 7: true when a brand name has no choice of its own and at least one of its marks has one. */
+export function usesMarkPackages(content: ProposalContent, name: unknown): boolean {
+  if (packageChoiceOptions(content, name).length > 0) return false;
+  return arr<unknown>(obj(name).marks).some((m) => packageChoiceOptions(content, m).length > 0);
 }
 
 /** A package offer as `ProposalPricing` (always the flat rule). For display words; prices still come from `quoteProposal`. */
@@ -184,6 +217,16 @@ function resolvedPackagePicks(content: ProposalContent, selection: Selection | n
     if (offer && typeof id === "string") {
       picks[id] = offer.package;
       any = true;
+      continue;
+    }
+    // Spec 7: each mark with its own choice, keyed by the mark id.
+    for (const m of arr<unknown>(obj(nm).marks)) {
+      const markOffer = chosenMarkPackage(content, nm, m, selection);
+      const markId = obj(m).id;
+      if (markOffer && typeof markId === "string") {
+        picks[markId] = markOffer.package;
+        any = true;
+      }
     }
   }
   return any ? picks : null;
@@ -221,30 +264,67 @@ export function quoteProposal(content: ProposalContent, selection: Selection): P
     const classDelta = (n || allClasses.length) - nameIncluded;
     const base = Math.max(0, nameBase + namePerClass * (reduceUnderIncluded && !offer ? classDelta : Math.max(0, classDelta)));
 
-    const marks: QuotedMark[] = arr<ProposalContent["names"][number]["marks"][number]>(nm?.marks)
+    // Spec 7: a mark with its own package choice is priced under that package, always flat, over the name's classes.
+    const allMarks = arr<ProposalContent["names"][number]["marks"][number]>(nm?.marks);
+    const markOffers = new Map<string, PackageOffer>();
+    if (!offer) {
+      for (const m of allMarks) {
+        const mo = chosenMarkPackage(content, nm, m, selection);
+        if (mo && typeof m?.id === "string") markOffers.set(m.id, mo);
+      }
+    }
+    const flatFor = (o: PackageOffer) =>
+      Math.max(0, int(o.base_cents) + int(o.per_class_cents) * Math.max(0, (n || allClasses.length) - int(o.included_classes)));
+
+    const marks: QuotedMark[] = allMarks
       .filter((m) => on(m.id))
-      .map((m, i) => ({
-        id: m.id,
-        kind: m.kind,
-        desc: m.desc,
-        second: i > 0,
-        price_cents: i > 0 ? percentOff(base, nameSecondPct) : base,
-      }));
+      .map((m, i) => {
+        const mo = markOffers.get(m.id);
+        if (!mo) {
+          return {
+            id: m.id,
+            kind: m.kind,
+            desc: m.desc,
+            second: i > 0,
+            price_cents: i > 0 ? percentOff(base, nameSecondPct) : base,
+          };
+        }
+        const markBase = flatFor(mo);
+        return {
+          id: m.id,
+          kind: m.kind,
+          desc: m.desc,
+          second: i > 0,
+          price_cents: i > 0 ? percentOff(markBase, pct(mo.second_mark_discount_pct)) : markBase,
+          package: mo.package,
+          base_cents: markBase,
+        };
+      });
 
     const included = n > 0 && marks.length > 0;
     const beforeDiscount = included ? marks.reduce((sum, m) => sum + m.price_cents, 0) : 0;
     // Spec 6: the brand name's own percent comes off its legal fee once, after the package price.
     const hasDiscount = typeof nm?.discount_pct === "number";
     const legal = hasDiscount ? percentOff(beforeDiscount, nameDiscountPct(nm.discount_pct)) : beforeDiscount;
+    // Spec 7: the first-mark price of a name that prices per mark is its first ticked mark's (else its first mark's) own.
+    const firstMarkBase = () => {
+      const first = allMarks.find((m) => on(m.id)) ?? allMarks[0];
+      const mo = first ? markOffers.get(first.id) : undefined;
+      return mo ? flatFor(mo) : base;
+    };
     const quoted: QuotedName = {
       id: nm?.id,
       name: nm?.name,
       included,
       classes: included ? picked.map((c) => ({ id: c.id, label: c.label })) : [],
       marks: included ? marks : [],
-      base_cents: base,
+      base_cents: markOffers.size > 0 ? firstMarkBase() : base,
       legal_cents: legal,
-      gov_cents: included ? n * marks.length * nameGov : 0,
+      gov_cents: !included
+        ? 0
+        : markOffers.size > 0
+          ? marks.reduce((sum, m) => sum + n * (markOffers.has(m.id) ? int(markOffers.get(m.id)!.gov_per_class_cents) : nameGov), 0)
+          : n * marks.length * nameGov,
       class_count: included ? n * marks.length : 0,
     };
     if (offer) quoted.package = offer.package;
@@ -347,8 +427,9 @@ export function isFixedOffer(content: ProposalContent): boolean {
   const addMax = obj(nm.client_add).max;
   if (typeof addMax === "number" && Number.isInteger(addMax) && addMax > 0) return false;
   if (classes.some((c) => obj(c).client_entry === true)) return false;
-  // Spec 6: a package to pick is a choice too.
+  // Spec 6: a package to pick is a choice too (Spec 7: for the name or for one of its marks).
   if (packageChoiceOptions(content, nm).length > 0) return false;
+  if (usesMarkPackages(content, nm)) return false;
   return marks.length === 1 && classes.length === 1 && hasStringId(marks[0]) && hasStringId(classes[0]);
 }
 

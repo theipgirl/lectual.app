@@ -358,3 +358,6 @@
 /* Spec 6: "Let the client choose a package" under More options. Tokens only. */
 .pe-pkg-choice { display: grid; gap: 8px; }
 .pe-pkg-options { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+
+/* Spec 7: whether the client has opened the link, under the lifecycle buttons. Tokens only. */
+.pe-opens { margin: 8px 0 0; }

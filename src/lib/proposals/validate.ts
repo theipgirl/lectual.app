@@ -348,6 +348,30 @@ export function validateContent(content: unknown, options: ValidateOptions = {})
     }
   }
 
+  // Spec 6 / Spec 7: one package choice (a brand name's or a mark's): 1 to 3 of this proposal's packages, the default one of them.
+  const checkChoice = (path: string, raw: unknown) => {
+    const choice = isObj(raw) ? raw : null;
+    const options = choice && Array.isArray(choice.options) ? choice.options : null;
+    if (!hasPackages) err(path, "Add the packages to choose from before letting the client choose one.");
+    if (!choice || !options) return err(path, "The package choice is not readable.");
+    if (options.length < 1 || options.length > 3) err(`${path}.options`, "Offer from 1 to 3 packages to choose from.");
+    const seenOptions = new Set<string>();
+    for (const option of options) {
+      if (typeof option !== "string" || !option.trim()) {
+        err(`${path}.options`, "Every package to choose from needs a name.");
+        continue;
+      }
+      if (seenOptions.has(option)) err(`${path}.options`, `"${option}" is offered twice.`);
+      seenOptions.add(option);
+      if (hasPackages && !packageNames.has(option)) err(`${path}.options`, `"${option}" isn't one of this proposal's packages.`);
+    }
+    if (typeof choice.default !== "string" || !seenOptions.has(choice.default)) {
+      err(`${path}.default`, "Pick the package that starts selected from the packages offered.");
+    }
+  };
+  /** Spec 7: ids of marks with their own package choice (their pick is keyed by the mark id, so no brand name may share it). */
+  const markChoiceIds: Array<{ id: string; path: string }> = [];
+
   // names, marks, classes
   const names = Array.isArray(content.names) ? content.names : null;
   if (!names) err("names", "Add at least one brand name.");
@@ -379,26 +403,7 @@ export function validateContent(content: unknown, options: ValidateOptions = {})
 
     // Spec 6: the client's package for this brand name, and the brand name's own discount.
     if (raw.package_choice != null) {
-      const choice = isObj(raw.package_choice) ? raw.package_choice : null;
-      const options = choice && Array.isArray(choice.options) ? choice.options : null;
-      if (!hasPackages) err(`${p}.package_choice`, "Add the packages to choose from before letting the client choose one.");
-      if (!choice || !options) err(`${p}.package_choice`, "The package choice is not readable.");
-      else {
-        if (options.length < 1 || options.length > 3) err(`${p}.package_choice.options`, "Offer from 1 to 3 packages to choose from.");
-        const seenOptions = new Set<string>();
-        for (const option of options) {
-          if (typeof option !== "string" || !option.trim()) {
-            err(`${p}.package_choice.options`, "Every package to choose from needs a name.");
-            continue;
-          }
-          if (seenOptions.has(option)) err(`${p}.package_choice.options`, `"${option}" is offered twice.`);
-          seenOptions.add(option);
-          if (hasPackages && !packageNames.has(option)) err(`${p}.package_choice.options`, `"${option}" isn't one of this proposal's packages.`);
-        }
-        if (typeof choice.default !== "string" || !seenOptions.has(choice.default)) {
-          err(`${p}.package_choice.default`, "Pick the package that starts selected from the packages offered.");
-        }
-      }
+      checkChoice(`${p}.package_choice`, raw.package_choice);
       if (raw.price_override != null) {
         err(`${p}.price_override`, "A brand name whose package the client chooses can't also have its own price. Remove one.");
       }
@@ -428,7 +433,20 @@ export function validateContent(content: unknown, options: ValidateOptions = {})
       if (!str(m.desc).trim()) warn(`${mp}.desc`, "This mark has no description for the client.");
       textIssues(`${mp}.desc`, str(m.desc), out);
       if (typeof m.preselected !== "boolean") err(`${mp}.preselected`, "Say whether this mark starts ticked.");
+      // Spec 7: the client's package for this mark.
+      if (m.package_choice != null) {
+        checkChoice(`${mp}.package_choice`, m.package_choice);
+        markChoiceIds.push({ id: str(m.id).trim(), path: `${mp}.package_choice` });
+      }
     });
+    // Spec 7: a brand name prices either by its own package choice or by its marks' choices, never both.
+    const markChoices = marks.some((m) => isObj(m) && m.package_choice != null);
+    if (markChoices && raw.package_choice != null) {
+      err(`${p}.package_choice`, "Let the client choose a package for this brand name or for each mark, not both. Remove one.");
+    }
+    if (markChoices && raw.price_override != null) {
+      err(`${p}.price_override`, "A brand name whose marks' packages the client chooses can't also have its own price. Remove one.");
+    }
     classes.forEach((c, j) => {
       const cp = `${p}.classes[${j}]`;
       if (!isObj(c)) return err(cp, "This class is not readable.");
@@ -478,6 +496,10 @@ export function validateContent(content: unknown, options: ValidateOptions = {})
     if (marks.length > 0 && classes.length > 0) buyable = true;
   });
   if (names && !buyable) err("names", "Add at least one brand name with a mark and a class.");
+  // Spec 7: a mark's package pick is keyed by the mark id, a brand name's by the name id, so the two may never meet.
+  for (const m of markChoiceIds) {
+    if (m.id && nameIds.has(m.id)) err(m.path, `The id "${m.id}" is also a brand name's id. Give this mark another id.`);
+  }
 
   // adjustments
   const adjustmentIds = new Set<string>();

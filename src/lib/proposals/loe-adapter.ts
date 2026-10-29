@@ -22,14 +22,15 @@ import { formatDollars } from "@/lib/proposal-editor/events";
 import { findPackage } from "./package-list";
 import type { AcceptedSnapshot, ProposalContent, ProposalPricing, ProposalQuote, QuotedName } from "./types";
 
-export type LoeRefusal = "no_brand" | "multiple_brands" | "unknown_package" | "package_list_unreadable";
+export type LoeRefusal = "no_brand" | "multiple_brands" | "unknown_package" | "package_list_unreadable" | "mixed_mark_packages";
 
-/** The sentence shown for each refusal. `unknown_package` is paired with the "Choose the LOE template" heading. */
+/** The sentence shown for each refusal. `unknown_package` and `mixed_mark_packages` are paired with the "Choose the LOE template" heading. */
 export const LOE_REFUSAL_TEXT: Record<LoeRefusal, string> = {
   no_brand: "No brand name was accepted, so there is nothing to draft an engagement letter for.",
   multiple_brands: "More than one brand was accepted. Draft each engagement letter from the LOE form.",
   unknown_package: "This package isn't on the firm's current package list, so no engagement letter was drafted.",
   package_list_unreadable: "Couldn't check the firm's package list, so no engagement letter was drafted.",
+  mixed_mark_packages: "The marks were accepted under different packages, so no engagement letter was drafted.",
 };
 
 export const CHOOSE_LOE_TEMPLATE = "Choose the LOE template";
@@ -134,8 +135,16 @@ export function loeInputFromAcceptedProposal(snapshot: AcceptedSnapshot, facts: 
 
   // Spec 6: a brand name priced under a package the client chose names THAT package; it is looked up on the firm's
   // current list like any other ("Choose the LOE template" when it isn't there).
-  const offer = brand.package ? (Array.isArray(content.packages) ? content.packages : []).find((p) => p?.package === brand.package) : undefined;
-  const packageName = trimmed(brand.package) || trimmed(content.pricing?.package);
+  // Spec 7: marks priced under their own packages. One package across them is that package; two different ones are
+  // never guessed between: no draft, and "Choose the LOE template".
+  // A mark on such a name without a package of its own is priced under the proposal's package, so it counts as that.
+  const acceptedMarks = Array.isArray(brand.marks) ? brand.marks : [];
+  const perMark = acceptedMarks.some((m) => trimmed(m.package));
+  const markPackages = perMark ? [...new Set(acceptedMarks.map((m) => trimmed(m.package) || trimmed(content.pricing?.package)))] : [];
+  if (!brand.package && markPackages.length > 1) return { ok: false, reason: "mixed_mark_packages" };
+  const brandPackage = brand.package ?? markPackages[0];
+  const offer = brandPackage ? (Array.isArray(content.packages) ? content.packages : []).find((p) => p?.package === brandPackage) : undefined;
+  const packageName = trimmed(brandPackage) || trimmed(content.pricing?.package);
   const chartContent: ProposalContent = offer
     ? {
         ...content,

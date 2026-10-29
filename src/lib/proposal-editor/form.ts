@@ -25,6 +25,7 @@
 import { centsToInput, parseDollarsToCents } from "@/lib/quotes/money";
 import {
   MARK_KIND_DEFAULT_DESC,
+  MARK_KIND_LABEL,
   isMarkKind,
   type ProposalAdjustment,
   type ProposalClass,
@@ -99,11 +100,8 @@ export function parseDateInput(raw: string, label: string): Parsed<string | null
 
 /* ─────────────────────────── repeated rows ──────────────────────────────── */
 
-/**
- * Rows named `<prefix>.<n>.<field>` -> an array in ascending `n`. A row exists
- * if any of its fields was posted. Missing fields read as "".
- */
-export function collectRows(form: FormData, prefix: string, fields: readonly string[]): Record<string, string>[] {
+/** The row numbers posted under `prefix` (`mark.0.id`, `mark.3.kind` -> [0, 3]), in order: the rows `collectRows` returns. */
+export function rowIndexes(form: FormData, prefix: string): number[] {
   const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const pattern = new RegExp(`^${escaped}\\.(\\d+)\\.([A-Za-z_]+)$`);
   const indexes = new Set<number>();
@@ -111,8 +109,15 @@ export function collectRows(form: FormData, prefix: string, fields: readonly str
     const m = pattern.exec(key);
     if (m) indexes.add(Number(m[1]));
   }
-  return [...indexes]
-    .sort((a, b) => a - b)
+  return [...indexes].sort((a, b) => a - b);
+}
+
+/**
+ * Rows named `<prefix>.<n>.<field>` -> an array in ascending `n`. A row exists
+ * if any of its fields was posted. Missing fields read as "".
+ */
+export function collectRows(form: FormData, prefix: string, fields: readonly string[]): Record<string, string>[] {
+  return rowIndexes(form, prefix)
     .map((n) => {
       const row: Record<string, string> = {};
       for (const f of fields) {
@@ -238,15 +243,39 @@ export function parseName(form: FormData, existing: ProposalContent, rand: () =>
     for (const c of nm.classes) taken.add(c.id);
   }
 
+  const before = existing.names.find((n) => n.id === id);
+  const pkgFields = form.get("pkgFields") === "1";
   const marks: ProposalMark[] = [];
-  for (const row of collectRows(form, "mark", ["id", "kind", "desc", "preselected"])) {
+  const markRows = rowIndexes(form, "mark");
+  for (const [k, row] of collectRows(form, "mark", ["id", "kind", "desc", "preselected", "pkgChoice", "pkgDefault"]).entries()) {
     const kind = isMarkKind(row.kind) ? row.kind : null;
     if (!kind) return fail("Each mark must be a Word mark or a Logo mark.");
+    const markId = cleanId(row.id, "m", taken, rand);
+    // Spec 7: "Let the client choose a package for this mark", under More options. A form without the package fields
+    // keeps what the mark already has.
+    let markChoice: ProposalMark["package_choice"] | undefined = before?.marks.find((m) => m.id === markId)?.package_choice;
+    if (pkgFields) {
+      markChoice = undefined;
+      if (row.pkgChoice === "on") {
+        const options: string[] = [];
+        for (const v of form.getAll(`mark.${markRows[k]}.pkgOption`)) {
+          const o = typeof v === "string" ? v.trim() : "";
+          if (o && !options.includes(o)) options.push(o);
+        }
+        const which = `${MARK_KIND_LABEL[kind]} ${k + 1}`;
+        if (options.length < 1 || options.length > 3) return fail(`${which}, packages the client can choose: tick from 1 to 3 packages.`);
+        const wanted = row.pkgDefault;
+        const def = options.includes(wanted) ? wanted : wanted ? null : options[0];
+        if (def === null) return fail(`${which}, package that starts selected: pick one of the packages ticked.`);
+        markChoice = { options, default: def };
+      }
+    }
     marks.push({
-      id: cleanId(row.id, "m", taken, rand),
+      id: markId,
       kind,
       desc: row.desc,
       preselected: row.preselected === "on",
+      ...(markChoice ? { package_choice: markChoice } : {}),
     });
   }
   const classes: ProposalClass[] = collectRows(form, "class", ["id", "label", "preselected", "clientEntry"]).map((row) => {
@@ -273,10 +302,9 @@ export function parseName(form: FormData, existing: ProposalContent, rand: () =>
 
   // Spec 6: "Let the client choose a package" and "Discount on this brand name (%)", under More options. A form that
   // did not carry them (`pkgFields` absent) keeps what the brand name already has.
-  const before = existing.names.find((n) => n.id === id);
   let packageChoice: ProposalName["package_choice"] | undefined = before?.package_choice;
   let discountPct: number | undefined = before?.discount_pct;
-  if (form.get("pkgFields") === "1") {
+  if (pkgFields) {
     packageChoice = undefined;
     if (form.get("pkgChoice") === "on") {
       const options: string[] = [];
@@ -301,6 +329,14 @@ export function parseName(form: FormData, existing: ProposalContent, rand: () =>
   }
   if (packageChoice && (base.value !== undefined || per.value !== undefined)) {
     return fail("A brand name whose package the client chooses can't also have its own price. Clear its own price first.");
+  }
+  // Spec 7: a package choice per brand name or per mark, never both.
+  const markChoices = marks.some((m) => m.package_choice);
+  if (markChoices && packageChoice) {
+    return fail("Let the client choose a package for this brand name or for each mark, not both. Untick one.");
+  }
+  if (markChoices && (base.value !== undefined || per.value !== undefined)) {
+    return fail("A brand name whose marks' packages the client chooses can't also have its own price. Clear its own price first.");
   }
 
   // Every package includes one class: a brand whose mark starts ticked keeps its first class ticked.

@@ -67,6 +67,8 @@ export type Opts = {
   strip?: ConsultsStripData;
   /** Sprint 19: each accepted row's paid state / newest step event; omitted = nothing marked, "fail" = the read throws. */
   steps?: Record<string, { paid: unknown; newest: unknown }> | "fail";
+  /** Spec 7: the client's opens per version; omitted = none, "fail" = the read throws. */
+  opens?: Map<string, { count: number; lastAt: string }> | "fail";
 };
 
 export const PACKAGES = [
@@ -89,6 +91,10 @@ export async function renderListPage(search: { segment?: string; status?: string
     listStepActivity: vi.fn(async (ids: string[]) => {
       if (opts.steps === "fail") throw new Error("step events down");
       return new Map(ids.map((id) => [id, (opts.steps && opts.steps !== "fail" ? opts.steps[id] : undefined) ?? { paid: { state: "not_paid", undoneAt: null }, newest: null }]));
+    }),
+    listProposalOpens: vi.fn(async () => {
+      if (opts.opens === "fail") throw new Error("opens down");
+      return opts.opens ?? new Map();
     }),
     getProposalSettings: vi.fn(async () => {
       if (opts.settings === "fail") throw new Error("settings down");

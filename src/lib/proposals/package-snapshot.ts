@@ -46,9 +46,9 @@ export function packageOffersFromSetting(settingPricing: unknown): PackageOffer[
   });
 }
 
-/** True when some brand name lets the client choose its package. */
+/** True when some brand name (Spec 7: or one of its marks) lets the client choose its package. */
 export function usesPackageChoice(content: ProposalContent): boolean {
-  return (content.names ?? []).some((n) => isObj(n?.package_choice));
+  return (content.names ?? []).some((n) => isObj(n?.package_choice) || (Array.isArray(n?.marks) && n.marks.some((m) => isObj(m?.package_choice))));
 }
 
 /**
