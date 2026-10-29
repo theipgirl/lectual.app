@@ -52,7 +52,8 @@ describe("scope: no migration, no dependency, no new unsafe HTML", () => {
       return; // no history here: the static checks above still hold
     }
     for (const file of changed) {
-      expect(file, file).not.toMatch(/migrations?\/|\.sql$|^package\.json$|pnpm-lock\.yaml|pnpm-workspace\.yaml|^vercel\.json$/);
+      // vercel.json left this list on purpose: the 2026-10-28 hired-matter sync added its daily cron there.
+      expect(file, file).not.toMatch(/migrations?\/|\.sql$|^package\.json$|pnpm-lock\.yaml|pnpm-workspace\.yaml/);
     }
     // The paid view and the Lawmatics stage alias table are untouched. (paid.ts left this list on
     // purpose: the 2026-10-28 reset-acceptance change, lectual 0101, gave it the fresh-round rule.)
