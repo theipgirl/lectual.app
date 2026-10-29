@@ -4,6 +4,7 @@ import { firmToken } from "@/lib/intake-forms/lawmatics-sync";
 import { addNote, type FetchLike } from "@/lib/lawmatics/writes";
 import { formatDollars } from "@/lib/proposal-editor/events";
 import { addedClassCount } from "./client-classes";
+import { chosenPackagesText, packageLineTitle } from "./name-package";
 import { RESET_EVENT_TYPE, stepPayload, stepSucceeded, type ProposalStep, type StepEventInput, type StepPayload } from "./paid";
 import { MARK_KIND_LABEL, type AcceptedSnapshot } from "./types";
 
@@ -83,7 +84,8 @@ export function acceptanceNoteBody(snapshot: AcceptedSnapshot, clientName: strin
   const allClasses = (content.names ?? []).flatMap((n) => n.classes ?? []);
   const addedIds = new Set(allClasses.filter((c) => c.client_added === true && snapshot.selection?.[c.id] === true).map((c) => c.id));
   const describedIds = new Set(allClasses.filter((c) => c.client_entry === true && c.client_added !== true && snapshot.selection?.[c.id] === true).map((c) => c.id));
-  const pkg = text(content.pricing?.package) || "Proposal";
+  // Spec 6: a brand name priced under a package the client chose names it ("The Fold — Enhanced"); firm text only.
+  const pkg = text(chosenPackagesText(quote.names)) || text(content.pricing?.package) || "Proposal";
   const lines: string[] = [`${text(clientName) || "The client"} accepted this proposal. Accepted ${snapshot.accepted_at}.`, `Package: ${pkg}`];
   for (const n of (Array.isArray(quote.names) ? quote.names : []).filter((x) => x.included)) {
     const marks = n.marks.map((m) => MARK_KIND_LABEL[m.kind] ?? m.kind).join(" + ");
@@ -94,7 +96,7 @@ export function acceptanceNoteBody(snapshot: AcceptedSnapshot, clientName: strin
       .map((c) => text(c.label))
       .filter(Boolean)
       .join("; ");
-    lines.push(`- ${text(n.name)}: ${marks}${classes ? `; classes: ${classes}` : ""}`);
+    lines.push(`- ${text(packageLineTitle(n))}: ${marks}${classes ? `; classes: ${classes}` : ""}`);
   }
   for (const a of (Array.isArray(quote.adjustments) ? quote.adjustments : []).filter((x) => x.discount_cents > 0)) {
     lines.push(`Adjustment: ${text(a.label) || "Adjustment"} −${formatDollars(a.discount_cents)}`);
@@ -305,7 +307,8 @@ async function noticeStep(db: FollowupDb, row: Row): Promise<StepResult> {
     if (recipients.length === 0) return { outcome: "skipped", reason: "no approvers or intake staff to tell" };
     const headline = acceptanceHeadline({
       clientName: row.clientName,
-      packageName: row.snapshot.content.pricing?.package ?? "",
+      // Spec 6: each brand name's chosen package when the client picked one (firm text), else the proposal's package.
+      packageName: chosenPackagesText(row.snapshot.quote.names) || (row.snapshot.content.pricing?.package ?? ""),
       legalTotalCents: row.snapshot.quote.legal_total_cents,
       addedClasses: addedClassCount(row.snapshot.content, row.snapshot.selection),
     });
@@ -314,7 +317,8 @@ async function noticeStep(db: FollowupDb, row: Row): Promise<StepResult> {
         org_id: row.orgId,
         user_id: userId,
         kind: "approval_needed",
-        // Exactly three keys: no email, selection, snapshot, gov total, token or mark names.
+        // Exactly three keys: no email, selection, snapshot, gov total or token. The headline names a brand name only
+        // with the package the client chose for it (Spec 6, firm text); never anything the client typed.
         payload: { source: "proposal_accepted", proposal_id: row.id, headline },
       })),
     );

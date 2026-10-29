@@ -58,6 +58,7 @@ import "../proposals.css";
 import type { Metadata } from "next";
 import { recordPageTitle } from "@/lib/ui/page-title";
 import { PROPOSALS_NAME } from "@/lib/ui/words";
+import { packageLineTitle } from "@/lib/proposals/name-package";
 
 /** Tab title: the client's name through the scoped getter; "Proposal" when the read fails or finds nothing. */
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -244,8 +245,15 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
       marks: (n.marks ?? []).map((m) => ({ id: m.id, kind: m.kind, desc: m.desc, preselected: m.preselected })),
       classes: (n.classes ?? []).map((c) => ({ id: c.id, label: c.label, preselected: c.preselected, clientEntry: c.client_entry === true })),
       clientAddMax: explicitClientAddMax(n) === null ? "" : String(explicitClientAddMax(n)),
+      packageChoice: n.package_choice ? { options: [...n.package_choice.options], default: n.package_choice.default } : null,
+      discountPct: typeof n.discount_pct === "number" ? String(n.discount_pct) : "",
     }),
   );
+  // Spec 6: the packages a brand name may offer: the firm's current list, then any this proposal already holds.
+  // null when the firm's settings couldn't be read (the field says so and keeps what is saved).
+  const firmPackageNames: string[] | null = settings
+    ? [...new Set([...normalisePackages(settings.pricing ?? {}).map((p) => p.package), ...(content.packages ?? []).map((p) => p.package)])]
+    : null;
 
   const common = { proposalId: proposal.id, updatedAt: proposal.updated_at, editable };
 
@@ -394,7 +402,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
                     customHelp={customHelp}
                   />
                   {nameValues.map((n) => (
-                    <NameMoreFields key={n.id} proposalId={proposal.id} editable={editable} value={n} packageName={content.pricing?.package ?? ""} />
+                    <NameMoreFields key={n.id} proposalId={proposal.id} editable={editable} value={n} packageName={content.pricing?.package ?? ""} firmPackages={firmPackageNames} />
                   ))}
                   <MessageForm
                     {...common}
@@ -424,7 +432,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
             <dl>
               {quote.names.map((n) => (
                 <div key={n.id} className="pe-line">
-                  <dt>{n.name}</dt>
+                  <dt>{packageLineTitle(n)}</dt>
                   <dd>{n.included ? formatCents(n.legal_cents) : "none ticked"}</dd>
                 </div>
               ))}
@@ -457,6 +465,14 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
             <section className="lx-card pe-totals" aria-label="What the client accepted">
               <div className="lx-label">Accepted{proposal.accepted_at ? ` ${formatFirmStamp(proposal.accepted_at, tz)}` : ""}</div>
               <dl>
+                {proposal.accepted_snapshot.quote.names
+                  .filter((n) => n.included)
+                  .map((n) => (
+                    <div key={n.id} className="pe-line">
+                      <dt>{packageLineTitle(n)}</dt>
+                      <dd>{formatCents(n.legal_cents)}</dd>
+                    </div>
+                  ))}
                 <div className="pe-line pe-line-total">
                   <dt>Legal fee accepted</dt>
                   <dd>{formatCents(proposal.accepted_snapshot.quote.legal_total_cents)}</dd>

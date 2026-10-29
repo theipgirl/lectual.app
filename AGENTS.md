@@ -1171,3 +1171,36 @@ An ACCEPTED version can go back to "Link live" so the same client link can be ac
   The history reads "Acceptance reset by <name>" (`describeResetEvent`; `EventLine.text`), with the earlier legal fee in the details; the list's Last activity says
   "Acceptance reset". Only the NEWEST accepted line of a version carries what the client typed.
 - Not verified against a live database: the 0101 trigger and its event payload (lectual's DB cases skip without `.env.test`).
+
+## A package per brand name on the client proposal page (Spec 6, 2026-10-29, no schema)
+Taylor, for Danielle Milton: one section per brand name, each with "Select your package" (Essential, Enhanced or Concierge), then the classes as
+before (tickable, plus Spec 3's "Add a class"). Money logic: `quoteProposal` stays the ONE price engine. Nothing sends.
+- **Content (jsonb, additive; old proposals price byte for byte as before):** `content.packages: PackageOffer[]`, a SNAPSHOT of the firm's packages
+  (`package`, `base_cents`, `per_class_cents`, `included_classes`, `gov_per_class_cents`, `second_mark_discount_pct`, optional `includes` rows).
+  `ProposalName.package_choice: { options, default }` (1 to 3 names that exist in `content.packages`, the default one of them) and
+  `ProposalName.discount_pct` (a whole 0..50). `validateContent` refuses unknown, duplicate or too many options, a default not offered, a choice
+  without `content.packages`, a discount out of range, a `price_override` beside a choice, and a mark or class id of `packages` (reserved).
+- **Selection:** `Selection.packages = { <nameId>: <package NAME> }`. The browser sends a name, never a number. `chosenPackage` /
+  `normalizeSelection` keep a pick only when it is one of THAT brand name's options; anything else is the default. `accepted_selection` stores the
+  resolved picks; `accepted_snapshot.quote.names[].package` records what each name was priced under. Snapshots are never re-priced.
+- **Price (`pricing.ts`):** a name with a choice is priced under the chosen offer's base, per-class, included classes, second-mark % and USPTO fee,
+  ALWAYS the flat rule (`base + per_class * max(0, n - included)`; `reduce_under_included` never applies). Then `discount_pct` comes off that name's
+  legal fee, rounded once (`QuotedName.discount_cents`). The USPTO fee is never discounted. Global `adjustments` apply to the subtotal as before.
+  `QuotedName.package` / `discount_cents` appear only for names that have them. A choice makes the offer not fixed. `quoteWithClientClasses` (page
+  total, $0 lock, accept) carries the picks; added classes are priced under the chosen package.
+- **Danielle's figures (tests/proposals/package-choice.test.ts, fixture `danielle-fixture.ts`):** The Fold, 3 classes: Essential $3,600, Enhanced
+  $4,075, Concierge $4,950, USPTO $1,050. The Confidence Interval, 2 classes, 10% off: $2,497.50 / $2,925 / $4,455, USPTO $700. One added class each:
+  The Fold $4,425 / $4,900 / $5,775 (USPTO $1,400); The Confidence Interval $3,240 / $3,667.50 / $4,455 (USPTO $1,050).
+- **Client page:** in each brand name's card, above its marks, a labelled `<select>` "Select your package" (stored order, default selected) and the
+  line "<Package>: $X legal fee for <name> (after N% off) · includes N classes, each additional class $X". The review panel and the receipt title each
+  name "<Brand name> — <Package>" (`packageLineTitle`, `src/lib/proposals/name-package.ts`); a discount is its own line. When an offered package has
+  `includes` rows, "What each package includes" is ONE comparison table (`includesComparison`, a column per offered package, "—" for a row a package
+  lacks, inside a sideways-scrolling wrapper at phone width); otherwise the old table, unchanged.
+- **Staff:** the editor's More options, per brand name: "Package the client chooses" ("Let the client choose a package", a checkbox per firm package,
+  "Starts selected") and "Discount on this brand name (%)" (`parseName`; a form without the hidden `pkgFields` keeps what is saved). Saving a name
+  with a choice reads `client_proposal_setting` through the scoped client and snapshots the firm's CURRENT list (`withPackageSnapshot`,
+  `package-snapshot.ts`; a package already in the proposal but no longer on the list is kept); an unreadable list saves nothing. New proposal runs the
+  same snapshot (a no-op until a name has a choice). The staff page lists "<Brand name> — <Package>" per accepted name. The accept notice headline
+  and the Lawmatics note name each chosen package (firm text; client-typed class words still never leave the staff pages). The LOE adapter looks
+  up the accepted name's chosen package on the firm's current list ("Choose the LOE template" when it isn't there) and charts that offer's includes.
+- Not verified in a real browser at 375px: the markup and CSS (`.cp-pkg*`, `.cp-cmp*`) are tested only.

@@ -255,6 +255,10 @@ export type NameValues = {
   classes: { id: string; label: string; preselected: boolean; clientEntry?: boolean }[];
   /** "Let the client add classes": the firm's own max ("0" = none), or "" for the default (5, none on a fixed offer). */
   clientAddMax?: string;
+  /** Spec 6: the packages the client may choose between for this brand name, or null for none. */
+  packageChoice?: { options: string[]; default: string } | null;
+  /** Spec 6: "Discount on this brand name (%)", "" for none. */
+  discountPct?: string;
 };
 
 /* The marks and classes of every brand name are held in one place, because Step 2 draws their pickers and
@@ -497,10 +501,29 @@ export function NameCard({ proposalId, updatedAt, editable, issues, value }: Com
 }
 
 /** More options, per brand name: what it is, its note, its own price, and what each mark protects. Saved with that brand's button in Step 2. */
-export function NameMoreFields({ proposalId, editable, value, packageName }: { proposalId: string; editable: boolean; value: NameValues; packageName: string }) {
+export function NameMoreFields({
+  proposalId,
+  editable,
+  value,
+  packageName,
+  firmPackages,
+}: {
+  proposalId: string;
+  editable: boolean;
+  value: NameValues;
+  packageName: string;
+  /** Spec 6: package names the client may be offered (the firm's current list, plus any already in this proposal); null when the list couldn't be read. */
+  firmPackages?: string[] | null;
+}) {
   const rows = useNameRows(value);
   const form = nameFormId(proposalId, value.id);
   const common = { form, disabled: !editable } as const;
+  const [choiceOn, setChoiceOn] = useState(!!value.packageChoice);
+  const [ticked, setTicked] = useState<string[]>(value.packageChoice?.options ?? []);
+  const [def, setDef] = useState(value.packageChoice?.default ?? "");
+  const list = firmPackages ?? [];
+  const tickedInOrder = list.filter((p) => ticked.includes(p));
+  const shownDefault = tickedInOrder.includes(def) ? def : tickedInOrder[0] ?? "";
   return (
     <fieldset className="pe-fieldset" style={{ border: 0, padding: 0, margin: 0 }} aria-label={`More about ${value.name || "this brand name"}`}>
       <div className="lx-label">{value.name || "Brand name"}</div>
@@ -521,6 +544,86 @@ export function NameMoreFields({ proposalId, editable, value, packageName }: { p
         <label className="lx-field">
           <span className="lx-label">Price per extra class ($)</span>
           <input className="lx-input" name="overridePerClass" {...common} inputMode="decimal" defaultValue={value.overridePerClass} placeholder="Package price" />
+        </label>
+        <fieldset className="lx-field pe-pkg-choice" style={{ gridColumn: "1 / -1", border: 0, padding: 0, margin: 0 }}>
+          <input type="hidden" name="pkgFields" value="1" form={form} />
+          <legend className="lx-label">Package the client chooses</legend>
+          {firmPackages === null ? (
+            <span className="lx-note" role="status">
+              Couldn&rsquo;t load the firm&rsquo;s packages, so this can&rsquo;t be changed right now. Refresh to try again.
+            </span>
+          ) : null}
+          {/* With the list unreadable the current choice is still posted, so a save never drops it. */}
+          {firmPackages === null && value.packageChoice ? (
+            <>
+              <input type="hidden" name="pkgChoice" value="on" form={form} />
+              {value.packageChoice.options.map((o) => (
+                <input key={o} type="hidden" name="pkgOption" value={o} form={form} />
+              ))}
+              <input type="hidden" name="pkgDefault" value={value.packageChoice.default} form={form} />
+            </>
+          ) : null}
+          {firmPackages !== null ? (
+            <>
+              <label className="pe-check">
+                <input type="checkbox" name="pkgChoice" {...common} checked={choiceOn} onChange={(e) => setChoiceOn(e.target.checked)} />
+                <span>Let the client choose a package</span>
+              </label>
+              {choiceOn ? (
+                <>
+                  <span className="lx-note" id={`pe-pkg-${value.id}`}>
+                    Tick 1 to 3 packages. The client picks one for this brand name, and it is priced at that package&rsquo;s prices. A brand name the client
+                    chooses for can&rsquo;t also have its own price.
+                  </span>
+                  <div className="pe-pkg-options" role="group" aria-describedby={`pe-pkg-${value.id}`}>
+                    {list.map((p) => (
+                      <label key={p} className="pe-check">
+                        <input
+                          type="checkbox"
+                          name="pkgOption"
+                          value={p}
+                          {...common}
+                          checked={ticked.includes(p)}
+                          onChange={(e) => setTicked((prev) => (e.target.checked ? [...prev.filter((x) => x !== p), p] : prev.filter((x) => x !== p)))}
+                        />
+                        <span>{p}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <label className="lx-field">
+                    <span className="lx-label">Starts selected</span>
+                    <select className="lx-input" name="pkgDefault" {...common} value={shownDefault} onChange={(e) => setDef(e.target.value)}>
+                      {tickedInOrder.length === 0 ? <option value="">Tick a package first</option> : null}
+                      {tickedInOrder.map((p) => (
+                        <option key={p} value={p}>
+                          {p}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </>
+              ) : null}
+            </>
+          ) : null}
+        </fieldset>
+        <label className="lx-field">
+          <span className="lx-label">Discount on this brand name (%)</span>
+          <input
+            className="lx-input"
+            name="discountPct"
+            {...common}
+            type="number"
+            min={0}
+            max={50}
+            step={1}
+            inputMode="numeric"
+            defaultValue={value.discountPct ?? ""}
+            placeholder="None"
+            aria-describedby={`pe-disc-${value.id}`}
+          />
+          <span className="lx-note" id={`pe-disc-${value.id}`}>
+            A whole percent from 0 to 50, taken off this brand name&rsquo;s legal fee after its package price. The USPTO fee is never discounted.
+          </span>
         </label>
         {rows.marks.map((m, i) => (
           <label key={m.key} className="lx-field" style={{ gridColumn: "1 / -1" }}>

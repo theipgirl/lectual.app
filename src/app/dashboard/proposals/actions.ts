@@ -7,6 +7,7 @@ import { createProposal, getProposalSettings } from "@/lib/proposals/store";
 import { findPackage, normalisePackages } from "@/lib/proposals/package-list";
 import { standardProposalPricing, type ProposalName, type ProposalPackageBasis, type ProposalSettingRow } from "@/lib/proposals/types";
 import { buildNewContent, parseDateInput, pricingFromPackage } from "@/lib/proposal-editor/form";
+import { withPackageSnapshot } from "@/lib/proposals/package-snapshot";
 import { loadConsultForPrefill } from "@/lib/proposals/consult-prefill-load";
 import { buildBrandNames, CHANGED_SINCE_LOAD, consultPrefill } from "@/lib/proposals/prefill";
 import { proposalActionError, type ActionState } from "./errors";
@@ -88,7 +89,9 @@ export async function createProposalAction(_prev: ActionState, formData: FormDat
 
   let id: string;
   try {
-    const content = buildNewContent({
+    // Spec 6: a brand name that lets the client choose its package carries a snapshot of the firm's CURRENT list
+    // (a no-op for a content with no such name).
+    const content = withPackageSnapshot(buildNewContent({
       firstName,
       fullName,
       company: field(formData, "company"),
@@ -97,7 +100,7 @@ export async function createProposalAction(_prev: ActionState, formData: FormDat
       standard,
       packageBasis: basis,
       rand,
-    });
+    }), settings?.pricing ?? {});
     const created = await createProposal({
       clientName: fullName,
       clientEmail: field(formData, "clientEmail") || null,

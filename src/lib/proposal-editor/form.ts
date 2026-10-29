@@ -38,6 +38,7 @@ import {
 } from "@/lib/proposals/types";
 import { isCivilDate } from "@/lib/proposals/validate";
 import { DEFAULT_CLIENT_ENTRY_PROMPT, MAX_CLIENT_ADD } from "@/lib/proposals/client-classes";
+import { MAX_NAME_DISCOUNT_PCT } from "@/lib/proposals/pricing";
 
 export type Parsed<T> = { ok: true; value: T } | { ok: false; error: string };
 
@@ -270,6 +271,38 @@ export function parseName(form: FormData, existing: ProposalContent, rand: () =>
     clientAdd = Number(addRaw);
   }
 
+  // Spec 6: "Let the client choose a package" and "Discount on this brand name (%)", under More options. A form that
+  // did not carry them (`pkgFields` absent) keeps what the brand name already has.
+  const before = existing.names.find((n) => n.id === id);
+  let packageChoice: ProposalName["package_choice"] | undefined = before?.package_choice;
+  let discountPct: number | undefined = before?.discount_pct;
+  if (form.get("pkgFields") === "1") {
+    packageChoice = undefined;
+    if (form.get("pkgChoice") === "on") {
+      const options: string[] = [];
+      for (const v of form.getAll("pkgOption")) {
+        const o = typeof v === "string" ? v.trim() : "";
+        if (o && !options.includes(o)) options.push(o);
+      }
+      if (options.length < 1 || options.length > 3) return fail("Packages the client can choose: tick from 1 to 3 packages.");
+      const wanted = text(form, "pkgDefault");
+      const def = options.includes(wanted) ? wanted : wanted ? null : options[0];
+      if (def === null) return fail("Package that starts selected: pick one of the packages ticked.");
+      packageChoice = { options, default: def };
+    }
+    const dRaw = text(form, "discountPct");
+    discountPct = undefined;
+    if (dRaw) {
+      if (!/^\d{1,2}$/.test(dRaw) || Number(dRaw) > MAX_NAME_DISCOUNT_PCT) {
+        return fail(`Discount on this brand name: enter a whole percent from 0 to ${MAX_NAME_DISCOUNT_PCT}.`);
+      }
+      discountPct = Number(dRaw);
+    }
+  }
+  if (packageChoice && (base.value !== undefined || per.value !== undefined)) {
+    return fail("A brand name whose package the client chooses can't also have its own price. Clear its own price first.");
+  }
+
   // Every package includes one class: a brand whose mark starts ticked keeps its first class ticked.
   if (classes.length > 0 && marks.some((m) => m.preselected) && !classes.some((c) => c.preselected)) classes[0].preselected = true;
 
@@ -288,6 +321,8 @@ export function parseName(form: FormData, existing: ProposalContent, rand: () =>
     marks,
     classes,
     ...(clientAdd !== null ? { client_add: { max: clientAdd } } : {}),
+    ...(packageChoice ? { package_choice: packageChoice } : {}),
+    ...(discountPct !== undefined ? { discount_pct: discountPct } : {}),
   });
 }
 
