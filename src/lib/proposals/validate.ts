@@ -31,6 +31,7 @@
 import { isMarkKind } from "./types";
 import { MAX_CLASSES_TOTAL_PER_BRAND, MAX_CLIENT_ADD } from "./client-classes";
 import { validatePackages } from "./package-list";
+import { MAX_NAME_DISCOUNT_PCT } from "./pricing";
 
 export type ValidationLevel = "error" | "warning";
 export type ValidationIssue = { path: string; message: string; level: ValidationLevel };
@@ -306,6 +307,47 @@ export function validateContent(content: unknown, options: ValidateOptions = {})
     }
   }
 
+  // Spec 6: the package snapshot a brand name's `package_choice` reads from.
+  const packageNames = new Set<string>();
+  const hasPackages = content.packages != null;
+  if (hasPackages) {
+    if (!Array.isArray(content.packages) || content.packages.length === 0) err("packages", "The packages to choose from must be a list of at least one package.");
+    else {
+      content.packages.forEach((raw, i) => {
+        const p = `packages[${i}]`;
+        if (!isObj(raw)) return err(p, "This package is not readable.");
+        const name = str(raw.package).trim();
+        if (!name) err(`${p}.package`, "Name this package.");
+        else if (packageNames.has(name)) err(`${p}.package`, `Two packages share the name "${name}".`);
+        else packageNames.add(str(raw.package));
+        textIssues(`${p}.package`, str(raw.package), out);
+        for (const key of ["base_cents", "per_class_cents", "gov_per_class_cents"] as const) {
+          if (!isCents(raw[key])) err(`${p}.${key}`, "Money must be a whole number of cents, zero or more.");
+        }
+        const inc = raw.included_classes;
+        if (typeof inc !== "number" || !Number.isInteger(inc) || inc < 0) err(`${p}.included_classes`, "Included classes must be a whole number, zero or more.");
+        const pct = raw.second_mark_discount_pct;
+        if (typeof pct !== "number" || !Number.isFinite(pct) || pct < 0 || pct > 100) {
+          err(`${p}.second_mark_discount_pct`, "The second-mark discount must be between 0 and 100 percent.");
+        }
+        if (raw.includes != null) {
+          if (!Array.isArray(raw.includes)) err(`${p}.includes`, "The includes list must be a list.");
+          else {
+            raw.includes.forEach((row, j) => {
+              const rp = `${p}.includes[${j}]`;
+              if (!isObj(row)) return err(rp, "This row is not readable.");
+              if (!str(row.label).trim()) err(`${rp}.label`, "Give this row a label.");
+              for (const key of ["label", "value", "included", "note"] as const) {
+                textIssues(`${rp}.${key}`, str(row[key]), out, { officeAction: false });
+              }
+              officeActionIssue(`${rp}.label`, includesRowText(row), out);
+            });
+          }
+        }
+      });
+    }
+  }
+
   // names, marks, classes
   const names = Array.isArray(content.names) ? content.names : null;
   if (!names) err("names", "Add at least one brand name.");
@@ -335,8 +377,42 @@ export function validateContent(content: unknown, options: ValidateOptions = {})
       }
     }
 
+    // Spec 6: the client's package for this brand name, and the brand name's own discount.
+    if (raw.package_choice != null) {
+      const choice = isObj(raw.package_choice) ? raw.package_choice : null;
+      const options = choice && Array.isArray(choice.options) ? choice.options : null;
+      if (!hasPackages) err(`${p}.package_choice`, "Add the packages to choose from before letting the client choose one.");
+      if (!choice || !options) err(`${p}.package_choice`, "The package choice is not readable.");
+      else {
+        if (options.length < 1 || options.length > 3) err(`${p}.package_choice.options`, "Offer from 1 to 3 packages to choose from.");
+        const seenOptions = new Set<string>();
+        for (const option of options) {
+          if (typeof option !== "string" || !option.trim()) {
+            err(`${p}.package_choice.options`, "Every package to choose from needs a name.");
+            continue;
+          }
+          if (seenOptions.has(option)) err(`${p}.package_choice.options`, `"${option}" is offered twice.`);
+          seenOptions.add(option);
+          if (hasPackages && !packageNames.has(option)) err(`${p}.package_choice.options`, `"${option}" isn't one of this proposal's packages.`);
+        }
+        if (typeof choice.default !== "string" || !seenOptions.has(choice.default)) {
+          err(`${p}.package_choice.default`, "Pick the package that starts selected from the packages offered.");
+        }
+      }
+      if (raw.price_override != null) {
+        err(`${p}.price_override`, "A brand name whose package the client chooses can't also have its own price. Remove one.");
+      }
+    }
+    if (raw.discount_pct != null) {
+      const d = raw.discount_pct;
+      if (typeof d !== "number" || !Number.isInteger(d) || d < 0 || d > MAX_NAME_DISCOUNT_PCT) {
+        err(`${p}.discount_pct`, `The discount on this brand name must be a whole percent from 0 to ${MAX_NAME_DISCOUNT_PCT}.`);
+      }
+    }
+
     const claim = (itemId: string, path: string) => {
       if (!itemId) return err(`${path}.id`, "Every mark and class needs an id.");
+      if (itemId === "packages") return err(`${path}.id`, 'The id "packages" is reserved. Use another id.');
       const first = selectionIds.get(itemId);
       if (first) err(`${path}.id`, `The id "${itemId}" is also used at ${first}. Ids must be unique, or one checkbox would tick two.`);
       else selectionIds.set(itemId, path);

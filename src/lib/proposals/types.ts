@@ -195,6 +195,28 @@ export type ProposalName = {
   classes: ProposalClass[];
   /** The client may add up to `max` (0..10) more open classes to this brand name on /p/<token> (Spec 3). */
   client_add?: { max: number };
+  /**
+   * Spec 6: the client picks this brand name's package on /p/<token>. `options` are 1 to 3 names from
+   * `content.packages`, in the order shown; `default` is one of them and is what a missing or unknown pick means.
+   * Never together with `price_override`.
+   */
+  package_choice?: { options: string[]; default: string };
+  /** Spec 6: a whole percent (0..50) off THIS brand name's legal fee, after its package price. Never the USPTO fee. */
+  discount_pct?: number;
+};
+
+/**
+ * Spec 6: one firm package as it stood when the proposal was built (a snapshot, so a later change to the firm's
+ * list never re-prices a proposal). The same numbers as `ProposalPricing`, plus that package's own includes rows.
+ */
+export type PackageOffer = {
+  package: string;
+  base_cents: number;
+  per_class_cents: number;
+  included_classes: number;
+  gov_per_class_cents: number;
+  second_mark_discount_pct: number;
+  includes?: ProposalInclude[];
 };
 
 export type ProposalAdjustment = {
@@ -235,10 +257,18 @@ export type ProposalContent = {
   includes: ProposalInclude[];
   office_action_note?: string;
   package_basis?: ProposalPackageBasis;
+  /** Spec 6: the packages a brand name's `package_choice` may offer, snapshotted from the firm's list. */
+  packages?: PackageOffer[];
 };
 
-/** Mark or class id -> ticked. */
-export type Selection = Record<string, boolean>;
+/** Spec 6: brand name id -> the package NAME the client chose. Never a price. */
+export type PackagePicks = Record<string, string>;
+
+/**
+ * Mark or class id -> ticked, plus (Spec 6) `packages`: the package name chosen per brand name. The key
+ * "packages" is reserved (`validateContent` refuses it as a mark or class id).
+ */
+export type Selection = { [id: string]: boolean | PackagePicks | undefined; packages?: PackagePicks };
 
 /* ─────────────────────────── rows ────────────────────────────────────────── */
 
@@ -368,6 +398,10 @@ export type QuotedName = {
   gov_cents: number;
   /** Filing-class count for the fee: classes x marks. */
   class_count: number;
+  /** Spec 6: the package this brand name was priced under (only for a name with `package_choice`). */
+  package?: string;
+  /** Spec 6: what `discount_pct` took off this brand name's legal fee (only when the name has one). */
+  discount_cents?: number;
 };
 
 export type QuotedAdjustment = {

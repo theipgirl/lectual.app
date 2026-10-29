@@ -17,6 +17,7 @@ import {
 import { DEFAULT_CLIENT_ENTRY_PROMPT, DESCRIBE_BEFORE_ACCEPT } from "@/lib/proposals/client-classes";
 import { defaultSelection, quoteProposal } from "@/lib/proposals/pricing";
 import { sevetri } from "./fixture";
+import { danielle } from "./danielle-fixture";
 
 // Sprint 19: the acceptance follow-ups (firm notice + Lawmatics note) are scheduled with next/server's after().
 // Outside a request `after` is a no-op here; tests that care capture the callback and run it themselves.
@@ -856,5 +857,45 @@ describe("acceptPublicProposal: classes the client describes or adds", () => {
     const out = publicContent(c);
     expect(out.names[0].client_add).toEqual({ max: 2 });
     expect(out.names[0].classes[0]).toEqual({ id: "o1", label: DEFAULT_CLIENT_ENTRY_PROMPT, preselected: true, client_entry: true });
+  });
+});
+
+/* ─────────────────────────── Spec 6: a package per brand name ──────────── */
+
+
+describe("acceptPublicProposal with a package per brand name (Spec 6)", () => {
+  const ticks = { "fold-word": true, "fold-c1": true, "fold-c2": true, "fold-c3": true, "ci-word": true, "ci-c1": true, "ci-c2": true };
+
+  it("prices the chosen packages on the server and stores the picks and the package per name", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    const { db, tables } = world({ proposal: { content: danielle() } });
+    const r = await acceptPublicProposal(TOKEN, { ...ticks, packages: { fold: "Concierge", ci: "Essential" } }, NOW, db);
+    if (!r.ok) throw new Error(r.reason);
+    expect(r.quote.legal_total_cents).toBe(495_000 + 249_750);
+    expect(r.quote.gov_total_cents).toBe(175_000);
+    const row = tables.client_proposal[0];
+    expect((row.accepted_selection as { packages: unknown }).packages).toEqual({ fold: "Concierge", ci: "Essential" });
+    const names = (row.accepted_snapshot as { quote: { names: Array<{ package?: string }> } }).quote.names;
+    expect(names.map((n) => n.package)).toEqual(["Concierge", "Essential"]);
+  });
+
+  it("ignores any money in the request and falls back to the default for a forged package name", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    const { db, tables } = world({ proposal: { content: danielle() } });
+    const forged = {
+      ...ticks,
+      legal_total_cents: 1,
+      base_cents: 1,
+      packages: { fold: "Free", ci: { package: "Essential", base_cents: 1 } },
+      prices: { fold: 100 },
+    };
+    const r = await acceptPublicProposal(TOKEN, forged, NOW, db, { added: { fold: [{ text: "Candles", on: true, price: 1 }] } });
+    if (!r.ok) throw new Error(r.reason);
+    // Both defaults (Enhanced): The Fold with 4 classes $4,900, The Confidence Interval 10% off $2,925.
+    expect(r.quote.names.map((n) => [n.package, n.legal_cents])).toEqual([["Enhanced", 490_000], ["Enhanced", 292_500]]);
+    expect(r.quote.legal_total_cents).toBe(782_500);
+    const stored = tables.client_proposal[0].accepted_selection as Record<string, unknown>;
+    expect(stored.packages).toEqual({ fold: "Enhanced", ci: "Enhanced" });
+    for (const key of ["legal_total_cents", "base_cents", "prices"]) expect(key in stored).toBe(false);
   });
 });
