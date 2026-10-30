@@ -1242,5 +1242,11 @@ Lectual when a proposal has been viewed". Money logic: `quoteProposal` stays the
   shows "Opened by the client 4 times · last opened Oct 29, 3:12 PM" under the lifecycle buttons, in the firm's time zone, with the same states. A failed
   read is never "Not opened yet". The count is per version and comes from at most 5,000 rows per chunk.
 - Not verified in a real browser at 375px: the markup and CSS (`.cp-mark-pkg`, `.cp-pkg-mark`, `.pe-opens`) are tested only.
+- **At create (fix 2026-10-30):** New proposal's More options has the same choices for the FIRST brand name ("Let the client choose a package",
+  per mark "...for this mark (Word mark / Logo mark)", "Discount on this brand name (%)"; mark fields are `newMark.<kind>.pkg*` because the marks are
+  built on the server). `createProposalAction` applies them through `applyNewProposalPackageFields` (`src/lib/proposal-editor/create-package-choice.ts`),
+  which reads them with the editor's own `parsePackageChoiceFields` / `parseNameDiscountField` (`form.ts`, also used by `parseName`), accepts only
+  package names on the firm's CURRENT list (none when unreadable), snapshots them, checks `validateContent`'s package rules, and creates nothing on a
+  refusal. Before this the action read none of these fields. Other brand names are set in the editor.
 - Existing assertions changed on purpose: none of the pricing tests. `tests/proposals/proposal-detail-page.test.ts` and `list-page-harness.ts` mock the
   new store read; `tests/client-proposal/commitment.test.tsx`'s "leaves pricing.ts untouched" compares with HEAD, so it passes once this is committed.

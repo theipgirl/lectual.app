@@ -220,6 +220,40 @@ export function parsePricing(form: FormData): Parsed<ProposalPricing> {
   });
 }
 
+/* ─────────────────────────── package choice (Spec 6 / Spec 7) ────────────── */
+
+/**
+ * One "Let the client choose a package" group, posted as `<prefix>pkgChoice` ("on"), `<prefix>pkgOption` (one per
+ * ticked package) and `<prefix>pkgDefault`. `prefix` is "" for a brand name's own choice and `mark.<n>.` for a mark's.
+ * `which` names the mark in a refusal ("Word mark 1, packages the client can choose: ..."). Unticked = undefined.
+ * The ONE reader of these fields: the editor's brand-name save (`parseName`) and New proposal both use it.
+ */
+export function parsePackageChoiceFields(form: FormData, prefix: string, which?: string): Parsed<{ options: string[]; default: string } | undefined> {
+  if (form.get(`${prefix}pkgChoice`) !== "on") return ok(undefined);
+  const options: string[] = [];
+  for (const v of form.getAll(`${prefix}pkgOption`)) {
+    const o = typeof v === "string" ? v.trim() : "";
+    if (o && !options.includes(o)) options.push(o);
+  }
+  if (options.length < 1 || options.length > 3) {
+    return fail(`${which ? `${which}, packages` : "Packages"} the client can choose: tick from 1 to 3 packages.`);
+  }
+  const wanted = text(form, `${prefix}pkgDefault`);
+  const def = options.includes(wanted) ? wanted : wanted ? null : options[0];
+  if (def === null) return fail(`${which ? `${which}, package` : "Package"} that starts selected: pick one of the packages ticked.`);
+  return ok({ options, default: def });
+}
+
+/** "Discount on this brand name (%)" (`discountPct`): blank = none; otherwise a whole percent from 0 to 50. */
+export function parseNameDiscountField(form: FormData): Parsed<number | undefined> {
+  const raw = text(form, "discountPct");
+  if (!raw) return ok(undefined);
+  if (!/^\d{1,2}$/.test(raw) || Number(raw) > MAX_NAME_DISCOUNT_PCT) {
+    return fail(`Discount on this brand name: enter a whole percent from 0 to ${MAX_NAME_DISCOUNT_PCT}.`);
+  }
+  return ok(Number(raw));
+}
+
 /** One brand name with its marks and classes, from `mark.<n>.*` and `class.<n>.*` rows. */
 export function parseName(form: FormData, existing: ProposalContent, rand: () => string): Parsed<ProposalName> {
   const id = text(form, "nameId");
@@ -247,7 +281,7 @@ export function parseName(form: FormData, existing: ProposalContent, rand: () =>
   const pkgFields = form.get("pkgFields") === "1";
   const marks: ProposalMark[] = [];
   const markRows = rowIndexes(form, "mark");
-  for (const [k, row] of collectRows(form, "mark", ["id", "kind", "desc", "preselected", "pkgChoice", "pkgDefault"]).entries()) {
+  for (const [k, row] of collectRows(form, "mark", ["id", "kind", "desc", "preselected"]).entries()) {
     const kind = isMarkKind(row.kind) ? row.kind : null;
     if (!kind) return fail("Each mark must be a Word mark or a Logo mark.");
     const markId = cleanId(row.id, "m", taken, rand);
@@ -255,20 +289,9 @@ export function parseName(form: FormData, existing: ProposalContent, rand: () =>
     // keeps what the mark already has.
     let markChoice: ProposalMark["package_choice"] | undefined = before?.marks.find((m) => m.id === markId)?.package_choice;
     if (pkgFields) {
-      markChoice = undefined;
-      if (row.pkgChoice === "on") {
-        const options: string[] = [];
-        for (const v of form.getAll(`mark.${markRows[k]}.pkgOption`)) {
-          const o = typeof v === "string" ? v.trim() : "";
-          if (o && !options.includes(o)) options.push(o);
-        }
-        const which = `${MARK_KIND_LABEL[kind]} ${k + 1}`;
-        if (options.length < 1 || options.length > 3) return fail(`${which}, packages the client can choose: tick from 1 to 3 packages.`);
-        const wanted = row.pkgDefault;
-        const def = options.includes(wanted) ? wanted : wanted ? null : options[0];
-        if (def === null) return fail(`${which}, package that starts selected: pick one of the packages ticked.`);
-        markChoice = { options, default: def };
-      }
+      const parsed = parsePackageChoiceFields(form, `mark.${markRows[k]}.`, `${MARK_KIND_LABEL[kind]} ${k + 1}`);
+      if (!parsed.ok) return parsed;
+      markChoice = parsed.value;
     }
     marks.push({
       id: markId,
@@ -305,27 +328,12 @@ export function parseName(form: FormData, existing: ProposalContent, rand: () =>
   let packageChoice: ProposalName["package_choice"] | undefined = before?.package_choice;
   let discountPct: number | undefined = before?.discount_pct;
   if (pkgFields) {
-    packageChoice = undefined;
-    if (form.get("pkgChoice") === "on") {
-      const options: string[] = [];
-      for (const v of form.getAll("pkgOption")) {
-        const o = typeof v === "string" ? v.trim() : "";
-        if (o && !options.includes(o)) options.push(o);
-      }
-      if (options.length < 1 || options.length > 3) return fail("Packages the client can choose: tick from 1 to 3 packages.");
-      const wanted = text(form, "pkgDefault");
-      const def = options.includes(wanted) ? wanted : wanted ? null : options[0];
-      if (def === null) return fail("Package that starts selected: pick one of the packages ticked.");
-      packageChoice = { options, default: def };
-    }
-    const dRaw = text(form, "discountPct");
-    discountPct = undefined;
-    if (dRaw) {
-      if (!/^\d{1,2}$/.test(dRaw) || Number(dRaw) > MAX_NAME_DISCOUNT_PCT) {
-        return fail(`Discount on this brand name: enter a whole percent from 0 to ${MAX_NAME_DISCOUNT_PCT}.`);
-      }
-      discountPct = Number(dRaw);
-    }
+    const choice = parsePackageChoiceFields(form, "");
+    if (!choice.ok) return choice;
+    packageChoice = choice.value;
+    const discount = parseNameDiscountField(form);
+    if (!discount.ok) return discount;
+    discountPct = discount.value;
   }
   if (packageChoice && (base.value !== undefined || per.value !== undefined)) {
     return fail("A brand name whose package the client chooses can't also have its own price. Clear its own price first.");
