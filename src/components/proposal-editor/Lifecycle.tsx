@@ -10,7 +10,9 @@ import Popover from "@/components/list-page/Popover";
 import { NOT_EMAILED } from "@/lib/consult-proposal/manual-email";
 import { BUTTON_WORDS, LINK_NOT_LIVE_YET, askToCreateLink } from "@/lib/proposal-editor/vocabulary";
 import { RESET_CONFIRM, RESET_CONFIRM_BUTTON, RESET_LABEL, RESET_PENDING } from "@/lib/proposal-editor/reset-acceptance";
+import { finishButtonState } from "@/lib/proposal-editor/unsaved";
 import { ActionForm, Outcome } from "./ActionForm";
+import { useUnsaved } from "./UnsavedGuard";
 import { PostConsultEmail } from "./PostConsultEmail";
 
 /**
@@ -59,6 +61,10 @@ export function Lifecycle({
   const hidden = <input type="hidden" name="proposalId" value={proposalId} />;
   const approvers = approverNames.length > 0 ? joinOr(approverNames) : "a named approver";
   const menu = moreMenuItems({ status, canWrite, canDelete, canReset });
+  // A change in a step form that has not been saved is not in the link. UX guard only: the actions read the saved document.
+  const { labels } = useUnsaved();
+  const blockedBy = finishButtonState({ pending: false, unsavedLabels: labels }).sentence;
+  const unsavedId = `pe-unsaved-why-${proposalId}`;
 
   return (
     <div className="pe-bar" role="group" aria-label="Proposal actions">
@@ -67,9 +73,20 @@ export function Lifecycle({
           {({ state, pending }) => (
             <>
               {hidden}
-              <button type="submit" className="lx-btn lx-btn-pri" disabled={pending || blockingErrors > 0} title={blockingErrors > 0 ? "Fix the problems listed first" : undefined}>
+              <button
+                type="submit"
+                className="lx-btn lx-btn-pri"
+                disabled={finishButtonState({ pending, blockingErrors, unsavedLabels: labels }).disabled}
+                title={blockingErrors > 0 ? "Fix the problems listed first" : undefined}
+                aria-describedby={blockedBy ? unsavedId : undefined}
+              >
                 {pending ? BUTTON_WORDS.creatingLink : BUTTON_WORDS.createLink}
               </button>
+              {blockedBy && (
+                <span className="lx-note" id={unsavedId} role="note">
+                  {blockedBy}
+                </span>
+              )}
               <Outcome state={state} pending={pending} />
             </>
           )}
@@ -94,9 +111,19 @@ export function Lifecycle({
               <span className="lx-note" role="note">
                 {LINK_NOT_LIVE_YET}
               </span>
-              <button type="submit" className="lx-btn lx-btn-pri" disabled={pending}>
+              <button
+                type="submit"
+                className="lx-btn lx-btn-pri"
+                disabled={finishButtonState({ pending, unsavedLabels: labels }).disabled}
+                aria-describedby={blockedBy ? unsavedId : undefined}
+              >
                 {pending ? BUTTON_WORDS.turningOnLink : BUTTON_WORDS.turnOnLink}
               </button>
+              {blockedBy && (
+                <span className="lx-note" id={unsavedId} role="note">
+                  {blockedBy}
+                </span>
+              )}
               <Outcome state={state} pending={pending} />
             </>
           )}

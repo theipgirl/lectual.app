@@ -35,6 +35,7 @@ import { LinkLeadForm } from "@/components/proposal-editor/LinkLeadForm";
 import { ProposalCard } from "@/components/proposal-editor/ProposalCard";
 import { IssueList, type ShownIssue } from "@/components/proposal-editor/ActionForm";
 import { Lifecycle } from "@/components/proposal-editor/Lifecycle";
+import { UnsavedGuardProvider } from "@/components/proposal-editor/UnsavedGuard";
 import { canDeleteProposal } from "@/lib/proposal-editor/delete-proposal";
 import { PaidPanel } from "@/components/proposal-editor/PaidPanel";
 import { ChangePayLink } from "@/components/proposal-editor/ChangePayLink";
@@ -374,6 +375,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
 
       <div className="pe-cols">
         <div className="pe-forms">
+          <UnsavedGuardProvider>
           <NameRowsProvider key={nameValues.map((n) => n.id).join("|")} names={nameValues}>
             <BuilderLayout
               changed={changedCount}
@@ -446,6 +448,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
               }
             />
           </NameRowsProvider>
+          </UnsavedGuardProvider>
         </div>
 
         <aside className="pe-side" aria-label="Figures and preview">

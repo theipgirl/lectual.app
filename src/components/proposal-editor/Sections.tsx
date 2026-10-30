@@ -19,6 +19,7 @@ import { ExpiryField } from "./ExpiryField";
 import { IncludesFields } from "./IncludesFields";
 import type { PricingValues } from "./PricingFields";
 import { newRowId, useRows, type Keyed } from "./rows";
+import { MoreSaveButton, UnsavedPill } from "./UnsavedGuard";
 
 /**
  * The editor's section forms. One form per section, each posting to its own
@@ -44,11 +45,19 @@ function Hidden({ values }: { values: Record<string, string> }) {
   );
 }
 
-function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+function Section({ title, hint, children, unsavedId }: { title: string; hint?: string; children: React.ReactNode; unsavedId?: string }) {
   return (
     <section className="lx-card pe-card">
       <header className="pe-card-head">
-        <h2 className="pe-h">{title}</h2>
+        <h2 className="pe-h">
+          {title}
+          {unsavedId && (
+            <>
+              {" "}
+              <UnsavedPill formId={unsavedId} />
+            </>
+          )}
+        </h2>
         {hint && <p className="lx-note pe-hint">{hint}</p>}
       </header>
       {children}
@@ -69,13 +78,16 @@ export type DetailsValues = {
 /** The form ids that let More options fields belong to a step's form. */
 export const detailsFormId = (proposalId: string) => `pe-details-${proposalId}`;
 export const pricingFormId = (proposalId: string) => `pe-pricing-${proposalId}`;
+export const messageFormId = (proposalId: string) => `pe-message-${proposalId}`;
+export const adjustmentsFormId = (proposalId: string) => `pe-adjustments-${proposalId}`;
+export const includesFormId = (proposalId: string) => `pe-includes-${proposalId}`;
 export const nameFormId = (proposalId: string, nameId: string) => `pe-name-${proposalId}-${nameId}`;
 
 /** Step 1: who the proposal is for. The rest of this form's fields are in More options (`DetailsMoreFields`). */
 export function DetailsForm({ proposalId, updatedAt, editable, issues, values }: Common & { values: DetailsValues }) {
   return (
-    <Section title="Client" hint="Who this is for. Its title and greeting name are under More options.">
-      <ActionForm action={saveDetailsAction} id={detailsFormId(proposalId)}>
+    <Section unsavedId={detailsFormId(proposalId)} title="Client" hint="Who this is for. Its title and greeting name are under More options.">
+      <ActionForm action={saveDetailsAction} id={detailsFormId(proposalId)} unsavedLabel="Client">
         {({ state, pending }) => (
           <fieldset className="pe-fieldset" disabled={!editable}>
             <Hidden values={{ proposalId, updatedAt }} />
@@ -90,7 +102,7 @@ export function DetailsForm({ proposalId, updatedAt, editable, issues, values }:
               </label>
             </div>
             <IssueList issues={issues} />
-            <SaveRow editable={editable} state={state} pending={pending} label="Save client" />
+            <SaveRow editable={editable} state={state} pending={pending} label="Save client" formId={detailsFormId(proposalId)} />
           </fieldset>
         )}
       </ActionForm>
@@ -126,8 +138,8 @@ export function DetailsMoreFields({ proposalId, editable, values }: { proposalId
 
 export function MessageForm({ proposalId, updatedAt, editable, issues, values }: Common & { values: { greeting: string; recommendation: string; officeActionNote: string } }) {
   return (
-    <Section title="Words the client reads" hint="Plain business language. Never an International Class number. “Class 1, 2, 3” counting labels are fine.">
-      <ActionForm action={saveMessageAction}>
+    <Section unsavedId={messageFormId(proposalId)} title="Words the client reads" hint="Plain business language. Never an International Class number. “Class 1, 2, 3” counting labels are fine.">
+      <ActionForm action={saveMessageAction} id={messageFormId(proposalId)} unsavedLabel="Words the client reads">
         {({ state, pending }) => (
           <fieldset className="pe-fieldset" disabled={!editable}>
             <Hidden values={{ proposalId, updatedAt }} />
@@ -145,7 +157,7 @@ export function MessageForm({ proposalId, updatedAt, editable, issues, values }:
               <span className="lx-note">The substantive office action response is never part of a package; this note says it is quoted separately.</span>
             </label>
             <IssueList issues={issues} />
-            <SaveRow editable={editable} state={state} pending={pending} label="Save wording" />
+            <SaveRow editable={editable} state={state} pending={pending} label="Save wording" formId={messageFormId(proposalId)} />
           </fieldset>
         )}
       </ActionForm>
@@ -160,8 +172,8 @@ export type { PricingValues };
 /** Step 3: the package name and where "Accept" sends the client to pay. The prices are in More options (`PricingMoreFields`). */
 export function PricingForm({ proposalId, updatedAt, editable, issues, values, payUrl, expiresOn, today }: Common & { values: PricingValues; payUrl: string; expiresOn: string; today?: string }) {
   return (
-    <Section title="Package and pay link" hint="Totals are always worked out from the package, never typed. Packages are edited in Settings → Proposals; this proposal can change its own numbers under More options.">
-      <ActionForm action={savePricingAction} id={pricingFormId(proposalId)}>
+    <Section unsavedId={pricingFormId(proposalId)} title="Package and pay link" hint="Totals are always worked out from the package, never typed. Packages are edited in Settings → Proposals; this proposal can change its own numbers under More options.">
+      <ActionForm action={savePricingAction} id={pricingFormId(proposalId)} unsavedLabel="Package and pay link">
         {({ state, pending }) => (
           <fieldset className="pe-fieldset" disabled={!editable}>
             <Hidden values={{ proposalId, updatedAt }} />
@@ -177,7 +189,7 @@ export function PricingForm({ proposalId, updatedAt, editable, issues, values, p
               <ExpiryField defaultValue={expiresOn} today={today} disabled={!editable} />
             </div>
             <IssueList issues={issues} />
-            <SaveRow editable={editable} state={state} pending={pending} label="Save package and pay link" />
+            <SaveRow editable={editable} state={state} pending={pending} label="Save package and pay link" formId={pricingFormId(proposalId)} />
           </fieldset>
         )}
       </ActionForm>
@@ -332,7 +344,10 @@ export function NameCard({ proposalId, updatedAt, editable, issues, value }: Com
   return (
     <section className="lx-card pe-card" aria-label={`Brand name ${value.name}`}>
       <header className="pe-card-head pe-card-head-row">
-        <h3 className="pe-h">{value.name || "Brand name"}</h3>
+        <h3 className="pe-h">
+          {value.name || "Brand name"}{" "}
+          <UnsavedPill formId={nameFormId(proposalId, value.id)} />
+        </h3>
         {editable && (
           <ActionForm action={removeNameAction} confirm={`Remove ${value.name || "this brand name"} and its marks and classes? Unsaved changes in this card are lost.`}>
             {({ state, pending }) => (
@@ -352,7 +367,7 @@ export function NameCard({ proposalId, updatedAt, editable, issues, value }: Com
         )}
       </header>
 
-      <ActionForm action={saveNameAction} id={nameFormId(proposalId, value.id)}>
+      <ActionForm action={saveNameAction} id={nameFormId(proposalId, value.id)} unsavedLabel={value.name || "this brand name"}>
         {({ state, pending }) => (
           <fieldset className="pe-fieldset" disabled={!editable}>
             <Hidden values={{ proposalId, updatedAt, nameId: value.id }} />
@@ -493,7 +508,7 @@ export function NameCard({ proposalId, updatedAt, editable, issues, value }: Com
             </div>
 
             <IssueList issues={issues} />
-            <SaveRow editable={editable} state={state} pending={pending} label={`Save ${value.name || "brand name"}`} />
+            <SaveRow editable={editable} state={state} pending={pending} label={`Save ${value.name || "brand name"}`} formId={nameFormId(proposalId, value.id)} />
           </fieldset>
         )}
       </ActionForm>
@@ -652,6 +667,7 @@ export function NameMoreFields({
           </div>
         ))}
       </div>
+    {editable && <MoreSaveButton formId={form} label={`Save ${value.name || "brand name"}`} />}
     </fieldset>
   );
 }
@@ -779,8 +795,8 @@ export type AdjustmentValue = { id: string; label: string; kind: "amount" | "per
 export function AdjustmentsForm({ proposalId, updatedAt, editable, issues, value }: Common & { value: AdjustmentValue[] }) {
   const list = useRows(value);
   return (
-    <Section title="Discounts and credits" hint="Taken off the legal fee only, never the USPTO fee. A consultation credit is a dollar amount; a referral discount might be a percent.">
-      <ActionForm action={saveAdjustmentsAction}>
+    <Section unsavedId={adjustmentsFormId(proposalId)} title="Discounts and credits" hint="Taken off the legal fee only, never the USPTO fee. A consultation credit is a dollar amount; a referral discount might be a percent.">
+      <ActionForm action={saveAdjustmentsAction} id={adjustmentsFormId(proposalId)} unsavedLabel="Discounts and credits">
         {({ state, pending }) => (
           <fieldset className="pe-fieldset" disabled={!editable}>
             <Hidden values={{ proposalId, updatedAt }} />
@@ -811,7 +827,7 @@ export function AdjustmentsForm({ proposalId, updatedAt, editable, issues, value
               )}
             </div>
             <IssueList issues={issues} />
-            <SaveRow editable={editable} state={state} pending={pending} label="Save discounts" />
+            <SaveRow editable={editable} state={state} pending={pending} label="Save discounts" formId={adjustmentsFormId(proposalId)} />
           </fieldset>
         )}
       </ActionForm>
@@ -823,14 +839,14 @@ export function AdjustmentsForm({ proposalId, updatedAt, editable, issues, value
 
 export function IncludesForm({ proposalId, updatedAt, editable, issues, initial }: Common & { initial: ProposalInclude[] }) {
   return (
-    <Section title="What the package includes" hint="The table the client sees under the totals. The substantive office action response is never listed here; the strategy review is fine.">
-      <ActionForm action={saveIncludesAction}>
+    <Section unsavedId={includesFormId(proposalId)} title="What the package includes" hint="The table the client sees under the totals. The substantive office action response is never listed here; the strategy review is fine.">
+      <ActionForm action={saveIncludesAction} id={includesFormId(proposalId)} unsavedLabel="Included items">
         {({ state, pending }) => (
           <fieldset className="pe-fieldset" disabled={!editable}>
             <Hidden values={{ proposalId, updatedAt }} />
             <IncludesFields initial={initial} editable={editable} />
             <IssueList issues={issues} />
-            <SaveRow editable={editable} state={state} pending={pending} label="Save included items" />
+            <SaveRow editable={editable} state={state} pending={pending} label="Save included items" formId={includesFormId(proposalId)} />
           </fieldset>
         )}
       </ActionForm>
