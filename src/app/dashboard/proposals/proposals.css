@@ -380,3 +380,4 @@
 
 /* Spec 7: whether the client has opened the link, under the lifecycle buttons. Tokens only. */
 .pe-opens { margin: 8px 0 0; }
+.pe-unsaved { margin-left: 6px; vertical-align: middle; font-weight: 500; }
