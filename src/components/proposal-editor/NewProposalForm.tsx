@@ -5,6 +5,8 @@ import { createProposalAction } from "@/app/dashboard/proposals/actions";
 import type { PackageOption } from "@/lib/proposals/package-list";
 import { USE_CONSULT_LABEL } from "@/lib/proposals/prefill-words";
 import { countChangedFields, messageInMoreOptions } from "@/lib/proposal-editor/more-options";
+import { newMarkPackagePrefix } from "@/lib/proposal-editor/create-package-choice";
+import { MARK_KIND_LABEL, MARK_KINDS } from "@/lib/proposals/types";
 import { ActionForm, Outcome } from "./ActionForm";
 import { ExpiryField } from "./ExpiryField";
 import { BuilderLayout } from "./BuilderLayout";
@@ -216,11 +218,138 @@ export function NewProposalForm({
                     </label>
                   </>
                 )}
+                {packages !== null && options.length > 0 && <FirstNamePackageFields packages={options.map((o) => o.name)} />}
               </div>
             }
           />
         </>
       )}
     </ActionForm>
+  );
+}
+
+/**
+ * One "Let the client choose a package" group, posted as `<prefix>pkgChoice` / `<prefix>pkgOption` / `<prefix>pkgDefault` (the
+ * names `parsePackageChoiceFields` reads). The package boxes are always in the markup; while the group is off they are hidden
+ * AND disabled, so nothing of them is posted.
+ */
+function PackageChoiceGroup({
+  prefix,
+  label,
+  note,
+  packages,
+  off,
+  onToggle,
+}: {
+  prefix: string;
+  label: string;
+  note: string;
+  packages: string[];
+  off?: boolean;
+  onToggle?: (on: boolean) => void;
+}) {
+  const [on, setOn] = useState(false);
+  const [ticked, setTicked] = useState<string[]>([]);
+  const [def, setDef] = useState("");
+  const active = on && !off;
+  const tickedInOrder = packages.filter((p) => ticked.includes(p));
+  const shownDefault = tickedInOrder.includes(def) ? def : tickedInOrder[0] ?? "";
+  const noteId = `pe-new-pkg-${prefix || "name"}`.replace(/\./g, "-");
+  return (
+    <div className="pe-pkg-choice" hidden={off}>
+      <label className="pe-check">
+        <input
+          type="checkbox"
+          name={`${prefix}pkgChoice`}
+          disabled={off}
+          checked={on}
+          onChange={(e) => {
+            setOn(e.target.checked);
+            onToggle?.(e.target.checked);
+          }}
+        />
+        <span>{label}</span>
+      </label>
+      <div hidden={!active}>
+        <span className="lx-note" id={noteId}>
+          {note}
+        </span>
+        <div className="pe-pkg-options" role="group" aria-describedby={noteId}>
+          {packages.map((p) => (
+            <label key={p} className="pe-check">
+              <input
+                type="checkbox"
+                name={`${prefix}pkgOption`}
+                value={p}
+                disabled={!active}
+                checked={ticked.includes(p)}
+                onChange={(e) => setTicked((prev) => (e.target.checked ? [...prev.filter((x) => x !== p), p] : prev.filter((x) => x !== p)))}
+              />
+              <span>{p}</span>
+            </label>
+          ))}
+        </div>
+        <label className="lx-field">
+          <span className="lx-label">Starts selected</span>
+          <select className="lx-input" name={`${prefix}pkgDefault`} disabled={!active} value={shownDefault} onChange={(e) => setDef(e.target.value)}>
+            {tickedInOrder.length === 0 ? <option value="">Tick a package first</option> : null}
+            {tickedInOrder.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Spec 6 / Spec 7 at create, for the FIRST brand name: the package the client chooses (for the brand name, or for each
+ * mark), and its discount. The server re-reads every package name against the firm's current list
+ * (`applyNewProposalPackageFields`); other brand names are set on the next page.
+ */
+function FirstNamePackageFields({ packages }: { packages: string[] }) {
+  const [nameChoice, setNameChoice] = useState(false);
+  return (
+    <fieldset className="lx-field pe-pkg-choice" style={{ gridColumn: "1 / -1", border: 0, padding: 0, margin: 0 }}>
+      <input type="hidden" name="pkgFields" value="1" />
+      <legend className="lx-label">First brand name: package the client chooses</legend>
+      <PackageChoiceGroup
+        prefix=""
+        label="Let the client choose a package"
+        note="Tick 1 to 3 packages. The client picks one for this brand name, and it is priced at that package's prices."
+        packages={packages}
+        onToggle={setNameChoice}
+      />
+      {MARK_KINDS.map((kind) => (
+        <PackageChoiceGroup
+          key={kind}
+          prefix={newMarkPackagePrefix(kind)}
+          label={`Let the client choose a package for this mark (${MARK_KIND_LABEL[kind]})`}
+          note="Tick 1 to 3 packages. This mark is priced at the package the client picks; a second mark still gets that package's second-mark discount."
+          packages={packages}
+          off={nameChoice}
+        />
+      ))}
+      <label className="lx-field">
+        <span className="lx-label">Discount on this brand name (%)</span>
+        <input
+          className="lx-input"
+          name="discountPct"
+          type="number"
+          min={0}
+          max={50}
+          step={1}
+          inputMode="numeric"
+          placeholder="None"
+          aria-describedby="pe-new-disc"
+        />
+        <span className="lx-note" id="pe-new-disc">
+          A whole percent from 0 to 50, taken off this brand name&rsquo;s legal fee after its package price. The USPTO fee is never discounted.
+        </span>
+      </label>
+    </fieldset>
   );
 }
