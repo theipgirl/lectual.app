@@ -125,22 +125,46 @@ export function queueSummary(notes: string, staffUrl: string, issues: readonly V
 
 type Row = Record<string, unknown>;
 
-/** Whether this call has already been handled. A failed read counts as handled: never draft twice on a guess. */
+/**
+ * Whether this call has already been handled. A failed read counts as handled: never draft twice on a guess.
+ * A marker whose proposal has since been deleted or withdrawn no longer counts, so the call can be drafted
+ * again (Oct 30: Melvin Larry's proposal was deleted, and its old marker blocked every new draft). A marker
+ * that names no proposal (an `ai_insight` decision, or an older row) still counts.
+ */
 async function alreadyHandled(input: ConsultProposalRunInput, meetingId: string | null, hash: string | null): Promise<boolean | "failed"> {
   const types = input.skipDecided ? ["queue_drafted", "ai_insight"] : ["queue_drafted"];
   let q = input.db
     .from("crm_activity")
-    .select("id")
+    .select("id, payload")
     .eq("org_id", input.orgId)
     .in("type", types)
     .eq("payload->>source", CONSULT_PROPOSAL_SOURCE);
   q = meetingId ? q.eq("payload->>meeting_id", meetingId) : q.eq("payload->>paste_sha256", hash as string);
-  const { data, error } = await q.limit(1);
+  const { data, error } = await q.limit(20);
   if (error) {
     logDbError("check", error);
     return "failed";
   }
-  return (data ?? []).length > 0;
+  const markers = (data ?? []) as Row[];
+  if (markers.length === 0) return false;
+  const proposalIds: string[] = [];
+  for (const m of markers) {
+    const id = (m.payload as Row | null | undefined)?.proposal_id;
+    if (typeof id !== "string" || id.length === 0) return true;
+    proposalIds.push(id);
+  }
+  const { data: live, error: liveErr } = await input.db
+    .from("client_proposal")
+    .select("id")
+    .eq("org_id", input.orgId)
+    .in("id", proposalIds)
+    .neq("status", "withdrawn")
+    .limit(1);
+  if (liveErr) {
+    logDbError("check", liveErr);
+    return "failed";
+  }
+  return (live ?? []).length > 0;
 }
 
 /** Where the run is, so a throw can be named and any half-made proposal withdrawn. */
