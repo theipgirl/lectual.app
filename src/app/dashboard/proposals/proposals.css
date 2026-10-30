@@ -52,7 +52,7 @@
 .pe-h { font-family: var(--serif); font-weight: 400; font-size: 22px; line-height: 1.15; margin: 0; color: var(--ink); }
 .pe-hint { margin: 0; }
 .pe-fieldset { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
-.pe-fieldset:disabled .lx-input { background: var(--well); color: var(--body); }
+.pe-fieldset:disabled .lx-input { background-color: var(--well); color: var(--body); }
 .pe-sub { display: grid; gap: 6px; padding-top: 12px; border-top: 1px solid var(--line-2); }
 .pe-save { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .pe-save .pe-msg { flex: 1 1 200px; }

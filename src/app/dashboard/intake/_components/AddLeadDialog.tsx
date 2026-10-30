@@ -14,11 +14,14 @@ const fieldStyle: React.CSSProperties = {
   padding: "8px 10px",
   borderRadius: 8,
   border: "1px solid var(--line)",
-  background: "var(--surface)",
+  backgroundColor: "var(--surface)",
   color: "var(--ink)",
   width: "100%",
   boxSizing: "border-box",
 };
+
+// A select keeps room on the right for the shared chevron (globals.css).
+const selectStyle: React.CSSProperties = { ...fieldStyle, paddingRight: 40 };
 
 function Field({
   label,
@@ -213,7 +216,7 @@ export default function AddLeadDialog({
 
                 <label style={{ display: "grid", gap: 5, minWidth: 0 }}>
                   <span className="intake-eyebrow">Stage</span>
-                  <select name="currentStageId" defaultValue={values.currentStageId ?? ""} style={fieldStyle}>
+                  <select name="currentStageId" defaultValue={values.currentStageId ?? ""} style={selectStyle}>
                     <option value="">First stage</option>
                     {stages.map((stage) => (
                       <option key={stage.id} value={stage.id}>
@@ -225,7 +228,7 @@ export default function AddLeadDialog({
 
                 <label style={{ display: "grid", gap: 5, minWidth: 0 }}>
                   <span className="intake-eyebrow">Owner</span>
-                  <select name="assignedTo" defaultValue={values.assignedTo ?? ""} style={fieldStyle}>
+                  <select name="assignedTo" defaultValue={values.assignedTo ?? ""} style={selectStyle}>
                     <option value="">Unassigned</option>
                     {members.map((member) => (
                       <option key={member.userId} value={member.userId}>

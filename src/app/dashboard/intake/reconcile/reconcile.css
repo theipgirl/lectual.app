@@ -77,10 +77,11 @@
   font: inherit;
   font-size: 13.5px;
   color: var(--ink);
-  background: var(--paper);
+  background-color: var(--paper);
   border: 1px solid var(--line);
   border-radius: 9px;
-  padding: 0 8px;
+  padding-block: 0;
+  padding-left: 8px;
 }
 
 .rc-chosen {
