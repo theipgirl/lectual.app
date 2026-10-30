@@ -30,7 +30,7 @@ function StopForm({ leadId, enrollmentId }: { leadId: string; enrollmentId: stri
     <form action={action} style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
       <input type="hidden" name="leadId" value={leadId} />
       <input type="hidden" name="enrollmentId" value={enrollmentId} />
-      <select className="lx-input" name="reason" defaultValue="manual" aria-label="Why stop this campaign" style={{ width: "auto", padding: "4px 8px" }}>
+      <select className="lx-input" name="reason" defaultValue="manual" aria-label="Why stop this campaign" style={{ width: "auto", paddingBlock: 4, paddingLeft: 8 }}>
         {MANUAL_STOP_REASONS.map((r) => (
           <option key={r} value={r}>
             {MANUAL_LABEL[r] ?? STOP_REASON_LABEL[r]}
