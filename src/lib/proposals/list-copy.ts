@@ -10,10 +10,13 @@ export const OPEN_OFFERS_LABEL = "Open offers (lowest package each)";
 /** Why a consult can't be drafted from yet. */
 export const TRANSCRIPT_PROCESSING = "Transcript still processing";
 
-/** The consults strip's collapsed summary: "Recent consults (2 ready to draft)". */
-export function consultsSummary(input: { status: "ok" | "unavailable"; ready: number }): string {
-  if (input.status === "unavailable") return "Recent consults (couldn't load)";
-  return `Recent consults (${input.ready} ready to draft)`;
+export const CONSULTS_SECTION_TITLE = "Consults and client meetings";
+export const CONSULTS_UNAVAILABLE = "Can't show meetings right now. Refresh to try again.";
+export const CONSULTS_EMPTY = "No consults or client meetings yet.";
+
+/** Shown when the list holds only the newest meetings: "Showing the newest 30." */
+export function consultsCapNote(shown: number): string {
+  return `Showing the newest ${shown}.`;
 }
 
 /** A filtered list with nothing in it: the sentence for that segment. */

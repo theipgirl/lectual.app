@@ -85,6 +85,9 @@ describe("loadConsultsStrip", () => {
         {
           id: "m1",
           provider: "zoom",
+          title: "Call m1",
+          whenLabel: "Oct 19, 12:00 PM",
+          linkedTo: "Sana Okafor",
           clientName: "Sana Okafor",
           company: "Northbound Supply",
           line: "Zoom consult · yesterday · 30 min · transcript synced",
@@ -97,16 +100,30 @@ describe("loadConsultsStrip", () => {
     });
   });
 
-  it("keeps the last 14 days only, newest first, five rows and the rest as 'more'", async () => {
+  it("keeps the last 14 days only, newest first, the newest 30 rows and the rest as 'more'", async () => {
     const meetings = [
-      ...Array.from({ length: 7 }, (_, i) => meeting(`m${i}`, { started_at: day(i + 1) })),
+      ...Array.from({ length: 32 }, (_, i) => meeting(`m${i}`, { started_at: new Date(NOW - (i + 1) * 3_600_000).toISOString() })),
       meeting("old", { started_at: day(15) }),
       meeting("nodate", { started_at: null }),
     ].reverse();
     const { data } = await load({ meetings });
     if (data.meetings.status !== "ok") throw new Error("expected ok");
-    expect(data.meetings.rows.map((r) => r.id)).toEqual(["m0", "m1", "m2", "m3", "m4"]);
+    expect(data.meetings.rows).toHaveLength(30);
+    expect(data.meetings.rows.slice(0, 3).map((r) => r.id)).toEqual(["m0", "m1", "m2"]);
     expect(data.meetings.more).toBe(2);
+  });
+
+  it("lists consult-titled meetings and any meeting linked to a lead or matter, and nothing else", async () => {
+    const meetings = [
+      meeting("consult", { title: "Strategy Session with Pat", lead_id: null, started_at: day(1) }),
+      meeting("lead", { title: "Weekly sync", lead_id: "lead-1", started_at: day(2) }),
+      meeting("matter", { title: "Filing review", lead_id: null, matter_id: "mat-1", started_at: day(3) }),
+      meeting("internal", { title: "Team standup", lead_id: null, started_at: day(4) }),
+    ];
+    const { data } = await load({ meetings, matters: [{ id: "mat-1", lead_id: null, title: "Acme TM" } as never] });
+    if (data.meetings.status !== "ok") throw new Error("expected ok");
+    expect(data.meetings.rows.map((r) => r.id)).toEqual(["consult", "lead", "matter"]);
+    expect(data.meetings.rows.map((r) => r.linkedTo)).toEqual([null, "Sana Okafor", "Acme TM"]);
   });
 
   it("no meetings in the window is an ok read with no rows, not unavailable", async () => {
@@ -163,10 +180,10 @@ describe("loadConsultsStrip", () => {
   });
 
   it("transcribing and unlinked meetings", async () => {
-    const { data } = await load({ meetings: [meeting("m1", { has_transcript: false }), meeting("m2", { lead_id: null, started_at: day(2) })] });
+    const { data } = await load({ meetings: [meeting("m1", { has_transcript: false }), meeting("m2", { title: "Discovery call m2", lead_id: null, started_at: day(2) })] });
     if (data.meetings.status !== "ok") throw new Error("expected ok");
     expect(data.meetings.rows.map((r) => r.state)).toEqual(["transcribing", "unlinked"]);
-    expect(data.meetings.rows[1]).toMatchObject({ clientName: "Call m2", leadId: null });
+    expect(data.meetings.rows[1]).toMatchObject({ clientName: "Discovery call m2", leadId: null, linkedTo: null });
   });
 
   it("uses the matter's lead for a meeting linked only to a matter", async () => {

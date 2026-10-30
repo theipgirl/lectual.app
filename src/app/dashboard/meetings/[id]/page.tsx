@@ -10,6 +10,7 @@ import { formatDuration, formatWhen, getMeeting, linkLabels } from "@/lib/meetin
 import { PROVIDER_LABEL } from "@/lib/meetings/types";
 import { DraftFollowUpButton, DraftProposalButton, LinkMeetingForm } from "@/components/meetings/MeetingForms";
 import type { Metadata } from "next";
+import { meetingBackHref } from "@/lib/proposals/consult-row";
 import { pageTitle } from "@/lib/ui/page-title";
 
 export const metadata: Metadata = { title: pageTitle("Meeting") };
@@ -21,8 +22,16 @@ export const dynamic = "force-dynamic";
  * is filed on, and "Draft follow-up" into the approval queue. Read through
  * RLS: another firm's meeting id is simply not found.
  */
-export default async function MeetingPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function MeetingPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<{ from?: string | string[] }>;
+}) {
   const { id } = await params;
+  // Only the exact value `proposals` shows the way back; nothing else in the query is ever turned into a link.
+  const backToProposals = meetingBackHref((await searchParams)?.from);
   const session = await resolveFirmSession();
   if (session.kind !== "ok") notFound();
 
@@ -59,6 +68,11 @@ export default async function MeetingPage({ params }: { params: Promise<{ id: st
 
   return (
     <>
+      {backToProposals && (
+        <Link href={backToProposals} className="lx-back">
+          ← Back to Proposals
+        </Link>
+      )}
       <Link href="/dashboard/meetings/" className="lx-back">
         ← Meetings
       </Link>

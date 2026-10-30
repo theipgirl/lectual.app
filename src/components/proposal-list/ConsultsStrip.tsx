@@ -1,10 +1,11 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { CONSULT_STATE_PILL, CONSULT_WINDOW_DAYS } from "@/lib/proposals/consult-row";
+import { CONSULT_STATE_PILL, meetingRowHref } from "@/lib/proposals/consult-row";
 import type { ConsultsStripData, ConsultRowView } from "@/lib/proposals/consults-load";
+import { PROVIDER_LABEL } from "@/lib/meetings/types";
 import { DraftMeetingButton } from "./DraftMeetingButton";
 import { LinkLeadPicker } from "./LinkLeadPicker";
-import { TRANSCRIPT_PROCESSING, consultsSummary } from "@/lib/proposals/list-copy";
+import { CONSULTS_EMPTY, CONSULTS_SECTION_TITLE, CONSULTS_UNAVAILABLE, consultsCapNote } from "@/lib/proposals/list-copy";
 
 const MEETINGS_SETUP = "/dashboard/settings/integrations/meetings/";
 
@@ -29,14 +30,9 @@ function Cta({ row, canDraft, draftNote, leads }: { row: ConsultRowView; canDraf
       );
     case "transcribing":
       return (
-        <>
-          <button type="button" className="lx-btn lx-btn-sec" disabled aria-describedby={`why-${row.id}`}>
-            Not ready
-          </button>
-          <span id={`why-${row.id}`} className="lx-note">
-            {TRANSCRIPT_PROCESSING}
-          </span>
-        </>
+        <button type="button" className="lx-btn lx-btn-sec" disabled>
+          Not ready
+        </button>
       );
     default:
       if (!canDraft) return null;
@@ -51,11 +47,13 @@ function Cta({ row, canDraft, draftNote, leads }: { row: ConsultRowView; canDraf
 }
 
 /**
- * The top card of the proposals page: recent Zoom / Fathom consults and what can be done with
- * each. The header says which provider and whether it is connected; "Paste or upload a
- * transcript" reveals the existing transcript form below it (`paste`, composed by the page,
- * or null when the role can't draft). Three states, never two: a failed meetings read says
- * "Couldn't load consults", and only a read that worked and found nothing says there were none.
+ * The "Consults and client meetings" section under the proposals table. Always open: a heading
+ * and a scrollable box (about six rows) of consult-type meetings plus any meeting already linked
+ * to a lead or matter, newest first. The row's main area is ONE link to the meeting page; the
+ * quick buttons (Link to a lead, Draft the proposal) are its siblings, never inside the `<a>`,
+ * so pressing one never navigates. Three states, never two: a failed read says it can't show
+ * meetings, and only a read that worked and found nothing says there are none. "Paste or upload
+ * a transcript" reveals the existing transcript form (`paste`, composed by the page).
  */
 export function ConsultsStrip({
   data,
@@ -82,9 +80,8 @@ export function ConsultsStrip({
   const head = (
     <>
       <span className="pq-dot" data-kind={header.status.kind} aria-hidden="true" />
-      <span className="pq-consults-title">{header.title}</span>
       <span className="pq-mono" data-status={header.status.kind}>
-        {header.status.text}
+        {header.title} · {header.status.text}
       </span>
       {header.status.kind === "none" && (
         <Link href={MEETINGS_SETUP} className="pq-mono">
@@ -99,11 +96,11 @@ export function ConsultsStrip({
     </>
   );
 
-  const ready = meetings.status === "ok" ? meetings.rows.filter((r) => r.state === "ready").length : 0;
   return (
-    <details className="pq-strip" open={pasteOpen || undefined}>
-      <summary className="pq-strip-sum">{consultsSummary({ status: meetings.status === "ok" ? "ok" : "unavailable", ready })}</summary>
-    <section className="lx-card pq-consults" aria-label="Recent consults">
+    <section className="lx-card pq-consults" aria-labelledby="pq-consults-title">
+      <h2 id="pq-consults-title" className="lx-h2 pq-consults-h">
+        {CONSULTS_SECTION_TITLE}
+      </h2>
       {sync && <div className="pq-sync">{sync}</div>}
       {paste ? (
         <details className="pq-paste" open={pasteOpen || undefined}>
@@ -119,28 +116,30 @@ export function ConsultsStrip({
 
       {meetings.status === "unavailable" ? (
         <div className="pq-consults-empty" role="status">
-          <b>Couldn&apos;t load consults</b>
-          <span className="lx-note">Can&apos;t show this right now. Refresh to try again.</span>
+          <b>{CONSULTS_UNAVAILABLE}</b>
         </div>
       ) : meetings.rows.length === 0 ? (
         <div className="pq-consults-empty">
-          <b>No consults in the last {CONSULT_WINDOW_DAYS} days</b>
+          <b>{CONSULTS_EMPTY}</b>
         </div>
       ) : (
-        <ul className="pq-rows">
+        <ul className="pq-rows pq-rows-scroll">
           {meetings.rows.map((row) => {
             const pill = CONSULT_STATE_PILL[row.state];
             return (
               <li key={row.id} className="pq-row" data-state={row.state}>
-                <div className="pq-row-main">
-                  <div>
-                    <span className="pq-name">{row.clientName}</span>
-                    {row.company && <span className="pq-co">{row.company}</span>}
-                  </div>
-                  <div className="pq-mono">{row.line}</div>
+                <a href={meetingRowHref(row.id)} className="pq-row-link">
+                  <span className="pq-row-main">
+                    <span className="pq-name">{row.title}</span>
+                    <span className="pq-mono">
+                      {row.whenLabel} · {PROVIDER_LABEL[row.provider]} · {row.linkedTo ? `Linked to ${row.linkedTo}` : "Not linked"}
+                    </span>
+                  </span>
+                  <span className={`lx-pill lx-pill-${pill.tone}`}>{pill.label}</span>
+                </a>
+                <div className="pq-row-actions">
+                  <Cta row={row} canDraft={canDraft} draftNote={draftNote} leads={leads} />
                 </div>
-                <span className={`lx-pill lx-pill-${pill.tone}`}>{pill.label}</span>
-                <Cta row={row} canDraft={canDraft} draftNote={draftNote} leads={leads} />
               </li>
             );
           })}
@@ -148,10 +147,10 @@ export function ConsultsStrip({
       )}
       {meetings.status === "ok" && meetings.more > 0 && (
         <div className="pq-more">
-          <Link href="/dashboard/meetings/">{meetings.more} more</Link>
+          {consultsCapNote(meetings.rows.length)}{" "}
+          <Link href="/dashboard/meetings/">See all in Meetings</Link>
         </div>
       )}
     </section>
-    </details>
   );
 }

@@ -10,6 +10,8 @@ import {
   connectionHeader,
   consultLine,
   consultRowState,
+  isListedMeeting,
+  meetingWhen,
   type ConnectionHeader,
   type ConsultDraftFacts,
   type ConsultRowState,
@@ -30,6 +32,12 @@ import {
 export type ConsultRowView = {
   id: string;
   provider: MeetingProvider;
+  /** The meeting's own title. */
+  title: string;
+  /** Start time in the firm's zone. */
+  whenLabel: string;
+  /** The lead's or matter's name, or null when the meeting is not linked. */
+  linkedTo: string | null;
   clientName: string;
   company: string | null;
   line: string;
@@ -59,6 +67,7 @@ export async function loadConsultsStrip(input: {
   const since = input.now - CONSULT_WINDOW_DAYS * 86_400_000;
   const recent = read.meetings
     .filter((m) => m.started_at !== null && Date.parse(m.started_at) >= since)
+    .filter((m) => isListedMeeting({ title: m.title, leadId: m.lead_id, matterId: m.matter_id }))
     .sort((a, b) => Date.parse(b.started_at as string) - Date.parse(a.started_at as string));
   if (recent.length === 0) return { header, meetings: { status: "ok", rows: [], more: 0 } };
 
@@ -68,10 +77,14 @@ export async function loadConsultsStrip(input: {
   // A meeting linked to a matter but not a lead uses the matter's lead, as the meeting page does.
   const matterIds = [...new Set(shown.filter((m) => !m.lead_id && m.matter_id).map((m) => m.matter_id as string))];
   const matterLead = new Map<string, string>();
+  const matterTitle = new Map<string, string>();
   if (matterIds.length > 0) {
     try {
-      const { data } = await supabase.from("crm_matter").select("id, lead_id").in("id", matterIds);
-      for (const r of (data ?? []) as Array<{ id: string; lead_id: string | null }>) if (r.lead_id) matterLead.set(r.id, r.lead_id);
+      const { data } = await supabase.from("crm_matter").select("id, lead_id, title").in("id", matterIds);
+      for (const r of (data ?? []) as Array<{ id: string; lead_id: string | null; title: string | null }>) {
+        if (r.lead_id) matterLead.set(r.id, r.lead_id);
+        if (r.title?.trim()) matterTitle.set(r.id, r.title.trim());
+      }
     } catch {
       /* the row then reads as not linked and points at the meeting page */
     }
@@ -121,9 +134,14 @@ export async function loadConsultsStrip(input: {
       { id: m.id, leadId, startedAt: m.started_at, hasTranscript: m.has_transcript },
       { markers, proposals: input.proposals },
     );
+    // A name that couldn't be read still says the meeting IS linked; only a meeting with neither link reads "Not linked".
+    const linkedTo = person || company || (m.matter_id ? matterTitle.get(m.matter_id) : undefined) || (leadId ? "A lead" : m.matter_id ? "A matter" : null);
     return {
       id: m.id,
       provider: m.provider,
+      title: m.title,
+      whenLabel: meetingWhen(m.started_at, input.tz),
+      linkedTo,
       clientName: person || company || m.title,
       company: person && company ? company : null,
       line: consultLine({ provider: m.provider, startedAt: m.started_at, durationSeconds: m.duration_seconds, hasTranscript: m.has_transcript, now: input.now, tz: input.tz }),
