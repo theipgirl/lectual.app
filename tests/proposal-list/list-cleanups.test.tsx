@@ -5,7 +5,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ROWS, STRIP_OK, item, renderListPage } from "../proposals/list-page-harness";
 import type { ConsultsStripData } from "@/lib/proposals/consults-load";
-import { consultsSummary, emptySegmentSentence, OPEN_OFFERS_LABEL, TRANSCRIPT_PROCESSING } from "@/lib/proposals/list-copy";
+import { consultsCapNote, emptySegmentSentence, OPEN_OFFERS_LABEL, TRANSCRIPT_PROCESSING } from "@/lib/proposals/list-copy";
 import { FEE_SENTENCE, PROPOSALS_NAME, PROPOSALS_SUBLINE } from "@/lib/ui/words";
 
 const root = path.resolve(__dirname, "../..");
@@ -15,6 +15,9 @@ const text = (html: string) => html.replaceAll("&#x27;", "'").replaceAll("&amp;"
 const row = (over: Record<string, unknown> = {}) => ({
   id: "m1",
   provider: "zoom" as const,
+  title: "Sana consult",
+  whenLabel: "Oct 20, 10:00 AM",
+  linkedTo: "Sana Okafor",
   clientName: "Sana Okafor",
   company: null,
   line: "Zoom consult · yesterday",
@@ -36,11 +39,12 @@ describe("Proposals list (F11)", () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  it("the table comes before the consults strip, which is a collapsed details with a count", async () => {
+  it("the table comes before the consults section, which is always open (no collapsed details)", async () => {
     const html = text(await renderListPage({}, { strip: strip([row(), row({ id: "m2" }), row({ id: "m3", state: "transcribing" })]) }));
     expect(html.indexOf("<table")).toBeGreaterThan(-1);
-    expect(html.indexOf("<table")).toBeLessThan(html.indexOf('class="pq-strip"'));
-    expect(html).toMatch(/<details class="pq-strip"><summary[^>]*>Recent consults \(2 ready to draft\)<\/summary>/);
+    expect(html.indexOf("<table")).toBeLessThan(html.indexOf("Consults and client meetings"));
+    expect(html).not.toContain('class="pq-strip"');
+    expect(html).not.toContain("Recent consults (");
   });
 
   it("'Not ready' gives its reason and 'Link a lead first' becomes a 'Link to a lead' picker", async () => {
@@ -49,7 +53,6 @@ describe("Proposals list (F11)", () => {
     );
     expect(html).toContain(TRANSCRIPT_PROCESSING);
     expect(html).toContain("Transcript still processing");
-    expect(html).toMatch(/aria-describedby="why-t1"/);
     expect(html).toContain(">Link to a lead<");
     expect(html).not.toContain("Link a lead first");
     expect(html).toContain('<option value="lead-1">Ana Ruiz</option>');
@@ -101,9 +104,8 @@ describe("Proposals list (F11)", () => {
     expect(ROWS.length).toBeGreaterThan(0);
   });
 
-  it("the strip summary is honest when meetings couldn't be read", () => {
-    expect(consultsSummary({ status: "unavailable", ready: 0 })).toBe("Recent consults (couldn't load)");
-    expect(consultsSummary({ status: "ok", ready: 0 })).toBe("Recent consults (0 ready to draft)");
+  it("the cap note says how many are shown", () => {
+    expect(consultsCapNote(30)).toBe("Showing the newest 30.");
   });
 
   it("h1, title and back links use one name", async () => {
