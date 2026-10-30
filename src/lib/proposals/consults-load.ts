@@ -1,3 +1,4 @@
+import { matterDisplayTitle } from "@/lib/matters/display-title";
 import "server-only";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { listMeetings } from "@/lib/meetings/read";
@@ -80,10 +81,22 @@ export async function loadConsultsStrip(input: {
   const matterTitle = new Map<string, string>();
   if (matterIds.length > 0) {
     try {
-      const { data } = await supabase.from("crm_matter").select("id, lead_id, title").in("id", matterIds);
-      for (const r of (data ?? []) as Array<{ id: string; lead_id: string | null; title: string | null }>) {
+      const { data } = await supabase
+        .from("crm_matter")
+        .select("id, lead_id, title, mark_text, owner_name, matter_number")
+        .in("id", matterIds);
+      for (const r of (data ?? []) as Array<{
+        id: string;
+        lead_id: string | null;
+        title: string | null;
+        mark_text: string | null;
+        owner_name: string | null;
+        matter_number: string | null;
+      }>) {
         if (r.lead_id) matterLead.set(r.id, r.lead_id);
-        if (r.title?.trim()) matterTitle.set(r.id, r.title.trim());
+        // The same readable name the rest of the app shows (never a generated "TM-..." key when a mark or client exists).
+        const shownTitle = matterDisplayTitle({ ...r, matter_number: r.matter_number ?? "" }).title;
+        if (shownTitle?.trim()) matterTitle.set(r.id, shownTitle.trim());
       }
     } catch {
       /* the row then reads as not linked and points at the meeting page */
