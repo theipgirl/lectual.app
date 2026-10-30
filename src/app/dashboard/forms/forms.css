@@ -198,7 +198,7 @@
   padding: 9px 12px;
   border: 1px solid rgba(42, 18, 22, 0.2);
   border-radius: 8px;
-  background: #fff;
+  background-color: #fff;
   font: inherit;
   font-size: 14px;
   line-height: 20px;
@@ -214,15 +214,15 @@ textarea.ifm-input {
 }
 .ifm-input.bad {
   border-color: var(--wine);
-  background: #fdf4f5;
+  background-color: #fdf4f5;
 }
 .ifm-input.ifm-readonly {
-  background: var(--paper);
+  background-color: var(--paper);
   color: var(--body);
   border-color: var(--line);
 }
 .ifm-editor:disabled .ifm-input {
-  background: var(--paper);
+  background-color: var(--paper);
   color: var(--body);
 }
 .ifm-link {
@@ -2082,7 +2082,7 @@ textarea.ifm-input {
   min-width: 0;
 }
 .ifm-bare:disabled .ifm-input {
-  background: var(--paper);
+  background-color: var(--paper);
   color: var(--body);
 }
 .ifm-save-row {

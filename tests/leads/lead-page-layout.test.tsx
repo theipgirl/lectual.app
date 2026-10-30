@@ -159,6 +159,7 @@ describe("P1: composer tabs", () => {
     expect(coarse(rd("src/components/matters/matter-page.css"), /\.lx-board-move \.lp-btn \{ min-height: 44px; \}/)).toBe(true);
     const pq = rd("src/app/dashboard/proposals/proposals.css");
     expect(coarse(pq, /\.pq-seg \{ min-height: 44px; \}/)).toBe(true);
-    expect(coarse(pq, /\.pq-strip > summary \{ min-height: 44px; display: flex; align-items: center; \}/)).toBe(true);
+    // The collapsed consults strip is gone (Spec 8); its row buttons are 44px at every width.
+    expect(pq).toMatch(/\.pq-row-actions \.lx-btn[^{]*\{ min-height: 44px;/);
   });
 });

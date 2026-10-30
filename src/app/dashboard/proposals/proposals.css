@@ -52,7 +52,7 @@
 .pe-h { font-family: var(--serif); font-weight: 400; font-size: 22px; line-height: 1.15; margin: 0; color: var(--ink); }
 .pe-hint { margin: 0; }
 .pe-fieldset { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
-.pe-fieldset:disabled .lx-input { background: var(--well); color: var(--body); }
+.pe-fieldset:disabled .lx-input { background-color: var(--well); color: var(--body); }
 .pe-sub { display: grid; gap: 6px; padding-top: 12px; border-top: 1px solid var(--line-2); }
 .pe-save { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .pe-save .pe-msg { flex: 1 1 200px; }
@@ -322,8 +322,28 @@
 .pe-link-lead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 /* ── Proposals list (Sprint 33): table first, a collapsed consults strip, Expires folded in under 1200px ── */
-.pq-strip > summary { cursor: pointer; padding: 8px 2px; font-size: 15px; color: var(--ink); }
-.pq-strip[open] > summary { margin-bottom: 8px; }
+/* "Consults and client meetings": always open, a box about six rows tall that scrolls. The row's
+   main area is one link; the quick buttons are its siblings, so pressing one never navigates. */
+.pq-consults-h { font-size: 22px; margin: 0; }
+.pq-rows-scroll { max-height: 420px; overflow-y: auto; overscroll-behavior: contain; padding-right: 2px; }
+.pq-row { align-items: stretch; }
+.pq-row-link {
+  display: flex; align-items: center; gap: 12px; flex: 1 1 320px; min-width: 0; min-height: 44px;
+  color: inherit; text-decoration: none; border-radius: 8px;
+}
+.pq-row-link:hover { text-decoration: none; background: var(--well); }
+.pq-row-link:focus-visible { outline: 2px solid var(--ox); outline-offset: 2px; }
+.pq-row-link .pq-row-main { display: grid; gap: 2px; flex: 1 1 auto; min-width: 0; }
+.pq-row-link .pq-name, .pq-row-link .pq-mono { overflow-wrap: anywhere; }
+.pq-row-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pq-row-actions .lx-btn, .pq-row-actions .pq-link-pick > summary { min-height: 44px; display: inline-flex; align-items: center; }
+@media (max-width: 640px) {
+  .pq-row { flex-direction: column; align-items: stretch; }
+  .pq-row-link { flex-basis: auto; flex-wrap: wrap; }
+  .pq-row-actions { width: 100%; }
+  .pq-row-actions .lx-btn { flex: 1 1 auto; justify-content: center; }
+  .pq-consults-head { min-width: 0; }
+}
 .pq-link-pick > summary { list-style: none; width: fit-content; cursor: pointer; }
 .pq-link-pick > summary::-webkit-details-marker { display: none; }
 .pq-link-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
@@ -345,7 +365,6 @@
 
 @media (pointer: coarse) {
   .pq-seg { min-height: 44px; }
-  .pq-strip > summary { min-height: 44px; display: flex; align-items: center; }
 }
 
 /* "Sync new meetings" sits on its own row at the top of the consults card. */

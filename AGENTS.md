@@ -1250,3 +1250,19 @@ Lectual when a proposal has been viewed". Money logic: `quoteProposal` stays the
   refusal. Before this the action read none of these fields. Other brand names are set in the editor.
 - Existing assertions changed on purpose: none of the pricing tests. `tests/proposals/proposal-detail-page.test.ts` and `list-page-harness.ts` mock the
   new store read; `tests/client-proposal/commitment.test.tsx`'s "leaves pricing.ts untouched" compares with HEAD, so it passes once this is committed.
+
+## Consults and client meetings on Proposals (Spec 8, 2026-10-30, no schema)
+The collapsed "Recent consults (N ready to draft)" toggle is gone. Under the proposals table is an always-open section, "Consults and client meetings".
+- **One read.** It is still `loadConsultsStrip` (`consults-load.ts`) over `listMeetings()`: same 14-day window, newest first. The filter is widened by `isListedMeeting`
+  (`consult-row.ts`, pure): a title `isConsultTitle` matches (the calendar sync's regex), OR a meeting already linked to a lead or matter. The cap went from 5 to
+  `CONSULT_ROW_CAP = 30`; when it cuts rows off the section says "Showing the newest N." with a link to Meetings.
+- **States, never two** (words in `list-copy.ts`): a failed read is "Can't show meetings right now. Refresh to try again."; a read that worked and found nothing is
+  "No consults or client meetings yet."
+- **Row:** title, date and time in the firm's zone (`meetingWhen`), provider, "Linked to <lead or matter>" or "Not linked", and a state pill (Ready to draft, Transcript still
+  processing, Proposal created, Not linked). The main area is ONE plain `<a>` to `meetingRowHref(id)` = `/dashboard/meetings/<encoded id>/?from=proposals` (not `next/link`,
+  which strips the slash in tests). The quick buttons (Link to a lead, Draft the proposal, Open the draft) are siblings in `.pq-row-actions`, never inside the `<a>`.
+- **Meeting page:** `meetingBackHref(from)` returns the "← Back to Proposals" target ONLY for the exact value `proposals`; anything else (or a repeated key whose first value
+  differs) shows nothing, and no link is ever built from the query.
+- **Phones:** under 640px the row stacks (link first, buttons below); row buttons are 44px at every width; the list scrolls inside `.pq-rows-scroll` (`max-height: 420px`).
+- Assertions changed on purpose: the consults-strip, consults-load, consult-row, list-cleanups, quotes-page and lead-page-layout tests (they pinned the collapsed `<details>`,
+  the old pill words, the five-row cap and "No consults in the last 14 days").
