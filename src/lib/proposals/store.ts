@@ -11,6 +11,7 @@ import { summarizeOpens, type OpensSummary } from "./opens";
 import {
   PROPOSAL_ADMIN_ROLES,
   PROPOSAL_STAFF_WRITE_ROLES,
+  isGeneralContent,
   isProposalEditable,
   type AcceptedSnapshot,
   type ProposalChange,
@@ -503,6 +504,8 @@ export type ProposalListItem = {
   signed_package: string | null;
   /** The staff-only "edited from <package>" note (`content.package_basis`), or null. */
   package_basis: ProposalPackageBasis | null;
+  /** Spec 9: a general (flat-fee) proposal's matter title; null on a trademark proposal. */
+  matter_title?: string | null;
   /** What the client pays now: the accepted total once accepted, else the firm's preselected offer. */
   legal_total_cents: number;
   /** USPTO fees, due at filing. */
@@ -540,7 +543,7 @@ export async function listProposals(options: ProposalListOptions = {}): Promise<
   const rows = (Array.isArray(data) ? data : []) as Array<
     Omit<
       ProposalListItem,
-      "legal_total_cents" | "gov_total_cents" | "blocking_issue" | "brands" | "offered" | "class_count" | "signed_package" | "package_basis"
+      "legal_total_cents" | "gov_total_cents" | "blocking_issue" | "brands" | "offered" | "class_count" | "signed_package" | "package_basis" | "matter_title"
     > & {
       client_email: string | null;
       pay_url: string | null;
@@ -575,6 +578,7 @@ export async function listProposals(options: ProposalListOptions = {}): Promise<
       ...totals,
       blocking_issue,
       brands: names.map((n) => (typeof n?.name === "string" ? n.name.trim() : "")).filter(Boolean),
+      matter_title: isGeneralContent(content) && typeof content.general?.matter_title === "string" ? content.general.matter_title.trim() || null : null,
       offered: offeredPackages(content),
       class_count: (Array.isArray(quote.names) ? quote.names : []).reduce((n, nm) => n + (nm.classes?.length ?? 0), 0),
       signed_package: typeof signedPackage === "string" && signedPackage.trim() ? signedPackage.trim() : null,

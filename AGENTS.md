@@ -1309,3 +1309,49 @@ The matter page's aside shows a "Billing" card listing that matter's invoices, r
 - **Display:** newest first, invoice number zero-padded to six, status as words ("Void" whenever `voided_at` is set), past due flagged with `--ox`, "View PDF" only for an https `pdf_url`. The totals row (billed / paid / outstanding)
   counts invoices that are neither void nor draft.
 - **NOT verified against a live Lawmatics:** the `/invoices` attribute and relationship names come from the public API reference (Postman collection 26379991/2sA3JM7gbw). Check the first real card against the Lawmatics UI.
+
+## General (flat-fee) proposals (Spec 9, no schema)
+RPB's contract work (management-contract termination letters, contractor agreements and SOWs, equipment rental agreements) is a "General LOE" matter: one
+flat fee, scope typed by staff, never a trademark package price and never a USPTO fee. First real case and the test fixture: Faithe Williams
+(`tests/proposals/general-fixture.ts`), value 2.5 hrs x $500/hr = $1,250, fee $500. No migration: everything lives in `client_proposal.content`; statuses,
+RPCs, triggers, approval, link, accept, reset, delete, paid and opens are the existing ones, unchanged.
+- **Content (jsonb, additive):** `content.kind?: "trademark" | "general"` (absent = trademark, every older row) and, for general, `content.general =
+  { matter_title (1..160), summary? (<= 1,200), items (1..20: id, label 1..200, hours? in quarter steps 0 < h <= 100, rate_cents? > 0, value_cents? >= 0),
+  fee_cents > 0, excludes? (<= 10 lines, each <= 200), terms_note? (<= 600) }`. `names` is `[]` and `pricing` is `GENERAL_PRICING_STUB` (every number 0, so older
+  readers find an object and no trademark price). `isGeneralContent` (`types.ts`) is the one test. `validateContent` checks the block and REFUSES a general
+  proposal with any brand name, a package list, a USPTO fee or any non-zero package number; a trademark proposal carrying a `general` block is refused too.
+- **Price (`pricing.ts`, still the ONE engine):** `quoteProposal` returns `quoteGeneral` for a general content BEFORE any trademark code runs: legal subtotal =
+  `fee_cents`, the same `adjustments` (consult credit) through the shared `applyAdjustments` helper, `gov_total_cents` 0, `gov_class_count` 0, `names` [], and
+  `quote.general = { value_cents, fee_cents, items: [{ label, hours?, value_cents }] }`. An item's value is `generalItemValue` (hours x rate rounded once,
+  else `value_cents`); `generalValueOverFee` gives "Value $1,250 · Your fee $500" only when the value is MORE than the fee. `quoteHasItems` is `fee_cents > 0`.
+  The selection is ignored. **Trademark pricing did not move by a cent:** `tests/proposals/general-proposals.test.ts` compares `quoteProposal`,
+  `defaultSelection`, `normalizeSelection`, `isFixedOffer`, `quoteHasItems`, `lockedSelectionIds` and `priceForClassCount` with the engine at `46f47dd`
+  over 300+ selections of the Sevetri, Danielle and Fold fixtures (credits and the custom package included).
+- **New proposal:** a "Type" switch at the top (`PROPOSAL_TYPE_TRADEMARK` "Trademark filing", the default and unchanged | `PROPOSAL_TYPE_GENERAL` "Contract or
+  other matter (flat fee)", `?type=general`). The picker, its search and Start blank keep the type (`pickerWithType`, `withProposalType`, `WhoIsThisFor`'s
+  `hidden`); the switch keeps the chosen lead or matter (`proposalTypeHrefs`). The general form (`NewGeneralProposalForm`, fields in `GeneralFields`) posts
+  `kind=general` to the same `createProposalAction`, which builds the content with `parseGeneralForm` + `buildGeneralContent`
+  (`src/lib/proposal-editor/general-form.ts`, pure; dollars in, cents out, blank rows skipped, fixed sentences) and refuses anything `validateContent` calls an
+  error. No package, consult fill or settings read on that path.
+- **Editor:** a general draft shows the Client step (with its More fields), ONE "Matter and flat fee" section (`GeneralForm`: greeting, matter, work, fee,
+  not included, terms note, pay link, expiry; `saveGeneralAction` -> `applyGeneralForm`) tracked by the unsaved guard, then the same Lifecycle. The totals box
+  lists the work, the value (when over the fee), the flat fee, credits and the legal fee; no USPTO line. The trademark sections' actions (package, brand
+  names, included items) refuse a general proposal with one sentence. The edit history diffs the general fields (`diff.ts`).
+- **Client page:** `ProposalDocument` dispatches to `GeneralProposalDocument` for a general content (the trademark view is untouched, renamed
+  `TrademarkProposalDocument` inside the file). Firm header, greeting, matter, summary, "What we'll do" (hours when given), "Not included", terms note, the
+  value-vs-fee lines, "Flat fee due now", `generalCommitmentSentence`, Accept (sends `{}` and nothing written), pay link after accept, receipt, and the same
+  footer and disclaimer. No USPTO text, no classes, no package table; only `/brand/` and `/_next/static/` assets. `publicContent` keeps `kind` and the
+  block's own keys only. Accept recomputes from the stored content as before.
+- **Staff list and page:** a general row's headline is "<title> — <matter title>", sub-line "<ref> · Flat fee", At signing is the fee and At filing is "—"
+  (`atFilingCents: null`; `ProposalListItem.matter_title`). The proposal card shows the matter, summary, work and not-included lines.
+- **After acceptance:** the notice headline is "<client> accepted <matter title> · legal $X"; the Lawmatics note lists the matter, the work and the fee, no
+  class lines and no USPTO line. The LOE adapter answers `general_matter` (never the trademark LOE); `paid-flow.ts` records it with `code: "unknown_package"`,
+  `detail: "general_matter"` and `GENERAL_LOE_SENTENCE` "Draft the General LOE for this matter." under "Choose the LOE template". The accepted-proposal docx
+  has a general layout.
+- **Post-consult email:** `buildManualEmail` uses `renderGeneralProposalEmail` for a general proposal: subject "Your Proposal from <firm>: <matter title>",
+  body = greeting, the firm's summary, "The flat fee for this work is $X." (from the quote), the link, the sign-off. Queued for approval only, never sent.
+- **Out of scope:** Copilot `draft_proposal` and the consult drafter stay trademark-only; they read general rows only through `quoteProposal`,
+  `validateContent` and the card, which handle them. No general LOE template is built.
+- Not verified in a real browser (desktop or 375px): the forms, the client page and the CSS (`.pe-work-*`, `[data-kind="general"]`, `.cp-work`) are
+  tested with `renderToStaticMarkup` and pure tests only. Adding or removing a work row by button fires no `input`, so the unsaved guard marks the section
+  only once a field is edited (the existing limit).

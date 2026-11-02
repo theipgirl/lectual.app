@@ -36,6 +36,8 @@ import {
   type Selection,
 } from "@/lib/proposals/types";
 import { commitmentSentence } from "@/lib/proposals/commitment";
+import { isGeneralContent } from "@/lib/proposals/types";
+import { GeneralProposalDocument } from "./GeneralProposalDocument";
 import { usptoLine } from "@/lib/proposals/uspto-line";
 import { MARK_PACKAGE_WORDS, packageLineTitle } from "@/lib/proposals/name-package";
 import { markDisplayPrices } from "./display";
@@ -187,7 +189,16 @@ export function includesComparison(content: ProposalContent): { packages: string
   };
 }
 
+/**
+ * The client's proposal page. Spec 9: a general (flat-fee) proposal has its own view (`GeneralProposalDocument`);
+ * every other proposal is the trademark view below, unchanged.
+ */
 export function ProposalDocument(props: ProposalDocumentProps) {
+  if (isGeneralContent(props.content)) return <GeneralProposalDocument {...props} />;
+  return <TrademarkProposalDocument {...props} />;
+}
+
+function TrademarkProposalDocument(props: ProposalDocumentProps) {
   const { content, title, clientName, expiresOn, firm, mode, initialSelection, acceptedQuote, payUrl, onAccept, initialClientClasses } = props;
   const brand: ProposalBrand = brandForSlug(firm.slug);
 

@@ -39,6 +39,8 @@ export type ListRowInput = {
   class_count: number;
   signed_package: string | null;
   package_basis: ProposalPackageBasis | null;
+  /** Spec 9: set (non-empty) only on a general (flat-fee) proposal. Absent or null = trademark. */
+  matter_title?: string | null;
 };
 
 /**
@@ -72,8 +74,8 @@ export type ProposalRowView = {
   statusSub: string | null;
   /** The legal fee, due at signing. A figure of its own: it is never added to the USPTO fees. */
   atSigningCents: number;
-  /** The USPTO fees, due at filing. */
-  atFilingCents: number;
+  /** The USPTO fees, due at filing. Null on a general (flat-fee) proposal, which has none: the list shows "—". */
+  atFilingCents: number | null;
   expires: string;
   activity: string;
   /** Accepted rows only: Paid / Not paid / Couldn't read, from the same `PaidState` the proposal page reads. Null on every other row. */
@@ -132,24 +134,28 @@ export function buildProposalRowView(
   const acceptedWhen = item.accepted_at ? formatShortFirmDate(item.accepted_at, ctx.tz) : "";
   const accepted = item.status === "accepted" || item.accepted_at ? (acceptedWhen ? `Accepted ${acceptedWhen}` : "Accepted") : "Not yet";
   const edited = item.package_basis && item.package_basis.edited.length > 0 ? item.package_basis.name : null;
+  // Spec 9: a general (flat-fee) proposal is named by its matter, has one flat fee and no USPTO fee.
+  const matterTitle = typeof item.matter_title === "string" && item.matter_title.trim() ? item.matter_title.trim() : null;
   return {
     id: item.id,
     key: display.key,
-    headline: proposalHeadline(item.title, item.brands),
-    subline: proposalSubline({
-      ref: proposalRef(item.family_id, item.version),
-      key: display.key,
-      offeredCount: item.offered.length,
-      signedPackage: item.signed_package,
-      classCount: item.class_count,
-      editedFrom: edited,
-    }),
+    headline: matterTitle ? `${item.title} — ${matterTitle}` : proposalHeadline(item.title, item.brands),
+    subline: matterTitle
+      ? `${proposalRef(item.family_id, item.version)} · Flat fee`
+      : proposalSubline({
+          ref: proposalRef(item.family_id, item.version),
+          key: display.key,
+          offeredCount: item.offered.length,
+          signedPackage: item.signed_package,
+          classCount: item.class_count,
+          editedFrom: edited,
+        }),
     client: item.client_name,
     statusLabel: display.label,
     statusTone: proposalDisplayTone(display.key),
     statusSub: display.sub,
     atSigningCents: item.legal_total_cents,
-    atFilingCents: item.gov_total_cents,
+    atFilingCents: matterTitle ? null : item.gov_total_cents,
     expires: expiresLabel({ key: display.key, expiresOn: item.expires_on, acceptedAt: item.accepted_at, tz: ctx.tz }),
     activity: lastActivityLine({
       key: display.key,

@@ -22,7 +22,10 @@ export function WhoIsThisFor({
   chosen,
   basePath = NEW_PROPOSAL_PATH,
   intro = "Pick a lead or a matter and the form below is filled from it. You can change anything before you create the draft.",
+  hidden,
 }: {
+  /** Spec 9: extra query values the search keeps (New proposal's `type=general`). */
+  hidden?: Record<string, string>;
   view: PickerView | null;
   chosen: WhoChosen | null;
   /** Where the search form submits. New proposal by default; New document passes its own page. */
@@ -71,6 +74,9 @@ export function WhoIsThisFor({
       </nav>
       <form method="get" action={basePath} className="pe-who-search" role="search">
         <input type="hidden" name="kind" value={kind} />
+        {Object.entries(hidden ?? {}).map(([k, v]) => (
+          <input key={k} type="hidden" name={k} value={v} />
+        ))}
         <input
           id={inputId}
           className="lx-input"

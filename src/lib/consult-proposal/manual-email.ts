@@ -1,9 +1,12 @@
-import type { ProposalContent, ProposalRow } from "@/lib/proposals/types";
+import { isGeneralContent, type ProposalContent, type ProposalRow } from "@/lib/proposals/types";
+import { quoteProposal } from "@/lib/proposals/pricing";
+import { formatDollars } from "@/lib/proposal-editor/events";
 import {
   ProposalEmailError,
   buildReasoningBlock,
   offersWordAndLogo,
   proposalEmailSubject,
+  renderGeneralProposalEmail,
   renderProposalEmail,
 } from "./email";
 import { CONSULT_PROPOSAL_SOURCE, firmSignatureName, firmTeamSignOff } from "./shared";
@@ -76,11 +79,24 @@ export function usableRecipient(email: string | null | undefined): string | null
 
 /** The email, rendered from the proposal alone. Throws `ProposalEmailError` for an unusable link or sign-off. */
 export function buildManualEmail(args: {
-  content: Pick<ProposalContent, "client" | "names" | "pricing">;
+  content: Pick<ProposalContent, "client" | "names" | "pricing" | "kind" | "general" | "adjustments">;
   firmName: string;
   proposalUrl: string;
   signOff: string;
 }): { subject: string; body: string } {
+  // Spec 9: a general (flat-fee) proposal gets its own email: no trademark words, the fee from the quote.
+  if (isGeneralContent(args.content)) {
+    const content = args.content as ProposalContent;
+    return renderGeneralProposalEmail({
+      firstName: content.client?.first_name ?? "",
+      matterTitle: content.general?.matter_title ?? "",
+      summary: content.general?.summary ?? null,
+      feeText: formatDollars(quoteProposal(content, {}).legal_total_cents),
+      firmName: args.firmName,
+      proposalUrl: args.proposalUrl,
+      signOff: args.signOff,
+    });
+  }
   return renderProposalEmail(
     { content: args.content, email: { subject: proposalEmailSubject(args.firmName), reasoning: manualReasoning(args.content) } },
     { proposalUrl: args.proposalUrl, signOff: args.signOff },

@@ -124,6 +124,11 @@
 }
 .cp-card-h h3 { font-size: 26px; overflow-wrap: anywhere; }
 .cp-what { font-size: 15px; color: var(--cp-soft); }
+/* Spec 9: a general (flat-fee) proposal's work and not-included lists. */
+[data-kind="general"] .cp-card { margin-top: 16px; padding: 18px 22px; }
+[data-kind="general"] .cp-card h3 { font-size: 19px; margin-bottom: 8px; }
+.cp-work { margin: 0; padding-left: 20px; font-size: 16px; line-height: 1.55; overflow-wrap: anywhere; }
+.cp-work small { color: var(--cp-soft); font-size: 14px; white-space: nowrap; }
 .cp-sub { text-align: right; white-space: nowrap; }
 .cp-sub .cp-k { display: block; font-size: 13px; color: var(--cp-soft); }
 .cp-sub .cp-v { font-size: 22px; font-weight: 700; color: var(--cp-ink); }

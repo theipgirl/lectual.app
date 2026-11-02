@@ -10,7 +10,21 @@ import type { ProposalPricing, ProposalSettingRow } from "@/lib/proposals/types"
 import { loadConsultStrip } from "@/lib/proposals/consult-strip-load";
 import { loadConsultForPrefill } from "@/lib/proposals/consult-prefill-load";
 import { leadOptionLabel } from "@/lib/proposals/lead-label";
-import { buildPicker, NEW_PROPOSAL_PATH, pickerHref, pickerKind, proposalLeadRecord, proposalMatterRecord, type ListRead } from "@/lib/proposals/new-picker";
+import {
+  buildPicker,
+  NEW_PROPOSAL_PATH,
+  pickerHref,
+  pickerKind,
+  pickerWithType,
+  proposalLeadRecord,
+  proposalMatterRecord,
+  proposalTypeHrefs,
+  proposalTypeOf,
+  withProposalType,
+  type ListRead,
+  type NewProposalType,
+} from "@/lib/proposals/new-picker";
+import { NewGeneralProposalForm } from "@/components/proposal-editor/NewGeneralProposalForm";
 import {
   clientFromLead,
   consultPrefill,
@@ -35,7 +49,7 @@ import { requireProposalsModule } from "../gate";
 import "../proposals.css";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
-import { PROPOSALS_NAME } from "@/lib/ui/words";
+import { PROPOSALS_NAME, PROPOSAL_TYPE_GENERAL, PROPOSAL_TYPE_TRADEMARK } from "@/lib/ui/words";
 
 export const metadata: Metadata = { title: pageTitle("New proposal") };
 
@@ -52,7 +66,15 @@ function defaultExpiry(tz: string): string {
 /** A query value is a string, or the first of several. */
 const first = (v: string | string[] | undefined): string => (Array.isArray(v) ? v[0] : v) ?? "";
 
-type Search = { lead?: string | string[]; matter?: string | string[]; kind?: string | string[]; q?: string | string[]; blank?: string | string[] };
+type Search = {
+  lead?: string | string[];
+  matter?: string | string[];
+  kind?: string | string[];
+  q?: string | string[];
+  blank?: string | string[];
+  /** Spec 9: "general" for a contract or other matter at a flat fee; anything else is the trademark form. */
+  type?: string | string[];
+};
 
 /** A list read, in the states it can end in. A failed read is never an empty list. */
 async function readRecords(kind: RecordKind): Promise<ListRead> {
@@ -182,13 +204,56 @@ export default async function NewProposalPage({ searchParams }: { searchParams: 
   const kind: RecordKind = matterRaw ? "matter" : leadRaw ? "lead" : pickerKind(params.kind);
   const chosenLabel = matterRow ? matterTitle(matterRow) : leadRow && !matterRaw ? leadOptionLabel(leadRow) : null;
   const blank = first(params.blank) === "1" && !matterRaw && !leadRaw;
+  const type: NewProposalType = proposalTypeOf(params.type);
+  const typeHrefs = proposalTypeHrefs({
+    lead: defaults.leadId && !defaults.matterId ? defaults.leadId : undefined,
+    matter: defaults.matterId || undefined,
+  });
   let who: WhoChosen | null = null;
   let view: ReturnType<typeof buildPicker> | null = null;
-  if (chosenLabel) who = { kind: "chosen", label: chosenLabel, changeHref: pickerHref(matterRow ? "matter" : "lead", term) };
-  else if (blank) who = { kind: "blank", chooseHref: NEW_PROPOSAL_PATH };
+  if (chosenLabel) who = { kind: "chosen", label: chosenLabel, changeHref: withProposalType(pickerHref(matterRow ? "matter" : "lead", term), type) };
+  else if (blank) who = { kind: "blank", chooseHref: withProposalType(NEW_PROPOSAL_PATH, type) };
   else {
     const [leads, matters] = await Promise.all([readRecords("lead"), readRecords("matter")]);
-    view = buildPicker({ kind, term, leads, matters });
+    view = pickerWithType(buildPicker({ kind, term, leads, matters }), type);
+  }
+
+  // Spec 9: a contract or other matter at a flat fee. Same picker and links; no package, consult fill or classes.
+  if (type === "general") {
+    return (
+      <div className="pe-page">
+        <Link href="/dashboard/proposals/" className="lx-back">
+          ← {PROPOSALS_NAME}
+        </Link>
+        <div>
+          <div className="lx-label">Intake</div>
+          <h1 className="lx-h1" data-tour="proposal-new-head">New proposal</h1>
+          <p className="lx-sub">
+            Starts as a draft. You can change anything on the next page before a named approver creates the client link.
+          </p>
+        </div>
+        <ProposalTypeSwitch type={type} hrefs={typeHrefs} />
+        <WhoIsThisFor view={view} chosen={who} hidden={{ type: "general" }} />
+        {defaults.leadId && (
+          <p className="lx-note" style={{ margin: 0 }}>
+            Linked to the lead you came from.{" "}
+            <Link href={`/dashboard/leads/${defaults.leadId}/`}>Open the lead</Link>
+          </p>
+        )}
+        {defaults.matterId && (
+          <p className="lx-note" style={{ margin: 0 }}>
+            Linked to the matter you came from.{" "}
+            <Link href={`/dashboard/matters/${defaults.matterId}/`}>Open the matter</Link>
+          </p>
+        )}
+        {leadNote && (
+          <p role="status" className="lx-banner lx-banner-mute" style={{ margin: 0 }}>
+            {leadNote}
+          </p>
+        )}
+        <NewGeneralProposalForm key={`${defaults.matterId}|${defaults.leadId}`} defaults={defaults} today={firmCivilDate(new Date(), tz)} />
+      </div>
+    );
   }
 
   // The consult: for the lead, or the matter's lead. Only a REVIEWED newest record fills anything.
@@ -221,6 +286,7 @@ export default async function NewProposalPage({ searchParams }: { searchParams: 
           creates the client link.
         </p>
       </div>
+      <ProposalTypeSwitch type={type} hrefs={typeHrefs} />
       <WhoIsThisFor view={view} chosen={who} />
       <FilledFrom line={line} />
       {defaults.leadId && (
@@ -257,6 +323,20 @@ export default async function NewProposalPage({ searchParams }: { searchParams: 
         consult={filled ? <ConsultFillList brands={filled.brands} /> : undefined}
       />
     </div>
+  );
+}
+
+/** Spec 9: the "Type" choice at the top. Two links; the trademark form stays the default and is unchanged. */
+function ProposalTypeSwitch({ type, hrefs }: { type: NewProposalType; hrefs: Record<NewProposalType, string> }) {
+  return (
+    <nav className="lx-segs pe-type" aria-label="Type">
+      <a href={hrefs.trademark} aria-current={type === "trademark" ? "page" : undefined}>
+        {PROPOSAL_TYPE_TRADEMARK}
+      </a>
+      <a href={hrefs.general} aria-current={type === "general" ? "page" : undefined}>
+        {PROPOSAL_TYPE_GENERAL}
+      </a>
+    </nav>
   );
 }
 

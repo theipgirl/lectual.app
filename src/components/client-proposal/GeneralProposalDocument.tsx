@@ -1,0 +1,309 @@
+"use client";
+
+import { useMemo, useState, type ReactNode } from "react";
+import { NOT_A_LAW_FIRM_DISCLAIMER } from "@/lib/legal/disclaimer";
+import { generalValueOverFee, quoteProposal } from "@/lib/proposals/pricing";
+import { generalCommitmentSentence } from "@/lib/proposals/commitment";
+import type { ProposalQuote } from "@/lib/proposals/types";
+import type { ProposalDocumentProps } from "./ProposalDocument";
+import { RPB_FONT_VARS } from "./fonts";
+import { brandForSlug, formatCivilDate, money, paragraphs, richSegments, safeHttpsUrl, type ProposalBrand } from "./format";
+import "./proposal.css";
+
+/**
+ * Spec 9: the client's page for a general (flat-fee) proposal: a contract or other matter. The firm's header, the
+ * greeting, the matter, its summary, "What we'll do" (hours when the firm gave them), "Not included", the terms note,
+ * the value of the work beside the fee, and Accept. Nothing to tick: Accept sends an empty selection and the server
+ * prices the stored content again. No USPTO fee, no classes, no package table.
+ *
+ * Every figure comes from `quoteProposal` (the function the server runs at acceptance); this file formats only.
+ * All firm text is rendered as React text. Same modes, footer and assets as the trademark page.
+ */
+export function GeneralProposalDocument(props: ProposalDocumentProps) {
+  const { content, title, clientName, expiresOn, firm, mode, acceptedQuote, payUrl, onAccept } = props;
+  const brand: ProposalBrand = brandForSlug(firm.slug);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<{ payUrl: string | null; opened: boolean } | null>(null);
+
+  const accepted = mode === "accepted" || done !== null;
+  const quote = useMemo<ProposalQuote>(
+    () => (mode === "accepted" && acceptedQuote ? acceptedQuote : quoteProposal(content, {})),
+    [mode, acceptedQuote, content],
+  );
+  const g = content.general;
+  const items = quote.general?.items ?? [];
+  const valueOverFee = generalValueOverFee(quote);
+  const excludes = (g?.excludes ?? []).filter((l) => typeof l === "string" && l.trim());
+  const firstName = content.client?.first_name?.trim() || "";
+  const who = clientName?.trim() || content.client?.full_name || "";
+  const company = content.client?.company?.trim();
+  const expires = formatCivilDate(expiresOn);
+  const finalPayUrl = safeHttpsUrl(done ? done.payUrl : payUrl);
+  const heading = title?.trim() && title.trim() !== "Proposal" ? title.trim() : "Your Proposal";
+  const canAccept = quote.legal_total_cents > 0 || (quote.general?.fee_cents ?? 0) > 0;
+
+  async function accept() {
+    if (mode !== "live" || !onAccept || pending || done || !canAccept) return;
+    setError(null);
+    setPending(true);
+    // Opened inside the click so the popup blocker allows it; pointed at the payment page once the server has recorded the acceptance.
+    let tab: Window | null = null;
+    try {
+      tab = window.open("about:blank", "_blank");
+      if (tab) tab.document.body.textContent = "Opening your secure payment page…";
+    } catch {
+      tab = null;
+    }
+    try {
+      // Nothing to tick on a flat-fee proposal: an empty selection and nothing written by the client.
+      const result = await onAccept({}, { entries: {}, added: {} });
+      if (!result.ok) {
+        tab?.close();
+        setError(result.message);
+        return;
+      }
+      const url = safeHttpsUrl(result.payUrl);
+      let opened = false;
+      if (url && tab && !tab.closed) {
+        try {
+          tab.opener = null;
+          tab.location.href = url;
+          opened = true;
+        } catch {
+          opened = false;
+        }
+      }
+      if (!opened) tab?.close();
+      setDone({ payUrl: url, opened });
+    } catch {
+      tab?.close();
+      setError("We couldn’t record your acceptance. Please try again.");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  const rootClass = ["cp-root", brand === "rpb" ? RPB_FONT_VARS : ""].filter(Boolean).join(" ");
+  const gutter = "cp-gut";
+
+  return (
+    <div className={rootClass} data-brand={brand} data-mode={mode} data-kind="general">
+      <header className={`cp-band ${gutter}`}>
+        <div className="cp-wrap cp-band-in">
+          {brand === "rpb" ? (
+            // eslint-disable-next-line @next/next/no-img-element -- a 30px brand strip; the optimizer buys nothing.
+            <img className="cp-logo" src="/brand/rpb-logo-cream.png" alt="RPB Law Firm, Est 2024" width={984} height={168} />
+          ) : (
+            <span className="cp-firm">{firm.name}</span>
+          )}
+          <span className="cp-who">{who ? `Prepared for ${who}${company ? ` · ${company}` : ""}` : null}</span>
+        </div>
+      </header>
+
+      <main className={`cp-main ${gutter}`}>
+        <div className="cp-wrap cp-layout">
+          <div className="cp-left">
+            <section className="cp-intro">
+              {expires ? <p className="cp-date">Available through {expires}</p> : null}
+              <h1>{heading}</h1>
+              {paragraphs(content.greeting).map((p, i) => (
+                <p key={i} className="cp-hi">
+                  <Rich text={p} />
+                </p>
+              ))}
+            </section>
+
+            <section className="cp-choose" aria-labelledby="cp-matter">
+              <div className="cp-step-h">
+                <span className="cp-n" aria-hidden="true">
+                  1
+                </span>
+                <div>
+                  <h2 id="cp-matter">{g?.matter_title || "Your matter"}</h2>
+                </div>
+              </div>
+              {g?.summary?.trim()
+                ? paragraphs(g.summary).map((p, i) => (
+                    <p key={i} className="cp-hi">
+                      {p}
+                    </p>
+                  ))
+                : null}
+
+              <div className="cp-card">
+                <h3>What we&rsquo;ll do</h3>
+                <ul className="cp-work">
+                  {items.map((it, i) => (
+                    <li key={i}>
+                      <span>{it.label}</span>
+                      {typeof it.hours === "number" ? <small className="cp-num"> {hoursText(it.hours)}</small> : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {excludes.length > 0 ? (
+                <div className="cp-card">
+                  <h3>Not included</h3>
+                  <ul className="cp-work">
+                    {excludes.map((line, i) => (
+                      <li key={i}>{line}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              {g?.terms_note?.trim() ? <p className="cp-hi">{g.terms_note}</p> : null}
+            </section>
+          </div>
+
+          <aside className="cp-side" id="cp-review" aria-labelledby="cp-s2">
+            <div className="cp-panel">
+              <div className="cp-panel-h">
+                <span className="cp-n" aria-hidden="true">
+                  2
+                </span>
+                <h2 id="cp-s2">{accepted ? "Your acceptance" : "Review and accept"}</h2>
+              </div>
+              <div className="cp-panel-b" aria-live="polite">
+                <div className="cp-lines">
+                  {valueOverFee ? (
+                    <div className="cp-grp">
+                      <div className="cp-ln">
+                        <span className="cp-l">Value</span>
+                        <span className="cp-r cp-num">{money(valueOverFee.value_cents)}</span>
+                      </div>
+                      <div className="cp-ln">
+                        <span className="cp-l">Your fee</span>
+                        <span className="cp-r cp-num">{money(valueOverFee.fee_cents)}</span>
+                      </div>
+                    </div>
+                  ) : null}
+                  {quote.adjustments.some((a) => a.discount_cents > 0) ? (
+                    <div className="cp-grp">
+                      <h3>Credits</h3>
+                      {quote.adjustments
+                        .filter((a) => a.discount_cents > 0)
+                        .map((a) => (
+                          <div className="cp-ln" key={a.id}>
+                            <span className="cp-l">
+                              {a.label}
+                              {a.kind === "percent" ? <small>{a.value}% off</small> : null}
+                            </span>
+                            <span className="cp-r cp-num">{money(-a.discount_cents)}</span>
+                          </div>
+                        ))}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="cp-tot">
+                  <div className="cp-row">
+                    <div className="cp-l">
+                      <b>Flat fee due now</b>
+                      <span>Due now to begin</span>
+                    </div>
+                    <div className="cp-big cp-num">{money(quote.legal_total_cents)}</div>
+                  </div>
+                </div>
+
+                {accepted ? (
+                  <>
+                    <div className="cp-done" role="status">
+                      <h3>Thank you{firstName ? `, ${firstName}` : ""}.</h3>
+                      <p>
+                        Your acceptance is recorded.
+                        {finalPayUrl
+                          ? done?.opened
+                            ? " Your payment page opened in a new tab. If it didn’t, use the button below."
+                            : " Use the button below to pay your fee."
+                          : " We will send your payment link by email."}
+                      </p>
+                    </div>
+                    {finalPayUrl ? (
+                      <a className="cp-btn" href={finalPayUrl} target="_blank" rel="noopener noreferrer">
+                        Pay my fee
+                      </a>
+                    ) : null}
+                    <p className="cp-paynote">
+                      Once your payment is received, we&rsquo;ll send your engagement agreement for review and signature.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="cp-commit">{generalCommitmentSentence(firm.displayName ?? firm.name)}</p>
+                    {mode === "preview" ? (
+                      <button type="button" className="cp-btn" disabled>
+                        Preview
+                      </button>
+                    ) : (
+                      <button type="button" className="cp-btn" onClick={accept} disabled={!canAccept || pending || !onAccept}>
+                        {pending ? "Recording…" : "Accept and pay my fee"}
+                      </button>
+                    )}
+                    {error ? (
+                      <p className="cp-error" role="alert">
+                        {error}
+                      </p>
+                    ) : null}
+                    <p className="cp-paynote">
+                      You&rsquo;ll pay <b className="cp-num">{money(quote.legal_total_cents)}</b>{" "}
+                      through our secure client portal. Once it&rsquo;s received, we&rsquo;ll send your engagement agreement for review and
+                      signature.
+                    </p>
+                  </>
+                )}
+
+                {expires ? (
+                  <p className="cp-exp">
+                    Available through <b>{expires}</b>
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </aside>
+        </div>
+      </main>
+
+      {accepted ? null : (
+        <div className="cp-bar">
+          <div className="cp-bar-in">
+            <span>
+              Flat fee due now <b className="cp-num">{money(quote.legal_total_cents)}</b>
+            </span>
+            <a href="#cp-review">Review and accept</a>
+          </div>
+        </div>
+      )}
+
+      <footer className={`cp-footer ${gutter}`}>
+        <div className="cp-wrap">
+          {brand === "rpb" ? (
+            <>
+              <p className="cp-c">RPB Law, PLLC &middot; (305) 712-6960 &middot; info@rpblawfirm.com &middot; www.rpblawfirm.com</p>
+              <p className="cp-d">
+                Attorney advertising. Prepared for discussion purposes; does not constitute legal advice or create an
+                attorney-client relationship.
+              </p>
+            </>
+          ) : (
+            <p className="cp-c">{[firm.name, firm.contactLine].filter(Boolean).join(" · ")}</p>
+          )}
+          <p className="cp-d">
+            {NOT_A_LAW_FIRM_DISCLAIMER} Lectual provides the software this proposal is presented in; the proposal itself is
+            from the firm that sent it.
+          </p>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+function hoursText(h: number): string {
+  return `${h} ${h === 1 ? "hr" : "hrs"}`;
+}
+
+function Rich({ text }: { text: string | undefined }): ReactNode {
+  return richSegments(text).map((seg, i) => (seg.bold ? <b key={i}>{seg.text}</b> : seg.text));
+}

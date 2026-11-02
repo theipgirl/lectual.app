@@ -6,7 +6,7 @@ import { formatDollars } from "@/lib/proposal-editor/events";
 import { addedClassCount } from "./client-classes";
 import { chosenPackagesText, packageLineTitle } from "./name-package";
 import { RESET_EVENT_TYPE, stepPayload, stepSucceeded, type ProposalStep, type StepEventInput, type StepPayload } from "./paid";
-import { MARK_KIND_LABEL, type AcceptedSnapshot } from "./types";
+import { MARK_KIND_LABEL, isGeneralContent, type AcceptedSnapshot } from "./types";
 
 /**
  * What happens after a client accepts on `/p/<token>` (Sprint 19). It runs in `after()`,
@@ -80,6 +80,7 @@ export function acceptanceHeadline(input: { clientName: string; packageName: str
  * in it; they are not in the in-app notice.
  */
 export function acceptanceNoteBody(snapshot: AcceptedSnapshot, clientName: string): { name: string; body: string } {
+  if (isGeneralContent(snapshot.content)) return generalAcceptanceNoteBody(snapshot, clientName);
   const { content, quote } = snapshot;
   const allClasses = (content.names ?? []).flatMap((n) => n.classes ?? []);
   const addedIds = new Set(allClasses.filter((c) => c.client_added === true && snapshot.selection?.[c.id] === true).map((c) => c.id));
@@ -106,6 +107,28 @@ export function acceptanceNoteBody(snapshot: AcceptedSnapshot, clientName: strin
   lines.push(`Legal fee, due when accepted: ${formatDollars(quote.legal_total_cents)}`);
   lines.push(`USPTO fees, due at filing: ${formatDollars(quote.gov_total_cents)} (separate; not part of the legal fee)`);
   return { name: `Proposal accepted: ${pkg}`.slice(0, 120), body: lines.join("\n") };
+}
+
+/**
+ * Spec 9: the Lawmatics note for a general (flat-fee) proposal: the matter title, the work the firm listed (its own
+ * words, with hours when given) and the fee. No class lines and no USPTO fee: a general proposal has neither.
+ */
+function generalAcceptanceNoteBody(snapshot: AcceptedSnapshot, clientName: string): { name: string; body: string } {
+  const { content, quote } = snapshot;
+  const title = text(content.general?.matter_title) || "Proposal";
+  const lines: string[] = [`${text(clientName) || "The client"} accepted this proposal. Accepted ${snapshot.accepted_at}.`, `Matter: ${title}`];
+  const items = quote.general?.items ?? [];
+  if (items.length > 0) lines.push("Work:");
+  for (const it of items) {
+    const hours = typeof it.hours === "number" ? ` (${it.hours} ${it.hours === 1 ? "hr" : "hrs"})` : "";
+    lines.push(`- ${text(it.label)}${hours}`);
+  }
+  lines.push(`Flat fee: ${formatDollars(quote.legal_subtotal_cents)}`);
+  for (const a of (Array.isArray(quote.adjustments) ? quote.adjustments : []).filter((x) => x.discount_cents > 0)) {
+    lines.push(`Adjustment: ${text(a.label) || "Adjustment"} −${formatDollars(a.discount_cents)}`);
+  }
+  lines.push(`Legal fee, due when accepted: ${formatDollars(quote.legal_total_cents)}`);
+  return { name: `Proposal accepted: ${title}`.slice(0, 120), body: lines.join("\n") };
 }
 
 /* ─────────────────────────── the note's target ─────────────────────────── */
@@ -308,7 +331,10 @@ async function noticeStep(db: FollowupDb, row: Row): Promise<StepResult> {
     const headline = acceptanceHeadline({
       clientName: row.clientName,
       // Spec 6: each brand name's chosen package when the client picked one (firm text), else the proposal's package.
-      packageName: chosenPackagesText(row.snapshot.quote.names) || (row.snapshot.content.pricing?.package ?? ""),
+      // Spec 9: a general (flat-fee) proposal is named by its matter title.
+      packageName: isGeneralContent(row.snapshot.content)
+        ? (row.snapshot.content.general?.matter_title ?? "")
+        : chosenPackagesText(row.snapshot.quote.names) || (row.snapshot.content.pricing?.package ?? ""),
       legalTotalCents: row.snapshot.quote.legal_total_cents,
       addedClasses: addedClassCount(row.snapshot.content, row.snapshot.selection),
     });
