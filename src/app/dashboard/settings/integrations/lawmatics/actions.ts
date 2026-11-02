@@ -30,6 +30,7 @@ import {
   type ImportReport,
   type PreviewResult,
 } from "@/lib/lawmatics/import";
+import { runHiredSync } from "@/lib/lawmatics/hired-sync";
 import { planPeople, type PlanPerson } from "@/lib/lawmatics/find-in-plan";
 import type {
   PlanOptions,
@@ -463,5 +464,36 @@ export async function applyMattersImportAction(
       };
     }
     return { phase: "error", error: await failure(err) };
+  }
+}
+
+// ── Hired matters (create path) ──────────────────────────────────────────────
+// A person marked Hired in the firm's own Lawmatics becomes a matter here. The same runner the daily
+// job uses, for the CALLER'S org only: the org comes from the session, never from the form.
+
+export type HiredSyncState = { ok?: boolean; notice?: string; error?: string };
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function syncHiredMattersAction(_prev: HiredSyncState, _formData: FormData): Promise<HiredSyncState> {
+  try {
+    await requireImportAdmin();
+  } catch {
+    return { error: `${ADMIN_TIER_PHRASE} can add hired matters from Lawmatics.` };
+  }
+  const session = await resolveFirmSession();
+  if (session.kind !== "ok") return { error: "Sign in again to add hired matters." };
+
+  try {
+    const s = await runHiredSync({ orgId: session.org.id });
+    if (s.connections === 0) return { error: "Lawmatics isn't connected for your firm. Connect it above." };
+    if (s.failedFirms > 0) {
+      return { error: "We couldn't read all of Lawmatics, so nothing was added. Try again shortly." };
+    }
+    revalidatePath("/dashboard/matters/");
+    revalidatePath(PAGE);
+    const needs = s.skipped + s.failedWrites;
+    return { ok: true, notice: `Added ${s.created} matters, linked ${s.linked}, ${needs} need a look.` };
+  } catch {
+    return { error: "We couldn't add hired matters just now. Try again shortly." };
   }
 }

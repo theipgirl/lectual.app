@@ -157,7 +157,7 @@ describe("the Lawmatics settings page: LOE fields section", () => {
     }));
     vi.doMock("@/components/lawmatics/LawmaticsImport", () => {
       const stub = () => createElement("div", { "data-stub": "import" });
-      return { ClientsImport: stub, ConnectLawmatics: stub, DisconnectLawmatics: stub, MattersImport: stub };
+      return { ClientsImport: stub, ConnectLawmatics: stub, DisconnectLawmatics: stub, MattersImport: stub, HiredMattersSync: stub };
     });
     vi.doMock("@/app/dashboard/settings/integrations/lawmatics/loe-fields-actions", () => ({ saveLoeFieldsAction: vi.fn() }));
     const { default: Page } = await import("../../src/app/dashboard/settings/integrations/lawmatics/page");

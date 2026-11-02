@@ -8,6 +8,8 @@ import {
   disconnectLawmaticsAction,
   importAction,
   previewMattersImportAction,
+  syncHiredMattersAction,
+  type HiredSyncState,
   type ConnectState,
   type ImportState,
   type MattersImportState,
@@ -453,5 +455,28 @@ export function MattersImport() {
         </>
       )}
     </div>
+  );
+}
+
+export function HiredMattersSync() {
+  const [state, action, pending] = useActionState<HiredSyncState, FormData>(syncHiredMattersAction, {});
+  return (
+    <form action={action} style={{ display: "grid", gap: 10 }}>
+      <p className="lx-note" style={{ margin: 0 }}>
+        People marked Hired in Lawmatics get a matter here automatically every day. This button does it now for your firm. It only reads from
+        Lawmatics, and it never changes a matter that is already linked.
+      </p>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <button type="submit" className="lx-btn lx-btn-sec" disabled={pending}>
+          {pending ? "Reading Lawmatics…" : "Sync hired matters now"}
+        </button>
+        {state.ok && state.notice && (
+          <span className="lx-note" style={{ color: "var(--ok)" }} role="status">
+            {state.notice}
+          </span>
+        )}
+      </div>
+      <Err text={state.error} />
+    </form>
   );
 }

@@ -203,7 +203,7 @@ describe("the mailbox-sync route", () => {
 
   it("vercel.json is unchanged: the same three crons, no new one", () => {
     const crons = JSON.parse(readFileSync("vercel.json", "utf8")).crons as { path: string; schedule: string }[];
-    expect(crons.map((c) => c.path)).toEqual(["/api/cron/mailbox-sync/", "/api/cron/agents/", "/api/cron/meetings-import/"]);
+    expect(crons.map((c) => c.path)).toEqual(["/api/cron/mailbox-sync/", "/api/cron/agents/", "/api/cron/meetings-import/", "/api/cron/lawmatics-matters/"]);
   });
 
   it("the route adds no admin client of its own: the step reaches the runner only through productionRunnerDeps", () => {
