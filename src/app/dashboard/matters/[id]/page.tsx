@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveFirmSession } from "@/lib/firm/session";
@@ -64,6 +65,9 @@ import { canSendIntakeRequest, listMatterIntakeRequests } from "@/lib/intake-for
 import { intakeOrigin } from "@/lib/intake-forms/origin";
 import { PROPOSAL_STAFF_WRITE_ROLES } from "@/lib/proposals/types";
 import { MatterProposalCard } from "@/components/matters/MatterProposalCard";
+import { canSeeBilling } from "@/lib/billing/can-see";
+import { BillingCardLoading } from "@/components/billing/BillingCard";
+import { MatterBilling } from "@/components/billing/MatterBilling";
 import { MATTER_TYPE_LABEL } from "../labels";
 import "@/components/matters/matter-page.css";
 import { stageDisplayName } from "@/lib/matters/list-view";
@@ -518,6 +522,12 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
             canUpload={FILE_UPLOAD_ROLES.includes(session.role)}
             canDelete={FILE_DELETE_ROLES.includes(session.role)}
           />
+
+          {canSeeBilling(session.role) ? (
+            <Suspense fallback={<BillingCardLoading />}>
+              <MatterBilling lawmaticsId={matter.lawmatics_id} />
+            </Suspense>
+          ) : null}
 
           <section className="lx-card lx-aside">
             <div className="lx-label">About</div>
