@@ -24,7 +24,10 @@ import { explicitClientAddMax } from "@/lib/proposals/client-classes";
 import { findPackage, normalisePackages } from "@/lib/proposals/package-list";
 import { loadLeadLink } from "@/lib/proposals/lead-link";
 import { loadLeadOptions } from "@/lib/proposals/lead-options";
-import { defaultSelection, priceForClassCount, quoteProposal } from "@/lib/proposals/pricing";
+import { defaultSelection, generalValueOverFee, priceForClassCount, quoteProposal } from "@/lib/proposals/pricing";
+import { isGeneralContent } from "@/lib/proposals/types";
+import { generalFormValues } from "@/lib/proposal-editor/general-form";
+import { GeneralForm } from "@/components/proposal-editor/GeneralFields";
 import { buildProposalCard } from "@/lib/proposals/card";
 import { loadConsultStrip } from "@/lib/proposals/consult-strip-load";
 import { ProposalDocument } from "@/components/client-proposal/ProposalDocument";
@@ -305,6 +308,34 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
     title: proposal.title,
   };
 
+  // Spec 9: a general (flat-fee) proposal gets its own section and figures; everything else is the trademark builder.
+  const general = isGeneralContent(content);
+  const valueOverFee = generalValueOverFee(quote);
+
+  const createBlock = (
+    <>
+      <Lifecycle
+        proposalId={proposal.id}
+        status={proposal.status}
+        version={proposal.version}
+        canWrite={canWrite}
+        isApprover={isApprover}
+        blockingErrors={errors}
+        approverNames={approverNames}
+        clientUrl={clientUrl}
+        queueNote={sendBlock.blocked ? { text: GOES_LIVE_ON_APPROVAL, queueId: sendBlock.queueId } : null}
+        canDelete={canDeleteProposal(session.role)}
+        canReset={canReset}
+        updatedAt={proposal.updated_at}
+      />
+      {opensText ? (
+        <p className="lx-note pe-opens" role="status" data-opens={opensKind(proposal.status, opensRead, proposal.id)}>
+          {opensText}
+        </p>
+      ) : null}
+    </>
+  );
+
   return (
     <div className="pe-page">
       <Link href="/dashboard/proposals/" className="lx-back">
@@ -376,6 +407,26 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
       <div className="pe-cols">
         <div className="pe-forms">
           <UnsavedGuardProvider>
+          {general ? (
+            // Spec 9: a general (flat-fee) proposal. The client step, then ONE section for the matter and its fee,
+            // then the same lifecycle button (it waits while that section has unsaved changes).
+            <>
+              <DetailsForm {...common} issues={shown(groups.details)} values={detailsValues} />
+              <section className="lx-card pe-card" aria-label="Client details and title">
+                <DetailsMoreFields proposalId={proposal.id} editable={editable} values={detailsValues} />
+              </section>
+              <GeneralForm
+                {...common}
+                issues={shown(issues.filter((i) => !groups.details.includes(i)))}
+                values={generalFormValues(content.general)}
+                greeting={content.greeting ?? ""}
+                payUrl={proposal.pay_url ?? ""}
+                expiresOn={proposal.expires_on ?? ""}
+                today={firmCivilDate(new Date(), tz)}
+              />
+              <section className="lx-card pe-card">{createBlock}</section>
+            </>
+          ) : (
           <NameRowsProvider key={nameValues.map((n) => n.id).join("|")} names={nameValues}>
             <BuilderLayout
               changed={changedCount}
@@ -391,29 +442,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
                 </>
               }
               packageStep={<PricingForm {...common} issues={shown(groups.pricing)} values={pricingValues} payUrl={proposal.pay_url ?? ""} expiresOn={proposal.expires_on ?? ""} today={firmCivilDate(new Date(), tz)} />}
-              create={
-                <>
-                <Lifecycle
-                  proposalId={proposal.id}
-                  status={proposal.status}
-                  version={proposal.version}
-                  canWrite={canWrite}
-                  isApprover={isApprover}
-                  blockingErrors={errors}
-                  approverNames={approverNames}
-                  clientUrl={clientUrl}
-                  queueNote={sendBlock.blocked ? { text: GOES_LIVE_ON_APPROVAL, queueId: sendBlock.queueId } : null}
-                  canDelete={canDeleteProposal(session.role)}
-                  canReset={canReset}
-                  updatedAt={proposal.updated_at}
-                />
-                {opensText ? (
-                  <p className="lx-note pe-opens" role="status" data-opens={opensKind(proposal.status, opensRead, proposal.id)}>
-                    {opensText}
-                  </p>
-                ) : null}
-                </>
-              }
+              create={createBlock}
               more={
                 <>
                   <DetailsMoreFields proposalId={proposal.id} editable={editable} values={detailsValues} />
@@ -448,12 +477,54 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
               }
             />
           </NameRowsProvider>
+          )}
           </UnsavedGuardProvider>
         </div>
 
         <aside className="pe-side" aria-label="Figures and preview">
           <section className="lx-card pe-totals" aria-label="What the client pays">
             <div className="lx-label">What the client pays</div>
+            {general ? (
+              <>
+                <dl>
+                  {quote.general?.items.map((it, n) => (
+                    <div key={n} className="pe-line pe-line-mute">
+                      <dt>
+                        {it.label}
+                        {typeof it.hours === "number" ? ` (${it.hours} ${it.hours === 1 ? "hr" : "hrs"})` : ""}
+                      </dt>
+                      <dd>{formatCents(it.value_cents)}</dd>
+                    </div>
+                  ))}
+                  {valueOverFee && (
+                    <div className="pe-line pe-line-mute">
+                      <dt>Value of the work</dt>
+                      <dd>{formatCents(valueOverFee.value_cents)}</dd>
+                    </div>
+                  )}
+                  <div className="pe-line">
+                    <dt>Flat fee</dt>
+                    <dd>{formatCents(quote.legal_subtotal_cents)}</dd>
+                  </div>
+                  {quote.adjustments
+                    .filter((a) => a.discount_cents > 0)
+                    .map((a) => (
+                      <div key={a.id} className="pe-line pe-line-mute">
+                        <dt>{a.label || "Adjustment"}</dt>
+                        <dd>−{formatCents(a.discount_cents)}</dd>
+                      </div>
+                    ))}
+                  <div className="pe-line pe-line-total">
+                    <dt>Legal fee, due when accepted</dt>
+                    <dd>{formatCents(quote.legal_total_cents)}</dd>
+                  </div>
+                </dl>
+                <p className="lx-note" style={{ margin: 0 }}>
+                  Worked out from the saved fee. A flat fee: no packages, classes or USPTO fees.
+                </p>
+              </>
+            ) : (
+            <>
             <dl>
               {quote.names.map((n) => (
                 <div key={n.id} className="pe-line">
@@ -484,6 +555,8 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
             <p className="lx-note" style={{ margin: 0 }}>
               Worked out from the saved prices. The client can untick marks and classes; their total follows.
             </p>
+            </>
+            )}
           </section>
 
           {proposal.status === "accepted" && proposal.accepted_snapshot?.quote && (
@@ -498,14 +571,22 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
                       <dd>{formatCents(n.legal_cents)}</dd>
                     </div>
                   ))}
+                {proposal.accepted_snapshot.quote.general && (
+                  <div className="pe-line">
+                    <dt>{proposal.accepted_snapshot.content?.general?.matter_title || "Flat fee"}</dt>
+                    <dd>{formatCents(proposal.accepted_snapshot.quote.legal_subtotal_cents)}</dd>
+                  </div>
+                )}
                 <div className="pe-line pe-line-total">
                   <dt>Legal fee accepted</dt>
                   <dd>{formatCents(proposal.accepted_snapshot.quote.legal_total_cents)}</dd>
                 </div>
-                <div className="pe-line pe-line-mute">
-                  <dt>USPTO fees, due at filing</dt>
-                  <dd>{formatCents(proposal.accepted_snapshot.quote.gov_total_cents)}</dd>
-                </div>
+                {!proposal.accepted_snapshot.quote.general && (
+                  <div className="pe-line pe-line-mute">
+                    <dt>USPTO fees, due at filing</dt>
+                    <dd>{formatCents(proposal.accepted_snapshot.quote.gov_total_cents)}</dd>
+                  </div>
+                )}
               </dl>
               {clientDescribed.length > 0 && (
                 <div className="pe-client-added">

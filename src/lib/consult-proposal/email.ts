@@ -231,3 +231,43 @@ export function renderProposalEmail(
 
   return { subject: draft.email.subject.replace(/\s+/g, " ").trim(), body };
 }
+
+/* ─────────────────────────── Spec 9: a general (flat-fee) proposal ──────── */
+
+/** "Your Proposal from RPB Law: Management agreement: notice of non-renewal": the firm and the matter, nothing else. */
+export function generalProposalEmailSubject(firmName: string, matterTitle: string): string {
+  const firm = firmName.replace(/\s+/g, " ").trim();
+  const matter = matterTitle.replace(/\s+/g, " ").trim();
+  const head = firm ? `Your Proposal from ${firm}` : "Your Proposal";
+  return matter ? `${head}: ${matter}` : head;
+}
+
+/**
+ * The client email for a general (flat-fee) proposal. Greeting, the firm's own summary as one paragraph (left out
+ * when there is none), the fee line, the link and the sign-off. No trademark words; nothing written here gives
+ * advice. `feeText` is the fee as the caller formatted it from the quote (this file does no arithmetic). It is queued
+ * for approval like every other client email; nothing here sends it.
+ */
+export function renderGeneralProposalEmail(input: {
+  firstName: string;
+  matterTitle: string;
+  summary?: string | null;
+  feeText: string;
+  firmName: string;
+  proposalUrl: string;
+  signOff: string;
+}): { subject: string; body: string } {
+  const url = checkProposalUrl(input.proposalUrl);
+  const signOff = input.signOff.replace(/\r\n?/g, "\n").replace(/^\s*best(?:\s+regards)?\s*,?\s*\n+/i, "").trim();
+  if (!signOff) throw new ProposalEmailError("The email needs the firm's sign-off.", "no_sign_off");
+  const firstName = input.firstName.replace(/\s+/g, " ").trim() || "[First name]";
+  const summary = (input.summary ?? "").replace(/\r\n?/g, "\n").replace(/\n{2,}/g, "\n").trim();
+  const parts = [
+    `Hi ${firstName},`,
+    ...(summary ? [summary] : []),
+    `The flat fee for this work is ${input.feeText}.`,
+    `You can review and accept your proposal here:\n${url}`,
+    `Best,\n${signOff}`,
+  ];
+  return { subject: generalProposalEmailSubject(input.firmName, input.matterTitle), body: parts.join("\n\n") };
+}

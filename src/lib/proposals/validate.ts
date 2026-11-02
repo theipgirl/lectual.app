@@ -271,6 +271,17 @@ export function validateContent(content: unknown, options: ValidateOptions = {})
     return out;
   }
 
+  // Spec 9: what the proposal is for. Absent is a trademark proposal; a general one has its own rules.
+  if (content.kind != null && content.kind !== "trademark" && content.kind !== "general") {
+    err("kind", 'A proposal is either a "trademark" or a "general" proposal.');
+    return out;
+  }
+  if (content.kind === "general") {
+    validateGeneralContent(content, out);
+    return out;
+  }
+  if (content.general != null) err("general", "Only a flat-fee proposal has a matter and a flat fee. Remove it, or make this a flat-fee proposal.");
+
   // client
   const client = isObj(content.client) ? content.client : null;
   if (!client) err("client", "Add the client's name.");
@@ -501,25 +512,7 @@ export function validateContent(content: unknown, options: ValidateOptions = {})
     if (m.id && nameIds.has(m.id)) err(m.path, `The id "${m.id}" is also a brand name's id. Give this mark another id.`);
   }
 
-  // adjustments
-  const adjustmentIds = new Set<string>();
-  (Array.isArray(content.adjustments) ? content.adjustments : []).forEach((raw, i) => {
-    const p = `adjustments[${i}]`;
-    if (!isObj(raw)) return err(p, "This adjustment is not readable.");
-    const id = str(raw.id).trim();
-    if (!id) err(`${p}.id`, "Every adjustment needs an id.");
-    else if (adjustmentIds.has(id)) err(`${p}.id`, `Two adjustments share the id "${id}".`);
-    else adjustmentIds.add(id);
-    if (!str(raw.label).trim()) err(`${p}.label`, "Label this adjustment so the client knows what it is.");
-    textIssues(`${p}.label`, str(raw.label), out);
-    if (raw.kind !== "amount" && raw.kind !== "percent") {
-      err(`${p}.kind`, 'An adjustment is either an "amount" or a "percent".');
-    } else if (raw.kind === "amount") {
-      if (!isCents(raw.value)) err(`${p}.value`, "An amount must be a whole number of cents, zero or more.");
-    } else if (typeof raw.value !== "number" || !Number.isFinite(raw.value) || raw.value < 0 || raw.value > 100) {
-      err(`${p}.value`, "A percentage must be between 0 and 100.");
-    }
-  });
+  validateAdjustments(content, out);
 
   // includes
   (Array.isArray(content.includes) ? content.includes : []).forEach((raw, i) => {
@@ -538,6 +531,136 @@ export function validateContent(content: unknown, options: ValidateOptions = {})
   });
 
   return out;
+}
+
+/** The adjustments (credits) on either kind of proposal: ids unique, a label, an amount in cents or a percent 0..100. */
+function validateAdjustments(content: Record<string, unknown>, out: ValidationIssue[]): void {
+  const err = (path: string, message: string) => out.push({ path, message, level: "error" });
+  const adjustmentIds = new Set<string>();
+  (Array.isArray(content.adjustments) ? content.adjustments : []).forEach((raw, i) => {
+    const p = `adjustments[${i}]`;
+    if (!isObj(raw)) return err(p, "This adjustment is not readable.");
+    const id = str(raw.id).trim();
+    if (!id) err(`${p}.id`, "Every adjustment needs an id.");
+    else if (adjustmentIds.has(id)) err(`${p}.id`, `Two adjustments share the id "${id}".`);
+    else adjustmentIds.add(id);
+    if (!str(raw.label).trim()) err(`${p}.label`, "Label this adjustment so the client knows what it is.");
+    textIssues(`${p}.label`, str(raw.label), out);
+    if (raw.kind !== "amount" && raw.kind !== "percent") {
+      err(`${p}.kind`, 'An adjustment is either an "amount" or a "percent".');
+    } else if (raw.kind === "amount") {
+      if (!isCents(raw.value)) err(`${p}.value`, "An amount must be a whole number of cents, zero or more.");
+    } else if (typeof raw.value !== "number" || !Number.isFinite(raw.value) || raw.value < 0 || raw.value > 100) {
+      err(`${p}.value`, "A percentage must be between 0 and 100.");
+    }
+  });
+}
+
+/* ─────────────────────────── Spec 9: general (flat-fee) proposals ─────────── */
+
+export const GENERAL_LIMITS = {
+  matterTitle: 160,
+  summary: 1200,
+  items: 20,
+  itemLabel: 200,
+  maxHours: 100,
+  excludes: 10,
+  excludeLine: 200,
+  termsNote: 600,
+} as const;
+
+/** Hours in quarter-hour steps, above 0 and at most 100. */
+export function isQuarterHours(v: unknown): v is number {
+  return typeof v === "number" && Number.isFinite(v) && v > 0 && v <= GENERAL_LIMITS.maxHours && Number.isInteger(v * 4);
+}
+
+/**
+ * A general proposal: the client, the greeting, the matter (title, summary, 1 to 20 work items, a flat fee above
+ * zero, "Not included" lines, a terms note) and any credits. It carries no trademark: no brand name, no package list,
+ * and its `pricing` (kept only so older readers find an object) has every number at zero, so no USPTO fee and no
+ * package price can ride along.
+ */
+function validateGeneralContent(content: Record<string, unknown>, out: ValidationIssue[]): void {
+  const err = (path: string, message: string) => out.push({ path, message, level: "error" });
+  const L = GENERAL_LIMITS;
+
+  const client = isObj(content.client) ? content.client : null;
+  if (!client) err("client", "Add the client's name.");
+  else {
+    if (!str(client.full_name).trim()) err("client.full_name", "Add the client's full name.");
+    if (!str(client.first_name).trim()) err("client.first_name", "Add the client's first name (used in the greeting).");
+    if (client.company != null && typeof client.company !== "string") err("client.company", "The company must be text.");
+  }
+  if (!str(content.greeting).trim()) err("greeting", "Add the greeting paragraph.");
+  if (content.greeting != null && typeof content.greeting !== "string") err("greeting", "This must be text.");
+
+  // No trademark may ride along on a flat-fee proposal.
+  if (Array.isArray(content.names) && content.names.length > 0) {
+    err("names", "A flat-fee proposal has no brand names, marks or classes. Remove them, or start a trademark proposal.");
+  } else if (content.names != null && !Array.isArray(content.names)) err("names", "The brand names are not readable.");
+  if (Array.isArray(content.packages) && content.packages.length > 0) err("packages", "A flat-fee proposal has no trademark packages.");
+  if (content.pricing != null) {
+    const pr = isObj(content.pricing) ? content.pricing : null;
+    if (!pr) err("pricing", "The pricing is not readable.");
+    else {
+      if (pr.gov_per_class_cents != null && pr.gov_per_class_cents !== 0) err("pricing.gov_per_class_cents", "A flat-fee proposal never carries a USPTO fee.");
+      for (const key of ["base_cents", "per_class_cents", "included_classes", "second_mark_discount_pct"] as const) {
+        if (pr[key] != null && pr[key] !== 0) err(`pricing.${key}`, "A flat-fee proposal never carries a trademark package price. Its fee is the flat fee.");
+      }
+    }
+  }
+
+  const g = isObj(content.general) ? content.general : null;
+  if (!g) {
+    err("general", "Add the matter and its flat fee.");
+  } else {
+    const title = str(g.matter_title).trim();
+    if (!title) err("general.matter_title", "Name the matter.");
+    else if (title.length > L.matterTitle) err("general.matter_title", `Keep the matter title to ${L.matterTitle} characters.`);
+    if (g.summary != null && typeof g.summary !== "string") err("general.summary", "The summary must be text.");
+    else if (str(g.summary).length > L.summary) err("general.summary", `Keep the summary to ${L.summary.toLocaleString("en-US")} characters.`);
+
+    const items = Array.isArray(g.items) ? g.items : null;
+    if (!items || items.length === 0) err("general.items", "Add at least one piece of work.");
+    else if (items.length > L.items) err("general.items", `Use at most ${L.items} pieces of work.`);
+    const ids = new Set<string>();
+    (items ?? []).forEach((raw, i) => {
+      const p = `general.items[${i}]`;
+      if (!isObj(raw)) return err(p, "This piece of work is not readable.");
+      const id = str(raw.id).trim();
+      if (!id) err(`${p}.id`, "Every piece of work needs an id.");
+      else if (ids.has(id)) err(`${p}.id`, `Two pieces of work share the id "${id}".`);
+      else ids.add(id);
+      const label = str(raw.label).trim();
+      if (!label) err(`${p}.label`, "Say what this piece of work is.");
+      else if (label.length > L.itemLabel) err(`${p}.label`, `Keep each piece of work to ${L.itemLabel} characters.`);
+      if (raw.hours != null && !isQuarterHours(raw.hours)) err(`${p}.hours`, "Hours go in quarter-hour steps, above 0 and at most 100.");
+      if (raw.rate_cents != null && !(typeof raw.rate_cents === "number" && Number.isInteger(raw.rate_cents) && raw.rate_cents > 0)) {
+        err(`${p}.rate_cents`, "An hourly rate must be a whole number of cents above zero.");
+      }
+      if (raw.rate_cents != null && raw.hours == null) err(`${p}.rate_cents`, "Give the hours with the rate, or a value instead.");
+      if (raw.value_cents != null && !isCents(raw.value_cents)) err(`${p}.value_cents`, "A value must be a whole number of cents, zero or more.");
+    });
+
+    const fee = g.fee_cents;
+    if (typeof fee !== "number" || !Number.isInteger(fee) || fee <= 0) err("general.fee_cents", "Set the flat fee: a whole number of cents above zero.");
+
+    if (g.excludes != null) {
+      if (!Array.isArray(g.excludes)) err("general.excludes", "The not-included lines must be a list.");
+      else {
+        if (g.excludes.length > L.excludes) err("general.excludes", `Use at most ${L.excludes} not-included lines.`);
+        g.excludes.forEach((line, i) => {
+          const t = typeof line === "string" ? line.trim() : "";
+          if (!t) err(`general.excludes[${i}]`, "A not-included line can't be blank.");
+          else if (t.length > L.excludeLine) err(`general.excludes[${i}]`, `Keep each not-included line to ${L.excludeLine} characters.`);
+        });
+      }
+    }
+    if (g.terms_note != null && typeof g.terms_note !== "string") err("general.terms_note", "The terms note must be text.");
+    else if (str(g.terms_note).length > L.termsNote) err("general.terms_note", `Keep the terms note to ${L.termsNote} characters.`);
+  }
+
+  validateAdjustments(content, out);
 }
 
 /* ─────────────────────────── the firm's settings ─────────────────────────── */

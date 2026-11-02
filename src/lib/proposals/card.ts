@@ -54,6 +54,17 @@ export type ProposalCard = {
   usptoAtFilingCents: number;
   expiresOn: string | null;
   receipts: ProposalCardReceipts;
+  /** Spec 9: present only on a general (flat-fee) proposal; then `brands` is empty and there is no USPTO fee. */
+  general?: ProposalCardGeneral;
+};
+
+export type ProposalCardGeneral = {
+  matterTitle: string;
+  summary: string | null;
+  items: Array<{ label: string; hours?: number; valueCents: number }>;
+  valueCents: number;
+  feeCents: number;
+  excludes: string[];
 };
 
 const arr = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
@@ -158,5 +169,19 @@ export function buildProposalCard(
     usptoAtFilingCents: quote.gov_total_cents,
     expiresOn: row.expires_on,
     receipts: receiptsFrom(events),
+    ...(quote.general ? { general: generalCard(content, quote.general) } : {}),
+  };
+}
+
+/** Spec 9: a general proposal's matter, summary and work, from the saved content and the quote's own figures. */
+function generalCard(content: Partial<ProposalContent>, q: NonNullable<ReturnType<typeof quoteProposal>["general"]>): ProposalCardGeneral {
+  const g = obj(content.general);
+  return {
+    matterTitle: text(g.matter_title) ?? "",
+    summary: text(g.summary),
+    items: q.items.map((i) => ({ label: i.label, ...(i.hours !== undefined ? { hours: i.hours } : {}), valueCents: i.value_cents })),
+    valueCents: q.value_cents,
+    feeCents: q.fee_cents,
+    excludes: arr<unknown>(g.excludes).map(text).filter((l): l is string => l !== null),
   };
 }

@@ -42,6 +42,32 @@ export function acceptedProposalLines(snapshot: AcceptedSnapshot, facts: Accepte
   lines.push({ kind: "text", text: `Client: ${clean(facts.clientName)}${entity ? ` (${entity})` : ""}` });
   lines.push({ kind: "text", text: `Accepted: ${longDate(snapshot.accepted_at, facts.timeZone)}` });
 
+  // Spec 9: a general (flat-fee) proposal: the matter, the firm's own words for the work, and the one fee.
+  if (quote.general) {
+    const g = content.general;
+    lines.push({ kind: "heading", text: "Matter" });
+    lines.push({ kind: "text", text: clean(g?.matter_title) });
+    if (clean(g?.summary)) lines.push({ kind: "text", text: clean(g?.summary) });
+    lines.push({ kind: "heading", text: "Work" });
+    for (const it of quote.general.items) {
+      const hours = typeof it.hours === "number" ? ` (${it.hours} ${it.hours === 1 ? "hr" : "hrs"})` : "";
+      lines.push({ kind: "bullet", text: `${clean(it.label)}${hours}` });
+    }
+    const excludes = (g?.excludes ?? []).map(clean).filter(Boolean);
+    if (excludes.length > 0) {
+      lines.push({ kind: "heading", text: "Not included" });
+      for (const line of excludes) lines.push({ kind: "bullet", text: line });
+    }
+    if (clean(g?.terms_note)) lines.push({ kind: "text", text: clean(g?.terms_note) });
+    lines.push({ kind: "heading", text: "Fee" });
+    if (quote.general.value_cents > quote.general.fee_cents) lines.push({ kind: "text", text: `Value of the work: ${formatDollars(quote.general.value_cents)}` });
+    lines.push({ kind: "text", text: `Flat fee: ${formatDollars(quote.legal_subtotal_cents)}` });
+    for (const a of quote.adjustments.filter((x) => x.discount_cents > 0)) lines.push({ kind: "text", text: `${clean(a.label) || "Adjustment"}: −${formatDollars(a.discount_cents)}` });
+    lines.push({ kind: "text", text: `Legal fee, due when accepted: ${formatDollars(quote.legal_total_cents)}` });
+    lines.push({ kind: "text", text: "This is a record of what the client accepted on the proposal page." });
+    return lines;
+  }
+
   lines.push({ kind: "heading", text: "Package" });
   lines.push({ kind: "text", text: `Package: ${clean(content.pricing?.package)}` });
   for (const row of chartRowsFor(content)) lines.push({ kind: "bullet", text: row });

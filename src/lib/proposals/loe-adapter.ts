@@ -20,9 +20,10 @@
 import type { TrademarkLoeInput } from "@/lib/documents/loe";
 import { formatDollars } from "@/lib/proposal-editor/events";
 import { findPackage } from "./package-list";
-import type { AcceptedSnapshot, ProposalContent, ProposalPricing, ProposalQuote, QuotedName } from "./types";
+import { isGeneralContent, type AcceptedSnapshot, type ProposalContent, type ProposalPricing, type ProposalQuote, type QuotedName } from "./types";
+import { GENERAL_LOE_SENTENCE } from "@/lib/ui/words";
 
-export type LoeRefusal = "no_brand" | "multiple_brands" | "unknown_package" | "package_list_unreadable" | "mixed_mark_packages";
+export type LoeRefusal = "no_brand" | "multiple_brands" | "unknown_package" | "package_list_unreadable" | "mixed_mark_packages" | "general_matter";
 
 /** The sentence shown for each refusal. `unknown_package` and `mixed_mark_packages` are paired with the "Choose the LOE template" heading. */
 export const LOE_REFUSAL_TEXT: Record<LoeRefusal, string> = {
@@ -31,6 +32,8 @@ export const LOE_REFUSAL_TEXT: Record<LoeRefusal, string> = {
   unknown_package: "This package isn't on the firm's current package list, so no engagement letter was drafted.",
   package_list_unreadable: "Couldn't check the firm's package list, so no engagement letter was drafted.",
   mixed_mark_packages: "The marks were accepted under different packages, so no engagement letter was drafted.",
+  // Spec 9: a contract or other matter at a flat fee never gets the trademark LOE.
+  general_matter: GENERAL_LOE_SENTENCE,
 };
 
 export const CHOOSE_LOE_TEMPLATE = "Choose the LOE template";
@@ -128,6 +131,8 @@ function trimmed(value: unknown): string {
 
 export function loeInputFromAcceptedProposal(snapshot: AcceptedSnapshot, facts: LoeFacts): LoeAdapterResult {
   const { content, quote } = snapshot;
+  // Spec 9: a general (flat-fee) proposal is never drafted as a trademark LOE: "Choose the LOE template".
+  if (isGeneralContent(content)) return { ok: false, reason: "general_matter" };
   const brands = (Array.isArray(quote?.names) ? quote.names : []).filter((n) => n.included);
   if (brands.length === 0) return { ok: false, reason: "no_brand" };
   if (brands.length > 1) return { ok: false, reason: "multiple_brands" };

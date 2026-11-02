@@ -381,3 +381,15 @@
 /* Spec 7: whether the client has opened the link, under the lifecycle buttons. Tokens only. */
 .pe-opens { margin: 8px 0 0; }
 .pe-unsaved { margin-left: 6px; vertical-align: middle; font-weight: 500; }
+
+/* ── Spec 9: general (flat-fee) proposals ───────────────────── */
+.pe-general { display: grid; gap: 14px; }
+.pe-type { display: flex; flex-wrap: wrap; gap: 8px; }
+.pe-work-head, .pe-work-row { display: grid; grid-template-columns: minmax(160px, 3fr) minmax(64px, 0.8fr) minmax(80px, 1fr) minmax(80px, 1fr) auto; gap: 8px; align-items: center; }
+.pe-work-head { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.13em; text-transform: uppercase; color: var(--muted); }
+.pe-general-items { margin: 0; padding-left: 18px; }
+@media (max-width: 760px) {
+  .pe-work-head { display: none; }
+  .pe-work-row { grid-template-columns: repeat(3, minmax(0, 1fr)); padding-bottom: 10px; border-bottom: 1px solid var(--line-2); }
+  .pe-work-row input[name$=".label"], .pe-work-row button { grid-column: 1 / -1; }
+}
