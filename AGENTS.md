@@ -1370,3 +1370,34 @@ RPCs, triggers, approval, link, accept, reset, delete, paid and opens are the ex
 - Not verified in a real browser (desktop or 375px): the forms, the client page and the CSS (`.pe-work-*`, `[data-kind="general"]`, `.cp-work`) are
   tested with `renderToStaticMarkup` and pure tests only. Adding or removing a work row by button fires no `input`, so the unsaved guard marks the section
   only once a field is edited (the existing limit).
+
+## Weekly review (no schema)
+`/dashboard/review/` ("Weekly review", rail row right under Approvals, `data-tour="review-head"`) replaces the Monday spreadsheet walk-through: every OPEN
+matter (`status` open / on_hold and an open docket stage) plus every lead in an open stage past first contact (any `open` lead stage except the new-enquiry stage
+and a Follow-Up stage; a lead that has a matter shows once, as the matter). Every role reads it; the edit controls show only for `MATTER_WRITE_ROLES`
+(= `CAN_WRITE_LEAD`). Nothing is sent and no schema changed. Code: `src/lib/review/` (pure) and `src/components/review/`.
+- **Buckets** (`buckets.ts`, `reviewBuckets(rows, today)`): a row is in exactly ONE, the first that applies: Overdue follow-ups (next step due before today) ->
+  Due this week (today..+6) -> Needs a next step (no open task, OR a task with no due date, shown "No date set") -> Quiet 14+ days (dated next step, no contact in
+  14+ days or none) -> Waiting on the USPTO -> On track. A record waiting on the USPTO skips Needs and Quiet (silence from the office is normal). If last contact
+  could not be read, Quiet is skipped, never guessed. "Today" is the firm's calendar date (`getFirmTimeZone`); a task's due date is its UTC day.
+- **Next step** = the earliest OPEN `crm_task` on the matter or lead (soonest due, undated last). **Last contact** = newest `email_sent` / `email_received` /
+  `call_logged` / `note` / `voice_note` (type + date only; the payload is never selected). Direction comes only from the emails and calls: they replied last = Us,
+  we sent last = Client; a note is contact but has no direction (`contact.ts`).
+- **Waiting on** (`waiting.ts`): USPTO when the docket stage's `waiting_on` is `uspto` or its name matches the ONE keyword table `USPTO_STAGE_PATTERNS`; else
+  Approval when a pending queue item names the record (the same `loadPendingApprovalsByLead` / `matterIdsNeedingReview` the lead and matter pages use); else Us / Client.
+- **Views** (`?view=board|meeting|stage`, default board; filters `?who=mine`, `?kind=matters|leads`, `?q=`; all links, so every state is a shareable URL).
+  Board: lanes are people (`lanes.ts`): the next-step assignee, else the record's assignee, else Unassigned; owners first, the rest alphabetical, Unassigned last; four
+  columns (Overdue, This week, Needs a next step, Quiet). USPTO and On track are two collapsed lists under the board. Under 900px it scrolls sideways, under 640px
+  each lane stacks. Meeting mode: one card at a time over the flagged rows in board order, `?i=<n>` (1-based, clamped), server-rendered Previous / Next links; "Keep"
+  is just Next. Stage view: grouped by stage in pipeline order (leads' stages, then the docket), flagged rows first, with counts. The KPI strip is Overdue, Due this
+  week, Waiting on approval, Needs a next step, Waiting on the USPTO; a tile whose source failed is a dash and "Couldn't load", never 0.
+- **Reads are three-state per source** (`load.ts`, scoped client only, one query per table per chunk of 80 ids, paged past PostgREST's 1,000-row cap and FAILED, not
+  truncated, if the page budget runs out). Matters, leads (and lead stages) and tasks are CRITICAL: any failing gives ONE alert and no sections (a failed task read must
+  not put everyone under "Needs a next step"). Last contact, deadlines, approvals, stage history and team names are optional: the rows still draw and one note names
+  what failed ("Some details couldn't load (deadlines). Refresh to try again."). An unreachable approval queue skips the Approval chip and says so; an unconfigured one
+  just has none.
+- **Actions** (`actions.ts`, fixed sentences): Set next step = `createTask` (type `custom`, `lead_id` or `matter_id`; the org is read from the parent row by `createTask`,
+  the record is re-read through the scoped client first and the assignee is checked against the member directory); Done = `completeTask` after a scoped read of the
+  task; Log what happened = `addMatterNote` / `addLeadNote` as a plain `note` (a timeline entry and last contact). Role re-resolved on every call.
+- Leads DO have an assignee (`crm_lead.assigned_to`), so a lead row shows it and the board uses it. Not built: proposal-expiry tags on cards (it would need a per-record
+  proposal read), snooze, move-stage and lost/nurture buttons from the mockup. `createTask` and `completeTask` write no timeline row today, so neither does this page.

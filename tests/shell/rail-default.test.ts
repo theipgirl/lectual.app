@@ -85,8 +85,9 @@ describe("parent rows open the list (F2)", () => {
 describe("Approvals is a top-level row (F3)", () => {
   const tops = (modules: string[]) => railGroups(visibleNav(modules, "owner"), "/dashboard/")[0].map((e) => e.key);
 
-  it("sits directly after Today, before Communication", () => {
-    expect(tops(["mailbox"]).slice(0, 3)).toEqual(["today", "queue", "Communication"]);
+  it("sits directly after Today, then Weekly review, before Communication", () => {
+    expect(tops(["mailbox"]).slice(0, 3)).toEqual(["today", "queue", "review"]);
+    expect(tops(["mailbox"]).slice(2, 4)).toEqual(["review", "Communication"]);
     expect(tops([]).slice(0, 2)).toEqual(["today", "queue"]);
   });
 

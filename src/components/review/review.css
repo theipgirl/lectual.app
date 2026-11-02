@@ -1,0 +1,55 @@
+/* Weekly review: only the inline action panels. Tokens only (the table, chips and bands are the shared list-page ones). */
+.rv-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; position: relative; z-index: 1; }
+.rv-act > summary {
+  cursor: pointer;
+  list-style: none;
+  color: var(--ox);
+  font-weight: 500;
+  font-size: 13.5px;
+  padding: 6px 4px;
+}
+.rv-act > summary::-webkit-details-marker { display: none; }
+.rv-act[open] > summary { color: var(--ink); }
+.rv-form { display: grid; gap: 8px; margin-top: 6px; min-width: 240px; max-width: 320px; }
+.rv-form .lx-input, .rv-form select { width: 100%; }
+.rv-saved { color: var(--ok); font-size: 13px; margin: 0; }
+.rv-chip-us, .rv-chip-client, .rv-chip-approval, .rv-chip-uspto { white-space: nowrap; }
+.rv-readonly { margin: 0; }
+.rv-sub { display: block; font-size: 13px; }
+.rv-deadline-soon { color: var(--wine); }
+@media (pointer: coarse) {
+  .rv-act > summary { min-height: 44px; display: inline-flex; align-items: center; }
+}
+
+/* KPI strip */
+.rv-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+
+/* Board: lanes are people; the four groups sit across */
+.rv-board { display: grid; gap: 18px; }
+.rv-person-name { font-size: 22px; margin: 0 0 8px; }
+.rv-scroll { overflow-x: auto; }
+.rv-cols { display: grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap: 10px; align-items: start; }
+.rv-col { display: grid; gap: 8px; align-content: start; }
+.rv-colh { margin: 0; padding: 2px; }
+.rv-card { padding: 10px 12px; display: grid; gap: 6px; border-left: 4px solid var(--line); }
+.rv-card-overdue { border-left-color: var(--ox); }
+.rv-card-week { border-left-color: var(--warn); }
+.rv-card-needs { border-left-color: var(--body); }
+.rv-card-quiet { border-left-color: var(--muted); }
+.rv-card-title { color: var(--ink); font-weight: 600; }
+.rv-card-step { margin: 0; font-size: 14px; }
+.rv-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+@media (max-width: 900px) { .rv-cols { min-width: 880px; } }
+@media (max-width: 640px) {
+  .rv-scroll { overflow-x: visible; }
+  .rv-cols { grid-template-columns: 1fr; min-width: 0; }
+}
+
+/* Meeting mode */
+.rv-focus { max-width: 680px; margin: 0 auto; padding: 22px; display: grid; gap: 10px; }
+.rv-prog { margin: 0; }
+.rv-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 8px 0; }
+.rv-facts > div { background: var(--well); border-radius: 10px; padding: 10px; }
+.rv-facts dd { margin: 4px 0 0; }
+.rv-pager { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; }
+@media (max-width: 640px) { .rv-facts { grid-template-columns: 1fr; } }
