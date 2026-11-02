@@ -88,9 +88,9 @@ describe("consultRowState", () => {
   });
 
   it("has a pill for every state", () => {
-    expect(CONSULT_STATE_PILL.drafted.label).toBe("Drafted");
-    expect(CONSULT_STATE_PILL.ready.label).toBe("Transcript ready");
-    expect(CONSULT_STATE_PILL.transcribing.label).toBe("Transcribing");
+    expect(CONSULT_STATE_PILL.drafted.label).toBe("Proposal created");
+    expect(CONSULT_STATE_PILL.ready.label).toBe("Ready to draft");
+    expect(CONSULT_STATE_PILL.transcribing.label).toBe("Transcript still processing");
     expect(CONSULT_STATE_PILL.unlinked.label).toBe("Not linked");
   });
 });

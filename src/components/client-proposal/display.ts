@@ -24,6 +24,8 @@ export type MarkDisplay = {
   base_cents: number;
   /** Classes the price assumes, for "3 classes included". */
   class_count: number;
+  /** Spec 7: the package this mark is (or would be) priced under, when it has its own choice. */
+  package?: string;
 };
 
 export function markDisplayPrices(content: ProposalContent, selection: Selection): Record<string, MarkDisplay> {
@@ -41,20 +43,31 @@ export function markDisplayPrices(content: ProposalContent, selection: Selection
       const ticked = priced[m.id] === true;
       let price = qn.base_cents;
       let second = false;
+      // Spec 7: a mark priced under its own package strikes through ITS package price, not the name's.
+      let markBase = qn.base_cents;
+      let pkg: string | undefined;
       if (ticked && qn.included) {
         const found = qn.marks.find((x) => x.id === m.id);
         if (found) {
           price = found.price_cents;
           second = found.second;
+          if (found.base_cents !== undefined) markBase = found.base_cents;
+          pkg = found.package;
         }
       } else if (!ticked) {
         const withMark = quoteProposal(content, { ...priced, [m.id]: true }).names[i];
+        const asQuoted = withMark.marks.find((x) => x.id === m.id);
+        if (asQuoted?.base_cents !== undefined) {
+          markBase = asQuoted.base_cents;
+          price = asQuoted.base_cents;
+        }
+        pkg = asQuoted?.package;
         if (withMark.included) {
           price = withMark.legal_cents - (qn.included ? qn.legal_cents : 0);
           second = qn.included;
         }
       }
-      out[m.id] = { price_cents: price, second, base_cents: qn.base_cents, class_count: classCount };
+      out[m.id] = { price_cents: price, second, base_cents: markBase, class_count: classCount, ...(pkg ? { package: pkg } : {}) };
     }
   });
   return out;

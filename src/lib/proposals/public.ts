@@ -285,7 +285,12 @@ export function publicContent(raw: unknown): ProposalContent {
     // Spec 6: the client's package choice for this brand name, and its own discount.
     if (isObject(nm.package_choice)) name.package_choice = pick(nm.package_choice, ["options", "default"]);
     if (nm.discount_pct !== undefined) name.discount_pct = nm.discount_pct;
-    name.marks = objects(nm.marks).map((m) => pick(m, ["id", "kind", "desc", "preselected"]));
+    name.marks = objects(nm.marks).map((m) => {
+      const mark = pick(m, ["id", "kind", "desc", "preselected"]);
+      // Spec 7: the client's package choice for this mark.
+      if (isObject(m.package_choice)) mark.package_choice = pick(m.package_choice, ["options", "default"]);
+      return mark;
+    });
     name.classes = objects(nm.classes).map((cl) => pick(cl, ["id", "label", "preselected", "client_added", "client_entry", "prompt"]));
     return name;
   });

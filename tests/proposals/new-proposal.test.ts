@@ -163,7 +163,9 @@ describe("new proposal page: ?matter= prefill and the package dropdown", () => {
   it("a legacy firm (flat fields only) is offered one package", async () => {
     const html = await render({}, {}, { settings: settingsWith({ package: "Signature", base_cents: 650_000, included_classes: 2 }) });
     expect(html).toContain("Signature — $6,500 · 2 classes");
-    expect(html.match(/<option/g)?.length).toBe(1);
+    // Only the package dropdown counts: the 2026-10-30 package-choice groups under More options add their own "Starts selected" selects.
+    const packageSelect = /<select[^>]*name="package"[^>]*>([\s\S]*?)<\/select>/.exec(html)?.[1] ?? "";
+    expect(packageSelect.match(/<option/g)?.length).toBe(1);
   });
 
   it("a failed settings read still renders the form, with a note and no dropdown", async () => {

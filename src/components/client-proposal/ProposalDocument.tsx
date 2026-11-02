@@ -12,6 +12,7 @@ import {
 } from "@/lib/proposals/client-classes";
 import { classLock, markWithoutClass } from "@/lib/proposals/class-lock";
 import {
+  chosenMarkPackage,
   chosenPackage,
   defaultSelection,
   isFixedOffer,
@@ -22,6 +23,7 @@ import {
   priceForClassCount,
   quoteHasItems,
   quoteProposal,
+  usesMarkPackages,
 } from "@/lib/proposals/pricing";
 import {
   MARK_KIND_DEFAULT_DESC,
@@ -35,7 +37,7 @@ import {
 } from "@/lib/proposals/types";
 import { commitmentSentence } from "@/lib/proposals/commitment";
 import { usptoLine } from "@/lib/proposals/uspto-line";
-import { packageLineTitle } from "@/lib/proposals/name-package";
+import { MARK_PACKAGE_WORDS, packageLineTitle } from "@/lib/proposals/name-package";
 import { markDisplayPrices } from "./display";
 import { RPB_FONT_VARS } from "./fonts";
 import {
@@ -110,6 +112,10 @@ function addedCount(content: ProposalContent, selection: Selection, nameId: stri
   return (content.names.find((n) => n.id === nameId)?.classes ?? []).filter((c) => c.client_added === true && selection[c.id] === true).length;
 }
 
+function capitalize(text: string): string {
+  return text ? text[0].toUpperCase() + text.slice(1) : text;
+}
+
 function plural(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`;
 }
@@ -136,18 +142,26 @@ export function packageTermsWords(p: ProposalPricing): string {
   return `includes ${plural(p.included_classes, "class", "classes")}, each additional class ${money(p.per_class_cents)}`;
 }
 
-/** Every package some brand name offers, in the order they first appear (Spec 6). */
+/** Every package some brand name (Spec 7: or mark) offers, in the order they first appear (Spec 6). */
 export function offeredPackages(content: ProposalContent): PackageOffer[] {
   const seen = new Set<string>();
   const out: PackageOffer[] = [];
   for (const nm of content.names ?? []) {
-    for (const offer of packageChoiceOptions(content, nm)) {
-      if (seen.has(offer.package)) continue;
-      seen.add(offer.package);
-      out.push(offer);
+    const owners: unknown[] = usesMarkPackages(content, nm) ? (nm.marks ?? []) : [nm];
+    for (const owner of owners) {
+      for (const offer of packageChoiceOptions(content, owner)) {
+        if (seen.has(offer.package)) continue;
+        seen.add(offer.package);
+        out.push(offer);
+      }
     }
   }
   return out;
+}
+
+/** Spec 7: what an add-on mark's checkbox says: "Add the design mark (logo)". */
+export function addMarkLabel(kind: keyof typeof MARK_PACKAGE_WORDS): string {
+  return kind === "logo" ? "Add the design mark (logo)" : `Add the ${MARK_PACKAGE_WORDS[kind] ?? kind}`;
 }
 
 /**
@@ -278,12 +292,28 @@ export function ProposalDocument(props: ProposalDocumentProps) {
   const canAccept = quoteHasItems(quote) && !missingClass && !missingText;
   const pricing = content.pricing;
   // Spec 6: a brand name with a package choice shows its chosen package's terms; the rest show the proposal's pricing.
+  // Spec 7: a name that prices per mark shows its first mark's package (each mark's own terms sit beside that mark).
   const pricingFor = (nameId: string): ProposalPricing => {
     const nm = shown.names.find((n) => n.id === nameId);
-    const offer = nm ? chosenPackage(shown, nm, shownSelection) : null;
+    if (!nm) return pricing;
+    const offer = chosenPackage(shown, nm, shownSelection) ?? markPricingOffer(nm);
     return offer ? offerPricing(offer) : pricing;
   };
+  /** Spec 7: the package of a name's first ticked mark with its own choice (else its first such mark), or null. */
+  function markPricingOffer(nm: ProposalContent["names"][number]): PackageOffer | null {
+    const withChoice = (nm.marks ?? []).filter((m) => chosenMarkPackage(shown, nm, m, shownSelection));
+    const first = withChoice.find((m) => shownSelection[m.id] === true) ?? withChoice[0];
+    return first ? chosenMarkPackage(shown, nm, first, shownSelection) : null;
+  }
+  /** The terms a mark's price follows: its own package (Spec 7), else its brand name's. */
+  const markPricing = (nameId: string, markId: string): ProposalPricing => {
+    const nm = shown.names.find((n) => n.id === nameId);
+    const m = nm?.marks.find((x) => x.id === markId);
+    const offer = nm && m ? chosenMarkPackage(shown, nm, m, shownSelection) : null;
+    return offer ? offerPricing(offer) : pricingFor(nameId);
+  };
   const hasChoices = offeredPackages(content).length > 0;
+  const offeredPerMark = (content.names ?? []).some((nm) => usesMarkPackages(content, nm));
   const comparison = includesComparison(content);
   const govRates = new Set(quote.names.filter((q) => q.included).map((q) => pricingFor(q.id).gov_per_class_cents));
   const govShown = govRates.size === 1 ? [...govRates][0] : pricing.gov_per_class_cents;
@@ -459,8 +489,11 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                   const staffClasses = nm.classes.filter((c) => c.client_added !== true);
                   const choices = packageChoiceOptions(content, nm);
                   const offer = chosenPackage(shown, nm, shownSelection);
-                  const namePr = offer ? offerPricing(offer) : pricing;
-                  const perClass = offer ? namePr.per_class_cents : nm.price_override?.per_class_cents ?? pricing.per_class_cents;
+                  // Spec 7: the marks carry the packages; the card's class terms follow the first mark's.
+                  const perMark = usesMarkPackages(content, nm);
+                  const markOffer = perMark ? markPricingOffer(nm) : null;
+                  const namePr = offer ? offerPricing(offer) : markOffer ? offerPricing(markOffer) : pricing;
+                  const perClass = offer || markOffer ? namePr.per_class_cents : nm.price_override?.per_class_cents ?? pricing.per_class_cents;
                   // The firm's content decides (an explicit max, else 5, else 0 on a fixed offer), never what was added.
                   const addMax = clientAddMax(content, nm);
                   const holdsLast = [...nm.marks, ...nm.classes].some((x) => locked.has(x.id));
@@ -516,16 +549,18 @@ export function ProposalDocument(props: ProposalDocumentProps) {
 
                       <div className="cp-part">
                         <h4>{fixed ? "Mark" : "Marks"}</h4>
-                        {nm.marks.map((m) => {
+                        {nm.marks.map((m, mi) => {
                           const d = display[m.id];
                           const on = shownSelection[m.id] === true;
-                          return option(
+                          const markPr = markPricing(nm.id, m.id);
+                          const row = option(
                             nm.id,
                             m.id,
                             on,
                             <>
                               <span className="cp-t">
-                                <b>{MARK_KIND_LABEL[m.kind] ?? m.kind}</b>
+                                {/* Spec 7: on a name that prices per mark, every mark after the first is an add-on. */}
+                                <b>{perMark && mi > 0 ? addMarkLabel(m.kind) : (MARK_KIND_LABEL[m.kind] ?? m.kind)}</b>
                                 <span>{m.desc}</span>
                               </span>
                               <span className="cp-pr cp-num">
@@ -533,11 +568,55 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                                 {money(d?.price_cents ?? 0)}
                                 <small>
                                   {d?.second
-                                    ? `${Math.round(namePr.second_mark_discount_pct)}% off as your second mark`
+                                    ? `${Math.round(markPr.second_mark_discount_pct)}% off as your second mark`
                                     : `${plural(d?.class_count ?? 0, "class", "classes")} included`}
                                 </small>
                               </span>
                             </>,
+                          );
+                          if (!perMark) return row;
+                          const markChoices = packageChoiceOptions(content, m);
+                          const chosen = chosenMarkPackage(shown, nm, m, shownSelection);
+                          // The first mark always shows its package; an add-on mark only once it is ticked.
+                          const showPick = markChoices.length > 0 && chosen && (mi === 0 || on) && (!readOnly || on);
+                          if (!showPick) return row;
+                          const quotedMark = qn?.included ? qn.marks.find((x) => x.id === m.id) : undefined;
+                          const words = MARK_PACKAGE_WORDS[m.kind] ?? m.kind;
+                          const selId = `cp-pkg-${m.id}`;
+                          return (
+                            <div className="cp-mark-pkg" key={m.id}>
+                              {row}
+                              <div className="cp-pkg cp-pkg-mark">
+                                {readOnly ? (
+                                  <h4>{`Package for the ${words}: ${chosen.package}`}</h4>
+                                ) : (
+                                  <>
+                                    <label className="cp-pkg-l" htmlFor={selId}>
+                                      Select your package
+                                    </label>
+                                    <select
+                                      id={selId}
+                                      className="cp-pkg-sel"
+                                      value={chosen.package}
+                                      aria-label={`Select your package for the ${words}`}
+                                      aria-describedby={`${selId}-terms`}
+                                      onChange={(e) => setPackage(m.id, e.target.value)}
+                                    >
+                                      {markChoices.map((o) => (
+                                        <option key={o.package} value={o.package}>
+                                          {o.package}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </>
+                                )}
+                                <p className="cp-how-add" id={`${selId}-terms`}>
+                                  {quotedMark ? `${chosen.package}: ${money(quotedMark.price_cents)} legal fee for the ${words}` : chosen.package}
+                                  {quotedMark?.second ? ` (${Math.round(markPr.second_mark_discount_pct)}% off as your second mark)` : ""}
+                                  {` · ${packageTermsWords(markPr)}`}
+                                </p>
+                              </div>
+                            </div>
                           );
                         })}
                       </div>
@@ -689,7 +768,21 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                         <div className="cp-part cp-add">
                           <h4>Add a class</h4>
                           <p className="cp-how-add">Add another class (category of goods or services) you&rsquo;d like us to include, and describe it in your own words.</p>
-                          <p className="cp-how-add">{classPriceWords(namePr, perClass, pickedClasses)}</p>
+                          {perMark ? (
+                            // Spec 7: one line per ticked mark that carries its own package.
+                            nm.marks
+                              .filter((m) => shownSelection[m.id] === true && chosenMarkPackage(shown, nm, m, shownSelection))
+                              .map((m) => {
+                                const mp = markPricing(nm.id, m.id);
+                                return (
+                                  <p className="cp-how-add" key={m.id}>
+                                    {`${capitalize(MARK_PACKAGE_WORDS[m.kind] ?? m.kind)}: ${classPriceWords(mp, mp.per_class_cents, pickedClasses)}`}
+                                  </p>
+                                );
+                              })
+                          ) : (
+                            <p className="cp-how-add">{classPriceWords(namePr, perClass, pickedClasses)}</p>
+                          )}
                           {mine.length < addMax ? (
                             <button type="button" className="cp-add-btn" onClick={() => addClass(nm.id, addMax)}>
                               Add a class
@@ -806,7 +899,8 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                           <div className="cp-ln" key={m.id}>
                             <span className="cp-l">
                               {MARK_KIND_LABEL[m.kind] ?? m.kind}
-                              {m.second ? <small>{Math.round(pricingFor(qn.id).second_mark_discount_pct)}% off</small> : null}
+                              {m.package ? <small>{m.package}</small> : null}
+                              {m.second ? <small>{Math.round((m.package ? markPricing(qn.id, m.id) : pricingFor(qn.id)).second_mark_discount_pct)}% off</small> : null}
                             </span>
                             <span className="cp-r cp-num">{money(m.price_cents)}</span>
                           </div>
@@ -931,8 +1025,8 @@ export function ProposalDocument(props: ProposalDocumentProps) {
                 <p className="cp-how">
                   {hasChoices ? (
                     <>
-                      Each brand name is priced under the package you select for it: the package price covers its included
-                      classes, then each class added is priced as shown with the package.
+                      Each brand name{offeredPerMark ? ", or each mark," : ""} is priced under the package you select for it: the
+                      package price covers its included classes, then each class added is priced as shown with the package.
                     </>
                   ) : pricing.reduce_under_included === true ? (
                     <>

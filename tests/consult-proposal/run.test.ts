@@ -61,6 +61,10 @@ const TOKEN = "T".repeat(43);
 type Opts = {
   setting?: unknown | null;
   handled?: boolean;
+  /** Markers that name a proposal, and which of those proposals still exist (not withdrawn). */
+  markerProposals?: string[];
+  liveProposals?: string[];
+  proposalReadFails?: boolean;
   activityReadFails?: boolean;
   markerFails?: number;
   proposalInsertFails?: boolean;
@@ -73,7 +77,12 @@ function handler(o: Opts = {}): Handler {
   return (q: Recorded) => {
     if (q.table === "crm_activity" && q.action === "select") {
       if (o.activityReadFails) return { data: null, error: { message: "boom" } };
+      if (o.markerProposals) return { data: o.markerProposals.map((id, i) => ({ id: `a${i}`, payload: { source: "consult-proposal", proposal_id: id } })), error: null };
       return { data: o.handled ? [{ id: "a1" }] : [], error: null };
+    }
+    if (q.table === "client_proposal" && q.action === "select") {
+      if (o.proposalReadFails) return { data: null, error: { message: "boom" } };
+      return { data: (o.liveProposals ?? []).map((id) => ({ id })), error: null };
     }
     if (q.table === "crm_activity" && q.action === "insert") {
       const v = q.values as { type?: string };
@@ -217,6 +226,28 @@ describe("runConsultProposal", () => {
     const t = setup({ handled: true }, { source: { kind: "meeting", meetingId: "m-1", title: "Strategy call", startedAt: null, summary: null, transcript: [{ speaker: "Rebecca", text: "hello there" }] } });
     expect(await runConsultProposal(t.input)).toMatchObject({ ok: false, reason: "already_drafted" });
     expect(filterValue(t.db.log.find((q) => q.table === "crm_activity")!, "payload->>meeting_id")).toBe("m-1");
+  });
+
+  it("drafts again when the earlier proposal was deleted or withdrawn (the old marker no longer blocks)", async () => {
+    const t = setup({ markerProposals: ["gone-1"], liveProposals: [] });
+    const r = await runConsultProposal(t.input);
+    expect(r.ok).toBe(true);
+    expect(t.createDraft).toHaveBeenCalledTimes(1);
+    const check = t.db.log.find((q) => q.table === "client_proposal" && q.action === "select")!;
+    expect(filterValue(check, "status")).toBe("withdrawn");
+    assertOrgFenced(t.db.log);
+  });
+
+  it("still refuses while the earlier proposal exists", async () => {
+    const t = setup({ markerProposals: ["p-1"], liveProposals: ["p-1"] });
+    expect(await runConsultProposal(t.input)).toMatchObject({ ok: false, reason: "already_drafted" });
+    expect(t.calls).toHaveLength(0);
+  });
+
+  it("refuses when the earlier proposal can't be read", async () => {
+    const t = setup({ markerProposals: ["p-1"], proposalReadFails: true });
+    expect(await runConsultProposal(t.input)).toMatchObject({ ok: false, reason: "unavailable" });
+    expect(t.calls).toHaveLength(0);
   });
 
   it("refuses when it can't tell whether the call was already drafted", async () => {

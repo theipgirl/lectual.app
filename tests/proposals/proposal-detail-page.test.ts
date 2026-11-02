@@ -67,6 +67,8 @@ type Extra = {
   /** The version's step events (Sprint 19); "fail" = the read fails. */
   steps?: Array<Record<string, unknown>> | "fail";
   members?: unknown[];
+  /** Spec 7: the client's opens of this version; "fail" = the read fails. */
+  opens?: Map<string, { count: number; lastAt: string }> | "fail";
 };
 
 async function render(proposal: ProposalRow, events: ProposalEventRow[], strip: unknown = { status: "none" }, extra: Extra = {}) {
@@ -88,6 +90,10 @@ async function render(proposal: ProposalRow, events: ProposalEventRow[], strip: 
     getProposalSettings: vi.fn(async () => null),
     isCurrentUserApprover: vi.fn(async () => false),
     listProposalStepEvents: vi.fn(async () => (extra.steps === "fail" ? { ok: false } : { ok: true, events: extra.steps ?? [] })),
+    listProposalOpens: vi.fn(async () => {
+      if (extra.opens === "fail") throw new Error("read failed");
+      return extra.opens ?? new Map();
+    }),
   }));
   vi.doMock("@/lib/consult-proposal/link", () => ({ GOES_LIVE_ON_APPROVAL: "x", proposalSendBlock: vi.fn(async () => ({ blocked: false })) }));
   vi.doMock("@/lib/proposals/consult-strip-load", () => ({ loadConsultStrip: loadStrip }));
@@ -408,5 +414,32 @@ describe("proposal detail page: Change pay link (lectual 0100)", () => {
     const { html } = await render(row({ status: "sent", sent_at: "2026-10-19T12:00:00Z" }), [], undefined, { role });
     expect(html).not.toContain("Change pay link");
     expect(html).not.toContain("except its pay link");
+  });
+});
+
+describe("proposal detail page: opened by the client (Spec 7)", () => {
+  beforeEach(() => vi.resetModules());
+  const live = () => row({ status: "sent", sent_at: "2026-10-28T12:00:00Z" });
+  const line = (html: string) => /<p class="lx-note pe-opens" role="status" data-opens="([a-z_]+)">([^<]*)<\/p>/.exec(html.replaceAll("&#x27;", "'"));
+
+  it("opened: the count and the last time, in the firm's time zone", async () => {
+    const { html } = await render(live(), [], { status: "none" }, { opens: new Map([[ID, { count: 4, lastAt: "2026-10-29T19:12:00Z" }]]) });
+    expect(line(html)?.slice(1)).toEqual(["opened", "Opened by the client 4 times · last opened Oct 29, 3:12 PM"]);
+  });
+
+  it("not opened yet", async () => {
+    const { html } = await render(live(), [], { status: "none" }, { opens: new Map() });
+    expect(line(html)?.slice(1)).toEqual(["not_opened", "Not opened by the client yet"]);
+  });
+
+  it("a failed read is 'Couldn't load opens', never 'not opened'", async () => {
+    const { html } = await render(live(), [], { status: "none" }, { opens: "fail" });
+    expect(line(html)?.slice(1)).toEqual(["unavailable", "Couldn't load opens"]);
+    expect(html).not.toContain("Not opened");
+  });
+
+  it("a draft has no line", async () => {
+    const { html } = await render(row(), [], { status: "none" }, { opens: new Map([[ID, { count: 4, lastAt: "2026-10-29T19:12:00Z" }]]) });
+    expect(line(html)).toBeNull();
   });
 });

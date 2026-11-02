@@ -16,6 +16,7 @@
 
 import { PROVIDER_LABEL, type MeetingProvider } from "@/lib/meetings/types";
 import { relativeTime } from "@/lib/relative-time";
+import { isConsultTitle } from "@/lib/calendar/outlook-parse";
 import { dayMonth } from "./list-labels";
 
 export type ConsultMeeting = {
@@ -53,14 +54,41 @@ export function consultRowState(meeting: ConsultMeeting, facts: ConsultDraftFact
 }
 
 export const CONSULT_STATE_PILL: Record<ConsultRowState["state"], { label: string; tone: "ok" | "ox" | "mute" | "warn" }> = {
-  drafted: { label: "Drafted", tone: "ok" },
-  ready: { label: "Transcript ready", tone: "ox" },
-  transcribing: { label: "Transcribing", tone: "mute" },
+  drafted: { label: "Proposal created", tone: "ok" },
+  ready: { label: "Ready to draft", tone: "ox" },
+  transcribing: { label: "Transcript still processing", tone: "mute" },
   unlinked: { label: "Not linked", tone: "warn" },
 };
 
 export const CONSULT_WINDOW_DAYS = 14;
-export const CONSULT_ROW_CAP = 5;
+/** The newest N meetings the list holds; past it the list says "Showing the newest N". */
+export const CONSULT_ROW_CAP = 30;
+
+/**
+ * Which meetings the "Consults and client meetings" list holds: a consult by title (the same
+ * regex the calendar sync uses), or any meeting already linked to a lead or a matter.
+ */
+export function isListedMeeting(m: { title: string | null | undefined; leadId: string | null; matterId: string | null }): boolean {
+  return isConsultTitle(m.title) || !!m.leadId || !!m.matterId;
+}
+
+/** The row's own link to the meeting page. The id is encoded; `from=proposals` makes the page offer a way back. */
+export function meetingRowHref(id: string): string {
+  return `/dashboard/meetings/${encodeURIComponent(id)}/?from=proposals`;
+}
+
+/** "Oct 28, 2:30 PM" in the firm's zone; "Date unknown" when the provider gave none. */
+export function meetingWhen(iso: string | null, tz: string): string {
+  const t = iso ? Date.parse(iso) : NaN;
+  if (Number.isNaN(t)) return "Date unknown";
+  return new Intl.DateTimeFormat("en-US", { timeZone: tz, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(t));
+}
+
+/** The meeting page's back link: only the exact value `proposals` (a string, or a repeated key's first) shows one. */
+export function meetingBackHref(from: string | string[] | undefined): string | null {
+  const v = Array.isArray(from) ? from[0] : from;
+  return v === "proposals" ? "/dashboard/proposals/" : null;
+}
 
 /** "today", "yesterday", a weekday within the last week, else "21 Aug" — all in the firm's zone. */
 export function consultWhen(iso: string | null, now: number, tz: string): string {

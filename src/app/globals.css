@@ -194,13 +194,40 @@ a:hover {
   font: inherit;
   font-size: 15px;
   color: var(--ink);
-  background: var(--paper);
+  background-color: var(--paper);
   border: 1px solid var(--line);
   border-radius: 9px;
   padding: 10px 12px;
   outline: none;
   width: 100%;
   box-sizing: border-box;
+}
+
+/*
+ * Every native <select> (multi-row ones excluded): our own chevron, inset 14px from the
+ * right edge, instead of the browser's arrow pressed against it. ONE rule for the whole app.
+ * It sets background-image/-position only, so a select's own background-COLOR, border and
+ * radius tokens stay; never write a `background:` shorthand on a select (it wipes the chevron).
+ * Chevron colour is --ink (#2a1216); the app has no dark theme. The padding is right-only, and
+ * its specificity beats a class rule's `padding:` shorthand, so text never runs under the arrow.
+ */
+select:not([multiple]):not([size]) {
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: 40px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%232a1216' stroke-opacity='1' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 12px 8px;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+select:not([multiple]):not([size])::-ms-expand { display: none; }
+select:not([multiple]):not([size]):focus-visible { outline: 2px solid var(--ox); outline-offset: 2px; }
+select:not([multiple]):not([size]):disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%232a1216' stroke-opacity='0.45' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 .lx-pill {
   font-family: var(--mono);

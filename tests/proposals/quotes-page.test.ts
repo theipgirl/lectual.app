@@ -221,20 +221,21 @@ describe("Proposals page", () => {
           meetings: {
             status: "ok",
             more: 0,
-            rows: [{ id: "m1", provider: "zoom", clientName: "Sana Okafor", company: "Northbound Supply", line: "Zoom consult · yesterday · 28 min · transcript synced", state: "ready", proposalId: null, leadId: "l1" }],
+            rows: [{ id: "m1", provider: "zoom", title: "Sana consult", whenLabel: "Oct 20, 10:00 AM", linkedTo: "Sana Okafor", clientName: "Sana Okafor", company: "Northbound Supply", line: "Zoom consult · yesterday · 28 min · transcript synced", state: "ready", proposalId: null, leadId: "l1" }],
           },
         },
       });
       expect(html).toContain("Zoom consults");
       expect(html).toContain("connected · last sync 6 min ago");
-      expect(html).toContain("Sana Okafor");
+      expect(html).toContain("Sana consult");
+      expect(html).toContain("Linked to Sana Okafor");
       expect(html).toContain("Draft the proposal");
     });
 
     it("a failed meetings read shows Couldn't load consults, and the rest of the page still works", async () => {
       const html = await go({}, { strip: { header: { title: "Consults", status: { kind: "connected", text: "connected · no import yet" } }, meetings: { status: "unavailable" } } });
-      expect(html).toContain("Couldn&#x27;t load consults");
-      expect(html).not.toContain("No consults in the last");
+      expect(html).toContain("Can&#x27;t show meetings right now. Refresh to try again.");
+      expect(html).not.toContain("No consults or client meetings yet.");
       expect(html).toContain("Client a1");
     });
   });

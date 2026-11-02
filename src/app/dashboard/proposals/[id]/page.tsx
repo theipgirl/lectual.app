@@ -8,7 +8,7 @@ import { firmCivilDate } from "@/lib/quotes/firm-time";
 import { formatCents } from "@/lib/quotes/money";
 import { formatFirmStamp, formatShortFirmDate } from "@/lib/quotes/labels";
 import { ProposalError } from "@/lib/proposals/errors";
-import { getProposal, getProposalSettings, isCurrentUserApprover, listProposalStepEvents, type ProposalDetail } from "@/lib/proposals/store";
+import { getProposal, getProposalSettings, isCurrentUserApprover, listProposalOpens, listProposalStepEvents, type ProposalDetail } from "@/lib/proposals/store";
 import { PROPOSAL_PAID_ROLES, paidStateFromEvents } from "@/lib/proposals/paid";
 import { canResetAcceptance } from "@/lib/proposal-editor/reset-acceptance";
 import { buildPaidPanelView } from "@/lib/proposals/paid-view";
@@ -35,6 +35,7 @@ import { LinkLeadForm } from "@/components/proposal-editor/LinkLeadForm";
 import { ProposalCard } from "@/components/proposal-editor/ProposalCard";
 import { IssueList, type ShownIssue } from "@/components/proposal-editor/ActionForm";
 import { Lifecycle } from "@/components/proposal-editor/Lifecycle";
+import { UnsavedGuardProvider } from "@/components/proposal-editor/UnsavedGuard";
 import { canDeleteProposal } from "@/lib/proposal-editor/delete-proposal";
 import { PaidPanel } from "@/components/proposal-editor/PaidPanel";
 import { ChangePayLink } from "@/components/proposal-editor/ChangePayLink";
@@ -59,6 +60,7 @@ import type { Metadata } from "next";
 import { recordPageTitle } from "@/lib/ui/page-title";
 import { PROPOSALS_NAME } from "@/lib/ui/words";
 import { packageLineTitle } from "@/lib/proposals/name-package";
+import { opensKind, opensPageText, type OpensRead } from "@/lib/proposals/opens";
 
 /** Tab title: the client's name through the scoped getter; "Proposal" when the read fails or finds nothing. */
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -120,7 +122,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
   const { proposal, versions, events } = detail;
   const content = proposal.content;
 
-  const [tz, members, settings, isApprover, origin, consult, stepRead, leadLink, leadOptions] = await Promise.all([
+  const [tz, members, settings, isApprover, origin, consult, stepRead, leadLink, leadOptions, opensRead] = await Promise.all([
     getFirmTimeZone(),
     listMemberDirectory().catch((): MemberIdentity[] => []),
     getProposalSettings().catch(() => null),
@@ -132,7 +134,15 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
     loadLeadLink(proposal.lead_id),
     // Only an unlinked, still-editable proposal on a writer's page needs the list to link one from.
     !proposal.lead_id && isProposalEditable(proposal.status) && canWrite ? loadLeadOptions() : Promise.resolve(null),
+    // Spec 7: the client's opens of this version (a failed read is "Couldn't load opens", never "not opened").
+    isProposalEditable(proposal.status)
+      ? Promise.resolve(new Map() as OpensRead)
+      : listProposalOpens([proposal.id]).then(
+          (m): OpensRead => m,
+          (): OpensRead => "unavailable",
+        ),
   ]);
+  const opensText = opensPageText(proposal.status, opensRead, proposal.id, tz);
   // The family's events are already loaded, so the card needs no extra read.
   const card = buildProposalCard(proposal, events);
 
@@ -242,7 +252,13 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
       note: n.note ?? "",
       overrideBase: moneyInput(n.price_override?.base_cents),
       overridePerClass: moneyInput(n.price_override?.per_class_cents),
-      marks: (n.marks ?? []).map((m) => ({ id: m.id, kind: m.kind, desc: m.desc, preselected: m.preselected })),
+      marks: (n.marks ?? []).map((m) => ({
+        id: m.id,
+        kind: m.kind,
+        desc: m.desc,
+        preselected: m.preselected,
+        packageChoice: m.package_choice ? { options: [...m.package_choice.options], default: m.package_choice.default } : null,
+      })),
       classes: (n.classes ?? []).map((c) => ({ id: c.id, label: c.label, preselected: c.preselected, clientEntry: c.client_entry === true })),
       clientAddMax: explicitClientAddMax(n) === null ? "" : String(explicitClientAddMax(n)),
       packageChoice: n.package_choice ? { options: [...n.package_choice.options], default: n.package_choice.default } : null,
@@ -359,6 +375,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
 
       <div className="pe-cols">
         <div className="pe-forms">
+          <UnsavedGuardProvider>
           <NameRowsProvider key={nameValues.map((n) => n.id).join("|")} names={nameValues}>
             <BuilderLayout
               changed={changedCount}
@@ -375,6 +392,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
               }
               packageStep={<PricingForm {...common} issues={shown(groups.pricing)} values={pricingValues} payUrl={proposal.pay_url ?? ""} expiresOn={proposal.expires_on ?? ""} today={firmCivilDate(new Date(), tz)} />}
               create={
+                <>
                 <Lifecycle
                   proposalId={proposal.id}
                   status={proposal.status}
@@ -389,6 +407,12 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
                   canReset={canReset}
                   updatedAt={proposal.updated_at}
                 />
+                {opensText ? (
+                  <p className="lx-note pe-opens" role="status" data-opens={opensKind(proposal.status, opensRead, proposal.id)}>
+                    {opensText}
+                  </p>
+                ) : null}
+                </>
               }
               more={
                 <>
@@ -424,6 +448,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
               }
             />
           </NameRowsProvider>
+          </UnsavedGuardProvider>
         </div>
 
         <aside className="pe-side" aria-label="Figures and preview">
