@@ -37,7 +37,24 @@ export function ProposalCard({ card, showFees = true }: { card: Card; /** The ed
         </div>
       </div>
 
-      {card.brands.length === 0 ? (
+      {card.general ? (
+        <div className="pe-pcard-general">
+          <b>{card.general.matterTitle || "Matter not named yet"}</b>
+          {card.general.summary && <p className="lx-note" style={{ margin: "4px 0 0" }}>{card.general.summary}</p>}
+          {card.general.items.length > 0 && (
+            <ul className="pe-general-items">
+              {card.general.items.map((it, i) => (
+                <li key={i}>
+                  {it.label}
+                  {typeof it.hours === "number" ? ` · ${it.hours} ${it.hours === 1 ? "hr" : "hrs"}` : ""}
+                  {it.valueCents > 0 ? ` · ${formatDollars(it.valueCents)}` : ""}
+                </li>
+              ))}
+            </ul>
+          )}
+          {card.general.excludes.length > 0 && <p className="lx-note" style={{ margin: 0 }}>Not included: {card.general.excludes.join("; ")}</p>}
+        </div>
+      ) : card.brands.length === 0 ? (
         <p className="lx-note" style={{ margin: 0 }}>No brand names on this proposal yet.</p>
       ) : (
         <ul className="pe-pcard-brands">
@@ -60,7 +77,21 @@ export function ProposalCard({ card, showFees = true }: { card: Card; /** The ed
         </p>
       )}
 
-      {showFees && (
+      {showFees && card.general && (
+        <dl className="pe-pcard-fees">
+          {card.general.valueCents > card.general.feeCents && (
+            <div>
+              <dt>Value of the work</dt>
+              <dd className="lx-num">{formatDollars(card.general.valueCents)}</dd>
+            </div>
+          )}
+          <div>
+            <dt>At signing (flat fee)</dt>
+            <dd className="lx-num">{formatDollars(card.legalAtSigningCents)}</dd>
+          </div>
+        </dl>
+      )}
+      {showFees && !card.general && (
         <>
         <dl className="pe-pcard-fees">
           <div>

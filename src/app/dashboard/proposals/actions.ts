@@ -10,6 +10,8 @@ import { buildNewContent, parseDateInput, pricingFromPackage } from "@/lib/propo
 import { applyNewProposalPackageFields } from "@/lib/proposal-editor/create-package-choice";
 import { loadConsultForPrefill } from "@/lib/proposals/consult-prefill-load";
 import { buildBrandNames, CHANGED_SINCE_LOAD, consultPrefill } from "@/lib/proposals/prefill";
+import { buildGeneralContent, GENERAL_PROPOSAL_TITLE, parseGeneralForm } from "@/lib/proposal-editor/general-form";
+import { validateContent } from "@/lib/proposals/validate";
 import { proposalActionError, type ActionState } from "./errors";
 import { gateStaffAction } from "./gate";
 
@@ -57,6 +59,34 @@ export async function createProposalAction(_prev: ActionState, formData: FormDat
   const packageName = field(formData, "package");
   const expires = parseDateInput(field(formData, "expiresOn"), "Expiry date");
   if (!expires.ok) return { error: expires.error };
+
+  // Spec 9: a contract or other matter at a flat fee. Built here from the posted fields, checked by
+  // `validateContent`, and never given a package, a brand name or a USPTO fee.
+  if (field(formData, "kind") === "general") {
+    const general = parseGeneralForm(formData, () => randomBytes(4).toString("hex"));
+    if (!general.ok) return { error: general.error };
+    const content = buildGeneralContent({ firstName: firstName || fullName.split(/\s+/)[0], fullName, company: field(formData, "company"), general: general.value });
+    const problem = validateContent(content).find((i) => i.level === "error");
+    if (problem) return { error: problem.message };
+    let createdId: string;
+    try {
+      const created = await createProposal({
+        clientName: fullName,
+        clientEmail: field(formData, "clientEmail") || null,
+        title: field(formData, "title") || GENERAL_PROPOSAL_TITLE,
+        content,
+        leadId: leadRaw || null,
+        matterId: matterRaw || null,
+        expiresOn: expires.value,
+        payUrl: field(formData, "payUrl") || null,
+      });
+      createdId = created.id;
+    } catch (err) {
+      return proposalActionError(err, "Couldn't create this proposal.");
+    }
+    revalidatePath("/dashboard/proposals/");
+    redirect(`/dashboard/proposals/${createdId}/`);
+  }
 
   let settings: ProposalSettingRow | null = null;
   let settingsRead = true;

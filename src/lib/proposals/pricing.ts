@@ -83,6 +83,7 @@ import type {
   QuotedName,
   Selection,
 } from "./types";
+import { isGeneralContent } from "./types";
 
 /** A finite number rounded to an integer cents/count; anything else is 0. */
 function int(value: unknown): number {
@@ -238,7 +239,9 @@ function resolvedPackagePicks(content: ProposalContent, selection: Selection | n
  * hand-built request body cannot tick a box with `1` or `"true"`.
  */
 export function quoteProposal(content: ProposalContent, selection: Selection): ProposalQuote {
-  const on = (id: string) => selection != null && selection[id] === true;
+  // Spec 9: a general (flat-fee) proposal has its own branch; every other content prices exactly as before.
+  if (isGeneralContent(content)) return quoteGeneral(content);
+  const on =(id: string) => selection != null && selection[id] === true;
   const pricing = obj(content?.pricing);
   const baseCents = int(pricing.base_cents);
   const perClassCents = int(pricing.per_class_cents);
@@ -333,18 +336,7 @@ export function quoteProposal(content: ProposalContent, selection: Selection): P
   });
 
   const legalSubtotal = names.reduce((sum, x) => sum + x.legal_cents, 0);
-
-  // Adjustments come off a positive subtotal only, in content order. Each is
-  // capped at what is left, so the per-line figures always add up to the total
-  // discount and the total never goes below zero.
-  let remaining = legalSubtotal;
-  const adjustments: QuotedAdjustment[] = arr<ProposalAdjustment>(content?.adjustments).map((a) => {
-    const raw = a?.kind === "percent" ? percentOf(legalSubtotal, a.value) : Math.max(0, int(a?.value));
-    const taken = legalSubtotal > 0 ? Math.min(Math.max(0, raw), remaining) : 0;
-    remaining -= taken;
-    return { id: a?.id, label: a?.label, kind: a?.kind === "percent" ? "percent" : "amount", value: a?.value, discount_cents: taken };
-  });
-  const discount = legalSubtotal - remaining;
+  const { adjustments, discount } = applyAdjustments(content, legalSubtotal);
 
   return {
     names,
@@ -354,6 +346,83 @@ export function quoteProposal(content: ProposalContent, selection: Selection): P
     legal_total_cents: Math.max(0, legalSubtotal - discount),
     gov_total_cents: names.reduce((sum, x) => sum + x.gov_cents, 0),
     gov_class_count: names.reduce((sum, x) => sum + x.class_count, 0),
+  };
+}
+
+/**
+ * Adjustments come off a positive subtotal only, in content order. Each is
+ * capped at what is left, so the per-line figures always add up to the total
+ * discount and the total never goes below zero. Shared by the trademark and the
+ * general (Spec 9) quote, so a consult credit works the same on both.
+ */
+function applyAdjustments(content: ProposalContent, legalSubtotal: number): { adjustments: QuotedAdjustment[]; discount: number } {
+  let remaining = legalSubtotal;
+  const adjustments: QuotedAdjustment[] = arr<ProposalAdjustment>(content?.adjustments).map((a) => {
+    const raw = a?.kind === "percent" ? percentOf(legalSubtotal, a.value) : Math.max(0, int(a?.value));
+    const taken = legalSubtotal > 0 ? Math.min(Math.max(0, raw), remaining) : 0;
+    remaining -= taken;
+    return { id: a?.id, label: a?.label, kind: a?.kind === "percent" ? "percent" : "amount", value: a?.value, discount_cents: taken };
+  });
+  return { adjustments, discount: legalSubtotal - remaining };
+}
+
+/* ─────────────────────────── Spec 9: general (flat-fee) proposals ──────────
+ * A contract or other non-filing matter. No brand names, marks, classes,
+ * packages or USPTO fee: the client pays ONE flat fee (`general.fee_cents`).
+ * Each work item has a VALUE, `hours x rate_cents` (rounded once) when both are
+ * given, else `value_cents`; the sum is what the work is worth and is shown as a
+ * courtesy beside the fee ("Value $1,250 · Your fee $500"), never charged.
+ *   legal_subtotal = fee_cents; adjustments as for a trademark proposal;
+ *   gov_total = 0; gov_class_count = 0; names = [].
+ * Nothing on a general proposal is selectable: the selection is ignored.
+ */
+
+/** A finite number of hours in quarter-hour steps, 0 < h <= 100; anything else is no hours. */
+function quarterHours(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0 || value > 100) return undefined;
+  return Number.isInteger(value * 4) ? value : undefined;
+}
+
+/** One work item's value in cents: hours x rate (rounded once) when both are given, else its own value, else 0. */
+export function generalItemValue(item: unknown): number {
+  const it = obj(item);
+  const hours = quarterHours(it.hours);
+  const rate = int(it.rate_cents);
+  if (hours !== undefined && rate > 0) return Math.round(hours * rate);
+  return Math.max(0, int(it.value_cents));
+}
+
+/** The general block's figures: each item's value, their sum and the flat fee. Total, never throws. */
+export function generalFigures(content: ProposalContent): { value_cents: number; fee_cents: number; items: Array<{ label: string; hours?: number; value_cents: number }> } {
+  const g = obj(content?.general);
+  const items = arr<unknown>(g.items).map((raw) => {
+    const it = obj(raw);
+    const hours = quarterHours(it.hours);
+    return { label: typeof it.label === "string" ? it.label : "", ...(hours !== undefined ? { hours } : {}), value_cents: generalItemValue(it) };
+  });
+  return { value_cents: items.reduce((sum, i) => sum + i.value_cents, 0), fee_cents: Math.max(0, int(g.fee_cents)), items };
+}
+
+/** The courtesy line beside a general proposal's fee: the work's value only when it is MORE than the fee, else null. */
+export function generalValueOverFee(quote: ProposalQuote): { value_cents: number; fee_cents: number } | null {
+  const g = quote.general;
+  if (!g || g.value_cents <= g.fee_cents) return null;
+  return { value_cents: g.value_cents, fee_cents: g.fee_cents };
+}
+
+function quoteGeneral(content: ProposalContent): ProposalQuote {
+  const general = generalFigures(content);
+  const legalSubtotal = general.fee_cents;
+  const { adjustments, discount } = applyAdjustments(content, legalSubtotal);
+  return {
+    names: [],
+    legal_subtotal_cents: legalSubtotal,
+    adjustments,
+    discount_cents: discount,
+    legal_total_cents: Math.max(0, legalSubtotal - discount),
+    gov_total_cents: 0,
+    gov_class_count: 0,
+    general,
   };
 }
 
@@ -441,6 +510,8 @@ function fixedOfferSelection(content: ProposalContent): Selection {
 
 /** True when the quote has at least one brand name in it (something to accept). */
 export function quoteHasItems(quote: ProposalQuote): boolean {
+  // Spec 9: a general proposal has something to accept when its flat fee is above zero.
+  if (quote.general) return quote.general.fee_cents > 0;
   return quote.names.some((n) => n.included);
 }
 

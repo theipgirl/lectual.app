@@ -303,6 +303,15 @@ export function publicContent(raw: unknown): ProposalContent {
       return offer;
     });
   }
+  // Spec 9: a general (flat-fee) proposal's matter, work items and fee. Only the keys `GeneralBlock` defines.
+  if (c.kind === "trademark" || c.kind === "general") out.kind = c.kind;
+  if (c.kind === "general" && isObject(c.general)) {
+    const g = c.general;
+    const general = pick(g, ["matter_title", "summary", "fee_cents", "terms_note"]);
+    general.items = objects(g.items).map((it) => pick(it, ["id", "label", "hours", "rate_cents", "value_cents"]));
+    if (Array.isArray(g.excludes)) general.excludes = g.excludes.filter((x): x is string => typeof x === "string");
+    out.general = general;
+  }
   return out as unknown as ProposalContent;
 }
 

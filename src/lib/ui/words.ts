@@ -139,3 +139,9 @@ export const LAWMATICS_TOKEN_HELP = "In Lawmatics: Settings \u2192 API \u2192 cr
 
 /** Sprint 34: the one sentence a read-only member sees on the Service library, instead of a wall of disabled fields. */
 export const SERVICE_LIBRARY_READ_ONLY = `You can use these on quotes. ${ADMIN_TIER_PHRASE} can change the list.`;
+
+/** Spec 9: the two kinds of proposal, as the New proposal "Type" choice names them. */
+export const PROPOSAL_TYPE_TRADEMARK = "Trademark filing";
+export const PROPOSAL_TYPE_GENERAL = "Contract or other matter (flat fee)";
+/** Spec 9: the LOE step's sentence for a general (flat-fee) proposal. Never the trademark LOE. */
+export const GENERAL_LOE_SENTENCE = "Draft the General LOE for this matter.";

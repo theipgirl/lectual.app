@@ -147,8 +147,9 @@ async function loeDraftStep(supabase: ScopedClient, proposal: ProposalRow, event
     // Spec 7: marks accepted under different packages are also "Choose the LOE template": the line carries the
     // `unknown_package` code the payment panel links from (paid-view.ts is unchanged), with its own sentence and `detail`.
     const reason = facts.adapted.reason;
-    if (reason === "unknown_package" || reason === "mixed_mark_packages") {
-      const mixed: Record<string, string> = reason === "mixed_mark_packages" ? { detail: reason } : {};
+    // Spec 9: a general (flat-fee) proposal is "Choose the LOE template" too, detail `general_matter`.
+    if (reason === "unknown_package" || reason === "mixed_mark_packages" || reason === "general_matter") {
+      const mixed: Record<string, string> = reason === "mixed_mark_packages" || reason === "general_matter" ? { detail: reason } : {};
       const found = await resolveProposalMatter(supabase, proposal);
       if (found.status === "one") {
         return report(proposal, "loe_draft", "blocked", LOE_REFUSAL_TEXT[reason], { code: "unknown_package", ...mixed, matter_id: found.id });

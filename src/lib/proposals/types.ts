@@ -253,7 +253,72 @@ export type ProposalPackageBasis = {
   edited: string[];
 };
 
+/* ─────────────────────────── Spec 9: general (flat-fee) proposals ──────────── */
+
+/** Spec 9: what a proposal is for. Absent = "trademark" (every row written before Spec 9). */
+export const PROPOSAL_KINDS = ["trademark", "general"] as const;
+export type ProposalKind = (typeof PROPOSAL_KINDS)[number];
+
+/**
+ * Spec 9: one piece of work on a general proposal, typed by staff. Its VALUE is `hours x rate_cents` when both are
+ * given, else `value_cents` (worked out only in `pricing.ts#generalItemValue`). The value is what the work is worth;
+ * the client pays `fee_cents`, never the sum of the values.
+ */
+export type GeneralItem = {
+  id: string;
+  /** 1..200 characters. */
+  label: string;
+  /** Quarter-hour steps, 0 < hours <= 100. */
+  hours?: number;
+  /** An hourly rate in cents, > 0. */
+  rate_cents?: number;
+  /** A value in cents, >= 0, used when hours x rate is not given. */
+  value_cents?: number;
+};
+
+/**
+ * Spec 9: a contract or other non-filing matter, at a FLAT fee. No brand names, marks, classes, packages or USPTO
+ * fee. Everything here is staff's own words; nothing is generated.
+ */
+export type GeneralBlock = {
+  /** 1..160 characters, e.g. "Management agreement: notice of non-renewal and termination". */
+  matter_title: string;
+  /** At most 1,200 characters, shown above the work items. */
+  summary?: string;
+  /** 1..20 work items. */
+  items: GeneralItem[];
+  /** The flat fee the client pays, cents, > 0. */
+  fee_cents: number;
+  /** "Not included" lines: at most 10, each at most 200 characters. */
+  excludes?: string[];
+  /** At most 600 characters. */
+  terms_note?: string;
+};
+
+/**
+ * The `pricing` a general proposal carries: every number zero and no USPTO fee, so the many readers that expect a
+ * `pricing` object keep working and none of them can find a trademark price in it. `validateContent` refuses a
+ * general proposal whose pricing has any number other than zero.
+ */
+export const GENERAL_PRICING_STUB: ProposalPricing = {
+  package: "Flat fee",
+  base_cents: 0,
+  included_classes: 0,
+  per_class_cents: 0,
+  second_mark_discount_pct: 0,
+  gov_per_class_cents: 0,
+};
+
+/** True for a Spec 9 general (flat-fee) proposal. Anything else, an absent `kind` included, is a trademark proposal. */
+export function isGeneralContent(content: unknown): boolean {
+  return !!content && typeof content === "object" && (content as { kind?: unknown }).kind === "general";
+}
+
 export type ProposalContent = {
+  /** Spec 9: absent = "trademark". */
+  kind?: ProposalKind;
+  /** Spec 9: the matter, its work items and its flat fee. Only on `kind: "general"`. */
+  general?: GeneralBlock;
   client: { first_name: string; full_name: string; company?: string };
   greeting: string;
   recommendation?: string;
@@ -436,6 +501,15 @@ export type ProposalQuote = {
   gov_total_cents: number;
   /** Total filing classes (classes x marks) the USPTO fee is charged on. */
   gov_class_count: number;
+  /** Spec 9: a general proposal's figures. Present only for `kind: "general"`; `names` is then empty. */
+  general?: QuotedGeneral;
+};
+
+/** Spec 9: what a general quote carries. `value_cents` is the worth of the work; `fee_cents` is what is charged. */
+export type QuotedGeneral = {
+  value_cents: number;
+  fee_cents: number;
+  items: Array<{ label: string; hours?: number; value_cents: number }>;
 };
 
 /* ─────────────────────────── the firm's standard pricing ─────────────────── */

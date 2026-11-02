@@ -18,6 +18,7 @@ import { DEFAULT_CLIENT_ENTRY_PROMPT, DESCRIBE_BEFORE_ACCEPT } from "@/lib/propo
 import { defaultSelection, quoteProposal } from "@/lib/proposals/pricing";
 import { sevetri } from "./fixture";
 import { danielle } from "./danielle-fixture";
+import { faithe } from "./general-fixture";
 
 // Sprint 19: the acceptance follow-ups (firm notice + Lawmatics note) are scheduled with next/server's after().
 // Outside a request `after` is a no-op here; tests that care capture the callback and run it themselves.
@@ -897,5 +898,34 @@ describe("acceptPublicProposal with a package per brand name (Spec 6)", () => {
     const stored = tables.client_proposal[0].accepted_selection as Record<string, unknown>;
     expect(stored.packages).toEqual({ fold: "Enhanced", ci: "Enhanced" });
     for (const key of ["legal_total_cents", "base_cents", "prices"]) expect(key in stored).toBe(false);
+  });
+});
+
+describe("acceptPublicProposal: a general (flat-fee) proposal (Spec 9)", () => {
+  it("accepts with an empty selection, recomputes the $500 fee from the stored content, and freezes it", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    const { db, tables, calls } = world({ proposal: { content: faithe(), title: "Proposal", client_name: "Faithe Williams" } });
+    // Whatever the browser sends is ignored: nothing on a flat-fee proposal is selectable or priced by the client.
+    const r = await acceptPublicProposal(TOKEN, { "w-contracts": true, price: 1, fee_cents: 1 }, NOW, db, { entries: { x: "y" } });
+    if (!r.ok) throw new Error(r.reason);
+    expect(r.quote.legal_total_cents).toBe(50_000);
+    expect(r.quote.gov_total_cents).toBe(0);
+    expect(r.quote.general).toMatchObject({ value_cents: 125_000, fee_cents: 50_000 });
+    const row = tables.client_proposal[0];
+    expect(row.status).toBe("accepted");
+    expect(row.accepted_selection).toEqual({});
+    const snap = row.accepted_snapshot as { content: { kind: string; general: { fee_cents: number } }; quote: { legal_total_cents: number } };
+    expect(snap.content.kind).toBe("general");
+    expect(snap.content.general.fee_cents).toBe(50_000);
+    expect(snap.quote.legal_total_cents).toBe(50_000);
+    expect(calls.find((c) => c.op === "update")!.filters).toEqual([["id", "prop-2"], ["org_id", "org-1"], ["status", "sent"]]);
+  });
+
+  it("the public read serves the general block", async () => {
+    const { db } = world({ proposal: { content: faithe() } });
+    const read = await readPublicProposal(TOKEN, NOW, db);
+    if (read.status !== "ok") throw new Error(read.status);
+    expect(read.view.content.kind).toBe("general");
+    expect(read.view.content.general?.matter_title).toBe("Management agreement: notice of non-renewal and termination");
   });
 });

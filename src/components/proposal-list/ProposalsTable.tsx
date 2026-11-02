@@ -56,7 +56,7 @@ export function ProposalsTable({ rows, footerLeft, footerRight }: { rows: Propos
                   <PaidCell proposalId={r.id} cell={r.paidCell} />
                 </td>
                 <td className="pq-money pq-c-signing" data-label="At signing">{formatCents(r.atSigningCents)}</td>
-                <td className="pq-money pq-filing pq-c-filing" data-label="At filing">{formatCents(r.atFilingCents)}</td>
+                <td className="pq-money pq-filing pq-c-filing" data-label="At filing">{r.atFilingCents === null ? "—" : formatCents(r.atFilingCents)}</td>
                 <td className="pq-mono pq-expires pq-c-expires" data-label="Expires">{r.expires}</td>
                 <td className="wrap pq-activity pq-c-activity" data-label="Last activity">{r.activity}</td>
               </tr>

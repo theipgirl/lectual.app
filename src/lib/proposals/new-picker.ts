@@ -145,3 +145,43 @@ export function buildPicker(input: { kind: RecordKind; term: string; leads: List
 export function showingLine(shown: number, total: number): string {
   return `Showing ${shown} of ${total}.`;
 }
+
+/* ─────────────────────────── Spec 9: the proposal type ─────────────────── */
+
+/** New proposal's two types: "trademark" (the default, no parameter) and "general" (`type=general`). */
+export type NewProposalType = "trademark" | "general";
+
+/** The type a query asks for. Anything but exactly "general" is the trademark form. */
+export function proposalTypeOf(raw: string | string[] | undefined | null): NewProposalType {
+  const v = Array.isArray(raw) ? raw[0] : raw;
+  return v === "general" ? "general" : "trademark";
+}
+
+/** A New proposal link that keeps the chosen type. The trademark type adds nothing, so its links are unchanged. */
+export function withProposalType(href: string, type: NewProposalType): string {
+  if (type !== "general") return href;
+  return `${href}${href.includes("?") ? "&" : "?"}type=general`;
+}
+
+/** The picker with every link carrying the type (rows, the Leads | Matters switch, Start blank). */
+export function pickerWithType(view: PickerView, type: NewProposalType): PickerView {
+  if (type !== "general") return view;
+  const list: PickerList =
+    view.list.status === "ok" ? { ...view.list, rows: view.list.rows.map((r) => ({ ...r, href: withProposalType(r.href, type) })) } : view.list;
+  return {
+    ...view,
+    list,
+    switchHrefs: { lead: withProposalType(view.switchHrefs.lead, type), matter: withProposalType(view.switchHrefs.matter, type) },
+    blankHref: view.blankHref ? withProposalType(view.blankHref, type) : null,
+  };
+}
+
+/** The Type switch's two links, each keeping the chosen lead or matter (and nothing else). */
+export function proposalTypeHrefs(chosen: { lead?: string; matter?: string }): Record<NewProposalType, string> {
+  const base = chosen.matter
+    ? `${NEW_PROPOSAL_PATH}?matter=${encodeURIComponent(chosen.matter)}`
+    : chosen.lead
+      ? `${NEW_PROPOSAL_PATH}?lead=${encodeURIComponent(chosen.lead)}`
+      : NEW_PROPOSAL_PATH;
+  return { trademark: base, general: withProposalType(base, "general") };
+}

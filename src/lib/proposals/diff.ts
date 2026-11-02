@@ -114,6 +114,26 @@ function flatten(content: unknown): Map<string, Leaf> {
     set(`${base}.included`, `${label}: included`, "text", row.included);
     set(`${base}.note`, `${label}: note`, "text", row.note);
   }
+
+  // Spec 9: a general (flat-fee) proposal's matter, work and fee.
+  if (isObj(content.general)) {
+    const g = content.general;
+    set("general.matter_title", "Matter", "text", g.matter_title);
+    set("general.summary", "Summary", "text", g.summary);
+    set("general.fee_cents", "Flat fee", "cents", g.fee_cents);
+    set("general.terms_note", "Terms note", "text", g.terms_note);
+    set("general.excludes", "Not included", "text", Array.isArray(g.excludes) ? g.excludes.filter((x) => typeof x === "string").join("; ") : undefined);
+    for (const it of arr(g.items)) {
+      const id = text(it.id);
+      if (!id) continue;
+      const base = `general.items[${id}]`;
+      const label = text(it.label) || id;
+      set(base, "Work", "text", it.label);
+      set(`${base}.hours`, `${label}: hours`, "count", it.hours);
+      set(`${base}.rate_cents`, `${label}: hourly rate`, "cents", it.rate_cents);
+      set(`${base}.value_cents`, `${label}: value`, "cents", it.value_cents);
+    }
+  }
   return out;
 }
 

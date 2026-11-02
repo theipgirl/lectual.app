@@ -36,6 +36,8 @@ import {
   takenIds,
   type Parsed,
 } from "@/lib/proposal-editor/form";
+import { applyGeneralForm } from "@/lib/proposal-editor/general-form";
+import { isGeneralContent } from "@/lib/proposals/types";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { CAN_WRITE_LEAD } from "@/lib/pipeline/leads";
@@ -147,12 +149,35 @@ export async function saveDetailsAction(_prev: ActionState, formData: FormData):
   });
 }
 
+/**
+ * Spec 9: a general (flat-fee) draft's one section: the matter, its work, the flat fee, the not-included lines,
+ * the terms note, the greeting, and the pay link and expiry date beside them. Refused on a trademark proposal.
+ */
+export async function saveGeneralAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  return edit(formData, (current) => {
+    const r = applyGeneralForm(formData, current.content, rand);
+    if (!r.ok) return r;
+    const payUrl = formData.has("payUrl") ? { payUrl: field(formData, "payUrl") || null } : {};
+    let expiresOn: { expiresOn: string | null } | Record<string, never> = {};
+    if (formData.has("expiresOn")) {
+      const e = parseDateInput(field(formData, "expiresOn"), "Expiry date");
+      if (!e.ok) return e;
+      expiresOn = { expiresOn: e.value };
+    }
+    return { ok: true, value: { content: r.value, ...payUrl, ...expiresOn } };
+  });
+}
+
+/** The trademark sections (package, brand names, included items) are refused on a general (flat-fee) proposal. */
+const NOT_ON_GENERAL: Parsed<never> = { ok: false, error: "This is a flat-fee proposal. It has no packages, brand names or classes." };
+
 export async function saveMessageAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   return edit(formData, (current) => withContent(parseMessage(formData, current.content)));
 }
 
 export async function savePricingAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   return edit(formData, (current) => {
+    if (isGeneralContent(current.content)) return NOT_ON_GENERAL;
     const r = parsePricing(formData);
     if (!r.ok) return r;
     // The pay link rides on this form (Step 3); a form that did not carry it leaves the stored one alone.
@@ -182,6 +207,7 @@ export async function saveNameAction(_prev: ActionState, formData: FormData): Pr
     }
   }
   return edit(formData, (current) => {
+    if (isGeneralContent(current.content)) return NOT_ON_GENERAL;
     const name = parseName(formData, current.content, rand);
     if (!name.ok) return name;
     const replaced = replaceName(current.content, name.value);
@@ -192,6 +218,7 @@ export async function saveNameAction(_prev: ActionState, formData: FormData): Pr
 
 export async function addNameAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   return edit(formData, (current) => {
+    if (isGeneralContent(current.content)) return NOT_ON_GENERAL;
     const name = field(formData, "name");
     if (!name) return { ok: false, error: "Enter the brand name to add." };
     const added = newBrandName(name, takenIds(current.content), rand);
@@ -200,7 +227,7 @@ export async function addNameAction(_prev: ActionState, formData: FormData): Pro
 }
 
 export async function removeNameAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  return edit(formData, (current) => withContent(removeName(current.content, field(formData, "nameId"))));
+  return edit(formData, (current) => (isGeneralContent(current.content) ? NOT_ON_GENERAL : withContent(removeName(current.content, field(formData, "nameId")))));
 }
 
 export async function saveAdjustmentsAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -212,6 +239,7 @@ export async function saveAdjustmentsAction(_prev: ActionState, formData: FormDa
 
 export async function saveIncludesAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   return edit(formData, (current) => {
+    if (isGeneralContent(current.content)) return NOT_ON_GENERAL;
     const r = parseIncludes(formData);
     return r.ok ? { ok: true, value: { content: { ...current.content, includes: r.value } } } : r;
   });
