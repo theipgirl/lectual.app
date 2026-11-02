@@ -30,6 +30,8 @@ import { listMeetingConnections } from "@/lib/meetings/connection";
 import { syncControl } from "@/lib/meetings/sync-access";
 import { ConsultsStrip } from "@/components/proposal-list/ConsultsStrip";
 import { ProposalsTable } from "@/components/proposal-list/ProposalsTable";
+import { LegacyProposals } from "@/components/proposal-list/LegacyProposals";
+import { loadLegacyProposals } from "@/lib/proposals/legacy-load";
 import { SegmentColumn } from "@/components/proposal-list/SegmentColumn";
 import { requireProposalsModule } from "./gate";
 import "./proposals.css";
@@ -87,7 +89,7 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
   const failed = !listedRead.ok;
   const today = firmCivilDate(nowDate, tz);
 
-  const [eventsRead, names, strip, leadsRead, draftBlock, stepRead, syncConns, opensRead] = await Promise.all([
+  const [eventsRead, names, strip, leadsRead, draftBlock, stepRead, syncConns, opensRead, legacy] = await Promise.all([
     listedRead.ok && listed.length > 0 ? readEvents(listed) : Promise.resolve(new Map<string, ActivityEvent>() as ReadonlyMap<string, ActivityEvent> | "unavailable"),
     readNames(),
     loadStrip(listed, now, tz),
@@ -96,6 +98,7 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
     readStepActivity(listed),
     listMeetingConnections().then((r) => (r.ok ? r.connections : null), () => null),
     readOpens(listed),
+    loadLegacyProposals(),
   ]);
   const events = withStepActivity(eventsRead, stepRead);
   const canMarkPaid = !!role && PROPOSAL_PAID_ROLES.includes(role);
@@ -194,6 +197,8 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
         ) : (
           <ProposalsTable rows={rows} footerLeft={footerLeft} footerRight={FEE_SENTENCE} />
         )}
+
+        <LegacyProposals items={legacy} />
 
         <ConsultsStrip
           data={strip}
