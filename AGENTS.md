@@ -1295,3 +1295,17 @@ Each editor section (Client, each brand name, Package and pay link, wording, dis
 - **Pure rules** in `src/lib/proposal-editor/unsaved.ts` (`dirtyReducer`, `blockingSentence`, `finishButtonState`). `UnsavedGuard.tsx` holds the provider, pill and `MoreSaveButton`. The provider listens for `input` / `change` on the document and uses the event target's `.form`, which follows the `form=` attribute, so More options fields count. A form is tracked only when `ActionForm` is given an `id` and `unsavedLabel` (it renders `data-unsaved-label`); a successful save (`state.saved`) marks it clean, a refusal does not. New proposal has no provider, so nothing is ever unsaved there.
 - **Effects:** "Save and create link" and "Turn on the link" are disabled with "Save your changes to The Fold and Client first." (`aria-describedby`, brand names use their own name). Each unsaved section shows an "Unsaved changes" pill by its heading and its Save button turns primary. Each brand name's More options holds its own Save button tied to that form by `form=`. `beforeunload` warns while anything is unsaved (browser only).
 - **Limit:** adding or removing a row with a button (discounts, included items) fires no `input` event, so those forms are marked only once a field is edited. Not verified in a real browser.
+
+## Owner-only billing card (Lawmatics invoices, no schema)
+The matter page's aside shows a "Billing" card listing that matter's invoices, read LIVE from the firm's own Lawmatics. Nothing is stored, nothing is written, no migration.
+- **Owner only.** `canSeeBilling(role)` (`src/lib/billing/can-see.ts`, pure) is true for `owner` and nothing else: not the admin tier, no ranking. Unknown or unreadable = no. The page mounts the card only behind
+  `canSeeBilling(session.role)` and `MatterBilling` (its own async server component, in Suspense so a slow Lawmatics call doesn't hold the page) asks again before reading. Other roles see nothing: no placeholder, no hint.
+  `tests/billing/matter-page.test.ts` greps the page.
+- **The read** (`src/lib/billing/load.ts`, server-only): `firmLawmaticsClient()` (the firm's own active connection, never a deployment token), `listAll("/invoices")` with `filter_by=prospect_id&filter_on=<matter lawmatics_id>`, one 15 s
+  deadline shared by every page. Lawmatics ignores parameters silently, so the filter is never trusted: `normalizeInvoices` (`invoices.ts`, pure) keeps only invoices whose own `relationships.prospect.data.id` equals the matter's
+  `lawmatics_id`, and drops ones with unreadable amounts. Money stays integer cents (`formatCents` from `quotes/money.ts` formats). Nothing about an invoice is logged; a failure logs an error name only.
+- **States, never collapsed:** ok (rows, or "No invoices in Lawmatics for this matter."), cut-short (a truncated sweep: "Showing the first N invoices; Lawmatics didn't return them all."), not linked (`lawmatics_id` null), not connected,
+  and couldn't read (any non-2xx including 401/403/429, timeout, unrecognised shape). Not linked makes no Lawmatics call.
+- **Display:** newest first, invoice number zero-padded to six, status as words ("Void" whenever `voided_at` is set), past due flagged with `--ox`, "View PDF" only for an https `pdf_url`. The totals row (billed / paid / outstanding)
+  counts invoices that are neither void nor draft.
+- **NOT verified against a live Lawmatics:** the `/invoices` attribute and relationship names come from the public API reference (Postman collection 26379991/2sA3JM7gbw). Check the first real card against the Lawmatics UI.
