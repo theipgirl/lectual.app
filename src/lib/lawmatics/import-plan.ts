@@ -378,9 +378,15 @@ export function planImport(
     // source — a missing field means "we don't know", not "Inbound", and
     // guessing "Inbound" from silence would misrepresent every record
     // Lawmatics simply doesn't expose this attribute for.
-    const referralSource = rec.referralSource !== null
-      ? classifyReferralSource(rec.referralSource).source
-      : null;
+    // The real origin (intake answers, event tags) wins; a flat `referral_source` attribute is only a
+    // fallback in case Lawmatics ever returns one. Unknown stays null: never "Lawmatics", never "Inbound".
+    const origin = rec.origin?.source ? rec.origin : null;
+    const referralSource = origin
+      ? origin.source
+      : rec.referralSource !== null
+        ? classifyReferralSource(rec.referralSource).source
+        : null;
+    const referralDetail = origin ? origin.detail : rec.referralSource;
 
     const fields: LeadWriteFields = {
       first_name: rec.firstName ?? "",
@@ -391,7 +397,7 @@ export function planImport(
       website: rec.website,
       practice_area: rec.practiceArea,
       referral_source: referralSource,
-      referral_detail: rec.referralSource,
+      referral_detail: referralDetail,
     };
 
     const existingByfId = byLawmaticsId.get(rec.lawmaticsId);
@@ -638,8 +644,10 @@ function buildUpdate(
     diff("business_name", lead.business_name, fields.business_name),
     diff("website", lead.website, fields.website),
     diff("practice_area", lead.practice_area, fields.practice_area),
-    diff("referral_source", lead.referral_source, fields.referral_source),
-    diff("referral_detail", lead.referral_detail, fields.referral_detail),
+    // Origin only ever FILLS a blank: a source a person already set is never replaced, even with
+    // "overwrite edited fields" on, and its detail travels with it.
+    lead.referral_source ? null : diff("referral_source", lead.referral_source, fields.referral_source),
+    lead.referral_source ? null : diff("referral_detail", lead.referral_detail, fields.referral_detail),
   ]) {
     if (!change) continue;
     const overwritesLocalValue = (change.from ?? "") !== "";

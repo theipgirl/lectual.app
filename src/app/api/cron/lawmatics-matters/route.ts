@@ -24,6 +24,8 @@ export async function GET(req: NextRequest) {
       linked: s.linked,
       skipped: s.skipped,
       failedFirms: s.failedFirms,
+      leadsMoved: s.leadsMoved,
+      leadMovesFailed: s.leadMovesFailed,
     });
   } catch {
     return NextResponse.json({ ok: false, reason: "connection read failed" }, { status: 500 });

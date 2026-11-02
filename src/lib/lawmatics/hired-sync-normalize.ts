@@ -9,6 +9,7 @@
 import { bag, field, idOf, relatedId, nestedName, type Raw } from "./jsonapi";
 import { cleanEmail, cleanText } from "./normalize";
 import type { HiredProspect } from "./hired-sync-plan";
+import { leadOriginFromProspect } from "./lead-origin";
 
 function isRaw(v: unknown): v is Raw {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -38,7 +39,11 @@ function dateOnly(v: string | null): string | null {
   return m ? m[1] : null;
 }
 
-export function normalizeHiredProspect(rec: Raw, practiceAreas: Map<string, string>): HiredProspect | null {
+export function normalizeHiredProspect(
+  rec: Raw,
+  practiceAreas: Map<string, string>,
+  lookups: { tagNames?: ReadonlyMap<string, string>; fieldNames?: ReadonlyMap<string, string> } = {},
+): HiredProspect | null {
   const id = cleanText(idOf(rec), 128);
   if (!id) return null;
   const paId = relatedId(rec, "practice_area") ?? cleanText(field(rec, "practice_area_id"), 128);
@@ -57,5 +62,6 @@ export function normalizeHiredProspect(rec: Raw, practiceAreas: Map<string, stri
     trademarkName: customFieldValue(rec, "Name of Trademark"),
     practiceAreaField: customFieldValue(rec, "Practice Area"),
     practiceAreaName: paName,
+    origin: leadOriginFromProspect(rec, lookups.tagNames, lookups.fieldNames),
   };
 }

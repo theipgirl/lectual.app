@@ -8,8 +8,18 @@ import { firmToken } from "@/lib/intake-forms/lawmatics-sync";
 
 import { createLawmaticsClient, type FetchLike, type LawmaticsClient } from "./client";
 import { normalizeHiredProspect } from "./hired-sync-normalize";
-import { planHiredSync, type HiredProspect, type PlanLead, type PlanMatter, type PlanStage } from "./hired-sync-plan";
+import {
+  LEAD_MOVE_REASON,
+  planHiredSync,
+  type HiredProspect,
+  type LeadStageRef,
+  type PlanLead,
+  type PlanMatter,
+  type PlannedLeadMove,
+  type PlanStage,
+} from "./hired-sync-plan";
 import { field, idOf } from "./jsonapi";
+import { readOriginLookups } from "./lead-origin-read";
 
 /**
  * Hired-matter sync runner (Lawmatics -> Lectual). Runs as the SERVICE ROLE, per ACTIVE
@@ -33,6 +43,10 @@ export type FirmResult = {
   skipped: number;
   /** Inserts or links that failed one by one. */
   failedWrites: number;
+  /** Leads moved from an open stage to the won stage. */
+  leadsMoved: number;
+  /** Lead moves that errored. The matter is untouched and the run goes on. */
+  leadMovesFailed: number;
 };
 
 export type HiredSyncSummary = {
@@ -42,6 +56,8 @@ export type HiredSyncSummary = {
   skipped: number;
   failedFirms: number;
   failedWrites: number;
+  leadsMoved: number;
+  leadMovesFailed: number;
 };
 
 export type HiredSyncDeps = {
@@ -54,7 +70,7 @@ export type HiredSyncDeps = {
   now?: () => Date;
 };
 
-const FAILED: FirmResult = { ok: false, created: 0, linked: 0, skipped: 0, failedWrites: 0 };
+const FAILED: FirmResult = { ok: false, created: 0, linked: 0, skipped: 0, failedWrites: 0, leadsMoved: 0, leadMovesFailed: 0 };
 
 async function pageAll<T>(read: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>, max = 30_000): Promise<T[] | null> {
   const size = 1000;
@@ -79,9 +95,11 @@ async function readProspects(client: LawmaticsClient): Promise<HiredProspect[] |
   }
   const pulled = await client.listAll("/prospects", { params: { fields: "all" } });
   if (pulled.truncated || pulled.unrecognisedShape) return null;
+  // Optional: tag and custom-field names for the lead origin. A failed read only skips those rules.
+  const lookups = await readOriginLookups(client);
   const out: HiredProspect[] = [];
   for (const raw of pulled.records) {
-    const n = normalizeHiredProspect(raw, names);
+    const n = normalizeHiredProspect(raw, names, lookups);
     if (n) out.push(n);
   }
   return out;
@@ -92,20 +110,28 @@ export async function syncFirm(admin: Admin, orgId: string, client: LawmaticsCli
     const prospects = await readProspects(client);
     if (!prospects) return { ...FAILED };
 
-    const [matters, leads, stages] = await Promise.all([
+    const [matters, leads, stages, leadStageRows] = await Promise.all([
       pageAll<PlanMatter>((a, b) =>
-        admin.from("crm_matter").select("id,owner_name,title,mark_text,matter_number,lawmatics_id").eq("org_id", orgId).order("created_at", { ascending: true }).range(a, b),
+        admin.from("crm_matter").select("id,owner_name,title,mark_text,matter_number,lawmatics_id,lead_id").eq("org_id", orgId).order("created_at", { ascending: true }).range(a, b),
       ),
-      pageAll<PlanLead>((a, b) => admin.from("crm_lead").select("id,email,lawmatics_id").eq("org_id", orgId).order("created_at", { ascending: true }).range(a, b)),
+      pageAll<PlanLead>((a, b) => admin.from("crm_lead").select("id,email,lawmatics_id,current_stage_id,stage_entered_at").eq("org_id", orgId).order("created_at", { ascending: true }).range(a, b)),
       pageAll<PlanStage>((a, b) => admin.from("crm_matter_stage").select("id,label").eq("org_id", orgId).order("order_index", { ascending: true }).range(a, b)),
+      pageAll<LeadStageRef>((a, b) => admin.from("crm_stage").select("id,name,category,order_index").eq("org_id", orgId).order("order_index", { ascending: true }).range(a, b)),
     ]);
     if (!matters || !leads || !stages) return { ...FAILED };
+    // An unreadable lead-stage list only means no lead is moved this run; the matters still sync.
+    const leadStages = leadStageRows ?? [];
 
-    const plan = planHiredSync({ prospects, matters, leads, stages });
+    const plan = planHiredSync({ prospects, matters, leads, stages, leadStages });
+    const enteredAt = new Map(leads.map((l) => [l.id, (l as PlanLead & { stage_entered_at?: string | null }).stage_entered_at ?? null]));
     const stamp = now.toISOString();
     let created = 0;
     let linked = 0;
     let failedWrites = 0;
+    let leadsMoved = 0;
+    let leadMovesFailed = 0;
+    // Which matter steps actually landed, so a lead only moves once its matter exists.
+    const landed = new Map<string, "create" | "link">();
 
     for (const c of plan.create) {
       const { data, error } = await admin
@@ -121,6 +147,7 @@ export async function syncFirm(admin: Admin, orgId: string, client: LawmaticsCli
           stage_id: c.stage_id,
           stage_entered_at: c.stage_id ? stamp : null,
           lead_id: c.lead_id,
+          referral_source: c.referral_source,
           notes: c.notes,
           lawmatics_id: c.lawmaticsId,
           lawmatics_synced_at: stamp,
@@ -132,6 +159,7 @@ export async function syncFirm(admin: Admin, orgId: string, client: LawmaticsCli
         continue;
       }
       created += 1;
+      landed.set(c.lawmaticsId, "create");
       await logRow(admin, orgId, data.id, "matter_opened", "Matter added from Lawmatics (hired)", c.lawmaticsId);
     }
 
@@ -149,12 +177,71 @@ export async function syncFirm(admin: Admin, orgId: string, client: LawmaticsCli
       }
       if (!data?.length) continue; // someone linked it meanwhile: nothing to do
       linked += 1;
+      landed.set(l.lawmaticsId, "link");
       await logRow(admin, orgId, l.matterId, "matter_updated", "Matter linked to its Lawmatics record", l.lawmaticsId);
     }
 
-    return { ok: true, created, linked, skipped: plan.skipped.length, failedWrites };
+    // The hired lead leaves its open stage for the won one. Never aborts the run or undoes a matter.
+    const moved = new Set<string>();
+    for (const m of plan.leadMoves) {
+      if (m.trigger !== "existing" && landed.get(m.lawmaticsId) !== m.trigger) continue;
+      if (moved.has(m.leadId)) continue;
+      const outcome = await moveLead(admin, orgId, m, enteredAt.get(m.leadId) ?? null, stamp);
+      if (outcome === "moved") {
+        moved.add(m.leadId);
+        leadsMoved += 1;
+      } else if (outcome === "failed") leadMovesFailed += 1;
+    }
+
+    return { ok: true, created, linked, skipped: plan.skipped.length, failedWrites, leadsMoved, leadMovesFailed };
   } catch {
     return { ...FAILED };
+  }
+}
+
+/**
+ * Move one lead, conditional on it still being in the stage the plan saw. "stale" (a person moved it
+ * meanwhile) is not an error. No automation rules and no matter handoff: the matter already exists.
+ * A move with no timeline row is undone, so nobody sees a lead jump with no explanation.
+ */
+async function moveLead(admin: Admin, orgId: string, m: PlannedLeadMove, previousEnteredAt: string | null, stamp: string): Promise<"moved" | "stale" | "failed"> {
+  try {
+    const { data, error } = await admin
+      .from("crm_lead")
+      .update({ current_stage_id: m.toStageId, stage_entered_at: stamp, last_activity_at: stamp })
+      .eq("id", m.leadId)
+      .eq("org_id", orgId)
+      .eq("current_stage_id", m.fromStageId)
+      .select("id");
+    if (error) return "failed";
+    if (!data?.length) return "stale";
+    const { error: logError } = await admin.from("crm_activity").insert({
+      org_id: orgId,
+      lead_id: m.leadId,
+      type: "stage_changed",
+      actor_type: "system",
+      actor_id: null,
+      payload: {
+        from_stage: m.fromStageName,
+        from_stage_id: m.fromStageId,
+        to_stage: m.toStageName,
+        to_stage_id: m.toStageId,
+        actor: SOURCE,
+        reason: LEAD_MOVE_REASON,
+      } as Json,
+    });
+    if (logError) {
+      await admin
+        .from("crm_lead")
+        .update(previousEnteredAt ? { current_stage_id: m.fromStageId, stage_entered_at: previousEnteredAt } : { current_stage_id: m.fromStageId })
+        .eq("id", m.leadId)
+        .eq("org_id", orgId)
+        .eq("current_stage_id", m.toStageId);
+      return "failed";
+    }
+    return "moved";
+  } catch {
+    return "failed";
   }
 }
 
@@ -185,7 +272,7 @@ export async function runHiredSync(deps: HiredSyncDeps = {}): Promise<HiredSyncS
   const { data: conns, error } = await q;
   if (error) throw new Error("connection read failed");
 
-  const summary: HiredSyncSummary = { connections: conns?.length ?? 0, created: 0, linked: 0, skipped: 0, failedFirms: 0, failedWrites: 0 };
+  const summary: HiredSyncSummary = { connections: conns?.length ?? 0, created: 0, linked: 0, skipped: 0, failedFirms: 0, failedWrites: 0, leadsMoved: 0, leadMovesFailed: 0 };
   for (const conn of conns ?? []) {
     let result: FirmResult;
     try {
@@ -199,6 +286,8 @@ export async function runHiredSync(deps: HiredSyncDeps = {}): Promise<HiredSyncS
     summary.linked += result.linked;
     summary.skipped += result.skipped;
     summary.failedWrites += result.failedWrites;
+    summary.leadsMoved += result.leadsMoved;
+    summary.leadMovesFailed += result.leadMovesFailed;
   }
   return summary;
 }

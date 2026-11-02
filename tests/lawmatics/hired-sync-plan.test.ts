@@ -9,6 +9,9 @@ import {
   normalizeTitle,
   ownersMatch,
   planHiredSync,
+  wonTargetStage,
+  LEAD_MOVE_REASON,
+  type LeadStageRef,
   type HiredProspect,
   type PlanLead,
   type PlanMatter,
@@ -44,7 +47,7 @@ describe("cutoff and status", () => {
   it("cutoff is today's reconciliation date", () => expect(HIRED_SYNC_CUTOFF).toBe("2026-10-28"));
   it("ignores records dated before the cutoff", () => {
     const r = plan([P({ convertedDate: "2026-10-27" })]);
-    expect(r).toEqual({ create: [], link: [], skipped: [] });
+    expect(r).toEqual({ create: [], link: [], skipped: [], leadMoves: [] });
   });
   it("includes a record dated exactly on the cutoff", () => {
     expect(plan([P({ convertedDate: "2026-10-28" })]).create).toHaveLength(1);
@@ -202,5 +205,64 @@ describe("cap", () => {
     expect(r.create).toHaveLength(MAX_CREATES_PER_RUN);
     expect(r.skipped).toHaveLength(3);
     expect(r.skipped.every((s) => s.reason === SKIP.overLimit)).toBe(true);
+  });
+});
+
+describe("lead moves to the won stage", () => {
+  const LS: LeadStageRef[] = [
+    { id: "o1", name: "Post Consultation Email Sent", category: "open", order_index: 3 },
+    { id: "o2", name: "Proposal Sent", category: "open", order_index: 4 },
+    { id: "w2", name: "Welcome", category: "won", order_index: 9 },
+    { id: "w1", name: "Signed LOE / Deposit Received", category: "won", order_index: 10 },
+    { id: "l1", name: "Lost", category: "lost", order_index: 11 },
+    { id: "n1", name: "Nurture", category: "nurture", order_index: 12 },
+  ];
+  const run = (prospects: HiredProspect[], matters: PlanMatter[], leads: PlanLead[], leadStages = LS) =>
+    planHiredSync({ prospects, matters, leads, stages: STAGES, leadStages });
+  const lead = (stage: string, o: Partial<PlanLead> = {}): PlanLead => ({ id: "L", email: "ada@example.com", lawmatics_id: null, current_stage_id: stage, ...o });
+
+  it("picks the Signed LOE won stage, else the lowest-ordered won stage with ties by name then id", () => {
+    expect(wonTargetStage(LS)!.id).toBe("w1");
+    expect(wonTargetStage(LS.filter((s) => s.id !== "w1"))!.id).toBe("w2");
+    expect(wonTargetStage([{ id: "b", name: "Same", category: "won", order_index: 1 }, { id: "a", name: "Same", category: "won", order_index: 1 }])!.id).toBe("a");
+    expect(wonTargetStage([{ id: "x", name: "Paid - Deposit Received", category: "won", order_index: 20 }, { id: "y", name: "A", category: "won", order_index: 1 }])!.id).toBe("x");
+    expect(wonTargetStage(LS.filter((s) => s.category !== "won"))).toBeNull();
+  });
+  it("a created matter moves its open lead", () => {
+    const r = run([P()], [], [lead("o1")]);
+    expect(r.create[0].lead_id).toBe("L");
+    expect(r.leadMoves).toEqual([
+      { lawmaticsId: "100", trigger: "create", leadId: "L", fromStageId: "o1", fromStageName: "Post Consultation Email Sent", toStageId: "w1", toStageName: "Signed LOE / Deposit Received" },
+    ]);
+    expect(LEAD_MOVE_REASON).toBe("Hired in Lawmatics; matter opened");
+  });
+  it("a linked matter moves the matter's lead, falling back to the matched lead", () => {
+    expect(run([P()], [M({ lead_id: "L" })], [lead("o2")]).leadMoves[0]).toMatchObject({ trigger: "link", leadId: "L", fromStageId: "o2" });
+    expect(run([P()], [M()], [lead("o2")]).leadMoves[0]).toMatchObject({ trigger: "link", leadId: "L" });
+  });
+  it("an already-synced matter repairs a stuck lead, but only by the matter's lead_id", () => {
+    const r = run([P()], [M({ lawmatics_id: "100", lead_id: "L" })], [lead("o1")]);
+    expect(r.skipped[0].reason).toBe(SKIP.linked);
+    expect(r.leadMoves).toHaveLength(1);
+    expect(r.leadMoves[0].trigger).toBe("existing");
+    expect(run([P()], [M({ lawmatics_id: "100", lead_id: null })], [lead("o1")]).leadMoves).toEqual([]);
+  });
+  it("never moves a lead already won / lost / nurture, or one with an unknown stage", () => {
+    for (const stage of ["w2", "w1", "l1", "n1", "zzz"]) expect(run([P()], [], [lead(stage)]).leadMoves).toEqual([]);
+    expect(run([P()], [], [lead("o1", { current_stage_id: null })]).leadMoves).toEqual([]);
+  });
+  it("moves nothing without a won stage, a lead stage list, or a resolved lead", () => {
+    expect(run([P()], [], [lead("o1")], LS.filter((s) => s.category !== "won")).leadMoves).toEqual([]);
+    expect(run([P()], [], [lead("o1")], []).leadMoves).toEqual([]);
+    expect(run([P()], [], [lead("o1", { email: "other@x.com" })]).leadMoves).toEqual([]);
+    expect(run([P()], [], [lead("o1"), lead("o1", { id: "L2" })]).leadMoves).toEqual([]); // two leads share the email: no guess
+  });
+  it("records dated before the cutoff move nothing", () => {
+    expect(run([P({ convertedDate: "2026-10-01" })], [M({ lawmatics_id: "100", lead_id: "L" })], [lead("o1")]).leadMoves).toEqual([]);
+  });
+  it("creates carry the origin as referral_source", () => {
+    expect(plan([P({ origin: { source: "Referral", detail: "Dean" } })]).create[0].referral_source).toBe("Referral (Dean)");
+    expect(plan([P({ origin: { source: "Inbound", detail: null } })]).create[0].referral_source).toBe("Inbound");
+    expect(plan([P()]).create[0].referral_source).toBeNull();
   });
 });

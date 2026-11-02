@@ -13,6 +13,7 @@
  * Pure module: no I/O. Unit-tested against fixtures.
  */
 
+import { leadOriginFromProspect, type LeadOrigin } from "./lead-origin";
 import {
   bag,
   field,
@@ -154,6 +155,11 @@ export type LawmaticsSourceRecord = {
    * relies on that distinction to avoid stamping a bucket from silence.
    */
   referralSource: string | null;
+  /**
+   * Where the person came from, read from the prospect's intake answers and event tags
+   * (./lead-origin.ts). `source: null` means unknown. Optional so older fixtures still type.
+   */
+  origin?: LeadOrigin;
 };
 
 /** A sanitized Lawmatics contact, used to enrich prospects that lack details. */
@@ -205,6 +211,7 @@ export function normalizeContact(rec: Raw): LawmaticsSourceContact | null {
 export function normalizeProspect(
   rec: Raw,
   included: Map<string, Raw> = new Map(),
+  lookups: { tagNames?: ReadonlyMap<string, string>; fieldNames?: ReadonlyMap<string, string> } = {},
 ): LawmaticsSourceRecord | null {
   const id = cleanText(idOf(rec), CAP.id);
   if (!id) return null;
@@ -253,6 +260,7 @@ export function normalizeProspect(
       field(rec, "referral_source", "source", "lead_source", "referred_by"),
       CAP.referralSource,
     ),
+    origin: leadOriginFromProspect(rec, lookups.tagNames, lookups.fieldNames),
   };
 }
 

@@ -562,3 +562,32 @@ describe("planImport — practice_area / referral_source / referral_detail on up
     );
   });
 });
+
+describe("planImport — origin from the Lawmatics prospect", () => {
+  it("uses the origin for source and detail on create", () => {
+    const plan = planImport([source({ origin: { source: "UGW", detail: "UGW 2026" } })], stages, []);
+    expect(plan.creates[0].fields).toMatchObject({ referral_source: "UGW", referral_detail: "UGW 2026" });
+  });
+  it("an origin beats a flat referral_source attribute, which stays a fallback", () => {
+    const a = planImport([source({ referralSource: "Instagram", origin: { source: "Referral", detail: "Dean" } })], stages, []);
+    expect(a.creates[0].fields).toMatchObject({ referral_source: "Referral", referral_detail: "Dean" });
+    const b = planImport([source({ referralSource: "Instagram", origin: { source: null, detail: null } })], stages, []);
+    expect(b.creates[0].fields).toMatchObject({ referral_source: "Instagram" });
+  });
+  it("unknown origin stays null (never Lawmatics or Inbound)", () => {
+    const plan = planImport([source({ origin: { source: null, detail: null } })], stages, []);
+    expect(plan.creates[0].fields).toMatchObject({ referral_source: null, referral_detail: null });
+  });
+  it("fills a blank source on update", () => {
+    const plan = planImport([source({ origin: { source: "Event", detail: "Render ATL" } })], stages, [existing({ referral_source: null, referral_detail: null })]);
+    expect(plan.updates[0].changes).toEqual(expect.arrayContaining([
+      { field: "referral_source", from: null, to: "Event" },
+      { field: "referral_detail", from: null, to: "Render ATL" },
+    ]));
+  });
+  it("never overwrites a source a person already set, even with overwrite on", () => {
+    const plan = planImport([source({ origin: { source: "Event", detail: "Render ATL" } })], stages, [existing({ referral_source: "Referral", referral_detail: "Dean" })], OVERWRITE);
+    expect(plan.updates).toHaveLength(0);
+    expect(plan.withheld).toHaveLength(0);
+  });
+});

@@ -156,7 +156,7 @@ describe("readLawmatics", () => {
     if (read.status === "ok") expect(read.records[0]).toMatchObject({ lawmaticsId: "100", stageName: "Consultation Scheduled" });
     expect(Object.keys(stub.client).sort()).toEqual(["get", "listAll"]);
     expect(stub.calls.every((c) => c.method === "listAll" || c.method === "get")).toBe(true);
-    expect(stub.calls.map((c) => c.path).sort()).toEqual(["/contacts", "/prospects"]);
+    expect(stub.calls.map((c) => c.path).sort()).toEqual(["/contacts", "/custom_fields", "/prospects", "/tags"]); // /tags and /custom_fields name the lead origin
   });
 
   it("not connected is its own state, with the connection's own sentence", async () => {

@@ -14,6 +14,10 @@ export const REFERRAL_SOURCES = [
   "Referral",
   "Event",
   "Inbound",
+  "Social media",
+  "Search engine",
+  "Website",
+  "Other",
 ] as const;
 
 export type ReferralSource = (typeof REFERRAL_SOURCES)[number];

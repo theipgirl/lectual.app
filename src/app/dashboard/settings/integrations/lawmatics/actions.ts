@@ -492,7 +492,10 @@ export async function syncHiredMattersAction(_prev: HiredSyncState, _formData: F
     revalidatePath("/dashboard/matters/");
     revalidatePath(PAGE);
     const needs = s.skipped + s.failedWrites;
-    return { ok: true, notice: `Added ${s.created} matters, linked ${s.linked}, ${needs} need a look.` };
+    const moves =
+      (s.leadsMoved > 0 ? ` Moved ${s.leadsMoved} ${s.leadsMoved === 1 ? "lead" : "leads"} to signed.` : "") +
+      (s.leadMovesFailed > 0 ? ` ${s.leadMovesFailed} ${s.leadMovesFailed === 1 ? "lead" : "leads"} couldn't be moved.` : "");
+    return { ok: true, notice: `Added ${s.created} matters, linked ${s.linked}, ${needs} need a look.${moves}` };
   } catch {
     return { error: "We couldn't add hired matters just now. Try again shortly." };
   }
