@@ -241,7 +241,7 @@ function resolvedPackagePicks(content: ProposalContent, selection: Selection | n
 export function quoteProposal(content: ProposalContent, selection: Selection): ProposalQuote {
   // Spec 9: a general (flat-fee) proposal has its own branch; every other content prices exactly as before.
   if (isGeneralContent(content)) return quoteGeneral(content);
-  const on =(id: string) => selection != null && selection[id] === true;
+  const on = (id: string) => selection != null && selection[id] === true;
   const pricing = obj(content?.pricing);
   const baseCents = int(pricing.base_cents);
   const perClassCents = int(pricing.per_class_cents);
