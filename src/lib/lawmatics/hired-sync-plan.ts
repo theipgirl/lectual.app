@@ -15,7 +15,15 @@
  *   4. Owner AND title match a matter linked to a DIFFERENT id      -> skip, never create.
  *   5. Otherwise                                                    -> create.
  * Same owner with a different title is a NEW matter (one client often has several marks).
+ *
+ * LEAD MOVES (the sync's one stage move, firm owner's request 2026-11-02): once a matter is created,
+ * linked, or was already here, the lead behind it, if still in an `open` stage, goes to the firm's
+ * won stage ("Signed LOE / Deposit Received", else the lowest-ordered `won` stage). Only from `open`
+ * and only to `won`, so never backwards and never out of won / lost / nurture. The plan only decides;
+ * ./hired-sync.ts writes, conditional on the lead still being in its from-stage.
  */
+import { compareStageOrder } from "@/lib/pipeline/stage-order";
+import { originAsMatterSource, type LeadOrigin } from "./lead-origin";
 
 /** Hired before this date came from the spreadsheet or were reconciled by hand. */
 export const HIRED_SYNC_CUTOFF = "2026-10-28";
@@ -40,6 +48,8 @@ export type HiredProspect = {
   practiceAreaField: string | null;
   /** Resolved name of the practice_area relationship. */
   practiceAreaName: string | null;
+  /** Where the person came from (./lead-origin.ts). Null source = unknown. Optional for older callers. */
+  origin?: LeadOrigin;
 };
 
 export type PlanMatter = {
@@ -49,9 +59,27 @@ export type PlanMatter = {
   mark_text: string | null;
   matter_number: string;
   lawmatics_id: string | null;
+  /** The lead this matter belongs to; needed to repair a lead left behind by an earlier run. */
+  lead_id?: string | null;
 };
-export type PlanLead = { id: string; email: string | null; lawmatics_id: string | null };
+export type PlanLead = { id: string; email: string | null; lawmatics_id: string | null; current_stage_id?: string | null };
 export type PlanStage = { id: string; label: string };
+/** A lead-pipeline stage (`crm_stage`), as the lead move needs it. */
+export type LeadStageRef = { id: string; name: string; category: string; order_index: number | null };
+
+export const LEAD_MOVE_REASON = "Hired in Lawmatics; matter opened";
+
+/** Which outcome of the matter step a lead move depends on. */
+export type LeadMoveTrigger = "create" | "link" | "existing";
+export type PlannedLeadMove = {
+  lawmaticsId: string;
+  trigger: LeadMoveTrigger;
+  leadId: string;
+  fromStageId: string;
+  fromStageName: string;
+  toStageId: string;
+  toStageName: string;
+};
 
 export type PlannedHiredCreate = {
   lawmaticsId: string;
@@ -62,6 +90,8 @@ export type PlannedHiredCreate = {
   matter_number: string;
   stage_id: string | null;
   lead_id: string | null;
+  /** "Source (detail)", "Source", or null when Lawmatics doesn't say. Never "Lawmatics". */
+  referral_source: string | null;
   notes: string;
   hiredDate: string;
 };
@@ -72,6 +102,8 @@ export type HiredSyncPlan = {
   create: PlannedHiredCreate[];
   link: PlannedHiredLink[];
   skipped: SkippedHired[];
+  /** Leads to move to the won stage. A lead may appear more than once; the runner's conditional update lets only one land. */
+  leadMoves: PlannedLeadMove[];
 };
 
 export const SKIP = {
@@ -168,15 +200,46 @@ export type PlanInput = {
   matters: PlanMatter[];
   leads: PlanLead[];
   stages: PlanStage[];
+  /** The firm's lead stages. Without them (or without a won stage) no lead is moved. */
+  leadStages?: LeadStageRef[];
   /** Overridable for tests; defaults to HIRED_SYNC_CUTOFF. */
   cutoff?: string;
 };
+
+/** The won stage a hired lead goes to: the "Signed LOE / Deposit Received" one, else the lowest-ordered won stage. */
+export function wonTargetStage(stages: readonly LeadStageRef[]): LeadStageRef | null {
+  const won = stages.filter((s) => s.category === "won").sort(compareStageOrder);
+  const signed = won.find((s) => /signed loe|deposit received/i.test(s.name));
+  return signed ?? won[0] ?? null;
+}
 
 export function planHiredSync(input: PlanInput): HiredSyncPlan {
   const cutoff = input.cutoff ?? HIRED_SYNC_CUTOFF;
   const create: PlannedHiredCreate[] = [];
   const link: PlannedHiredLink[] = [];
   const skipped: SkippedHired[] = [];
+  const leadMoves: PlannedLeadMove[] = [];
+
+  const leadStages = input.leadStages ?? [];
+  const target = wonTargetStage(leadStages);
+  const stageById = new Map(leadStages.map((s) => [s.id, s]));
+  const leadById = new Map(input.leads.map((l) => [l.id, l]));
+  const moveLead = (lawmaticsId: string, trigger: LeadMoveTrigger, leadId: string | null | undefined) => {
+    if (!target || !leadId) return;
+    const lead = leadById.get(leadId);
+    const from = lead?.current_stage_id ? stageById.get(lead.current_stage_id) : undefined;
+    if (!from || from.category !== "open") return; // already won / lost / nurture, or unknown: leave it
+    leadMoves.push({
+      lawmaticsId,
+      trigger,
+      leadId,
+      fromStageId: from.id,
+      fromStageName: from.name,
+      toStageId: target.id,
+      toStageName: target.name,
+    });
+  };
+  const matterByLawmaticsId = new Map(input.matters.filter((m) => m.lawmatics_id).map((m) => [m.lawmatics_id as string, m]));
 
   const byLawmaticsId = new Set(input.matters.map((m) => m.lawmatics_id).filter((x): x is string => !!x));
   const numbers = new Set(input.matters.map((m) => m.matter_number));
@@ -217,6 +280,8 @@ export function planHiredSync(input: PlanInput): HiredSyncPlan {
     if (p.convertedDate < cutoff) continue; // older: came from the sheet or was done by hand
     if (byLawmaticsId.has(p.lawmaticsId)) {
       skipped.push({ lawmaticsId: p.lawmaticsId, reason: SKIP.linked });
+      // A rerun repairs a lead an earlier run left in an open stage.
+      moveLead(p.lawmaticsId, "existing", matterByLawmaticsId.get(p.lawmaticsId)?.lead_id);
       continue;
     }
     const ownerName = p.name ? cap(p.name, 200) : "";
@@ -240,6 +305,7 @@ export function planHiredSync(input: PlanInput): HiredSyncPlan {
       if (free.length === 1) {
         claimedMatters.add(free[0].m.id);
         link.push({ lawmaticsId: p.lawmaticsId, matterId: free[0].m.id });
+        moveLead(p.lawmaticsId, "link", free[0].m.lead_id ?? leadFor(p));
         continue;
       }
       if (free.length > 1) {
@@ -265,6 +331,8 @@ export function planHiredSync(input: PlanInput): HiredSyncPlan {
     if (numbers.has(number)) number = `${number}-${p.caseNumber ?? p.lawmaticsId}`;
     if (numbers.has(number)) number = `${number}-${p.lawmaticsId}`;
     numbers.add(number);
+    const leadId = leadFor(p);
+    moveLead(p.lawmaticsId, "create", leadId);
     create.push({
       lawmaticsId: p.lawmaticsId,
       type,
@@ -273,10 +341,11 @@ export function planHiredSync(input: PlanInput): HiredSyncPlan {
       owner_name: ownerName,
       matter_number: number,
       stage_id: type === "TM" ? stageId : null,
-      lead_id: leadFor(p),
+      lead_id: leadId,
+      referral_source: originAsMatterSource(p.origin ?? { source: null, detail: null }),
       notes: `Added from Lawmatics (case #${p.caseNumber ?? p.lawmaticsId}, hired ${p.convertedDate}).`,
       hiredDate: p.convertedDate,
     });
   }
-  return { create, link, skipped };
+  return { create, link, skipped, leadMoves };
 }

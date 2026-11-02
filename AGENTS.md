@@ -1193,7 +1193,22 @@ A person marked **Hired** in a firm's OWN Lawmatics gets a `crm_matter` here. A 
   `/prospects` is swept with `listAll`; a truncated, failed or unrecognised read (or an unreadable matter / lead / stage list) creates NOTHING for that firm and counts a failed firm. Each created matter
   logs `matter_opened` (`actor_type system`, payload `source: "lawmatics-sync"`); a link logs `matter_updated`. One failed insert is counted and does not stop the others. Nothing is written to Lawmatics;
   no names, emails or titles are logged.
-- **NOT verified against a live Lawmatics:** the attribute names `status`, `converted_date`, `case_title`, `case_number` and the shape of `custom_fields` come from the public API reference. Check the first run's counts.
+- **Exception to "no import or agent ever targets a `won` stage": the hired lead move (firm owner, 2026-11-02).** A paid, hired client used to stay in an open lead stage ("Post Consultation
+  Email Sent") after the sync made their matter. This sync, and only this one, now moves THAT lead to a `won` stage. Why it is allowed here: the evidence is Lawmatics' own Hired status plus a
+  matter that now exists, and the matter handoff the `won` rule guards against has already happened. Limits: the lead must have a resolved `lead_id` (created matter: the one lead by `lawmatics_id`
+  else exactly one by email; linked matter: its own `lead_id`; a matter that already existed with that `lawmatics_id`: its `lead_id`, so a rerun repairs stuck leads); the lead must be in an `open`
+  stage now (never out of won / lost / nurture, never backwards); the target is the `won` stage named like "signed loe" / "deposit received", else the lowest-ordered `won` stage
+  (`wonTargetStage`, `stage-order.ts` ties); no `won` stage means no move. `planHiredSync` decides (`leadMoves`); the runner writes `crm_lead` conditional on `current_stage_id = from`
+  (a person's move in between wins), sets `stage_entered_at` and `last_activity_at` to now, and inserts one `stage_changed` row (`actor_type system`, payload `from_stage`, `from_stage_id`,
+  `to_stage`, `to_stage_id`, `actor: "lawmatics-sync"`, `reason`). A row that can't be written puts the lead back. It runs no automation rule and no matter handoff, never fails the run or undoes the
+  matter, and counts `leadsMoved` / `leadMovesFailed` (shown on the button and in the cron JSON). An unreadable `crm_stage` list means no lead moves that run. Nothing else in the codebase may copy this.
+- **Source, not "Lawmatics" (2026-11-02).** `src/lib/lawmatics/lead-origin.ts` (`leadOriginFromProspect`, pure) reads where a person came from: event tags first (a UGW tag -> UGW; a tag with a year
+  -> Event; "webinar" -> Event), then the "How did you hear about us?" picklist with "Referred By" and "Specify Source" (matched by field NAME, ids 589386/878263/690013/491217/491218 are only hints),
+  then "Source: Direct" -> Inbound. Nothing -> unknown (`null`), never "Lawmatics" and never "Inbound" from silence. Tag and custom-field names are read once per run by `lead-origin-read.ts`
+  (read-only); if they can't be read the rules needing them are skipped. The lead importer writes `referral_source`/`referral_detail` from it (an attribute named `referral_source`, if Lawmatics ever
+  returns one, is only the fallback) and on update only FILLS a blank source: one a person already set is never replaced, even with "overwrite edited fields". The hired sync stamps a created
+  matter's `referral_source` as "Source (detail)" or "Source". `REFERRAL_SOURCES` gained "Social media", "Search engine", "Website", "Other" (appended).
+- **NOT verified against a live Lawmatics:** the attribute names `status`, `converted_date`, `case_title`, `case_number` and the shape of `custom_fields` come from the public API reference. Check the first run's counts. Also unverified: how tags appear on a prospect (relationship ids, inline names, `tag_ids` are all tried) and `custom_field_values[<id>].formatted_value`.
 
 ## A package per brand name on the client proposal page (Spec 6, 2026-10-29, no schema)
 Taylor, for Danielle Milton: one section per brand name, each with "Select your package" (Essential, Enhanced or Concierge), then the classes as

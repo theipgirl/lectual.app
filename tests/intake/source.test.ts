@@ -67,6 +67,15 @@ function updateOf(index: number): Record<string, unknown> {
   return (call?.[1][0] ?? {}) as Record<string, unknown>;
 }
 
+describe("REFERRAL_SOURCES", () => {
+  it("keeps the original order and appends the Lawmatics-origin buckets", () => {
+    expect([...REFERRAL_SOURCES]).toEqual([
+      "UGW", "Melanin Money", "Flourish Media", "Instagram", "Referral", "Event", "Inbound",
+      "Social media", "Search engine", "Website", "Other",
+    ]);
+  });
+});
+
 describe("isReferralSource", () => {
   it("accepts every bucket and nothing else", () => {
     for (const source of REFERRAL_SOURCES) expect(isReferralSource(source)).toBe(true);

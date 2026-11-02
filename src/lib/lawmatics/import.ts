@@ -8,6 +8,7 @@ import type { Database } from "@/lib/db/types";
 
 import { LawmaticsApiError, type LawmaticsClient } from "./client";
 import { firmLawmaticsClient } from "./connection";
+import { readOriginLookups } from "./lead-origin-read";
 import {
   DEFAULT_PLAN_OPTIONS,
   planImport,
@@ -182,10 +183,13 @@ export async function pullSource(client: LawmaticsClient): Promise<SourcePull> {
     truncatedReason = `Contact details could not be fetched (${describe(err)}); some records may be missing an email or phone.`;
   }
 
+  // Tag and custom-field names, read once. Failing to read them only skips the rules that need them.
+  const lookups = await readOriginLookups(client);
+
   const records: LawmaticsSourceRecord[] = [];
   const referenced = new Set<string>();
   for (const raw of prospects.records) {
-    const normalized = normalizeProspect(raw, prospects.included);
+    const normalized = normalizeProspect(raw, prospects.included, lookups);
     if (!normalized) continue;
     if (normalized.contactId) referenced.add(normalized.contactId);
     records.push(

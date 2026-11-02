@@ -38,6 +38,12 @@ describe("syncHiredMattersAction", () => {
     expect(r).toEqual({ ok: true, notice: "Added 2 matters, linked 1, 3 need a look." });
   });
 
+  it("reports lead moves only when there were some", async () => {
+    state.result = { ...state.result, leadsMoved: 2, leadMovesFailed: 1 };
+    const r = await syncHiredMattersAction({}, form());
+    expect(r.notice).toBe("Added 2 matters, linked 1, 3 need a look. Moved 2 leads to signed. 1 lead couldn't be moved.");
+  });
+
   it("a failed read is a fixed sentence, never a success", async () => {
     state.result = { ...state.result, failedFirms: 1, created: 0 };
     const r = await syncHiredMattersAction({}, form());
