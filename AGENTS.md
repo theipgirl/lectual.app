@@ -1289,6 +1289,26 @@ Lectual when a proposal has been viewed". Money logic: `quoteProposal` stays the
 - Existing assertions changed on purpose: none of the pricing tests. `tests/proposals/proposal-detail-page.test.ts` and `list-page-harness.ts` mock the
   new store read; `tests/client-proposal/commitment.test.tsx`'s "leaves pricing.ts untouched" compares with HEAD, so it passes once this is committed.
 
+## Custom discount on one package (2026-11-03, no schema)
+Taylor, for Sevetri Wilson: a package offer can carry a discount that applies ONLY when that package is chosen, shown to the client as its own
+line, never hidden in the price. Data only for now: there is no editor control to set it (it is written into the content jsonb). Nothing sends.
+- **Content:** `PackageOffer.custom_discount = { label (1..60, plain text: no `<`, `>` or control characters), per_class_under_cents (whole, > 0, at most
+  the offer's `per_class_cents`) }`, allowed only on `content.packages` entries (`validateContent` refuses one on `content.pricing`). `publicContent` keeps
+  its two keys; `withPackageSnapshot` keeps an existing entry's discount when it refreshes the firm's list (the firm's list never carries one).
+- **Price (`quoteProposal`, still the ONE engine):** wherever a brand name (Spec 6) or a mark (Spec 7) is priced under such an offer,
+  `under = max(0, included_classes - (n || all classes))` and `per_class_under_cents x under` comes off that package price BEFORE the second-mark percent,
+  never below zero; then the name's `discount_pct` and the global adjustments as before. USPTO untouched. A quoted mark it reduced carries
+  `custom_discount_cents` (what came off its `price_cents`, after the second-mark %), `price_before_custom_discount_cents` and `custom_discount_label`; the
+  name carries the sum and the label. Present only when > 0, so content without one quotes byte for byte as before (`tests/proposals/custom-discount.test.ts`
+  compares with the engine at `cc959d9`).
+- **Sevetri's figures** (fixture `tests/proposals/sevetri-custom-fixture.ts`, 2 classes per name, per-mark Essential/Enhanced/Concierge, Concierge
+  `$825` per class under 3): all Concierge $4,125 + $3,300 = $7,425 per name, $14,850 legal, USPTO $2,800; all Enhanced $11,700; all Essential $9,990;
+  Concierge with a third (client-added) class on a name: no discount there, $4,950 + $3,960.
+- **Shown:** the client page's package line gives the package price before the discount, then "<label> −$X" on its own line (`.cp-custom-off`); the
+  review panel and receipt list each mark at its pre-discount price and the name's "<label> −$X" line, before the `discount_pct` line. The staff
+  proposal page's totals add "<label> (in the fee above) −$X" under the name. The Lawmatics note and accept notice list no per-name discounts, so
+  they are unchanged. Not verified in a real browser.
+
 ## Consults and client meetings on Proposals (Spec 8, 2026-10-30, no schema)
 The collapsed "Recent consults (N ready to draft)" toggle is gone. Under the proposals table is an always-open section, "Consults and client meetings".
 - **One read.** It is still `loadConsultsStrip` (`consults-load.ts`) over `listMeetings()`: same 14-day window, newest first. The filter is widened by `isListedMeeting`

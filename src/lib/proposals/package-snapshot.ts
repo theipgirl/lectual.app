@@ -53,12 +53,17 @@ export function usesPackageChoice(content: ProposalContent): boolean {
 
 /**
  * `content` with `packages` set to the firm's current list (plus any earlier snapshot entry no longer on it), when a
- * brand name uses `package_choice`. Unchanged otherwise.
+ * brand name uses `package_choice`. Unchanged otherwise. An entry's `custom_discount` is kept on its refreshed copy.
  */
 export function withPackageSnapshot(content: ProposalContent, settingPricing: unknown): ProposalContent {
   if (!usesPackageChoice(content)) return content;
-  const current = packageOffersFromSetting(settingPricing);
+  const earlier = (Array.isArray(content.packages) ? content.packages : []).filter((p) => isObj(p) && typeof p.package === "string");
+  // A custom discount (2026-11-03) belongs to THIS proposal, not to the firm's list: a refreshed entry keeps it.
+  const current = packageOffersFromSetting(settingPricing).map((offer) => {
+    const before = earlier.find((p) => p.package === offer.package);
+    return before && isObj(before.custom_discount) ? { ...offer, custom_discount: before.custom_discount } : offer;
+  });
   const names = new Set(current.map((p) => p.package));
-  const kept = (Array.isArray(content.packages) ? content.packages : []).filter((p) => isObj(p) && typeof p.package === "string" && !names.has(p.package));
+  const kept = earlier.filter((p) => !names.has(p.package));
   return { ...content, packages: [...current, ...kept] };
 }

@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveFirmSession } from "@/lib/firm/session";
@@ -527,10 +528,18 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
             <>
             <dl>
               {quote.names.map((n) => (
-                <div key={n.id} className="pe-line">
-                  <dt>{packageLineTitle(n)}</dt>
-                  <dd>{n.included ? formatCents(n.legal_cents) : "none ticked"}</dd>
-                </div>
+                <Fragment key={n.id}>
+                  <div className="pe-line">
+                    <dt>{packageLineTitle(n)}</dt>
+                    <dd>{n.included ? formatCents(n.legal_cents) : "none ticked"}</dd>
+                  </div>
+                  {n.included && n.custom_discount_cents ? (
+                    <div className="pe-line pe-line-mute">
+                      <dt>{`${n.custom_discount_label || "Discount"} (in the fee above)`}</dt>
+                      <dd>−{formatCents(n.custom_discount_cents)}</dd>
+                    </div>
+                  ) : null}
+                </Fragment>
               ))}
               {quote.adjustments
                 .filter((a) => a.discount_cents > 0)

@@ -54,6 +54,19 @@
  *   `discount_pct` still comes off the name's total. `QuotedMark.package` /
  *   `base_cents` appear only for marks priced this way.
  *
+ * ── CUSTOM DISCOUNT ON ONE PACKAGE (2026-11-03) ─────────────────────────────
+ *   A package offer may carry `custom_discount` ({ label, per_class_under_cents }).
+ *   Wherever a brand name (Spec 6) or a mark (Spec 7) is priced under such an
+ *   offer: under = max(0, included_classes - (n || all classes of the name)),
+ *   discount = per_class_under_cents * under, taken off that package price
+ *   BEFORE the second-mark percent (a second mark is round((price - discount)
+ *   * (100 - pct) / 100)), never below zero. The USPTO fee and the global
+ *   adjustments are untouched. Each mark it reduced carries
+ *   `custom_discount_cents` (what actually came off ITS price_cents, i.e. after
+ *   the second-mark percent), `price_before_custom_discount_cents` and the label;
+ *   the brand name carries the sum and the label. Present only when > 0, so a
+ *   proposal without one quotes byte for byte as before.
+ *
  * ── MONEY ───────────────────────────────────────────────────────────────────
  * Integer cents. Rounding happens in exactly two places, both here and both
  * once per figure: a second mark's discounted price and a percent adjustment.
@@ -196,6 +209,23 @@ export function usesMarkPackages(content: ProposalContent, name: unknown): boole
   return arr<unknown>(obj(name).marks).some((m) => packageChoiceOptions(content, m).length > 0);
 }
 
+/**
+ * What an offer's custom discount takes off ONE package price for `classCount` classes: the per-class amount for each
+ * class under the offer's included classes, never more than `price`. 0 without a (readable, positive) discount.
+ */
+function customDiscountOff(offer: PackageOffer, classCount: number, price: number): number {
+  const cd = obj(offer?.custom_discount);
+  const perClassUnder = int(cd.per_class_under_cents);
+  if (perClassUnder <= 0) return 0;
+  const under = Math.max(0, int(offer.included_classes) - classCount);
+  return Math.min(Math.max(0, price), perClassUnder * under);
+}
+
+function customDiscountLabel(offer: PackageOffer): string {
+  const label = obj(offer?.custom_discount).label;
+  return typeof label === "string" ? label : "";
+}
+
 /** A package offer as `ProposalPricing` (always the flat rule). For display words; prices still come from `quoteProposal`. */
 export function offerPricing(offer: PackageOffer): ProposalPricing {
   return {
@@ -266,6 +296,9 @@ export function quoteProposal(content: ProposalContent, selection: Selection): P
     const nameGov = offer ? int(offer.gov_per_class_cents) : govPerClassCents;
     const classDelta = (n || allClasses.length) - nameIncluded;
     const base = Math.max(0, nameBase + namePerClass * (reduceUnderIncluded && !offer ? classDelta : Math.max(0, classDelta)));
+    // 2026-11-03: the chosen package's custom discount comes off the package price before the second-mark percent.
+    const nameCustomOff = offer ? customDiscountOff(offer, n || allClasses.length, base) : 0;
+    const nameCustomBase = base - nameCustomOff;
 
     // Spec 7: a mark with its own package choice is priced under that package, always flat, over the name's classes.
     const allMarks = arr<ProposalContent["names"][number]["marks"][number]>(nm?.marks);
@@ -279,29 +312,43 @@ export function quoteProposal(content: ProposalContent, selection: Selection): P
     const flatFor = (o: PackageOffer) =>
       Math.max(0, int(o.base_cents) + int(o.per_class_cents) * Math.max(0, (n || allClasses.length) - int(o.included_classes)));
 
+    /** Attach the custom discount fields to a quoted mark when it took something off (never otherwise). */
+    const withCustom = (q: QuotedMark, before: number, label: string): QuotedMark => {
+      const off = before - q.price_cents;
+      if (off <= 0) return q;
+      return { ...q, custom_discount_cents: off, custom_discount_label: label, price_before_custom_discount_cents: before };
+    };
+
     const marks: QuotedMark[] = allMarks
       .filter((m) => on(m.id))
       .map((m, i) => {
         const mo = markOffers.get(m.id);
         if (!mo) {
-          return {
+          const quotedMark: QuotedMark = {
             id: m.id,
             kind: m.kind,
             desc: m.desc,
             second: i > 0,
-            price_cents: i > 0 ? percentOff(base, nameSecondPct) : base,
+            price_cents: i > 0 ? percentOff(nameCustomBase, nameSecondPct) : nameCustomBase,
           };
+          if (nameCustomOff <= 0 || !offer) return quotedMark;
+          return withCustom(quotedMark, i > 0 ? percentOff(base, nameSecondPct) : base, customDiscountLabel(offer));
         }
         const markBase = flatFor(mo);
-        return {
+        const markOff = customDiscountOff(mo, n || allClasses.length, markBase);
+        const markPrice = markBase - markOff;
+        const markSecondPct = pct(mo.second_mark_discount_pct);
+        const quotedMark: QuotedMark = {
           id: m.id,
           kind: m.kind,
           desc: m.desc,
           second: i > 0,
-          price_cents: i > 0 ? percentOff(markBase, pct(mo.second_mark_discount_pct)) : markBase,
+          price_cents: i > 0 ? percentOff(markPrice, markSecondPct) : markPrice,
           package: mo.package,
           base_cents: markBase,
         };
+        if (markOff <= 0) return quotedMark;
+        return withCustom(quotedMark, i > 0 ? percentOff(markBase, markSecondPct) : markBase, customDiscountLabel(mo));
       });
 
     const included = n > 0 && marks.length > 0;
@@ -332,6 +379,14 @@ export function quoteProposal(content: ProposalContent, selection: Selection): P
     };
     if (offer) quoted.package = offer.package;
     if (hasDiscount) quoted.discount_cents = beforeDiscount - legal;
+    // 2026-11-03: the brand name's custom package discount, the sum of what it took off its marks.
+    if (included) {
+      const customOff = marks.reduce((sum, m) => sum + (m.custom_discount_cents ?? 0), 0);
+      if (customOff > 0) {
+        quoted.custom_discount_cents = customOff;
+        quoted.custom_discount_label = marks.find((m) => (m.custom_discount_cents ?? 0) > 0)?.custom_discount_label ?? "";
+      }
+    }
     return quoted;
   });
 

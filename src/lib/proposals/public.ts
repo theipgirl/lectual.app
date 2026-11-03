@@ -300,6 +300,10 @@ export function publicContent(raw: unknown): ProposalContent {
     out.packages = objects(c.packages).map((pk) => {
       const offer = pick(pk, ["package", "base_cents", "per_class_cents", "included_classes", "gov_per_class_cents", "second_mark_discount_pct"]);
       if (Array.isArray(pk.includes)) offer.includes = objects(pk.includes).map((r) => pick(r, ["label", "value", "included", "note", "highlight"]));
+      // 2026-11-03: the package's own custom discount (the client sees it as its own line), its two keys only.
+      if (pk.custom_discount && typeof pk.custom_discount === "object" && !Array.isArray(pk.custom_discount)) {
+        offer.custom_discount = pick(pk.custom_discount as Record<string, unknown>, ["label", "per_class_under_cents"]);
+      }
       return offer;
     });
   }
