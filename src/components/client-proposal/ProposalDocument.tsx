@@ -553,8 +553,14 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
                           <p className="cp-how-add" id={`cp-pkg-${nm.id}-terms`}>
                             {qn?.included ? `${offer.package}: ${money(qn.legal_cents)} legal fee for ${nm.name}` : offer.package}
                             {qn?.included && qn.discount_cents ? ` (after ${Math.round(nm.discount_pct ?? 0)}% off)` : ""}
+                            {qn?.included && qn.custom_discount_cents ? " (after the discount below)" : ""}
                             {` · ${packageTermsWords(namePr)}`}
                           </p>
+                          {qn?.included && qn.custom_discount_cents ? (
+                            <p className="cp-how-add cp-custom-off">
+                              {`${qn.custom_discount_label || "Discount"} ${money(-qn.custom_discount_cents)}`}
+                            </p>
+                          ) : null}
                         </div>
                       ) : null}
 
@@ -622,10 +628,17 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
                                   </>
                                 )}
                                 <p className="cp-how-add" id={`${selId}-terms`}>
-                                  {quotedMark ? `${chosen.package}: ${money(quotedMark.price_cents)} legal fee for the ${words}` : chosen.package}
+                                  {quotedMark
+                                    ? `${chosen.package}: ${money(quotedMark.price_before_custom_discount_cents ?? quotedMark.price_cents)} legal fee for the ${words}`
+                                    : chosen.package}
                                   {quotedMark?.second ? ` (${Math.round(markPr.second_mark_discount_pct)}% off as your second mark)` : ""}
                                   {` · ${packageTermsWords(markPr)}`}
                                 </p>
+                                {quotedMark?.custom_discount_cents ? (
+                                  <p className="cp-how-add cp-custom-off">
+                                    {`${quotedMark.custom_discount_label || "Discount"} ${money(-quotedMark.custom_discount_cents)}`}
+                                  </p>
+                                ) : null}
                               </div>
                             </div>
                           );
@@ -913,12 +926,18 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
                               {m.package ? <small>{m.package}</small> : null}
                               {m.second ? <small>{Math.round((m.package ? markPricing(qn.id, m.id) : pricingFor(qn.id)).second_mark_discount_pct)}% off</small> : null}
                             </span>
-                            <span className="cp-r cp-num">{money(m.price_cents)}</span>
+                            <span className="cp-r cp-num">{money(m.price_before_custom_discount_cents ?? m.price_cents)}</span>
                           </div>
                         ))
                       ) : (
                         <p className="cp-empty">Not included</p>
                       )}
+                      {qn.included && qn.custom_discount_cents ? (
+                        <div className="cp-ln cp-custom-off">
+                          <span className="cp-l">{qn.custom_discount_label || "Discount"}</span>
+                          <span className="cp-r cp-num">{money(-qn.custom_discount_cents)}</span>
+                        </div>
+                      ) : null}
                       {qn.included && qn.discount_cents ? (
                         <div className="cp-ln">
                           <span className="cp-l">

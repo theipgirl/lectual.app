@@ -197,6 +197,15 @@ function str(v: unknown): string {
   return typeof v === "string" ? v : "";
 }
 
+/** Plain text: no `<`, `>` or control characters. */
+function isPlainLabel(text: string): boolean {
+  for (const ch of text) {
+    const code = ch.codePointAt(0) ?? 0;
+    if (ch === "<" || ch === ">" || code < 0x20 || (code >= 0x7f && code <= 0x9f)) return false;
+  }
+  return true;
+}
+
 /** An includes row as one string, in the order a client reads it. */
 function includesRowText(row: Record<string, unknown>): string {
   return [row.label, row.value, row.included, row.note].map(str).filter((t) => t.trim()).join(" | ");
@@ -355,8 +364,30 @@ export function validateContent(content: unknown, options: ValidateOptions = {})
             });
           }
         }
+        // 2026-11-03: a discount that applies only when this package is chosen.
+        if (raw.custom_discount != null) {
+          const cd = raw.custom_discount;
+          const cp = `${p}.custom_discount`;
+          if (!isObj(cd)) err(cp, "This package's custom discount is not readable.");
+          else {
+            const label = typeof cd.label === "string" ? cd.label : null;
+            if (label == null || !label.trim()) err(`${cp}.label`, "Give the custom discount a label.");
+            else if (label.length > 60) err(`${cp}.label`, "The custom discount's label is too long (60 characters at most).");
+            else if (!isPlainLabel(label)) err(`${cp}.label`, "The custom discount's label must be plain text.");
+            else textIssues(`${cp}.label`, label, out);
+            const amount = cd.per_class_under_cents;
+            if (typeof amount !== "number" || !Number.isInteger(amount) || amount <= 0) {
+              err(`${cp}.per_class_under_cents`, "The custom discount must be a whole number of cents above zero.");
+            } else if (isCents(raw.per_class_cents) && amount > raw.per_class_cents) {
+              err(`${cp}.per_class_under_cents`, "The custom discount can't be more than the package's price per class.");
+            }
+          }
+        }
       });
     }
+  }
+  if (pricing && pricing.custom_discount != null) {
+    err("pricing.custom_discount", "A custom discount belongs on one of the packages the client chooses from, not on the proposal's pricing.");
   }
 
   // Spec 6 / Spec 7: one package choice (a brand name's or a mark's): 1 to 3 of this proposal's packages, the default one of them.

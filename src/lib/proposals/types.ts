@@ -223,6 +223,18 @@ export type PackageOffer = {
   gov_per_class_cents: number;
   second_mark_discount_pct: number;
   includes?: ProposalInclude[];
+  /**
+   * A discount that applies ONLY when this package is chosen (2026-11-03): `per_class_under_cents` off the package
+   * price for each class UNDER `included_classes`, shown to the client as its own line labelled `label`. Taken off
+   * before the second-mark percent; never below zero; never touches the USPTO fee. Data only (no editor yet).
+   */
+  custom_discount?: PackageCustomDiscount;
+};
+
+/** See `PackageOffer.custom_discount`. `label` is 1..60 characters of plain text; `per_class_under_cents` is a positive whole number of cents, at most the offer's `per_class_cents`. */
+export type PackageCustomDiscount = {
+  label: string;
+  per_class_under_cents: number;
 };
 
 export type ProposalAdjustment = {
@@ -454,6 +466,12 @@ export type QuotedMark = {
   package?: string;
   /** Spec 7: this mark's package price before any second-mark discount (only with `package`). */
   base_cents?: number;
+  /** The chosen package's custom discount: cents it actually took off `price_cents` (after the second-mark percent). Only when > 0. */
+  custom_discount_cents?: number;
+  /** That discount's label, as the firm wrote it. Only with `custom_discount_cents`. */
+  custom_discount_label?: string;
+  /** This mark's price had the custom discount not applied (after any second-mark percent). Only with `custom_discount_cents`. */
+  price_before_custom_discount_cents?: number;
 };
 
 export type QuotedName = {
@@ -477,6 +495,13 @@ export type QuotedName = {
   package?: string;
   /** Spec 6: what `discount_pct` took off this brand name's legal fee (only when the name has one). */
   discount_cents?: number;
+  /**
+   * The custom package discount on this brand name: for a name-level package (Spec 6) what it took off the marks'
+   * prices; for mark-level packages (Spec 7) the sum of its marks' `custom_discount_cents`. Only when > 0.
+   */
+  custom_discount_cents?: number;
+  /** The discount's label (the first one, when marks under different packages carry different labels). Only with `custom_discount_cents`. */
+  custom_discount_label?: string;
 };
 
 export type QuotedAdjustment = {
