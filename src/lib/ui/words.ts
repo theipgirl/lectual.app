@@ -19,6 +19,8 @@ export const FIRM_NOTES_PURPOSE = "Your assistants use these to match your tone,
 export const AI_TOOLS_GROUP = "AI tools";
 /** Drafts waiting for a person's OK (was "Queue"). */
 export const APPROVALS_NAME = "Approvals";
+/** The one page that replaces the Monday spreadsheet walk-through. */
+export const REVIEW_NAME = "Weekly review";
 /** The people who have asked about work (was "Intake" / "PNC"). */
 export const LEADS_NAME = "Leads";
 /** The rail group that holds Leads and the intake forms. */

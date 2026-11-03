@@ -1,6 +1,6 @@
 import type { OrgModule } from "@/lib/org/modules";
 import { hasRole, type Role } from "@/lib/auth/roles";
-import { AI_TOOLS_GROUP, APPROVALS_NAME, ASSISTANTS_NAME, COPILOT_NAME, FIRM_NOTES_NAME, LEADS_GROUP, LEADS_NAME, SHORTCUTS_NAME } from "@/lib/ui/words";
+import { AI_TOOLS_GROUP, APPROVALS_NAME, ASSISTANTS_NAME, COPILOT_NAME, FIRM_NOTES_NAME, LEADS_GROUP, LEADS_NAME, REVIEW_NAME, SHORTCUTS_NAME } from "@/lib/ui/words";
 
 /**
  * Sections of the workspace. One flat list of PAGES, read by the rail and the
@@ -49,6 +49,8 @@ export const ICON = {
   bars: "M4 20V11M10 20V4M16 20v-6M21 20H3",
   sliders: "M4 6h12M18 6h2M4 12h2M8 12h12M4 18h12M18 18h2M16 4v4M6 10v4M16 16v4",
   // A camera: a recorded call.
+  // A ticked box: the weekly review.
+  check: "M4 5h16v14H4zM8 12l3 3 5-6",
   video: "M3 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1zM15 10l6-3.5v11L15 14",
 } as const;
 
@@ -56,6 +58,8 @@ export const NAV: readonly NavItem[] = [
   { slug: "", label: "Today", href: "/dashboard/", icon: ICON.clock, step: 6 },
   { slug: "mail", label: "My Mail", href: "/dashboard/mail/", icon: ICON.env, module: "mailbox", step: 4 },
   { slug: "queue", label: APPROVALS_NAME, href: "/dashboard/queue/", icon: ICON.tray, step: 6 },
+  // Every open matter and lead past first contact, sorted by what needs a person this week. Reads only the firm's own records.
+  { slug: "review", label: REVIEW_NAME, href: "/dashboard/review/", icon: ICON.check, step: 7 },
   { slug: "campaigns", label: "Campaigns", href: "/dashboard/campaigns/", icon: ICON.send, step: 6 },
   { slug: "sms", label: "SMS", href: "/dashboard/sms/", icon: ICON.sms, step: 7, built: false },
   // No module: each firm imports only from the Fathom / Zoom account it connected itself (lectual 0081).
@@ -98,6 +102,7 @@ export const RAIL_TREE: readonly (readonly RailNode[])[] = [
     { slug: "" },
     // Approvals is a daily destination, so it sits at the top level (Sprint 32).
     { slug: "queue" },
+    { slug: "review" },
     { label: "Communication", icon: ICON.chat, kids: ["mail", "meetings", "campaigns", "sms"] },
     { slug: "calendar" },
   ],
@@ -282,7 +287,7 @@ export function mobileBarItems(visible: readonly NavItem[], pathname: string): M
 
 /** The More sheet, grouped as the rail groups its sections. Group labels are the rail's. */
 const MORE_GROUPS: readonly { label: string; slugs: readonly string[] }[] = [
-  { label: "Workspace", slugs: ["", "calendar"] },
+  { label: "Workspace", slugs: ["", "review", "calendar"] },
   { label: "Communication", slugs: ["meetings", "campaigns"] },
   { label: LEADS_GROUP, slugs: ["forms", "quotes", "proposals"] },
   { label: "Active matters", slugs: ["matters", "pipeline", "documents"] },
