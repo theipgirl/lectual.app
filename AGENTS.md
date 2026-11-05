@@ -1433,3 +1433,14 @@ and a Follow-Up stage; a lead that has a matter shows once, as the matter). Ever
   The firm needs a Lost and/or Nurture stage for the button to show.
 - Leads DO have an assignee (`crm_lead.assigned_to`), so a lead row shows it and the board uses it. Not built: proposal-expiry tags on cards (it would need a per-record
   proposal read), snooze, move-stage and lost/nurture buttons from the mockup. `createTask` and `completeTask` write no timeline row today, so neither does this page.
+
+## Sign-in links a scanner can't spend (2026-11-05, no schema)
+RPB's Check Point Harmony filter (like Microsoft Safe Links) opens every emailed link, which used up the one-time magic link (`otp_expired`).
+- **`/auth/confirm/`** (`src/app/auth/confirm/`): the Magic Link / Invite email templates point here (`?token_hash={{ .TokenHash }}&type=email|invite`).
+  Loading the page spends nothing; only the Sign in button's POST (`confirmSignIn`) calls `verifyOtp({ token_hash, type })`. `parseConfirmLink` accepts only
+  `email` / `magiclink` / `invite` and a url-safe hash of 8..256 characters; a bad or spent token goes to `/sign-in/?error=otp_expired` (next kept via `safeNext`).
+- **Code entry:** after a send, the sign-in page offers "Or enter the 6-digit code from the email" (`verifySignInCode`, `verifyOtp` type `email`,
+  `normalizeSignInCode`). Works only when the template includes `{{ .Token }}`.
+- **Fragment errors:** Supabase's own verify page bounces with `#error_code=...`, which the server can't read; `HashErrorNotice` reads it once in the browser
+  (`hashErrorCode`), shows `signInErrorMessage`'s fixed sentence and clears the fragment. Provider text is never shown.
+- The templates live in the Supabase dashboard (lectual-prod), not in this repo; change them only after this code is deployed.
