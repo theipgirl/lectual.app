@@ -34,3 +34,18 @@ export function normalizeSignInCode(raw: unknown): string | null {
   const digits = raw.replace(/[\s-]/g, "");
   return /^\d{6}$/.test(digits) ? digits : null;
 }
+
+/** Link types the confirm page accepts; anything else is refused before Supabase is called. */
+export const CONFIRM_TYPES = ["email", "magiclink", "invite"] as const;
+export type ConfirmType = (typeof CONFIRM_TYPES)[number];
+
+/** The token hash from a sign-in email: url-safe characters only, bounded. Pure. */
+export function parseConfirmLink(
+  tokenHash: unknown,
+  type: unknown,
+): { tokenHash: string; type: ConfirmType } | null {
+  if (typeof tokenHash !== "string" || !/^[A-Za-z0-9_-]{8,256}$/.test(tokenHash)) return null;
+  const t = typeof type === "string" && type ? type : "email";
+  if (!(CONFIRM_TYPES as readonly string[]).includes(t)) return null;
+  return { tokenHash, type: t as ConfirmType };
+}

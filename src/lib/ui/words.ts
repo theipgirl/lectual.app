@@ -84,6 +84,9 @@ export const SIGN_IN_SPAM_HINT = "Can't find it? Check your spam or junk folder.
 export const SIGN_IN_CODE_LABEL = "Or enter the 6-digit code from the email";
 export const SIGN_IN_CODE_BAD = "That code didn't work. Check the newest email, or get a new link.";
 export const SIGN_IN_CODE_FORMAT = "Enter the 6 digits from the email.";
+export const SIGN_IN_CONFIRM_TITLE = "Sign in to Lectual";
+export const SIGN_IN_CONFIRM_BODY = "Press the button to finish signing in. This step keeps email security scanners from using up your link.";
+export const SIGN_IN_CONFIRM_BUTTON = "Sign in";
 export const SIGN_IN_ERROR_FALLBACK = "That sign-in didn't work. Enter your email to get a new link.";
 
 /** Plain permission wording (was "scope"). */
