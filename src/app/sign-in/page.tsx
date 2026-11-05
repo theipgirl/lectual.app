@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { safeNext } from "@/lib/auth/safe-next";
 import LoginForm from "./LoginForm";
+import HashErrorNotice from "./HashErrorNotice";
 import { signInErrorMessage } from "@/lib/auth/sign-in-errors";
 import { SIGN_IN_INVITED_HELP, SIGN_IN_NOT_INVITED } from "@/lib/ui/words";
 import { NOT_A_LAW_FIRM_DISCLAIMER } from "@/lib/legal/disclaimer";
@@ -52,6 +53,7 @@ export default async function SignInPage({
             {signInErrorMessage(error)}
           </p>
         )}
+        <HashErrorNotice serverError={Boolean(error)} />
         <p style={{ margin: 0, fontSize: 14 }}>{SIGN_IN_INVITED_HELP}</p>
         <LoginForm next={safeNext} />
         <p style={{ margin: 0, fontSize: 14 }}>{SIGN_IN_NOT_INVITED}</p>

@@ -7,7 +7,7 @@ const h = vi.hoisted(() => ({ state: {} as Record<string, unknown> }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({ redirect: () => {} }));
-vi.mock("@/app/sign-in/actions", () => ({ sendMagicLink: async () => ({}) }));
+vi.mock("@/app/sign-in/actions", () => ({ sendMagicLink: async () => ({}), verifySignInCode: async () => ({}) }));
 vi.mock("react", async (orig) => {
   const actual = await orig<typeof import("react")>();
   return { ...actual, useActionState: (_fn: unknown, initial: unknown) => [Object.keys(h.state).length ? h.state : initial, () => {}, false] };
@@ -36,6 +36,18 @@ describe("LoginForm", () => {
     expect(html).toContain("Use a different address");
     expect(html).toContain('name="email" value="rita@firm.com"');
     expect(html).toContain('name="next" value="/dashboard/matters/"');
+  });
+  it("after a send offers the 6-digit code from the same email, posting the address and next", () => {
+    h.state = { ok: true, email: "rita@firm.com", sends: 1 };
+    const html = renderToStaticMarkup(<LoginForm next="/dashboard/review/" />);
+    expect(html).toContain("Or enter the 6-digit code from the email");
+    expect(html).toMatch(/<input id="code"[^>]*name="code"/);
+    expect(html).toMatch(/one-time-code/);
+    expect(html).toContain("Sign in with code");
+  });
+  it("the first screen has no code box", () => {
+    h.state = {};
+    expect(renderToStaticMarkup(<LoginForm next="/dashboard/" />)).not.toContain('id="code"');
   });
   it("a refused resend shows its sentence in place, and a later send says Sent again", () => {
     h.state = { ok: true, email: "rita@firm.com", sends: 1, error: "Please wait a little before asking for another link." };

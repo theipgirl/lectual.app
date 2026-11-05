@@ -13,3 +13,24 @@ export function signInErrorMessage(raw: string | null | undefined): string {
   if (EXPIRED_CODES.has(code)) return SIGN_IN_EXPIRED;
   return SIGN_IN_ERROR_FALLBACK;
 }
+
+/**
+ * Supabase's own verify page sends a failed magic link back with the reason in the URL FRAGMENT
+ * (`#error=access_denied&error_code=otp_expired&...`), which the server never sees. This reads the
+ * code out of `location.hash` so the browser can show the same fixed sentence. Pure; returns null
+ * when the fragment carries no error. The value is only ever passed to `signInErrorMessage`.
+ */
+export function hashErrorCode(hash: string | null | undefined): string | null {
+  const raw = (hash ?? "").replace(/^#/, "");
+  if (!raw) return null;
+  const params = new URLSearchParams(raw);
+  const code = params.get("error_code") ?? params.get("error");
+  return code && code.trim() ? code.trim() : null;
+}
+
+/** A 6-digit sign-in code typed by a person: digits only, spaces and dashes ignored. Pure. */
+export function normalizeSignInCode(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const digits = raw.replace(/[\s-]/g, "");
+  return /^\d{6}$/.test(digits) ? digits : null;
+}

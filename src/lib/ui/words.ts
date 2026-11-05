@@ -81,6 +81,9 @@ export const SIGN_IN_WAIT = "Please wait a little before asking for another link
 export const SIGN_IN_INVITED_HELP = "Use the email your firm invited.";
 export const SIGN_IN_NOT_INVITED = "Not invited yet? Ask your firm's owner to invite you.";
 export const SIGN_IN_SPAM_HINT = "Can't find it? Check your spam or junk folder.";
+export const SIGN_IN_CODE_LABEL = "Or enter the 6-digit code from the email";
+export const SIGN_IN_CODE_BAD = "That code didn't work. Check the newest email, or get a new link.";
+export const SIGN_IN_CODE_FORMAT = "Enter the 6 digits from the email.";
 export const SIGN_IN_ERROR_FALLBACK = "That sign-in didn't work. Enter your email to get a new link.";
 
 /** Plain permission wording (was "scope"). */
