@@ -8,6 +8,8 @@ import {
   type ReviewActionState,
 } from "@/app/dashboard/review/actions";
 import { TASK_TITLE_MAX } from "@/lib/matters/task-edit";
+import { LostNurture } from "./LostNurture";
+import type { CloseStage } from "@/lib/review/close-stage";
 import "./review.css";
 
 type Member = { userId: string; name: string };
@@ -33,12 +35,15 @@ export function ReviewRowActions({
   nextStepId,
   members,
   defaultAssignee,
+  closeStages = [],
 }: {
   kind: "matter" | "lead";
   id: string;
   nextStepId: string | null;
   members: Member[];
   defaultAssignee: string | null;
+  /** Lost / nurture stages the caller may move a lead to; empty hides the button. Leads only. */
+  closeStages?: CloseStage[];
 }) {
   const stepForm = useRef<HTMLFormElement>(null);
   const noteForm = useRef<HTMLFormElement>(null);
@@ -89,6 +94,7 @@ export function ReviewRowActions({
           <Msg state={noteState} />
         </form>
       </details>
+      {kind === "lead" && closeStages.length > 0 && <LostNurture id={id} stages={closeStages} />}
       {nextStepId && (
         <form action={doneAction}>
           <input type="hidden" name="taskId" value={nextStepId} />

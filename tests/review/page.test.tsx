@@ -21,7 +21,7 @@ function mock(load: unknown, role: string | null = "attorney") {
     resolveFirmSession: vi.fn(async () => (role ? { kind: "ok", role, user: { id: "u-rayn" } } : { kind: "signed-out", redirectTo: "/" })),
   }));
   vi.doMock("@/app/dashboard/review/actions", () => ({
-    setNextStepAction: vi.fn(), completeNextStepAction: vi.fn(), logWhatHappenedAction: vi.fn(),
+    setNextStepAction: vi.fn(), completeNextStepAction: vi.fn(), logWhatHappenedAction: vi.fn(), closeLeadAction: vi.fn(),
   }));
 }
 
@@ -119,5 +119,42 @@ describe("Weekly review page", () => {
   it("empty states are never a blank page", async () => {
     mock(ok({ rows: [] }));
     expect(await render()).toContain("Nothing to review");
+  });
+
+  describe("proposal expiry and Lost / Nurture", () => {
+    const stages = [{ id: "00000000-0000-4000-8000-0000000000aa", name: "Nurture 2027", category: "nurture" }];
+    const mixed = [
+      row({ key: "m1", kind: "matter", client: "Matter Co", proposalExpiry: { text: "Proposal expires Nov 4", expiresOn: "2026-11-04", expired: false } }),
+      row({ key: "l1", kind: "lead", client: "Lead Co", proposalExpiry: { text: "Proposal expired Oct 26", expiresOn: "2026-10-26", expired: true } }),
+    ];
+
+    it("shows the tags (expired one in the risk style) and the KPI count", async () => {
+      mock(ok({ rows: mixed, closeStages: stages }));
+      const html = await render();
+      expect(html).toContain("Proposal expires Nov 4");
+      expect(html).toMatch(/lp-pill-risk[^>]*>Proposal expired Oct 26/);
+      expect(html).toMatch(/Proposals expiring this week<\/span><span[^>]*>2</);
+    });
+    it("KPI is a dash, with no tags, when the proposals read failed", async () => {
+      mock(ok({ failed: ["proposals"] }));
+      const html = await render();
+      expect(html).toMatch(/Proposals expiring this week<\/span><span[^>]*>—<\/span><span[^>]*>Couldn&#x27;t load/);
+      expect(html).toContain("Some details couldn&#x27;t load (proposals)");
+      expect(html).not.toContain("Proposal expires");
+    });
+    it("Lost / Nurture shows on lead cards only", async () => {
+      mock(ok({ rows: mixed, closeStages: stages }));
+      const html = await render();
+      expect(html.match(/Lost \/ Nurture/g)?.length).toBe(1);
+      expect(html.indexOf("Lost / Nurture")).toBeGreaterThan(html.indexOf("Lead Co"));
+    });
+    it("is hidden without lost or nurture stages", async () => {
+      mock(ok({ rows: mixed, closeStages: [] }));
+      expect(await render()).not.toContain("Lost / Nurture");
+    });
+    it("is hidden for a viewer", async () => {
+      mock(ok({ rows: mixed, closeStages: stages }), "viewer");
+      expect(await render()).not.toContain("Lost / Nurture");
+    });
   });
 });

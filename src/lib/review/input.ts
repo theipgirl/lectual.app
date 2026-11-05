@@ -52,3 +52,17 @@ export function parseWhatHappened(form: { get(name: string): unknown }): Parsed<
   if (body.length > NOTE_MAX_LENGTH) return { ok: false, error: `Keep it to ${NOTE_MAX_LENGTH} characters or fewer.` };
   return { ok: true, value: { kind, id, body } };
 }
+
+export const CLOSE_REASON_MAX = 200;
+export type CloseLeadInput = { id: string; stageId: string; reason: string | null };
+
+/** Lost / Nurture: a lead id, the chosen stage id and an optional short reason. The ids are only pointers; the action re-reads both. */
+export function parseCloseLead(form: { get(name: string): unknown }): Parsed<CloseLeadInput> {
+  const id = String(form.get("id") ?? "").trim();
+  if (!isUuid(id)) return { ok: false, error: "That record couldn't be found. Refresh and try again." };
+  const stageId = String(form.get("stageId") ?? "").trim();
+  if (!isUuid(stageId)) return { ok: false, error: "Choose a stage to move this lead to." };
+  const reason = String(form.get("reason") ?? "").trim();
+  if (reason.length > CLOSE_REASON_MAX) return { ok: false, error: `Keep the reason to ${CLOSE_REASON_MAX} characters or fewer.` };
+  return { ok: true, value: { id, stageId, reason: reason || null } };
+}

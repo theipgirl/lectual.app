@@ -2,13 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { getScopedClient } from "@/lib/db/scoped-client";
-import { CAN_WRITE_LEAD, addLeadNote, resolveCurrentRole } from "@/lib/pipeline";
+import { CAN_MOVE_STAGE, CAN_WRITE_LEAD, addLeadNote, moveLeadStage, resolveCurrentRole } from "@/lib/pipeline";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import { addMatterNote } from "@/lib/matters/notes";
 import { completeTask, createTask } from "@/lib/matters/tasks";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { friendlyMatterError } from "../matters/errors";
-import { isUuid, parseNextStep, parseWhatHappened } from "@/lib/review/input";
+import { isUuid, parseCloseLead, parseNextStep, parseWhatHappened } from "@/lib/review/input";
 
 export type ReviewActionState = { error?: string; saved?: boolean };
 
@@ -98,4 +98,42 @@ export async function logWhatHappenedAction(_prev: ReviewActionState, formData: 
   }
   refresh();
   return { saved: true };
+}
+
+/**
+ * Lost / Nurture on a LEAD: a person's explicit choice, through the same `moveLeadStage` a drag uses (it logs
+ * `stage_changed`). Role, lead and target stage are all re-read here; only a `lost` or `nurture` stage is accepted,
+ * whatever the browser posted. Tasks are left alone. The optional reason becomes a plain lead note.
+ */
+export async function closeLeadAction(_prev: ReviewActionState, formData: FormData): Promise<ReviewActionState> {
+  const parsed = parseCloseLead(formData);
+  if (!parsed.ok) return { error: parsed.error };
+  const { id, stageId, reason } = parsed.value;
+  let stageName: string;
+  try {
+    const supabase = await getScopedClient();
+    const role = await resolveCurrentRole(supabase);
+    if (!CAN_MOVE_STAGE.includes(role) || !CAN_WRITE_LEAD.includes(role)) return { error: NO_PERMISSION };
+    const { data: lead, error: leadErr } = await supabase.from("crm_lead").select("id, current_stage_id").eq("id", id).maybeSingle();
+    if (leadErr) throw leadErr;
+    if (!lead) return { error: NOT_FOUND };
+    const { data: stage, error: stageErr } = await supabase.from("crm_stage").select("id, name, category").eq("id", stageId).maybeSingle();
+    if (stageErr) throw stageErr;
+    if (!stage || (stage.category !== "lost" && stage.category !== "nurture")) return { error: "Choose one of your Lost or Nurture stages." };
+    if (lead.current_stage_id === stage.id) return { error: "This lead is already in that stage." };
+    stageName = stage.name;
+    await moveLeadStage(id, stage.id);
+  } catch (err) {
+    return { error: friendlyMatterError(err, "Couldn't move this lead.") };
+  }
+  let noteSaved = true;
+  if (reason) {
+    try {
+      await addLeadNote(id, { kind: "note", body: `Moved to ${stageName}: ${reason}` });
+    } catch {
+      noteSaved = false;
+    }
+  }
+  refresh();
+  return noteSaved ? { saved: true } : { saved: true, error: "The lead was moved, but the reason couldn't be saved as a note." };
 }

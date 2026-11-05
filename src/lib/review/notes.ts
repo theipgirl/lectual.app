@@ -8,7 +8,7 @@ export const CRITICAL_SOURCES = ["matters", "leads", "tasks"] as const;
 export type CriticalSource = (typeof CRITICAL_SOURCES)[number];
 
 /** Sources that only enrich a row: the rows still draw, and the gap is named. */
-export const OPTIONAL_SOURCES = ["last contact", "deadlines", "approvals", "stage history", "team names"] as const;
+export const OPTIONAL_SOURCES = ["last contact", "deadlines", "approvals", "stage history", "team names", "proposals"] as const;
 export type OptionalSource = (typeof OPTIONAL_SOURCES)[number];
 
 function list(names: readonly string[]): string {
