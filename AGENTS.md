@@ -1419,5 +1419,28 @@ and a Follow-Up stage; a lead that has a matter shows once, as the matter). Ever
 - **Actions** (`actions.ts`, fixed sentences): Set next step = `createTask` (type `custom`, `lead_id` or `matter_id`; the org is read from the parent row by `createTask`,
   the record is re-read through the scoped client first and the assignee is checked against the member directory); Done = `completeTask` after a scoped read of the
   task; Log what happened = `addMatterNote` / `addLeadNote` as a plain `note` (a timeline entry and last contact). Role re-resolved on every call.
+- **Proposal-expiry tags** (`src/lib/review/proposal-expiry.ts`, pure; read in `load.ts` `readProposalExpiries`): `client_proposal` rows by `lead_id` and `matter_id` (a matter row also
+  takes proposals filed on its lead), one batched read per id chunk, selecting only id, family_id, version, status, lead_id, matter_id and `expires_on` (a real column, a civil date; no content,
+  name or email is read). Only the NEWEST version of each family counts, and only while it is `sent`; a record with several takes the earliest expiry. Tag text: "Proposal expires Nov 4" /
+  "Proposal expires today" / "Proposal expired Oct 26" (the expired one in the `--ox` risk style), on board cards, the meeting card and stage-view rows. Tags NEVER change a bucket. KPI tile
+  "Proposals expiring this week" = expires today..+6 or expired within the last 14 days and still sent. Optional source `proposals`: a failed read draws no tags, the tile is a dash with
+  "Couldn't load", and the note reads "Some details couldn't load (proposals)", never "no proposal".
+- **Lost / Nurture** (lead rows only: board card, meeting card, stage row; `LostNurture.tsx`, `closeLeadAction`): a small inline form (stage select, optional reason of at most 200 characters,
+  `InlineConfirm`). The choices are the firm's stages whose category is `lost` or `nurture` (`closeStagesOf`, read from the stage list the loader already has); a firm with neither sees no button
+  and nothing else changes. Shown only for `CAN_MOVE_STAGE` (narrower than `CAN_WRITE_LEAD`: a paralegal can edit leads but `moveLeadStage` refuses them). The action re-resolves the role,
+  re-reads the lead and the target stage through the scoped client, refuses any stage that is not `lost`/`nurture`, then moves with the person path `moveLeadStage(id, stageId)` (logs
+  `stage_changed`; no agent path) and, when a reason was given, `addLeadNote` "Moved to <stage>: <reason>". The lead then leaves the review (it left an open stage). Its open task is left alone.
+  The firm needs a Lost and/or Nurture stage for the button to show.
 - Leads DO have an assignee (`crm_lead.assigned_to`), so a lead row shows it and the board uses it. Not built: proposal-expiry tags on cards (it would need a per-record
   proposal read), snooze, move-stage and lost/nurture buttons from the mockup. `createTask` and `completeTask` write no timeline row today, so neither does this page.
+
+## Sign-in links a scanner can't spend (2026-11-05, no schema)
+RPB's Check Point Harmony filter (like Microsoft Safe Links) opens every emailed link, which used up the one-time magic link (`otp_expired`).
+- **`/auth/confirm/`** (`src/app/auth/confirm/`): the Magic Link / Invite email templates point here (`?token_hash={{ .TokenHash }}&type=email|invite`).
+  Loading the page spends nothing; only the Sign in button's POST (`confirmSignIn`) calls `verifyOtp({ token_hash, type })`. `parseConfirmLink` accepts only
+  `email` / `magiclink` / `invite` and a url-safe hash of 8..256 characters; a bad or spent token goes to `/sign-in/?error=otp_expired` (next kept via `safeNext`).
+- **Code entry:** after a send, the sign-in page offers "Or enter the 6-digit code from the email" (`verifySignInCode`, `verifyOtp` type `email`,
+  `normalizeSignInCode`). Works only when the template includes `{{ .Token }}`.
+- **Fragment errors:** Supabase's own verify page bounces with `#error_code=...`, which the server can't read; `HashErrorNotice` reads it once in the browser
+  (`hashErrorCode`), shows `signInErrorMessage`'s fixed sentence and clears the fragment. Provider text is never shown.
+- The templates live in the Supabase dashboard (lectual-prod), not in this repo; change them only after this code is deployed.

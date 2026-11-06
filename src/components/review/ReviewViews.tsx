@@ -4,13 +4,14 @@ import { BOARD_COLUMNS, type Kpis, type Lane, type MeetingPosition, type StageGr
 import { WAITING_LABEL } from "@/lib/review/waiting";
 import { deadlineIsSoon, dueText, lastContactText, shortDate } from "@/lib/review/format";
 import { reviewHref, REVIEW_VIEWS, type ReviewParams, type ReviewView } from "@/lib/review/params";
+import type { CloseStage } from "@/lib/review/close-stage";
 import { ReviewRowActions } from "./ReviewRowActions";
 import { ReviewTable } from "./ReviewSection";
 import "@/components/list-page/list-page.css";
 import "./review.css";
 
 type Member = { userId: string; name: string };
-type Common = { today: string; members: Member[]; canWrite: boolean };
+type Common = { today: string; members: Member[]; canWrite: boolean; closeStages?: CloseStage[] };
 
 const VIEW_LABEL: Record<ReviewView, string> = { board: "Board", meeting: "Meeting mode", stage: "By stage" };
 
@@ -48,6 +49,7 @@ export function KpiStrip({ kpis }: { kpis: Kpis }) {
       <Tile label="Waiting on approval" value={kpis.approval} />
       <Tile label="Needs a next step" value={kpis.needs} />
       <Tile label="Waiting on the USPTO" value={kpis.uspto} />
+      <Tile label="Proposals expiring this week" value={kpis.expiring} tone="warn" />
     </div>
   );
 }
@@ -59,11 +61,12 @@ function Tags({ row, today }: { row: ReviewRow; today: string }) {
       {row.deadline && (
         <span className={`lp-pill${deadlineIsSoon(row.deadline.dueDate, today) ? " lp-pill-risk" : ""}`}>USPTO deadline {shortDate(row.deadline.dueDate, today)}</span>
       )}
+      {row.proposalExpiry && <span className={`lp-pill${row.proposalExpiry.expired ? " lp-pill-risk rv-deadline-soon" : ""}`}>{row.proposalExpiry.text}</span>}
     </div>
   );
 }
 
-function Card({ row, bucket, today, members, canWrite }: Common & { row: ReviewRow; bucket: BucketKey }) {
+function Card({ row, bucket, today, members, canWrite, closeStages }: Common & { row: ReviewRow; bucket: BucketKey }) {
   const due = row.nextStep ? dueText(row.nextStep.dueDate, today) : null;
   return (
     <article className={`lx-card rv-card rv-card-${bucket}`}>
@@ -80,7 +83,7 @@ function Card({ row, bucket, today, members, canWrite }: Common & { row: ReviewR
         {due && <span className={`lx-note rv-sub${due.overdue ? " rv-deadline-soon" : ""}`}>{due.text}</span>}
       </p>
       <Tags row={row} today={today} />
-      {canWrite && <ReviewRowActions kind={row.kind} id={row.id} nextStepId={row.nextStep?.id ?? null} members={members} defaultAssignee={row.nextStep?.assigneeId ?? row.assignedTo} />}
+      {canWrite && <ReviewRowActions kind={row.kind} id={row.id} nextStepId={row.nextStep?.id ?? null} members={members} defaultAssignee={row.nextStep?.assigneeId ?? row.assignedTo} closeStages={closeStages} />}
     </article>
   );
 }
@@ -184,7 +187,7 @@ export function MeetingCard({
         </div>
       </dl>
       <Tags row={row} today={common.today} />
-      {common.canWrite && <ReviewRowActions kind={row.kind} id={row.id} nextStepId={row.nextStep?.id ?? null} members={common.members} defaultAssignee={row.nextStep?.assigneeId ?? row.assignedTo} />}
+      {common.canWrite && <ReviewRowActions kind={row.kind} id={row.id} nextStepId={row.nextStep?.id ?? null} members={common.members} defaultAssignee={row.nextStep?.assigneeId ?? row.assignedTo} closeStages={common.closeStages} />}
       <nav className="rv-pager" aria-label="Meeting mode">
         {pos.prev ? <Link className="lx-btn lx-btn-ghost lx-btn-sm" href={href(pos.prev)}>Previous</Link> : <span />}
         {pos.next ? <Link className="lx-btn lx-btn-sec lx-btn-sm" href={href(pos.next)}>Keep and go to next</Link> : <span className="lx-note">That&apos;s the last one.</span>}

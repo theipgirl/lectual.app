@@ -11,6 +11,8 @@ import { matterIdsNeedingReview } from "@/app/dashboard/matters/list-utils";
 import { buildReviewRows, civilDateIn, reviewLeadStageIds, type ReviewActivityIn, type ReviewDeadlineIn, type ReviewTaskIn } from "./build";
 import type { ReviewRow } from "./buckets";
 import { CONTACT_TYPES } from "./contact";
+import { proposalExpiryTag, type ProposalExpiryIn } from "./proposal-expiry";
+import { closeStagesOf, type CloseStage } from "./close-stage";
 import { OPTIONAL_SOURCES, type CriticalSource, type OptionalSource } from "./notes";
 
 type ScopedClient = Awaited<ReturnType<typeof getScopedClient>>;
@@ -21,6 +23,8 @@ export const CHUNK = 80;
 const PAGE = 1000;
 const MAX_PAGES = 10;
 
+type ProposalExpiryRead = ProposalExpiryIn & { id: string; lead_id: string | null; matter_id: string | null };
+
 export type ReviewLoad =
   | {
       status: "ok";
@@ -29,6 +33,8 @@ export type ReviewLoad =
       timeZone: string;
       members: { userId: string; name: string; role: string }[];
       failed: OptionalSource[];
+      /** The firm's lost / nurture stages, for the Lost / Nurture button. Empty hides the button. */
+      closeStages: CloseStage[];
     }
   | { status: "unavailable"; failed: CriticalSource[] };
 
@@ -105,6 +111,30 @@ export async function readOpenDeadlines(db: ScopedClient, matterIds: readonly st
   );
 }
 
+/**
+ * Proposals linked to the given leads and matters. Only ids, status and the expiry DATE are selected:
+ * no content, client name or email ever reaches this module.
+ */
+export async function readProposalExpiries(db: ScopedClient, matterIds: readonly string[], leadIds: readonly string[]): Promise<ProposalExpiryRead[]> {
+  const select = "id, family_id, version, status, lead_id, matter_id, expires_on";
+  // The generated Database type has no 0089 tables: the same scoped connection seen through a narrow shape (as the proposals store does).
+  type Q = PromiseLike<{ data: ProposalExpiryRead[] | null; error: unknown }> & {
+    in(column: string, values: readonly string[]): Q;
+    order(column: string): Q;
+    range(from: number, to: number): Q;
+  };
+  const raw = db as unknown as { from(table: string): { select(columns: string): Q } };
+  const [m, l] = await Promise.all([
+    inChunks(matterIds, (chunk) =>
+      readAllPages<ProposalExpiryRead>((from, to) => raw.from("client_proposal").select(select).in("matter_id", chunk).order("id").range(from, to)),
+    ),
+    inChunks(leadIds, (chunk) =>
+      readAllPages<ProposalExpiryRead>((from, to) => raw.from("client_proposal").select(select).in("lead_id", chunk).order("id").range(from, to)),
+    ),
+  ]);
+  return [...m, ...l];
+}
+
 export async function readLastStageChange(db: ScopedClient, leadIds: readonly string[]): Promise<Map<string, string>> {
   const rows = await inChunks(leadIds, (chunk) =>
     readAllPages<{ lead_id: string | null; created_at: string }>((from, to) =>
@@ -114,6 +144,13 @@ export async function readLastStageChange(db: ScopedClient, leadIds: readonly st
   const newest = new Map<string, string>();
   for (const r of rows) if (r.lead_id && !newest.has(r.lead_id)) newest.set(r.lead_id, r.created_at);
   return newest;
+}
+
+/** A matter row also shows proposals filed against its lead (a quote drafted before the matter opened). */
+function proposalsFor(row: ReviewRow, all: readonly ProposalExpiryRead[], matters: readonly { id: string; lead_id: string | null }[]): ProposalExpiryRead[] {
+  if (row.kind === "lead") return all.filter((p) => p.lead_id === row.id);
+  const leadId = matters.find((m) => m.id === row.id)?.lead_id ?? null;
+  return all.filter((p) => p.matter_id === row.id || (leadId !== null && p.lead_id === leadId));
 }
 
 /**
@@ -148,14 +185,16 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
   const leadIds = leads.filter((l) => !withMatter.has(l.id) && eligibleStages.has(l.current_stage_id)).map((l) => l.id);
 
   const dependsOnRecords = failedCritical.length === 0;
-  const [tasksS, activityS, deadlinesS, changesS] = dependsOnRecords
+  const proposalLeadIds = [...new Set([...leadIds, ...matters.filter((m) => m.status === "open" || m.status === "on_hold").map((m) => m.lead_id).filter((x): x is string => !!x)])];
+  const [tasksS, activityS, deadlinesS, changesS, proposalsS] = dependsOnRecords
     ? await Promise.allSettled([
         readOpenTasks(db, matterIds, leadIds),
         readContactActivity(db, matterIds, leadIds),
         readOpenDeadlines(db, matterIds),
         readLastStageChange(db, leadIds),
+        readProposalExpiries(db, matterIds, proposalLeadIds),
       ])
-    : ([null, null, null, null] as const);
+    : ([null, null, null, null, null] as const);
   if (dependsOnRecords && tasksS && tasksS.status === "rejected") failedCritical.push("tasks");
   if (failedCritical.length > 0) return { status: "unavailable", failed: failedCritical };
 
@@ -166,6 +205,9 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
   if (!deadlinesOk) failed.push("deadlines");
   const changes = changesS?.status === "fulfilled" ? changesS.value : null;
   if (!changes) failed.push("stage history");
+
+  const proposals = proposalsS?.status === "fulfilled" ? proposalsS.value : null;
+  if (!proposals) failed.push("proposals");
 
   // Approvals: the queue's own three states. Unconfigured = nothing pending to chip; unavailable = chip skipped, said so.
   let pendingMatterIds: Set<string> | null = new Set();
@@ -189,6 +231,7 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
   const memberList = membersS.status === "fulfilled" ? membersS.value : [];
   if (membersS.status === "rejected") failed.push("team names");
 
+  const today = civilDateIn(now, timeZone);
   const rows = buildReviewRows({
     matters,
     leads,
@@ -204,10 +247,14 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
     now,
   });
 
+  // Tags only: a failed read draws no tags (and the KPI tile is a dash), never "no proposal".
+  const tagged = proposals ? rows.map((r) => ({ ...r, proposalExpiry: proposalExpiryTag(proposalsFor(r, proposals, matters), today) })) : rows;
+
   return {
     status: "ok",
-    rows,
-    today: civilDateIn(now, timeZone),
+    rows: tagged,
+    closeStages: closeStagesOf(leadStages),
+    today,
     timeZone,
     members: memberList.map((m) => ({ userId: m.userId, name: m.displayName || m.email || "Teammate", role: m.role })),
     failed: OPTIONAL_SOURCES.filter((s) => failed.includes(s)),

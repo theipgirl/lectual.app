@@ -1,4 +1,5 @@
 import { BUCKET_KEYS, type BucketKey, type ReviewBuckets, type ReviewRow } from "./buckets";
+import { expiringThisWeek } from "./proposal-expiry";
 
 /**
  * The board, the meeting walk-through and the by-stage view, from the SAME buckets. Pure.
@@ -118,14 +119,17 @@ export type Kpis = {
   needs: number;
   uspto: number;
   approval: number | null;
+  /** Live proposals expiring this week or lapsed in the last 14 days; null when the proposals read failed. */
+  expiring: number | null;
 };
 
-export function kpis(buckets: ReviewBuckets, rows: readonly ReviewRow[], approvalsKnown: boolean): Kpis {
+export function kpis(buckets: ReviewBuckets, rows: readonly ReviewRow[], approvalsKnown: boolean, expiry: { known: boolean; today: string } = { known: false, today: "" }): Kpis {
   return {
     overdue: buckets.counts.overdue,
     week: buckets.counts.week,
     needs: buckets.counts.needs,
     uspto: buckets.counts.uspto,
     approval: approvalsKnown ? rows.filter((r) => r.waiting === "approval").length : null,
+    expiring: expiry.known ? rows.filter((r) => expiringThisWeek(r.proposalExpiry, expiry.today)).length : null,
   };
 }

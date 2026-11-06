@@ -80,3 +80,92 @@ describe("review actions", () => {
     expect(addLeadNote).toHaveBeenCalledWith(ID, { kind: "note", body: "Spoke" });
   });
 });
+
+describe("closeLeadAction (Lost / Nurture)", () => {
+  const STAGE = "00000000-0000-4000-8000-000000000009";
+  const moveLeadStage = vi.fn(async () => ({}));
+  let category = "lost";
+  let leadStage = "00000000-0000-4000-8000-000000000008";
+  let leadFound = true;
+  let stageFound = true;
+  let canMove = true;
+
+  function setupClose() {
+    vi.doMock("next/cache", () => ({ revalidatePath: vi.fn() }));
+    vi.doMock("@/lib/db/scoped-client", () => ({
+      getScopedClient: async () => ({
+        from: (table: string) => ({
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () =>
+                table === "crm_lead"
+                  ? { data: leadFound ? { id: ID, current_stage_id: leadStage } : null, error: null }
+                  : { data: stageFound ? { id: STAGE, name: "Nurture 2027", category } : null, error: null },
+            }),
+          }),
+        }),
+      }),
+    }));
+    vi.doMock("@/lib/pipeline", () => ({
+      CAN_WRITE_LEAD: ["owner", "attorney", "paralegal"],
+      CAN_MOVE_STAGE: canMove ? ["owner", "attorney"] : [],
+      resolveCurrentRole: async () => role,
+      addLeadNote,
+      moveLeadStage,
+    }));
+    vi.doMock("@/lib/matters/matters", () => ({ MATTER_WRITE_ROLES: ["owner", "attorney"] }));
+    vi.doMock("@/lib/matters/notes", () => ({ addMatterNote }));
+    vi.doMock("@/lib/matters/tasks", () => ({ createTask, completeTask }));
+    vi.doMock("@/lib/members/directory", () => ({ listMemberDirectory: async () => members }));
+  }
+
+  beforeEach(() => {
+    vi.resetModules(); vi.clearAllMocks();
+    role = "attorney"; category = "lost"; leadFound = true; stageFound = true; canMove = true;
+    leadStage = "00000000-0000-4000-8000-000000000008";
+    setupClose();
+  });
+
+  it("moves with moveLeadStage, then saves the reason as a lead note", async () => {
+    const { closeLeadAction } = await import("../../src/app/dashboard/review/actions");
+    const res = await closeLeadAction({}, fd({ id: ID, stageId: STAGE, reason: "Went quiet" }));
+    expect(res).toEqual({ saved: true });
+    expect(moveLeadStage).toHaveBeenCalledWith(ID, STAGE);
+    expect(addLeadNote).toHaveBeenCalledWith(ID, { kind: "note", body: "Moved to Nurture 2027: Went quiet" });
+    expect(moveLeadStage.mock.invocationCallOrder[0]).toBeLessThan(addLeadNote.mock.invocationCallOrder[0]);
+    expect(createTask).not.toHaveBeenCalled();
+    expect(completeTask).not.toHaveBeenCalled();
+  });
+  it("writes no note without a reason", async () => {
+    const { closeLeadAction } = await import("../../src/app/dashboard/review/actions");
+    expect(await closeLeadAction({}, fd({ id: ID, stageId: STAGE }))).toEqual({ saved: true });
+    expect(addLeadNote).not.toHaveBeenCalled();
+  });
+  it("refuses a role that cannot move stages", async () => {
+    role = "viewer";
+    const { closeLeadAction } = await import("../../src/app/dashboard/review/actions");
+    expect((await closeLeadAction({}, fd({ id: ID, stageId: STAGE }))).error).toMatch(/permission/);
+    expect(moveLeadStage).not.toHaveBeenCalled();
+  });
+  it("refuses a stage that is not lost or nurture", async () => {
+    for (const c of ["open", "won"]) {
+      vi.resetModules(); category = c; setupClose();
+      const { closeLeadAction } = await import("../../src/app/dashboard/review/actions");
+      expect((await closeLeadAction({}, fd({ id: ID, stageId: STAGE }))).error).toMatch(/Lost or Nurture/);
+    }
+    expect(moveLeadStage).not.toHaveBeenCalled();
+  });
+  it("treats a foreign (invisible) stage or lead as refused / not found", async () => {
+    stageFound = false;
+    const { closeLeadAction } = await import("../../src/app/dashboard/review/actions");
+    expect((await closeLeadAction({}, fd({ id: ID, stageId: STAGE }))).error).toMatch(/Lost or Nurture/);
+    vi.resetModules(); stageFound = true; leadFound = false; setupClose();
+    const again = await import("../../src/app/dashboard/review/actions");
+    expect((await again.closeLeadAction({}, fd({ id: ID, stageId: STAGE }))).error).toMatch(/couldn't be found/);
+    expect(moveLeadStage).not.toHaveBeenCalled();
+  });
+  it("rejects a reason over 200 characters before any read", async () => {
+    const { closeLeadAction } = await import("../../src/app/dashboard/review/actions");
+    expect((await closeLeadAction({}, fd({ id: ID, stageId: STAGE, reason: "x".repeat(201) }))).error).toMatch(/200/);
+  });
+});

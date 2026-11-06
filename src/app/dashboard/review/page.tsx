@@ -7,6 +7,7 @@ import { ReviewSection } from "@/components/review/ReviewSection";
 import { KpiStrip, MeetingCard, ReviewBoard, StageView, ViewSwitch } from "@/components/review/ReviewViews";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
+import { CAN_MOVE_STAGE } from "@/lib/pipeline/leads";
 import { loadReview } from "@/lib/review/load";
 import { bucketOf, reviewBuckets, reviewSubline } from "@/lib/review/buckets";
 import { boardLanes, kpis, meetingPosition, meetingQueue, stageGroups } from "@/lib/review/lanes";
@@ -32,6 +33,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const role = session.kind === "ok" ? session.role : null;
   const userId = session.kind === "ok" ? session.user.id : null;
   const canWrite = !!role && MATTER_WRITE_ROLES.includes(role);
+  const canMove = canWrite && CAN_MOVE_STAGE.includes(role);
 
   if (load.status === "unavailable") {
     return (
@@ -51,7 +53,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   // Chip counts: each chip counts what it would show with the other filters kept.
   const countFor = (over: Partial<ReviewParams>) => applyReviewFilters(load.rows, { ...params, ...over }, userId).length;
   const note = detailsNote(load.failed);
-  const common = { today: load.today, members: load.members, canWrite };
+  const common = { today: load.today, members: load.members, canWrite, closeStages: canMove ? load.closeStages : [] };
   const queue = meetingQueue(buckets, load.members);
   const pos = meetingPosition(queue.length, params.i);
   const focus = pos ? queue[pos.index] : null;
@@ -71,7 +73,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
         toggle={<ViewSwitch params={params} />}
       />
 
-      <KpiStrip kpis={kpis(buckets, shown, !load.failed.includes("approvals"))} />
+      <KpiStrip kpis={kpis(buckets, shown, !load.failed.includes("approvals"), { known: !load.failed.includes("proposals"), today: load.today })} />
 
       <FilterChips as="nav" label="Whose">
         <Chip href={link({ who: "all" })} active={params.who === "all"} count={countFor({ who: "all" })}>Everyone</Chip>

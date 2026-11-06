@@ -1,5 +1,6 @@
 import type { Direction, Waiting } from "./waiting";
 import type { ContactType } from "./contact";
+import type { ProposalExpiryTag } from "./proposal-expiry";
 
 /**
  * The weekly review's sections. Pure: rows in, buckets out. A row is in exactly ONE section, the
@@ -47,6 +48,8 @@ export type ReviewRow = {
   nextStep: ReviewNextStep | null;
   /** The nearest open USPTO deadline (matters only). */
   deadline: { dueDate: string; title: string | null } | null;
+  /** A live proposal's expiry, drawn as a tag only. Never moves a row between sections. Absent = none, or the read failed. */
+  proposalExpiry?: ProposalExpiryTag | null;
 };
 
 export const BUCKET_KEYS = ["overdue", "week", "needs", "quiet", "uspto", "track"] as const;

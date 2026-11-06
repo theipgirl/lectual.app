@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { BUCKET_COPY, type BucketKey, type ReviewRow } from "@/lib/review/buckets";
 import { WAITING_LABEL } from "@/lib/review/waiting";
 import { deadlineIsSoon, dueText, lastContactText, shortDate } from "@/lib/review/format";
+import type { CloseStage } from "@/lib/review/close-stage";
 import { ReviewRowActions } from "./ReviewRowActions";
 import "@/components/list-page/list-page.css";
 import "./review.css";
@@ -16,9 +17,11 @@ export type SectionProps = {
   members: Member[];
   /** Whether the caller's role can write; false hides every edit control. */
   canWrite: boolean;
+  /** Lost / nurture stages for the Lost / Nurture button on lead rows; empty or absent hides it. */
+  closeStages?: CloseStage[];
 };
 
-export function ReviewTable({ rows, today, members, canWrite }: Omit<SectionProps, "bucket">) {
+export function ReviewTable({ rows, today, members, canWrite, closeStages }: Omit<SectionProps, "bucket">) {
   const names = new Map(members.map((m) => [m.userId, m.name]));
   const who = (id: string | null) => (id ? names.get(id) ?? "Teammate" : null);
   return (
@@ -50,6 +53,7 @@ export function ReviewTable({ rows, today, members, canWrite }: Omit<SectionProp
                     {r.kind === "lead" ? "Lead" : "Matter"}
                     {r.mark ? ` · ${r.mark}` : ""}
                   </div>
+                  {r.proposalExpiry && <span className={`lp-pill${r.proposalExpiry.expired ? " lp-pill-risk rv-deadline-soon" : ""}`}>{r.proposalExpiry.text}</span>}
                 </td>
                 <td data-label="Stage">
                   {r.stageLabel ? <span className="lp-pill">{r.stageLabel}</span> : <span className="lx-note">—</span>}
@@ -85,7 +89,7 @@ export function ReviewTable({ rows, today, members, canWrite }: Omit<SectionProp
                 </td>
                 {canWrite && (
                   <td data-label="Update">
-                    <ReviewRowActions kind={r.kind} id={r.id} nextStepId={r.nextStep?.id ?? null} members={members} defaultAssignee={r.nextStep?.assigneeId ?? r.assignedTo} />
+                    <ReviewRowActions kind={r.kind} id={r.id} nextStepId={r.nextStep?.id ?? null} members={members} defaultAssignee={r.nextStep?.assigneeId ?? r.assignedTo} closeStages={closeStages} />
                   </td>
                 )}
               </tr>
