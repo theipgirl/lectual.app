@@ -43,13 +43,13 @@ describe("cards actions", () => {
   it("Hand to hands over the step when there is one, else the record", async () => {
     const { deckHandToAction } = await import("../../src/app/dashboard/review/card-actions");
     await run(() => deckHandToAction(fd({ taskId: "tt", assigneeId: PERSON, kind: "lead", id: "i" })));
-    const stepForm = update.mock.calls[0][1] as FormData;
+    const stepForm = (update.mock.calls[0] as unknown[])[1] as FormData;
     expect(stepForm.get("taskId")).toBe("tt");
     expect(stepForm.get("assigneeId")).toBe(PERSON);
     expect(stepForm.has("title")).toBe(false);
     expect(assign).not.toHaveBeenCalled();
     await run(() => deckHandToAction(fd({ assigneeId: PERSON, kind: "lead", id: "i" })));
-    const recForm = assign.mock.calls[0][1] as FormData;
+    const recForm = (assign.mock.calls[0] as unknown[])[1] as FormData;
     expect(recForm.get("userId")).toBe(PERSON);
     expect(recForm.get("kind")).toBe("lead");
   });
