@@ -33,6 +33,8 @@ export type ReviewRow = {
   client: string;
   mark: string | null;
   stageLabel: string | null;
+  /** The docket stage's own code ("19A"), when the record has one. The agenda reads it before the label. */
+  stageCode?: string | null;
   /** The matter type code (TM, CR, PATENT, BL, LIT, ...). Absent on a lead, or when unknown (read as TM). */
   matterType?: string | null;
   stageDays: number | null;

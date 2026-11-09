@@ -173,3 +173,14 @@ describe("Cards deck follows the agenda order", () => {
     expect(deck.map((c) => c.row.key)).toEqual(["lead", "tmOver", "tmWeek", "oa", "biz"]);
   });
 });
+
+describe("readRowStage (docket code first)", () => {
+  it("uses the code when the label has no number", async () => {
+    const { readRowStage } = await import("../../src/lib/review/agenda");
+    expect(readRowStage({ stageCode: "20A", stageLabel: "Specimen(s) Requested" })).toBe("post-filing");
+    expect(readRowStage({ stageCode: "17", stageLabel: "Application Filed" })).toBe("post-filing");
+    expect(readRowStage({ stageCode: "16", stageLabel: "Full Balance Received" })).toBe("pre-filing");
+    expect(readRowStage({ stageCode: "9", stageLabel: "Comprehensive Search" })).toBe("pre-filing");
+    expect(readRowStage({ stageCode: null, stageLabel: "Awaiting Trademark Registration" })).toBe("post-filing");
+  });
+});

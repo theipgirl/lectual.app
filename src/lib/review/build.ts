@@ -181,6 +181,7 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
       client,
       mark: display.title !== client ? display.title : null,
       stageLabel: m.stage ? m.stage.label : null,
+      stageCode: m.stage ? m.stage.code : null,
       matterType: m.type ?? null,
       stageDays: age.days,
       stageNote: age.days === null ? age.label : null,

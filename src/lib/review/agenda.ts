@@ -69,11 +69,21 @@ export function readStage(label: string | null | undefined): StageReading {
  * deadline is never parked, so an office action response date can't be hidden in a collapsed section.
  * Leads are never parked.
  */
+/**
+ * A matter's stage: its docket code first ("19A" -> 19; 17 "Application Filed" and over is at or past filing, so
+ * "20A. Specimen(s) Requested" is USPTO work), because the firm's labels carry no number. Else the label rules.
+ */
+export function readRowStage(row: Pick<ReviewRow, "stageCode" | "stageLabel">): StageReading {
+  const m = /^\s*(\d{1,3})[A-Za-z]?\s*$/.exec(String(row.stageCode ?? ""));
+  if (m) return Number(m[1]) < 17 ? "pre-filing" : "post-filing";
+  return readStage(row.stageLabel);
+}
+
 export function agendaSection(row: ReviewRow, today: string): AgendaSection {
   if (row.kind === "lead") return "new-clients";
   const type = row.matterType ?? "TM";
   const ip = IP_MATTER_TYPES.includes(type);
-  const home: AgendaSection = !ip ? "contracts" : readStage(row.stageLabel) === "post-filing" ? "uspto" : "tm-in-progress";
+  const home: AgendaSection = !ip ? "contracts" : readRowStage(row) === "post-filing" ? "uspto" : "tm-in-progress";
   if (row.deadline) return home;
   const bucket = bucketOf(row, today);
   if (bucket === "track") return "parked";
