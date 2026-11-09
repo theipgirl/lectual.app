@@ -62,7 +62,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const note = detailsNote(load.failed);
   const common = { today: load.today, members: load.members, canWrite, params };
   const agenda = agendaOrder(shown, load.today);
-  const queue = agendaQueue(agenda);
+  const queue = agendaQueue(agenda, load.today);
   const pos = meetingPosition(queue.length, params.i);
   const focus = pos ? queue[pos.index] : null;
 

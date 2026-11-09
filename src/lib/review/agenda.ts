@@ -123,8 +123,12 @@ export function agendaOrder(rows: readonly ReviewRow[], today: string): AgendaGr
 }
 
 /** The rows meeting mode walks: sections 1 to 4 in order, Parked left out. */
-export function agendaQueue(groups: readonly AgendaGroup[]): ReviewRow[] {
-  return groups.filter((g) => MEETING_SECTIONS.includes(g.section)).flatMap((g) => g.rows);
+export function agendaQueue(groups: readonly AgendaGroup[], today: string): ReviewRow[] {
+  // Meeting mode skips on-track leads (Taylor, Nov 9): nothing to talk about for them this week. The agenda still lists them.
+  return groups
+    .filter((g) => MEETING_SECTIONS.includes(g.section))
+    .flatMap((g) => g.rows)
+    .filter((r) => !(r.kind === "lead" && bucketOf(r, today) === "track"));
 }
 
 /** Every row in agenda order, Parked last: the position of each row, for the Cards deck. */

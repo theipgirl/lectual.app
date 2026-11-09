@@ -150,10 +150,12 @@ describe("agendaOrder", () => {
       row({ key: "oa", client: "O", stageLabel: "19A. OA Issued", ...flagged }),
       row({ key: "tm", client: "T", ...flagged }),
       row({ key: "lead", client: "L", kind: "lead", ...flagged }),
+      row({ key: "calm", client: "C", kind: "lead", ...quietOk }),
     ];
     const groups = agendaOrder(rows, TODAY);
-    expect(agendaQueue(groups).map((r) => r.key)).toEqual(["lead", "tm", "oa", "biz"]);
-    expect([...agendaPositions(groups).keys()]).toEqual(["lead", "tm", "oa", "biz", "park"]);
+    expect(agendaQueue(groups, TODAY).map((r) => r.key)).toEqual(["lead", "tm", "oa", "biz"]);
+    expect(groups[0].rows.map((r) => r.key)).toContain("calm");
+    expect([...agendaPositions(groups).keys()]).toEqual(["lead", "calm", "tm", "oa", "biz", "park"]);
   });
 });
 
