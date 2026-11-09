@@ -165,8 +165,26 @@ export function validatePackages(list: unknown): PackageIssue[] {
  * the office-action note, anything unknown) is kept. Does not validate.
  */
 export function withPackages(pricing: Record<string, unknown>, list: readonly ProposalPricing[]): Record<string, unknown> {
-  const copy = list.map((p) => ({ ...p }));
-  const first = copy[0];
+  // A package's own `includes` rows are not edited by the price form, so they are carried across from the
+  // stored entry of the same name (case-insensitive, trimmed). Nothing is invented.
+  const stored = Array.isArray(pricing.packages) ? pricing.packages : [];
+  const includesFor = (name: string): unknown[] | undefined => {
+    const key = name.trim().toLowerCase();
+    const hit = stored.find((r) => isObject(r) && typeof r.package === "string" && r.package.trim().toLowerCase() === key);
+    return isObject(hit) && Array.isArray(hit.includes) ? hit.includes : undefined;
+  };
+  const flat = list.map((p) => {
+    const copy: Record<string, unknown> & ProposalPricing = { ...p };
+    delete copy.includes;
+    return copy;
+  });
+  const copy = flat.map((p) => {
+    const includes = includesFor(p.package);
+    return includes ? { ...p, includes } : { ...p };
+  });
+  // The flat fields come from the first package's numbers only, never its `includes` (the top-level
+  // `includes` is the firm's own "what's included" table).
+  const first = flat[0];
   return first ? { ...pricing, ...first, packages: copy } : { ...pricing };
 }
 

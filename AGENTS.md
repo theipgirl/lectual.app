@@ -1309,6 +1309,24 @@ line, never hidden in the price. Data only for now: there is no editor control t
   proposal page's totals add "<label> (in the fee above) −$X" under the name. The Lawmatics note and accept notice list no per-name discounts, so
   they are unchanged. Not verified in a real browser.
 
+## "What's included" follows the chosen package (2026-11-09, no schema)
+Taylor: when the client selects a package, the "what's included" list should show it; two different packages (one per mark or brand name) are shown side
+by side. Display and data-keeping only: `pricing.ts` has no diff and `quoteProposal` is untouched. Nothing sends.
+- **Columns follow the selection.** `chosenPackageNames(content, selection)` (`src/lib/proposals/chosen-packages.ts`, pure) is the distinct packages chosen
+  across brand names (Spec 6, `chosenPackage`, only while one of the name's marks is ticked) and marks (Spec 7, `chosenMarkPackage`, only ticked marks),
+  ordered as in `content.packages`. The client page passes its LIVE selection (`shownSelection`; the accepted selection on a receipt), so a dropdown change
+  redraws the table. `includesComparison(content, packageNames?)` shows those packages only (`mode: "chosen"`); with nothing chosen, no name matching an
+  offer, or no chosen package having includes rows, it shows every offered package as before (`mode: "all"`); `null` (no offered package has rows) keeps the
+  `content.includes` table. Headings (`comparisonHeading`): one chosen = "What your package includes" / "<Package>™, with each trademark you choose"; several =
+  "Compare your packages"; all = "What each package includes". Same `.cp-cmp*` markup, scroll wrapper and "—" cells. No `package_choice` = unchanged.
+- **Includes survive saves.** `withPackageSnapshot` keeps an earlier snapshot entry's `includes` when the firm's list has none for that package (the firm's
+  rows win when present; a package new to the proposal gets the firm's rows or none), beside the `custom_discount` it already kept. `withPackages` (Settings
+  -> Client proposals) carries each stored `pricing.packages[i].includes` across by name (case-insensitive, trimmed), never invents any, and never copies a
+  package's rows onto the top-level `includes` table.
+- There is still no editor control for a package's own `includes` rows; they are data (content jsonb or the settings' `packages` entries).
+- Tests: `tests/client-proposal/includes-follow-choice.test.tsx`. The Spec 6 page test in `tests/client-proposal/package-choice.test.tsx` changed on purpose
+  (the default selection now shows one Enhanced column). Not verified in a real browser.
+
 ## Consults and client meetings on Proposals (Spec 8, 2026-10-30, no schema)
 The collapsed "Recent consults (N ready to draft)" toggle is gone. Under the proposals table is an always-open section, "Consults and client meetings".
 - **One read.** It is still `loadConsultsStrip` (`consults-load.ts`) over `listMeetings()`: same 14-day window, newest first. The filter is widened by `isListedMeeting`

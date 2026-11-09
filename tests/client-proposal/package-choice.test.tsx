@@ -88,10 +88,11 @@ describe("What each package includes (Spec 6)", () => {
       { label: "Search report", value: undefined, note: undefined, highlight: undefined, cells: ["1", "2", "3"] },
       { label: "Post registration monitoring", value: undefined, note: undefined, highlight: undefined, cells: ["—", "—", "✓"] },
     ]);
+    // The page itself follows the client's choice (both brand names start on Enhanced): one column.
     const html = render({ content: c });
-    expect(html).toContain("What each package includes");
-    expect(html).toContain('<th scope="col" class="cp-vcell">Concierge</th>');
-    expect(html).not.toContain("What your package includes");
+    expect(html).toContain("What your package includes");
+    expect(html).toContain('<th scope="col" class="cp-vcell">Enhanced</th>');
+    expect(html).not.toContain('<th scope="col" class="cp-vcell">Concierge</th>');
   });
 
   it("without package includes, the existing table is unchanged", () => {
