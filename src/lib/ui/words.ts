@@ -21,8 +21,9 @@ export const AI_TOOLS_GROUP = "AI tools";
 export const APPROVALS_NAME = "Approvals";
 /** The one page that replaces the Monday spreadsheet walk-through. */
 export const REVIEW_NAME = "Weekly review";
-/** The Weekly review view that follows the Monday meeting's order. */
-export const REVIEW_AGENDA_VIEW = "Monday agenda";
+/** The Weekly review's three views. */
+export const REVIEW_BOARD_VIEW = "Board";
+export const REVIEW_SHEET_VIEW = "Sheet";
 /** The Weekly review view that deals one person's records as cue cards. */
 export const REVIEW_CARDS_VIEW = "Cards";
 /** The people who have asked about work (was "Intake" / "PNC"). */

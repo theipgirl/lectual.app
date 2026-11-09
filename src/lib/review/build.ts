@@ -21,6 +21,7 @@ export type ReviewMatterIn = {
   owner_name: string | null;
   status: string;
   type?: string | null;
+  referral_source?: string | null;
   lead_id: string | null;
   assigned_to: string | null;
   stage_entered_at: string | null;
@@ -44,6 +45,7 @@ export type ReviewLeadIn = {
   lawmatics_id: string | null;
   lawmatics_synced_at: string | null;
   sheet_key: string | null;
+  referral_source?: string | null;
 };
 
 export type ReviewStageIn = { id: string; name: string; category?: string | null; order_index: number | null };
@@ -154,9 +156,13 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
   const contactKnown = input.sources.activity === "ok";
 
   const contactOf = (list: readonly ContactActivity[] | undefined) => {
-    if (!contactKnown) return { lastContact: null, direction: null };
-    const { last, direction } = summarizeContact(list ?? [], now);
-    return { lastContact: last ? { date: civilDateIn(last.at, timeZone), type: last.type } : null, direction };
+    if (!contactKnown) return { lastContact: null, direction: null, lastOutbound: null };
+    const { last, direction, lastOutbound } = summarizeContact(list ?? [], now);
+    return {
+      lastContact: last ? { date: civilDateIn(last.at, timeZone), type: last.type } : null,
+      direction,
+      lastOutbound: lastOutbound ? civilDateIn(lastOutbound.at, timeZone) : null,
+    };
   };
 
   const rows: ReviewRow[] = [];
@@ -170,7 +176,7 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
       imported: Boolean(m.lawmatics_id || m.lawmatics_synced_at),
       now,
     });
-    const { lastContact, direction } = contactOf(activityByMatter.get(m.id));
+    const { lastContact, direction, lastOutbound } = contactOf(activityByMatter.get(m.id));
     const display = matterDisplayTitle(m);
     const client = m.owner_name?.trim() || display.title;
     rows.push({
@@ -190,6 +196,8 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
       contactKnown,
       lastContact,
       lastDirection: direction,
+      lastOutbound,
+      source: m.referral_source?.trim() || null,
       waiting: waitingOn({
         withUspto: stageIsWithUspto(m.stage),
         pendingApproval: input.pendingMatterIds?.has(m.id) ?? false,
@@ -215,7 +223,7 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
       lastStageChangeAt: input.lastStageChange?.get(l.id) ?? null,
       now,
     });
-    const { lastContact, direction } = contactOf(activityByLead.get(l.id));
+    const { lastContact, direction, lastOutbound } = contactOf(activityByLead.get(l.id));
     const full = `${l.first_name ?? ""} ${l.last_name ?? ""}`.trim();
     const client = l.business_name?.trim() || full || l.email || "Unnamed lead";
     rows.push({
@@ -233,6 +241,8 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
       contactKnown,
       lastContact,
       lastDirection: direction,
+      lastOutbound,
+      source: l.referral_source?.trim() || null,
       waiting: waitingOn({
         withUspto: false,
         pendingApproval: input.pendingLeadIds?.has(l.id) ?? false,

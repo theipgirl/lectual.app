@@ -38,8 +38,21 @@ describe("summarizeContact", () => {
     expect(r.direction).toBe("they");
   });
   it("ignores the future and nothing gives null", () => {
-    expect(summarizeContact([{ type: "email_sent", created_at: "2027-01-01T00:00:00Z" }], now)).toEqual({ last: null, direction: null });
+    expect(summarizeContact([{ type: "email_sent", created_at: "2027-01-01T00:00:00Z" }], now)).toEqual({ last: null, direction: null, lastOutbound: null });
     expect(summarizeContact([], now).last).toBeNull();
+  });
+  it("lastOutbound is the newest email we sent or call we made, not a reply or a note", () => {
+    const r = summarizeContact(
+      [
+        { type: "email_sent", created_at: "2026-10-20T10:00:00Z" },
+        { type: "call_logged", created_at: "2026-10-25T10:00:00Z" },
+        { type: "email_received", created_at: "2026-10-28T10:00:00Z" },
+        { type: "note", created_at: "2026-10-30T10:00:00Z" },
+      ],
+      now,
+    );
+    expect(r.lastOutbound).toEqual({ at: "2026-10-25T10:00:00Z", type: "call_logged" });
+    expect(summarizeContact([{ type: "email_received", created_at: "2026-10-28T10:00:00Z" }], now).lastOutbound).toBeNull();
   });
   it("words", () => expect(contactWords("email_received")).toBe("they replied"));
 });

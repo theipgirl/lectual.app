@@ -8,11 +8,14 @@ const members = [
 ];
 const step = (dueDate: string | null, assigneeId: string | null) => ({ id: "t", title: "Follow up", dueDate, assigneeId });
 const rows = [
-  row({ key: "a", client: "Overdue Co", nextStep: step("2026-10-30", "u-rayn") }),
-  row({ key: "b", client: "Week Co", nextStep: step("2026-11-04", "u-reb") }),
-  row({ key: "c", client: "Needs Co", nextStep: null }),
+  row({ key: "a", client: "Overdue Co", waiting: "us", nextStep: step("2026-10-30", "u-rayn") }),
+  row({ key: "b", client: "Week Co", waiting: "us", nextStep: step("2026-11-04", "u-reb") }),
+  row({ key: "c", client: "Needs Co", waiting: "us", nextStep: null }),
   row({ key: "d", client: "Office Co", waiting: "uspto", nextStep: null, deadline: { dueDate: "2026-11-20", title: "Response" } }),
-  row({ key: "e", client: "Fine Co", stageLabel: "Application Filed" }),
+  row({ key: "e", client: "Fine Co", stageLabel: "Application Filed", waiting: null }),
+  row({ key: "f", client: "Client Co", assignedTo: "u-rayn", waiting: "client", lastOutbound: "2026-10-28", proposalExpiry: { text: "Proposal expires Nov 11", expiresOn: "2026-11-11", expired: false } }),
+  row({ key: "g", client: "Lapsed Co", kind: "lead", id: "00000000-0000-4000-8000-0000000000d1", assignedTo: "u-rayn", waiting: "client", lastOutbound: null, proposalExpiry: { text: "Proposal expired Oct 28", expiresOn: "2026-10-28", expired: true } }),
+  row({ key: "h", client: "Approve Co", waiting: "approval", nextStep: step("2026-12-30", "u-rayn") }),
 ];
 
 function mock(load: unknown, role: string | null = "attorney") {
@@ -51,90 +54,124 @@ describe("Weekly review page", () => {
     expect(String(mod.metadata.title)).toBe("Weekly review · Lectual");
   });
 
-  it("the Monday agenda is the default: five numbered sections in the meeting's order, Parked collapsed, owner on each card", async () => {
+  it("the Board is the default (no view param): lanes split Our turn / Waiting on client, collapsed USPTO and on-track", async () => {
     mock(ok());
     const html = await render();
-    expect(html).toContain("rv-agenda");
-    expect(html).not.toContain("rv-board");
-    const at = (t: string) => html.indexOf(t);
-    expect(at("1. New clients and consults")).toBeGreaterThan(-1);
-    expect(at("1. New clients")).toBeLessThan(at("2. Trademarks in progress"));
-    expect(at("2. Trademarks in progress")).toBeLessThan(at("3. USPTO matters"));
-    expect(at("3. USPTO matters")).toBeLessThan(at("4. Contracts and business matters"));
-    expect(at("4. Contracts")).toBeLessThan(at("5. Parked"));
-    expect(html).toMatch(/<details[^>]*data-section="parked"[^>]*>\s*<summary[^>]*>[\s\S]*?5\. Parked/);
-    expect(html).toMatch(/data-section="new-clients"[\s\S]*Nothing here this week\./);
-    // Fine Co is Application Filed with nothing to do: parked, so it comes after the Parked heading.
-    expect(at("Fine Co")).toBeGreaterThan(at("5. Parked"));
-    // Overdue Co sits in section 2, ahead of Needs Co; the next step's owner is named on the card.
-    expect(at("Overdue Co")).toBeLessThan(at("Needs Co"));
-    expect(html).toMatch(/rv-card-owner[^>]*><span class="lx-label">Next step<\/span> Rayn/);
-    expect(html).toMatch(/rv-card-owner[^>]*><span class="lx-label">Next step<\/span> Unassigned/);
-    expect(html).toMatch(/aria-current="page" class="on" href="[^"]*">Monday agenda/);
-    expect(html.indexOf("Monday agenda")).toBeLessThan(html.indexOf(">Board<"));
-  });
-
-  it("agenda respects the Matters / Leads filter and shows one quiet line for an empty section", async () => {
-    const lead = row({ key: "l1", kind: "lead", id: "00000000-0000-4000-8000-0000000000c1", client: "Lead Co", stageLabel: "Proposal Sent" });
-    mock(ok({ rows: [...rows, lead] }));
-    const leads = await render({ kind: "leads" });
-    expect(leads).toContain("Lead Co");
-    expect(leads).not.toContain("Overdue Co");
-    expect(leads.match(/Nothing here this week\./g)).toHaveLength(4);
-  });
-
-  it("board stays reachable at ?view=board: h1, tour hook, KPI strip, lanes, columns, collapsed USPTO and on-track", async () => {
-    mock(ok());
-    const html = await render({ view: "board" });
     expect(html).toContain('data-tour="review-head"');
     expect(html).toContain(">Weekly review</h1>");
-    expect(html).toContain("rv-kpis");
-    expect(html).toContain("Waiting on the USPTO");
-    expect(html.indexOf("Rebecca")).toBeLessThan(html.indexOf("Rayn"));
-    for (const name of ["Overdue Co", "Week Co", "Needs Co"]) expect(html).toContain(name);
     expect(html).toContain("rv-board");
+    expect(html).not.toContain("rv-agenda");
+    expect(html.indexOf("Rebecca")).toBeLessThan(html.indexOf("Rayn"));
+    for (const name of ["Overdue Co", "Week Co", "Needs Co", "Client Co", "Approve Co"]) expect(html).toContain(name);
+    expect(html).toContain("Our turn");
+    expect(html).toContain("Waiting on client");
     expect(html).toMatch(/<details[^>]*>\s*<summary[^>]*>Waiting on the USPTO \(1\)/);
     expect(html).toMatch(/<summary[^>]*>On track \(1\)/);
     expect(html).toMatch(/aria-current="page" class="on" href="[^"]*">Board/);
+    expect(html).toContain("rv-kpis");
   });
 
-  it("view switch links to the three views", async () => {
+  it("Waiting-on-client cards say when we last followed up, and 'No follow-up recorded' when unknown", async () => {
     mock(ok());
     const html = await render();
-    expect(html).toContain("view=board");
-    expect(html).toContain("view=meeting");
-    expect(html).toContain("view=stage");
+    const client = html.slice(html.indexOf('data-half="client"'));
+    expect(client).toContain("Last followed up Oct 28 · 5 days");
+    expect(client).toContain("No follow-up recorded");
+    // Our-move cards never carry the follow-up line.
+    const our = html.slice(html.indexOf('data-half="our"'), html.indexOf('data-half="client"'));
+    expect(our).not.toContain("Last followed up");
   });
 
-  it("KPI tile is a dash and 'Couldn't load' when approvals failed, never 0", async () => {
+  it("Proposals out strip: soonest last day first, expired in the risk style, each linking to the panel", async () => {
+    mock(ok());
+    const html = await render();
+    const strip = html.slice(html.indexOf('data-strip="proposals"'), html.indexOf('data-strip="person"'));
+    expect(strip).toContain("Proposals out");
+    expect(strip.indexOf("Lapsed Co")).toBeLessThan(strip.indexOf("Client Co"));
+    expect(strip).toContain("Expired Oct 28");
+    expect(strip).toContain("Last day Nov 11");
+    expect(strip).toMatch(/rv-strip-when rv-deadline-soon">Expired Oct 28/);
+    expect(strip).toMatch(/href="[^"]*open=lead%3A/);
+  });
+
+  it("Proposals out says it couldn't load when the proposals read failed, never 'No proposals out'", async () => {
+    mock(ok({ failed: ["proposals"] }));
+    const html = await render();
+    expect(html).toContain("Proposals couldn&#x27;t load");
+    expect(html).not.toContain("No proposals out");
+  });
+
+  it("an empty proposals read says none are out", async () => {
+    mock(ok({ rows: rows.map((r) => ({ ...r, proposalExpiry: null })) }));
+    expect(await render()).toContain("No proposals out.");
+  });
+
+  it("Waiting on Rebecca lists her next steps and approvals; hidden when there is no Rebecca", async () => {
+    mock(ok());
+    const html = await render();
+    const from = html.indexOf('data-strip="person"');
+    const strip = html.slice(from, html.indexOf("</section>", from));
+    expect(strip).toContain("Waiting on Rebecca");
+    expect(strip).toContain("Week Co");
+    expect(strip).toContain("Approve Co");
+    expect(strip).not.toContain("Overdue Co");
+    vi.resetModules();
+    mock(ok({ members: [{ userId: "u-rayn", name: "Rayn", role: "paralegal" }] }));
+    expect(await render()).not.toContain('data-strip="person"');
+  });
+
+  it("Waiting on Rebecca says approvals couldn't load rather than implying none", async () => {
+    mock(ok({ failed: ["approvals"], rows: rows.filter((r) => r.key !== "b") }));
+    const html = await render();
+    expect(html).toContain("Approvals couldn&#x27;t load, so only next steps assigned to Rebecca are listed.");
+    expect(html).not.toContain("Nothing is waiting on Rebecca");
+  });
+
+  it("view switch is exactly Board, Sheet, Cards", async () => {
+    mock(ok());
+    const html = await render();
+    const nav = html.slice(html.indexOf('aria-label="View"'), html.indexOf("</nav>", html.indexOf('aria-label="View"')));
+    expect([...nav.matchAll(/>([A-Za-z ]+)<\/a>/g)].map((m) => m[1])).toEqual(["Board", "Sheet", "Cards"]);
+    expect(nav).toContain("view=sheet");
+    expect(nav).toContain("view=cards");
+    expect(html).not.toContain("view=meeting");
+    expect(html).not.toContain("view=stage");
+    expect(html).not.toContain("Monday agenda");
+  });
+
+  it("old ?view=agenda|meeting|stage fall back to the Board", async () => {
+    for (const view of ["agenda", "meeting", "stage"]) {
+      vi.resetModules();
+      mock(ok());
+      const html = await render({ view });
+      expect(html).toContain("rv-board");
+      expect(html).toMatch(/aria-current="page" class="on" href="[^"]*">Board/);
+    }
+  });
+
+  it("Sheet view: Trademarks then Contracts, the eight columns, Client links to the panel, filters respected", async () => {
+    const contract = row({ key: "k", client: "Contract Co", matterType: "BL", stageLabel: "Drafting", stageOrder: 100_001, waiting: "client", lastOutbound: "2026-10-28", source: "Referral" });
+    mock(ok({ rows: [...rows, contract] }));
+    const html = await render({ view: "sheet" });
+    expect(html).toMatch(/aria-current="page" class="on" href="[^"]*">Sheet/);
+    expect(html.indexOf("Trademarks")).toBeGreaterThan(-1);
+    expect(html.indexOf("Trademarks")).toBeLessThan(html.indexOf("Contracts"));
+    expect(html.indexOf("Lapsed Co")).toBeLessThan(html.indexOf("Contracts"));
+    expect(html.indexOf("Contract Co")).toBeGreaterThan(html.indexOf("Contracts"));
+    for (const c of ["Client", "Mark", "Status", "Next step", "Whose court", "Waiting on", "Source", "Last contact"]) expect(html).toContain(`<th>${c}</th>`);
+    expect(html).toContain("Client · followed up Oct 28");
+    expect(html).toContain("Referral");
+    expect(html).toMatch(/class="lx-rowlink" href="[^"]*view=sheet[^"]*open=matter%3A/);
+    expect(html).toContain("lx-stack");
+    expect(html).not.toContain("rv-board");
+    const leads = await render({ view: "sheet", kind: "leads" });
+    expect(leads).toContain("Lapsed Co");
+    expect(leads).not.toContain("Contract Co");
+  });
+
+  it("a failed approvals read is named in the details note", async () => {
     mock(ok({ failed: ["approvals"] }));
-    const html = await render();
-    expect(html).toMatch(/Waiting on approval<\/span><span[^>]*>—<\/span><span[^>]*>Couldn&#x27;t load/);
-    expect(html).toContain("Some details couldn&#x27;t load (approvals)");
-  });
-
-  it("meeting mode shows one card, progress and server-rendered Prev/Next", async () => {
-    mock(ok());
-    const html = await render({ view: "meeting", i: "2" });
-    expect(html).toContain("2 of 4");
-    expect(html).toContain("Trademarks in progress");
-    expect(html).toContain("Last contact");
-    expect(html).toMatch(/href="\/dashboard\/review\/?\?view=meeting"[^>]*>Previous/);
-    expect(html).toMatch(/href="\/dashboard\/review\/?\?view=meeting&amp;i=3"[^>]*>Keep and go to next/);
-    expect(html).toContain("Open details");
-  });
-
-  it("meeting mode past the end clamps to the last card", async () => {
-    mock(ok());
-    expect(await render({ view: "meeting", i: "99" })).toContain("4 of 4");
-  });
-
-  it("stage view groups by stage with counts", async () => {
-    mock(ok());
-    const html = await render({ view: "stage" });
-    expect(html).toContain("Application Filed");
-    expect(html).toContain("Application Preparation");
-    expect(html).toMatch(/\d matters? · \d need attention/);
+    expect(await render()).toContain("Some details couldn&#x27;t load (approvals)");
   });
 
   it("a failed critical source is one alert and no sections", async () => {
@@ -166,8 +203,8 @@ describe("Weekly review page", () => {
 
   it("a card is a link that opens the panel and keeps the other review params", async () => {
     mock(ok());
-    const html = await render({ view: "stage", q: "co" });
-    expect(html).toMatch(/class="lx-rowlink" href="[^"]*view=stage[^"]*open=matter%3A/);
+    const html = await render({ view: "sheet", q: "co" });
+    expect(html).toMatch(/class="lx-rowlink" href="[^"]*view=sheet[^"]*open=matter%3A/);
     const board = await render({ kind: "matters" });
     expect(board).toMatch(/class="rv-card-link" href="[^"]*kind=matters[^"]*open=matter%3A/);
   });

@@ -10,16 +10,18 @@ const form = (o: Record<string, string>) => ({ get: (k: string) => o[k] ?? null 
 
 describe("params", () => {
   it("defaults and parsing", () => {
-    expect(parseReviewParams({})).toEqual({ who: "all", kind: "both", q: "", view: "agenda", i: 1, person: null, open: null });
-    expect(parseReviewParams({ view: "board" })).toMatchObject({ view: "board" });
-    expect(parseReviewParams({ who: "mine", kind: "leads", q: "  a  b ", view: "meeting", i: "4" })).toEqual({ who: "mine", kind: "lead", q: "a b", view: "meeting", i: 4, person: null, open: null });
-    expect(parseReviewParams({ view: "nope", i: "-3", kind: "x" })).toMatchObject({ view: "agenda", i: 1, kind: "both" });
+    expect(parseReviewParams({})).toEqual({ who: "all", kind: "both", q: "", view: "board", i: 1, person: null, open: null });
+    expect(parseReviewParams({ view: "sheet" })).toMatchObject({ view: "sheet" });
+    expect(parseReviewParams({ who: "mine", kind: "leads", q: "  a  b ", view: "cards", i: "4" })).toEqual({ who: "mine", kind: "lead", q: "a b", view: "cards", i: 4, person: null, open: null });
+    expect(parseReviewParams({ view: "nope", i: "-3", kind: "x" })).toMatchObject({ view: "board", i: 1, kind: "both" });
+    for (const old of ["agenda", "meeting", "stage"]) expect(parseReviewParams({ view: old }).view).toBe("board");
   });
   it("href round-trips and omits defaults", () => {
     expect(reviewHref(parseReviewParams({}))).toBe("/dashboard/review/");
-    expect(reviewHref(parseReviewParams({ view: "board" }))).toBe("/dashboard/review/?view=board");
-    expect(parseReviewParams(Object.fromEntries(new URL(reviewHref(parseReviewParams({ view: "board" })), "http://x").searchParams)).view).toBe("board");
-    const p = parseReviewParams({ who: "mine", kind: "matters", q: "x", view: "meeting", i: "3" });
+    expect(reviewHref(parseReviewParams({ view: "board" }))).toBe("/dashboard/review/");
+    expect(reviewHref(parseReviewParams({ view: "sheet" }))).toBe("/dashboard/review/?view=sheet");
+    expect(parseReviewParams(Object.fromEntries(new URL(reviewHref(parseReviewParams({ view: "sheet" })), "http://x").searchParams)).view).toBe("sheet");
+    const p = parseReviewParams({ who: "mine", kind: "matters", q: "x", view: "cards", i: "3" });
     expect(parseReviewParams(Object.fromEntries(new URL(reviewHref(p), "http://x").searchParams))).toEqual(p);
   });
   it("filters: mine, kind, search", () => {

@@ -1,17 +1,17 @@
-import { BUCKET_KEYS, type BucketKey, type ReviewBuckets, type ReviewRow } from "./buckets";
-import { expiringThisWeek } from "./proposal-expiry";
+import type { BucketKey, ReviewBuckets, ReviewRow } from "./buckets";
 
 /**
- * The board, the meeting walk-through and the by-stage view, from the SAME buckets. Pure.
+ * The board, from the buckets. Pure.
  *
  * Lanes are people. A row's lane is its next-step assignee, else the matter's (or lead's) assignee,
- * else "Unassigned". Lane order: owners first, then the rest alphabetically, Unassigned last. Only
- * the four flagged columns are on the board; "Waiting on the USPTO" and "On track" are counted
- * below it.
+ * else "Unassigned". Lane order: owners first, then the rest alphabetically, Unassigned last.
+ * Inside a lane two lists, "Our move" and "Waiting on client" (`placeOnBoard`). "Waiting on the
+ * USPTO" and "On track" are the collapsed lists under the board (`offBoard`).
  */
 
 export type LaneMember = { userId: string; name: string; role: string };
 
+/** The flagged buckets, in the order "Our move" lists them. */
 export const BOARD_COLUMNS = ["overdue", "week", "needs", "quiet"] as const satisfies readonly BucketKey[];
 export type BoardColumn = (typeof BOARD_COLUMNS)[number];
 
@@ -21,12 +21,28 @@ export type Lane = {
   /** The member's user id, or null for the Unassigned lane. */
   userId: string | null;
   name: string;
-  columns: Record<BoardColumn, ReviewRow[]>;
+  /** Overdue, due this week, needs a next step, quiet, then on-track rows that wait on us or on an approval. */
+  our: ReviewRow[];
+  /** We sent last: the ball is with the client. Longest since our last follow-up first. */
+  client: ReviewRow[];
   count: number;
 };
 
 export function laneOf(row: ReviewRow): string | null {
   return row.nextStep?.assigneeId ?? row.assignedTo ?? null;
+}
+
+const FLAGGED: ReadonlySet<BucketKey> = new Set(BOARD_COLUMNS);
+
+/**
+ * Which list of a lane a row is on, or null when it stays off the board (waiting on the USPTO, or on track with nothing
+ * waiting on us). Waiting on the client wins over every bucket; a flagged bucket, or a row waiting on us or an approval, is "our" move.
+ */
+export function placeOnBoard(row: ReviewRow, bucket: BucketKey): "our" | "client" | null {
+  if (row.waiting === "client") return "client";
+  if (FLAGGED.has(bucket)) return "our";
+  if (bucket === "track" && (row.waiting === "us" || row.waiting === "approval")) return "our";
+  return null;
 }
 
 function compareLanes(a: { userId: string | null; name: string; owner: boolean }, b: { userId: string | null; name: string; owner: boolean }): number {
@@ -35,26 +51,27 @@ function compareLanes(a: { userId: string | null; name: string; owner: boolean }
   return a.name.localeCompare(b.name, "en");
 }
 
-/** The lanes that hold at least one flagged card, in lane order. An id that is no longer a member reads "Teammate". */
+/** The lanes that hold at least one card, in lane order. An id that is no longer a member reads "Teammate". */
 export function boardLanes(buckets: ReviewBuckets, members: readonly LaneMember[]): Lane[] {
   const byId = new Map(members.map((m) => [m.userId, m]));
   const lanes = new Map<string | null, Lane>();
-  for (const column of BOARD_COLUMNS) {
-    for (const row of buckets.sections[column]) {
+  for (const bucket of [...BOARD_COLUMNS, "track"] as const) {
+    for (const row of buckets.sections[bucket]) {
+      const where = placeOnBoard(row, bucket);
+      if (!where) continue;
       const id = laneOf(row);
       let lane = lanes.get(id);
       if (!lane) {
-        lane = {
-          userId: id,
-          name: id ? byId.get(id)?.name ?? "Teammate" : UNASSIGNED_LANE,
-          columns: { overdue: [], week: [], needs: [], quiet: [] },
-          count: 0,
-        };
+        lane = { userId: id, name: id ? byId.get(id)?.name ?? "Teammate" : UNASSIGNED_LANE, our: [], client: [], count: 0 };
         lanes.set(id, lane);
       }
-      lane.columns[column].push(row);
+      lane[where].push(row);
       lane.count += 1;
     }
+  }
+  // Longest without a follow-up first; none recorded is the most neglected.
+  for (const lane of lanes.values()) {
+    lane.client.sort((a, b) => (a.lastOutbound ?? "").localeCompare(b.lastOutbound ?? "") || a.client.localeCompare(b.client, "en") || a.key.localeCompare(b.key));
   }
   return [...lanes.values()].sort((a, b) =>
     compareLanes(
@@ -64,72 +81,23 @@ export function boardLanes(buckets: ReviewBuckets, members: readonly LaneMember[
   );
 }
 
-/** Rows that need a person, in board order: lane by lane, then column left to right. */
-export function meetingQueue(buckets: ReviewBuckets, members: readonly LaneMember[]): ReviewRow[] {
-  return boardLanes(buckets, members).flatMap((lane) => BOARD_COLUMNS.flatMap((c) => lane.columns[c]));
+/** The two collapsed lists under the board: waiting on the USPTO, and on-track rows nothing is waiting on us for. */
+export function offBoard(buckets: ReviewBuckets): { uspto: ReviewRow[]; track: ReviewRow[] } {
+  return { uspto: buckets.sections.uspto, track: buckets.sections.track.filter((r) => placeOnBoard(r, "track") === null) };
 }
 
 export type MeetingPosition = { index: number; position: number; total: number; prev: number | null; next: number | null };
 
-/** `i` is 1-based from the URL; it is clamped into range. An empty queue has no position. */
+/** `i` is 1-based from the URL; it is clamped into range. An empty queue has no position. (Used by the Cards deck.) */
 export function meetingPosition(total: number, i: number): MeetingPosition | null {
   if (total <= 0) return null;
   const position = Math.min(Math.max(Math.trunc(Number.isFinite(i) ? i : 1), 1), total);
   return { index: position - 1, position, total, prev: position > 1 ? position - 1 : null, next: position < total ? position + 1 : null };
 }
 
-export function beyondBoard(buckets: ReviewBuckets): { uspto: number; track: number } {
-  return { uspto: buckets.counts.uspto, track: buckets.counts.track };
-}
+/** The KPI strip: counts of the four attention buckets. */
+export type Kpis = { overdue: number; week: number; needs: number; uspto: number };
 
-export type StageGroup = { key: string; label: string; kind: "matter" | "lead"; rows: ReviewRow[]; flagged: number };
-
-const FLAGGED: ReadonlySet<BucketKey> = new Set(BOARD_COLUMNS);
-
-/** Rows grouped by stage in pipeline order (leads' stages, then the docket), flagged rows first in each group. */
-export function stageGroups(buckets: ReviewBuckets): StageGroup[] {
-  const groups = new Map<string, StageGroup & { order: number }>();
-  const rank = new Map<string, number>();
-  for (const key of BUCKET_KEYS) {
-    buckets.sections[key].forEach((row, n) => rank.set(row.key, BUCKET_KEYS.indexOf(key) * 100_000 + n));
-    for (const row of buckets.sections[key]) {
-      const label = row.stageLabel ?? "No stage";
-      const gk = `${row.kind}|${label}`;
-      let g = groups.get(gk);
-      if (!g) {
-        g = { key: gk, label, kind: row.kind, rows: [], flagged: 0, order: row.stageOrder ?? Number.POSITIVE_INFINITY };
-        groups.set(gk, g);
-      }
-      g.rows.push(row);
-      if (FLAGGED.has(key)) g.flagged += 1;
-    }
-  }
-  const out = [...groups.values()].sort((a, b) => a.order - b.order || a.label.localeCompare(b.label, "en") || a.kind.localeCompare(b.kind));
-  for (const g of out) {
-    // Flagged first: board columns in order (overdue, week, needs, quiet), then the waiting ones. Within one, bucket order.
-    g.rows.sort((x, y) => (rank.get(x.key) ?? 0) - (rank.get(y.key) ?? 0));
-  }
-  return out.map((g) => ({ key: g.key, label: g.label, kind: g.kind, rows: g.rows, flagged: g.flagged }));
-}
-
-/** The KPI strip. A tile whose source failed is `null` (drawn as a dash and "Couldn't load"), never 0. */
-export type Kpis = {
-  overdue: number;
-  week: number;
-  needs: number;
-  uspto: number;
-  approval: number | null;
-  /** Live proposals expiring this week or lapsed in the last 14 days; null when the proposals read failed. */
-  expiring: number | null;
-};
-
-export function kpis(buckets: ReviewBuckets, rows: readonly ReviewRow[], approvalsKnown: boolean, expiry: { known: boolean; today: string } = { known: false, today: "" }): Kpis {
-  return {
-    overdue: buckets.counts.overdue,
-    week: buckets.counts.week,
-    needs: buckets.counts.needs,
-    uspto: buckets.counts.uspto,
-    approval: approvalsKnown ? rows.filter((r) => r.waiting === "approval").length : null,
-    expiring: expiry.known ? rows.filter((r) => expiringThisWeek(r.proposalExpiry, expiry.today)).length : null,
-  };
+export function kpis(buckets: ReviewBuckets): Kpis {
+  return { overdue: buckets.counts.overdue, week: buckets.counts.week, needs: buckets.counts.needs, uspto: buckets.counts.uspto };
 }

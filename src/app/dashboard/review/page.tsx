@@ -4,16 +4,17 @@ import { ListToolbar } from "@/components/list-page/ListToolbar";
 import { Chip, FilterChips } from "@/components/list-page/Chips";
 import "@/components/list-page/list-page.css";
 import { ReviewSection } from "@/components/review/ReviewSection";
-import { AgendaView, KpiStrip, MeetingCard, ReviewBoard, StageView, ViewSwitch } from "@/components/review/ReviewViews";
+import { KpiStrip, ProposalsOutStrip, ReviewBoard, ViewSwitch, WaitingOnStrip } from "@/components/review/ReviewViews";
+import { SheetView } from "@/components/review/SheetView";
 import { CardsDeck, PersonChips } from "@/components/review/CardsDeck";
 import { ReviewPanel } from "@/components/review/ReviewPanel";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import { CAN_MOVE_STAGE } from "@/lib/pipeline/leads";
 import { loadReview } from "@/lib/review/load";
-import { agendaOrder, agendaQueue, agendaSection, AGENDA_COPY } from "@/lib/review/agenda";
-import { bucketOf, reviewBuckets, reviewSubline } from "@/lib/review/buckets";
-import { boardLanes, kpis, meetingPosition, stageGroups } from "@/lib/review/lanes";
+import { reviewBuckets, reviewSubline } from "@/lib/review/buckets";
+import { boardLanes, kpis, meetingPosition, offBoard } from "@/lib/review/lanes";
+import { proposalsOut, reviewPerson, waitingOnPerson } from "@/lib/review/strips";
 import { applyReviewFilters, DEFAULT_REVIEW_VIEW, parseReviewParams, reviewHref, type ReviewParams } from "@/lib/review/params";
 import { criticalAlert, detailsNote } from "@/lib/review/notes";
 import { noticeFor } from "@/lib/review/notice";
@@ -61,10 +62,17 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const countFor = (over: Partial<ReviewParams>) => applyReviewFilters(load.rows, { ...params, ...over }, userId).length;
   const note = detailsNote(load.failed);
   const common = { today: load.today, members: load.members, canWrite, params };
-  const agenda = agendaOrder(shown, load.today);
-  const queue = agendaQueue(agenda, load.today);
-  const pos = meetingPosition(queue.length, params.i);
-  const focus = pos ? queue[pos.index] : null;
+  const proposalsKnown = !load.failed.includes("proposals");
+  const approvalsKnown = !load.failed.includes("approvals");
+  const person = reviewPerson(load.members);
+  const strips = (
+    <div className="rv-strips">
+      <ProposalsOutStrip items={proposalsOut(shown, load.today)} known={proposalsKnown} params={params} />
+      {person && <WaitingOnStrip firstName={person.firstName} personId={person.userId} rows={waitingOnPerson(shown, person.userId)} approvalsKnown={approvalsKnown} params={params} />}
+    </div>
+  );
+  const lanes = boardLanes(buckets, load.members);
+  const rest = offBoard(buckets);
 
   // Cards: one person's deck, built from every row that passes the search and the kind chips (Whose is ignored: the picker is the person).
   let cards: { people: ReturnType<typeof deckPeople>; personId: string | null; card: ReturnType<typeof buildDeck>[number] | null; pos: ReturnType<typeof meetingPosition>; note: Awaited<ReturnType<typeof loadLatestNote>> | null } | null = null;
@@ -73,7 +81,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
     let people = deckPeople(load.members, boardLanes(deckBuckets, load.members).map((l) => l.userId));
     if (people.length === 0 && userId) people = [{ userId, name: "You" }];
     const personId = chosenPerson(people, params.person, userId);
-    const deck = buildDeck(deckBuckets, load.members, personId, load.today);
+    const deck = buildDeck(deckBuckets, load.members, personId);
     const cardPos = meetingPosition(deck.length, params.i);
     const card = cardPos ? deck[cardPos.index] : null;
     cards = { people, personId, card, pos: cardPos, note: card ? await loadLatestNote({ kind: card.row.kind, id: card.row.id }) : null };
@@ -100,7 +108,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
         toggle={<ViewSwitch params={params} />}
       />
 
-      <KpiStrip kpis={kpis(buckets, shown, !load.failed.includes("approvals"), { known: !load.failed.includes("proposals"), today: load.today })} />
+      <KpiStrip kpis={kpis(buckets)} />
 
       <FilterChips as="nav" label="Whose">
         <Chip href={link({ who: "all" })} active={params.who === "all"} count={countFor({ who: "all" })}>Everyone</Chip>
@@ -135,17 +143,17 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           <PersonChips people={cards.people} personId={cards.personId} params={params} />
           <CardsDeck card={cards.card} pos={cards.pos} personId={cards.personId} personName={cards.people.find((p) => p.userId === cards.personId)?.name ?? null} note={cards.note} {...common} />
         </>
-      ) : params.view === "meeting" ? (
-        <MeetingCard row={focus} bucket={focus ? bucketOf(focus, load.today) : null} sectionLabel={focus ? AGENDA_COPY[agendaSection(focus, load.today)].label : null} pos={pos} {...common} />
-      ) : params.view === "stage" ? (
-        <StageView groups={stageGroups(buckets)} {...common} />
-      ) : params.view === "agenda" ? (
-        <AgendaView groups={agenda} {...common} />
+      ) : params.view === "sheet" ? (
+        <>
+          {strips}
+          <SheetView rows={shown} {...common} />
+        </>
       ) : (
         <>
-          <ReviewBoard lanes={boardLanes(buckets, load.members)} {...common} />
-          <ReviewSection bucket="uspto" rows={buckets.sections.uspto} collapsed {...common} />
-          <ReviewSection bucket="track" rows={buckets.sections.track} collapsed {...common} />
+          {strips}
+          <ReviewBoard lanes={lanes} {...common} />
+          <ReviewSection bucket="uspto" rows={rest.uspto} collapsed {...common} />
+          <ReviewSection bucket="track" rows={rest.track} collapsed {...common} />
         </>
       )}
       {panel && params.open && (

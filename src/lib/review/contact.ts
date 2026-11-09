@@ -49,7 +49,8 @@ function ms(iso: string): number {
 export function summarizeContact(
   activity: readonly ContactActivity[],
   now: Date,
-): { last: LastContact | null; direction: Direction | null } {
+): { last: LastContact | null; direction: Direction | null; /** The newest OUTBOUND contact (we emailed or called), for "last followed up". */ lastOutbound: LastContact | null } {
+  let outbound: { at: string; type: ContactType } | null = null;
   let last: { at: string; type: ContactType } | null = null;
   let directional: { at: string; type: ContactType } | null = null;
   for (const a of activity) {
@@ -57,7 +58,8 @@ export function summarizeContact(
     const t = ms(a.created_at);
     if (!Number.isFinite(t) || t > now.getTime()) continue;
     if (!last || t > ms(last.at)) last = { at: a.created_at, type: a.type };
+    if (DIRECTION[a.type] === "we" && (!outbound || t > ms(outbound.at))) outbound = { at: a.created_at, type: a.type };
     if (DIRECTION[a.type] && (!directional || t > ms(directional.at))) directional = { at: a.created_at, type: a.type };
   }
-  return { last, direction: directional ? DIRECTION[directional.type] : null };
+  return { last, direction: directional ? DIRECTION[directional.type] : null, lastOutbound: outbound };
 }

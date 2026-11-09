@@ -1,19 +1,17 @@
 import Link from "next/link";
-import { BUCKET_COPY, bucketOf, type BucketKey, type ReviewRow } from "@/lib/review/buckets";
-import { BOARD_COLUMNS, laneOf, type Kpis, type Lane, type MeetingPosition, type StageGroup } from "@/lib/review/lanes";
-import { dueText, lastContactText } from "@/lib/review/format";
+import { bucketOf, type BucketKey, type ReviewRow } from "@/lib/review/buckets";
+import type { ProposalOut } from "@/lib/review/strips";
+import { laneOf, type Kpis, type Lane } from "@/lib/review/lanes";
+import { dueText, followUpText } from "@/lib/review/format";
 import { openToken } from "@/lib/review/open";
 import { reviewHref, REVIEW_VIEWS, type ReviewParams, type ReviewView } from "@/lib/review/params";
-import { REVIEW_AGENDA_VIEW, REVIEW_CARDS_VIEW } from "@/lib/ui/words";
-import type { AgendaGroup } from "@/lib/review/agenda";
-import { WAITING_LABEL } from "@/lib/review/waiting";
+import { OUR_TURN, REVIEW_BOARD_VIEW, REVIEW_CARDS_VIEW, REVIEW_SHEET_VIEW } from "@/lib/ui/words";
 import { DoneButton } from "./DoneButton";
 import { Avatar, openHref, Tags, type Common } from "./shared";
-import { ReviewTable } from "./ReviewSection";
 import "@/components/list-page/list-page.css";
 import "./review.css";
 
-const VIEW_LABEL: Record<ReviewView, string> = { agenda: REVIEW_AGENDA_VIEW, board: "Board", meeting: "Meeting mode", stage: "By stage", cards: REVIEW_CARDS_VIEW };
+const VIEW_LABEL: Record<ReviewView, string> = { board: REVIEW_BOARD_VIEW, sheet: REVIEW_SHEET_VIEW, cards: REVIEW_CARDS_VIEW };
 
 /** The three views, as links (the URL carries the view), in the design's segmented control. */
 export function ViewSwitch({ params }: { params: ReviewParams }) {
@@ -40,22 +38,20 @@ function Tile({ label, value, tone }: { label: string; value: number | null; ton
   );
 }
 
-/** Overdue, due this week, waiting on approval, needs a next step, waiting on the USPTO. A failed source is a dash. */
+/** Overdue, due this week, needs a next step, waiting on the USPTO. (Approvals and proposals have their own strips.) */
 export function KpiStrip({ kpis }: { kpis: Kpis }) {
   return (
     <div className="rv-kpis" role="group" aria-label="This week at a glance">
       <Tile label="Overdue" value={kpis.overdue} tone="risk" />
       <Tile label="Due this week" value={kpis.week} tone="warn" />
-      <Tile label="Waiting on approval" value={kpis.approval} />
       <Tile label="Needs a next step" value={kpis.needs} />
       <Tile label="Waiting on the USPTO" value={kpis.uspto} />
-      <Tile label="Proposals expiring this week" value={kpis.expiring} tone="warn" />
     </div>
   );
 }
 
 /** The whole card is one link to the panel; Done and Open sit OUTSIDE it, so nothing interactive is nested. */
-export function Card({ row, bucket, today, members, canWrite, params, showOwner }: Common & { row: ReviewRow; bucket: BucketKey; /** The agenda names who owns the next step on the card itself, since the meeting assigns by person. */ showOwner?: boolean }) {
+export function Card({ row, bucket, today, members, canWrite, params, followUp }: Common & { row: ReviewRow; bucket: BucketKey; /** A "Waiting on client" card says when we last followed up. */ followUp?: boolean }) {
   const due = row.nextStep ? dueText(row.nextStep.dueDate, today) : null;
   const ownerId = laneOf(row);
   const ownerName = ownerId ? members.find((m) => m.userId === ownerId)?.name ?? "Teammate" : null;
@@ -76,11 +72,7 @@ export function Card({ row, bucket, today, members, canWrite, params, showOwner 
           {row.nextStep ? row.nextStep.title : "No next step"}
           {due && <span className={`rv-chip${due.overdue ? " rv-chip-overdue" : ""}`}>{due.text}</span>}
         </span>
-        {showOwner && (
-          <span className="rv-card-owner">
-            <span className="lx-label">Next step</span> {ownerName ?? "Unassigned"}
-          </span>
-        )}
+        {followUp && <span className="rv-card-followup lx-note">{followUpText(row, today)}</span>}
         <Tags row={row} today={today} max={2} />
       </Link>
       <div className="rv-card-acts">
@@ -93,41 +85,56 @@ export function Card({ row, bucket, today, members, canWrite, params, showOwner 
   );
 }
 
-/**
- * The Monday agenda: the meeting's five sections in order, each with a count. Cards are the board's own `Card`
- * (a link to the panel, no forms), with the next step's owner named. Parked is collapsed.
- */
-export function AgendaView({ groups, ...common }: Common & { groups: AgendaGroup[] }) {
+/** One lane per person, each split in two: "Our move" and "Waiting on client". Stacks under 640px. */
+export function ReviewBoard({ lanes, ...common }: Common & { lanes: Lane[] }) {
+  if (lanes.length === 0) {
+    return (
+      <div className="lx-card lx-empty-card">
+        <h2 className="lx-h2" style={{ fontSize: 25 }}>Nothing needs attention</h2>
+        <p className="lx-note" style={{ margin: 0 }}>No records are waiting on us or on a client for this view.</p>
+      </div>
+    );
+  }
   return (
-    <div className="rv-agenda">
-      {groups.map((g, n) => {
-        const body =
-          g.rows.length === 0 ? (
-            <p className="lx-note rv-agenda-empty">Nothing here this week.</p>
-          ) : (
-            <div className="rv-agenda-cards">
-              {g.rows.map((row) => (
-                <Card key={row.key} row={row} bucket={bucketOf(row, common.today)} showOwner {...common} />
-              ))}
+    <div className="rv-board">
+      {lanes.map((lane) => {
+        const id = lane.userId ?? "none";
+        return (
+          <section key={id} className="rv-person" aria-labelledby={`rv-person-${id}`}>
+            <h2 id={`rv-person-${id}`} className="lx-h2 rv-person-name">
+              <Avatar name={lane.name} />
+              <span>{lane.name}</span> <span className="lx-note">{lane.count}</span>
+            </h2>
+            <div className="rv-halves">
+              <div className="rv-half" data-half="our">
+                <h3 className="lx-label rv-colh">
+                  {OUR_TURN} <span className="lx-note">{lane.our.length}</span>
+                </h3>
+                {lane.our.length === 0 ? (
+                  <p className="lx-note rv-none">Nothing for us to do here.</p>
+                ) : (
+                  <div className="rv-cards">
+                    {lane.our.map((row) => (
+                      <Card key={row.key} row={row} bucket={bucketOf(row, common.today)} {...common} />
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="rv-half" data-half="client">
+                <h3 className="lx-label rv-colh">
+                  Waiting on client <span className="lx-note">{lane.client.length}</span>
+                </h3>
+                {lane.client.length === 0 ? (
+                  <p className="lx-note rv-none">Nobody is waiting on a client.</p>
+                ) : (
+                  <div className="rv-cards">
+                    {lane.client.map((row) => (
+                      <Card key={row.key} row={row} bucket={bucketOf(row, common.today)} followUp {...common} />
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-          );
-        const head = (
-          <>
-            <span className="lx-h2 rv-agenda-title">{n + 1}. {g.label}</span>{" "}
-            <span className="lx-note">{g.rows.length}</span>
-          </>
-        );
-        return g.section === "parked" ? (
-          <details key={g.section} className="lx-card rv-agenda-sec rv-agenda-parked" data-section={g.section}>
-            <summary className="rv-agenda-head">{head}</summary>
-            <p className="lx-note rv-agenda-hint">{g.hint}</p>
-            {body}
-          </details>
-        ) : (
-          <section key={g.section} className="lx-card rv-agenda-sec" data-section={g.section} aria-labelledby={`rv-agenda-${g.section}`}>
-            <h2 id={`rv-agenda-${g.section}`} className="rv-agenda-head">{head}</h2>
-            <p className="lx-note rv-agenda-hint">{g.hint}</p>
-            {body}
           </section>
         );
       })}
@@ -135,148 +142,55 @@ export function AgendaView({ groups, ...common }: Common & { groups: AgendaGroup
   );
 }
 
-/** People down the side, the four flagged groups across. Stacks (each lane a section) under 640px; scrolls sideways under 900px. */
-export function ReviewBoard({ lanes, ...common }: Common & { lanes: Lane[] }) {
-  if (lanes.length === 0) {
-    return (
-      <div className="lx-card lx-empty-card">
-        <h2 className="lx-h2" style={{ fontSize: 25 }}>Nothing needs attention</h2>
-        <p className="lx-note" style={{ margin: 0 }}>No overdue, due-this-week, undated or quiet records for this view.</p>
-      </div>
-    );
-  }
+/** Proposals that are out, soonest last day first. A failed read says so; it is never "none". */
+export function ProposalsOutStrip({ items, known, params }: { items: ProposalOut[]; known: boolean; params: ReviewParams }) {
   return (
-    <div className="rv-board">
-      {lanes.map((lane) => (
-        <section key={lane.userId ?? "none"} className="rv-person" aria-labelledby={`rv-person-${lane.userId ?? "none"}`}>
-          <h2 id={`rv-person-${lane.userId ?? "none"}`} className="lx-h2 rv-person-name">
-            <Avatar name={lane.name} />
-            <span>{lane.name}</span> <span className="lx-note">{lane.count}</span>
-          </h2>
-          <div className="rv-scroll">
-            <div className="rv-cols">
-              {BOARD_COLUMNS.map((c) => (
-                <div key={c} className="rv-col">
-                  <h3 className="lx-label rv-colh">
-                    {BUCKET_COPY[c].label} <span className="lx-note">{lane.columns[c].length}</span>
-                  </h3>
-                  {lane.columns[c].map((row) => (
-                    <Card key={row.key} row={row} bucket={c} {...common} />
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      ))}
-    </div>
-  );
-}
-
-/** One record at a time. Prev / Next are links; "Keep" is just Next. */
-export function MeetingCard({
-  row,
-  bucket,
-  pos,
-  params,
-  sectionLabel,
-  ...common
-}: Common & { row: ReviewRow | null; bucket: BucketKey | null; pos: MeetingPosition | null; /** The agenda section the row is in, e.g. "USPTO matters". */ sectionLabel?: string | null }) {
-  if (!row || !pos) {
-    return (
-      <div className="lx-card lx-empty-card">
-        <h2 className="lx-h2" style={{ fontSize: 25 }}>Nothing left to go through</h2>
-        <p className="lx-note" style={{ margin: 0 }}>Nothing in the four meeting sections for this view. Parked records are left out.</p>
-      </div>
-    );
-  }
-  const href = (i: number) => reviewHref({ ...params, view: "meeting", i, open: null });
-  const due = row.nextStep ? dueText(row.nextStep.dueDate, common.today) : null;
-  const who = (id: string | null) => (id ? common.members.find((m) => m.userId === id)?.name ?? "Teammate" : null);
-  const owner = who(row.nextStep?.assigneeId ?? null) ?? who(row.assignedTo);
-  return (
-    <div className="lx-card rv-focus">
-      <p className="lx-note rv-prog" role="status">
-        {pos.position} of {pos.total}
-        {sectionLabel ? ` · ${sectionLabel}` : ""}
-        {bucket ? ` · ${BUCKET_COPY[bucket].label}` : ""}
-      </p>
-      <h2 className="lx-h2">
-        <Link href={openHref(params, row)} scroll={false}>
-          {row.client}
-        </Link>
+    <section className="lx-card rv-strip" data-strip="proposals" aria-labelledby="rv-strip-proposals">
+      <h2 id="rv-strip-proposals" className="lx-h2 rv-strip-title">
+        Proposals out {known && <span className="lx-note">{items.length}</span>}
       </h2>
-      <div className="lx-note">
-        {row.kind === "lead" ? "Lead" : "Matter"}
-        {row.mark ? ` · ${row.mark}` : ""}
-        {row.stageLabel ? ` · ${row.stageLabel}` : ""}
-      </div>
-      <dl className="rv-facts">
-        <div>
-          <dt className="lx-label">Last contact</dt>
-          <dd>{lastContactText(row, common.today)}</dd>
-        </div>
-        <div>
-          <dt className="lx-label">Next step</dt>
-          <dd>
-            {row.nextStep ? row.nextStep.title : "No next step"}
-            {due && (
-              <span className={`lx-note rv-sub${due.overdue ? " rv-deadline-soon" : ""}`}>
-                {due.text}
-                {owner ? ` · ${owner}` : ""}
-              </span>
-            )}
-            {!row.nextStep && owner && <span className="lx-note rv-sub">{owner}</span>}
-          </dd>
-        </div>
-        <div>
-          <dt className="lx-label">Waiting on</dt>
-          <dd>{row.waiting ? WAITING_LABEL[row.waiting] : "—"}</dd>
-        </div>
-        <div>
-          <dt className="lx-label">In stage</dt>
-          <dd>{row.stageDays !== null ? `${row.stageDays} days` : row.stageNote ?? "—"}</dd>
-        </div>
-      </dl>
-      <Tags row={row} today={common.today} />
-      <div className="rv-card-acts">
-        {common.canWrite && row.nextStep && <DoneButton taskId={row.nextStep.id} />}
-        <Link href={openHref(params, row)} className="lx-btn lx-btn-sec lx-btn-sm" scroll={false}>
-          Open details
-        </Link>
-      </div>
-      <nav className="rv-pager" aria-label="Meeting mode">
-        {pos.prev ? <Link className="lx-btn lx-btn-ghost lx-btn-sm" href={href(pos.prev)}>Previous</Link> : <span />}
-        {pos.next ? <Link className="lx-btn lx-btn-sec lx-btn-sm" href={href(pos.next)}>Keep and go to next</Link> : <span className="lx-note">That&apos;s the last one.</span>}
-      </nav>
-    </div>
+      {!known ? (
+        <p className="lx-note rv-strip-note" role="status">Proposals couldn&apos;t load. Refresh to try again.</p>
+      ) : items.length === 0 ? (
+        <p className="lx-note rv-strip-note">No proposals out.</p>
+      ) : (
+        <ul className="rv-strip-list">
+          {items.map((p) => (
+            <li key={p.row.key}>
+              <Link href={openHref(params, p.row)} scroll={false}>{p.row.client}</Link>{" "}
+              <span className={`rv-strip-when${p.expired ? " rv-deadline-soon" : ""}`}>{p.text}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
-/** Rows grouped by stage in pipeline order, flagged rows first, with counts. */
-export function StageView({ groups, ...common }: Common & { groups: StageGroup[] }) {
-  if (groups.length === 0) {
-    return (
-      <div className="lx-card lx-empty-card">
-        <h2 className="lx-h2" style={{ fontSize: 25 }}>Nothing to show</h2>
-        <p className="lx-note" style={{ margin: 0 }}>Try another filter or search.</p>
-      </div>
-    );
-  }
+/** What waits on the review person: next steps assigned to them and approvals. Hidden by the page when there is no such person. */
+export function WaitingOnStrip({ firstName, rows, approvalsKnown, params, personId }: { firstName: string; rows: ReviewRow[]; approvalsKnown: boolean; params: ReviewParams; personId: string }) {
   return (
-    <>
-      {groups.map((g) => (
-        <section key={g.key} className="lx-card lx-band" aria-labelledby={`rv-stage-${g.key}`}>
-          <header className="lx-band-head">
-            <h2 id={`rv-stage-${g.key}`} className="lx-h2">{g.label}</h2>
-            <span className="lx-note">
-              {g.rows.length} {g.kind === "lead" ? (g.rows.length === 1 ? "lead" : "leads") : g.rows.length === 1 ? "matter" : "matters"}
-              {g.flagged > 0 ? ` · ${g.flagged} need attention` : ""}
-            </span>
-          </header>
-          <ReviewTable rows={g.rows} {...common} />
-        </section>
-      ))}
-    </>
+    <section className="lx-card rv-strip" data-strip="person" aria-labelledby="rv-strip-person">
+      <h2 id="rv-strip-person" className="lx-h2 rv-strip-title">
+        Waiting on {firstName} <span className="lx-note">{rows.length}</span>
+      </h2>
+      {!approvalsKnown && (
+        <p className="lx-note rv-strip-note" role="status">Approvals couldn&apos;t load, so only next steps assigned to {firstName} are listed.</p>
+      )}
+      {rows.length === 0 ? (
+        approvalsKnown && <p className="lx-note rv-strip-note">Nothing is waiting on {firstName}.</p>
+      ) : (
+        <ul className="rv-strip-list">
+          {rows.map((r) => (
+            <li key={r.key}>
+              <Link href={openHref(params, r)} scroll={false}>{r.client}</Link>{" "}
+              <span className="lx-note">
+                {r.nextStep?.assigneeId === personId ? `Next step: ${r.nextStep.title}` : "Waiting on approval"}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

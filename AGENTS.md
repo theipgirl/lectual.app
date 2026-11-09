@@ -1405,28 +1405,28 @@ and a Follow-Up stage; a lead that has a matter shows once, as the matter). Ever
   we sent last = Client; a note is contact but has no direction (`contact.ts`).
 - **Waiting on** (`waiting.ts`): USPTO when the docket stage's `waiting_on` is `uspto` or its name matches the ONE keyword table `USPTO_STAGE_PATTERNS`; else
   Approval when a pending queue item names the record (the same `loadPendingApprovalsByLead` / `matterIdsNeedingReview` the lead and matter pages use); else Us / Client.
-- **Monday agenda (default view, `?view=agenda`, label "Monday agenda" from `words.ts`, first in the switch; no `view` param = agenda, the board is `?view=board`, and `reviewHref` omits `view` only for the agenda).** The
-  same filtered rows dealt in the order RPB's Monday meeting walks the pipeline. Pure rules in `src/lib/review/agenda.ts` (`agendaSection(row, today)`, `agendaOrder`, `agendaQueue`, `agendaPositions`); no new read and no schema (the
-  matter's `type` was already in `listMatters`'s `select("*")`; `ReviewRow.matterType` carries it).
-  Five sections, each with a count; an empty one says "Nothing here this week."; Parked is a collapsed `<details>`. Cards are the board's own `Card` (one link to the `?open=` panel, no forms) with "Next step <owner>" named
-  (the lane person, else "Unassigned"). A critical read failure is still ONE alert and no sections. **Every lead is section 1** and is never parked (an on-track lead is still a person to follow up). A matter whose type is not
-  TM / CR / PATENT is section 4 (type absent reads as TM). A TM / CR / PATENT matter is section 3 when its stage reads post-filing, else section 2 (unknown text is section 2, never dropped). Stage names are read by ONE table
-  (`STAGE_RULES`, first match wins, post-filing words first so "20D. SOU Preparation" is not "application preparation": OA, office action, publication, opposition, NOA / notice of allowance, SOU / statement of use, extension,
-  registration, renewal, declaration, section 8/9/15, application filed; then pre-filing words: opinion letter, application prep, search, clearance, LOE, engagement, deposit, signed, specimen, intake, consult), then the
-  stage NUMBER (under 18 pre-filing, 18 and over post-filing), else unknown. **Parked (matters only):** bucket `track` in any matter section, or a section-3 matter whose bucket is `uspto` (only waiting on the office), EXCEPT a
-  matter with an open docketed deadline is never parked (our addition, so a response date can't hide in a collapsed section). A pre-filing matter that is merely waiting on the USPTO is not parked by that alone.
-  Order inside a section: urgency (overdue, due this week, needs a next step, quiet, then the rest), then USPTO section soonest deadline first (rows without one after) / new-clients rows with a proposal expiring or
-  expired first (earliest expiry), then client A to Z, then key. **Meeting mode** walks `agendaQueue` (sections 1 to 4, Parked left out) and its card names the section; **Cards** (`buildDeck(buckets, members, personId, today)`)
-  keeps its membership (the person's flagged lane rows, then approval rows for an approver) but sorts both parts into agenda order. `meetingQueue` (board order) is kept in `lanes.ts` but the page no longer uses it.
-  Assertions changed on purpose: `tests/review/page.test.tsx` (default is now the agenda, the board test uses `?view=board`, meeting mode counts 4 rows and says "of 4" because the agenda queue includes on-track leads and
-  pre-filing matters and the section name, view switch now lists the board link), `tests/review/params-input.test.ts` (default view agenda, board href carries `view=board`), `tests/review/deck-open-snooze.test.ts` (`buildDeck` takes
-  `today`). New: `tests/review/agenda.test.ts`. Not verified in a browser.
-- **Views** (`?view=board|meeting|stage`, default board; filters `?who=mine`, `?kind=matters|leads`, `?q=`; all links, so every state is a shareable URL).
-  Board: lanes are people (`lanes.ts`): the next-step assignee, else the record's assignee, else Unassigned; owners first, the rest alphabetical, Unassigned last; four
-  columns (Overdue, This week, Needs a next step, Quiet). USPTO and On track are two collapsed lists under the board. Under 900px it scrolls sideways, under 640px
-  each lane stacks. Meeting mode: one card at a time over the flagged rows in board order, `?i=<n>` (1-based, clamped), server-rendered Previous / Next links; "Keep"
-  is just Next. Stage view: grouped by stage in pipeline order (leads' stages, then the docket), flagged rows first, with counts. The KPI strip is Overdue, Due this
-  week, Waiting on approval, Needs a next step, Waiting on the USPTO; a tile whose source failed is a dash and "Couldn't load", never 0.
+- **Three views** (`?view=board|sheet|cards`; **Board is the default, no `view` param**, and `reviewHref` omits `view` only for the Board; `REVIEW_VIEWS` / `DEFAULT_REVIEW_VIEW`
+  in `params.ts`, labels from `words.ts`). **The Monday agenda, Meeting mode and By stage views were removed (Nov 9, the firm owner: "a mess"; the Board is what works)**, with `agenda.ts`,
+  `meetingQueue` and `stageGroups`; an old `?view=agenda|meeting|stage` is not a view and reads as the Board. Filters `?who=mine`, `?kind=matters|leads`, `?q=`; all links, so every state is a shareable URL.
+  A critical read failure is still ONE alert and no sections.
+- **Board** (default). Lanes are people (`lanes.ts`): the next-step assignee, else the record's assignee, else Unassigned; owners first, the rest alphabetical, Unassigned last. **Each lane holds
+  two lists** (`placeOnBoard(row, bucket)`, the one rule): **Our turn** (the glossary's word, `OUR_TURN`; `no-build-words` bans "Our move") = a flagged bucket (overdue, due this week, needs a next step, quiet) or an on-track row waiting on us or an approval, in bucket
+  order; **Waiting on client** = `waiting === "client"` (we sent last), which wins over every bucket, sorted longest-since-our-follow-up first (none recorded first). Each Waiting-on-client card shows
+  `followUpText`: "Last followed up Nov 4 · 5 days", "No follow-up recorded", or "Follow-up couldn't be loaded" when last contact could not be read. That date is `ReviewRow.lastOutbound`, the newest
+  OUTBOUND contact (`email_sent` / `call_logged`, from `summarizeContact`, same activity read, no new query). USPTO and the remaining On-track rows (`offBoard`) are the two collapsed lists under the board.
+  Cards are one link to the `?open=` panel; Done / Open sit outside it; no forms on cards. Under 900px the two lists stack. The KPI strip is Overdue, Due this week, Needs a next step, Waiting on the USPTO
+  (the approvals and proposals tiles went when the strips below replaced them).
+- **Two strips above the lanes (Board and Sheet; built from the filtered rows, so Whose / kind / search narrow them too; `strips.ts`).** **Proposals out**: every row with a live `proposalExpiry`, soonest last day first
+  (expired first of all): "Last day Nov 11", "Last day today", "Expired Nov 5" (expired in the `--ox` risk style), each a link to `?open=`. A failed proposals read says "Proposals couldn't load. Refresh to try
+  again." and never "No proposals out." **Waiting on <first name>**: rows whose next step is assigned to the review person plus every row waiting on approval (`reviewPerson`: the member whose display name starts
+  with "Rebecca", the same rule as the Cards deck's default but with no fallback, so with no such member the strip is not drawn). A failed approvals read says so in the strip ("only next steps assigned to ... are listed"),
+  never "Nothing is waiting".
+- **Sheet** (`?view=sheet`, `sheet.ts` + `SheetView.tsx`): the Excel tracker as one table, two sections, **Trademarks** (every lead plus TM / CR / PATENT matters; no type reads as TM) then **Contracts** (other matter
+  types). Columns in order: Client | Mark | Status (stage label) | Next step (title + due, overdue in `--ox`) | Whose court (lane person, else Unassigned) | Waiting on (Us / "Client · followed up Nov 4" /
+  USPTO / Approval) | Source | Last contact. Rows by stage pipeline order (`stageOrder`, none last), then client. The Client cell links to `?open=` (edits happen in the panel). Sticky header, zebra rows,
+  `.lx-stack` + `data-label` under 640px, sideways scroll 641-900px. Source is `referral_source` of the matter or lead, read from the rows `listMatters` / `listLeads` already return (`select("*")`), "—" when none.
+- **Cards** keep their membership (the person's flagged lane rows, then approval rows for an approver) but are now dealt in board column order (the agenda ordering went with the agenda; `buildDeck(buckets, members, personId)`).
+  Not verified in a browser.
 - **Reads are three-state per source** (`load.ts`, scoped client only, one query per table per chunk of 80 ids, paged past PostgREST's 1,000-row cap and FAILED, not
   truncated, if the page budget runs out). Matters, leads (and lead stages) and tasks are CRITICAL: any failing gives ONE alert and no sections (a failed task read must
   not put everyone under "Needs a next step"). Last contact, deadlines, approvals, stage history and team names are optional: the rows still draw and one note names
@@ -1439,7 +1439,7 @@ and a Follow-Up stage; a lead that has a matter shows once, as the matter). Ever
   takes proposals filed on its lead), one batched read per id chunk, selecting only id, family_id, version, status, lead_id, matter_id and `expires_on` (a real column, a civil date; no content,
   name or email is read). Only the NEWEST version of each family counts, and only while it is `sent`; a record with several takes the earliest expiry. Tag text: "Proposal expires Nov 4" /
   "Proposal expires today" / "Proposal expired Oct 26" (the expired one in the `--ox` risk style), on board cards, the meeting card and stage-view rows. Tags NEVER change a bucket. KPI tile
-  "Proposals expiring this week" = expires today..+6 or expired within the last 14 days and still sent. Optional source `proposals`: a failed read draws no tags, the tile is a dash with
+  "Proposals expiring this week" (the tile itself was dropped for the Proposals out strip; `expiringThisWeek` is still in `proposal-expiry.ts`) = expires today..+6 or expired within the last 14 days and still sent. Optional source `proposals`: a failed read draws no tags, the tile is a dash with
   "Couldn't load", and the note reads "Some details couldn't load (proposals)", never "no proposal".
 - **Lost / Nurture** (leads only, now inside the detail panel; `LostNurture.tsx`, `closeLeadAction`): a small inline form (stage select, optional reason of at most 200 characters,
   `InlineConfirm`). The choices are the firm's stages whose category is `lost` or `nurture` (`closeStagesOf`, read from the stage list the loader already has); a firm with neither sees no button

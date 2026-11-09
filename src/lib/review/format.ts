@@ -42,3 +42,12 @@ export function initials(name: string): string {
   const last = parts.length > 1 ? Array.from(parts[parts.length - 1])[0] ?? "" : "";
   return (first + last).toUpperCase() || "?";
 }
+
+/** "Last followed up Nov 4 · 5 days" from the newest outbound contact; fixed sentences for none and for unreadable. */
+export function followUpText(row: { contactKnown: boolean; lastOutbound?: string | null }, today: string): string {
+  if (!row.contactKnown) return "Follow-up couldn't be loaded";
+  if (!row.lastOutbound) return "No follow-up recorded";
+  const n = daysBetween(row.lastOutbound, today);
+  const ago = !Number.isFinite(n) || n < 0 ? "" : n === 0 ? " · today" : n === 1 ? " · 1 day" : ` · ${n} days`;
+  return `Last followed up ${shortDate(row.lastOutbound, today)}${ago}`;
+}

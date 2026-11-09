@@ -1,15 +1,14 @@
 import { BUCKET_KEYS, type BucketKey, type ReviewBuckets, type ReviewRow } from "./buckets";
-import { agendaOrder, agendaPositions } from "./agenda";
 import { BOARD_COLUMNS, laneOf, type LaneMember } from "./lanes";
 import { QUEUE_APPROVE_ROLES } from "@/lib/queue/roles";
 
 /**
- * The Cards view: one person's deck, dealt in Monday-agenda order. Pure.
+ * The Cards view: one person's deck, dealt in board column order. Pure.
  *
- * The deck is that person's flagged rows from the board grouping (their lane: the next-step assignee, else the
- * record's assignee: Overdue, This week, Needs a next step, Quiet), sorted into agenda order (new clients, trademarks
- * in progress, USPTO, contracts; see `agenda.ts`), plus, for a person in an approver role, every row waiting on
- * approval (any bucket), also in agenda order and after the lane rows, without repeating a row.
+ * The deck is that person's flagged rows (their lane: the next-step assignee, else the record's assignee), in the
+ * board's column order (Overdue, This week, Needs a next step, Quiet; each bucket's own sort), plus, for a person in an
+ * approver role, every row waiting on approval (any bucket) after the lane rows, without repeating a row. The Monday
+ * agenda ordering was removed with the agenda view.
  */
 export type DeckCard = { row: ReviewRow; bucket: BucketKey };
 
@@ -17,11 +16,8 @@ export function canApproveRole(role: string | null | undefined): boolean {
   return !!role && (QUEUE_APPROVE_ROLES as readonly string[]).includes(role);
 }
 
-export function buildDeck(buckets: ReviewBuckets, members: readonly LaneMember[], personId: string | null, today: string): DeckCard[] {
+export function buildDeck(buckets: ReviewBuckets, members: readonly LaneMember[], personId: string | null): DeckCard[] {
   if (!personId) return [];
-  const all = BUCKET_KEYS.flatMap((b) => buckets.sections[b]);
-  const position = agendaPositions(agendaOrder(all, today));
-  const rank = (c: DeckCard) => position.get(c.row.key) ?? Number.MAX_SAFE_INTEGER;
   const deck: DeckCard[] = [];
   const seen = new Set<string>();
   for (const bucket of BOARD_COLUMNS) {
@@ -31,7 +27,6 @@ export function buildDeck(buckets: ReviewBuckets, members: readonly LaneMember[]
       deck.push({ row, bucket });
     }
   }
-  deck.sort((a, b) => rank(a) - rank(b));
   const approvals: DeckCard[] = [];
   const person = members.find((m) => m.userId === personId);
   if (person && canApproveRole(person.role)) {
@@ -43,7 +38,7 @@ export function buildDeck(buckets: ReviewBuckets, members: readonly LaneMember[]
       }
     }
   }
-  return [...deck, ...approvals.sort((a, b) => rank(a) - rank(b))];
+  return [...deck, ...approvals];
 }
 
 export type DeckPerson = { userId: string; name: string };

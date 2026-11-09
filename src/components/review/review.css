@@ -15,9 +15,6 @@
 /* Board: lanes are people; the four groups sit across */
 .rv-board { display: grid; gap: 18px; }
 .rv-person-name { font-size: 22px; margin: 0 0 8px; display: flex; align-items: center; gap: 8px; }
-.rv-scroll { overflow-x: auto; }
-.rv-cols { display: grid; grid-template-columns: repeat(4, minmax(260px, 1fr)); gap: 12px; align-items: start; }
-.rv-col { display: grid; gap: 8px; align-content: start; }
 .rv-colh { margin: 0; padding: 2px; }
 .rv-card { padding: 0; display: grid; grid-template-rows: 1fr auto; min-height: 148px; border-left: 4px solid var(--line); overflow: hidden; }
 .rv-card-link { display: grid; gap: 6px; align-content: start; padding: 12px 14px 6px; color: inherit; text-decoration: none; }
@@ -36,14 +33,36 @@
 .rv-card-title { color: var(--ink); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .rv-card-step { margin: 0; font-size: 14px; }
 .rv-tags { display: flex; flex-wrap: wrap; gap: 4px; }
-@media (max-width: 900px) { .rv-cols { min-width: 1070px; } }
-@media (max-width: 640px) {
-  .rv-scroll { overflow-x: visible; }
-  .rv-cols { grid-template-columns: 1fr; min-width: 0; }
-}
+.rv-halves { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+.rv-half { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.rv-half[data-half="client"] { border-left: 1px dashed var(--line); padding-left: 14px; }
+.rv-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
+.rv-none { margin: 0; }
+.rv-card-followup { display: block; }
+.rv-strips { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; align-items: start; }
+.rv-strip { padding: 12px 14px; display: grid; gap: 6px; }
+.rv-strip-title { margin: 0; font-size: 20px; }
+.rv-strip-note { margin: 0; }
+.rv-strip-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 220px; overflow-y: auto; }
+.rv-strip-list a { color: var(--ink); font-weight: 600; text-decoration: none; }
+.rv-strip-list a:hover { text-decoration: underline; }
+.rv-strip-when { font-size: 13.5px; color: var(--body); }
+@media (max-width: 900px) { .rv-halves { grid-template-columns: 1fr; } .rv-half[data-half="client"] { border-left: 0; padding-left: 0; border-top: 1px dashed var(--line); padding-top: 10px; } }
 
-/* Meeting mode */
-.rv-focus { max-width: 680px; margin: 0 auto; padding: 22px; display: grid; gap: 10px; }
+/* Sheet: the Excel tracker. Sticky header, zebra rows; scrolls sideways under 900px, stacks under 640px (.lx-stack). */
+.rv-sheets { display: grid; gap: 14px; }
+.rv-sheet-sec { padding: 12px 14px; display: grid; gap: 8px; }
+.rv-sheet-title { margin: 0; font-size: 22px; }
+.rv-sheet-wrap { overflow: auto; max-height: 75vh; }
+.rv-sheet { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px; }
+.rv-sheet th { position: sticky; top: 0; z-index: 2; background: var(--card); border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+.rv-sheet td { vertical-align: top; padding: 6px 10px; }
+.rv-sheet tbody tr:nth-child(even) td { background: var(--well); }
+@media (max-width: 900px) and (min-width: 641px) { .rv-sheet { min-width: 980px; } }
+@media (max-width: 640px) { .rv-sheet-wrap { max-height: none; overflow: visible; } }
+
+
+/* Shared fact grid (Cards, detail panel) */
 .rv-prog { margin: 0; }
 .rv-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 8px 0; }
 .rv-facts > div { background: var(--well); border-radius: 10px; padding: 10px; }
@@ -102,14 +121,3 @@
 .rv-note-box > summary { list-style: none; display: inline-flex; align-items: center; }
 .rv-note-box > summary::-webkit-details-marker { display: none; }
 @media (max-width: 640px) { .rv-big { padding: 18px 16px; } .rv-big-title { font-size: 25px; } .rv-big-step { font-size: 19px; } .rv-handto { flex-wrap: wrap; } }
-
-/* Monday agenda: five sections in the meeting's order. Tokens only. */
-.rv-agenda { display: grid; gap: 14px; }
-.rv-agenda-sec { padding: 14px 16px; display: grid; gap: 10px; }
-.rv-agenda-head { margin: 0; display: flex; align-items: baseline; gap: 8px; cursor: default; }
-.rv-agenda-parked > .rv-agenda-head { cursor: pointer; }
-.rv-agenda-title { font-size: 22px; }
-.rv-agenda-hint, .rv-agenda-empty { margin: 0; }
-.rv-agenda-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
-.rv-card-owner { display: flex; align-items: baseline; gap: 6px; font-weight: 600; color: var(--ink); }
-@media (max-width: 640px) { .rv-agenda-cards { grid-template-columns: 1fr; } .rv-agenda-title { font-size: 19px; } }

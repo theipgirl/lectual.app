@@ -6,10 +6,10 @@ import { openToken, parseOpenParam, type OpenRef } from "./open";
 export type ReviewWho = "all" | "mine";
 export type ReviewScope = "both" | ReviewKind;
 
-export type ReviewView = "agenda" | "board" | "meeting" | "stage" | "cards";
-export const REVIEW_VIEWS: readonly ReviewView[] = ["agenda", "board", "meeting", "stage", "cards"];
-/** The view with no `view` param: the Monday agenda. */
-export const DEFAULT_REVIEW_VIEW: ReviewView = "agenda";
+export type ReviewView = "board" | "sheet" | "cards";
+export const REVIEW_VIEWS: readonly ReviewView[] = ["board", "sheet", "cards"];
+/** The view with no `view` param: the Board. An old `?view=agenda|meeting|stage` is not a view any more and reads as the Board. */
+export const DEFAULT_REVIEW_VIEW: ReviewView = "board";
 
 export type ReviewParams = { who: ReviewWho; kind: ReviewScope; q: string; view: ReviewView; i: number; /** The Cards view's person (a user id), or null for the default. */ person: string | null; /** The record whose detail panel is open. */ open: OpenRef | null };
 
@@ -36,7 +36,7 @@ export function reviewHref(p: ReviewParams): string {
   if (p.q) qs.set("q", p.q);
   if (p.view !== DEFAULT_REVIEW_VIEW) qs.set("view", p.view);
   if (p.view === "cards" && p.person) qs.set("person", p.person);
-  if ((p.view === "meeting" || p.view === "cards") && p.i > 1) qs.set("i", String(p.i));
+  if (p.view === "cards" && p.i > 1) qs.set("i", String(p.i));
   if (p.open) qs.set("open", openToken(p.open));
   const s = qs.toString();
   return `/dashboard/review/${s ? `?${s}` : ""}`;

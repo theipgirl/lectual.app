@@ -33,7 +33,7 @@ export type ReviewRow = {
   client: string;
   mark: string | null;
   stageLabel: string | null;
-  /** The docket stage's own code ("19A"), when the record has one. The agenda reads it before the label. */
+  /** The docket stage's own code ("19A"), when the record has one. */
   stageCode?: string | null;
   /** The matter type code (TM, CR, PATENT, BL, LIT, ...). Absent on a lead, or when unknown (read as TM). */
   matterType?: string | null;
@@ -49,6 +49,10 @@ export type ReviewRow = {
   lastContact: { date: string; type: ContactType } | null;
   waiting: Waiting | null;
   lastDirection: Direction | null;
+  /** YYYY-MM-DD in the firm's zone of the newest OUTBOUND contact (we emailed / called). Null = none recorded or unreadable (see `contactKnown`). */
+  lastOutbound?: string | null;
+  /** Where the lead / matter came from (`referral_source`), if recorded. */
+  source?: string | null;
   nextStep: ReviewNextStep | null;
   /** The nearest open USPTO deadline (matters only). */
   deadline: { dueDate: string; title: string | null } | null;
