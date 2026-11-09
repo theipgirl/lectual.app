@@ -1,17 +1,19 @@
 import type { ReviewKind, ReviewRow } from "./buckets";
+import { isUuid } from "./input";
+import { openToken, parseOpenParam, type OpenRef } from "./open";
 
 /** The page's URL state: who (Mine | Everyone), which kind (Matters | Leads | Both) and a search term. Pure. */
 export type ReviewWho = "all" | "mine";
 export type ReviewScope = "both" | ReviewKind;
 
-export type ReviewView = "board" | "meeting" | "stage";
-export const REVIEW_VIEWS: readonly ReviewView[] = ["board", "meeting", "stage"];
+export type ReviewView = "board" | "meeting" | "stage" | "cards";
+export const REVIEW_VIEWS: readonly ReviewView[] = ["board", "meeting", "stage", "cards"];
 
-export type ReviewParams = { who: ReviewWho; kind: ReviewScope; q: string; view: ReviewView; i: number };
+export type ReviewParams = { who: ReviewWho; kind: ReviewScope; q: string; view: ReviewView; i: number; /** The Cards view's person (a user id), or null for the default. */ person: string | null; /** The record whose detail panel is open. */ open: OpenRef | null };
 
 export const SEARCH_MAX = 80;
 
-export function parseReviewParams(raw: { who?: string | string[]; kind?: string | string[]; q?: string | string[]; view?: string | string[]; i?: string | string[] }): ReviewParams {
+export function parseReviewParams(raw: { who?: string | string[]; kind?: string | string[]; q?: string | string[]; view?: string | string[]; i?: string | string[]; person?: string | string[]; open?: string | string[] }): ReviewParams {
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   const who = one(raw.who) === "mine" ? "mine" : "all";
   const k = one(raw.kind);
@@ -21,7 +23,8 @@ export function parseReviewParams(raw: { who?: string | string[]; kind?: string 
   const view: ReviewView = REVIEW_VIEWS.find((x) => x === v) ?? "board";
   const n = Number.parseInt(one(raw.i) ?? "", 10);
   const i = Number.isFinite(n) && n >= 1 && n <= 100_000 ? n : 1;
-  return { who, kind, q, view, i };
+  const p = (one(raw.person) ?? "").trim();
+  return { who, kind, q, view, i, person: isUuid(p) ? p.toLowerCase() : null, open: parseOpenParam(raw.open) };
 }
 
 export function reviewHref(p: ReviewParams): string {
@@ -30,7 +33,9 @@ export function reviewHref(p: ReviewParams): string {
   if (p.kind !== "both") qs.set("kind", p.kind === "matter" ? "matters" : "leads");
   if (p.q) qs.set("q", p.q);
   if (p.view !== "board") qs.set("view", p.view);
-  if (p.view === "meeting" && p.i > 1) qs.set("i", String(p.i));
+  if (p.view === "cards" && p.person) qs.set("person", p.person);
+  if ((p.view === "meeting" || p.view === "cards") && p.i > 1) qs.set("i", String(p.i));
+  if (p.open) qs.set("open", openToken(p.open));
   const s = qs.toString();
   return `/dashboard/review/${s ? `?${s}` : ""}`;
 }

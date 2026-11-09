@@ -169,3 +169,131 @@ describe("closeLeadAction (Lost / Nurture)", () => {
     expect((await closeLeadAction({}, fd({ id: ID, stageId: STAGE, reason: "x".repeat(201) }))).error).toMatch(/200/);
   });
 });
+
+describe("panel actions", () => {
+  const TASK = "00000000-0000-4000-8000-000000000003";
+  const STAGE = "00000000-0000-4000-8000-000000000009";
+  const updateTask = vi.fn(async () => ({}));
+  const updateMatterStage = vi.fn(async () => {});
+  const assignMatterOwner = vi.fn(async () => ({}));
+  const assignLead = vi.fn(async () => ({}));
+  const moveLeadStage = vi.fn(async () => ({}));
+  let taskStatus: string | null = "open";
+  let stageCategory = "open";
+  let leadStage = "00000000-0000-4000-8000-000000000008";
+
+  function setupPanel() {
+    vi.doMock("next/cache", () => ({ revalidatePath: vi.fn() }));
+    vi.doMock("@/lib/db/scoped-client", () => ({
+      getScopedClient: async () => ({
+        from: (table: string) => ({
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => {
+                if (table === "crm_task") return { data: taskStatus ? { id: TASK, status: taskStatus } : null, error: null };
+                if (table === "crm_stage") return { data: { id: STAGE, category: stageCategory }, error: null };
+                if (table === "crm_lead") return { data: { id: ID, current_stage_id: leadStage }, error: null };
+                return { data: { id: ID }, error: null };
+              },
+            }),
+          }),
+        }),
+      }),
+    }));
+    vi.doMock("@/lib/pipeline", () => ({
+      CAN_WRITE_LEAD: ["owner", "attorney", "paralegal"],
+      CAN_MOVE_STAGE: ["owner", "attorney"],
+      resolveCurrentRole: async () => role,
+      addLeadNote, assignLead, moveLeadStage,
+    }));
+    vi.doMock("@/lib/matters/matters", () => ({ MATTER_WRITE_ROLES: ["owner", "attorney", "paralegal"], assignMatterOwner }));
+    vi.doMock("@/lib/matters/stages", () => ({ updateMatterStage }));
+    vi.doMock("@/lib/matters/notes", () => ({ addMatterNote }));
+    vi.doMock("@/lib/matters/tasks", () => ({ createTask, completeTask, updateTask }));
+    vi.doMock("@/lib/members/directory", () => ({ listMemberDirectory: async () => members }));
+    vi.doMock("@/lib/org/profile", () => ({ getFirmTimeZone: async () => "America/New_York" }));
+  }
+  beforeEach(() => {
+    vi.resetModules(); vi.clearAllMocks();
+    role = "attorney"; taskStatus = "open"; stageCategory = "open"; members = [{ userId: USER }];
+    leadStage = "00000000-0000-4000-8000-000000000008";
+    setupPanel();
+  });
+
+  it("edits only the posted fields of the existing step through updateTask", async () => {
+    const { updateNextStepAction } = await import("../../src/app/dashboard/review/actions");
+    const res = await updateNextStepAction({}, fd({ taskId: TASK, title: " New ", dueAt: "2026-11-12", assigneeId: USER }));
+    expect(res).toEqual({ saved: true });
+    expect(updateTask).toHaveBeenCalledWith(TASK, { title: " New ", dueAt: "2026-11-12", assigneeId: USER });
+    await updateNextStepAction({}, fd({ taskId: TASK, assigneeId: "" }));
+    expect(updateTask).toHaveBeenLastCalledWith(TASK, { assigneeId: "" });
+    expect(createTask).not.toHaveBeenCalled();
+  });
+  it("refuses a viewer, a missing task and a finished one, writing nothing", async () => {
+    const { updateNextStepAction } = await import("../../src/app/dashboard/review/actions");
+    role = "viewer";
+    expect((await updateNextStepAction({}, fd({ taskId: TASK, title: "x" }))).error).toMatch(/permission/);
+    role = "attorney"; taskStatus = null;
+    expect((await updateNextStepAction({}, fd({ taskId: TASK, title: "x" }))).error).toMatch(/couldn't be found/);
+    taskStatus = "completed";
+    expect((await updateNextStepAction({}, fd({ taskId: TASK, title: "x" }))).error).toMatch(/already done/);
+    expect((await updateNextStepAction({}, fd({ taskId: "nope", title: "x" }))).error).toMatch(/couldn't be found/);
+    expect(updateTask).not.toHaveBeenCalled();
+  });
+  it("snooze moves the due date only, computed from the firm's date", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-09T15:00:00Z")); // a Monday in New York
+    try {
+      const { snoozeNextStepAction } = await import("../../src/app/dashboard/review/actions");
+      expect(await snoozeNextStepAction({}, fd({ taskId: TASK, when: "monday" }))).toEqual({ saved: true });
+      expect(updateTask).toHaveBeenCalledWith(TASK, { dueAt: "2026-11-16" });
+      await snoozeNextStepAction({}, fd({ taskId: TASK, when: "tomorrow" }));
+      expect(updateTask).toHaveBeenLastCalledWith(TASK, { dueAt: "2026-11-10" });
+      expect((await snoozeNextStepAction({}, fd({ taskId: TASK, when: "never" }))).error).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("snooze late on Sunday night New York time still counts as Sunday there", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-09T03:00:00Z")); // 10pm Sunday in New York
+    try {
+      const { snoozeNextStepAction } = await import("../../src/app/dashboard/review/actions");
+      await snoozeNextStepAction({}, fd({ taskId: TASK, when: "tomorrow" }));
+      expect(updateTask).toHaveBeenCalledWith(TASK, { dueAt: "2026-11-09" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("moves a matter through updateMatterStage and a lead through moveLeadStage", async () => {
+    const { moveStageAction } = await import("../../src/app/dashboard/review/actions");
+    expect(await moveStageAction({}, fd({ kind: "matter", id: ID, stageId: STAGE }))).toEqual({ saved: true });
+    expect(updateMatterStage).toHaveBeenCalledWith(ID, STAGE);
+    expect(await moveStageAction({}, fd({ kind: "lead", id: ID, stageId: STAGE }))).toEqual({ saved: true });
+    expect(moveLeadStage).toHaveBeenCalledWith(ID, STAGE);
+  });
+  it("never moves a lead to a won stage, nor to its own stage, nor without CAN_MOVE_STAGE", async () => {
+    const { moveStageAction } = await import("../../src/app/dashboard/review/actions");
+    stageCategory = "won";
+    expect((await moveStageAction({}, fd({ kind: "lead", id: ID, stageId: STAGE }))).error).toMatch(/won stage/);
+    stageCategory = "open"; leadStage = STAGE;
+    expect((await moveStageAction({}, fd({ kind: "lead", id: ID, stageId: STAGE }))).error).toMatch(/already in that stage/);
+    leadStage = "00000000-0000-4000-8000-000000000008"; role = "paralegal";
+    expect((await moveStageAction({}, fd({ kind: "lead", id: ID, stageId: STAGE }))).error).toMatch(/permission/);
+    expect(moveLeadStage).not.toHaveBeenCalled();
+    role = "viewer";
+    expect((await moveStageAction({}, fd({ kind: "matter", id: ID, stageId: STAGE }))).error).toMatch(/permission/);
+    expect(updateMatterStage).not.toHaveBeenCalled();
+  });
+  it("assigns through assignMatterOwner / assignLead, checks membership, and unassigns on empty", async () => {
+    const { assignRecordAction } = await import("../../src/app/dashboard/review/actions");
+    await assignRecordAction({}, fd({ kind: "matter", id: ID, userId: USER }));
+    expect(assignMatterOwner).toHaveBeenCalledWith(ID, USER);
+    await assignRecordAction({}, fd({ kind: "lead", id: ID, userId: "" }));
+    expect(assignLead).toHaveBeenCalledWith(ID, null);
+    members = [];
+    expect((await assignRecordAction({}, fd({ kind: "lead", id: ID, userId: USER }))).error).toMatch(/isn't a member/);
+    role = "viewer";
+    expect((await assignRecordAction({}, fd({ kind: "lead", id: ID, userId: "" }))).error).toMatch(/permission/);
+  });
+});

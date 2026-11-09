@@ -1425,14 +1425,37 @@ and a Follow-Up stage; a lead that has a matter shows once, as the matter). Ever
   "Proposal expires today" / "Proposal expired Oct 26" (the expired one in the `--ox` risk style), on board cards, the meeting card and stage-view rows. Tags NEVER change a bucket. KPI tile
   "Proposals expiring this week" = expires today..+6 or expired within the last 14 days and still sent. Optional source `proposals`: a failed read draws no tags, the tile is a dash with
   "Couldn't load", and the note reads "Some details couldn't load (proposals)", never "no proposal".
-- **Lost / Nurture** (lead rows only: board card, meeting card, stage row; `LostNurture.tsx`, `closeLeadAction`): a small inline form (stage select, optional reason of at most 200 characters,
+- **Lost / Nurture** (leads only, now inside the detail panel; `LostNurture.tsx`, `closeLeadAction`): a small inline form (stage select, optional reason of at most 200 characters,
   `InlineConfirm`). The choices are the firm's stages whose category is `lost` or `nurture` (`closeStagesOf`, read from the stage list the loader already has); a firm with neither sees no button
   and nothing else changes. Shown only for `CAN_MOVE_STAGE` (narrower than `CAN_WRITE_LEAD`: a paralegal can edit leads but `moveLeadStage` refuses them). The action re-resolves the role,
   re-reads the lead and the target stage through the scoped client, refuses any stage that is not `lost`/`nurture`, then moves with the person path `moveLeadStage(id, stageId)` (logs
   `stage_changed`; no agent path) and, when a reason was given, `addLeadNote` "Moved to <stage>: <reason>". The lead then leaves the review (it left an open stage). Its open task is left alone.
   The firm needs a Lost and/or Nurture stage for the button to show.
-- Leads DO have an assignee (`crm_lead.assigned_to`), so a lead row shows it and the board uses it. Not built: proposal-expiry tags on cards (it would need a per-record
-  proposal read), snooze, move-stage and lost/nurture buttons from the mockup. `createTask` and `completeTask` write no timeline row today, so neither does this page.
+- **Open a record (detail panel, no schema).** A card, a stage-view row and the meeting card are LINKS to `?open=<matter|lead>:<uuid>` on the current review URL (view, who, kind, q, i
+  and person are kept), so the panel is server-rendered, shareable and Back closes it (`openHref` in `shared.tsx`; `parseOpenParam`, `open.ts`: only `matter:`/`lead:` plus a uuid, anything
+  else is no panel). The panel is a right-side drawer from 900px and a full-screen sheet below (`ReviewPanel` over `PanelShell`: focus moves in, Tab wraps, Esc follows the close link,
+  focus returns). It re-reads the ONE record through the scoped client (`loadReviewDetail`, `detail-load.ts`): a missing or foreign id is "This record couldn't be found." with no
+  record data, a failed read is "couldn't be loaded", and the three optional reads (open steps, last 8 timeline rows, stage options) each say so on failure. The computed facts (waiting
+  on, last contact, USPTO deadline, proposal tag) come from the review row. **No form lives on a card**: the card is one `<a>` and "Done" / "Open" sit outside it (nothing interactive
+  nested). The old inline "Set next step" / "Log what happened" details forms are gone from the cards and table; they live in the panel.
+- **Panel actions reuse the existing ones, all re-resolving the role** (`actions.ts`): Save the EXISTING next step = `updateNextStepAction` -> `updateTask` (the matter page's task editor;
+  only posted fields change); Snooze (Tomorrow / Next Monday / In 2 weeks) = `snoozeNextStepAction`, due date only, the date worked out on the server from the firm's own calendar day
+  (`snoozeDate`, `snooze.ts`; Monday + "next Monday" = +7); Done = `completeNextStepAction`; "Add another next step" = `setNextStepAction`; Move stage = `moveStageAction` (a matter:
+  `updateMatterStage`, the docket move; a lead: `moveLeadStage`, `CAN_MOVE_STAGE`, open / lost / nurture stages only, a `won` stage refused again on the server because that move runs the
+  matter handoff); Assigned to = `assignRecordAction` (`assignMatterOwner` / `assignLead`, member checked, unreadable directory refuses); Log what happened = `logWhatHappenedAction`;
+  Lost / Nurture keeps its own `closeLeadAction`. Read-only roles see the same facts with no form. Activity shows a title per row and the note text (clipped to 200 characters, as React
+  text) for plain notes only (`detail.ts`).
+- **Cards view (`?view=cards&person=<user id>&i=<n>`, "Cards" from `words.ts`): a deck for one person** (Rebecca's cue cards). The person chips are every member (owners first); the
+  default is the member whose name starts with "Rebecca", else the signed-in user. `buildDeck` (`deck.ts`, pure): that person's board lane (next-step assignee, else record assignee) in
+  column order (Overdue, This week, Needs a next step, Quiet), then, for an approver role (`QUEUE_APPROVE_ROLES`), every row waiting on approval, never repeating a row. The Whose chip is
+  ignored here (the person picker is the person); the search and Matters/Leads chips apply. One big card with "N of M" and progress dots; Done, Snooze, Hand to (the step's assignee, or
+  the record's when there is no step), Add note, Open (the panel), Skip / Back. The buttons are plain forms posting to `card-actions.ts`, which run the SAME actions as the panel and then
+  redirect back to the same `i` (clamped), rebuilding the address from the posted view fields through `parseReviewParams`, never a posted URL; a refusal rides back as a closed
+  `notice=denied|missing|failed` code with a fixed sentence (`notice.ts`). Left / Right arrows follow the Back / Skip links (`DeckKeys`); without JavaScript the links work. The latest
+  note line is its own optional read (`loadLatestNote`): a failure says "couldn't load", never "no notes".
+- **Board cards:** client (one line), a small kind / mark / stage line, the next step with a due chip (overdue in `--ox`), an initials avatar for the lane person, at most two tags then
+  "+N", the bucket's left border, equal height; columns `minmax(260px, 1fr)`; lane headers carry an avatar, the name and the count. Tokens only, light and dark.
+- Leads DO have an assignee (`crm_lead.assigned_to`), so a lead row shows it and the board uses it. Snooze, move-stage and Lost / Nurture are now in the detail panel (above). `createTask` and `completeTask` write no timeline row today, so neither does this page.
 
 ## Sign-in links a scanner can't spend (2026-11-05, no schema)
 RPB's Check Point Harmony filter (like Microsoft Safe Links) opens every emailed link, which used up the one-time magic link (`otp_expired`).

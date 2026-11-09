@@ -5,6 +5,8 @@ import { Chip, FilterChips } from "@/components/list-page/Chips";
 import "@/components/list-page/list-page.css";
 import { ReviewSection } from "@/components/review/ReviewSection";
 import { KpiStrip, MeetingCard, ReviewBoard, StageView, ViewSwitch } from "@/components/review/ReviewViews";
+import { CardsDeck, PersonChips } from "@/components/review/CardsDeck";
+import { ReviewPanel } from "@/components/review/ReviewPanel";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import { CAN_MOVE_STAGE } from "@/lib/pipeline/leads";
@@ -13,6 +15,9 @@ import { bucketOf, reviewBuckets, reviewSubline } from "@/lib/review/buckets";
 import { boardLanes, kpis, meetingPosition, meetingQueue, stageGroups } from "@/lib/review/lanes";
 import { applyReviewFilters, parseReviewParams, reviewHref, type ReviewParams } from "@/lib/review/params";
 import { criticalAlert, detailsNote } from "@/lib/review/notes";
+import { noticeFor } from "@/lib/review/notice";
+import { buildDeck, chosenPerson, deckPeople } from "@/lib/review/deck";
+import { loadLatestNote, loadReviewDetail } from "@/lib/review/detail-load";
 import { pageTitle } from "@/lib/ui/page-title";
 import { REVIEW_NAME } from "@/lib/ui/words";
 
@@ -20,7 +25,7 @@ export const metadata: Metadata = { title: pageTitle(REVIEW_NAME) };
 
 export const dynamic = "force-dynamic";
 
-type SearchParams = { who?: string | string[]; kind?: string | string[]; q?: string | string[]; view?: string | string[]; i?: string | string[] };
+type SearchParams = { who?: string | string[]; kind?: string | string[]; q?: string | string[]; view?: string | string[]; i?: string | string[]; person?: string | string[]; open?: string | string[]; notice?: string | string[] };
 
 /**
  * One page for Monday's walk-through: every open matter and every lead past first contact, in the
@@ -28,7 +33,8 @@ type SearchParams = { who?: string | string[]; kind?: string | string[]; q?: str
  * source: a failed critical source is ONE alert and no sections; a failed optional source is one note.
  */
 export default async function ReviewPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const params = parseReviewParams(await searchParams);
+  const sp = await searchParams;
+  const params = parseReviewParams(sp);
   const [load, session] = await Promise.all([loadReview(), resolveFirmSession()]);
   const role = session.kind === "ok" ? session.role : null;
   const userId = session.kind === "ok" ? session.user.id : null;
@@ -47,16 +53,35 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
     );
   }
 
-  const link = (next: Partial<ReviewParams>) => reviewHref({ ...params, i: 1, ...next });
+  const link = (next: Partial<ReviewParams>) => reviewHref({ ...params, i: 1, open: null, ...next });
   const shown = applyReviewFilters(load.rows, params, userId);
   const buckets = reviewBuckets(shown, load.today);
   // Chip counts: each chip counts what it would show with the other filters kept.
   const countFor = (over: Partial<ReviewParams>) => applyReviewFilters(load.rows, { ...params, ...over }, userId).length;
   const note = detailsNote(load.failed);
-  const common = { today: load.today, members: load.members, canWrite, closeStages: canMove ? load.closeStages : [] };
+  const common = { today: load.today, members: load.members, canWrite, params };
   const queue = meetingQueue(buckets, load.members);
   const pos = meetingPosition(queue.length, params.i);
   const focus = pos ? queue[pos.index] : null;
+
+  // Cards: one person's deck, built from every row that passes the search and the kind chips (Whose is ignored: the picker is the person).
+  let cards: { people: ReturnType<typeof deckPeople>; personId: string | null; card: ReturnType<typeof buildDeck>[number] | null; pos: ReturnType<typeof meetingPosition>; note: Awaited<ReturnType<typeof loadLatestNote>> | null } | null = null;
+  if (params.view === "cards") {
+    const deckBuckets = reviewBuckets(applyReviewFilters(load.rows, { ...params, who: "all" }, userId), load.today);
+    let people = deckPeople(load.members, boardLanes(deckBuckets, load.members).map((l) => l.userId));
+    if (people.length === 0 && userId) people = [{ userId, name: "You" }];
+    const personId = chosenPerson(people, params.person, userId);
+    const deck = buildDeck(deckBuckets, load.members, personId);
+    const cardPos = meetingPosition(deck.length, params.i);
+    const card = cardPos ? deck[cardPos.index] : null;
+    cards = { people, personId, card, pos: cardPos, note: card ? await loadLatestNote({ kind: card.row.kind, id: card.row.id }) : null };
+  }
+
+  // The detail panel: the record is read AGAIN through the scoped client; the review row only supplies the computed facts.
+  const panel = params.open
+    ? { detail: await loadReviewDetail(params.open), row: load.rows.find((r) => r.kind === params.open!.kind && r.id === params.open!.id) ?? null }
+    : null;
+  const notice = noticeFor(sp.notice);
 
   return (
     <div className="lp-root">
@@ -67,7 +92,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           label: "Search clients and marks",
           placeholder: "Client or mark",
           defaultValue: params.q,
-          hidden: { ...(params.view !== "board" ? { view: params.view } : {}), ...(params.who === "mine" ? { who: "mine" } : {}), ...(params.kind !== "both" ? { kind: params.kind === "matter" ? "matters" : "leads" } : {}) },
+          hidden: { ...(params.view !== "board" ? { view: params.view } : {}), ...(params.view === "cards" && params.person ? { person: params.person } : {}), ...(params.who === "mine" ? { who: "mine" } : {}), ...(params.kind !== "both" ? { kind: params.kind === "matter" ? "matters" : "leads" } : {}) },
           clearHref: link({ q: "", i: 1 }),
         }}
         toggle={<ViewSwitch params={params} />}
@@ -90,6 +115,11 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           {note}
         </p>
       )}
+      {notice && (
+        <p className="lx-banner lx-banner-warn" role="alert" style={{ margin: 0 }}>
+          {notice}
+        </p>
+      )}
 
       {shown.length === 0 ? (
         <div className="lx-card lx-empty-card">
@@ -98,8 +128,13 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
             {load.rows.length === 0 ? "Open matters and leads past first contact will show up here." : "Try another filter or search."}
           </p>
         </div>
+      ) : params.view === "cards" && cards ? (
+        <>
+          <PersonChips people={cards.people} personId={cards.personId} params={params} />
+          <CardsDeck card={cards.card} pos={cards.pos} personId={cards.personId} personName={cards.people.find((p) => p.userId === cards.personId)?.name ?? null} note={cards.note} {...common} />
+        </>
       ) : params.view === "meeting" ? (
-        <MeetingCard row={focus} bucket={focus ? bucketOf(focus, load.today) : null} pos={pos} params={params} {...common} />
+        <MeetingCard row={focus} bucket={focus ? bucketOf(focus, load.today) : null} pos={pos} {...common} />
       ) : params.view === "stage" ? (
         <StageView groups={stageGroups(buckets)} {...common} />
       ) : (
@@ -108,6 +143,20 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           <ReviewSection bucket="uspto" rows={buckets.sections.uspto} collapsed {...common} />
           <ReviewSection bucket="track" rows={buckets.sections.track} collapsed {...common} />
         </>
+      )}
+      {panel && params.open && (
+        <ReviewPanel
+          open={params.open}
+          row={panel.row}
+          detail={panel.detail}
+          today={load.today}
+          timeZone={load.timeZone}
+          members={load.members}
+          canWrite={canWrite}
+          canMove={canMove}
+          closeStages={load.closeStages}
+          closeHref={reviewHref({ ...params, open: null })}
+        />
       )}
     </div>
   );

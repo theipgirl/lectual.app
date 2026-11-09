@@ -3,25 +3,18 @@ import type { ReactNode } from "react";
 import { BUCKET_COPY, type BucketKey, type ReviewRow } from "@/lib/review/buckets";
 import { WAITING_LABEL } from "@/lib/review/waiting";
 import { deadlineIsSoon, dueText, lastContactText, shortDate } from "@/lib/review/format";
-import type { CloseStage } from "@/lib/review/close-stage";
-import { ReviewRowActions } from "./ReviewRowActions";
+import { DoneButton } from "./DoneButton";
+import { openHref, type Common } from "./shared";
 import "@/components/list-page/list-page.css";
 import "./review.css";
 
-type Member = { userId: string; name: string };
 
-export type SectionProps = {
+export type SectionProps = Common & {
   bucket: BucketKey;
   rows: ReviewRow[];
-  today: string;
-  members: Member[];
-  /** Whether the caller's role can write; false hides every edit control. */
-  canWrite: boolean;
-  /** Lost / nurture stages for the Lost / Nurture button on lead rows; empty or absent hides it. */
-  closeStages?: CloseStage[];
 };
 
-export function ReviewTable({ rows, today, members, canWrite, closeStages }: Omit<SectionProps, "bucket">) {
+export function ReviewTable({ rows, today, members, canWrite, params }: Omit<SectionProps, "bucket">) {
   const names = new Map(members.map((m) => [m.userId, m.name]));
   const who = (id: string | null) => (id ? names.get(id) ?? "Teammate" : null);
   return (
@@ -36,7 +29,7 @@ export function ReviewTable({ rows, today, members, canWrite, closeStages }: Omi
             <th>Next step</th>
             <th>Waiting on</th>
             <th>USPTO deadline</th>
-            {canWrite && <th>Update</th>}
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -46,7 +39,7 @@ export function ReviewTable({ rows, today, members, canWrite, closeStages }: Omi
             return (
               <tr key={r.key} className="lp-row">
                 <td className="pri">
-                  <Link href={r.href} className="lx-rowlink">
+                  <Link href={openHref(params, r)} className="lx-rowlink" scroll={false}>
                     {r.client}
                   </Link>
                   <div className="lx-note">
@@ -87,11 +80,14 @@ export function ReviewTable({ rows, today, members, canWrite, closeStages }: Omi
                     <span className="lx-note">—</span>
                   )}
                 </td>
-                {canWrite && (
-                  <td data-label="Update">
-                    <ReviewRowActions kind={r.kind} id={r.id} nextStepId={r.nextStep?.id ?? null} members={members} defaultAssignee={r.nextStep?.assigneeId ?? r.assignedTo} closeStages={closeStages} />
-                  </td>
-                )}
+                <td data-label="Actions">
+                  <div className="rv-card-acts">
+                    {canWrite && r.nextStep && <DoneButton taskId={r.nextStep.id} />}
+                    <Link href={openHref(params, r)} className="lx-btn lx-btn-ghost lx-btn-sm" scroll={false}>
+                      Open
+                    </Link>
+                  </div>
+                </td>
               </tr>
             );
           })}

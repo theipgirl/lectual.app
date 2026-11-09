@@ -33,3 +33,12 @@ export function deadlineIsSoon(dueDate: string, today: string): boolean {
   const n = daysBetween(today, dueDate);
   return Number.isFinite(n) && n <= 30 && dueDate <= addDays(today, 30);
 }
+
+/** "RM" for "Rebecca Miller", "R" for one word, "?" for nothing. Pure. */
+export function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  const first = Array.from(parts[0])[0] ?? "";
+  const last = parts.length > 1 ? Array.from(parts[parts.length - 1])[0] ?? "" : "";
+  return (first + last).toUpperCase() || "?";
+}

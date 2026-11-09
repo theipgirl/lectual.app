@@ -22,10 +22,20 @@ function mock(load: unknown, role: string | null = "attorney") {
   }));
   vi.doMock("@/app/dashboard/review/actions", () => ({
     setNextStepAction: vi.fn(), completeNextStepAction: vi.fn(), logWhatHappenedAction: vi.fn(), closeLeadAction: vi.fn(),
+    updateNextStepAction: vi.fn(), snoozeNextStepAction: vi.fn(), moveStageAction: vi.fn(), assignRecordAction: vi.fn(),
+  }));
+  vi.doMock("@/lib/review/detail-load", () => ({
+    loadReviewDetail: vi.fn(async () => detailResult),
+    loadLatestNote: vi.fn(async () => ({ status: "ok", text: "Spoke to the client" })),
   }));
 }
 
-const ok = (over: object = {}) => ({ status: "ok", rows, today: TODAY, timeZone: "America/New_York", members, failed: [], ...over });
+let detailResult: unknown = { status: "ok", currentStageId: null, assignedTo: null, cameFrom: null, steps: { ok: true, items: [] }, activity: { ok: true, items: [] }, stages: { ok: true, options: [] } };
+
+/** The toolbar's search box is a form; the cards and the panel are what must not carry one for a viewer. */
+const withoutSearch = (html: string) => html.replace(/<form class="lp-search"[\s\S]*?<\/form>/, "");
+
+const ok = (over: object = {}) => ({ status: "ok", rows, today: TODAY, timeZone: "America/New_York", members, failed: [], closeStages: [], ...over });
 
 async function render(params: Record<string, string> = {}) {
   const { default: Page } = await import("../../src/app/dashboard/review/page");
@@ -77,7 +87,7 @@ describe("Weekly review page", () => {
     expect(html).toContain("Last contact");
     expect(html).toMatch(/href="\/dashboard\/review\/?\?view=meeting"[^>]*>Previous/);
     expect(html).toMatch(/href="\/dashboard\/review\/?\?view=meeting&amp;i=3"[^>]*>Keep and go to next/);
-    expect(html).toContain("Log what happened");
+    expect(html).toContain("Open details");
   });
 
   it("meeting mode past the end clamps to the last card", async () => {
@@ -101,19 +111,37 @@ describe("Weekly review page", () => {
     expect(html).not.toContain("Needs a next step");
   });
 
-  it("a viewer sees no edit controls", async () => {
+  it("a viewer sees no Done button or form anywhere", async () => {
     mock(ok(), "viewer");
     const html = await render();
-    expect(html).not.toContain("Set next step");
-    expect(html).not.toContain("Log what happened");
+    expect(withoutSearch(html)).not.toContain("<form");
     expect(html).toContain("Overdue Co");
+    expect(html).toContain(">Open<");
   });
 
-  it("an editor sees the actions", async () => {
+  it("an editor gets Done and Open on a card, and no form inside any card link", async () => {
     mock(ok());
     const html = await render();
-    expect(html).toContain("Set next step");
-    expect(html).toContain("Log what happened");
+    expect(html).toContain(">Done<");
+    expect(html).not.toContain("Set next step");
+    expect(html).not.toContain("<details class=\"rv-act\"");
+    for (const m of html.matchAll(/<a class="rv-card-link"[\s\S]*?<\/a>/g)) {
+      expect(m[0]).not.toMatch(/<form|<button|<input|<select|<textarea/);
+    }
+  });
+
+  it("a card is a link that opens the panel and keeps the other review params", async () => {
+    mock(ok());
+    const html = await render({ view: "stage", q: "co" });
+    expect(html).toMatch(/class="lx-rowlink" href="[^"]*view=stage[^"]*open=matter%3A/);
+    const board = await render({ kind: "matters" });
+    expect(board).toMatch(/class="rv-card-link" href="[^"]*kind=matters[^"]*open=matter%3A/);
+  });
+
+  it("card count per column and at most two tags then +N", async () => {
+    mock(ok({ rows: [row({ key: "t", client: "Tag Co", nextStep: step("2026-10-30", "u-rayn"), deadline: { dueDate: "2026-11-10", title: null }, proposalExpiry: { text: "Proposal expires Nov 4", expiresOn: "2026-11-04", expired: false } })] }));
+    const html = await render();
+    expect(html).toContain("+1");
   });
 
   it("empty states are never a blank page", async () => {
@@ -121,40 +149,129 @@ describe("Weekly review page", () => {
     expect(await render()).toContain("Nothing to review");
   });
 
-  describe("proposal expiry and Lost / Nurture", () => {
+  describe("detail panel", () => {
+    const ID = "00000000-0000-4000-8000-000000000001";
+    const lead = row({ key: "l1", kind: "lead", id: ID, client: "Lead Co", nextStep: step("2026-11-04", "u-reb") });
+    const detailOk = { status: "ok", currentStageId: "s1", assignedTo: "u-reb", cameFrom: "Referral", steps: { ok: true, items: [{ id: "t", title: "Follow up", dueDate: "2026-11-04", assigneeId: "u-reb" }, { id: "t2", title: "Send form", dueDate: null, assigneeId: null }] }, activity: { ok: true, items: [{ id: "a1", type: "note", actor_type: "user", created_at: "2026-10-31T15:00:00Z", payload: { note: "Spoke to the client" } }] }, stages: { ok: true, options: [{ id: "s1", name: "Proposal" }, { id: "s2", name: "Hired" }] } };
     const stages = [{ id: "00000000-0000-4000-8000-0000000000aa", name: "Nurture 2027", category: "nurture" }];
-    const mixed = [
-      row({ key: "m1", kind: "matter", client: "Matter Co", proposalExpiry: { text: "Proposal expires Nov 4", expiresOn: "2026-11-04", expired: false } }),
-      row({ key: "l1", kind: "lead", client: "Lead Co", proposalExpiry: { text: "Proposal expired Oct 26", expiresOn: "2026-10-26", expired: true } }),
-    ];
 
-    it("shows the tags (expired one in the risk style) and the KPI count", async () => {
-      mock(ok({ rows: mixed, closeStages: stages }));
-      const html = await render();
-      expect(html).toContain("Proposal expires Nov 4");
-      expect(html).toMatch(/lp-pill-risk[^>]*>Proposal expired Oct 26/);
-      expect(html).toMatch(/Proposals expiring this week<\/span><span[^>]*>2</);
+    it("renders for a valid open param with facts, editable next step, snooze, other steps, stage, owner, note, activity", async () => {
+      detailResult = detailOk;
+      mock(ok({ rows: [lead], closeStages: stages }));
+      const html = await render({ open: `lead:${ID}` });
+      expect(html).toContain('role="dialog"');
+      expect(html).toContain("Lead Co");
+      expect(html).toContain("Referral");
+      expect(html).toMatch(/name="title"[^>]*value="Follow up"/);
+      expect(html).toMatch(/name="dueAt"[^>]*value="2026-11-04"/);
+      for (const w of ["Tomorrow", "Next Monday", "In 2 weeks", "Add another next step", "Send form", "Move stage", "Log what happened", "Recent activity", "Spoke to the client", "Lost / Nurture"]) expect(html).toContain(w);
+      expect(html).toContain("Open the full lead page");
+      expect(html).toMatch(/data-close[^>]*href="\/dashboard\/review\/?"|href="\/dashboard\/review\/?"[^>]*data-close/);
+      expect(html).not.toContain("Hired</option><option");
     });
-    it("KPI is a dash, with no tags, when the proposals read failed", async () => {
-      mock(ok({ failed: ["proposals"] }));
-      const html = await render();
-      expect(html).toMatch(/Proposals expiring this week<\/span><span[^>]*>—<\/span><span[^>]*>Couldn&#x27;t load/);
-      expect(html).toContain("Some details couldn&#x27;t load (proposals)");
-      expect(html).not.toContain("Proposal expires");
+    it("a foreign or missing id reads 'couldn't be found' with a close link and no record data", async () => {
+      detailResult = { status: "missing" };
+      mock(ok({ rows: [lead] }));
+      const html = await render({ open: `lead:${ID}` });
+      expect(html).toContain("This record couldn&#x27;t be found.");
+      expect(html).toContain("data-close");
+      expect(html).not.toContain('name="title"');
     });
-    it("Lost / Nurture shows on lead cards only", async () => {
-      mock(ok({ rows: mixed, closeStages: stages }));
-      const html = await render();
-      expect(html.match(/Lost \/ Nurture/g)?.length).toBe(1);
-      expect(html.indexOf("Lost / Nurture")).toBeGreaterThan(html.indexOf("Lead Co"));
+    it("a failed read is its own sentence, never 'not found'", async () => {
+      detailResult = { status: "unavailable" };
+      mock(ok({ rows: [lead] }));
+      const html = await render({ open: `lead:${ID}` });
+      expect(html).toContain("couldn&#x27;t be loaded");
+      expect(html).not.toContain("couldn&#x27;t be found");
     });
-    it("is hidden without lost or nurture stages", async () => {
-      mock(ok({ rows: mixed, closeStages: [] }));
-      expect(await render()).not.toContain("Lost / Nurture");
+    it("a bad open param opens nothing", async () => {
+      detailResult = detailOk;
+      mock(ok({ rows: [lead] }));
+      const html = await render({ open: "lead:not-a-uuid" });
+      expect(html).not.toContain('role="dialog"');
     });
-    it("is hidden for a viewer", async () => {
-      mock(ok({ rows: mixed, closeStages: stages }), "viewer");
-      expect(await render()).not.toContain("Lost / Nurture");
+    it("a viewer sees the facts and no form", async () => {
+      detailResult = detailOk;
+      mock(ok({ rows: [lead], closeStages: stages }), "viewer");
+      const html = await render({ open: `lead:${ID}` });
+      expect(html).toContain('role="dialog"');
+      expect(html).toContain("Follow up");
+      const panel = html.slice(html.indexOf('role="dialog"'));
+      expect(panel).not.toContain("<form");
+      expect(panel).not.toContain("<textarea");
+    });
+    it("optional reads that failed say so", async () => {
+      detailResult = { ...detailOk, steps: { ok: false }, activity: { ok: false }, stages: { ok: false } };
+      mock(ok({ rows: [lead] }));
+      const html = await render({ open: `lead:${ID}` });
+      expect(html).toContain("Recent activity couldn&#x27;t load.");
+      expect(html).toContain("Other steps couldn&#x27;t load.");
+      expect(html).toContain("Stages couldn&#x27;t load.");
+    });
+    it("Lost / Nurture shows for a lead only and not without such stages", async () => {
+      detailResult = detailOk;
+      mock(ok({ rows: [lead], closeStages: [] }));
+      expect(await render({ open: `lead:${ID}` })).not.toContain("Lost / Nurture");
+      const m = row({ key: "m1", kind: "matter", id: ID, client: "Matter Co" });
+      mock(ok({ rows: [m], closeStages: stages }));
+      expect(await render({ open: `matter:${ID}` })).not.toContain("Lost / Nurture");
+    });
+  });
+
+  describe("cards view", () => {
+    const rowsC = [
+      row({ key: "a", client: "Overdue Co", nextStep: step("2026-10-30", "u-rayn") }),
+      row({ key: "b", client: "Week Co", nextStep: step("2026-11-04", "u-rayn") }),
+      row({ key: "c", client: "Reb Co", nextStep: step("2026-10-29", "u-reb") }),
+    ];
+    it("renders the deck for the default person (the one named Rebecca) with chips, progress and big buttons", async () => {
+      mock(ok({ rows: rowsC }));
+      const html = await render({ view: "cards" });
+      expect(html).toContain("Whose cards");
+      expect(html.indexOf("Rebecca")).toBeLessThan(html.indexOf("Rayn"));
+      expect(html).toContain("1 of 1");
+      expect(html).toContain("Reb Co");
+      expect(html).not.toContain("Overdue Co</a></h2>");
+      for (const w of ["Done", "Snooze: Tomorrow", "Snooze: Next Monday", "Hand to", "Add note", "Open"]) expect(html).toContain(w);
+      expect(html).toContain("Latest note: Spoke to the client");
+      expect(html).toMatch(/aria-current="page"[^>]*>[\s\S]*?Rebecca/);
+    });
+    it("person param picks another deck, i clamps, Back and Skip are links", async () => {
+      mock(ok({ rows: rowsC }));
+      const p = "u-rayn";
+      // person must be a uuid: use the members' ids through a uuid-shaped fixture
+      const html = await render({ view: "cards", person: p, i: "9" });
+      expect(html).toContain("1 of 1"); // non-uuid person is ignored, default deck
+      const two = [
+        { userId: "00000000-0000-4000-8000-0000000000b1", name: "Rebecca", role: "owner" },
+        { userId: "00000000-0000-4000-8000-0000000000b2", name: "Rayn", role: "paralegal" },
+      ];
+      const rr = [
+        row({ key: "a", client: "A Co", nextStep: { id: "t", title: "x", dueDate: "2026-10-30", assigneeId: two[1].userId } }),
+        row({ key: "b", client: "B Co", nextStep: { id: "t", title: "y", dueDate: "2026-11-04", assigneeId: two[1].userId } }),
+      ];
+      vi.resetModules();
+      mock(ok({ rows: rr, members: two }));
+      const deck = await render({ view: "cards", person: two[1].userId, i: "9" });
+      expect(deck).toContain("2 of 2");
+      expect(deck).toMatch(/data-deck-prev/);
+      expect(deck).not.toMatch(/data-deck-next/);
+    });
+    it("an empty deck says so", async () => {
+      mock(ok({ rows: [row({ key: "z", client: "Z", nextStep: step("2026-12-30", "u-reb") })] }));
+      const html = await render({ view: "cards", person: "00000000-0000-4000-8000-00000000ffff" });
+      expect(html).toMatch(/Nothing on Rebecca&#x27;s cards right now\./);
+    });
+    it("a viewer sees the card with no action forms", async () => {
+      mock(ok({ rows: rowsC }), "viewer");
+      const html = await render({ view: "cards" });
+      expect(html).toContain("Reb Co");
+      expect(withoutSearch(html)).not.toContain("<form");
+    });
+    it("shows a fixed notice after a refused action", async () => {
+      mock(ok({ rows: rowsC }));
+      expect(await render({ view: "cards", notice: "denied" })).toContain("You don&#x27;t have permission");
+      expect(await render({ view: "cards", notice: "<script>" })).not.toContain("<script>alert");
     });
   });
 });

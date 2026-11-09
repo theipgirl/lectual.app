@@ -1,26 +1,25 @@
 import Link from "next/link";
 import { BUCKET_COPY, type BucketKey, type ReviewRow } from "@/lib/review/buckets";
-import { BOARD_COLUMNS, type Kpis, type Lane, type MeetingPosition, type StageGroup } from "@/lib/review/lanes";
-import { WAITING_LABEL } from "@/lib/review/waiting";
-import { deadlineIsSoon, dueText, lastContactText, shortDate } from "@/lib/review/format";
+import { BOARD_COLUMNS, laneOf, type Kpis, type Lane, type MeetingPosition, type StageGroup } from "@/lib/review/lanes";
+import { dueText, lastContactText } from "@/lib/review/format";
+import { openToken } from "@/lib/review/open";
 import { reviewHref, REVIEW_VIEWS, type ReviewParams, type ReviewView } from "@/lib/review/params";
-import type { CloseStage } from "@/lib/review/close-stage";
-import { ReviewRowActions } from "./ReviewRowActions";
+import { REVIEW_CARDS_VIEW } from "@/lib/ui/words";
+import { WAITING_LABEL } from "@/lib/review/waiting";
+import { DoneButton } from "./DoneButton";
+import { Avatar, openHref, Tags, type Common } from "./shared";
 import { ReviewTable } from "./ReviewSection";
 import "@/components/list-page/list-page.css";
 import "./review.css";
 
-type Member = { userId: string; name: string };
-type Common = { today: string; members: Member[]; canWrite: boolean; closeStages?: CloseStage[] };
-
-const VIEW_LABEL: Record<ReviewView, string> = { board: "Board", meeting: "Meeting mode", stage: "By stage" };
+const VIEW_LABEL: Record<ReviewView, string> = { board: "Board", meeting: "Meeting mode", stage: "By stage", cards: REVIEW_CARDS_VIEW };
 
 /** The three views, as links (the URL carries the view), in the design's segmented control. */
 export function ViewSwitch({ params }: { params: ReviewParams }) {
   return (
     <nav className="lx-segs lx-view-toggle" aria-label="View">
       {REVIEW_VIEWS.map((v) => (
-        <Link key={v} href={reviewHref({ ...params, view: v, i: 1 })} aria-current={params.view === v ? "page" : undefined} className={params.view === v ? "on" : undefined}>
+        <Link key={v} href={reviewHref({ ...params, view: v, i: 1, open: null })} aria-current={params.view === v ? "page" : undefined} className={params.view === v ? "on" : undefined}>
           {VIEW_LABEL[v]}
         </Link>
       ))}
@@ -54,36 +53,36 @@ export function KpiStrip({ kpis }: { kpis: Kpis }) {
   );
 }
 
-function Tags({ row, today }: { row: ReviewRow; today: string }) {
-  return (
-    <div className="rv-tags">
-      {row.waiting && <span className={`lp-pill${row.waiting === "approval" ? " lp-pill-warn" : ""}`}>Waiting on {WAITING_LABEL[row.waiting]}</span>}
-      {row.deadline && (
-        <span className={`lp-pill${deadlineIsSoon(row.deadline.dueDate, today) ? " lp-pill-risk" : ""}`}>USPTO deadline {shortDate(row.deadline.dueDate, today)}</span>
-      )}
-      {row.proposalExpiry && <span className={`lp-pill${row.proposalExpiry.expired ? " lp-pill-risk rv-deadline-soon" : ""}`}>{row.proposalExpiry.text}</span>}
-    </div>
-  );
-}
-
-function Card({ row, bucket, today, members, canWrite, closeStages }: Common & { row: ReviewRow; bucket: BucketKey }) {
+/** The whole card is one link to the panel; Done and Open sit OUTSIDE it, so nothing interactive is nested. */
+function Card({ row, bucket, today, members, canWrite, params }: Common & { row: ReviewRow; bucket: BucketKey }) {
   const due = row.nextStep ? dueText(row.nextStep.dueDate, today) : null;
+  const ownerId = laneOf(row);
+  const ownerName = ownerId ? members.find((m) => m.userId === ownerId)?.name ?? "Teammate" : null;
+  const href = openHref(params, row);
   return (
-    <article className={`lx-card rv-card rv-card-${bucket}`}>
-      <Link href={row.href} className="rv-card-title">
-        {row.client}
+    <article className={`lx-card rv-card rv-card-${bucket}`} data-key={openToken(row)}>
+      <Link href={href} className="rv-card-link" scroll={false}>
+        <span className="rv-card-top">
+          <span className="rv-card-title">{row.client}</span>
+          {ownerName && <Avatar name={ownerName} />}
+        </span>
+        <span className="rv-card-meta lx-note">
+          {row.kind === "lead" ? "Lead" : "Matter"}
+          {row.mark ? ` · ${row.mark}` : ""}
+          {row.stageLabel ? ` · ${row.stageLabel}` : ""}
+        </span>
+        <span className="rv-card-step">
+          {row.nextStep ? row.nextStep.title : "No next step"}
+          {due && <span className={`rv-chip${due.overdue ? " rv-chip-overdue" : ""}`}>{due.text}</span>}
+        </span>
+        <Tags row={row} today={today} max={2} />
       </Link>
-      <div className="lx-note">
-        {row.kind === "lead" ? "Lead" : "Matter"}
-        {row.mark ? ` · ${row.mark}` : ""}
-        {row.stageLabel ? ` · ${row.stageLabel}` : ""}
+      <div className="rv-card-acts">
+        {canWrite && row.nextStep && <DoneButton taskId={row.nextStep.id} />}
+        <Link href={href} className="lx-btn lx-btn-ghost lx-btn-sm" scroll={false}>
+          Open
+        </Link>
       </div>
-      <p className="rv-card-step">
-        {row.nextStep ? row.nextStep.title : "No next step"}
-        {due && <span className={`lx-note rv-sub${due.overdue ? " rv-deadline-soon" : ""}`}>{due.text}</span>}
-      </p>
-      <Tags row={row} today={today} />
-      {canWrite && <ReviewRowActions kind={row.kind} id={row.id} nextStepId={row.nextStep?.id ?? null} members={members} defaultAssignee={row.nextStep?.assigneeId ?? row.assignedTo} closeStages={closeStages} />}
     </article>
   );
 }
@@ -103,7 +102,8 @@ export function ReviewBoard({ lanes, ...common }: Common & { lanes: Lane[] }) {
       {lanes.map((lane) => (
         <section key={lane.userId ?? "none"} className="rv-person" aria-labelledby={`rv-person-${lane.userId ?? "none"}`}>
           <h2 id={`rv-person-${lane.userId ?? "none"}`} className="lx-h2 rv-person-name">
-            {lane.name} <span className="lx-note">{lane.count}</span>
+            <Avatar name={lane.name} />
+            <span>{lane.name}</span> <span className="lx-note">{lane.count}</span>
           </h2>
           <div className="rv-scroll">
             <div className="rv-cols">
@@ -132,7 +132,7 @@ export function MeetingCard({
   pos,
   params,
   ...common
-}: Common & { row: ReviewRow | null; bucket: BucketKey | null; pos: MeetingPosition | null; params: ReviewParams }) {
+}: Common & { row: ReviewRow | null; bucket: BucketKey | null; pos: MeetingPosition | null }) {
   if (!row || !pos) {
     return (
       <div className="lx-card lx-empty-card">
@@ -141,7 +141,7 @@ export function MeetingCard({
       </div>
     );
   }
-  const href = (i: number) => reviewHref({ ...params, view: "meeting", i });
+  const href = (i: number) => reviewHref({ ...params, view: "meeting", i, open: null });
   const due = row.nextStep ? dueText(row.nextStep.dueDate, common.today) : null;
   const who = (id: string | null) => (id ? common.members.find((m) => m.userId === id)?.name ?? "Teammate" : null);
   const owner = who(row.nextStep?.assigneeId ?? null) ?? who(row.assignedTo);
@@ -152,7 +152,9 @@ export function MeetingCard({
         {bucket ? ` · ${BUCKET_COPY[bucket].label}` : ""}
       </p>
       <h2 className="lx-h2">
-        <Link href={row.href}>{row.client}</Link>
+        <Link href={openHref(params, row)} scroll={false}>
+          {row.client}
+        </Link>
       </h2>
       <div className="lx-note">
         {row.kind === "lead" ? "Lead" : "Matter"}
@@ -187,7 +189,12 @@ export function MeetingCard({
         </div>
       </dl>
       <Tags row={row} today={common.today} />
-      {common.canWrite && <ReviewRowActions kind={row.kind} id={row.id} nextStepId={row.nextStep?.id ?? null} members={common.members} defaultAssignee={row.nextStep?.assigneeId ?? row.assignedTo} closeStages={common.closeStages} />}
+      <div className="rv-card-acts">
+        {common.canWrite && row.nextStep && <DoneButton taskId={row.nextStep.id} />}
+        <Link href={openHref(params, row)} className="lx-btn lx-btn-sec lx-btn-sm" scroll={false}>
+          Open details
+        </Link>
+      </div>
       <nav className="rv-pager" aria-label="Meeting mode">
         {pos.prev ? <Link className="lx-btn lx-btn-ghost lx-btn-sm" href={href(pos.prev)}>Previous</Link> : <span />}
         {pos.next ? <Link className="lx-btn lx-btn-sec lx-btn-sm" href={href(pos.next)}>Keep and go to next</Link> : <span className="lx-note">That&apos;s the last one.</span>}
