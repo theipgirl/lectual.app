@@ -52,28 +52,37 @@ export function usesPackageChoice(content: ProposalContent): boolean {
 }
 
 /**
- * `content` with `packages` set to the firm's current list (plus any earlier snapshot entry no longer on it), when a
- * brand name uses `package_choice`. Unchanged otherwise. An entry's `custom_discount` is kept on its refreshed copy, and so
- * are its `includes` rows when the firm's list has none for that package.
+ * `content` with `packages` refreshed from the firm's current list, when a brand name uses `package_choice`. Unchanged
+ * otherwise.
+ *
+ * The firm's list supplies the PRICES only. What belongs to this proposal is kept on the refreshed copy (2026-11-09):
+ * - an entry's `custom_discount` (2026-11-03);
+ * - an entry's `includes` rows when the firm's list has none for that package: taking its (empty) rows wiped every
+ *   package's "What each package includes" table on the first editor save. When the firm's list HAS rows for the
+ *   package (Settings -> Proposals, 2026-11-10), the firm's rows win, as its prices do (#23);
+ * - the proposal's own ORDER: its entries stay where they were (an entry no longer on the firm's list keeps its
+ *   place, unpriced by the refresh), and a package new to the proposal is added after them, in the firm's order.
+ *
+ * `content` is always the STORED proposal's content (plus the server-parsed brand name), never browser input, so
+ * nothing here is taken from the browser.
  */
 export function withPackageSnapshot(content: ProposalContent, settingPricing: unknown): ProposalContent {
   if (!usesPackageChoice(content)) return content;
   const earlier = (Array.isArray(content.packages) ? content.packages : []).filter((p) => isObj(p) && typeof p.package === "string");
-  // A custom discount (2026-11-03) belongs to THIS proposal, not to the firm's list: a refreshed entry keeps it.
-  // The same holds for an entry's `includes` rows when the firm's list gives none for that package (RPB's list has
-  // none, so a refresh used to wipe them); when the firm's list has rows, the firm's list wins.
-  const current = packageOffersFromSetting(settingPricing).map((offer) => {
-    const before = earlier.find((p) => p.package === offer.package);
-    if (!before) return offer;
-    let next: PackageOffer = offer;
-    if (!offer.includes) {
-      const kept = includeRows(before.includes);
-      if (kept) next = { ...next, includes: kept };
-    }
-    if (isObj(before.custom_discount)) next = { ...next, custom_discount: before.custom_discount };
-    return next;
+  const offers = packageOffersFromSetting(settingPricing);
+  const refresh = (before: PackageOffer, offer: PackageOffer): PackageOffer => {
+    const { includes: firmIncludes, ...prices } = offer;
+    const includes = firmIncludes ?? includeRows(before.includes);
+    return {
+      ...prices,
+      ...(includes ? { includes } : {}),
+      ...(isObj(before.custom_discount) ? { custom_discount: before.custom_discount } : {}),
+    };
+  };
+  const kept = earlier.map((before) => {
+    const offer = offers.find((o) => o.package === before.package);
+    return offer ? refresh(before, offer) : before;
   });
-  const names = new Set(current.map((p) => p.package));
-  const kept = earlier.filter((p) => !names.has(p.package));
-  return { ...content, packages: [...current, ...kept] };
+  const had = new Set(earlier.map((p) => p.package));
+  return { ...content, packages: [...kept, ...offers.filter((o) => !had.has(o.package))] };
 }
