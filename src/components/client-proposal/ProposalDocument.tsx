@@ -36,6 +36,7 @@ import {
   type Selection,
 } from "@/lib/proposals/types";
 import { commitmentSentence } from "@/lib/proposals/commitment";
+import { chosenPackageNames } from "@/lib/proposals/chosen-packages";
 import { isGeneralContent } from "@/lib/proposals/types";
 import { GeneralProposalDocument } from "./GeneralProposalDocument";
 import { usptoLine } from "@/lib/proposals/uspto-line";
@@ -167,17 +168,29 @@ export function addMarkLabel(kind: keyof typeof MARK_PACKAGE_WORDS): string {
 }
 
 /**
- * Spec 6: one comparison table, a column per offered package and a row per "what's included" label (in the order
- * they first appear). `null` when no offered package has includes rows, so the page keeps its single-package table.
+ * Spec 6: one comparison table, a column per package and a row per "what's included" label (in the order they first
+ * appear). With `packageNames` (the packages the client has chosen, `chosenPackageNames`), the columns are those
+ * packages only, in that order, and `mode` is "chosen"; when none is given, none matches an offer, or no chosen package
+ * has includes rows, every offered package is a column (`mode` "all"), as before. `null` when no offered package has
+ * includes rows, so the page keeps its single-package table.
  */
-export function includesComparison(content: ProposalContent): { packages: string[]; rows: { label: string; value?: string; note?: string; highlight?: boolean; cells: string[] }[] } | null {
-  const offers = offeredPackages(content);
+export function includesComparison(
+  content: ProposalContent,
+  packageNames?: readonly string[],
+): { mode: "chosen" | "all"; packages: string[]; rows: { label: string; value?: string; note?: string; highlight?: boolean; cells: string[] }[] } | null {
+  const offered = offeredPackages(content);
   const listed = (o: PackageOffer): ProposalInclude[] =>
     Array.isArray(o.includes) ? o.includes.filter((r) => r && typeof r.label === "string" && r.label.trim()) : [];
-  if (!offers.some((o) => listed(o).length > 0)) return null;
+  if (!offered.some((o) => listed(o).length > 0)) return null;
+  const chosen = (packageNames ?? [])
+    .map((name) => offered.find((o) => o.package === name))
+    .filter((o): o is PackageOffer => !!o);
+  const useChosen = chosen.some((o) => listed(o).length > 0);
+  const offers = useChosen ? chosen : offered;
   const labels: ProposalInclude[] = [];
   for (const o of offers) for (const r of listed(o)) if (!labels.some((l) => l.label === r.label)) labels.push(r);
   return {
+    mode: useChosen ? "chosen" : "all",
     packages: offers.map((o) => o.package),
     rows: labels.map((l) => ({
       label: l.label,
@@ -187,6 +200,15 @@ export function includesComparison(content: ProposalContent): { packages: string
       cells: offers.map((o) => listed(o).find((r) => r.label === l.label)?.included?.trim() || "—"),
     })),
   };
+}
+
+/** The heading and sub-line over the comparison table: one chosen package, several chosen, or every offered one. */
+export function comparisonHeading(comparison: { mode: "chosen" | "all"; packages: string[] }): { title: string; sub: string } {
+  if (comparison.mode === "chosen" && comparison.packages.length === 1) {
+    return { title: "What your package includes", sub: `${comparison.packages[0]}\u2122, with each trademark you choose` };
+  }
+  if (comparison.mode === "chosen") return { title: "Compare your packages", sub: "The packages you have chosen, side by side" };
+  return { title: "What each package includes", sub: "Compare the packages you can choose from" };
 }
 
 /**
@@ -325,7 +347,9 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
   };
   const hasChoices = offeredPackages(content).length > 0;
   const offeredPerMark = (content.names ?? []).some((nm) => usesMarkPackages(content, nm));
-  const comparison = includesComparison(content);
+  const chosenNames = useMemo(() => chosenPackageNames(shown, shownSelection), [shown, shownSelection]);
+  const comparison = useMemo(() => includesComparison(content, chosenNames), [content, chosenNames]);
+  const comparisonTitle = comparison ? comparisonHeading(comparison) : null;
   const govRates = new Set(quote.names.filter((q) => q.included).map((q) => pricingFor(q.id).gov_per_class_cents));
   const govShown = govRates.size === 1 ? [...govRates][0] : pricing.gov_per_class_cents;
   const firstName = content.client?.first_name?.trim() || "";
@@ -839,8 +863,8 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
               {comparison ? (
                 <>
                   <div className="cp-inc-h">
-                    <h2 id="cp-h-inc">What each package includes</h2>
-                    <span>Compare the packages you can choose from</span>
+                    <h2 id="cp-h-inc">{comparisonTitle?.title}</h2>
+                    <span>{comparisonTitle?.sub}</span>
                   </div>
                   <div className="cp-cmp-wrap">
                     <table className="cp-ben cp-cmp">
