@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { BUCKET_COPY, type BucketKey, type ReviewRow } from "@/lib/review/buckets";
+import { BUCKET_COPY, bucketOf, type BucketKey, type ReviewRow } from "@/lib/review/buckets";
 import { BOARD_COLUMNS, laneOf, type Kpis, type Lane, type MeetingPosition, type StageGroup } from "@/lib/review/lanes";
 import { dueText, lastContactText } from "@/lib/review/format";
 import { openToken } from "@/lib/review/open";
 import { reviewHref, REVIEW_VIEWS, type ReviewParams, type ReviewView } from "@/lib/review/params";
-import { REVIEW_CARDS_VIEW } from "@/lib/ui/words";
+import { REVIEW_AGENDA_VIEW, REVIEW_CARDS_VIEW } from "@/lib/ui/words";
+import type { AgendaGroup } from "@/lib/review/agenda";
 import { WAITING_LABEL } from "@/lib/review/waiting";
 import { DoneButton } from "./DoneButton";
 import { Avatar, openHref, Tags, type Common } from "./shared";
@@ -12,7 +13,7 @@ import { ReviewTable } from "./ReviewSection";
 import "@/components/list-page/list-page.css";
 import "./review.css";
 
-const VIEW_LABEL: Record<ReviewView, string> = { board: "Board", meeting: "Meeting mode", stage: "By stage", cards: REVIEW_CARDS_VIEW };
+const VIEW_LABEL: Record<ReviewView, string> = { agenda: REVIEW_AGENDA_VIEW, board: "Board", meeting: "Meeting mode", stage: "By stage", cards: REVIEW_CARDS_VIEW };
 
 /** The three views, as links (the URL carries the view), in the design's segmented control. */
 export function ViewSwitch({ params }: { params: ReviewParams }) {
@@ -54,7 +55,7 @@ export function KpiStrip({ kpis }: { kpis: Kpis }) {
 }
 
 /** The whole card is one link to the panel; Done and Open sit OUTSIDE it, so nothing interactive is nested. */
-function Card({ row, bucket, today, members, canWrite, params }: Common & { row: ReviewRow; bucket: BucketKey }) {
+export function Card({ row, bucket, today, members, canWrite, params, showOwner }: Common & { row: ReviewRow; bucket: BucketKey; /** The agenda names who owns the next step on the card itself, since the meeting assigns by person. */ showOwner?: boolean }) {
   const due = row.nextStep ? dueText(row.nextStep.dueDate, today) : null;
   const ownerId = laneOf(row);
   const ownerName = ownerId ? members.find((m) => m.userId === ownerId)?.name ?? "Teammate" : null;
@@ -75,6 +76,11 @@ function Card({ row, bucket, today, members, canWrite, params }: Common & { row:
           {row.nextStep ? row.nextStep.title : "No next step"}
           {due && <span className={`rv-chip${due.overdue ? " rv-chip-overdue" : ""}`}>{due.text}</span>}
         </span>
+        {showOwner && (
+          <span className="rv-card-owner">
+            <span className="lx-label">Next step</span> {ownerName ?? "Unassigned"}
+          </span>
+        )}
         <Tags row={row} today={today} max={2} />
       </Link>
       <div className="rv-card-acts">
@@ -84,6 +90,48 @@ function Card({ row, bucket, today, members, canWrite, params }: Common & { row:
         </Link>
       </div>
     </article>
+  );
+}
+
+/**
+ * The Monday agenda: the meeting's five sections in order, each with a count. Cards are the board's own `Card`
+ * (a link to the panel, no forms), with the next step's owner named. Parked is collapsed.
+ */
+export function AgendaView({ groups, ...common }: Common & { groups: AgendaGroup[] }) {
+  return (
+    <div className="rv-agenda">
+      {groups.map((g, n) => {
+        const body =
+          g.rows.length === 0 ? (
+            <p className="lx-note rv-agenda-empty">Nothing here this week.</p>
+          ) : (
+            <div className="rv-agenda-cards">
+              {g.rows.map((row) => (
+                <Card key={row.key} row={row} bucket={bucketOf(row, common.today)} showOwner {...common} />
+              ))}
+            </div>
+          );
+        const head = (
+          <>
+            <span className="lx-h2 rv-agenda-title">{n + 1}. {g.label}</span>{" "}
+            <span className="lx-note">{g.rows.length}</span>
+          </>
+        );
+        return g.section === "parked" ? (
+          <details key={g.section} className="lx-card rv-agenda-sec rv-agenda-parked" data-section={g.section}>
+            <summary className="rv-agenda-head">{head}</summary>
+            <p className="lx-note rv-agenda-hint">{g.hint}</p>
+            {body}
+          </details>
+        ) : (
+          <section key={g.section} className="lx-card rv-agenda-sec" data-section={g.section} aria-labelledby={`rv-agenda-${g.section}`}>
+            <h2 id={`rv-agenda-${g.section}`} className="rv-agenda-head">{head}</h2>
+            <p className="lx-note rv-agenda-hint">{g.hint}</p>
+            {body}
+          </section>
+        );
+      })}
+    </div>
   );
 }
 
@@ -131,13 +179,14 @@ export function MeetingCard({
   bucket,
   pos,
   params,
+  sectionLabel,
   ...common
-}: Common & { row: ReviewRow | null; bucket: BucketKey | null; pos: MeetingPosition | null }) {
+}: Common & { row: ReviewRow | null; bucket: BucketKey | null; pos: MeetingPosition | null; /** The agenda section the row is in, e.g. "USPTO matters". */ sectionLabel?: string | null }) {
   if (!row || !pos) {
     return (
       <div className="lx-card lx-empty-card">
         <h2 className="lx-h2" style={{ fontSize: 25 }}>Nothing left to go through</h2>
-        <p className="lx-note" style={{ margin: 0 }}>Every record in this view has a dated next step and recent contact.</p>
+        <p className="lx-note" style={{ margin: 0 }}>Nothing in the four meeting sections for this view. Parked records are left out.</p>
       </div>
     );
   }
@@ -149,6 +198,7 @@ export function MeetingCard({
     <div className="lx-card rv-focus">
       <p className="lx-note rv-prog" role="status">
         {pos.position} of {pos.total}
+        {sectionLabel ? ` · ${sectionLabel}` : ""}
         {bucket ? ` · ${BUCKET_COPY[bucket].label}` : ""}
       </p>
       <h2 className="lx-h2">

@@ -6,8 +6,10 @@ import { openToken, parseOpenParam, type OpenRef } from "./open";
 export type ReviewWho = "all" | "mine";
 export type ReviewScope = "both" | ReviewKind;
 
-export type ReviewView = "board" | "meeting" | "stage" | "cards";
-export const REVIEW_VIEWS: readonly ReviewView[] = ["board", "meeting", "stage", "cards"];
+export type ReviewView = "agenda" | "board" | "meeting" | "stage" | "cards";
+export const REVIEW_VIEWS: readonly ReviewView[] = ["agenda", "board", "meeting", "stage", "cards"];
+/** The view with no `view` param: the Monday agenda. */
+export const DEFAULT_REVIEW_VIEW: ReviewView = "agenda";
 
 export type ReviewParams = { who: ReviewWho; kind: ReviewScope; q: string; view: ReviewView; i: number; /** The Cards view's person (a user id), or null for the default. */ person: string | null; /** The record whose detail panel is open. */ open: OpenRef | null };
 
@@ -20,7 +22,7 @@ export function parseReviewParams(raw: { who?: string | string[]; kind?: string 
   const kind: ReviewScope = k === "matters" ? "matter" : k === "leads" ? "lead" : "both";
   const q = (one(raw.q) ?? "").replace(/\s+/g, " ").trim().slice(0, SEARCH_MAX);
   const v = one(raw.view);
-  const view: ReviewView = REVIEW_VIEWS.find((x) => x === v) ?? "board";
+  const view: ReviewView = REVIEW_VIEWS.find((x) => x === v) ?? DEFAULT_REVIEW_VIEW;
   const n = Number.parseInt(one(raw.i) ?? "", 10);
   const i = Number.isFinite(n) && n >= 1 && n <= 100_000 ? n : 1;
   const p = (one(raw.person) ?? "").trim();
@@ -32,7 +34,7 @@ export function reviewHref(p: ReviewParams): string {
   if (p.who === "mine") qs.set("who", "mine");
   if (p.kind !== "both") qs.set("kind", p.kind === "matter" ? "matters" : "leads");
   if (p.q) qs.set("q", p.q);
-  if (p.view !== "board") qs.set("view", p.view);
+  if (p.view !== DEFAULT_REVIEW_VIEW) qs.set("view", p.view);
   if (p.view === "cards" && p.person) qs.set("person", p.person);
   if ((p.view === "meeting" || p.view === "cards") && p.i > 1) qs.set("i", String(p.i));
   if (p.open) qs.set("open", openToken(p.open));

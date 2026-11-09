@@ -62,7 +62,7 @@ describe("buildDeck", () => {
     row({ key: "a2", client: "Approval and mine", nextStep: step("2026-10-20", "u-att"), waiting: "approval" }),
   ];
   const buckets = reviewBuckets(rows, TODAY);
-  const keys = (id: string) => buildDeck(buckets, members, id).map((c) => c.row.key);
+  const keys = (id: string) => buildDeck(buckets, members, id, TODAY).map((c) => c.row.key);
 
   it("is the person's lane in column order: overdue, this week, needs, quiet", () => {
     expect(keys("u-reb")).toEqual(["o", "w", "n", "q", "a2", "a"]); // own lane first, then the approval rows in section order
@@ -75,7 +75,7 @@ describe("buildDeck", () => {
     expect(keys("u-rayn")).toEqual(["x"]);
   });
   it("unknown or no person gives an empty deck", () => {
-    expect(buildDeck(buckets, members, null)).toEqual([]);
+    expect(buildDeck(buckets, members, null, TODAY)).toEqual([]);
     expect(keys("nobody")).toEqual([]);
   });
 });

@@ -51,9 +51,41 @@ describe("Weekly review page", () => {
     expect(String(mod.metadata.title)).toBe("Weekly review · Lectual");
   });
 
-  it("board is the default: h1, tour hook, KPI strip, lanes, columns, collapsed USPTO and on-track", async () => {
+  it("the Monday agenda is the default: five numbered sections in the meeting's order, Parked collapsed, owner on each card", async () => {
     mock(ok());
     const html = await render();
+    expect(html).toContain("rv-agenda");
+    expect(html).not.toContain("rv-board");
+    const at = (t: string) => html.indexOf(t);
+    expect(at("1. New clients and consults")).toBeGreaterThan(-1);
+    expect(at("1. New clients")).toBeLessThan(at("2. Trademarks in progress"));
+    expect(at("2. Trademarks in progress")).toBeLessThan(at("3. USPTO matters"));
+    expect(at("3. USPTO matters")).toBeLessThan(at("4. Contracts and business matters"));
+    expect(at("4. Contracts")).toBeLessThan(at("5. Parked"));
+    expect(html).toMatch(/<details[^>]*data-section="parked"[^>]*>\s*<summary[^>]*>[\s\S]*?5\. Parked/);
+    expect(html).toMatch(/data-section="new-clients"[\s\S]*Nothing here this week\./);
+    // Fine Co is Application Filed with nothing to do: parked, so it comes after the Parked heading.
+    expect(at("Fine Co")).toBeGreaterThan(at("5. Parked"));
+    // Overdue Co sits in section 2, ahead of Needs Co; the next step's owner is named on the card.
+    expect(at("Overdue Co")).toBeLessThan(at("Needs Co"));
+    expect(html).toMatch(/rv-card-owner[^>]*><span class="lx-label">Next step<\/span> Rayn/);
+    expect(html).toMatch(/rv-card-owner[^>]*><span class="lx-label">Next step<\/span> Unassigned/);
+    expect(html).toMatch(/aria-current="page" class="on" href="[^"]*">Monday agenda/);
+    expect(html.indexOf("Monday agenda")).toBeLessThan(html.indexOf(">Board<"));
+  });
+
+  it("agenda respects the Matters / Leads filter and shows one quiet line for an empty section", async () => {
+    const lead = row({ key: "l1", kind: "lead", id: "00000000-0000-4000-8000-0000000000c1", client: "Lead Co", stageLabel: "Proposal Sent" });
+    mock(ok({ rows: [...rows, lead] }));
+    const leads = await render({ kind: "leads" });
+    expect(leads).toContain("Lead Co");
+    expect(leads).not.toContain("Overdue Co");
+    expect(leads.match(/Nothing here this week\./g)).toHaveLength(4);
+  });
+
+  it("board stays reachable at ?view=board: h1, tour hook, KPI strip, lanes, columns, collapsed USPTO and on-track", async () => {
+    mock(ok());
+    const html = await render({ view: "board" });
     expect(html).toContain('data-tour="review-head"');
     expect(html).toContain(">Weekly review</h1>");
     expect(html).toContain("rv-kpis");
@@ -69,6 +101,7 @@ describe("Weekly review page", () => {
   it("view switch links to the three views", async () => {
     mock(ok());
     const html = await render();
+    expect(html).toContain("view=board");
     expect(html).toContain("view=meeting");
     expect(html).toContain("view=stage");
   });
@@ -83,7 +116,8 @@ describe("Weekly review page", () => {
   it("meeting mode shows one card, progress and server-rendered Prev/Next", async () => {
     mock(ok());
     const html = await render({ view: "meeting", i: "2" });
-    expect(html).toContain("2 of 3");
+    expect(html).toContain("2 of 4");
+    expect(html).toContain("Trademarks in progress");
     expect(html).toContain("Last contact");
     expect(html).toMatch(/href="\/dashboard\/review\/?\?view=meeting"[^>]*>Previous/);
     expect(html).toMatch(/href="\/dashboard\/review\/?\?view=meeting&amp;i=3"[^>]*>Keep and go to next/);
@@ -92,7 +126,7 @@ describe("Weekly review page", () => {
 
   it("meeting mode past the end clamps to the last card", async () => {
     mock(ok());
-    expect(await render({ view: "meeting", i: "99" })).toContain("3 of 3");
+    expect(await render({ view: "meeting", i: "99" })).toContain("4 of 4");
   });
 
   it("stage view groups by stage with counts", async () => {

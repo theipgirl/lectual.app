@@ -33,6 +33,8 @@ export type ReviewRow = {
   client: string;
   mark: string | null;
   stageLabel: string | null;
+  /** The matter type code (TM, CR, PATENT, BL, LIT, ...). Absent on a lead, or when unknown (read as TM). */
+  matterType?: string | null;
   stageDays: number | null;
   /** "In stage since import" etc. when there is no day count. */
   stageNote: string | null;

@@ -1405,6 +1405,22 @@ and a Follow-Up stage; a lead that has a matter shows once, as the matter). Ever
   we sent last = Client; a note is contact but has no direction (`contact.ts`).
 - **Waiting on** (`waiting.ts`): USPTO when the docket stage's `waiting_on` is `uspto` or its name matches the ONE keyword table `USPTO_STAGE_PATTERNS`; else
   Approval when a pending queue item names the record (the same `loadPendingApprovalsByLead` / `matterIdsNeedingReview` the lead and matter pages use); else Us / Client.
+- **Monday agenda (default view, `?view=agenda`, label "Monday agenda" from `words.ts`, first in the switch; no `view` param = agenda, the board is `?view=board`, and `reviewHref` omits `view` only for the agenda).** The
+  same filtered rows dealt in the order RPB's Monday meeting walks the pipeline. Pure rules in `src/lib/review/agenda.ts` (`agendaSection(row, today)`, `agendaOrder`, `agendaQueue`, `agendaPositions`); no new read and no schema (the
+  matter's `type` was already in `listMatters`'s `select("*")`; `ReviewRow.matterType` carries it).
+  Five sections, each with a count; an empty one says "Nothing here this week."; Parked is a collapsed `<details>`. Cards are the board's own `Card` (one link to the `?open=` panel, no forms) with "Next step <owner>" named
+  (the lane person, else "Unassigned"). A critical read failure is still ONE alert and no sections. **Every lead is section 1** and is never parked (an on-track lead is still a person to follow up). A matter whose type is not
+  TM / CR / PATENT is section 4 (type absent reads as TM). A TM / CR / PATENT matter is section 3 when its stage reads post-filing, else section 2 (unknown text is section 2, never dropped). Stage names are read by ONE table
+  (`STAGE_RULES`, first match wins, post-filing words first so "20D. SOU Preparation" is not "application preparation": OA, office action, publication, opposition, NOA / notice of allowance, SOU / statement of use, extension,
+  registration, renewal, declaration, section 8/9/15, application filed; then pre-filing words: opinion letter, application prep, search, clearance, LOE, engagement, deposit, signed, specimen, intake, consult), then the
+  stage NUMBER (under 18 pre-filing, 18 and over post-filing), else unknown. **Parked (matters only):** bucket `track` in any matter section, or a section-3 matter whose bucket is `uspto` (only waiting on the office), EXCEPT a
+  matter with an open docketed deadline is never parked (our addition, so a response date can't hide in a collapsed section). A pre-filing matter that is merely waiting on the USPTO is not parked by that alone.
+  Order inside a section: urgency (overdue, due this week, needs a next step, quiet, then the rest), then USPTO section soonest deadline first (rows without one after) / new-clients rows with a proposal expiring or
+  expired first (earliest expiry), then client A to Z, then key. **Meeting mode** walks `agendaQueue` (sections 1 to 4, Parked left out) and its card names the section; **Cards** (`buildDeck(buckets, members, personId, today)`)
+  keeps its membership (the person's flagged lane rows, then approval rows for an approver) but sorts both parts into agenda order. `meetingQueue` (board order) is kept in `lanes.ts` but the page no longer uses it.
+  Assertions changed on purpose: `tests/review/page.test.tsx` (default is now the agenda, the board test uses `?view=board`, meeting mode counts 4 rows and says "of 4" because the agenda queue includes on-track leads and
+  pre-filing matters and the section name, view switch now lists the board link), `tests/review/params-input.test.ts` (default view agenda, board href carries `view=board`), `tests/review/deck-open-snooze.test.ts` (`buildDeck` takes
+  `today`). New: `tests/review/agenda.test.ts`. Not verified in a browser.
 - **Views** (`?view=board|meeting|stage`, default board; filters `?who=mine`, `?kind=matters|leads`, `?q=`; all links, so every state is a shareable URL).
   Board: lanes are people (`lanes.ts`): the next-step assignee, else the record's assignee, else Unassigned; owners first, the rest alphabetical, Unassigned last; four
   columns (Overdue, This week, Needs a next step, Quiet). USPTO and On track are two collapsed lists under the board. Under 900px it scrolls sideways, under 640px

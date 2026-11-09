@@ -20,6 +20,7 @@ export type ReviewMatterIn = {
   mark_text: string | null;
   owner_name: string | null;
   status: string;
+  type?: string | null;
   lead_id: string | null;
   assigned_to: string | null;
   stage_entered_at: string | null;
@@ -180,6 +181,7 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
       client,
       mark: display.title !== client ? display.title : null,
       stageLabel: m.stage ? m.stage.label : null,
+      matterType: m.type ?? null,
       stageDays: age.days,
       stageNote: age.days === null ? age.label : null,
       stageOrder: m.stage ? MATTER_ORDER_BASE + (m.stage.order_index ?? 0) : null,

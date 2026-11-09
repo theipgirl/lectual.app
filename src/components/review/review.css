@@ -102,3 +102,14 @@
 .rv-note-box > summary { list-style: none; display: inline-flex; align-items: center; }
 .rv-note-box > summary::-webkit-details-marker { display: none; }
 @media (max-width: 640px) { .rv-big { padding: 18px 16px; } .rv-big-title { font-size: 25px; } .rv-big-step { font-size: 19px; } .rv-handto { flex-wrap: wrap; } }
+
+/* Monday agenda: five sections in the meeting's order. Tokens only. */
+.rv-agenda { display: grid; gap: 14px; }
+.rv-agenda-sec { padding: 14px 16px; display: grid; gap: 10px; }
+.rv-agenda-head { margin: 0; display: flex; align-items: baseline; gap: 8px; cursor: default; }
+.rv-agenda-parked > .rv-agenda-head { cursor: pointer; }
+.rv-agenda-title { font-size: 22px; }
+.rv-agenda-hint, .rv-agenda-empty { margin: 0; }
+.rv-agenda-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.rv-card-owner { display: flex; align-items: baseline; gap: 6px; font-weight: 600; color: var(--ink); }
+@media (max-width: 640px) { .rv-agenda-cards { grid-template-columns: 1fr; } .rv-agenda-title { font-size: 19px; } }
