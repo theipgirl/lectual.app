@@ -52,10 +52,13 @@ export function viewPrefValue(pref: ViewPref): string {
   return pref.kind === "as" ? `as:${pref.role}` : pref.kind;
 }
 
-/** Who may use the switch and "Preview a view" in the account menu. Lectual staff acting in a firm can too. */
+/** Who may use the switch and "Preview a view" in the account menu. Not Lectual staff acting in a firm (see canSwitchView). */
 export const VIEW_SWITCH_ROLES: readonly Role[] = ["owner", "admin", "senior_admin"];
 export function canSwitchView(role: Role | null | undefined, actingAsStaff: boolean): boolean {
-  return actingAsStaff || (!!role && VIEW_SWITCH_ROLES.includes(role));
+  // Lectual staff inside a firm they do not belong to never switch or preview: a preview is saved on THEIR account, so it
+  // would follow them into every other firm they open. They always get today's shell there.
+  if (actingAsStaff) return false;
+  return !!role && VIEW_SWITCH_ROLES.includes(role);
 }
 
 /**
@@ -71,7 +74,8 @@ export function viewFor(args: { role: Role | null | undefined; pref: ViewPref; f
   if (!firmHasRoleViews) return "technician";
   if (pref.kind === "technician") return "technician";
   // Lectual staff inside a firm see today's shell, unless they chose to preview a view themselves.
-  if (actingAsStaff) return pref.kind === "as" ? liveViewOf(pref.role) : "technician";
+  // Lectual staff acting inside a firm: always today's shell, whatever preview their account carries.
+  if (actingAsStaff) return "technician";
   if (!role) return "technician";
   const asRole = pref.kind === "as" && canSwitchView(role, false) ? pref.role : role;
   return liveViewOf(asRole);

@@ -71,14 +71,20 @@ export function approvalReceipt(text: string): string {
 }
 
 /** The signed-in reviewer, with the role re-resolved now. Throws a sentence when signed out or not allowed. */
+/** A refusal whose message is a fixed sentence written for a person (safe to show). Anything else thrown is not. */
+export class ReviewerRefusal extends Error {}
+
+/** Shown when an item was already approved or rejected (a second tab, a replayed POST): nothing is resolved twice. */
+export const ALREADY_DECIDED = "This card was already decided.";
+
 export async function requireFirmReviewer(allowed: Role[], verb: string): Promise<{ email: string; userId: string; role: Role }> {
   const supabase = await getScopedClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user?.email) throw new Error("You must be signed in to review queue items.");
+  if (!user?.email) throw new ReviewerRefusal("You must be signed in to review queue items.");
   const role = await resolveQueueRole(supabase, allowed);
-  if (!role) throw new Error(`You don't have permission to ${verb} client communications.`);
+  if (!role) throw new ReviewerRefusal(`You don't have permission to ${verb} client communications.`);
   return { email: user.email, userId: user.id, role };
 }
 
@@ -101,7 +107,8 @@ export async function runQueueReview(input: ReviewInput): Promise<ReviewOutcome>
     resolvedBy = reviewer.email;
     caller = { userId: reviewer.userId, role: reviewer.role };
   } catch (err) {
-    return { kind: "error", error: err instanceof Error ? err.message : "You must be signed in." };
+    // Only our own fixed sentences reach the screen; anything else (an auth or network error) is a fixed sentence too.
+    return { kind: "error", error: err instanceof ReviewerRefusal ? err.message : "You must be signed in." };
   }
 
   // Approve and reject: the item's kind and owner decide who may. Re-read here on every submit; the role and the
@@ -113,6 +120,8 @@ export async function runQueueReview(input: ReviewInput): Promise<ReviewOutcome>
     } catch {
       return { kind: "error", error: FAILED };
     }
+    // Decided already (another tab, a replayed deck POST): never resolve twice, never make a second mailbox draft.
+    if (target.status !== "pending") return { kind: "error", error: ALREADY_DECIDED };
     const routed = await loadApprovalRouting();
     // An approval covers the text that would go out, so an edit in this form is checked too, not only the stored item.
     const checked = intent === "approve" && editedBody ? { ...target, final_body: editedBody } : target;
@@ -144,6 +153,7 @@ export async function runQueueReview(input: ReviewInput): Promise<ReviewOutcome>
 
       // The stale-draft check runs again HERE, server-side: a hand-posted form must not skip it.
       const before = await getQueueItem(qKey, id);
+      if (before.status !== "pending") return { kind: "error", error: ALREADY_DECIDED };
 
       // What would actually go out: the edit in this form, else what is saved. Checked before anything is saved or
       // resolved, so a refused body is never stored as the final text.
@@ -202,7 +212,8 @@ export async function runQueueReview(input: ReviewInput): Promise<ReviewOutcome>
             provider = made.provider;
           }
         } catch (err) {
-          console.error("[queue] mailbox draft failed", err);
+          // The name only: a provider error object can carry addresses or message text.
+          console.error("[queue] mailbox draft failed:", err instanceof Error ? err.name : typeof err);
           sendStatus = "mailbox-failed";
         }
       }
@@ -212,7 +223,7 @@ export async function runQueueReview(input: ReviewInput): Promise<ReviewOutcome>
       try {
         await generateApprovedDocument(qKey, id);
       } catch (err) {
-        console.error("[document-center] post-approve hook threw unexpectedly", err);
+        console.error("[document-center] post-approve hook threw unexpectedly:", err instanceof Error ? err.name : typeof err);
       }
       return { kind: "resolved", intent: "approve", send: sendStatus, webLink, draftId, provider };
     }

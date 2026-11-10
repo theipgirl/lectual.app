@@ -149,10 +149,10 @@ describe("switch on", () => {
     expect(m.menu.props.viewMenu).toBeUndefined();
   });
 
-  it("Lectual staff see today's shell and the preview offer", async () => {
-    const m = await mount(session("owner", [...MODULES, "role-views"], {}, { actingAsStaff: true, member: null }));
+  it("Lectual staff see today's shell and no view switch, even with a preview saved on their account", async () => {
+    const m = await mount(session("owner", [...MODULES, "role-views"], { lectual_view: "as:owner" }, { actingAsStaff: true, member: null }));
     expect(m.rail.props.variant).toBeUndefined();
-    expect(m.menu.props.viewMenu).toMatchObject({ previewRoles: ["owner"] });
+    expect(m.menu.props.viewMenu).toBeUndefined();
   });
 });
 

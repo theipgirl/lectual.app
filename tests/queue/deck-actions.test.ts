@@ -124,6 +124,12 @@ describe("every action re-checks the caller", () => {
     expect(r).toMatchObject({ ok: true, draft: { provider: "microsoft", webLink: "https://outlook/d", draftId: "AAMk1", canSend: true } });
   });
 
+  it("a second Yes on a decided card (another tab, a replayed POST) is refused by the core and drafts nothing", async () => {
+    state.core.mockResolvedValue({ kind: "error", error: "This card was already decided." });
+    expect(await A.approveCardAction("q1")).toEqual({ ok: false, error: "This card was already decided." });
+    expect(await A.markReadCardAction("q1")).toMatchObject({ ok: false });
+  });
+
   it("the core's refusal comes back as it is (routing, gates, stale)", async () => {
     state.core.mockResolvedValue({ kind: "error", error: "Only an attorney can approve this kind of message." });
     expect(await A.approveCardAction("q1")).toEqual({ ok: false, error: "Only an attorney can approve this kind of message." });

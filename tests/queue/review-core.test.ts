@@ -68,6 +68,23 @@ beforeEach(() => {
 });
 
 describe("runQueueReview: refusals are the action's own", () => {
+  it("an item already decided is never resolved again and never drafted twice (second tab, replayed POST)", async () => {
+    for (const status of ["approved", "rejected"] as const) {
+      state.item = qitem({ draft_body: BODY, status });
+      expect(await runQueueReview({ id: "q1", intent: "approve" })).toEqual({ kind: "error", error: "This card was already decided." });
+      expect(await runQueueReview({ id: "q1", intent: "reject", note: "x" })).toEqual({ kind: "error", error: "This card was already decided." });
+    }
+    expect(state.resolve).not.toHaveBeenCalled();
+    expect(state.draft).not.toHaveBeenCalled();
+    expect(state.save).not.toHaveBeenCalled();
+  });
+
+  it("a non-refusal error from the sign-in read never reaches the screen", async () => {
+    const src = readFileSync("src/lib/queue/review-core.ts", "utf8");
+    expect(src).toMatch(/err instanceof ReviewerRefusal \? err\.message : "You must be signed in\."/);
+    expect(src).not.toMatch(/console\.error\([^)]*,\s*err\)/);
+  });
+
   it("a role outside the edit roles is refused with the permission sentence", async () => {
     state.role = "viewer";
     expect(await runQueueReview({ id: "q1", intent: "approve" })).toEqual({ kind: "error", error: "You don't have permission to approve or reject client communications." });

@@ -27,8 +27,8 @@ describe("saveViewAction", () => {
     expect(updateUser).toHaveBeenCalledWith({ data: { full_name: "Ada L", lectual_tour: { version: 1 }, lectual_view: value } });
   });
 
-  it("saves a preview for an owner, admin, senior admin and Lectual staff", async () => {
-    for (const [role, staff] of [["owner", false], ["admin", false], ["senior_admin", false], ["viewer", true]] as const) {
+  it("saves a preview for an owner, admin and senior admin, never for Lectual staff acting in a firm", async () => {
+    for (const [role, staff] of [["owner", false], ["admin", false], ["senior_admin", false]] as const) {
       resolveFirmSession.mockResolvedValue(ok(role, staff));
       expect(await saveViewAction("as:owner")).toEqual({ ok: true, pref: "as:owner" });
     }

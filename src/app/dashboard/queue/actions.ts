@@ -6,7 +6,7 @@ import { resolveQueueItem } from "@/lib/queue/api";
 import { activeQueueOrgKey } from "@/lib/queue/org";
 import { QUEUE_EDIT_ROLES } from "@/lib/queue/roles";
 import { ROUTING_ADMIN_ROLES } from "@/lib/queue/routing";
-import { requireFirmReviewer, runQueueReview } from "@/lib/queue/review-core";
+import { requireFirmReviewer, ReviewerRefusal, runQueueReview } from "@/lib/queue/review-core";
 import { loadApprovalRouting } from "@/lib/queue/routing-load";
 import { loadActiveQueue } from "@/lib/queue/load";
 import { dismissStale, dismissableFollowups, type DismissResult } from "@/lib/queue/dismiss";
@@ -57,7 +57,7 @@ export async function dismissStaleFollowupsAction(_prev: DismissState, formData:
   try {
     reviewer = await requireFirmReviewer(QUEUE_EDIT_ROLES, "dismiss");
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "You must be signed in." };
+    return { error: err instanceof ReviewerRefusal ? err.message : "You must be signed in." };
   }
 
   const load = await loadActiveQueue("pending");

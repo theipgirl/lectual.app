@@ -39,10 +39,10 @@ describe("viewFor", () => {
     expect(viewFor({ role: "owner", pref: { kind: "technician" }, firmHasRoleViews: true, actingAsStaff: false })).toBe("technician");
   });
 
-  it("Lectual staff inside a firm see today's shell unless they chose to preview", () => {
+  it("Lectual staff inside a firm always see today's shell: a preview saved on their account never follows them into a firm", () => {
     expect(viewFor({ role: "owner", pref: AUTO, firmHasRoleViews: true, actingAsStaff: true })).toBe("technician");
     expect(viewFor({ role: "owner", pref: { kind: "technician" }, firmHasRoleViews: true, actingAsStaff: true })).toBe("technician");
-    expect(viewFor({ role: "owner", pref: { kind: "as", role: "owner" }, firmHasRoleViews: true, actingAsStaff: true })).toBe("owner");
+    expect(viewFor({ role: "owner", pref: { kind: "as", role: "owner" }, firmHasRoleViews: true, actingAsStaff: true })).toBe("technician");
     expect(viewFor({ role: "owner", pref: { kind: "as", role: "attorney" }, firmHasRoleViews: true, actingAsStaff: true })).toBe("technician");
   });
 
@@ -73,17 +73,18 @@ describe("the preference", () => {
     expect(prefAllowed("technician", "viewer", false)).toEqual({ kind: "technician" });
     expect(prefAllowed("auto", "viewer", false)).toEqual(AUTO);
     expect(prefAllowed("as:owner", "admin", false)).toEqual({ kind: "as", role: "owner" });
-    expect(prefAllowed("as:owner", "attorney", true)).toEqual({ kind: "as", role: "owner" });
+    expect(prefAllowed("as:owner", "attorney", true)).toBeNull();
     expect(prefAllowed("as:owner", "attorney", false)).toBeNull();
     expect(prefAllowed("as:attorney", "owner", false)).toBeNull();
     expect(prefAllowed("as:boss", "owner", false)).toBeNull();
     for (const raw of [undefined, "", "owner", 1, "Technician"]) expect(prefAllowed(raw, "owner", false)).toBeNull();
   });
 
-  it("who may switch: owner, admin, senior admin and staff", () => {
+  it("who may switch: owner, admin, senior admin; never Lectual staff acting in a firm", () => {
     expect(ROLES.filter((r) => canSwitchView(r, false))).toEqual(expect.arrayContaining(["owner", "admin", "senior_admin"]));
     expect(ROLES.filter((r) => canSwitchView(r, false))).toHaveLength(3);
-    expect(canSwitchView("viewer", true)).toBe(true);
+    expect(canSwitchView("viewer", true)).toBe(false);
+    expect(canSwitchView("owner", true)).toBe(false);
     expect(canSwitchView(null, false)).toBe(false);
     expect(previewableRoles()).toEqual(["owner"]);
   });
@@ -99,7 +100,7 @@ describe("viewMenuFor", () => {
     expect(viewMenuFor({ role: "owner", pref: AUTO, firmHasRoleViews: true, actingAsStaff: false, view: "owner" })).toEqual({ pref: "auto", ownViewLive: true, ownViewOn: true, previewRoles: [] });
     expect(viewMenuFor({ role: "owner", pref: { kind: "technician" }, firmHasRoleViews: true, actingAsStaff: false, view: "technician" })?.ownViewOn).toBe(false);
     expect(viewMenuFor({ role: "admin", pref: AUTO, firmHasRoleViews: true, actingAsStaff: false, view: "technician" })).toEqual({ pref: "auto", ownViewLive: false, ownViewOn: false, previewRoles: ["owner"] });
-    expect(viewMenuFor({ role: "owner", pref: AUTO, firmHasRoleViews: true, actingAsStaff: true, view: "technician" })).toEqual({ pref: "auto", ownViewLive: false, ownViewOn: false, previewRoles: ["owner"] });
+    expect(viewMenuFor({ role: "owner", pref: AUTO, firmHasRoleViews: true, actingAsStaff: true, view: "technician" })).toBeUndefined();
   });
 });
 
