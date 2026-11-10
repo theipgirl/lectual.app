@@ -26,11 +26,13 @@ export function ReviewPanel(props: {
   confirmStale?: string | null;
   /** What the checks below need (type, the firm's sign-off, member names). Absent = no checks drawn. */
   audit?: AuditContext;
+  /** Opens with the editor showing (default: the rendered view). */
+  startEditing?: boolean;
 }) {
-  const { id, initialBody, canApprove, canEdit, confirmStale, audit } = props;
+  const { id, initialBody, canApprove, canEdit, confirmStale, audit, startEditing = false } = props;
   const [state, action, pending] = useActionState<ReviewState, FormData>(reviewQueueAction, {});
   const [body, setBody] = useState(initialBody);
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(startEditing);
   // What the editor opened with, so Cancel can put it back.
   const [openedWith, setOpenedWith] = useState(initialBody);
   const [staleConfirmed, setStaleConfirmed] = useState(false);
@@ -71,21 +73,6 @@ export function ReviewPanel(props: {
             <label htmlFor="body" className="lx-label">
               Draft {dirty && <span style={{ color: "var(--warn)" }}>· edited</span>}
             </label>
-            <span style={{ display: "flex", gap: 8 }}>
-              <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" onClick={() => setEditing(false)}>
-                Done editing
-              </button>
-              <button
-                type="button"
-                className="lx-btn lx-btn-ghost lx-btn-sm"
-                onClick={() => {
-                  setBody(openedWith);
-                  setEditing(false);
-                }}
-              >
-                Cancel
-              </button>
-            </span>
           </div>
           <textarea
             id="body"
@@ -95,6 +82,21 @@ export function ReviewPanel(props: {
             rows={Math.min(24, Math.max(10, body.split("\n").length + 2))}
             className="lx-input lx-draft"
           />
+          <span className="lx-edit-actions">
+            <button
+              type="button"
+              className="lx-btn lx-btn-ghost lx-btn-sm"
+              onClick={() => {
+                setBody(openedWith);
+                setEditing(false);
+              }}
+            >
+              Cancel
+            </button>
+            <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" onClick={() => setEditing(false)}>
+              Done editing
+            </button>
+          </span>
         </div>
       ) : (
         <section aria-labelledby="draft-view-label" className="lx-view-draft lx-voice" data-draft-mode="view">
@@ -126,15 +128,15 @@ export function ReviewPanel(props: {
 
       {canApprove && (
         <>
-          <label htmlFor="note" className="lx-label">
+          <label htmlFor="note" className="lx-label lx-note-label">
             Note <span style={{ textTransform: "none", letterSpacing: 0 }}>(required to reject)</span>
           </label>
-          <input id="note" name="note" type="text" className="lx-input" placeholder="Why — e.g. wrong fee quoted, tone off…" />
+          <input id="note" name="note" type="text" className="lx-input lx-note-input" placeholder="Why — e.g. wrong fee quoted, tone off…" />
         </>
       )}
 
       {canApprove && confirmStale && (
-        <label className="lx-banner lx-banner-risk" style={{ display: "flex", gap: 10, alignItems: "flex-start", margin: 0, cursor: "pointer" }}>
+        <label className="lx-banner lx-banner-risk lx-stale-tick" style={{ display: "flex", gap: 10, alignItems: "flex-start", margin: 0, cursor: "pointer" }}>
           <input
             type="checkbox"
             name="confirm_stale"
@@ -147,7 +149,7 @@ export function ReviewPanel(props: {
         </label>
       )}
 
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+      <div className="lx-review-actions" data-pinned={canApprove ? "true" : undefined} style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         {canApprove && (
           <button
             type="submit"
@@ -184,7 +186,7 @@ export function ReviewPanel(props: {
           {state.error}
         </p>
       )}
-      <p className="lx-note" style={{ margin: 0 }}>
+      <p className="lx-note lx-review-foot" style={{ margin: 0 }}>
         Approving creates a draft in your mail client — you still press Send. Nothing reaches a client on its own. The original draft is kept alongside your edits.
       </p>
     </form>

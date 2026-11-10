@@ -124,6 +124,7 @@ a.dk-side-row:hover { background: var(--well); text-decoration: none; color: var
 .dk-mini small { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
 .dk-mini b { font-weight: 600; font-size: 15px; line-height: 1.3; }
 
+.dk-handnote { margin: 0; padding: 12px 14px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); font-size: 13px; line-height: 1.45; color: var(--ink); }
 .dk-reason { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 14px; background: var(--card); border: 1px solid rgba(106, 31, 43, 0.3); font-size: 13px; line-height: 1.45; color: var(--ink); }
 .dk-reason svg { flex: 0 0 auto; margin-top: 1px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
@@ -201,6 +202,7 @@ a.dk-move--open { font-size: 14px; }
 .dk-handto textarea { padding: 10px 12px; resize: none; width: 100%; box-sizing: border-box; border: 1px solid var(--line); border-radius: 12px; background: var(--card); font: 14px var(--sans); color: var(--ink); }
 .dk-ghost { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 44px; padding: 0 20px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--ink); font: 500 14px var(--sans); cursor: pointer; }
 .dk-ghost:disabled { opacity: 0.45; cursor: not-allowed; }
+.dk-handto-cancel { display: none; align-self: flex-start; height: 36px; }
 .dk-row-sub { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
 .dk-panel { background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 16px; padding: 14px; display: grid; gap: 8px; box-shadow: var(--shadow); }
 .dk-error { margin: 0; }
@@ -297,6 +299,9 @@ a.dk-move--open { font-size: 14px; }
   .dk-stage[data-mode="handing"] .dk-mini,
   .dk-stage[data-mode="holding"] .dk-mini,
   .dk-stage[data-mode="decided"] .dk-mini { display: flex; }
+  /* Hand off: the form takes the place of the moves row (the board shows only the mini card and the form); Cancel closes it. */
+  .dk-stage[data-mode="handing"] .dk-moves { display: none; }
+  .dk-handto-cancel { display: inline-flex; }
   /* Reject is a bottom sheet over a scrim. */
   .dk-stage[data-mode="rejecting"] .dk-scrim { display: block; position: fixed; inset: 0; z-index: 80; background: var(--dk-scrim); }
   .dk-sheet--reject { position: fixed; left: 0; right: 0; bottom: 0; z-index: 81; border-radius: 24px 24px 0 0; border: 0; padding: 10px 16px 16px; box-shadow: 0 -18px 40px -18px rgba(20, 4, 8, 0.5); }

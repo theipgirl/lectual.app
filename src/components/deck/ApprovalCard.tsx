@@ -47,6 +47,7 @@ import {
   DECK_HANDED_NO_YES,
   DECK_HAND_OFF,
   DECK_LATER,
+  DECK_LATER_DONE,
   DECK_MARK_READ,
   DECK_OPEN_DRAFT,
   DECK_OPEN_TO_REVIEW,
@@ -181,15 +182,15 @@ export function ApprovalCard(props: ApprovalCardProps) {
               </span>
               <span className={quiet ? "dk-tag dk-tag--quiet" : "dk-tag"}>{props.tag}</span>
             </div>
+            <h2 className="dk-title" id={`dk-title-${props.id}`}>
+              {props.title}
+            </h2>
             {props.handedToMe && props.handedByName && (
-              <p className="dk-ctx dk-ctx--step">
+              <p className="dk-ctx">
                 {handedBy(props.handedByName)}
                 {props.handNote ? `: ${props.handNote}` : "."}
               </p>
             )}
-            <h2 className="dk-title" id={`dk-title-${props.id}`}>
-              {props.title}
-            </h2>
             {(props.recipient || props.opening) && (
               <p className="dk-ctx">
                 {props.recipient ? `To ${props.recipient}.` : ""}
@@ -197,7 +198,6 @@ export function ApprovalCard(props: ApprovalCardProps) {
                 {props.opening}
               </p>
             )}
-            {props.handedToMe && !props.canYes && <p className="dk-ctx dk-ctx--step">{DECK_HANDED_NO_YES}</p>}
             <div className="dk-card-foot">
               <span className="dk-why">
                 {props.firstStep ? (props.checkFirst ? <strong>CHECK FIRST: </strong> : `${DECK_FIRST_STEP} `) : null}
@@ -229,6 +229,12 @@ export function ApprovalCard(props: ApprovalCardProps) {
           <span className="dk-card-stack" aria-hidden="true" />
         </div>
       </div>
+
+      {props.handedToMe && !props.canYes && !decided && (
+        <p className="dk-handnote" role="note">
+          {DECK_HANDED_NO_YES}
+        </p>
+      )}
 
       {props.closerLook && !decided && (
         <div className="dk-reason" role="note">
@@ -275,7 +281,7 @@ export function ApprovalCard(props: ApprovalCardProps) {
       )}
 
       {mode === "handing" && !decided && (
-        <HandOffPicker people={props.people} disabledReason={props.movesUnavailable} pending={pending} onHandOff={(userId, n) => run(() => handOffCardAction(props.id, userId, n))} />
+        <HandOffPicker people={props.people} disabledReason={props.movesUnavailable} pending={pending} onCancel={() => setMode("idle")} onHandOff={(userId, n) => run(() => handOffCardAction(props.id, userId, n))} />
       )}
 
       {mode === "editing" && !decided && (
@@ -290,7 +296,15 @@ export function ApprovalCard(props: ApprovalCardProps) {
         </p>
       )}
 
-      {result && result.ok && (
+      {result && result.ok && !draft && result.message === DECK_LATER_DONE && (
+        // Later: one dark pill with the way on (the board's toast; there is no undo for Later).
+        <div className="dk-later-done" role="status">
+          <span>{result.message}</span>
+          <a href={props.afterHref}>{DECK_SKIP}</a>
+        </div>
+      )}
+
+      {result && result.ok && !(!draft && result.message === DECK_LATER_DONE) && (
         <div className="dk-after" role="status">
           {draft ? <span className="dk-after-line">{deckApprovedLine(props.title)}</span> : null}
           {draft && !draft.provider ? (

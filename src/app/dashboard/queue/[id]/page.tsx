@@ -76,7 +76,7 @@ export default async function QueueItemPage({
   ]);
 
   const back = (
-    <Link href="/dashboard/queue/" className="lx-back">
+    <Link href="/dashboard/queue/" className="lx-back lx-qi-back">
       ← {APPROVALS_NAME}
     </Link>
   );
@@ -110,7 +110,7 @@ export default async function QueueItemPage({
   return (
     <>
       {back}
-      <div className="lx-split">
+      <div className="lx-split lx-qi">
         <div className="lx-col">
           {outcome && (
             <div role="status" className={`lx-banner lx-banner-${outcome.tone === "ok" ? "ok" : outcome.tone === "risk" ? "risk" : "mute"}`}>
@@ -118,7 +118,7 @@ export default async function QueueItemPage({
             </div>
           )}
           <div>
-            <div className="lx-label">
+            <div className="lx-label lx-qi-kind">
               {typeLabel(item.type)} · {agentLabel(item.agent)}
             </div>
             <h1 className="lx-h1" style={{ fontSize: 32 }}>
@@ -144,7 +144,7 @@ export default async function QueueItemPage({
               was queued. Check before approving.
             </p>
           )}
-          <section className="lx-card" style={{ padding: 20 }}>
+          <section className="lx-card lx-qi-card" style={{ padding: 20 }}>
             {resolved ? (
               <>
                 <div className="lx-label" style={{ marginBottom: 8 }}>
@@ -171,15 +171,15 @@ export default async function QueueItemPage({
             )}
           </section>
         </div>
-        <aside className="lx-card lx-aside">
-          <span className={`lx-pill ${STATUS_PILL[item.status].tone}`} style={{ justifySelf: "start" }}>
+        <aside className="lx-card lx-aside lx-qi-aside">
+          <span className={`lx-pill lx-qi-status ${STATUS_PILL[item.status].tone}`} style={{ justifySelf: "start" }}>
             {STATUS_PILL[item.status].label}
           </span>
-          <p className="lx-note" data-queue-owner style={{ margin: 0 }}>
+          <p className="lx-note lx-qi-owner" data-queue-owner style={{ margin: 0 }}>
             {kindLabel(classifyQueueItem(item))} · {ownerText(item, view.routing, view.members ?? [])}
           </p>
           {/* Client, To, Subject, Send at and Queued as one compact definition list. */}
-          <dl className="lx-dl" data-queue-details>
+          <dl className="lx-dl lx-qi-facts" data-queue-details>
             <Meta label="Client" value={item.client_name} />
             <Meta label="To" value={item.recipient} />
             <Meta label="Subject" value={item.subject} />

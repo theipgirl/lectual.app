@@ -78,11 +78,24 @@ vi.mock("@/lib/queue/audit-context", () => ({
 }));
 vi.mock("@/lib/queue/stale", async (orig) => ({
   ...(await orig<typeof import("@/lib/queue/stale")>()),
-  checkDraftStaleness: async () => ({ status: "clear", leadIds: [], leadName: null, linkedBy: "draft" }),
+  checkDraftStaleness: async () => (state as { itemStale?: unknown }).itemStale ?? { status: "clear", leadIds: [], leadName: null, linkedBy: "draft" },
 }));
 vi.mock("@/lib/consult-proposal/link", async (orig) => ({
   ...(await orig<typeof import("@/lib/consult-proposal/link")>()),
   gateLinkedProposal: async () => ({ ok: true, proposal: null }),
+  loadLinkedPanel: async () => ({ status: "none" }),
+}));
+
+// Approval item page (/dashboard/queue/[id]/)
+vi.mock("@/lib/queue/api", async (orig) => ({
+  ...(await orig<typeof import("@/lib/queue/api")>()),
+  getQueueItem: async (_k: string, id: string) => [...state.pending, ...state.approved, ...state.rejected].find((i) => i.id === id)!,
+}));
+vi.mock("@/lib/queue/org", async (orig) => ({ ...(await orig<typeof import("@/lib/queue/org")>()), activeQueueOrgKey: async () => "rpb" }));
+vi.mock("@/lib/db/scoped-client", () => ({ getScopedClient: async () => ({}) }));
+vi.mock("@/lib/queue/roles", async (orig) => ({ ...(await orig<typeof import("@/lib/queue/roles")>()), resolveQueueRole: async () => "owner" }));
+vi.mock("@/lib/queue/view-context", () => ({
+  loadQueueViewContext: async () => ({ viewer: { userId: "00000000-0000-4000-8000-0000000000a1", role: "owner" }, routing: {}, members: [], routingFailed: false, dropped: 0, now: Date.parse("2026-11-10T14:30:00Z") }),
 }));
 
 // Weekly review
