@@ -71,9 +71,11 @@ function statOf<T>(settled: PromiseSettledResult<T>, count: (value: T) => number
  * so one dead source never blanks the others or the page, and a failed read
  * says so instead of printing a zero.
  */
-export default async function CopilotPage(props?: { searchParams?: Promise<{ c?: string | string[] }> }) {
+export default async function CopilotPage(props?: { searchParams?: Promise<{ c?: string | string[]; q?: string | string[] }> }) {
   const params = (await props?.searchParams) ?? {};
   const openParam = typeof params.c === "string" ? params.c : null;
+  // A question typed elsewhere (Today's "Ask Copilot" box) is placed in the input, never sent by itself.
+  const prefill = typeof params.q === "string" ? params.q.trim().slice(0, 2000) : "";
   const configured = aiConfigured();
   const session = configured ? await resolveFirmSession() : null;
   if (configured && session?.kind !== "ok") return null; // the layout already handled this
@@ -128,6 +130,7 @@ export default async function CopilotPage(props?: { searchParams?: Promise<{ c?:
           history={saved.history}
           openId={saved.openId}
           initialExchanges={saved.exchanges}
+          initialQuestion={saved.openId ? "" : prefill}
           openNote={saved.openNote}
           greeting={greeting}
           stats={landing}

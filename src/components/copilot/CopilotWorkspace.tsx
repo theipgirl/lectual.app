@@ -18,6 +18,8 @@ export function CopilotWorkspace(props: {
   /** The saved chat that is open, when `?c=` named one the person can see. */
   openId: string | null;
   initialExchanges?: Exchange[];
+  /** Put in the input, never sent by itself. */
+  initialQuestion?: string;
   greeting: string;
   stats: ReactNode;
   /** A sentence about the chat the address named, when it could not be opened. */
@@ -47,6 +49,7 @@ export function CopilotWorkspace(props: {
           greeting={props.greeting}
           stats={props.stats}
           initialExchanges={props.initialExchanges}
+          initialQuestion={props.initialQuestion}
           conversationId={props.openId}
           onNewChat={newChat}
         />

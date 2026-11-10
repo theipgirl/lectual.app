@@ -92,6 +92,8 @@ type Props = {
   pathname?: string;
   /** For tests and for restoring a thread. */
   initialExchanges?: Exchange[];
+  /** Put in the input, never sent by itself. */
+  initialQuestion?: string;
   /** The saved chat these exchanges belong to (lectual 0099). Unset = a new chat. */
   conversationId?: string | null;
   /** Called when "New chat" is pressed in the composer. */
@@ -109,8 +111,8 @@ type Props = {
  * straight to the matter or lead record it came from, and an answer with no
  * citations says so plainly instead of pretending to be backed by one.
  */
-export function CopilotChat({ variant, greeting, stats, pathname, initialExchanges, conversationId: savedId, onNewChat }: Props) {
-  const [question, setQuestion] = useState("");
+export function CopilotChat({ variant, greeting, stats, pathname, initialExchanges, initialQuestion, conversationId: savedId, onNewChat }: Props) {
+  const [question, setQuestion] = useState(initialQuestion ?? "");
   const [exchanges, setExchanges] = useState<Exchange[]>(initialExchanges ?? []);
   const [pending, setPending] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
