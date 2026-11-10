@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { ListHeader } from "@/components/list-page/ListHeader";
-import { ListToolbar } from "@/components/list-page/ListToolbar";
+import { ListSearch } from "@/components/list-page/ListToolbar";
 import { Chip, FilterChips } from "@/components/list-page/Chips";
 import "@/components/list-page/list-page.css";
 import { ReviewSection } from "@/components/review/ReviewSection";
@@ -22,7 +23,7 @@ import { buildDeck, chosenPerson, deckPeople } from "@/lib/review/deck";
 import { loadLatestNote, loadReviewDetail } from "@/lib/review/detail-load";
 import { pageTitle } from "@/lib/ui/page-title";
 import { QUEUE_APPROVE_ROLES } from "@/lib/queue/roles";
-import { REVIEW_NAME, REVIEW_SHOW_ALL, REVIEW_SHOWING_ALL, REVIEW_SINCE_LABEL, REVIEW_SINCE_SUSPENDED, reviewOlderHidden } from "@/lib/ui/words";
+import { REVIEW_NAME, REVIEW_SHOW_ALL, REVIEW_SHOWING_ALL, REVIEW_SINCE_LABEL, REVIEW_SINCE_SUSPENDED, reviewIntro, reviewOlderHidden } from "@/lib/ui/words";
 
 export const metadata: Metadata = { title: pageTitle(REVIEW_NAME) };
 
@@ -62,9 +63,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const filterParams: ReviewParams = sinceOff ? { ...params, since: "all" } : params;
   const shown = applyReviewFilters(load.rows, filterParams, userId);
   const buckets = reviewBuckets(shown, load.today);
-  // Chip counts: each chip counts what it would show with the other filters kept.
-  const countFor = (over: Partial<ReviewParams>) => applyReviewFilters(load.rows, { ...filterParams, ...over }, userId).length;
-  const note = detailsNote(load.failed);
+    const note = detailsNote(load.failed);
   const common = { today: load.today, members: load.members, canWrite, params };
   const proposalsKnown = !load.failed.includes("proposals");
   const approvalsKnown = !load.failed.includes("approvals");
@@ -100,45 +99,45 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
     : null;
   const notice = noticeFor(sp.notice);
 
+  const searchHidden = { ...(params.since === "all" ? { since: "all" } : {}), ...(params.view !== DEFAULT_REVIEW_VIEW ? { view: params.view } : {}), ...(params.view === "cards" && params.person ? { person: params.person } : {}), ...(params.who === "mine" ? { who: "mine" } : {}), ...(params.kind !== "both" ? { kind: params.kind === "matter" ? "matters" : "leads" } : {}) };
+
   return (
-    <div className="lp-root">
-      <ListHeader title={REVIEW_NAME} tour="review-head" sub={reviewSubline(buckets)} />
+    <div className="lp-root rv-root">
+      <header className="rv-head">
+        <div className="rv-head-text">
+          <h1 className="lx-h1 rv-h1" data-tour="review-head">{REVIEW_NAME}</h1>
+          <p className="lx-sub rv-sub">{buckets.total === 0 ? reviewSubline(buckets) : reviewIntro(buckets.total)}</p>
+        </div>
+        <ViewSwitch params={params} />
+      </header>
 
-      <ListToolbar
-        search={{
-          label: "Search clients and marks",
-          placeholder: "Client or mark",
-          defaultValue: params.q,
-          hidden: { ...(params.since === "all" ? { since: "all" } : {}), ...(params.view !== DEFAULT_REVIEW_VIEW ? { view: params.view } : {}), ...(params.view === "cards" && params.person ? { person: params.person } : {}), ...(params.who === "mine" ? { who: "mine" } : {}), ...(params.kind !== "both" ? { kind: params.kind === "matter" ? "matters" : "leads" } : {}) },
-          clearHref: link({ q: "", i: 1 }),
-        }}
-        toggle={<ViewSwitch params={params} />}
-      />
-
-      <KpiStrip kpis={kpis(buckets)} />
-
-      <FilterChips as="nav" label="Whose">
-        <Chip href={link({ who: "all" })} active={params.who === "all"} count={countFor({ who: "all" })}>Everyone</Chip>
-        <Chip href={link({ who: "mine" })} active={params.who === "mine"} count={countFor({ who: "mine" })}>Mine</Chip>
-      </FilterChips>
-      <FilterChips as="nav" label="Matters or leads">
-        <Chip href={link({ kind: "both" })} active={params.kind === "both"} count={countFor({ kind: "both" })}>Both</Chip>
-        <Chip href={link({ kind: "matter" })} active={params.kind === "matter"} count={countFor({ kind: "matter" })}>Matters</Chip>
-        <Chip href={link({ kind: "lead" })} active={params.kind === "lead"} count={countFor({ kind: "lead" })}>Leads</Chip>
-      </FilterChips>
-
-      <FilterChips as="nav" label="Since">
+      <div className="rv-filters">
         {sinceOff ? (
           <Chip href={link({})} active={false}>{REVIEW_SINCE_SUSPENDED}</Chip>
         ) : params.since === "all" ? (
-          <Chip href={link({ since: "default" })} active={false}>{REVIEW_SHOWING_ALL} · {REVIEW_SINCE_LABEL}</Chip>
+          <Link href={link({ since: "default" })} className="rv-since">{REVIEW_SHOWING_ALL} · {REVIEW_SINCE_LABEL}</Link>
         ) : (
-          <>
-            <Chip href={link({ since: "default" })} active>{REVIEW_SINCE_LABEL} · {reviewOlderHidden(olderHidden)}</Chip>
-            <Chip href={link({ since: "all" })} active={false}>{REVIEW_SHOW_ALL}</Chip>
-          </>
+          <Link href={link({ since: "all" })} className="rv-since">
+            {REVIEW_SINCE_LABEL} · {reviewOlderHidden(olderHidden)} · <span className="rv-since-act">{REVIEW_SHOW_ALL}</span>
+          </Link>
         )}
-      </FilterChips>
+        <span className="rv-divider" aria-hidden />
+        <FilterChips as="nav" label="Whose" className="rv-chips">
+          <Chip href={link({ who: "all" })} active={params.who === "all"}>Everyone</Chip>
+          <Chip href={link({ who: "mine" })} active={params.who === "mine"}>Mine</Chip>
+        </FilterChips>
+        <FilterChips as="nav" label="Matters or leads" className="rv-chips">
+          <Chip href={link({ kind: "both" })} active={params.kind === "both"}>All</Chip>
+          <Chip href={link({ kind: "matter" })} active={params.kind === "matter"}>Matters</Chip>
+          <Chip href={link({ kind: "lead" })} active={params.kind === "lead"}>Leads</Chip>
+        </FilterChips>
+        <div className="rv-search">
+          <span className="rv-search-label" aria-hidden>Search</span>
+          <ListSearch label="Search clients and marks" placeholder="Client or mark" defaultValue={params.q} hidden={searchHidden} clearHref={link({ q: "", i: 1 })} />
+        </div>
+      </div>
+
+      <KpiStrip kpis={kpis(buckets)} />
 
       {note && (
         <p className="lx-banner lx-banner-warn" role="status" style={{ margin: 0 }}>
@@ -172,8 +171,10 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
         <>
           {strips}
           <ReviewBoard lanes={lanes} {...common} />
-          <ReviewSection bucket="uspto" rows={rest.uspto} collapsed {...common} />
-          <ReviewSection bucket="track" rows={rest.track} collapsed {...common} />
+          <div className="rv-rest">
+            <ReviewSection bucket="uspto" rows={rest.uspto} collapsed {...common} />
+            <ReviewSection bucket="track" rows={rest.track} collapsed {...common} />
+          </div>
         </>
       )}
       {panel && params.open && (

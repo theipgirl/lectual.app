@@ -28,9 +28,9 @@ export function ViewSwitch({ params }: { params: ReviewParams }) {
 
 function Tile({ label, value, tone }: { label: string; value: number | null; tone?: "risk" | "warn" }) {
   return (
-    <div className="lx-card lx-kpi">
+    <div className="lx-card lx-kpi rv-kpi">
       <span className="lx-label">{label}</span>
-      <span className="lx-kpi-value" style={tone && value ? { color: tone === "risk" ? "var(--ox)" : "var(--warn)" } : undefined}>
+      <span className="lx-kpi-value" style={tone === "risk" && value ? { color: "var(--ox)" } : undefined}>
         {value === null ? "—" : value}
       </span>
       {value === null && <span className="lx-note">Couldn&apos;t load</span>}
@@ -56,8 +56,16 @@ export function Card({ row, bucket, today, members, canWrite, params, followUp }
   const ownerId = laneOf(row);
   const ownerName = ownerId ? members.find((m) => m.userId === ownerId)?.name ?? "Teammate" : null;
   const href = openHref(params, row);
+  // The pill at the right of the step: the due date, else "Approval" for a record waiting on one, else a nudge to set a step.
+  const pill = due
+    ? { text: due.text, tone: due.overdue ? "risk" : due.text.startsWith("Due") ? "warn" : "plain" }
+    : row.waiting === "approval"
+      ? { text: "Approval", tone: "ox" }
+      : !row.nextStep
+        ? { text: "Needs a step", tone: "plain" }
+        : null;
   return (
-    <article className={`lx-card rv-card rv-card-${bucket}`} data-key={openToken(row)}>
+    <article className={`lx-card rv-card rv-card-${bucket}${followUp ? " rv-card-waits" : " rv-card-ours"}`} data-key={openToken(row)}>
       <Link href={href} className="rv-card-link" scroll={false}>
         <span className="rv-card-top">
           <span className="rv-card-title">{row.client}</span>
@@ -69,8 +77,8 @@ export function Card({ row, bucket, today, members, canWrite, params, followUp }
           {row.stageLabel ? ` · ${row.stageLabel}` : ""}
         </span>
         <span className="rv-card-step">
-          {row.nextStep ? row.nextStep.title : "No next step"}
-          {due && <span className={`rv-chip${due.overdue ? " rv-chip-overdue" : ""}`}>{due.text}</span>}
+          <span className="rv-card-step-text">{row.nextStep ? row.nextStep.title : "No next step"}</span>
+          {!followUp && pill && <span className={`rv-pill rv-pill-${pill.tone}`}>{pill.text}</span>}
         </span>
         {followUp && <span className="rv-card-followup lx-note">{followUpText(row, today)}</span>}
         <Tags row={row} today={today} max={2} />
@@ -100,15 +108,15 @@ export function ReviewBoard({ lanes, ...common }: Common & { lanes: Lane[] }) {
       {lanes.map((lane) => {
         const id = lane.userId ?? "none";
         return (
-          <section key={id} className="rv-person" aria-labelledby={`rv-person-${id}`}>
-            <h2 id={`rv-person-${id}`} className="lx-h2 rv-person-name">
+          <section key={id} className="lx-card rv-person" aria-labelledby={`rv-person-${id}`}>
+            <h2 id={`rv-person-${id}`} className="rv-person-name">
               <Avatar name={lane.name} />
-              <span>{lane.name}</span> <span className="lx-note">{lane.count}</span>
+              <span>{lane.name}</span> <span className="rv-count">{lane.count}</span>
             </h2>
             <div className="rv-halves">
               <div className="rv-half" data-half="our">
                 <h3 className="lx-label rv-colh">
-                  {OUR_TURN} <span className="lx-note">{lane.our.length}</span>
+                  {OUR_TURN}
                 </h3>
                 {lane.our.length === 0 ? (
                   <p className="lx-note rv-none">Nothing for us to do here.</p>
@@ -122,7 +130,7 @@ export function ReviewBoard({ lanes, ...common }: Common & { lanes: Lane[] }) {
               </div>
               <div className="rv-half" data-half="client">
                 <h3 className="lx-label rv-colh">
-                  Waiting on client <span className="lx-note">{lane.client.length}</span>
+                  Waiting on client
                 </h3>
                 {lane.client.length === 0 ? (
                   <p className="lx-note rv-none">Nobody is waiting on a client.</p>
@@ -146,9 +154,10 @@ export function ReviewBoard({ lanes, ...common }: Common & { lanes: Lane[] }) {
 export function ProposalsOutStrip({ items, known, params }: { items: ProposalOut[]; known: boolean; params: ReviewParams }) {
   return (
     <section className="lx-card rv-strip" data-strip="proposals" aria-labelledby="rv-strip-proposals">
-      <h2 id="rv-strip-proposals" className="lx-h2 rv-strip-title">
-        Proposals out {known && <span className="lx-note">{items.length}</span>}
-      </h2>
+      <div className="rv-strip-head">
+        <h2 id="rv-strip-proposals" className="rv-strip-title">Proposals out</h2>
+        {known && <span className="rv-strip-count">{items.length} · soonest last day first</span>}
+      </div>
       {!known ? (
         <p className="lx-note rv-strip-note" role="status">Proposals couldn&apos;t load. Refresh to try again.</p>
       ) : items.length === 0 ? (
@@ -157,8 +166,9 @@ export function ProposalsOutStrip({ items, known, params }: { items: ProposalOut
         <ul className="rv-strip-list">
           {items.map((p) => (
             <li key={p.row.key}>
-              <Link href={openHref(params, p.row)} scroll={false}>{p.row.client}</Link>{" "}
-              <span className={`rv-strip-when${p.expired ? " rv-deadline-soon" : ""}`}>{p.text}</span>
+              <Link href={openHref(params, p.row)} className={`rv-pill ${p.expired ? "rv-pill-risk" : "rv-pill-plain"}`} scroll={false}>
+                {p.row.client} · <span className={`rv-strip-when${p.expired ? " rv-deadline-soon" : ""}`}>{p.text}</span>
+              </Link>
             </li>
           ))}
         </ul>
@@ -171,9 +181,10 @@ export function ProposalsOutStrip({ items, known, params }: { items: ProposalOut
 export function WaitingOnStrip({ firstName, rows, approvalsKnown, params, personId, you }: { firstName: string; /** The strip is about the signed-in approver: "Waiting on you". */ you?: boolean; rows: ReviewRow[]; approvalsKnown: boolean; params: ReviewParams; personId: string }) {
   return (
     <section className="lx-card rv-strip" data-strip="person" aria-labelledby="rv-strip-person">
-      <h2 id="rv-strip-person" className="lx-h2 rv-strip-title">
-        {you ? WAITING_ON_YOU : `Waiting on ${firstName}`} <span className="lx-note">{rows.length}</span>
-      </h2>
+      <div className="rv-strip-head">
+        <h2 id="rv-strip-person" className="rv-strip-title">{you ? WAITING_ON_YOU : `Waiting on ${firstName}`}</h2>
+        <span className="rv-strip-count">{rows.length} · next steps and approvals</span>
+      </div>
       {!approvalsKnown && (
         <p className="lx-note rv-strip-note" role="status">{you ? WAITING_ON_YOU_PARTIAL : `Approvals couldn't load, so only next steps assigned to ${firstName} are listed.`}</p>
       )}
@@ -181,14 +192,16 @@ export function WaitingOnStrip({ firstName, rows, approvalsKnown, params, person
         approvalsKnown && <p className="lx-note rv-strip-note">{you ? NOTHING_WAITING_ON_YOU : `Nothing is waiting on ${firstName}.`}</p>
       ) : (
         <ul className="rv-strip-list">
-          {rows.map((r) => (
-            <li key={r.key}>
-              <Link href={openHref(params, r)} scroll={false}>{r.client}</Link>{" "}
-              <span className="lx-note">
-                {r.nextStep?.assigneeId === personId ? `Next step: ${r.nextStep.title}` : "Waiting on approval"}
-              </span>
-            </li>
-          ))}
+          {rows.map((r) => {
+            const step = r.nextStep?.assigneeId === personId;
+            return (
+              <li key={r.key}>
+                <Link href={openHref(params, r)} className={`rv-pill ${step ? "rv-pill-plain" : "rv-pill-ox"}`} scroll={false}>
+                  {r.client} · {step && r.nextStep ? r.nextStep.title : "approval"}
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>

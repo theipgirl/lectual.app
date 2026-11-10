@@ -166,7 +166,11 @@ export function drawnNav(items: NavItem[], view: ViewId): NavItem[] {
     const item = bySlug.get(slug);
     if (!item) return [];
     // The deck is the owner's Approvals; the list and each item's page still belong to the section.
-    return [slug === "queue" ? { ...item, href: DECK_PATH, also: [...(item.also ?? []), "/dashboard/queue/"] } : item];
+    if (slug === "queue") return [{ ...item, href: DECK_PATH, also: [...(item.also ?? []), "/dashboard/queue/"] }];
+    // The owner's words (OwnerRail board): one "Proposals" row, and "Matters" under More (not the technician's "All matters").
+    if (slug === "proposals" || slug === "quotes") return [{ ...item, label: PROPOSALS_NAME, railLabel: PROPOSALS_NAME }];
+    if (slug === "matters") return [{ ...item, railLabel: item.label }];
+    return [item];
   });
 }
 

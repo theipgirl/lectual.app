@@ -1,6 +1,6 @@
 import { OwnerToday } from "@/components/today/OwnerToday";
 import { state } from "../state";
-import { NOW, OWNER_ID, resetState } from "../fixtures";
+import { NOW, OWNER_ID, proposals, resetState } from "../fixtures";
 import { OwnerShell } from "../shell";
 import type { Screen } from "../registry";
 
@@ -20,6 +20,7 @@ export const screens: Screen[] = [
     prepare: () => {
       resetState();
       state.pathname = "/dashboard/";
+      state.proposals = proposals.map((p, i) => ({ ...p, opens: i === 0 ? 2 : 0 }));
     },
     render: today,
     note: "Real OwnerToday (async server component) with the loaders mocked in setup.ts.",
@@ -35,6 +36,7 @@ export const screens: Screen[] = [
     prepare: () => {
       resetState();
       state.pathname = "/dashboard/";
+      state.proposals = proposals.map((p, i) => ({ ...p, opens: i === 0 ? 2 : 0 }));
     },
     render: today,
     note: "Same page at 375px; the rail hides and MobileBar shows.",

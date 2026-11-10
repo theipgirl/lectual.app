@@ -11,23 +11,28 @@ import { loadDeckSummary, type DeckSummary } from "@/lib/queue/deck-summary";
 import { loadTodayConsults, type TodayConsultsResult } from "@/lib/calendar/consult-sources";
 import { liveConsultDeps } from "@/lib/calendar/consult-sources-live";
 import { loadOwnerDeadlines, loadOwnerProposals } from "@/lib/today/owner-load";
-import { cardsLine, dueText, OWNER_PROPOSALS_SHOWN, OWNER_DEADLINES_SHOWN, weekStrip } from "@/lib/today/owner-rules";
+import { cardsHero, deadlineChip, proposalTone, weekdayDate, OWNER_PROPOSALS_SHOWN, OWNER_DEADLINES_SHOWN, weekStrip } from "@/lib/today/owner-rules";
 import { DECK_PATH } from "@/lib/views";
 import { AddNameLink } from "@/components/account/AddNameLink";
-import { TodayConsultsView } from "@/components/calendar/TodayConsults";
+import { OwnerConsults } from "@/components/today/owner/OwnerConsults";
 import { WeekStrip } from "@/components/today/owner/WeekStrip";
 import { CopilotBox } from "@/components/today/owner/CopilotBox";
 import "@/components/today/owner/owner-today.css";
 import {
-  OWNER_CALENDAR_LINK,
   OWNER_CARDS_HEADING,
   OWNER_CARDS_START,
+  OWNER_CONSULTS_FAILED,
+  OWNER_PROPOSAL_LINK_LIVE,
+  OWNER_PROPOSALS_SORT_NOTE,
+  OWNER_WEEK_KEY_CONSULT,
+  OWNER_WEEK_KEY_DEADLINE,
+  OWNER_WEEK_OPEN_CALENDAR,
+  ownerProposalOpens,
   OWNER_DEADLINES_FAILED,
   OWNER_DEADLINES_HEADING,
   OWNER_DEADLINES_NONE,
   OWNER_PROPOSALS_FAILED,
   OWNER_PROPOSALS_HEADING,
-  OWNER_PROPOSALS_LINK,
   OWNER_PROPOSALS_NONE,
   OWNER_WEEK_BOTH_FAILED,
   OWNER_WEEK_CONSULTS_FAILED,
@@ -35,10 +40,18 @@ import {
   OWNER_WEEK_HEADING,
 } from "@/lib/ui/words";
 
+function longDate(now: Date, tz: string): string {
+  return new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "long", month: "long", day: "numeric" }).format(now);
+}
+
 function greeting(hour: number): string {
   return hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening";
 }
 
+/**
+ * The owner's Today: short and calm. Every read is independent (allSettled); a failed one says so in words and
+ * prints no number. Read-only: nothing is sent, moved or opened from here. The technician Today is untouched.
+ */
 /**
  * The owner's Today: short and calm. Every read is independent (allSettled); a failed one says so in words and
  * prints no number. Read-only: nothing is sent, moved or opened from here. The technician Today is untouched.
@@ -74,8 +87,8 @@ export async function OwnerToday({
 
   const today = civilInZone(now, tz);
   const firstName = greetingName({ userId, members, metadata, email });
-  const line = cardsLine(deck);
-  const week = weekStrip({ now, tz, consults: consults ? consults.consults : null, deadlines });
+  const hero = cardsHero(deck);
+  const week = weekStrip({ now, tz, consults: consults ? consults.consults : null, deadlines, proposals: Array.isArray(proposals) ? proposals : null });
   const weekNote =
     consults === null && deadlines === null
       ? OWNER_WEEK_BOTH_FAILED
@@ -84,155 +97,183 @@ export async function OwnerToday({
         : deadlines === null
           ? OWNER_WEEK_DEADLINES_FAILED
           : null;
+  const columns = proposals === null ? 2 : 3;
 
   return (
-    <>
-      <div className="lx-page-head lx-page-head-list">
-        <div style={{ flex: 1, minWidth: 260 }}>
-          <h1 className="lx-h1">
-            Good {greeting(hourInZone(now, tz))}
-            {greetingSuffix(firstName)}.
-          </h1>
-          {!firstName && <AddNameLink />}
-        </div>
+    <div className="ot-page">
+      <div className="ot-top">
+        <h1 className="ot-h1">
+          Good {greeting(hourInZone(now, tz))}
+          {greetingSuffix(firstName)}.
+        </h1>
+        <p className="ot-date">{longDate(now, tz)}</p>
+        {!firstName && <AddNameLink />}
       </div>
 
-      <div className="ot-grid">
-        <div className="ot-col">
-          <section className="ot-deck" aria-labelledby="ot-cards-h" data-state={line.state}>
-            <h2 id="ot-cards-h" className="lx-h2" style={{ fontSize: 25 }}>
-              {OWNER_CARDS_HEADING}
-            </h2>
-            <p className="ot-deck-line" role={line.state === "unavailable" ? "alert" : undefined}>
-              {line.headline}
-            </p>
-            {line.sub && <p className="ot-deck-sub">{line.sub}</p>}
-            {line.canStart && (
-              <Link href={DECK_PATH} className="lx-btn">
-                {OWNER_CARDS_START}
-              </Link>
-            )}
-          </section>
+      <section className="ot-hero" aria-labelledby="ot-cards-h" data-state={hero.state}>
+        <h2 id="ot-cards-h" className="ot-eyebrow ot-only-narrow">
+          {OWNER_CARDS_HEADING}
+        </h2>
+        {hero.big !== null ? (
+          <>
+            <div className="ot-hero-main ot-only-wide">
+              <span className="ot-big">{hero.big}</span>
+              <div className="ot-hero-text">
+                <span className="ot-hero-title">
+                  {hero.unit} &middot; {hero.about}
+                </span>
+                <span className="ot-hero-sub">{hero.dealLine}</span>
+              </div>
+            </div>
+            <div className="ot-hero-main ot-only-narrow">
+              <p className="ot-hero-count">
+                {hero.big} {hero.cards} <span className="ot-hero-about">&middot; {hero.about}</span>
+              </p>
+              <p className="ot-hero-sub">{hero.dealLine}</p>
+            </div>
+          </>
+        ) : (
+          <p className="ot-hero-message" role={hero.state === "unavailable" ? "alert" : undefined}>
+            {hero.message}
+          </p>
+        )}
+        {hero.canStart && (
+          <Link href={DECK_PATH} className="ot-start">
+            {OWNER_CARDS_START}
+          </Link>
+        )}
+      </section>
 
+      <section className="ot-card ot-week-card" aria-labelledby="ot-week-h">
+        <div className="ot-card-head">
+          <h2 id="ot-week-h" className="ot-card-title">
+            {OWNER_WEEK_HEADING}
+          </h2>
+          <span className="ot-sub">
+            <span className="ot-key ot-key-consult" /> {OWNER_WEEK_KEY_CONSULT} <span className="ot-key ot-key-deadline" /> {OWNER_WEEK_KEY_DEADLINE}
+            <span className="ot-only-wide">
+              {" "}
+              &middot;{" "}
+              <Link href="/dashboard/calendar/" className="ot-link">
+                {OWNER_WEEK_OPEN_CALENDAR}
+              </Link>
+            </span>
+          </span>
+        </div>
+        <WeekStrip days={week} />
+        {weekNote && (
+          <p className="ot-sub ot-note" role="alert">
+            {weekNote}
+          </p>
+        )}
+      </section>
+
+      <div className="ot-cols" style={{ ["--ot-cols" as string]: columns }}>
+        <div className="ot-col-consults">
           {consults ? (
-            <TodayConsultsView result={consults} timeZone={tz} />
+            <OwnerConsults result={consults} timeZone={tz} today={today} />
           ) : (
-            <section className="lx-card ot-card" aria-labelledby="ot-consults-h">
-              <h2 id="ot-consults-h" className="lx-h2" style={{ fontSize: 25 }}>
-                Consults
+            <section className="ot-card" aria-labelledby="ot-consults-h">
+              <h2 id="ot-consults-h" className="ot-card-title">
+                Today&apos;s consults
               </h2>
-              <p className="lx-note" role="alert" style={{ margin: 0 }}>
-                Couldn&apos;t load consults.
+              <p className="ot-sub ot-note" role="alert">
+                {OWNER_CONSULTS_FAILED}
               </p>
             </section>
           )}
-
-          <section className="lx-card ot-card" aria-labelledby="ot-week-h">
-            <div className="ot-head">
-              <h2 id="ot-week-h" className="lx-h2" style={{ fontSize: 25 }}>
-                {OWNER_WEEK_HEADING}
-              </h2>
-              <Link href="/dashboard/calendar/" className="lx-note">
-                {OWNER_CALENDAR_LINK}
-              </Link>
-            </div>
-            <WeekStrip days={week} />
-            {weekNote && (
-              <p className="lx-note" role="alert" style={{ margin: 0 }}>
-                {weekNote}
-              </p>
-            )}
-          </section>
         </div>
 
-        <div className="ot-col">
-          <section className="lx-card ot-card" aria-labelledby="ot-deadlines-h">
-            <div className="ot-head">
-              <h2 id="ot-deadlines-h" className="lx-h2" style={{ fontSize: 25 }}>
-                {OWNER_DEADLINES_HEADING}
-              </h2>
-              <Link href="/dashboard/calendar/" className="lx-note">
-                {OWNER_CALENDAR_LINK}
-              </Link>
-            </div>
-            {deadlines === null ? (
-              <p className="lx-note" role="alert" style={{ margin: 0 }}>
-                {OWNER_DEADLINES_FAILED}
-              </p>
-            ) : deadlines.length === 0 ? (
-              <p className="lx-note" style={{ margin: 0 }}>
-                {OWNER_DEADLINES_NONE}
-              </p>
-            ) : (
-              <ul className="lx-list">
-                {deadlines.slice(0, OWNER_DEADLINES_SHOWN).map((d) => (
-                  <li key={d.key} className="lx-task">
-                    <span style={{ minWidth: 0 }}>
-                      <Link href={d.href} style={{ fontWeight: 500, color: "var(--ink)" }}>
-                        {d.name}
-                      </Link>
-                      <span className="lx-note" style={{ display: "block" }}>
-                        {d.detail}
-                      </span>
-                    </span>
-                    <span className={d.overdueDays > 0 ? "lx-note ot-risk" : "lx-note"}>{dueText(d, today)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {deadlines !== null && deadlines.length > OWNER_DEADLINES_SHOWN && (
-              <Link href="/dashboard/calendar/" className="lx-note">
-                {deadlines.length - OWNER_DEADLINES_SHOWN} more on the calendar
-              </Link>
-            )}
-          </section>
-
-          {proposals !== null && (
-            <section className="lx-card ot-card" aria-labelledby="ot-proposals-h">
-              <div className="ot-head">
-                <h2 id="ot-proposals-h" className="lx-h2" style={{ fontSize: 25 }}>
+        {proposals !== null && (
+          <div className="ot-col-proposals">
+            <section className="ot-card" aria-labelledby="ot-proposals-h">
+              <div className="ot-card-head">
+                <h2 id="ot-proposals-h" className="ot-card-title">
                   {OWNER_PROPOSALS_HEADING}
                 </h2>
-                <Link href="/dashboard/proposals/" className="lx-note">
-                  {OWNER_PROPOSALS_LINK}
-                </Link>
+                {Array.isArray(proposals) && proposals.length > 0 && (
+                  <span className="ot-sub">
+                    {proposals.length} <span className="ot-only-wide">&middot; {OWNER_PROPOSALS_SORT_NOTE}</span>
+                  </span>
+                )}
               </div>
               {proposals === undefined ? (
-                <p className="lx-note" role="alert" style={{ margin: 0 }}>
+                <p className="ot-sub ot-note" role="alert">
                   {OWNER_PROPOSALS_FAILED}
                 </p>
               ) : proposals.length === 0 ? (
-                <p className="lx-note" style={{ margin: 0 }}>
-                  {OWNER_PROPOSALS_NONE}
-                </p>
+                <p className="ot-sub ot-empty">{OWNER_PROPOSALS_NONE}</p>
               ) : (
-                <ul className="lx-list">
-                  {proposals.slice(0, OWNER_PROPOSALS_SHOWN).map((p) => (
-                    <li key={p.id} className="lx-task">
-                      <span style={{ minWidth: 0 }}>
-                        <Link href={p.href} style={{ fontWeight: 500, color: "var(--ink)" }}>
-                          {p.client}
+                proposals.slice(0, OWNER_PROPOSALS_SHOWN).map((p) => {
+                  const opens = ownerProposalOpens(p.opens);
+                  return (
+                    <div key={p.id} className="ot-row">
+                      <div className="ot-row-main">
+                        <Link href={p.href} className="ot-row-title">
+                          {p.client} &middot; {p.title}
                         </Link>
-                        <span className="lx-note" style={{ display: "block" }}>
-                          {p.title}
+                        <span className="ot-sub ot-only-wide">
+                          {OWNER_PROPOSAL_LINK_LIVE}
+                          {opens ? ` \u00b7 ${opens}` : ""}
                         </span>
-                      </span>
-                      <span className={p.expired ? "lx-note ot-risk" : "lx-note"}>{p.expiry}</span>
-                    </li>
-                  ))}
-                </ul>
+                      </div>
+                      <span className={`ot-pill ot-pill-${proposalTone(p, today)}`}>{p.expiry}</span>
+                    </div>
+                  );
+                })
               )}
               {Array.isArray(proposals) && proposals.length > OWNER_PROPOSALS_SHOWN && (
-                <Link href="/dashboard/proposals/" className="lx-note">
+                <Link href="/dashboard/proposals/" className="ot-link ot-more">
                   {proposals.length - OWNER_PROPOSALS_SHOWN} more
                 </Link>
               )}
             </section>
-          )}
+          </div>
+        )}
 
-          {aiConfigured() && <CopilotBox />}
+        <div className="ot-col-deadlines">
+          <section className="ot-card" aria-labelledby="ot-deadlines-h">
+            <div className="ot-card-head">
+              <h2 id="ot-deadlines-h" className="ot-card-title">
+                {OWNER_DEADLINES_HEADING}
+              </h2>
+              {deadlines !== null && deadlines.length > 0 && <span className="ot-sub">{deadlines.length}</span>}
+            </div>
+            {deadlines === null ? (
+              <p className="ot-sub ot-note" role="alert">
+                {OWNER_DEADLINES_FAILED}
+              </p>
+            ) : deadlines.length === 0 ? (
+              <p className="ot-sub ot-empty">{OWNER_DEADLINES_NONE}</p>
+            ) : (
+              deadlines.slice(0, OWNER_DEADLINES_SHOWN).map((d) => {
+                const chip = deadlineChip(d, today);
+                return (
+                  <div key={d.key} className="ot-row">
+                    <div className="ot-row-main">
+                      <Link href={d.href} className="ot-row-title">
+                        {d.name}
+                      </Link>
+                      <span className="ot-sub">
+                        <span className="ot-only-wide">{d.detail} &middot; </span>
+                        {weekdayDate(d.dueDate)}
+                      </span>
+                    </div>
+                    <span className={`ot-pill ot-pill-${chip.tone}`}>{chip.text}</span>
+                  </div>
+                );
+              })
+            )}
+            {deadlines !== null && deadlines.length > OWNER_DEADLINES_SHOWN && (
+              <Link href="/dashboard/calendar/" className="ot-link ot-more">
+                {deadlines.length - OWNER_DEADLINES_SHOWN} more on the calendar
+              </Link>
+            )}
+          </section>
         </div>
       </div>
-    </>
+
+      {aiConfigured() && <CopilotBox />}
+    </div>
   );
 }

@@ -163,6 +163,8 @@ export const GENERAL_LOE_SENTENCE = "Draft the General LOE for this matter.";
 /** The account menu's view group (Lectual staff acting inside a firm with the switch on; firm members never see it). */
 export const VIEW_GROUP_NAME = "View";
 export const OWNER_VIEW_NAME = "Owner view";
+/** The line under the owner view's phone More sheet (its rail and bar carry no Settings row). */
+export const SETTINGS_IN_MENU_NOTE = "Settings is in the account menu.";
 export const TECHNICIAN_VIEW_NAME = "Technician view";
 export const TECHNICIAN_VIEW_SUB = "everything, as today";
 /** The pill on the view row that is drawn right now. */
@@ -263,7 +265,7 @@ export function ownerCardsNextDeal(count: number, label: string, later: number):
   const more = later > 0 ? ` ${later} more at ${label}.` : "";
   return count > 0 ? `Next deal ${label}.${more}` : `All decided. Next deal ${label}.${more}`;
 }
-export const OWNER_DEADLINES_HEADING = "Deadlines in the next 14 days";
+export const OWNER_DEADLINES_HEADING = "Deadlines, next 14 days";
 export const OWNER_DEADLINES_NONE = "Nothing due in the next 14 days.";
 export const OWNER_DEADLINES_FAILED = "Couldn't load deadlines.";
 export const OWNER_CALENDAR_LINK = "Calendar \u2192";
@@ -280,6 +282,47 @@ export const OWNER_COPILOT_LABEL = "Ask a question about your matters, leads or 
 export const OWNER_COPILOT_PLACEHOLDER = "For example: which matters are waiting on us?";
 export const OWNER_COPILOT_BUTTON = "Ask";
 export const OWNER_COPILOT_NOTE = "Answers come from your firm's own records. Nothing is sent.";
+export const OWNER_COPILOT_SUB = "Answers from your firm\u2019s own records: matters, leads, deadlines and activity.";
+export const OWNER_COPILOT_SUB_SHORT = "Answers from your firm\u2019s own records.";
+export const OWNER_COPILOT_ASK_PLACEHOLDER = "Ask about your matters and leads";
+export const OWNER_COPILOT_CHIPS = ["What\u2019s due this week?", "Which proposals haven\u2019t been opened?", "Who haven\u2019t we heard from in 14 days?"] as const;
+export const OWNER_CONSULTS_HEADING = "Today\u2019s consults";
+export const OWNER_CONSULTS_NONE_TODAY = "No consults today.";
+export const OWNER_CONSULTS_FAILED = "Couldn't load consults.";
+export const OWNER_CONSULT_LEAD_LINK = "Lead";
+export const OWNER_CONSULT_JOIN_LINK = "Join";
+export const OWNER_WEEK_KEY_CONSULT = "consult";
+export const OWNER_WEEK_KEY_DEADLINE = "deadline";
+export const OWNER_WEEK_OPEN_CALENDAR = "Open Calendar";
+export const OWNER_WEEK_NOT_LOADED = "Not loaded";
+export const OWNER_WEEK_LAST_DAY = "Last day";
+export const OWNER_WEEK_DUE = "Due";
+export const OWNER_PROPOSALS_SORT_NOTE = "soonest last day first";
+export const OWNER_PROPOSAL_LINK_LIVE = "Link live";
+export const OWNER_CARDS_FOR_YOU = "for you";
+export function ownerCardsWord(count: number): string {
+  return count === 1 ? "card" : "cards";
+}
+export function ownerCardsAbout(minutes: number): string {
+  return `about ${minutes} min`;
+}
+export function ownerDealLine(openedLabel: string | null, nextLabel: string, later: number): string {
+  const opened = openedLabel ? `Deal opened ${openedLabel}. ` : "";
+  const more = later > 0 ? ` ${later} more at ${nextLabel}.` : "";
+  return `${opened}Next deal ${nextLabel}.${more}`;
+}
+export function ownerProposalOpens(opens: number | "unavailable" | undefined): string | null {
+  if (opens === undefined) return null;
+  if (opens === "unavailable") return "Couldn't load opens";
+  if (opens === 0) return "not opened yet";
+  return `opened ${opens} ${opens === 1 ? "time" : "times"}`;
+}
+export function ownerDayChip(days: number): string {
+  if (days < 0) return days === -1 ? "1 day overdue" : `${-days} days overdue`;
+  if (days === 0) return "Today";
+  if (days === 1) return "Tomorrow";
+  return `${days} days`;
+}
 
 
 /* ── Phase 1 owner view: weekly review ── */
@@ -290,6 +333,7 @@ export const REVIEW_SINCE_SUSPENDED = "Showing all: some details couldn't load, 
 export const REVIEW_SHOW_ALL = "Show all";
 export const REVIEW_SHOWING_ALL = "Showing all";
 export const reviewOlderHidden = (n: number) => `${n} older hidden`;
+export const reviewIntro = (shown: number) => `Every open matter and every lead past first contact. ${shown} shown.`;
 /** The strip that is about the signed-in approver. */
 export const WAITING_ON_YOU = "Waiting on you";
 export const NOTHING_WAITING_ON_YOU = "Nothing is waiting on you.";
