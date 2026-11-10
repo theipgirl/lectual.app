@@ -31,10 +31,10 @@ import { ApprovalCard, type ApprovalCardProps } from "@/components/deck/Approval
 import { DeckBoard, DeckList, type BoardColumn } from "@/components/deck/DeckList";
 import { DeckClean, DeckEmpty, DeckUnavailable } from "@/components/deck/DeckStates";
 import { queuedLabel, waitingText, ageText, type BoardCard, type ListRow } from "@/components/deck/deck-rows";
-import { classifyQueueItem } from "@/lib/queue/routing";
+import { classifyQueueItem, kindRowWord, kindShort } from "@/lib/queue/routing";
 import { roleLabel } from "@/lib/auth/roles";
 import { DeckKeys } from "@/components/review/DeckKeys";
-import { agentLabel, fmtWhen } from "@/components/queue/format";
+import { agentLabel } from "@/components/queue/format";
 import {
   DECK_BADGE_INTERNAL,
   DECK_BADGE_REVIEW,
@@ -50,13 +50,10 @@ import {
   DECK_META_NOT_CONNECTED,
   DECK_OPEN_TO_REVIEW,
   DECK_ST_NEXT_DEAL,
-  DECK_ST_SKIPPED_WAITING,
   DECK_ST_WAITING,
   deckDecidedAt,
-  deckKindShort,
   deckLeft,
   deckListSub,
-  deckRowKind,
   deckWaitingBack,
   deckWaitingTo,
   DECK_ROUTING_UNREAD,
@@ -203,7 +200,7 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
       id: item.id,
       href: `/dashboard/queue/${encodeURIComponent(item.id)}/`,
       title: item.headline,
-      kind: deckKindShort(classifyQueueItem(item)),
+      kind: kindShort(classifyQueueItem(item)),
       to: item.client_name,
       from: agentLabel(item.agent),
       queued: queuedLabel(item.created_at, now, tz),
@@ -226,7 +223,7 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
     const card = (item: QueueItem, badge: string, badgeTone: BoardCard["badgeTone"], sub: string): BoardCard => ({
       id: item.id,
       href: `/dashboard/queue/${encodeURIComponent(item.id)}/`,
-      kind: deckKindShort(classifyQueueItem(item)),
+      kind: kindShort(classifyQueueItem(item)),
       forName: item.client_name,
       badge,
       badgeTone,
@@ -282,7 +279,7 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
       return {
         id: c.item.id,
         title: c.item.headline,
-        sub: `${agentLabel(c.item.agent)} · ${deckRowKind(c.kind)}`,
+        sub: `${agentLabel(c.item.agent)} · ${kindRowWord(c.kind)}`,
         href: deckHref({ at: c.item.id, dealNow }),
         current: now_,
         decided: false,

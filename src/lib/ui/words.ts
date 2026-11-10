@@ -310,20 +310,6 @@ export const DECK_ST_NEXT_DEAL = "Next deal";
 export const DECK_BADGE_YES = "Yes?";
 export const DECK_BADGE_REVIEW = "Review";
 export const DECK_BADGE_INTERNAL = "Internal";
-/** The short kind of an approval, for the list and board. */
-const DECK_KIND_SHORT: Record<string, string> = {
-  stalled_followup: "Stalled follow-up",
-  post_consult_email: "Post-consult email",
-  welcome_email: "Welcome email",
-  engagement_letter: "Engagement letter",
-  opinion_letter: "Opinion letter",
-  internal_briefing: "Internal briefing",
-  partnership_other: "Partnership follow-up",
-  client_email_other: "Client email",
-};
-export const deckKindShort = (kind: string) => DECK_KIND_SHORT[kind] ?? "Client email";
-/** The quiet word after the assistant in the side list: internal, letter or client email. */
-export const deckRowKind = (kind: string) => (kind === "internal_briefing" ? "internal" : kind === "engagement_letter" || kind === "opinion_letter" ? "letter" : "client email");
 
 /* ── Phase 1 owner view: owner Today ── */
 export const OWNER_CARDS_HEADING = "Your cards";

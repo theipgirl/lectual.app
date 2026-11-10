@@ -351,7 +351,7 @@ export function ApprovalCard(props: ApprovalCardProps) {
         <div className="dk-moves">
           <div className={`dk-moves5 dk-moves5--${moveCount >= 5 ? 5 : moveCount === 3 ? 3 : moveCount <= 2 ? 2 : 4}`} role="group" aria-label="Decide this card">
             {props.canYes && (
-              <button type="button" className="dk-move dk-move--reject" disabled={busy} onClick={() => setMode(mode === "rejecting" ? "idle" : "rejecting")} aria-expanded={mode === "rejecting"}>
+              <button type="button" className="dk-move dk-move--reject" disabled={busy} onClick={() => setMode("rejecting")}>
                 {DECK_REJECT}
                 <small>{DECK_SUB_REJECT}</small>
               </button>
