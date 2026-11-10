@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { mobileBarItems, moreSections, railCountFor, type MobileBarSpec, type MoreGroup, type MoreSection, type NavItem } from "@/lib/nav";
 import { focusRestoreTarget, tourKeyAction } from "@/lib/onboarding/engine";
 import { menuKeyAction } from "@/lib/shell/menu-behaviour";
-import { MORE_NAME } from "@/lib/ui/words";
+import { MORE_NAME, SETTINGS_IN_MENU_NOTE } from "@/lib/ui/words";
 import type { QueueLoadStatus } from "@/lib/queue/load";
 import "./owner-shell.css";
 
@@ -21,6 +21,8 @@ type Props = {
   groups?: readonly MoreGroup[];
   /** The owner view's colours. */
   variant?: "owner";
+  /** Draw the More sheet open to start with (default closed). Used by the design harness. */
+  initialOpen?: boolean;
 };
 
 const MORE_ICON = "M5 12h.01M12 12h.01M19 12h.01";
@@ -34,7 +36,7 @@ function Icon({ d }: { d: string }) {
 }
 
 /** The sections the bar does not carry, grouped as the rail groups them. Presentational: the bar owns open/close. */
-export function MoreSheet({ sections, onClose, sheetRef }: { sections: MoreSection[]; onClose: () => void; sheetRef?: React.Ref<HTMLDivElement> }) {
+export function MoreSheet({ sections, onClose, sheetRef, note }: { sections: MoreSection[]; onClose: () => void; sheetRef?: React.Ref<HTMLDivElement>; note?: string }) {
   return (
     <div ref={sheetRef} id="lx-more-sheet" className="lx-more" role="dialog" aria-modal="true" aria-label={MORE_NAME}>
       {sections.map((section) => (
@@ -47,6 +49,7 @@ export function MoreSheet({ sections, onClose, sheetRef }: { sections: MoreSecti
           ))}
         </div>
       ))}
+      {note && <p className="lx-more-note">{note}</p>}
     </div>
   );
 }
@@ -59,9 +62,9 @@ export function MoreSheet({ sections, onClose, sheetRef }: { sections: MoreSecti
  * keeps the queue's three states. Hiding an entry is a courtesy; every page
  * still checks its own gate.
  */
-export function MobileBar({ items, queueStatus, pendingCount, counts, bar: barSpec, groups, variant }: Props) {
+export function MobileBar({ items, queueStatus, pendingCount, counts, bar: barSpec, groups, variant, initialOpen = false }: Props) {
   const pathname = usePathname() ?? "/dashboard/";
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialOpen);
   const moreButton = useRef<HTMLButtonElement>(null);
   const sheet = useRef<HTMLDivElement>(null);
   const lastPath = useRef(pathname);
@@ -108,6 +111,8 @@ export function MobileBar({ items, queueStatus, pendingCount, counts, bar: barSp
     controls[action.index]?.focus();
   };
 
+  // The owner's open sheet takes the active tile (PhoneBar board); the page you are on is still named by aria-current.
+  const sheetOwnsTile = variant === "owner" && open;
   const moreActive = sections.some((s) => s.items.some((i) => i.active));
 
   return (
@@ -119,7 +124,7 @@ export function MobileBar({ items, queueStatus, pendingCount, counts, bar: barSp
             <Link
               key={item.slug || "today"}
               href={item.href}
-              className={`lx-mbar-item${item.active ? " is-active" : ""}`}
+              className={`lx-mbar-item${item.active && !sheetOwnsTile ? " is-active" : ""}`}
               aria-current={item.active ? "page" : undefined}
               aria-label={count ? `${item.label} (${count === "!" ? "couldn't reach the queue" : count})` : item.label}
             >
@@ -149,7 +154,7 @@ export function MobileBar({ items, queueStatus, pendingCount, counts, bar: barSp
       {open && (
         <div onKeyDown={onKeyDown}>
           <div className="lx-more-scrim" onPointerDown={() => close(true)} aria-hidden="true" />
-          <MoreSheet sections={sections} sheetRef={sheet} onClose={() => setOpen(false)} />
+          <MoreSheet sections={sections} sheetRef={sheet} onClose={() => setOpen(false)} note={variant === "owner" ? SETTINGS_IN_MENU_NOTE : undefined} />
         </div>
       )}
     </>

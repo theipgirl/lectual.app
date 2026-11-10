@@ -99,7 +99,7 @@ describe("the role-views gate", () => {
   });
 
   it("the page gates the same way", () => {
-    const src = readFileSync("src/app/dashboard/queue/deck/page.tsx", "utf8");
+    const src = readFileSync("src/app/dashboard/queue/deck/deck-view.tsx", "utf8");
     expect(src).toMatch(/if \(!\(await orgHasModule\("role-views"\)\)\) notFound\(\);/);
   });
 });

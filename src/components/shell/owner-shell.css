@@ -15,49 +15,124 @@
   --owner-rail-line: rgba(253, 247, 235, 0.2);
 }
 
-/* Rail: the owner's oxblood column. Same shape, rows and behaviour as the default rail. */
+/* Rail (OwnerRail / TodayCollapsed boards): the owner's oxblood column. Rows are 37px on a 10px rhythm, a rule
+   (the group spacer) sets More apart, and More lists its sections inline on a guide line (no icons on those). */
 .lx-rail.lx-rail--owner {
   background: var(--owner-rail);
   border-color: var(--owner-rail-line);
+  color: rgba(253, 247, 235, 0.8);
 }
+.lx-rail--owner .lx-rail-scroll,
+.lx-rail--owner .lx-rail-group,
+.lx-rail--owner .lx-rail-node { gap: 10px; }
+.lx-rail--owner .lx-rail-spacer { height: 1px; margin: 4px 2px; background: rgba(253, 247, 235, 0.12); }
+.lx-rail--owner .lx-rail-headrow { padding: 0 6px; }
+.lx-rail--owner .lx-rail-kicker { color: rgba(253, 247, 235, 0.62); letter-spacing: 1.8px; }
+/* Collapsed (not hovered, focused or pinned): icons only, but the pin stays, as on the board. */
+.lx-rail--owner:not(:hover):not(.is-pinned):not(:has(:focus-visible)) .lx-rail-kicker { display: none; }
+.lx-rail--owner .lx-rail-pin { opacity: 1; pointer-events: auto; border-color: rgba(253, 247, 235, 0.4); color: var(--cream); background: rgba(253, 247, 235, 0.14); }
+.lx-rail--owner .lx-rail-item { color: rgba(253, 247, 235, 0.8); }
+.lx-rail--owner .lx-rail-item:hover { color: var(--cream); }
+.lx-rail--owner .lx-rail-item.is-active,
+.lx-rail--owner .lx-rail-item.is-active:hover { color: var(--ink); }
+.lx-rail--owner .lx-rail-count { color: rgba(253, 247, 235, 0.66); }
+.lx-rail--owner .lx-rail-item.is-active .lx-rail-count { color: var(--wine); }
+/* The More row: its dots are heavier than the other icons, and it is tinted while the rail is collapsed. */
+.lx-rail--owner .lx-rail-item:has(+ .lx-rail-kids) svg { stroke-width: 2.5; }
+.lx-rail--owner:not(:hover):not(.is-pinned):not(:has(:focus-visible)) .lx-rail-item:has(+ .lx-rail-kids) { background: rgba(253, 247, 235, 0.07); color: var(--cream); }
+.lx-rail--owner .lx-rail-chev { display: flex; flex: 0 0 auto; opacity: 0; transition: opacity 0.14s; }
+.lx-rail--owner:hover .lx-rail-chev,
+.lx-rail--owner:has(:focus-visible) .lx-rail-chev,
+.lx-rail--owner.is-pinned .lx-rail-chev { opacity: 1; }
+.lx-rail--owner .lx-rail-kids { margin-left: 21px; padding-left: 22px; gap: 1px; }
+.lx-rail--owner .lx-rail-kid { height: 29px; font-size: 12.5px; color: rgba(253, 247, 235, 0.72); }
+.lx-rail--owner .lx-rail-kid:hover { color: var(--cream); }
+.lx-rail--owner .lx-rail-kid.is-active,
+.lx-rail--owner .lx-rail-kid.is-active:hover { color: var(--ink); }
 
-/* Top bar: full width, wordmark left, bell and avatar right; no section label. */
-.lx-top.lx-top--owner {
-  height: 64px;
+/* The collapsed rail's More menu (TodayCollapsed): beside the rail, never while the rail is open (it lists them inline). */
+.lx-rail-flyout {
+  position: absolute;
+  left: 88px;
+  top: 258px;
+  z-index: 41;
+  width: 190px;
+  box-sizing: border-box;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-radius: 16px;
+  border: 1px solid var(--owner-rail-line);
+  background: var(--owner-rail);
+  box-shadow: 0 24px 50px -20px rgba(0, 0, 0, 0.7);
 }
+.lx-rail:hover ~ .lx-rail-flyout,
+.lx-rail:has(:focus-visible) ~ .lx-rail-flyout,
+.lx-rail.is-pinned ~ .lx-rail-flyout { display: none; }
+.lx-rail-flyout-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: rgba(253, 247, 235, 0.62);
+  padding: 6px 10px 4px;
+}
+.lx-rail-flyout-item {
+  display: flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 9px;
+  font-size: 13px;
+  color: rgba(253, 247, 235, 0.72);
+  text-decoration: none;
+}
+.lx-rail-flyout-item:hover { background: rgba(253, 247, 235, 0.1); color: var(--cream); text-decoration: none; }
+.lx-rail-flyout-item.is-active,
+.lx-rail-flyout-item.is-active:hover { background: var(--cream); color: var(--ink); font-weight: 500; }
+.lx-rail-flyout-item:focus-visible { outline: 2px solid var(--cream); outline-offset: -2px; }
+
+/* Top bar (TopBar board): 64px, full width, the wordmark left (28px serif), bell and profile right, both 38px. */
+.lx-top.lx-top--owner {
+  box-sizing: border-box;
+  height: 64px;
+  gap: 12px;
+  padding: 0 28px 0 34px;
+}
+.lx-top--owner .lx-wordmark { font-size: 28px; }
+.lx-top--owner .lx-bell > summary { width: 38px; height: 38px; color: var(--ink); }
+.lx-top--owner .lx-bell-badge { top: -4px; right: -4px; padding: 0 5px; font-size: 10.5px; background: var(--owner-rail); }
+.lx-top--owner .lx-bell-badge-warn { background: var(--warn); }
+.lx-top--owner .lx-avatar { width: 38px; height: 38px; }
 @media (max-width: 900px) {
   .lx-top.lx-top--owner {
     height: 56px;
     padding: 0 16px;
+    gap: 8px;
+    /* Phone Today board (.ph-top): the header sits on the page's cream, no white band, no rule. */
+    background: var(--paper);
+    border-bottom: 0;
   }
   .lx-top.lx-top--owner .lx-wordmark {
     font-size: 22px;
     max-width: 60vw;
   }
-  /* The floating pill bar: the real MobileBar (cream active tile, oxblood badges) on the owner's colour. */
+  .lx-top--owner .lx-bell > summary,
+  .lx-top--owner .lx-avatar { width: 40px; height: 40px; }
+  /* The floating pill bar (PhoneBar board): the real MobileBar, oxblood, cream active tile, oxblood count badges. */
   .lx-mbar.lx-mbar--owner {
     background: var(--owner-rail);
     border-color: var(--owner-rail-line);
+    box-shadow: 0 18px 40px -14px rgba(20, 4, 8, 0.6);
+    /* Above the open More sheet and its scrim, so the bar and its cream More tile are never dimmed. */
+    z-index: 73;
   }
-  /* The oxblood badge keeps a cream ring so it reads on the oxblood bar. */
-  .lx-mbar.lx-mbar--owner .lx-mbar-badge {
-    box-shadow: 0 0 0 1.5px var(--cream);
+  .lx-more-note {
+    margin: 0;
+    padding: 0 8px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
   }
-}
-
-/* The account menu's View group. */
-.lx-view-toggle {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
-.lx-view-state {
-  font-family: var(--mono);
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.lx-view-toggle[aria-checked="true"] .lx-view-state {
-  color: var(--ox);
 }

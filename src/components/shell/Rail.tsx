@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ICON, RAIL_PIN_COOKIE, isNavActive, navItemBySlug, railCountFor, railGroups, visibleReports, REPORTS_INDEX, type NavItem, type RailNode } from "@/lib/nav";
 import { RAIL_COUNT_TITLE } from "@/lib/intake/counts";
 import { navTourToken } from "@/lib/onboarding/tour";
 import { closeRailOnEscape, releaseRailFocus } from "@/lib/rail-behaviour";
+import { MORE_NAME, OWNER_VIEW_NAME } from "@/lib/ui/words";
 import type { QueueLoadStatus } from "@/lib/queue/load";
 import "./owner-shell.css";
 
@@ -25,9 +26,12 @@ type Props = {
   tree?: readonly (readonly RailNode[])[];
   /** The owner view's colours. */
   variant?: "owner";
+  /** Owner view, collapsed rail: draw the More menu open to start with (default closed). Used by the design harness. */
+  initialFlyout?: boolean;
 };
 
 const PIN = "M9 4h6M12 4v6M7 10h10l-1 5H8zM12 15v5";
+const CHEVRON = "M6 9l6 6 6-6";
 
 function Icon({ d, size }: { d: string; size: number }) {
   return (
@@ -49,9 +53,29 @@ function Icon({ d, size }: { d: string; size: number }) {
  * it, "!" when we could not (an outage never reads as "nothing waiting"),
  * nothing when there is no queue.
  */
-export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, showSettings = true, showReports: reportsAllowed = true, tree, variant }: Props) {
+export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, showSettings = true, showReports: reportsAllowed = true, tree, variant, initialFlyout = false }: Props) {
   const pathname = usePathname() ?? "/dashboard/";
   const [pinned, setPinned] = useState(initialPinned);
+  const [flyout, setFlyout] = useState(initialFlyout);
+  const slot = useRef<HTMLDivElement>(null);
+  const owner = variant === "owner";
+
+  // The owner's collapsed More menu closes on Escape and on a pointer-down outside it.
+  useEffect(() => {
+    if (!flyout) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setFlyout(false);
+    };
+    const onDown = (e: PointerEvent) => {
+      if (!slot.current?.contains(e.target as Node)) setFlyout(false);
+    };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("pointerdown", onDown);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("pointerdown", onDown);
+    };
+  }, [flyout]);
 
   function togglePin() {
     const next = !pinned;
@@ -70,9 +94,10 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
   // One Reports row above Settings, only for a firm and role that can see at least one report.
   const showReports = reportsAllowed && visibleReports(items).length > 0;
   const reportsActive = pathname.startsWith(REPORTS_INDEX);
+  const moreEntry = groups.flat().find((e) => e.kids.length > 0);
 
   return (
-    <div className={`lx-rail-slot${pinned ? " is-pinned" : ""}`}>
+    <div ref={slot} className={`lx-rail-slot${pinned ? " is-pinned" : ""}`}>
       <nav
         className={`lx-rail${pinned ? " is-pinned" : ""}${variant === "owner" ? " lx-rail--owner" : ""}`}
         aria-label="Sections"
@@ -80,7 +105,7 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
         onKeyDown={(e) => closeRailOnEscape(e.key, e.currentTarget, document.activeElement as HTMLElement | null)}
       >
         <div className="lx-rail-headrow">
-          <span className="lx-rail-kicker">Navigate</span>
+          <span className="lx-rail-kicker">{owner ? OWNER_VIEW_NAME : "Navigate"}</span>
           <button
             type="button"
             className={`lx-rail-pin${pinned ? " is-on" : ""}`}
@@ -107,7 +132,15 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
                   <div key={entry.key} className="lx-rail-node">
                     <Link
                       href={entry.href}
-                      onClick={releaseFocus}
+                      onClick={(e) => {
+                        // The owner's More row, on a collapsed rail nobody is pointing at: open its menu instead of the first list.
+                        if (owner && entry.kids.length > 0 && !e.currentTarget.closest(".lx-rail")?.matches(":hover, :has(:focus-visible), .is-pinned")) {
+                          e.preventDefault();
+                          setFlyout((o) => !o);
+                          return;
+                        }
+                        releaseFocus();
+                      }}
                       data-tour={(entry.kids.length > 0 ? entry.kids.map((k) => k.key) : [entry.key]).map(navTourToken).join(" ")}
                       className={`lx-rail-item${entry.active ? " is-active" : entry.childActive ? " is-parent" : ""}`}
                       aria-current={entry.active ? "page" : undefined}
@@ -120,6 +153,11 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
                       </span>
                       <span className="lx-rail-label">{entry.label}</span>
                       {count && <span className={`lx-rail-count${count === "!" ? " is-alert" : ""}`}>{count}</span>}
+                      {owner && entry.kids.length > 0 && (
+                        <span className="lx-rail-chev">
+                          <Icon d={CHEVRON} size={13} />
+                        </span>
+                      )}
                     </Link>
                     {entry.kids.length > 0 && (
                       <div className="lx-rail-kids">
@@ -135,7 +173,7 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
                               aria-current={kid.active ? "page" : undefined}
                               title={kc ? RAIL_COUNT_TITLE[kid.countKey] : undefined}
                             >
-                              <Icon d={kid.icon} size={13} />
+                              {!owner && <Icon d={kid.icon} size={13} />}
                               <span className="lx-rail-label">{kid.label}</span>
                               {kc && <span className={`lx-rail-kidcount${kc === "!" ? " is-alert" : ""}`}>{kc}</span>}
                             </Link>
@@ -183,6 +221,23 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
         </Link>
         )}
       </nav>
+      {owner && flyout && moreEntry && (
+        <div className="lx-rail-flyout" role="menu" aria-label={MORE_NAME}>
+          <span className="lx-rail-flyout-label">{MORE_NAME}</span>
+          {moreEntry.kids.map((kid) => (
+            <Link
+              key={kid.key}
+              href={kid.href}
+              role="menuitem"
+              onClick={() => setFlyout(false)}
+              className={`lx-rail-flyout-item${kid.active ? " is-active" : ""}`}
+              aria-current={kid.active ? "page" : undefined}
+            >
+              {kid.label}
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

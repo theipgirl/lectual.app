@@ -1,106 +1,123 @@
 import { describe, expect, it } from "vitest";
-import { ROLES, type Role } from "@/lib/auth/roles";
+import { ROLES } from "@/lib/auth/roles";
 import { mobileBarItems, moreSections, railGroups, visibleNav } from "@/lib/nav";
 import {
   DECK_PATH,
+  NO_PREVIEW,
+  VIEW_PREVIEW_KEY,
+  VIEW_PREVIEW_MAX,
   canSwitchView,
   drawnNav,
+  parsePreviewMap,
   parseViewPref,
   prefAllowed,
+  previewFor,
   previewableRoles,
   railTreeFor,
   shellFor,
   viewFor,
   viewMenuFor,
   viewPrefValue,
+  withPreview,
   type ViewPref,
 } from "@/lib/views";
 
-const AUTO: ViewPref = { kind: "auto" };
+const AS_OWNER: ViewPref = { kind: "as", role: "owner" };
 const ALL = ["mailbox", "agents", "proposals", "document-center", "agent-toolkit", "role-views"];
+const FIRM_A = "11111111-1111-4111-8111-111111111111";
+const FIRM_B = "22222222-2222-4222-8222-222222222222";
 
 describe("viewFor", () => {
-  it("switch off: the technician view for every role and every preference", () => {
+  it("switch off: the technician view for every role, staff or not, whatever the preview", () => {
     for (const role of ROLES) {
-      for (const pref of [AUTO, { kind: "technician" } as ViewPref, { kind: "as", role: "owner" } as ViewPref]) {
-        expect(viewFor({ role, pref, firmHasRoleViews: false, actingAsStaff: false })).toBe("technician");
-        expect(viewFor({ role, pref, firmHasRoleViews: false, actingAsStaff: true })).toBe("technician");
+      for (const preview of [NO_PREVIEW, AS_OWNER]) {
+        expect(viewFor({ role, preview, firmHasRoleViews: false, actingAsStaff: false })).toBe("technician");
+        expect(viewFor({ role, preview, firmHasRoleViews: false, actingAsStaff: true })).toBe("technician");
       }
     }
   });
 
-  it("switch on: an owner gets the owner view; every other role keeps today's shell (not live yet)", () => {
+  it("switch on: a firm member's view is their role's alone (owner -> owner view, everyone else today's shell)", () => {
     for (const role of ROLES) {
-      expect(viewFor({ role, pref: AUTO, firmHasRoleViews: true, actingAsStaff: false })).toBe(role === "owner" ? "owner" : "technician");
+      for (const preview of [NO_PREVIEW, AS_OWNER, { kind: "as", role: "attorney" } as ViewPref]) {
+        expect(viewFor({ role, preview, firmHasRoleViews: true, actingAsStaff: false })).toBe(role === "owner" ? "owner" : "technician");
+      }
     }
   });
 
-  it("a person who chose the technician view gets it", () => {
-    expect(viewFor({ role: "owner", pref: { kind: "technician" }, firmHasRoleViews: true, actingAsStaff: false })).toBe("technician");
-  });
-
-  it("Lectual staff inside a firm always see today's shell: a preview saved on their account never follows them into a firm", () => {
-    expect(viewFor({ role: "owner", pref: AUTO, firmHasRoleViews: true, actingAsStaff: true })).toBe("technician");
-    expect(viewFor({ role: "owner", pref: { kind: "technician" }, firmHasRoleViews: true, actingAsStaff: true })).toBe("technician");
-    expect(viewFor({ role: "owner", pref: { kind: "as", role: "owner" }, firmHasRoleViews: true, actingAsStaff: true })).toBe("technician");
-    expect(viewFor({ role: "owner", pref: { kind: "as", role: "attorney" }, firmHasRoleViews: true, actingAsStaff: true })).toBe("technician");
-  });
-
-  it("a preview is honoured only for a person who may preview", () => {
-    for (const role of ["admin", "senior_admin"] as Role[]) {
-      expect(viewFor({ role, pref: { kind: "as", role: "owner" }, firmHasRoleViews: true, actingAsStaff: false })).toBe("owner");
-    }
-    for (const role of ["attorney", "paralegal", "intake", "viewer", "social_media", "clerk", "law_clerk"] as Role[]) {
-      expect(viewFor({ role, pref: { kind: "as", role: "owner" }, firmHasRoleViews: true, actingAsStaff: false })).toBe("technician");
-    }
+  it("Lectual staff in a firm: the technician view by default, the preview they chose for this firm otherwise", () => {
+    expect(viewFor({ role: "owner", preview: NO_PREVIEW, firmHasRoleViews: true, actingAsStaff: true })).toBe("technician");
+    expect(viewFor({ role: "owner", preview: AS_OWNER, firmHasRoleViews: true, actingAsStaff: true })).toBe("owner");
+    // A view that is not live is never drawn, even as a preview.
+    expect(viewFor({ role: "owner", preview: { kind: "as", role: "attorney" }, firmHasRoleViews: true, actingAsStaff: true })).toBe("technician");
   });
 
   it("an unreadable role is the technician view", () => {
-    expect(viewFor({ role: null, pref: AUTO, firmHasRoleViews: true, actingAsStaff: false })).toBe("technician");
+    expect(viewFor({ role: null, preview: NO_PREVIEW, firmHasRoleViews: true, actingAsStaff: false })).toBe("technician");
   });
 });
 
-describe("the preference", () => {
-  it("parses technician, auto and as:<role>; anything else is auto", () => {
-    expect(parseViewPref("technician")).toEqual({ kind: "technician" });
-    expect(parseViewPref("auto")).toEqual({ kind: "auto" });
-    expect(parseViewPref("as:owner")).toEqual({ kind: "as", role: "owner" });
-    for (const raw of [undefined, null, 3, {}, "", "owner", "as:", "as:boss", "AS:owner", "technician "]) expect(parseViewPref(raw)).toEqual(AUTO);
-    expect(viewPrefValue({ kind: "as", role: "owner" })).toBe("as:owner");
+describe("the staff preview, kept per firm", () => {
+  it("parses as:<role>; anything else is technician", () => {
+    expect(parseViewPref("as:owner")).toEqual(AS_OWNER);
+    for (const raw of [undefined, null, 3, {}, "", "owner", "auto", "technician", "as:", "as:boss", "AS:owner"]) expect(parseViewPref(raw)).toEqual(NO_PREVIEW);
+    expect(viewPrefValue(AS_OWNER)).toBe("as:owner");
+    expect(viewPrefValue(NO_PREVIEW)).toBe("technician");
   });
 
-  it("prefAllowed: technician and auto always; a preview only for a switcher and a live view", () => {
-    expect(prefAllowed("technician", "viewer", false)).toEqual({ kind: "technician" });
-    expect(prefAllowed("auto", "viewer", false)).toEqual(AUTO);
-    expect(prefAllowed("as:owner", "admin", false)).toEqual({ kind: "as", role: "owner" });
-    expect(prefAllowed("as:owner", "attorney", true)).toBeNull();
-    expect(prefAllowed("as:owner", "attorney", false)).toBeNull();
-    expect(prefAllowed("as:attorney", "owner", false)).toBeNull();
-    expect(prefAllowed("as:boss", "owner", false)).toBeNull();
-    for (const raw of [undefined, "", "owner", 1, "Technician"]) expect(prefAllowed(raw, "owner", false)).toBeNull();
+  it("a preview stored for firm A applies in firm A only", () => {
+    const meta = { [VIEW_PREVIEW_KEY]: { [FIRM_A]: "as:owner" } };
+    expect(previewFor(meta, FIRM_A)).toEqual(AS_OWNER);
+    expect(previewFor(meta, FIRM_B)).toEqual(NO_PREVIEW);
+    expect(viewFor({ role: "owner", preview: previewFor(meta, FIRM_B), firmHasRoleViews: true, actingAsStaff: true })).toBe("technician");
+    expect(viewFor({ role: "owner", preview: previewFor(meta, FIRM_A), firmHasRoleViews: true, actingAsStaff: true })).toBe("owner");
   });
 
-  it("who may switch: owner, admin, senior admin; never Lectual staff acting in a firm", () => {
-    expect(ROLES.filter((r) => canSwitchView(r, false))).toEqual(expect.arrayContaining(["owner", "admin", "senior_admin"]));
-    expect(ROLES.filter((r) => canSwitchView(r, false))).toHaveLength(3);
-    expect(canSwitchView("viewer", true)).toBe(false);
-    expect(canSwitchView("owner", true)).toBe(false);
-    expect(canSwitchView(null, false)).toBe(false);
+  it("the old account-wide lectual_view is never read", () => {
+    expect(previewFor({ lectual_view: "as:owner" }, FIRM_A)).toEqual(NO_PREVIEW);
+  });
+
+  it("the stored map is cleaned: org ids only, live previews only, at most the cap", () => {
+    expect(parsePreviewMap(null)).toEqual({});
+    expect(parsePreviewMap(["as:owner"])).toEqual({});
+    expect(parsePreviewMap({ [FIRM_A]: "as:owner", "not-an-id": "as:owner", [FIRM_B]: "as:attorney" })).toEqual({ [FIRM_A]: "as:owner" });
+    const many = Object.fromEntries(Array.from({ length: VIEW_PREVIEW_MAX + 5 }, (_, i) => [`${String(i).padStart(8, "0")}-1111-4111-8111-111111111111`, "as:owner"]));
+    expect(Object.keys(parsePreviewMap(many))).toHaveLength(VIEW_PREVIEW_MAX);
+  });
+
+  it("withPreview sets or removes this firm's entry and keeps the others", () => {
+    const start = { [FIRM_B]: "as:owner" };
+    expect(withPreview(start, FIRM_A, AS_OWNER)).toEqual({ [FIRM_B]: "as:owner", [FIRM_A]: "as:owner" });
+    expect(withPreview({ [FIRM_A]: "as:owner", [FIRM_B]: "as:owner" }, FIRM_A, NO_PREVIEW)).toEqual({ [FIRM_B]: "as:owner" });
+    expect(withPreview(undefined, FIRM_A, NO_PREVIEW)).toEqual({});
+  });
+
+  it("prefAllowed: technician, or a preview of a live view; nothing else", () => {
+    expect(prefAllowed("technician")).toEqual(NO_PREVIEW);
+    expect(prefAllowed("as:owner")).toEqual(AS_OWNER);
+    for (const raw of [undefined, "", "auto", "owner", 1, "Technician", "as:attorney", "as:boss"]) expect(prefAllowed(raw)).toBeNull();
     expect(previewableRoles()).toEqual(["owner"]);
+  });
+
+  it("who may switch: Lectual staff acting in a firm with role views; never a firm member", () => {
+    expect(canSwitchView({ actingAsStaff: true, firmHasRoleViews: true })).toBe(true);
+    expect(canSwitchView({ actingAsStaff: true, firmHasRoleViews: false })).toBe(false);
+    expect(canSwitchView({ actingAsStaff: false, firmHasRoleViews: true })).toBe(false);
   });
 });
 
 describe("viewMenuFor", () => {
-  it("is absent with the switch off or for a role that may not switch", () => {
-    expect(viewMenuFor({ role: "owner", pref: AUTO, firmHasRoleViews: false, actingAsStaff: false, view: "technician" })).toBeUndefined();
-    expect(viewMenuFor({ role: "attorney", pref: AUTO, firmHasRoleViews: true, actingAsStaff: false, view: "technician" })).toBeUndefined();
+  it("is absent for every firm member (owner, admin, senior admin included) and with the switch off", () => {
+    for (const actingAsStaff of [false, true]) {
+      expect(viewMenuFor({ preview: NO_PREVIEW, firmHasRoleViews: false, actingAsStaff })).toBeUndefined();
+    }
+    expect(viewMenuFor({ preview: AS_OWNER, firmHasRoleViews: true, actingAsStaff: false })).toBeUndefined();
   });
 
-  it("an owner gets the on/off switch and nothing to preview; an admin gets only the preview", () => {
-    expect(viewMenuFor({ role: "owner", pref: AUTO, firmHasRoleViews: true, actingAsStaff: false, view: "owner" })).toEqual({ pref: "auto", ownViewLive: true, ownViewOn: true, previewRoles: [] });
-    expect(viewMenuFor({ role: "owner", pref: { kind: "technician" }, firmHasRoleViews: true, actingAsStaff: false, view: "technician" })?.ownViewOn).toBe(false);
-    expect(viewMenuFor({ role: "admin", pref: AUTO, firmHasRoleViews: true, actingAsStaff: false, view: "technician" })).toEqual({ pref: "auto", ownViewLive: false, ownViewOn: false, previewRoles: ["owner"] });
-    expect(viewMenuFor({ role: "owner", pref: AUTO, firmHasRoleViews: true, actingAsStaff: true, view: "technician" })).toBeUndefined();
+  it("staff get Technician view (current by default) and the live views to preview", () => {
+    expect(viewMenuFor({ preview: NO_PREVIEW, firmHasRoleViews: true, actingAsStaff: true })).toEqual({ pref: "technician", previewRoles: ["owner"] });
+    expect(viewMenuFor({ preview: AS_OWNER, firmHasRoleViews: true, actingAsStaff: true })).toEqual({ pref: "as:owner", previewRoles: ["owner"] });
+    expect(viewMenuFor({ preview: { kind: "as", role: "attorney" }, firmHasRoleViews: true, actingAsStaff: true })?.pref).toBe("technician");
   });
 });
 
@@ -129,9 +146,9 @@ describe("drawnNav", () => {
   it("the owner rail: four rows and a More parent; Approvals opens the deck and stays active on the list and an item", () => {
     const drawn = drawnNav(visibleNav(ALL, "owner"), "owner");
     const groups = railGroups(drawn, "/dashboard/queue/abc/", railTreeFor("owner")!);
-    expect(groups.map((g) => g.map((e) => e.label))).toEqual([["Today", "Approvals", "Weekly review", "Client proposals"], ["More"]]);
+    expect(groups.map((g) => g.map((e) => e.label))).toEqual([["Today", "Approvals", "Weekly review", "Proposals"], ["More"]]);
     expect(groups[0][1]).toMatchObject({ href: DECK_PATH, active: true, countKey: "queue" });
-    expect(groups[1][0].kids.map((k) => k.label)).toEqual(["Leads", "All matters", "Calendar"]);
+    expect(groups[1][0].kids.map((k) => k.label)).toEqual(["Leads", "Matters", "Calendar"]);
     expect(groups[1][0].href).toBe("/dashboard/intake/");
   });
 

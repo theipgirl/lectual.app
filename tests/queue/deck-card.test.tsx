@@ -42,7 +42,8 @@ const base: ApprovalCardProps = {
   review: { initialBody: "Hi Ana", canApprove: true, canEdit: true },
 };
 const html = (over: Partial<ApprovalCardProps> = {}) => renderToStaticMarkup(<ApprovalCard {...base} {...over} />);
-const buttons = (h: string) => [...h.matchAll(/<(?:button|a)[^>]*>([^<]*)<\/(?:button|a)>/g)].map((m) => m[1].trim()).filter(Boolean);
+// A move is its name plus a small sub-line; the name is what is pinned.
+const buttons = (h: string) => [...h.replace(/<small>[^<]*<\/small>/g, "").matchAll(/<(?:button|a)[^>]*>([^<]*)<\/(?:button|a)>/g)].map((m) => m[1].trim()).filter(Boolean).filter((t) => !/^[‹›]$/.test(t));
 
 describe("ApprovalCard", () => {
   it("draws the anatomy and the main row Reject · Later · Edit · Hand off · Yes", () => {
@@ -78,8 +79,8 @@ describe("ApprovalCard", () => {
 
   it("Hand off and Later are drawn disabled with the sentence until the table is there", () => {
     const h = html({ movesUnavailable: "This isn't switched on for your firm yet. Lectual will turn it on." });
-    expect(h).toMatch(/<button[^>]*disabled=""[^>]*aria-describedby="[^"]+"[^>]*>Later<\/button>/);
-    expect(h).toMatch(/<button[^>]*disabled=""[^>]*aria-describedby="[^"]+"[^>]*>Hand off<\/button>/);
+    expect(h).toMatch(/<button[^>]*disabled=""[^>]*aria-describedby="[^"]+"[^>]*>Later<small>/);
+    expect(h).toMatch(/<button[^>]*disabled=""[^>]*aria-describedby="[^"]+"[^>]*>Hand off<small>/);
     expect(h).toContain("This isn&#x27;t switched on for your firm yet. Lectual will turn it on.");
   });
 
@@ -112,8 +113,9 @@ describe("DeckFrame", () => {
     const h = frame();
     expect(h).toContain("Today&#x27;s deal · 7:00 AM");
     expect(h).toContain("Needs you");
+    expect(h).toContain("Your deal");
     for (const t of [">Cards<", ">List<", ">Board<"]) expect(h).toContain(t);
-    expect(h).toMatch(/aria-current="true"[^>]*>First</);
+    expect(h).toMatch(/aria-current="true"[\s\S]*?First</);
     expect(h).toMatch(/Decided[\s\S]*Done one/);
     expect(h).toContain("3 more at 2:00 PM");
     expect(h).toContain(">Deal them now<");

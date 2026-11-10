@@ -71,6 +71,7 @@ export function SheetView({ rows, ...common }: Common & { rows: ReviewRow[] }) {
     <div className="rv-sheets">
       <SheetTable id="trademarks" title="Trademarks" rows={trademarks} {...common} />
       <SheetTable id="contracts" title="Contracts" rows={contracts} {...common} />
+      <p className="rv-sheet-note">Next step and Whose court come from next steps and mail, not from the spreadsheet. Edits happen in the record panel.</p>
     </div>
   );
 }

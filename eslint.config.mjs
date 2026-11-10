@@ -22,6 +22,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Design prototypes — reference HTML, not app source.
     "design/**",
+    // Design harness output (rendered HTML, screenshots, copied CSS).
+    "scripts/design-harness/out/**",
   ]),
   // Security fence: only the admin module may call createClient with the
   // service-role key. Everything else must use getScopedClient() or

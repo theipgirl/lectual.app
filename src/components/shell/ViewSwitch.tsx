@@ -5,13 +5,21 @@ import { useRouter } from "next/navigation";
 import { saveViewAction } from "@/lib/account/view-actions";
 import { roleLabel } from "@/lib/auth/roles";
 import type { ViewMenu } from "@/lib/views";
-import "./owner-shell.css";
-import { BACK_TO_MY_VIEW, OWNER_VIEW_NAME, PREVIEW_A_VIEW, VIEW_GROUP_NAME, VIEW_NOT_SAVED } from "@/lib/ui/words";
-
+import "./account-menu.css";
+import {
+  PREVIEW_A_VIEW,
+  TECHNICIAN_VIEW_NAME,
+  TECHNICIAN_VIEW_SUB,
+  VIEW_CURRENT_PILL,
+  VIEW_GROUP_NAME,
+  VIEW_NOT_SAVED,
+  VIEW_PREVIEW_NOTE,
+} from "@/lib/ui/words";
 
 /**
- * The account menu's View group: "Owner view" on/off (auto vs technician) and "Preview a view". It only saves the
- * person's own preference, which decides what is drawn; the page is then refreshed so the shell follows.
+ * The account menu's View group, drawn ONLY for Lectual staff acting inside a firm with role views (viewMenuFor).
+ * "Technician view" (the default) and a chip per live view to preview. It saves the staff member's preview for this
+ * firm only (saveViewAction keys it by the session's firm), which decides what is drawn; the page is then refreshed.
  */
 export function ViewSwitch({ menu, onDone }: { menu: ViewMenu; onDone?: () => void }) {
   const router = useRouter();
@@ -19,6 +27,7 @@ export function ViewSwitch({ menu, onDone }: { menu: ViewMenu; onDone?: () => vo
   const [error, setError] = useState<string | null>(null);
 
   const save = (value: string) => {
+    if (value === menu.pref) return;
     setError(null);
     startTransition(async () => {
       try {
@@ -35,57 +44,49 @@ export function ViewSwitch({ menu, onDone }: { menu: ViewMenu; onDone?: () => vo
     });
   };
 
-  const previewing = menu.pref.startsWith("as:");
+  const technicianOn = menu.pref === "technician";
 
   return (
-    <div role="group" aria-labelledby="lx-view-h" style={{ display: "grid", gap: 8 }}>
-      <div id="lx-view-h" className="lx-label" style={{ fontSize: 11 }}>
+    <div role="group" aria-labelledby="lx-view-h" className="lx-am-menu">
+      <div id="lx-view-h" className="lx-am-eyebrow lx-am-sep">
         {VIEW_GROUP_NAME}
       </div>
-      {menu.ownViewLive && (
-        <button
-          type="button"
-          role="menuitemcheckbox"
-          aria-checked={menu.ownViewOn}
-          className="lx-btn lx-btn-sec lx-btn-sm lx-view-toggle"
-          style={{ width: "100%" }}
-          disabled={pending}
-          onClick={() => save(menu.ownViewOn ? "technician" : "auto")}
-        >
-          <span>{OWNER_VIEW_NAME}</span>
-          <span className="lx-view-state" aria-hidden="true">
-            {menu.ownViewOn ? "On" : "Off"}
-          </span>
-        </button>
-      )}
+      <button
+        type="button"
+        role="menuitemradio"
+        aria-checked={technicianOn}
+        className="lx-am-item"
+        disabled={pending}
+        onClick={() => save("technician")}
+      >
+        <span>{TECHNICIAN_VIEW_NAME}</span>
+        {technicianOn ? <span className="lx-am-pill">{VIEW_CURRENT_PILL}</span> : <span className="lx-am-sub">{TECHNICIAN_VIEW_SUB}</span>}
+      </button>
       {menu.previewRoles.length > 0 && (
-        <div role="group" aria-label={PREVIEW_A_VIEW} style={{ display: "grid", gap: 6 }}>
-          <div className="lx-note" style={{ fontSize: 12.5 }}>
+        <>
+          <div id="lx-preview-h" className="lx-am-eyebrow lx-am-eyebrow--tight">
             {PREVIEW_A_VIEW}
           </div>
-          {menu.previewRoles.map((r) => (
-            <button
-              key={r}
-              type="button"
-              role="menuitemradio"
-              aria-checked={menu.pref === `as:${r}`}
-              className="lx-btn lx-btn-sec lx-btn-sm"
-              style={{ width: "100%" }}
-              disabled={pending}
-              onClick={() => save(`as:${r}`)}
-            >
-              {roleLabel(r)}
-            </button>
-          ))}
-        </div>
+          <div role="group" aria-labelledby="lx-preview-h" className="lx-am-chips">
+            {menu.previewRoles.map((r) => (
+              <button
+                key={r}
+                type="button"
+                role="menuitemradio"
+                aria-checked={menu.pref === `as:${r}`}
+                className="lx-am-chip"
+                disabled={pending}
+                onClick={() => save(`as:${r}`)}
+              >
+                {roleLabel(r)}
+              </button>
+            ))}
+          </div>
+        </>
       )}
-      {previewing && (
-        <button type="button" role="menuitemradio" aria-checked={false} className="lx-btn lx-btn-ghost lx-btn-sm" style={{ width: "100%" }} disabled={pending} onClick={() => save("auto")}>
-          {BACK_TO_MY_VIEW}
-        </button>
-      )}
+      <p className="lx-am-note">{VIEW_PREVIEW_NOTE}</p>
       {error && (
-        <p role="alert" className="lx-note" style={{ color: "var(--wine)", margin: 0 }}>
+        <p role="alert" className="lx-am-error">
           {error}
         </p>
       )}

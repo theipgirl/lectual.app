@@ -1,41 +1,173 @@
-/* Owner Today. Tokens only, except the deck panel colour which the owner shell shares (#550E1A). */
+/* Owner Today, after the approved Today board. Tokens only; every new colour has a light and a dark value. */
 :root {
   --ot-deck-bg: #550e1a;
   --ot-deck-ink: #fdf7eb;
+  --ot-hero-sub: #efd9dc;
   --ot-dot: var(--ox);
+  --ot-today: #550e1a;
+  --ot-consult-tint: rgba(106, 31, 43, 0.09);
+  --ot-deadline-tint: rgba(124, 83, 18, 0.13);
+  --ot-consult-dot: #6a1f2b;
+  --ot-deadline-dot: #7c5312;
+  --ot-risk-bg: rgba(106, 31, 43, 0.12);
+  --ot-risk-ink: #6a1f2b;
+  --ot-warn-bg: rgba(124, 83, 18, 0.12);
+  --ot-warn-ink: #7c5312;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --ot-deck-bg: #6a1f2b;
     --ot-deck-ink: #fdf7eb;
+    --ot-hero-sub: #efd9dc;
     --ot-dot: #e0a9b1;
+    --ot-today: #e0a9b1;
+    --ot-consult-tint: rgba(224, 169, 177, 0.14);
+    --ot-deadline-tint: rgba(214, 168, 92, 0.16);
+    --ot-consult-dot: #e0a9b1;
+    --ot-deadline-dot: #d6a85c;
+    --ot-risk-bg: rgba(224, 169, 177, 0.16);
+    --ot-risk-ink: #e0a9b1;
+    --ot-warn-bg: rgba(214, 168, 92, 0.16);
+    --ot-warn-ink: #d6a85c;
   }
 }
 :root[data-theme="dark"] {
   --ot-deck-bg: #6a1f2b;
   --ot-deck-ink: #fdf7eb;
+  --ot-hero-sub: #efd9dc;
   --ot-dot: #e0a9b1;
+  --ot-today: #e0a9b1;
+  --ot-consult-tint: rgba(224, 169, 177, 0.14);
+  --ot-deadline-tint: rgba(214, 168, 92, 0.16);
+  --ot-consult-dot: #e0a9b1;
+  --ot-deadline-dot: #d6a85c;
+  --ot-risk-bg: rgba(224, 169, 177, 0.16);
+  --ot-risk-ink: #e0a9b1;
+  --ot-warn-bg: rgba(214, 168, 92, 0.16);
+  --ot-warn-ink: #d6a85c;
 }
-.ot-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
-@media (min-width: 900px) { .ot-grid { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); } }
-.ot-col { display: grid; gap: 16px; align-content: start; min-width: 0; }
-.ot-card { padding: 18px; display: grid; gap: 10px; }
-.ot-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
-.ot-deck { background: var(--ot-deck-bg); color: var(--ot-deck-ink); border-radius: 14px; padding: 20px; display: grid; gap: 8px; }
-.ot-deck h2 { color: var(--ot-deck-ink); margin: 0; }
-.ot-deck-line { font-size: 19px; line-height: 1.3; margin: 0; }
-.ot-deck-sub { font-size: 14px; opacity: 0.85; margin: 0; }
-.ot-deck .lx-btn { justify-self: start; min-height: 44px; background: var(--ot-deck-ink); color: var(--ot-deck-bg); border-color: var(--ot-deck-ink); }
-.ot-risk { color: var(--ox); font-weight: 500; }
-.ot-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
-@media (max-width: 480px) {
-  /* 7 x 44px + gaps no longer fits beside the page gutters: scroll the strip itself, never the page. */
-  .ot-week { grid-template-columns: repeat(7, minmax(44px, 1fr)); overflow-x: auto; }
+
+/* Page: one column, 18px apart. */
+.ot-page { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.ot-top { display: flex; flex-direction: column; gap: 6px; }
+.ot-h1 { font-family: var(--serif); font-weight: 400; font-size: 44px; line-height: 1.05; letter-spacing: -0.01em; color: var(--ink); margin: 0; }
+.ot-date { font-size: 14px; color: var(--body); margin: 0; }
+.ot-mono, .ot-sub { font-family: var(--mono); }
+.ot-sub { font-size: 11.5px; color: var(--muted); }
+.ot-only-narrow { display: none; }
+.ot-only-narrow-block { display: none !important; }
+.ot-link { color: var(--ox); text-decoration: underline; text-underline-offset: 2px; font-size: 13px; }
+
+/* Hero: the oxblood panel, a huge count and a cream Start. */
+.ot-hero { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 28px 32px; border-radius: 22px; background: var(--ot-deck-bg); color: var(--ot-deck-ink); box-shadow: var(--shadow); }
+.ot-hero-main { display: flex; align-items: flex-end; gap: 18px; min-width: 0; }
+.ot-hero-main.ot-only-narrow { display: none; }
+.ot-big { font-family: var(--serif); font-size: 96px; line-height: 0.9; }
+.ot-hero-text { display: flex; flex-direction: column; gap: 6px; padding-bottom: 8px; }
+.ot-hero-title { font-family: var(--serif); font-size: 30px; line-height: 1.1; }
+.ot-hero-sub { color: var(--ot-hero-sub); font-size: 14px; margin: 0; }
+.ot-hero-message { font-family: var(--serif); font-size: 30px; line-height: 1.15; margin: 0; }
+.ot-start { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; height: 56px; padding: 0 40px; border-radius: 999px; background: var(--ot-deck-ink); color: var(--ot-deck-bg) !important; font: 500 17px var(--sans); text-decoration: none !important; }
+.ot-start:focus-visible, .ot-btn:focus-visible, .ot-chip:focus-visible, .ot-day:focus-visible { outline: 2px solid var(--ot-dot); outline-offset: 2px; }
+.ot-eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--muted); font-weight: 400; margin: 0; }
+
+/* Cards, rows, pills. */
+.ot-card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); padding: 20px 22px; min-width: 0; }
+.ot-week-card, .ot-copilot-card { padding: 18px 20px; }
+.ot-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.ot-card-title { font-family: var(--sans); font-size: 15px; font-weight: 600; color: var(--ink); margin: 0; }
+.ot-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line-2); }
+.ot-card-head + .ot-row { border-top: 0; }
+.ot-row-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
+.ot-row-title, .ot-line { display: block; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ot-row-title { font-size: 13.5px; color: var(--ink); text-decoration: none; }
+a.ot-row-title:hover { text-decoration: underline; }
+.ot-pill { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 999px; font-size: 12px; white-space: nowrap; background: var(--well); color: var(--body); flex: 0 0 auto; }
+.ot-pill-risk { background: var(--ot-risk-bg); color: var(--ot-risk-ink); font-weight: 600; }
+.ot-pill-warn { background: var(--ot-warn-bg); color: var(--ot-warn-ink); }
+.ot-empty, .ot-note, .ot-foot { margin: 8px 0 0; }
+.ot-note { color: var(--warn); }
+.ot-more { display: inline-block; margin-top: 8px; }
+
+/* Three columns on desktop; one ordered stack on a phone. */
+.ot-cols { display: grid; grid-template-columns: repeat(var(--ot-cols, 3), minmax(0, 1fr)); gap: 18px; align-items: start; }
+.ot-cols > div { min-width: 0; }
+
+/* This week. */
+.ot-key { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-left: 6px; }
+.ot-key-consult { background: var(--ot-consult-tint); border: 1px solid var(--line); }
+.ot-key-deadline { background: var(--ot-deadline-tint); border: 1px solid var(--line); }
+.ot-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
+.ot-day { display: flex; flex-direction: column; gap: 6px; min-height: 118px; padding: 8px; border-radius: 12px; background: var(--paper); border: 1px solid var(--line-2); color: var(--ink); text-decoration: none; min-width: 0; }
+.ot-day:hover { text-decoration: none; border-color: var(--ot-dot); }
+.ot-day[aria-current="date"] { border: 2px solid var(--ot-today); background: var(--card); padding: 7px; }
+.ot-day-date { font-size: 13px; font-weight: 600; color: var(--ink); }
+.ot-day-date .ot-mono { font-weight: 400; font-size: 11px; color: var(--muted); text-transform: uppercase; }
+.ot-day-items { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ot-item { display: flex; flex-direction: column; gap: 1px; padding: 5px 7px; border-radius: 8px; font-size: 11.5px; line-height: 1.3; color: var(--ink); overflow-wrap: anywhere; }
+.ot-item b { font-family: var(--mono); font-weight: 400; font-size: 10.5px; color: var(--muted); }
+.ot-item-consult { background: var(--ot-consult-tint); }
+.ot-item-deadline { background: var(--ot-deadline-tint); }
+.ot-day-dots { display: none; }
+.ot-dot { display: inline-block; width: 7px; height: 7px; border-radius: 999px; }
+.ot-dot-consult { background: var(--ot-consult-dot); }
+.ot-dot-deadline { background: var(--ot-deadline-dot); }
+
+/* Ask Copilot. */
+.ot-copilot { display: flex; gap: 8px; margin-top: 10px; }
+.ot-copilot input { flex: 1 1 auto; min-width: 0; height: 44px; padding: 0 18px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--ink); font: 14px var(--sans); }
+.ot-btn { display: inline-flex; align-items: center; justify-content: center; height: 44px; padding: 0 20px; border-radius: 999px; border: 0; background: var(--ox); color: var(--cream); font: 500 14px var(--sans); cursor: pointer; }
+.ot-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.ot-chip { display: inline-flex; align-items: center; height: 32px; padding: 0 13px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); font-size: 12.5px; color: var(--ink); text-decoration: none; }
+.ot-chip:hover { border-color: var(--ot-dot); text-decoration: none; }
+
+@media (max-width: 900px) {
+  .ot-day-items .ot-item { font-size: 11px; }
 }
-.ot-day { display: grid; gap: 4px; justify-items: center; padding: 8px 2px; min-width: 44px; border-radius: 10px; border: 1px solid var(--line); color: inherit; text-align: center; font-size: 12.5px; }
-.ot-day[aria-current="date"] { background: var(--cream); border-color: var(--ox); }
-.ot-day:hover { text-decoration: none; border-color: var(--ox); }
-.ot-dots { display: flex; gap: 3px; align-items: center; min-height: 14px; font-size: 12.5px; color: var(--ot-dot); }
-.ot-copilot { display: flex; gap: 8px; flex-wrap: wrap; }
-.ot-copilot input { flex: 1 1 220px; min-width: 0; min-height: 44px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); font: inherit; }
-.ot-copilot .lx-btn { min-height: 44px; }
+
+/* Phone (375 wide): h1 32, a plain "Your cards" card, a dot strip for the week, then Ask Copilot, consults, deadlines, proposals. */
+@media (max-width: 640px) {
+  .ot-only-wide, .ot-only-wide-block { display: none !important; }
+  .ot-only-narrow-block { display: flex !important; }
+  .ot-copilot input.ot-only-narrow-block { display: block !important; }
+  .ot-chips { flex-wrap: nowrap; }
+  .ot-only-narrow { display: initial; }
+  .ot-page { gap: 14px; }
+  .ot-h1 { font-size: 32px; }
+  .ot-date { display: none; }
+
+  .ot-hero { flex-direction: column; align-items: stretch; gap: 10px; padding: 18px; border-radius: 18px; background: var(--card); color: var(--ink); border: 1px solid var(--line); }
+  .ot-hero-main.ot-only-narrow { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
+  .ot-hero-count { font-family: var(--serif); font-size: 30px; line-height: 1; margin: 0; }
+  .ot-hero-about { font-size: 20px; color: var(--muted); }
+  .ot-hero-sub { color: var(--body); font-size: 13px; }
+  .ot-hero-message { font-size: 22px; color: var(--ink); }
+  .ot-start { width: 100%; height: 44px; padding: 0 20px; background: var(--ox); color: var(--cream) !important; font-size: 14px; }
+
+  .ot-card, .ot-week-card, .ot-copilot-card { padding: 14px 16px; border-radius: 18px; }
+  .ot-week-card { padding: 12px 12px 14px; }
+  .ot-week { gap: 4px; }
+  .ot-day { min-height: 62px; padding: 5px 3px; align-items: center; text-align: center; gap: 4px; }
+  .ot-day[aria-current="date"] { padding: 4px 2px; }
+  .ot-day-date { display: flex; flex-direction: column; align-items: center; font-size: 13px; line-height: 1.2; }
+  .ot-day-date .ot-mono { font-size: 10px; text-transform: none; }
+  .ot-day-items { display: none; }
+  .ot-day-dots { display: flex; gap: 3px; min-height: 7px; justify-content: center; flex-wrap: wrap; }
+
+  .ot-copilot { flex-direction: column; margin-top: 4px; }
+  .ot-copilot .ot-btn { display: none; }
+  .ot-copilot input { padding: 0 16px; }
+  .ot-chips { gap: 6px; margin-top: 8px; }
+  .ot-chip { height: 36px; }
+  .ot-copilot-card .ot-card-head { flex-direction: column; gap: 2px; margin-bottom: 4px; }
+
+  .ot-cols { display: contents; }
+  .ot-copilot-card { order: 1; }
+  .ot-col-consults { order: 2; }
+  .ot-col-deadlines { order: 3; }
+  .ot-col-proposals { order: 4; }
+  .ot-card-head { margin-bottom: 4px; }
+  .ot-key { width: 8px; height: 8px; border-radius: 999px; border: 0; vertical-align: 0; }
+  .ot-key-consult { background: var(--ot-consult-dot); }
+  .ot-key-deadline { background: var(--ot-deadline-dot); }
+}

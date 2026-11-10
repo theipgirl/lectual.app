@@ -24,52 +24,70 @@ export const QUEUE_KINDS = [
 ] as const;
 export type QueueKind = (typeof QUEUE_KINDS)[number];
 
-type KindInfo = { label: string; help: string; attorneyOnly: boolean };
+type KindInfo = { label: string; help: string; attorneyOnly: boolean; /** Short name for the deck list and board. */ short: string; /** The quiet word after the assistant in the deck side list. */ rowWord: string };
 
 /** Attorney-only kinds are the UPL line: only an attorney or owner-tier member may own or approve them. */
 export const KIND_INFO: Record<QueueKind, KindInfo> = {
   stalled_followup: {
     label: "Follow-up for a stalled lead",
+    short: "Stalled follow-up",
+    rowWord: "client email",
     help: "Routine nudges the morning brief drafts for leads that went quiet. Good to hand to a team member so attorneys only see legal emails.",
     attorneyOnly: false,
   },
   post_consult_email: {
     label: "Post-consult and proposal emails",
+    short: "Post-consult email",
+    rowWord: "client email",
     help: "What a client is told after a consult, including the proposal link. Attorneys only.",
     attorneyOnly: true,
   },
   welcome_email: {
     label: "Welcome emails",
+    short: "Welcome email",
+    rowWord: "client email",
     help: "The first note to a new client. Can be handled by any team member.",
     attorneyOnly: false,
   },
   engagement_letter: {
     label: "Engagement letters",
+    short: "Engagement letter",
+    rowWord: "letter",
     help: "Letters of engagement. Attorneys only.",
     attorneyOnly: true,
   },
   opinion_letter: {
     label: "Opinion and clearance letters",
+    short: "Opinion letter",
+    rowWord: "letter",
     help: "Opinion letters and trademark clearance reports. Attorneys only.",
     attorneyOnly: true,
   },
   internal_briefing: {
     label: "Internal briefings and digests",
+    short: "Internal briefing",
+    rowWord: "internal",
     help: "Morning briefs, inbox summaries and consult heads-ups. Nothing here goes to a client.",
     attorneyOnly: false,
   },
   partnership_other: {
     label: "Partnership and other follow-ups",
+    short: "Partnership follow-up",
+    rowWord: "client email",
     help: "Partner and referral follow-ups that are not about a client matter.",
     attorneyOnly: false,
   },
   client_email_other: {
     label: "Other client emails",
+    short: "Client email",
+    rowWord: "client email",
     help: "Any client email that fits no other kind. Attorneys only, to be safe.",
     attorneyOnly: true,
   },
 };
 
+export const kindShort = (kind: QueueKind): string => KIND_INFO[kind].short;
+export const kindRowWord = (kind: QueueKind): string => KIND_INFO[kind].rowWord;
 export const kindLabel = (kind: QueueKind): string => KIND_INFO[kind].label;
 export const isAttorneyOnlyKind = (kind: QueueKind): boolean => KIND_INFO[kind].attorneyOnly;
 export const isQueueKind = (value: unknown): value is QueueKind => typeof value === "string" && (QUEUE_KINDS as readonly string[]).includes(value);

@@ -15,24 +15,25 @@ function contrast(a: string, b: string): number {
   return (x + 0.05) / (y + 0.05);
 }
 
-describe("Yes is the clear primary move on the oxblood card", () => {
-  it("the card's primary button is cream with oxblood text, with hover, focus-visible and disabled states", () => {
-    expect(css).toMatch(/\.dk-card \.lx-btn\.lx-btn-pri,[\s\S]*?background: var\(--deck-hero-ink\);[\s\S]*?color: var\(--deck-hero\);/);
-    expect(css).toMatch(/\.dk-card \.lx-btn\.lx-btn-pri:hover:not\(:disabled\)/);
-    expect(css).toMatch(/\.dk-card \.lx-btn\.lx-btn-pri:focus-visible/);
-    expect(css).toMatch(/\.dk-card \.lx-btn\.lx-btn-pri:disabled/);
+describe("Yes is the clear primary move on the white card", () => {
+  it("Yes is the one solid oxblood tile, with hover, focus-visible and disabled states", () => {
+    expect(css).toMatch(/\.dk-move--yes,\s*a\.dk-move--yes \{[\s\S]*?background: var\(--st-1\);[\s\S]*?color: var\(--cream\);/);
+    expect(css).toMatch(/\.dk-move--yes:hover:not\(:disabled\)/);
+    expect(css).toMatch(/\.dk-move:focus-visible/);
+    expect(css).toMatch(/\.dk-move--yes:disabled/);
   });
-  it("the other moves on the card are outlined, so Yes is the only solid button", () => {
-    expect(css).toMatch(/\.dk-card \.lx-btn\.lx-btn-sec,\s*\.dk-card \.lx-btn\.lx-btn-danger \{[\s\S]*?background: transparent;/);
+  it("the other moves are outlined white tiles", () => {
+    expect(css).toMatch(/\.dk-move \{[^}]*background: var\(--card\);/);
   });
-  it("cream on oxblood reads at 4.5:1 or better in light and dark", () => {
-    for (const hero of ["#550e1a", "#4a0c17"]) expect(contrast("#fdf7eb", hero)).toBeGreaterThanOrEqual(4.5);
+  it("cream on the state fills reads at 4.5:1 or better in light and dark", () => {
+    for (const fill of ["#550e1a", "#6a1f2b", "#2a1216", "#4a0c17", "#5a1924", "#1c0b0e"]) expect(contrast("#fdf7eb", fill)).toBeGreaterThanOrEqual(4.5);
   });
 });
 
 describe("the hold toast's Undo stays readable", () => {
-  it("is outlined cream on the dark toast, not the light secondary fill", () => {
-    expect(css).toMatch(/\.dk-hold \.lx-btn \{ background: transparent; color: var\(--cream\);/);
+  it("is pink on the dark toast", () => {
+    expect(css).toMatch(/\.dk-toast \{[^}]*background: var\(--st-1\);[^}]*color: var\(--cream\)/);
+    expect(css).toMatch(/\.dk-toast \.dk-undo \{[^}]*color: var\(--st-pink\)/);
   });
 });
 
@@ -51,8 +52,8 @@ describe("a Later that runs past the next deal names its day", () => {
   });
 });
 
-describe("the side box is not drawn empty", () => {
-  it("DeckFrame draws the list only when there are rows", () => {
-    expect(readFileSync("src/components/deck/DeckFrame.tsx", "utf8")).toMatch(/side && side\.length > 0 &&/);
+describe("the side box states its own emptiness", () => {
+  it("DeckSide says Nothing left in this deal rather than drawing an empty list", () => {
+    expect(readFileSync("src/components/deck/DeckSide.tsx", "utf8")).toMatch(/DECK_SIDE_NOTHING_LEFT/);
   });
 });

@@ -49,3 +49,6 @@ next-env.d.ts
 !.claude/agents/
 .playwright-mcp/
 .private/
+
+# design harness output (screenshots, rendered html, compiled css copies)
+scripts/design-harness/out/

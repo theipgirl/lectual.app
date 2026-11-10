@@ -1,6 +1,6 @@
 import "server-only";
 import { listUpcomingDeadlines } from "@/lib/matters";
-import { listProposals } from "@/lib/proposals/store";
+import { listProposalOpens, listProposals } from "@/lib/proposals/store";
 import { ownerDeadlines, proposalsOut, OWNER_DEADLINE_DAYS, type OwnerDeadline, type OwnerProposal } from "@/lib/today/owner-rules";
 import { civilInZone } from "@/lib/today/outcomes";
 
@@ -17,5 +17,13 @@ export async function loadOwnerDeadlines(now: Date, tz: string): Promise<OwnerDe
 export async function loadOwnerProposals(now: Date, tz: string): Promise<OwnerProposal[]> {
   // latestOnly (the default) keeps each family's newest version; only a live one counts.
   const items = await listProposals({ limit: 300 });
-  return proposalsOut(items, civilInZone(now, tz));
+  const out = proposalsOut(items, civilInZone(now, tz));
+  // Opens are the `viewed` events the public page already writes (scoped read, no payload). Its own failure never fails
+  // the card: each row then says "Couldn't load opens", never "not opened yet".
+  try {
+    const opens = await listProposalOpens(out.map((p) => p.id));
+    return out.map((p) => ({ ...p, opens: opens.get(p.id)?.count ?? 0 }));
+  } catch {
+    return out.map((p) => ({ ...p, opens: "unavailable" as const }));
+  }
 }

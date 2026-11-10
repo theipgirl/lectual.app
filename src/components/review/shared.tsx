@@ -21,8 +21,8 @@ export function Avatar({ name }: { name: string }) {
   );
 }
 
-export function Tags({ row, today, max }: { row: ReviewRow; today: string; max?: number }) {
-  const all = rowTags(row, today);
+export function Tags({ row, today, max, skip }: { row: ReviewRow; today: string; max?: number; /** Tags the card already says elsewhere (the column heading, the meta line). */ skip?: ("waiting" | "expiry")[] }) {
+  const all = rowTags(row, today).filter((t) => !(skip?.includes("waiting") && t.text.startsWith("Waiting on ")) && !(skip?.includes("expiry") && row.proposalExpiry && t.text === row.proposalExpiry.text));
   const { shown, more } = limitTags(all, max ?? all.length);
   if (shown.length === 0) return null;
   return (
