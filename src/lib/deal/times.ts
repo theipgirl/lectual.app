@@ -92,3 +92,26 @@ export function dealFor(now: Date, timeZone: string, times: readonly string[] = 
   const tomorrow = new Date(Date.UTC(today.year, today.month - 1, today.day + 1, 12));
   return { current, next: on(tomorrow.getUTCFullYear(), tomorrow.getUTCMonth() + 1, tomorrow.getUTCDate(), list[0]) };
 }
+
+/**
+ * The instant the cards on the table were dealt: today's current deal, or before the first one, yesterday's last.
+ * Anything queued after it is a later arrival, counted and dealt at the next time (or by "Deal them now").
+ */
+export function dealtAt(now: Date, timeZone: string, times: readonly string[] = DEFAULT_DEAL_TIMES): Date {
+  const deal = dealFor(now, timeZone, times);
+  if (deal.current) return deal.current.at;
+  const tz = safeZone(timeZone);
+  const list = cleanTimes(times);
+  const today = partsIn(now, tz);
+  const y = new Date(Date.UTC(today.year, today.month - 1, today.day - 1, 12));
+  const [h, mi] = list[list.length - 1].split(":").map(Number);
+  return zonedInstant(y.getUTCFullYear(), y.getUTCMonth() + 1, y.getUTCDate(), h, mi, tz);
+}
+
+/** True when `at` falls on the same calendar day as `now` in the firm's zone. */
+export function sameFirmDay(at: Date, now: Date, timeZone: string): boolean {
+  const tz = safeZone(timeZone);
+  const a = partsIn(at, tz);
+  const b = partsIn(now, tz);
+  return a.year === b.year && a.month === b.month && a.day === b.day;
+}

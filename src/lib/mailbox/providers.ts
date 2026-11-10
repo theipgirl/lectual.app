@@ -1,4 +1,6 @@
 import { pkceChallenge } from "./state";
+import { SEND_SCOPE } from "./send-draft";
+import { env } from "@/lib/env";
 import { PROVIDER_FETCH_TIMEOUT_MS, withTimeout } from "@/lib/http/timeout";
 
 /**
@@ -9,7 +11,10 @@ import { PROVIDER_FETCH_TIMEOUT_MS, withTimeout } from "@/lib/http/timeout";
  *             gmail.compose  — create DRAFTS (an approved queue item becomes a
  *                              draft in the approver's mailbox; a person sends)
  *   Microsoft Mail.Read, Mail.ReadWrite — the same pair in Graph terms
- *             (ReadWrite is what drafts need; we never send or delete)
+ *             (ReadWrite is what drafts need; we never send or delete on
+ *             our own. With MAILBOX_SEND_SCOPE "on" one more permission is
+ *             asked for, see sendScopeRequested: the button a person presses
+ *             to send her own approved draft)
  *             Calendars.Read, read-only; the daily sync copies upcoming events
  *             so consults show on the calendar, lead page and Today. It is
  *             asked for but NOT required: declining it still connects the
@@ -100,6 +105,28 @@ const CONFIG: Record<MailboxProvider, Config> = {
   },
 };
 
+/**
+ * The send permission is asked for ONLY when MAILBOX_SEND_SCOPE is "on" (default off), for the approval deck's
+ * "Send from Outlook now" button, which a person presses herself after approving. It is never in `required`: a mailbox
+ * that declines it still connects for mail and drafts. A mailbox connected before the flag was on has to be reconnected.
+ */
+export function sendScopeRequested(): boolean {
+  try {
+    return env.MAILBOX_SEND_SCOPE === "on";
+  } catch {
+    return false;
+  }
+}
+
+/** The Microsoft scopes to ask for at connect time. */
+function microsoftScopes(): string[] {
+  return sendScopeRequested() ? [...CONFIG.microsoft.scopes, SEND_SCOPE] : [...CONFIG.microsoft.scopes];
+}
+
+function scopesFor(provider: MailboxProvider): string[] {
+  return provider === "microsoft" ? microsoftScopes() : [...CONFIG.google.scopes];
+}
+
 export const PROVIDER_LABEL: Record<MailboxProvider, string> = {
   google: "Gmail",
   microsoft: "Outlook",
@@ -122,6 +149,15 @@ function normaliseScope(provider: MailboxProvider, scope: string): string {
 export function hasCalendarScope(provider: MailboxProvider, scopes: readonly string[] | null | undefined): boolean {
   if (provider !== "microsoft" || !Array.isArray(scopes)) return false;
   return scopes.some((s) => typeof s === "string" && normaliseScope(provider, s.trim()) === CALENDAR_SCOPE.toLowerCase());
+}
+
+/**
+ * True when a connection's STORED scopes include the send permission. Microsoft only, same normalisation as
+ * `hasCalendarScope`; a missing or unreadable list means it was never granted.
+ */
+export function hasSendScope(provider: MailboxProvider, scopes: readonly string[] | null | undefined): boolean {
+  if (provider !== "microsoft" || !Array.isArray(scopes)) return false;
+  return scopes.some((s) => typeof s === "string" && normaliseScope(provider, s.trim()) === SEND_SCOPE.toLowerCase());
 }
 
 export function missingScopes(provider: MailboxProvider, granted: string[]): string[] {
@@ -149,7 +185,7 @@ export function authorizeUrl(args: {
   p.set("client_id", args.clientId);
   p.set("redirect_uri", args.redirectUri);
   p.set("response_type", "code");
-  p.set("scope", cfg.scopes.join(" "));
+  p.set("scope", scopesFor(args.provider).join(" "));
   p.set("state", args.nonce);
   p.set("code_challenge", pkceChallenge(args.verifier));
   p.set("code_challenge_method", "S256");
@@ -193,7 +229,7 @@ export async function exchangeCode(args: {
     redirect_uri: args.redirectUri,
     grant_type: "authorization_code",
   });
-  if (provider === "microsoft") body.set("scope", CONFIG.microsoft.scopes.join(" "));
+  if (provider === "microsoft") body.set("scope", microsoftScopes().join(" "));
 
   const res = await fetchImpl(
     CONFIG[provider].tokenUrl,
@@ -312,9 +348,11 @@ export async function refreshAccessToken(args: {
   });
   if (provider === "microsoft") {
     const calendarGranted = hasCalendarScope(provider, args.grantedScopes);
+    // The send permission, like the calendar one, is asked for on refresh only when this connection granted it.
+    const sendGranted = hasSendScope(provider, args.grantedScopes);
     body.set(
       "scope",
-      CONFIG.microsoft.scopes.filter((s) => s !== CALENDAR_SCOPE || calendarGranted).join(" "),
+      [...CONFIG.microsoft.scopes.filter((s) => s !== CALENDAR_SCOPE || calendarGranted), ...(sendGranted ? [SEND_SCOPE] : [])].join(" "),
     );
   }
 
