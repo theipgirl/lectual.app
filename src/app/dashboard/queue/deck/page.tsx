@@ -12,7 +12,7 @@ import { gateLinkedProposal } from "@/lib/consult-proposal/link";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { listMemberDirectory, type MemberIdentity } from "@/lib/members/directory";
 import { QUEUE_EDIT_ROLES } from "@/lib/queue/roles";
-import { dealFor, dealtAt, sameFirmDay } from "@/lib/deal/times";
+import { whenLabel, dealFor, dealtAt, sameFirmDay } from "@/lib/deal/times";
 import {
   buildDeck,
   decidedToday,
@@ -165,7 +165,10 @@ export default async function DeckPage({ searchParams }: { searchParams: Promise
   if (!pos) {
     const onDeck = new Set([...deck.cards, ...deck.laterArrivals, ...deck.later, ...deck.handedOff].map((c) => c.item.id));
     const othersPending = load.items.filter((i) => i.status === "pending" && !onDeck.has(i.id)).length;
-    const empty = deckEmptyState({ queueOk: true, role: viewer.role, deck, nextDealLabel: deal.next.label, othersPending });
+    // A Later can run past the next deal (set after the last one of the day): name the day it comes back.
+    const firstBack = deck.later.map((c) => Date.parse(c.until)).filter(Number.isFinite).sort((a, b) => a - b)[0];
+    const laterBackLabel = firstBack === undefined ? undefined : whenLabel(new Date(firstBack), now, tz);
+    const empty = deckEmptyState({ queueOk: true, role: viewer.role, deck, nextDealLabel: deal.next.label, othersPending, laterBackLabel });
     return frame(
       side,
       <div className="lx-card lx-empty-card" role="status">

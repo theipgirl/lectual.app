@@ -4,7 +4,7 @@ import { approvalBlock, auditDraft, type AuditContext } from "@/lib/queue/hygien
 import { mineItems } from "@/lib/queue/mine";
 import { parseReviewerSummary } from "@/lib/queue/reviewer-summary";
 import { QUEUE_APPROVE_ROLES, QUEUE_EDIT_ROLES } from "@/lib/queue/roles";
-import { DECK_NOTHING_FOR_YOU, DECK_NOTHING_NOW, deckAllDecided, deckHandedCount, deckOthersWaiting, deckLaterArrivals, deckLaterBack } from "@/lib/ui/words";
+import { DECK_NOTHING_FOR_YOU, DECK_NOTHING_NOW, deckAllDecided, deckHandedCount, deckOthersWaiting, deckLaterArrivals, deckLaterBack, deckLaterBackWhen } from "@/lib/ui/words";
 import { canApproveItem, classifyQueueItem, type ApprovalRouting, type QueueKind, type Viewer } from "@/lib/queue/routing";
 
 /**
@@ -271,12 +271,12 @@ export type DeckEmpty =
  * `othersPending`: pending items the queue holds that are not on this person's deck in any form (someone else's to
  * decide). "All decided" is said only when that is 0 too: nothing is waiting for anyone.
  */
-export function deckEmptyState(args: { queueOk: boolean; role: Role; deck: Pick<Deck, "laterArrivals" | "later" | "handedOff">; nextDealLabel: string; othersPending?: number }): DeckEmpty {
+export function deckEmptyState(args: { queueOk: boolean; role: Role; deck: Pick<Deck, "laterArrivals" | "later" | "handedOff">; nextDealLabel: string; othersPending?: number; /** When the earliest Later card comes back ("tomorrow at 7:00 AM"); else the next deal. */ laterBackLabel?: string }): DeckEmpty {
   if (!args.queueOk) return { kind: "unreached" };
   const { laterArrivals, later, handedOff } = args.deck;
   const details: string[] = [];
   if (laterArrivals.length > 0) details.push(`${deckLaterArrivals(laterArrivals.length, args.nextDealLabel)}.`);
-  if (later.length > 0) details.push(deckLaterBack(later.length, args.nextDealLabel));
+  if (later.length > 0) details.push(args.laterBackLabel ? deckLaterBackWhen(later.length, args.laterBackLabel) : deckLaterBack(later.length, args.nextDealLabel));
   if (handedOff.length > 0) details.push(deckHandedCount(handedOff.length));
   if (details.length > 0) return { kind: "waiting", headline: DECK_NOTHING_NOW, details };
   if (!QUEUE_EDIT_ROLES.includes(args.role) || !QUEUE_APPROVE_ROLES.includes(args.role)) return { kind: "nothing-for-you", headline: DECK_NOTHING_FOR_YOU, details: [] };

@@ -190,6 +190,8 @@ export const deckLaterArrivals = (n: number, label: string) => `${n} more at ${l
 export const deckAllDecided = (label: string) => `All decided. Next deal ${label}.`;
 export const DECK_NOTHING_NOW = "Nothing to decide right now.";
 export const DECK_NOTHING_FOR_YOU = "There is nothing for you to decide here.";
+/** Later cards with the day they come back: `when` is "today at 2:00 PM" / "tomorrow at 7:00 AM". */
+export const deckLaterBackWhen = (n: number, when: string) => `${n} ${n === 1 ? "card is" : "cards are"} back ${when}.`;
 export const deckLaterBack = (n: number, label: string) => `${n} ${n === 1 ? "card is" : "cards are"} back at ${label}.`;
 /** The deck is empty for this person but the queue still holds items someone else decides. */
 export const deckOthersWaiting = (n: number) => `${n} waiting for ${n === 1 ? "a colleague" : "colleagues"} to decide.`;

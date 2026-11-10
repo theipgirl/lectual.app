@@ -53,8 +53,9 @@ export function DeckFrame({
         </nav>
       </div>
 
-      <div className={side ? "dk-body" : undefined}>
-        {side && (
+      <div className={side && side.length > 0 ? "dk-body" : undefined}>
+        {/* No rows, no box: the empty state beside it already says what is waiting and when. */}
+        {side && side.length > 0 && (
           <nav className="lx-card dk-side" aria-label={DECK_ALL_LIST_HEADING}>
             <h2 className="lx-label">{DECK_ALL_LIST_HEADING}</h2>
             {sideNote && (
