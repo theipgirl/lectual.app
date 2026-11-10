@@ -4,8 +4,8 @@ import type { ProposalSegment } from "./segments";
  * Words on the proposals list that are decided by a rule, not just copy (Sprint 33). Pure.
  */
 
-/** The dollar tile's label (was "Out with clients"); the one-line explanation under it stays. */
-export const OPEN_OFFERS_LABEL = "Open offers (lowest package each)";
+/** The dollar tile's label (was "Out with clients"); the one-line explanation under it says "counted at the cheapest package offered". */
+export const OPEN_OFFERS_LABEL = "Open offers";
 
 /** Why a consult can't be drafted from yet. */
 export const TRANSCRIPT_PROCESSING = "Transcript still processing";
@@ -28,6 +28,8 @@ export function emptySegmentSentence(segment: ProposalSegment): string {
       return "No drafts or blocked proposals right now.";
     case "accepted":
       return "No accepted proposals yet.";
+    case "paid":
+      return "No paid proposals yet.";
     case "expired":
       return "No expired proposals.";
     default:

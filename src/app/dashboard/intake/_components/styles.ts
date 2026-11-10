@@ -17,8 +17,10 @@ import type { Temperature } from "@/lib/intake";
  */
 
 const MONO = "var(--font-jetbrains-mono), monospace";
+/** Sentence-like lines (a name, a suggestion, a next step) are Geist; Courier is for dates, counts and uppercase labels. */
+const SANS = "var(--font-geist), system-ui, sans-serif";
 
-function pill(background: string, color: string, fontSize = 11): CSSProperties {
+function pill(background: string, color: string, fontSize = 12): CSSProperties {
   return {
     fontFamily: MONO,
     fontSize,
@@ -31,24 +33,24 @@ function pill(background: string, color: string, fontSize = 11): CSSProperties {
 }
 
 export const TEMP_PILL: Record<Temperature, CSSProperties> = {
-  hot: pill("var(--critbg)", "var(--crit)", 10.5),
-  warm: pill("var(--warnbg)", "var(--warn)", 10.5),
-  cold: pill("var(--oxbg)", "var(--ox)", 10.5),
+  hot: pill("var(--critbg)", "var(--crit)", 12),
+  warm: pill("var(--warnbg)", "var(--warn)", 12),
+  cold: pill("var(--oxbg)", "var(--ox)", 12),
 };
 
 /** Not routed: no lane and nothing to derive from — never a guessed level. */
 export const TEMP_NONE: CSSProperties = {
-  fontFamily: MONO,
-  fontSize: 11.5,
+  fontFamily: SANS,
+  fontSize: "var(--lp-meta, 13px)",
   color: "var(--mute)",
 };
 
-export const OWNER_TEXT: CSSProperties = { fontFamily: MONO, fontSize: 11.5, color: "var(--ink2)" };
-export const OWNER_TEXT_NONE: CSSProperties = { fontFamily: MONO, fontSize: 11.5, color: "var(--mute)" };
+export const OWNER_TEXT: CSSProperties = { fontFamily: MONO, fontSize: "var(--lp-meta, 13px)", color: "var(--ink2)" };
+export const OWNER_TEXT_NONE: CSSProperties = { fontFamily: MONO, fontSize: "var(--lp-meta, 13px)", color: "var(--mute)" };
 
 export const OWNER_CHIP: CSSProperties = {
   fontFamily: MONO,
-  fontSize: 10,
+  fontSize: 11.5,
   padding: "2px 5px",
   borderRadius: 4,
   background: "var(--surface2)",
@@ -58,7 +60,7 @@ export const OWNER_CHIP: CSSProperties = {
 /** Dashed, because "nobody" is an empty slot rather than a person named "—". */
 export const OWNER_CHIP_NONE: CSSProperties = {
   fontFamily: MONO,
-  fontSize: 10,
+  fontSize: 11.5,
   padding: "2px 5px",
   borderRadius: 4,
   border: "1px dashed var(--line)",
@@ -66,23 +68,31 @@ export const OWNER_CHIP_NONE: CSSProperties = {
 };
 
 /** ← waiting on us: burgundy, because it is the only colour on the row that means "you". */
-export const TOUCH_IN: CSSProperties = { fontFamily: MONO, fontSize: 11.5, color: "var(--burg)", whiteSpace: "nowrap" };
-export const TOUCH_OUT: CSSProperties = { fontFamily: MONO, fontSize: 11.5, color: "var(--mute)", whiteSpace: "nowrap" };
-export const TOUCH_IN_SMALL: CSSProperties = { ...TOUCH_IN, fontSize: 10 };
-export const TOUCH_OUT_SMALL: CSSProperties = { ...TOUCH_OUT, fontSize: 10 };
+export const TOUCH_IN: CSSProperties = { fontFamily: MONO, fontSize: "var(--lp-meta, 13px)", color: "var(--burg)", whiteSpace: "nowrap" };
+export const TOUCH_OUT: CSSProperties = { fontFamily: MONO, fontSize: "var(--lp-meta, 13px)", color: "var(--mute)", whiteSpace: "nowrap" };
+export const TOUCH_IN_SMALL: CSSProperties = { ...TOUCH_IN, fontSize: "var(--lp-meta, 13px)" };
+export const TOUCH_OUT_SMALL: CSSProperties = { ...TOUCH_OUT, fontSize: "var(--lp-meta, 13px)" };
 
 export const NEXT: CSSProperties = {
-  fontSize: 12.5,
+  fontSize: "var(--lp-meta, 13px)",
   color: "var(--ink2)",
-  lineHeight: 1.35,
+  lineHeight: 1.4,
   minWidth: 0,
 };
 
+/** A long next step shows two lines; the cell's title holds the whole text. */
+export const NEXT_CLAMP: CSSProperties = {
+  display: "-webkit-box",
+  WebkitLineClamp: 2,
+  WebkitBoxOrient: "vertical",
+  overflow: "hidden",
+};
+
 export const NEXT_HOT: CSSProperties = {
-  fontSize: 12.5,
+  fontSize: "var(--lp-meta, 13px)",
   color: "var(--ox)",
   fontWeight: 500,
-  lineHeight: 1.35,
+  lineHeight: 1.4,
   minWidth: 0,
 };
 
@@ -93,7 +103,7 @@ export function ownerAvatar(kind: "none" | "primary" | "soft" | "neutral"): CSSP
     width: 26,
     height: 26,
     borderRadius: 999,
-    fontSize: 10.5,
+    fontSize: 11.5,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -101,7 +111,7 @@ export function ownerAvatar(kind: "none" | "primary" | "soft" | "neutral"): CSSP
   };
   switch (kind) {
     case "none":
-      return { ...base, border: "1px dashed var(--line)", color: "var(--mute)", fontSize: 11 };
+      return { ...base, border: "1px dashed var(--line)", color: "var(--mute)", fontSize: 11.5 };
     case "primary":
       return { ...base, background: "var(--ox)", color: "var(--cream)" };
     case "soft":
@@ -123,4 +133,4 @@ export function ownerAvatarFor(index: number): CSSProperties {
 }
 
 /** The count that rides inside a filter chip. */
-export const CHIP_COUNT: CSSProperties = { fontFamily: MONO, fontSize: 11 };
+export const CHIP_COUNT: CSSProperties = { fontFamily: MONO, fontSize: "var(--lp-meta, 13px)" };

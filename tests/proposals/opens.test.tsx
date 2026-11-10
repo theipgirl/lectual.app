@@ -123,8 +123,8 @@ describe("the list cell, rendered", () => {
     expect(cell({}, "unavailable")).toMatchObject({ kind: "unavailable", text: "Couldn't load opens" });
   });
 
-  it("a draft is a dash", () => {
-    expect(cell({ status: "draft" }, OPENED)).toMatchObject({ kind: "no_link", text: "—" });
+  it("a draft has no opens line (nothing to open yet)", () => {
+    expect(cell({ status: "draft" }, OPENED).kind).toBeNull();
   });
 
   it("no line at all when the opens weren't asked for", () => {
@@ -139,7 +139,7 @@ describe("the list page reads opens once and shows them per row", () => {
     const html = text(await renderListPage({}, { opens: new Map([["s1", { count: 2, lastAt: "2026-10-29T19:12:00Z" }]]) }));
     expect(rowOf(html, "Client s1")).toContain("Opened Oct 29, 3:12 PM · 2 times");
     expect(rowOf(html, "Client e1")).toContain("Not opened yet");
-    expect(rowOf(html, "Client a1")).toContain('data-opens="no_link"');
+    expect(rowOf(html, "Client a1")).not.toContain("data-opens=");
   });
 
   it("a failed read says so on every live row, and never 'Not opened yet'", async () => {

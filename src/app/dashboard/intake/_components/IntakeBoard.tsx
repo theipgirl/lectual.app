@@ -12,8 +12,8 @@ import { ownerColumns, stageColumns } from "@/lib/intake/views";
 import IntakeCard from "./IntakeCard";
 import { CHIP_COUNT, ownerAvatar, ownerAvatarFor } from "./styles";
 
-/** Narrower than this and a card is unreadable, so the board scrolls instead. */
-const MIN_COLUMN = 210;
+/** Columns share the width equally. Five stages must fit beside the open rail at 1280px (956px of page), which is 182px each; narrower than this a card is unreadable, so the board scrolls instead. */
+const MIN_COLUMN = 180;
 
 const columnShell: React.CSSProperties = {
   display: "flex",
@@ -27,7 +27,7 @@ const columnShell: React.CSSProperties = {
 
 const pill = (background: string, color: string): React.CSSProperties => ({
   fontFamily: "var(--font-jetbrains-mono), monospace",
-  fontSize: 10.5,
+  fontSize: 12,
   padding: "3px 7px",
   borderRadius: 5,
   background,
@@ -95,7 +95,7 @@ export default function IntakeBoard({
               <span style={pill("var(--oxbg)", "var(--ox)")}>{column.code}</span>
               <span
                 style={{
-                  fontSize: 12,
+                  fontSize: 14,
                   fontWeight: 500,
                   minWidth: 0,
                   whiteSpace: "nowrap",
@@ -123,7 +123,7 @@ export default function IntakeBoard({
                 <span
                   style={{
                     display: "block",
-                    fontSize: 12.5,
+                    fontSize: 14,
                     fontWeight: 500,
                     whiteSpace: "nowrap",
                     overflow: "hidden",
@@ -133,8 +133,7 @@ export default function IntakeBoard({
                   {column.label}
                 </span>
                 <span
-                  className="intake-mono"
-                  style={{ display: "block", fontSize: 10.5, color: "var(--mute)", marginTop: 2 }}
+                  style={{ display: "block", fontSize: "var(--lp-meta, 13px)", lineHeight: 1.4, color: "var(--mute)", marginTop: 2 }}
                 >
                   {column.load}
                 </span>
@@ -227,7 +226,7 @@ export default function IntakeBoard({
                     padding: 11,
                     border: "1px dashed var(--line)",
                     borderRadius: 10,
-                    fontSize: 11.5,
+                    fontSize: "var(--lp-meta, 13px)",
                     lineHeight: 1.45,
                     color: "var(--mute)",
                   }}

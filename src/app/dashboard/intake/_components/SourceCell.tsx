@@ -31,7 +31,7 @@ export default function SourceCell({
   onSet: (source: ReferralSource | null) => void;
 }) {
   const current = source?.trim() || null;
-  const fontSize = compact ? 10.5 : 12.5;
+  const fontSize = "var(--lp-meta, 13px)";
 
   return (
     <Popover

@@ -17,7 +17,7 @@ import NeedsRebeccaBadge from "./NeedsRebeccaBadge";
 import AgentMoveChip from "./AgentMoveChip";
 import SourceCell from "./SourceCell";
 import type { Lane } from "@/lib/leads/lane";
-import { NEXT, NEXT_HOT, TOUCH_IN, TOUCH_OUT } from "./styles";
+import { NEXT, NEXT_CLAMP, NEXT_HOT, TOUCH_IN, TOUCH_OUT } from "./styles";
 import { NO_LEADS_YET, NO_LEAD_MATCHES } from "@/lib/ui/words";
 
 /**
@@ -26,7 +26,7 @@ import { NO_LEADS_YET, NO_LEAD_MATCHES } from "@/lib/ui/words";
  * a "Suggested: Warm" chip never runs into its neighbour. Seven columns, in
  * the header strip and in every row.
  */
-const GRID = "2fr 1.1fr 1.5fr .95fr 64px 1.6fr 1.35fr";
+const GRID = "1.8fr 1.45fr 1.35fr .9fr 64px 1.35fr 1.7fr";
 
 /** What the ← and → in the Last touch column mean. */
 const ARROW_LEGEND = "← waiting on us, → waiting on them";
@@ -189,8 +189,7 @@ export default function IntakeTable({
                     </div>
                     <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0, marginTop: 2 }}>
                       <span
-                        className="intake-mono"
-                        style={{ ...ellipsis, fontSize: 11, color: "var(--mute)" }}
+                        style={{ ...ellipsis, fontSize: "var(--lp-meta, 13px)", lineHeight: 1.4, color: "var(--mute)" }}
                       >
                         {lead.mark_text?.trim() || lead.business_name?.trim() || "—"}
                       </span>
@@ -201,7 +200,7 @@ export default function IntakeTable({
 
                   <div style={{ minWidth: 0 }} data-label="Stage">
                     <span
-                      className={`lp-pill${row.stage ? "" : " lp-pill-warn"}`}
+                      className={`lp-pill lp-pill-wrap${row.stage ? "" : " lp-pill-warn"}`}
                       title={row.stage?.name ?? "This lead's stage no longer exists"}
                     >
                       {stageCodeFor(row.stage)} · {stageLabelFor(row.stage)}
@@ -249,7 +248,7 @@ export default function IntakeTable({
                       the row past its container. */}
                   <div data-label="Next step" style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                     <span
-                      style={{ ...(step.urgent ? NEXT_HOT : NEXT), ...ellipsis, flex: 1 }}
+                      style={{ ...(step.urgent ? NEXT_HOT : NEXT), ...NEXT_CLAMP, flex: 1, overflowWrap: "anywhere" }}
                       title={step.text}
                     >
                       {step.text}
@@ -273,7 +272,7 @@ export default function IntakeTable({
                     role="status"
                     style={{
                       padding: "6px 18px",
-                      fontSize: 11.5,
+                      fontSize: "var(--lp-meta, 13px)",
                       color: "var(--crit)",
                       background: "var(--critbg)",
                       borderBottom: "1px solid var(--line)",

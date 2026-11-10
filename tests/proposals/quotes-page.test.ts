@@ -50,7 +50,7 @@ describe("Proposals page", () => {
       const html = await go();
       expect(html).toContain(">Show<");
       expect(html).not.toContain(">Segments<");
-      expect(segments(html)).toEqual(["Everything:8", "Out with a client:1", "Drafts and blocked:3", "Accepted:1", "Expired:2"]);
+      expect(segments(html)).toEqual(["Current:8", "Out with a client:1", "Drafts and blocked:3", "Accepted:1", "Paid:0", "Expired:2"]);
     });
 
     it("?segment=out filters the table and highlights that segment; the counts do not move", async () => {
@@ -59,7 +59,7 @@ describe("Proposals page", () => {
       for (const other of ["a1", "a2", "b1", "e1", "e2", "c1", "x1"]) expect(html).not.toContain(`Client ${other}<`);
       expect(html).toMatch(/aria-current="page"[^>]*><span>Out with a client/);
       expect(html.match(/aria-current="page"/g)).toHaveLength(1);
-      expect(segments(html)).toEqual(["Everything:8", "Out with a client:1", "Drafts and blocked:3", "Accepted:1", "Expired:2"]);
+      expect(segments(html)).toEqual(["Current:8", "Out with a client:1", "Drafts and blocked:3", "Accepted:1", "Paid:0", "Expired:2"]);
     });
 
     it("each segment's count matches the rows shown for it", async () => {
@@ -81,7 +81,7 @@ describe("Proposals page", () => {
       const html = await go({}, { rows });
       expect(html).toContain("$8,550.00");
       expect(html).toContain("2 proposals are out with a client, counted at the cheapest package offered.");
-      expect(html).toContain(">Open offers (lowest package each)<");
+      expect(html).toContain(">Open offers<");
     });
 
     it("one proposal out reads in the singular, as in the design", async () => {
@@ -106,12 +106,12 @@ describe("Proposals page", () => {
   });
 
   describe("the table", () => {
-    it("has the nine columns in order (Accepted and Paid after Status), with the legal fee and the USPTO fees in two cells and no total", async () => {
+    it("has the five columns in order (Client response merges Accepted and Paid, Fees merges the two fees), the legal fee and the USPTO fees as two lines and no total", async () => {
       const html = await go();
-      const heads = [...html.slice(html.indexOf("<thead")).matchAll(/<th[^>]*>([^<]*)<\/th>/g)].map((m) => m[1]).slice(0, 9);
-      expect(heads).toEqual(["Proposal", "Client", "Status", "Accepted", "Paid", "At signing", "At filing", "Expires", "Last activity"]);
+      const heads = [...html.slice(html.indexOf("<thead")).matchAll(/<th[^>]*>([^<]*)<\/th>/g)].map((m) => m[1]).slice(0, 5);
+      expect(heads).toEqual(["Proposal", "Client", "Status", "Client response", "Fees"]);
       const row = rowOf(html, "Client s1<");
-      expect([...row.matchAll(/<td class="pq-money[^"]*"[^>]*>([^<]*)<\/td>/g)].map((m) => m[1])).toEqual(["$4,950.00", "$700.00"]);
+      expect([...row.matchAll(/<span class="pq-fee-n">([^<]*)<\/span> <span class="pq-fee-l">([^<]*)<\/span>/g)].map((m) => `${m[1]} ${m[2]}`)).toEqual(["$4,950.00 at signing", "$700.00 at filing"]);
       expect(html.toLowerCase()).not.toContain("total");
       expect(html).not.toContain("$5,650.00");
     });
@@ -126,9 +126,11 @@ describe("Proposals page", () => {
       ];
       const html = await go({}, { rows });
       const sent = rowOf(html, "Irina Vilarino");
-      expect(sent).toContain("Trademark Proposal — ONEFORME PILATES");
+      // F: a default-titled proposal is named by its brand names in the list, with the type in the sub-line.
+      expect(sent).toContain(">ONEFORME PILATES</a>");
+      expect(sent).toContain("Trademark proposal · pr-");
       expect(sent).toContain("1 package offered · 5 classes");
-      expect(sent).toContain(">Oct 28<");
+      expect(sent).toContain("Expires Oct 28<");
       expect(sent).toContain("Drafted by the intake agent from the consult");
       const acc = rowOf(html, "Maison Petra");
       expect(acc).toContain("ENHANCED signed · 2 classes");
@@ -141,7 +143,11 @@ describe("Proposals page", () => {
       expect(draft).toContain("Not sent");
       const blocked = rowOf(html, "Birchwood Coffee Co.");
       expect(blocked).toContain("no package offered · 2 classes");
-      expect(blocked).toContain("No package offered yet");
+      // The blocked reason is said once, in Status; the quiet third line of the Proposal cell is the update time.
+      expect(blocked).toContain("Name the package.");
+      expect(blocked.match(/Name the package\./g)).toHaveLength(2); // the Status line's text and its title
+      expect(blocked).not.toContain("No package offered yet");
+      expect(blocked).toContain("Updated 1d ago");
       expect(blocked).toContain("Sep 30");
     });
 
@@ -159,11 +165,13 @@ describe("Proposals page", () => {
 
     it("a failed events read still renders every Last activity cell, with a derived line", async () => {
       const html = await go({}, { events: "fail" });
-      expect(html).toContain('class="wrap pq-activity pq-c-activity"');
-      for (const id of ["a1", "a2", "s1"]) expect(rowOf(html, `Client ${id}<`)).toMatch(/pq-c-activity"[^>]*>Updated 1d ago</);
+      expect(html).toContain('class="pq-mono pq-activity-line"');
+      for (const id of ["a1", "a2", "s1"]) expect(rowOf(html, `Client ${id}<`)).toMatch(/pq-activity-line"[^>]*>Updated 1d ago</);
       expect(rowOf(html, "Client e1<")).toContain("Stored status still says sent");
+      // Blocked: the reason lives in Status only.
       expect(rowOf(html, "Client b1<")).toContain("Add the pay link before creating the link.");
-      expect(html).not.toContain('pq-activity"><');
+      expect(rowOf(html, "Client b1<").match(/Add the pay link before creating the link\./g)).toHaveLength(2);
+      expect(html).not.toContain('pq-activity-line"></div>');
     });
 
     it("shows 'Edited from' in the sub-line when a field was changed from the package", async () => {

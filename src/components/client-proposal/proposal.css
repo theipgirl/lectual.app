@@ -10,19 +10,21 @@
    ============================================================ */
 
 .cp-root {
-  /* neutral firm (default) */
-  --cp-page: #f4f5f7;
-  --cp-sheet: #ffffff;
-  --cp-tint: #eaeff5;
-  --cp-stripe: #f7f9fb;
-  --cp-box: #ffffff;
-  --cp-ink: #1f2933;
-  --cp-brand: #1f3a5f;
-  --cp-brand-dark: #16294a;
-  --cp-soft: #4b5a6b;
-  --cp-line: #dde3ea;
-  --cp-line-2: #c5ced8;
-  --cp-on-brand: #ffffff;
+  /* Any firm without a bespoke brand: the workspace palette (oxblood / cream), as values, not
+     var(--ox) etc., so the page carries its own colours wherever it is served (a firm's own
+     domain included). Mirrors globals.css: paper, card, well, cream, ink, body, ox, ox-hover, line. */
+  --cp-page: #f6f0e3; /* --paper */
+  --cp-sheet: #fffdf7; /* --card */
+  --cp-tint: #f1e8d8; /* --well */
+  --cp-stripe: #fdf7eb; /* --cream */
+  --cp-box: #fffdf7; /* --card */
+  --cp-ink: #2a1216; /* --ink */
+  --cp-brand: #6a1f2b; /* --ox */
+  --cp-brand-dark: #5a1924; /* --ox-hover */
+  --cp-soft: #4a2a2e; /* --body */
+  --cp-line: rgba(42, 18, 22, 0.13); /* --line */
+  --cp-line-2: rgba(42, 18, 22, 0.22);
+  --cp-on-brand: #fdf7eb; /* --cream */
   --cp-heading-font: Georgia, "Times New Roman", serif;
   --cp-body-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
@@ -166,7 +168,7 @@
 .cp-pr { text-align: right; white-space: nowrap; font-size: 18px; font-weight: 700; }
 .cp-pr small { display: block; font-size: 13px; font-weight: 400; color: var(--cp-soft); white-space: normal; }
 .cp-pr s { color: var(--cp-soft); font-weight: 400; font-size: 14px; margin-right: 6px; }
-.cp-off .cp-t b, .cp-off .cp-pr { opacity: 0.5; }
+.cp-off .cp-t b, .cp-off .cp-pr { opacity: 0.7; } /* unticked: quieter, still 4.5:1 */
 .cp-warn { margin: 0 22px 14px; font-size: 15px; font-weight: 600; color: var(--cp-brand); }
 /* The last mark or class held on so the proposal can't be emptied to $0. */
 .cp-keep { margin: 0 22px 14px; font-size: 14px; color: var(--cp-soft); }
@@ -220,8 +222,9 @@
 }
 .cp-btn:hover { background: var(--cp-brand-dark); border-color: var(--cp-brand-dark); }
 .cp-btn:active { transform: scale(0.98); }
-.cp-btn:disabled { opacity: 0.42; cursor: not-allowed; }
-.cp-btn:disabled:hover { background: var(--cp-brand); border-color: var(--cp-brand); }
+/* Disabled: a quiet well with body text (readable, not a faded brand button). */
+.cp-btn:disabled { background: var(--cp-tint); border-color: var(--cp-line-2); color: var(--cp-soft); cursor: not-allowed; }
+.cp-btn:disabled:hover { background: var(--cp-tint); border-color: var(--cp-line-2); }
 .cp-btn:disabled:active { transform: none; }
 .cp-paynote { font-size: 14.5px; color: var(--cp-soft); line-height: 1.45; text-align: center; }
 .cp-paynote b { color: var(--cp-ink); }
@@ -392,6 +395,31 @@ footer.cp-footer { background: var(--cp-ink); color: var(--cp-on-brand); padding
 /* Spec 7: a mark's own package, under that mark's row. Tokens only. */
 .cp-mark-pkg { display: grid; gap: 6px; }
 .cp-pkg-mark { padding: 0 0 10px 36px; }
+@container cp (max-width: 560px) {
+  .cp-pkg-mark { padding-left: 0; }
+}
+
+/* ── Spacing pass (Sevetri Wilson's proposal: two brand names, a package per mark, a custom discount). CSS only. ──
+   `.cp-root p { margin: 0 }` (0,1,1) beats the single-class rules above, so these paragraphs lost their margins and
+   sat flush against the card edge (the note) or against each other (the Add a class text). Restated with `.cp-root`. */
+.cp-root .cp-note { margin: 16px 22px 0; }
+.cp-root .cp-warn, .cp-root .cp-keep { margin: 0 22px 14px; }
+.cp-root .cp-describe { margin: 10px 0 0; }
+.cp-root .cp-how-add { margin: 0 0 8px; }
+.cp-root .cp-pkg .cp-how-add { margin: 0; }
+@container cp (max-width: 560px) {
+  .cp-root .cp-note { margin-left: 16px; margin-right: 16px; }
+  .cp-root .cp-warn, .cp-root .cp-keep { margin-left: 16px; margin-right: 16px; }
+  .cp-root .cp-describe { margin-left: 0; margin-right: 0; }
+}
+/* A heading that wraps (a long "Classes (apply to each mark selected above)", a long brand and package title) needs more than 1.2. */
+.cp-part h4 { line-height: 1.35; margin-bottom: 6px; }
+.cp-grp h3 { line-height: 1.35; margin-bottom: 6px; }
+.cp-lines { gap: 22px; }
+.cp-ln { align-items: baseline; line-height: 1.4; }
+.cp-ln .cp-l { min-width: 0; overflow-wrap: anywhere; }
+/* A mark's package block: lined up with the mark's own text (26px box + 14px gap) and with room before the next row's rule. */
+.cp-pkg-mark { padding: 0 0 16px 40px; }
 @container cp (max-width: 560px) {
   .cp-pkg-mark { padding-left: 0; }
 }

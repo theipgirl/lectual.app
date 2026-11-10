@@ -107,7 +107,7 @@ describe("F5: Matters list", () => {
     const fresh = await render({ queue: ok, matters: [m()] });
     expect(fresh).not.toContain("lp-pill-risk");
     const stale = await render({ queue: ok, matters: [m({ stage_entered_at: daysAgo(400) })] });
-    expect(stale).toContain("lp-pill lp-pill-risk");
+    expect(stale).toContain("lp-pill lp-pill-num lp-pill-risk");
   });
 
   it("an unreachable queue uses the standard warning banner", async () => {

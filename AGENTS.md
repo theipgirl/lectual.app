@@ -1570,3 +1570,27 @@ A second shell for the managing attorney, beside today's (the TECHNICIAN view, u
   USPTO deadline or wait, a pending approval, a live proposal or unreadable contact history. Firm-wide, with its chip ("N older hidden ·
   Show all"). For an approver the "Waiting on <name>" strip is "Waiting on you".
 - **NOT verified:** a real browser (desktop or 375px), migration 0103 against a real database, a live Graph send, the Mail.Send consent.
+
+## Proposals list: no sideways scroll, and paid leaves the default list (no schema)
+Display only; `pricing.ts`, `paid.ts` and `paid-view.ts` are untouched.
+- **No sideways scroll on desktop.** From 761px `.pq-tbl` is `table-layout: fixed` with set column widths (`.pq-th-*`, padding included) and a
+  880px floor; the headline (2 lines), package line and activity (4 lines) wrap or are cut with a `title` holding the whole text, the client's
+  name stays on one line (ellipsis + title). Below 1700px the "Show" column lies down as a row of chips above the list (with Open offers
+  beside it) so the table gets the whole width; Expires folds into the Status cell below 1500px. The old 140/170/150px column minimums and
+  the 880px minimum that leaked into the phone layout (it made the stacked cards scroll sideways) are gone. Narrowest width with no scroll:
+  1206px with the rail open (the 880px floor plus the rail and page gutters); under that the box scrolls instead of crushing the columns.
+- **A paid proposal leaves the default list (never deleted).** Segments are now Everything except paid, Out with a client, Drafts and blocked,
+  Accepted (accepted and not yet paid), **Paid**, Expired. `inSegment(segment, key, paid)`: paid is the row's own Paid cell
+  (`paidCell.kind === "paid"`, the same current-round state the column shows), so Undo or a reset brings the row back with no extra code. A paid
+  state that couldn't be read is NOT paid: the row stays in the default list and Accepted, the Paid count is "—", and the Paid segment says it
+  can't list them (never "No paid proposals yet"). Counts, the "Showing" footer ("6 proposals · 2 paid, listed under Paid") and the rows come
+  from the one rule. Words are in `words.ts` (`PROPOSALS_EVERYTHING_SEGMENT`, `PROPOSALS_PAID_SEGMENT`, ...).
+- Owner Today's "Proposals out" and the weekly review's "Proposals out" strip read only `sent` versions (`proposal-expiry.ts`, `owner-rules.ts`);
+  a paid proposal is accepted, so it cannot appear there and nothing changed.
+
+## Proposals list: five columns, "Current", Open offers tile (Nov 10, no schema)
+Display only; `pricing.ts`, `paid.ts` and `paid-view.ts` are untouched.
+- **Five columns at every desktop width** (no eight-column layout at 1700px+): Proposal (headline, sub-line, and `activityLine` as a third quiet line), Client, Status (the pill never wraps; the blocked reason is said ONCE here, clamped to 2 lines with a title, so a Blocked row's third line reads "Updated 5d ago"), Client response (Accepted, Opened, then the paid state with Mark paid / Undo; no paid line on a row that isn't accepted, no opens line for a draft) and Fees ("$4,075.00 at signing" / "$700.00 at filing", Geist tabular 14px; `formatCents` has no drop-the-cents option, so cents stay; a flat-fee row has no filing line). Under 760px a row stacks: proposal, client, response, then Status and Fees side by side.
+- The Mark paid sentence (`MARK_PAID_NOTE`) is the button's title and appears once in the table footer (only when some row has the button).
+- The default segment is "Current" (`PROPOSALS_EVERYTHING_SEGMENT`). Open offers is a KPI-style tile (`lx-card lx-kpi pq-out`).
+- **List-only brand headline:** a row titled "Trademark Proposal" (`DEFAULT_PROPOSAL_TITLE`) with brand names shows the brand names as its headline and "Trademark proposal" first in the sub-line; stored titles never change.

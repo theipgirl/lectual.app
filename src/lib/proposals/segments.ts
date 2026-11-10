@@ -5,27 +5,32 @@
  * Segments are views over `proposalDisplayStatus` keys (display-status.ts), never new
  * stored statuses:
  *
- *   Everything          every row, Closed included
- *   Out with a client   Sent (open, not past its expiry)
- *   Drafts and blocked  Draft and Blocked
- *   Accepted            Accepted
- *   Expired             Expired (derived)
+ *   Current                  every row that is not paid, Closed included (the default list)
+ *   Out with a client        Sent (open, not past its expiry)
+ *   Drafts and blocked       Draft and Blocked
+ *   Accepted                 Accepted and not yet paid
+ *   Paid                     Accepted and paid in the current round
+ *   Expired                  Expired (derived)
  *
- * Closed (withdrawn / superseded) is listed under Everything only.
+ * Closed (withdrawn / superseded) is listed under Everything only. A PAID proposal leaves the default list and Accepted and is
+ * listed under Paid (never deleted). Paid is the same derived state the Paid column shows (paid.ts, current round
+ * only, so a reset or an Undo brings the row back); a paid state that could not be read is NOT paid, so that row stays where it was.
  */
 
+import { PROPOSALS_EVERYTHING_SEGMENT, PROPOSALS_PAID_SEGMENT } from "@/lib/ui/words";
 import { defaultSelection, quoteProposal } from "./pricing";
 import type { ProposalDisplayKey } from "./display-status";
 import type { ProposalContent } from "./types";
 
-export const PROPOSAL_SEGMENTS = ["everything", "out", "drafts", "accepted", "expired"] as const;
+export const PROPOSAL_SEGMENTS = ["everything", "out", "drafts", "accepted", "paid", "expired"] as const;
 export type ProposalSegment = (typeof PROPOSAL_SEGMENTS)[number];
 
 export const SEGMENT_LABEL: Record<ProposalSegment, string> = {
-  everything: "Everything",
+  everything: PROPOSALS_EVERYTHING_SEGMENT,
   out: "Out with a client",
   drafts: "Drafts and blocked",
   accepted: "Accepted",
+  paid: PROPOSALS_PAID_SEGMENT,
   expired: "Expired",
 };
 
@@ -46,8 +51,13 @@ export function segmentFor(key: ProposalDisplayKey): ProposalSegment {
   }
 }
 
-/** Whether a row with this display status is listed under `segment`. */
-export function inSegment(segment: ProposalSegment, key: ProposalDisplayKey): boolean {
+/**
+ * Whether a row with this display status is listed under `segment`. `paid` is true only for a row whose paid state was READ and
+ * is paid; it defaults to false, which is also what an unreadable paid state means.
+ */
+export function inSegment(segment: ProposalSegment, key: ProposalDisplayKey, paid = false): boolean {
+  if (segment === "paid") return paid;
+  if (paid) return false;
   return segment === "everything" || segmentFor(key) === segment;
 }
 

@@ -8,6 +8,7 @@ import { opensKind, opensListText, type OpensKind, type OpensRead } from "./open
 import { proposalDisplayStatus, proposalDisplayTone, type ProposalDisplayKey } from "./display-status";
 import {
   expiresLabel,
+  compactAgo,
   lastActivityLine,
   proposalHeadline,
   proposalRef,
@@ -78,6 +79,11 @@ export type ProposalRowView = {
   atFilingCents: number | null;
   expires: string;
   activity: string;
+  /**
+   * The quiet third line of the Proposal cell: `activity`, except on a Blocked row, whose reason is already in the Status
+   * cell and so is said once: it reads "Updated 5d ago" there.
+   */
+  activityLine: string;
   /** Accepted rows only: Paid / Not paid / Couldn't read, from the same `PaidState` the proposal page reads. Null on every other row. */
   paid: PaidMarker | null;
   /** Mark paid is offered: an accepted row that is read as not paid, for a role that may mark. Never while the read failed. */
@@ -97,6 +103,16 @@ const PAID_RANK: Record<PaidCellView["kind"], number> = { not_paid: 0, unreadabl
 export function sortForSegment<T extends Pick<ProposalRowView, "paidCell">>(segment: string, rows: readonly T[]): T[] {
   if (segment !== "accepted") return [...rows];
   return rows.map((row, index) => ({ row, index })).sort((a, b) => PAID_RANK[a.row.paidCell.kind] - PAID_RANK[b.row.paidCell.kind] || a.index - b.index).map((x) => x.row);
+}
+
+/** The title a proposal is created with (New proposal, the consult drafter, the client page). In the LIST only, a row with this title is named by its brand names. */
+export const DEFAULT_PROPOSAL_TITLE = "Trademark Proposal";
+
+/** The brand names as a list headline: the first two uppercased and joined with " & ", then "+N" for the rest. */
+function brandHeadline(brands: readonly string[]): string {
+  const names = brands.map((b) => b.trim().toUpperCase()).filter(Boolean);
+  const shown = names.slice(0, 2).join(" & ");
+  return names.length > 2 ? `${shown} +${names.length - 2}` : shown;
 }
 
 export function buildProposalRowView(
@@ -136,13 +152,27 @@ export function buildProposalRowView(
   const edited = item.package_basis && item.package_basis.edited.length > 0 ? item.package_basis.name : null;
   // Spec 9: a general (flat-fee) proposal is named by its matter, has one flat fee and no USPTO fee.
   const matterTitle = typeof item.matter_title === "string" && item.matter_title.trim() ? item.matter_title.trim() : null;
+  // Display only, never stored: a default-titled trademark proposal with brand names reads as its brand names, with the type in the sub-line.
+  const byBrand = !matterTitle && item.title.trim().toLowerCase() === DEFAULT_PROPOSAL_TITLE.toLowerCase() && brandHeadline(item.brands) !== "";
+  const activity = lastActivityLine({
+    key: display.key,
+    source: item.source,
+    updatedAt: item.updated_at,
+    acceptedAt: item.accepted_at,
+    offeredCount: item.offered.length,
+    blockingIssue: item.blocking_issue,
+    event: ctx.events === "unavailable" ? "unavailable" : (ctx.events.get(item.id) ?? null),
+    names: ctx.names,
+    now: ctx.now,
+  });
+  const updatedAgo = compactAgo(item.updated_at, ctx.now);
   return {
     id: item.id,
     key: display.key,
-    headline: matterTitle ? `${item.title} — ${matterTitle}` : proposalHeadline(item.title, item.brands),
+    headline: matterTitle ? `${item.title} — ${matterTitle}` : byBrand ? brandHeadline(item.brands) : proposalHeadline(item.title, item.brands),
     subline: matterTitle
       ? `${proposalRef(item.family_id, item.version)} · Flat fee`
-      : proposalSubline({
+      : (byBrand ? "Trademark proposal · " : "") + proposalSubline({
           ref: proposalRef(item.family_id, item.version),
           key: display.key,
           offeredCount: item.offered.length,
@@ -157,17 +187,8 @@ export function buildProposalRowView(
     atSigningCents: item.legal_total_cents,
     atFilingCents: matterTitle ? null : item.gov_total_cents,
     expires: expiresLabel({ key: display.key, expiresOn: item.expires_on, acceptedAt: item.accepted_at, tz: ctx.tz }),
-    activity: lastActivityLine({
-      key: display.key,
-      source: item.source,
-      updatedAt: item.updated_at,
-      acceptedAt: item.accepted_at,
-      offeredCount: item.offered.length,
-      blockingIssue: item.blocking_issue,
-      event: ctx.events === "unavailable" ? "unavailable" : (ctx.events.get(item.id) ?? null),
-      names: ctx.names,
-      now: ctx.now,
-    }),
+    activity,
+    activityLine: display.key === "blocked" ? (updatedAgo ? `Updated ${updatedAgo}` : "Updated") : activity,
     paid,
     canMarkPaid,
     accepted,

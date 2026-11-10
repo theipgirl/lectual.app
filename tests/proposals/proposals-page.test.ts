@@ -10,7 +10,7 @@ import { item, renderListPage as render, rowOf, segments } from "./list-page-har
  * counts now read as segments. The page's own layout is tested in quotes-page.test.ts.
  */
 
-const ALL_SEGMENTS = ["Everything:8", "Out with a client:1", "Drafts and blocked:3", "Accepted:1", "Expired:2"];
+const ALL_SEGMENTS = ["Current:8", "Out with a client:1", "Drafts and blocked:3", "Accepted:1", "Paid:0", "Expired:2"];
 
 describe("proposals list page", () => {
   beforeEach(() => {
@@ -27,7 +27,7 @@ describe("proposals list page", () => {
 
   it("a segment with no rows is still listed, with a 0", async () => {
     const html = await render({}, { rows: [item("a1"), item("c1", { status: "accepted" })] });
-    expect(segments(html)).toEqual(["Everything:2", "Out with a client:0", "Drafts and blocked:1", "Accepted:1", "Expired:0"]);
+    expect(segments(html)).toEqual(["Current:2", "Out with a client:0", "Drafts and blocked:1", "Accepted:1", "Paid:0", "Expired:0"]);
   });
 
   it("?segment=expired lists only expired rows and leaves the counts alone", async () => {
@@ -76,14 +76,14 @@ describe("proposals list page", () => {
     expect(sent).not.toContain("Client e1<");
     vi.resetModules();
     const closed = await render({ status: "withdrawn" });
-    expect(closed).toMatch(/aria-current="page"[^>]*><span>Everything/);
+    expect(closed).toMatch(/aria-current="page"[^>]*><span>Current/);
     expect(closed).toContain("Client x1");
   });
 
   it("a failed load says Proposals couldn't be loaded, with no counts and no empty-state wording", async () => {
     const html = await render({}, { rows: "fail" });
     expect(html).toContain("Proposals couldn&#x27;t be loaded");
-    expect(segments(html)).toEqual(["Everything", "Out with a client", "Drafts and blocked", "Accepted", "Expired"]);
+    expect(segments(html)).toEqual(["Current", "Out with a client", "Drafts and blocked", "Accepted", "Paid", "Expired"]);
     expect(html).not.toContain("No proposals yet");
     expect(html).not.toContain("No accepted proposals yet.");
   });
@@ -91,7 +91,7 @@ describe("proposals list page", () => {
   it("an empty list reads as empty only when the read worked", async () => {
     const html = await render({}, { rows: [] });
     expect(html).toContain("No proposals yet");
-    expect(segments(html)[0]).toBe("Everything:0");
+    expect(segments(html)[0]).toBe("Current:0");
   });
 
   it("a segment with no rows says so, and points back to Everything", async () => {
@@ -161,7 +161,7 @@ describe("proposals list page: paid marker and Mark paid on accepted rows (Sprin
   });
 
   it("a paid row shows 'Paid Oct 21' with Undo (who marked it is the tooltip) and no Mark paid; Last activity reads 'Marked paid', not 'Edited'", async () => {
-    const html = await render({}, { rows, steps: { c1: PAID }, directory: DAWN, events: new Map([["c1", { type: "accepted", actor: "client", actor_user_id: null, created_at: "2026-10-21T15:00:00Z" }]]) });
+    const html = await render({ segment: "paid" }, { rows, steps: { c1: PAID }, directory: DAWN, events: new Map([["c1", { type: "accepted", actor: "client", actor_user_id: null, created_at: "2026-10-21T15:00:00Z" }]]) });
     const row = rowOf(html, "Client c1");
     expect(row).toContain("Paid Oct 21");
     expect(row).toContain('title="Paid · marked by Dawn · Oct 21"');
@@ -185,7 +185,7 @@ describe("proposals list page: paid marker and Mark paid on accepted rows (Sprin
     expect(rowOf(html, "Client c1")).toContain("Not paid");
     expect(buttons(rowOf(html, "Client c1"))).toEqual([]);
     vi.resetModules();
-    const paid = await render({}, { rows, role, steps: { c1: PAID }, directory: DAWN });
+    const paid = await render({ segment: "paid" }, { rows, role, steps: { c1: PAID }, directory: DAWN });
     expect(rowOf(paid, "Client c1")).toContain("Paid Oct 21");
     expect(buttons(rowOf(paid, "Client c1"))).toEqual([]);
   });

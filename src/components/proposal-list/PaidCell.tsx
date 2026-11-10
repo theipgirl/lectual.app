@@ -8,6 +8,7 @@ import { MARK_PAID_NOTE, type PaidCellView } from "@/lib/proposals/list-rows";
  * The Paid column of a row: "-" for a row that is not accepted, "Paid Oct 21 · Undo", "Not paid · Mark paid" (with a note
  * on how to confirm), or "Paid status couldn't be read" with no button (never "Not paid" for a failed read).
  *
+ * The Mark paid sentence is not repeated per row: it is the button's title and is said once in the table's footer.
  * Mark paid and Undo are the proposal page's own actions (`markPaidAction`, `undoPaidAction`, each gated on its own to the
  * roles in PROPOSAL_PAID_ROLES); a role outside them sees the text and no button. This is a stopgap: paid is marked by
  * hand until the firm's LawPay connection takes payment on the proposal, and then the paid state comes from that payment.
@@ -35,11 +36,10 @@ export function PaidCell({ proposalId, cell }: { proposalId: string; cell: PaidC
               <input type="hidden" name="proposalId" value={proposalId} />
               <span className="pq-paid-act">
                 <span aria-hidden="true">{"·"}</span>
-                <button type="submit" className={`lx-btn lx-btn-sm ${paid ? "lx-btn-ghost" : "lx-btn-sec"}`} disabled={pending}>
+                <button type="submit" className={`lx-btn lx-btn-sm ${paid ? "lx-btn-ghost" : "lx-btn-sec"}`} disabled={pending} title={paid ? undefined : MARK_PAID_NOTE}>
                   {pending ? (paid ? "Undoing…" : "Marking…") : paid ? "Undo" : "Mark paid"}
                 </button>
               </span>
-              {!paid && <span className="lx-note pq-paid-note">{MARK_PAID_NOTE}</span>}
               <Outcome state={state} pending={pending} />
             </>
           )}
