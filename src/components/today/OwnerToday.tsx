@@ -22,6 +22,7 @@ import {
   OWNER_CARDS_HEADING,
   OWNER_CARDS_START,
   OWNER_CONSULTS_FAILED,
+  OWNER_CONSULTS_HEADING,
   OWNER_PROPOSAL_LINK_LIVE,
   OWNER_PROPOSALS_SORT_NOTE,
   OWNER_WEEK_KEY_CONSULT,
@@ -175,7 +176,7 @@ export async function OwnerToday({
           ) : (
             <section className="ot-card" aria-labelledby="ot-consults-h">
               <h2 id="ot-consults-h" className="ot-card-title">
-                Today&apos;s consults
+                {OWNER_CONSULTS_HEADING}
               </h2>
               <p className="ot-sub ot-note" role="alert">
                 {OWNER_CONSULTS_FAILED}

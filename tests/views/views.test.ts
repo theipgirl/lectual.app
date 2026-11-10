@@ -146,9 +146,9 @@ describe("drawnNav", () => {
   it("the owner rail: four rows and a More parent; Approvals opens the deck and stays active on the list and an item", () => {
     const drawn = drawnNav(visibleNav(ALL, "owner"), "owner");
     const groups = railGroups(drawn, "/dashboard/queue/abc/", railTreeFor("owner")!);
-    expect(groups.map((g) => g.map((e) => e.label))).toEqual([["Today", "Approvals", "Weekly review", "Client proposals"], ["More"]]);
+    expect(groups.map((g) => g.map((e) => e.label))).toEqual([["Today", "Approvals", "Weekly review", "Proposals"], ["More"]]);
     expect(groups[0][1]).toMatchObject({ href: DECK_PATH, active: true, countKey: "queue" });
-    expect(groups[1][0].kids.map((k) => k.label)).toEqual(["Leads", "All matters", "Calendar"]);
+    expect(groups[1][0].kids.map((k) => k.label)).toEqual(["Leads", "Matters", "Calendar"]);
     expect(groups[1][0].href).toBe("/dashboard/intake/");
   });
 

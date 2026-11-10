@@ -59,8 +59,9 @@ describe("Owner Today", () => {
   it("greets by name and shows the cards line with a Start link to the deck", async () => {
     const html = await render();
     expect(html).toContain("Good morning, Rebecca.");
-    expect(html).toContain("3 cards need you");
-    expect(html).toContain("about 6 min");
+    expect(html).toContain('<span class="ot-big">3</span>');
+    expect(html).toContain("cards for you · about 6 min");
+    expect(html).toContain("Deal opened 7:00 AM. Next deal 2:00 PM.");
     expect(html).toMatch(/href="\/dashboard\/queue\/deck\/"[^>]*>Start</);
   });
 
@@ -89,7 +90,7 @@ describe("Owner Today", () => {
     expect(html).toContain("Couldn't load deadlines.");
     expect(html).toContain("Couldn't load proposals.");
     expect(html).toContain("Couldn't load this week.");
-    expect(html).toContain("3 cards need you");
+    expect(html).toContain('<span class="ot-big">3</span>');
     expect(html).not.toContain("boom secret");
     expect(html).not.toContain("Nothing due in the next 14 days.");
     expect(html).not.toContain("No proposals are out right now.");

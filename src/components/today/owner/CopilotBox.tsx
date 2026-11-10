@@ -7,6 +7,8 @@ import {
   OWNER_COPILOT_CHIPS,
   OWNER_COPILOT_HEADING,
   OWNER_COPILOT_LABEL,
+  OWNER_COPILOT_PHONE_CHIPS,
+  OWNER_COPILOT_PHONE_PLACEHOLDER,
   OWNER_COPILOT_SUB,
   OWNER_COPILOT_SUB_SHORT,
 } from "@/lib/ui/words";
@@ -26,15 +28,23 @@ export function CopilotBox() {
         <span className="ot-sub ot-only-narrow">{OWNER_COPILOT_SUB_SHORT}</span>
       </div>
       <form action={COPILOT_PATH} method="get" className="ot-copilot" role="search" aria-label={COPILOT_NAME}>
-        <input name="q" type="text" maxLength={500} autoComplete="off" aria-label={OWNER_COPILOT_LABEL} placeholder={OWNER_COPILOT_ASK_PLACEHOLDER} />
+        <input name="q" type="text" maxLength={500} autoComplete="off" aria-label={OWNER_COPILOT_LABEL} placeholder={OWNER_COPILOT_ASK_PLACEHOLDER} className="ot-only-wide-block" />
+        <input name="q" type="text" maxLength={500} autoComplete="off" aria-label={OWNER_COPILOT_LABEL} placeholder={OWNER_COPILOT_PHONE_PLACEHOLDER} className="ot-only-narrow-block" />
         <button type="submit" className="ot-btn">
           {OWNER_COPILOT_BUTTON}
         </button>
       </form>
-      <div className="ot-chips">
+      <div className="ot-chips ot-only-wide-block">
         {OWNER_COPILOT_CHIPS.map((q) => (
           <Link key={q} href={copilotHref(q)} prefetch={false} className="ot-chip">
             {q}
+          </Link>
+        ))}
+      </div>
+      <div className="ot-chips ot-only-narrow-block">
+        {OWNER_COPILOT_PHONE_CHIPS.map((c) => (
+          <Link key={c.label} href={copilotHref(c.question)} prefetch={false} className="ot-chip">
+            {c.label}
           </Link>
         ))}
       </div>

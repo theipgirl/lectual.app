@@ -95,6 +95,7 @@
 
 /* Top bar (TopBar board): 64px, full width, the wordmark left (28px serif), bell and profile right, both 38px. */
 .lx-top.lx-top--owner {
+  box-sizing: border-box;
   height: 64px;
   gap: 12px;
   padding: 0 28px 0 34px;
@@ -121,6 +122,8 @@
     background: var(--owner-rail);
     border-color: var(--owner-rail-line);
     box-shadow: 0 18px 40px -14px rgba(20, 4, 8, 0.6);
+    /* Above the open More sheet and its scrim, so the bar and its cream More tile are never dimmed. */
+    z-index: 73;
   }
   .lx-more-note {
     margin: 0;

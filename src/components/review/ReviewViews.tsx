@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { bucketOf, type BucketKey, type ReviewRow } from "@/lib/review/buckets";
 import type { ProposalOut } from "@/lib/review/strips";
-import { laneOf, type Kpis, type Lane } from "@/lib/review/lanes";
+import { type Kpis, type Lane } from "@/lib/review/lanes";
 import { dueText, followUpText } from "@/lib/review/format";
 import { openToken } from "@/lib/review/open";
 import { reviewHref, REVIEW_VIEWS, type ReviewParams, type ReviewView } from "@/lib/review/params";
@@ -51,10 +51,8 @@ export function KpiStrip({ kpis }: { kpis: Kpis }) {
 }
 
 /** The whole card is one link to the panel; Done and Open sit OUTSIDE it, so nothing interactive is nested. */
-export function Card({ row, bucket, today, members, canWrite, params, followUp }: Common & { row: ReviewRow; bucket: BucketKey; /** A "Waiting on client" card says when we last followed up. */ followUp?: boolean }) {
+export function Card({ row, bucket, today, canWrite, params, followUp }: Common & { row: ReviewRow; bucket: BucketKey; /** A "Waiting on client" card says when we last followed up. */ followUp?: boolean }) {
   const due = row.nextStep ? dueText(row.nextStep.dueDate, today) : null;
-  const ownerId = laneOf(row);
-  const ownerName = ownerId ? members.find((m) => m.userId === ownerId)?.name ?? "Teammate" : null;
   const href = openHref(params, row);
   // The pill at the right of the step: the due date, else "Approval" for a record waiting on one, else a nudge to set a step.
   const pill = due
@@ -69,19 +67,19 @@ export function Card({ row, bucket, today, members, canWrite, params, followUp }
       <Link href={href} className="rv-card-link" scroll={false}>
         <span className="rv-card-top">
           <span className="rv-card-title">{row.client}</span>
-          {ownerName && <Avatar name={ownerName} />}
-        </span>
-        <span className="rv-card-meta lx-note">
-          {row.kind === "lead" ? "Lead" : "Matter"}
-          {row.mark ? ` · ${row.mark}` : ""}
-          {row.stageLabel ? ` · ${row.stageLabel}` : ""}
+          <span className="rv-card-meta lx-note">
+            {row.kind === "lead" ? "Lead" : "Matter"}
+            {row.mark ? ` · ${row.mark}` : ""}
+            {row.stageLabel ? ` · ${row.stageLabel}` : ""}
+            {row.proposalExpiry ? <span className={row.proposalExpiry.expired ? "rv-deadline-soon" : undefined}>{` · ${row.proposalExpiry.text}`}</span> : null}
+          </span>
+          {!followUp && pill && <span className={`rv-pill rv-pill-${pill.tone}`}>{pill.text}</span>}
         </span>
         <span className="rv-card-step">
           <span className="rv-card-step-text">{row.nextStep ? row.nextStep.title : "No next step"}</span>
-          {!followUp && pill && <span className={`rv-pill rv-pill-${pill.tone}`}>{pill.text}</span>}
         </span>
         {followUp && <span className="rv-card-followup lx-note">{followUpText(row, today)}</span>}
-        <Tags row={row} today={today} max={2} />
+        <Tags row={row} today={today} max={2} skip={["waiting", "expiry"]} />
       </Link>
       <div className="rv-card-acts">
         {canWrite && row.nextStep && <DoneButton taskId={row.nextStep.id} />}

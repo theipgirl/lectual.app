@@ -111,6 +111,8 @@ export function MobileBar({ items, queueStatus, pendingCount, counts, bar: barSp
     controls[action.index]?.focus();
   };
 
+  // The owner's open sheet takes the active tile (PhoneBar board); the page you are on is still named by aria-current.
+  const sheetOwnsTile = variant === "owner" && open;
   const moreActive = sections.some((s) => s.items.some((i) => i.active));
 
   return (
@@ -122,7 +124,7 @@ export function MobileBar({ items, queueStatus, pendingCount, counts, bar: barSp
             <Link
               key={item.slug || "today"}
               href={item.href}
-              className={`lx-mbar-item${item.active ? " is-active" : ""}`}
+              className={`lx-mbar-item${item.active && !sheetOwnsTile ? " is-active" : ""}`}
               aria-current={item.active ? "page" : undefined}
               aria-label={count ? `${item.label} (${count === "!" ? "couldn't reach the queue" : count})` : item.label}
             >

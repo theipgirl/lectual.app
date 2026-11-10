@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cardsLine, copilotHref, dueText, ownerDeadlines, proposalsOut, weekStrip } from "@/lib/today/owner-rules";
+import { cardsHero, deadlineChip, proposalTone, cardsLine, copilotHref, dueText, ownerDeadlines, proposalsOut, weekStrip } from "@/lib/today/owner-rules";
 
 const NOW = new Date("2026-11-10T15:00:00Z");
 const TZ = "America/New_York";
@@ -50,5 +50,20 @@ describe("owner Today rules", () => {
   it("copilotHref trims and encodes", () => {
     expect(copilotHref("  what is due? ")).toBe("/dashboard/copilot/?q=what%20is%20due%3F");
     expect(copilotHref("   ")).toBe("/dashboard/copilot/");
+  });
+
+  it("cardsHero: a number only for a read queue with cards; the deal line names the opened deal", () => {
+    expect(cardsHero({ status: "unavailable" })).toMatchObject({ big: null, message: "Couldn't load your cards.", canStart: false });
+    const ok = cardsHero({ status: "ok", count: 6, minutes: 8, dealLabel: "7:00 AM", nextDealLabel: "2:00 PM", laterArrivals: 0 });
+    expect(ok).toMatchObject({ big: "6", unit: "cards for you", about: "about 8 min", dealLine: "Deal opened 7:00 AM. Next deal 2:00 PM.", canStart: true });
+    expect(cardsHero({ status: "ok", count: 0, minutes: 0, dealLabel: null, nextDealLabel: "2:00 PM", laterArrivals: 0 })).toMatchObject({ big: null, message: "All decided. Next deal 2:00 PM." });
+  });
+
+  it("day chips and tones; a proposal's tone follows its last day", () => {
+    expect(deadlineChip({ dueDate: "2026-11-14", overdueDays: 0 }, "2026-11-10")).toEqual({ text: "4 days", tone: "risk" });
+    expect(deadlineChip({ dueDate: "2026-11-18", overdueDays: 0 }, "2026-11-10")).toEqual({ text: "8 days", tone: "warn" });
+    expect(deadlineChip({ dueDate: "2026-11-07", overdueDays: 3 }, "2026-11-10")).toEqual({ text: "3 days overdue", tone: "risk" });
+    expect(proposalTone({ expired: false, expiresOn: "2026-11-20" }, "2026-11-10")).toBe("plain");
+    expect(proposalTone({ expired: true, expiresOn: "2026-11-05" }, "2026-11-10")).toBe("risk");
   });
 });
