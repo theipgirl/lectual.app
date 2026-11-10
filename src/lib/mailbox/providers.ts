@@ -1,5 +1,5 @@
 import { pkceChallenge } from "./state";
-import { SEND_SCOPE } from "./send-draft";
+import { SEND_SCOPE } from "./outlook-send";
 import { env } from "@/lib/env";
 import { PROVIDER_FETCH_TIMEOUT_MS, withTimeout } from "@/lib/http/timeout";
 

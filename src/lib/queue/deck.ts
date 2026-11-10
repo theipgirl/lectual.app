@@ -227,3 +227,28 @@ export function decidedToday(items: readonly QueueItem[], email: string | null, 
     .filter((i) => i.status !== "pending" && (i.resolved_by ?? "").trim().toLowerCase() === me && i.resolved_at && isToday(new Date(i.resolved_at)))
     .sort((a, b) => (b.resolved_at ?? "").localeCompare(a.resolved_at ?? ""));
 }
+
+export const DECK_BASE = "/dashboard/queue/deck/";
+
+/** A deck address. Only these three keys ever appear; the id is the queue's own (checked by `parseAtParam`). */
+export function deckHref(args: { view?: DeckView; at?: string | null; dealNow?: boolean }): string {
+  const q = new URLSearchParams();
+  if (args.view && args.view !== "cards") q.set("view", args.view);
+  if (args.at) q.set("at", args.at);
+  if (args.dealNow) q.set("deal", "now");
+  const s = q.toString();
+  return s ? `${DECK_BASE}?${s}` : DECK_BASE;
+}
+
+/** The first lines of the draft, as plain text, for the card. */
+export function draftOpening(item: Pick<QueueItem, "draft_body" | "final_body">, max = 220): string {
+  const text = (item.final_body ?? item.draft_body ?? "")
+    .replace(/[#*_`>|]+/g, " ")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
+}

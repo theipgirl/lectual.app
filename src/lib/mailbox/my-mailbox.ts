@@ -5,7 +5,7 @@ import { providerCredentials, rootKeyOrNull } from "./config";
 import { createMailboxDraft, type DraftInput } from "./drafts";
 import { freshAccessToken, type ConnectionRow } from "./sync";
 import { hasSendScope, sendScopeRequested, type MailboxProvider } from "./providers";
-import { sendCheckedDraft, type SendCheck } from "./send-draft";
+import { sendCheckedDraft, type SendCheck } from "./outlook-send";
 import type { SearchableMailbox } from "@/lib/reconcile/mailbox-search";
 
 /**
