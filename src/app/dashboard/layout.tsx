@@ -23,7 +23,7 @@ import { NavProgress } from "@/components/shell/NavProgress";
 import { shouldShowTour } from "@/lib/onboarding/tour";
 import { FirmWordmark } from "@/components/shell/FirmWordmark";
 import { YourNameDialog } from "@/components/account/YourNameDialog";
-import { drawnNav, parseViewPref, shellFor, VIEW_PREF_KEY, viewFor, viewMenuFor } from "@/lib/views";
+import { drawnNav, NO_PREVIEW, previewFor, shellFor, viewFor, viewMenuFor } from "@/lib/views";
 
 export const metadata: Metadata = { title: "Lectual" };
 
@@ -49,12 +49,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // The view decides only what is DRAWN (src/lib/views): read off the user already in hand, never a second read.
   // Every page and action keeps its own gate; with the firm's switch off this is today's shell, unchanged.
   const firmHasRoleViews = (org.modules ?? []).includes("role-views");
-  const viewPref = parseViewPref(user.user_metadata?.[VIEW_PREF_KEY]);
-  const view = viewFor({ role, pref: viewPref, firmHasRoleViews, actingAsStaff });
+  // Firm members have no preference: their view is their role's. Only Lectual staff acting here carry a preview,
+  // kept per firm, so one chosen in another firm never applies in this one.
+  const viewPreview = actingAsStaff ? previewFor(user.user_metadata, org.id) : NO_PREVIEW;
+  const view = viewFor({ role, preview: viewPreview, firmHasRoleViews, actingAsStaff });
   const shell = shellFor(view);
   // The one draw-only filter, after visibleNav: it can drop a section, never add one.
   const drawn = drawnNav(items, view);
-  const viewMenu = viewMenuFor({ role, pref: viewPref, firmHasRoleViews, actingAsStaff, view });
+  const viewMenu = viewMenuFor({ preview: viewPreview, firmHasRoleViews, actingAsStaff });
 
   // Three states, carried to the rail badge — an unreachable queue must never
   // render like an empty one (src/lib/queue/load.ts).
@@ -105,6 +107,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           switchableFirms={switchableFirms}
           viewMenu={viewMenu}
           settingsInMenu={shell.settingsInMenu}
+          variant={shell.variant}
         />
       </header>
       <div className="lx-main">

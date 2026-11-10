@@ -1509,12 +1509,20 @@ A second shell for the managing attorney, beside today's (the TECHNICIAN view, u
   (`modules-copy.ts`). Off (the default) = today's shell for every firm, byte for byte (tests compare the drawn rail, phone bar and More
   sheet with the old calls). The deck page and every deck action answer `notFound()` without it.
 - **`src/lib/views/` (pure):** view ids technician, owner, attorney, matters-team, intake, office, marketing, read-only; `LIVE_VIEWS =
-  ["owner"]` (every other role keeps today's shell). `viewFor({ role, pref, firmHasRoleViews, actingAsStaff })`: switch off -> technician;
-  the person's own `user_metadata.lectual_view` = `technician` | `auto` | `as:<role>`; `technician` wins; Lectual staff acting in a firm
-  get technician unless they chose a preview themselves; `as:<role>` is honoured only for owner / admin / senior_admin / staff
-  (`canSwitchView`). `saveViewAction` (`src/lib/account/view-actions.ts`) is the name action's merge pattern: scoped client, merged
-  metadata, no user or org argument, fixed sentences. The switch and "Preview a view" are in `AccountMenu` only for those roles and only
-  when the firm has `role-views`; only a role with a live view of its own gets the on/off switch.
+  ["owner"]` (every other role keeps today's shell). `viewFor({ role, preview, firmHasRoleViews, actingAsStaff })`: switch off -> technician.
+  **Firm members (owner and every other role) have NO view switch** (founder, 2026-11-10): their view is their role's alone (owner -> owner
+  view, everyone else technician while only the owner view is live), and a stored preference is never read for them (the old account-wide
+  `user_metadata.lectual_view` is ignored everywhere). **Only Lectual staff acting inside a firm** (`actingAsStaff`, which
+  `resolveFirmSession` asks the database via `is_platform_admin`) get the switch (`canSwitchView`), and only when THAT firm has `role-views`:
+  technician by default, or a preview of a LIVE view. The preview is kept per firm on the staff member's own account,
+  `user_metadata.lectual_view_preview = { <org id>: "as:<role>" }` (`previewFor`, `withPreview`; org-id keys only, at most 50, `technician`
+  removes that firm's key), so a preview chosen in firm A never applies in firm B. Chosen over a cookie because the layout already holds
+  the user (no second read), it follows the staff member across devices, and one cookie path covers every firm anyway. It is user-editable
+  and draw-only: it decides what is drawn, never what can be opened. `saveViewAction` (`src/lib/account/view-actions.ts`) refuses every
+  firm member and staff in a firm without `role-views` (`VIEW_PREVIEW_NOT_ALLOWED`), takes the firm from the session (no org or user
+  argument from the browser), merges metadata like the name action, scoped client only, fixed sentences. The menu's View group
+  (`ViewSwitch`: "Technician view" radio row, "Preview a view" chips, `VIEW_PREVIEW_NOTE`) is drawn only for those staff. The owner view's
+  account menu (`AccountMenu variant="owner"`, `account-menu.css`) follows the AccountMenu board; with no variant the menu is today's.
 - **The seam:** ONE `drawnNav(items, view)` in `src/app/dashboard/layout.tsx`, after `visibleNav`, feeding Rail, MobileBar and the tour's
   `navSlugs`. Never inside `visibleNav` / `navItemAllowed` (Reports index and the hub gate on those). `railGroups` / `mobileBarItems` /
   `moreSections` take an optional tree / bar / groups; with none they are unchanged. Owner rail: Today, Approvals (opens the deck),

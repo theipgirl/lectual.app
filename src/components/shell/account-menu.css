@@ -1,0 +1,165 @@
+/* The account menu as drawn in the owner view (AccountMenu variant="owner") and the View group (ViewSwitch, Lectual
+   staff only). Ported from the AccountMenu design board. Tokens only; the two new colours have dark values. */
+:root {
+  --am-pill-ox-bg: color-mix(in srgb, var(--ox) 10%, transparent);
+  --am-hover: var(--well);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --am-pill-ox-bg: color-mix(in srgb, var(--ox) 22%, transparent);
+    --am-hover: color-mix(in srgb, var(--ink) 8%, transparent);
+  }
+}
+:root[data-theme="dark"] {
+  --am-pill-ox-bg: color-mix(in srgb, var(--ox) 22%, transparent);
+  --am-hover: color-mix(in srgb, var(--ink) 8%, transparent);
+}
+
+.lx-am {
+  position: absolute;
+  right: 0;
+  top: 44px;
+  z-index: 60;
+  width: 330px;
+  max-width: calc(100vw - 32px);
+  padding: 8px;
+  border-radius: 18px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-lift);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.lx-am-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.lx-am-head {
+  padding: 10px 12px 12px;
+  border-bottom: 1px solid var(--line-2);
+}
+.lx-am-name {
+  margin: 0;
+  font-weight: 600;
+  color: var(--ink);
+}
+.lx-am-sub {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.lx-am-sep {
+  border-top: 1px solid var(--line-2);
+}
+.lx-am-eyebrow {
+  padding: 10px 12px 4px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.lx-am-eyebrow--tight {
+  padding-top: 8px;
+}
+.lx-am-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  font: 14px var(--sans);
+  color: var(--ink);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.lx-am-item--sm {
+  padding: 8px 12px;
+}
+.lx-am-item:hover {
+  background: var(--am-hover);
+}
+.lx-am-item:focus-visible,
+.lx-am-chip:focus-visible {
+  outline: 2px solid var(--ox);
+  outline-offset: 1px;
+}
+.lx-am-item:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.lx-am-item[aria-checked="true"] {
+  background: var(--well);
+  font-weight: 500;
+}
+.lx-am-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 400;
+  white-space: nowrap;
+  background: var(--am-pill-ox-bg);
+  color: var(--ox);
+}
+.lx-am-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 2px 12px 10px;
+}
+.lx-am-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 13px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  font: 12.5px var(--sans);
+  color: var(--ink);
+  cursor: pointer;
+}
+.lx-am-chip[aria-checked="true"] {
+  background: var(--ink);
+  color: var(--cream);
+  border-color: var(--ink);
+}
+.lx-am-note {
+  margin: 0;
+  padding: 0 12px 10px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.lx-am-error {
+  margin: 0;
+  padding: 0 12px 10px;
+  font-size: 13px;
+  color: var(--wine);
+}
+.lx-am-firm {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line-2);
+}
+@media (pointer: coarse) {
+  .lx-am-item {
+    min-height: 44px;
+  }
+  .lx-am-chip {
+    min-height: 44px;
+  }
+}

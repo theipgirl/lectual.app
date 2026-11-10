@@ -160,18 +160,22 @@ export const PROPOSAL_TYPE_GENERAL = "Contract or other matter (flat fee)";
 export const GENERAL_LOE_SENTENCE = "Draft the General LOE for this matter.";
 
 /* ── Phase 1 owner view: views and shell (owned by the views/shell piece) ── */
-/** The account menu's view group (owner, admin, senior admin and Lectual staff, firms with the switch on). */
+/** The account menu's view group (Lectual staff acting inside a firm with the switch on; firm members never see it). */
 export const VIEW_GROUP_NAME = "View";
 export const OWNER_VIEW_NAME = "Owner view";
+export const TECHNICIAN_VIEW_NAME = "Technician view";
+export const TECHNICIAN_VIEW_SUB = "everything, as today";
+/** The pill on the view row that is drawn right now. */
+export const VIEW_CURRENT_PILL = "Showing";
 export const PREVIEW_A_VIEW = "Preview a view";
-export const BACK_TO_MY_VIEW = "Back to my own view";
+export const VIEW_PREVIEW_NOTE = "A preview for this firm only. It changes what is drawn, not what can be opened.";
 /** The owner phone bar's short name for the weekly review. */
 export const REVIEW_SHORT_NAME = "Review";
 export const SETTINGS_NAME = "Settings";
 /** saveViewAction's fixed sentences. */
 export const VIEW_NOT_SAVED = "We couldn't change your view. Try again.";
 export const VIEW_NOT_SIGNED_IN = "You are not signed in.";
-export const VIEW_PREVIEW_NOT_ALLOWED = "Only an owner or admin can preview another view.";
+export const VIEW_PREVIEW_NOT_ALLOWED = "Only Lectual staff can preview a view, inside a firm that has views switched on.";
 
 /* ── Phase 1 owner view: approval deck ── */
 /** Yes is off while the card's editor is open: it would approve the saved text, not the edit. */

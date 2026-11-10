@@ -39,7 +39,7 @@ import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 import { ASSISTANTS_NAME, OUR_TURN } from "@/lib/ui/words";
 import { OwnerToday } from "@/components/today/OwnerToday";
-import { parseViewPref, viewFor, VIEW_PREF_KEY } from "@/lib/views";
+import { NO_PREVIEW, previewFor, viewFor } from "@/lib/views";
 
 export const metadata: Metadata = { title: pageTitle("Today") };
 
@@ -72,7 +72,7 @@ export default async function TodayPage() {
   // The owner's Today is its own page. It is chosen BEFORE any technician read runs, so with the switch off nothing below changes.
   const view = viewFor({
     role: session.role,
-    pref: parseViewPref(session.user.user_metadata?.[VIEW_PREF_KEY]),
+    preview: session.actingAsStaff ? previewFor(session.user.user_metadata, session.org.id) : NO_PREVIEW,
     firmHasRoleViews: (session.org.modules ?? []).includes("role-views"),
     actingAsStaff: session.actingAsStaff,
   });

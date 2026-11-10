@@ -31,54 +31,89 @@ export const LIVE_VIEWS: readonly ViewId[] = ["owner"];
 
 export const isLiveView = (v: ViewId): boolean => v === "technician" || LIVE_VIEWS.includes(v);
 
-/** The person's own choice, `user_metadata.lectual_view`. Self-service; it decides only what is drawn. */
-export type ViewPref = { kind: "auto" } | { kind: "technician" } | { kind: "as"; role: Role };
+/**
+ * A Lectual staff member's preview while acting inside a firm. Firm members have no preference at all: their view
+ * comes from their role alone, and a `lectual_view` left on their account by an earlier build is never read.
+ */
+export type ViewPref = { kind: "technician" } | { kind: "as"; role: Role };
 
-export const VIEW_PREF_KEY = "lectual_view";
+export const NO_PREVIEW: ViewPref = { kind: "technician" };
+
+/**
+ * Where a staff preview is kept: `user_metadata.lectual_view_preview = { <org id>: "as:<role>" }`, on the staff
+ * member's OWN account, keyed by the firm it was chosen in, so it never follows them into another firm. Only
+ * `as:<role>` values are stored; going back to the technician view removes that firm's key.
+ */
+export const VIEW_PREVIEW_KEY = "lectual_view_preview";
+
+/** How many firms' previews one account keeps; the oldest are dropped first. */
+export const VIEW_PREVIEW_MAX = 50;
 
 const ROLE_SET = new Set<string>(Object.keys(ROLE_VIEW));
+const ORG_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** `technician` | `auto` | `as:<role>`. Anything else (missing, malformed, unknown role) reads as auto. */
+/** `technician` | `as:<role>`. Anything else (missing, malformed, unknown role) reads as technician. */
 export function parseViewPref(raw: unknown): ViewPref {
-  if (raw === "technician") return { kind: "technician" };
   if (typeof raw === "string" && raw.startsWith("as:")) {
     const role = raw.slice(3);
     if (ROLE_SET.has(role)) return { kind: "as", role: role as Role };
   }
-  return { kind: "auto" };
+  return NO_PREVIEW;
 }
 
 export function viewPrefValue(pref: ViewPref): string {
-  return pref.kind === "as" ? `as:${pref.role}` : pref.kind;
+  return pref.kind === "as" ? `as:${pref.role}` : "technician";
 }
 
-/** Who may use the switch and "Preview a view" in the account menu. Not Lectual staff acting in a firm (see canSwitchView). */
-export const VIEW_SWITCH_ROLES: readonly Role[] = ["owner", "admin", "senior_admin"];
-export function canSwitchView(role: Role | null | undefined, actingAsStaff: boolean): boolean {
-  // Lectual staff inside a firm they do not belong to never switch or preview: a preview is saved on THEIR account, so it
-  // would follow them into every other firm they open. They always get today's shell there.
-  if (actingAsStaff) return false;
-  return !!role && VIEW_SWITCH_ROLES.includes(role);
+/** The stored map, cleaned: only org-id keys with a previewable `as:<role>` value, at most VIEW_PREVIEW_MAX (newest kept). */
+export function parsePreviewMap(raw: unknown): Record<string, string> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const entries = Object.entries(raw as Record<string, unknown>).filter(([k, v]) => {
+    if (!ORG_ID.test(k)) return false;
+    const pref = parseViewPref(v);
+    return pref.kind === "as" && previewableRoles().includes(pref.role);
+  }) as [string, string][];
+  return Object.fromEntries(entries.slice(-VIEW_PREVIEW_MAX));
+}
+
+/** The preview a staff member chose for THIS firm (read off their metadata); technician when none. */
+export function previewFor(metadata: unknown, orgId: string): ViewPref {
+  const raw = metadata && typeof metadata === "object" ? (metadata as Record<string, unknown>)[VIEW_PREVIEW_KEY] : undefined;
+  const value = parsePreviewMap(raw)[orgId];
+  return value ? parseViewPref(value) : NO_PREVIEW;
+}
+
+/** The map after saving `pref` for `orgId`: other firms' entries kept, this firm's set or (technician) removed. */
+export function withPreview(raw: unknown, orgId: string, pref: ViewPref): Record<string, string> {
+  const map = parsePreviewMap(raw);
+  delete map[orgId];
+  if (pref.kind === "as") map[orgId] = viewPrefValue(pref);
+  const entries = Object.entries(map);
+  return Object.fromEntries(entries.slice(-VIEW_PREVIEW_MAX));
+}
+
+/**
+ * Who sees the view switch: ONLY Lectual staff acting inside a firm, and only when that firm has role views. Firm
+ * members (owner included) never switch; their view follows their role.
+ */
+export function canSwitchView(args: { actingAsStaff: boolean; firmHasRoleViews: boolean }): boolean {
+  return args.actingAsStaff && args.firmHasRoleViews;
 }
 
 /**
  * The view to draw. Fails closed to the technician view (today's shell):
  *  - the firm's switch is off;
- *  - Lectual staff acting inside a firm they do not belong to;
- *  - the person chose the technician view;
- *  - the role's view is not live yet.
- * A preview (`as:<role>`) is honoured only for a person who may preview (canSwitchView).
+ *  - Lectual staff acting inside a firm, unless they chose a preview for THIS firm (a live view only);
+ *  - a firm member whose role's view is not live yet, or whose role cannot be read.
+ * A firm member's view is their role's, whatever `preview` says.
  */
-export function viewFor(args: { role: Role | null | undefined; pref: ViewPref; firmHasRoleViews: boolean; actingAsStaff: boolean }): ViewId {
-  const { role, pref, firmHasRoleViews, actingAsStaff } = args;
+export function viewFor(args: { role: Role | null | undefined; preview: ViewPref; firmHasRoleViews: boolean; actingAsStaff: boolean }): ViewId {
+  const { role, preview, firmHasRoleViews, actingAsStaff } = args;
   if (!firmHasRoleViews) return "technician";
-  if (pref.kind === "technician") return "technician";
-  // Lectual staff inside a firm see today's shell, unless they chose to preview a view themselves.
-  // Lectual staff acting inside a firm: always today's shell, whatever preview their account carries.
-  if (actingAsStaff) return "technician";
-  if (!role) return "technician";
-  const asRole = pref.kind === "as" && canSwitchView(role, false) ? pref.role : role;
-  return liveViewOf(asRole);
+  if (actingAsStaff) {
+    return preview.kind === "as" && previewableRoles().includes(preview.role) ? liveViewOf(preview.role) : "technician";
+  }
+  return role ? liveViewOf(role) : "technician";
 }
 
 /** The role's view when it is live, else the technician view. */
@@ -87,22 +122,17 @@ export function liveViewOf(role: Role): ViewId {
   return v && LIVE_VIEWS.includes(v) ? v : "technician";
 }
 
-/** The roles a person may preview from the account menu: those whose view is live. */
+/** The roles a staff member may preview from the account menu: those whose view is live. */
 export function previewableRoles(): Role[] {
   return (Object.keys(ROLE_VIEW) as Role[]).filter((r) => LIVE_VIEWS.includes(ROLE_VIEW[r]));
 }
 
-/**
- * Whether a value may be saved as this person's preference. `technician` and `auto` always; `as:<role>` only for a
- * person who may preview (canSwitchView) and only for a role whose view is live. Anything else is refused.
- */
-export function prefAllowed(raw: unknown, role: Role | null | undefined, actingAsStaff: boolean): ViewPref | null {
-  if (raw === "technician") return { kind: "technician" };
-  if (raw === "auto") return { kind: "auto" };
+/** Whether a value may be saved as a staff preview: `technician`, or `as:<role>` for a role whose view is live. */
+export function prefAllowed(raw: unknown): ViewPref | null {
+  if (raw === "technician") return NO_PREVIEW;
   if (typeof raw !== "string" || !raw.startsWith("as:")) return null;
   const pref = parseViewPref(raw);
-  if (pref.kind !== "as" || !canSwitchView(role, actingAsStaff)) return null;
-  return previewableRoles().includes(pref.role) ? pref : null;
+  return pref.kind === "as" && previewableRoles().includes(pref.role) ? pref : null;
 }
 
 /** The approval deck, the owner view's Approvals. */
@@ -178,27 +208,18 @@ export function shellFor(view: ViewId): ShellSpec {
   return { view: "technician", tree: undefined, bar: undefined, moreGroups: undefined, showSettings: true, showReports: true, settingsInMenu: false, variant: undefined };
 }
 
-/** What the account menu's View group draws. Absent when the person may not switch or the firm's switch is off. */
+/** What the account menu's View group draws. Absent unless the person may switch (Lectual staff in a firm with role views). */
 export type ViewMenu = {
-  /** The saved preference: `technician` | `auto` | `as:<role>`. */
+  /** The preview drawn for this firm right now: `technician` | `as:<role>`. */
   pref: string;
-  /** The person's own role has a live view (today: an owner), so the on/off switch is offered. */
-  ownViewLive: boolean;
-  /** The view drawn right now is the person's own live view (the switch reads "on"). */
-  ownViewOn: boolean;
-  /** Roles whose view is live and may be previewed (never the person's own). */
+  /** Roles whose view is live and may be previewed. */
   previewRoles: Role[];
 };
 
-export function viewMenuFor(args: { role: Role | null | undefined; pref: ViewPref; firmHasRoleViews: boolean; actingAsStaff: boolean; view: ViewId }): ViewMenu | undefined {
-  const { role, pref, firmHasRoleViews, actingAsStaff, view } = args;
-  if (!firmHasRoleViews || !canSwitchView(role, actingAsStaff)) return undefined;
-  const own = !actingAsStaff && role ? liveViewOf(role) : "technician";
-  const ownViewLive = own !== "technician";
-  return {
-    pref: viewPrefValue(pref),
-    ownViewLive,
-    ownViewOn: ownViewLive && pref.kind !== "as" && view === own,
-    previewRoles: previewableRoles().filter((r) => actingAsStaff || r !== role),
-  };
+export function viewMenuFor(args: { preview: ViewPref; firmHasRoleViews: boolean; actingAsStaff: boolean }): ViewMenu | undefined {
+  const { preview, firmHasRoleViews, actingAsStaff } = args;
+  if (!canSwitchView({ actingAsStaff, firmHasRoleViews })) return undefined;
+  const roles = previewableRoles();
+  const live = preview.kind === "as" && roles.includes(preview.role) ? preview : NO_PREVIEW;
+  return { pref: viewPrefValue(live), previewRoles: roles };
 }
