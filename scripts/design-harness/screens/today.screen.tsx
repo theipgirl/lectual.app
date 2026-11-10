@@ -1,0 +1,42 @@
+import { OwnerToday } from "@/components/today/OwnerToday";
+import { state } from "../state";
+import { NOW, OWNER_ID, resetState } from "../fixtures";
+import { OwnerShell } from "../shell";
+import type { Screen } from "../registry";
+
+const today = () => (
+  <OwnerShell>
+    <OwnerToday userId={OWNER_ID} role="owner" email="rebecca@rpb.example" metadata={{ full_name: "Rebecca Ames" }} now={NOW} />
+  </OwnerShell>
+);
+
+export const screens: Screen[] = [
+  {
+    id: "today-desktop",
+    title: "Owner Today, desktop",
+    designBoard: "Main",
+    viewport: "desktop",
+    pathname: "/dashboard/",
+    prepare: () => {
+      resetState();
+      state.pathname = "/dashboard/";
+    },
+    render: today,
+    note: "Real OwnerToday (async server component) with the loaders mocked in setup.ts.",
+  },
+  {
+    id: "today-phone",
+    title: "Owner Today, phone",
+    designBoard: "PhoneToday",
+    viewport: "phone",
+    // Left phone ("03 Simple Today") of the 1000x960 board. Tune with the README's crop recipe.
+    designCrop: [40, 61, 375, 812],
+    pathname: "/dashboard/",
+    prepare: () => {
+      resetState();
+      state.pathname = "/dashboard/";
+    },
+    render: today,
+    note: "Same page at 375px; the rail hides and MobileBar shows.",
+  },
+];
