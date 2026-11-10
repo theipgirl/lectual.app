@@ -6,7 +6,7 @@ import { reviewHref, type ReviewParams } from "@/lib/review/params";
 type Member = { userId: string; name: string };
 
 /** `params` is the page's URL state: every card link keeps it and adds `open=`, so the panel is shareable and Back closes it. */
-export type Common = { today: string; members: Member[]; canWrite: boolean; params: ReviewParams };
+export type Common = { /** The owner view draws the board look; every other view keeps the earlier markup. */ owner?: boolean; today: string; members: Member[]; canWrite: boolean; params: ReviewParams };
 
 /** The review URL with this record's panel open. */
 export function openHref(params: ReviewParams, row: Pick<ReviewRow, "kind" | "id">): string {

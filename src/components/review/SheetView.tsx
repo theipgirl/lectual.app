@@ -65,13 +65,13 @@ function SheetTable({ id, title, rows, today, members, params }: Common & { id: 
 }
 
 /** The Excel tracker as one table: Trademarks, then Contracts, in pipeline order. Edits happen in the panel the Client link opens. */
-export function SheetView({ rows, ...common }: Common & { rows: ReviewRow[] }) {
+export function SheetView({ rows, owner, ...common }: Common & { rows: ReviewRow[] }) {
   const { trademarks, contracts } = sheetSections(rows);
   return (
     <div className="rv-sheets">
       <SheetTable id="trademarks" title="Trademarks" rows={trademarks} {...common} />
       <SheetTable id="contracts" title="Contracts" rows={contracts} {...common} />
-      <p className="rv-sheet-note">Next step and Whose court come from next steps and mail, not from the spreadsheet. Edits happen in the record panel.</p>
+      {owner && <p className="rv-sheet-note">Next step and Whose court come from next steps and mail, not from the spreadsheet. Edits happen in the record panel.</p>}
     </div>
   );
 }

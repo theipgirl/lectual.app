@@ -9,7 +9,10 @@ export const FONTS_HREF = "https://fonts.googleapis.com/css2?family=Instrument+S
 /** Copies every compiled CSS file of the last `pnpm build` into out/css and returns their file names, globals first. */
 export function copyCss(): string[] {
   const dir = path.join(REPO, ".next/static/chunks");
-  const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith(".css")) : [];
+  let files = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith(".css")) : [];
+  // HARNESS_SKIP_CSS=<regex>: leave out compiled chunks that match (their rules come from the live src copies instead), so a stale build cannot hide a difference.
+  const skip = process.env.HARNESS_SKIP_CSS ? new RegExp(process.env.HARNESS_SKIP_CSS) : null;
+  if (skip) files = files.filter((f) => !skip.test(fs.readFileSync(path.join(dir, f), "utf8")));
   if (files.length === 0) throw new Error("No compiled CSS in .next/static/chunks. Run `pnpm build` once.");
   fs.mkdirSync(path.join(OUT, "css"), { recursive: true });
   for (const f of files) fs.copyFileSync(path.join(dir, f), path.join(OUT, "css", f));
