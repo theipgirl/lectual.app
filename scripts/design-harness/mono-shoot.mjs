@@ -92,7 +92,6 @@ const AUDIT = () => {
     if (isCourier) {
       out.courierAll++;
       out.courier.push({ text: t.slice(0, 70), size, el: sig(el), upper });
-      const bare = /^[\d\s.,:$%\/·–—\-+#A-Za-z]{0,24}$/.test(t) && words <= 3;
       const dateish = /^(\w{3} \d{1,2}(, \d{4})?|\d+[dhm]|\d{1,2}:\d{2}.*|TM-\d+|[A-Z]{2,5}-\d+.*|\d+)$/.test(t);
       if (words >= 4 && !upper && !dateish) out.courierSentences.push({ text: t.slice(0, 80), size, el: sig(el) });
     }
