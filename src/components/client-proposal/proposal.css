@@ -10,19 +10,21 @@
    ============================================================ */
 
 .cp-root {
-  /* neutral firm (default) */
-  --cp-page: #f4f5f7;
-  --cp-sheet: #ffffff;
-  --cp-tint: #eaeff5;
-  --cp-stripe: #f7f9fb;
-  --cp-box: #ffffff;
-  --cp-ink: #1f2933;
-  --cp-brand: #1f3a5f;
-  --cp-brand-dark: #16294a;
-  --cp-soft: #4b5a6b;
-  --cp-line: #dde3ea;
-  --cp-line-2: #c5ced8;
-  --cp-on-brand: #ffffff;
+  /* Any firm without a bespoke brand: the workspace palette (oxblood / cream), as values, not
+     var(--ox) etc., so the page carries its own colours wherever it is served (a firm's own
+     domain included). Mirrors globals.css: paper, card, well, cream, ink, body, ox, ox-hover, line. */
+  --cp-page: #f6f0e3; /* --paper */
+  --cp-sheet: #fffdf7; /* --card */
+  --cp-tint: #f1e8d8; /* --well */
+  --cp-stripe: #fdf7eb; /* --cream */
+  --cp-box: #fffdf7; /* --card */
+  --cp-ink: #2a1216; /* --ink */
+  --cp-brand: #6a1f2b; /* --ox */
+  --cp-brand-dark: #5a1924; /* --ox-hover */
+  --cp-soft: #4a2a2e; /* --body */
+  --cp-line: rgba(42, 18, 22, 0.13); /* --line */
+  --cp-line-2: rgba(42, 18, 22, 0.22);
+  --cp-on-brand: #fdf7eb; /* --cream */
   --cp-heading-font: Georgia, "Times New Roman", serif;
   --cp-body-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
@@ -166,7 +168,7 @@
 .cp-pr { text-align: right; white-space: nowrap; font-size: 18px; font-weight: 700; }
 .cp-pr small { display: block; font-size: 13px; font-weight: 400; color: var(--cp-soft); white-space: normal; }
 .cp-pr s { color: var(--cp-soft); font-weight: 400; font-size: 14px; margin-right: 6px; }
-.cp-off .cp-t b, .cp-off .cp-pr { opacity: 0.5; }
+.cp-off .cp-t b, .cp-off .cp-pr { opacity: 0.7; } /* unticked: quieter, still 4.5:1 */
 .cp-warn { margin: 0 22px 14px; font-size: 15px; font-weight: 600; color: var(--cp-brand); }
 /* The last mark or class held on so the proposal can't be emptied to $0. */
 .cp-keep { margin: 0 22px 14px; font-size: 14px; color: var(--cp-soft); }
@@ -220,8 +222,9 @@
 }
 .cp-btn:hover { background: var(--cp-brand-dark); border-color: var(--cp-brand-dark); }
 .cp-btn:active { transform: scale(0.98); }
-.cp-btn:disabled { opacity: 0.42; cursor: not-allowed; }
-.cp-btn:disabled:hover { background: var(--cp-brand); border-color: var(--cp-brand); }
+/* Disabled: a quiet well with body text (readable, not a faded brand button). */
+.cp-btn:disabled { background: var(--cp-tint); border-color: var(--cp-line-2); color: var(--cp-soft); cursor: not-allowed; }
+.cp-btn:disabled:hover { background: var(--cp-tint); border-color: var(--cp-line-2); }
 .cp-btn:disabled:active { transform: none; }
 .cp-paynote { font-size: 14.5px; color: var(--cp-soft); line-height: 1.45; text-align: center; }
 .cp-paynote b { color: var(--cp-ink); }
