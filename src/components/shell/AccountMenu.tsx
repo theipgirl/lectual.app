@@ -13,7 +13,9 @@ import { requestFeedback } from "@/lib/feedback/open";
 import { requestNameDialog } from "@/lib/account/name";
 import { roleLabel } from "@/lib/auth/roles";
 import { isOutsidePress, menuKeyAction } from "@/lib/shell/menu-behaviour";
-import { HELP_AND_TIPS } from "@/lib/ui/words";
+import { HELP_AND_TIPS, SETTINGS_NAME } from "@/lib/ui/words";
+import type { ViewMenu } from "@/lib/views";
+import { ViewSwitch } from "./ViewSwitch";
 
 type Props = {
   initials: string;
@@ -23,6 +25,10 @@ type Props = {
   firmName: string;
   activeOrgId: string;
   switchableFirms: SwitchableFirmRef[];
+  /** The View group (owner, admin, senior admin and Lectual staff, when the firm has role views). Absent = not drawn. */
+  viewMenu?: ViewMenu;
+  /** The owner view has no Settings row in the rail, so Settings is a link here. */
+  settingsInMenu?: boolean;
 };
 
 /** The avatar at the right of the top bar: who you are, which firm, sign out. */
@@ -34,6 +40,8 @@ export function AccountMenu({
   firmName,
   activeOrgId,
   switchableFirms,
+  viewMenu,
+  settingsInMenu = false,
 }: Props) {
   const [switchState, switchAction, switching] = useActionState<SwitchFirmState, FormData>(
     switchFirmAction,
@@ -134,6 +142,20 @@ export function AccountMenu({
           >
             Your name
           </button>
+
+          {settingsInMenu && (
+            <Link
+              href="/dashboard/settings/"
+              role="menuitem"
+              className="lx-btn lx-btn-sec lx-btn-sm"
+              style={{ width: "100%" }}
+              onClick={closeMenu}
+            >
+              {SETTINGS_NAME}
+            </Link>
+          )}
+
+          {viewMenu && <ViewSwitch menu={viewMenu} onDone={closeMenu} />}
 
           <div role="group" aria-labelledby="lx-help-h" style={{ display: "grid", gap: 8 }}>
             <div id="lx-help-h" className="lx-label" style={{ fontSize: 11 }}>

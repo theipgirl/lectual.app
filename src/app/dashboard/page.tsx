@@ -38,6 +38,8 @@ import { TodayConsults } from "@/components/calendar/TodayConsults";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 import { ASSISTANTS_NAME, OUR_TURN } from "@/lib/ui/words";
+import { OwnerToday } from "@/components/today/OwnerToday";
+import { parseViewPref, viewFor, VIEW_PREF_KEY } from "@/lib/views";
 
 export const metadata: Metadata = { title: pageTitle("Today") };
 
@@ -67,6 +69,16 @@ function Kpi({ label, value, sub, href, failed }: { label: string; value: number
 export default async function TodayPage() {
   const session = await resolveFirmSession();
   if (session.kind !== "ok") return null; // the layout already handled this
+  // The owner's Today is its own page. It is chosen BEFORE any technician read runs, so with the switch off nothing below changes.
+  const view = viewFor({
+    role: session.role,
+    pref: parseViewPref(session.user.user_metadata?.[VIEW_PREF_KEY]),
+    firmHasRoleViews: (session.org.modules ?? []).includes("role-views"),
+    actingAsStaff: session.actingAsStaff,
+  });
+  if (view === "owner") {
+    return <OwnerToday userId={session.user.id} role={session.role} email={session.user.email} metadata={session.user.user_metadata} />;
+  }
   const now = new Date();
   const [hasAgents, tz] = await Promise.all([orgHasModule("agents"), getFirmTimeZone()]);
   const monthFloor = monthQueryFloor(now, tz);

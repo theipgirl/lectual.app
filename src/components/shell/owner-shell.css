@@ -1,0 +1,59 @@
+/* The owner view's shell (src/lib/views). Drawn only when the firm has the role-views switch on and the
+   person's view is the owner's; every other shell is untouched. Colours are tokens, light and dark. */
+:root {
+  --owner-rail: #550e1a;
+  --owner-rail-line: rgba(253, 247, 235, 0.16);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --owner-rail: #4a0c17;
+    --owner-rail-line: rgba(253, 247, 235, 0.2);
+  }
+}
+
+/* Rail: the owner's oxblood column. Same shape, rows and behaviour as the default rail. */
+.lx-rail.lx-rail--owner {
+  background: var(--owner-rail);
+  border-color: var(--owner-rail-line);
+}
+
+/* Top bar: full width, wordmark left, bell and avatar right; no section label. */
+.lx-top.lx-top--owner {
+  height: 64px;
+}
+@media (max-width: 900px) {
+  .lx-top.lx-top--owner {
+    height: 56px;
+    padding: 0 16px;
+  }
+  .lx-top.lx-top--owner .lx-wordmark {
+    font-size: 22px;
+    max-width: 60vw;
+  }
+  /* The floating pill bar: the real MobileBar (cream active tile, oxblood badges) on the owner's colour. */
+  .lx-mbar.lx-mbar--owner {
+    background: var(--owner-rail);
+    border-color: var(--owner-rail-line);
+  }
+  /* The oxblood badge keeps a cream ring so it reads on the oxblood bar. */
+  .lx-mbar.lx-mbar--owner .lx-mbar-badge {
+    box-shadow: 0 0 0 1.5px var(--cream);
+  }
+}
+
+/* The account menu's View group. */
+.lx-view-toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.lx-view-state {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.lx-view-toggle[aria-checked="true"] .lx-view-state {
+  color: var(--ox);
+}

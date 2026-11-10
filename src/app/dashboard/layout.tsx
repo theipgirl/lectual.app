@@ -23,6 +23,7 @@ import { NavProgress } from "@/components/shell/NavProgress";
 import { shouldShowTour } from "@/lib/onboarding/tour";
 import { FirmWordmark } from "@/components/shell/FirmWordmark";
 import { YourNameDialog } from "@/components/account/YourNameDialog";
+import { drawnNav, parseViewPref, shellFor, VIEW_PREF_KEY, viewFor, viewMenuFor } from "@/lib/views";
 
 export const metadata: Metadata = { title: "Lectual" };
 
@@ -45,6 +46,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const { org, role, actingAsStaff, switchableFirms, displayName, user } = session;
   const items = visibleNav(org.modules ?? [], role);
+  // The view decides only what is DRAWN (src/lib/views): read off the user already in hand, never a second read.
+  // Every page and action keeps its own gate; with the firm's switch off this is today's shell, unchanged.
+  const firmHasRoleViews = (org.modules ?? []).includes("role-views");
+  const viewPref = parseViewPref(user.user_metadata?.[VIEW_PREF_KEY]);
+  const view = viewFor({ role, pref: viewPref, firmHasRoleViews, actingAsStaff });
+  const shell = shellFor(view);
+  // The one draw-only filter, after visibleNav: it can drop a section, never add one.
+  const drawn = drawnNav(items, view);
+  const viewMenu = viewMenuFor({ role, pref: viewPref, firmHasRoleViews, actingAsStaff, view });
 
   // Three states, carried to the rail badge — an unreachable queue must never
   // render like an empty one (src/lib/queue/load.ts).
@@ -78,11 +88,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
           is logged.
         </div>
       )}
-      <header className="lx-top">
+      <header className={shell.variant === "owner" ? "lx-top lx-top--owner" : "lx-top"}>
         <div className="lx-wordmark" title={org.name}>
           <FirmWordmark org={org} />
         </div>
-        <SectionLabel />
+        {shell.variant !== "owner" && <SectionLabel />}
         <div style={{ flex: 1 }} />
         <NotificationBell />
         <AccountMenu
@@ -93,26 +103,40 @@ export default async function DashboardLayout({ children }: { children: React.Re
           firmName={org.name}
           activeOrgId={org.id}
           switchableFirms={switchableFirms}
+          viewMenu={viewMenu}
+          settingsInMenu={shell.settingsInMenu}
         />
       </header>
       <div className="lx-main">
         <Rail
-          items={items}
+          items={drawn}
           queueStatus={queue.status}
           pendingCount={queue.items.length}
           counts={counts}
           initialPinned={railPinned}
+          showSettings={shell.showSettings}
+          showReports={shell.showReports}
+          tree={shell.tree}
+          variant={shell.variant}
         />
         <div className="lx-content">
           <div className="lx-page">{children}</div>
         </div>
       </div>
-      <MobileBar items={items} queueStatus={queue.status} pendingCount={queue.items.length} counts={counts} />
+      <MobileBar
+        items={drawn}
+        queueStatus={queue.status}
+        pendingCount={queue.items.length}
+        counts={counts}
+        bar={shell.bar}
+        groups={shell.moreGroups}
+        variant={shell.variant}
+      />
       <CopilotLauncher configured={aiConfigured()} />
       <FeedbackTrailRecorder />
       <FeedbackDialog />
       <YourNameDialog currentFullName={typeof user.user_metadata?.full_name === "string" ? user.user_metadata.full_name : null} />
-      <OnboardingTour open={shouldShowTour(user.user_metadata) && !actingAsStaff} role={role} navSlugs={items.map((i) => i.slug)} firmName={org.name} aiConfigured={aiConfigured()} />
+      <OnboardingTour open={shouldShowTour(user.user_metadata) && !actingAsStaff} role={role} navSlugs={drawn.map((i) => i.slug)} firmName={org.name} aiConfigured={aiConfigured()} />
       <GettingStartedRunner role={role} modules={org.modules} aiConfigured={aiConfigured()} />
     </div>
   );

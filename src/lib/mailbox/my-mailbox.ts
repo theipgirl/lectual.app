@@ -34,7 +34,7 @@ async function openMailboxToken(root: Buffer, id: string, orgId: string): Promis
  *
  * Returns null when the approver has no active personal mailbox.
  */
-export async function draftInMyMailbox(draft: DraftInput): Promise<{ provider: MailboxProvider; email: string; webLink: string | null } | null> {
+export async function draftInMyMailbox(draft: DraftInput): Promise<{ provider: MailboxProvider; email: string; webLink: string | null; id: string } | null> {
   const root = rootKeyOrNull();
   if (!root) return null;
 
@@ -52,7 +52,7 @@ export async function draftInMyMailbox(draft: DraftInput): Promise<{ provider: M
   const accessToken = await openMailboxToken(root, mine.id, mine.org_id);
   if (!accessToken) return null;
   const made = await createMailboxDraft(mine.provider as MailboxProvider, { accessToken, draft });
-  return { provider: mine.provider as MailboxProvider, email: mine.email, webLink: made.webLink };
+  return { provider: mine.provider as MailboxProvider, email: mine.email, webLink: made.webLink, id: made.id };
 }
 
 /**

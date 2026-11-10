@@ -76,6 +76,7 @@ describe("no new send path (H6, Q5)", () => {
       .filter((f) => /\.(ts|tsx)$/.test(f))
       .filter((f) => /\bresolveQueueItem\(/.test(readFileSync(f, "utf8")))
       .map((f) => f.replaceAll("\\", "/"));
-    expect(callers.sort()).toEqual(["src/app/dashboard/queue/actions.ts", "src/lib/queue/api.ts"].sort());
+    // The approve core moved out of the action (Phase 1 approval deck); the action and the deck both call it.
+    expect(callers.sort()).toEqual(["src/app/dashboard/queue/actions.ts", "src/lib/queue/api.ts", "src/lib/queue/review-core.ts"].sort());
   });
 });

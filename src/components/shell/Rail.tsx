@@ -3,11 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ICON, RAIL_PIN_COOKIE, isNavActive, navItemBySlug, railCountFor, railGroups, visibleReports, REPORTS_INDEX, type NavItem } from "@/lib/nav";
+import { ICON, RAIL_PIN_COOKIE, isNavActive, navItemBySlug, railCountFor, railGroups, visibleReports, REPORTS_INDEX, type NavItem, type RailNode } from "@/lib/nav";
 import { RAIL_COUNT_TITLE } from "@/lib/intake/counts";
 import { navTourToken } from "@/lib/onboarding/tour";
 import { closeRailOnEscape, releaseRailFocus } from "@/lib/rail-behaviour";
 import type { QueueLoadStatus } from "@/lib/queue/load";
+import "./owner-shell.css";
 
 type Props = {
   items: NavItem[];
@@ -16,6 +17,14 @@ type Props = {
   /** Section counts keyed by slug. Absent = unknown, and nothing is drawn (never a false 0). */
   counts: Partial<Record<string, number>>;
   initialPinned: boolean;
+  /** Draw the Settings row at the bottom (default: yes, today's rail). The owner view keeps Settings in the account menu. */
+  showSettings?: boolean;
+  /** Draw the Reports row above Settings when a report is visible (default: yes). */
+  showReports?: boolean;
+  /** The rail's shape (default: RAIL_TREE). A view's own tree; it only ever names slugs that `items` allowed. */
+  tree?: readonly (readonly RailNode[])[];
+  /** The owner view's colours. */
+  variant?: "owner";
 };
 
 const PIN = "M9 4h6M12 4v6M7 10h10l-1 5H8zM12 15v5";
@@ -40,7 +49,7 @@ function Icon({ d, size }: { d: string; size: number }) {
  * it, "!" when we could not (an outage never reads as "nothing waiting"),
  * nothing when there is no queue.
  */
-export function Rail({ items, queueStatus, pendingCount, counts, initialPinned }: Props) {
+export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, showSettings = true, showReports: reportsAllowed = true, tree, variant }: Props) {
   const pathname = usePathname() ?? "/dashboard/";
   const [pinned, setPinned] = useState(initialPinned);
 
@@ -55,17 +64,17 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned }
 
   const countFor = (key: string | null) => railCountFor(key, queueStatus, pendingCount, counts);
 
-  const groups = railGroups(items, pathname);
+  const groups = railGroups(items, pathname, tree);
   const settings = items.find((i) => i.slug === "settings") ?? navItemBySlug("settings")!;
   const settingsActive = isNavActive(pathname, settings);
   // One Reports row above Settings, only for a firm and role that can see at least one report.
-  const showReports = visibleReports(items).length > 0;
+  const showReports = reportsAllowed && visibleReports(items).length > 0;
   const reportsActive = pathname.startsWith(REPORTS_INDEX);
 
   return (
     <div className={`lx-rail-slot${pinned ? " is-pinned" : ""}`}>
       <nav
-        className={`lx-rail${pinned ? " is-pinned" : ""}`}
+        className={`lx-rail${pinned ? " is-pinned" : ""}${variant === "owner" ? " lx-rail--owner" : ""}`}
         aria-label="Sections"
         data-tour="rail"
         onKeyDown={(e) => closeRailOnEscape(e.key, e.currentTarget, document.activeElement as HTMLElement | null)}
@@ -141,7 +150,7 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned }
           ))}
         </div>
 
-        <div className="lx-rail-rule" aria-hidden="true" />
+        {(showReports || showSettings) && <div className="lx-rail-rule" aria-hidden="true" />}
 
         {showReports && (
           <Link
@@ -158,6 +167,7 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned }
           </Link>
         )}
 
+        {showSettings && (
         <Link
           href={settings.href}
           onClick={releaseFocus}
@@ -171,6 +181,7 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned }
           </span>
           <span className="lx-rail-label">Settings</span>
         </Link>
+        )}
       </nav>
     </div>
   );
