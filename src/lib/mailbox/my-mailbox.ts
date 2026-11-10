@@ -101,7 +101,7 @@ export async function mySendAccess(): Promise<MySendAccess> {
  * its stored scopes, and `sendCheckedDraft` reads the message back (still a draft, addressed to `recipient`) before it
  * sends. The caller (the deck's send action) has already checked the item was approved by this same person.
  */
-export async function sendFromMyOutlook(args: { draftId: string; recipient: string | null }): Promise<SendCheck | { ok: false; reason: MySendAccess }> {
+export async function sendFromMyOutlook(args: { draftId: string; recipient: string | null; subject: string | null; approvedAt: string | null }): Promise<SendCheck | { ok: false; reason: MySendAccess }> {
   if (!sendScopeRequested()) return { ok: false, reason: "switched-off" };
   const root = rootKeyOrNull();
   if (!root) return { ok: false, reason: "unavailable" };
@@ -116,7 +116,7 @@ export async function sendFromMyOutlook(args: { draftId: string; recipient: stri
     return { ok: false, reason: "reauth" };
   }
   if (!accessToken) return { ok: false, reason: "no-mailbox" };
-  return sendCheckedDraft({ accessToken, draftId: args.draftId, recipient: args.recipient });
+  return sendCheckedDraft({ accessToken, draftId: args.draftId, recipient: args.recipient, subject: args.subject, approvedAt: args.approvedAt });
 }
 
 /**

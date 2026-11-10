@@ -69,6 +69,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
       code,
       verifier: state.verifier,
       redirectUri: redirectUri(origin, provider),
+      mailbox: state.scope === "personal" ? "personal" : "firm",
     });
     const email = await fetchAccountEmail({ provider, accessToken: tokens.accessToken });
 

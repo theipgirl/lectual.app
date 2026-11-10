@@ -21,7 +21,7 @@ export const DRAFT_ID = /^[A-Za-z0-9_=+-]{1,512}$/;
 
 const GRAPH = "https://graph.microsoft.com/v1.0/me/messages/";
 
-export type SendCheck = { ok: true } | { ok: false; reason: "bad-id" | "gone" | "not-a-draft" | "wrong-recipient" | "reauth" | "failed" };
+export type SendCheck = { ok: true } | { ok: false; reason: "bad-id" | "gone" | "not-a-draft" | "wrong-recipient" | "not-this-approval" | "reauth" | "failed" };
 
 /** Does this message's recipient list include `recipient` (case-insensitive, trimmed)? */
 export function recipientsInclude(to: readonly string[], recipient: string | null | undefined): boolean {
@@ -38,6 +38,13 @@ export async function sendCheckedDraft(args: {
   accessToken: string;
   draftId: string;
   recipient: string | null;
+  /**
+   * Ties the draft to THIS approval (the draft id comes from the browser): its subject must be the item's, and it must
+   * have been created no earlier than the approval (two minutes' slack for clocks). Another draft in the same Outlook
+   * addressed to the same client is refused.
+   */
+  subject?: string | null;
+  approvedAt?: string | null;
   fetchImpl?: typeof fetch;
 }): Promise<SendCheck> {
   const { accessToken, draftId, recipient, fetchImpl = fetch } = args;
@@ -47,17 +54,18 @@ export async function sendCheckedDraft(args: {
 
   let res: Response;
   try {
-    res = await fetchImpl(`${base}?$select=isDraft,toRecipients`, withTimeout({ headers }, PROVIDER_FETCH_TIMEOUT_MS));
+    res = await fetchImpl(`${base}?$select=isDraft,toRecipients,subject,createdDateTime`, withTimeout({ headers }, PROVIDER_FETCH_TIMEOUT_MS));
   } catch {
     return { ok: false, reason: "failed" };
   }
   if (res.status === 401 || res.status === 403) return { ok: false, reason: "reauth" };
   if (res.status === 404) return { ok: false, reason: "gone" };
   if (!res.ok) return { ok: false, reason: "failed" };
-  const json = (await res.json().catch(() => null)) as { isDraft?: unknown; toRecipients?: Array<{ emailAddress?: { address?: string | null } }> } | null;
+  const json = (await res.json().catch(() => null)) as { isDraft?: unknown; subject?: string | null; createdDateTime?: string | null; toRecipients?: Array<{ emailAddress?: { address?: string | null } }> } | null;
   if (!json || json.isDraft !== true) return { ok: false, reason: "not-a-draft" };
   const to = (json.toRecipients ?? []).map((r) => r.emailAddress?.address ?? "").filter(Boolean);
   if (!recipientsInclude(to, recipient)) return { ok: false, reason: "wrong-recipient" };
+  if (!draftMatchesApproval({ subject: json.subject ?? null, createdDateTime: json.createdDateTime ?? null }, args)) return { ok: false, reason: "not-this-approval" };
 
   let sent: Response;
   try {
@@ -69,4 +77,22 @@ export async function sendCheckedDraft(args: {
   if (sent.status === 404) return { ok: false, reason: "gone" };
   if (!sent.ok) return { ok: false, reason: "failed" };
   return { ok: true };
+}
+
+/** Pure: is this draft the one made for the approval (same subject; created at or after the approval, two minutes' slack)? */
+export function draftMatchesApproval(
+  draft: { subject: string | null; createdDateTime: string | null },
+  want: { subject?: string | null; approvedAt?: string | null },
+): boolean {
+  if (want.subject !== undefined) {
+    const norm = (v: string | null | undefined) => (v ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+    if (norm(draft.subject) !== norm(want.subject)) return false;
+  }
+  if (want.approvedAt !== undefined) {
+    const approved = Date.parse(want.approvedAt ?? "");
+    const created = Date.parse(draft.createdDateTime ?? "");
+    if (!Number.isFinite(approved) || !Number.isFinite(created)) return false;
+    if (created < approved - 2 * 60_000) return false;
+  }
+  return true;
 }

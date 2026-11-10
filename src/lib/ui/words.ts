@@ -174,6 +174,10 @@ export const VIEW_NOT_SIGNED_IN = "You are not signed in.";
 export const VIEW_PREVIEW_NOT_ALLOWED = "Only an owner or admin can preview another view.";
 
 /* ── Phase 1 owner view: approval deck ── */
+/** Yes is off while the card's editor is open: it would approve the saved text, not the edit. */
+/** The deck when approval assignments couldn't be read: the usual approvers' rule applies. */
+export const DECK_ROUTING_UNREAD = "Assignments couldn't be loaded. Showing the cards the usual approvers decide.";
+export const DECK_EDITING_YES = "Approve from the editor, or close it first.";
 export const DECK_TITLE = "Needs you";
 export const dealHeader = (label: string) => `Today's deal · ${label}`;
 export const nextDealHeader = (label: string) => `Next deal · ${label}`;
@@ -268,6 +272,8 @@ export const OWNER_COPILOT_NOTE = "Answers come from your firm's own records. No
 /* ── Phase 1 owner view: weekly review ── */
 /** The weekly review's firm-wide "since" display filter chip. */
 export const REVIEW_SINCE_LABEL = "Since Feb 2026";
+/** Shown instead of the since chips when a read the filter relies on failed: nothing older is hidden. */
+export const REVIEW_SINCE_SUSPENDED = "Showing all: some details couldn't load, so older rows aren't hidden";
 export const REVIEW_SHOW_ALL = "Show all";
 export const REVIEW_SHOWING_ALL = "Showing all";
 export const reviewOlderHidden = (n: number) => `${n} older hidden`;

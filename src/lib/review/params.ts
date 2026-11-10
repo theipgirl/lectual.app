@@ -76,6 +76,15 @@ export function isOlderThanSince(row: ReviewRow): boolean {
   return last === null || last < REVIEW_SINCE;
 }
 
+/**
+ * The reads the since filter's protections depend on. When one of them failed, a row's open deadline, pending approval
+ * or live proposal is unknown, so the filter hides nothing (it never guesses a row is safe to hide).
+ */
+export const SINCE_PROTECTION_SOURCES: readonly string[] = ["deadlines", "approvals", "proposals", "last contact"];
+export function sinceSuspended(failed: readonly string[]): boolean {
+  return failed.some((f) => SINCE_PROTECTION_SOURCES.includes(f));
+}
+
 function passesOtherFilters(r: ReviewRow, p: ReviewParams, userId: string | null): boolean {
   return (p.kind === "both" || r.kind === p.kind) && (p.who === "all" || isMine(r, userId)) && matchesSearch(r, p.q);
 }

@@ -1,6 +1,5 @@
 import { pkceChallenge } from "./state";
 import { SEND_SCOPE } from "./outlook-send";
-import { env } from "@/lib/env";
 import { PROVIDER_FETCH_TIMEOUT_MS, withTimeout } from "@/lib/http/timeout";
 
 /**
@@ -111,20 +110,20 @@ const CONFIG: Record<MailboxProvider, Config> = {
  * that declines it still connects for mail and drafts. A mailbox connected before the flag was on has to be reconnected.
  */
 export function sendScopeRequested(): boolean {
-  try {
-    return env.MAILBOX_SEND_SCOPE === "on";
-  } catch {
-    return false;
-  }
+  // Read directly, not through `@/lib/env`: this file is also reached from client components, and env.ts is server-only.
+  // The variable is still declared in env.ts. On the client it is undefined, i.e. off.
+  return typeof process !== "undefined" && process.env.MAILBOX_SEND_SCOPE === "on";
 }
 
 /** The Microsoft scopes to ask for at connect time. */
-function microsoftScopes(): string[] {
-  return sendScopeRequested() ? [...CONFIG.microsoft.scopes, SEND_SCOPE] : [...CONFIG.microsoft.scopes];
+// Only a PERSONAL mailbox ever sends (the approver's own), so a firm (shared) mailbox is never asked for SEND_SCOPE:
+// where a tenant needs admin consent for it, asking would make the shared connect fail.
+function microsoftScopes(mailbox: "personal" | "firm" = "firm"): string[] {
+  return sendScopeRequested() && mailbox === "personal" ? [...CONFIG.microsoft.scopes, SEND_SCOPE] : [...CONFIG.microsoft.scopes];
 }
 
-function scopesFor(provider: MailboxProvider): string[] {
-  return provider === "microsoft" ? microsoftScopes() : [...CONFIG.google.scopes];
+function scopesFor(provider: MailboxProvider, mailbox: "personal" | "firm" = "firm"): string[] {
+  return provider === "microsoft" ? microsoftScopes(mailbox) : [...CONFIG.google.scopes];
 }
 
 export const PROVIDER_LABEL: Record<MailboxProvider, string> = {
@@ -178,6 +177,8 @@ export function authorizeUrl(args: {
   nonce: string;
   verifier: string;
   loginHint?: string;
+  /** Which kind of connection this is; only "personal" may be asked for the send permission. Absent = firm. */
+  mailbox?: "personal" | "firm";
 }): string {
   const cfg = CONFIG[args.provider];
   const url = new URL(cfg.authorizeUrl);
@@ -185,7 +186,7 @@ export function authorizeUrl(args: {
   p.set("client_id", args.clientId);
   p.set("redirect_uri", args.redirectUri);
   p.set("response_type", "code");
-  p.set("scope", scopesFor(args.provider).join(" "));
+  p.set("scope", scopesFor(args.provider, args.mailbox).join(" "));
   p.set("state", args.nonce);
   p.set("code_challenge", pkceChallenge(args.verifier));
   p.set("code_challenge_method", "S256");
@@ -217,6 +218,8 @@ export async function exchangeCode(args: {
   code: string;
   verifier: string;
   redirectUri: string;
+  /** Must match what the authorize request asked for. Absent = firm (no send permission). */
+  mailbox?: "personal" | "firm";
   fetchImpl?: typeof fetch;
   now?: number;
 }): Promise<TokenSet> {
@@ -229,7 +232,7 @@ export async function exchangeCode(args: {
     redirect_uri: args.redirectUri,
     grant_type: "authorization_code",
   });
-  if (provider === "microsoft") body.set("scope", microsoftScopes().join(" "));
+  if (provider === "microsoft") body.set("scope", microsoftScopes(args.mailbox).join(" "));
 
   const res = await fetchImpl(
     CONFIG[provider].tokenUrl,

@@ -1501,3 +1501,52 @@ RPB's Check Point Harmony filter (like Microsoft Safe Links) opens every emailed
 - **Fragment errors:** Supabase's own verify page bounces with `#error_code=...`, which the server can't read; `HashErrorNotice` reads it once in the browser
   (`hashErrorCode`), shows `signInErrorMessage`'s fixed sentence and clears the fragment. Provider text is never shown.
 - The templates live in the Supabase dashboard (lectual-prod), not in this repo; change them only after this code is deployed.
+
+## Owner view and the approval deck (Phase 1, needs lectual 0103 for Hand off / Later; no schema here)
+A second shell for the managing attorney, beside today's (the TECHNICIAN view, unchanged). A view decides only what is DRAWN
+(rail, phone bar, Today, account menu); every page and action keeps its own role and feature gate. Nothing here sends by itself.
+- **The switch:** `role-views` in `OrgModule`, a ROLLOUT switch Lectual sets in `crm_org.modules`, kept out of Settings -> Features
+  (`modules-copy.ts`). Off (the default) = today's shell for every firm, byte for byte (tests compare the drawn rail, phone bar and More
+  sheet with the old calls). The deck page and every deck action answer `notFound()` without it.
+- **`src/lib/views/` (pure):** view ids technician, owner, attorney, matters-team, intake, office, marketing, read-only; `LIVE_VIEWS =
+  ["owner"]` (every other role keeps today's shell). `viewFor({ role, pref, firmHasRoleViews, actingAsStaff })`: switch off -> technician;
+  the person's own `user_metadata.lectual_view` = `technician` | `auto` | `as:<role>`; `technician` wins; Lectual staff acting in a firm
+  get technician unless they chose a preview themselves; `as:<role>` is honoured only for owner / admin / senior_admin / staff
+  (`canSwitchView`). `saveViewAction` (`src/lib/account/view-actions.ts`) is the name action's merge pattern: scoped client, merged
+  metadata, no user or org argument, fixed sentences. The switch and "Preview a view" are in `AccountMenu` only for those roles and only
+  when the firm has `role-views`; only a role with a live view of its own gets the on/off switch.
+- **The seam:** ONE `drawnNav(items, view)` in `src/app/dashboard/layout.tsx`, after `visibleNav`, feeding Rail, MobileBar and the tour's
+  `navSlugs`. Never inside `visibleNav` / `navItemAllowed` (Reports index and the hub gate on those). `railGroups` / `mobileBarItems` /
+  `moreSections` take an optional tree / bar / groups; with none they are unchanged. Owner rail: Today, Approvals (opens the deck),
+  Weekly review, Proposals, then More (Leads, Matters, Calendar); no Reports or Settings row (Settings is in the account menu); a full-width
+  top bar; the phone pill bar is Today, Approvals, Review, Proposals, More. Colour `--owner-rail` (#550E1A) in `owner-shell.css`.
+- **Owner Today** (`OwnerToday.tsx`, branched in `dashboard/page.tsx` before any technician read): greeting, Your cards
+  (`loadDeckSummary`), today's consults, deadlines in 14 days, proposals out, a week strip, "Ask Copilot" (a GET to `/dashboard/copilot/?q=`;
+  the Copilot page puts the question in the input and never sends it by itself; hidden without AI). Each read on its own; a failed one says
+  "Couldn't load", never 0. No setup or Getting started card.
+- **The approval deck** (`/dashboard/queue/deck/`, the owner's Approvals; Cards | List | Board). Dealt at `DEFAULT_DEAL_TIMES` (7:00 AM,
+  2:00 PM firm time, code constants) by `dealFor` (`src/lib/deal/times.ts`); items that arrive after the current deal are counted ("3 more at
+  2:00 PM") with "Deal them now". `buildDeck` (`src/lib/queue/deck.ts`, pure): the viewer's own items (`mineItems`) that `canApproveItem`
+  allows, plus items handed TO them (those carry no Yes: Edit and Send back only), CHECK FIRST first then oldest, positioned by id
+  (`?at=<id>`). A card that needs a closer look (CHECK FIRST, an `approvalBlock` issue, stale, a linked proposal) shows "Open to review"
+  instead of Yes; an internal briefing shows "Mark read" (the action refuses any other kind). Queue reads stay three-state.
+- **Approve core:** `src/lib/queue/review-core.ts` (`server-only`) is the old body of `reviewQueueAction`, every check in the same order;
+  `reviewQueueAction` is a thin wrapper with the same redirect. It returns the mailbox draft's `webLink` and id. Deck approvals append
+  `Receipt: sha256 <12 hex>` of the approved text to the resolve note (the full approval page does not, because `stale.test.ts` pins its
+  notes). Yes is a 5-second client hold with Undo; nothing is posted until it ends, and there is no un-approve after. Then: "Draft is in
+  Outlook. Nothing is sent until someone presses Send." Reject needs a typed note (the voice recorder files against a lead or matter, so it
+  is not reused). Edit opens the existing `ReviewPanel` (its Approve is the full page's path, no hold).
+- **Hand off / Later:** `queue_card_event` (lectual 0103, append-only; type hand-added in `src/lib/db/types.ts` until codegen). Read by
+  `card-state.ts`, three states: ok / not-set-up (42P01, PGRST205: Hand off and Later drawn disabled with `NOT_SWITCHED_ON`, actions refuse)
+  / unavailable (EVERY card is shown, never fewer). `actor_id` is never sent from the browser; a hand-off target must be a current staff
+  member; a hand-off never widens who may approve (an attorney-only item's Yes stays with an approver).
+- **Send from Outlook now** (`outlook-send.ts`, the ONE file allowed a send call; `tests/agents/new-agents-hygiene.test.ts` pins it): a
+  button the approver presses herself, after approving. The caller's own personal Microsoft mailbox only, with `Mail.Send` in its stored
+  scopes; the draft id is checked (a draft, addressed to the item's recipient, item approved by this session). `Mail.Send` is requested only
+  when `MAILBOX_SEND_SCOPE=on` (default off), never required, and refresh asks for it only when it was granted. To use it: set the flag,
+  allow Mail.Send in the Microsoft app, and the person reconnects Outlook. Until then a quiet line says sending from here isn't switched on.
+- **Weekly review:** "Since Feb 2026" display filter (`REVIEW_SINCE`, `applyReviewFilters` in `src/lib/review/params.ts`, `?since=all`
+  shows everything): a row whose last contact is before 2026-02-01 (or that has none) is hidden unless it has an open next step, an open
+  USPTO deadline or wait, a pending approval, a live proposal or unreadable contact history. Firm-wide, with its chip ("N older hidden ·
+  Show all"). For an approver the "Waiting on <name>" strip is "Waiting on you".
+- **NOT verified:** a real browser (desktop or 375px), migration 0103 against a real database, a live Graph send, the Mail.Send consent.

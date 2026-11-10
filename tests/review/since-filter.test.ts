@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyReviewFilters, isOlderThanSince, olderHiddenCount, parseReviewParams, REVIEW_SINCE, reviewHref } from "@/lib/review/params";
+import { applyReviewFilters, isOlderThanSince, olderHiddenCount, parseReviewParams, REVIEW_SINCE, reviewHref, sinceSuspended } from "@/lib/review/params";
 import { reviewBuckets } from "@/lib/review/buckets";
 import { row, TODAY } from "./fixtures";
 
@@ -60,5 +60,13 @@ describe("since filter", () => {
     expect(reviewHref({ ...p, since: "all" })).toBe("/dashboard/review/?who=mine&kind=leads&q=acme&since=all&view=sheet");
     expect(reviewHref({ ...p, since: "default" })).not.toContain("since");
     expect(reviewHref(P)).toBe("/dashboard/review/");
+  });
+});
+
+describe("a failed read behind a protection turns the filter off", () => {
+  it("deadlines, approvals, proposals or last contact failing suspends it; team names does not", () => {
+    for (const f of ["deadlines", "approvals", "proposals", "last contact"]) expect(sinceSuspended([f])).toBe(true);
+    expect(sinceSuspended(["team names", "stage history"])).toBe(false);
+    expect(sinceSuspended([])).toBe(false);
   });
 });

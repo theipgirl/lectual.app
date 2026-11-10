@@ -238,7 +238,7 @@ describe("Send from Outlook now", () => {
     state.item = approvedByMe();
     const r = await A.sendDraftNowAction("q1", "AAMk1");
     expect(r).toMatchObject({ ok: true, message: expect.stringMatching(/^Sent from Outlook by you at .+\.$/) });
-    expect(state.send).toHaveBeenCalledWith({ draftId: "AAMk1", recipient: "ana@example.com" });
+    expect(state.send).toHaveBeenCalledWith({ draftId: "AAMk1", recipient: "ana@example.com", subject: "Next steps", approvedAt: null });
   });
 
   it.each([

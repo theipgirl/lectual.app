@@ -32,7 +32,7 @@ import { DeckKeys } from "@/components/review/DeckKeys";
 import { QueueUnavailable } from "@/components/queue/QueueUnavailable";
 import { agentLabel, fmtWhen } from "@/components/queue/format";
 import { pageTitle } from "@/lib/ui/page-title";
-import {
+import { DECK_ROUTING_UNREAD,
   DECK_COL_DECIDED,
   DECK_COL_HANDED_OFF,
   DECK_COL_LATER,
@@ -144,6 +144,11 @@ export default async function DeckPage({ searchParams }: { searchParams: Promise
       nextDealLabel={deal.next.label}
       dealNowHref={deckHref({ view, dealNow: true })}
     >
+      {routed.status !== "ok" && (
+        <p role="status" className="lx-note" style={{ margin: "0 0 12px" }}>
+          {DECK_ROUTING_UNREAD}
+        </p>
+      )}
       {children}
     </DeckFrame>
   );

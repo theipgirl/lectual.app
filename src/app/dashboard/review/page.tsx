@@ -15,14 +15,14 @@ import { loadReview } from "@/lib/review/load";
 import { reviewBuckets, reviewSubline } from "@/lib/review/buckets";
 import { boardLanes, kpis, meetingPosition, offBoard } from "@/lib/review/lanes";
 import { proposalsOut, reviewPerson, waitingOnPerson } from "@/lib/review/strips";
-import { applyReviewFilters, olderHiddenCount, DEFAULT_REVIEW_VIEW, parseReviewParams, reviewHref, type ReviewParams } from "@/lib/review/params";
+import { applyReviewFilters, olderHiddenCount, sinceSuspended, DEFAULT_REVIEW_VIEW, parseReviewParams, reviewHref, type ReviewParams } from "@/lib/review/params";
 import { criticalAlert, detailsNote } from "@/lib/review/notes";
 import { noticeFor } from "@/lib/review/notice";
 import { buildDeck, chosenPerson, deckPeople } from "@/lib/review/deck";
 import { loadLatestNote, loadReviewDetail } from "@/lib/review/detail-load";
 import { pageTitle } from "@/lib/ui/page-title";
 import { QUEUE_APPROVE_ROLES } from "@/lib/queue/roles";
-import { REVIEW_NAME, REVIEW_SHOW_ALL, REVIEW_SHOWING_ALL, REVIEW_SINCE_LABEL, reviewOlderHidden } from "@/lib/ui/words";
+import { REVIEW_NAME, REVIEW_SHOW_ALL, REVIEW_SHOWING_ALL, REVIEW_SINCE_LABEL, REVIEW_SINCE_SUSPENDED, reviewOlderHidden } from "@/lib/ui/words";
 
 export const metadata: Metadata = { title: pageTitle(REVIEW_NAME) };
 
@@ -57,10 +57,13 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   }
 
   const link = (next: Partial<ReviewParams>) => reviewHref({ ...params, i: 1, open: null, ...next });
-  const shown = applyReviewFilters(load.rows, params, userId);
+  // A failed read behind one of the since filter's protections turns the filter off for this page, and the chip says so.
+  const sinceOff = sinceSuspended(load.failed);
+  const filterParams: ReviewParams = sinceOff ? { ...params, since: "all" } : params;
+  const shown = applyReviewFilters(load.rows, filterParams, userId);
   const buckets = reviewBuckets(shown, load.today);
   // Chip counts: each chip counts what it would show with the other filters kept.
-  const countFor = (over: Partial<ReviewParams>) => applyReviewFilters(load.rows, { ...params, ...over }, userId).length;
+  const countFor = (over: Partial<ReviewParams>) => applyReviewFilters(load.rows, { ...filterParams, ...over }, userId).length;
   const note = detailsNote(load.failed);
   const common = { today: load.today, members: load.members, canWrite, params };
   const proposalsKnown = !load.failed.includes("proposals");
@@ -81,7 +84,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   // Cards: one person's deck, built from every row that passes the search and the kind chips (Whose is ignored: the picker is the person).
   let cards: { people: ReturnType<typeof deckPeople>; personId: string | null; card: ReturnType<typeof buildDeck>[number] | null; pos: ReturnType<typeof meetingPosition>; note: Awaited<ReturnType<typeof loadLatestNote>> | null } | null = null;
   if (params.view === "cards") {
-    const deckBuckets = reviewBuckets(applyReviewFilters(load.rows, { ...params, who: "all" }, userId), load.today);
+    const deckBuckets = reviewBuckets(applyReviewFilters(load.rows, { ...filterParams, who: "all" }, userId), load.today);
     let people = deckPeople(load.members, boardLanes(deckBuckets, load.members).map((l) => l.userId));
     if (people.length === 0 && userId) people = [{ userId, name: "You" }];
     const personId = chosenPerson(people, params.person, userId);
@@ -125,7 +128,9 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
       </FilterChips>
 
       <FilterChips as="nav" label="Since">
-        {params.since === "all" ? (
+        {sinceOff ? (
+          <Chip href={link({})} active={false}>{REVIEW_SINCE_SUSPENDED}</Chip>
+        ) : params.since === "all" ? (
           <Chip href={link({ since: "default" })} active={false}>{REVIEW_SHOWING_ALL} · {REVIEW_SINCE_LABEL}</Chip>
         ) : (
           <>

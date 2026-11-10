@@ -251,11 +251,13 @@ export async function sendDraftNowAction(rawId: unknown, rawDraftId: unknown): P
   if (!item) return { ok: false, error: DECK_FAILED };
   const approvedByMe = item.status === "approved" && (item.resolved_by ?? "").trim().toLowerCase() === who.email.trim().toLowerCase();
   if (!approvedByMe || item.type !== "CLIENT_EMAIL" || !item.recipient) return { ok: false, error: DECK_NOT_YOURS };
-  const sent = await sendFromMyOutlook({ draftId, recipient: item.recipient });
+  // The subject the approve path drafted with (core: item.subject ?? item.headline) and the approval time tie the draft to this item.
+  const sent = await sendFromMyOutlook({ draftId, recipient: item.recipient, subject: item.subject ?? item.headline, approvedAt: item.resolved_at });
   if (!sent.ok) {
     if (sent.reason === "needs-permission" || sent.reason === "reauth") return { ok: false, error: DECK_SEND_RECONNECT };
     if (sent.reason === "switched-off" || sent.reason === "not-outlook" || sent.reason === "no-mailbox") return { ok: false, error: DECK_SEND_OFF };
     if (sent.reason === "not-a-draft" || sent.reason === "gone") return { ok: false, error: "That draft isn't in your Outlook Drafts any more, so nothing was sent from here." };
+    if (sent.reason === "not-this-approval") return { ok: false, error: "That isn't the draft made for this approval, so nothing was sent. Check it in Outlook." };
     if (sent.reason === "wrong-recipient") return { ok: false, error: "That draft is no longer addressed to this client, so nothing was sent. Check it in Outlook." };
     return { ok: false, error: "Couldn't send from here, so nothing was sent. Open the draft in Outlook and press Send there." };
   }

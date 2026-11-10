@@ -5,6 +5,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  * granted) and the draft check (read back first: still a draft, addressed to the recipient; only then the send).
  */
 
+// providers.ts reads process.env directly (env.ts is server-only and providers.ts is reachable from client components).
+function setSendFlag(v: string | undefined) {
+  envState.MAILBOX_SEND_SCOPE = v;
+  if (v === undefined) delete process.env.MAILBOX_SEND_SCOPE;
+  else process.env.MAILBOX_SEND_SCOPE = v;
+}
 const envState = vi.hoisted(() => ({ MAILBOX_SEND_SCOPE: undefined as string | undefined }));
 vi.mock("@/lib/env", () => ({ env: new Proxy({}, { get: (_t, k: string) => (envState as Record<string, unknown>)[k] }) }));
 
@@ -12,12 +18,12 @@ const { authorizeUrl, exchangeCode, refreshAccessToken, missingScopes, hasSendSc
 const { sendCheckedDraft, recipientsInclude, SEND_SCOPE } = await import("@/lib/mailbox/outlook-send");
 
 const creds = { clientId: "cid", clientSecret: "secret" };
-const scopesOf = () =>
-  new URL(authorizeUrl({ provider: "microsoft", clientId: "cid", redirectUri: "https://x/cb/", nonce: "n", verifier: "v".repeat(43) })).searchParams.get("scope")!.split(" ");
+const scopesOf = (mailbox: "personal" | "firm" = "personal") =>
+  new URL(authorizeUrl({ provider: "microsoft", clientId: "cid", redirectUri: "https://x/cb/", nonce: "n", verifier: "v".repeat(43), mailbox })).searchParams.get("scope")!.split(" ");
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
 beforeEach(() => {
-  envState.MAILBOX_SEND_SCOPE = undefined;
+  setSendFlag(undefined);
 });
 
 describe("the send permission is behind a flag", () => {
@@ -27,8 +33,10 @@ describe("the send permission is behind a flag", () => {
   });
 
   it("is asked for with MAILBOX_SEND_SCOPE=on, Microsoft only, and never required", async () => {
-    envState.MAILBOX_SEND_SCOPE = "on";
+    setSendFlag("on");
     expect(scopesOf()).toContain(SEND_SCOPE);
+    // A firm (shared) mailbox never sends, so it is never asked.
+    expect(scopesOf("firm")).not.toContain(SEND_SCOPE);
     const google = new URL(authorizeUrl({ provider: "google", clientId: "cid", redirectUri: "https://x/cb/", nonce: "n", verifier: "v".repeat(43) })).searchParams.get("scope")!;
     expect(google).not.toMatch(/send/i);
     expect(missingScopes("microsoft", ["Mail.Read", "Mail.ReadWrite"])).toEqual([]);
@@ -38,7 +46,7 @@ describe("the send permission is behind a flag", () => {
   });
 
   it("any value but 'on' is off", () => {
-    envState.MAILBOX_SEND_SCOPE = "true";
+    setSendFlag("true");
     expect(scopesOf()).not.toContain(SEND_SCOPE);
   });
 
@@ -52,7 +60,7 @@ describe("the send permission is behind a flag", () => {
       const body = (fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body as URLSearchParams;
       return body.get("scope")!.split(" ");
     };
-    envState.MAILBOX_SEND_SCOPE = "on";
+    setSendFlag("on");
     expect(await asked(["Mail.Read", "Mail.ReadWrite"])).not.toContain(SEND_SCOPE);
     expect(await asked(["Mail.Read", "Mail.ReadWrite", "https://graph.microsoft.com/Mail.Send"])).toContain(SEND_SCOPE);
   });
@@ -73,7 +81,7 @@ describe("sendCheckedDraft", () => {
     const fetchImpl = vi.fn(async (url: string) => (url.endsWith("/send") ? new Response(null, { status: 202 }) : draft()));
     expect(await sendCheckedDraft({ accessToken: "t", draftId: "AAMk-1=", recipient: "ana@example.com", fetchImpl: fetchImpl as unknown as typeof fetch })).toEqual({ ok: true });
     const urls = fetchImpl.mock.calls.map((c) => c[0]);
-    expect(urls[0]).toBe("https://graph.microsoft.com/v1.0/me/messages/AAMk-1%3D?$select=isDraft,toRecipients");
+    expect(urls[0]).toBe("https://graph.microsoft.com/v1.0/me/messages/AAMk-1%3D?$select=isDraft,toRecipients,subject,createdDateTime");
     expect(urls[1]).toBe("https://graph.microsoft.com/v1.0/me/messages/AAMk-1%3D/send");
     expect((fetchImpl.mock.calls[1] as unknown as [string, RequestInit])[1].method).toBe("POST");
   });
@@ -107,5 +115,17 @@ describe("sendCheckedDraft", () => {
     expect(recipientsInclude(["Ana@Example.com"], " ana@example.com ")).toBe(true);
     expect(recipientsInclude(["ana@example.com.evil"], "ana@example.com")).toBe(false);
     expect(recipientsInclude(["a@b.c"], null)).toBe(false);
+  });
+});
+
+describe("the draft must be the one made for this approval", async () => {
+  const { draftMatchesApproval } = await import("@/lib/mailbox/outlook-send");
+  const at = "2026-11-10T15:00:00.000Z";
+  it("needs the same subject and a draft made at or after the approval", () => {
+    expect(draftMatchesApproval({ subject: " Next  steps ", createdDateTime: "2026-11-10T15:00:05Z" }, { subject: "next steps", approvedAt: at })).toBe(true);
+    expect(draftMatchesApproval({ subject: "Other", createdDateTime: "2026-11-10T15:00:05Z" }, { subject: "Next steps", approvedAt: at })).toBe(false);
+    expect(draftMatchesApproval({ subject: "Next steps", createdDateTime: "2026-11-01T09:00:00Z" }, { subject: "Next steps", approvedAt: at })).toBe(false);
+    expect(draftMatchesApproval({ subject: "Next steps", createdDateTime: null }, { subject: "Next steps", approvedAt: at })).toBe(false);
+    expect(draftMatchesApproval({ subject: "Next steps", createdDateTime: "2026-11-10T15:00:05Z" }, { subject: "Next steps", approvedAt: null })).toBe(false);
   });
 });

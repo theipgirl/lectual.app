@@ -34,7 +34,7 @@ import {
   DECK_SEND_BACK,
   DECK_SEND_NOW,
   DECK_SKIP,
-  DECK_YES,
+  DECK_YES, DECK_EDITING_YES,
   deckPosition,
   handedBy,
 } from "@/lib/ui/words";
@@ -123,6 +123,8 @@ export function ApprovalCard(props: ApprovalCardProps) {
   };
 
   const busy = pending || holding !== null || decided;
+  // While the editor is open, Yes would approve the SAVED text, not what is being typed: approve from the editor instead.
+  const editing = mode === "editing";
   const draft = result && result.ok ? result.draft : null;
   const showYes = props.canYes && !props.closerLook && !props.internal;
   const showMarkRead = props.canYes && props.internal && !props.closerLook;
@@ -200,11 +202,11 @@ export function ApprovalCard(props: ApprovalCardProps) {
                 {DECK_OPEN_TO_REVIEW}
               </a>
             ) : showMarkRead ? (
-              <button type="button" className="lx-btn lx-btn-pri" disabled={busy} onClick={() => run(() => markReadCardAction(props.id))}>
+              <button type="button" className="lx-btn lx-btn-pri" disabled={busy || editing} title={editing ? DECK_EDITING_YES : undefined} onClick={() => run(() => markReadCardAction(props.id))}>
                 {DECK_MARK_READ}
               </button>
             ) : showYes ? (
-              <button type="button" className="lx-btn lx-btn-pri" disabled={busy} onClick={startHold}>
+              <button type="button" className="lx-btn lx-btn-pri" disabled={busy || editing} title={editing ? DECK_EDITING_YES : undefined} onClick={startHold}>
                 {DECK_YES}
               </button>
             ) : null}
