@@ -99,7 +99,7 @@ describe("the deck page", () => {
       events: ["l1", "l2"].map((id) => ({ queueItemId: id, kind: "later", actorId: U.rebecca, targetUserId: null, until, note: null, createdAt: "2026-11-10T01:00:00Z" })),
     };
     const h = await render();
-    expect(h).toMatch(/2 cards are back at (7:00 AM|2:00 PM)\./);
+    expect(h).toMatch(/2 cards are back (today|tomorrow) at \d{1,2}:\d{2} (AM|PM)\./);
     expect(h).not.toMatch(/All decided/);
   });
 

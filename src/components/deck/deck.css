@@ -51,6 +51,30 @@
 .dk-stage { display: grid; gap: 12px; }
 .dk-card { background: linear-gradient(160deg, var(--deck-hero) 0%, var(--deck-hero-2) 60%, var(--deck-hero-deep) 100%); color: var(--deck-hero-ink); border-radius: 18px; padding: 24px; display: grid; gap: 12px; box-shadow: var(--shadow-lift); }
 .dk-card a { color: var(--deck-hero-ink); }
+/* Yes (and Mark read / Open to review) is the card's primary move: the app's oxblood primary fill would sink into the
+   oxblood card, so on the card it is cream with oxblood text (about 13:1), the most prominent button. */
+.dk-card .lx-btn.lx-btn-pri,
+.dk-card a.lx-btn.lx-btn-pri {
+  background: var(--deck-hero-ink);
+  color: var(--deck-hero);
+  border: 1px solid var(--deck-hero-ink);
+  font-weight: 600;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.18);
+}
+.dk-card .lx-btn.lx-btn-pri:hover:not(:disabled) { background: #ffffff; color: var(--deck-hero); }
+.dk-card .lx-btn.lx-btn-pri:focus-visible { outline: 2px solid var(--deck-hero-ink); outline-offset: 3px; }
+/* The other moves on the card are outlined in cream, so Yes is the one solid button. */
+.dk-card .lx-btn.lx-btn-sec,
+.dk-card .lx-btn.lx-btn-danger {
+  background: transparent;
+  color: var(--deck-hero-ink);
+  border: 1px solid var(--deck-hero-muted);
+}
+.dk-card .lx-btn.lx-btn-sec:hover:not(:disabled),
+.dk-card .lx-btn.lx-btn-danger:hover:not(:disabled) { background: rgba(253, 247, 235, 0.12); }
+.dk-card .lx-btn.lx-btn-sec:focus-visible,
+.dk-card .lx-btn.lx-btn-danger:focus-visible { outline: 2px solid var(--deck-hero-ink); outline-offset: 3px; }
+.dk-card .lx-btn.lx-btn-pri:disabled { background: var(--deck-hero-ink); color: var(--deck-hero); opacity: 0.6; cursor: not-allowed; }
 .dk-card-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--deck-hero-muted); }
 .dk-tag { display: inline-block; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--deck-hero-muted); color: var(--deck-hero-ink); font-size: 12.5px; }
 .dk-title { margin: 0; font-family: var(--serif); font-size: 30px; line-height: 1.15; font-weight: 400; }
@@ -65,7 +89,11 @@
 .dk-panel { background: var(--card); color: var(--ink); border-radius: 12px; padding: 14px; display: grid; gap: 8px; }
 .dk-panel a { color: var(--ox); }
 .dk-hold { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 12px 14px; border-radius: 12px; background: var(--ink); color: var(--cream); }
-.dk-hold button { color: var(--cream); border-color: var(--cream); }
+/* Undo must stay readable on the dark toast: outlined cream, never the light secondary fill. */
+.dk-hold button,
+.dk-hold .lx-btn { background: transparent; color: var(--cream); border: 1px solid var(--cream); font-weight: 600; }
+.dk-hold .lx-btn:hover:not(:disabled) { background: rgba(253, 247, 235, 0.14); }
+.dk-hold .lx-btn:focus-visible { outline: 2px solid var(--cream); outline-offset: 3px; }
 .dk-handto { display: grid; gap: 8px; }
 .dk-handto .rv-handto { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 

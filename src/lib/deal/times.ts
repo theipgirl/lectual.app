@@ -115,3 +115,20 @@ export function sameFirmDay(at: Date, now: Date, timeZone: string): boolean {
   const b = partsIn(now, tz);
   return a.year === b.year && a.month === b.month && a.day === b.day;
 }
+
+/**
+ * When a moment falls, said from `now` in the firm's day: "today at 7:00 AM", "tomorrow at 7:00 AM", else
+ * "Wed, Nov 12 at 7:00 AM". Used where a card comes back after Later, which can run past the next deal.
+ */
+export function whenLabel(at: Date, now: Date, timeZone: string): string {
+  const tz = safeZone(timeZone);
+  const time = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit" }).format(at);
+  const a = partsIn(at, tz);
+  const n = partsIn(now, tz);
+  const dayNumber = (p: { year: number; month: number; day: number }) => Date.UTC(p.year, p.month - 1, p.day) / 86_400_000;
+  const diff = dayNumber(a) - dayNumber(n);
+  if (diff === 0) return `today at ${time}`;
+  if (diff === 1) return `tomorrow at ${time}`;
+  const day = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short", month: "short", day: "numeric" }).format(at);
+  return `${day} at ${time}`;
+}
