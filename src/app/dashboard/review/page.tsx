@@ -167,8 +167,8 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
         </div>
       </div>
 
-      {/* The editable Sheet (board 19b) is the table alone: no KPI tiles or strips above it. */}
-      {!sheetPerms && <KpiStrip owner kpis={kpis(buckets)} />}
+      {/* The owner's Sheet keeps the key numbers and the two strips above the table, as the Board does (Taylor, Nov 10). */}
+      <KpiStrip owner kpis={kpis(buckets)} />
         </>
       ) : (
         <>
@@ -237,7 +237,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
         </>
       ) : params.view === "sheet" ? (
         <>
-          {!sheetPerms && strips}
+          {strips}
           <SheetView rows={shown} {...common} {...(sheetPerms ? { sheetEdit: { perms: sheetPerms } } : {})} />
         </>
       ) : (

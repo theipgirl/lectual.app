@@ -156,11 +156,14 @@
 .rv-owner .rv-kpi .lx-note { font-size: 13px; }
 
 .rv-owner .rv-strips { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.rv-owner .rv-strip { padding: 14px 16px; border-radius: 18px; gap: 6px; }
+.rv-owner .rv-strip { padding: 14px 16px; border-radius: 18px; gap: 6px; min-width: 0; grid-template-columns: minmax(0, 1fr); }
+.rv-owner .rv-strip-list { min-width: 0; }
+.rv-owner .rv-strip-list > li { min-width: 0; max-width: 100%; }
 .rv-owner .rv-strip-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .rv-owner .rv-strip-title { margin: 0; font-family: var(--sans); font-size: 16px; font-weight: 600; color: var(--ink); }
 .rv-owner .rv-strip-count { font-family: var(--mono); font-size: 13px; color: var(--muted); }
 .rv-owner .rv-strip-list { display: flex; flex-wrap: wrap; gap: 6px; max-height: none; overflow: visible; }
+.rv-owner .rv-strip-list .rv-pill { display: inline-block; line-height: 26px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rv-owner .rv-pill { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px; border-radius: 999px; font-size: 13px; white-space: nowrap; background: var(--well); color: var(--body); text-decoration: none; font-weight: 400; }
 .rv-owner .rv-strip-list a.rv-pill { font-weight: 400; color: var(--body); }
 .rv-owner .rv-strip-list a.rv-pill:hover { text-decoration: none; }
