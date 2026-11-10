@@ -5,7 +5,7 @@ import { laneOf, type Kpis, type Lane } from "@/lib/review/lanes";
 import { dueText, followUpText } from "@/lib/review/format";
 import { openToken } from "@/lib/review/open";
 import { reviewHref, REVIEW_VIEWS, type ReviewParams, type ReviewView } from "@/lib/review/params";
-import { OUR_TURN, REVIEW_BOARD_VIEW, REVIEW_CARDS_VIEW, REVIEW_SHEET_VIEW } from "@/lib/ui/words";
+import { NOTHING_WAITING_ON_YOU, OUR_TURN, WAITING_ON_YOU, WAITING_ON_YOU_PARTIAL, REVIEW_BOARD_VIEW, REVIEW_CARDS_VIEW, REVIEW_SHEET_VIEW } from "@/lib/ui/words";
 import { DoneButton } from "./DoneButton";
 import { Avatar, openHref, Tags, type Common } from "./shared";
 import "@/components/list-page/list-page.css";
@@ -168,17 +168,17 @@ export function ProposalsOutStrip({ items, known, params }: { items: ProposalOut
 }
 
 /** What waits on the review person: next steps assigned to them and approvals. Hidden by the page when there is no such person. */
-export function WaitingOnStrip({ firstName, rows, approvalsKnown, params, personId }: { firstName: string; rows: ReviewRow[]; approvalsKnown: boolean; params: ReviewParams; personId: string }) {
+export function WaitingOnStrip({ firstName, rows, approvalsKnown, params, personId, you }: { firstName: string; /** The strip is about the signed-in approver: "Waiting on you". */ you?: boolean; rows: ReviewRow[]; approvalsKnown: boolean; params: ReviewParams; personId: string }) {
   return (
     <section className="lx-card rv-strip" data-strip="person" aria-labelledby="rv-strip-person">
       <h2 id="rv-strip-person" className="lx-h2 rv-strip-title">
-        Waiting on {firstName} <span className="lx-note">{rows.length}</span>
+        {you ? WAITING_ON_YOU : `Waiting on ${firstName}`} <span className="lx-note">{rows.length}</span>
       </h2>
       {!approvalsKnown && (
-        <p className="lx-note rv-strip-note" role="status">Approvals couldn&apos;t load, so only next steps assigned to {firstName} are listed.</p>
+        <p className="lx-note rv-strip-note" role="status">{you ? WAITING_ON_YOU_PARTIAL : `Approvals couldn't load, so only next steps assigned to ${firstName} are listed.`}</p>
       )}
       {rows.length === 0 ? (
-        approvalsKnown && <p className="lx-note rv-strip-note">Nothing is waiting on {firstName}.</p>
+        approvalsKnown && <p className="lx-note rv-strip-note">{you ? NOTHING_WAITING_ON_YOU : `Nothing is waiting on ${firstName}.`}</p>
       ) : (
         <ul className="rv-strip-list">
           {rows.map((r) => (

@@ -160,9 +160,60 @@ export const PROPOSAL_TYPE_GENERAL = "Contract or other matter (flat fee)";
 export const GENERAL_LOE_SENTENCE = "Draft the General LOE for this matter.";
 
 /* ── Phase 1 owner view: views and shell (owned by the views/shell piece) ── */
+/** The account menu's view group (owner, admin, senior admin and Lectual staff, firms with the switch on). */
+export const VIEW_GROUP_NAME = "View";
+export const OWNER_VIEW_NAME = "Owner view";
+export const PREVIEW_A_VIEW = "Preview a view";
+export const BACK_TO_MY_VIEW = "Back to my own view";
+/** The owner phone bar's short name for the weekly review. */
+export const REVIEW_SHORT_NAME = "Review";
+export const SETTINGS_NAME = "Settings";
+/** saveViewAction's fixed sentences. */
+export const VIEW_NOT_SAVED = "We couldn't change your view. Try again.";
+export const VIEW_NOT_SIGNED_IN = "You are not signed in.";
+export const VIEW_PREVIEW_NOT_ALLOWED = "Only an owner or admin can preview another view.";
 
 /* ── Phase 1 owner view: approval deck ── */
 
 /* ── Phase 1 owner view: owner Today ── */
+export const OWNER_CARDS_HEADING = "Your cards";
+export const OWNER_CARDS_START = "Start";
+export const OWNER_CARDS_NONE_STATUS = "No approval cards to deal right now.";
+export const OWNER_CARDS_UNREACHABLE = "Couldn't load your cards.";
+export const OWNER_CARDS_NOT_CONNECTED = "No approval queue is connected for your firm yet.";
+export function ownerCardsCount(count: number, minutes: number): string {
+  return `${count} ${count === 1 ? "card needs" : "cards need"} you \u00b7 about ${minutes} min`;
+}
+export function ownerCardsNextDeal(count: number, label: string, later: number): string {
+  const more = later > 0 ? ` ${later} more at ${label}.` : "";
+  return count > 0 ? `Next deal ${label}.${more}` : `All decided. Next deal ${label}.${more}`;
+}
+export const OWNER_DEADLINES_HEADING = "Deadlines in the next 14 days";
+export const OWNER_DEADLINES_NONE = "Nothing due in the next 14 days.";
+export const OWNER_DEADLINES_FAILED = "Couldn't load deadlines.";
+export const OWNER_CALENDAR_LINK = "Calendar \u2192";
+export const OWNER_PROPOSALS_HEADING = "Proposals out";
+export const OWNER_PROPOSALS_NONE = "No proposals are out right now.";
+export const OWNER_PROPOSALS_FAILED = "Couldn't load proposals.";
+export const OWNER_PROPOSALS_LINK = "Proposals \u2192";
+export const OWNER_WEEK_HEADING = "This week";
+export const OWNER_WEEK_CONSULTS_FAILED = "Consults couldn't be read, so only deadlines are marked.";
+export const OWNER_WEEK_DEADLINES_FAILED = "Deadlines couldn't be read, so only consults are marked.";
+export const OWNER_WEEK_BOTH_FAILED = "Couldn't load this week.";
+export const OWNER_COPILOT_HEADING = "Ask Copilot";
+export const OWNER_COPILOT_LABEL = "Ask a question about your matters, leads or deadlines";
+export const OWNER_COPILOT_PLACEHOLDER = "For example: which matters are waiting on us?";
+export const OWNER_COPILOT_BUTTON = "Ask";
+export const OWNER_COPILOT_NOTE = "Answers come from your firm's own records. Nothing is sent.";
+
 
 /* ── Phase 1 owner view: weekly review ── */
+/** The weekly review's firm-wide "since" display filter chip. */
+export const REVIEW_SINCE_LABEL = "Since Feb 2026";
+export const REVIEW_SHOW_ALL = "Show all";
+export const REVIEW_SHOWING_ALL = "Showing all";
+export const reviewOlderHidden = (n: number) => `${n} older hidden`;
+/** The strip that is about the signed-in approver. */
+export const WAITING_ON_YOU = "Waiting on you";
+export const NOTHING_WAITING_ON_YOU = "Nothing is waiting on you.";
+export const WAITING_ON_YOU_PARTIAL = "Approvals couldn't load, so only next steps assigned to you are listed.";

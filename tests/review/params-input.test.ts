@@ -10,9 +10,9 @@ const form = (o: Record<string, string>) => ({ get: (k: string) => o[k] ?? null 
 
 describe("params", () => {
   it("defaults and parsing", () => {
-    expect(parseReviewParams({})).toEqual({ who: "all", kind: "both", q: "", view: "board", i: 1, person: null, open: null });
+    expect(parseReviewParams({})).toEqual({ since: "default", who: "all", kind: "both", q: "", view: "board", i: 1, person: null, open: null });
     expect(parseReviewParams({ view: "sheet" })).toMatchObject({ view: "sheet" });
-    expect(parseReviewParams({ who: "mine", kind: "leads", q: "  a  b ", view: "cards", i: "4" })).toEqual({ who: "mine", kind: "lead", q: "a b", view: "cards", i: 4, person: null, open: null });
+    expect(parseReviewParams({ who: "mine", kind: "leads", q: "  a  b ", view: "cards", i: "4" })).toEqual({ since: "default", who: "mine", kind: "lead", q: "a b", view: "cards", i: 4, person: null, open: null });
     expect(parseReviewParams({ view: "nope", i: "-3", kind: "x" })).toMatchObject({ view: "board", i: 1, kind: "both" });
     for (const old of ["agenda", "meeting", "stage"]) expect(parseReviewParams({ view: old }).view).toBe("board");
   });

@@ -107,7 +107,7 @@ describe("Weekly review page", () => {
   });
 
   it("Waiting on Rebecca lists her next steps and approvals; hidden when there is no Rebecca", async () => {
-    mock(ok());
+    mock(ok(), "paralegal");
     const html = await render();
     const from = html.indexOf('data-strip="person"');
     const strip = html.slice(from, html.indexOf("</section>", from));
@@ -116,15 +116,23 @@ describe("Weekly review page", () => {
     expect(strip).toContain("Approve Co");
     expect(strip).not.toContain("Overdue Co");
     vi.resetModules();
-    mock(ok({ members: [{ userId: "u-rayn", name: "Rayn", role: "paralegal" }] }));
+    mock(ok({ members: [{ userId: "u-rayn", name: "Rayn", role: "paralegal" }] }), "paralegal");
     expect(await render()).not.toContain('data-strip="person"');
   });
 
   it("Waiting on Rebecca says approvals couldn't load rather than implying none", async () => {
-    mock(ok({ failed: ["approvals"], rows: rows.filter((r) => r.key !== "b") }));
+    mock(ok({ failed: ["approvals"], rows: rows.filter((r) => r.key !== "b") }), "paralegal");
     const html = await render();
     expect(html).toContain("Approvals couldn&#x27;t load, so only next steps assigned to Rebecca are listed.");
     expect(html).not.toContain("Nothing is waiting on Rebecca");
+  });
+
+  it("an approver gets Waiting on you, even with no Rebecca; the failed-approvals sentence stays", async () => {
+    mock(ok({ failed: ["approvals"], members: [{ userId: "u-rayn", name: "Rayn", role: "attorney" }] }));
+    const html = await render();
+    expect(html).toContain("Waiting on you");
+    expect(html).not.toContain("Waiting on Rebecca");
+    expect(html).toContain("only next steps assigned to you are listed.");
   });
 
   it("view switch is exactly Board, Sheet, Cards", async () => {
