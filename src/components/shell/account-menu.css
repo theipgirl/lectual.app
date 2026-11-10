@@ -165,6 +165,6 @@
   }
 }
 
-
-/* MONO-OFF (toggle): the menu's note is a sentence. The role and e-mail lines (data) stay mono. Revert: delete, or data-mono="keep" on <html>. */
-:root:not([data-mono="keep"]) .lx-am-note { font-family: var(--sans); line-height: 1.5; }
+/* Facts in Geist (founder, Nov 10): the role / firm / e-mail lines and the notes are Geist. */
+.lx-am-sub, .lx-am-note { font-family: var(--sans); }
+.lx-am-note { line-height: 1.5; }

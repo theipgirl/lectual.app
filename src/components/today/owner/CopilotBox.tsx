@@ -9,8 +9,6 @@ import {
   OWNER_COPILOT_LABEL,
   OWNER_COPILOT_PHONE_CHIPS,
   OWNER_COPILOT_PHONE_PLACEHOLDER,
-  OWNER_COPILOT_SUB,
-  OWNER_COPILOT_SUB_SHORT,
 } from "@/lib/ui/words";
 
 /**
@@ -24,8 +22,6 @@ export function CopilotBox() {
         <h2 id="ot-copilot-h" className="ot-card-title">
           {OWNER_COPILOT_HEADING}
         </h2>
-        <span className="ot-sub ot-only-wide">{OWNER_COPILOT_SUB}</span>
-        <span className="ot-sub ot-only-narrow">{OWNER_COPILOT_SUB_SHORT}</span>
       </div>
       <form action={COPILOT_PATH} method="get" className="ot-copilot" role="search" aria-label={COPILOT_NAME}>
         <input name="q" type="text" maxLength={500} autoComplete="off" aria-label={OWNER_COPILOT_LABEL} placeholder={OWNER_COPILOT_ASK_PLACEHOLDER} className="ot-only-wide-block" />

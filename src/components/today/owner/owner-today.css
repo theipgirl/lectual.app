@@ -182,12 +182,7 @@ a.ot-row-title:hover { text-decoration: underline; }
   .ot-eyebrow { font-size: 12px; }
   .ot-copilot input { font-size: 16px; }
 }
-
-/* MONO-OFF (toggle): sentence-like sub-lines in Geist. Dates, times, counts and matter numbers stay Courier. Revert: delete this block,
-   or set data-mono="keep" on <html>. The consult line mixes a time with words, so the whole line is Geist (see the report). */
-:root:not([data-mono="keep"]) .ot-foot,
-:root:not([data-mono="keep"]) .ot-col-consults .ot-line,
-:root:not([data-mono="keep"]) .ot-col-proposals .ot-line,
-:root:not([data-mono="keep"]) .ot-card-head .ot-only-wide,
-:root:not([data-mono="keep"]) .ot-card-head .ot-only-narrow,
-:root:not([data-mono="keep"]) .ot-copilot-card .ot-card-head .ot-sub { font-family: var(--sans); }
+/* Facts in Geist (founder, Nov 10): consult time and source, "Link live · opened 2 times", deadline matter number and date, the hero's deal
+   times. Courier stays for bare counts and the week strip's day labels and times. */
+.ot-line, .ot-sub.ot-empty, .ot-note, .ot-foot { font-family: var(--sans); }
+.ot-line { font-size: 14px; line-height: 1.4; }

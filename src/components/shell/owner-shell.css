@@ -161,7 +161,4 @@
   .lx-app:has(.lx-top--owner) .lx-more-link { font-size: 16px; }
 }
 
-/* MONO-OFF (toggle): the More note is a sentence, so it is Geist. Revert: delete this block, or set data-mono="keep" on <html>. */
-@media (max-width: 900px) {
-  :root:not([data-mono="keep"]) .lx-app:has(.lx-top--owner) .lx-more-note { font-family: var(--sans); }
-}
+/* The phone More sheet's note is gone (founder, Nov 10); the MORE label stays 12px or more. */

@@ -80,7 +80,6 @@ export function OwnerConsults({ result, timeZone, today }: { result: TodayConsul
           )}
         </p>
       ))}
-      {notes.length === 0 && readOk.length > 0 && <p className="ot-sub ot-foot">Read from {readOk.join(" and ")}.</p>}
     </section>
   );
 }

@@ -255,7 +255,5 @@
   .rv-owner .rv-card .rv-card-acts, .rv-owner .rv-card-waits .rv-card-acts { position: static; justify-content: flex-end; padding: 0 10px 8px; gap: 6px; }
   .rv-owner .rv-card-ours .rv-card-acts { padding: 0 0 6px; }
 }
-
-/* MONO-OFF (toggle): sentence-like meta lines in Geist. Counts, dates and matter numbers stay Courier. Revert: delete this block,
-   or set data-mono="keep" on <html>. */
-:root:not([data-mono="keep"]) .rv-owner :is(.rv-card-meta, .rv-search-label, .rv-strip-count, .rv-sheet-note, .rv-kpi .lx-note) { font-family: var(--sans); }
+/* Facts in Geist (founder, Nov 10): the row's mark and stage line and the search label. Counts stay Courier. */
+.rv-owner :is(.rv-card-meta, .rv-search-label) { font-family: var(--sans); }

@@ -43,7 +43,6 @@ import {
   DECK_SUB_SEND_BACK,
   DECK_SUB_YES,
   deckApprovedLine,
-  deckArrowsHint,
   DECK_HANDED_NO_YES,
   DECK_HAND_OFF,
   DECK_LATER,
@@ -425,7 +424,6 @@ export function ApprovalCard(props: ApprovalCardProps) {
               <small>{DECK_SUB_YES}</small>
             </button>
           ) : null}
-          <p className="dk-hint dk-hint--desk">{deckArrowsHint(props.position, props.total)}</p>
         </div>
       )}
       {props.movesUnavailable && props.canMove && !decided && (

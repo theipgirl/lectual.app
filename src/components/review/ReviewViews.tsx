@@ -298,7 +298,7 @@ function OwnerProposalsOutStrip({ items, known, params }: { items: ProposalOut[]
     <section className="lx-card rv-strip" data-strip="proposals" aria-labelledby="rv-strip-proposals">
       <div className="rv-strip-head">
         <h2 id="rv-strip-proposals" className="rv-strip-title">Proposals out</h2>
-        {known && <span className="rv-strip-count">{items.length} · soonest last day first</span>}
+        {known && <span className="rv-strip-count">{items.length}</span>}
       </div>
       {!known ? (
         <p className="lx-note rv-strip-note" role="status">Proposals couldn&apos;t load. Refresh to try again.</p>
@@ -325,7 +325,7 @@ function OwnerWaitingOnStrip({ firstName, rows, approvalsKnown, params, personId
     <section className="lx-card rv-strip" data-strip="person" aria-labelledby="rv-strip-person">
       <div className="rv-strip-head">
         <h2 id="rv-strip-person" className="rv-strip-title">{you ? WAITING_ON_YOU : `Waiting on ${firstName}`}</h2>
-        <span className="rv-strip-count">{rows.length} · next steps and approvals</span>
+        <span className="rv-strip-count">{rows.length}</span>
       </div>
       {!approvalsKnown && (
         <p className="lx-note rv-strip-note" role="status">{you ? WAITING_ON_YOU_PARTIAL : `Approvals couldn't load, so only next steps assigned to ${firstName} are listed.`}</p>

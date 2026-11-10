@@ -163,8 +163,6 @@ export const GENERAL_LOE_SENTENCE = "Draft the General LOE for this matter.";
 /** The account menu's view group (Lectual staff acting inside a firm with the switch on; firm members never see it). */
 export const VIEW_GROUP_NAME = "View";
 export const OWNER_VIEW_NAME = "Owner view";
-/** The line under the owner view's phone More sheet (its rail and bar carry no Settings row). */
-export const SETTINGS_IN_MENU_NOTE = "Settings is in the account menu.";
 export const TECHNICIAN_VIEW_NAME = "Technician view";
 export const TECHNICIAN_VIEW_SUB = "everything, as today";
 /** The pill on the view row that is drawn right now. */

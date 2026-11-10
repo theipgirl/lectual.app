@@ -341,7 +341,8 @@ a.dk-move--open { font-size: 14px; }
   .dk-deal-btn { min-height: 44px; }
 }
 
-/* MONO-OFF (toggle): sentence-like sub-lines in Geist. Courier stays for dates, times, counts and ids. Revert: delete this block,
-   or set data-mono="keep" on <html>. */
-:root:not([data-mono="keep"]) .lx-app:has(.lx-top--owner) :is(.dk-side-sub, .dk-after-line, .dk-row-sub, .dk-foot-note, .dk-move small, .dk-mini small, .dk-lcard-sub) { font-family: var(--sans); }
-:root:not([data-mono="keep"]) .lx-app:has(.lx-top--owner) .dk-move small { letter-spacing: 0; }
+/* Facts in Geist (founder, Nov 10): sub-lines that say something (who, what, how many) are Geist. Courier stays for bare dates, times,
+   counts and the uppercase labels. */
+.dk-side-sub, .dk-after-line, .dk-row-sub, .dk-move small, .dk-mini small, .dk-lcard-sub, .dk-sub-mono, .dk-meta, .dk-clean-sub, .dk-pos { font-family: var(--sans); }
+.dk-move small { letter-spacing: 0; }
+.dk-sub-mono, .dk-meta { font-size: 14px; }
