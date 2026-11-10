@@ -156,12 +156,17 @@ describe("withPackageSnapshot keeps a proposal's includes", () => {
     expect(concierge?.custom_discount).toEqual({ label: "Custom", per_class_under_cents: 82_500 });
   });
 
-  it("the firm's includes win when the firm's list has them", () => {
+  // 2026-11-10 (the firm owner): each proposal keeps its own rows, even when the firm's list has rows; this replaced
+  // "the firm's includes win". A package with no rows of its own in the proposal still takes the firm's.
+  it("keeps the proposal's own includes even when the firm's list has rows; an entry with none takes the firm's", () => {
     const c = withIncludes(danielle());
     const firmRows = [{ label: "Firm row", included: "Yes" }];
     const firm = { packages: setting.packages.map((p) => ({ ...p, includes: firmRows })) };
     const out = withPackageSnapshot(c, firm);
-    expect(out.packages!.every((p) => JSON.stringify(p.includes) === JSON.stringify(firmRows))).toBe(true);
+    for (const p of out.packages!) expect(p.includes).toEqual(ROWS[p.package as keyof typeof ROWS]);
+    const bare = withIncludes(danielle());
+    bare.packages = bare.packages!.map((p) => (p.package === "Enhanced" ? { ...p, includes: undefined } : p));
+    expect(withPackageSnapshot(bare, firm).packages!.find((p) => p.package === "Enhanced")?.includes).toEqual(firmRows);
   });
 
   it("a package new to the proposal gets the firm's includes, or none", () => {

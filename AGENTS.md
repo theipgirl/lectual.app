@@ -1251,8 +1251,9 @@ Settings -> Proposals -> Packages has, under each package's prices, a closed "Wh
   them by name, so the prices-only `savePackagesAction` never wipes them); marker with no rows = clear them. At most 30 rows, each
   with an item name and cells of at most 300 characters; `validateSettingInput` runs the standard table's text and office-action
   checks on them too.
-- A new proposal's snapshot takes them (`packageOffersFromSetting`). On a refresh (`withPackageSnapshot`) the firm's rows win when the
-  firm has rows for that package (#23); otherwise the proposal keeps its own. The proposal's own package ORDER is kept, and a package
+- A new proposal's snapshot takes them (`packageOffersFromSetting`). On a refresh (`withPackageSnapshot`) **each proposal keeps its own
+  rows** (firm owner, 2026-11-10; this replaced #23's "the firm's rows win"): editing a package's rows in Settings changes new proposals only.
+  A package with no rows of its own in the proposal takes the firm's. The proposal's own package ORDER is kept, and a package
   new to it is appended in the firm's order. Prices are untouched (`quoteProposal` has no diff).
 
 ## A package per mark, and "Opened" in Lectual (Spec 7, 2026-10-29, no schema)
@@ -1331,8 +1332,8 @@ by side. Display and data-keeping only: `pricing.ts` has no diff and `quotePropo
   offer, or no chosen package having includes rows, it shows every offered package as before (`mode: "all"`); `null` (no offered package has rows) keeps the
   `content.includes` table. Headings (`comparisonHeading`): one chosen = "What your package includes" / "<Package>™, with each trademark you choose"; several =
   "Compare your packages"; all = "What each package includes". Same `.cp-cmp*` markup, scroll wrapper and "—" cells. No `package_choice` = unchanged.
-- **Includes survive saves.** `withPackageSnapshot` keeps an earlier snapshot entry's `includes` when the firm's list has none for that package (the firm's
-  rows win when present; a package new to the proposal gets the firm's rows or none), beside the `custom_discount` it already kept. `withPackages` (Settings
+- **Includes survive saves.** `withPackageSnapshot` keeps an earlier snapshot entry's own `includes`, even when the firm's list has rows for
+  that package (2026-11-10; an entry with none, or a package new to the proposal, gets the firm's rows or none), beside the `custom_discount` it already kept. `withPackages` (Settings
   -> Client proposals) carries each stored `pricing.packages[i].includes` across by name (case-insensitive, trimmed), never invents any, and never copies a
   package's rows onto the top-level `includes` table.
 - There is still no editor control for a package's own `includes` rows; they are data (content jsonb or the settings' `packages` entries).
