@@ -70,8 +70,8 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   // The board look is the owner view's; every other view keeps the page as it was. Decided the way Today decides it.
   const owner = session.kind === "ok" && viewFor({
     role: session.role,
-    preview: session.actingAsStaff ? previewFor(session.user.user_metadata, session.org.id) : NO_PREVIEW,
-    firmHasRoleViews: (session.org.modules ?? []).includes("role-views"),
+    preview: session.actingAsStaff ? previewFor(session.user?.user_metadata, session.org?.id) : NO_PREVIEW,
+    firmHasRoleViews: (session.org?.modules ?? []).includes("role-views"),
     actingAsStaff: session.actingAsStaff,
   }) === "owner";
   const common = { owner, today: load.today, members: load.members, canWrite, params };
@@ -149,7 +149,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
         </div>
       </div>
 
-      <KpiStrip kpis={kpis(buckets)} />
+      <KpiStrip owner kpis={kpis(buckets)} />
         </>
       ) : (
         <>

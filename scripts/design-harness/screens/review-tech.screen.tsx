@@ -1,6 +1,7 @@
 import ReviewPage from "@/app/dashboard/review/page";
 import { state } from "../state";
 import { ORG, resetState, session } from "../fixtures";
+import type { FirmSession } from "@/lib/firm/session";
 import type { Screen } from "../registry";
 
 /**
@@ -9,8 +10,9 @@ import type { Screen } from "../registry";
  */
 const tech = (query: Record<string, string>) =>
   async function renderTech() {
-    const before = session.org;
-    (session as { org: typeof ORG }).org = { ...ORG, modules: ORG.modules.filter((m) => m !== "role-views") };
+    const live = session as Extract<FirmSession, { kind: "ok" }>;
+    const before = live.org;
+    (live as { org: typeof ORG }).org = { ...ORG, modules: ORG.modules.filter((m) => m !== "role-views") };
     try {
       const page = await ReviewPage({ searchParams: Promise.resolve(query) });
       return (
@@ -23,7 +25,7 @@ const tech = (query: Record<string, string>) =>
         </div>
       );
     } finally {
-      (session as { org: typeof ORG }).org = before;
+      live.org = before;
     }
   };
 const prepare = () => {

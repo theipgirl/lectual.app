@@ -136,3 +136,12 @@
     color: var(--muted);
   }
 }
+
+/* Shared by the segmented view toggles (ViewToggle, the weekly review's views, Reports' periods, Calendar). Kept here
+   where it has always lived; removing it changed those toggles' widths for every role. */
+.lx-view-toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
