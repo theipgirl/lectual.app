@@ -1,0 +1,109 @@
+/* The weekly review's editable Sheet: OWNER VIEW ONLY (every rule is under .rv-owner). Tokens only; no new colours. */
+
+.rv-owner .rse-head-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.rv-owner .rse-status-wrap { display: inline-flex; align-items: center; gap: 8px; }
+.rv-owner .rse-saved { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 999px; font-size: 14px; font-weight: 600; background: color-mix(in srgb, var(--ok) 12%, transparent); color: var(--ok); }
+.rv-owner .rse-saved--saving { background: var(--well); color: var(--body); font-weight: 500; }
+.rv-owner .rse-saved-tick { fill: none; stroke: currentColor; stroke-width: 2; }
+.rv-owner .rse-failed { display: inline-flex; align-items: center; min-height: 32px; padding: 4px 12px; border-radius: 16px; font-size: 14px; font-weight: 500; line-height: 1.4; background: color-mix(in srgb, var(--ox) 10%, transparent); color: var(--ox); max-width: 520px; }
+.rv-owner .rse-saved--empty { display: none; }
+
+.rv-owner .rse-root { display: grid; gap: 14px; }
+.rv-owner .rse-wrap { display: grid; gap: 18px; }
+.rv-owner .rse-keys { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: flex-end; font-size: 13px; line-height: 1.4; color: var(--muted); }
+.rv-owner .rse-key { display: inline-flex; align-items: center; height: 22px; padding: 0 6px; border-radius: 5px; border: 1px solid var(--line); background: var(--card); font-family: var(--mono); font-size: 13px; color: var(--ink); }
+
+.rv-owner .rse-card { padding: 0; overflow: visible; border-radius: 18px; }
+.rv-owner .rse-tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 15px; }
+.rv-owner .rse-tbl thead th { position: relative; text-align: left; font-family: var(--mono); font-weight: 400; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); padding: 10px 10px; background: var(--well); border-bottom: 1px solid var(--line); vertical-align: bottom; }
+.rv-owner .rse-tbl thead th:first-child { border-top-left-radius: 18px; }
+.rv-owner .rse-tbl thead th:last-child { border-top-right-radius: 18px; }
+.rv-owner .rse-tbl .rse-lock-th { color: var(--muted); }
+.rv-owner .rse-tbl td { position: relative; padding: 11px 10px; border-bottom: 1px solid var(--line-2); vertical-align: top; color: var(--ink); line-height: 1.4; }
+.rv-owner .rse-tbl tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--well) 35%, transparent); }
+.rv-owner .rse-tbl tbody tr:last-child td { border-bottom: 0; }
+.rv-owner .rse-tbl .rse-sec th { text-align: left; padding: 11px 10px; font-size: 15px; font-weight: 600; color: var(--ink); background: var(--well); border-bottom: 1px solid var(--line-2); }
+.rv-owner .rse-tbl .rse-empty td { color: var(--muted); font-size: 14px; }
+.rv-owner .rse-client { color: var(--ox); text-decoration: underline; text-underline-offset: 2px; }
+.rv-owner .rse-dash { color: var(--muted); }
+.rv-owner .rse-tbl .rse-locked { color: var(--body); }
+.rv-owner .rse-tbl .rse-mono { font-family: var(--mono); font-size: 14px; white-space: nowrap; }
+.rv-owner .rse-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* An editable cell: a quiet frame on hover/focus, the ox ring when open. */
+.rv-owner .rse-cell { display: block; width: calc(100% + 12px); margin: -6px; padding: 6px; border-radius: 8px; border: 1px solid transparent; background: transparent; font: inherit; color: inherit; text-align: left; line-height: 1.4; }
+.rv-owner .rse-edit { cursor: text; }
+.rv-owner .rse-edit:hover { border-color: var(--line); }
+.rv-owner .rse-edit:focus-visible { outline: none; border-color: var(--ox); }
+.rv-owner .rse-cell.is-saving { color: var(--muted); }
+.rv-owner .rse-on { border: 2px solid var(--ox); background: var(--card); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ox) 12%, transparent); }
+.rv-owner .rse-wrapcell { white-space: normal; }
+.rv-owner .rse-overdue, .rv-owner .rse-cell.rse-overdue { color: var(--ox); font-weight: 600; }
+
+/* The next-step editor: text and due date in the cell. */
+.rv-owner .rse-next-ed { display: flex; flex-direction: column; gap: 6px; min-width: 250px; cursor: default; }
+.rv-owner .rse-ed-label { font-size: 13px; color: var(--muted); }
+.rv-owner .rse-ed-due { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.rv-owner .rse-ed-hint { font-size: 13px; line-height: 1.4; color: var(--muted); }
+.rv-owner .rse-ed-error { margin: 0; font-size: 13px; color: var(--ox); }
+.rv-owner .rse-in, .rv-owner .rse-tbl .rse-in { width: 100%; box-shadow: none; outline: none; height: 36px; border: 1px solid var(--line); border-radius: 9px; padding: 0 10px; font: 15px var(--sans); color: var(--ink); background: var(--card); }
+.rv-owner .rse-in:focus-visible, .rv-owner .rse-tbl .rse-in:focus-visible { outline: 2px solid var(--ox); outline-offset: 0; }
+.rv-owner .rse-in-date, .rv-owner .rse-tbl .rse-in-date { width: 140px; }
+.rv-owner .rse-tbl .rse-next-td { min-width: 280px; }
+.rv-owner .rse-textarea, .rv-owner .rse-tbl .rse-textarea { height: auto; padding: 8px 10px; resize: none; line-height: 1.4; }
+
+/* Popovers: the stage list, the person picker, the source list and "+ Note". */
+.rv-owner .rse-pop { position: absolute; z-index: 8; top: calc(100% - 2px); left: 4px; min-width: 230px; width: max-content; max-width: 340px; padding: 8px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow-lift); display: flex; flex-direction: column; gap: 2px; text-align: left; white-space: normal; }
+.rv-owner .rse-pop-list { display: flex; flex-direction: column; gap: 2px; max-height: 300px; overflow: auto; }
+.rv-owner .rse-pop-eyebrow { padding: 4px 10px; font-family: var(--mono); font-size: 12px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--muted); }
+.rv-owner .rse-pop-foot { margin: 0; padding: 4px 10px; font-size: 13px; line-height: 1.4; color: var(--muted); }
+.rv-owner .rse-opt { display: flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 10px; border-radius: 9px; border: 0; background: transparent; font: 15px var(--sans); color: var(--ink); text-align: left; white-space: nowrap; cursor: pointer; }
+.rv-owner .rse-opt:hover, .rv-owner .rse-opt:focus-visible { background: color-mix(in srgb, var(--well) 60%, transparent); outline: none; }
+.rv-owner .rse-opt.sel { background: var(--well); font-weight: 600; }
+.rv-owner .rse-av { flex: 0 0 auto; width: 26px; height: 26px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; background: var(--ox); color: var(--cream); font-family: var(--mono); font-size: 11.5px; }
+.rv-owner .rse-av.soft { background: color-mix(in srgb, var(--ox) 14%, var(--card)); color: var(--ox); }
+.rv-owner .rse-pop .rse-in { margin-bottom: 4px; }
+
+.rv-owner .rse-note-th, .rv-owner .rse-note-td { width: 1%; white-space: nowrap; }
+.rv-owner .rse-btn { display: inline-flex; align-items: center; justify-content: center; height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: transparent; font: 500 14px var(--sans); color: var(--ink); white-space: nowrap; cursor: pointer; }
+.rv-owner .rse-btn--on { border-color: var(--ox); background: var(--ox); color: var(--cream); box-shadow: none; }
+.rv-owner .rse-btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+.rv-owner .rse-note-pop { left: auto; right: 4px; width: 270px; gap: 8px; padding: 12px; }
+.rv-owner .rse-note-label { font-size: 14px; font-weight: 600; color: var(--ink); }
+.rv-owner .rse-note-pop .rse-pop-foot { padding: 0; }
+.rv-owner .rse-note-acts { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* Column edge and row grips: a per-viewer convenience, shown on hover and focus. */
+.rv-owner .rse-col-grip { position: absolute; top: 4px; bottom: 4px; right: -3px; width: 6px; border-radius: 3px; cursor: col-resize; z-index: 3; background: transparent; }
+.rv-owner .rse-tbl thead th:hover .rse-col-grip, .rv-owner .rse-col-grip:focus-visible, .rv-owner .rse-col-grip.is-active { background: var(--ox); outline: none; }
+.rv-owner .rse-col-tip { position: absolute; top: -24px; right: -20px; padding: 2px 6px; border-radius: 6px; background: var(--ink); color: var(--cream); font-family: var(--mono); font-size: 12px; letter-spacing: 0; text-transform: none; white-space: nowrap; }
+.rv-owner .rse-row-grip { position: absolute; left: 8px; right: 8px; bottom: -3px; height: 5px; border-radius: 3px; cursor: row-resize; background: transparent; z-index: 2; }
+.rv-owner .rse-tbl tbody tr:hover .rse-row-grip, .rv-owner .rse-row-grip.is-active { background: color-mix(in srgb, var(--ox) 45%, transparent); }
+
+.rv-owner .rse-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; padding: 16px 20px; box-shadow: none; border-radius: 18px; }
+.rv-owner .rse-legend-title { margin: 0 0 4px; font-size: 15px; font-weight: 600; color: var(--ink); }
+.rv-owner .rse-legend-body { margin: 0; font-size: 15px; line-height: 1.45; color: var(--body); }
+
+@media (max-width: 900px) and (min-width: 641px) {
+  .rv-owner .rse-card { overflow-x: auto; }
+  .rv-owner .rse-tbl { min-width: 1000px; }
+}
+
+/* Phone: stacked rows, no inline editing (edits open the record panel from the Client link). */
+@media (max-width: 640px) {
+  .rv-owner .rse-keys, .rv-owner .rse-col-grip, .rv-owner .rse-row-grip, .rv-owner .rse-col-tip, .rv-owner .rse-note-th, .rv-owner .rse-note-td, .rv-owner .rse-pop { display: none; }
+  .rv-owner .rse-cell { pointer-events: none; width: auto; margin: 0; padding: 0; border: 0; box-shadow: none; text-align: right; }
+  .rv-owner .rse-tbl { font-size: 14px; }
+  .rv-owner .rse-tbl td { border-bottom: 0; padding: 4px 0; }
+  .rv-owner .rse-tbl td[data-label]::before { font-size: 12px; }
+  .rv-owner .rse-tbl tbody tr:not(.rse-sec) { border-bottom: 1px solid var(--line-2); }
+  .rv-owner .rse-tbl .rse-sec { padding: 10px 14px; }
+  .rv-owner .rse-tbl .rse-sec th { display: block; padding: 0; background: transparent; border: 0; }
+  .rv-owner .rse-tbl .rse-sec, .rv-owner .rse-tbl .rse-empty { background: var(--well); }
+  .rv-owner .rse-tbl tbody tr:nth-child(even) td { background: transparent; }
+  .rv-owner .rse-tbl td.pri { font-size: 16px; }
+  .rv-owner .rse-client { display: inline-flex; align-items: center; min-height: 44px; }
+  .rv-owner .rse-legend { grid-template-columns: 1fr; padding: 14px 16px; }
+  .rv-owner .rse-legend-body { font-size: 14px; }
+  .rv-owner .rse-head-right { justify-content: flex-start; }
+}

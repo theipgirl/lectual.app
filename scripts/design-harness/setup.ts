@@ -118,3 +118,18 @@ vi.mock("@/lib/review/detail-load", () => ({
   loadReviewDetail: async () => null,
   loadLatestNote: async () => null,
 }));
+
+// Weekly review, the owner's editable Sheet (screens/review-sheet-edit.screen.tsx): the stage lists and the drawing-only
+// starting state (editors open) come from `state.sheetStages` / `state.sheetEditInitial`.
+vi.mock("@/lib/review/sheet-edit-load", () => ({
+  loadSheetStages: async () => (state as { sheetStages?: unknown }).sheetStages ?? { matter: null, lead: null },
+}));
+vi.mock("@/components/review/SheetEditTable", async (orig) => {
+  const m = await orig<typeof import("@/components/review/SheetEditTable")>();
+  const { createElement } = await import("react");
+  return {
+    ...m,
+    SheetEditTable: (p: Parameters<typeof m.SheetEditTable>[0]) =>
+      createElement(m.SheetEditTable, { ...p, initial: p.initial ?? (state as { sheetEditInitial?: Parameters<typeof m.SheetEditTable>[0]["initial"] }).sheetEditInitial }),
+  };
+});

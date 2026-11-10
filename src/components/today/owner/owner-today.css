@@ -51,12 +51,12 @@
 .ot-page { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 .ot-top { display: flex; flex-direction: column; gap: 6px; }
 .ot-h1 { font-family: var(--serif); font-weight: 400; font-size: 44px; line-height: 1.05; letter-spacing: -0.01em; color: var(--ink); margin: 0; }
-.ot-date { font-size: 14px; color: var(--body); margin: 0; }
+.ot-date { font-size: 15px; color: var(--body); margin: 0; }
 .ot-mono, .ot-sub { font-family: var(--mono); }
-.ot-sub { font-size: 11.5px; color: var(--muted); }
+.ot-sub { font-size: 13px; line-height: 1.4; color: var(--muted); }
 .ot-only-narrow { display: none; }
 .ot-only-narrow-block { display: none !important; }
-.ot-link { color: var(--ox); text-decoration: underline; text-underline-offset: 2px; font-size: 13px; }
+.ot-link { color: var(--ox); text-decoration: underline; text-underline-offset: 2px; font-size: 14px; }
 
 /* Hero: the oxblood panel, a huge count and a cream Start. */
 .ot-hero { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 28px 32px; border-radius: 22px; background: var(--ot-deck-bg); color: var(--ot-deck-ink); box-shadow: var(--shadow); }
@@ -65,24 +65,24 @@
 .ot-big { font-family: var(--serif); font-size: 96px; line-height: 0.9; }
 .ot-hero-text { display: flex; flex-direction: column; gap: 6px; padding-bottom: 8px; }
 .ot-hero-title { font-family: var(--serif); font-size: 30px; line-height: 1.1; }
-.ot-hero-sub { color: var(--ot-hero-sub); font-size: 14px; margin: 0; }
+.ot-hero-sub { color: var(--ot-hero-sub); font-size: 15px; margin: 0; }
 .ot-hero-message { font-family: var(--serif); font-size: 30px; line-height: 1.15; margin: 0; }
 .ot-start { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; height: 56px; padding: 0 40px; border-radius: 999px; background: var(--ot-deck-ink); color: var(--ot-deck-bg) !important; font: 500 17px var(--sans); text-decoration: none !important; }
 .ot-start:focus-visible, .ot-btn:focus-visible, .ot-chip:focus-visible, .ot-day:focus-visible { outline: 2px solid var(--ot-dot); outline-offset: 2px; }
-.ot-eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--muted); font-weight: 400; margin: 0; }
+.ot-eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--muted); font-weight: 400; margin: 0; }
 
 /* Cards, rows, pills. */
 .ot-card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); padding: 20px 22px; min-width: 0; }
 .ot-week-card, .ot-copilot-card { padding: 18px 20px; }
 .ot-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
-.ot-card-title { font-family: var(--sans); font-size: 15px; font-weight: 600; color: var(--ink); margin: 0; }
-.ot-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line-2); }
+.ot-card-title { font-family: var(--sans); font-size: 16px; font-weight: 600; color: var(--ink); margin: 0; }
+.ot-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line-2); }
 .ot-card-head + .ot-row { border-top: 0; }
-.ot-row-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
+.ot-row-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1 1 auto; }
 .ot-row-title, .ot-line { display: block; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ot-row-title { font-size: 13.5px; color: var(--ink); text-decoration: none; }
+.ot-row-title { font-size: 15px; white-space: normal; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: 1.3; color: var(--ink); text-decoration: none; }
 a.ot-row-title:hover { text-decoration: underline; }
-.ot-pill { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 999px; font-size: 12px; white-space: nowrap; background: var(--well); color: var(--body); flex: 0 0 auto; }
+.ot-pill { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 999px; font-size: 13px; white-space: nowrap; background: var(--well); color: var(--body); flex: 0 0 auto; }
 .ot-pill-risk { background: var(--ot-risk-bg); color: var(--ot-risk-ink); font-weight: 600; }
 .ot-pill-warn { background: var(--ot-warn-bg); color: var(--ot-warn-ink); }
 .ot-empty, .ot-note, .ot-foot { margin: 8px 0 0; }
@@ -98,14 +98,14 @@ a.ot-row-title:hover { text-decoration: underline; }
 .ot-key-consult { background: var(--ot-consult-tint); border: 1px solid var(--line); }
 .ot-key-deadline { background: var(--ot-deadline-tint); border: 1px solid var(--line); }
 .ot-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
-.ot-day { display: flex; flex-direction: column; gap: 6px; min-height: 118px; padding: 8px; border-radius: 12px; background: var(--paper); border: 1px solid var(--line-2); color: var(--ink); text-decoration: none; min-width: 0; }
+.ot-day { display: flex; flex-direction: column; gap: 6px; min-height: 124px; padding: 9px; border-radius: 12px; background: var(--paper); border: 1px solid var(--line-2); color: var(--ink); text-decoration: none; min-width: 0; }
 .ot-day:hover { text-decoration: none; border-color: var(--ot-dot); }
-.ot-day[aria-current="date"] { border: 2px solid var(--ot-today); background: var(--card); padding: 7px; }
+.ot-day[aria-current="date"] { border: 2px solid var(--ot-today); background: var(--card); padding: 8px; }
 .ot-day-date { font-size: 13px; font-weight: 600; color: var(--ink); }
-.ot-day-date .ot-mono { font-weight: 400; font-size: 11px; color: var(--muted); text-transform: uppercase; }
+.ot-day-date .ot-mono { font-weight: 400; font-size: 12px; color: var(--muted); text-transform: uppercase; }
 .ot-day-items { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.ot-item { display: flex; flex-direction: column; gap: 1px; padding: 5px 7px; border-radius: 8px; font-size: 11.5px; line-height: 1.3; color: var(--ink); overflow-wrap: anywhere; }
-.ot-item b { font-family: var(--mono); font-weight: 400; font-size: 10.5px; color: var(--muted); }
+.ot-item { display: flex; flex-direction: column; gap: 1px; padding: 5px 8px; border-radius: 8px; font-size: 13px; line-height: 1.3; color: var(--ink); overflow-wrap: anywhere; }
+.ot-item b { font-family: var(--mono); font-weight: 400; font-size: 13px; color: var(--body); }
 .ot-item-consult { background: var(--ot-consult-tint); }
 .ot-item-deadline { background: var(--ot-deadline-tint); }
 .ot-day-dots { display: none; }
@@ -115,14 +115,14 @@ a.ot-row-title:hover { text-decoration: underline; }
 
 /* Ask Copilot. */
 .ot-copilot { display: flex; gap: 8px; margin-top: 10px; }
-.ot-copilot input { flex: 1 1 auto; min-width: 0; height: 44px; padding: 0 18px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--ink); font: 14px var(--sans); }
+.ot-copilot input { flex: 1 1 auto; min-width: 0; height: 44px; padding: 0 18px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--ink); font: 15px var(--sans); }
 .ot-btn { display: inline-flex; align-items: center; justify-content: center; height: 44px; padding: 0 20px; border-radius: 999px; border: 0; background: var(--ox); color: var(--cream); font: 500 14px var(--sans); cursor: pointer; }
 .ot-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-.ot-chip { display: inline-flex; align-items: center; height: 32px; padding: 0 13px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); font-size: 12.5px; color: var(--ink); text-decoration: none; }
+.ot-chip { display: inline-flex; align-items: center; height: 36px; padding: 0 13px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); font-size: 14px; color: var(--ink); text-decoration: none; }
 .ot-chip:hover { border-color: var(--ot-dot); text-decoration: none; }
 
 @media (max-width: 900px) {
-  .ot-day-items .ot-item { font-size: 11px; }
+  .ot-day-items .ot-item { font-size: 13px; }
 }
 
 /* Phone (375 wide): h1 32, a plain "Your cards" card, a dot strip for the week, then Ask Copilot, consults, deadlines, proposals. */
@@ -140,25 +140,25 @@ a.ot-row-title:hover { text-decoration: underline; }
   .ot-hero-main.ot-only-narrow { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
   .ot-hero-count { font-family: var(--serif); font-size: 30px; line-height: 1; margin: 0; }
   .ot-hero-about { font-size: 20px; color: var(--muted); }
-  .ot-hero-sub { color: var(--body); font-size: 13px; }
+  .ot-hero-sub { color: var(--body); font-size: 14px; }
   .ot-hero-message { font-size: 22px; color: var(--ink); }
-  .ot-start { width: 100%; height: 44px; padding: 0 20px; background: var(--ox); color: var(--cream) !important; font-size: 14px; }
+  .ot-start { width: 100%; height: 44px; padding: 0 20px; background: var(--ox); color: var(--cream) !important; font-size: 15px; }
 
   .ot-card, .ot-week-card, .ot-copilot-card { padding: 14px 16px; border-radius: 18px; }
   .ot-week-card { padding: 12px 12px 14px; }
   .ot-week { gap: 4px; }
-  .ot-day { min-height: 62px; padding: 5px 3px; align-items: center; text-align: center; gap: 4px; }
+  .ot-day { min-height: 64px; padding: 5px 2px; align-items: center; text-align: center; gap: 4px; }
   .ot-day[aria-current="date"] { padding: 4px 2px; }
   .ot-day-date { display: flex; flex-direction: column; align-items: center; font-size: 13px; line-height: 1.2; }
-  .ot-day-date .ot-mono { font-size: 10px; text-transform: none; }
+  .ot-day-date .ot-mono { font-size: 13px; text-transform: none; }
   .ot-day-items { display: none; }
   .ot-day-dots { display: flex; gap: 3px; min-height: 7px; justify-content: center; flex-wrap: wrap; }
 
   .ot-copilot { flex-direction: column; margin-top: 4px; }
   .ot-copilot .ot-btn { display: none; }
-  .ot-copilot input { padding: 0 16px; }
+  .ot-copilot input { padding: 0 16px; font-size: 16px; }
   .ot-chips { gap: 6px; margin-top: 8px; }
-  .ot-chip { height: 36px; }
+  .ot-chip { height: 44px; }
   .ot-copilot-card .ot-card-head { flex-direction: column; gap: 2px; margin-bottom: 4px; }
 
   .ot-cols { display: contents; }
@@ -171,3 +171,23 @@ a.ot-row-title:hover { text-decoration: underline; }
   .ot-key-consult { background: var(--ot-consult-dot); }
   .ot-key-deadline { background: var(--ot-deadline-dot); }
 }
+
+
+/* Legibility pass (founder, Nov 10). Phone: row titles 16px, sub-lines 14px. */
+@media (max-width: 640px) {
+  .ot-row-title { font-size: 16px; }
+  .ot-sub { font-size: 14px; }
+  .ot-link { font-size: 15px; }
+  .ot-pill { font-size: 13px; }
+  .ot-eyebrow { font-size: 12px; }
+  .ot-copilot input { font-size: 16px; }
+}
+
+/* MONO-OFF (toggle): sentence-like sub-lines in Geist. Dates, times, counts and matter numbers stay Courier. Revert: delete this block,
+   or set data-mono="keep" on <html>. The consult line mixes a time with words, so the whole line is Geist (see the report). */
+:root:not([data-mono="keep"]) .ot-foot,
+:root:not([data-mono="keep"]) .ot-col-consults .ot-line,
+:root:not([data-mono="keep"]) .ot-col-proposals .ot-line,
+:root:not([data-mono="keep"]) .ot-card-head .ot-only-wide,
+:root:not([data-mono="keep"]) .ot-card-head .ot-only-narrow,
+:root:not([data-mono="keep"]) .ot-copilot-card .ot-card-head .ot-sub { font-family: var(--sans); }

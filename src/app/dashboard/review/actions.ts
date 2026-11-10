@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { CAN_MOVE_STAGE, CAN_WRITE_LEAD, addLeadNote, assignLead, moveLeadStage, resolveCurrentRole } from "@/lib/pipeline";
-import { MATTER_WRITE_ROLES, assignMatterOwner } from "@/lib/matters/matters";
+import { MATTER_WRITE_ROLES, assignMatterOwner, updateMatterHeader } from "@/lib/matters/matters";
+import { setReferralSource } from "@/lib/intake/leads";
+import { isReferralSource } from "@/lib/intake/referral-source";
 import { updateMatterStage } from "@/lib/matters/stages";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { addMatterNote } from "@/lib/matters/notes";
@@ -271,6 +273,29 @@ export async function assignRecordAction(_prev: ReviewActionState, formData: For
     else await assignLead(id, userId || null);
   } catch (err) {
     return { error: friendlyMatterError(err, "Couldn't change who this is assigned to.") };
+  }
+  refresh();
+  return { saved: true };
+}
+
+/**
+ * Source, from the owner's Sheet. The existing write paths only: a lead through `setReferralSource` (the Leads list's
+ * source menu, CAN_WRITE_LEAD re-checked inside, logs `lead_updated`), a matter through `updateMatterHeader` (the matter
+ * page's "Came from", requireMatterWriteRole inside, logs `matter_updated`). Only one of REFERRAL_SOURCES, or blank to clear.
+ */
+export async function setSourceAction(_prev: ReviewActionState, formData: FormData): Promise<ReviewActionState> {
+  const kind = parseKind(formData.get("kind"));
+  const id = String(formData.get("id") ?? "").trim();
+  const raw = String(formData.get("source") ?? "").trim();
+  if (!kind || !isUuid(id)) return { error: NOT_FOUND };
+  if (raw && !isReferralSource(raw)) return { error: "That isn't one of the sources." };
+  try {
+    if (!(await canWrite(kind))) return { error: NO_PERMISSION };
+    if (!(await recordVisible(kind, id))) return { error: NOT_FOUND };
+    if (kind === "matter") await updateMatterHeader(id, { referralSource: raw });
+    else await setReferralSource(id, raw && isReferralSource(raw) ? raw : null);
+  } catch (err) {
+    return { error: friendlyMatterError(err, "Couldn't change the source.") };
   }
   refresh();
   return { saved: true };

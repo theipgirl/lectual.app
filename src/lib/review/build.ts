@@ -22,6 +22,7 @@ export type ReviewMatterIn = {
   status: string;
   type?: string | null;
   referral_source?: string | null;
+  stage_id?: string | null;
   lead_id: string | null;
   assigned_to: string | null;
   stage_entered_at: string | null;
@@ -187,6 +188,7 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
       client,
       mark: display.title !== client ? display.title : null,
       stageLabel: m.stage ? m.stage.label : null,
+      stageId: m.stage_id ?? null,
       stageCode: m.stage ? m.stage.code : null,
       matterType: m.type ?? null,
       stageDays: age.days,
@@ -234,6 +236,7 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
       client,
       mark: l.mark_text?.trim() || null,
       stageLabel: stageName.get(l.current_stage_id) ?? null,
+      stageId: l.current_stage_id,
       stageDays: age.days,
       stageNote: age.days === null ? age.label : null,
       stageOrder: typeof stageOrderOf.get(l.current_stage_id) === "number" ? stageOrderOf.get(l.current_stage_id)! : null,

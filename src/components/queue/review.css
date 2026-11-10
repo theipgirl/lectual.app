@@ -34,14 +34,14 @@
   .lx-app:has(.lx-top--owner) .lx-qi .lx-review,
   .lx-app:has(.lx-top--owner) .lx-qi > .lx-qi-aside { display: contents; }
 
-  .lx-app:has(.lx-top--owner) .lx-qi-back { font-size: 13.5px; color: var(--ox); text-decoration: underline; text-underline-offset: 2px; min-height: 28px; display: inline-flex; align-items: center; }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-qi-kind { font-size: 11px; letter-spacing: 0.06em; color: var(--muted); }
+  .lx-app:has(.lx-top--owner) .lx-qi-back { font-size: 14px; color: var(--ox); text-decoration: underline; text-underline-offset: 2px; min-height: 44px; display: inline-flex; align-items: center; }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-qi-kind { font-size: 12px; letter-spacing: 0.1em; color: var(--muted); }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-h1 { font-size: 28px !important; margin-top: 4px; }
 
   /* Stale notice, then its tick, then the checks. */
-  .lx-app:has(.lx-top--owner) .lx-qi [role="alert"].lx-banner { border-radius: 14px; padding: 12px 14px; font-size: 13px; }
-  .lx-app:has(.lx-top--owner) .lx-qi [role="alert"].lx-banner strong { font-size: 13.5px !important; }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-stale-tick { order: 1; margin: 0; padding: 12px 14px; font-size: 13.5px; border-radius: 14px; min-height: 44px; align-items: center !important; }
+  .lx-app:has(.lx-top--owner) .lx-qi [role="alert"].lx-banner { border-radius: 14px; padding: 12px 14px; font-size: 14px; }
+  .lx-app:has(.lx-top--owner) .lx-qi [role="alert"].lx-banner strong { font-size: 14px !important; }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-stale-tick { order: 1; margin: 0; padding: 12px 14px; font-size: 15px; border-radius: 14px; min-height: 44px; align-items: center !important; }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-stale-tick input { width: 22px; height: 22px; accent-color: var(--ox); margin-top: 0 !important; }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-review > [role="alert"] { order: 2; }
 
@@ -57,20 +57,20 @@
   }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-view-draft-head { flex-wrap: nowrap; align-items: center; }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-view-draft-head .lx-label {
-    font-family: var(--sans); font-size: 15px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--ink);
+    font-family: var(--sans); font-size: 16px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--ink);
   }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-view-draft-head .lx-btn {
     min-height: 44px; padding: 0 16px; border-radius: 14px; font-size: 14px; font-weight: 600; background: var(--card); color: var(--ink); border: 1px solid var(--line);
   }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-view-draft > .lx-note { font-size: 12.5px; }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-view-draft .lx-draft { min-height: 160px; font-size: 14px; line-height: 1.5; border-radius: 12px; padding: 11px 13px; }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-view-draft > .lx-note { font-size: 14px; }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-view-draft .lx-draft { min-height: 160px; font-size: 16px; line-height: 1.5; border-radius: 12px; padding: 11px 13px; }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-edit-actions-head { display: none !important; }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-edit-actions { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-edit-actions .lx-btn { min-height: 48px; border-radius: 14px; font-size: 15px; font-weight: 600; justify-content: center; border: 1px solid var(--line); background: var(--card); color: var(--ink); }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-edit-actions .lx-btn-sec { background: var(--ox); border-color: var(--ox); color: var(--cream); }
 
   /* The reject note stays, quietly, under the draft. */
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-note-label { order: 4; font-size: 11px; letter-spacing: 0.06em; margin-bottom: -6px; }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-note-label { order: 4; font-size: 12px; letter-spacing: 0.1em; margin-bottom: -6px; }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-note-input { order: 4; }
 
   /* The aside's parts become cards in the board's order: reviewer, proposal, status line, facts. */
@@ -80,18 +80,18 @@
     padding: 14px 16px; border-radius: 16px; border: 1px solid var(--line); background: var(--card); box-shadow: var(--shadow);
   }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-rv { order: 5; gap: 8px; }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-rv > .lx-label { font-family: var(--sans); font-size: 15px !important; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--ink); }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-rv-item { background: transparent; padding: 0; border-radius: 0; font-size: 13px; line-height: 1.4; color: var(--ink); }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-rv > .lx-label { font-family: var(--sans); font-size: 16px !important; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--ink); }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-rv-item { background: transparent; padding: 0; border-radius: 0; font-size: 14px; line-height: 1.45; color: var(--ink); }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-rv-item[data-check-first="true"] { background: transparent; border: 0; }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-rv-tag {
-    font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.6px; color: var(--cream); background: var(--ox); border-radius: 5px; padding: 2px 6px; margin-right: 8px;
+    font-family: var(--mono); font-size: 12px; letter-spacing: 0.6px; color: var(--cream); background: var(--ox); border-radius: 5px; padding: 2px 7px; margin-right: 8px;
   }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-rv-more > summary { font-size: 13px; text-decoration: underline; text-underline-offset: 2px; min-height: 28px; }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-rv-more > summary { font-size: 14px; text-decoration: underline; text-underline-offset: 2px; min-height: 44px; display: inline-flex; align-items: center; }
   .lx-app:has(.lx-top--owner) .lx-qi-aside > .lx-card { order: 6; }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-qi-status { order: 7; justify-self: start; }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-qi-owner { order: 7; margin: 0; font-size: 12.5px; }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-qi-facts { order: 8; font-size: 13px; row-gap: 6px; }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-qi-facts dt { font-family: var(--mono); font-size: 11px; letter-spacing: 0; text-transform: none; color: var(--muted); }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-qi-owner { order: 7; margin: 0; font-size: 14px; }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-qi-facts { order: 8; font-size: 14px; row-gap: 6px; }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-qi-facts dt { font-family: var(--mono); font-size: 13px; letter-spacing: 0; text-transform: none; color: var(--muted); }
 
   /* Messages after the cards. */
   .lx-app:has(.lx-top--owner) .lx-qi .lx-review > p { order: 20; margin: 0; }
@@ -109,4 +109,13 @@
   .lx-app:has(.lx-top--owner) .lx-qi .lx-review-actions .lx-btn-sec { order: 0; grid-column: 1 / -1; }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-review-actions .lx-btn-sec:disabled { display: none; }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-review-actions .lx-btn:disabled { opacity: 0.45; }
+}
+
+
+/* Legibility pass (founder, Nov 10): the pill and the note input on the owner phone item. */
+@media (max-width: 900px) {
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-qi-status { font-size: 13px; }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-note-label span { font-size: 13px; }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-note-input { font-size: 16px; }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-review-actions .lx-btn { font-size: 16px; }
 }

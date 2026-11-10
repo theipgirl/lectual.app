@@ -28,8 +28,21 @@ export type Lane = {
   count: number;
 };
 
-export function laneOf(row: ReviewRow): string | null {
+export function laneOf(row: Pick<ReviewRow, "nextStep" | "assignedTo">): string | null {
   return row.nextStep?.assigneeId ?? row.assignedTo ?? null;
+}
+
+/**
+ * Where "Whose court" is changed, by the same rule `laneOf` reads it: the next step's assignee when there is a
+ * next step, else the record's own assignee. The weekly review's Sheet edits through this; there is no second rule.
+ */
+export function courtTarget(row: Pick<ReviewRow, "nextStep">): "step" | "record" {
+  return row.nextStep ? "step" : "record";
+}
+
+/** The row as it reads once Whose court is set to `userId` (null = Unassigned) through `courtTarget`. */
+export function withCourt<T extends Pick<ReviewRow, "nextStep" | "assignedTo">>(row: T, userId: string | null): T {
+  return courtTarget(row) === "step" && row.nextStep ? { ...row, nextStep: { ...row.nextStep, assigneeId: userId } } : { ...row, assignedTo: userId };
 }
 
 const FLAGGED: ReadonlySet<BucketKey> = new Set(BOARD_COLUMNS);

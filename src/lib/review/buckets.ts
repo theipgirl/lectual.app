@@ -33,6 +33,8 @@ export type ReviewRow = {
   client: string;
   mark: string | null;
   stageLabel: string | null;
+  /** The current stage's id (the matter's docket stage, or the lead's pipeline stage), when known. */
+  stageId?: string | null;
   /** The docket stage's own code ("19A"), when the record has one. */
   stageCode?: string | null;
   /** The matter type code (TM, CR, PATENT, BL, LIT, ...). Absent on a lead, or when unknown (read as TM). */
