@@ -256,15 +256,15 @@ describe("the table", () => {
   ];
   const html = renderToStaticMarkup(createElement(ProposalsTable, { rows, footerLeft: "All 3 proposals", footerRight: "Government filing fees are $350 per class, paid before the application goes in." }));
 
-  it("has the nine columns, in order", () => {
+  it("has the five columns, in order (Accepted and Paid are one Client response column, the two fees one Fees column)", () => {
     const heads = [...html.matchAll(/<th[^>]*>([^<]*)<\/th>/g)].map((m) => m[1]);
-    expect(heads).toEqual(["Proposal", "Client", "Status", "Accepted", "Paid", "At signing", "At filing", "Expires", "Last activity"]);
+    expect(heads).toEqual(["Proposal", "Client", "Status", "Client response", "Fees"]);
   });
 
   it("shows the legal fee and the USPTO fees as two separate cells, and never a sum or a 'total'", () => {
     const first = html.slice(html.indexOf("<tr", html.indexOf("<tbody")), html.indexOf("</tr>", html.indexOf("<tbody")));
-    const money = [...first.matchAll(/<td class="pq-money[^"]*"[^>]*>([^<]*)<\/td>/g)].map((m) => m[1]);
-    expect(money).toEqual([formatCents(660_000), formatCents(175_000)]);
+    const money = [...first.matchAll(/<span class="pq-fee-n">([^<]*)<\/span> <span class="pq-fee-l">([^<]*)<\/span>/g)].map((m) => `${m[1]} ${m[2]}`);
+    expect(money).toEqual([`${formatCents(660_000)} at signing`, `${formatCents(175_000)} at filing`]);
     expect(html.toLowerCase()).not.toContain("total");
     expect(html).not.toContain(formatCents(660_000 + 175_000));
     expect(html).not.toContain(formatCents(325_000 + 70_000));

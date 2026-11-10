@@ -443,7 +443,9 @@ describe("after a flat-fee proposal is accepted", () => {
     expect(view.atSigningCents).toBe(50_000);
     expect(view.atFilingCents).toBeNull();
     const html = renderToStaticMarkup(createElement(ProposalsTable, { rows: [view], footerLeft: "", footerRight: "" }));
-    expect(html).toMatch(/data-label="At filing">—<\/td>/);
+    // A flat-fee row has no filing line at all (it is omitted, not a dash): one fee, "at signing".
+    expect(html).toContain("at signing");
+    expect(html).not.toContain("at filing");
     // A trademark row is unchanged.
     const tm = buildProposalRowView({ ...item, matter_title: null, brands: ["Prosperall"], gov_total_cents: 70_000 }, { today: "2026-11-02", tz: "America/New_York", now: 0, events: new Map(), names: new Map() });
     expect(tm.headline).toBe("Proposal — PROSPERALL");

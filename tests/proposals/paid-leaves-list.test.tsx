@@ -76,7 +76,7 @@ describe("the page", () => {
     const html = await renderListPage({}, { rows, steps });
     expect(html).not.toContain("Client p1<");
     for (const c of ["u1", "s1", "x1"]) expect(html).toContain(`Client ${c}<`);
-    expect(segments(html)).toEqual(["Everything except paid:3", "Out with a client:1", "Drafts and blocked:0", "Accepted:1", "Paid:1", "Expired:0"]);
+    expect(segments(html)).toEqual(["Current:3", "Out with a client:1", "Drafts and blocked:0", "Accepted:1", "Paid:1", "Expired:0"]);
     expect(html.match(/<tr data-status=/g)).toHaveLength(3);
     expect(html).toContain("3 proposals · 1 paid, listed under Paid");
   });
@@ -108,7 +108,7 @@ describe("the page", () => {
     const html = await renderListPage({}, { rows, steps: { p1: { paid: { state: "not_paid", undoneAt: "2026-10-25T16:00:00Z" }, newest: null } } });
     expect(html).toContain("Client p1<");
     expect(rowOf(html, "Client p1<")).toContain("Not paid");
-    expect(segments(html)).toEqual(["Everything except paid:4", "Out with a client:1", "Drafts and blocked:0", "Accepted:2", "Paid:0", "Expired:0"]);
+    expect(segments(html)).toEqual(["Current:4", "Out with a client:1", "Drafts and blocked:0", "Accepted:2", "Paid:0", "Expired:0"]);
     expect(html).toContain("All 4 proposals");
   });
 
@@ -116,7 +116,7 @@ describe("the page", () => {
     const html = await renderListPage({}, { rows, steps: "fail" });
     for (const c of ["p1", "u1", "s1", "x1"]) expect(html).toContain(`Client ${c}<`);
     expect(rowOf(html, "Client p1<")).toContain("Paid status couldn&#x27;t be read");
-    expect(segments(html)).toEqual(["Everything except paid:4", "Out with a client:1", "Drafts and blocked:0", "Accepted:2", "Paid:—", "Expired:0"]);
+    expect(segments(html)).toEqual(["Current:4", "Out with a client:1", "Drafts and blocked:0", "Accepted:2", "Paid:—", "Expired:0"]);
     vi.resetModules();
     const acc = await renderListPage({ segment: "accepted" }, { rows, steps: "fail" });
     expect(acc).toContain("Client p1<");

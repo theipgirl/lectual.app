@@ -144,7 +144,7 @@ export const LECTUAL_SETS_UP = "Lectual sets this up";
 export const PROPOSALS_NAME = "Proposals";
 export const PROPOSALS_SUBLINE = "Every proposal you've sent or started, newest first.";
 /** Proposals list segments whose names depend on the paid rule: a paid proposal leaves the default list and is listed under Paid. */
-export const PROPOSALS_EVERYTHING_SEGMENT = "Everything except paid";
+export const PROPOSALS_EVERYTHING_SEGMENT = "Current";
 export const PROPOSALS_PAID_SEGMENT = "Paid";
 /** Footer of the default list when paid proposals are kept out of it: "6 proposals · 2 paid, listed under Paid". */
 export function proposalsPaidAsideNote(hidden: number): string {

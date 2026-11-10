@@ -5,7 +5,7 @@
  * Segments are views over `proposalDisplayStatus` keys (display-status.ts), never new
  * stored statuses:
  *
- *   Everything except paid   every row that is not paid, Closed included (the default list)
+ *   Current                  every row that is not paid, Closed included (the default list)
  *   Out with a client        Sent (open, not past its expiry)
  *   Drafts and blocked       Draft and Blocked
  *   Accepted                 Accepted and not yet paid

@@ -88,18 +88,23 @@ describe("the table markup", () => {
   const html = (rows: ReturnType<typeof row>[]) => text(renderToStaticMarkup(<ProposalsTable rows={rows} footerLeft="" footerRight="" />));
   const buttons = (h: string) => [...h.matchAll(/<button[^>]*>([^<]*)<\/button>/g)].map((m) => m[1]);
 
-  it("every row has an Accepted and a Paid cell, and the headers say so", () => {
+  it("every row has a Client response cell (Accepted, Opened, Paid), and the header says so", () => {
     const out = html([row({ id: "a", status: "draft" }, new Map()), row({ id: "b", ...ACCEPTED }, new Map([["b", NOT_PAID]])), row({ id: "c", ...ACCEPTED }, new Map([["c", PAID]])), row({ id: "d", ...ACCEPTED }, "unavailable")]);
-    expect([...out.matchAll(/<th[^>]*>([^<]*)<\/th>/g)].map((m) => m[1]).slice(3, 5)).toEqual(["Accepted", "Paid"]);
-    expect(out.match(/class="pq-c-accepted"/g)).toHaveLength(4);
-    expect(out.match(/class="wrap pq-c-paid"/g)).toHaveLength(4);
+    expect([...out.matchAll(/<th[^>]*>([^<]*)<\/th>/g)].map((m) => m[1]).slice(3, 4)).toEqual(["Client response"]);
+    expect(out.match(/class="wrap pq-c-response" data-label="Client response"/g)).toHaveLength(4);
+    expect(out.match(/class="pq-accepted"/g)).toHaveLength(4);
+    // The Paid state sits in the same cell, and only on an accepted row (a draft says "Not yet" and nothing more).
+    expect(out.match(/class="pq-c-paid"/g)).toHaveLength(3);
     const [draft, unpaid, paid, unread] = out.split("<tr ").slice(1);
     expect(draft).toContain(">Not yet<");
-    expect(draft).toContain('<span class="pq-paid-none">—</span>');
+    expect(draft).not.toContain("pq-paid");
     expect(unpaid).toContain("Accepted Oct 21");
     expect(unpaid).toContain("Not paid");
     expect(buttons(unpaid)).toEqual(["Mark paid"]);
-    expect(unpaid).toContain(MARK_PAID_NOTE);
+    // The sentence is the button's title, not a visible line on the row (it is said once, in the footer).
+    expect(unpaid).toContain(`title="${MARK_PAID_NOTE}"`);
+    expect(unpaid).not.toContain("pq-paid-note");
+    expect(unpaid).not.toContain(`>${MARK_PAID_NOTE}<`);
     expect(MARK_PAID_NOTE).toBe("Mark paid after you've confirmed the payment in Lawmatics.");
     expect(paid).toContain("Paid Oct 24");
     expect(buttons(paid)).toEqual(["Undo"]);
@@ -107,6 +112,22 @@ describe("the table markup", () => {
     expect(unread).toContain("Paid status couldn't be read");
     expect(unread).not.toContain("Not paid");
     expect(buttons(unread)).toEqual([]);
+  });
+
+  it("the Mark paid sentence is said once under the table, beside the fee sentence, however many rows can be marked", () => {
+    const rows = ["b", "c", "e"].map((id) => row({ id, ...ACCEPTED }, new Map([[id, NOT_PAID]])));
+    const out = text(renderToStaticMarkup(<ProposalsTable rows={rows} footerLeft="3 proposals" footerRight="Legal fee is due at signing." />));
+    const foot = out.slice(out.indexOf('class="pq-foot"'));
+    expect(foot.match(new RegExp(MARK_PAID_NOTE.replace(/[.]/g, "\\."), "g"))).toHaveLength(1);
+    expect(foot).toContain("Legal fee is due at signing.");
+    // Everywhere else it is only a button title.
+    expect(out.split(`>${MARK_PAID_NOTE}<`)).toHaveLength(2);
+    expect(buttons(out)).toEqual(["Mark paid", "Mark paid", "Mark paid"]);
+  });
+
+  it("no footer sentence when no row has a Mark paid button", () => {
+    const out = html([row({ id: "c", ...ACCEPTED }, new Map([["c", PAID]]))]);
+    expect(out).not.toContain(MARK_PAID_NOTE);
   });
 
   it("a role outside the paid roles sees the words and no button on any row", () => {
@@ -174,12 +195,13 @@ describe("the page: the Accepted segment", () => {
 describe("mobile, wording and no new paid logic", () => {
   const css = readFileSync("src/app/dashboard/proposals/proposals.css", "utf8");
 
-  it("under 760px a row stacks and Accepted and Paid sit directly under the client's name", () => {
+  it("under 760px a row stacks: the proposal, the client, then Client response (Accepted, Opened, Paid), then Status and Fees", () => {
     const block = css.slice(css.indexOf("Under 760px a row is a stack"));
     expect(block).toContain("@media (max-width: 760px)");
-    expect(block).toContain('"proposal proposal" "client client" "accepted paid"');
-    expect(block).toMatch(/td\.pq-c-accepted\s*\{\s*grid-area: accepted/);
-    expect(block).toMatch(/td\.pq-c-paid\s*\{\s*grid-area: paid/);
+    expect(block).toContain('"proposal proposal" "client client" "response response" "status fees"');
+    expect(block).toMatch(/td\.pq-c-response\s*\{\s*grid-area: response/);
+    expect(block).toMatch(/td\.pq-c-fees\s*\{\s*grid-area: fees/);
+    expect(block).toContain("content: attr(data-label)");
     expect(block).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(/);
   });
 

@@ -175,9 +175,11 @@ td.pq-mono { font-family: var(--mono); }
 .pq-seg:hover { text-decoration: none; background: var(--well); color: var(--ink); }
 .pq-seg[aria-current="page"] { background: var(--ox); color: var(--cream); font-weight: 500; }
 .pq-count { font-family: var(--mono); font-size: 11.5px; opacity: 0.8; }
-.pq-out { display: grid; gap: 6px; padding-top: 6px; }
-.pq-out-figure { font-family: var(--mono); font-size: 26px; letter-spacing: 0.08em; color: var(--ink); }
-.pq-out .lx-note { margin: 0; }
+/* Open offers: a small tile like the weekly review's KPI tiles (card surface, 12px label, the amount in Geist tabular, a 13px explanation). */
+.pq-out { padding: 14px 16px; border-radius: 18px; gap: 2px; align-content: start; align-self: start; }
+.pq-out .lx-label { font-size: 12px; letter-spacing: 1.4px; }
+.pq-out-figure { font-family: var(--sans); font-variant-numeric: tabular-nums; font-size: 24px; font-weight: 500; line-height: 1.3; letter-spacing: 0; color: var(--ink); }
+.pq-out .lx-note { margin: 0; font-size: 13px; line-height: 1.4; }
 .pq-note { margin: auto 0 0; padding-top: 18px; }
 
 /* consults strip */
@@ -217,37 +219,43 @@ td.pq-mono { font-family: var(--mono); }
    included), and the long text (headline, package line, activity) wraps or is cut with a title carrying the whole thing. The client's
    name stays on one line. */
 @media (min-width: 761px) {
-  .pq-tbl { table-layout: fixed; width: 100%; min-width: 880px; }
-  .pq-tbl th, .pq-tbl td { box-sizing: border-box; padding-left: 8px; padding-right: 8px; }
+  .pq-tbl { table-layout: fixed; width: 100%; min-width: 860px; }
+  .pq-tbl th, .pq-tbl td { box-sizing: border-box; padding-left: 10px; padding-right: 10px; }
   .pq-tbl th:first-child, .pq-tbl td:first-child { padding-left: 16px; }
   .pq-tbl th:last-child, .pq-tbl td:last-child { padding-right: 16px; }
   .pq-tbl th { white-space: normal; line-height: 1.3; letter-spacing: 0.1em; vertical-align: bottom; }
-  .pq-th-client { width: 150px; }
-  .pq-th-status { width: 104px; }
-  .pq-th-accepted { width: 100px; }
-  .pq-th-paid { width: 128px; }
-  .pq-th-money { width: 92px; }
-  .pq-th-expires { width: 84px; }
-  .pq-th-activity { width: 100px; }
+  /* Five columns: the Proposal column takes what the other four leave. The Status column is sized for the longest pill ("ACCEPTED BY CLIENT"). */
+  .pq-th-client { width: 120px; }
+  .pq-th-status { width: 176px; }
+  .pq-th-response { width: 168px; }
+  .pq-th-fees { width: 160px; }
   .pq-tbl td.pq-c-client { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .pq-tbl td.pq-c-status, .pq-tbl td.pq-c-accepted, .pq-tbl td.pq-c-expires { white-space: normal; overflow-wrap: anywhere; }
-  .pq-tbl td.pq-c-status .lx-pill { white-space: normal; max-width: 100%; line-height: 1.35; letter-spacing: 0.06em; padding-left: 8px; padding-right: 8px; }
-  .pq-tbl td.pq-money { font-size: 13.5px; letter-spacing: 0.02em; }
   .pq-headline { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
-  .pq-subline { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .pq-clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; overflow-wrap: anywhere; }
 }
+/* Cells that are the same at every width. */
+.pq-subline, .pq-activity-line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pq-activity-line { margin-top: 2px; line-height: 1.4; }
+.pq-tbl td.pq-c-status .pq-pill { display: inline-block; white-space: nowrap; max-width: 100%; line-height: 1.35; letter-spacing: 0.04em; padding-left: 9px; padding-right: 9px; }
+.pq-status-sub { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+.pq-accepted { font-size: 14px; line-height: 1.4; color: var(--ink); }
+.pq-accepted[data-accepted="no"] { color: var(--muted); }
+.pq-c-response .pq-opens { margin-top: 2px; }
+.pq-c-response .pq-c-paid { margin-top: 4px; }
+/* Fees: Geist with tabular numerals, the amount in ink and the word quiet. */
+.pq-fee { font-family: var(--sans); font-variant-numeric: tabular-nums; font-size: 14px; line-height: 1.45; white-space: nowrap; }
+.pq-fee-n { color: var(--ink); }
+.pq-fee-l { color: var(--muted); font-size: 13px; }
 .pq-tbl th { background: var(--well); position: sticky; top: 0; z-index: 1; }
-.pq-tbl td { height: 56px; vertical-align: middle; }
+.pq-tbl td { height: 88px; vertical-align: middle; }
 .pq-tbl td.wrap { min-width: 0; }
-.pq-money { text-align: right; font-family: var(--mono); letter-spacing: 0.04em; white-space: nowrap; }
-.pq-filing { color: var(--warn); }
-.pq-activity { color: var(--ink); font-size: 14px; }
 .pq-sub { margin-top: 2px; font-weight: 400; }
 .pq-foot {
   display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap;
   padding: 12px 18px; border-top: 1px solid var(--line); font-family: var(--sans); font-size: var(--pq-meta, 13px); line-height: 1.4; color: var(--muted);
 }
+
+.pq-foot-right { display: grid; gap: 2px; justify-items: end; text-align: right; }
+@media (max-width: 760px) { .pq-foot-right { justify-items: start; text-align: left; } }
 
 @media (max-width: 900px) {
   .pq-layout { grid-template-columns: minmax(0, 1fr); }
@@ -272,13 +280,10 @@ td.pq-mono { font-family: var(--mono); }
 .pq-paid { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
 .pq-paid-form { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
 .pq-paid-act { display: inline-flex; align-items: center; gap: 6px; }
-.pq-paid-note { flex-basis: 100%; margin: 0; max-width: 240px; font-size: var(--pq-meta, 13px); }
 .pq-paid-text[data-paid="unreadable"] { color: var(--wine); }
 .pq-paid-none { color: var(--muted); }
-.pq-c-accepted[data-accepted="no"] { color: var(--muted); }
-.pq-tbl td.pq-c-accepted { white-space: normal; overflow-wrap: anywhere; }
 
-/* Under 760px a row is a stack: the proposal, the client, then Accepted and Paid directly under the client's name. */
+/* Under 760px a row is a stack: the proposal, the client, the client's response, then Status and Fees side by side. */
 @media (max-width: 760px) {
   .pq-tbl { min-width: 0; display: block; }
   .pq-tbl th { position: static; }
@@ -287,19 +292,15 @@ td.pq-mono { font-family: var(--mono); }
   .pq-tbl tr {
     display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 12px; row-gap: 4px;
     padding: 12px 14px; border-bottom: 1px solid var(--line);
-    grid-template-areas: "proposal proposal" "client client" "accepted paid" "status status" "signing filing" "expires activity";
+    grid-template-areas: "proposal proposal" "client client" "response response" "status fees";
   }
   .pq-tbl td { display: block; height: auto; min-width: 0; padding: 0; border: 0; }
   .pq-tbl td:first-child { min-width: 0; }
   .pq-tbl td.pq-c-proposal { grid-area: proposal; }
   .pq-tbl td.pq-c-client { grid-area: client; }
-  .pq-tbl td.pq-c-accepted { grid-area: accepted; }
-  .pq-tbl td.pq-c-paid { grid-area: paid; }
+  .pq-tbl td.pq-c-response { grid-area: response; }
   .pq-tbl td.pq-c-status { grid-area: status; }
-  .pq-tbl td.pq-c-signing { grid-area: signing; text-align: left; }
-  .pq-tbl td.pq-c-filing { grid-area: filing; text-align: left; }
-  .pq-tbl td.pq-c-expires { grid-area: expires; }
-  .pq-tbl td.pq-c-activity { grid-area: activity; }
+  .pq-tbl td.pq-c-fees { grid-area: fees; text-align: left; }
   .pq-tbl td[data-label]::before {
     content: attr(data-label);
     display: block;
@@ -309,6 +310,8 @@ td.pq-mono { font-family: var(--mono); }
     text-transform: uppercase;
     color: var(--muted);
   }
+  /* The proposal and client cells need no label of their own. */
+  .pq-tbl td.pq-c-client::before { content: none; }
 }
 
 /* ── New proposal: who it is for (Sprint 20) ──────────────── */
@@ -378,11 +381,7 @@ td.pq-mono { font-family: var(--mono); }
 .pq-link-pick > summary::-webkit-details-marker { display: none; }
 .pq-link-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
 .pq-link-form .lx-input { width: auto; min-width: 200px; flex: 1 1 200px; }
-.pq-exp-inline { display: none; }
-@media (max-width: 1499px) {
-  .pq-tbl .pq-th-expires, .pq-tbl td.pq-c-expires { display: none; }
-  .pq-exp-inline { display: block; }
-}
+.pq-exp-inline { display: block; }
 /* Below 1700px the "Show" column lies down as a row of chips above the list (with the open-offers figure beside it), so the table gets the
    whole width: with the rail open, a 240px column beside it left 690px at a 1280px window, too little for eight columns. */
 @media (max-width: 1699px) {
@@ -396,8 +395,7 @@ td.pq-mono { font-family: var(--mono); }
   .pq-segs-label { flex-basis: 100%; padding-bottom: 2px; }
   .pq-seg { border-radius: 999px; border: 1px solid var(--line); padding: 6px 12px; min-height: 36px; align-items: center; gap: 8px; }
   .pq-seg[aria-current="page"] { border-color: var(--ox); }
-  .pq-out { flex: 0 1 220px; padding-top: 0; }
-  .pq-out-figure { font-size: 22px; }
+  .pq-out { flex: 0 1 260px; }
 }
 /* Under 760px the "Show" column lies down as a row of chips. */
 @media (max-width: 760px) {
@@ -405,7 +403,6 @@ td.pq-mono { font-family: var(--mono); }
   .pq-segs-label { flex-basis: 100%; padding-bottom: 2px; }
   .pq-seg { border-radius: 999px; border: 1px solid var(--line); padding: 6px 12px; min-height: 36px; align-items: center; gap: 8px; }
   .pq-seg[aria-current="page"] { border-color: var(--ox); }
-  .pq-tbl tr { grid-template-areas: "proposal proposal" "client client" "accepted paid" "status status" "signing filing" "activity activity"; }
 }
 
 @media (pointer: coarse) {
@@ -441,11 +438,13 @@ td.pq-mono { font-family: var(--mono); }
 
 /* ── Spacing pass (Sevetri Wilson's proposal). CSS only. ─────────────────────────────── */
 /* List: the Paid cell stacks (a lone "·" used to wrap onto its own line) and the wrapping columns keep a readable width. */
-.pq-paid, .pq-paid-form { flex-direction: column; align-items: flex-start; gap: 6px; }
+.pq-paid, .pq-paid-form { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
 .pq-paid-act > [aria-hidden="true"] { display: none; }
-.pq-paid-note { max-width: 220px; line-height: 1.4; overflow-wrap: anywhere; }
+.pq-paid-text { font-size: 14px; line-height: 1.4; color: var(--ink); }
+.pq-paid .lx-btn { padding: 3px 10px; font-size: 13px; }
+@media (pointer: coarse) { .pq-paid .lx-btn { padding: 8px 12px; } }
 @media (min-width: 761px) {
-  .pq-tbl td { padding-top: 12px; padding-bottom: 12px; }
+  .pq-tbl td { padding-top: 10px; padding-bottom: 10px; }
 }
 .pq-sub { margin-top: 4px; line-height: 1.4; }
 /* Proposal page: the card's label no longer touches the client's name; the brand lines breathe. */

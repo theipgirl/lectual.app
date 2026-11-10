@@ -1587,3 +1587,10 @@ Display only; `pricing.ts`, `paid.ts` and `paid-view.ts` are untouched.
   from the one rule. Words are in `words.ts` (`PROPOSALS_EVERYTHING_SEGMENT`, `PROPOSALS_PAID_SEGMENT`, ...).
 - Owner Today's "Proposals out" and the weekly review's "Proposals out" strip read only `sent` versions (`proposal-expiry.ts`, `owner-rules.ts`);
   a paid proposal is accepted, so it cannot appear there and nothing changed.
+
+## Proposals list: five columns, "Current", Open offers tile (Nov 10, no schema)
+Display only; `pricing.ts`, `paid.ts` and `paid-view.ts` are untouched.
+- **Five columns at every desktop width** (no eight-column layout at 1700px+): Proposal (headline, sub-line, and `activityLine` as a third quiet line), Client, Status (the pill never wraps; the blocked reason is said ONCE here, clamped to 2 lines with a title, so a Blocked row's third line reads "Updated 5d ago"), Client response (Accepted, Opened, then the paid state with Mark paid / Undo; no paid line on a row that isn't accepted, no opens line for a draft) and Fees ("$4,075.00 at signing" / "$700.00 at filing", Geist tabular 14px; `formatCents` has no drop-the-cents option, so cents stay; a flat-fee row has no filing line). Under 760px a row stacks: proposal, client, response, then Status and Fees side by side.
+- The Mark paid sentence (`MARK_PAID_NOTE`) is the button's title and appears once in the table footer (only when some row has the button).
+- The default segment is "Current" (`PROPOSALS_EVERYTHING_SEGMENT`). Open offers is a KPI-style tile (`lx-card lx-kpi pq-out`).
+- **List-only brand headline:** a row titled "Trademark Proposal" (`DEFAULT_PROPOSAL_TITLE`) with brand names shows the brand names as its headline and "Trademark proposal" first in the sub-line; stored titles never change.

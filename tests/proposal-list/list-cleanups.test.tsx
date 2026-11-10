@@ -84,16 +84,20 @@ describe("Proposals list (F11)", () => {
 
   it("relabels the dollar tile and keeps its explanation", async () => {
     const html = text(await renderListPage({}, { rows: [item("s1", { status: "sent" })] }));
-    expect(OPEN_OFFERS_LABEL).toBe("Open offers (lowest package each)");
-    expect(html).toContain(">Open offers (lowest package each)<");
+    expect(OPEN_OFFERS_LABEL).toBe("Open offers");
+    expect(html).toContain(">Open offers<");
+    // A small tile like the weekly review's KPI tiles: a card, the amount, the one-line explanation.
+    expect(html).toContain('class="lx-card lx-kpi pq-out"');
+    expect(css).toMatch(/\.pq-out-figure \{[^}]*font-family: var\(--sans\); font-variant-numeric: tabular-nums; font-size: 24px/);
     expect(html).toContain("counted at the cheapest package offered");
   });
 
-  it("folds Expires into the status line under 1500px", async () => {
+  it("Expires is a line in the Status cell at every width (there is no Expires column)", async () => {
     const html = text(await renderListPage());
     expect(html).toContain("pq-exp-inline");
-    expect(css).toMatch(/@media \(max-width: 1499px\) \{[^}]*\.pq-th-expires, \.pq-tbl td\.pq-c-expires \{ display: none; \}/);
+    expect(html).not.toContain("pq-th-expires");
     expect(css).toContain(".pq-exp-inline { display: block; }");
+    expect(css).not.toContain("pq-c-expires");
   });
 
   it("a filtered empty segment says so with a Show all link", async () => {

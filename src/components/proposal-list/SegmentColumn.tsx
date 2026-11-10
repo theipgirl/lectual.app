@@ -42,8 +42,8 @@ export function SegmentColumn({
         ))}
       </nav>
 
-      <div className="pq-out">
-        <div className="lx-label">{OPEN_OFFERS_LABEL}</div>
+      <div className="lx-card lx-kpi pq-out">
+        <span className="lx-label">{OPEN_OFFERS_LABEL}</span>
         {out.status === "ok" ? (
           <>
             <div className="pq-out-figure">{formatCents(out.cents)}</div>
