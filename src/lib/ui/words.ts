@@ -158,3 +158,11 @@ export const PROPOSAL_TYPE_TRADEMARK = "Trademark filing";
 export const PROPOSAL_TYPE_GENERAL = "Contract or other matter (flat fee)";
 /** Spec 9: the LOE step's sentence for a general (flat-fee) proposal. Never the trademark LOE. */
 export const GENERAL_LOE_SENTENCE = "Draft the General LOE for this matter.";
+
+/* ── Phase 1 owner view: views and shell (owned by the views/shell piece) ── */
+
+/* ── Phase 1 owner view: approval deck ── */
+
+/* ── Phase 1 owner view: owner Today ── */
+
+/* ── Phase 1 owner view: weekly review ── */
