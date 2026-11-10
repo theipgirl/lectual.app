@@ -98,6 +98,17 @@ vi.mock("@/lib/queue/view-context", () => ({
   loadQueueViewContext: async () => ({ viewer: { userId: "00000000-0000-4000-8000-0000000000a1", role: "owner" }, routing: {}, members: [], routingFailed: false, dropped: 0, now: Date.parse("2026-11-10T14:30:00Z") }),
 }));
 
+// Lets a screen open the item page's draft editor (the page itself always starts in the rendered view).
+vi.mock("@/components/queue/ReviewPanel", async (orig) => {
+  const m = await orig<typeof import("@/components/queue/ReviewPanel")>();
+  const { createElement } = await import("react");
+  return {
+    ...m,
+    ReviewPanel: (p: Parameters<typeof m.ReviewPanel>[0]) =>
+      createElement(m.ReviewPanel, { ...p, startEditing: Boolean(p.startEditing) || Boolean((state as { itemEditing?: boolean }).itemEditing) }),
+  };
+});
+
 // Weekly review
 vi.mock("@/lib/review/load", async (orig) => ({
   ...(await orig<typeof import("@/lib/review/load")>()),
