@@ -57,9 +57,10 @@ export function usesPackageChoice(content: ProposalContent): boolean {
  *
  * The firm's list supplies the PRICES only. What belongs to this proposal is kept on the refreshed copy (2026-11-09):
  * - an entry's `custom_discount` (2026-11-03);
- * - an entry's `includes` rows when the firm's list has none for that package: taking its (empty) rows wiped every
- *   package's "What each package includes" table on the first editor save. When the firm's list HAS rows for the
- *   package (Settings -> Proposals, 2026-11-10), the firm's rows win, as its prices do (#23);
+ * - an entry's `includes` rows, always (2026-11-10, the firm owner: "let each proposal keep its own rows"). Taking the
+ *   firm's (then empty) rows wiped every package's "What each package includes" table on the first editor save, and a
+ *   later edit in Settings -> Proposals must not rewrite proposals already made. Only an entry with no rows of its own
+ *   takes the firm's rows, if the firm's list holds some;
  * - the proposal's own ORDER: its entries stay where they were (an entry no longer on the firm's list keeps its
  *   place, unpriced by the refresh), and a package new to the proposal is added after them, in the firm's order.
  *
@@ -72,7 +73,7 @@ export function withPackageSnapshot(content: ProposalContent, settingPricing: un
   const offers = packageOffersFromSetting(settingPricing);
   const refresh = (before: PackageOffer, offer: PackageOffer): PackageOffer => {
     const { includes: firmIncludes, ...prices } = offer;
-    const includes = firmIncludes ?? includeRows(before.includes);
+    const includes = includeRows(before.includes) ?? firmIncludes;
     return {
       ...prices,
       ...(includes ? { includes } : {}),
