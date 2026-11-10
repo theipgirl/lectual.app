@@ -4,7 +4,8 @@ import { getAdminClient } from "@/lib/db/admin";
 import { providerCredentials, rootKeyOrNull } from "./config";
 import { createMailboxDraft, type DraftInput } from "./drafts";
 import { freshAccessToken, type ConnectionRow } from "./sync";
-import type { MailboxProvider } from "./providers";
+import { hasSendScope, sendScopeRequested, type MailboxProvider } from "./providers";
+import { sendCheckedDraft, type SendCheck } from "./send-draft";
 import type { SearchableMailbox } from "@/lib/reconcile/mailbox-search";
 
 /**
@@ -53,6 +54,69 @@ export async function draftInMyMailbox(draft: DraftInput): Promise<{ provider: M
   if (!accessToken) return null;
   const made = await createMailboxDraft(mine.provider as MailboxProvider, { accessToken, draft });
   return { provider: mine.provider as MailboxProvider, email: mine.email, webLink: made.webLink, id: made.id };
+}
+
+/**
+ * Can "Send from Outlook now" be offered to this person? Only when the deployment asks for the send permission, and the
+ * mailbox `draftInMyMailbox` would use (the caller's own first active personal connection, found by their scoped read)
+ * is Microsoft AND its stored scopes granted it. Any failed read is `unavailable`, never "ready".
+ */
+export type MySendAccess = "ready" | "switched-off" | "no-mailbox" | "not-outlook" | "needs-permission" | "unavailable";
+
+async function myDraftMailbox(): Promise<{ ok: true; row: { id: string; org_id: string; provider: string; scopes: unknown } | null } | { ok: false }> {
+  try {
+    const supabase = await getScopedClient();
+    const { data, error } = await supabase
+      .from("mailbox_connection")
+      .select("id, org_id, provider, scopes")
+      .eq("scope", "personal")
+      .eq("status", "active")
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (error) return { ok: false };
+    return { ok: true, row: data ?? null };
+  } catch {
+    return { ok: false };
+  }
+}
+
+function accessOf(row: { provider: string; scopes: unknown } | null): MySendAccess {
+  if (!row) return "no-mailbox";
+  if (row.provider !== "microsoft") return "not-outlook";
+  const scopes = Array.isArray(row.scopes) ? (row.scopes as string[]) : null;
+  return hasSendScope("microsoft", scopes) ? "ready" : "needs-permission";
+}
+
+export async function mySendAccess(): Promise<MySendAccess> {
+  if (!sendScopeRequested()) return "switched-off";
+  if (!rootKeyOrNull()) return "unavailable";
+  const mine = await myDraftMailbox();
+  return mine.ok ? accessOf(mine.row) : "unavailable";
+}
+
+/**
+ * Send one approved draft that sits in the caller's OWN Outlook Drafts, by its id. The connection is re-read through
+ * the caller's scoped client on every call (only their own personal row is visible), the send permission is checked on
+ * its stored scopes, and `sendCheckedDraft` reads the message back (still a draft, addressed to `recipient`) before it
+ * sends. The caller (the deck's send action) has already checked the item was approved by this same person.
+ */
+export async function sendFromMyOutlook(args: { draftId: string; recipient: string | null }): Promise<SendCheck | { ok: false; reason: MySendAccess }> {
+  if (!sendScopeRequested()) return { ok: false, reason: "switched-off" };
+  const root = rootKeyOrNull();
+  if (!root) return { ok: false, reason: "unavailable" };
+  const mine = await myDraftMailbox();
+  if (!mine.ok) return { ok: false, reason: "unavailable" };
+  const access = accessOf(mine.row);
+  if (access !== "ready" || !mine.row) return { ok: false, reason: access };
+  let accessToken: string | null;
+  try {
+    accessToken = await openMailboxToken(root, mine.row.id, mine.row.org_id);
+  } catch {
+    return { ok: false, reason: "reauth" };
+  }
+  if (!accessToken) return { ok: false, reason: "no-mailbox" };
+  return sendCheckedDraft({ accessToken, draftId: args.draftId, recipient: args.recipient });
 }
 
 /**
