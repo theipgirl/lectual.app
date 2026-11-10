@@ -5,11 +5,12 @@ import { useRows } from "./rows";
 
 /**
  * The "What your package includes" table as form rows (`inc.<n>.*`), shared by
- * the proposal editor and the firm's standard-pricing settings. Rows are held
+ * the proposal editor and the firm's standard-pricing settings (and, under
+ * `pkg.<n>.inc`, each package's own rows in Settings). Rows are held
  * in client state until the surrounding form is submitted; a row left entirely
  * blank is dropped on save (`parseIncludes`).
  */
-export function IncludesFields({ initial, editable }: { initial: ProposalInclude[]; editable: boolean }) {
+export function IncludesFields({ initial, editable, prefix = "inc" }: { initial: ProposalInclude[]; editable: boolean; prefix?: string }) {
   const list = useRows<ProposalInclude>(initial);
   return (
     <div className="pe-rows">
@@ -23,12 +24,12 @@ export function IncludesFields({ initial, editable }: { initial: ProposalInclude
       </div>
       {list.rows.map((row, i) => (
         <div key={row.key} className="pe-inc-row">
-          <input className="lx-input" name={`inc.${i}.label`} defaultValue={row.label} aria-label="Item" maxLength={300} />
-          <input className="lx-input" name={`inc.${i}.value`} defaultValue={row.value ?? ""} aria-label="Worth" placeholder="$450 each" maxLength={120} />
-          <input className="lx-input" name={`inc.${i}.included`} defaultValue={row.included} aria-label="In this package" placeholder="✓ or Unlimited" maxLength={120} />
-          <input className="lx-input" name={`inc.${i}.note`} defaultValue={row.note ?? ""} aria-label="Note" maxLength={300} />
+          <input className="lx-input" name={`${prefix}.${i}.label`} defaultValue={row.label} aria-label="Item" maxLength={300} />
+          <input className="lx-input" name={`${prefix}.${i}.value`} defaultValue={row.value ?? ""} aria-label="Worth" placeholder="$450 each" maxLength={120} />
+          <input className="lx-input" name={`${prefix}.${i}.included`} defaultValue={row.included} aria-label="In this package" placeholder="✓ or Unlimited" maxLength={120} />
+          <input className="lx-input" name={`${prefix}.${i}.note`} defaultValue={row.note ?? ""} aria-label="Note" maxLength={300} />
           <label className="pe-check" title="Draws attention to this row">
-            <input type="checkbox" name={`inc.${i}.highlight`} defaultChecked={row.highlight === true} />
+            <input type="checkbox" name={`${prefix}.${i}.highlight`} defaultChecked={row.highlight === true} />
             <span className="pe-sr">Highlight</span>
           </label>
           {editable ? (

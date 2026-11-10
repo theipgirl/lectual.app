@@ -3,8 +3,13 @@
 import { useState } from "react";
 import type { PricingValues } from "./PricingFields";
 import { packageExample } from "@/lib/proposals/package-example";
+import type { ProposalInclude } from "@/lib/proposals/types";
+import { IncludesFields } from "./IncludesFields";
 
-type PackageRow = PricingValues & { key: number };
+/** One package on the settings page: its six price fields and (2026-11-10) its own "what this package includes" rows. */
+export type SettingsPackageValues = PricingValues & { includes?: ProposalInclude[] };
+
+type PackageRow = SettingsPackageValues & { key: number };
 
 
 /**
@@ -16,17 +21,21 @@ type PackageRow = PricingValues & { key: number };
  * it as well. Posted as `pkg.<n>.<field>`; the server action re-parses and
  * validates everything, and re-checks the admin gate.
  *
+ * Each package also has its own "What this package includes" rows (2026-11-10), posted as `pkg.<n>.inc.<r>.<field>`
+ * with the marker `pkg.<n>.incFields=1`. A new proposal's package snapshot takes them, and the client page's
+ * "What each package includes" comparison shows them. A new package starts with none.
+ *
  * Since Sprint 33 this is a SECTION of the one settings form (`SettingsForm`), not a form of its
  * own: the settings page has one form and one Save button.
  */
-export function PackagePricesSection({ packages }: { packages: PricingValues[] }) {
+export function PackagePricesSection({ packages }: { packages: SettingsPackageValues[] }) {
   const [rows, setRows] = useState<PackageRow[]>(() => packages.map((p, key) => ({ ...p, key })));
   const [nextKey, setNextKey] = useState(packages.length);
 
   function add() {
     setRows((prev) => {
       const last = prev[prev.length - 1];
-      return [...prev, { ...(last ?? emptyPackage), package: "", key: nextKey }];
+      return [...prev, { ...(last ?? emptyPackage), package: "", includes: [], key: nextKey }];
     });
     setNextKey((k) => k + 1);
   }
@@ -89,6 +98,16 @@ export function PackagePricesSection({ packages }: { packages: PricingValues[] }
               <p className="lx-note pe-example" aria-live="polite">
                 {packageExample(row).text}
               </p>
+              <details className="pe-pkg-inc">
+                <summary className="lx-label">
+                  What this package includes{row.includes && row.includes.length > 0 ? ` (${row.includes.length})` : ""}
+                </summary>
+                <p className="lx-note pe-hint">
+                  Shown to the client in the &ldquo;What each package includes&rdquo; comparison on new proposals that let them choose a package. Proposals already made keep their own rows.
+                </p>
+                <input type="hidden" name={`pkg.${n}.incFields`} value="1" />
+                <IncludesFields prefix={`pkg.${n}.inc`} initial={row.includes ?? []} editable />
+              </details>
             </fieldset>
           ))}
           <div className="pe-save">

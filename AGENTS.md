@@ -1243,6 +1243,18 @@ before (tickable, plus Spec 3's "Add a class"). Money logic: `quoteProposal` sta
   up the accepted name's chosen package on the firm's current list ("Choose the LOE template" when it isn't there) and charts that offer's includes.
 - Not verified in a real browser at 375px: the markup and CSS (`.cp-pkg*`, `.cp-cmp*`) are tested only.
 
+## Per-package "what this package includes" in Settings (2026-11-10, no schema)
+Settings -> Proposals -> Packages has, under each package's prices, a closed "What this package includes" table (the editor's
+`IncludesFields` with `prefix="pkg.<n>.inc"`, plus the marker `pkg.<n>.incFields=1`). Stored on that package's entry in
+`client_proposal_setting.pricing.packages[]`, never in the flat fields (the top-level `includes` stays the firm's standard table).
+- `parsePackageList` reads a package's rows only when its marker was posted: no marker = keep the stored rows (`withPackages` carries
+  them by name, so the prices-only `savePackagesAction` never wipes them); marker with no rows = clear them. At most 30 rows, each
+  with an item name and cells of at most 300 characters; `validateSettingInput` runs the standard table's text and office-action
+  checks on them too.
+- A new proposal's snapshot takes them (`packageOffersFromSetting`). On a refresh (`withPackageSnapshot`) the firm's rows win when the
+  firm has rows for that package (#23); otherwise the proposal keeps its own. The proposal's own package ORDER is kept, and a package
+  new to it is appended in the firm's order. Prices are untouched (`quoteProposal` has no diff).
+
 ## A package per mark, and "Opened" in Lectual (Spec 7, 2026-10-29, no schema)
 Taylor: "a selector for word mark and design mark … an option to add on the design mark and then select the package for that", and "show in
 Lectual when a proposal has been viewed". Money logic: `quoteProposal` stays the ONE price engine; the browser sends package NAMES only. Nothing sends.
