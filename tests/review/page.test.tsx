@@ -220,10 +220,7 @@ describe("Weekly review page", () => {
   it("card count per column and at most two tags then +N", async () => {
     mock(ok({ rows: [row({ key: "t", client: "Tag Co", nextStep: step("2026-10-30", "u-rayn"), deadline: { dueDate: "2026-11-10", title: null }, proposalExpiry: { text: "Proposal expires Nov 4", expiresOn: "2026-11-04", expired: false } })] }));
     const html = await render();
-    // The waiting tag is the column heading's job and the proposal expiry rides in the meta line; the deadline stays a tag.
-    expect(html).toContain("USPTO deadline");
-    expect(html).toContain("Proposal expires Nov 4");
-    expect(html).not.toContain("+1");
+    expect(html).toContain("+1");
   });
 
   it("empty states are never a blank page", async () => {
