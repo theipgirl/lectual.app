@@ -7,6 +7,7 @@ import type { CardState } from "@/lib/queue/deck";
 import type { DeckSummary } from "@/lib/queue/deck-summary";
 import type { TodayConsultsResult } from "@/lib/calendar/consult-sources";
 import type { OwnerDeadline, OwnerProposal } from "@/lib/today/owner-rules";
+import type { NeedsReviewItem } from "@/lib/today/needs-review";
 import type { ReviewLoad } from "@/lib/review/load";
 
 export type HarnessState = {
@@ -19,6 +20,7 @@ export type HarnessState = {
   deckSummary: DeckSummary;
   consults: TodayConsultsResult;
   deadlines: OwnerDeadline[];
+  needsReview: NeedsReviewItem[];
   proposals: OwnerProposal[];
   review: ReviewLoad;
 };

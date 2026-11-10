@@ -10,10 +10,11 @@ import { civilInZone } from "@/lib/today/outcomes";
 import { loadDeckSummary, type DeckSummary } from "@/lib/queue/deck-summary";
 import { loadTodayConsults, type TodayConsultsResult } from "@/lib/calendar/consult-sources";
 import { liveConsultDeps } from "@/lib/calendar/consult-sources-live";
-import { loadOwnerDeadlines, loadOwnerProposals } from "@/lib/today/owner-load";
+import { loadOwnerDeadlines, loadOwnerNeedsReview, loadOwnerProposals } from "@/lib/today/owner-load";
 import { cardsHero, deadlineChip, deadlineParts, proposalTone, weekdayDate, OWNER_PROPOSALS_SHOWN, OWNER_DEADLINES_SHOWN, weekStrip } from "@/lib/today/owner-rules";
 import { DECK_PATH } from "@/lib/views";
 import { AddNameLink } from "@/components/account/AddNameLink";
+import { OwnerNeedsReview } from "@/components/today/owner/OwnerNeedsReview";
 import { OwnerConsults } from "@/components/today/owner/OwnerConsults";
 import { WeekStrip } from "@/components/today/owner/WeekStrip";
 import { CopilotBox } from "@/components/today/owner/CopilotBox";
@@ -71,10 +72,11 @@ export async function OwnerToday({
   now?: Date;
 }) {
   const [hasProposals, tz] = await Promise.all([orgHasModule("proposals").catch(() => false), getFirmTimeZone()]);
-  const [deckS, consultsS, deadlinesS, proposalsS, membersS] = await Promise.allSettled([
+  const [deckS, consultsS, deadlinesS, reviewS, proposalsS, membersS] = await Promise.allSettled([
     loadDeckSummary({ userId, role }),
     loadTodayConsults(now, tz, liveConsultDeps),
     loadOwnerDeadlines(now, tz),
+    loadOwnerNeedsReview(now, tz),
     hasProposals ? loadOwnerProposals(now, tz) : Promise.resolve(null),
     listMemberDirectory(),
   ]);
@@ -83,6 +85,7 @@ export async function OwnerToday({
   const deck: DeckSummary = deckS.status === "fulfilled" ? deckS.value : { status: "unavailable" };
   const consults: TodayConsultsResult | null = consultsS.status === "fulfilled" ? consultsS.value : null;
   const deadlines = deadlinesS.status === "fulfilled" ? deadlinesS.value : null;
+  const needsReview = reviewS.status === "fulfilled" ? reviewS.value : null;
   const proposals = proposalsS.status === "fulfilled" ? proposalsS.value : undefined; // null = no proposals feature; undefined = failed
   const members = membersS.status === "fulfilled" ? membersS.value : [];
 
@@ -272,6 +275,7 @@ export async function OwnerToday({
               </Link>
             )}
           </section>
+          <OwnerNeedsReview items={needsReview} />
         </div>
       </div>
 

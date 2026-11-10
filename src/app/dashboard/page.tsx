@@ -32,6 +32,8 @@ import { deadlineKindLabel, deadlineNeedsReview } from "@/lib/matters/deadline-r
 import { AutopilotControl } from "@/components/agents/AutopilotControl";
 import { RunDigestList } from "@/components/agents/RunDigestList";
 import { GetSetUpCard } from "@/components/setup/GetSetUpCard";
+import { NeedsReviewCard } from "@/components/today/NeedsReviewCard";
+import { needsReviewItems } from "@/lib/today/needs-review";
 import { NeedsYouSection } from "@/components/today/NeedsYouSection";
 import { AddNameLink } from "@/components/account/AddNameLink";
 import { TodayConsults } from "@/components/calendar/TodayConsults";
@@ -229,6 +231,8 @@ export default async function TodayPage() {
           <TodayConsults />
 
           <NeedsYouSection needs={needs} queue={queue.status} />
+
+          <NeedsReviewCard items={deadlines ? needsReviewItems(deadlines, civilDate(now)) : null} />
         </div>
 
         <aside className="lx-col lx-col-aside">

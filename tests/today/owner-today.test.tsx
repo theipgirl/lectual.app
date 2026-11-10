@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { DeckSummary } from "@/lib/queue/deck-summary";
 import type { OwnerDeadline, OwnerProposal } from "@/lib/today/owner-rules";
+import type { NeedsReviewItem } from "@/lib/today/needs-review";
 import type { TodayConsultsResult } from "@/lib/calendar/consult-sources";
 
 process.env.__NEXT_TRAILING_SLASH = "true";
@@ -16,6 +17,7 @@ type Reads = {
   consults?: TodayConsultsResult | "fail";
   deadlines?: OwnerDeadline[] | "fail";
   proposals?: OwnerProposal[] | "fail";
+  review?: NeedsReviewItem[] | "fail";
   proposalsModule?: boolean;
   ai?: boolean;
 };
@@ -43,6 +45,10 @@ async function render(r: Reads = {}) {
     loadOwnerDeadlines: vi.fn(async () => {
       if (r.deadlines === "fail") throw new Error("boom secret");
       return r.deadlines ?? [dl()];
+    }),
+    loadOwnerNeedsReview: vi.fn(async () => {
+      if (r.review === "fail") throw new Error("boom secret");
+      return r.review ?? [];
     }),
     loadOwnerProposals: vi.fn(async () => {
       if (r.proposals === "fail") throw new Error("boom secret");
@@ -162,5 +168,33 @@ describe("Today page branch", () => {
   it("OwnerToday itself shows neither the get-set-up nor the getting-started card", () => {
     const owner = readFileSync(path.join(process.cwd(), "src/components/today/OwnerToday.tsx"), "utf8");
     expect(owner).not.toMatch(/GetSetUpCard|GettingStartedCard|FinishSetupCard/);
+  });
+});
+
+describe("Owner Today: Needs review", () => {
+  const item = (over: Partial<NeedsReviewItem> = {}): NeedsReviewItem => ({ key: "n1", href: "/dashboard/matters/m9/", name: "Response to office action", matter: "TM-9 \u00b7 Old Mark", dueDate: "2025-01-15", daysPastDue: 299, ...over });
+
+  it("lists each date with its matter, how long past due and a link to the matter", async () => {
+    const html = await render({ review: [item(), item({ key: "n2", href: "/dashboard/matters/m8/", name: "Statement of use", daysPastDue: 1 })] });
+    expect(html).toContain("Needs review");
+    expect(html).toContain("Response to office action");
+    expect(html).toContain("TM-9 \u00b7 Old Mark");
+    expect(html).toContain("299 days past due");
+    expect(html).toContain("1 day past due");
+    expect(html).toContain("Entered by hand, never confirmed, and more than 180 days past due.");
+    expect(html).toMatch(/href="\/dashboard\/matters\/m9\/"/);
+  });
+
+  it("draws nothing for an ok read with no items", async () => {
+    const html = await render({ review: [] });
+    expect(html).not.toContain("Needs review");
+  });
+
+  it("says it couldn't load on a failed read, never 'nothing to review'", async () => {
+    const html = await render({ review: "fail" });
+    expect(html).toContain("Needs review");
+    expect(html).toContain("Couldn't load the dates to review.");
+    expect(html).not.toContain("boom");
+    expect(html).not.toContain("past due");
   });
 });

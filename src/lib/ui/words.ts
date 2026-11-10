@@ -459,3 +459,16 @@ export const sheetResizeColumn = (name: string) => `Resize ${name} column`;
 export const SHEET_RESIZE_ROW = "Resize row";
 export const SHEET_EMPTY_SECTION = "Nothing here for this view.";
 export const SHEET_SAVE_FAILED = "Couldn't save this change.";
+
+/* Needs review (Today, both views): old hand-entered dates nobody confirmed. */
+export const NEEDS_REVIEW_HEADING = "Needs review";
+export const NEEDS_REVIEW_FAILED = "Couldn't load the dates to review.";
+export function needsReviewExplain(days: number): string {
+  return `Entered by hand, never confirmed, and more than ${days} days past due. Confirm, close or correct each on its matter.`;
+}
+export function needsReviewPastDue(days: number): string {
+  return days === 1 ? "1 day past due" : `${days} days past due`;
+}
+export function needsReviewCut(shown: number, total: number): string {
+  return `Showing the oldest ${shown} of ${total}.`;
+}

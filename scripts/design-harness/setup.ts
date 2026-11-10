@@ -58,6 +58,7 @@ vi.mock("@/lib/calendar/consult-sources", async (orig) => ({
 vi.mock("@/lib/calendar/consult-sources-live", () => ({ liveConsultDeps: {} }));
 vi.mock("@/lib/today/owner-load", () => ({
   loadOwnerDeadlines: async () => state.deadlines,
+  loadOwnerNeedsReview: async () => state.needsReview,
   loadOwnerProposals: async () => state.proposals,
 }));
 
