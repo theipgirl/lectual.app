@@ -158,3 +158,133 @@ export const PROPOSAL_TYPE_TRADEMARK = "Trademark filing";
 export const PROPOSAL_TYPE_GENERAL = "Contract or other matter (flat fee)";
 /** Spec 9: the LOE step's sentence for a general (flat-fee) proposal. Never the trademark LOE. */
 export const GENERAL_LOE_SENTENCE = "Draft the General LOE for this matter.";
+
+/* ── Phase 1 owner view: views and shell (owned by the views/shell piece) ── */
+/** The account menu's view group (owner, admin, senior admin and Lectual staff, firms with the switch on). */
+export const VIEW_GROUP_NAME = "View";
+export const OWNER_VIEW_NAME = "Owner view";
+export const PREVIEW_A_VIEW = "Preview a view";
+export const BACK_TO_MY_VIEW = "Back to my own view";
+/** The owner phone bar's short name for the weekly review. */
+export const REVIEW_SHORT_NAME = "Review";
+export const SETTINGS_NAME = "Settings";
+/** saveViewAction's fixed sentences. */
+export const VIEW_NOT_SAVED = "We couldn't change your view. Try again.";
+export const VIEW_NOT_SIGNED_IN = "You are not signed in.";
+export const VIEW_PREVIEW_NOT_ALLOWED = "Only an owner or admin can preview another view.";
+
+/* ── Phase 1 owner view: approval deck ── */
+/** Yes is off while the card's editor is open: it would approve the saved text, not the edit. */
+/** The deck when approval assignments couldn't be read: the usual approvers' rule applies. */
+export const DECK_ROUTING_UNREAD = "Assignments couldn't be loaded. Showing the cards the usual approvers decide.";
+export const DECK_EDITING_YES = "Approve from the editor, or close it first.";
+export const DECK_TITLE = "Needs you";
+export const dealHeader = (label: string) => `Today's deal · ${label}`;
+export const nextDealHeader = (label: string) => `Next deal · ${label}`;
+export const DECK_DEALT_NOW = "Dealt just now";
+export const DECK_VIEW_CARDS = "Cards";
+export const DECK_VIEW_LIST = "List";
+export const DECK_VIEW_BOARD = "Board";
+export const DECK_DEAL_NOW = "Deal them now";
+export const deckLaterArrivals = (n: number, label: string) => `${n} more at ${label}`;
+export const deckAllDecided = (label: string) => `All decided. Next deal ${label}.`;
+export const DECK_NOTHING_NOW = "Nothing to decide right now.";
+export const DECK_NOTHING_FOR_YOU = "There is nothing for you to decide here.";
+export const deckLaterBack = (n: number, label: string) => `${n} ${n === 1 ? "card is" : "cards are"} back at ${label}.`;
+/** The deck is empty for this person but the queue still holds items someone else decides. */
+export const deckOthersWaiting = (n: number) => `${n} waiting for ${n === 1 ? "a colleague" : "colleagues"} to decide.`;
+export const deckHandedCount = (n: number) => `${n} handed to ${n === 1 ? "a colleague" : "colleagues"}.`;
+export const DECK_DRAFT_NONE = "Approved. No draft was made, so nothing is in a mailbox and nothing has been sent. Copy the text from the full approval page into an email, or connect a mailbox in Settings.";
+export const DECK_ALL_LIST_HEADING = "Your approvals";
+export const DECK_TAG_INTERNAL = "Internal";
+export const deckTagYes = (minutes: number) => `Needs your yes · ${minutes} min`;
+export const deckSource = (assistant: string) => `Lectual · ${assistant}`;
+export const deckPosition = (position: number, total: number) => `${position} / ${total}`;
+export const DECK_YES = "Yes";
+export const DECK_MARK_READ = "Mark read";
+export const DECK_REJECT = "Reject";
+export const DECK_LATER = "Later";
+export const DECK_EDIT = "Edit";
+export const DECK_HAND_OFF = "Hand off";
+export const DECK_HAND_TO = "Hand to";
+export const DECK_SEND_BACK = "Send back";
+export const DECK_OPEN_TO_REVIEW = "Open to review";
+export const DECK_BACK = "Previous card";
+export const DECK_SKIP = "Next card";
+export const DECK_REJECT_NOTE_LABEL = "Why are you rejecting it?";
+export const DECK_REJECT_NOTE_NEEDED = "Add a short note first. It goes back to the assistant that drafted it.";
+export const DECK_HAND_NOTE_LABEL = "Note for them (optional)";
+export const deckHolding = (seconds: number) => `Approving in ${seconds}…`;
+export const DECK_UNDO = "Undo";
+export const DECK_HOLD_NOTE = "Nothing happens until the countdown ends. Once approved, it can't be un-approved here.";
+export const DECK_DRAFT_IN_OUTLOOK = "Draft is in Outlook. Nothing is sent until someone presses Send.";
+export const DECK_DRAFT_IN_GMAIL = "Draft is in Gmail. Nothing is sent until someone presses Send.";
+export const DECK_OPEN_DRAFT = "Open the draft";
+export const DECK_SEND_NOW = "Send from Outlook now";
+export const deckSentAt = (time: string) => `Sent from Outlook by you at ${time}.`;
+export const DECK_SEND_OFF = "Sending from here isn't switched on for you. Open the draft in Outlook and press Send there.";
+export const DECK_SEND_RECONNECT = "To send from here, reconnect your Outlook in Settings and allow sending. Until then, press Send in Outlook.";
+export const DECK_MARKED_READ = "Marked read.";
+export const DECK_REJECTED = "Rejected. The note goes back to the assistant. Nothing was sent.";
+export const DECK_HANDED_OFF = "Handed off. It's on their cards now.";
+export const DECK_LATER_DONE = "Put off until the next deal.";
+export const DECK_SENT_BACK = "Sent back.";
+export const handedBy = (name: string) => `Handed to you by ${name}`;
+export const DECK_HANDED_NO_YES = "You can edit this and send it back. The yes stays with an approver.";
+export const DECK_CLOSER_LOOK = "This one needs a closer look before it can be approved.";
+export const DECK_COL_NEEDS_YES = "Needs your yes";
+export const DECK_COL_HANDED_OFF = "Handed off";
+export const DECK_COL_LATER = "Later";
+export const DECK_COL_DECIDED = "Decided today";
+export const DECK_DECIDED_UNREAD = "Decided today couldn't be loaded. Refresh to try again.";
+export const DECK_EVENTS_UNREAD = "Hand-offs and Later couldn't be loaded, so every card is shown.";
+export const DECK_NOTHING_HERE = "Nothing here.";
+export const DECK_NOT_YOURS = "This card isn't on your deck any more. Refresh to see what's left.";
+export const DECK_FAILED = "That didn't go through. Nothing was sent. Refresh to try again.";
+export const DECK_PICK_PERSON = "Choose who to hand it to.";
+export const DECK_BAD_PERSON = "That person can't take approvals. Choose someone else on your team.";
+
+/* ── Phase 1 owner view: owner Today ── */
+export const OWNER_CARDS_HEADING = "Your cards";
+export const OWNER_CARDS_START = "Start";
+export const OWNER_CARDS_NONE_STATUS = "No approval cards to deal right now.";
+export const OWNER_CARDS_UNREACHABLE = "Couldn't load your cards.";
+export const OWNER_CARDS_NOT_CONNECTED = "No approval queue is connected for your firm yet.";
+export function ownerCardsCount(count: number, minutes: number): string {
+  return `${count} ${count === 1 ? "card needs" : "cards need"} you \u00b7 about ${minutes} min`;
+}
+export function ownerCardsNextDeal(count: number, label: string, later: number): string {
+  const more = later > 0 ? ` ${later} more at ${label}.` : "";
+  return count > 0 ? `Next deal ${label}.${more}` : `All decided. Next deal ${label}.${more}`;
+}
+export const OWNER_DEADLINES_HEADING = "Deadlines in the next 14 days";
+export const OWNER_DEADLINES_NONE = "Nothing due in the next 14 days.";
+export const OWNER_DEADLINES_FAILED = "Couldn't load deadlines.";
+export const OWNER_CALENDAR_LINK = "Calendar \u2192";
+export const OWNER_PROPOSALS_HEADING = "Proposals out";
+export const OWNER_PROPOSALS_NONE = "No proposals are out right now.";
+export const OWNER_PROPOSALS_FAILED = "Couldn't load proposals.";
+export const OWNER_PROPOSALS_LINK = "Proposals \u2192";
+export const OWNER_WEEK_HEADING = "This week";
+export const OWNER_WEEK_CONSULTS_FAILED = "Consults couldn't be read, so only deadlines are marked.";
+export const OWNER_WEEK_DEADLINES_FAILED = "Deadlines couldn't be read, so only consults are marked.";
+export const OWNER_WEEK_BOTH_FAILED = "Couldn't load this week.";
+export const OWNER_COPILOT_HEADING = "Ask Copilot";
+export const OWNER_COPILOT_LABEL = "Ask a question about your matters, leads or deadlines";
+export const OWNER_COPILOT_PLACEHOLDER = "For example: which matters are waiting on us?";
+export const OWNER_COPILOT_BUTTON = "Ask";
+export const OWNER_COPILOT_NOTE = "Answers come from your firm's own records. Nothing is sent.";
+
+
+/* ── Phase 1 owner view: weekly review ── */
+/** The weekly review's firm-wide "since" display filter chip. */
+export const REVIEW_SINCE_LABEL = "Since Feb 2026";
+/** Shown instead of the since chips when a read the filter relies on failed: nothing older is hidden. */
+export const REVIEW_SINCE_SUSPENDED = "Showing all: some details couldn't load, so older rows aren't hidden";
+export const REVIEW_SHOW_ALL = "Show all";
+export const REVIEW_SHOWING_ALL = "Showing all";
+export const reviewOlderHidden = (n: number) => `${n} older hidden`;
+/** The strip that is about the signed-in approver. */
+export const WAITING_ON_YOU = "Waiting on you";
+export const NOTHING_WAITING_ON_YOU = "Nothing is waiting on you.";
+export const WAITING_ON_YOU_PARTIAL = "Approvals couldn't load, so only next steps assigned to you are listed.";

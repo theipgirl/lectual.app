@@ -26,7 +26,10 @@ const ALLOW: Allow[] = [
   { file: /^src\/app\/dashboard\/leads\/\[id\]\/actions\.ts$/, reason: "only a PrepConsultFlowError's own sentence passes; anything else is a fixed sentence" },
   { file: /^src\/app\/dashboard\/forms\/actions\.ts$/, reason: "only an IntakeFormError's own sentence passes" },
   { file: /^src\/app\/dashboard\/settings\/integrations\/lawmatics\/actions\.ts$/, reason: "LawmaticsNotConnectedError / PlanChangedError carry sentences written for a person" },
-  { file: /^src\/app\/dashboard\/queue\/actions\.ts$/, reason: "requireFirmReviewer throws the sign-in / role sentence; the generic catch below it uses a fixed sentence" },
+  { file: /^src\/app\/dashboard\/queue\/actions\.ts$/, reason: "only a ReviewerRefusal (the sign-in / role sentence) passes; anything else is a fixed sentence" },
+  { file: /^src\/lib\/queue\/hygiene\.ts$/, reason: "joins the draft audit's own issue messages, which are fixed sentences written for a person" },
+  { file: /^src\/lib\/queue\/resolve-batch\.ts$/, reason: "rethrows a read error to its callers, which catch it and show a fixed sentence (lead pages: unavailable; agents: logged)" },
+  { file: /^src\/lib\/queue\/review-core\.ts$/, reason: "only a ReviewerRefusal's own sign-in / role sentence passes; anything else is a fixed sentence (tests/queue/review-core.test.ts)" },
   { file: /^src\/app\/dashboard\/brain\/actions\.ts$/, reason: "friendlyBrainError passes only a message that starts 'You don't have permission to'; anything else is the fixed fallback" },
 ];
 
@@ -48,7 +51,8 @@ export function rawErrorHits(file: string, source: string): string[] {
 }
 
 describe("no raw error text on a screen", () => {
-  const files = [...walk("src/app/dashboard"), ...walk("src/components")].filter((f) => !f.endsWith(".d.ts"));
+  // src/lib/queue too: the approve core returns sentences straight to the approval page and the deck.
+  const files = [...walk("src/app/dashboard"), ...walk("src/components"), ...walk("src/lib/queue")].filter((f) => !f.endsWith(".d.ts"));
 
   it("finds err.message nowhere outside logs and the documented sentence-carrying errors", () => {
     const hits: string[] = [];

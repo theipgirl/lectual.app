@@ -15,19 +15,20 @@ import { loadReview } from "@/lib/review/load";
 import { reviewBuckets, reviewSubline } from "@/lib/review/buckets";
 import { boardLanes, kpis, meetingPosition, offBoard } from "@/lib/review/lanes";
 import { proposalsOut, reviewPerson, waitingOnPerson } from "@/lib/review/strips";
-import { applyReviewFilters, DEFAULT_REVIEW_VIEW, parseReviewParams, reviewHref, type ReviewParams } from "@/lib/review/params";
+import { applyReviewFilters, olderHiddenCount, sinceSuspended, DEFAULT_REVIEW_VIEW, parseReviewParams, reviewHref, type ReviewParams } from "@/lib/review/params";
 import { criticalAlert, detailsNote } from "@/lib/review/notes";
 import { noticeFor } from "@/lib/review/notice";
 import { buildDeck, chosenPerson, deckPeople } from "@/lib/review/deck";
 import { loadLatestNote, loadReviewDetail } from "@/lib/review/detail-load";
 import { pageTitle } from "@/lib/ui/page-title";
-import { REVIEW_NAME } from "@/lib/ui/words";
+import { QUEUE_APPROVE_ROLES } from "@/lib/queue/roles";
+import { REVIEW_NAME, REVIEW_SHOW_ALL, REVIEW_SHOWING_ALL, REVIEW_SINCE_LABEL, REVIEW_SINCE_SUSPENDED, reviewOlderHidden } from "@/lib/ui/words";
 
 export const metadata: Metadata = { title: pageTitle(REVIEW_NAME) };
 
 export const dynamic = "force-dynamic";
 
-type SearchParams = { who?: string | string[]; kind?: string | string[]; q?: string | string[]; view?: string | string[]; i?: string | string[]; person?: string | string[]; open?: string | string[]; notice?: string | string[] };
+type SearchParams = { since?: string | string[]; who?: string | string[]; kind?: string | string[]; q?: string | string[]; view?: string | string[]; i?: string | string[]; person?: string | string[]; open?: string | string[]; notice?: string | string[] };
 
 /**
  * One page for Monday's walk-through: every open matter and every lead past first contact, in the
@@ -56,19 +57,25 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   }
 
   const link = (next: Partial<ReviewParams>) => reviewHref({ ...params, i: 1, open: null, ...next });
-  const shown = applyReviewFilters(load.rows, params, userId);
+  // A failed read behind one of the since filter's protections turns the filter off for this page, and the chip says so.
+  const sinceOff = sinceSuspended(load.failed);
+  const filterParams: ReviewParams = sinceOff ? { ...params, since: "all" } : params;
+  const shown = applyReviewFilters(load.rows, filterParams, userId);
   const buckets = reviewBuckets(shown, load.today);
   // Chip counts: each chip counts what it would show with the other filters kept.
-  const countFor = (over: Partial<ReviewParams>) => applyReviewFilters(load.rows, { ...params, ...over }, userId).length;
+  const countFor = (over: Partial<ReviewParams>) => applyReviewFilters(load.rows, { ...filterParams, ...over }, userId).length;
   const note = detailsNote(load.failed);
   const common = { today: load.today, members: load.members, canWrite, params };
   const proposalsKnown = !load.failed.includes("proposals");
   const approvalsKnown = !load.failed.includes("approvals");
-  const person = reviewPerson(load.members);
+  // An approver sees the strip about THEM ("Waiting on you"); anyone else sees it about the review person, as before.
+  const isApprover = !!role && !!userId && QUEUE_APPROVE_ROLES.includes(role);
+  const person = isApprover ? { userId: userId!, firstName: "you" } : reviewPerson(load.members);
+  const olderHidden = olderHiddenCount(load.rows, params, userId);
   const strips = (
     <div className="rv-strips">
       <ProposalsOutStrip items={proposalsOut(shown, load.today)} known={proposalsKnown} params={params} />
-      {person && <WaitingOnStrip firstName={person.firstName} personId={person.userId} rows={waitingOnPerson(shown, person.userId)} approvalsKnown={approvalsKnown} params={params} />}
+      {person && <WaitingOnStrip firstName={person.firstName} you={isApprover} personId={person.userId} rows={waitingOnPerson(shown, person.userId)} approvalsKnown={approvalsKnown} params={params} />}
     </div>
   );
   const lanes = boardLanes(buckets, load.members);
@@ -77,7 +84,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   // Cards: one person's deck, built from every row that passes the search and the kind chips (Whose is ignored: the picker is the person).
   let cards: { people: ReturnType<typeof deckPeople>; personId: string | null; card: ReturnType<typeof buildDeck>[number] | null; pos: ReturnType<typeof meetingPosition>; note: Awaited<ReturnType<typeof loadLatestNote>> | null } | null = null;
   if (params.view === "cards") {
-    const deckBuckets = reviewBuckets(applyReviewFilters(load.rows, { ...params, who: "all" }, userId), load.today);
+    const deckBuckets = reviewBuckets(applyReviewFilters(load.rows, { ...filterParams, who: "all" }, userId), load.today);
     let people = deckPeople(load.members, boardLanes(deckBuckets, load.members).map((l) => l.userId));
     if (people.length === 0 && userId) people = [{ userId, name: "You" }];
     const personId = chosenPerson(people, params.person, userId);
@@ -102,7 +109,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           label: "Search clients and marks",
           placeholder: "Client or mark",
           defaultValue: params.q,
-          hidden: { ...(params.view !== DEFAULT_REVIEW_VIEW ? { view: params.view } : {}), ...(params.view === "cards" && params.person ? { person: params.person } : {}), ...(params.who === "mine" ? { who: "mine" } : {}), ...(params.kind !== "both" ? { kind: params.kind === "matter" ? "matters" : "leads" } : {}) },
+          hidden: { ...(params.since === "all" ? { since: "all" } : {}), ...(params.view !== DEFAULT_REVIEW_VIEW ? { view: params.view } : {}), ...(params.view === "cards" && params.person ? { person: params.person } : {}), ...(params.who === "mine" ? { who: "mine" } : {}), ...(params.kind !== "both" ? { kind: params.kind === "matter" ? "matters" : "leads" } : {}) },
           clearHref: link({ q: "", i: 1 }),
         }}
         toggle={<ViewSwitch params={params} />}
@@ -118,6 +125,19 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
         <Chip href={link({ kind: "both" })} active={params.kind === "both"} count={countFor({ kind: "both" })}>Both</Chip>
         <Chip href={link({ kind: "matter" })} active={params.kind === "matter"} count={countFor({ kind: "matter" })}>Matters</Chip>
         <Chip href={link({ kind: "lead" })} active={params.kind === "lead"} count={countFor({ kind: "lead" })}>Leads</Chip>
+      </FilterChips>
+
+      <FilterChips as="nav" label="Since">
+        {sinceOff ? (
+          <Chip href={link({})} active={false}>{REVIEW_SINCE_SUSPENDED}</Chip>
+        ) : params.since === "all" ? (
+          <Chip href={link({ since: "default" })} active={false}>{REVIEW_SHOWING_ALL} · {REVIEW_SINCE_LABEL}</Chip>
+        ) : (
+          <>
+            <Chip href={link({ since: "default" })} active>{REVIEW_SINCE_LABEL} · {reviewOlderHidden(olderHidden)}</Chip>
+            <Chip href={link({ since: "all" })} active={false}>{REVIEW_SHOW_ALL}</Chip>
+          </>
+        )}
       </FilterChips>
 
       {note && (

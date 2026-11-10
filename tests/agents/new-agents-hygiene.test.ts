@@ -90,7 +90,17 @@ describe("Sprint 17 hygiene", () => {
   });
 
   it("nothing in src sends mail: no send call, no send endpoint, no send scope (before the sprint and after)", () => {
-    for (const f of walk("src", /\.(ts|tsx)$/)) expect(read(f), f).not.toMatch(SEND_PATTERN);
+    // One exception, on purpose (Phase 1 approval deck): "Send from Outlook now", a button the approver presses herself
+    // after approving, sends her OWN approved draft by id. It lives in this one file, and nothing schedules or automates it.
+    const PERSON_PRESSED_SEND = path.join("src/lib/mailbox/outlook-send.ts");
+    for (const f of walk("src", /\.(ts|tsx)$/)) if (f !== PERSON_PRESSED_SEND) expect(read(f), f).not.toMatch(SEND_PATTERN);
+    const sendFile = read(PERSON_PRESSED_SEND);
+    // It sends an existing draft (never composes one) and reads it back first.
+    expect(sendFile).toMatch(/isDraft/);
+    expect(sendFile).not.toMatch(new RegExp(["send", "Mail"].join(""), "i"));
+    // Only the approval deck's send action imports the helper that calls it.
+    const importers = walk("src", /\.(ts|tsx)$/).filter((f) => /\bsendFromMyOutlook\b/.test(read(f)) && !f.endsWith(path.join("mailbox", "my-mailbox.ts")));
+    expect(importers).toEqual([path.join("src/app/dashboard/queue/deck/actions.ts")]);
   });
 
   it("the Outlook draft helper has exactly one new caller, the inbox reply drafts; the Mail scopes are the existing two", () => {

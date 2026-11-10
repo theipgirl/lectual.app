@@ -68,6 +68,7 @@ export function CardsDeck({
       <input type="hidden" name="vwho" value={params.who === "mine" ? "mine" : ""} />
       <input type="hidden" name="vkind" value={params.kind === "matter" ? "matters" : params.kind === "lead" ? "leads" : ""} />
       <input type="hidden" name="vq" value={params.q} />
+      <input type="hidden" name="vsince" value={params.since === "all" ? "all" : ""} />
       <input type="hidden" name="vperson" value={personId ?? ""} />
       <input type="hidden" name="vi" value={pos.position} />
     </>

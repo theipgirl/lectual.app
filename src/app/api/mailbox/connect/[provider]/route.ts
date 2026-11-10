@@ -46,6 +46,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
       // Personal: pre-fill the signed-in address. Firm: leave the chooser open,
       // since the shared mailbox is a different account.
       loginHint: scope === "personal" ? (session.user.email ?? undefined) : undefined,
+      mailbox: scope === "personal" ? "personal" : "firm",
     }),
   );
   res.cookies.set(STATE_COOKIE, encodeStateCookie(root, state), {

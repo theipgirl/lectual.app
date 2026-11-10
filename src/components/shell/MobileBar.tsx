@@ -3,17 +3,24 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { mobileBarItems, moreSections, railCountFor, type MoreSection, type NavItem } from "@/lib/nav";
+import { mobileBarItems, moreSections, railCountFor, type MobileBarSpec, type MoreGroup, type MoreSection, type NavItem } from "@/lib/nav";
 import { focusRestoreTarget, tourKeyAction } from "@/lib/onboarding/engine";
 import { menuKeyAction } from "@/lib/shell/menu-behaviour";
 import { MORE_NAME } from "@/lib/ui/words";
 import type { QueueLoadStatus } from "@/lib/queue/load";
+import "./owner-shell.css";
 
 type Props = {
   items: NavItem[];
   queueStatus: QueueLoadStatus;
   pendingCount: number;
   counts: Partial<Record<string, number>>;
+  /** A view's own bar (default: Today, Leads, Approvals, Mail or Matters). Still filtered through `items`. */
+  bar?: MobileBarSpec;
+  /** A view's own More sheet groups (default: the rail's groups plus Reports). */
+  groups?: readonly MoreGroup[];
+  /** The owner view's colours. */
+  variant?: "owner";
 };
 
 const MORE_ICON = "M5 12h.01M12 12h.01M19 12h.01";
@@ -52,7 +59,7 @@ export function MoreSheet({ sections, onClose, sheetRef }: { sections: MoreSecti
  * keeps the queue's three states. Hiding an entry is a courtesy; every page
  * still checks its own gate.
  */
-export function MobileBar({ items, queueStatus, pendingCount, counts }: Props) {
+export function MobileBar({ items, queueStatus, pendingCount, counts, bar: barSpec, groups, variant }: Props) {
   const pathname = usePathname() ?? "/dashboard/";
   const [open, setOpen] = useState(false);
   const moreButton = useRef<HTMLButtonElement>(null);
@@ -89,8 +96,8 @@ export function MobileBar({ items, queueStatus, pendingCount, counts }: Props) {
     if (open) sheet.current?.querySelector<HTMLElement>("a")?.focus();
   }, [open]);
 
-  const bar = mobileBarItems(items, pathname);
-  const sections = moreSections(items, pathname);
+  const bar = mobileBarItems(items, pathname, barSpec);
+  const sections = moreSections(items, pathname, groups, barSpec);
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     const controls = [...(sheet.current?.querySelectorAll<HTMLElement>("a") ?? [])];
@@ -105,7 +112,7 @@ export function MobileBar({ items, queueStatus, pendingCount, counts }: Props) {
 
   return (
     <>
-      <nav className="lx-mbar" aria-label="Main">
+      <nav className={`lx-mbar${variant === "owner" ? " lx-mbar--owner" : ""}`} aria-label="Main">
         {bar.map((item) => {
           const count = railCountFor(item.countKey, queueStatus, pendingCount, counts);
           return (

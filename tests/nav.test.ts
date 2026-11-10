@@ -173,3 +173,19 @@ describe("one proposals surface (Sprint 3)", () => {
     expect(visibleNav([], "owner").map((n) => n.slug)).toContain("quotes");
   });
 });
+
+describe("railGroups takes an optional tree (Phase 1 owner view)", () => {
+  it("without one it is RAIL_TREE, unchanged", () => {
+    const items = visibleNav(["mailbox", "agents"], "owner");
+    expect(railGroups(items, "/dashboard/", undefined)).toEqual(railGroups(items, "/dashboard/"));
+    expect(railGroups(items, "/dashboard/", RAIL_TREE)).toEqual(railGroups(items, "/dashboard/"));
+  });
+
+  it("a given tree only draws slugs the firm and role may see; More is an ordinary parent", () => {
+    const tree = [[{ slug: "" }, { slug: "agents" }], [{ label: "More", icon: "M0 0", kids: ["intake", "matters", "brain"] }]];
+    expect(railGroups(visibleNav([], "owner"), "/dashboard/matters/", tree).map((g) => g.map((e) => e.key))).toEqual([["today"], ["More"]]);
+    const more = railGroups(visibleNav([], "owner"), "/dashboard/matters/", tree)[1][0];
+    expect(more).toMatchObject({ href: "/dashboard/intake/", childActive: true, countKey: null });
+    expect(more.kids.map((k) => k.key)).toEqual(["intake", "matters", "brain"]);
+  });
+});

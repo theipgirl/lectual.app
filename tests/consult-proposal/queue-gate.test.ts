@@ -59,7 +59,7 @@ vi.mock("@/lib/queue/stale", () => ({
 vi.mock("@/lib/org/profile", () => ({ getFirmTimeZone: async () => "America/New_York" }));
 vi.mock("@/lib/documents/approve-hook", () => ({ generateApprovedDocument: async () => undefined }));
 
-const item = { id: QUEUE_ID, type: "CLIENT_EMAIL", recipient: "c@example.com", subject: "Your Trademark Proposal", headline: "h", draft_body: "body", final_body: null };
+const item = { id: QUEUE_ID, status: "pending", type: "CLIENT_EMAIL", recipient: "c@example.com", subject: "Your Trademark Proposal", headline: "h", draft_body: "body", final_body: null };
 vi.mock("@/lib/queue/api", () => ({
   getQueueItem: async () => item,
   saveQueueEdit: vi.fn(),

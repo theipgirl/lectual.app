@@ -64,6 +64,12 @@ import { getScopedClient } from "@/lib/db/scoped-client";
  *                      named approver, a public `/p/<token>` page. The pricing
  *                      defaults and the page's wording are RPB Law's, so it is
  *                      opt-in per firm.
+ *  - `role-views`      A ROLLOUT SWITCH, not a feature: with it on, a person whose
+ *                      role has a live view (today only `owner`) sees that view's
+ *                      shell (src/lib/views) and the approval deck. It decides only
+ *                      what is DRAWN; every page and action keeps its own gate. Off
+ *                      (the default) = today's shell for everyone. Kept out of the
+ *                      Settings -> Features list on purpose: Lectual turns it on.
  */
 export type OrgModule =
   | "litigation"
@@ -73,7 +79,8 @@ export type OrgModule =
   | "lawmatics-import"
   | "mailbox"
   | "agents"
-  | "proposals";
+  | "proposals"
+  | "role-views";
 
 /**
  * Modules on the caller's ACTIVE org. Read through the RLS-scoped client, so

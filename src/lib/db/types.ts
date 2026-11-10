@@ -3893,6 +3893,50 @@ export type Database = {
           },
         ]
       }
+      // queue_card_event: lectual migration 0103 (append-only card events for the approval deck: hand-off, later,
+      // returned). Hand-added until the next codegen run, like crm_file. `actor_id` defaults to auth.uid() in the
+      // database and is never sent by this app. Until 0103 is applied, reads answer 42P01 / PGRST205 (src/lib/queue/card-state.ts).
+      queue_card_event: {
+        Row: {
+          actor_id: string
+          created_at: string
+          kind: string
+          note: string | null
+          org_id: string
+          queue_item_id: string
+          target_user_id: string | null
+          until: string | null
+        }
+        Insert: {
+          actor_id?: string
+          created_at?: string
+          kind: string
+          note?: string | null
+          org_id: string
+          queue_item_id: string
+          target_user_id?: string | null
+          until?: string | null
+        }
+        Update: {
+          actor_id?: string
+          created_at?: string
+          kind?: string
+          note?: string | null
+          org_id?: string
+          queue_item_id?: string
+          target_user_id?: string | null
+          until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "queue_card_event_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_org"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_org_preference: {
         Row: {
           active_org_id: string | null

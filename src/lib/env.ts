@@ -40,6 +40,10 @@ const fieldSchemas = {
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
   MS_OAUTH_CLIENT_ID: z.string().optional(),
   MS_OAUTH_CLIENT_SECRET: z.string().optional(),
+  // "on" asks Microsoft for the send permission at connect time, for the approval deck's "Send from Outlook now"
+  // button (a person presses it after approving). Anything else, or unset (the default), = not asked for, and the
+  // button is not offered. A mailbox connected before it was "on" must be reconnected to grant it.
+  MAILBOX_SEND_SCOPE: z.string().optional(),
   // 32-byte key (base64) for AES-256-GCM encryption of mailbox tokens.
   MAILBOX_TOKEN_KEY: z.string().optional(),
   // Shared secret Vercel Cron sends to /api/cron/* (steps 4–5).

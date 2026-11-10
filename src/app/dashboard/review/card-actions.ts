@@ -12,7 +12,7 @@ import { parseReviewParams, reviewHref } from "@/lib/review/params";
  */
 function backTo(fd: FormData, code: string | null): string {
   const field = (k: string) => String(fd.get(k) ?? "");
-  const params = parseReviewParams({ who: field("vwho"), kind: field("vkind"), q: field("vq"), person: field("vperson"), i: field("vi"), view: "cards" });
+  const params = parseReviewParams({ who: field("vwho"), kind: field("vkind"), q: field("vq"), since: field("vsince"), person: field("vperson"), i: field("vi"), view: "cards" });
   const href = reviewHref(params);
   return code ? `${href}${href.includes("?") ? "&" : "?"}notice=${code}` : href;
 }

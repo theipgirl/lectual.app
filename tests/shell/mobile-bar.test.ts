@@ -100,3 +100,33 @@ describe("the scrim (F6)", () => {
     expect(src).toMatch(/className="lx-more-scrim" onPointerDown=\{\(\) => close\(true\)\}/);
   });
 });
+
+describe("a view's own bar and sheet (Phase 1 owner view)", () => {
+  const OWNER_BAR = { slugs: ["", "queue", "review", "proposals", "quotes"], labels: { "": "Today", queue: "Approvals", review: "Review", proposals: "Proposals", quotes: "Proposals" } };
+  const GROUPS = [{ label: "More", slugs: ["intake", "matters", "calendar"] }];
+
+  it("without the new params the bar and sheet are exactly today's", () => {
+    const items = visibleNav(ALL, "owner");
+    expect(mobileBarItems(items, "/dashboard/", undefined)).toEqual(bar(ALL));
+    expect(moreSections(items, "/dashboard/", undefined, undefined)).toEqual(more(ALL));
+  });
+
+  it("a given bar is still filtered through what the firm and role may see", () => {
+    expect(mobileBarItems(visibleNav(ALL, "owner"), "/dashboard/", OWNER_BAR).map((i) => i.label)).toEqual(["Today", "Approvals", "Review", "Proposals"]);
+    expect(mobileBarItems(visibleNav([], "owner"), "/dashboard/", OWNER_BAR).map((i) => i.slug)).toEqual(["", "queue", "review", "quotes"]);
+  });
+
+  it("given groups are drawn as given, with no Reports group and nothing from the bar", () => {
+    const sheet = moreSections(visibleNav(ALL, "owner"), "/dashboard/", GROUPS, OWNER_BAR);
+    expect(sheet).toEqual([{ label: "More", items: expect.any(Array) }]);
+    expect(sheet[0].items.map((i) => i.label)).toEqual(["Leads", "Matters", "Calendar"]);
+  });
+
+  it("the owner variant keeps the real bar's markup and adds only its class", () => {
+    const items = visibleNav(ALL, "owner");
+    const html = renderToStaticMarkup(createElement(MobileBar, { items, queueStatus: "ok", pendingCount: 4, counts: {}, bar: OWNER_BAR, groups: GROUPS, variant: "owner" }));
+    expect(html).toContain('class="lx-mbar lx-mbar--owner"');
+    expect(html).toContain('<span class="lx-mbar-badge">4</span>');
+    expect(renderToStaticMarkup(createElement(MobileBar, { items, queueStatus: "ok", pendingCount: 4, counts: {} }))).toContain('class="lx-mbar"');
+  });
+});

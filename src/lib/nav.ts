@@ -215,9 +215,9 @@ export type RailEntry = {
  * no visible children disappears; a parent opens its list child (or its first
  * visible child) and shows that list's count.
  */
-export function railGroups(visible: readonly NavItem[], pathname: string): RailEntry[][] {
+export function railGroups(visible: readonly NavItem[], pathname: string, tree: readonly (readonly RailNode[])[] = RAIL_TREE): RailEntry[][] {
   const bySlug = new Map(visible.filter((item) => item.built !== false).map((item) => [item.slug, item]));
-  return RAIL_TREE.map((group) =>
+  return tree.map((group) =>
     group.flatMap((node): RailEntry[] => {
       if ("slug" in node) {
         const item = bySlug.get(node.slug);
@@ -275,18 +275,27 @@ const MOBILE_LABEL: Record<string, string> = { "": "Today", intake: LEADS_NAME, 
 
 export type MobileBarItem = { slug: string; label: string; icon: string; href: string; active: boolean; countKey: string };
 
-/** The bar's buttons that exist for this firm and role: Today, Leads, Approvals, then Mail (mailbox module) or Matters. */
-export function mobileBarItems(visible: readonly NavItem[], pathname: string): MobileBarItem[] {
+/** A phone bar other than the default (a view's own): its slugs in order and their short names. */
+export type MobileBarSpec = { slugs: readonly string[]; labels: Readonly<Record<string, string>> };
+
+/**
+ * The bar's buttons that exist for this firm and role: Today, Leads, Approvals, then Mail (mailbox module) or Matters.
+ * A view may hand its own `bar`; it is still filtered through `visible` (a slug the firm cannot see is never drawn).
+ */
+export function mobileBarItems(visible: readonly NavItem[], pathname: string, bar?: MobileBarSpec): MobileBarItem[] {
   const bySlug = new Map(visible.filter((i) => i.built !== false).map((i) => [i.slug, i]));
-  const slugs = MOBILE_BAR.filter((slug) => slug !== "matters" || !bySlug.has("mail"));
+  const slugs = bar ? bar.slugs : MOBILE_BAR.filter((slug) => slug !== "matters" || !bySlug.has("mail"));
+  const labels = bar ? bar.labels : MOBILE_LABEL;
   return slugs.flatMap((slug) => {
     const item = bySlug.get(slug);
-    return item ? [{ slug, label: MOBILE_LABEL[slug] ?? item.label, icon: item.icon, href: item.href, active: isNavActive(pathname, item), countKey: slug }] : [];
+    return item ? [{ slug, label: labels[slug] ?? item.label, icon: item.icon, href: item.href, active: isNavActive(pathname, item), countKey: slug }] : [];
   });
 }
 
+export type MoreGroup = { label: string; slugs: readonly string[] };
+
 /** The More sheet, grouped as the rail groups its sections. Group labels are the rail's. */
-const MORE_GROUPS: readonly { label: string; slugs: readonly string[] }[] = [
+const MORE_GROUPS: readonly MoreGroup[] = [
   { label: "Workspace", slugs: ["", "review", "calendar"] },
   { label: "Communication", slugs: ["meetings", "campaigns"] },
   { label: LEADS_GROUP, slugs: ["forms", "quotes", "proposals"] },
@@ -300,24 +309,30 @@ const REPORTS_GROUP_LABEL = "Reports";
 
 export type MoreSection = { label: string; items: { slug: string; label: string; href: string; active: boolean }[] };
 
-/** Everything the bar does not carry, filtered through the same visibility the rail uses (fails closed); empty groups vanish. */
-export function moreSections(visible: readonly NavItem[], pathname: string): MoreSection[] {
+/**
+ * Everything the bar does not carry, filtered through the same visibility the rail uses (fails closed); empty groups vanish.
+ * A view may hand its own `groups` (and the `bar` they sit beside); those are drawn as given, with no Reports group.
+ */
+export function moreSections(visible: readonly NavItem[], pathname: string, groups?: readonly MoreGroup[], bar?: MobileBarSpec): MoreSection[] {
   const bySlug = new Map(visible.filter((i) => i.built !== false).map((i) => [i.slug, i]));
   // Whatever the bar carries for this firm is not repeated here (Today always; Mail or Matters).
-  const inBar = new Set(mobileBarItems(visible, pathname).map((i) => i.slug));
-  const groups: MoreSection[] = MORE_GROUPS.map((group) => ({
-    label: group.label,
-    items: group.slugs.flatMap((slug) => {
-      const item = bySlug.get(slug);
-      return item && !inBar.has(slug) ? [{ slug, label: item.label, href: item.href, active: isNavActive(pathname, item) }] : [];
-    }),
-  }));
+  const inBar = new Set(mobileBarItems(visible, pathname, bar).map((i) => i.slug));
+  const sectionsOf = (list: readonly MoreGroup[]): MoreSection[] =>
+    list.map((group) => ({
+      label: group.label,
+      items: group.slugs.flatMap((slug) => {
+        const item = bySlug.get(slug);
+        return item && !inBar.has(slug) ? [{ slug, label: item.label, href: item.href, active: isNavActive(pathname, item) }] : [];
+      }),
+    }));
+  if (groups) return sectionsOf(groups).filter((g) => g.items.length > 0);
+  const defaults = sectionsOf(MORE_GROUPS);
   const path = pathname.endsWith("/") ? pathname : `${pathname}/`;
   const reports: MoreSection = {
     label: REPORTS_GROUP_LABEL,
     items: visibleReports(visible).map((key) => ({ slug: `report-${key}`, label: REPORTS[key].label, href: REPORTS[key].href, active: path.startsWith(REPORTS[key].href) })),
   };
-  const firm = groups.findIndex((g) => g.label === "Firm");
-  groups.splice(firm < 0 ? groups.length : firm, 0, reports);
-  return groups.filter((g) => g.items.length > 0);
+  const firm = defaults.findIndex((g) => g.label === "Firm");
+  defaults.splice(firm < 0 ? defaults.length : firm, 0, reports);
+  return defaults.filter((g) => g.items.length > 0);
 }

@@ -1,4 +1,5 @@
 import { pkceChallenge } from "./state";
+import { SEND_SCOPE } from "./outlook-send";
 import { PROVIDER_FETCH_TIMEOUT_MS, withTimeout } from "@/lib/http/timeout";
 
 /**
@@ -9,7 +10,10 @@ import { PROVIDER_FETCH_TIMEOUT_MS, withTimeout } from "@/lib/http/timeout";
  *             gmail.compose  — create DRAFTS (an approved queue item becomes a
  *                              draft in the approver's mailbox; a person sends)
  *   Microsoft Mail.Read, Mail.ReadWrite — the same pair in Graph terms
- *             (ReadWrite is what drafts need; we never send or delete)
+ *             (ReadWrite is what drafts need; we never send or delete on
+ *             our own. With MAILBOX_SEND_SCOPE "on" one more permission is
+ *             asked for, see sendScopeRequested: the button a person presses
+ *             to send her own approved draft)
  *             Calendars.Read, read-only; the daily sync copies upcoming events
  *             so consults show on the calendar, lead page and Today. It is
  *             asked for but NOT required: declining it still connects the
@@ -100,6 +104,28 @@ const CONFIG: Record<MailboxProvider, Config> = {
   },
 };
 
+/**
+ * The send permission is asked for ONLY when MAILBOX_SEND_SCOPE is "on" (default off), for the approval deck's
+ * "Send from Outlook now" button, which a person presses herself after approving. It is never in `required`: a mailbox
+ * that declines it still connects for mail and drafts. A mailbox connected before the flag was on has to be reconnected.
+ */
+export function sendScopeRequested(): boolean {
+  // Read directly, not through `@/lib/env`: this file is also reached from client components, and env.ts is server-only.
+  // The variable is still declared in env.ts. On the client it is undefined, i.e. off.
+  return typeof process !== "undefined" && process.env.MAILBOX_SEND_SCOPE === "on";
+}
+
+/** The Microsoft scopes to ask for at connect time. */
+// Only a PERSONAL mailbox ever sends (the approver's own), so a firm (shared) mailbox is never asked for SEND_SCOPE:
+// where a tenant needs admin consent for it, asking would make the shared connect fail.
+function microsoftScopes(mailbox: "personal" | "firm" = "firm"): string[] {
+  return sendScopeRequested() && mailbox === "personal" ? [...CONFIG.microsoft.scopes, SEND_SCOPE] : [...CONFIG.microsoft.scopes];
+}
+
+function scopesFor(provider: MailboxProvider, mailbox: "personal" | "firm" = "firm"): string[] {
+  return provider === "microsoft" ? microsoftScopes(mailbox) : [...CONFIG.google.scopes];
+}
+
 export const PROVIDER_LABEL: Record<MailboxProvider, string> = {
   google: "Gmail",
   microsoft: "Outlook",
@@ -124,6 +150,15 @@ export function hasCalendarScope(provider: MailboxProvider, scopes: readonly str
   return scopes.some((s) => typeof s === "string" && normaliseScope(provider, s.trim()) === CALENDAR_SCOPE.toLowerCase());
 }
 
+/**
+ * True when a connection's STORED scopes include the send permission. Microsoft only, same normalisation as
+ * `hasCalendarScope`; a missing or unreadable list means it was never granted.
+ */
+export function hasSendScope(provider: MailboxProvider, scopes: readonly string[] | null | undefined): boolean {
+  if (provider !== "microsoft" || !Array.isArray(scopes)) return false;
+  return scopes.some((s) => typeof s === "string" && normaliseScope(provider, s.trim()) === SEND_SCOPE.toLowerCase());
+}
+
 export function missingScopes(provider: MailboxProvider, granted: string[]): string[] {
   const have = new Set(granted.map((s) => normaliseScope(provider, s)));
   return CONFIG[provider].required.filter((r) => !have.has(r));
@@ -142,6 +177,8 @@ export function authorizeUrl(args: {
   nonce: string;
   verifier: string;
   loginHint?: string;
+  /** Which kind of connection this is; only "personal" may be asked for the send permission. Absent = firm. */
+  mailbox?: "personal" | "firm";
 }): string {
   const cfg = CONFIG[args.provider];
   const url = new URL(cfg.authorizeUrl);
@@ -149,7 +186,7 @@ export function authorizeUrl(args: {
   p.set("client_id", args.clientId);
   p.set("redirect_uri", args.redirectUri);
   p.set("response_type", "code");
-  p.set("scope", cfg.scopes.join(" "));
+  p.set("scope", scopesFor(args.provider, args.mailbox).join(" "));
   p.set("state", args.nonce);
   p.set("code_challenge", pkceChallenge(args.verifier));
   p.set("code_challenge_method", "S256");
@@ -181,6 +218,8 @@ export async function exchangeCode(args: {
   code: string;
   verifier: string;
   redirectUri: string;
+  /** Must match what the authorize request asked for. Absent = firm (no send permission). */
+  mailbox?: "personal" | "firm";
   fetchImpl?: typeof fetch;
   now?: number;
 }): Promise<TokenSet> {
@@ -193,7 +232,7 @@ export async function exchangeCode(args: {
     redirect_uri: args.redirectUri,
     grant_type: "authorization_code",
   });
-  if (provider === "microsoft") body.set("scope", CONFIG.microsoft.scopes.join(" "));
+  if (provider === "microsoft") body.set("scope", microsoftScopes(args.mailbox).join(" "));
 
   const res = await fetchImpl(
     CONFIG[provider].tokenUrl,
@@ -312,9 +351,11 @@ export async function refreshAccessToken(args: {
   });
   if (provider === "microsoft") {
     const calendarGranted = hasCalendarScope(provider, args.grantedScopes);
+    // The send permission, like the calendar one, is asked for on refresh only when this connection granted it.
+    const sendGranted = hasSendScope(provider, args.grantedScopes);
     body.set(
       "scope",
-      CONFIG.microsoft.scopes.filter((s) => s !== CALENDAR_SCOPE || calendarGranted).join(" "),
+      [...CONFIG.microsoft.scopes.filter((s) => s !== CALENDAR_SCOPE || calendarGranted), ...(sendGranted ? [SEND_SCOPE] : [])].join(" "),
     );
   }
 
