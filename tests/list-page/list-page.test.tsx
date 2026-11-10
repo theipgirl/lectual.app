@@ -182,7 +182,7 @@ describe("list-page.css", () => {
 
   it("gives one row height, pill and spacing to both pages", () => {
     expect(css).toContain("--lp-row-h: 46px");
-    expect(css).toMatch(/\.lp-row \{ height: var\(--lp-row-h\)/);
+    expect(css).toMatch(/\.lp-row \{ min-height: var\(--lp-row-h\)/);
     expect(css).toContain(".lp-pill {");
     expect(css).toContain(".lp-board-card {");
   });

@@ -34,7 +34,7 @@ describe("stacked cards under 640px (V1)", () => {
 
   it("a stacked row's fixed height is reset so cards grow to fit (Matters .lp-row)", () => {
     expect(small).toMatch(/\.lx-stack:not\(\.pq-tbl\) tr \{ height: auto;/);
-    expect(listPage).toMatch(/\.lp-row \{ height: var\(--lp-row-h\)/);
+    expect(listPage).toMatch(/\.lp-row \{ min-height: var\(--lp-row-h\)/);
   });
 
   it("the leads grid stacks the same way", () => {

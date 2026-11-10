@@ -37,7 +37,7 @@ export function MatterBoard(props: {
         </Link>
         <span className="lx-note lx-num">{m.matter_number}</span>
         <span style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-          {age.days !== null && <span className={`lp-pill${age.stale ? " lp-pill-risk" : ""}`}>{age.days}d</span>}
+          {age.days !== null && <span className={`lp-pill lp-pill-num${age.stale ? " lp-pill-risk" : ""}`}>{age.days}d</span>}
           {props.reviewIds.has(m.id) &&
             (props.reviewItems?.get(m.id) ? (
               <Link href={reviewHref(props.reviewItems.get(m.id)!)} className="lp-pill lp-pill-warn" style={{ position: "relative", zIndex: 1 }}>

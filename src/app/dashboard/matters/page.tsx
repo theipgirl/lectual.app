@@ -191,8 +191,8 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
                           <Link href={`/dashboard/matters/${m.id}/`} className="lx-rowlink">
                             {matterLabel(m)}
                           </Link>
-                          <div className="lx-note lx-num">
-                            {m.matter_number}
+                          <div className="lx-note mt-sub">
+                            <span className="lx-num">{m.matter_number}</span>
                             {m.owner_name ? ` · ${m.owner_name}` : ""}
                             {note ? ` · ${note}` : ""}
                             {reviewIds.has(m.id) &&
@@ -206,9 +206,9 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
                           </div>
                         </td>
                         <td data-label="Type">{MATTER_TYPE_LABEL[m.type]}</td>
-                        <td data-label="Stage">{m.stage ? <span className="lp-pill">{stageDisplayName(m.stage.label)}</span> : <span className="lx-note">—</span>}</td>
+                        <td data-label="Stage">{m.stage ? <span className="lp-pill lp-pill-wrap">{stageDisplayName(m.stage.label)}</span> : <span className="lx-note">—</span>}</td>
                         <td className="lx-num" data-label="In stage">
-                          {age.days === null ? "—" : age.stale ? <span className="lp-pill lp-pill-risk">{age.days}d</span> : <span>{age.days}d</span>}
+                          {age.days === null ? "—" : age.stale ? <span className="lp-pill lp-pill-num lp-pill-risk">{age.days}d</span> : <span>{age.days}d</span>}
                         </td>
                         <td data-label="Owner">{m.assigned_to ? memberName.get(m.assigned_to) ?? "Teammate" : <span className="lx-note">Unassigned</span>}</td>
                       </tr>

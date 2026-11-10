@@ -30,10 +30,10 @@ export function LtnSuggestion({
         overflow: "hidden",
         textOverflow: "ellipsis",
         verticalAlign: "bottom",
-        fontSize: 11,
-        lineHeight: 1.3,
+        fontSize: "var(--lp-meta, 13px)",
+        lineHeight: 1.4,
         color: "var(--mute)",
-        whiteSpace: "nowrap",
+        whiteSpace: "normal",
       }}
       title="Unbooked by day 10. Moving the lead is your call; nothing changes by itself."
     >

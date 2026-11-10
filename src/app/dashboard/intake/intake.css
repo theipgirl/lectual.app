@@ -69,7 +69,7 @@
    top-bar eyebrow. 10.5px is deliberate — it is a label, not copy. */
 .intake-root .intake-eyebrow {
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 10.5px;
+  font-size: 12px;
   letter-spacing: 0.17em;
   text-transform: uppercase;
   color: var(--mute);
@@ -154,8 +154,8 @@
   border-radius: 5px;
   background: var(--oxbg);
   color: var(--ox);
-  font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 10px;
+  font-family: var(--font-geist), system-ui, sans-serif;
+  font-size: var(--lp-meta, 13px);
   line-height: 1.4;
   white-space: nowrap;
 }
@@ -172,8 +172,8 @@
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 11px;
+  white-space: normal;
+  font-size: var(--lp-meta, 13px);
   line-height: 1.4;
   color: var(--ink2);
 }
@@ -184,14 +184,14 @@
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
   padding: 2px 7px;
   border-radius: 5px;
   background: var(--warnbg);
   color: var(--warn);
-  font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 10px;
+  font-family: var(--font-geist), system-ui, sans-serif;
+  font-size: var(--lp-meta, 13px);
   line-height: 1.4;
+  white-space: normal;
 }
 
 .intake-root .intake-column-badge {
@@ -199,8 +199,8 @@
   border-radius: 5px;
   background: var(--warnbg);
   color: var(--warn);
-  font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 10px;
+  font-family: var(--font-geist), system-ui, sans-serif;
+  font-size: var(--lp-meta, 13px);
   line-height: 1.4;
   white-space: nowrap;
 }
@@ -233,7 +233,7 @@
   border: 1px solid var(--ox);
   border-radius: 10px;
   background: var(--cream);
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--ink);
 }
 

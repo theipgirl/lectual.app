@@ -233,12 +233,12 @@ export default function VoiceNoteRecorder({
       <div className="lx-label">Voice note</div>
 
       {phase === "unsupported" && (
-        <p role="alert" style={{ fontSize: 12, color: "var(--muted)", margin: 0 }}>
+        <p role="alert" style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>
           This browser can&rsquo;t record audio — try Chrome, Edge, Firefox, or Safari.
         </p>
       )}
       {phase === "denied" && (
-        <p role="alert" style={{ fontSize: 12, color: "var(--wine)", margin: 0 }}>
+        <p role="alert" style={{ fontSize: 13, color: "var(--wine)", margin: 0 }}>
           Microphone access was blocked. Allow it in your browser&rsquo;s site settings, then try
           again.
         </p>
@@ -248,7 +248,7 @@ export default function VoiceNoteRecorder({
         <div
           style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}
         >
-          <span style={{ fontSize: 11, color: "var(--muted)" }}>
+          <span style={{ fontSize: 13, color: "var(--muted)" }}>
             Record a quick update on this {noun} — saved to the timeline, never sent.
           </span>
           <button
@@ -299,7 +299,7 @@ export default function VoiceNoteRecorder({
               gap: 10,
             }}
           >
-            <span style={{ fontSize: 11, color: "var(--muted)" }}>
+            <span style={{ fontSize: 13, color: "var(--muted)" }}>
               {formatClock(seconds)} recorded. Listen back, then save or discard.
             </span>
             <div style={{ display: "flex", gap: 8 }}>
@@ -315,7 +315,7 @@ export default function VoiceNoteRecorder({
       )}
 
       {error && (
-        <p role="alert" style={{ fontSize: 12, color: "var(--wine)", margin: 0 }}>
+        <p role="alert" style={{ fontSize: 13, color: "var(--wine)", margin: 0 }}>
           {error}
         </p>
       )}

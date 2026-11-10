@@ -13,12 +13,12 @@ export default function NeedsRebeccaBadge({ pending }: { pending: LeadPendingApp
   if (pending.length === 0) return null;
   return (
     <span
-      className="intake-mono"
       title={needsRebeccaTitle(pending)}
       style={{
         flex: "0 0 auto",
-        fontSize: 10,
-        padding: "2px 6px",
+        fontSize: "var(--lp-meta, 13px)",
+        lineHeight: 1.4,
+        padding: "1px 7px",
         borderRadius: 4,
         background: "var(--critbg)",
         color: "var(--crit)",

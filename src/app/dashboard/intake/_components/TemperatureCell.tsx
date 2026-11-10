@@ -54,7 +54,7 @@ export default function TemperatureCell({
               ...(person
                 ? { border: "1px solid currentColor", textTransform: "uppercase", letterSpacing: "0.06em" }
                 : value
-                  ? { border: "1px dashed currentColor", background: "transparent", fontStyle: "italic" }
+                  ? { border: "1px dashed currentColor", background: "transparent", fontStyle: "italic", fontFamily: "var(--font-geist), system-ui, sans-serif", fontSize: "var(--lp-meta, 13px)" }
                   : { border: "1px dashed var(--line)", background: "transparent", padding: "3px 7px", borderRadius: 5 }),
               maxWidth: "100%",
               overflow: "hidden",

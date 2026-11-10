@@ -72,7 +72,7 @@ const MENU_ITEM: React.CSSProperties = {
   gap: 8,
   textAlign: "left",
   width: "100%",
-  fontSize: 12.5,
+  fontSize: 13,
   fontFamily: "inherit",
   padding: "6px 8px",
   borderRadius: 6,
@@ -211,7 +211,7 @@ export default function TimeChip({
             style={{
               ...CHIP_BASE,
               ...(runningHere ? CHIP_RUNNING : null),
-              fontSize: compact ? 10 : 11,
+              fontSize: 13,
               padding: compact ? "2px 5px" : "3px 6px",
               cursor: pending ? "progress" : "pointer",
               opacity: pending ? 0.6 : 1,
@@ -251,7 +251,7 @@ export default function TimeChip({
                 style={{
                   display: "block",
                   padding: "6px 8px",
-                  fontSize: 11.5,
+                  fontSize: 13,
                   lineHeight: 1.45,
                   color: "var(--mute)",
                 }}
@@ -305,7 +305,7 @@ export default function TimeChip({
                     key={line}
                     style={{
                       padding: "3px 8px",
-                      fontSize: 11.5,
+                      fontSize: 13,
                       lineHeight: 1.4,
                       color: "var(--ink2)",
                     }}
@@ -317,7 +317,7 @@ export default function TimeChip({
             )}
 
             <span
-              style={{ padding: "6px 8px 2px", fontSize: 10.5, lineHeight: 1.4, color: "var(--mute)" }}
+              style={{ padding: "6px 8px 2px", fontSize: 13, lineHeight: 1.4, color: "var(--mute)" }}
             >
               Internal effort only — never a client invoice.
             </span>
@@ -330,7 +330,7 @@ export default function TimeChip({
           role="status"
           style={{
             marginLeft: 6,
-            fontSize: 11,
+            fontSize: 13,
             color: "var(--crit)",
             maxWidth: 220,
             overflow: "hidden",

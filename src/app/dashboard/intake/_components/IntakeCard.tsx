@@ -115,9 +115,9 @@ export default function IntakeCard({
             background: "var(--surface)",
             color: "var(--mute)",
             borderRadius: 5,
-            fontSize: 10,
+            fontSize: "var(--lp-meta, 13px)",
             lineHeight: 1,
-            padding: "3px 5px",
+            padding: "4px 7px",
             cursor: "pointer",
           }}
         >
@@ -199,9 +199,9 @@ export default function IntakeCard({
           href={`/dashboard/leads/${lead.id}`}
           style={{
             ...ellipsis,
-            fontSize: 12.5,
+            fontSize: 14,
             fontWeight: 500,
-            lineHeight: 1.3,
+            lineHeight: 1.35,
             color: touch.waitingOnUs ? "var(--burg)" : "var(--ink)",
           }}
         >
@@ -210,7 +210,7 @@ export default function IntakeCard({
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-        <div className="intake-mono" style={{ ...ellipsis, fontSize: 10.5, color: "var(--mute)", flex: 1 }}>
+        <div style={{ ...ellipsis, fontSize: "var(--lp-meta, 13px)", lineHeight: 1.4, color: "var(--mute)", flex: 1 }}>
           {mark}
         </div>
         <SourceCell
@@ -261,7 +261,8 @@ export default function IntakeCard({
       <div
         style={{
           ...ellipsis,
-          fontSize: 11,
+          fontSize: "var(--lp-meta, 13px)",
+          lineHeight: 1.4,
           ...(temperature.source === "person" && temperature.value
             ? { color: TEMP_PILL[temperature.value].color, fontWeight: 500 }
             : { color: "var(--mute)", fontStyle: "italic" }),
@@ -272,7 +273,7 @@ export default function IntakeCard({
       </div>
 
       {variant === "owner" && (
-        <div style={{ ...(step.urgent ? NEXT_HOT : NEXT), fontSize: 12, textWrap: "pretty" }}>
+        <div style={{ ...(step.urgent ? NEXT_HOT : NEXT), textWrap: "pretty" }}>
           {step.text}
         </div>
       )}
@@ -280,7 +281,7 @@ export default function IntakeCard({
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         {variant === "owner" ? (
           <span
-            className={`lp-pill${row.stage ? "" : " lp-pill-warn"}`}
+            className={`lp-pill lp-pill-wrap${row.stage ? "" : " lp-pill-warn"}`}
           >
             {stageCodeFor(row.stage)} · {stageLabelFor(row.stage)}
           </span>
@@ -314,7 +315,7 @@ export default function IntakeCard({
           role="status"
           style={{
             margin: 0,
-            fontSize: 11,
+            fontSize: "var(--lp-meta, 13px)",
             lineHeight: 1.4,
             color: "var(--crit)",
             background: "var(--critbg)",
