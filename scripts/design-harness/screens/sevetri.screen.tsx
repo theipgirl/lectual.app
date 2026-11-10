@@ -115,7 +115,7 @@ const staffRender = async () => {
   const { default: Page } = await import("@/app/dashboard/proposals/[id]/page");
   return <OwnerShell>{await Page({ params: Promise.resolve({ id: ID }) })}</OwnerShell>;
 };
-const clientRender = (mode: "live" | "accepted") => async () => {
+const clientRender = (mode: "live" | "accepted") => async function clientScreen() {
   const { ProposalDocument } = await import("@/components/client-proposal/ProposalDocument");
   const a = accepted();
   return createElement(ProposalDocument, {
