@@ -7,12 +7,15 @@ import "@/components/list-page/list-page.css";
 import { ReviewSection } from "@/components/review/ReviewSection";
 import { KpiStrip, ProposalsOutStrip, ReviewBoard, ViewSwitch, WaitingOnStrip } from "@/components/review/ReviewViews";
 import { SheetView } from "@/components/review/SheetView";
+import { SheetSaveStatus } from "@/components/review/SheetSaveStatus";
+import { loadSheetStages } from "@/lib/review/sheet-edit-load";
+import { READ_ONLY_PERMS, type SheetPerms } from "@/lib/review/sheet-edit";
 import { CardsDeck, PersonChips } from "@/components/review/CardsDeck";
 import { ReviewPanel } from "@/components/review/ReviewPanel";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { NO_PREVIEW, previewFor, viewFor } from "@/lib/views";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
-import { CAN_MOVE_STAGE } from "@/lib/pipeline/leads";
+import { CAN_MOVE_STAGE, CAN_WRITE_LEAD } from "@/lib/pipeline/leads";
 import { loadReview } from "@/lib/review/load";
 import { reviewBuckets, reviewSubline } from "@/lib/review/buckets";
 import { boardLanes, kpis, meetingPosition, offBoard } from "@/lib/review/lanes";
@@ -75,6 +78,14 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
     actingAsStaff: session.actingAsStaff,
   }) === "owner";
   const common = { owner, today: load.today, members: load.members, canWrite, params };
+  // The owner's Sheet edits in place. Each permission comes from the role re-resolved above; the stage lists are read only for a role that can move one.
+  let sheetPerms: SheetPerms | null = null;
+  if (owner && params.view === "sheet") {
+    const writeLead = !!role && CAN_WRITE_LEAD.includes(role);
+    const moveLead = writeLead && !!role && CAN_MOVE_STAGE.includes(role);
+    const stages = canWrite || moveLead ? await loadSheetStages() : { matter: null, lead: null };
+    sheetPerms = canWrite || writeLead ? { writeMatter: canWrite, writeLead, moveLead, matterStages: canWrite ? stages.matter : null, leadStages: moveLead ? stages.lead : null } : READ_ONLY_PERMS;
+  }
   const proposalsKnown = !load.failed.includes("proposals");
   const approvalsKnown = !load.failed.includes("approvals");
   // An approver sees the strip about THEM ("Waiting on you"); anyone else sees it about the review person, as before.
@@ -120,7 +131,14 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           <h1 className="lx-h1 rv-h1" data-tour="review-head">{REVIEW_NAME}</h1>
           <p className="lx-sub rv-sub">{buckets.total === 0 ? reviewSubline(buckets) : reviewIntro(buckets.total)}</p>
         </div>
-        <ViewSwitch params={params} />
+        {sheetPerms && sheetPerms !== READ_ONLY_PERMS ? (
+          <div className="rse-head-right">
+            <SheetSaveStatus />
+            <ViewSwitch params={params} />
+          </div>
+        ) : (
+          <ViewSwitch params={params} />
+        )}
       </header>
 
       <div className="rv-filters">
@@ -149,7 +167,8 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
         </div>
       </div>
 
-      <KpiStrip owner kpis={kpis(buckets)} />
+      {/* The editable Sheet (board 19b) is the table alone: no KPI tiles or strips above it. */}
+      {!sheetPerms && <KpiStrip owner kpis={kpis(buckets)} />}
         </>
       ) : (
         <>
@@ -218,8 +237,8 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
         </>
       ) : params.view === "sheet" ? (
         <>
-          {strips}
-          <SheetView rows={shown} {...common} />
+          {!sheetPerms && strips}
+          <SheetView rows={shown} {...common} {...(sheetPerms ? { sheetEdit: { perms: sheetPerms } } : {})} />
         </>
       ) : (
         <>

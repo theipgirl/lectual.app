@@ -1,7 +1,7 @@
 "use client";
 
 import { useId } from "react";
-import { DECK_HAND_EYEBROW, DECK_HAND_NOTE_LABEL, DECK_HAND_TO, DECK_HAND_WHY } from "@/lib/ui/words";
+import { DECK_CANCEL, DECK_HAND_EYEBROW, DECK_HAND_NOTE_LABEL, DECK_HAND_TO, DECK_HAND_WHY } from "@/lib/ui/words";
 
 export type HandOffPerson = { userId: string; name: string };
 
@@ -14,11 +14,14 @@ export function HandOffPicker({
   disabledReason,
   pending,
   onHandOff,
+  onCancel,
 }: {
   people: HandOffPerson[];
   disabledReason: string | null;
   pending?: boolean;
   onHandOff: (userId: string, note: string) => void;
+  /** Closes the form. Drawn on phones only, where the moves row steps aside while the form is open. */
+  onCancel?: () => void;
 }) {
   const reasonId = useId();
   const disabled = !!disabledReason || pending;
@@ -53,6 +56,11 @@ export function HandOffPicker({
       </label>
       <textarea id={`${reasonId}-note`} name="note" rows={2} maxLength={500} disabled={disabled} />
       <p className="dk-hint dk-hint--left">{DECK_HAND_WHY}</p>
+      {onCancel && (
+        <button type="button" className="dk-ghost dk-handto-cancel" onClick={onCancel}>
+          {DECK_CANCEL}
+        </button>
+      )}
       {disabledReason && (
         <p id={reasonId} className="dk-moves-note">
           {disabledReason}

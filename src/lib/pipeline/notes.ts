@@ -10,6 +10,9 @@ import { notify } from "@/lib/notifications";
 
 type ScopedClient = Awaited<ReturnType<typeof getScopedClient>>;
 
+/** The fixed sentence for a lead the caller cannot see (another firm's and a missing one read the same). */
+export const LEAD_NOT_FOUND = "That lead couldn't be found. It may have been removed.";
+
 /**
  * Same per-call role resolution as the other lead writes: `current_org_role()`
  * every time, never cached. crm_activity_insert_staff RLS is the real boundary;
@@ -58,6 +61,20 @@ export async function addLeadNote(leadId: string, input: AddLeadNoteInput): Prom
 
   const supabase = await getScopedClient();
   await requireNoteWriteRole(supabase);
+
+  // The lead must be visible to the caller's scoped client before anything is
+  // written: crm_activity's insert policy checks only the row's own org_id and
+  // role, and lead_id is a plain FK, so this read (RLS) is what keeps a note
+  // from pointing at another firm's lead. Another firm's id and a missing one
+  // read the same. Done here, not in each action, so every caller gets it, as
+  // addMatterNote does for matters.
+  const { data: visible, error: visibleError } = await supabase
+    .from("crm_lead")
+    .select("id")
+    .eq("id", leadId)
+    .maybeSingle();
+  if (visibleError) throw visibleError;
+  if (!visible) throw new LeadWriteError(LEAD_NOT_FOUND);
 
   const { kind, body, subject } = validated.value;
 

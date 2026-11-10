@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { DECK_DECIDED_UNREAD, DECK_FOR, DECK_LIST_FOOT, DECK_NOTHING_HERE } from "@/lib/ui/words";
+import { DECK_DECIDED_UNREAD, DECK_FOR, DECK_NOTHING_HERE } from "@/lib/ui/words";
 import type { BoardCard, ListRow } from "./deck-rows";
 
 /** Everything waiting, as a table (a stack of cards on a phone). */
@@ -68,7 +68,6 @@ export function DeckList({ rows, decidedReadable }: { rows: ListRow[]; decidedRe
           </ul>
         </>
       )}
-      <p className="dk-foot-note">{DECK_LIST_FOOT}</p>
     </>
   );
 }

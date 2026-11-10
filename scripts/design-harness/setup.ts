@@ -78,12 +78,36 @@ vi.mock("@/lib/queue/audit-context", () => ({
 }));
 vi.mock("@/lib/queue/stale", async (orig) => ({
   ...(await orig<typeof import("@/lib/queue/stale")>()),
-  checkDraftStaleness: async () => ({ status: "clear", leadIds: [], leadName: null, linkedBy: "draft" }),
+  checkDraftStaleness: async () => (state as { itemStale?: unknown }).itemStale ?? { status: "clear", leadIds: [], leadName: null, linkedBy: "draft" },
 }));
 vi.mock("@/lib/consult-proposal/link", async (orig) => ({
   ...(await orig<typeof import("@/lib/consult-proposal/link")>()),
   gateLinkedProposal: async () => ({ ok: true, proposal: null }),
+  loadLinkedPanel: async () => ({ status: "none" }),
 }));
+
+// Approval item page (/dashboard/queue/[id]/)
+vi.mock("@/lib/queue/api", async (orig) => ({
+  ...(await orig<typeof import("@/lib/queue/api")>()),
+  getQueueItem: async (_k: string, id: string) => [...state.pending, ...state.approved, ...state.rejected].find((i) => i.id === id)!,
+}));
+vi.mock("@/lib/queue/org", async (orig) => ({ ...(await orig<typeof import("@/lib/queue/org")>()), activeQueueOrgKey: async () => "rpb" }));
+vi.mock("@/lib/db/scoped-client", () => ({ getScopedClient: async () => ({}) }));
+vi.mock("@/lib/queue/roles", async (orig) => ({ ...(await orig<typeof import("@/lib/queue/roles")>()), resolveQueueRole: async () => "owner" }));
+vi.mock("@/lib/queue/view-context", () => ({
+  loadQueueViewContext: async () => ({ viewer: { userId: "00000000-0000-4000-8000-0000000000a1", role: "owner" }, routing: {}, members: [], routingFailed: false, dropped: 0, now: Date.parse("2026-11-10T14:30:00Z") }),
+}));
+
+// Lets a screen open the item page's draft editor (the page itself always starts in the rendered view).
+vi.mock("@/components/queue/ReviewPanel", async (orig) => {
+  const m = await orig<typeof import("@/components/queue/ReviewPanel")>();
+  const { createElement } = await import("react");
+  return {
+    ...m,
+    ReviewPanel: (p: Parameters<typeof m.ReviewPanel>[0]) =>
+      createElement(m.ReviewPanel, { ...p, startEditing: Boolean(p.startEditing) || Boolean((state as { itemEditing?: boolean }).itemEditing) }),
+  };
+});
 
 // Weekly review
 vi.mock("@/lib/review/load", async (orig) => ({
@@ -94,3 +118,18 @@ vi.mock("@/lib/review/detail-load", () => ({
   loadReviewDetail: async () => null,
   loadLatestNote: async () => null,
 }));
+
+// Weekly review, the owner's editable Sheet (screens/review-sheet-edit.screen.tsx): the stage lists and the drawing-only
+// starting state (editors open) come from `state.sheetStages` / `state.sheetEditInitial`.
+vi.mock("@/lib/review/sheet-edit-load", () => ({
+  loadSheetStages: async () => (state as { sheetStages?: unknown }).sheetStages ?? { matter: null, lead: null },
+}));
+vi.mock("@/components/review/SheetEditTable", async (orig) => {
+  const m = await orig<typeof import("@/components/review/SheetEditTable")>();
+  const { createElement } = await import("react");
+  return {
+    ...m,
+    SheetEditTable: (p: Parameters<typeof m.SheetEditTable>[0]) =>
+      createElement(m.SheetEditTable, { ...p, initial: p.initial ?? (state as { sheetEditInitial?: Parameters<typeof m.SheetEditTable>[0]["initial"] }).sheetEditInitial }),
+  };
+});

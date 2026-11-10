@@ -24,7 +24,6 @@ import {
   OWNER_CONSULTS_FAILED,
   OWNER_CONSULTS_HEADING,
   OWNER_PROPOSAL_LINK_LIVE,
-  OWNER_PROPOSALS_SORT_NOTE,
   OWNER_WEEK_KEY_CONSULT,
   OWNER_WEEK_KEY_DEADLINE,
   OWNER_WEEK_OPEN_CALENDAR,
@@ -152,10 +151,10 @@ export async function OwnerToday({
             {OWNER_WEEK_HEADING}
           </h2>
           <span className="ot-sub">
-            <span className="ot-key ot-key-consult" /> {OWNER_WEEK_KEY_CONSULT} <span className="ot-key ot-key-deadline" /> {OWNER_WEEK_KEY_DEADLINE}
+            <span className="ot-only-narrow">
+              <span className="ot-key ot-key-consult" /> {OWNER_WEEK_KEY_CONSULT} <span className="ot-key ot-key-deadline" /> {OWNER_WEEK_KEY_DEADLINE}
+            </span>
             <span className="ot-only-wide">
-              {" "}
-              &middot;{" "}
               <Link href="/dashboard/calendar/" className="ot-link">
                 {OWNER_WEEK_OPEN_CALENDAR}
               </Link>
@@ -195,7 +194,7 @@ export async function OwnerToday({
                 </h2>
                 {Array.isArray(proposals) && proposals.length > 0 && (
                   <span className="ot-sub">
-                    {proposals.length} <span className="ot-only-wide">&middot; {OWNER_PROPOSALS_SORT_NOTE}</span>
+                    {proposals.length}
                   </span>
                 )}
               </div>

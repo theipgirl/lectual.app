@@ -4,6 +4,8 @@ import { dueText, lastContactText, shortDate } from "@/lib/review/format";
 import { laneOf } from "@/lib/review/lanes";
 import { SHEET_COLUMNS, sheetSections, waitingCell } from "@/lib/review/sheet";
 import { openHref, type Common } from "./shared";
+import { SheetEdit } from "./SheetEdit";
+import type { SheetPerms } from "@/lib/review/sheet-edit";
 import "@/components/list-page/list-page.css";
 import "./review.css";
 
@@ -32,7 +34,7 @@ function SheetTable({ id, title, rows, today, members, params }: Common & { id: 
                 const lane = laneOf(r);
                 return (
                   <tr key={r.key}>
-                    <td className="pri">
+                    <td className="pri" title={r.client}>
                       <Link href={openHref(params, r)} className="lx-rowlink" scroll={false}>
                         {r.client}
                       </Link>
@@ -65,13 +67,13 @@ function SheetTable({ id, title, rows, today, members, params }: Common & { id: 
 }
 
 /** The Excel tracker as one table: Trademarks, then Contracts, in pipeline order. Edits happen in the panel the Client link opens. */
-export function SheetView({ rows, owner, ...common }: Common & { rows: ReviewRow[] }) {
+export function SheetView({ rows, owner, sheetEdit, ...common }: Common & { rows: ReviewRow[]; /** The owner view's editable sheet (owner view only). */ sheetEdit?: { perms: SheetPerms } }) {
+  if (owner && sheetEdit) return <SheetEdit rows={rows} perms={sheetEdit.perms} owner {...common} />;
   const { trademarks, contracts } = sheetSections(rows);
   return (
     <div className="rv-sheets">
       <SheetTable id="trademarks" title="Trademarks" rows={trademarks} {...common} />
       <SheetTable id="contracts" title="Contracts" rows={contracts} {...common} />
-      {owner && <p className="rv-sheet-note">Next step and Whose court come from next steps and mail, not from the spreadsheet. Edits happen in the record panel.</p>}
     </div>
   );
 }

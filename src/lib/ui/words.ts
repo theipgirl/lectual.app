@@ -163,8 +163,6 @@ export const GENERAL_LOE_SENTENCE = "Draft the General LOE for this matter.";
 /** The account menu's view group (Lectual staff acting inside a firm with the switch on; firm members never see it). */
 export const VIEW_GROUP_NAME = "View";
 export const OWNER_VIEW_NAME = "Owner view";
-/** The line under the owner view's phone More sheet (its rail and bar carry no Settings row). */
-export const SETTINGS_IN_MENU_NOTE = "Settings is in the account menu.";
 export const TECHNICIAN_VIEW_NAME = "Technician view";
 export const TECHNICIAN_VIEW_SUB = "everything, as today";
 /** The pill on the view row that is drawn right now. */
@@ -422,3 +420,42 @@ export const deckWaitingTo = (name: string, age: string) => `Waiting to ${name} 
 export const deckWaitingBack = (label: string) => `Waiting back at ${label}`;
 export const deckDecidedAt = (what: "approved" | "rejected", time: string, noteKept: boolean) => `${what} ${time}${noteKept ? " · note kept" : ""}`;
 export const DECK_FOR = "for";
+
+/* ── Owner view: the weekly review's editable Sheet ── */
+export const SHEET_YOU_TYPE = "You type these";
+export const SHEET_YOU_TYPE_BODY = "Status (moves the stage), Next step (text and due date), Whose court (a person), Source. Each change saves on its own and is logged on the record.";
+export const SHEET_WORKED_OUT = "Lectual works these out";
+export const SHEET_WORKED_OUT_BODY = "Waiting on and Last contact come from next steps, mail and calls. They can't be edited here; log what happened with + Note instead.";
+export const SHEET_LEGEND_LABEL = "Which columns you can edit";
+export const SHEET_KEYS_EDIT = "or click to edit";
+export const SHEET_KEYS_NEXT = "next cell";
+export const SHEET_KEYS_CANCEL = "cancel · Drag a column edge to resize";
+export const SHEET_MOVE_TO_STAGE = "Move to stage";
+export const sheetMoveLogged = (firstName: string) => `The move is logged on ${firstName}'s timeline.`;
+export const SHEET_FIND_PERSON = "Find a person";
+export const SHEET_NO_ONE_FOUND = "No one matches.";
+export const SHEET_NEXT_STEP = "Next step";
+export const SHEET_DUE = "Due";
+export const SHEET_ENTER_ESC = "Enter to save · Esc to cancel";
+export const SHEET_NOTE_BUTTON = "+ Note";
+export const sheetNoteFor = (client: string) => `Add a note for ${client}`;
+export const SHEET_WHAT_HAPPENED = "What happened?";
+export const sheetNoteHint = (firstName: string) => `Goes on ${firstName}'s timeline as a note and counts as last contact.`;
+export const SHEET_ADD_NOTE = "Add note";
+export const SHEET_CANCEL = "Cancel";
+export const SHEET_NO_SOURCE = "No source";
+export const SHEET_SOURCE_LABEL = "Source";
+export const SHEET_OVERDUE = "(overdue)";
+export const sheetSaved = (client: string, field: string) => `Saved · ${client}, ${field}`;
+export const sheetSaving = (client: string, field: string) => `Saving · ${client}, ${field}`;
+/** After a refused save: the action's own fixed sentence, then this. */
+export const SHEET_PUT_BACK = "The earlier value is back.";
+export const SHEET_NOTE_NOT_SAVED = "The note wasn't saved.";
+export const SHEET_TRY_AFTER_REFRESH = "Couldn't save this yet. Refresh the page and try again.";
+export const SHEET_ENTER_TITLE = "Enter what happens next.";
+export const SHEET_WRITE_NOTE = "Write what happened.";
+export const SHEET_STAGES_UNREADABLE = "The stage list couldn't load, so Status can't be changed here right now. Refresh to try again.";
+export const sheetResizeColumn = (name: string) => `Resize ${name} column`;
+export const SHEET_RESIZE_ROW = "Resize row";
+export const SHEET_EMPTY_SECTION = "Nothing here for this view.";
+export const SHEET_SAVE_FAILED = "Couldn't save this change.";

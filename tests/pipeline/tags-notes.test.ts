@@ -151,6 +151,27 @@ describe("removeTag audit", () => {
 });
 
 describe("addLeadNote", () => {
+  // The lead must be visible through the scoped client before anything is written.
+  beforeEach(() => {
+    state.resultsByTable.crm_lead = { data: { id: "lead-1" }, error: null };
+  });
+
+  it("refuses another firm's (or a missing) lead with a fixed sentence and writes nothing", async () => {
+    state.resultsByTable.crm_lead = { data: null, error: null };
+    const { LeadWriteError } = await import("@/lib/pipeline/errors");
+    const err = await addLeadNote("lead-other-firm", { kind: "note", body: "hi" }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(LeadWriteError);
+    expect((err as Error).message).toBe("That lead couldn't be found. It may have been removed.");
+    expect(state.tables).toContain("crm_lead");
+    expect(state.logActivity).not.toHaveBeenCalled();
+  });
+
+  it("refuses when the visibility read fails, and writes nothing", async () => {
+    state.resultsByTable.crm_lead = { data: null, error: { code: "XX000", message: "boom" } };
+    await expect(addLeadNote("lead-1", { body: "hi" })).rejects.toMatchObject({ code: "XX000" });
+    expect(state.logActivity).not.toHaveBeenCalled();
+  });
+
   it("writes a strict (non-swallowed) activity row for a plain note", async () => {
     await addLeadNote("lead-1", { kind: "note", body: "  Called the founder.  " });
 

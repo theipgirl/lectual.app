@@ -79,6 +79,16 @@ describe("review actions", () => {
     await logWhatHappenedAction({}, fd({ kind: "lead", id: ID, body: "Spoke" }));
     expect(addLeadNote).toHaveBeenCalledWith(ID, { kind: "note", body: "Spoke" });
   });
+  it("refuses a note on another firm's (or a missing) lead or matter and writes nothing", async () => {
+    visible = false;
+    const { logWhatHappenedAction } = await import("../../src/app/dashboard/review/actions");
+    for (const kind of ["lead", "matter"]) {
+      const res = await logWhatHappenedAction({}, fd({ kind, id: ID, body: "Spoke" }));
+      expect(res).toEqual({ error: "That record couldn't be found. It may have been removed." });
+    }
+    expect(addLeadNote).not.toHaveBeenCalled();
+    expect(addMatterNote).not.toHaveBeenCalled();
+  });
 });
 
 describe("closeLeadAction (Lost / Nurture)", () => {

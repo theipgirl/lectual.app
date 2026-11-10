@@ -27,15 +27,15 @@
 .lx-rail--owner .lx-rail-node { gap: 10px; }
 .lx-rail--owner .lx-rail-spacer { height: 1px; margin: 4px 2px; background: rgba(253, 247, 235, 0.12); }
 .lx-rail--owner .lx-rail-headrow { padding: 0 6px; }
-.lx-rail--owner .lx-rail-kicker { color: rgba(253, 247, 235, 0.62); letter-spacing: 1.8px; }
+.lx-rail--owner .lx-rail-kicker { color: rgba(253, 247, 235, 0.72); font-size: 12px; letter-spacing: 1.4px; }
 /* Collapsed (not hovered, focused or pinned): icons only, but the pin stays, as on the board. */
 .lx-rail--owner:not(:hover):not(.is-pinned):not(:has(:focus-visible)) .lx-rail-kicker { display: none; }
 .lx-rail--owner .lx-rail-pin { opacity: 1; pointer-events: auto; border-color: rgba(253, 247, 235, 0.4); color: var(--cream); background: rgba(253, 247, 235, 0.14); }
-.lx-rail--owner .lx-rail-item { color: rgba(253, 247, 235, 0.8); }
+.lx-rail--owner .lx-rail-item { font-size: 15px; color: rgba(253, 247, 235, 0.85); }
 .lx-rail--owner .lx-rail-item:hover { color: var(--cream); }
 .lx-rail--owner .lx-rail-item.is-active,
 .lx-rail--owner .lx-rail-item.is-active:hover { color: var(--ink); }
-.lx-rail--owner .lx-rail-count { color: rgba(253, 247, 235, 0.66); }
+.lx-rail--owner .lx-rail-count { font-size: 11.5px; color: rgba(253, 247, 235, 0.72); }
 .lx-rail--owner .lx-rail-item.is-active .lx-rail-count { color: var(--wine); }
 /* The More row: its dots are heavier than the other icons, and it is tinted while the rail is collapsed. */
 .lx-rail--owner .lx-rail-item:has(+ .lx-rail-kids) svg { stroke-width: 2.5; }
@@ -44,8 +44,8 @@
 .lx-rail--owner:hover .lx-rail-chev,
 .lx-rail--owner:has(:focus-visible) .lx-rail-chev,
 .lx-rail--owner.is-pinned .lx-rail-chev { opacity: 1; }
-.lx-rail--owner .lx-rail-kids { margin-left: 21px; padding-left: 22px; gap: 1px; }
-.lx-rail--owner .lx-rail-kid { height: 29px; font-size: 12.5px; color: rgba(253, 247, 235, 0.72); }
+.lx-rail--owner .lx-rail-kids { margin-left: 21px; padding-left: 22px; gap: 2px; }
+.lx-rail--owner .lx-rail-kid { height: 34px; font-size: 14px; color: rgba(253, 247, 235, 0.8); }
 .lx-rail--owner .lx-rail-kid:hover { color: var(--cream); }
 .lx-rail--owner .lx-rail-kid.is-active,
 .lx-rail--owner .lx-rail-kid.is-active:hover { color: var(--ink); }
@@ -56,7 +56,7 @@
   left: 88px;
   top: 258px;
   z-index: 41;
-  width: 190px;
+  width: 214px;
   box-sizing: border-box;
   padding: 8px;
   display: flex;
@@ -72,19 +72,19 @@
 .lx-rail.is-pinned ~ .lx-rail-flyout { display: none; }
 .lx-rail-flyout-label {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 1.6px;
   text-transform: uppercase;
-  color: rgba(253, 247, 235, 0.62);
+  color: rgba(253, 247, 235, 0.72);
   padding: 6px 10px 4px;
 }
 .lx-rail-flyout-item {
   display: flex;
   align-items: center;
-  height: 36px;
+  height: 40px;
   padding: 0 10px;
   border-radius: 9px;
-  font-size: 13px;
+  font-size: 14px;
   color: rgba(253, 247, 235, 0.72);
   text-decoration: none;
 }
@@ -102,7 +102,7 @@
 }
 .lx-top--owner .lx-wordmark { font-size: 28px; }
 .lx-top--owner .lx-bell > summary { width: 38px; height: 38px; color: var(--ink); }
-.lx-top--owner .lx-bell-badge { top: -4px; right: -4px; padding: 0 5px; font-size: 10.5px; background: var(--owner-rail); }
+.lx-top--owner .lx-bell-badge { top: -4px; right: -4px; padding: 0 5px; min-width: 19px; height: 19px; font-size: 11.5px; background: var(--owner-rail); }
 .lx-top--owner .lx-bell-badge-warn { background: var(--warn); }
 .lx-top--owner .lx-avatar { width: 38px; height: 38px; }
 @media (max-width: 900px) {
@@ -132,7 +132,7 @@
     margin: 0;
     padding: 0 8px;
     font-family: var(--mono);
-    font-size: 11.5px;
+    font-size: 13px;
     color: var(--muted);
   }
 }
@@ -145,3 +145,20 @@
   align-items: center;
   gap: 8px;
 }
+
+
+/* Legibility pass (founder, Nov 10): owner shell type. Rail rows 15px, children 14px, uppercase labels 12px, count badges 11.5px,
+   phone bar labels 12px, More sheet rows 16px. Every rule is scoped to the owner shell. */
+.lx-rail--owner .lx-rail-kidcount { font-size: 11.5px; color: rgba(253, 247, 235, 0.8); opacity: 1; }
+.lx-rail--owner .lx-rail-kid.is-active .lx-rail-kidcount { color: var(--wine); }
+.lx-rail--owner .lx-rail-label { line-height: 1.25; }
+.lx-top--owner .lx-bell .lx-label { font-size: 12px !important; letter-spacing: 1.4px; }
+@media (max-width: 900px) {
+  .lx-more-note { line-height: 1.45; }
+  .lx-mbar--owner .lx-mbar-label { font-size: 12px; }
+  .lx-mbar--owner .lx-mbar-badge { font-size: 11.5px; min-width: 18px; height: 18px; }
+  .lx-app:has(.lx-top--owner) .lx-more-label { font-size: 12px; letter-spacing: 0.12em; }
+  .lx-app:has(.lx-top--owner) .lx-more-link { font-size: 16px; }
+}
+
+/* The phone More sheet's note is gone (founder, Nov 10); the MORE label stays 12px or more. */

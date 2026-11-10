@@ -73,6 +73,27 @@ describe("addLeadNote", () => {
     expect(db.rows("crm_lead")[0].last_activity_at).toBeTruthy();
   });
 
+  it("refuses a lead the caller's scoped client can't see, with the fixed sentence, and inserts nothing", async () => {
+    // Another firm's lead is simply absent from the scoped view (RLS), the same as a missing id.
+    await expect(addLeadNote("lead-other-firm", { kind: "note", body: "@Dawn hi" })).rejects.toThrow(
+      "That lead couldn't be found. It may have been removed.",
+    );
+    expect(db.activity()).toEqual([]);
+    expect(h.notify).not.toHaveBeenCalled();
+  });
+
+  it("the lead page's note form gets the same refusal (addNoteAction is a caller)", async () => {
+    vi.doMock("next/cache", () => ({ revalidatePath: vi.fn() }));
+    const { addNoteAction } = await import("@/app/dashboard/leads/[id]/actions");
+    const f = new FormData();
+    f.set("leadId", "lead-other-firm");
+    f.set("kind", "note");
+    f.set("body", "hi");
+    const res = await addNoteAction({}, f);
+    expect(res.error).toBe("That lead couldn't be found. It may have been removed.");
+    expect(db.activity()).toEqual([]);
+  });
+
   it("refuses a viewer", async () => {
     db.role = "viewer";
     await expect(addLeadNote("lead-1", { kind: "meeting", body: "Met" })).rejects.toThrow(/Forbidden|permission/i);
