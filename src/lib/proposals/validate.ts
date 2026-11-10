@@ -753,7 +753,20 @@ export function validateSettingInput(input: SettingInput): ValidationIssue[] {
       }
       if (Array.isArray(p.packages)) {
         p.packages.forEach((pkg, i) => {
-          if (isObj(pkg)) textIssues(`pricing.packages[${i}].package`, str(pkg.package), out);
+          if (!isObj(pkg)) return;
+          textIssues(`pricing.packages[${i}].package`, str(pkg.package), out);
+          // 2026-11-10: a package's own "what this package includes" rows get the same checks as the standard table.
+          if (pkg.includes == null) return;
+          if (!Array.isArray(pkg.includes)) return err(`pricing.packages[${i}].includes`, "The includes list must be a list.");
+          pkg.includes.forEach((row, j) => {
+            const rp = `pricing.packages[${i}].includes[${j}]`;
+            if (!isObj(row)) return err(rp, "This row is not readable.");
+            if (!str(row.label).trim()) err(`${rp}.label`, "Give this row a label.");
+            for (const key of ["label", "value", "included", "note"] as const) {
+              textIssues(`${rp}.${key}`, str(row[key]), out, { officeAction: false });
+            }
+            officeActionIssue(`${rp}.label`, includesRowText(row), out);
+          });
         });
       }
     }

@@ -2,7 +2,7 @@ import { currentRole } from "@/lib/auth/current-role";
 import { listMemberDirectory, type MemberIdentity } from "@/lib/members/directory";
 import { getProposalSettings } from "@/lib/proposals/store";
 import { PROPOSAL_ADMIN_ROLES, standardProposalPricing } from "@/lib/proposals/types";
-import { normalisePackages } from "@/lib/proposals/package-list";
+import { packageOffersFromSetting } from "@/lib/proposals/package-snapshot";
 import { moneyInput } from "@/lib/proposal-editor/form";
 import { firstNameOf } from "@/lib/proposal-editor/labels";
 import { SettingsForm } from "@/components/proposal-editor/SettingsForm";
@@ -81,7 +81,8 @@ export default async function ProposalSettingsPage() {
   // The forms show what a NEW proposal would start from: stored values where
   // they are well-formed, the RPB defaults otherwise.
   const standard = standardProposalPricing(settings?.pricing ?? {});
-  const packages = normalisePackages(settings?.pricing ?? {});
+  // `packageOffersFromSetting` is `normalisePackages` plus each package's own includes rows.
+  const packages = packageOffersFromSetting(settings?.pricing ?? {});
 
   return (
     <>
@@ -99,6 +100,7 @@ export default async function ProposalSettingsPage() {
           perClass: moneyInput(p.per_class_cents),
           secondMarkPct: String(p.second_mark_discount_pct),
           govPerClass: moneyInput(p.gov_per_class_cents),
+          includes: p.includes ?? [],
         }))}
         members={members.map((m) => ({
           userId: m.userId,

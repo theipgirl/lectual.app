@@ -19,7 +19,7 @@
 
 import { centsToInput } from "@/lib/quotes/money";
 import { formatDollars } from "@/lib/proposal-editor/events";
-import type { ProposalPricing } from "./types";
+import type { ProposalInclude, ProposalPricing } from "./types";
 
 /** RPB's Concierge package, from the Sevetri example, in cents. */
 export const DEFAULT_PROPOSAL_PRICING: ProposalPricing = {
@@ -159,33 +159,39 @@ export function validatePackages(list: unknown): PackageIssue[] {
 }
 
 /**
+ * One package as Settings saves it: the six price fields, plus (2026-11-10) the package's own "what this package
+ * includes" rows when the form carried them. `includes` absent = keep what the package already had; `[]` = none.
+ */
+export type PackageListEntry = ProposalPricing & { includes?: ProposalInclude[] };
+
+/** The `includes` rows stored on the package named `name` in `pricing.packages`, if any (name compared trimmed, ignoring case). */
+function storedIncludes(pricing: Record<string, unknown>, name: string): unknown[] | undefined {
+  if (!Array.isArray(pricing.packages)) return undefined;
+  const key = name.trim().toLowerCase();
+  const hit = pricing.packages.find((p) => isObject(p) && typeof p.package === "string" && p.package.trim().toLowerCase() === key);
+  return isObject(hit) && Array.isArray(hit.includes) && hit.includes.length > 0 ? hit.includes : undefined;
+}
+
+/**
  * `pricing` with the list stored under `packages` and the six flat fields
  * written from the FIRST package, so an older reader (and `standardProposalPricing`
  * on a stale deploy) sees the default package. Every other key (includes,
  * the office-action note, anything unknown) is kept. Does not validate.
+ *
+ * A package's own `includes` rows (2026-11-10) live only on its `packages` entry, never in the flat fields (the
+ * top-level `includes` is the firm's standard table). An entry that carries `includes` sets them (`[]` removes
+ * them); one that doesn't keeps the rows the same-named package already had, so the prices-only save never wipes them.
  */
-export function withPackages(pricing: Record<string, unknown>, list: readonly ProposalPricing[]): Record<string, unknown> {
-  // A package's own `includes` rows are not edited by the price form, so they are carried across from the
-  // stored entry of the same name (case-insensitive, trimmed). Nothing is invented.
-  const stored = Array.isArray(pricing.packages) ? pricing.packages : [];
-  const includesFor = (name: string): unknown[] | undefined => {
-    const key = name.trim().toLowerCase();
-    const hit = stored.find((r) => isObject(r) && typeof r.package === "string" && r.package.trim().toLowerCase() === key);
-    return isObject(hit) && Array.isArray(hit.includes) ? hit.includes : undefined;
-  };
-  const flat = list.map((p) => {
-    const copy: Record<string, unknown> & ProposalPricing = { ...p };
-    delete copy.includes;
-    return copy;
+export function withPackages(pricing: Record<string, unknown>, list: readonly PackageListEntry[]): Record<string, unknown> {
+  const copy = list.map(({ includes, ...p }) => {
+    const rows = includes !== undefined ? includes : storedIncludes(pricing, p.package);
+    return rows && rows.length > 0 ? { ...p, includes: rows.map((r) => ({ ...(r as object) })) } : { ...p };
   });
-  const copy = flat.map((p) => {
-    const includes = includesFor(p.package);
-    return includes ? { ...p, includes } : { ...p };
-  });
-  // The flat fields come from the first package's numbers only, never its `includes` (the top-level
-  // `includes` is the firm's own "what's included" table).
-  const first = flat[0];
-  return first ? { ...pricing, ...first, packages: copy } : { ...pricing };
+  const first = copy[0];
+  if (!first) return { ...pricing };
+  const { includes: _firstIncludes, ...flat } = first as PackageListEntry;
+  void _firstIncludes;
+  return { ...pricing, ...flat, packages: copy };
 }
 
 /** "3 classes" / "1 class". */
