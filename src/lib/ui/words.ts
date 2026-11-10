@@ -416,3 +416,8 @@ export const reviewIntro = (shown: number) => `Every open matter and every lead 
 export const WAITING_ON_YOU = "Waiting on you";
 export const NOTHING_WAITING_ON_YOU = "Nothing is waiting on you.";
 export const WAITING_ON_YOU_PARTIAL = "Approvals couldn't load, so only next steps assigned to you are listed.";
+export const deckWaiting = (age: string) => `Waiting ${age}`;
+export const deckWaitingTo = (name: string, age: string) => `Waiting to ${name} · ${age}`;
+export const deckWaitingBack = (label: string) => `Waiting back at ${label}`;
+export const deckDecidedAt = (what: "approved" | "rejected", time: string, noteKept: boolean) => `${what} ${time}${noteKept ? " · note kept" : ""}`;
+export const DECK_FOR = "for";
