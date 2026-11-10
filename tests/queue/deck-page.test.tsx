@@ -44,7 +44,7 @@ describe("the deck page", () => {
   });
 
   it("an ok, empty queue says All decided with the next deal", async () => {
-    expect(await render()).toMatch(/All decided\. Next deal (7:00 AM|2:00 PM)\./);
+    expect(await render()).toMatch(/All decided\.(<br\/>| )Next deal (7:00 AM|2:00 PM)\./);
   });
 
   it.each([

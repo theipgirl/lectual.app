@@ -65,7 +65,7 @@ vi.mock("@/lib/today/owner-load", () => ({
 vi.mock("@/lib/queue/load", async (orig) => ({
   ...(await orig<typeof import("@/lib/queue/load")>()),
   loadActiveQueue: async (status: "pending" | "approved" | "rejected" = "pending") => ({
-    status: "ok",
+    status: (status === "pending" ? (state as { queueStatus?: string }).queueStatus : undefined) ?? "ok",
     items: status === "pending" ? state.pending : status === "approved" ? state.approved : state.rejected,
   }),
 }));

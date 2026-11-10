@@ -11,6 +11,7 @@ const deck = (view: "cards" | "list" | "board", at?: string) =>
   };
 const prepare = () => {
   resetState();
+  (state as { queueStatus?: string }).queueStatus = undefined;
   state.pathname = "/dashboard/queue/deck/";
 };
 

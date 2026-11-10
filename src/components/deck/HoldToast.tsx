@@ -9,15 +9,16 @@ import { DECK_HOLD_NOTE, DECK_UNDO, deckHolding } from "@/lib/ui/words";
 export function HoldToast({ seconds, onUndo }: { seconds: number; onUndo: () => void }) {
   return (
     <div className="dk-hold" role="status" aria-live="polite">
-      <span>
-        <strong>{deckHolding(seconds)}</strong>
-        <span className="lx-note" style={{ display: "block", color: "inherit", opacity: 0.8 }}>
-          {DECK_HOLD_NOTE}
-        </span>
-      </span>
-      <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" onClick={onUndo} autoFocus>
-        {DECK_UNDO}
-      </button>
+      <div className="dk-toast">
+        <span>{deckHolding(seconds)}</span>
+        <button type="button" className="dk-undo" onClick={onUndo} autoFocus>
+          {DECK_UNDO}
+        </button>
+      </div>
+      <div className="dk-toast-bar" aria-hidden="true">
+        <i />
+      </div>
+      <p className="dk-hint">{DECK_HOLD_NOTE}</p>
     </div>
   );
 }

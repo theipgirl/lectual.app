@@ -40,7 +40,7 @@
 .dk-frame--cards { grid-template-columns: 380px minmax(0, 1fr); gap: 26px; align-items: start; }
 .dk-left { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .dk-eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--muted); }
-.dk-head { display: flex; flex-direction: column; gap: 6px; }
+.dk-pagehead { display: flex; flex-direction: column; gap: 6px; }
 .dk-head-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .dk-h1 { margin: 0; font-family: var(--serif); font-weight: 400; font-size: 38px; line-height: 1.05; letter-spacing: -0.01em; color: var(--ink); }
 .dk-h1--wide { font-size: 44px; }
@@ -193,11 +193,11 @@ a.dk-move--open { font-size: 14px; }
 .dk-field textarea,
 .dk-sheet textarea,
 .dk-sheet select,
-.dk-sheet input[type="text"] { width: 100%; box-sizing: border-box; border: 1px solid var(--dk-edge); border-radius: 12px; padding: 11px 13px; font: 14px var(--sans); background: var(--card); resize: none; color: var(--ink); }
+.dk-sheet input[type="text"] { width: 100%; box-sizing: border-box; border: 1px solid var(--dk-edge); border-radius: 12px; padding: 11px 13px; font: 14px var(--sans); background-color: var(--card); resize: none; color: var(--ink); }
 .dk-sheet-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .dk-handto { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow); }
 .dk-handto-row { display: flex; gap: 8px; align-items: center; }
-.dk-handto select { height: 44px; flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--card); font: 14px var(--sans); color: var(--ink); padding: 0 12px; }
+.dk-handto select { height: 44px; flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 12px; background-color: var(--card); font: 14px var(--sans); color: var(--ink); padding: 0 12px; }
 .dk-handto textarea { padding: 10px 12px; resize: none; width: 100%; box-sizing: border-box; border: 1px solid var(--line); border-radius: 12px; background: var(--card); font: 14px var(--sans); color: var(--ink); }
 .dk-ghost { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 44px; padding: 0 20px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--ink); font: 500 14px var(--sans); cursor: pointer; }
 .dk-ghost:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -308,3 +308,6 @@ a.dk-move--open { font-size: 14px; }
   .dk-arrow { min-height: 44px; min-width: 44px; }
   .dk-arrow { width: 44px; height: 44px; }
 }
+.dk-card a.dk-arrow { color: var(--ink); }
+.dk-choice[aria-pressed="true"]:disabled { opacity: 1; cursor: default; }
+.dk-after-link { text-decoration: underline; text-underline-offset: 2px; }
