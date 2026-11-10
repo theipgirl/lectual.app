@@ -73,6 +73,22 @@ export function ReviewPanel(props: {
             <label htmlFor="body" className="lx-label">
               Draft {dirty && <span style={{ color: "var(--warn)" }}>· edited</span>}
             </label>
+            {/* Everyone: beside the label. The owner view on a phone hides this pair and shows the one under the editor. */}
+            <span className="lx-edit-actions-head" style={{ display: "flex", gap: 8 }}>
+              <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" onClick={() => setEditing(false)}>
+                Done editing
+              </button>
+              <button
+                type="button"
+                className="lx-btn lx-btn-ghost lx-btn-sm"
+                onClick={() => {
+                  setBody(openedWith);
+                  setEditing(false);
+                }}
+              >
+                Cancel
+              </button>
+            </span>
           </div>
           <textarea
             id="body"

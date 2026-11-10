@@ -16,8 +16,9 @@
 .lx-view-draft { display: grid; gap: 8px; }
 .lx-view-draft-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 
-/* Edit actions sit under the editor (Cancel, Done editing), on every width. */
-.lx-edit-actions { display: flex; justify-content: flex-end; gap: 8px; }
+/* Edit actions: beside the label for everyone (.lx-edit-actions-head). The pair under the editor is for the owner view on a
+   phone only; elsewhere it is display:none, so it is not drawn, not focusable and not in the accessibility tree. */
+.lx-edit-actions { display: none; }
 
 /* ── Approval item on a phone, owner view (PhoneItem board 05a-05c) ─────────────────────────────────────────────
    Phone only, and only inside the owner shell (its header carries .lx-top--owner): the technician page is untouched.
@@ -63,6 +64,7 @@
   }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-view-draft > .lx-note { font-size: 12.5px; }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-view-draft .lx-draft { min-height: 160px; font-size: 14px; line-height: 1.5; border-radius: 12px; padding: 11px 13px; }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-edit-actions-head { display: none !important; }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-edit-actions { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-edit-actions .lx-btn { min-height: 48px; border-radius: 14px; font-size: 15px; font-weight: 600; justify-content: center; border: 1px solid var(--line); background: var(--card); color: var(--ink); }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-edit-actions .lx-btn-sec { background: var(--ox); border-color: var(--ox); color: var(--cream); }
