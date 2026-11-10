@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useMemo, useReducer, useRef, useState, useSyncExternalStore, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useId, useMemo, useReducer, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import {
   closeLeadAction,
   logWhatHappenedAction,
@@ -19,6 +19,11 @@ import {
   MAX_COL,
   MAX_ROW,
   MIN_COL,
+  DEFAULT_COL_WIDTHS,
+  NEXT_MIN_WIDTH,
+  NOTE_COL_WIDTH,
+  colWidth,
+  sheetMinWidth,
   MIN_ROW,
   NO_SIZES,
   SHEET_SIZES_KEY,
@@ -282,7 +287,7 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
     e.preventDefault();
     const th = (e.currentTarget as HTMLElement).closest("th");
-    const now = sizes.cols[col] ?? th?.getBoundingClientRect().width ?? 160;
+    const now = sizes.cols[col] ?? th?.getBoundingClientRect().width ?? DEFAULT_COL_WIDTHS[col] ?? NEXT_MIN_WIDTH;
     const next = { ...sizes, cols: { ...sizes.cols, [col]: clampSize(now + (e.key === "ArrowRight" ? 16 : -16), MIN_COL, MAX_COL) } };
     setSizes(next);
     writeSizes(next);
@@ -323,16 +328,24 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
         </p>
       )}
       <div className="lx-card rse-card">
-        <table className="rse-tbl lx-stack">
+       <div className="rse-scroll">
+        <table className="rse-tbl lx-stack" style={{ "--rse-min": `${sheetMinWidth(sizes, editing)}px` } as CSSProperties}>
+          <colgroup>
+            {HEADS.map((h) => {
+              const cw = colWidth(sizes, h.col);
+              return <col key={h.col} style={cw ? { width: cw } : undefined} />;
+            })}
+            {editing && <col style={{ width: NOTE_COL_WIDTH }} />}
+          </colgroup>
           <thead>
             <tr>
               {HEADS.map((h) => {
                 const typed = editing && (h.col === "status" || h.col === "next" || h.col === "court" || h.col === "source");
                 const locked = h.col === "waiting" || h.col === "contact";
-                const w = sizes.cols[h.col];
+                const w = colWidth(sizes, h.col);
                 const active = initial?.activeColumn === h.col || dragCol === h.col;
                 return (
-                  <th key={h.col} className={locked ? "rse-lock-th" : undefined} style={w ? { width: w } : undefined} scope="col">
+                  <th key={h.col} className={locked ? "rse-lock-th" : undefined} scope="col">
                     {h.label}
                     {typed && <span aria-hidden> ✎</span>}
                     {editing && (
@@ -346,7 +359,7 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                         onKeyDown={colKey(h.col)}
                       />
                     )}
-                    {editing && active && <span className="rse-col-tip">{Math.round(w ?? 300)} px</span>}
+                    {editing && active && <span className="rse-col-tip">{Math.round(w ?? NEXT_MIN_WIDTH)} px</span>}
                   </th>
                 );
               })}
@@ -383,7 +396,7 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                   const stages = stageChoices(row.kind, perms) ?? [];
                   return (
                     <tr key={row.key} style={h ? { height: h } : undefined} data-row={row.key}>
-                      <td className="pri">
+                      <td className="pri" title={row.client}>
                         <Link href={row.openHref} className="rse-client" scroll={false}>
                           {row.client}
                         </Link>
@@ -555,6 +568,7 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
             ))}
           </tbody>
         </table>
+       </div>
       </div>
     </div>
   );

@@ -34,7 +34,7 @@ function SheetTable({ id, title, rows, today, members, params }: Common & { id: 
                 const lane = laneOf(r);
                 return (
                   <tr key={r.key}>
-                    <td className="pri">
+                    <td className="pri" title={r.client}>
                       <Link href={openHref(params, r)} className="lx-rowlink" scroll={false}>
                         {r.client}
                       </Link>

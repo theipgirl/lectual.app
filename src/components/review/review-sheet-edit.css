@@ -8,13 +8,18 @@
 .rv-owner .rse-failed { display: inline-flex; align-items: center; min-height: 32px; padding: 4px 12px; border-radius: 16px; font-size: 14px; font-weight: 500; line-height: 1.4; background: color-mix(in srgb, var(--ox) 10%, transparent); color: var(--ox); max-width: 520px; }
 .rv-owner .rse-saved--empty { display: none; }
 
-.rv-owner .rse-root { display: grid; gap: 14px; }
-.rv-owner .rse-wrap { display: grid; gap: 18px; }
-.rv-owner .rse-keys { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: flex-end; font-size: 13px; line-height: 1.4; color: var(--muted); }
-.rv-owner .rse-key { display: inline-flex; align-items: center; height: 22px; padding: 0 6px; border-radius: 5px; border: 1px solid var(--line); background: var(--card); font-family: var(--mono); font-size: 13px; color: var(--ink); }
+.rv-owner .rse-root { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.rv-owner .rse-wrap { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
+.rv-owner .rse-keys { margin: 0; display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; justify-content: flex-end; font-family: var(--sans); font-size: 13px; line-height: 1.4; color: var(--muted); white-space: nowrap; }
+.rv-owner .rse-key { display: inline-flex; align-items: center; height: 22px; padding: 0 6px; border-radius: 5px; border: 1px solid var(--line); background: var(--card); font-family: var(--sans); font-size: 13px; color: var(--ink); }
 
 .rv-owner .rse-card { padding: 0; overflow: visible; border-radius: 18px; }
-.rv-owner .rse-tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 15px; }
+/* Wider than the content area: the table scrolls sideways inside its card; Client is never squeezed. */
+.rv-owner .rse-scroll { overflow-x: auto; border-radius: 18px; }
+.rv-owner .rse-tbl { width: 100%; min-width: var(--rse-min, 1160px); table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: 15px; }
+.rv-owner .rse-tbl thead th { white-space: nowrap; }
+/* Client: one line, ellipsis (the full name is the link's title). */
+.rv-owner .rse-tbl td.pri { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rv-owner .rse-tbl thead th { position: relative; text-align: left; font-family: var(--mono); font-weight: 400; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); padding: 10px 10px; background: var(--well); border-bottom: 1px solid var(--line); vertical-align: bottom; }
 .rv-owner .rse-tbl thead th:first-child { border-top-left-radius: 18px; }
 .rv-owner .rse-tbl thead th:last-child { border-top-right-radius: 18px; }
@@ -49,7 +54,7 @@
 .rv-owner .rse-in, .rv-owner .rse-tbl .rse-in { width: 100%; box-shadow: none; outline: none; height: 36px; border: 1px solid var(--line); border-radius: 9px; padding: 0 10px; font: 15px var(--sans); color: var(--ink); background: var(--card); }
 .rv-owner .rse-in:focus-visible, .rv-owner .rse-tbl .rse-in:focus-visible { outline: 2px solid var(--ox); outline-offset: 0; }
 .rv-owner .rse-in-date, .rv-owner .rse-tbl .rse-in-date { width: 140px; }
-.rv-owner .rse-tbl .rse-next-td { min-width: 280px; }
+.rv-owner .rse-tbl .rse-next-td { min-width: 240px; white-space: normal; }
 .rv-owner .rse-textarea, .rv-owner .rse-tbl .rse-textarea { height: auto; padding: 8px 10px; resize: none; line-height: 1.4; }
 
 /* Popovers: the stage list, the person picker, the source list and "+ Note". */
@@ -64,7 +69,7 @@
 .rv-owner .rse-av.soft { background: color-mix(in srgb, var(--ox) 14%, var(--card)); color: var(--ox); }
 .rv-owner .rse-pop .rse-in { margin-bottom: 4px; }
 
-.rv-owner .rse-note-th, .rv-owner .rse-note-td { width: 1%; white-space: nowrap; }
+.rv-owner .rse-note-th, .rv-owner .rse-note-td { white-space: nowrap; }
 .rv-owner .rse-btn { display: inline-flex; align-items: center; justify-content: center; height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: transparent; font: 500 14px var(--sans); color: var(--ink); white-space: nowrap; cursor: pointer; }
 .rv-owner .rse-btn--on { border-color: var(--ox); background: var(--ox); color: var(--cream); box-shadow: none; }
 .rv-owner .rse-btn[disabled] { opacity: 0.45; cursor: not-allowed; }
@@ -84,16 +89,16 @@
 .rv-owner .rse-legend-title { margin: 0 0 4px; font-size: 15px; font-weight: 600; color: var(--ink); }
 .rv-owner .rse-legend-body { margin: 0; font-size: 15px; line-height: 1.45; color: var(--body); }
 
-@media (max-width: 900px) and (min-width: 641px) {
-  .rv-owner .rse-card { overflow-x: auto; }
-  .rv-owner .rse-tbl { min-width: 1000px; }
-}
 
 /* Phone: stacked rows, no inline editing (edits open the record panel from the Client link). */
 @media (max-width: 640px) {
   .rv-owner .rse-keys, .rv-owner .rse-col-grip, .rv-owner .rse-row-grip, .rv-owner .rse-col-tip, .rv-owner .rse-note-th, .rv-owner .rse-note-td, .rv-owner .rse-pop { display: none; }
   .rv-owner .rse-cell { pointer-events: none; width: auto; margin: 0; padding: 0; border: 0; box-shadow: none; text-align: right; }
-  .rv-owner .rse-tbl { font-size: 14px; }
+  .rv-owner .rse-scroll { overflow: visible; }
+  .rv-owner .rse-tbl { font-size: 14px; min-width: 0; table-layout: auto; }
+  .rv-owner .rse-tbl colgroup { display: none; }
+  .rv-owner .rse-tbl thead th { white-space: normal; }
+  .rv-owner .rse-tbl td.pri { white-space: normal; overflow: visible; }
   .rv-owner .rse-tbl td { border-bottom: 0; padding: 4px 0; }
   .rv-owner .rse-tbl td[data-label]::before { font-size: 12px; }
   .rv-owner .rse-tbl tbody tr:not(.rse-sec) { border-bottom: 1px solid var(--line-2); }

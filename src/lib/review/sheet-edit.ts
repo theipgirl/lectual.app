@@ -253,6 +253,33 @@ export const MAX_ROW = 320;
 export type SheetSizes = { cols: Partial<Record<SheetEditColumn, number>>; rows: Record<string, number> };
 export const NO_SIZES: SheetSizes = { cols: {}, rows: {} };
 
+/** Default column widths in px. Next step is flexible (no fixed width) and never narrower than `NEXT_MIN_WIDTH`. A stored width overrides these. */
+export const DEFAULT_COL_WIDTHS: Record<SheetEditColumn, number | null> = {
+  client: 150,
+  mark: 150,
+  status: 140,
+  next: null,
+  court: 120,
+  waiting: 160,
+  source: 110,
+  contact: 90,
+};
+export const NEXT_MIN_WIDTH = 240;
+/** The "+ Note" column, drawn only while editing. */
+export const NOTE_COL_WIDTH = 84;
+
+/** The width a column is drawn at: this viewer's stored width, else the default; null = flexible (Next step). */
+export function colWidth(sizes: Pick<SheetSizes, "cols">, col: SheetEditColumn): number | null {
+  return sizes.cols[col] ?? DEFAULT_COL_WIDTHS[col];
+}
+
+/** The narrowest the table may get before it scrolls sideways inside its card (flexible Next step counted at its minimum). */
+export function sheetMinWidth(sizes: Pick<SheetSizes, "cols">, withNote: boolean): number {
+  let total = withNote ? NOTE_COL_WIDTH : 0;
+  for (const c of SHEET_EDIT_COLUMNS) total += colWidth(sizes, c) ?? NEXT_MIN_WIDTH;
+  return total;
+}
+
 export function clampSize(n: number, min: number, max: number): number {
   return Math.round(Math.min(max, Math.max(min, n)));
 }

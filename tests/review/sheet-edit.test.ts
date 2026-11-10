@@ -7,6 +7,10 @@ import {
   SHEET_EDIT_COLUMNS,
   cellEditable,
   cellKey,
+  DEFAULT_COL_WIDTHS,
+  NEXT_MIN_WIDTH,
+  colWidth,
+  sheetMinWidth,
   courtOf,
   nextEditableCell,
   notePost,
@@ -184,6 +188,25 @@ describe("Tab and sizes", () => {
     expect(parseSizes(null)).toEqual({ cols: {}, rows: {} });
     expect(parseSizes("{not json")).toEqual({ cols: {}, rows: {} });
     expect(parseSizes(JSON.stringify({ cols: { next: 9999, nope: 10, court: "x" }, rows: { "matter:1": 5, "bad key!": 50 } }))).toEqual({ cols: { next: 640 }, rows: { "matter:1": 40 } });
+  });
+});
+
+describe("default column widths", () => {
+  it("are the director's defaults, with Next step flexible", () => {
+    expect(DEFAULT_COL_WIDTHS).toEqual({ client: 150, mark: 150, status: 140, next: null, court: 120, waiting: 160, source: 110, contact: 90 });
+    expect(NEXT_MIN_WIDTH).toBe(240);
+  });
+  it("a stored width overrides the default; nothing stored reads the default", () => {
+    expect(colWidth(parseSizes(null), "client")).toBe(150);
+    expect(colWidth(parseSizes(null), "next")).toBeNull();
+    const stored = parseSizes(JSON.stringify({ cols: { client: 220, next: 400 } }));
+    expect(colWidth(stored, "client")).toBe(220);
+    expect(colWidth(stored, "next")).toBe(400);
+    expect(colWidth(stored, "mark")).toBe(150);
+  });
+  it("the table's minimum is the sum, Next step counted at 240 and the note column only while editing", () => {
+    expect(sheetMinWidth(parseSizes(null), false)).toBe(150 + 150 + 140 + 240 + 120 + 160 + 110 + 90);
+    expect(sheetMinWidth(parseSizes(null), true)).toBe(1160 + 84);
   });
 });
 

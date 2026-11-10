@@ -186,3 +186,13 @@ a.ot-row-title:hover { text-decoration: underline; }
    times. Courier stays for bare counts and the week strip's day labels and times. */
 .ot-line, .ot-sub.ot-empty, .ot-note, .ot-foot { font-family: var(--sans); }
 .ot-line { font-size: 14px; line-height: 1.4; }
+
+/* Polish (director, Nov 10): the week card's "Open Calendar" is Geist 14px, not the small mono sub-line. */
+.ot-sub .ot-link { font-family: var(--sans); font-size: 14px; line-height: 1.4; }
+/* Phone: a row's pill sits on its own line under the name, so the name gets the full width (Proposals out, Deadlines, Consults). */
+@media (max-width: 640px) {
+  .ot-row { flex-wrap: wrap; align-items: flex-start; row-gap: 6px; }
+  .ot-row-main { flex: 1 1 100%; }
+  .ot-row .ot-pill { margin-top: 0; }
+  .ot-sub .ot-link { font-size: 15px; }
+}

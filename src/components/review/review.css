@@ -241,7 +241,21 @@
 .rv-owner .lp-pill { font-size: 13px; }
 .rv-owner .rv-chip { font-size: 13px; }
 .rv-owner .lx-tbl th { font-size: 12px; }
-@media (min-width: 901px) { .rv-owner .lx-tbl.rv-sheet td:first-child, .rv-owner .lx-tbl.rv-sheet td:nth-child(5), .rv-owner .lx-tbl.rv-sheet td:last-child { white-space: nowrap; } }
+/* Sheet column widths (match the editable Sheet): Client never squeezes; a table wider than its card scrolls sideways inside it. */
+@media (min-width: 641px) {
+  .rv-owner .rv-sheet-wrap { overflow-x: auto; }
+  .rv-owner .lx-tbl.rv-sheet { width: 100%; min-width: 1160px; table-layout: fixed; }
+  .rv-owner .lx-tbl.rv-sheet th { white-space: nowrap; }
+  .rv-owner .lx-tbl.rv-sheet th:nth-child(1) { width: 150px; }
+  .rv-owner .lx-tbl.rv-sheet th:nth-child(2) { width: 150px; }
+  .rv-owner .lx-tbl.rv-sheet th:nth-child(3) { width: 140px; }
+  .rv-owner .lx-tbl.rv-sheet th:nth-child(5) { width: 120px; }
+  .rv-owner .lx-tbl.rv-sheet th:nth-child(6) { width: 160px; }
+  .rv-owner .lx-tbl.rv-sheet th:nth-child(7) { width: 110px; }
+  .rv-owner .lx-tbl.rv-sheet th:nth-child(8) { width: 90px; }
+  .rv-owner .lx-tbl.rv-sheet td:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rv-owner .lx-tbl.rv-sheet td:nth-child(5), .rv-owner .lx-tbl.rv-sheet td:last-child { white-space: nowrap; }
+}
 @media (max-width: 640px) {
   .rv-owner .rv-card-title { font-size: 16px; }
   .rv-owner .rv-card-meta, .rv-owner .rv-card-step, .rv-owner .rv-card-followup { font-size: 14px; }
