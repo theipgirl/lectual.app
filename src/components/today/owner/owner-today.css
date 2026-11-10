@@ -92,6 +92,7 @@ a.ot-row-title:hover { text-decoration: underline; }
 /* Three columns on desktop; one ordered stack on a phone. */
 .ot-cols { display: grid; grid-template-columns: repeat(var(--ot-cols, 3), minmax(0, 1fr)); gap: 18px; align-items: start; }
 .ot-cols > div { min-width: 0; }
+.ot-col-deadlines { display: flex; flex-direction: column; gap: 18px; }
 
 /* This week. */
 .ot-key { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-left: 6px; }

@@ -205,11 +205,15 @@
 
 /* table */
 .pq-table-card { overflow: hidden; display: flex; flex-direction: column; }
-.pq-table-scroll { overflow: auto; }
+.pq-table-scroll {
+  overflow: auto; overscroll-behavior: contain;
+  /* The list scrolls inside its own box so every loaded proposal is reachable; the header row stays put. */
+  max-height: max(360px, calc(100vh - 200px));
+}
 @media (min-width: 761px) {
   .pq-tbl { min-width: 980px; }
 }
-.pq-tbl th { background: var(--well); }
+.pq-tbl th { background: var(--well); position: sticky; top: 0; z-index: 1; }
 .pq-tbl td { height: 56px; vertical-align: middle; }
 .pq-tbl td.wrap { min-width: 0; }
 .pq-tbl td:first-child { min-width: 280px; }
@@ -255,6 +259,7 @@
 /* Under 760px a row is a stack: the proposal, the client, then Accepted and Paid directly under the client's name. */
 @media (max-width: 760px) {
   .pq-tbl { min-width: 0; display: block; }
+  .pq-tbl th { position: static; }
   .pq-tbl thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .pq-tbl tbody { display: block; }
   .pq-tbl tr {

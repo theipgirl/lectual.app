@@ -54,3 +54,28 @@ export const screens: Screen[] = [
     render: review("sheet"),
   },
 ];
+
+screens.push({
+  id: "review-board-rest-open",
+  title: "Weekly review, Board (USPTO / On track lists opened)",
+  designBoard: "ReviewBoard",
+  viewport: "desktop",
+  pathname: "/dashboard/review/",
+  prepare,
+  render: review(),
+  transformHtml: (html) =>
+    html
+      .replace(/<details class="lx-card lx-disclosure"/g, '<details open="" class="lx-card lx-disclosure"')
+      .replace(/^/, "<style>.rv-kpis,.rv-strips,.rv-board{display:none}</style>"),
+});
+
+screens.push({
+  id: "review-board-phone-lanes",
+  title: "Weekly review, Board (phone, lanes)",
+  designBoard: "ReviewBoard",
+  viewport: "phone",
+  pathname: "/dashboard/review/",
+  prepare,
+  render: review(),
+  transformHtml: (html) => "<style>.rv-kpis,.rv-strips{display:none}</style>" + html,
+});

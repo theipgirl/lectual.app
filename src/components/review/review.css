@@ -186,10 +186,15 @@
 
 /* Our turn: flat rows. Waiting on client: tinted, bordered cards with an accent edge. */
 .rv-owner .rv-card { min-height: 0; border-left-width: 1px; border-radius: 12px; }
-.rv-owner .rv-card-ours { border: 0; background: transparent; box-shadow: none; border-radius: 0; }
-.rv-owner .rv-card-ours .rv-card-link { padding: 3px 0; gap: 3px; }
-.rv-owner .rv-card-waits { background: var(--paper); box-shadow: inset 3px 0 0 var(--line); border-color: var(--line); }
-.rv-owner .rv-card-waits .rv-card-link { padding: 10px 12px 10px 12px; gap: 4px; }
+.rv-owner .rv-card-ours, .rv-owner .rv-card-waits { background: var(--paper); box-shadow: inset 3px 0 0 var(--line); border-color: var(--line); }
+/* Our turn cards: the same card as Waiting on client, the bucket colour as the left edge. */
+.rv-owner .rv-card-ours.rv-card-overdue { box-shadow: inset 3px 0 0 var(--ox); }
+.rv-owner .rv-card-ours.rv-card-week { box-shadow: inset 3px 0 0 var(--warn); }
+.rv-owner .rv-card-ours.rv-card-needs { box-shadow: inset 3px 0 0 var(--body); }
+.rv-owner .rv-card-ours.rv-card-quiet { box-shadow: inset 3px 0 0 var(--muted); }
+.rv-owner .rv-card-ours .rv-card-link, .rv-owner .rv-card-waits .rv-card-link { padding: 10px 12px 10px 14px; gap: 4px; }
+/* Empty lane list: an empty card, dashed, the height of a small card. */
+.rv-owner .rv-none { display: flex; align-items: center; min-height: 72px; padding: 10px 14px; border: 1px dashed var(--line); border-radius: 12px; background: transparent; font-size: 14px; color: var(--body); }
 .rv-owner .rv-card-title { font-size: 15px; flex: 0 0 auto; white-space: nowrap; }
 .rv-owner .rv-card-top { justify-content: flex-start; flex-wrap: nowrap; align-items: baseline; gap: 4px 8px; min-width: 0; }
 .rv-owner .rv-card-top .rv-pill { margin-left: auto; }
@@ -199,16 +204,17 @@
 .rv-owner .rv-card-step { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 0; font-size: 14px; color: var(--body); }
 .rv-owner .rv-card-step-text { min-width: 0; text-decoration: underline; text-underline-offset: 2px; }
 .rv-owner .rv-card-waits .rv-card-step-text { text-decoration: none; }
+.rv-owner .rv-card-ours .rv-card-step-text { text-decoration: none; }
 .rv-owner .rv-card-followup { font-size: 14px; color: var(--body); }
 .rv-owner .rv-card { position: relative; display: block; }
 .rv-owner .rv-card-step, .rv-owner .rv-card-followup { padding-right: 116px; }
 .rv-owner .rv-card-top { padding-right: 0; }
 .rv-owner .rv-card-acts { position: absolute; right: 0; bottom: 2px; padding: 0; gap: 2px; }
-.rv-owner .rv-card-waits .rv-card-acts { right: 8px; bottom: 6px; }
+.rv-owner .rv-card-acts { right: 8px; bottom: 6px; }
 .rv-owner .rv-card-acts .lx-btn { min-height: 0; height: 28px; padding: 0 8px; border: 0; background: transparent; font-size: 14px; color: var(--ox); text-decoration: underline; box-shadow: none; }
 .rv-owner .rv-card-overdue .rv-card-link .rv-pill { font-weight: 600; }
 
-.rv-owner .rv-rest { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.rv-owner .rv-rest { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
 .rv-owner .rv-rest > details { box-shadow: none; padding: 12px 16px; }
 .rv-owner .rv-rest > details > summary { cursor: pointer; font-size: 15px; }
 
@@ -270,7 +276,6 @@
   /* Done / Open sit on their own row, so the step and follow-up lines keep the full width. */
   .rv-owner .rv-card-step, .rv-owner .rv-card-followup { padding-right: 0; }
   .rv-owner .rv-card .rv-card-acts, .rv-owner .rv-card-waits .rv-card-acts { position: static; justify-content: flex-end; padding: 0 10px 8px; gap: 6px; }
-  .rv-owner .rv-card-ours .rv-card-acts { padding: 0 0 6px; }
 }
 /* Facts in Geist (founder, Nov 10): the row's mark and stage line and the search label. Counts stay Courier. */
 .rv-owner :is(.rv-card-meta, .rv-search-label) { font-family: var(--sans); }

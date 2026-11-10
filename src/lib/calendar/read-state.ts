@@ -12,14 +12,13 @@ export type CalendarReadState =
 export function calendarReadState(reads: {
   deadlines: unknown | null;
   tasks: unknown | null;
-  /** `undefined` when the view does not read events (agenda). */
-  events: unknown | null | undefined;
+  events: unknown | null;
 }): CalendarReadState {
   const attempted: [string, boolean][] = [
     ["docket dates", reads.deadlines !== null],
     ["tasks", reads.tasks !== null],
   ];
-  if (reads.events !== undefined) attempted.push(["consults and meetings", reads.events !== null]);
+  attempted.push(["consults and meetings", reads.events !== null]);
   const failed = attempted.filter(([, ok]) => !ok).map(([name]) => name);
   if (failed.length === 0) return { kind: "ok" };
   if (failed.length === attempted.length) return { kind: "unavailable" };

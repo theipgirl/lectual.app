@@ -8,7 +8,7 @@
  * before they get here.
  */
 
-export type CalendarView = "month" | "week" | "agenda";
+export type CalendarView = "month" | "week";
 
 export type CalendarItem = {
   key: string;
@@ -72,7 +72,7 @@ export function isCivilDate(value: unknown): value is string {
 }
 
 export function parseCalendarView(value: unknown): CalendarView {
-  return value === "week" || value === "agenda" ? value : "month";
+  return value === "week" ? "week" : "month";
 }
 
 /** Timed items first by time, then all-day items by kind (deadlines lead), then title. */

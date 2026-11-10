@@ -9,6 +9,7 @@ import type { ReviewRow } from "@/lib/review/buckets";
 import type { ReviewLoad } from "@/lib/review/load";
 import type { ConsultItem } from "@/lib/calendar/consult-sources";
 import type { OwnerDeadline, OwnerProposal } from "@/lib/today/owner-rules";
+import type { NeedsReviewItem } from "@/lib/today/needs-review";
 import type { FirmSession } from "@/lib/firm/session";
 
 export const NOW = new Date("2026-11-10T14:30:00Z");
@@ -46,6 +47,11 @@ export const deadlines: OwnerDeadline[] = [
   { key: "d2", href: "/dashboard/matters/m2/", name: "Statement of use", detail: "TM-1038 · OAT & ORCHARD", dueDate: "2026-11-12", overdueDays: 0 },
   { key: "d3", href: "/dashboard/matters/m3/", name: "Registration maintenance", detail: "TM-0991 · NORTHFIELD GOODS", dueDate: "2026-11-17", overdueDays: 0 },
   { key: "d4", href: "/dashboard/matters/m4/", name: "Extension request", detail: "TM-1020 · HALCYON PRESS", dueDate: "2026-11-21", overdueDays: 0 },
+];
+export const needsReviewSample: NeedsReviewItem[] = [
+  { key: "n1", href: "/dashboard/matters/m5/", name: "Response to office action", matter: "TM-0712 \u00b7 PINE & PAIL", dueDate: "2025-03-14", daysPastDue: 606 },
+  { key: "n2", href: "/dashboard/matters/m6/", name: "Statement of use", matter: "TM-0764 \u00b7 TIDEWORK", dueDate: "2025-08-02", daysPastDue: 465 },
+  { key: "n3", href: "/dashboard/matters/m7/", name: "Registration maintenance", matter: "TM-0801 \u00b7 BRIGHT LANTERN", dueDate: "2026-04-20", daysPastDue: 204 },
 ];
 export const proposals: OwnerProposal[] = [
   { id: "p1", href: "/dashboard/proposals/p1/", client: "Maya Chen", title: "CRUMB & CO. · Enhanced", expiry: "Last day Nov 11", expired: false, expiresOn: "2026-11-11" },
@@ -147,6 +153,7 @@ export function resetState() {
     deckSummary: { status: "ok", count: 6, minutes: 8, dealLabel: "7:00 AM", nextDealLabel: "2:00 PM", laterArrivals: 0 },
     consults: { consults, outlook: "ok", zoom: "ok" },
     deadlines,
+    needsReview: needsReviewSample,
     proposals,
     review,
   });
