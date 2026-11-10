@@ -38,8 +38,8 @@ export const session: FirmSession = {
 
 /* ── Today ── */
 export const consults: ConsultItem[] = [
-  { key: "outlook:1", source: "outlook", title: "Strategy session · Maya Chen", startsAt: "2026-11-10T16:00:00Z", allDay: false, joinUrl: "https://zoom.example/j/111", leadId: null, leadName: "Maya Chen" },
-  { key: "outlook:2", source: "outlook", title: "Discovery call · Jonah Reyes", startsAt: "2026-11-10T19:30:00Z", allDay: false, joinUrl: null, leadId: null, leadName: "Jonah Reyes" },
+  { key: "outlook:1", source: "outlook", title: "Strategy session · Maya Chen", startsAt: "2026-11-10T16:00:00Z", allDay: false, joinUrl: "https://zoom.us/j/111", leadId: "5b3f1c2e-1111-4a2b-9c3d-000000000001", leadName: "Maya Chen" },
+  { key: "outlook:2", source: "outlook", title: "Discovery call · Jonah Reyes", startsAt: "2026-11-10T19:30:00Z", allDay: false, joinUrl: null, leadId: "5b3f1c2e-1111-4a2b-9c3d-000000000002", leadName: "Jonah Reyes" },
 ];
 export const deadlines: OwnerDeadline[] = [
   { key: "d1", href: "/dashboard/matters/m1/", name: "Office action response", detail: "TM-1042 · LUMEN TEA", dueDate: "2026-11-09", overdueDays: 1 },

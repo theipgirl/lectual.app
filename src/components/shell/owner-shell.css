@@ -110,6 +110,9 @@
     height: 56px;
     padding: 0 16px;
     gap: 8px;
+    /* Phone Today board (.ph-top): the header sits on the page's cream, no white band, no rule. */
+    background: var(--paper);
+    border-bottom: 0;
   }
   .lx-top.lx-top--owner .lx-wordmark {
     font-size: 22px;

@@ -3,7 +3,7 @@ import { formatEventWhen } from "@/lib/calendar/outlook-format";
 import { sourceNote, type TodayConsultsResult } from "@/lib/calendar/consult-sources";
 import { civilInZone } from "@/lib/today/outcomes";
 import { OWNER_CONSULTS_SHOWN } from "@/lib/today/owner-rules";
-import { ownerSeeAll, OWNER_CONSULTS_HEADING, OWNER_CONSULTS_NONE_TODAY, OWNER_CONSULT_JOIN_LINK, OWNER_CONSULT_LEAD_LINK } from "@/lib/ui/words";
+import { ownerSeeAll, OWNER_CONSULTS_HEADING, OWNER_CONSULTS_NONE_TODAY, ownerConsultJoinLink, OWNER_CONSULT_LEAD_LINK } from "@/lib/ui/words";
 
 const SOURCE_LABEL = { outlook: "Outlook", zoom: "Zoom" } as const;
 
@@ -42,17 +42,20 @@ export function OwnerConsults({ result, timeZone, today }: { result: TodayConsul
               <span className="ot-row-title">{c.title}</span>
               <span className="ot-sub ot-line">
                 {when} &middot; {SOURCE_LABEL[c.source]}
-                {c.joinUrl ? " · Zoom link" : ""}
+                {c.joinUrl && /^https:\/\//i.test(c.joinUrl) ? (
+                  <>
+                    {" "}&middot;{" "}
+                    <a href={c.joinUrl} target="_blank" rel="noopener noreferrer" className="ot-link">
+                      {ownerConsultJoinLink(c.joinUrl)}
+                    </a>
+                  </>
+                ) : null}
               </span>
             </div>
             {c.leadId ? (
               <Link href={`/dashboard/leads/${c.leadId}/`} className="ot-link">
                 {OWNER_CONSULT_LEAD_LINK}
               </Link>
-            ) : c.joinUrl && /^https:\/\//i.test(c.joinUrl) ? (
-              <a href={c.joinUrl} target="_blank" rel="noopener noreferrer" className="ot-link">
-                {OWNER_CONSULT_JOIN_LINK}
-              </a>
             ) : null}
           </div>
         );

@@ -357,7 +357,19 @@ export const OWNER_CONSULTS_HEADING = "Today\u2019s consults";
 export const OWNER_CONSULTS_NONE_TODAY = "No consults today.";
 export const OWNER_CONSULTS_FAILED = "Couldn't load consults.";
 export const OWNER_CONSULT_LEAD_LINK = "Lead";
-export const OWNER_CONSULT_JOIN_LINK = "Join";
+export const OWNER_CONSULT_JOIN_LINK = "Join link";
+/** The join link's words on owner Today's consult row, named for the meeting service as the board does ("Zoom link"). */
+export function ownerConsultJoinLink(url: string): string {
+  let host = "";
+  try {
+    host = new URL(url).hostname.toLowerCase();
+  } catch {
+    return OWNER_CONSULT_JOIN_LINK;
+  }
+  if (host === "zoom.us" || host.endsWith(".zoom.us") || host === "zoom.com" || host.endsWith(".zoom.com")) return "Zoom link";
+  if (host === "teams.microsoft.com" || host === "teams.live.com") return "Teams link";
+  return OWNER_CONSULT_JOIN_LINK;
+}
 export const OWNER_WEEK_KEY_CONSULT = "consult";
 export const OWNER_WEEK_KEY_DEADLINE = "deadline";
 export const OWNER_WEEK_OPEN_CALENDAR = "Open Calendar";
