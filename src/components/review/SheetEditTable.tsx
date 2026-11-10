@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useMemo, useReducer, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import {
   closeLeadAction,
   logWhatHappenedAction,
@@ -37,6 +37,8 @@ import {
   nextEditableCell,
   notePost,
   parseSizes,
+  growHeight,
+  normalizeNextStepTitle,
   personInitials,
   postFor,
   rowHolds,
@@ -697,8 +699,18 @@ function NextEditor({ row, draft, onSave, onSaveAndMove, onCancel }: { row: Shee
   const [due, setDue] = useState(draft?.dueDate ?? row.nextStep?.dueDate ?? "");
   const [error, setError] = useState<string | null>(null);
   const id = `rse-ns-${row.key.replace(/[^A-Za-z0-9_-]/g, "")}`;
+  const taRef = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const el = taRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const cs = getComputedStyle(el);
+    const chrome = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
+    el.style.height = `${growHeight(el.scrollHeight + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth), parseFloat(cs.lineHeight) || 21, chrome)}px`;
+  }, [title]);
+  const clean = () => normalizeNextStepTitle(title);
   const valid = () => {
-    if (!title.trim()) {
+    if (!clean()) {
       setError(SHEET_ENTER_TITLE);
       return false;
     }
@@ -713,15 +725,15 @@ function NextEditor({ row, draft, onSave, onSaveAndMove, onCancel }: { row: Shee
         if (e.key === "Escape") {
           e.preventDefault();
           onCancel();
-        } else if (e.key === "Enter") {
+        } else if (e.key === "Enter" && !e.shiftKey) {
           e.preventDefault();
-          if (valid()) onSave(title.trim(), due || null);
+          if (valid()) onSave(clean(), due || null);
         } else if (e.key === "Tab") {
           const last = (e.target as HTMLElement).id === `${id}-d`;
           const first = (e.target as HTMLElement).id === `${id}-t`;
           if ((last && !e.shiftKey) || (first && e.shiftKey)) {
             e.preventDefault();
-            if (valid()) onSaveAndMove(title.trim(), due || null, e.shiftKey ? -1 : 1);
+            if (valid()) onSaveAndMove(clean(), due || null, e.shiftKey ? -1 : 1);
           }
         }
       }}
@@ -729,7 +741,7 @@ function NextEditor({ row, draft, onSave, onSaveAndMove, onCancel }: { row: Shee
       <label className="rse-ed-label" htmlFor={`${id}-t`}>
         {SHEET_NEXT_STEP}
       </label>
-      <input id={`${id}-t`} className="rse-in" type="text" value={title} maxLength={200} autoFocus onChange={(e) => setTitle(e.target.value)} aria-invalid={!!error || undefined} />
+      <textarea ref={taRef} id={`${id}-t`} className="rse-in rse-textarea rse-title-ta" rows={2} value={title} maxLength={200} autoFocus onChange={(e) => setTitle(e.target.value)} aria-invalid={!!error || undefined} />
       <div className="rse-ed-due">
         <label className="rse-ed-label" htmlFor={`${id}-d`}>
           {SHEET_DUE}
