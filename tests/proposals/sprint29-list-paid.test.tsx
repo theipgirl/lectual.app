@@ -154,20 +154,20 @@ describe("the page: the Accepted segment", () => {
     item("s1", { status: "sent", expires_on: "2026-10-30" }),
   ];
 
-  it("shows the two accepted-not-paid proposals above the paid ones", async () => {
+  it("Accepted lists only the accepted-and-not-paid proposals; the paid two have left it", async () => {
     const html = await renderListPage({ segment: "accepted" }, { rows, steps: { p1: PAID_STEP, p2: PAID_STEP } });
-    const order = ["Client u1", "Client p1", "Client p2"].map((n) => html.indexOf(n));
-    expect(order.every((i) => i > 0)).toBe(true);
-    // u1 is the only one not paid, so it leads; the paid two keep their order.
-    expect(order[0]).toBeLessThan(order[1]);
-    expect(order[1]).toBeLessThan(order[2]);
     expect(rowOf(html, "Client u1")).toContain("Not paid");
+    expect(html).not.toContain("Client p1");
+    expect(html).not.toContain("Client p2");
     expect(html).not.toContain("Client s1");
   });
 
-  it("the Everything segment keeps the list's order", async () => {
+  it("the default list keeps the list's order and holds no paid row", async () => {
     const html = await renderListPage({}, { rows, steps: { p1: PAID_STEP, p2: PAID_STEP } });
-    expect(html.indexOf("Client p1")).toBeLessThan(html.indexOf("Client u1"));
+    expect(html).not.toContain("Client p1");
+    expect(html).not.toContain("Client p2");
+    expect(html.indexOf("Client u1")).toBeGreaterThan(0);
+    expect(html.indexOf("Client s1")).toBeGreaterThan(0);
   });
 });
 

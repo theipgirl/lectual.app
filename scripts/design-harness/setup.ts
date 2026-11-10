@@ -151,7 +151,11 @@ vi.mock("@/lib/proposals/store", async (orig) => {
     listProposals: async () => d.proposalList,
     listLatestProposalEvents: async () => new Map(),
     listProposalOpens: async () => new Map([[d.P.crumb, { count: 4, lastAt: "2026-11-08T10:12:00Z" }]]),
-    listStepActivity: async (ids: string[]) => new Map(ids.map((i) => [i, { paid: { state: "not_paid", undoneAt: null }, newest: null }])),
+    listStepActivity: async (ids: string[]) => {
+      // state.paidUnreadable: the whole paid read fails (the page then says "Paid status couldn't be read" on every accepted row).
+      if ((state as { paidUnreadable?: boolean }).paidUnreadable) throw new Error("paid read failed");
+      return new Map(ids.map((i) => [i, { paid: d.PAID_IDS.has(i) ? { state: "paid", by: null, at: "2026-11-06T15:00:00Z" } : { state: "not_paid", undoneAt: null }, newest: null }]));
+    },
     getProposal: async () => d.proposalDetail,
     getProposalSettings: async () => ({ pricing: { packages: [{ package: "Enhanced", base_cents: 407_500, included_classes: 3, per_class_cents: 82_500, second_mark_discount_pct: 20, gov_per_class_cents: 35_000 }] }, default_pay_url: null }),
     isCurrentUserApprover: async () => true,

@@ -50,7 +50,7 @@ describe("Proposals page", () => {
       const html = await go();
       expect(html).toContain(">Show<");
       expect(html).not.toContain(">Segments<");
-      expect(segments(html)).toEqual(["Everything:8", "Out with a client:1", "Drafts and blocked:3", "Accepted:1", "Expired:2"]);
+      expect(segments(html)).toEqual(["Everything except paid:8", "Out with a client:1", "Drafts and blocked:3", "Accepted:1", "Paid:0", "Expired:2"]);
     });
 
     it("?segment=out filters the table and highlights that segment; the counts do not move", async () => {
@@ -59,7 +59,7 @@ describe("Proposals page", () => {
       for (const other of ["a1", "a2", "b1", "e1", "e2", "c1", "x1"]) expect(html).not.toContain(`Client ${other}<`);
       expect(html).toMatch(/aria-current="page"[^>]*><span>Out with a client/);
       expect(html.match(/aria-current="page"/g)).toHaveLength(1);
-      expect(segments(html)).toEqual(["Everything:8", "Out with a client:1", "Drafts and blocked:3", "Accepted:1", "Expired:2"]);
+      expect(segments(html)).toEqual(["Everything except paid:8", "Out with a client:1", "Drafts and blocked:3", "Accepted:1", "Paid:0", "Expired:2"]);
     });
 
     it("each segment's count matches the rows shown for it", async () => {
@@ -160,7 +160,7 @@ describe("Proposals page", () => {
     it("a failed events read still renders every Last activity cell, with a derived line", async () => {
       const html = await go({}, { events: "fail" });
       expect(html).toContain('class="wrap pq-activity pq-c-activity"');
-      for (const id of ["a1", "a2", "s1"]) expect(rowOf(html, `Client ${id}<`)).toMatch(/pq-c-activity"[^>]*>Updated 1d ago</);
+      for (const id of ["a1", "a2", "s1"]) expect(rowOf(html, `Client ${id}<`)).toMatch(/pq-c-activity"[^>]*>(?:<span[^>]*>)?Updated 1d ago</);
       expect(rowOf(html, "Client e1<")).toContain("Stored status still says sent");
       expect(rowOf(html, "Client b1<")).toContain("Add the pay link before creating the link.");
       expect(html).not.toContain('pq-activity"><');

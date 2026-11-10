@@ -43,6 +43,7 @@ export const screens: Screen[] = pages.flatMap((p) =>
       prepare: () => {
         resetState();
         state.pathname = p.pathname;
+        (state as { paidUnreadable?: boolean }).paidUnreadable = false;
       },
       render: async () => {
         const page = await p.render();
@@ -51,3 +52,20 @@ export const screens: Screen[] = pages.flatMap((p) =>
     })),
   ),
 );
+
+/** Proposals list variants: the paid read failing (every accepted row says so), and the Paid segment (only exists after the paid-leaves-the-list change). */
+const proposalsVariant = (key: string, title: string, search: Record<string, string>, unreadable: boolean): Screen => ({
+  id: `mono-proposals-${key}-tech-d`,
+  title: `Proposals list, ${title} (tech, desktop)`,
+  designBoard: "none",
+  viewport: "desktop",
+  pathname: "/dashboard/proposals/",
+  shell: "none" as const,
+  prepare: () => {
+    resetState();
+    state.pathname = "/dashboard/proposals/";
+    (state as { paidUnreadable?: boolean }).paidUnreadable = unreadable;
+  },
+  render: async () => <TechShell>{(await ProposalsPage({ searchParams: Promise.resolve(search) })) as unknown as ReactElement}</TechShell>,
+});
+screens.push(proposalsVariant("unreadable", "paid read failed", {}, true), proposalsVariant("paid-segment", "Paid segment", { segment: "paid" }, false));

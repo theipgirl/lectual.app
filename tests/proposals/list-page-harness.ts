@@ -121,7 +121,7 @@ export async function renderListPage(search: { segment?: string; status?: string
 export function segments(html: string): string[] {
   const nav = html.slice(html.indexOf('aria-label="Show"'));
   const end = nav.indexOf("</nav>");
-  return [...nav.slice(0, end).matchAll(/<a [^>]*><span>([^<]*)<\/span>(?:<span class="pq-count">(\d+)<\/span>)?<\/a>/g)].map((m) => (m[2] === undefined ? m[1] : `${m[1]}:${m[2]}`));
+  return [...nav.slice(0, end).matchAll(/<a [^>]*><span>([^<]*)<\/span>(?:<span class="pq-count">(\d+|—)<\/span>)?<\/a>/g)].map((m) => (m[2] === undefined ? m[1] : `${m[1]}:${m[2]}`));
 }
 
 /** The HTML of one table row, found by something in it. */

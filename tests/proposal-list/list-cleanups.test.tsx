@@ -89,10 +89,10 @@ describe("Proposals list (F11)", () => {
     expect(html).toContain("counted at the cheapest package offered");
   });
 
-  it("folds Expires into the status line under 1200px", async () => {
+  it("folds Expires into the status line under 1500px", async () => {
     const html = text(await renderListPage());
     expect(html).toContain("pq-exp-inline");
-    expect(css).toMatch(/@media \(max-width: 1199px\) \{[^}]*\.pq-th-expires, \.pq-tbl td\.pq-c-expires \{ display: none; \}/);
+    expect(css).toMatch(/@media \(max-width: 1499px\) \{[^}]*\.pq-th-expires, \.pq-tbl td\.pq-c-expires \{ display: none; \}/);
     expect(css).toContain(".pq-exp-inline { display: block; }");
   });
 

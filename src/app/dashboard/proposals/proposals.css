@@ -213,17 +213,35 @@ td.pq-mono { font-family: var(--mono); }
   /* The list scrolls inside its own box so every loaded proposal is reachable; the header row stays put. */
   max-height: max(360px, calc(100vh - 200px));
 }
+/* From 761px the table never scrolls sideways at the widths the page is built for: fixed layout, the column widths below (padding
+   included), and the long text (headline, package line, activity) wraps or is cut with a title carrying the whole thing. The client's
+   name stays on one line. */
 @media (min-width: 761px) {
-  .pq-tbl { min-width: 980px; }
-  .pq-tbl td.pq-c-client { white-space: nowrap; }
+  .pq-tbl { table-layout: fixed; width: 100%; min-width: 880px; }
+  .pq-tbl th, .pq-tbl td { box-sizing: border-box; padding-left: 8px; padding-right: 8px; }
+  .pq-tbl th:first-child, .pq-tbl td:first-child { padding-left: 16px; }
+  .pq-tbl th:last-child, .pq-tbl td:last-child { padding-right: 16px; }
+  .pq-tbl th { white-space: normal; line-height: 1.3; letter-spacing: 0.1em; vertical-align: bottom; }
+  .pq-th-client { width: 150px; }
+  .pq-th-status { width: 104px; }
+  .pq-th-accepted { width: 100px; }
+  .pq-th-paid { width: 128px; }
+  .pq-th-money { width: 92px; }
+  .pq-th-expires { width: 84px; }
+  .pq-th-activity { width: 100px; }
+  .pq-tbl td.pq-c-client { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pq-tbl td.pq-c-status, .pq-tbl td.pq-c-accepted, .pq-tbl td.pq-c-expires { white-space: normal; overflow-wrap: anywhere; }
+  .pq-tbl td.pq-c-status .lx-pill { white-space: normal; max-width: 100%; line-height: 1.35; letter-spacing: 0.06em; padding-left: 8px; padding-right: 8px; }
+  .pq-tbl td.pq-money { font-size: 13.5px; letter-spacing: 0.02em; }
+  .pq-headline { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+  .pq-subline { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pq-clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; overflow-wrap: anywhere; }
 }
 .pq-tbl th { background: var(--well); position: sticky; top: 0; z-index: 1; }
 .pq-tbl td { height: 56px; vertical-align: middle; }
 .pq-tbl td.wrap { min-width: 0; }
-.pq-tbl td:first-child { min-width: 280px; }
 .pq-money { text-align: right; font-family: var(--mono); letter-spacing: 0.04em; white-space: nowrap; }
 .pq-filing { color: var(--warn); }
-.pq-expires { white-space: nowrap; }
 .pq-activity { color: var(--ink); font-size: 14px; }
 .pq-sub { margin-top: 2px; font-weight: 400; }
 .pq-foot {
@@ -258,7 +276,7 @@ td.pq-mono { font-family: var(--mono); }
 .pq-paid-text[data-paid="unreadable"] { color: var(--wine); }
 .pq-paid-none { color: var(--muted); }
 .pq-c-accepted[data-accepted="no"] { color: var(--muted); }
-.pq-c-accepted { white-space: nowrap; }
+.pq-tbl td.pq-c-accepted { white-space: normal; overflow-wrap: anywhere; }
 
 /* Under 760px a row is a stack: the proposal, the client, then Accepted and Paid directly under the client's name. */
 @media (max-width: 760px) {
@@ -361,10 +379,25 @@ td.pq-mono { font-family: var(--mono); }
 .pq-link-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
 .pq-link-form .lx-input { width: auto; min-width: 200px; flex: 1 1 200px; }
 .pq-exp-inline { display: none; }
-@media (max-width: 1199px) {
+@media (max-width: 1499px) {
   .pq-tbl .pq-th-expires, .pq-tbl td.pq-c-expires { display: none; }
   .pq-exp-inline { display: block; }
-  .pq-tbl { min-width: 880px; }
+}
+/* Below 1700px the "Show" column lies down as a row of chips above the list (with the open-offers figure beside it), so the table gets the
+   whole width: with the rail open, a 240px column beside it left 690px at a 1280px window, too little for eight columns. */
+@media (max-width: 1699px) {
+  .pq-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; align-content: start; }
+  /* The title stays first: the main column's pieces join the grid, and the chips sit between the title and the list. */
+  .pq-main { display: contents; }
+  .pq-main > * { order: 3; }
+  .pq-main > .lx-page-head { order: 1; }
+  .pq-side { order: 2; flex-direction: row; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px 24px; }
+  .pq-segs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; flex: 1 1 520px; }
+  .pq-segs-label { flex-basis: 100%; padding-bottom: 2px; }
+  .pq-seg { border-radius: 999px; border: 1px solid var(--line); padding: 6px 12px; min-height: 36px; align-items: center; gap: 8px; }
+  .pq-seg[aria-current="page"] { border-color: var(--ox); }
+  .pq-out { flex: 0 1 220px; padding-top: 0; }
+  .pq-out-figure { font-size: 22px; }
 }
 /* Under 760px the "Show" column lies down as a row of chips. */
 @media (max-width: 760px) {
@@ -410,11 +443,8 @@ td.pq-mono { font-family: var(--mono); }
 /* List: the Paid cell stacks (a lone "·" used to wrap onto its own line) and the wrapping columns keep a readable width. */
 .pq-paid, .pq-paid-form { flex-direction: column; align-items: flex-start; gap: 6px; }
 .pq-paid-act > [aria-hidden="true"] { display: none; }
-.pq-paid-note { max-width: 220px; line-height: 1.4; }
+.pq-paid-note { max-width: 220px; line-height: 1.4; overflow-wrap: anywhere; }
 @media (min-width: 761px) {
-  .pq-tbl td.pq-c-client { min-width: 140px; }
-  .pq-tbl td.pq-c-paid { min-width: 170px; }
-  .pq-tbl td.pq-c-activity { min-width: 150px; }
   .pq-tbl td { padding-top: 12px; padding-bottom: 12px; }
 }
 .pq-sub { margin-top: 4px; line-height: 1.4; }

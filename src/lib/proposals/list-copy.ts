@@ -28,6 +28,8 @@ export function emptySegmentSentence(segment: ProposalSegment): string {
       return "No drafts or blocked proposals right now.";
     case "accepted":
       return "No accepted proposals yet.";
+    case "paid":
+      return "No paid proposals yet.";
     case "expired":
       return "No expired proposals.";
     default:

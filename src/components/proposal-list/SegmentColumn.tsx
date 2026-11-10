@@ -11,8 +11,8 @@ export function outTileSentence(count: number): string {
 }
 
 /**
- * The page's left column: "Show", the five segments with their counts (from the unfiltered set), and the
- * "Open offers" dollar tile. Under 760px the segments lie down as a row of chips. `counts` and
+ * The page's left column: "Show", the segments with their counts (from the unfiltered set), and the
+ * "Open offers" dollar tile. A count is null (shown "—") when it can't be known: Paid while the paid read failed. Under 760px the segments lie down as a row of chips. `counts` and
  * `out` are null/unavailable when the proposals read failed: the page then shows "—" and
  * "couldn't be loaded", never 0 and never "$0.00".
  */
@@ -22,7 +22,7 @@ export function SegmentColumn({
   out,
 }: {
   active: ProposalSegment;
-  counts: Record<ProposalSegment, number> | null;
+  counts: Record<ProposalSegment, number | null> | null;
   out: OutWithClients;
 }) {
   return (
@@ -37,7 +37,7 @@ export function SegmentColumn({
             className="pq-seg"
           >
             <span>{SEGMENT_LABEL[seg]}</span>
-            {counts && <span className="pq-count">{counts[seg]}</span>}
+            {counts && <span className="pq-count">{counts[seg] ?? "—"}</span>}
           </Link>
         ))}
       </nav>

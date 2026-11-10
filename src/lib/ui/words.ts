@@ -143,6 +143,17 @@ export const LECTUAL_SETS_UP = "Lectual sets this up";
 /** One name for the proposals area (was "Quotes & proposals" / "Client proposals" on its own pages). */
 export const PROPOSALS_NAME = "Proposals";
 export const PROPOSALS_SUBLINE = "Every proposal you've sent or started, newest first.";
+/** Proposals list segments whose names depend on the paid rule: a paid proposal leaves the default list and is listed under Paid. */
+export const PROPOSALS_EVERYTHING_SEGMENT = "Everything except paid";
+export const PROPOSALS_PAID_SEGMENT = "Paid";
+/** Footer of the default list when paid proposals are kept out of it: "6 proposals · 2 paid, listed under Paid". */
+export function proposalsPaidAsideNote(hidden: number): string {
+  return `${hidden} paid, listed under ${PROPOSALS_PAID_SEGMENT}`;
+}
+/** The Paid segment while the paid read failed: never an empty list, never a count. */
+export const PROPOSALS_PAID_UNREADABLE = "Paid status couldn't be read, so paid proposals can't be listed right now. Refresh to try again.";
+/** Every proposal is paid, so the default list is empty. */
+export const PROPOSALS_ALL_PAID = "Every proposal is paid.";
 /** Said once on the proposals list. */
 export const FEE_SENTENCE = "Legal fee is due at signing. USPTO fees are paid at filing.";
 /** A connect or run button that is disabled because the part isn't switched on. */

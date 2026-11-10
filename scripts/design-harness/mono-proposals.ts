@@ -6,7 +6,9 @@ import { ORG, OWNER_ID } from "./fixtures";
 import { L } from "./mono-data";
 
 const pid = (n: number) => `${String(n).repeat(8)}-${String(n).repeat(4)}-4${String(n).repeat(3)}-8${String(n).repeat(3)}-${String(n).padStart(12, "0")}`;
-export const P = { crumb: pid(1), halcyon: pid(2), lumen: pid(3), oat: pid(4), north: pid(5), moon: pid(6) };
+export const P = { crumb: pid(1), halcyon: pid(2), lumen: pid(3), oat: pid(4), north: pid(5), moon: pid(6), faithe: pid(7), vivian: pid(8), reset: pid(9) };
+/** Accepted rows the harness reads as paid (the rest are "not paid"). */
+export const PAID_IDS = new Set([P.faithe, P.vivian]);
 
 function content() {
   const c = sevetri();
@@ -51,6 +53,10 @@ export const proposalList: ProposalListItem[] = [
   listItem(P.oat, "Priya Nair", "sent", { brands: ["OAT & ORCHARD"], sent_at: "2026-10-20T15:00:00Z", expires_on: "2026-11-03" }),
   listItem(P.north, "Jonah Reyes", "approved", { brands: ["NORTHFIELD GOODS"] }),
   listItem(P.moon, "Ines Walker", "withdrawn", { brands: ["PAPER MOON"] }),
+  // Long text: a flat-fee proposal with a long matter title and a long client name (paid), a long brand pair (paid), and a reset one (accepted again, not paid).
+  listItem(P.faithe, "Faithe Williams-Montgomery-Ashworth", "accepted", { matter_title: "Termination of the management contract and transition of vendor agreements for the studio", accepted_at: "2026-11-03T16:00:00Z", legal_total_cents: 125_000, gov_total_cents: 0, class_count: 0, offered: [] } as Partial<ProposalListItem>),
+  listItem(P.vivian, "Vivian Olodun Anderson", "accepted", { brands: ["THE CONFIDENCE INTERVAL LABORATORIES", "SEVENTH STREET APOTHECARY"], accepted_at: "2026-10-30T16:00:00Z", signed_package: "Concierge", class_count: 5, legal_total_cents: 842_500, gov_total_cents: 175_000 }),
+  listItem(P.reset, "Marcus Holloway", "accepted", { brands: ["HOLLOWAY & SONS PROVISIONS"], accepted_at: "2026-11-09T16:00:00Z", signed_package: "Enhanced" }),
 ];
 
 export const proposalRow: ProposalRow = {

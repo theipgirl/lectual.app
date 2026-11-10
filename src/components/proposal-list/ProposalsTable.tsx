@@ -22,31 +22,31 @@ export function ProposalsTable({ rows, footerLeft, footerRight }: { rows: Propos
         <table className="lx-tbl pq-tbl lx-stack">
           <thead>
             <tr>
-              <th>Proposal</th>
-              <th>Client</th>
-              <th>Status</th>
-              <th>Accepted</th>
-              <th>Paid</th>
-              <th className="pq-money">At signing</th>
-              <th className="pq-money">At filing</th>
+              <th className="pq-th-proposal">Proposal</th>
+              <th className="pq-th-client">Client</th>
+              <th className="pq-th-status">Status</th>
+              <th className="pq-th-accepted">Accepted</th>
+              <th className="pq-th-paid">Paid</th>
+              <th className="pq-money pq-th-money">At signing</th>
+              <th className="pq-money pq-th-money">At filing</th>
               <th className="pq-th-expires">Expires</th>
-              <th>Last activity</th>
+              <th className="pq-th-activity">Last activity</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r) => (
               <tr key={r.id} data-status={r.key}>
                 <td className="wrap pq-c-proposal">
-                  <Link href={`/dashboard/proposals/${r.id}/`} className="lx-rowlink">
+                  <Link href={`/dashboard/proposals/${r.id}/`} className="lx-rowlink pq-headline" title={r.headline}>
                     {r.headline}
                   </Link>
-                  <div className="pq-mono pq-sub">{r.subline}</div>
+                  <div className="pq-mono pq-sub pq-subline" title={r.subline}>{r.subline}</div>
                 </td>
-                <td className="wrap pq-client pq-c-client">{r.client}</td>
+                <td className="wrap pq-client pq-c-client" title={r.client}>{r.client}</td>
                 <td className="pq-c-status">
                   <span className={`lx-pill lx-pill-${r.statusTone}`}>{r.statusLabel}</span>
                   {r.statusSub && <div className="pq-mono pq-sub">{r.statusSub}</div>}
-                  {r.expires && r.expires !== "—" && <div className="pq-mono pq-sub pq-exp-inline">Expires {r.expires}</div>}
+                  {r.expires && r.expires !== "—" && <div className="pq-mono pq-sub pq-exp-inline">{/^(Signed|Expired) /.test(r.expires) ? r.expires : <>Expires{" "}{r.expires}</>}</div>}
                 </td>
                 <td className="pq-c-accepted" data-label="Accepted" data-accepted={r.accepted === "Not yet" ? "no" : "yes"}>
                   {r.accepted}
@@ -58,7 +58,9 @@ export function ProposalsTable({ rows, footerLeft, footerRight }: { rows: Propos
                 <td className="pq-money pq-c-signing" data-label="At signing">{formatCents(r.atSigningCents)}</td>
                 <td className="pq-money pq-filing pq-c-filing" data-label="At filing">{r.atFilingCents === null ? "—" : formatCents(r.atFilingCents)}</td>
                 <td className="pq-mono pq-expires pq-c-expires" data-label="Expires">{r.expires}</td>
-                <td className="wrap pq-activity pq-c-activity" data-label="Last activity">{r.activity}</td>
+                <td className="wrap pq-activity pq-c-activity" data-label="Last activity">
+                  <span className="pq-clamp" title={r.activity}>{r.activity}</span>
+                </td>
               </tr>
             ))}
           </tbody>

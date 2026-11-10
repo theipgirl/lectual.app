@@ -37,7 +37,7 @@ import { requireProposalsModule } from "./gate";
 import "./proposals.css";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
-import { FEE_SENTENCE, PROPOSALS_NAME, PROPOSALS_SUBLINE } from "@/lib/ui/words";
+import { FEE_SENTENCE, PROPOSALS_ALL_PAID, PROPOSALS_NAME, PROPOSALS_PAID_UNREADABLE, PROPOSALS_SUBLINE, proposalsPaidAsideNote } from "@/lib/ui/words";
 import { emptySegmentSentence } from "@/lib/proposals/list-copy";
 import { DELETE_DONE } from "@/lib/proposal-editor/delete-proposal";
 
@@ -50,8 +50,9 @@ export const dynamic = "force-dynamic";
  * read: rows, empty, or "couldn't load". An unreachable database never renders as "No
  * proposals yet", an unreachable queue of proposals never as "$0.00".
  *
- * The page follows the approved design: a left column of five segments (Everything, Out with a
- * client, Drafts and blocked, Accepted, Expired; counts from the unfiltered set; `?segment=`),
+ * The page follows the approved design: a left column of segments (Everything except paid, Out with a
+ * client, Drafts and blocked, Accepted, Paid, Expired; counts from the unfiltered set; `?segment=`; a paid
+ * proposal is listed under Paid only, and a paid state that couldn't be read keeps the row in the default list),
  * the "Out with clients" dollar tile (the cheapest offered package's legal fee per Sent
  * proposal, never a USPTO fee), the consults strip (Zoom / Fathom imports and their next step)
  * and a seven-column table with the legal fee at signing and the USPTO fees at filing as two
@@ -107,15 +108,28 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
     item,
     view: buildProposalRowView(item, { today, tz, now, events, names, paid: stepRead === "unavailable" ? "unavailable" : new Map([...stepRead].map(([id, a]) => [id, a.paid])), canMarkPaid, opens: opensRead }),
   }));
+  // A paid proposal leaves the default list and Accepted and is listed under Paid (never deleted). Paid is the Paid column's own state,
+  // current round only, so Undo or a reset brings the row back. A paid state that could not be read is NOT paid: the row stays put,
+  // and the Paid segment says it can't be listed rather than showing 0.
+  const paidReadable = stepRead !== "unavailable";
+  const isPaid = (v: ProposalRowView) => v.paidCell.kind === "paid";
+  const inShown = (s: ProposalSegment, r: (typeof all)[number]) => inSegment(s, r.view.key, isPaid(r.view));
   const counts = failed
     ? null
-    : (Object.fromEntries(PROPOSAL_SEGMENTS.map((s) => [s, all.filter((r) => inSegment(s, r.view.key)).length])) as Record<ProposalSegment, number>);
+    : (Object.fromEntries(PROPOSAL_SEGMENTS.map((s) => [s, s === "paid" && !paidReadable ? null : all.filter((r) => inShown(s, r)).length])) as Record<ProposalSegment, number | null>);
   const out = outWithClientsCents(failed ? null : all.map((r) => ({ displayKey: r.view.key, offered: r.item.offered })));
+  const paidCount = all.filter((r) => isPaid(r.view)).length;
   // The Accepted segment lists accepted-and-not-paid first (what still needs a person); every other segment keeps the list's order.
-  const rows: ProposalRowView[] = sortForSegment(segment, all.filter((r) => inSegment(segment, r.view.key)).map((r) => r.view));
+  const rows: ProposalRowView[] = sortForSegment(segment, all.filter((r) => inShown(segment, r)).map((r) => r.view));
+  const paidUnreadable = segment === "paid" && !paidReadable;
 
   // The fee sentence is said once on the page, in the table's footer.
-  const footerLeft = segment === "everything" ? `All ${all.length} proposals` : `${rows.length} of ${all.length} proposals`;
+  const footerLeft =
+    segment === "everything"
+      ? paidCount > 0
+        ? `${rows.length} proposals · ${proposalsPaidAsideNote(paidCount)}`
+        : `All ${all.length} proposals`
+      : `${rows.length} of ${all.length} proposals`;
 
   // Opened from a lead (`?lead=<id>`): that lead is chosen in the transcript form, and the form is open.
   const preselected = leadsRead?.status === "ok" ? preselectedLeadId(sp.lead, leadsRead.leads) : "";
@@ -177,10 +191,19 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
               Can&apos;t show this right now. Refresh to try again.
             </p>
           </div>
+        ) : paidUnreadable ? (
+          <div className="lx-card lx-empty-card" role="status" data-paid="unreadable">
+            <h2 className="lx-h2" style={{ fontSize: 25 }}>
+              Paid proposals couldn&apos;t be listed
+            </h2>
+            <p className="lx-note" style={{ margin: 0 }}>
+              {PROPOSALS_PAID_UNREADABLE}
+            </p>
+          </div>
         ) : rows.length === 0 ? (
           <div className="lx-card lx-empty-card">
             <h2 className="lx-h2" style={{ fontSize: 25 }}>
-              {all.length === 0 ? "No proposals yet" : emptySegmentSentence(segment)}
+              {all.length === 0 ? "No proposals yet" : segment === "everything" && paidCount > 0 ? PROPOSALS_ALL_PAID : emptySegmentSentence(segment)}
             </h2>
             <p className="lx-note" style={{ margin: 0 }}>
               {all.length === 0 ? (
@@ -189,6 +212,8 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
                 ) : (
                   "When one is started it will be listed here."
                 )
+              ) : segment === "everything" && paidCount > 0 ? (
+                <Link href="/dashboard/proposals/?segment=paid">Show paid</Link>
               ) : (
                 <Link href="/dashboard/proposals/">Show all</Link>
               )}

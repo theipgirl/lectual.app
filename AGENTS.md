@@ -1570,3 +1570,20 @@ A second shell for the managing attorney, beside today's (the TECHNICIAN view, u
   USPTO deadline or wait, a pending approval, a live proposal or unreadable contact history. Firm-wide, with its chip ("N older hidden ·
   Show all"). For an approver the "Waiting on <name>" strip is "Waiting on you".
 - **NOT verified:** a real browser (desktop or 375px), migration 0103 against a real database, a live Graph send, the Mail.Send consent.
+
+## Proposals list: no sideways scroll, and paid leaves the default list (no schema)
+Display only; `pricing.ts`, `paid.ts` and `paid-view.ts` are untouched.
+- **No sideways scroll on desktop.** From 761px `.pq-tbl` is `table-layout: fixed` with set column widths (`.pq-th-*`, padding included) and a
+  880px floor; the headline (2 lines), package line and activity (4 lines) wrap or are cut with a `title` holding the whole text, the client's
+  name stays on one line (ellipsis + title). Below 1700px the "Show" column lies down as a row of chips above the list (with Open offers
+  beside it) so the table gets the whole width; Expires folds into the Status cell below 1500px. The old 140/170/150px column minimums and
+  the 880px minimum that leaked into the phone layout (it made the stacked cards scroll sideways) are gone. Narrowest width with no scroll:
+  1206px with the rail open (the 880px floor plus the rail and page gutters); under that the box scrolls instead of crushing the columns.
+- **A paid proposal leaves the default list (never deleted).** Segments are now Everything except paid, Out with a client, Drafts and blocked,
+  Accepted (accepted and not yet paid), **Paid**, Expired. `inSegment(segment, key, paid)`: paid is the row's own Paid cell
+  (`paidCell.kind === "paid"`, the same current-round state the column shows), so Undo or a reset brings the row back with no extra code. A paid
+  state that couldn't be read is NOT paid: the row stays in the default list and Accepted, the Paid count is "—", and the Paid segment says it
+  can't list them (never "No paid proposals yet"). Counts, the "Showing" footer ("6 proposals · 2 paid, listed under Paid") and the rows come
+  from the one rule. Words are in `words.ts` (`PROPOSALS_EVERYTHING_SEGMENT`, `PROPOSALS_PAID_SEGMENT`, ...).
+- Owner Today's "Proposals out" and the weekly review's "Proposals out" strip read only `sent` versions (`proposal-expiry.ts`, `owner-rules.ts`);
+  a paid proposal is accepted, so it cannot appear there and nothing changed.
