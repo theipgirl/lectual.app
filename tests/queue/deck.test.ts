@@ -187,3 +187,14 @@ describe("deckEmptyState", () => {
     for (const role of ["viewer", "social_media", "paralegal", "clerk"] as Role[]) expect(st({ role }).kind, role).toBe("nothing-for-you");
   });
 });
+
+describe("deckEmptyState: All decided only when nothing waits for anyone", () => {
+  it("an approver with an empty deck but items waiting for colleagues is told so", async () => {
+    const { deckEmptyState } = await import("@/lib/queue/deck");
+    const empty = { laterArrivals: [], later: [], handedOff: [] };
+    const r = deckEmptyState({ queueOk: true, role: "owner", deck: empty, nextDealLabel: "2:00 PM", othersPending: 2 });
+    expect(r.kind).toBe("waiting");
+    expect(r.kind === "waiting" && r.details.join(" ")).toMatch(/2 waiting for colleagues to decide/);
+    expect(deckEmptyState({ queueOk: true, role: "owner", deck: empty, nextDealLabel: "2:00 PM", othersPending: 0 }).kind).toBe("all-decided");
+  });
+});

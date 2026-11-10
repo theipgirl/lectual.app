@@ -4,7 +4,7 @@ import { approvalBlock, auditDraft, type AuditContext } from "@/lib/queue/hygien
 import { mineItems } from "@/lib/queue/mine";
 import { parseReviewerSummary } from "@/lib/queue/reviewer-summary";
 import { QUEUE_APPROVE_ROLES, QUEUE_EDIT_ROLES } from "@/lib/queue/roles";
-import { DECK_NOTHING_FOR_YOU, DECK_NOTHING_NOW, deckAllDecided, deckHandedCount, deckLaterArrivals, deckLaterBack } from "@/lib/ui/words";
+import { DECK_NOTHING_FOR_YOU, DECK_NOTHING_NOW, deckAllDecided, deckHandedCount, deckOthersWaiting, deckLaterArrivals, deckLaterBack } from "@/lib/ui/words";
 import { canApproveItem, classifyQueueItem, type ApprovalRouting, type QueueKind, type Viewer } from "@/lib/queue/routing";
 
 /**
@@ -267,7 +267,11 @@ export type DeckEmpty =
  * What an empty card pile means. "All decided" only when the queue was reached and nothing is waiting for this person in
  * any form; otherwise the counts say where the cards are. Pure; the page draws it.
  */
-export function deckEmptyState(args: { queueOk: boolean; role: Role; deck: Pick<Deck, "laterArrivals" | "later" | "handedOff">; nextDealLabel: string }): DeckEmpty {
+/**
+ * `othersPending`: pending items the queue holds that are not on this person's deck in any form (someone else's to
+ * decide). "All decided" is said only when that is 0 too: nothing is waiting for anyone.
+ */
+export function deckEmptyState(args: { queueOk: boolean; role: Role; deck: Pick<Deck, "laterArrivals" | "later" | "handedOff">; nextDealLabel: string; othersPending?: number }): DeckEmpty {
   if (!args.queueOk) return { kind: "unreached" };
   const { laterArrivals, later, handedOff } = args.deck;
   const details: string[] = [];
@@ -276,5 +280,7 @@ export function deckEmptyState(args: { queueOk: boolean; role: Role; deck: Pick<
   if (handedOff.length > 0) details.push(deckHandedCount(handedOff.length));
   if (details.length > 0) return { kind: "waiting", headline: DECK_NOTHING_NOW, details };
   if (!QUEUE_EDIT_ROLES.includes(args.role) || !QUEUE_APPROVE_ROLES.includes(args.role)) return { kind: "nothing-for-you", headline: DECK_NOTHING_FOR_YOU, details: [] };
+  const others = args.othersPending ?? 0;
+  if (others > 0) return { kind: "waiting", headline: DECK_NOTHING_NOW, details: [deckOthersWaiting(others)] };
   return { kind: "all-decided", headline: deckAllDecided(args.nextDealLabel), details: [] };
 }

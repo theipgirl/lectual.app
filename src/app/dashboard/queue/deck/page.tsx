@@ -163,7 +163,9 @@ export default async function DeckPage({ searchParams }: { searchParams: Promise
   ];
 
   if (!pos) {
-    const empty = deckEmptyState({ queueOk: true, role: viewer.role, deck, nextDealLabel: deal.next.label });
+    const onDeck = new Set([...deck.cards, ...deck.laterArrivals, ...deck.later, ...deck.handedOff].map((c) => c.item.id));
+    const othersPending = load.items.filter((i) => i.status === "pending" && !onDeck.has(i.id)).length;
+    const empty = deckEmptyState({ queueOk: true, role: viewer.role, deck, nextDealLabel: deal.next.label, othersPending });
     return frame(
       side,
       <div className="lx-card lx-empty-card" role="status">

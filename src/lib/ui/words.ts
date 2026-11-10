@@ -191,6 +191,8 @@ export const deckAllDecided = (label: string) => `All decided. Next deal ${label
 export const DECK_NOTHING_NOW = "Nothing to decide right now.";
 export const DECK_NOTHING_FOR_YOU = "There is nothing for you to decide here.";
 export const deckLaterBack = (n: number, label: string) => `${n} ${n === 1 ? "card is" : "cards are"} back at ${label}.`;
+/** The deck is empty for this person but the queue still holds items someone else decides. */
+export const deckOthersWaiting = (n: number) => `${n} waiting for ${n === 1 ? "a colleague" : "colleagues"} to decide.`;
 export const deckHandedCount = (n: number) => `${n} handed to ${n === 1 ? "a colleague" : "colleagues"}.`;
 export const DECK_DRAFT_NONE = "Approved. No draft was made, so nothing is in a mailbox and nothing has been sent. Copy the text from the full approval page into an email, or connect a mailbox in Settings.";
 export const DECK_ALL_LIST_HEADING = "Your approvals";
