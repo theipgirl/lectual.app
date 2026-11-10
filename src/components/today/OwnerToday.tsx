@@ -11,7 +11,7 @@ import { loadDeckSummary, type DeckSummary } from "@/lib/queue/deck-summary";
 import { loadTodayConsults, type TodayConsultsResult } from "@/lib/calendar/consult-sources";
 import { liveConsultDeps } from "@/lib/calendar/consult-sources-live";
 import { loadOwnerDeadlines, loadOwnerProposals } from "@/lib/today/owner-load";
-import { cardsHero, deadlineChip, proposalTone, weekdayDate, OWNER_PROPOSALS_SHOWN, OWNER_DEADLINES_SHOWN, weekStrip } from "@/lib/today/owner-rules";
+import { cardsHero, deadlineChip, deadlineParts, proposalTone, weekdayDate, OWNER_PROPOSALS_SHOWN, OWNER_DEADLINES_SHOWN, weekStrip } from "@/lib/today/owner-rules";
 import { DECK_PATH } from "@/lib/views";
 import { AddNameLink } from "@/components/account/AddNameLink";
 import { OwnerConsults } from "@/components/today/owner/OwnerConsults";
@@ -29,6 +29,7 @@ import {
   OWNER_WEEK_KEY_DEADLINE,
   OWNER_WEEK_OPEN_CALENDAR,
   ownerProposalOpens,
+  ownerSeeAll,
   OWNER_DEADLINES_FAILED,
   OWNER_DEADLINES_HEADING,
   OWNER_DEADLINES_NONE,
@@ -213,7 +214,7 @@ export async function OwnerToday({
                         <Link href={p.href} className="ot-row-title">
                           {p.client} &middot; {p.title}
                         </Link>
-                        <span className="ot-sub ot-only-wide">
+                        <span className="ot-sub ot-line ot-only-wide">
                           {OWNER_PROPOSAL_LINK_LIVE}
                           {opens ? ` \u00b7 ${opens}` : ""}
                         </span>
@@ -225,7 +226,7 @@ export async function OwnerToday({
               )}
               {Array.isArray(proposals) && proposals.length > OWNER_PROPOSALS_SHOWN && (
                 <Link href="/dashboard/proposals/" className="ot-link ot-more">
-                  {proposals.length - OWNER_PROPOSALS_SHOWN} more
+                  {ownerSeeAll(proposals.length)}
                 </Link>
               )}
             </section>
@@ -249,14 +250,15 @@ export async function OwnerToday({
             ) : (
               deadlines.slice(0, OWNER_DEADLINES_SHOWN).map((d) => {
                 const chip = deadlineChip(d, today);
+                const parts = deadlineParts(d);
                 return (
                   <div key={d.key} className="ot-row">
                     <div className="ot-row-main">
                       <Link href={d.href} className="ot-row-title">
-                        {d.name}
+                        {parts.title}
                       </Link>
-                      <span className="ot-sub">
-                        <span className="ot-only-wide">{d.detail} &middot; </span>
+                      <span className="ot-sub ot-line">
+                        <span className="ot-only-wide">{parts.who} &middot; </span>
                         {weekdayDate(d.dueDate)}
                       </span>
                     </div>
@@ -267,7 +269,7 @@ export async function OwnerToday({
             )}
             {deadlines !== null && deadlines.length > OWNER_DEADLINES_SHOWN && (
               <Link href="/dashboard/calendar/" className="ot-link ot-more">
-                {deadlines.length - OWNER_DEADLINES_SHOWN} more on the calendar
+                {ownerSeeAll(deadlines.length)}
               </Link>
             )}
           </section>

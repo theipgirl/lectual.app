@@ -2,7 +2,8 @@ import Link from "next/link";
 import { formatEventWhen } from "@/lib/calendar/outlook-format";
 import { sourceNote, type TodayConsultsResult } from "@/lib/calendar/consult-sources";
 import { civilInZone } from "@/lib/today/outcomes";
-import { OWNER_CONSULTS_HEADING, OWNER_CONSULTS_NONE_TODAY, OWNER_CONSULT_JOIN_LINK, OWNER_CONSULT_LEAD_LINK } from "@/lib/ui/words";
+import { OWNER_CONSULTS_SHOWN } from "@/lib/today/owner-rules";
+import { ownerSeeAll, OWNER_CONSULTS_HEADING, OWNER_CONSULTS_NONE_TODAY, OWNER_CONSULT_JOIN_LINK, OWNER_CONSULT_LEAD_LINK } from "@/lib/ui/words";
 
 const SOURCE_LABEL = { outlook: "Outlook", zoom: "Zoom" } as const;
 
@@ -33,13 +34,13 @@ export function OwnerConsults({ result, timeZone, today }: { result: TodayConsul
         </h2>
         {notes.length === 0 && <span className="ot-sub">{todays.length}</span>}
       </div>
-      {todays.map((c) => {
+      {todays.slice(0, OWNER_CONSULTS_SHOWN).map((c) => {
         const when = c.allDay ? "All day" : clockOf(formatEventWhen({ starts_at: c.startsAt, all_day: false }, timeZone));
         return (
           <div key={c.key} className="ot-row">
             <div className="ot-row-main">
               <span className="ot-row-title">{c.title}</span>
-              <span className="ot-sub">
+              <span className="ot-sub ot-line">
                 {when} &middot; {SOURCE_LABEL[c.source]}
                 {c.joinUrl ? " · Zoom link" : ""}
               </span>
@@ -56,6 +57,11 @@ export function OwnerConsults({ result, timeZone, today }: { result: TodayConsul
           </div>
         );
       })}
+      {todays.length > OWNER_CONSULTS_SHOWN && (
+        <Link href="/dashboard/calendar/" className="ot-link ot-more">
+          {ownerSeeAll(todays.length)}
+        </Link>
+      )}
       {todays.length === 0 && notes.length === 0 && <p className="ot-sub ot-empty">{OWNER_CONSULTS_NONE_TODAY}</p>}
       {todays.length === 0 && notes.length > 0 && readOk.length > 0 && <p className="ot-sub ot-empty">No consults today in {readOk.join(" and ")}.</p>}
       {notes.map((n) => (

@@ -22,8 +22,9 @@ import {
 /** Pure rules for the owner's Today. No reads here; every source arrives already three-state. */
 
 export const OWNER_DEADLINE_DAYS = 14;
-export const OWNER_PROPOSALS_SHOWN = 6;
-export const OWNER_DEADLINES_SHOWN = 6;
+export const OWNER_PROPOSALS_SHOWN = 3;
+export const OWNER_DEADLINES_SHOWN = 3;
+export const OWNER_CONSULTS_SHOWN = 3;
 
 /* ── Your cards ── */
 
@@ -74,6 +75,13 @@ export function cardsHero(summary: DeckSummary): CardsHero {
 /* ── Deadlines ── */
 
 export type OwnerDeadline = { key: string; href: string; name: string; detail: string; dueDate: string; overdueDays: number };
+
+/** One-line parts: the title "Office action response · NORTHFIELD" and the sub-line start "TM-1042" (detail is "number · title"). */
+export function deadlineParts(d: Pick<OwnerDeadline, "name" | "detail">): { title: string; who: string } {
+  const [number, ...rest] = d.detail.split(" \u00b7 ");
+  const mark = rest.join(" \u00b7 ");
+  return { title: mark ? `${d.name} \u00b7 ${mark}` : d.name, who: number };
+}
 
 export type Tone = "risk" | "warn" | "plain";
 
@@ -182,12 +190,18 @@ export function addCivilDays(civil: string, n: number): string {
   return new Date(Date.parse(`${civil}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 }
 
+/** The Monday of the calendar week holding a civil date (Monday to Sunday). */
+export function mondayOf(civil: string): string {
+  const dow = new Date(`${civil}T12:00:00Z`).getUTCDay();
+  return addCivilDays(civil, -((dow + 6) % 7));
+}
+
 function clock(iso: string, tz: string): string {
   return new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit" }).format(new Date(iso));
 }
 
 /**
- * Seven days from today in firm time. A null source marks its count as unknown, never zero. Proposals' last days (when the
+ * The calendar week (Monday to Sunday) holding today, in firm time; today is marked wherever it falls. A null source marks its count as unknown, never zero. Proposals' last days (when the
  * firm has the feature and the read worked) are listed as deadline-coloured items; they do not change the deadline counts.
  */
 export function weekStrip(input: {
@@ -198,8 +212,9 @@ export function weekStrip(input: {
   proposals?: readonly OwnerProposal[] | null;
 }): WeekDay[] {
   const today = civilInZone(input.now, input.tz);
+  const monday = mondayOf(today);
   return Array.from({ length: 7 }, (_, i) => {
-    const date = addCivilDays(today, i);
+    const date = addCivilDays(monday, i);
     const at = new Date(`${date}T12:00:00Z`);
     const label = new Intl.DateTimeFormat("en-US", { timeZone: "UTC", weekday: "short", day: "numeric" }).format(at);
     const weekday = new Intl.DateTimeFormat("en-US", { timeZone: "UTC", weekday: "short" }).format(at);
@@ -209,10 +224,10 @@ export function weekStrip(input: {
     const dayProposals = (input.proposals ?? []).filter((p) => p.expiresOn === date && !p.expired);
     const items: WeekItem[] = [
       ...(dayConsults ?? []).map((c): WeekItem => ({ kind: "consult", lead: c.allDay ? "All day" : clock(c.startsAt, input.tz), text: c.title })),
-      ...(dayDeadlines ?? []).map((d): WeekItem => ({ kind: "deadline", lead: OWNER_WEEK_DUE, text: `${d.name} \u00b7 ${d.detail}` })),
+      ...(dayDeadlines ?? []).map((d): WeekItem => ({ kind: "deadline", lead: OWNER_WEEK_DUE, text: deadlineParts(d).title })),
       ...dayProposals.map((p): WeekItem => ({ kind: "deadline", lead: OWNER_WEEK_LAST_DAY, text: `Proposal \u00b7 ${p.client}` })),
     ];
-    return { date, label, weekday, num: String(Number(date.slice(8))), isToday: i === 0, consults: dayConsults ? dayConsults.length : null, deadlines: dayDeadlines ? dayDeadlines.length : null, items };
+    return { date, label, weekday, num: String(Number(date.slice(8))), isToday: date === today, consults: dayConsults ? dayConsults.length : null, deadlines: dayDeadlines ? dayDeadlines.length : null, items };
   });
 }
 

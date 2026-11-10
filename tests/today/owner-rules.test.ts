@@ -41,10 +41,14 @@ describe("owner Today rules", () => {
   it("weekStrip: seven days in firm time, unknown sources are null", () => {
     const days = weekStrip({ now: NOW, tz: TZ, consults: [{ startsAt: "2026-11-11T02:00:00Z" } as never], deadlines: null });
     expect(days).toHaveLength(7);
-    expect(days[0].isToday).toBe(true);
+    // The calendar week, Monday 9 to Sunday 15 Nov; today (Tuesday the 10th) is marked where it falls.
+    expect(days.map((d) => d.weekday)).toEqual(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]);
+    expect(days[0].date).toBe("2026-11-09");
+    expect(days[1].isToday).toBe(true);
+    expect(days.filter((d) => d.isToday)).toHaveLength(1);
     // 02:00Z on the 11th is 9 pm on the 10th in New York.
-    expect(days[0].consults).toBe(1);
-    expect(days[0].deadlines).toBeNull();
+    expect(days[1].consults).toBe(1);
+    expect(days[1].deadlines).toBeNull();
   });
 
   it("copilotHref trims and encodes", () => {

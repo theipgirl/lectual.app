@@ -350,6 +350,9 @@ export const OWNER_COPILOT_PHONE_CHIPS = [
   { label: "Proposals not opened", question: "Which proposals haven\u2019t been opened?" },
   { label: "Quiet 14 days", question: "Who haven\u2019t we heard from in 14 days?" },
 ] as const;
+export function ownerSeeAll(total: number): string {
+  return `See all ${total}`;
+}
 export const OWNER_CONSULTS_HEADING = "Today\u2019s consults";
 export const OWNER_CONSULTS_NONE_TODAY = "No consults today.";
 export const OWNER_CONSULTS_FAILED = "Couldn't load consults.";

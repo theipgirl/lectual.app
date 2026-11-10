@@ -20,9 +20,11 @@ export const screens: Screen[] = [
     prepare: () => {
       resetState();
       state.pathname = "/dashboard/";
-      state.proposals = proposals.map((p, i) => ({ ...p, opens: i === 0 ? 2 : 0 }));
+      state.proposals = proposals.map((p, i) => ({ ...p, title: p.title.split(" \u00b7 ")[0], opens: i === 0 ? 2 : 0 }));
     },
     render: today,
+    // The real shell scrolls inside .lx-page (rail and top bar fixed). For a full-page capture only, unfold it.
+    transformHtml: (html) => "<style>.lx-app{height:auto!important;overflow:visible!important}.lx-content,.lx-page{overflow:visible!important}</style>" + html,
     note: "Real OwnerToday (async server component) with the loaders mocked in setup.ts.",
   },
   {
@@ -36,7 +38,7 @@ export const screens: Screen[] = [
     prepare: () => {
       resetState();
       state.pathname = "/dashboard/";
-      state.proposals = proposals.map((p, i) => ({ ...p, opens: i === 0 ? 2 : 0 }));
+      state.proposals = proposals.map((p, i) => ({ ...p, title: p.title.split(" \u00b7 ")[0], opens: i === 0 ? 2 : 0 }));
     },
     render: today,
     note: "Same page at 375px; the rail hides and MobileBar shows.",
