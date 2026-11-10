@@ -92,7 +92,7 @@ vi.mock("@/lib/queue/api", async (orig) => ({
   getQueueItem: async (_k: string, id: string) => [...state.pending, ...state.approved, ...state.rejected].find((i) => i.id === id)!,
 }));
 vi.mock("@/lib/queue/org", async (orig) => ({ ...(await orig<typeof import("@/lib/queue/org")>()), activeQueueOrgKey: async () => "rpb" }));
-vi.mock("@/lib/db/scoped-client", async () => ({ getScopedClient: async () => (await import("./mono-data")).fakeClient() }));
+vi.mock("@/lib/db/scoped-client", () => ({ getScopedClient: async () => ({}) }));
 vi.mock("@/lib/queue/roles", async (orig) => ({ ...(await orig<typeof import("@/lib/queue/roles")>()), resolveQueueRole: async () => "owner" }));
 vi.mock("@/lib/queue/view-context", () => ({
   loadQueueViewContext: async () => ({ viewer: { userId: "00000000-0000-4000-8000-0000000000a1", role: "owner" }, routing: {}, members: [], routingFailed: false, dropped: 0, now: Date.parse("2026-11-10T14:30:00Z") }),
@@ -132,44 +132,4 @@ vi.mock("@/components/review/SheetEditTable", async (orig) => {
     SheetEditTable: (p: Parameters<typeof m.SheetEditTable>[0]) =>
       createElement(m.SheetEditTable, { ...p, initial: p.initial ?? (state as { sheetEditInitial?: Parameters<typeof m.SheetEditTable>[0]["initial"] }).sheetEditInitial }),
   };
-});
-
-// Mono pages (staff Proposals / Leads / Matters; screens/mono-pages.screen.tsx): request-scope and network edges.
-vi.mock("next/headers", () => ({
-  headers: async () => new Headers({ host: "app.example" }),
-  cookies: async () => ({ get: () => undefined, getAll: () => [], has: () => false }),
-}));
-vi.mock("@/lib/site-origin", () => ({ getSiteOrigin: async () => "https://app.example" }));
-
-// Mono pages: the proposals store and its neighbours (screens/mono-pages.screen.tsx).
-vi.mock("@/lib/proposals/store", async (orig) => {
-  const m = await orig<typeof import("@/lib/proposals/store")>();
-  const d = await import("./mono-proposals");
-  return {
-    ...m,
-    listProposals: async () => d.proposalList,
-    listLatestProposalEvents: async () => new Map(),
-    listProposalOpens: async () => new Map([[d.P.crumb, { count: 4, lastAt: "2026-11-08T10:12:00Z" }]]),
-    listStepActivity: async (ids: string[]) => new Map(ids.map((i) => [i, { paid: { state: "not_paid", undoneAt: null }, newest: null }])),
-    getProposal: async () => d.proposalDetail,
-    getProposalSettings: async () => ({ pricing: { packages: [{ package: "Enhanced", base_cents: 407_500, included_classes: 3, per_class_cents: 82_500, second_mark_discount_pct: 20, gov_per_class_cents: 35_000 }] }, default_pay_url: null }),
-    isCurrentUserApprover: async () => true,
-    listProposalStepEvents: async () => ({ ok: true, events: [] }),
-  };
-});
-vi.mock("@/lib/proposals/consults-load", () => ({
-  loadConsultsStrip: async () => ({
-    header: { title: "Zoom consults", status: { kind: "connected", text: "connected · last sync 6 min ago" } },
-    meetings: { status: "ok", rows: [], more: 0 },
-  }),
-}));
-vi.mock("@/lib/proposals/consult-strip-load", () => ({ loadConsultStrip: async () => ({ status: "none" }) }));
-vi.mock("@/lib/proposals/lead-options", () => ({ loadLeadOptions: async () => ({ status: "ok", leads: [{ id: "lead-1", label: "Maya Chen" }] }) }));
-vi.mock("@/lib/proposals/lead-link", () => ({ loadLeadLink: async (id: string | null) => (id ? { state: "linked", id, name: "Maya Chen" } : { state: "none" }) }));
-vi.mock("@/lib/consult-proposal/draft-gate", () => ({ loadDraftBlock: async () => null }));
-vi.mock("@/lib/proposals/legacy-load", () => ({ loadLegacyProposals: async () => [] }));
-vi.mock("@/lib/meetings/connection", async (orig) => ({ ...(await orig<typeof import("@/lib/meetings/connection")>()), listMeetingConnections: async () => ({ ok: true, connections: [] }) }));
-vi.mock("next/font/google", () => {
-  const font = () => ({ className: "", variable: "", style: { fontFamily: "inherit" } });
-  return { Bodoni_Moda: font, Source_Serif_4: font, Instrument_Serif: font, Geist: font, Courier_Prime: font };
 });

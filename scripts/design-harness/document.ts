@@ -13,19 +13,13 @@ export function copyCss(): string[] {
   // HARNESS_SKIP_CSS=<regex>: leave out compiled chunks that match (their rules come from the live src copies instead), so a stale build cannot hide a difference.
   const skip = process.env.HARNESS_SKIP_CSS ? new RegExp(process.env.HARNESS_SKIP_CSS) : null;
   if (skip) files = files.filter((f) => !skip.test(fs.readFileSync(path.join(dir, f), "utf8")));
-  if (process.env.HARNESS_GLOBALS) files = [];
-  if (files.length === 0 && !process.env.HARNESS_GLOBALS) throw new Error("No compiled CSS in .next/static/chunks. Run `pnpm build` once.");
+  if (files.length === 0) throw new Error("No compiled CSS in .next/static/chunks. Run `pnpm build` once.");
   fs.mkdirSync(path.join(OUT, "css"), { recursive: true });
   for (const f of files) fs.copyFileSync(path.join(dir, f), path.join(OUT, "css", f));
   // The compiled CSS points at the next/font files as ../media/<hash>.woff2: copy them next to it.
   const media = path.join(REPO, ".next/static/media");
   if (fs.existsSync(media)) fs.cpSync(media, path.join(OUT, "media"), { recursive: true });
   const isGlobals = (f: string) => fs.readFileSync(path.join(dir, f), "utf8").includes("--serif:");
-  // HARNESS_GLOBALS=<compiled css>: a fresh compile of src/app/globals.css (postcss + tailwind) replaces the build's stale globals chunk.
-  if (process.env.HARNESS_GLOBALS) {
-    fs.copyFileSync(process.env.HARNESS_GLOBALS, path.join(OUT, "css", "0-globals-fresh.css"));
-    return ["0-globals-fresh.css"];
-  }
   return [...files.filter(isGlobals), ...files.filter((f) => !isGlobals(f)).sort()];
 }
 
