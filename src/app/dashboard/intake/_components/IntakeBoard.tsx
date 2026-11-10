@@ -12,8 +12,8 @@ import { ownerColumns, stageColumns } from "@/lib/intake/views";
 import IntakeCard from "./IntakeCard";
 import { CHIP_COUNT, ownerAvatar, ownerAvatarFor } from "./styles";
 
-/** Narrower than this and a card is unreadable, so the board scrolls instead. */
-const MIN_COLUMN = 250;
+/** Columns share the width equally. Five stages must fit beside the open rail at 1280px (956px of page), which is 182px each; narrower than this a card is unreadable, so the board scrolls instead. */
+const MIN_COLUMN = 180;
 
 const columnShell: React.CSSProperties = {
   display: "flex",

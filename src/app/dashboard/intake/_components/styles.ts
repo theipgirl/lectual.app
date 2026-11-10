@@ -80,6 +80,14 @@ export const NEXT: CSSProperties = {
   minWidth: 0,
 };
 
+/** A long next step shows two lines; the cell's title holds the whole text. */
+export const NEXT_CLAMP: CSSProperties = {
+  display: "-webkit-box",
+  WebkitLineClamp: 2,
+  WebkitBoxOrient: "vertical",
+  overflow: "hidden",
+};
+
 export const NEXT_HOT: CSSProperties = {
   fontSize: "var(--lp-meta, 13px)",
   color: "var(--ox)",

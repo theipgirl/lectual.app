@@ -17,7 +17,7 @@ import NeedsRebeccaBadge from "./NeedsRebeccaBadge";
 import AgentMoveChip from "./AgentMoveChip";
 import SourceCell from "./SourceCell";
 import type { Lane } from "@/lib/leads/lane";
-import { NEXT, NEXT_HOT, TOUCH_IN, TOUCH_OUT } from "./styles";
+import { NEXT, NEXT_CLAMP, NEXT_HOT, TOUCH_IN, TOUCH_OUT } from "./styles";
 import { NO_LEADS_YET, NO_LEAD_MATCHES } from "@/lib/ui/words";
 
 /**
@@ -248,7 +248,7 @@ export default function IntakeTable({
                       the row past its container. */}
                   <div data-label="Next step" style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                     <span
-                      style={{ ...(step.urgent ? NEXT_HOT : NEXT), flex: 1, overflowWrap: "anywhere" }}
+                      style={{ ...(step.urgent ? NEXT_HOT : NEXT), ...NEXT_CLAMP, flex: 1, overflowWrap: "anywhere" }}
                       title={step.text}
                     >
                       {step.text}
