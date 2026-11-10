@@ -1,7 +1,10 @@
+import type { Role } from "@/lib/auth/roles";
 import type { QueueItem } from "@/lib/queue/api";
 import { approvalBlock, auditDraft, type AuditContext } from "@/lib/queue/hygiene";
 import { mineItems } from "@/lib/queue/mine";
 import { parseReviewerSummary } from "@/lib/queue/reviewer-summary";
+import { QUEUE_APPROVE_ROLES, QUEUE_EDIT_ROLES } from "@/lib/queue/roles";
+import { DECK_NOTHING_FOR_YOU, DECK_NOTHING_NOW, deckAllDecided, deckHandedCount, deckLaterArrivals, deckLaterBack } from "@/lib/ui/words";
 import { canApproveItem, classifyQueueItem, type ApprovalRouting, type QueueKind, type Viewer } from "@/lib/queue/routing";
 
 /**
@@ -251,4 +254,27 @@ export function draftOpening(item: Pick<QueueItem, "draft_body" | "final_body">,
     .replace(/\s+/g, " ")
     .trim();
   return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
+}
+
+export type DeckEmpty =
+  | { kind: "unreached" }
+  | { kind: "all-decided"; headline: string; details: [] }
+  /** Cards exist for this viewer but not on the table: arriving at the next deal, back from Later, or handed to colleagues. */
+  | { kind: "waiting"; headline: string; details: string[] }
+  | { kind: "nothing-for-you"; headline: string; details: [] };
+
+/**
+ * What an empty card pile means. "All decided" only when the queue was reached and nothing is waiting for this person in
+ * any form; otherwise the counts say where the cards are. Pure; the page draws it.
+ */
+export function deckEmptyState(args: { queueOk: boolean; role: Role; deck: Pick<Deck, "laterArrivals" | "later" | "handedOff">; nextDealLabel: string }): DeckEmpty {
+  if (!args.queueOk) return { kind: "unreached" };
+  const { laterArrivals, later, handedOff } = args.deck;
+  const details: string[] = [];
+  if (laterArrivals.length > 0) details.push(`${deckLaterArrivals(laterArrivals.length, args.nextDealLabel)}.`);
+  if (later.length > 0) details.push(deckLaterBack(later.length, args.nextDealLabel));
+  if (handedOff.length > 0) details.push(deckHandedCount(handedOff.length));
+  if (details.length > 0) return { kind: "waiting", headline: DECK_NOTHING_NOW, details };
+  if (!QUEUE_EDIT_ROLES.includes(args.role) || !QUEUE_APPROVE_ROLES.includes(args.role)) return { kind: "nothing-for-you", headline: DECK_NOTHING_FOR_YOU, details: [] };
+  return { kind: "all-decided", headline: deckAllDecided(args.nextDealLabel), details: [] };
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Role } from "@/lib/auth/roles";
 import type { QueueItem } from "@/lib/queue/api";
-import { buildDeck, cardTag, currentHolder, decidedToday, deckHref, deckMinutes, parseAtParam, positionOf, type CardEvent, type CardState } from "@/lib/queue/deck";
+import { buildDeck, deckEmptyState, cardTag, currentHolder, decidedToday, deckHref, deckMinutes, parseAtParam, positionOf, type CardEvent, type CardState } from "@/lib/queue/deck";
 import { canApproveItem, type ApprovalRouting } from "@/lib/queue/routing";
 import { followup, qitem, U } from "./routing-fixtures";
 
@@ -164,5 +164,26 @@ describe("cards", () => {
     ];
     expect(decidedToday(items, "rebecca@example.com", (d) => d.toISOString().startsWith("2026-11-10")).map((i) => i.id)).toEqual(["a"]);
     expect(decidedToday(items, null, () => true)).toEqual([]);
+  });
+});
+
+describe("deckEmptyState", () => {
+  const none = { laterArrivals: [], later: [], handedOff: [] };
+  const card = (id: string) => ({ item: qitem({ id }) }) as never;
+  const st = (over: Partial<Parameters<typeof deckEmptyState>[0]> = {}) => deckEmptyState({ queueOk: true, role: "attorney", deck: none, nextDealLabel: "2:00 PM", ...over });
+
+  it("All decided only for a reached queue with nothing waiting", () => {
+    expect(st()).toMatchObject({ kind: "all-decided", headline: "All decided. Next deal 2:00 PM." });
+  });
+  it("an unreached queue is never All decided", () => {
+    expect(st({ queueOk: false })).toEqual({ kind: "unreached" });
+  });
+  it("later arrivals, Later and hand-offs are counted", () => {
+    expect(st({ deck: { ...none, laterArrivals: [card("a"), card("b")] } })).toMatchObject({ kind: "waiting", details: ["2 more at 2:00 PM."] });
+    expect(st({ deck: { ...none, later: [card("a")] as never } })).toMatchObject({ details: ["1 card is back at 2:00 PM."] });
+    expect(st({ deck: { ...none, handedOff: [card("a"), card("b")] as never } })).toMatchObject({ details: ["2 handed to colleagues."] });
+  });
+  it("viewer and non-approver roles have nothing to decide", () => {
+    for (const role of ["viewer", "social_media", "paralegal", "clerk"] as Role[]) expect(st({ role }).kind, role).toBe("nothing-for-you");
   });
 });

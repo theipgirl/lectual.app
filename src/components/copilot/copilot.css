@@ -567,3 +567,9 @@ body:has([data-save-bar]) .cpd-launcher { bottom: 86px; }
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* The approval deck's move buttons sit at the bottom of the card; on a phone the launcher would float over them
+   (the same rule as a sticky Save bar), so it steps out of the way there. */
+@media (max-width: 900px) {
+  body:has(.dk-stage) .cpd-launcher { display: none; }
+}

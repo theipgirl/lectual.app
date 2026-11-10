@@ -9,7 +9,7 @@
   --deck-tick: #43602f;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --deck-hero: #4a0c17;
     --deck-hero-2: #5a1924;
     --deck-hero-deep: #1c0b0e;
@@ -17,6 +17,14 @@
     --deck-hero-muted: rgba(253, 247, 235, 0.7);
     --deck-tick: #7fa463;
   }
+}
+:root[data-theme="dark"] {
+  --deck-hero: #4a0c17;
+  --deck-hero-2: #5a1924;
+  --deck-hero-deep: #1c0b0e;
+  --deck-hero-ink: #fdf7eb;
+  --deck-hero-muted: rgba(253, 247, 235, 0.7);
+  --deck-tick: #7fa463;
 }
 
 .dk-frame { display: grid; gap: 16px; }

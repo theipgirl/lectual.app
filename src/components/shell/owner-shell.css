@@ -5,10 +5,14 @@
   --owner-rail-line: rgba(253, 247, 235, 0.16);
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --owner-rail: #4a0c17;
     --owner-rail-line: rgba(253, 247, 235, 0.2);
   }
+}
+:root[data-theme="dark"] {
+  --owner-rail: #4a0c17;
+  --owner-rail-line: rgba(253, 247, 235, 0.2);
 }
 
 /* Rail: the owner's oxblood column. Same shape, rows and behaviour as the default rail. */

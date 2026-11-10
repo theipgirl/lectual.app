@@ -20,6 +20,7 @@ import {
   DECK_BACK,
   DECK_CLOSER_LOOK,
   DECK_DRAFT_IN_GMAIL,
+  DECK_DRAFT_NONE,
   DECK_DRAFT_IN_OUTLOOK,
   DECK_EDIT,
   DECK_HANDED_NO_YES,
@@ -265,7 +266,9 @@ export function ApprovalCard(props: ApprovalCardProps) {
 
       {result && result.ok && (
         <div className="dk-panel" role="status">
-          {draft ? (
+          {draft && !draft.provider ? (
+            <p style={{ margin: 0 }}>{DECK_DRAFT_NONE}</p>
+          ) : draft ? (
             <>
               <p style={{ margin: 0 }}>{draft.provider === "google" ? DECK_DRAFT_IN_GMAIL : DECK_DRAFT_IN_OUTLOOK}</p>
               {draft.webLink && (

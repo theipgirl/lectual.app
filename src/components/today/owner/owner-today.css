@@ -28,7 +28,11 @@
 .ot-deck .lx-btn { justify-self: start; min-height: 44px; background: var(--ot-deck-ink); color: var(--ot-deck-bg); border-color: var(--ot-deck-ink); }
 .ot-risk { color: var(--ox); font-weight: 500; }
 .ot-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
-.ot-day { display: grid; gap: 4px; justify-items: center; padding: 8px 2px; border-radius: 10px; border: 1px solid var(--line); color: inherit; text-align: center; font-size: 12.5px; }
+@media (max-width: 480px) {
+  /* 7 x 44px + gaps no longer fits beside the page gutters: scroll the strip itself, never the page. */
+  .ot-week { grid-template-columns: repeat(7, minmax(44px, 1fr)); overflow-x: auto; }
+}
+.ot-day { display: grid; gap: 4px; justify-items: center; padding: 8px 2px; min-width: 44px; border-radius: 10px; border: 1px solid var(--line); color: inherit; text-align: center; font-size: 12.5px; }
 .ot-day[aria-current="date"] { background: var(--cream); border-color: var(--ox); }
 .ot-day:hover { text-decoration: none; border-color: var(--ox); }
 .ot-dots { display: flex; gap: 3px; align-items: center; min-height: 14px; font-size: 12.5px; color: var(--ot-dot); }

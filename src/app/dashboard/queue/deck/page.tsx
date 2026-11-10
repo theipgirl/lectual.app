@@ -16,6 +16,7 @@ import { dealFor, dealtAt, sameFirmDay } from "@/lib/deal/times";
 import {
   buildDeck,
   decidedToday,
+  deckEmptyState,
   deckHref,
   draftOpening,
   parseAtParam,
@@ -45,7 +46,6 @@ import { DECK_ROUTING_UNREAD,
   DECK_TITLE,
   NOT_SWITCHED_ON,
   dealHeader,
-  deckAllDecided,
   deckSource,
   deckTagYes,
   nextDealHeader,
@@ -163,12 +163,18 @@ export default async function DeckPage({ searchParams }: { searchParams: Promise
   ];
 
   if (!pos) {
+    const empty = deckEmptyState({ queueOk: true, role: viewer.role, deck, nextDealLabel: deal.next.label });
     return frame(
       side,
       <div className="lx-card lx-empty-card" role="status">
         <h2 className="lx-h2" style={{ fontSize: 25 }}>
-          {deckAllDecided(deal.next.label)}
+          {"headline" in empty ? empty.headline : null}
         </h2>
+        {"details" in empty && empty.details.length > 0 && (
+          <p className="lx-note" style={{ margin: "8px 0 0" }}>
+            {empty.details.join(" ")}
+          </p>
+        )}
       </div>,
     );
   }
