@@ -288,18 +288,19 @@ export const NO_SIZES: SheetSizes = { cols: {}, rows: {} };
 
 /** Default column widths in px. Next step is flexible (no fixed width) and never narrower than `NEXT_MIN_WIDTH`. A stored width overrides these. */
 export const DEFAULT_COL_WIDTHS: Record<SheetEditColumn, number | null> = {
-  client: 150,
-  mark: 150,
-  status: 140,
+  client: 140,
+  mark: 130,
+  status: 130,
   next: null,
-  court: 120,
-  waiting: 160,
-  source: 110,
-  contact: 90,
+  court: 110,
+  waiting: 140,
+  source: 100,
+  contact: 84,
 };
-export const NEXT_MIN_WIDTH = 240;
+/** With the Note column the defaults and this minimum sum to 1,110px, which fits the content area at 1440 with the rail open (1,114px). */
+export const NEXT_MIN_WIDTH = 200;
 /** The "+ Note" column, drawn only while editing. */
-export const NOTE_COL_WIDTH = 84;
+export const NOTE_COL_WIDTH = 76;
 
 /** The width a column is drawn at: this viewer's stored width, else the default; null = flexible (Next step). */
 export function colWidth(sizes: Pick<SheetSizes, "cols">, col: SheetEditColumn): number | null {

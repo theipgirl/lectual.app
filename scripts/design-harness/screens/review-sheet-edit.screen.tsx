@@ -84,6 +84,13 @@ const OPEN: SheetEditInitial = {
   activeRow: "lead:2",
 };
 
+/** Popovers on the bottom rows (they must flip up and stay fully visible; placed in the browser by scripts/design-harness: see the README note in the report). */
+const LAST_ROW = (col: "note" | "status" | "court" | "source"): SheetEditInitial => ({ open: [{ rowKey: "matter:9", col }], noteDraft: { "matter:9": "Sent the first draft; waiting on comments." } });
+const lastRowPrepare = (col: "note" | "status" | "court" | "source") => () => {
+  prepare(false)();
+  Object.assign(state, { sheetEditInitial: LAST_ROW(col) });
+};
+
 const prepare = (withEditors: boolean) => () => {
   resetState();
   state.pathname = "/dashboard/review/";
@@ -98,4 +105,6 @@ export const screens: Screen[] = [
   { ...base, id: "review-sheet-edit", title: "Weekly review, Sheet editable (editors open as on the board)", viewport: "desktop", prepare: prepare(true) },
   { ...base, id: "review-sheet-edit-rest", title: "Weekly review, Sheet editable (at rest)", viewport: "desktop", prepare: prepare(false) },
   { ...base, id: "review-sheet-edit-phone", title: "Weekly review, Sheet editable (phone: stacked, edits in the panel)", viewport: "phone", prepare: prepare(false) },
+  { ...base, id: "review-sheet-edit-lastrow-note", title: "Weekly review, Sheet editable: + Note popover on the last row", viewport: "desktop", prepare: lastRowPrepare("note") },
+  { ...base, id: "review-sheet-edit-lastrow-court", title: "Weekly review, Sheet editable: person picker on the last row", viewport: "desktop", prepare: lastRowPrepare("court") },
 ];

@@ -81,6 +81,7 @@ import {
   sheetNoteHint,
   sheetResizeColumn,
 } from "@/lib/ui/words";
+import { usePopPlacement } from "./pop-placement";
 import { sheetStatusStore } from "./sheet-status-store";
 import "./review-sheet-edit.css";
 
@@ -638,6 +639,7 @@ function listKeys(e: ReactKeyboardEvent<HTMLElement>, onCancel: () => void, onTa
 
 function ChoicePop({ label, eyebrow, footer, options, onPick, onCancel, onTab }: { label: string; eyebrow?: string; footer?: string; options: { id: string; label: string; selected: boolean }[]; onPick: (id: string) => void; onCancel: () => void; onTab: (dir: 1 | -1) => void }) {
   const ref = useRef<HTMLDivElement>(null);
+  usePopPlacement(ref);
   useEffect(() => {
     const el = ref.current?.querySelector<HTMLElement>("[aria-selected=true]") ?? ref.current?.querySelector<HTMLElement>("[role=option]");
     el?.focus();
@@ -659,10 +661,12 @@ function ChoicePop({ label, eyebrow, footer, options, onPick, onCancel, onTab }:
 
 function PersonPop({ people, current, onPick, onCancel, onTab }: { people: SheetPerson[]; current: string | null; onPick: (userId: string | null) => void; onCancel: () => void; onTab: (dir: 1 | -1) => void }) {
   const [term, setTerm] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+  usePopPlacement(ref);
   const shown = matchPeople(people, term);
   const showUnassigned = !term.trim() || UNASSIGNED_LANE.toLowerCase().includes(term.trim().toLowerCase());
   return (
-    <div className="rse-pop" role="listbox" aria-label="Whose court" onKeyDown={(e) => listKeys(e, onCancel, onTab)}>
+    <div className="rse-pop" role="listbox" aria-label="Whose court" ref={ref} onKeyDown={(e) => listKeys(e, onCancel, onTab)}>
       <input className="rse-in" type="text" aria-label={SHEET_FIND_PERSON} placeholder={SHEET_FIND_PERSON} value={term} onChange={(e) => setTerm(e.target.value)} autoFocus />
       <div className="rse-pop-list">
         {shown.map((p) => (
@@ -747,8 +751,11 @@ function NotePop({ client, draft, onSave, onCancel }: { client: string; draft?: 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const id = `rse-note-${useId().replace(/[^A-Za-z0-9_-]/g, "")}`;
+  const ref = useRef<HTMLFormElement>(null);
+  usePopPlacement(ref, "right");
   return (
     <form
+      ref={ref}
       className="rse-pop rse-note-pop"
       aria-label={sheetNoteFor(client)}
       onKeyDown={(e) => {
