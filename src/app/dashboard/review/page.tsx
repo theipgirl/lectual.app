@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ListHeader } from "@/components/list-page/ListHeader";
-import { ListSearch } from "@/components/list-page/ListToolbar";
+import { ListSearch, ListToolbar } from "@/components/list-page/ListToolbar";
 import { Chip, FilterChips } from "@/components/list-page/Chips";
 import "@/components/list-page/list-page.css";
 import { ReviewSection } from "@/components/review/ReviewSection";
@@ -10,6 +10,7 @@ import { SheetView } from "@/components/review/SheetView";
 import { CardsDeck, PersonChips } from "@/components/review/CardsDeck";
 import { ReviewPanel } from "@/components/review/ReviewPanel";
 import { resolveFirmSession } from "@/lib/firm/session";
+import { NO_PREVIEW, previewFor, viewFor } from "@/lib/views";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import { CAN_MOVE_STAGE } from "@/lib/pipeline/leads";
 import { loadReview } from "@/lib/review/load";
@@ -63,8 +64,17 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const filterParams: ReviewParams = sinceOff ? { ...params, since: "all" } : params;
   const shown = applyReviewFilters(load.rows, filterParams, userId);
   const buckets = reviewBuckets(shown, load.today);
-    const note = detailsNote(load.failed);
-  const common = { today: load.today, members: load.members, canWrite, params };
+  // Chip counts (technician view): each chip counts what it would show with the other filters kept.
+  const countFor = (over: Partial<ReviewParams>) => applyReviewFilters(load.rows, { ...filterParams, ...over }, userId).length;
+  const note = detailsNote(load.failed);
+  // The board look is the owner view's; every other view keeps the page as it was. Decided the way Today decides it.
+  const owner = session.kind === "ok" && viewFor({
+    role: session.role,
+    preview: session.actingAsStaff ? previewFor(session.user?.user_metadata, session.org?.id) : NO_PREVIEW,
+    firmHasRoleViews: (session.org?.modules ?? []).includes("role-views"),
+    actingAsStaff: session.actingAsStaff,
+  }) === "owner";
+  const common = { owner, today: load.today, members: load.members, canWrite, params };
   const proposalsKnown = !load.failed.includes("proposals");
   const approvalsKnown = !load.failed.includes("approvals");
   // An approver sees the strip about THEM ("Waiting on you"); anyone else sees it about the review person, as before.
@@ -73,8 +83,8 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const olderHidden = olderHiddenCount(load.rows, params, userId);
   const strips = (
     <div className="rv-strips">
-      <ProposalsOutStrip items={proposalsOut(shown, load.today)} known={proposalsKnown} params={params} />
-      {person && <WaitingOnStrip firstName={person.firstName} you={isApprover} personId={person.userId} rows={waitingOnPerson(shown, person.userId)} approvalsKnown={approvalsKnown} params={params} />}
+      <ProposalsOutStrip owner={owner} items={proposalsOut(shown, load.today)} known={proposalsKnown} params={params} />
+      {person && <WaitingOnStrip owner={owner} firstName={person.firstName} you={isApprover} personId={person.userId} rows={waitingOnPerson(shown, person.userId)} approvalsKnown={approvalsKnown} params={params} />}
     </div>
   );
   const lanes = boardLanes(buckets, load.members);
@@ -102,7 +112,9 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const searchHidden = { ...(params.since === "all" ? { since: "all" } : {}), ...(params.view !== DEFAULT_REVIEW_VIEW ? { view: params.view } : {}), ...(params.view === "cards" && params.person ? { person: params.person } : {}), ...(params.who === "mine" ? { who: "mine" } : {}), ...(params.kind !== "both" ? { kind: params.kind === "matter" ? "matters" : "leads" } : {}) };
 
   return (
-    <div className="lp-root rv-root">
+    <div className={owner ? "lp-root rv-root rv-owner" : "lp-root"}>
+      {owner ? (
+        <>
       <header className="rv-head">
         <div className="rv-head-text">
           <h1 className="lx-h1 rv-h1" data-tour="review-head">{REVIEW_NAME}</h1>
@@ -137,7 +149,49 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
         </div>
       </div>
 
+      <KpiStrip owner kpis={kpis(buckets)} />
+        </>
+      ) : (
+        <>
+      <ListHeader title={REVIEW_NAME} tour="review-head" sub={reviewSubline(buckets)} />
+
+      <ListToolbar
+        search={{
+          label: "Search clients and marks",
+          placeholder: "Client or mark",
+          defaultValue: params.q,
+          hidden: searchHidden,
+          clearHref: link({ q: "", i: 1 }),
+        }}
+        toggle={<ViewSwitch params={params} />}
+      />
+
       <KpiStrip kpis={kpis(buckets)} />
+
+      <FilterChips as="nav" label="Whose">
+        <Chip href={link({ who: "all" })} active={params.who === "all"} count={countFor({ who: "all" })}>Everyone</Chip>
+        <Chip href={link({ who: "mine" })} active={params.who === "mine"} count={countFor({ who: "mine" })}>Mine</Chip>
+      </FilterChips>
+      <FilterChips as="nav" label="Matters or leads">
+        <Chip href={link({ kind: "both" })} active={params.kind === "both"} count={countFor({ kind: "both" })}>Both</Chip>
+        <Chip href={link({ kind: "matter" })} active={params.kind === "matter"} count={countFor({ kind: "matter" })}>Matters</Chip>
+        <Chip href={link({ kind: "lead" })} active={params.kind === "lead"} count={countFor({ kind: "lead" })}>Leads</Chip>
+      </FilterChips>
+
+      <FilterChips as="nav" label="Since">
+        {sinceOff ? (
+          <Chip href={link({})} active={false}>{REVIEW_SINCE_SUSPENDED}</Chip>
+        ) : params.since === "all" ? (
+          <Chip href={link({ since: "default" })} active={false}>{REVIEW_SHOWING_ALL} · {REVIEW_SINCE_LABEL}</Chip>
+        ) : (
+          <>
+            <Chip href={link({ since: "default" })} active>{REVIEW_SINCE_LABEL} · {reviewOlderHidden(olderHidden)}</Chip>
+            <Chip href={link({ since: "all" })} active={false}>{REVIEW_SHOW_ALL}</Chip>
+          </>
+        )}
+      </FilterChips>
+        </>
+      )}
 
       {note && (
         <p className="lx-banner lx-banner-warn" role="status" style={{ margin: 0 }}>
@@ -171,10 +225,17 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
         <>
           {strips}
           <ReviewBoard lanes={lanes} {...common} />
-          <div className="rv-rest">
-            <ReviewSection bucket="uspto" rows={rest.uspto} collapsed {...common} />
-            <ReviewSection bucket="track" rows={rest.track} collapsed {...common} />
-          </div>
+          {owner ? (
+            <div className="rv-rest">
+              <ReviewSection bucket="uspto" rows={rest.uspto} collapsed {...common} />
+              <ReviewSection bucket="track" rows={rest.track} collapsed {...common} />
+            </div>
+          ) : (
+            <>
+              <ReviewSection bucket="uspto" rows={rest.uspto} collapsed {...common} />
+              <ReviewSection bucket="track" rows={rest.track} collapsed {...common} />
+            </>
+          )}
         </>
       )}
       {panel && params.open && (
