@@ -395,3 +395,28 @@ footer.cp-footer { background: var(--cp-ink); color: var(--cp-on-brand); padding
 @container cp (max-width: 560px) {
   .cp-pkg-mark { padding-left: 0; }
 }
+
+/* ── Spacing pass (Sevetri Wilson's proposal: two brand names, a package per mark, a custom discount). CSS only. ──
+   `.cp-root p { margin: 0 }` (0,1,1) beats the single-class rules above, so these paragraphs lost their margins and
+   sat flush against the card edge (the note) or against each other (the Add a class text). Restated with `.cp-root`. */
+.cp-root .cp-note { margin: 16px 22px 0; }
+.cp-root .cp-warn, .cp-root .cp-keep { margin: 0 22px 14px; }
+.cp-root .cp-describe { margin: 10px 0 0; }
+.cp-root .cp-how-add { margin: 0 0 8px; }
+.cp-root .cp-pkg .cp-how-add { margin: 0; }
+@container cp (max-width: 560px) {
+  .cp-root .cp-note { margin-left: 16px; margin-right: 16px; }
+  .cp-root .cp-warn, .cp-root .cp-keep { margin-left: 16px; margin-right: 16px; }
+  .cp-root .cp-describe { margin-left: 0; margin-right: 0; }
+}
+/* A heading that wraps (a long "Classes (apply to each mark selected above)", a long brand and package title) needs more than 1.2. */
+.cp-part h4 { line-height: 1.35; margin-bottom: 6px; }
+.cp-grp h3 { line-height: 1.35; margin-bottom: 6px; }
+.cp-lines { gap: 22px; }
+.cp-ln { align-items: baseline; line-height: 1.4; }
+.cp-ln .cp-l { min-width: 0; overflow-wrap: anywhere; }
+/* A mark's package block: lined up with the mark's own text (26px box + 14px gap) and with room before the next row's rule. */
+.cp-pkg-mark { padding: 0 0 16px 40px; }
+@container cp (max-width: 560px) {
+  .cp-pkg-mark { padding-left: 0; }
+}

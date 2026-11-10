@@ -401,3 +401,31 @@
   .pe-work-row { grid-template-columns: repeat(3, minmax(0, 1fr)); padding-bottom: 10px; border-bottom: 1px solid var(--line-2); }
   .pe-work-row input[name$=".label"], .pe-work-row button { grid-column: 1 / -1; }
 }
+
+/* ── Spacing pass (Sevetri Wilson's proposal). CSS only. ─────────────────────────────── */
+/* List: the Paid cell stacks (a lone "·" used to wrap onto its own line) and the wrapping columns keep a readable width. */
+.pq-paid, .pq-paid-form { flex-direction: column; align-items: flex-start; gap: 6px; }
+.pq-paid-act > [aria-hidden="true"] { display: none; }
+.pq-paid-note { max-width: 220px; line-height: 1.4; }
+@media (min-width: 761px) {
+  .pq-tbl td.pq-c-client { min-width: 140px; }
+  .pq-tbl td.pq-c-paid { min-width: 170px; }
+  .pq-tbl td.pq-c-activity { min-width: 150px; }
+  .pq-tbl td { padding-top: 12px; padding-bottom: 12px; }
+}
+.pq-sub { margin-top: 4px; line-height: 1.4; }
+/* Proposal page: the card's label no longer touches the client's name; the brand lines breathe. */
+.pe-pcard-head .lx-label { margin-bottom: 6px; }
+.pe-pcard-brands { gap: 12px; }
+.pe-pcard-brands li { gap: 4px; padding-top: 12px; }
+/* "What the client pays": a brand name's line and its discount read as one group, groups are apart, long titles wrap beside a top-aligned amount. */
+.pe-totals { gap: 10px; }
+.pe-totals dl { gap: 10px; }
+.pe-totals .pe-line { align-items: flex-start; line-height: 1.4; }
+.pe-totals .pe-line dt { min-width: 0; overflow-wrap: anywhere; }
+.pe-totals .pe-line:not(.pe-line-mute):not(.pe-line-total) + .pe-line-mute { margin-top: -5px; }
+.pe-totals .pe-line-total { margin-top: 4px; padding-top: 12px; }
+/* The link row takes its own row, so the client-email button, its note and More line up on the next one. */
+.pe-link { flex: 1 1 100%; }
+/* "Let the client add classes" no longer sits against the class rows above it. */
+.pe-client-add { margin-top: 10px; }
