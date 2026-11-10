@@ -361,3 +361,19 @@ export function matchPeople<T extends { name: string; roleLabel: string }>(peopl
 
 /** Kept here so the client never needs the whole ReviewRow type. */
 export type SheetRowSource = Pick<ReviewRow, "key" | "kind" | "id" | "client" | "mark" | "stageId" | "stageLabel" | "nextStep" | "assignedTo" | "source">;
+
+/** The next step's title as typed in the Sheet's growing field: Windows line breaks become one, spaces around a break go, blank lines collapse to one break, the ends are trimmed. The server also trims and caps at 200 characters; it accepts a line break. */
+export function normalizeNextStepTitle(raw: string): string {
+  return raw
+    .replace(/\r\n?/g, "\n")
+    .replace(/[ \t]*\n[ \t\n]*/g, "\n")
+    .trim();
+}
+
+/** Height in pixels for the growing title field: its content, but never fewer than `minRows` or more than `maxRows` lines (it scrolls past that). */
+export function growHeight(scrollHeight: number, lineHeight: number, chrome: number, minRows = 2, maxRows = 4): number {
+  const min = lineHeight * minRows + chrome;
+  const max = lineHeight * maxRows + chrome;
+  return Math.round(Math.min(max, Math.max(min, scrollHeight)));
+}
+

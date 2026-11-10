@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
+  growHeight,
+  normalizeNextStepTitle,
   EDITABLE_COLUMNS,
   EMPTY_SHEET_STATE,
   LOCKED_COLUMNS,
@@ -342,5 +344,18 @@ describe("a saved value never outlives its save", () => {
     s = sheetReducer(s, { type: "failed", cell, seq: 1, client: "Acme", field: "next", message: "No." });
     expect(s.overrides).toEqual({});
     expect(shownRow(before, s).nextStep?.title).toBe("Call back");
+  });
+});
+
+describe("next step title field", () => {
+  it("keeps a single line break, drops blank lines and edge spaces", () => {
+    expect(normalizeNextStepTitle("  Follow up \r\n  on the proposal \n\n\n and send  ")).toBe("Follow up\non the proposal\nand send");
+    expect(normalizeNextStepTitle("one line")).toBe("one line");
+    expect(normalizeNextStepTitle(" \n ")).toBe("");
+  });
+  it("grows to its content between 2 and 4 lines", () => {
+    expect(growHeight(10, 21, 18)).toBe(60);
+    expect(growHeight(70, 21, 18)).toBe(70);
+    expect(growHeight(400, 21, 18)).toBe(102);
   });
 });

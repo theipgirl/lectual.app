@@ -56,6 +56,8 @@
 .rv-owner .rse-in-date, .rv-owner .rse-tbl .rse-in-date { width: 140px; }
 .rv-owner .rse-tbl .rse-next-td { white-space: normal; }
 .rv-owner .rse-textarea, .rv-owner .rse-tbl .rse-textarea { height: auto; padding: 8px 10px; resize: none; line-height: 1.4; }
+/* The next-step title: wraps at the cell width, grows from 2 to 4 lines (the height is set from its content), then scrolls. The cell never widens, so the row stays put. */
+.rv-owner .rse-tbl .rse-title-ta { display: block; box-sizing: border-box; line-height: 21px; min-height: 60px; max-height: 102px; overflow-y: auto; overflow-wrap: anywhere; }
 
 /* Popovers: the stage list, the person picker, the source list and "+ Note". */
 .rv-owner .rse-pop { position: absolute; z-index: 8; top: calc(100% - 2px); left: 4px; min-width: 230px; width: max-content; max-width: 340px; padding: 8px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow-lift); display: flex; flex-direction: column; gap: 2px; text-align: left; white-space: normal; }
