@@ -109,6 +109,23 @@ export function applyValue(row: SheetEditRow, value: CellValue): SheetEditRow {
   }
 }
 
+/**
+ * Whether the server's row already reads `value` in that cell. A next step counts only when it is a real step (an id),
+ * so a stand-in never passes for the saved one.
+ */
+export function rowHolds(row: SheetEditRow, value: CellValue): boolean {
+  switch (value.col) {
+    case "status":
+      return row.stageId === value.stageId;
+    case "next":
+      return !!row.nextStep?.id && row.nextStep.title === value.title && (row.nextStep.dueDate ?? null) === (value.dueDate ?? null);
+    case "court":
+      return courtOf(row) === value.userId;
+    case "source":
+      return (row.source ?? null) === (value.source ?? null);
+  }
+}
+
 /** Whose court, by the lane rule (`laneOf`). */
 export function courtOf(row: Pick<SheetEditRow, "nextStep" | "assignedTo">): string | null {
   return laneOf(row);
@@ -136,7 +153,10 @@ export function postFor(row: Pick<SheetEditRow, "kind" | "id" | "nextStep">, val
       return { action: "moveStage", fields: { ...base, stageId: value.stageId } };
     }
     case "next":
-      return row.nextStep && row.nextStep.id
+      // A step added a moment ago is a stand-in with no id until the page reads it back: posting `setNextStep` again would
+      // leave two open steps, so nothing is posted (the "try after refresh" sentence), as Whose court does below.
+      if (row.nextStep && !row.nextStep.id) return null;
+      return row.nextStep
         ? { action: "updateNextStep", fields: { taskId: row.nextStep.id, title: value.title, dueAt: value.dueDate ?? "" } }
         : { action: "setNextStep", fields: { ...base, title: value.title, dueAt: value.dueDate ?? "" } };
     case "court":
@@ -160,7 +180,10 @@ export const FIELD_WORDS: Record<EditableColumn | "note", string> = { status: "s
 
 export type SheetStatus = { tone: "saving" | "saved" | "error"; client: string; field: EditableColumn | "note"; message?: string };
 export type SheetEditState = {
-  /** Values laid over the server's rows while saving, and after a save until fresh rows arrive. Key: `<row key>|<col>`. */
+  /**
+   * Values laid over the server's rows while saving, and after a save until rows that read the saved value arrive
+   * (`saved` with `serverHas`, or the next `refreshed`). Key: `<row key>|<col>`.
+   */
   overrides: Record<string, CellValue>;
   /** The newest save per cell; an older answer for the same cell is ignored. */
   seq: Record<string, number>;
@@ -172,7 +195,12 @@ export const EMPTY_SHEET_STATE: SheetEditState = { overrides: {}, seq: {}, savin
 
 export type SheetEvent =
   | { type: "start"; cell: string; seq: number; value: CellValue; client: string; field: EditableColumn }
-  | { type: "saved"; cell: string; seq: number; client: string; field: EditableColumn | "note" }
+  /**
+   * `serverHas`: the server rows on screen when the answer came already read the saved value (`rowHolds`), i.e. the
+   * revalidated tree landed while the cell was saving. Then the override goes now. Otherwise it stays (no longer saving)
+   * until the next fresh rows, which the table asks for, so the old value never flashes back in between.
+   */
+  | { type: "saved"; cell: string; seq: number; client: string; field: EditableColumn | "note"; serverHas?: boolean }
   | { type: "failed"; cell: string; seq: number; client: string; field: EditableColumn | "note"; message: string }
   | { type: "note-saved"; client: string }
   | { type: "note-failed"; client: string; message: string }
@@ -200,7 +228,12 @@ export function sheetReducer(state: SheetEditState, event: SheetEvent): SheetEdi
       };
     case "saved":
       if (state.seq[event.cell] !== event.seq) return state;
-      return { ...state, saving: without(state.saving, event.cell), status: { tone: "saved", client: event.client, field: event.field } };
+      return {
+        ...state,
+        overrides: event.serverHas ? without(state.overrides, event.cell) : state.overrides,
+        saving: without(state.saving, event.cell),
+        status: { tone: "saved", client: event.client, field: event.field },
+      };
     case "failed":
       if (state.seq[event.cell] !== event.seq) return state;
       // The value the person typed is taken off: the cell reads what the server holds again.

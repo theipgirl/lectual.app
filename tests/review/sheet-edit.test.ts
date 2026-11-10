@@ -253,3 +253,94 @@ describe("setSourceAction (the Sheet's Source cell)", () => {
     expect(updateMatterHeader).not.toHaveBeenCalled();
   });
 });
+
+describe("a new next step saved twice before the refresh is not posted twice", () => {
+  const cell = cellKey("matter:1", "next");
+  const A = { col: "next" as const, title: "Step A", dueDate: "2026-11-14" };
+  const B = { col: "next" as const, title: "Step B", dueDate: null };
+
+  it("the stand-in step (no id yet) posts nothing, so setNextStep is never sent a second time", () => {
+    const server = sheetRow({ nextStep: null });
+    // First save: no step -> setNextStep.
+    expect(postFor(server, A)?.action).toBe("setNextStep");
+    let s = sheetReducer(EMPTY_SHEET_STATE, { type: "start", cell, seq: 1, value: A, client: "Acme", field: "next" });
+    s = sheetReducer(s, { type: "saved", cell, seq: 1, client: "Acme", field: "next", serverHas: false });
+    // The page hasn't read the new step back: the row shows a stand-in with an empty id.
+    const shown = shownRow(server, s);
+    expect(shown.nextStep).toMatchObject({ id: "", title: "Step A" });
+    // Second save before the refresh: nothing is posted (the table says "try after refresh").
+    expect(postFor(shown, B)).toBeNull();
+  });
+
+  it("once the refresh brings the real step, the next save updates it", () => {
+    let s = sheetReducer(EMPTY_SHEET_STATE, { type: "start", cell, seq: 1, value: A, client: "Acme", field: "next" });
+    s = sheetReducer(s, { type: "saved", cell, seq: 1, client: "Acme", field: "next", serverHas: false });
+    s = sheetReducer(s, { type: "refreshed" });
+    const fresh = sheetRow({ nextStep: { id: TASK, title: "Step A", dueDate: "2026-11-14", assigneeId: null } });
+    expect(postFor(shownRow(fresh, s), B)).toEqual({ action: "updateNextStep", fields: { taskId: TASK, title: "Step B", dueAt: "" } });
+  });
+});
+
+describe("a saved value never outlives its save", () => {
+  const value = { col: "next" as const, title: "New", dueDate: "2026-11-14" };
+  const cell = cellKey("matter:1", "next");
+  const before = sheetRow();
+  const after = sheetRow({ nextStep: { id: TASK, title: "New", dueDate: "2026-11-14", assigneeId: U1 } });
+
+  it("rowHolds: the server row reads the value (a stand-in next step never counts)", async () => {
+    const { rowHolds } = await import("@/lib/review/sheet-edit");
+    expect(rowHolds(after, value)).toBe(true);
+    expect(rowHolds(before, value)).toBe(false);
+    expect(rowHolds(sheetRow({ nextStep: { id: "", title: "New", dueDate: "2026-11-14", assigneeId: null } }), value)).toBe(false);
+    expect(rowHolds(sheetRow({ stageId: STAGE }), { col: "status", stageId: STAGE, stageLabel: "Filed" })).toBe(true);
+    expect(rowHolds(sheetRow({ source: "Referral" }), { col: "source", source: "Referral" })).toBe(true);
+    expect(rowHolds(sheetRow(), { col: "court", userId: U1 })).toBe(true);
+    expect(rowHolds(sheetRow(), { col: "court", userId: U2 })).toBe(false);
+  });
+
+  it("refreshed (the tree with the save) then saved: no override is left", () => {
+    let s = sheetReducer(EMPTY_SHEET_STATE, { type: "start", cell, seq: 1, value, client: "Acme", field: "next" });
+    s = sheetReducer(s, { type: "refreshed" });
+    expect(s.overrides[cell]).toEqual(value); // still saving: kept, no flash of the old value
+    s = sheetReducer(s, { type: "saved", cell, seq: 1, client: "Acme", field: "next", serverHas: true });
+    expect(s.overrides).toEqual({});
+    expect(s.saving).toEqual({});
+    expect(shownRow(after, s).nextStep?.title).toBe("New");
+  });
+
+  it("then a colleague's change (or a different stored value) shows, not the typed one", () => {
+    let s = sheetReducer(EMPTY_SHEET_STATE, { type: "start", cell, seq: 1, value, client: "Acme", field: "next" });
+    s = sheetReducer(s, { type: "refreshed" });
+    s = sheetReducer(s, { type: "saved", cell, seq: 1, client: "Acme", field: "next", serverHas: true });
+    const colleague = sheetRow({ nextStep: { id: TASK, title: "Colleague's step", dueDate: null, assigneeId: U1 } });
+    expect(shownRow(colleague, s).nextStep?.title).toBe("Colleague's step");
+  });
+
+  it("a stale tree landing during the save keeps the typed value until rows read after the write arrive", () => {
+    let s = sheetReducer(EMPTY_SHEET_STATE, { type: "start", cell, seq: 1, value, client: "Acme", field: "next" });
+    s = sheetReducer(s, { type: "refreshed" }); // an earlier save's tree, without this write
+    s = sheetReducer(s, { type: "saved", cell, seq: 1, client: "Acme", field: "next", serverHas: false });
+    expect(shownRow(before, s).nextStep?.title).toBe("New"); // never flashes "Call back"
+    s = sheetReducer(s, { type: "refreshed" }); // the rows the table asked for after the save
+    expect(s.overrides).toEqual({});
+    expect(shownRow(after, s).nextStep?.title).toBe("New");
+  });
+
+  it("saved then refreshed: the server's value shows", () => {
+    let s = sheetReducer(EMPTY_SHEET_STATE, { type: "start", cell, seq: 1, value, client: "Acme", field: "next" });
+    s = sheetReducer(s, { type: "saved", cell, seq: 1, client: "Acme", field: "next", serverHas: false });
+    expect(shownRow(before, s).nextStep?.title).toBe("New"); // no flash before the tree arrives
+    s = sheetReducer(s, { type: "refreshed" });
+    expect(s.overrides).toEqual({});
+    const stored = sheetRow({ nextStep: { id: TASK, title: "New (as stored)", dueDate: "2026-11-14", assigneeId: U1 } });
+    expect(shownRow(stored, s).nextStep?.title).toBe("New (as stored)");
+  });
+
+  it("a refused save still reverts, whichever order the tree comes in", () => {
+    let s = sheetReducer(EMPTY_SHEET_STATE, { type: "start", cell, seq: 1, value, client: "Acme", field: "next" });
+    s = sheetReducer(s, { type: "refreshed" });
+    s = sheetReducer(s, { type: "failed", cell, seq: 1, client: "Acme", field: "next", message: "No." });
+    expect(s.overrides).toEqual({});
+    expect(shownRow(before, s).nextStep?.title).toBe("Call back");
+  });
+});

@@ -97,6 +97,8 @@ export async function logWhatHappenedAction(_prev: ReviewActionState, formData: 
   const { kind, id, body } = parsed.value;
   try {
     if (!(await canWrite(kind))) return { error: NO_PERMISSION };
+    // Another firm's (or a missing) record is refused before anything is written, like the other review actions.
+    if (!(await recordVisible(kind, id))) return { error: NOT_FOUND };
     if (kind === "matter") await addMatterNote(id, { kind: "note", body });
     else await addLeadNote(id, { kind: "note", body });
   } catch (err) {

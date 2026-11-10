@@ -3,6 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { row, TODAY } from "./fixtures";
 import type { SheetPerms } from "@/lib/review/sheet-edit";
 
+// The table asks the router for fresh rows after a save the rows on screen don't read yet.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock("@/app/dashboard/review/actions", () => ({
   setNextStepAction: vi.fn(), updateNextStepAction: vi.fn(), moveStageAction: vi.fn(), closeLeadAction: vi.fn(),
   assignRecordAction: vi.fn(), setSourceAction: vi.fn(), logWhatHappenedAction: vi.fn(),

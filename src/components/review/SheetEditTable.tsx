@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useId, useMemo, useReducer, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import {
   closeLeadAction,
@@ -38,6 +39,7 @@ import {
   parseSizes,
   personInitials,
   postFor,
+  rowHolds,
   sheetReducer,
   shownRow,
   stageChoices,
@@ -207,7 +209,13 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
   const allRows = useMemo(() => sections.flatMap((s) => s.rows), [sections]);
   const editing = !phone && allRows.some((r) => canNote(r.kind, perms) || (["status", "next", "court", "source"] as const).some((c) => cellEditable(c, r.kind, perms)));
 
-  useEffect(() => dispatch({ type: "refreshed" }), [sections]);
+  const router = useRouter();
+  // The server's rows as last drawn, read when a save answers (the closure's `row` is the one from before the save).
+  const latestRows = useRef(allRows);
+  useEffect(() => {
+    latestRows.current = allRows;
+    dispatch({ type: "refreshed" });
+  }, [sections, allRows]);
   useEffect(() => {
     if (state.status) sheetStatusStore.set(state.status);
   }, [state.status]);
@@ -253,8 +261,16 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
     const mine = nextSeq();
     dispatch({ type: "start", cell, seq: mine, value, client: row.client, field });
     const res = await post(p.action, p.fields);
-    if (res.ok) dispatch({ type: "saved", cell, seq: mine, client: row.client, field });
-    else dispatch({ type: "failed", cell, seq: mine, client: row.client, field, message: res.message ?? SHEET_SAVE_FAILED });
+    if (!res.ok) {
+      dispatch({ type: "failed", cell, seq: mine, client: row.client, field, message: res.message ?? SHEET_SAVE_FAILED });
+      return;
+    }
+    const current = latestRows.current.find((r) => r.key === row.key);
+    const serverHas = !!current && rowHolds(current, value);
+    dispatch({ type: "saved", cell, seq: mine, client: row.client, field, serverHas });
+    // The rows on screen don't read the saved value yet: ask for fresh ones (read after the write), which then replace the
+    // typed value, so it never outlives the save or hides what the server really holds.
+    if (!serverHas) router.refresh();
   }
 
   async function saveNote(row: SheetEditRow, body: string): Promise<boolean> {
@@ -385,7 +401,12 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                     "aria-haspopup": c === "next" ? ("dialog" as const) : ("listbox" as const),
                     "aria-expanded": isOpen(row.key, c),
                     "aria-busy": saving(c) || undefined,
-                    onClick: () => setOpen([{ rowKey: row.key, col: c }]),
+                    "aria-disabled": saving(c) || undefined,
+                    // Not reopened while its save is in flight: a second save would race the first (two new next steps).
+                    onClick: () => {
+                      if (saving(c)) return;
+                      setOpen([{ rowKey: row.key, col: c }]);
+                    },
                     onKeyDown: (e: ReactKeyboardEvent<HTMLButtonElement>) => {
                       if (e.key === "Escape" && isOpen(row.key, c)) {
                         e.preventDefault();
