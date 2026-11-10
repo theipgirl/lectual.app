@@ -41,7 +41,7 @@ async function render(opts: { mailbox?: boolean; outlook?: OutlookRead<{ events:
   vi.doMock("@/lib/org/modules", () => ({ orgHasModule: vi.fn(async (m: string) => m === "mailbox" && (opts.mailbox ?? true)) }));
   vi.doMock("@/lib/org/profile", () => ({ getOrgProfile: vi.fn(async () => ({ time_zone: "America/New_York" })) }));
   const { default: Page } = await import("../../src/app/dashboard/calendar/page");
-  return text(renderToStaticMarkup(await Page({ searchParams: Promise.resolve({ view: opts.view ?? "agenda", d: "2026-10-21" }) })));
+  return text(renderToStaticMarkup(await Page({ searchParams: Promise.resolve({ view: opts.view ?? "month", d: "2026-10-21" }) })));
 }
 
 beforeEach(() => {
@@ -51,24 +51,28 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe("Calendar page: Outlook events", () => {
-  it("agenda: an Outlook event appears in the same agenda as the deadline and the task", async () => {
+  it("month: an Outlook event appears beside the deadline and the task", async () => {
     const html = await render({ outlook: { status: "ok", events: [storedConsult()] } });
     expect(html).toContain("Respond to office action");
     expect(html).toContain("Call the examiner");
     expect(html).toContain("Strategy Session: Amara Nwosu");
-    expect(html).toContain("Meetings and consults");
-    expect(html).toContain("Thu, Oct 22, 2:00 PM");
-    // A consult carries a visible marker and a Join link; the title links to its lead.
-    expect(html).toMatch(/<span class="lx-pill lx-pill-ox">Consult<\/span>/);
-    expect(html).toMatch(/<a [^>]*href="https:\/\/teams\.microsoft\.com\/l\/meetup-join\/strategy-1"[^>]*>Join<\/a>/);
-    expect(html).toMatch(/<a [^>]*href="\/dashboard\/leads\/lead-amara\/"[^>]*>Strategy Session: Amara Nwosu<\/a>/);
     expect(html).not.toContain("Outlook events aren't available");
     expect(html).not.toContain("We couldn't load your Outlook calendar");
   });
 
-  it("agenda reads the next 30 days from today", async () => {
+  it("reads Outlook for the month grid's range", async () => {
     await render({ outlook: { status: "ok", events: [] } });
-    expect(listOutlookCalendarEvents).toHaveBeenCalledWith("2026-10-21", "2026-11-20");
+    expect(listOutlookCalendarEvents).toHaveBeenCalledWith("2026-09-27", "2026-10-31");
+  });
+
+  it("?view=agenda is not a view any more: it draws the default Month, no Agenda toggle, no error", async () => {
+    const agenda = await render({ view: "agenda", outlook: { status: "ok", events: [storedConsult()] } });
+    const month = await render({ view: "month", outlook: { status: "ok", events: [storedConsult()] } });
+    expect(agenda).toBe(month);
+    expect(agenda).toContain("October 2026");
+    expect(agenda).not.toContain("Agenda");
+    expect(agenda).toContain("Month");
+    expect(agenda).toContain("Week");
   });
 
   it("week view: the chip sits beside the deadline and task on its day, marked Consult, with Join beside it", async () => {
@@ -121,7 +125,7 @@ describe("Calendar page: Outlook events", () => {
 
   it("the header no longer claims events are synced from Lawmatics", async () => {
     for (const mailbox of [true, false]) {
-      for (const view of ["agenda", "week", "month"]) {
+      for (const view of ["week", "month"]) {
         const html = await render({ mailbox, view });
         expect(html).not.toContain("synced from Lawmatics");
         expect(html).not.toContain("Lawmatics");

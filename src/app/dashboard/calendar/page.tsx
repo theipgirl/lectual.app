@@ -1,18 +1,15 @@
 import { stepLabel, zoneLabel } from "@/lib/calendar/zone-label";
 import Link from "next/link";
 import { listTasks, listUpcomingDeadlines } from "@/lib/matters";
-import { buildCalendarRows, civilDate, civilDaysBetween, groupCalendarRows, type CalendarRow } from "@/lib/matters/calendar-rows";
-import { NEEDS_REVIEW_PAST_DUE_DAYS, deadlineKindLabel, splitNeedsReview } from "@/lib/matters/deadline-rules";
-import type { UpcomingDeadline } from "@/lib/matters/deadlines";
+import { buildCalendarRows, civilDate, type CalendarRow } from "@/lib/matters/calendar-rows";
 import { formatCivilDate } from "@/lib/matters/ip-fields";
 import { getOrgProfile } from "@/lib/org/profile";
 import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
 import { listCalendarEvents, type CalendarEventRow } from "@/lib/calendar/events";
 import { listOutlookCalendarEvents, type OutlookCalendarEvent, type OutlookRead } from "@/lib/calendar/outlook-read";
-import { formatEventWhen, joinHref } from "@/lib/calendar/outlook-format";
+import { joinHref } from "@/lib/calendar/outlook-format";
 import { orgHasModule } from "@/lib/org/modules";
 import {
-  addDays,
   isCivilDate,
   monthGrid,
   parseCalendarView,
@@ -186,155 +183,7 @@ function WeekView({ days }: { days: GridDay[] }) {
 }
 
 /**
- * Old unconfirmed manual dates, kept out of Overdue and every count. Nothing
- * here edits or closes a date: confirming, closing and correcting stay on the
- * matter, where the attorney-only actions are.
- */
-function NeedsReviewBand({ deadlines, now }: { deadlines: UpcomingDeadline[]; now: Date }) {
-  const today = civilDate(now);
-  return (
-    <section className="lx-card lx-band" aria-labelledby="cal-needs-review">
-      <header className="lx-band-head">
-        <h2 id="cal-needs-review" className="lx-h2">
-          Needs review
-        </h2>
-        <span className="lx-note">{deadlines.length}</span>
-      </header>
-      <ul className="lx-list" style={{ padding: "0 18px 8px" }}>
-        {deadlines.map((d) => {
-          const days = civilDaysBetween(d.due_date, today);
-          return (
-            <li key={d.id} className="lx-task">
-              <span style={{ minWidth: 0 }}>
-                <Link prefetch={false} href={`/dashboard/matters/${d.matter_id}`} className="lx-rowlink">
-                  {d.title ?? deadlineKindLabel(d.kind)}
-                </Link>
-                <span className="lx-note" style={{ display: "block" }}>
-                  {`${[d.matter_number, d.matter_title].filter(Boolean).join(" · ") || "Docket"} · due ${formatCivilDate(d.due_date)}`}
-                </span>
-                <span className="lx-note" style={{ display: "block" }}>
-                  {`Entered by hand, never confirmed, and more than ${NEEDS_REVIEW_PAST_DUE_DAYS} days past due. Confirm, close or correct it on the matter.`}
-                </span>
-              </span>
-              <span className="lx-pill lx-pill-mute">{`${days} days past due`}</span>
-            </li>
-          );
-        })}
-      </ul>
-    </section>
-  );
-}
-
-/** Outlook events for the next 30 days, in the same agenda as the deadlines and tasks. */
-function OutlookAgendaBand({ events, timeZone }: { events: OutlookCalendarEvent[]; timeZone: string }) {
-  return (
-    <section className="lx-card lx-band" aria-labelledby="cal-outlook">
-      <header className="lx-band-head">
-        <h2 id="cal-outlook" className="lx-h2">
-          Meetings and consults
-        </h2>
-        <span className="lx-note">{events.length}</span>
-      </header>
-      <ul className="lx-list" style={{ padding: "0 18px 8px" }}>
-        {events.map((e) => {
-          const join = joinHref(e.join_url);
-          const name = e.title?.trim() || (e.is_consult ? "Consult" : "Event");
-          return (
-            <li key={e.id} className="lx-task">
-              <span style={{ minWidth: 0 }}>
-                {e.lead_id ? (
-                  <Link prefetch={false} href={`/dashboard/leads/${e.lead_id}/`} className="lx-rowlink">
-                    {name}
-                  </Link>
-                ) : (
-                  <span style={{ fontWeight: 500, color: "var(--ink)" }}>{name}</span>
-                )}
-                <span className="lx-note" style={{ display: "block" }}>
-                  {[formatEventWhen(e, timeZone), e.location].filter(Boolean).join(" · ")}
-                </span>
-              </span>
-              <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                {e.is_consult && <span className="lx-pill lx-pill-ox">Consult</span>}
-                {join && (
-                  <a href={join} target="_blank" rel="noopener noreferrer" className="lx-btn lx-btn-sec lx-btn-sm">
-                    Join
-                  </a>
-                )}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-    </section>
-  );
-}
-
-function AgendaView({
-  rows,
-  needsReview,
-  now,
-  unconfirmed,
-  outlook,
-  timeZone,
-}: {
-  rows: CalendarRow[];
-  needsReview: UpcomingDeadline[];
-  now: Date;
-  unconfirmed: Set<string>;
-  outlook: OutlookCalendarEvent[];
-  timeZone: string;
-}) {
-  const groups = groupCalendarRows(rows, now);
-  if (groups.length === 0 && needsReview.length === 0 && outlook.length === 0) {
-    return (
-      <div className="lx-card lx-empty-card">
-        <h2 className="lx-h2" style={{ fontSize: 25 }}>Nothing on the docket or task list</h2>
-        <p className="lx-note" style={{ margin: 0 }}>Deadlines docketed on a matter and tasks with a due date show up here.</p>
-      </div>
-    );
-  }
-  return (
-    <>
-      {groups.map((g) => (
-        <section key={g.key} className="lx-card lx-band" aria-labelledby={`cal-${g.key}`}>
-          <header className="lx-band-head">
-            <h2 id={`cal-${g.key}`} className="lx-h2" style={g.key === "overdue" ? { color: "var(--wine)" } : undefined}>
-              {g.label}
-            </h2>
-            <span className="lx-note">{g.rows.length}</span>
-          </header>
-          <ul className="lx-list" style={{ padding: "0 18px 8px" }}>
-            {g.rows.map((r) => (
-              <li key={r.key} className="lx-task">
-                <span style={{ minWidth: 0 }}>
-                  <Link prefetch={false} href={r.href} className="lx-rowlink">
-                    {r.name}
-                  </Link>
-                  {unconfirmed.has(r.key) && (
-                    <span className="lx-pill lx-pill-warn" style={{ marginLeft: 8 }} title="Calculated or entered, not yet confirmed by an attorney">
-                      Unconfirmed
-                    </span>
-                  )}
-                  <span className="lx-note" style={{ display: "block" }}>
-                    {r.source === "deadline" ? `Docket · ${r.detail}` : "Task"}
-                  </span>
-                </span>
-                <span className={`lx-pill ${r.overdueDays > 0 ? "lx-pill-risk" : "lx-pill-mute"}`}>
-                  {r.overdueDays > 0 ? `${r.overdueDays}d overdue` : formatCivilDate(r.dueDate)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
-      {outlook.length > 0 && <OutlookAgendaBand events={outlook} timeZone={timeZone} />}
-      {needsReview.length > 0 && <NeedsReviewBand deadlines={needsReview} now={now} />}
-    </>
-  );
-}
-
-/**
- * Calendar: a month grid, a week view and the agenda list, over the same
+ * Calendar: a month grid and a week view, over the same
  * sources: open docket deadlines, open task due dates, and events in
  * crm_calendar_event, which for a firm with the mailbox module include the
  * events the daily sync reads from its connected Outlook calendars. Timed
@@ -355,14 +204,13 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
 
   // The Outlook events exist only for a firm with the mailbox module; without it, no read and no note.
   const hasMailbox = await orgHasModule("mailbox");
-  const outlookWindow = view === "agenda" ? { from: today, to: addDays(today, 30) } : range;
 
   const [deadlinesS, tasksS, profileS, eventsS, outlookS] = await Promise.allSettled([
     listUpcomingDeadlines({}),
     listTasks({ status: "open" }),
     getOrgProfile(),
-    view === "agenda" ? Promise.resolve([] as CalendarEventRow[]) : listCalendarEvents(range.from, range.to),
-    hasMailbox ? listOutlookCalendarEvents(outlookWindow.from, outlookWindow.to) : Promise.resolve(null),
+    listCalendarEvents(range.from, range.to),
+    hasMailbox ? listOutlookCalendarEvents(range.from, range.to) : Promise.resolve(null),
   ]);
   const deadlines = deadlinesS.status === "fulfilled" ? deadlinesS.value : null;
   const tasks = tasksS.status === "fulfilled" ? tasksS.value : null;
@@ -378,13 +226,12 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         ? "We couldn't load your Outlook calendar. Docket dates and tasks are shown."
         : null;
 
-  const readState = calendarReadState({ deadlines, tasks, events: view === "agenda" ? undefined : events });
+  const readState = calendarReadState({ deadlines, tasks, events });
   const partialNote =
     readState.kind === "partial" ? `Couldn't load ${readState.failed.join(" or ")}, so this calendar is incomplete. Try again shortly.` : null;
   const unavailable = readState.kind === "unavailable";
 
   const rows = buildCalendarRows(deadlines ?? [], tasks ?? [], now);
-  const { needsReview } = splitNeedsReview(deadlines ?? [], now);
   const unconfirmed = new Set((deadlines ?? []).filter((d) => !d.attorney_confirmed).map((d) => `d-${d.id}`));
   // The base read also returns Outlook rows once the database has them; the richer copy wins, so a row never shows twice.
   const outlookIds = new Set(outlookEvents.map((e) => e.id));
@@ -394,7 +241,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     ...outlookEvents.map((e) => outlookToItem(e, timeZone)),
   ];
 
-  const title = view === "agenda" ? "Agenda" : viewTitle(view, anchor);
+  const title = viewTitle(view, anchor);
 
   return (
     <>
@@ -410,8 +257,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
           </p>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          {view !== "agenda" && (
-            <div className="lx-cal-nav">
+          <div className="lx-cal-nav">
               <Link prefetch={false} href={calendarHref(view, stepAnchor(view, anchor, -1))} className="lx-btn lx-btn-sec lx-btn-sm" aria-label={stepLabel("previous", view)}>
                 ‹
               </Link>
@@ -421,12 +267,11 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
               <Link prefetch={false} href={calendarHref(view, stepAnchor(view, anchor, 1))} className="lx-btn lx-btn-sec lx-btn-sm" aria-label={stepLabel("next", view)}>
                 ›
               </Link>
-            </div>
-          )}
+          </div>
           <nav className="lx-view-toggle" aria-label="Calendar view">
-            {(["month", "week", "agenda"] as const).map((v) => (
+            {(["month", "week"] as const).map((v) => (
               <Link key={v} prefetch={false} href={calendarHref(v, anchor)} className={view === v ? "on" : undefined} aria-current={view === v ? "page" : undefined}>
-                {v === "month" ? "Month" : v === "week" ? "Week" : "Agenda"}
+                {v === "month" ? "Month" : "Week"}
               </Link>
             ))}
           </nav>
@@ -453,9 +298,8 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
 
       {!unavailable && view === "month" && <MonthView weeks={monthGrid(anchor, today, items)} />}
       {!unavailable && view === "week" && <WeekView days={weekGrid(anchor, today, items)} />}
-      {!unavailable && view === "agenda" && <AgendaView rows={rows} needsReview={needsReview} now={now} unconfirmed={unconfirmed} outlook={outlookEvents} timeZone={timeZone} />}
 
-      {!unavailable && view !== "agenda" && (
+      {!unavailable && (
         <p className="lx-note" style={{ margin: 0 }}>
           <span className="lx-cal-key is-deadline" /> Docket deadline <span className="lx-cal-key is-event" /> Consult or meeting{" "}
           <span className="lx-cal-key is-task" /> Task <span className="lx-cal-key is-overdue" /> Overdue

@@ -12,10 +12,6 @@ describe("calendarReadState", () => {
   it("unavailable when every read failed, never an empty week", () => {
     expect(calendarReadState({ deadlines: null, tasks: null, events: null })).toEqual({ kind: "unavailable" });
   });
-  it("agenda does not count events", () => {
-    expect(calendarReadState({ deadlines: null, tasks: null, events: undefined })).toEqual({ kind: "unavailable" });
-    expect(calendarReadState({ deadlines: [], tasks: [], events: undefined })).toEqual({ kind: "ok" });
-  });
 });
 
 describe("calendar page links", () => {
