@@ -187,11 +187,12 @@
 .rv-owner .rv-card-ours .rv-card-link { padding: 2px 0; gap: 2px; }
 .rv-owner .rv-card-waits { background: var(--paper); box-shadow: inset 3px 0 0 var(--line); border-color: var(--line); }
 .rv-owner .rv-card-waits .rv-card-link { padding: 10px 12px 10px 12px; gap: 3px; }
-.rv-owner .rv-card-title { font-size: 13.5px; }
-.rv-owner .rv-card-top { justify-content: flex-start; flex-wrap: wrap; gap: 4px 8px; }
+.rv-owner .rv-card-title { font-size: 13.5px; flex: 0 0 auto; white-space: nowrap; }
+.rv-owner .rv-card-top { justify-content: flex-start; flex-wrap: nowrap; align-items: baseline; gap: 4px 8px; min-width: 0; }
 .rv-owner .rv-card-top .rv-pill { margin-left: auto; }
 .rv-owner .rv-card-top .rv-avatar { display: none; }
-.rv-owner .rv-card-meta { display: inline; overflow: visible; white-space: normal; font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+.rv-owner .rv-card-top .rv-pill { flex: 0 0 auto; }
+.rv-owner .rv-card-meta { display: inline; flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
 .rv-owner .rv-card-step { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 0; font-size: 12.5px; color: var(--body); }
 .rv-owner .rv-card-step-text { min-width: 0; text-decoration: underline; text-underline-offset: 2px; }
 .rv-owner .rv-card-waits .rv-card-step-text { text-decoration: none; }
