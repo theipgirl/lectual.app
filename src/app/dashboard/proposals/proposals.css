@@ -82,6 +82,9 @@
 .pe-pkg { padding: 12px 0 0; border-top: 1px solid var(--line-2); }
 .pe-pkg:first-of-type { border-top: 0; padding-top: 0; }
 .pe-pkg-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.pe-pkg-inc { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 10px; }
+.pe-pkg-inc > summary { cursor: pointer; }
+.pe-pkg-inc[open] > summary { margin-bottom: 6px; }
 
 /* ── side panel ────────────────────────────────────────────── */
 .pe-totals { padding: 14px 16px; display: grid; gap: 8px; }

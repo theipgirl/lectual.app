@@ -8,8 +8,7 @@ import { saveProposalSettingsAction } from "@/app/dashboard/settings/proposals/a
 import { SETTINGS_APPROVERS_HEADING } from "@/lib/proposal-editor/vocabulary";
 import { ActionForm, Outcome } from "./ActionForm";
 import { IncludesFields } from "./IncludesFields";
-import { PackagePricesSection } from "./PackagePricesForm";
-import type { PricingValues } from "./PricingFields";
+import { PackagePricesSection, type SettingsPackageValues } from "./PackagePricesForm";
 
 export type SettingsMember = { userId: string; name: string; email: string | null; role: string };
 
@@ -25,7 +24,7 @@ export type SettingsValues = {
  * prices, where acceptance notices go, and the standard includes table. Admins only (the action re-checks).
  * `packages` is omitted when the prices aren't being edited here.
  */
-export function SettingsForm({ members, values, packages }: { members: SettingsMember[]; values: SettingsValues; packages?: PricingValues[] }) {
+export function SettingsForm({ members, values, packages }: { members: SettingsMember[]; values: SettingsValues; packages?: SettingsPackageValues[] }) {
   const [chosen, setChosen] = useState<string[]>(values.approverUserIds);
   const pick = approverPick(chosen);
   return (

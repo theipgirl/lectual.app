@@ -38,6 +38,7 @@ import {
   type ProposalSettingPricing,
 } from "@/lib/proposals/types";
 import { isCivilDate } from "@/lib/proposals/validate";
+import type { PackageListEntry } from "@/lib/proposals/package-list";
 import { DEFAULT_CLIENT_ENTRY_PROMPT, MAX_CLIENT_ADD } from "@/lib/proposals/client-classes";
 import { MAX_NAME_DISCOUNT_PCT } from "@/lib/proposals/pricing";
 
@@ -432,10 +433,13 @@ export function parseAdjustments(form: FormData, rand: () => string): Parsed<Pro
   return ok(out);
 }
 
-/** The "What your package includes" table: `inc.<n>.{label,value,included,note,highlight}`. */
-export function parseIncludes(form: FormData): Parsed<ProposalInclude[]> {
+/**
+ * The "What your package includes" table: `<prefix>.<n>.{label,value,included,note,highlight}`, `inc` by default
+ * (the proposal's own table and the firm's standard one); Settings posts a package's own rows as `pkg.<n>.inc`.
+ */
+export function parseIncludes(form: FormData, prefix = "inc"): Parsed<ProposalInclude[]> {
   const out: ProposalInclude[] = [];
-  for (const row of collectRows(form, "inc", ["label", "value", "included", "note", "highlight"])) {
+  for (const row of collectRows(form, prefix, ["label", "value", "included", "note", "highlight"])) {
     // A row nobody typed in (the blank one "Add row" makes) is dropped, not an error.
     if (!row.label && !row.value && !row.included && !row.note) continue;
     out.push({
@@ -564,10 +568,12 @@ export const PACKAGE_FORM_FIELDS = ["package", "base", "includedClasses", "perCl
  * LIST is acceptable (a name each, no duplicates, at least one) is
  * `validatePackages`'s job, run by the caller.
  */
-export function parsePackageList(form: FormData): Parsed<ProposalPricing[]> {
+export function parsePackageList(form: FormData): Parsed<PackageListEntry[]> {
   const rows = collectRows(form, "pkg", PACKAGE_FORM_FIELDS);
   if (rows.length === 0) return fail("Keep at least one package.");
-  const out: ProposalPricing[] = [];
+  const out: PackageListEntry[] = [];
+  // `collectRows` returns rows in this same order, so `indexes[i]` is row i's posted number.
+  const indexes = rowIndexes(form, "pkg");
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     const where = `Package ${i + 1}${row.package ? ` (${row.package})` : ""}`;
@@ -581,6 +587,8 @@ export function parsePackageList(form: FormData): Parsed<ProposalPricing[]> {
     if (!included.ok) return included;
     const pct = parsePercent(row.secondMarkPct, `${where}, second mark discount`);
     if (!pct.ok) return pct;
+    const includes = parsePackageIncludes(form, indexes[i], where);
+    if (!includes.ok) return includes;
     out.push({
       package: row.package,
       base_cents: base.value,
@@ -588,9 +596,37 @@ export function parsePackageList(form: FormData): Parsed<ProposalPricing[]> {
       per_class_cents: perClass.value,
       second_mark_discount_pct: pct.value,
       gov_per_class_cents: gov.value,
+      ...(includes.value ? { includes: includes.value } : {}),
     });
   }
   return ok(out);
+}
+
+/** At most this many "what this package includes" rows per package in Settings. */
+export const MAX_PACKAGE_INCLUDE_ROWS = 30;
+/** The longest any one cell of a package's includes row may be (the inputs' own maxLength is 300 or 120). */
+export const MAX_PACKAGE_INCLUDE_CHARS = 300;
+
+/**
+ * A package's own "what this package includes" rows (2026-11-10), posted as `pkg.<n>.inc.<r>.<field>` beside the
+ * marker `pkg.<n>.incFields=1`. No marker (an older caller, or the prices-only action): `undefined`, and
+ * `withPackages` keeps the rows the package already had. Marker with no rows: `[]`, which clears them. A row with
+ * text but no item name, too many rows, or an over-long cell is refused naming its package.
+ */
+function parsePackageIncludes(form: FormData, n: number | undefined, where: string): Parsed<ProposalInclude[] | undefined> {
+  if (n === undefined || form.get(`pkg.${n}.incFields`) !== "1") return ok(undefined);
+  const parsed = parseIncludes(form, `pkg.${n}.inc`);
+  if (!parsed.ok) return parsed;
+  const rows = parsed.value;
+  if (rows.length > MAX_PACKAGE_INCLUDE_ROWS) return fail(`${where}: list at most ${MAX_PACKAGE_INCLUDE_ROWS} things this package includes.`);
+  for (let r = 0; r < rows.length; r++) {
+    const row = rows[r];
+    if (!row.label) return fail(`${where}, included item ${r + 1}: give it a name.`);
+    if ([row.label, row.value ?? "", row.included, row.note ?? ""].some((t) => t.length > MAX_PACKAGE_INCLUDE_CHARS)) {
+      return fail(`${where}, included item ${r + 1}: keep each box to ${MAX_PACKAGE_INCLUDE_CHARS} characters.`);
+    }
+  }
+  return ok(rows);
 }
 
 /** Cents as the text a money input is pre-filled with ("4950.00"); blank for none. */
