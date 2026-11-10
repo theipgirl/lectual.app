@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { mobileBarItems, moreSections, railCountFor, type MobileBarSpec, type MoreGroup, type MoreSection, type NavItem } from "@/lib/nav";
 import { focusRestoreTarget, tourKeyAction } from "@/lib/onboarding/engine";
 import { menuKeyAction } from "@/lib/shell/menu-behaviour";
-import { MORE_NAME, SETTINGS_IN_MENU_NOTE } from "@/lib/ui/words";
+import { MORE_NAME } from "@/lib/ui/words";
 import type { QueueLoadStatus } from "@/lib/queue/load";
 import "./owner-shell.css";
 
@@ -154,7 +154,7 @@ export function MobileBar({ items, queueStatus, pendingCount, counts, bar: barSp
       {open && (
         <div onKeyDown={onKeyDown}>
           <div className="lx-more-scrim" onPointerDown={() => close(true)} aria-hidden="true" />
-          <MoreSheet sections={sections} sheetRef={sheet} onClose={() => setOpen(false)} note={variant === "owner" ? SETTINGS_IN_MENU_NOTE : undefined} />
+          <MoreSheet sections={sections} sheetRef={sheet} onClose={() => setOpen(false)} />
         </div>
       )}
     </>
