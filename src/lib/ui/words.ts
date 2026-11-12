@@ -511,3 +511,33 @@ export const LETTER_APPROVERS_UNREADABLE = "Who can approve couldn't be loaded, 
 export const LETTER_FIX_BEFORE_APPROVING = "Fix the problems above before approving.";
 export const LETTER_SETTINGS_LINK = "Engagement letter";
 export const LETTER_SETTINGS_LINK_NOTE = "The letter a client signs on their proposal, with its versions and who approves them.";
+
+/* Engagement letter section of the proposal editor (Sprint 6). */
+export const LETTER_SECTION_HEADING = "Engagement letter";
+export const LETTER_SECTION_HINT = "The letter your client reads and signs on the proposal page before paying. It is your firm's own text.";
+export const LETTER_SWITCH_LABEL = "Include the engagement letter";
+export const LETTER_SWITCH_ON_NOTE = "The client reads the letter, signs it, then pays. Saving this proposal copies your firm's current approved letter onto it.";
+export const LETTER_SWITCH_OFF_NOTE = "Off: the client accepts and pays with no letter to sign.";
+export const LETTER_SETUP_LINE = "Your firm has no approved engagement letter for this kind of proposal yet. Write and approve one, then turn it on here.";
+export const LETTER_SETUP_LINK = "Set up the engagement letter";
+export const LETTER_SECTION_UNREADABLE = "Your firm's engagement letter couldn't be loaded, so the switch is hidden. Refresh to try again. Nothing was changed.";
+export const LETTER_ABSENT_NOTE = "This proposal has no engagement letter.";
+export const LETTER_PREVIEW_CONTROL = "Preview the letter";
+export const LETTER_PREVIEW_PLACEHOLDER_NOTE = "Fields the client fills in or that are set when they sign show in [brackets].";
+export const LETTER_READ_ONLY_SECTION_NOTE = "Your role can read this but not change it.";
+export const letterAttachedLabel = (version: number): string => `Version ${version}, approved`;
+export const LETTER_NEWER_VERSION_NOTE = "Your firm has approved a newer version. Save this proposal to use it.";
+export const LETTER_LIVE_COPY_NOTE = "This is the copy the client reads and signs.";
+
+/* Signed letter card on the staff proposal page (Sprint 6). */
+export const SIGNED_CARD_HEADING = "Engagement letter";
+export const SIGNED_CARD_NOT_FOUND = "This version was accepted with an engagement letter, but its signature record wasn't found. It is not shown as signed here.";
+export const SIGNED_CARD_UNAVAILABLE = "The signature record couldn't be loaded. Refresh to try again.";
+export const SIGNED_DOWNLOAD = "Download the signed letter (PDF)";
+export const SIGNED_DOWNLOADING = "Preparing…";
+export const SIGNED_FILING_HEADING = "Filed in Lawmatics";
+export const SIGNED_FILING_NOT_YET = "Not filed yet.";
+export const SIGNED_FILING_OK = "Filed in the matter's Engagement folder.";
+export const SIGNED_TRY_AGAIN = "Try again";
+export const SIGNED_FINGERPRINT_LABEL = "Fingerprint (sha256)";
+export const SIGNED_DOWNLOAD_NOT_ALLOWED = "Your role can't download the signed letter.";

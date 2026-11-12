@@ -15,7 +15,14 @@ import { buildPaidPanelView } from "@/lib/proposals/paid-view";
 import { PROPOSAL_STAFF_WRITE_ROLES, isProposalEditable, type ProposalRow } from "@/lib/proposals/types";
 import { validateContent } from "@/lib/proposals/validate";
 import { describeProposalEvent, formatDollars } from "@/lib/proposal-editor/events";
-import { firstNameOf, joinOr, statusLabel, statusTone } from "@/lib/proposal-editor/labels";
+import { firstNameOf, joinOr, statusLabelFor, statusTone } from "@/lib/proposal-editor/labels";
+import { getScopedClient } from "@/lib/db/scoped-client";
+import { editorLetterState } from "@/lib/loe/editor-state";
+import { readSignature, type SignatureRead } from "@/lib/loe/signature-read";
+import { buildSignedCard } from "@/lib/loe/signed-card";
+import { getApprovedLetter } from "@/lib/loe/templates-store";
+import { isSignedSnapshot } from "@/lib/proposals/signed-state";
+import { EngagementLetterCard } from "@/components/proposal-editor/EngagementLetterCard";
 import { moneyInput } from "@/lib/proposal-editor/form";
 import { addedClassesPhrase, clientAddedClasses, clientDescribedClasses } from "@/lib/proposals/added-view";
 import { explicitClientAddMax } from "@/lib/proposals/client-classes";
@@ -126,7 +133,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
   const { proposal, versions, events } = detail;
   const content = proposal.content;
 
-  const [tz, members, settings, isApprover, origin, consult, stepRead, leadLink, leadOptions, opensRead] = await Promise.all([
+  const [tz, members, settings, isApprover, origin, consult, stepRead, leadLink, leadOptions, opensRead, letterRead, signatureRead] = await Promise.all([
     getFirmTimeZone(),
     listMemberDirectory().catch((): MemberIdentity[] => []),
     getProposalSettings().catch(() => null),
@@ -145,7 +152,35 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
           (m): OpensRead => m,
           (): OpensRead => "unavailable",
         ),
+    // Sprint 6: the firm's approved letter (only an editable version's section needs it; a failed read is "unavailable", never "no letter").
+    isProposalEditable(proposal.status) && canWrite
+      ? getScopedClient().then(
+          (db) => getApprovedLetter(db, isGeneralContent(content) ? "general" : "trademark"),
+          () => ({ status: "unavailable" }) as const,
+        )
+      : Promise.resolve(null),
+    // Sprint 6: the signature row of an accepted version that carries a letter (three-state).
+    proposal.status === "accepted" && content.loe
+      ? getScopedClient().then(
+          (db) => readSignature(db, proposal.id),
+          (): SignatureRead => ({ status: "unavailable" }),
+        )
+      : Promise.resolve(null),
   ]);
+  const letterState = editorLetterState({ read: letterRead, attached: content.loe });
+  const signedCard = signatureRead
+    ? buildSignedCard({
+        proposalId: proposal.id,
+        status: proposal.status,
+        snapshot: proposal.accepted_snapshot,
+        signature: signatureRead,
+        events: stepRead && stepRead.ok ? stepRead.events : null,
+        tz,
+        canRetry: PROPOSAL_PAID_ROLES.includes(session.role),
+        canDownload: canWrite,
+      })
+    : null;
+  const signedAccepted = proposal.status === "accepted" && isSignedSnapshot(proposal.accepted_snapshot);
   const opensText = opensPageText(proposal.status, opensRead, proposal.id, tz);
   // The family's events are already loaded, so the card needs no extra read.
   const card = buildProposalCard(proposal, events);
@@ -345,7 +380,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
           <div className="lx-label">{PROPOSALS_NAME}</div>
           <h1 className="lx-h1">{proposal.client_name}</h1>
           <div className="pe-meta">
-            <span className={`lx-pill lx-pill-${statusTone(proposal.status)}`}>{statusLabel(proposal.status)}</span>
+            <span className={`lx-pill lx-pill-${statusTone(proposal.status)}`}>{statusLabelFor(proposal.status, signedAccepted)}</span>
             <span className="lx-num">
               Version {proposal.version}
               {versions.length > 1 ? ` of ${versions.length}` : ""}
@@ -382,6 +417,8 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
       {canWrite && proposal.status === "sent" && (
         <ChangePayLink proposalId={proposal.id} updatedAt={proposal.updated_at} payUrl={proposal.pay_url ?? ""} />
       )}
+
+      {signedCard && <EngagementLetterCard proposalId={proposal.id} view={signedCard} />}
 
       {paidView && <PaidPanel proposalId={proposal.id} view={paidView} />}
 
@@ -445,7 +482,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
                   issues={shown(groups.message)}
                   values={{ greeting: content.greeting ?? "", recommendation: content.recommendation ?? "", officeActionNote: content.office_action_note ?? "" }}
                 />
-                <EngagementLetterSlot />
+                <EngagementLetterSlot state={letterState} editable={editable} />
               </DraftFormElement>
               {general ? null : <BrandForms proposalId={proposal.id} updatedAt={proposal.updated_at} names={nameValues} editable={editable} />}
               <section className="lx-card pe-card" aria-label="Proposal actions">
@@ -549,7 +586,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
           {versions.map((v) => (
             <li key={v.id}>
               <span className="lx-num">v{v.version}</span>
-              <span className={`lx-pill lx-pill-${statusTone(v.status)}`}>{statusLabel(v.status)}</span>
+              <span className={`lx-pill lx-pill-${statusTone(v.status)}`}>{statusLabelFor(v.status, v.id === proposal.id && signedAccepted)}</span>
               {v.id === proposal.id ? <span className="lx-note">You are here</span> : <Link href={`/dashboard/proposals/${v.id}/`}>Open</Link>}
               <span className="lx-note">
                 {v.source === "revision" ? "Revision · " : ""}

@@ -260,12 +260,14 @@ describe("F7: live, accepted, replaced and withdrawn versions keep today's behav
   });
 });
 
-describe("V4: the Engagement letter slot renders nothing", () => {
-  it("no heading, card or text for it in the five-section render", async () => {
+describe("V4: the Engagement letter slot (Sprint 6 fills it)", () => {
+  it("is drawn as its own section, after Message and inside the one form, with no placeholder text", async () => {
     for (const content of [sevetri(), faithe()]) {
       const html = await render(row({ content }));
-      expect(html).not.toContain("Engagement letter");
-      expect(html).not.toMatch(/engagement/i);
+      expect(html).toContain('id="pe-sec-letter"');
+      expect(html).toContain("Engagement letter");
+      expect(html.indexOf('id="pe-sec-message"')).toBeLessThan(html.indexOf('id="pe-sec-letter"'));
+      expect(html).not.toMatch(/TODO|Coming soon|Lorem/i);
     }
   });
 });

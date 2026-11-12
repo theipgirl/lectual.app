@@ -19,7 +19,7 @@ import { notReadyYet } from "@/lib/ui/words";
 
 export const DELETE_LABEL = "Delete proposal";
 export const DELETE_CONFIRM =
-  "Delete this proposal and all its versions? The client link stops working and its history is removed. This can't be undone.";
+  "Delete this proposal and all its versions? The client link stops working and its history is removed, and the signed letter's record is removed too. This can't be undone.";
 export const DELETE_DONE = "Proposal deleted.";
 export const DELETE_OWNER_ONLY = "Only the firm's owner can delete a proposal.";
 export const DELETE_NOT_FOUND = "Proposal not found.";

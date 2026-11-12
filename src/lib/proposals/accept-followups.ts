@@ -1,7 +1,14 @@
 import "server-only";
 
 import { firmToken } from "@/lib/intake-forms/lawmatics-sync";
-import { addNote, type FetchLike } from "@/lib/lawmatics/writes";
+import { buildSignedLetterPdf, signedLetterFileName } from "@/lib/loe/signed-pdf";
+import { rebuildSignedLetter } from "@/lib/loe/signed-letter";
+import { resolveTimeZone } from "@/lib/org/profile-rules";
+import { addNote, uploadMatterFile, type FetchLike, type MultipartFetchLike } from "@/lib/lawmatics/writes";
+import { firmDisplayName } from "./commitment";
+import { runSignedLoeUpload } from "./loe-signed-upload";
+import { isSignedSnapshot } from "./signed-state";
+import { STEP_TEXT } from "./step-text";
 import { formatDollars } from "@/lib/proposal-editor/events";
 import { addedClassCount } from "./client-classes";
 import { chosenPackagesText, packageLineTitle } from "./name-package";
@@ -14,7 +21,8 @@ import { MARK_KIND_LABEL, isGeneralContent, type AcceptedSnapshot } from "./type
  *
  *   1. an in-app notice (crm_notification, kind `approval_needed`) to the proposal's
  *      approvers and the firm's intake staff: a headline, nothing else;
- *   2. a Lawmatics NOTE on the right record, through the firm's OWN connection.
+ *   2. a Lawmatics NOTE on the right record, through the firm's OWN connection;
+ *   3. (Sprint 6, a SIGNED acceptance only) the signed letter's PDF filed in the matter's Engagement folder.
  *
  * Each step is independent, records its outcome on the proposal's timeline, and runs once
  * per accepted version (a version has its own id, so the dedupe is by proposal id). NOTHING
@@ -244,6 +252,8 @@ export type FollowupDeps = {
   /** The firm's Lawmatics token for this org, or null. Default: `firmToken` over the same client. */
   getToken?: (db: FollowupDb, orgId: string) => Promise<string | null>;
   fetchImpl?: FetchLike;
+  /** The multipart request that files the signed letter (tests only; the default is `fetch`). */
+  uploadFetch?: MultipartFetchLike;
 };
 
 const PROPOSAL_COLUMNS = "id, org_id, family_id, status, client_name, client_email, lead_id, matter_id, accepted_snapshot";
@@ -279,7 +289,7 @@ async function readEarlierSteps(db: FollowupDb, row: Row): Promise<StepEventInpu
       .select("proposal_id, created_at, payload")
       .eq("proposal_id", row.id)
       .eq("org_id", row.orgId)
-      .in("payload->>step", ["accept_notice", "lawmatics_note"])
+      .in("payload->>step", ["accept_notice", "lawmatics_note", "signed_loe_upload"])
       .limit(50),
     db
       .from("client_proposal_event")
@@ -377,6 +387,49 @@ async function noteStep(db: FollowupDb, row: Row, deps: FollowupDeps): Promise<S
   }
 }
 
+/** The firm's name for the letterhead and its time zone, read for this org only. A failed read falls back to no name and the default zone. */
+async function firmLetterFacts(db: FollowupDb, orgId: string): Promise<{ displayName: string; timeZone: string }> {
+  const [org, profile] = await Promise.all([
+    db.from("crm_org").select("name").eq("id", orgId).maybeSingle(),
+    db.from("crm_org_profile").select("display_name, time_zone").eq("org_id", orgId).maybeSingle(),
+  ]);
+  const orgName = !org.error && isObject(org.data) && typeof org.data.name === "string" ? org.data.name : "";
+  const p = !profile.error && isObject(profile.data) ? profile.data : null;
+  return {
+    displayName: orgName ? firmDisplayName(p && typeof p.display_name === "string" ? p.display_name : null, orgName) : "",
+    timeZone: resolveTimeZone(p && typeof p.time_zone === "string" ? p.time_zone : null),
+  };
+}
+
+/** Files the signed letter (a PDF) in the matter's Engagement folder, through the firm's OWN connection. Schema-2 snapshots only. */
+async function signedUploadStep(db: FollowupDb, row: Row, deps: FollowupDeps): Promise<StepResult> {
+  try {
+    const facts = await firmLetterFacts(db, row.orgId);
+    const letter = rebuildSignedLetter(row.snapshot, facts.timeZone);
+    return await runSignedLoeUpload(letter, {
+      token: async () => {
+        try {
+          const t = await (deps.getToken ?? ((d, orgId) => firmToken(d as never, orgId)))(db, row.orgId);
+          return t ? { status: "ok", token: t } : { status: "not_connected" };
+        } catch {
+          return { status: "unavailable" };
+        }
+      },
+      target: async () => {
+        const target = await resolveNoteTarget(db, row);
+        if (target.ok) return { ok: true, lawmaticsId: target.notableId };
+        if (target.reason === "unreadable") return { ok: false, kind: "failed", reason: STEP_TEXT.signedTargetUnreadable };
+        return { ok: false, kind: "blocked", reason: target.reason === "none" ? STEP_TEXT.signedNoMatter : STEP_TEXT.signedManyMatters };
+      },
+      buildPdf: () => buildSignedLetterPdf(letter!, { displayName: facts.displayName, title: row.snapshot.content.loe?.title ?? "Engagement letter" }),
+      upload: (token, file) => uploadMatterFile(token, { matterId: file.matterId, fileName: file.fileName, mime: file.mime, bytes: file.bytes }, deps.uploadFetch),
+      fileName: signedLetterFileName(row.snapshot.agreement?.signer_name ?? "", row.snapshot.agreement?.signed_at ?? "", facts.timeZone),
+    });
+  } catch {
+    return { outcome: "failed", reason: "unexpected error" };
+  }
+}
+
 async function runStep(db: FollowupDb, row: Row, step: ProposalStep, earlier: StepEventInput[] | null, run: () => Promise<StepResult>, blockWhenUnchecked: boolean): Promise<void> {
   if (earlier && stepSucceeded(earlier, row.id, step)) return;
   const result = earlier === null && blockWhenUnchecked ? ({ outcome: "blocked", reason: "couldn't check for an earlier one" } as StepResult) : await run();
@@ -399,6 +452,8 @@ export async function runAcceptanceFollowups(db: FollowupDb, input: FollowupInpu
     // a second note in the firm's CRM is worse than a missing one, so that step waits for a readable history.
     await runStep(db, row, "accept_notice", earlier, () => noticeStep(db, row), false);
     await runStep(db, row, "lawmatics_note", earlier, () => noteStep(db, row, deps), true);
+    // Sprint 6: a signed (schema 2) acceptance also files the signed letter. Earlier acceptances never run this step.
+    if (isSignedSnapshot(row.snapshot)) await runStep(db, row, "signed_loe_upload", earlier, () => signedUploadStep(db, row, deps), true);
   } catch {
     console.error("[proposals] the acceptance follow-ups stopped early");
   }

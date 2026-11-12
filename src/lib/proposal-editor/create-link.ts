@@ -1,6 +1,7 @@
 import type { ProposalRow } from "@/lib/proposals/types";
 import type { ActionState } from "@/app/dashboard/proposals/errors";
-import { LINK_CREATED, LINK_NOT_TURNED_ON } from "./vocabulary";
+import type { LetterCopyCheck } from "@/lib/loe/editor-state";
+import { LETTER_CHANGED_SENTENCE, LETTER_UNREADABLE_SENTENCE, LINK_CREATED, LINK_NOT_TURNED_ON } from "./vocabulary";
 
 /**
  * "Save and create link": the existing approve transition, then the existing send
@@ -13,6 +14,11 @@ export type CreateLinkDeps = {
   gate: () => Promise<ActionState | null>;
   /** Saves the posted form first (the one Save). Only called when the page said it has unsaved changes. */
   save?: (form: FormData) => Promise<ActionState>;
+  /**
+   * Sprint 6: is the engagement letter copy on the (just saved) proposal the firm's current approved version? Read AFTER the save, so
+   * a Save that refreshed the copy passes. Optional: absent = no check (callers that carry no letter).
+   */
+  letterCurrent?: (id: string) => Promise<LetterCopyCheck>;
   approve: (id: string) => Promise<ProposalRow>;
   makeLive: (id: string) => Promise<ProposalRow>;
   /** Maps a thrown failure to the fixed sentence the person reads. */
@@ -32,6 +38,18 @@ export async function runCreateLink(
   if (options.dirty && deps.save && options.form) {
     const saved = await deps.save(options.form);
     if (saved.error) return saved;
+  }
+
+  // A stale copy, or a failed read of the firm's letter, stops here with a fixed sentence: nothing is approved and no link is made.
+  if (deps.letterCurrent) {
+    let check: LetterCopyCheck;
+    try {
+      check = await deps.letterCurrent(id);
+    } catch {
+      check = "unreadable";
+    }
+    if (check === "stale") return { error: LETTER_CHANGED_SENTENCE };
+    if (check === "unreadable") return { error: LETTER_UNREADABLE_SENTENCE };
   }
 
   try {

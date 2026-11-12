@@ -19,6 +19,13 @@ export const STATUS_WORDS: Record<ProposalStatus, string> = {
   withdrawn: "Withdrawn",
 };
 
+/** A signed acceptance (the client signed the engagement letter): the pill and header say so. Unsigned stays "Accepted by client". */
+export const SIGNED_STATUS_WORD = "Signed by client";
+
+/** Create-link refusals about the engagement letter copy (Sprint 6). Fixed sentences; nothing of the letter is quoted. */
+export const LETTER_CHANGED_SENTENCE = "The firm's engagement letter has changed since this was saved. Save your changes, then create the link again.";
+export const LETTER_UNREADABLE_SENTENCE = "Couldn't check the firm's engagement letter. Nothing was changed; try again shortly.";
+
 export const BUTTON_WORDS = {
   createLink: "Save and create link",
   creatingLink: "Creating link…",

@@ -10,6 +10,8 @@ const nextConfig: NextConfig = {
   // (the client proposal page); without this the serverless function ships without them and the PDF fails.
   outputFileTracingIncludes: {
     "/p/*": ["./src/lib/loe/fonts/**"],
+    // Sprint 6: the staff Download and "Try again" (filing the signed letter) build the same PDF from the proposal page's actions.
+    "/dashboard/proposals/*": ["./src/lib/loe/fonts/**"],
   },
   experimental: {
     // The stage reconciliation screen posts an intake sheet (up to 5 MB, see

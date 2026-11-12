@@ -1749,3 +1749,41 @@ No migration, no dependency, `pricing.ts` untouched. Nothing here approves, make
 - Existing assertions changed on purpose: `tests/proposals/draft-spec.test.ts` (checks now ARE stored on the content, and still returned); `tests/copilot/draft-proposal.test.ts` (a class number
   now comes back as `needs_changes` from the builder instead of a built draft with `blocking`).
 - Not verified: the real model (no key here), a database, a real browser. `tests/proposals/sprint5-hygiene.test.ts` greps the new code for approve/link/queue/mail/service-role paths and price fields.
+
+## Sprint 6 (Letter track): Signed letter on the staff side, and the flat-fee letter (needs lectual 0106; NOT applied yet)
+Nothing here sends, moves a stage, opens a matter or calls a model. No migration, no dependency. Pricing is untouched.
+- **The editor's Engagement letter section** (`EngagementLetterSlot`, rules in `src/lib/loe/editor-state.ts`, pure) draws one of five states from the firm's
+  approved letter, read through the scoped client (`getApprovedLetter`): `none` (no approved letter of this kind, or the table isn't there: the set-up line
+  and NO switch), `unreadable` (the read failed: says so, no switch, never "no letter"), `on` (the attached version "Version N, approved" and a Preview),
+  `off`, and `absent` (a version that can't be edited and carries no letter). Nothing returns null. "On" is simply "the saved copy exists": the one builder
+  attaches the letter when a proposal is made, and Save removes it when the switch is off. The switch is a plain checkbox INSIDE the editor's one form
+  (`loeOn`, with a `loeFields=1` marker), so the existing unsaved-changes guard marks the page. A viewer or social media never gets the input.
+- **Save refreshes the copy.** `buildDraftUpdate` calls `withLoeSnapshot(content, approved, wanted)` with `wanted` from the switch (`wantedFromForm`): a form that
+  doesn't carry the switch keeps it as it is. An approved-letter read that fails refuses a CHANGE of the switch (a person must not turn a letter off on a guess) and
+  otherwise leaves the copy untouched. A general template never attaches to a trademark proposal (kind mismatch removes `loe`).
+- **Create link re-checks.** `runCreateLink` gains an optional `letterCurrent` dependency, run AFTER the save and BEFORE approve or send: `stale` or `unreadable`
+  returns a fixed sentence (`LETTER_CHANGED_SENTENCE`, `LETTER_UNREADABLE_SENTENCE`) and neither `approve` nor `makeLive` runs. "Save and create link" saves
+  first when the page has unsaved changes (it is not disabled), so a Save that refreshed the copy passes. "Turn on the link" (`sendAction`) is not re-checked.
+- **Signed means a schema-2 snapshot with an agreement** (`isSignedSnapshot`). The pill reads "Signed by client" and the list's Accepted column "Signed Oct 21";
+  an unsigned accepted version stays "Accepted by client" / "Accepted Oct 21", and a list row whose `signed` is unknown reads as accepted, never as signed.
+- **Staff card** (`EngagementLetterCard`, view in `src/lib/loe/signed-card.ts`): only for an ACCEPTED version whose snapshot carries a letter. The signature ROW
+  (`client_proposal_signature`, `signature-read.ts`, named columns, never `agreement_text`, address, IP or user agent) is the source of the signer, the time and the
+  fingerprint: `ok` draws it, `none` says the record wasn't found (never "Signed" from the snapshot alone), `unavailable` says it couldn't be loaded. Download is
+  `downloadSignedLetterStaffAction` (module gate with `notFound()`, a proposal-writing role, scoped client, fixed sentences). Try again is `retryUploadAction` with
+  step `signed_loe_upload`, offered to `PROPOSAL_PAID_ROLES` (the roles that already retry the other upload steps).
+- **One PDF, no docx.** `buildLetterPdf` (mode `signed`) via `buildSignedLetterPdf(rebuildSignedLetter(snapshot))` is the file the client downloads, the staff
+  download and the file filed in Lawmatics, so their text is the same. The PDF now starts with a letterhead line, the firm's display name
+  (`firmDisplayName(profile, org name)`). File name: `<signer>-engagement-letter-signed-<firm-zone date>.pdf`. `next.config.ts` traces the fonts for
+  `/dashboard/proposals/*` as well as `/p/*`.
+- **`signed_loe_upload`** (a ninth step, success word `uploaded`, in `RETRYABLE_STEPS`): `runAcceptanceFollowups` runs it after the note for a signed snapshot only, as the
+  service role fenced on the proposal's org, with the firm's own token (`firmToken`; never an env token). Core: `loe-signed-upload.ts` (deps injected). Outcomes:
+  `uploaded`; `skipped` (no active Lawmatics connection); `blocked` (no Lawmatics record, or more than one, from `resolveNoteTarget`); `failed` (the request, an
+  unreadable lookup, the connection check, the PDF). Once per signing and round (`stepSucceeded`; a reset starts a fresh round). A failed upload never changes the acceptance or
+  the paid state. Retry (`retryProposalStep`) needs no paid mark for this step, uses the signed-in token and the same core. Step events carry an outcome and a fixed
+  sentence or an HTTP status, never letter text, an address or bytes.
+- **Mark paid on a signed version** records `loe_draft` as `skipped` ("Signed on the proposal page") before any module check, lookup or `generateTrademarkLoe`.
+  The accepted-proposal file and the LOE fields still run. An unsigned (no-letter) accepted version behaves as before.
+- **Confirm sentences.** Reset says "Earlier signature records are kept." (a reset still writes only `status: sent`). Delete says "the signed letter's record is removed too."
+  The owner's delete stays allowed for a signed proposal (the design's "keep or refuse" is still Taylor's open item).
+- **NOT verified:** the real 0106 table and function, Lawmatics' `/files` multipart (same unverified shape as the accepted-proposal upload), a real browser (the Blob
+  download, the switch's hide/show of Preview, focus), Vercel's bundling of the font for the dashboard route (traced in `next.config.ts`; checked by build only).

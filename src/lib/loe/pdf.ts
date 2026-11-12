@@ -107,6 +107,21 @@ export async function buildLetterPdf(input: BuildLetterPdfInput): Promise<Uint8A
 
   doc.font("Regular").fontSize(BODY).fillColor("#000000");
 
+  // The letterhead line: the firm's display name, first on the first page, before any paragraph of the letter.
+  const letterhead = (input.firmName ?? "").replace(/\s+/g, " ").trim();
+  if (letterhead) {
+    doc.font("Bold").fontSize(14).text(letterhead, left, doc.y, { width });
+    doc.moveDown(0.3);
+    doc
+      .moveTo(left, doc.y)
+      .lineTo(left + width, doc.y)
+      .strokeColor("#999999")
+      .lineWidth(0.5)
+      .stroke();
+    doc.moveDown(0.8);
+    doc.font("Regular").fontSize(BODY).fillColor("#000000");
+  }
+
   // The full letter: every paragraph, in order, bold lead-in first.
   for (const block of input.blocks) {
     doc.x = left;

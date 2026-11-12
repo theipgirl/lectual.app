@@ -30,6 +30,7 @@ import { MAX_CONTENT_BYTES, hasErrors, isCivilDate, isPlausibleEmail, validateCo
 import { PAY_LINK_NEEDS_DB_UPDATE, PAY_LINK_NOT_HTTPS, PAY_LINK_NOT_LIVE, PAY_LINK_UNCHANGED } from "@/lib/proposal-editor/pay-link";
 import { runDeleteProposalFamily, type DeleteFamilyResult } from "@/lib/proposal-editor/delete-proposal";
 import { RESET_NEEDS_DB_UPDATE, RESET_NOT_ACCEPTED } from "@/lib/proposal-editor/reset-acceptance";
+import { isSignedSnapshot } from "./signed-state";
 
 /**
  * The proposal data layer — every read and write the signed-in firm makes.
@@ -506,6 +507,8 @@ export type ProposalListItem = {
   package_basis: ProposalPackageBasis | null;
   /** Spec 9: a general (flat-fee) proposal's matter title; null on a trademark proposal. */
   matter_title?: string | null;
+  /** Sprint 6: the accepted snapshot carries a signature (schema 2 with an agreement). */
+  signed?: boolean;
   /** What the client pays now: the accepted total once accepted, else the firm's preselected offer. */
   legal_total_cents: number;
   /** USPTO fees, due at filing. */
@@ -543,7 +546,7 @@ export async function listProposals(options: ProposalListOptions = {}): Promise<
   const rows = (Array.isArray(data) ? data : []) as Array<
     Omit<
       ProposalListItem,
-      "legal_total_cents" | "gov_total_cents" | "blocking_issue" | "brands" | "offered" | "class_count" | "signed_package" | "package_basis" | "matter_title"
+      "legal_total_cents" | "gov_total_cents" | "blocking_issue" | "brands" | "offered" | "class_count" | "signed_package" | "package_basis" | "matter_title" | "signed"
     > & {
       client_email: string | null;
       pay_url: string | null;
@@ -577,6 +580,7 @@ export async function listProposals(options: ProposalListOptions = {}): Promise<
       ...rest,
       ...totals,
       blocking_issue,
+      signed: isSignedSnapshot(accepted_snapshot),
       brands: names.map((n) => (typeof n?.name === "string" ? n.name.trim() : "")).filter(Boolean),
       matter_title: isGeneralContent(content) && typeof content.general?.matter_title === "string" ? content.general.matter_title.trim() || null : null,
       offered: offeredPackages(content),
