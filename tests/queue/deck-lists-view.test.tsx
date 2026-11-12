@@ -60,7 +60,6 @@ describe("DeckSide sections", () => {
     expect(html).toContain("Can&#x27;t show this list right now.");
     expect(html).not.toContain("Nothing decided yet");
     expect(html).not.toContain("Decided today, full list");
-    expect(html).toContain("1 waiting \u00B7 \u2014 decided");
   });
   it("without a later prop (technician-less callers) the Later section is not drawn", () => {
     expect(renderToStaticMarkup(<DeckSide rows={[row]} />)).not.toContain("Nothing put off.");

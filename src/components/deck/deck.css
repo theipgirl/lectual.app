@@ -398,3 +398,6 @@ a.dk-move--open { font-size: 15px; }
 .dk-sep--first { border-top: 0; }
 .dk-side-row .dk-chip { white-space: normal; height: auto; min-height: 26px; padding: 5px 8px; line-height: 1.25; max-width: 46%; text-align: left; }
 .dk-chip--line { background: transparent; color: var(--body); border: 1px solid var(--line); }
+.dk-sidestack { display: flex; flex-direction: column; gap: 14px; max-height: calc(100vh - 150px); overflow-y: auto; scrollbar-width: thin; min-width: 0; }
+.dk-side-note--card { padding: 0 4px; }
+.dk-sidestack .dk-sidecard { flex: none; }

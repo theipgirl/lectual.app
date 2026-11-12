@@ -13,7 +13,6 @@ import {
   DECK_SIDE_SEE_ALL_LATER,
   DECK_SIDE_TITLE,
   NOT_SWITCHED_ON,
-  deckSideCounts,
 } from "@/lib/ui/words";
 import { listHref } from "@/lib/queue/deck-lists";
 import type { ChipTone } from "./deck-rows";
@@ -49,12 +48,15 @@ function Row({ r }: { r: DeckSideRow }) {
   );
 }
 
-function Sep({ label, count, first }: { label: string; count: string | number; first?: boolean }) {
+function Card({ label, count, children }: { label: string; count: string | number; children: React.ReactNode }) {
   return (
-    <div className={first ? "dk-sep dk-sep--first" : "dk-sep"}>
-      <span>{label}</span>
-      <span>{count}</span>
-    </div>
+    <section className="dk-sidecard" aria-label={label}>
+      <div className="dk-sidecard-head">
+        <h2>{label}</h2>
+        <span className="dk-sub-mono">{count}</span>
+      </div>
+      {children}
+    </section>
   );
 }
 
@@ -64,14 +66,9 @@ export function DeckSide({ rows, failed, note, later, decidedFailed }: { rows: D
   const done = rows.filter((r) => r.decided);
   const noDecided = failed || decidedFailed;
   return (
-    <nav className="dk-sidecard" aria-label={DECK_SIDE_TITLE}>
-      <div className="dk-sidecard-head">
-        <h2>{DECK_SIDE_TITLE}</h2>
-        <span className="dk-sub-mono">{deckSideCounts(failed ? "—" : String(need.length), noDecided ? "—" : String(done.length))}</span>
-      </div>
-      <div className="dk-side-scroll">
-        {note && <p className="dk-side-note">{note}</p>}
-        <Sep first label={DECK_COL_NEEDS_YES} count={failed ? "—" : need.length} />
+    <nav className="dk-sidestack" aria-label={DECK_SIDE_TITLE}>
+      {note && <p className="dk-side-note dk-side-note--card">{note}</p>}
+      <Card label={DECK_COL_NEEDS_YES} count={failed ? "—" : need.length}>
         {failed ? <p className="dk-side-note dk-side-note--risk">{DECK_SIDE_CANT}</p> : need.length === 0 ? <p className="dk-empty-card">{DECK_SIDE_NOTHING_LEFT}</p> : (
           <ol className="dk-side-rows">
             {need.map((r) => (
@@ -79,30 +76,30 @@ export function DeckSide({ rows, failed, note, later, decidedFailed }: { rows: D
             ))}
           </ol>
         )}
-        {later && (
-          <>
-            <Sep label={DECK_COL_LATER} count={later.status === "ok" ? later.rows.length : "—"} />
-            {later.status === "ok" ? (
-              later.rows.length === 0 ? (
-                <p className="dk-empty-card">{DECK_SIDE_LATER_NOTHING}</p>
-              ) : (
-                <>
-                  <ol className="dk-side-rows">
-                    {later.rows.map((r) => (
-                      <Row key={r.id} r={r} />
-                    ))}
-                  </ol>
-                  <Link href={listHref("later")} className="dk-side-more">
-                    {DECK_SIDE_SEE_ALL_LATER}
-                  </Link>
-                </>
-              )
+      </Card>
+      {later && (
+        <Card label={DECK_COL_LATER} count={later.status === "ok" ? later.rows.length : "—"}>
+          {later.status === "ok" ? (
+            later.rows.length === 0 ? (
+              <p className="dk-empty-card">{DECK_SIDE_LATER_NOTHING}</p>
             ) : (
-              <p className={`dk-side-note${later.status === "unavailable" ? " dk-side-note--risk" : ""}`}>{later.status === "not-set-up" ? NOT_SWITCHED_ON : DECK_SIDE_LATER_CANT}</p>
-            )}
-          </>
-        )}
-        <Sep label={DECK_COL_DECIDED} count={noDecided ? "—" : done.length} />
+              <>
+                <ol className="dk-side-rows">
+                  {later.rows.map((r) => (
+                    <Row key={r.id} r={r} />
+                  ))}
+                </ol>
+                <Link href={listHref("later")} className="dk-side-more">
+                  {DECK_SIDE_SEE_ALL_LATER}
+                </Link>
+              </>
+            )
+          ) : (
+            <p className={`dk-side-note${later.status === "unavailable" ? " dk-side-note--risk" : ""}`}>{later.status === "not-set-up" ? NOT_SWITCHED_ON : DECK_SIDE_LATER_CANT}</p>
+          )}
+        </Card>
+      )}
+      <Card label={DECK_COL_DECIDED} count={noDecided ? "—" : done.length}>
         {noDecided ? <p className="dk-side-note dk-side-note--risk">{DECK_SIDE_CANT_DECIDED}</p> : done.length === 0 ? <p className="dk-empty-card">{DECK_SIDE_NOTHING_DECIDED}</p> : (
           <>
             <ol className="dk-side-rows">
@@ -115,7 +112,7 @@ export function DeckSide({ rows, failed, note, later, decidedFailed }: { rows: D
             </Link>
           </>
         )}
-      </div>
+      </Card>
     </nav>
   );
 }
