@@ -3,12 +3,12 @@ import type { ConsultMark, StoredConsultDetails } from "@/lib/consult/vocab";
 import type { ReviewedConsultRead } from "@/lib/consult/store";
 import type { ProposalContent } from "@/lib/proposals/types";
 import { MARK_KIND_DEFAULT_DESC } from "@/lib/proposals/types";
-import { newBrandName } from "@/lib/proposal-editor/form";
 
 /**
- * createProposalAction with "Use the marks and classes from the reviewed consult" ticked. The action
- * re-reads the lead's consult details itself, so the browser never supplies a mark or a class; these
- * tests fake that read and the create call, and look at the document that reaches `createProposal`.
+ * createProposalAction with "Use the marks and classes from the reviewed consult" ticked (Sprint 3: the one-step
+ * action; the lead is read on the server from its id). The action re-reads the lead's consult details itself, so
+ * the browser never supplies a mark or a class; these tests fake that read and the create call, and look at the
+ * document that reaches `createProposal`.
  */
 
 const LEAD = "11111111-1111-4111-8111-111111111111";
@@ -54,10 +54,14 @@ const ZEPHYR = mark("m1", "Zephyr", "word", [
 ]);
 const SWIRL = mark("m2", "Swirl", "design");
 
-const base = { fullName: "Ana Ruiz", firstName: "Ana", expiresOn: "2026-11-10", package: "Concierge" };
+const base = {};
 const settings = { default_pay_url: "https://pay.example/x", pricing: { packages: PACKAGES } };
 
-async function setup(opts: { consult?: ReviewedConsultRead; gate?: { error: string } | "notFound" | null } = {}) {
+/** The lead the action reads by id through the scoped client; `mark_text` is the lead's own brand. */
+const leadRow = (over: Record<string, unknown> = {}) => ({ id: LEAD, first_name: "Ana", last_name: "Ruiz", business_name: null, email: "ana@example.com", mark_text: null, ...over });
+const matterRow = { id: MATTER, lead_id: LEAD, owner_name: "Ana Ruiz", mark_text: null, title: null, matter_number: "TM-1" };
+
+async function setup(opts: { consult?: ReviewedConsultRead; gate?: { error: string } | "notFound" | null; lead?: Record<string, unknown> | null } = {}) {
   vi.resetModules();
   const created = vi.fn<(input: unknown) => Promise<{ id: string }>>(async () => ({ id: "new-1" }));
   const loadConsult = vi.fn<(leadId: string) => Promise<ReviewedConsultRead>>(async () => opts.consult ?? NONE);
@@ -76,6 +80,20 @@ async function setup(opts: { consult?: ReviewedConsultRead; gate?: { error: stri
     }),
   }));
   vi.doMock("@/lib/proposals/store", () => ({ createProposal: created, getProposalSettings: vi.fn(async () => settings) }));
+  vi.doMock("@/lib/db/scoped-client", () => ({
+    getScopedClient: vi.fn(async () => ({
+      from: (table: string) => {
+        const q = {
+          select: () => q,
+          eq: () => q,
+          maybeSingle: async () => ({ data: table === "crm_matter" ? matterRow : opts.lead === undefined ? leadRow() : opts.lead, error: null }),
+        };
+        return q;
+      },
+    })),
+  }));
+  vi.doMock("@/lib/loe/templates-store", () => ({ getApprovedLetter: vi.fn(async () => ({ status: "ok", letter: null })) }));
+  vi.doMock("@/lib/org/profile", () => ({ getFirmTimeZone: vi.fn(async () => "America/New_York") }));
   vi.doMock("@/lib/proposals/consult-prefill-load", () => ({ loadConsultForPrefill: loadConsult }));
   const { createProposalAction } = await import("../../src/app/dashboard/proposals/actions");
   const form = (fields: Record<string, string>) => {
@@ -109,8 +127,8 @@ describe("the box ticked, the consult reviewed", () => {
     const wide = Array.from({ length: 10 }, (_, i) =>
       mark(`m${i}`, `Brand${String.fromCharCode(97 + i)}`, i % 2 ? "design" : "word", [[25, "Goods one"], [35, "Goods two"], [9, "Goods three"], [41, "Goods four"]]),
     );
-    const { created, run } = await setup({ consult: reviewed(details(wide)) });
-    await expect(run({ ...base, leadId: LEAD, useConsult: "on", brandName: "Typed Extra" })).rejects.toBeInstanceOf(Redirected);
+    const { created, run } = await setup({ consult: reviewed(details(wide)), lead: leadRow({ mark_text: "Typed Extra" }) });
+    await expect(run({ ...base, leadId: LEAD, useConsult: "on" })).rejects.toBeInstanceOf(Redirected);
     const { names } = contentOf(created);
     expect(names).toHaveLength(10);
     expect(names.every((x) => x.classes.length <= 3)).toBe(true);
@@ -123,24 +141,24 @@ describe("the box ticked, the consult reviewed", () => {
     expect(JSON.stringify(names)).not.toMatch(/Class \d/);
   });
 
-  it("a typed name that matches a consult mark is that mark's brand name; the others follow", async () => {
-    const { created, run } = await setup({ consult: reviewed(details([ZEPHYR, SWIRL])) });
-    await expect(run({ ...base, leadId: LEAD, useConsult: "on", brandName: "ZEPHYR!" })).rejects.toBeInstanceOf(Redirected);
+  it("a lead's own brand that matches a consult mark is that mark's brand name; the others follow", async () => {
+    const { created, run } = await setup({ consult: reviewed(details([ZEPHYR, SWIRL])), lead: leadRow({ mark_text: "ZEPHYR!" }) });
+    await expect(run({ ...base, leadId: LEAD, useConsult: "on" })).rejects.toBeInstanceOf(Redirected);
     const { names } = contentOf(created);
     expect(names.map((x) => x.name)).toEqual(["ZEPHYR!", "Swirl"]);
     expect(names[0].classes).toHaveLength(2);
   });
 
-  it("a typed name that matches none stays first with the default pair; a blank one creates only the consult marks", async () => {
-    const first = await setup({ consult: reviewed(details([ZEPHYR])) });
-    await expect(first.run({ ...base, leadId: LEAD, useConsult: "on", brandName: "Other" })).rejects.toBeInstanceOf(Redirected);
+  it("a lead brand that matches none stays first with the default pair; a lead with no brand creates only the consult marks", async () => {
+    const first = await setup({ consult: reviewed(details([ZEPHYR])), lead: leadRow({ mark_text: "Other" }) });
+    await expect(first.run({ ...base, leadId: LEAD, useConsult: "on" })).rejects.toBeInstanceOf(Redirected);
     const { names } = contentOf(first.created);
     expect(names.map((x) => x.name)).toEqual(["Other", "Zephyr"]);
     expect(names[0].marks.map((m) => m.kind)).toEqual(["word", "logo"]);
     expect(names[0].classes).toEqual([]);
 
     const blank = await setup({ consult: reviewed(details([ZEPHYR])) });
-    await expect(blank.run({ ...base, leadId: LEAD, useConsult: "on", brandName: "" })).rejects.toBeInstanceOf(Redirected);
+    await expect(blank.run({ ...base, leadId: LEAD, useConsult: "on" })).rejects.toBeInstanceOf(Redirected);
     expect(contentOf(blank.created).names.map((x) => x.name)).toEqual(["Zephyr"]);
   });
 
@@ -152,24 +170,19 @@ describe("the box ticked, the consult reviewed", () => {
     expect(JSON.stringify(contentOf(created))).not.toContain("Injected");
   });
 
-  it("an unchanged package posts no 'edited' flags; editing one price records that field only", async () => {
-    const same = await setup({ consult: reviewed(details([ZEPHYR])) });
-    await expect(
-      same.run({ ...base, package: "Enhanced", base: "3250.00", includedClasses: "2", perClass: "700.00", secondMarkPct: "15", govPerClass: "350.00", leadId: LEAD, useConsult: "on" }),
-    ).rejects.toBeInstanceOf(Redirected);
-    expect(contentOf(same.created).pricing).toEqual(PACKAGES[1]);
-    expect(contentOf(same.created).package_basis).toBeUndefined();
-
-    const edited = await setup({ consult: reviewed(details([ZEPHYR])) });
-    await expect(
-      edited.run({ ...base, package: "Enhanced", base: "2900", includedClasses: "2", perClass: "700.00", secondMarkPct: "15", govPerClass: "350.00", leadId: LEAD, useConsult: "on" }),
-    ).rejects.toBeInstanceOf(Redirected);
-    expect(contentOf(edited.created).package_basis).toEqual({ name: "Enhanced", edited: ["price"] });
+  it("the consult's recommended package becomes the proposal's package when it is on the firm's list; one that isn't changes nothing", async () => {
+    const on = await setup({ consult: reviewed(details([ZEPHYR], { recommended_package: "Enhanced" })) });
+    await expect(on.run({ ...base, leadId: LEAD, useConsult: "on" })).rejects.toBeInstanceOf(Redirected);
+    expect(contentOf(on.created).pricing).toEqual(PACKAGES[1]);
+    const off = await setup({ consult: reviewed(details([ZEPHYR], { recommended_package: "Platinum" })) });
+    await expect(off.run({ ...base, leadId: LEAD, useConsult: "on" })).rejects.toBeInstanceOf(Redirected);
+    expect(contentOf(off.created).pricing).toEqual(PACKAGES[0]);
   });
 
   it("carries the lead and matter ids as before", async () => {
     const { created, run } = await setup({ consult: reviewed(details([ZEPHYR])) });
-    await expect(run({ ...base, leadId: LEAD, matterId: MATTER, useConsult: "on" })).rejects.toBeInstanceOf(Redirected);
+    // A matter is read on the server; its own lead is linked and its consult is the one read.
+    await expect(run({ ...base, matterId: MATTER, useConsult: "on" })).rejects.toBeInstanceOf(Redirected);
     expect(created.mock.calls[0][0]).toMatchObject({ leadId: LEAD, matterId: MATTER });
   });
 });
@@ -203,26 +216,24 @@ describe("refused when the consult is no longer reviewed: nothing is created", (
 });
 
 describe("the box without a lead, or not ticked", () => {
-  it("a ticked box with no lead id is ignored: the consult is never read", async () => {
+  it("a ticked box with no lead id (a blank start) is ignored: the consult is never read", async () => {
     const { created, loadConsult, run } = await setup({ consult: reviewed(details([ZEPHYR])) });
-    await expect(run({ ...base, useConsult: "on", brandName: "Prosperall" })).rejects.toBeInstanceOf(Redirected);
+    await expect(run({ fullName: "Ana Ruiz", useConsult: "on" })).rejects.toBeInstanceOf(Redirected);
     expect(loadConsult).not.toHaveBeenCalled();
-    expect(contentOf(created).names.map((x) => x.name)).toEqual(["Prosperall"]);
+    expect(contentOf(created).names).toEqual([]);
   });
 
-  it("not ticked: today's single typed name, exactly as before the sprint, and the consult is never read", async () => {
-    const { created, loadConsult, run } = await setup({ consult: reviewed(details([ZEPHYR, SWIRL])) });
-    await expect(run({ ...base, leadId: LEAD, brandName: "Prosperall" })).rejects.toBeInstanceOf(Redirected);
+  it("not ticked: only the lead's own brand with the default pair and no classes, and the consult is never read", async () => {
+    const { created, loadConsult, run } = await setup({ consult: reviewed(details([ZEPHYR, SWIRL])), lead: leadRow({ mark_text: "Prosperall" }) });
+    await expect(run({ ...base, leadId: LEAD })).rejects.toBeInstanceOf(Redirected);
     expect(loadConsult).not.toHaveBeenCalled();
-    // The first draws of the id source go to the one name, as they always did.
-    let i = 0;
-    const expected = newBrandName("Prosperall", new Set<string>(), () => String(++i).padStart(8, "0"));
-    expect(contentOf(created).names).toEqual([expected]);
-    expect(expected.marks.map((m) => m.kind)).toEqual(["word", "logo"]);
-    expect(expected.classes).toEqual([]);
+    const { names } = contentOf(created);
+    expect(names.map((x) => x.name)).toEqual(["Prosperall"]);
+    expect(names[0].marks.map((m) => m.kind)).toEqual(["word", "logo"]);
+    expect(names[0].classes).toEqual([]);
   });
 
-  it("not ticked and no typed name: no brand name at all", async () => {
+  it("not ticked and the lead has no brand: no brand name at all", async () => {
     const { created, run } = await setup({ consult: reviewed(details([ZEPHYR])) });
     await expect(run({ ...base, leadId: LEAD })).rejects.toBeInstanceOf(Redirected);
     expect(contentOf(created).names).toEqual([]);

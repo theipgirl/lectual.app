@@ -63,7 +63,7 @@ describe("hard rules", () => {
     "src/components/proposal-editor/LeadLink.tsx",
     "src/components/proposal-editor/LinkLeadForm.tsx",
     "src/components/proposal-editor/Sections.tsx",
-    "src/components/proposal-editor/NewProposalForm.tsx",
+    "src/components/proposal-editor/StartDraft.tsx",
     "src/components/client-proposal/ProposalDocument.tsx",
     "src/app/dashboard/proposals/[id]/page.tsx",
   ];

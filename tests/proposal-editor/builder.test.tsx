@@ -1,17 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { NewProposalForm } from "@/components/proposal-editor/NewProposalForm";
 import { countChangedFields, messageInMoreOptions, moreOptionsSummary } from "@/lib/proposal-editor/more-options";
-import { packageOption } from "@/lib/proposals/package-list";
 import type { ProposalDetail } from "@/lib/proposals/store";
 import type { ProposalRow } from "@/lib/proposals/types";
 import { sevetri } from "../proposals/fixture";
 
 vi.mock("@/app/dashboard/proposals/actions", () => ({ createProposalAction: vi.fn() }));
 
-const CONCIERGE = { package: "Concierge", base_cents: 495_000, included_classes: 3, per_class_cents: 82_500, second_mark_discount_pct: 20, gov_per_class_cents: 35_000 };
-const ESSENTIAL = { package: "Essential", base_cents: 195_000, included_classes: 1, per_class_cents: 82_500, second_mark_discount_pct: 20, gov_per_class_cents: 35_000 };
 
 describe("More options: the pure rules", () => {
   it("the summary adds ' - N changed' only when N is above zero", () => {
@@ -32,13 +28,6 @@ describe("More options: the pure rules", () => {
   });
 });
 
-const DEFAULTS = { leadId: "", matterId: "", fullName: "Ana", firstName: "Ana", company: "", clientEmail: "a@example.com", brandName: "Prosperall", title: "Trademark Proposal", expiresOn: "2026-11-10", payUrl: "" };
-const PACKAGES = [packageOption(ESSENTIAL), packageOption(CONCIERGE)];
-
-function renderNew(over: Record<string, unknown> = {}) {
-  return renderToStaticMarkup(createElement(NewProposalForm, { defaults: DEFAULTS, hasSettings: true, packages: PACKAGES, consult: createElement("p", null, "consult list"), ...over }));
-}
-
 const namesOf = (html: string) => new Set([...html.matchAll(/<(?:input|select|textarea)[^>]*? name="([^"]+)"/g)].map((m) => m[1]));
 const at = (html: string, needle: string) => {
   const i = html.indexOf(needle);
@@ -46,59 +35,12 @@ const at = (html: string, needle: string) => {
   return i;
 };
 
-describe("New proposal: three steps, the button, then one closed More options", () => {
-  const html = renderNew();
-
-  it("the DOM order is Who, Brand names and classes, Package and pay link, the create button, More options", () => {
-    const order = [
-      at(html, "Who</span>"),
-      at(html, "Brand names and classes</span>"),
-      at(html, "Package and pay link</span>"),
-      at(html, ">Create draft</button>"),
-      at(html, 'class="pe-more"'),
-    ];
-    expect([...order].sort((a, b) => a - b)).toEqual(order);
-  });
-
-  it("has exactly one details element, it is More options, and it is closed", () => {
-    expect(html.match(/<details/g)).toHaveLength(1);
-    expect(html).toMatch(/<details class="pe-more"><summary class="pe-more-sum">More options<\/summary>/);
-    expect(html).not.toMatch(/<details[^>]* open/);
-  });
-
-  it("the who step has the client; the package step has the package and pay link; the rest is in More options", () => {
-    const more = html.slice(at(html, 'class="pe-more"'));
-    const before = html.slice(0, at(html, 'class="pe-more"'));
-    for (const n of ["fullName", "clientEmail", "brandName", "useConsult", "package", "payUrl"]) expect(namesOf(before)).toContain(n);
-    for (const n of ["firstName", "company", "title", "base", "includedClasses", "perClass", "secondMarkPct", "govPerClass"]) {
-      expect(namesOf(more)).toContain(n);
-      expect(namesOf(before)).not.toContain(n);
-    }
-    // the expiry date sits in Step 3 beside the pay link, not in More options
-    expect(namesOf(before)).toContain("expiresOn");
-    expect(namesOf(more)).not.toContain("expiresOn");
-    expect(before.indexOf('name="payUrl"')).toBeLessThan(before.indexOf('name="expiresOn"'));
-  });
-
-  it("every field that existed before the redesign is still rendered under its old name", () => {
-    const before = ["leadId", "matterId", "fullName", "firstName", "company", "clientEmail", "title", "expiresOn", "brandName", "useConsult", "package", "base", "includedClasses", "perClass", "secondMarkPct", "govPerClass", "payUrl"];
-    const now = namesOf(html);
-    for (const n of before) expect(now, n).toContain(n);
-  });
-
-  it("with the defaults nothing has changed, so the summary has no count", () => {
-    expect(html).toContain("More options</summary>");
-    expect(html).not.toContain("changed</summary>");
-  });
-
-  it("without packages the five price fields and the dropdown are not drawn, and the page says why", () => {
-    const bare = renderNew({ packages: null });
-    for (const n of ["package", "base", "perClass"]) expect(namesOf(bare)).not.toContain(n);
-    expect(bare).toContain("couldn&#x27;t be loaded");
-  });
-});
-
-/* ───────────── the editor, rendered with the real section forms ───────────── */
+/*
+Sprint 3 removed the New proposal form (the three steps, the create button and its More options) that the tests here pinned.
+Where its coverage went: create-proposal-one-step.test.ts (the one-step action and 'no brand, package or pay-link field on any page
+under proposals/new'), new-proposal-picker.test.ts (the picker, Start blank, the one-button page), draft-spec.test.ts (packages and
+offers), and the editor tests below (which carry the same fields, the More options rules and the pay link).
+*/
 
 const ID = "55555555-5555-4555-8555-555555555555";
 

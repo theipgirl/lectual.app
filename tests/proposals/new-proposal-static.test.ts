@@ -20,7 +20,7 @@ const NEW_FILES = [
   "src/components/proposal-editor/FilledFrom.tsx",
   "src/components/matters/MatterProposalCard.tsx",
 ];
-const TOUCHED = [...NEW_FILES, "src/app/dashboard/proposals/new/page.tsx", "src/app/dashboard/proposals/actions.ts", "src/components/proposal-editor/NewProposalForm.tsx", "src/app/dashboard/matters/[id]/page.tsx"];
+const TOUCHED = [...NEW_FILES, "src/app/dashboard/proposals/new/page.tsx", "src/app/dashboard/proposals/actions.ts", "src/components/proposal-editor/StartDraft.tsx", "src/components/proposal-editor/StartDoors.tsx", "src/lib/proposals/start-subject.ts", "src/lib/proposals/draft-spec.ts", "src/app/dashboard/matters/[id]/page.tsx"];
 
 describe("New proposal picker and pre-fill: what the code must not do", () => {
   it.each(TOUCHED)("%s has no admin client, no raw HTML injection and no external call", (file) => {
@@ -47,8 +47,10 @@ describe("New proposal picker and pre-fill: what the code must not do", () => {
   });
 
   it("the page's own reads go through the caller's scoped client, with no org id from the URL or form", () => {
+    // Sprint 3: the page reads a chosen record through `readStartSubject`, which uses the caller's scoped client.
     const page = read("src/app/dashboard/proposals/new/page.tsx");
-    expect(page).toContain("getScopedClient");
+    expect(page).toContain("readStartSubject");
+    expect(read("src/lib/proposals/start-subject.ts")).toContain("getScopedClient");
     expect(page).not.toMatch(/org_id|orgId/);
     expect(read("src/app/dashboard/proposals/actions.ts")).not.toMatch(/org_id|orgId/);
   });
@@ -62,6 +64,6 @@ describe("New proposal picker and pre-fill: what the code must not do", () => {
   it("the gate is still the first statement of the create action", () => {
     const action = read("src/app/dashboard/proposals/actions.ts");
     expect(action).toMatch(/export async function createProposalAction\([^)]*\): Promise<ActionState> \{\n  const refused = await gateStaffAction\(\);/);
-    expect(action.indexOf("gateStaffAction()")).toBeLessThan(action.indexOf("loadConsultForPrefill(leadRaw)"));
+    expect(action.indexOf("gateStaffAction()")).toBeLessThan(action.indexOf("loadConsultForPrefill(leadId)"));
   });
 });
