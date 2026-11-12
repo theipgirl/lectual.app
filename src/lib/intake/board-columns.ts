@@ -28,8 +28,9 @@ export function splitStageColumns(rows: readonly IntakeRow[], stages: readonly S
  * The stages a lead can be moved to from a row menu or the bulk bar: the intake stages, plus the lost stages ONLY while the
  * Lost set is shown. A `won` stage is never offered (that move opens a matter).
  */
-export function moveTargetStages(intake: readonly Stage[], lost: readonly Stage[], lostShown: boolean): Stage[] {
-  return [...intake, ...(lostShown ? lost : [])].filter((s) => s.category !== "won");
+export function moveTargetStages(intake: readonly Stage[], lost: readonly Stage[], lostShown: boolean, nurture: readonly Stage[] = []): Stage[] {
+  const have = new Set(intake.map((s) => s.id));
+  return [...intake, ...nurture.filter((s) => !have.has(s.id)), ...(lostShown ? lost : [])].filter((s) => s.category !== "won");
 }
 
 /** "3 empty stages: A, B, C · Show": every empty stage is NAMED, so one like "Undecided / Questions" is findable. */

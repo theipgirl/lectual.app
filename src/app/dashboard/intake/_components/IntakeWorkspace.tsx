@@ -29,6 +29,7 @@ import { SET_LABEL, allOpenData, drawnSet, leavesSet, rowsInSet, setChips, type 
 import { isPastFirstContact, type LeadSet } from "@/lib/intake/working";
 import type { DuplicateOf } from "@/lib/intake/duplicates";
 import { SHOW_STEP, nextShow, pageSlice } from "@/lib/intake/paging";
+import { inPipelineOrder } from "@/lib/pipeline/stage-order";
 import { moveTargetStages } from "@/lib/intake/board-columns";
 import { boardModel } from "@/lib/intake/board-columns";
 import { hiddenSelectedCount, movableIds, selectShown, selectionKey } from "@/lib/intake/selection";
@@ -95,6 +96,7 @@ export default function IntakeWorkspace({
   lostCut = null,
   notesUnavailable = false,
   duplicates = {},
+  nurtureUnavailable = false,
   now: nowIso,
 }: {
   /** The rows of the server's set: the intake list, or the lost leads when `lostView`. */
@@ -123,6 +125,8 @@ export default function IntakeWorkspace({
   notesUnavailable?: boolean;
   /** Possible duplicates among the loaded open leads, by lead id (see duplicates.ts). */
   duplicates?: Record<string, DuplicateOf>;
+  /** The nurture read failed: the Nurture chip has no number and the board says so (never an empty nurture column). */
+  nurtureUnavailable?: boolean;
   now: string;
 }) {
   const [rows, setRows] = useState(initialRows);
@@ -227,7 +231,8 @@ export default function IntakeWorkspace({
   const columnStages = lostView ? lostStages : intakeStages;
   // The stage board ALWAYS ends with a Long-Term Nurture column (not in the Nurture set, which draws it already, and not
   // in the Lost set, whose rows come from a different read): the nurture leads, with the same filters and sort.
-  const nurtureStage = useMemo(() => intakeStages.find((s) => s.category === "nurture") ?? null, [intakeStages]);
+  const nurtureStages = useMemo(() => stages.filter((s) => s.category === "nurture"), [stages]);
+  const nurtureStage = useMemo(() => inPipelineOrder(nurtureStages)[0] ?? null, [nurtureStages]);
   const nurtureColumn = useMemo(() => {
     if (!board || viewState.group !== "stage" || lostView || drawn === "nurture" || !nurtureStage) return null;
     const mine = rows.filter((r) => stages.find((s) => s.id === r.lead.current_stage_id)?.category === "nurture");
@@ -235,7 +240,7 @@ export default function IntakeWorkspace({
   }, [board, viewState.group, lostView, drawn, nurtureStage, rows, stages, applyAll, sort]);
   // Lost stages are offered as a destination ONLY while the Lost set is shown (so a lead can be moved back out). Elsewhere,
   // moving a lead to Lost happens on the lead page or the weekly review, as before.
-  const moveStages = useMemo(() => moveTargetStages(intakeStages, lostStages, lostView), [intakeStages, lostStages, lostView]);
+  const moveStages = useMemo(() => moveTargetStages(intakeStages, lostStages, lostView, nurtureStages), [intakeStages, lostStages, lostView, nurtureStages]);
   const model = useMemo(
     () => boardModel({ rows: sorted, stages: columnStages, members, group: viewState.group, pinned, extra: colExtra, showEmpty, nurture: nurtureColumn }),
     [sorted, columnStages, members, viewState.group, pinned, colExtra, showEmpty, nurtureColumn],
@@ -384,13 +389,13 @@ export default function IntakeWorkspace({
     stageDecisions,
     notes: notesUnavailable ? { status: "unavailable" } : null,
     time: time === null ? { status: "unavailable" } : null,
-    extra: setData.degraded.map((d) => (d === "booth" ? "event list" : d)),
+    extra: [...setData.degraded.map((d) => (d === "booth" ? "event list" : d)), ...(nurtureUnavailable ? ["nurture leads"] : [])],
   });
   const moreItems = leadsMoreItems({ showReconcile });
   const clearFilters = () => setFilters(() => ({ ...EMPTY_INTAKE_FILTERS }));
   const filtersActive = filtersToQueryString(filters) !== "";
   const label = SET_LABEL[drawn];
-  const chips = setChips(setData, lost, drawn);
+  const chips = setChips(setData, lost, drawn, nurtureUnavailable);
   const setHref = (set: LeadSet) => intakeHref({ ...EMPTY_INTAKE_FILTERS }, { ...viewState, set, show: SHOW_STEP });
   const anyLeads = setData.counts.open + setData.counts.nurture > 0 || lost.status === "ok";
 

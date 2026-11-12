@@ -142,7 +142,7 @@ export const SET_LABEL: Record<LeadSet, string> = {
  * always visible). Lost: no number when its count could not be read (the chip still shows, and the page says so when
  * it is opened); hidden when the firm has no lost stage or no lost leads.
  */
-export function setChips(data: SetData, lost: LostRead, chosen: LeadSet): SetChip[] {
+export function setChips(data: SetData, lost: LostRead, chosen: LeadSet, nurtureUnavailable = false): SetChip[] {
   const n = data.counts;
   const unavailable = data.status === "unavailable";
   const all: SetChip[] = [
@@ -150,16 +150,25 @@ export function setChips(data: SetData, lost: LostRead, chosen: LeadSet): SetChi
     { set: "event", label: SET_LABEL.event, count: n.event, active: chosen === "event" },
     { set: "not-started", label: SET_LABEL["not-started"], count: n.notStarted, active: chosen === "not-started" },
     { set: "open", label: SET_LABEL.open, count: n.open, active: chosen === "open" },
-    { set: "nurture", label: SET_LABEL.nurture, count: n.nurture, active: chosen === "nurture" },
+    { set: "nurture", label: SET_LABEL.nurture, count: nurtureUnavailable ? null : n.nurture, active: chosen === "nurture" },
     { set: "lost", label: SET_LABEL.lost, count: lost.status === "ok" ? lost.count : null, active: chosen === "lost" },
   ];
   return all.filter((c) => {
     if (c.active) return true;
     // With Working unreadable the three Working chips have no honest number: they are not offered at all.
     if (unavailable && (c.set === "working" || c.set === "event" || c.set === "not-started")) return false;
+    if (c.set === "nurture" && nurtureUnavailable) return true;
     if (c.set === "lost") return lost.status === "unavailable" || (lost.status === "ok" && lost.count > 0);
     return (c.count ?? 0) > 0;
   });
+}
+
+/** Add leads that only the nurture read reached: each is in the Nurture set, and the Nurture chip counts them. */
+export function withNurtureExtra(data: SetData, extraIds: readonly string[]): SetData {
+  if (extraIds.length === 0) return data;
+  const bucketByLead = { ...data.bucketByLead };
+  for (const id of extraIds) bucketByLead[id] = "nurture";
+  return { ...data, bucketByLead, counts: { ...data.counts, nurture: data.counts.nurture + extraIds.length } };
 }
 
 /** Every row as open or nurture by its stage, with the Working rule unavailable: what a caller with no set data gets. */

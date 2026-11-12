@@ -113,3 +113,24 @@ describe("sources and sets", () => {
     expect(REFERRAL_SOURCES).toContain(INTAKE_REFERRAL_SOURCE);
   });
 });
+
+describe("the nurture leads the intake scope does not reach", () => {
+  it("they join the Nurture set and its count, are offered as a move destination, and an unreadable read shows the chip without a number", async () => {
+    const { setDataFrom, withNurtureExtra, setChips, inSet } = await import("@/lib/intake/sets");
+    const { classifyLeads } = await import("@/lib/intake/working");
+    const { moveTargetStages } = await import("@/lib/intake/board-columns");
+    const leads = [lead("a", "pnc")];
+    const ok = { status: "ok" as const, leadIds: new Set<string>() };
+    const base = setDataFrom(classifyLeads({ leads, stages: STAGES, facts: { activity: ok, approvals: ok, proposals: ok, consults: ok, booth: ok } }), leads, (id) => STAGES.find((s) => s.id === id)?.category ?? null);
+    const data = withNurtureExtra(base, ["n1", "n2"]);
+    expect(data.counts.nurture).toBe(2);
+    expect(inSet(data, "n1", "nurture")).toBe(true);
+    expect(inSet(data, "n1", "open")).toBe(false);
+    expect(withNurtureExtra(base, [])).toBe(base);
+    expect(setChips(data, { status: "none" }, "working").find((c) => c.set === "nurture")).toMatchObject({ count: 2 });
+    expect(setChips(base, { status: "none" }, "working", true).find((c) => c.set === "nurture")).toMatchObject({ count: null });
+    const intake = STAGES.filter((s) => s.category === "open");
+    expect(moveTargetStages(intake, [], false, STAGES.filter((s) => s.category === "nurture")).map((s) => s.id)).toContain("nur");
+    expect(moveTargetStages(intake, [], false).map((s) => s.id)).not.toContain("nur");
+  });
+});

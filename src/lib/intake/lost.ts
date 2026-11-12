@@ -31,6 +31,34 @@ export async function readLostCount(stages: readonly Stage[]): Promise<LostRead>
   }
 }
 
+/**
+ * The NURTURE leads the intake scope does not reach (a Long-Term Nurture stage placed after the first won stage is not an
+ * "intake" stage), by their own read: leads in `nurture`-category stages, trademark or unknown practice area, minus the
+ * ones the page already loaded. Three states: ok / unavailable / none (the firm has no nurture stage). It feeds the board's
+ * Long-Term Nurture column and the Nurture set only: never the rail badge, the Pipeline, Working or All open.
+ */
+export const NURTURE_LIST_CAP = 1000;
+export type NurtureExtra = { status: "ok"; leads: Lead[] } | { status: "unavailable" } | { status: "none" };
+
+export async function readNurtureExtra(stages: readonly Stage[], loadedIds: ReadonlySet<string>): Promise<NurtureExtra> {
+  const ids = stages.filter((s) => s.category === "nurture").map((s) => s.id);
+  if (ids.length === 0) return { status: "none" };
+  try {
+    const db = await getScopedClient();
+    const { data, error } = await db
+      .from("crm_lead")
+      .select("*")
+      .in("current_stage_id", ids)
+      .or(INTAKE_PRACTICE_AREA_FILTER)
+      .order("last_activity_at", { ascending: false, nullsFirst: false })
+      .limit(NURTURE_LIST_CAP);
+    if (error) return { status: "unavailable" };
+    return { status: "ok", leads: (data ?? []).filter((l) => !loadedIds.has(l.id)) };
+  } catch {
+    return { status: "unavailable" };
+  }
+}
+
 export type LostLeads = { status: "ok"; leads: Lead[]; total: number } | { status: "unavailable" };
 
 export async function listLostLeads(stages: readonly Stage[]): Promise<LostLeads> {

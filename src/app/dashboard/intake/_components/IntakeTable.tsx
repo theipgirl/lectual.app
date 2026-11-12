@@ -150,6 +150,11 @@ export default function IntakeTable({
                     </Link>
                     <NeedsRebeccaBadge pending={pendingDrafts} />
                     <AgentMoveChip move={row.agentMove} />
+                  </span>
+                  <span className="ix-subline">
+                    <span className="ix-sub" title={business || undefined}>
+                      {business || "—"}
+                    </span>
                     {duplicates[lead.id] && (
                       <a className="ix-marker ix-marker-dup" data-duplicate href={`/dashboard/leads/${duplicates[lead.id].leadId}/`} title={duplicateTitle(duplicates[lead.id])}>
                         {LEADS_DUPLICATE}
@@ -160,9 +165,6 @@ export default function IntakeTable({
                         {LEADS_MOVED_MARK}
                       </span>
                     )}
-                  </span>
-                  <span className="ix-sub" title={business || undefined}>
-                    {business || "—"}
                   </span>
                 </div>
 

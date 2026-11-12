@@ -5,8 +5,8 @@ import { loadLatestNotes, notesIncomplete, NOTE_LOOKBACK_DAYS } from "@/lib/inta
 import { loadWorkingFacts } from "@/lib/intake/working-load";
 import { classifyLeads } from "@/lib/intake/working";
 import { findDuplicates } from "@/lib/intake/duplicates";
-import { setDataFrom, type SetData, type LostRead } from "@/lib/intake/sets";
-import { listLostLeads, readLostCount, lostStageIds, type LostLeads } from "@/lib/intake/lost";
+import { setDataFrom, withNurtureExtra, type SetData, type LostRead } from "@/lib/intake/sets";
+import { listLostLeads, readLostCount, readNurtureExtra, lostStageIds, type LostLeads } from "@/lib/intake/lost";
 import { activeOrgModulesOrNull } from "@/lib/org/modules";
 import { intakeStages } from "@/lib/intake/scope";
 import { inPipelineOrder } from "@/lib/pipeline/stage-order";
@@ -141,16 +141,18 @@ export default async function IntakePage({
   // never hides a lead), where a firm without the Mailboxes feature simply has no consults.
   const modules = await activeOrgModulesOrNull().catch(() => null);
   const mailboxOn = modules ? modules.includes("mailbox") : null;
-  const [workingFacts, lostCount, lostLeads] = await Promise.all([
+  const [workingFacts, lostCount, lostLeads, nurtureExtra] = await Promise.all([
     loadWorkingFacts({ leadIds: intakeLeads.map((l) => l.id), stages, approvals: pendingApprovals, mailboxOn: mailboxOn ?? false, mailboxUnknown: mailboxOn === null }),
     readLostCount(stages),
     lostView ? listLostLeads(stages) : Promise.resolve<LostLeads | null>(null),
+    readNurtureExtra(stages, new Set(intakeLeads.map((l) => l.id))),
   ]);
   const stageCategory = (id: string | null) => stages.find((s) => s.id === id)?.category ?? null;
-  const setData: SetData = setDataFrom(classifyLeads({ leads: intakeLeads, stages, facts: workingFacts }), intakeLeads, stageCategory);
+  const nurtureOnly = nurtureExtra.status === "ok" ? nurtureExtra.leads : [];
+  const setData: SetData = withNurtureExtra(setDataFrom(classifyLeads({ leads: intakeLeads, stages, facts: workingFacts }), intakeLeads, stageCategory), nurtureOnly.map((l) => l.id));
   const lost: LostRead = lostCount;
   // The leads the page draws: the list, or (Lost chosen) the lost leads. A failed lost read draws none and says so.
-  const leads: Lead[] = lostView ? (lostLeads && lostLeads.status === "ok" ? lostLeads.leads : []) : intakeLeads;
+  const leads: Lead[] = lostView ? (lostLeads && lostLeads.status === "ok" ? lostLeads.leads : []) : [...intakeLeads, ...nurtureOnly];
   const lostFailed = lostView && (!lostLeads || lostLeads.status !== "ok");
   // Possible duplicates among the OPEN leads already loaded (no query, nothing merged).
   const duplicates = findDuplicates(leads, intakeLeads, stages);
@@ -229,6 +231,7 @@ export default async function IntakePage({
       lostFailed={lostFailed}
       notesUnavailable={notesIncomplete(notes)}
       duplicates={duplicates}
+      nurtureUnavailable={!lostView && nurtureExtra.status === "unavailable"}
       lostCut={lostShown && lostShown.total > lostShown.shown ? lostShown : null}
       members={members}
       initialFilters={filters}

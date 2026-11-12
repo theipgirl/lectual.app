@@ -115,3 +115,6 @@
 .ix-col-quiet { background: transparent; border-style: dashed; }
 .ix-col-quiet .ix-card { background: var(--surface); }
 .ix-col-quiet .ix-col-name { color: var(--ink2); font-weight: 400; }
+.ix-subline { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ix-subline .ix-sub { flex: 1 1 0; min-width: 3ch; }
+.ix-subline .ix-marker { flex: 0 0 auto; }
