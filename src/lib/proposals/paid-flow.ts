@@ -17,7 +17,8 @@ import { lawmaticsMatterAccess, resolveProposalMatter, signedInLawmaticsToken } 
 import { loeInputFromAcceptedProposal, loeFieldValues, LOE_REFUSAL_TEXT, type LoeAdapterResult } from "./loe-adapter";
 import { fieldWrites, readLoeFieldsConfig, type LoeFieldsConfig } from "./loe-fields";
 import { retryLoeFileUpload } from "./loe-upload";
-import { runSignedLoeUpload } from "./loe-signed-upload";
+import { SignedUploadBlocked, runSignedLoeUpload } from "./loe-signed-upload";
+import { logSignedMismatch } from "./signed-mismatch-log";
 import { isSignedSnapshot } from "./signed-state";
 import { normalisePackages } from "./package-list";
 import {
@@ -276,7 +277,13 @@ async function signedUploadRetryStep(supabase: ScopedClient, proposal: ProposalR
         firm: { displayName: facts.displayName, timeZone: facts.timeZone },
         readStored: () => readStoredAgreement(supabase as unknown as StoredAgreementDb, { proposalId: proposal.id, orgId: proposal.org_id, signatureId: snapshot!.agreement?.signature_id }),
       });
-      if (!built.ok) throw new Error("not built");
+      if (!built.ok) {
+        if (built.reason === "mismatch") {
+          logSignedMismatch(proposal.id, "signed_loe_upload");
+          throw new SignedUploadBlocked();
+        }
+        throw new Error("not built");
+      }
       return built.bytes;
     },
     upload: (token, file) => uploadMatterFile(token, { matterId: file.matterId, fileName: file.fileName, mime: file.mime, bytes: file.bytes }),

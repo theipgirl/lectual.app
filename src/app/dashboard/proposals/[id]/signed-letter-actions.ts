@@ -5,6 +5,7 @@ import { runStaffDownload } from "@/lib/loe/staff-download";
 import { loadStaffFirmFacts } from "@/lib/loe/staff-firm";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { readStoredAgreement, type StoredAgreementDb } from "@/lib/loe/stored-agreement";
+import { logSignedMismatch } from "@/lib/proposals/signed-mismatch-log";
 import { getProposalRow } from "@/lib/proposals/store";
 import { gateSignedLetterDownload } from "../gate";
 
@@ -27,6 +28,7 @@ export async function downloadSignedLetterStaffAction(proposalId: string): Promi
           orgId: proposal.org_id,
           signatureId: proposal.accepted_snapshot?.agreement?.signature_id,
         }),
+      onMismatch: (id) => logSignedMismatch(id, "staff_download"),
     },
     proposalId,
   );

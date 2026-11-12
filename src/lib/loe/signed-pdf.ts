@@ -4,10 +4,10 @@ import { firmCivilDate } from "@/lib/quotes/firm-time";
 import { isSignedSnapshot } from "@/lib/proposals/signed-state";
 import type { AcceptedSnapshot } from "@/lib/proposals/types";
 import type { Exhibit } from "./exhibit";
-import { agreementTextSha256 } from "./fingerprint";
 import { buildLetterPdf } from "./pdf";
-import { rebuildSignedLetter, signedLetterText } from "./signed-letter";
 import { cleanSigningDetails, signedAtText, signedAtUtcIso } from "./signing";
+
+import { verifySignedCopy, type StoredAgreement } from "./signed-text-check";
 
 export { rebuiltTextMatches } from "./signed-text-check";
 
@@ -22,18 +22,24 @@ export { rebuiltTextMatches } from "./signed-text-check";
  *   - different (the rendering code changed since the signing): the PDF is built from the STORED signed text itself
  *     (`client_proposal_signature.agreement_text`), verbatim, as plain paragraphs. That text is hashed too and must equal the
  *     stored fingerprint, which is then printed. `fromStoredText` tells the caller, so staff are told which copy they hold;
- *   - the stored text can't be read, or doesn't hash to the stored fingerprint: NO file. Never a fingerprint beside other text.
+ *   - the stored text can't be read: NO file (`unavailable`, try again);
+ *   - the stored text doesn't hash to its recorded fingerprint: NO file, and a DISTINCT outcome (`mismatch`), because trying
+ *     again cannot help. Never a fingerprint beside other text.
  *
  * The firm's name and zone are required: a failed read of either is the caller's to report, never a letter with no letterhead
  * or a time in a guessed zone.
  */
 
-/** The stored signed text and its stored sha256 (the signature row), or null when it couldn't be read or isn't there. */
-export type StoredAgreement = { text: string; sha256: string };
+export type { StoredAgreement };
 
 export type SignedPdfBuild =
   | { ok: true; bytes: Uint8Array; /** True when the file was produced from the stored signed text, not rebuilt. */ fromStoredText: boolean; signerName: string; signedAt: string }
-  | { ok: false };
+  /**
+   * `mismatch`: the stored signed text does not hash to its recorded fingerprint. No copy is made, and trying again cannot help:
+   * staff are told so, the Lawmatics filing is recorded as blocked, the client gets the generic sentence. `unavailable`: anything
+   * else (not signed, the stored text unreadable, the firm's name or zone missing): try again.
+   */
+  | { ok: false; reason: "mismatch" | "unavailable" };
 
 export type SignedPdfInput = {
   snapshot: AcceptedSnapshot | null | undefined;
@@ -48,14 +54,19 @@ const NO_EXHIBIT: Exhibit = { title: "", groups: [], legalDue: { label: "", note
 
 export async function buildVerifiedSignedPdf(input: SignedPdfInput): Promise<SignedPdfBuild> {
   const { snapshot, firm } = input;
-  if (!isSignedSnapshot(snapshot) || !snapshot?.agreement) return { ok: false };
-  if (!firm.displayName.trim() || !firm.timeZone.trim()) return { ok: false };
+  if (!isSignedSnapshot(snapshot) || !snapshot?.agreement) return { ok: false, reason: "unavailable" };
+  if (!firm.displayName.trim() || !firm.timeZone.trim()) return { ok: false, reason: "unavailable" };
   const agreement = snapshot.agreement;
   const title = snapshot.content?.loe?.title ?? "Engagement letter";
   const done = (bytes: Uint8Array, fromStoredText: boolean): SignedPdfBuild => ({ ok: true, bytes, fromStoredText, signerName: agreement.signer_name, signedAt: agreement.signed_at });
 
-  const letter = rebuildSignedLetter(snapshot, firm.timeZone);
-  if (letter && agreementTextSha256(signedLetterText(letter)) === agreement.sha256) {
+  // The one verification (`signed-text-check.ts`): what is printed was hashed and matched the stored fingerprint, or nothing is.
+  const copy = await verifySignedCopy(snapshot, firm.timeZone, input.readStored);
+  if (copy.kind === "mismatch") return { ok: false, reason: "mismatch" };
+  if (copy.kind === "unavailable") return { ok: false, reason: "unavailable" };
+
+  if (copy.kind === "rebuilt") {
+    const letter = copy.letter;
     const bytes = await buildLetterPdf({
       blocks: letter.blocks,
       exhibit: letter.exhibit,
@@ -68,26 +79,18 @@ export async function buildVerifiedSignedPdf(input: SignedPdfInput): Promise<Sig
     return done(bytes, false);
   }
 
-  // Today's code does not rebuild what was signed. Fall back to the stored signed text, and only if it is what the fingerprint covers.
-  let stored: StoredAgreement | null;
-  try {
-    stored = await input.readStored();
-  } catch {
-    stored = null;
-  }
-  if (!stored || typeof stored.text !== "string" || stored.text.length === 0) return { ok: false };
-  if (stored.sha256 !== agreement.sha256 || agreementTextSha256(stored.text) !== stored.sha256) return { ok: false };
+  // Today's code does not rebuild what was signed: the stored signed text itself, verbatim, with the fingerprint that covers it.
   const bytes = await buildLetterPdf({
     blocks: [],
     exhibit: NO_EXHIBIT,
-    storedText: stored.text,
+    storedText: copy.stored.text,
     details: cleanSigningDetails(snapshot.signing?.details),
     mode: "signed",
     signature: {
       signerName: agreement.signer_name,
       signedAtText: signedAtText(agreement.signed_at, firm.timeZone),
       signedAtUtc: signedAtUtcIso(agreement.signed_at),
-      fingerprint: stored.sha256,
+      fingerprint: copy.stored.sha256,
       signatureId: agreement.signature_id,
     },
     firmName: firm.displayName,

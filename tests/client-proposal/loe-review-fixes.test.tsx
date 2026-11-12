@@ -64,7 +64,7 @@ function render(over: Partial<ProposalDocumentProps> = {}) {
 function justSigned(over: Partial<ProposalDocumentProps> = {}) {
   return render({
     initialLoe: { step: 3, details: TEST_DETAILS, typedName: "Sevetri Wilson", agree: true },
-    initialDone: { payUrl: "https://example.com/pay", opened: true, signedLine: SIGNED_LINE, letterDate: "November 13, 2026" },
+    initialDone: { payUrl: "https://example.com/pay", opened: true, signedLine: SIGNED_LINE, letterDate: "November 13, 2026", letterVerified: true },
     ...over,
   });
 }

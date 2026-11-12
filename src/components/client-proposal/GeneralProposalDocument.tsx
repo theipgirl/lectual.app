@@ -33,8 +33,16 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
   const brand: ProposalBrand = brandForSlug(firm.slug);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<{ payUrl: string | null; opened: boolean; signedLine?: string | null; letterDate?: string | null } | null>(() =>
-    props.initialDone ? { payUrl: props.initialDone.payUrl, opened: props.initialDone.opened ?? false, signedLine: props.initialDone.signedLine ?? null, letterDate: props.initialDone.letterDate ?? null } : null,
+  const [done, setDone] = useState<{ payUrl: string | null; opened: boolean; signedLine?: string | null; letterDate?: string | null; letterVerified?: boolean } | null>(() =>
+    props.initialDone
+      ? {
+          payUrl: props.initialDone.payUrl,
+          opened: props.initialDone.opened ?? false,
+          signedLine: props.initialDone.signedLine ?? null,
+          letterDate: props.initialDone.letterDate ?? null,
+          letterVerified: props.initialDone.letterVerified === true,
+        }
+      : null,
   );
   const [previewOpen, setPreviewOpen] = useState(false);
 
@@ -72,7 +80,9 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
   });
   const loeOn = loeFlow.enabled;
   const stepOne = !loeOn || accepted || loeFlow.step === 1;
-  const signedView = letter?.signed ?? (done ? loeFlow.agreement : null);
+  // The letter shown as SIGNED: the server's verified copy on a receipt; on the just-signed page the page's own letter, and only
+  // when its text hashed to the sha256 the server stored (`letterVerified`). Otherwise nothing is shown under that label.
+  const signedView = letter?.signed ?? (done?.letterVerified ? loeFlow.agreement : null);
 
   async function accept() {
     if (mode !== "live" || !onAccept || pending || done || !canAccept) return;
@@ -114,7 +124,9 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
         }
       }
       if (!opened) tab?.close();
-      setDone({ payUrl: url, opened, signedLine: result.signedLine ?? null, letterDate: result.letterDate ?? null });
+      // Before anything is shown as "signed": does this page's letter, with the server's date, hash to what the server stored?
+      const letterVerified = loeOn ? await loeFlow.signedTextVerified(result.letterDate, result.textSha256) : false;
+      setDone({ payUrl: url, opened, signedLine: result.signedLine ?? null, letterDate: result.letterDate ?? null, letterVerified });
     } catch {
       tab?.close();
       setError("We couldn’t record your acceptance. Please try again.");

@@ -8,7 +8,8 @@ import { STEP_TEXT } from "./step-text";
  * signing or the paid state; it is a line on the proposal's timeline (the step `signed_loe_upload`, success word `uploaded`).
  *
  * Outcomes: `uploaded`; `skipped` (the firm has no Lawmatics connection, a plain reason); `blocked` (no record, or more than one,
- * a person can fix it); `failed` (a call went wrong: the request, the connection check, the record lookup, the PDF).
+ * or the stored signed text does not match its recorded fingerprint: a person has to look, and trying again will not help);
+ * `failed` (a call went wrong: the request, the connection check, the record lookup, the PDF).
  * Nothing of the letter, the signer's typed details or the PDF bytes is put in a reason.
  */
 
@@ -28,6 +29,18 @@ export type SignedUploadDeps = {
   fileName: string;
 };
 
+/**
+ * Thrown by `buildPdf` when no copy of the signed letter can EVER be built from what is stored (the stored signed text does not
+ * match its recorded fingerprint). The step is then `blocked` with one fixed sentence, not `failed`: trying again cannot help,
+ * and a person has to look. It carries no text of its own, so nothing a caller writes can end up on the timeline.
+ */
+export class SignedUploadBlocked extends Error {
+  constructor() {
+    super("blocked");
+    this.name = "SignedUploadBlocked";
+  }
+}
+
 /** `signed`: is there a signed letter on this version at all (a schema-2 snapshot)? Anything falsy is "nothing to file". */
 export async function runSignedLoeUpload(signed: unknown, deps: SignedUploadDeps): Promise<SignedUploadResult> {
   try {
@@ -42,7 +55,8 @@ export async function runSignedLoeUpload(signed: unknown, deps: SignedUploadDeps
     let bytes: Uint8Array;
     try {
       bytes = await deps.buildPdf();
-    } catch {
+    } catch (err) {
+      if (err instanceof SignedUploadBlocked) return { outcome: "blocked", reason: STEP_TEXT.signedMismatch };
       return { outcome: "failed", reason: STEP_TEXT.signedNotBuilt };
     }
     const sent = await deps.upload(token.token, { matterId: target.lawmaticsId, fileName: deps.fileName, mime: "application/pdf", bytes });

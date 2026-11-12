@@ -1,7 +1,8 @@
 import type { Agreement } from "@/lib/loe/signing";
 import { LoeExhibitTable } from "./LoeExhibitTable";
 
-export type LetterView = Pick<Agreement, "blocks" | "exhibit">;
+/** `exhibit` is null for the stored signed text: its exhibit lines are part of the text itself, so no table is drawn. */
+export type LetterView = { blocks: Agreement["blocks"]; exhibit: Agreement["exhibit"] | null };
 
 /**
  * The FULL engagement letter, every paragraph in order (a bold lead-in first where the firm wrote one), followed by Exhibit A.
@@ -18,7 +19,7 @@ export function LoeLetterPanel({ agreement, title, id }: { agreement: LetterView
           {b.text}
         </p>
       ))}
-      <LoeExhibitTable exhibit={agreement.exhibit} />
+      {agreement.exhibit ? <LoeExhibitTable exhibit={agreement.exhibit} /> : null}
     </div>
   );
 }

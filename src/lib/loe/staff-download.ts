@@ -18,6 +18,8 @@ export const STAFF_DOWNLOAD_MESSAGES = {
   not_found: "Proposal not found.",
   not_signed: "This version hasn't been signed, so there is no signed letter to download.",
   unavailable: "Couldn't build the signed letter. Try again shortly.",
+  /** Not a "try again": the stored signed text does not hash to its recorded fingerprint, so no copy is made at all. */
+  mismatch: "The stored signed letter doesn't match its recorded fingerprint, so no copy was made. Lectual has been told.",
 } as const;
 
 export type StaffDownloadDeps = {
@@ -28,6 +30,8 @@ export type StaffDownloadDeps = {
   firmFacts: () => Promise<StaffFirmFacts>;
   /** The stored signed text of this version (scoped client, fenced on the row's own org). Only called when the rebuilt text no longer matches. */
   readStored: (proposal: ProposalRow) => Promise<StoredAgreement | null>;
+  /** Called once when the stored signed text does not match its recorded fingerprint: the caller writes the one log line (id and step only). */
+  onMismatch?: (proposalId: string) => void;
 };
 
 const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -49,7 +53,13 @@ export async function runStaffDownload(deps: StaffDownloadDeps, proposalId: unkn
       firm: { displayName: facts.displayName, timeZone: facts.timeZone },
       readStored: () => deps.readStored(proposal),
     });
-    if (!built.ok) return { ok: false, message: STAFF_DOWNLOAD_MESSAGES.unavailable };
+    if (!built.ok) {
+      if (built.reason === "mismatch") {
+        deps.onMismatch?.(proposal.id);
+        return { ok: false, message: STAFF_DOWNLOAD_MESSAGES.mismatch };
+      }
+      return { ok: false, message: STAFF_DOWNLOAD_MESSAGES.unavailable };
+    }
     return {
       ok: true,
       base64: Buffer.from(built.bytes).toString("base64"),

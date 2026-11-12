@@ -345,6 +345,60 @@ describe("a draft whose letter couldn't be attached, still unresolved, never goe
   });
 });
 
+describe("checker's m1: Reset acceptance puts a version back to 'Link live', so it runs the same guard", () => {
+  const T0 = "2026-11-10T00:00:00Z";
+  const accepted = (content: ProposalContent) => (state.proposal = proposalRow({ status: "accepted", content, updated_at: T0 }));
+
+  it("a proposal with no letter resets as it always did, with no letter read", async () => {
+    accepted(sevetri());
+    const { resetProposalAcceptance } = await import("@/lib/proposals/store");
+    await resetProposalAcceptance(ID, { expectedUpdatedAt: T0 });
+    expect(state.updates).toEqual([{ status: "sent" }]);
+    expect(state.proposal.status).toBe("sent");
+    expect(state.templateReads).toBe(0);
+  });
+
+  it("a proposal whose letter copy is still the firm's current approved letter resets", async () => {
+    accepted(withLetter());
+    const { resetProposalAcceptance } = await import("@/lib/proposals/store");
+    await resetProposalAcceptance(ID, { expectedUpdatedAt: T0 });
+    expect(state.updates).toEqual([{ status: "sent" }]);
+    expect(state.templateFilters).toContainEqual(["org_id", ORG]);
+  });
+
+  it("the firm's letter changed since the proposal went out: refused with one fixed sentence, and the row is not written", async () => {
+    accepted(withLetter());
+    firmMovedOn();
+    const { resetProposalAcceptance } = await import("@/lib/proposals/store");
+    const { RESET_LETTER_CHANGED } = await import("@/lib/proposal-editor/reset-acceptance");
+    await expect(resetProposalAcceptance(ID, { expectedUpdatedAt: T0 })).rejects.toMatchObject({ message: RESET_LETTER_CHANGED });
+    expect(RESET_LETTER_CHANGED).toMatch(/engagement letter has changed since this proposal went out/);
+    expect(RESET_LETTER_CHANGED).toMatch(/Start a new version instead/);
+    expect(state.updates).toEqual([]);
+    expect(state.proposal.status).toBe("accepted");
+  });
+
+  it("the firm's letter cannot be read: refused (never reset on a guess), nothing written", async () => {
+    accepted(withLetter());
+    state.template = { data: null, error: { code: "XX000" }, throws: false };
+    const { resetProposalAcceptance } = await import("@/lib/proposals/store");
+    const { RESET_LETTER_UNREADABLE } = await import("@/lib/proposal-editor/reset-acceptance");
+    await expect(resetProposalAcceptance(ID, { expectedUpdatedAt: T0 })).rejects.toMatchObject({ message: RESET_LETTER_UNREADABLE });
+    expect(state.updates).toEqual([]);
+  });
+
+  it("the action shows that sentence to the person", async () => {
+    accepted(withLetter());
+    firmMovedOn();
+    vi.doMock("@/lib/auth/current-role", () => ({ currentRole: async () => "owner" }));
+    const { resetAcceptanceAction } = await import("../../src/app/dashboard/proposals/[id]/actions");
+    const { RESET_LETTER_CHANGED } = await import("@/lib/proposal-editor/reset-acceptance");
+    const r = await resetAcceptanceAction({}, form({ updatedAt: T0 }));
+    expect(r).toEqual({ error: RESET_LETTER_CHANGED });
+    expect(state.updates).toEqual([]);
+  });
+});
+
 describe("one guard, one place", () => {
   it("sendProposal is the only caller of client_proposal_send, and it runs the guard before it", () => {
     const store = readFileSync(join(process.cwd(), "src/lib/proposals/store.ts"), "utf8");

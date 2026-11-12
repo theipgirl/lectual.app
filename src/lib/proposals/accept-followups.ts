@@ -7,7 +7,8 @@ import { signedAtUtcIso } from "@/lib/loe/signing";
 import { resolveTimeZone } from "@/lib/org/profile-rules";
 import { addNote, uploadMatterFile, type FetchLike, type MultipartFetchLike } from "@/lib/lawmatics/writes";
 import { firmDisplayName } from "./commitment";
-import { runSignedLoeUpload } from "./loe-signed-upload";
+import { SignedUploadBlocked, runSignedLoeUpload } from "./loe-signed-upload";
+import { logSignedMismatch } from "./signed-mismatch-log";
 import { isSignedSnapshot } from "./signed-state";
 import { STEP_TEXT } from "./step-text";
 import { formatDollars } from "@/lib/proposal-editor/events";
@@ -448,7 +449,14 @@ async function signedUploadStep(db: FollowupDb, row: Row, deps: FollowupDeps): P
           // Only read when today's code no longer rebuilds the signed text; fenced on the proposal's own org.
           readStored: () => readStoredAgreement(db as unknown as StoredAgreementDb, { proposalId: row.id, orgId: row.orgId, signatureId: row.snapshot.agreement?.signature_id }),
         });
-        if (!built.ok) throw new Error("not built");
+        if (!built.ok) {
+          if (built.reason === "mismatch") {
+            // Not a hiccup: the stored signed text does not hash to its recorded fingerprint. Blocked, said once in the log.
+            logSignedMismatch(row.id, "signed_loe_upload");
+            throw new SignedUploadBlocked();
+          }
+          throw new Error("not built");
+        }
         return built.bytes;
       },
       upload: (token, file) => uploadMatterFile(token, { matterId: file.matterId, fileName: file.fileName, mime: file.mime, bytes: file.bytes }, deps.uploadFetch),

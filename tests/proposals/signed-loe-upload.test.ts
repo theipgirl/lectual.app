@@ -302,6 +302,25 @@ describe("item 6: the filed letter never carries a fingerprint beside other text
     expect(filed(tables)[0].payload).toMatchObject({ outcome: "failed", reason: STEP_TEXT.signedNotBuilt });
   });
 
+  it("checker's m4: a stored text that does not match its recorded fingerprint is BLOCKED with that reason (not failed), nothing uploaded, one log line with the id and the step", async () => {
+    const { snapshot, storedText, sha256 } = olderSigning();
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { db, tables } = fakeFollowupDb(
+      tablesFor(snapshot, { client_proposal_signature: [{ id: "sig-1", proposal_id: PID, org_id: ORG, agreement_text: `${storedText} altered`, agreement_sha256: sha256, signed_at: "2026-11-12T19:14:00.000Z" }] }),
+    );
+    const up = fakeUpload();
+    await run(db, up.fetchImpl);
+    expect(up.sent).toHaveLength(0);
+    expect(filed(tables)).toHaveLength(1);
+    expect(filed(tables)[0].payload).toMatchObject({ step: "signed_loe_upload", outcome: "blocked", reason: STEP_TEXT.signedMismatch });
+    expect(STEP_TEXT.signedMismatch).toMatch(/doesn't match its recorded fingerprint/);
+    // One log line: the proposal id and the step. No letter text, no name, no address, no hash.
+    const lines = spy.mock.calls.map((c) => c.join(" "));
+    spy.mockRestore();
+    expect(lines.filter((l) => l.includes("signed letter"))).toEqual([`[proposals] signed letter does not match its recorded fingerprint proposal=${PID} step=signed_loe_upload`]);
+    for (const never of ["Sevetri", "Example Street", "Dear ", sha256, "altered"]) expect(lines.join("\n")).not.toContain(never);
+  });
+
   it("when the snapshot rebuilds to the signed text, the signature table is never read", async () => {
     const { db, calls } = fakeFollowupDb(tablesFor(signedTrademark()));
     await run(db, fakeUpload().fetchImpl);
@@ -384,6 +403,30 @@ describe("Try again uploads and writes `uploaded`", () => {
     await flow.retryProposalStep(id, "signed_loe_upload");
     expect(uploadMatterFile).not.toHaveBeenCalled();
     expect(recorded).toEqual([{ step: "signed_loe_upload", outcome: "failed", reason: STEP_TEXT.signedFirmUnreadable }]);
+  });
+
+  it("checker's m4: Try again on a letter whose stored text does not match its fingerprint records `blocked` with the reason, and uploads nothing", async () => {
+    const id = "44444444-4444-4444-8444-444444444444";
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { flow, recorded, uploadMatterFile, proposal } = await setup([failedEvent(id)]);
+    // Today's code no longer rebuilds this signing, and the stored text was altered.
+    const real = proposal.accepted_snapshot!;
+    const text = "The text that was signed, as stored.";
+    const { agreementTextSha256: hash } = await import("@/lib/loe/fingerprint");
+    proposal.accepted_snapshot = { ...real, agreement: { ...real.agreement!, sha256: hash(text) } };
+    const { getScopedClient } = await import("@/lib/db/scoped-client");
+    vi.mocked(getScopedClient).mockResolvedValue({
+      from: () => {
+        const q: Record<string, unknown> = { select: () => q, eq: () => q, order: () => q, limit: async () => ({ data: [{ id: "sig-1", agreement_text: `${text} altered`, agreement_sha256: hash(text) }], error: null }) };
+        return q;
+      },
+    } as never);
+    await flow.retryProposalStep(id, "signed_loe_upload");
+    expect(uploadMatterFile).not.toHaveBeenCalled();
+    expect(recorded).toEqual([{ step: "signed_loe_upload", outcome: "blocked", reason: STEP_TEXT.signedMismatch }]);
+    const lines = spy.mock.calls.map((c) => c.join(" "));
+    spy.mockRestore();
+    expect(lines.filter((l) => l.includes("signed letter"))).toEqual([`[proposals] signed letter does not match its recorded fingerprint proposal=${id} step=signed_loe_upload`]);
   });
 
   it("every other retry still needs the paid mark", async () => {

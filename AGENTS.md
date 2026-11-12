@@ -1163,6 +1163,10 @@ An ACCEPTED version can go back to "Link live" so the same client link can be ac
 - `resetAcceptanceAction` -> `runResetAcceptance` (`src/lib/proposal-editor/reset-acceptance.ts`, pure, deps injected): `gateStaffAction`, role + approver re-read
   (`mayResetAcceptance`), the current-round paid read (paid = "Undo Mark paid first.", unreadable = refused), then `resetProposalAcceptance` in the store: scoped client,
   `status: 'sent'` ALONE, fenced on `status = accepted` and the rendered `updated_at`. It writes no event and sends nothing.
+- **A reset is a make-live, so it runs the letter guard** (`letterLiveCheck`, Sprint 6) inside `resetProposalAcceptance`, after the status check and before
+  the write. A proposal with no letter, or whose letter copy is still the firm's current approved one, resets as before. A copy that is no longer current is
+  refused with `RESET_LETTER_CHANGED` ("... has changed since this proposal went out ... Start a new version instead."); a letter that can't be read is
+  refused with `RESET_LETTER_UNREADABLE` (never reset on a guess). Nothing is written on a refusal.
 - **A reset starts a fresh round** (`currentRound` / `roundStartedAt` in `src/lib/proposals/paid.ts`): paid state, step states and "already done" checks count only step
   events AFTER the version's newest `reset` event. Every step-event reader also reads the version's `reset` rows (`listProposalStepEvents`, `listStepActivity`, the
   follow-ups' `readEarlierSteps`), so a second acceptance runs the firm notice and the Lawmatics note again, starts unpaid, and Mark paid drafts the LOE again (an LOE
@@ -1720,8 +1724,14 @@ anything; `pricing.ts` has no diff; one dependency was added (`pdfkit`, exact-pi
 - **Snapshot schema 2.** `buildAcceptedSnapshot` writes `schema: 2` with `agreement` ({ signature_id, signer_name, signed_at, sha256, template_version };
   the database stamps the final block) and `signing` ({ details, date_text, client_email }) for a signed acceptance; schema 1 is every other acceptance.
   Every reader accepts both (`tests/proposals/snapshot-schema.test.ts`). `rebuildSignedLetter` rebuilds the letter AS SIGNED from the snapshot alone, so
-  "Read it again" and the signed PDF never follow a later change to the firm's letter. (The signed PDF also checks that rebuild against the stored
-  fingerprint: Sprint 6, "One PDF".)
+  "Read it again" and the signed PDF never follow a later change to the firm's letter. Neither is shown or printed unchecked: both go through
+  `verifySignedCopy` (Sprint 6, "One verification").
+- **"Read it again" is only ever verified text.** On a reload, `readPublicProposal` runs `verifySignedCopy`: the rebuild when it hashes to the stored
+  sha256; else the STORED signed text (`storedSignedLetterView`, plain paragraphs, no exhibit table) when that hashes to it; else `view.letter.signed` is
+  null and the receipt says `SIGNED_VIEW_UNAVAILABLE` (a fixed sentence of its own, not the PDF's). A stored text that does not match is logged once
+  (`client_view`); one that can't be READ is not. On the just-signed page (no reload) the sign action returns the stored `textSha256` and the page shows its
+  own letter as signed only when `pageTextMatchesStored` says the page's text, with the server's date, hashes to it (`done.letterVerified`); otherwise the
+  same sentence. The download button is drawn either way.
 - **The client email is read only for a proposal that has a letter** (`readLetterEmail`, a separate single-row read; it is NOT in
   `PUBLIC_PROPOSAL_COLUMNS`) because the letter merges `{{client_email}}`. It reaches the browser in `view.letter` only for that proposal.
 - **PDF: one builder, `src/lib/loe/pdf.ts` (pdfkit).** Review copy ("Review copy - not yet signed" on every page) and signed copy (signature record: signer,
@@ -1732,7 +1742,9 @@ anything; `pricing.ts` has no diff; one dependency was added (`pdfkit`, exact-pi
 - **`downloadReviewLetterAction(token, selection, clientClasses, details)`** is anonymous and token-only (no id parameter): refuses a withdrawn, expired,
   replaced, signed or letterless proposal with one sentence, builds from the stored letter and the recomputed quote, logs nothing, and is rate limited
   (20 per token and 60 per address per hour) IN MEMORY per server instance, so on serverless it is a courtesy limit (`review-limit.ts`). The quote page's
-  actions have no limiter at all. `downloadSignedLetterAction(token)` builds through `buildVerifiedSignedPdf` (Sprint 6).
+  actions have no limiter at all. `downloadSignedLetterAction(token)` builds through `buildVerifiedSignedPdf` (Sprint 6) and is rate limited the same way
+  with ITS OWN counters (`signedTokenLimiter`, `signedAddressLimiter`: same numbers, separate maps), so review downloads never use up signed ones or the
+  other way round. The limit is checked before the proposal is read and a slot is used only when a PDF is really being built.
 - **Software builders write no legal-sounding text.** `src/lib/loe/client-words.ts` holds every word the letter steps add, and its header says who writes
   what: the builders write only words that name a step or say what the page did (button labels Continue, Sign and continue to payment, Pay my legal fee;
   the pay notes, which describe the steps). On a proposal that carries a letter: the sentence that the agreement is sent after payment is not shown;
@@ -1761,10 +1773,20 @@ No migration, no dependency, `pricing.ts` untouched. Nothing here approves, make
   `draftProposalFromConsult` returns (the read fenced on the firm, since the run may be on the service role), `copilot-draft-proposal.ts` only in the
   CONFIRMED branch, immediately before the insert. The content that carries the letter goes to the insert and nowhere else: not a prompt, a tool result, the
   queued email, the evidence event or a log (`tests/proposals/letter-never-in-prompts.test.ts` plants a marker in the letter and scans every model-facing
-  file). A letter read that FAILS still creates the draft, and never silently: the content carries a check (`path: "loe"`, drawn in "Ready to send?" as a
-  Check linked to the Engagement letter section), the consult reviewer's notes start with a CHECK FIRST line, and Copilot's result lists it. The editor's
-  Save drops that check once a person has saved with the switch on the page and the letter readable. (A person at the keyboard gets the stricter answer:
+  file). A letter read that FAILS still creates the draft, and never silently: the content carries the PENDING LETTER CHECK (`path: "loe"` on content
+  with no `loe`; `src/lib/proposals/letter-check.ts`: `pendingLetterCheck`, `hasPendingLetterCheck`). (A person at the keyboard gets the stricter answer:
   the from-scratch door creates nothing and says "Couldn't read your engagement letter".)
+- **The pending letter check blocks the link until it is settled, and an ordinary Save settles it.** It is not a note: `validateContent(..., { forApproval })`
+  makes it an error ("Fix", `LETTER_PENDING_FIX`), `letterLiveCheck` answers `unattached` (so `sendProposal`, "Turn on the link", the queue's go-live and
+  `runCreateLink` all refuse), and the editor's switch is drawn ON for such a draft when the firm has an approved letter now (`editorLetterState`'s
+  `startOn`, with `LETTER_PENDING_SWITCH_NOTE`). `settlePendingLetter` (`save-draft.ts`) is the one rule at Save: the letter read worked and the switch is on
+  (or the form carries no switch) -> the letter is attached and only then the check goes; the switch is OFF -> the check goes with no letter (the person's
+  explicit choice); the read shows the firm has NO approved letter (or the table isn't there) -> the check goes, since there is nothing to attach and no
+  switch to turn; the read FAILS again -> the save still succeeds and the check stays, whatever the switch says. A firm with an approved letter therefore
+  never gets a live proposal that silently lacks it.
+- **The check is not stored as text anywhere else.** The assistant's "Check first" panel line is derived from the content (`CheckFirstPanel`'s `letterCheck`,
+  from `pendingLetterCheck`), so it goes when the check goes. The consult evidence event's notes no longer carry it; the QUEUE summary may still mention it
+  at draft time (`queueNotes` in `run.ts`), and Copilot's result still lists it.
 - **"Client chooses" on a consult** (`consultChoice`): the setting's options with the package recommended on the call as the start; a recommended package missing from the options is
   added and the last other option dropped (never over 3). No recommendation on the list: the setting's own start stands and the CHECK FIRST package flag stays. Per brand or per mark as the setting says.
   Call-evidenced price edits are applied AFTER the builder under today's rules and force ONE package where they apply: a brand with an applied base price is built with no choice
@@ -1795,9 +1817,11 @@ Nothing here sends, moves a stage, opens a matter or calls a model. No migration
   `off`, and `absent` (a version that can't be edited and carries no letter). Nothing returns null. "On" is simply "the saved copy exists": the one builder
   attaches the letter when a proposal is made, and Save removes it when the switch is off. The switch is a plain checkbox INSIDE the editor's one form
   (`loeOn`, with a `loeFields=1` marker), so the existing unsaved-changes guard marks the page. A viewer or social media never gets the input.
+  One exception to "on = the saved copy exists": a draft that carries the pending letter check (Sprint 5) draws the switch ON though nothing is attached yet.
 - **Save refreshes the copy.** `buildDraftUpdate` calls `withLoeSnapshot(content, approved, wanted)` with `wanted` from the switch (`wantedFromForm`): a form that
   doesn't carry the switch keeps it as it is. An approved-letter read that fails refuses a CHANGE of the switch (a person must not turn a letter off on a guess) and
-  otherwise leaves the copy untouched. A general template never attaches to a trademark proposal (kind mismatch removes `loe`).
+  otherwise leaves the copy untouched. A general template never attaches to a trademark proposal (kind mismatch removes `loe`). A draft with the pending
+  letter check takes the other branch, `settlePendingLetter` (Sprint 5), and is never refused for an unreadable letter: the save succeeds and the check stays.
 - **One guard on making a version live** (`src/lib/loe/live-guard.ts`: `letterLiveCheck`, `letterLiveRefusal`). A version that carries a letter goes live
   only while that copy is the firm's CURRENT approved letter. The guard runs inside `sendProposal` (the store), which every make-live path ends in: "Save
   and create link", "Turn on the link" (`sendAction`) and the approval queue's go-live (`makeProposalLive`). `stale` or `unreadable` refuses with the same
@@ -1805,6 +1829,8 @@ Nothing here sends, moves a stage, opens a matter or calls a model. No migration
   fenced on the proposal ROW'S OWN org (`getApprovedLetter(db, kind, orgId)`), so the answer does not depend on what the connection can see. `runCreateLink`
   also asks the same guard (`letterCurrent`) AFTER the save and BEFORE approve, so a stale copy leaves no saved version behind; "Save and create link" saves
   first when the page has unsaved changes, so a Save that refreshed the copy passes. Never add a second way to make a version live.
+  The guard has five answers (`LetterCopyCheck`): `no_letter`, `current`, `stale`, `unreadable`, and `unattached` (the pending letter check is still on the
+  content: refused with `LETTER_PENDING_FIX`, with no read needed). Reset acceptance runs the same guard (see "Reset a client's acceptance").
 - **Signed means a schema-2 snapshot with an agreement** (`isSignedSnapshot`). The pill reads "Signed by client" and the list's Accepted column "Signed Oct 21";
   an unsigned accepted version stays "Accepted by client" / "Accepted Oct 21", and a list row whose `signed` is unknown reads as accepted, never as signed.
 - **Who may read a signature record is ONE list** (`src/lib/loe/signature-roles.ts`, `SIGNATURE_READ_ROLES`: owner, admin, senior_admin, attorney, intake,
@@ -1825,13 +1851,20 @@ Nothing here sends, moves a stage, opens a matter or calls a model. No migration
   (`client_proposal_signature.agreement_text`, read by `stored-agreement.ts` fenced on the proposal's own org) verbatim as plain paragraphs, that text is
   hashed too and must equal the stored fingerprint, and `fromStoredText` comes back so the staff card says in one fixed sentence that the copy was produced
   from the stored signed text. The stored text unreadable, or not matching its own fingerprint: NO file. The firm's name and zone must come from a read that
-  worked; an empty one builds nothing. The signature record prints the signed time with its zone and the same instant in UTC (ISO 8601). The PDF starts with
+  worked; an empty one builds nothing.
+  **One verification** (`verifySignedCopy`, `signed-text-check.ts`: `rebuilt` / `stored` / `mismatch` / `unavailable`) sits under the PDF and the client's
+  "Read it again", so they cannot disagree. **A mismatch is its own outcome, not a hiccup** (`{ ok: false, reason: "mismatch" | "unavailable" }`): staff see
+  `STAFF_DOWNLOAD_MESSAGES.mismatch` (the stored letter doesn't match its recorded fingerprint, no copy was made), not "try again"; the client keeps the
+  generic sentence; the filing step is `blocked` (below); and each place writes ONE log line through `logSignedMismatch(proposalId, step)`
+  (`src/lib/proposals/signed-mismatch-log.ts`, the only logger: the id and the step, never the letter, the signer, an address or a hash). `unavailable`
+  (a read failed) stays "try again" and is not logged. The signature record prints the signed time with its zone and the same instant in UTC (ISO 8601). The PDF starts with
   a letterhead line, the firm's display name (`firmDisplayName(profile, org name)`). File name: `<signer>-engagement-letter-signed-<firm-zone date>.pdf`.
   `next.config.ts` traces the fonts for `/dashboard/proposals/*` as well as `/p/*`. Test fixtures of a signed snapshot carry the REAL sha256 of their text
   (`stampRealFingerprint`), because a made-up one is not a snapshot the app could have produced.
 - **`signed_loe_upload`** (a ninth step, success word `uploaded`, in `RETRYABLE_STEPS`): `runAcceptanceFollowups` runs it after the note for a signed snapshot only, as the
   service role fenced on the proposal's org, with the firm's own token (`firmToken`; never an env token). Core: `loe-signed-upload.ts` (deps injected). Outcomes:
-  `uploaded`; `skipped` (no active Lawmatics connection); `blocked` (no Lawmatics record, or more than one, from `resolveNoteTarget`); `failed` (the request, an
+  `uploaded`; `skipped` (no active Lawmatics connection); `blocked` (no Lawmatics record, or more than one, from `resolveNoteTarget`; or the stored signed
+  text does not match its recorded fingerprint: `buildPdf` throws `SignedUploadBlocked`, which carries no text, and the core records `STEP_TEXT.signedMismatch`); `failed` (the request, an
   unreadable lookup, the connection check, the PDF, or a FAILED read of the firm's name or time zone: the PDF is then not built at all, never with a guessed
   zone or a missing firm name, and the step is retried by the next run or Try again; a firm with no profile row is not a failed read). Once per signing and round (`stepSucceeded`; a reset starts a fresh round). A failed upload never changes the acceptance or
   the paid state. Retry (`retryProposalStep`) needs no paid mark for this step, uses the signed-in token and the same core. Step events carry an outcome and a fixed

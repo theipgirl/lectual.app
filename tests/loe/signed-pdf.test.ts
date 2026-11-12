@@ -106,9 +106,10 @@ describe("item 7: the signature record names the zone and carries the UTC time",
   });
 
   it("never builds with a missing firm name or zone (a failed read is the caller's to report)", async () => {
-    expect((await build(signedTrademark(), { firm: { displayName: "", timeZone: "America/New_York" } })).result).toEqual({ ok: false });
-    expect((await build(signedTrademark(), { firm: { displayName: "   ", timeZone: "America/New_York" } })).result).toEqual({ ok: false });
-    expect((await build(signedTrademark(), { firm: { displayName: "RPB Law Firm", timeZone: "" } })).result).toEqual({ ok: false });
+    const no = { ok: false, reason: "unavailable" };
+    expect((await build(signedTrademark(), { firm: { displayName: "", timeZone: "America/New_York" } })).result).toEqual(no);
+    expect((await build(signedTrademark(), { firm: { displayName: "   ", timeZone: "America/New_York" } })).result).toEqual(no);
+    expect((await build(signedTrademark(), { firm: { displayName: "RPB Law Firm", timeZone: "" } })).result).toEqual(no);
   });
 });
 
@@ -164,9 +165,9 @@ describe("item 6: a fingerprint is never printed beside text it does not match",
     expect(result.signerName).toBe("Sevetri Wilson");
   });
 
-  it("MISMATCH and the stored text cannot be read: no file at all", async () => {
+  it("MISMATCH and the stored text cannot be READ: no file, and it is 'unavailable' (trying again may help)", async () => {
     const { snapshot } = signedByOlderCode();
-    expect((await build(snapshot, { readStored: vi.fn(async () => null) })).result).toEqual({ ok: false });
+    expect((await build(snapshot, { readStored: vi.fn(async () => null) })).result).toEqual({ ok: false, reason: "unavailable" });
     expect(
       (
         await build(snapshot, {
@@ -175,24 +176,37 @@ describe("item 6: a fingerprint is never printed beside text it does not match",
           }),
         })
       ).result,
-    ).toEqual({ ok: false });
+    ).toEqual({ ok: false, reason: "unavailable" });
   });
 
-  it("MISMATCH and the stored text does not hash to the stored fingerprint: no file (never a fingerprint beside other text)", async () => {
+  it("checker's m4: a stored text that does not hash to its recorded fingerprint is a DISTINCT outcome, 'mismatch', and no file (never a fingerprint beside other text)", async () => {
     const { snapshot, storedText, sha256 } = signedByOlderCode();
+    const mismatch = { ok: false, reason: "mismatch" };
     // The row's text was altered: it no longer hashes to its own sha256.
-    expect((await build(snapshot, { readStored: vi.fn(async () => ({ text: `${storedText} tampered`, sha256 })) })).result).toEqual({ ok: false });
+    expect((await build(snapshot, { readStored: vi.fn(async () => ({ text: `${storedText} tampered`, sha256 })) })).result).toEqual(mismatch);
     // The row is self-consistent but is not the signature this snapshot records.
     const other = "Some other agreement entirely.";
-    expect((await build(snapshot, { readStored: vi.fn(async () => ({ text: other, sha256: agreementTextSha256(other) })) })).result).toEqual({ ok: false });
+    expect((await build(snapshot, { readStored: vi.fn(async () => ({ text: other, sha256: agreementTextSha256(other) })) })).result).toEqual(mismatch);
     // An empty stored text.
-    expect((await build(snapshot, { readStored: vi.fn(async () => ({ text: "", sha256: agreementTextSha256("") })) })).result).toEqual({ ok: false });
+    expect((await build(snapshot, { readStored: vi.fn(async () => ({ text: "", sha256: agreementTextSha256("") })) })).result).toEqual(mismatch);
+  });
+
+  it("verifySignedCopy is the one verification: rebuilt, stored, mismatch, unavailable", async () => {
+    const { verifySignedCopy } = await import("@/lib/loe/signed-text-check");
+    const never = vi.fn(async () => null);
+    expect((await verifySignedCopy(signedTrademark(), "UTC", never)).kind).toBe("rebuilt");
+    expect(never).not.toHaveBeenCalled();
+    const { snapshot, storedText, sha256 } = signedByOlderCode();
+    expect(await verifySignedCopy(snapshot, "UTC", async () => ({ text: storedText, sha256 }))).toEqual({ kind: "stored", stored: { text: storedText, sha256 } });
+    expect(await verifySignedCopy(snapshot, "UTC", async () => ({ text: `${storedText}!`, sha256 }))).toEqual({ kind: "mismatch" });
+    expect(await verifySignedCopy(snapshot, "UTC", async () => null)).toEqual({ kind: "unavailable" });
+    expect(await verifySignedCopy(null, "UTC", never)).toEqual({ kind: "unavailable" });
   });
 
   it("a snapshot that is not signed builds nothing", async () => {
     const s = signedTrademark();
-    expect((await build({ ...s, schema: 1, agreement: undefined, signing: undefined })).result).toEqual({ ok: false });
-    expect((await build(null as never)).result).toEqual({ ok: false });
+    expect((await build({ ...s, schema: 1, agreement: undefined, signing: undefined })).result).toEqual({ ok: false, reason: "unavailable" });
+    expect((await build(null as never)).result).toEqual({ ok: false, reason: "unavailable" });
   });
 
   it("there is ONE signed-PDF builder: nothing outside signed-pdf.ts builds a signed letter PDF", () => {

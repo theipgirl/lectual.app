@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { LETTER_HEADING, PDF_MESSAGES, READ_AGAIN_LABEL } from "@/lib/loe/client-words";
+import { LETTER_HEADING, PDF_MESSAGES, READ_AGAIN_LABEL, SIGNED_VIEW_UNAVAILABLE } from "@/lib/loe/client-words";
 import type { LetterPdfResult } from "@/lib/loe/pdf-result";
 import { LoeLetterPanel, type LetterView } from "./LoeLetterPanel";
 import { saveBase64Pdf } from "./download-pdf";
@@ -9,6 +9,10 @@ import { saveBase64Pdf } from "./download-pdf";
 /**
  * After signing: the letter exactly as signed ("Read it again", from the stored snapshot, not rebuilt from the firm's current
  * settings). The signed line, the signed PDF and the pay button live in the totals panel (`LoeSideAction`).
+ *
+ * `agreement` is only ever a letter that was VERIFIED against the stored fingerprint (the server's `verifySignedCopy`, or on
+ * the just-signed page the page's own hash check). When it couldn't be, it is null and the fixed sentence is shown: never
+ * unverified text under a "signed" label.
  */
 export function LoeSignedLetter({ agreement, title }: { agreement: LetterView | null; title: string }) {
   return (
@@ -18,7 +22,9 @@ export function LoeSignedLetter({ agreement, title }: { agreement: LetterView | 
         {agreement ? (
           <LoeLetterPanel agreement={agreement} title={title || LETTER_HEADING} id="cp-letter-signed" />
         ) : (
-          <p className="cp-warn">{PDF_MESSAGES.unavailable}</p>
+          <p className="cp-warn" role="status" data-signed-unavailable>
+            {SIGNED_VIEW_UNAVAILABLE}
+          </p>
         )}
       </details>
     </section>

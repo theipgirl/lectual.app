@@ -14,3 +14,11 @@ export const REVIEW_PDF_WINDOW_MS = 60 * 60 * 1000;
 
 export const reviewTokenLimiter = createRateLimiter({ max: REVIEW_PDF_PER_TOKEN, windowMs: REVIEW_PDF_WINDOW_MS });
 export const reviewAddressLimiter = createRateLimiter({ max: REVIEW_PDF_PER_ADDRESS, windowMs: REVIEW_PDF_WINDOW_MS });
+
+/**
+ * The SIGNED letter's download is the other anonymous PDF action, with the same limits and its OWN counters, so a client who
+ * downloaded many review copies can still download their signed letter (and the other way round). The same kind of limiter,
+ * with the same caveat: in memory, per server instance.
+ */
+export const signedTokenLimiter = createRateLimiter({ max: REVIEW_PDF_PER_TOKEN, windowMs: REVIEW_PDF_WINDOW_MS });
+export const signedAddressLimiter = createRateLimiter({ max: REVIEW_PDF_PER_ADDRESS, windowMs: REVIEW_PDF_WINDOW_MS });

@@ -192,6 +192,23 @@ export function pageAgreement(state: PageSigningState): Agreement | null {
   return r.ok ? r.agreement : null;
 }
 
+/**
+ * Is the letter the page is about to show as "signed" exactly the text the server stored? The page rebuilds its agreement with the
+ * date the server stamped, hashes the text and compares it with the stored text's sha256 (which the sign action returned). Only
+ * a match is shown as the signed letter on the just-signed page; anything else shows the fixed "couldn't be shown" sentence (a
+ * reload then gets the server's own verified copy). Pure; Web Crypto, so it runs in the browser.
+ */
+export async function pageTextMatchesStored(state: PageSigningState, serverDateText: string | null | undefined, storedSha256: string | null | undefined): Promise<boolean> {
+  if (!serverDateText || !storedSha256) return false;
+  const agreement = pageAgreement({ ...state, dateText: serverDateText });
+  if (!agreement) return false;
+  try {
+    return (await sha256Hex(agreement.text)) === storedSha256;
+  } catch {
+    return false;
+  }
+}
+
 /** What the sign action posts: the cleaned name and details, the tick, and the fingerprint of the agreement on screen. Null if it can't sign. */
 export async function pageSigningPayload(state: PageSigningState & { agree: boolean }): Promise<SigningInput | null> {
   const details = cleanSigningDetails(state.details);

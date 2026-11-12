@@ -26,6 +26,36 @@ export type SignedLetter = {
   signatureId: string | null;
 };
 
+/**
+ * What a reader is SHOWN as the signed letter. Either the rebuilt letter (lead-ins and Exhibit A as a table) or, when today's
+ * code no longer rebuilds what was signed, the stored signed text as plain paragraphs (its exhibit lines are part of that text,
+ * so there is no table: `exhibit` is null and `fromStoredText` is true). Only ever built from text that was hashed and matched
+ * to the stored fingerprint (`verifySignedCopy`).
+ */
+export type SignedLetterView = Omit<SignedLetter, "exhibit"> & { exhibit: Exhibit | null; fromStoredText?: boolean };
+
+/** The stored signed text as a view: one plain block per blank-line-separated paragraph, line breaks kept. Signer, time and fingerprint from the snapshot. */
+export function storedSignedLetterView(snapshot: AcceptedSnapshot, stored: { text: string; sha256: string }, timeZone: string): SignedLetterView | null {
+  const agreement = snapshot.agreement;
+  if (!agreement) return null;
+  return {
+    blocks: stored.text
+      .split(/\n{2,}/)
+      .filter((p) => p.length > 0)
+      .map((text) => ({ lead: null, text })),
+    exhibit: null,
+    fromStoredText: true,
+    details: cleanSigningDetails(snapshot.signing?.details),
+    signerName: agreement.signer_name,
+    signedAt: agreement.signed_at,
+    signedLine: signedLineText(agreement.signed_at, timeZone, agreement.signer_name),
+    signedAtText: signedAtText(agreement.signed_at, timeZone),
+    signedAtUtc: signedAtUtcIso(agreement.signed_at),
+    fingerprint: stored.sha256,
+    signatureId: agreement.signature_id,
+  };
+}
+
 export function rebuildSignedLetter(snapshot: AcceptedSnapshot | null | undefined, timeZone: string): SignedLetter | null {
   if (!snapshot || snapshot.schema !== 2 || !snapshot.agreement || !snapshot.signing) return null;
   const body = snapshot.content?.loe?.body;

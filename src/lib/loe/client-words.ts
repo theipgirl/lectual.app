@@ -44,6 +44,8 @@ export const SIGN_RECORDING_NOTICE =
 export const DOWNLOAD_REVIEW_LABEL = "Download the letter (PDF)";
 export const DOWNLOAD_SIGNED_LABEL = "Download your signed letter (PDF)";
 export const READ_AGAIN_LABEL = "Read it again";
+/** Under "Read it again" when the signed letter could not be verified against its stored fingerprint, so it is not shown. */
+export const SIGNED_VIEW_UNAVAILABLE = "Your signed letter couldn't be shown here just now. Please try again later, or contact the firm.";
 export const REVIEW_COPY_MARK = "Review copy - not yet signed";
 
 /** Shown before signing, beside the total. Describes the steps only. */

@@ -61,6 +61,29 @@ describe("the staff Download of a signed letter", () => {
     expect(await runStaffDownload(deps({ getProposal: async () => row }), ID)).toEqual({ ok: false, message: STAFF_DOWNLOAD_MESSAGES.unavailable });
   });
 
+  it("checker's m4: a stored letter that does not match its recorded fingerprint is said in its own fixed sentence (not 'try again'), with one log callback", async () => {
+    const today = signedTrademark();
+    const storedText = `${storedTextOf(today)}\n\nA line only the stored text has.`;
+    const sha256 = agreementTextSha256(storedText);
+    const row = acceptedProposalRow({ ...today, agreement: { ...today.agreement!, sha256 } });
+    const onMismatch = vi.fn();
+    const r = await runStaffDownload(deps({ getProposal: async () => row, readStored: async () => ({ text: `${storedText} altered`, sha256 }), onMismatch }), ID);
+    expect(r).toEqual({ ok: false, message: STAFF_DOWNLOAD_MESSAGES.mismatch });
+    expect(STAFF_DOWNLOAD_MESSAGES.mismatch).toMatch(/doesn't match its recorded fingerprint/);
+    expect(STAFF_DOWNLOAD_MESSAGES.mismatch).toMatch(/no copy was made/);
+    expect(STAFF_DOWNLOAD_MESSAGES.mismatch).not.toMatch(/try again/i);
+    expect(STAFF_DOWNLOAD_MESSAGES.mismatch).not.toBe(STAFF_DOWNLOAD_MESSAGES.unavailable);
+    expect(onMismatch).toHaveBeenCalledTimes(1);
+    expect(onMismatch).toHaveBeenCalledWith(row.id);
+    // An unreadable stored text is still the ordinary sentence, with no log.
+    onMismatch.mockClear();
+    expect(await runStaffDownload(deps({ getProposal: async () => row, onMismatch }), ID)).toEqual({ ok: false, message: STAFF_DOWNLOAD_MESSAGES.unavailable });
+    expect(onMismatch).not.toHaveBeenCalled();
+    // The action wires the one log line: the id and the step, nothing else.
+    const action = readFileSync("src/app/dashboard/proposals/[id]/signed-letter-actions.ts", "utf8");
+    expect(action).toContain('onMismatch: (id) => logSignedMismatch(id, "staff_download"),');
+  });
+
   it("refuses an unsigned accepted version", async () => {
     const r = await runStaffDownload(deps({ getProposal: async () => acceptedProposalRow(acceptedSnapshot({ classes: 2 })) }), ID);
     expect(r).toEqual({ ok: false, message: STAFF_DOWNLOAD_MESSAGES.not_signed });

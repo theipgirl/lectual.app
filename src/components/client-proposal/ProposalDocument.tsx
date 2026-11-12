@@ -83,10 +83,10 @@ import "./proposal.css";
  */
 
 /**
- * `signedLine` ("Signed November 12, 2026 at 2:14 PM EST by ...") and `letterDate` (the letter's date as the server stamped it)
- * come back only when the acceptance was a signing.
+ * `signedLine` ("Signed November 12, 2026 at 2:14 PM EST by ..."), `letterDate` (the letter's date as the server stamped it) and
+ * `textSha256` (the sha256 of the agreement text that was stored) come back only when the acceptance was a signing.
  */
-export type ProposalAcceptResult = { ok: true; payUrl: string; signedLine?: string; letterDate?: string } | { ok: false; message: string };
+export type ProposalAcceptResult = { ok: true; payUrl: string; signedLine?: string; letterDate?: string; textSha256?: string } | { ok: false; message: string };
 
 export type ProposalDocumentProps = {
   content: ProposalContent;
@@ -134,7 +134,7 @@ export type ProposalDocumentProps = {
   /** Starting step and typed values: for tests and the staff preview, never set by the public page. */
   initialLoe?: { step?: LoeStep; details?: SignerDetails; typedName?: string; agree?: boolean };
   /** The state right after a successful accept or signing (what `onAccept` returned): for tests only, never set by the public page. */
-  initialDone?: { payUrl: string | null; opened?: boolean; signedLine?: string | null; letterDate?: string | null };
+  initialDone?: { payUrl: string | null; opened?: boolean; signedLine?: string | null; letterDate?: string | null; letterVerified?: boolean };
 };
 
 const DEFAULT_TITLE = "Trademark Proposal";
@@ -269,8 +269,16 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
   const [added, setAdded] = useState<Record<string, ClientAddedEntry[]>>(initialClientClasses?.added ?? {});
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<{ payUrl: string | null; opened: boolean; signedLine?: string | null; letterDate?: string | null } | null>(() =>
-    props.initialDone ? { payUrl: props.initialDone.payUrl, opened: props.initialDone.opened ?? false, signedLine: props.initialDone.signedLine ?? null, letterDate: props.initialDone.letterDate ?? null } : null,
+  const [done, setDone] = useState<{ payUrl: string | null; opened: boolean; signedLine?: string | null; letterDate?: string | null; letterVerified?: boolean } | null>(() =>
+    props.initialDone
+      ? {
+          payUrl: props.initialDone.payUrl,
+          opened: props.initialDone.opened ?? false,
+          signedLine: props.initialDone.signedLine ?? null,
+          letterDate: props.initialDone.letterDate ?? null,
+          letterVerified: props.initialDone.letterVerified === true,
+        }
+      : null,
   );
   const [previewOpen, setPreviewOpen] = useState(false);
 
@@ -336,7 +344,9 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
   });
   const loeOn = loeFlow.enabled;
   const stepOne = !loeOn || accepted || loeFlow.step === 1;
-  const signedView = letter?.signed ?? (done ? loeFlow.agreement : null);
+  // The letter shown as SIGNED: the server's verified copy on a receipt; on the just-signed page the page's own letter, and only
+  // when its text hashed to the sha256 the server stored (`letterVerified`). Otherwise nothing is shown under that label.
+  const signedView = letter?.signed ?? (done?.letterVerified ? loeFlow.agreement : null);
   // One name, one mark, one class: nothing to choose, so no checkboxes at all. A class the client describes or room to
   // add classes is a choice, so such a proposal is never fixed (`isFixedOffer`).
   const fixed = isFixedOffer(content);
@@ -512,7 +522,9 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
         }
       }
       if (!opened) tab?.close();
-      setDone({ payUrl: url, opened, signedLine: result.signedLine ?? null, letterDate: result.letterDate ?? null });
+      // Before anything is shown as "signed": does this page's letter, with the server's date, hash to what the server stored?
+      const letterVerified = loeOn ? await loeFlow.signedTextVerified(result.letterDate, result.textSha256) : false;
+      setDone({ payUrl: url, opened, signedLine: result.signedLine ?? null, letterDate: result.letterDate ?? null, letterVerified });
     } catch {
       tab?.close();
       setError("We couldn’t record your acceptance. Please try again.");

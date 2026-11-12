@@ -12,6 +12,7 @@ import {
   missingDetails,
   pageAgreement,
   pageSigningPayload,
+  pageTextMatchesStored,
   type Agreement,
   type PageSigningState,
   type SignerDetails,
@@ -19,7 +20,7 @@ import {
 } from "@/lib/loe/signing";
 import type { PublicLetterView } from "@/lib/proposals/public";
 import type { ProposalContent, ProposalQuote } from "@/lib/proposals/types";
-import type { SignedLetter } from "@/lib/loe/signed-letter";
+import type { SignedLetterView } from "@/lib/loe/signed-letter";
 
 /**
  * The engagement-letter state of the client page: which step the client is on, what they typed, the letter and exhibit built
@@ -31,7 +32,7 @@ import type { SignedLetter } from "@/lib/loe/signed-letter";
 
 export type LoeStep = 1 | 2 | 3;
 
-export type LoeLetterData = Pick<PublicLetterView, "dateText" | "clientEmail"> & { signed?: SignedLetter | null };
+export type LoeLetterData = Pick<PublicLetterView, "dateText" | "clientEmail"> & { signed?: SignedLetterView | null };
 
 export type LoeFlowInput = {
   /** The letter the proposal carries, or null (no letter: the flow is off and nothing here runs). */
@@ -111,6 +112,11 @@ export function useLoeFlow(input: LoeFlowInput) {
     return pageSigningPayload({ ...state, agree });
   }
 
+  /** After a successful sign: does the letter this page will show as signed hash to the text the server stored? */
+  async function signedTextVerified(serverDateText: string | null | undefined, storedSha256: string | null | undefined): Promise<boolean> {
+    return state ? pageTextMatchesStored(state, serverDateText, storedSha256) : false;
+  }
+
   return {
     enabled,
     step,
@@ -128,6 +134,7 @@ export function useLoeFlow(input: LoeFlowInput) {
     exhibit,
     signable,
     signingPayload,
+    signedTextVerified,
   };
 }
 

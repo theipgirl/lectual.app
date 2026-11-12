@@ -7,11 +7,12 @@ import type { LetterPdfResult } from "@/lib/loe/pdf-result";
 import { buildExhibit } from "@/lib/loe/exhibit";
 import { buildLetterPdf } from "@/lib/loe/pdf";
 import { buildVerifiedSignedPdf } from "@/lib/loe/signed-pdf";
-import { reviewAddressLimiter, reviewTokenLimiter } from "@/lib/loe/review-limit";
+import { reviewAddressLimiter, reviewTokenLimiter, signedAddressLimiter, signedTokenLimiter } from "@/lib/loe/review-limit";
 import { assembleAgreement, checkSigning, cleanSigningDetails, letterDateText } from "@/lib/loe/signing";
 import { parseInet } from "@/lib/quotes/public";
 import { quoteForAcceptance } from "./client-classes";
 import { readPublicProposal, readSignedSource, type PublicProposalsDb } from "./public";
+import { logSignedMismatch } from "./signed-mismatch-log";
 import { isSignedSnapshot } from "./signed-state";
 import { isWellFormedProposalToken } from "./types";
 
@@ -22,7 +23,7 @@ import { isWellFormedProposalToken } from "./types";
  *    signed". Built from the STORED letter, the recomputed quote and the CLEANED details: the browser sends details and
  *    ticks only, never letter text or money. Refuses a proposal that is not live (withdrawn, expired, replaced, or already
  *    signed), is rate limited, and logs nothing.
- *  - `signedLetterPdf`: the letter as signed, with the signature record: rebuilt from the accepted snapshot and checked against
+ *  - `signedLetterPdf`: rate limited the same way with its own counters. The letter as signed, with the signature record: rebuilt from the accepted snapshot and checked against
  *    the stored fingerprint, or (when that no longer matches) produced from the stored signed text (`buildVerifiedSignedPdf`).
  *
  * There is no proposal-id or org-id parameter: a caller who could name one could not name someone else's. The result carries
@@ -97,7 +98,13 @@ export async function reviewLetterPdf(
   }
 }
 
-export async function signedLetterPdf(token: string, now: Date, opts: { db?: PublicProposalsDb } = {}): Promise<LetterPdfResult> {
+export async function signedLetterPdf(token: string, now: Date, opts: { db?: PublicProposalsDb; ip?: string | null } = {}): Promise<LetterPdfResult> {
+  // Rate limited like the review copy, with its own counters (a client's review downloads never use up their signed ones).
+  if (!isWellFormedProposalToken(String(token ?? ""))) return fail(PDF_MESSAGES.not_open);
+  const tokenKey = `t:${createHash("sha256").update(String(token ?? "")).digest("hex")}`;
+  const ipKey = `ip:${parseInet(opts.ip) ?? "unknown"}`;
+  if (!signedTokenLimiter.allowed(tokenKey) || !signedAddressLimiter.allowed(ipKey)) return fail(PDF_MESSAGES.limit);
+
   const read = await readPublicProposal(String(token ?? ""), now, opts.db);
   if (read.status !== "ok") return fail(read.status === "unavailable" || read.status === "unconfigured" ? PDF_MESSAGES.unavailable : PDF_MESSAGES.not_open);
   if (read.handle.storedStatus !== "accepted" || !read.view.content.loe) return fail(PDF_MESSAGES.not_signed);
@@ -107,13 +114,20 @@ export async function signedLetterPdf(token: string, now: Date, opts: { db?: Pub
   if (!source) return fail(PDF_MESSAGES.unavailable);
   if (!isSignedSnapshot(source.snapshot)) return fail(PDF_MESSAGES.not_signed);
   try {
+    // Counted only once a PDF is really being made, so a refused call does not use a slot.
+    signedTokenLimiter.record(tokenKey);
+    signedAddressLimiter.record(ipKey);
     const built = await buildVerifiedSignedPdf({
       snapshot: source.snapshot,
       // `readPublicProposal` answers `unavailable` for a letter proposal whose firm profile couldn't be read, so these are real.
       firm: { displayName: read.view.firm.displayName, timeZone: read.view.firm.timeZone },
       readStored: source.readStored,
     });
-    if (!built.ok) return fail(PDF_MESSAGES.unavailable);
+    if (!built.ok) {
+      // The client gets the same generic sentence either way; a stored text that does not match its fingerprint is logged (id and step only).
+      if (built.reason === "mismatch") logSignedMismatch(read.handle.proposalId, "client_download");
+      return fail(PDF_MESSAGES.unavailable);
+    }
     const clientName = cleanSigningDetails(source.snapshot.signing?.details).client_name;
     return { ok: true, base64: Buffer.from(built.bytes).toString("base64"), filename: filenameFor(clientName, true) };
   } catch {

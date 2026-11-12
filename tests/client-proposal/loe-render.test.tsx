@@ -81,7 +81,7 @@ const SCREENS: Array<[string, () => ProposalDocumentProps]> = [
     () =>
       base({
         initialLoe: { step: 3, details: TEST_DETAILS, typedName: "Sevetri Wilson", agree: true },
-        initialDone: { payUrl: "https://example.com/pay", opened: true, signedLine: "Signed November 13, 2026 at 10:30 AM EST by Sevetri Wilson", letterDate: "November 13, 2026" },
+        initialDone: { payUrl: "https://example.com/pay", opened: true, signedLine: "Signed November 13, 2026 at 10:30 AM EST by Sevetri Wilson", letterDate: "November 13, 2026", letterVerified: true },
         onDownloadSigned: async () => ({ ok: false, message: "x" }),
       }),
   ],

@@ -50,6 +50,8 @@ export async function acceptProposalAction(token: string, selection: unknown, cl
       ...(result.signedLine ? { signedLine: result.signedLine } : {}),
       // The letter's date as stamped here at signing: the receipt redraws the letter with it (the page was built with the date at page load).
       ...(result.signedDateText ? { letterDate: result.signedDateText } : {}),
+      // The stored text's sha256: the page shows its own copy of the letter as "signed" only if it hashes to this.
+      ...(result.agreementSha256 ? { textSha256: result.agreementSha256 } : {}),
     };
   } catch {
     return { ok: false, message: "We couldn’t record your acceptance. Please try again." };
@@ -69,7 +71,8 @@ export async function downloadReviewLetterAction(token: string, selection: unkno
 /** The signed copy, rebuilt from what was signed. Token only. */
 export async function downloadSignedLetterAction(token: string): Promise<LetterPdfResult> {
   try {
-    return await signedLetterPdf(String(token ?? ""), new Date());
+    const h = await headers();
+    return await signedLetterPdf(String(token ?? ""), new Date(), { ip: h.get("x-forwarded-for") ?? h.get("x-real-ip") });
   } catch {
     return { ok: false, message: PDF_MESSAGES.unavailable };
   }

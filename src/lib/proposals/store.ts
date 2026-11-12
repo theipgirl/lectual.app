@@ -29,7 +29,7 @@ import {
 import { MAX_CONTENT_BYTES, hasErrors, isCivilDate, isPlausibleEmail, validateContent, validateSettingInput } from "./validate";
 import { PAY_LINK_NEEDS_DB_UPDATE, PAY_LINK_NOT_HTTPS, PAY_LINK_NOT_LIVE, PAY_LINK_UNCHANGED } from "@/lib/proposal-editor/pay-link";
 import { runDeleteProposalFamily, type DeleteFamilyResult } from "@/lib/proposal-editor/delete-proposal";
-import { RESET_NEEDS_DB_UPDATE, RESET_NOT_ACCEPTED } from "@/lib/proposal-editor/reset-acceptance";
+import { RESET_LETTER_CHANGED, RESET_LETTER_UNREADABLE, RESET_NEEDS_DB_UPDATE, RESET_NOT_ACCEPTED } from "@/lib/proposal-editor/reset-acceptance";
 import { isSignedSnapshot } from "./signed-state";
 import { letterLiveCheck, letterLiveRefusal } from "@/lib/loe/live-guard";
 
@@ -983,6 +983,8 @@ export async function deleteProposalFamily(proposalId: string): Promise<DeleteFa
  * accepted_at / accepted_selection / accepted_snapshot, refuses a paid version, a caller who is not
  * the admin tier or a named approver, and any other change, and writes the `reset` event itself with
  * the previous acceptance). Fenced on `status = accepted` and the rendered `updated_at`.
+ *
+ * It is one of the ways a version becomes live, so the engagement-letter guard runs here too (see below).
  */
 export async function resetProposalAcceptance(id: string, options: UpdateProposalOptions): Promise<ProposalRow> {
   const expected = typeof options?.expectedUpdatedAt === "string" ? options.expectedUpdatedAt.trim() : "";
@@ -995,6 +997,13 @@ export async function resetProposalAcceptance(id: string, options: UpdateProposa
   const current = await loadRow(db, id);
   if (Date.parse(current.updated_at) !== Date.parse(expected)) throw new ProposalError("conflict", PROPOSAL_SAVE_CONFLICT);
   if (current.status !== "accepted") throw new ProposalError("conflict", RESET_NOT_ACCEPTED);
+
+  // A reset writes `sent`: the client link is live again and the client is asked to sign again. That is making a version live,
+  // so it runs the ONE make-live guard. A proposal with no letter, or whose copy is still the firm's current approved letter,
+  // resets as before; a copy the firm has since replaced is not put back in front of a client.
+  const letter = await letterLiveCheck(supabase, current);
+  if (letter === "stale") throw new ProposalError("conflict", RESET_LETTER_CHANGED);
+  if (letter === "unreadable" || letter === "unattached") throw new ProposalError("unavailable", RESET_LETTER_UNREADABLE);
 
   const { data, error } = await db
     .from("client_proposal")

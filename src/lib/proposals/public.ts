@@ -13,7 +13,9 @@ import { SIGN_MESSAGES } from "@/lib/loe/client-words";
 import { agreementTextSha256, canonicalFingerprint } from "@/lib/loe/fingerprint";
 import { buildExhibit } from "@/lib/loe/exhibit";
 import { readStoredAgreement, type StoredAgreementDb } from "@/lib/loe/stored-agreement";
-import { rebuildSignedLetter, type SignedLetter } from "@/lib/loe/signed-letter";
+import { storedSignedLetterView, type SignedLetterView } from "@/lib/loe/signed-letter";
+import { verifySignedCopy } from "@/lib/loe/signed-text-check";
+import { logSignedMismatch } from "./signed-mismatch-log";
 import { addressJson, assembleAgreement, checkSigning, letterDateText, signedLineText } from "@/lib/loe/signing";
 import { parseInet } from "@/lib/quotes/public";
 import { quoteHasItems } from "./pricing";
@@ -196,7 +198,7 @@ export type PublicProposalView = {
   firm: PublicProposalFirm;
   /**
    * Engagement letter only. Before signing: what the letter merges with that the browser may not type (the proposal's own client
-   * email) and the letter's date. After signing: the letter as signed, rebuilt from the snapshot (`rebuildSignedLetter`).
+   * email) and the letter's date. After signing: the letter as signed, verified against the stored fingerprint (`verifySignedCopy`).
    * Null for every proposal without a letter.
    */
   letter: PublicLetterView | null;
@@ -207,7 +209,8 @@ export type PublicLetterView = {
   dateText: string;
   /** The proposal's own email, for `{{client_email}}`. Only on a proposal that carries a letter. */
   clientEmail: string;
-  signed: SignedLetter | null;
+  /** The signed letter as VERIFIED against the stored fingerprint (rebuilt, or the stored signed text), or null when it couldn't be. */
+  signed: SignedLetterView | null;
 };
 
 /** The server-side half of a resolved token. Never passed to a client component. */
@@ -486,7 +489,17 @@ export async function readPublicProposal(
     if (content.loe) {
       if (profileUnread) return { status: "unavailable" };
       if (accepted) {
-        const signed = rebuildSignedLetter(snapshot, firm.timeZone);
+        // "Read it again" is the letter AS SIGNED, and it is only ever shown once it has been checked against the stored
+        // fingerprint, the same verification the signed PDF uses (`verifySignedCopy`): the rebuilt letter when today's code
+        // still rebuilds the signed text; otherwise the STORED signed text (read here, fenced on this row's own id and org);
+        // and when neither verifies, nothing: the page says the signed letter couldn't be shown. Never unverified text
+        // labelled as signed.
+        const copy = await verifySignedCopy(snapshot, firm.timeZone, () =>
+          readStoredAgreement(client as unknown as StoredAgreementDb, { proposalId, orgId, signatureId: snapshot?.agreement?.signature_id }),
+        );
+        if (copy.kind === "mismatch") logSignedMismatch(proposalId, "client_view");
+        const signed: SignedLetterView | null =
+          copy.kind === "rebuilt" ? copy.letter : copy.kind === "stored" && snapshot ? storedSignedLetterView(snapshot, copy.stored, firm.timeZone) : null;
         // The signature row's own id is a database id: it never reaches the browser.
         letter = { dateText: snapshot?.signing?.date_text ?? "", clientEmail: "", signed: signed ? { ...signed, signatureId: null } : null };
       } else {
@@ -636,6 +649,11 @@ export type AcceptResult =
       signedLine?: string;
       /** Engagement letter only: the letter's date as stamped here at signing ("November 13, 2026", the firm's calendar). */
       signedDateText?: string;
+      /**
+       * Engagement letter only: the sha256 of the agreement text that was stored. The just-signed page hashes the letter it is
+       * about to show as "signed" and shows it only when it equals this (otherwise it says the letter couldn't be shown).
+       */
+      agreementSha256?: string;
     }
   | { ok: false; reason: AcceptRefusal; message: string };
 
@@ -869,6 +887,7 @@ async function signAndAccept(input: {
       proposalId,
       signedLine: signedLineText(signedAt, read.view.firm.timeZone, checked.typedName),
       signedDateText: dateText,
+      agreementSha256: sha256,
     };
   } catch {
     return refuse("unavailable");

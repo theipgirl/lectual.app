@@ -60,9 +60,11 @@ export async function browserSigning(
     readAt?: Date;
     /** What the client wrote in the class boxes, exactly as typed: `{ entries, added }`. */
     clientClasses?: unknown;
+    /** The link's token, when the world was made with another one. */
+    token?: string;
   } = {},
 ) {
-  const read = await readPublicProposal(TOKEN, over.readAt ?? NOW, db);
+  const read = await readPublicProposal(over.token ?? TOKEN, over.readAt ?? NOW, db);
   if (read.status !== "ok" || !read.view.letter) throw new Error("no letter");
   const content = read.view.content;
   const selection = normalizeSelection(content, { ...defaultSelection(content), ...(over.selection ?? {}) });
@@ -83,6 +85,8 @@ export async function browserSigning(
   const payload = await pageSigningPayload({ ...state, agree: true });
   if (!payload) throw new Error("the page could not sign");
   return {
+    /** The page's own state (what `useLoeFlow` holds), for the page-side checks. */
+    state,
     selection,
     /** What the client wrote, as typed: posted beside the ticks. */
     clientClasses: over.clientClasses,
