@@ -56,7 +56,7 @@ function deps(over: Partial<ResetAcceptanceDeps> = {}) {
 describe("the confirm sentence", () => {
   it("is the spec's wording, word for word", () => {
     expect(RESET_CONFIRM).toBe(
-      "Reset this acceptance? The client link opens again and they can accept again. The Lawmatics note and alerts already sent stay as they are.",
+      "Reset this acceptance? The client link opens again and they can accept again. The Lawmatics note and alerts already sent stay as they are. Earlier signature records are kept.",
     );
     expect(RESET_PAID).toBe("Undo Mark paid first.");
     expect(RESET_NEEDS_DB_UPDATE).toBe("Resetting an acceptance isn't switched on for your firm yet. Lectual will turn it on.");

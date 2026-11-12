@@ -35,6 +35,8 @@ import { CAN_WRITE_LEAD } from "@/lib/pipeline/leads";
 import { getSiteOrigin } from "@/lib/site-origin";
 import { clientLinkOrigin, clientLinkUrl } from "@/lib/proposals/client-link-origin";
 import { runManualEmail } from "@/lib/consult-proposal/manual-email";
+import { letterCopyCheck } from "@/lib/loe/editor-state";
+import { getApprovedLetter } from "@/lib/loe/templates-store";
 import { runCreateLink } from "@/lib/proposal-editor/create-link";
 import { runSaveDraft, type SaveDraftDeps } from "@/lib/proposal-editor/save-draft";
 import { runChangePayLink } from "@/lib/proposal-editor/pay-link";
@@ -164,6 +166,13 @@ function draftDeps(): SaveDraftDeps {
     gate: gateStaffAction,
     getRow: async (id) => (await getProposal(id))?.proposal ?? null,
     settingPricing: async () => (await getProposalSettings())?.pricing ?? {},
+    approvedLetter: async (kind) => {
+      try {
+        return await getApprovedLetter(await getScopedClient(), kind);
+      } catch {
+        return { status: "unavailable" };
+      }
+    },
     update: updateProposal,
     describe: proposalActionError,
     revalidate,
@@ -192,6 +201,15 @@ export async function createLinkAction(_prev: ActionState, formData: FormData): 
     {
       gate: gateStaffAction,
       save: (form) => runSaveDraft(draftDeps(), form),
+      letterCurrent: async (id) => {
+        const row = (await getProposal(id))?.proposal ?? null;
+        if (!row || !row.content.loe) return "no_letter";
+        try {
+          return letterCopyCheck(row.content, await getApprovedLetter(await getScopedClient(), isGeneralContent(row.content) ? "general" : "trademark"));
+        } catch {
+          return "unreadable";
+        }
+      },
       approve: approveProposal,
       makeLive: sendProposal,
       describe: proposalActionError,

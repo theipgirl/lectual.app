@@ -533,3 +533,29 @@ td.pq-mono { font-family: var(--mono); }
 .pe-start-row { display: block; width: 100%; text-align: left; background: none; font: inherit; cursor: pointer; }
 .pe-start-row:disabled { opacity: 0.6; cursor: progress; }
 @media (max-width: 900px) { .pe-doors, .pe-doors[data-doors="2"] { grid-template-columns: minmax(0, 1fr); } }
+
+/* Engagement letter section of the editor (Sprint 6). Tokens only. */
+.pe-letter { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.pe-letter-switch { font-size: 14.5px; font-weight: 500; color: var(--ink); white-space: normal; }
+.pe-letter-version { margin: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pe-letter-setup { margin: 0; font-size: 14.5px; line-height: 1.5; color: var(--body); }
+.pe-letter-setup a { color: var(--ox); text-decoration: underline; }
+.pe-letter-preview { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.pe-letter-preview > summary { cursor: pointer; width: fit-content; list-style: none; }
+.pe-letter-preview > summary::-webkit-details-marker { display: none; }
+.pe-letter-preview[open] > summary { margin-bottom: 8px; }
+.pe-letter-paper { max-width: 68ch; display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; font-size: 15px; line-height: 1.6; color: var(--ink); overflow-wrap: anywhere; max-height: 520px; overflow-y: auto; }
+.pe-letter-paper p { margin: 0; white-space: pre-line; }
+.pe-letter-paper strong { font-weight: 600; }
+.pe-letter-problems { margin: 0; padding: 10px 14px 10px 28px; border: 1px solid var(--line); border-left: 3px solid var(--wine); border-radius: 8px; background: var(--card); color: var(--wine); font-size: 13.5px; line-height: 1.5; }
+@media (max-width: 640px) { .pe-letter-paper { padding: 14px; } }
+
+/* Signed letter card on the staff proposal page (Sprint 6). */
+.pe-signed { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.pe-signed-dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 0; font-size: 14px; }
+.pe-signed-dl dt { color: var(--muted); }
+.pe-signed-dl dd { margin: 0; color: var(--ink); overflow-wrap: anywhere; }
+.pe-signed-print { font-family: var(--font-mono, ui-monospace, monospace); font-size: 12.5px; word-break: break-all; }
+.pe-signed-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.pe-signed-filing { display: flex; flex-direction: column; gap: 6px; padding-top: 10px; border-top: 1px solid var(--line-2); }
+@media (max-width: 640px) { .pe-signed-dl { grid-template-columns: 1fr; gap: 2px; } .pe-signed-dl dd { margin-bottom: 8px; } }

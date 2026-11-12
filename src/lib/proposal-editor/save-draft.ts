@@ -4,6 +4,9 @@ import { withPackageSnapshot } from "@/lib/proposals/package-snapshot";
 import type { UpdateProposalInput, UpdateProposalOptions } from "@/lib/proposals/store";
 import { PROPOSAL_SAVE_CONFLICT } from "@/lib/proposals/store";
 import type { ActionState } from "@/app/dashboard/proposals/errors";
+import { wantedFromForm } from "@/lib/loe/editor-state";
+import type { ApprovedRead } from "@/lib/loe/templates-store";
+import { withLoeSnapshot } from "@/lib/proposals/loe-snapshot";
 import { applyGeneralForm } from "./general-form";
 import {
   parseAdjustments,
@@ -34,6 +37,8 @@ export type SaveDraftDeps = {
   getRow: (id: string) => Promise<ProposalRow | null>;
   /** The firm's package settings (`client_proposal_setting.pricing`); throws when unreadable. */
   settingPricing: () => Promise<unknown>;
+  /** Sprint 6: the firm's approved engagement letter of one kind, through the scoped client. Absent = the letter copy is left as it is. */
+  approvedLetter?: (kind: "trademark" | "general") => Promise<ApprovedRead>;
   update: (id: string, input: UpdateProposalInput, options: UpdateProposalOptions) => Promise<ProposalRow>;
   describe: (err: unknown, fallback: string) => ActionState;
   revalidate: (id: string) => void;
@@ -41,6 +46,7 @@ export type SaveDraftDeps = {
 };
 
 export const SAVED_BACK_TO_DRAFT = "Saved. Its link wasn't live yet, so it is back to draft; create the link again when it's ready.";
+export const LETTER_SWITCH_UNREADABLE = "Engagement letter: couldn't load the firm's letter, so the switch wasn't changed. Try again.";
 export const PACKAGES_UNREADABLE = "Couldn't load the firm's packages. Try again.";
 
 const field = (form: FormData, key: string): string => {
@@ -109,7 +115,7 @@ function usesPackageChoice(names: readonly ProposalName[]): boolean {
 export async function buildDraftUpdate(
   form: FormData,
   current: ProposalRow,
-  deps: Pick<SaveDraftDeps, "settingPricing" | "rand">,
+  deps: Pick<SaveDraftDeps, "settingPricing" | "rand" | "approvedLetter">,
 ): Promise<Parsed<UpdateProposalInput>> {
   // Who (client name, email, first name, company, title) and, when the form carries them, the pay link and expiry date.
   const details = parseDetails(form, current.content);
@@ -168,6 +174,16 @@ export async function buildDraftUpdate(
     const credits = parseAdjustments(form, deps.rand);
     if (!credits.ok) return refuse("Fees and payment", credits.error);
     content = { ...content, adjustments: credits.value };
+  }
+
+  // The engagement letter: the switch decides, and a save refreshes the copy from the firm's CURRENT approved version (or removes it).
+  if (deps.approvedLetter) {
+    const currentlyOn = !!current.content.loe;
+    const wanted = wantedFromForm(form, currentlyOn);
+    const read = await deps.approvedLetter(isGeneralContent(current.content) ? "general" : "trademark");
+    if (read.status === "ok") content = withLoeSnapshot(content, read.letter, wanted);
+    else if (read.status === "unavailable" && wanted !== currentlyOn) return { ok: false, error: LETTER_SWITCH_UNREADABLE };
+    // not-set-up, or unreadable with the switch unchanged: the copy stays exactly as it was (create-link re-checks it).
   }
 
   const { clientName, clientEmail, title, expiresOn, payUrl } = details.value;

@@ -82,8 +82,9 @@ describe("paidStateFromEvents", () => {
 });
 
 describe("step vocabulary", () => {
-  it("has eight steps, one success word each, and stepPayload builds the payload", () => {
-    expect(PROPOSAL_STEPS).toHaveLength(8);
+  it("has nine steps (Sprint 6 added signed_loe_upload), one success word each, and stepPayload builds the payload", () => {
+    expect(PROPOSAL_STEPS).toHaveLength(9);
+    expect(STEP_SUCCESS.signed_loe_upload).toBe("uploaded");
     for (const s of PROPOSAL_STEPS) expect(typeof STEP_SUCCESS[s]).toBe("string");
     expect(NON_SUCCESS_OUTCOMES).toEqual(["blocked", "failed", "skipped"]);
     expect(stepPayload("loe_draft", "queued", null, { queue_item_id: "q1" })).toEqual({ queue_item_id: "q1", step: "loe_draft", outcome: "queued" });
@@ -96,8 +97,8 @@ describe("step vocabulary", () => {
     for (const bad of [null, undefined, 3, "s", [], {}, { step: "loe_draft" }, { step: "x", outcome: "y" }, { step: "loe_draft", outcome: "" }]) expect(readStep(bad)).toBeNull();
   });
 
-  it("isRetryableStep names the five steps the page can run again", () => {
-    for (const s of ["loe_draft", "accepted_file_upload", "custom_fields", "lawmatics_note", "loe_file_upload"]) expect(isRetryableStep(s)).toBe(true);
+  it("isRetryableStep names the six steps the page can run again (Sprint 6 added signed_loe_upload)", () => {
+    for (const s of ["loe_draft", "accepted_file_upload", "custom_fields", "lawmatics_note", "loe_file_upload", "signed_loe_upload"]) expect(isRetryableStep(s)).toBe(true);
     for (const s of ["paid_marked", "paid_undone", "accept_notice", "x", null]) expect(isRetryableStep(s)).toBe(false);
   });
 
