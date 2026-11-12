@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { sevetri } from "../proposals/fixture";
 
-/** The expiry date is saved by the package form (savePricingAction); the client save never clears it. */
+/** Sprint 1: the expiry date is saved by the one Save (saveDraftAction) from the Fees and payment section; a form that does not carry it leaves the stored one alone. */
 
 describe("expiry date saves", () => {
   beforeEach(() => vi.resetModules());
@@ -13,6 +13,7 @@ describe("expiry date saves", () => {
     vi.doMock("@/app/dashboard/proposals/gate", () => ({ gateStaffAction: vi.fn(async () => null) }));
     vi.doMock("@/lib/proposals/store", () => ({
       getProposal: vi.fn(async () => ({ proposal: { id: "p1", status: "draft", content: sevetri() } })),
+      getProposalSettings: vi.fn(async () => ({ pricing: {} })),
       updateProposal,
     }));
     const mod = await import("../../src/app/dashboard/proposals/[id]/actions");
@@ -24,31 +25,25 @@ describe("expiry date saves", () => {
     return { mod, updateProposal, form };
   }
 
-  const pricing = { package: "Concierge", base: "4950", includedClasses: "1", perClass: "825", secondMarkPct: "0", govPerClass: "350" };
+  const pricing = { fullName: "Ana Ruiz", firstName: "Ana", title: "T", package: "Concierge", base: "4950", includedClasses: "1", perClass: "825", secondMarkPct: "0", govPerClass: "350" };
 
-  it("the package form posts expiresOn and it is saved", async () => {
+  it("the form posts expiresOn and it is saved", async () => {
     const { mod, updateProposal, form } = await setup();
-    const r = await mod.savePricingAction({}, form({ ...pricing, expiresOn: "2026-12-01" }));
+    const r = await mod.saveDraftAction({}, form({ ...pricing, expiresOn: "2026-12-01" }));
     expect(r.saved).toBe(true);
     expect(updateProposal.mock.calls[0][1].expiresOn).toBe("2026-12-01");
   });
 
-  it("a package form without the field leaves the stored expiry alone", async () => {
+  it("a form without the field leaves the stored expiry alone", async () => {
     const { mod, updateProposal, form } = await setup();
-    await mod.savePricingAction({}, form(pricing));
+    await mod.saveDraftAction({}, form(pricing));
     expect("expiresOn" in updateProposal.mock.calls[0][1]).toBe(false);
   });
 
-  it("a bad date on the package form is refused", async () => {
+  it("a bad date is refused", async () => {
     const { mod, updateProposal, form } = await setup();
-    const r = await mod.savePricingAction({}, form({ ...pricing, expiresOn: "2026-02-31" }));
+    const r = await mod.saveDraftAction({}, form({ ...pricing, expiresOn: "2026-02-31" }));
     expect(r.error).toMatch(/Expiry date/);
     expect(updateProposal).not.toHaveBeenCalled();
-  });
-
-  it("the client save does not carry expiresOn, so it cannot clear it", async () => {
-    const { mod, updateProposal, form } = await setup();
-    await mod.saveDetailsAction({}, form({ fullName: "Ana Ruiz", firstName: "Ana", title: "T" }));
-    expect("expiresOn" in updateProposal.mock.calls[0][1]).toBe(false);
   });
 });

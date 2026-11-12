@@ -9,7 +9,7 @@ import { firmCivilDate } from "@/lib/quotes/firm-time";
  * (the package form in the editor, the one builder form on New proposal). Warns, in plain words,
  * when the date is today or earlier.
  */
-export function ExpiryField({ defaultValue, today, disabled }: { defaultValue: string; today?: string; disabled?: boolean }) {
+export function ExpiryField({ defaultValue, today, disabled, id }: { defaultValue: string; today?: string; disabled?: boolean; /** Lets the "Ready to send?" checklist link to the field. */ id?: string }) {
   const [value, setValue] = useState(defaultValue);
   const warning = expiryWarning(value, today ?? firmCivilDate(new Date()));
   return (
@@ -17,6 +17,7 @@ export function ExpiryField({ defaultValue, today, disabled }: { defaultValue: s
       <span className="lx-label">Expiry date</span>
       <input
         className="lx-input"
+        id={id}
         name="expiresOn"
         type="date"
         value={value}

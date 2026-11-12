@@ -1594,3 +1594,26 @@ Display only; `pricing.ts`, `paid.ts` and `paid-view.ts` are untouched.
 - The Mark paid sentence (`MARK_PAID_NOTE`) is the button's title and appears once in the table footer (only when some row has the button).
 - The default segment is "Current" (`PROPOSALS_EVERYTHING_SEGMENT`). Open offers is a KPI-style tile (`lx-card lx-kpi pq-out`).
 - **List-only brand headline:** a row titled "Trademark Proposal" (`DEFAULT_PROPOSAL_TITLE`) with brand names shows the brand names as its headline and "Trademark proposal" first in the sub-line; stored titles never change.
+
+## Sprint 1: Editor: one screen, one Save (no schema)
+The edit page for a draft is five sections in ONE form with ONE Save. Nothing sends; pricing is untouched (`pricing.ts` has no diff).
+- **One action, one write.** `saveDraftAction` -> `runSaveDraft` (`src/lib/proposal-editor/save-draft.ts`, deps injected like `create-link.ts`): `gateStaffAction` first (before any
+  read), a missing `updatedAt` is refused before any read, then the existing parsers (`parseDetails`, `parseName` per brand, `parsePricing`, `parseMessage`, `parseAdjustments`,
+  `parseIncludes`, `applyGeneralForm`) run on the one post and ONE `updateProposal` call carries everything with the `updated_at` fence. A refusal starts with the section and
+  field ("Brand name The Fold: Discount on this brand name: ...") and writes nothing. The per-section save actions are gone; add / remove brand name and link-to-lead stay (they
+  are small forms OUTSIDE the editor form, reached by the `form=` attribute, so forms never nest).
+- **Brand fields are posted as `b.<n>.<field>`** (`brandForm` strips the prefix and hands `parseName` what it always read; `b.<n>.pkgFields=1` is always posted). Sections that
+  can be emptied post a marker (`adjFields`, `incFields`) so removing the last row clears it. A package choice reads the firm's CURRENT list into the proposal (`withPackageSnapshot`);
+  an unreadable list saves nothing. "Use these package options for every brand" (`b.<n>.applyAll`) copies one brand's choice (one package / the client chooses / per mark) to the others on
+  save; a brand with its own price is refused by name.
+- **Save and create link** (`runCreateLink`): when the posted `dirty=1` hint is present it saves first, then approve, then makeLive. A refused save never calls approve. `dirty` is a hint only:
+  with it absent nothing is saved and the server works from the row it re-reads.
+- **One marker.** `UnsavedGuard` holds one page-level state (`unsaved.ts`): typing, and adding or removing a row (`useRows`, the mark and class rows) set it; a good save clears it, a refusal does not.
+  Exactly one "Unsaved changes" element. "Save and create link" is never disabled by it (it shows "Saves first"); "Turn on the link" (a saved version) still waits ("Save your changes first.").
+- **Side column.** `PayBox` (saved prices from `quoteProposal`, "Prices update when you save" only while unsaved), `ReadyChecklist` (`checklist.ts`: the same `validateContent(..., forApproval)` issues, each
+  an `<a href="#pe-f-...">`; `fieldId` / `targetForPath` are the one id map; "Nothing is blocking the link." when empty), then `EditorActions`. DECISION: Preview / Save / Save and create link are ONE element
+  (`EditorActions`), the last card of the sticky column on desktop and the fixed bottom bar under 900px (CSS only, above the phone nav), so a page never has two copies of Save.
+- **Assistant drafts** show `CheckFirstPanel` ("Check these N things": the stored CHECK FIRST notes and call quotes) instead of the old glance card; a person's draft shows no panel. `ProposalCard` stays for other pages.
+- **Engagement letter** is `EngagementLetterSlot`, which renders nothing until Sprint 6 fills it (no heading, no placeholder).
+- Words: `EDITOR_WORDS` / `checkTheseHeading` in `vocabulary.ts` ("Selected to start", "Let the client describe this"); the menu beside the lifecycle buttons is named for what it holds (`moreMenuLabel`: Withdraw, Reset or delete, ...).
+  New proposal still uses `BuilderLayout` and its "More options"; only the editor changed.

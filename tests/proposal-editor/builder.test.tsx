@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { NewProposalForm } from "@/components/proposal-editor/NewProposalForm";
-import { countChangedFields, editorChangedCount, messageInMoreOptions, moreOptionsSummary, pathInMoreOptions, shouldOpenMore } from "@/lib/proposal-editor/more-options";
+import { countChangedFields, messageInMoreOptions, moreOptionsSummary } from "@/lib/proposal-editor/more-options";
 import { packageOption } from "@/lib/proposals/package-list";
 import type { ProposalDetail } from "@/lib/proposals/store";
 import type { ProposalRow } from "@/lib/proposals/types";
@@ -22,26 +22,6 @@ describe("More options: the pure rules", () => {
   it("counts fields that differ from the defaults, trimmed", () => {
     expect(countChangedFields([{ current: "4950", baseline: "4950" }, { current: " 3 ", baseline: "3" }])).toBe(0);
     expect(countChangedFields([{ current: "5000", baseline: "4950" }, { current: "21", baseline: "20" }, { current: "x", baseline: "x" }])).toBe(2);
-  });
-
-  it("the editor's count: 0 at the firm's package, 2 when two numbers differ, and a discount is one more", () => {
-    const base = { pricing: { ...CONCIERGE }, firmPackage: CONCIERGE, adjustments: 0, brandPriceOverrides: 0 };
-    expect(editorChangedCount(base)).toBe(0);
-    expect(editorChangedCount({ ...base, pricing: { ...CONCIERGE, base_cents: 500_000, second_mark_discount_pct: 25 } })).toBe(2);
-    expect(editorChangedCount({ ...base, adjustments: 1 })).toBe(1);
-    expect(editorChangedCount({ ...base, brandPriceOverrides: 1, pricing: { ...CONCIERGE, reduce_under_included: true } })).toBe(2);
-  });
-
-  it("a package that is not on the firm's list has nothing to differ from", () => {
-    expect(editorChangedCount({ pricing: { ...CONCIERGE, package: "Custom" }, firmPackage: null, adjustments: 0, brandPriceOverrides: 0 })).toBe(0);
-  });
-
-  it("a problem on a field inside More options opens it; one on a step field does not", () => {
-    expect(shouldOpenMore(["pricing.second_mark_discount_pct"])).toBe(true);
-    expect(shouldOpenMore(["names[0].marks[1].desc"])).toBe(true);
-    expect(shouldOpenMore(["adjustments[0].label", "client_email"])).toBe(true);
-    expect(shouldOpenMore(["client_email", "pay_url", "pricing.package", "names[0].classes"])).toBe(false);
-    expect(pathInMoreOptions("names[0].marks[0].kind")).toBe(false);
   });
 
   it("a refusal sentence is placed by its label", () => {
@@ -156,57 +136,42 @@ async function renderEditor(proposal: ProposalRow, extra: { lead?: unknown; sett
   return renderToStaticMarkup(createElement("div", null, await Page({ params: Promise.resolve({ id: ID }) })));
 }
 
-describe("the proposal editor: three steps, the button, then one closed More options", () => {
+describe("the proposal editor: five sections, one Save (Sprint 1)", () => {
   beforeEach(() => vi.resetModules());
 
-  it("the DOM order is the three steps, then Save and create link, then More options", async () => {
+  it("the DOM order is Who, What we're protecting, Fees and payment, Message; no More options", async () => {
     const html = await renderEditor(row());
-    const order = [at(html, "Who</span>"), at(html, "Brand names and classes</span>"), at(html, "Package and pay link</span>"), at(html, "Save and create link"), at(html, 'class="pe-more"')];
+    const order = [at(html, 'id="pe-sec-who"'), at(html, 'id="pe-sec-brands"'), at(html, 'id="pe-sec-fees"'), at(html, 'id="pe-sec-message"')];
     expect([...order].sort((a, b) => a - b)).toEqual(order);
-    expect(html.match(/<details class="pe-more"/g)).toHaveLength(1);
-    expect(html).not.toMatch(/<details class="pe-more"[^>]* open/);
-    expect(html).toContain("More options</summary>");
+    expect(html).not.toContain("More options");
+    expect(html).not.toContain("pe-more-sum");
   });
 
-  it("every field the editor had before still renders, with the same names", async () => {
+  it("every field the editor had before still renders (brand fields under b.<n>.), in the form that saves them all", async () => {
     const html = await renderEditor(row());
     const names = namesOf(html);
     const before = [
       "fullName", "firstName", "company", "clientEmail", "title", "expiresOn", "payUrl",
       "greeting", "recommendation", "officeActionNote",
       "package", "base", "includedClasses", "perClass", "secondMarkPct", "govPerClass",
-      "name", "what", "note", "overrideBase", "overridePerClass",
-      "mark.0.id", "mark.0.kind", "mark.0.desc", "mark.0.preselected", "class.0.id", "class.0.label", "class.0.preselected",
+      "b.0.name", "b.0.what", "b.0.note", "b.0.overrideBase", "b.0.overridePerClass", "b.0.nameId",
+      "b.0.mark.0.id", "b.0.mark.0.kind", "b.0.mark.0.desc", "b.0.mark.0.preselected", "b.0.class.0.id", "b.0.class.0.label", "b.0.class.0.preselected",
+      "b.0.discountPct", "b.0.clientAddMax", "adjFields", "incFields",
     ];
     for (const n of before) expect(names, n).toContain(n);
     expect([...names].some((n) => n.startsWith("inc."))).toBe(true);
     expect(names.has("reduceUnderIncluded")).toBe(true);
-    // the rarely-changed ones are inside More options, the step ones are not
-    const more = html.slice(at(html, 'class="pe-more"'));
-    for (const n of ["firstName", "company", "title", "base", "secondMarkPct", "greeting", "recommendation", "officeActionNote", "what", "note", "overrideBase", "mark.0.desc"]) expect(namesOf(more), n).toContain(n);
-    const steps = html.slice(0, at(html, 'class="pe-more"'));
-    for (const n of ["fullName", "clientEmail", "package", "payUrl", "expiresOn", "class.0.label"]) expect(namesOf(steps), n).toContain(n);
   });
 
-  it("More options fields belong to their step's form through the form attribute", async () => {
+  it("the pay link and the expiry date sit together in Fees and payment", async () => {
     const html = await renderEditor(row());
-    expect(html).toContain(`id="pe-details-${ID}"`);
-    expect(html).toContain(`id="pe-pricing-${ID}"`);
-    expect(html).toMatch(new RegExp(`<input[^>]*name="title"[^>]*form="pe-details-${ID}"|<input[^>]*form="pe-details-${ID}"[^>]*name="title"`));
-    expect(html).toMatch(new RegExp(`name="secondMarkPct"[^>]*form="pe-pricing-${ID}"|form="pe-pricing-${ID}"[^>]*name="secondMarkPct"`));
+    const fees = html.slice(at(html, 'id="pe-sec-fees"'), at(html, 'id="pe-sec-message"'));
+    expect(fees).toContain('name="expiresOn"');
+    expect(fees).toContain('value="2026-11-10"');
+    expect(fees.indexOf('name="payUrl"')).toBeLessThan(fees.indexOf('name="expiresOn"'));
   });
 
-  it("the expiry date belongs to the package form, beside the pay link, and is not in More options", async () => {
-    const html = await renderEditor(row());
-    const more = html.slice(at(html, 'class="pe-more"'));
-    expect(namesOf(more)).not.toContain("expiresOn");
-    const pkg = html.slice(at(html, `id="pe-pricing-${ID}"`), at(html, 'class="pe-more"'));
-    expect(pkg).toContain('name="expiresOn"');
-    expect(pkg).toContain('value="2026-11-10"');
-    expect(pkg.indexOf('name="payUrl"')).toBeLessThan(pkg.indexOf('name="expiresOn"'));
-  });
-
-  it("a stored non-default value inside More options is still in the markup", async () => {
+  it("a stored non-default value inside Advanced is still in the markup", async () => {
     const c = sevetri();
     c.pricing = { ...c.pricing, second_mark_discount_pct: 17.5, reduce_under_included: true };
     c.adjustments = [{ id: "a1", label: "Event credit", kind: "amount", value: 15_000 }];
@@ -216,22 +181,6 @@ describe("the proposal editor: three steps, the button, then one closed More opt
     expect(html).toContain('value="Event credit"');
     expect(html).toContain('value="4500.00"');
     expect(html).toMatch(/name="reduceUnderIncluded"[^>]*checked|checked[^>]*name="reduceUnderIncluded"/);
-  });
-
-  it("counts what differs from the firm's package, and is closed when nothing is wrong", async () => {
-    const settings = { pricing: { packages: [CONCIERGE] }, approver_user_ids: [] };
-    const c = sevetri();
-    c.pricing = { ...c.pricing, second_mark_discount_pct: 25 };
-    c.adjustments = [{ id: "a1", label: "Credit", kind: "amount", value: 15_000 }];
-    const html = await renderEditor(row({ content: c }), { settings });
-    expect(html).toContain("More options - 2 changed</summary>");
-  });
-
-  it("opens More options when a problem is inside it (second-mark percent out of range)", async () => {
-    const c = sevetri();
-    c.pricing = { ...c.pricing, second_mark_discount_pct: 150 };
-    const html = await renderEditor(row({ content: c }));
-    expect(html).toMatch(/<details class="pe-more" open="">/);
   });
 
   it("the custom-package switch is labelled with the per-class amount and shows both prices", async () => {
@@ -279,8 +228,8 @@ describe("the editor's class rows: one class is always included", () => {
     c.names[0].classes = [c.names[0].classes[0]];
     const html = await renderEditor(row({ content: c }));
     expect(html).toContain('<span class="pe-lock">Included</span>');
-    expect(html).toContain('<input type="hidden" name="class.0.preselected" value="on"/>');
-    expect(html).toMatch(/<input type="checkbox" (?:checked="" disabled=""|disabled="" checked="")\/><span>Starts ticked<\/span><span class="pe-lock">Included/);
+    expect(html).toContain('<input type="hidden" name="b.0.class.0.preselected" value="on"/>');
+    expect(html).toMatch(/<input type="checkbox" (?:checked="" disabled=""|disabled="" checked="")\/><span>Selected to start<\/span><span class="pe-lock">Included/);
   });
 
   it("with several classes and one left ticked, that one says 'At least one class is included'", async () => {

@@ -1,9 +1,7 @@
 "use client";
 
-import { startTransition, useActionState, useEffect, type FormEvent, type ReactNode } from "react";
+import { startTransition, useActionState, type FormEvent, type ReactNode } from "react";
 import type { ActionState } from "@/app/dashboard/proposals/errors";
-import { FIRST_PROBLEM_ID } from "@/lib/proposal-editor/issues";
-import { useFormDirty, useUnsaved } from "./UnsavedGuard";
 
 /** A validation problem as the editor shows it: plain words, no path. */
 export type ShownIssue = { level: "error" | "warning"; message: string; where: string; /** The one "Go to first problem" lands on. */ anchor?: boolean };
@@ -29,25 +27,16 @@ export function ActionForm({
   confirm,
   className,
   id,
-  unsavedLabel,
 }: {
   action: Action;
   children: (s: { state: ActionState; pending: boolean }) => ReactNode;
   /** A question to ask before submitting (withdraw, remove). */
   confirm?: string;
   className?: string;
-  /** Lets fields placed elsewhere on the page (More options) belong to this form through their `form` attribute. */
+  /** Lets controls placed elsewhere on the page belong to this form through their `form` attribute. */
   id?: string;
-  /** Words for this form in "Save your changes to ... first." Needs an `id`; the form is then tracked for unsaved changes. */
-  unsavedLabel?: string;
 }) {
   const [state, dispatch, pending] = useActionState<ActionState, FormData>(action, {});
-  const { markClean } = useUnsaved();
-
-  // A successful save makes the form clean again (a refusal leaves it unsaved).
-  useEffect(() => {
-    if (id && unsavedLabel && state.saved && !state.error) markClean(id);
-  }, [state, id, unsavedLabel, markClean]);
 
   function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -58,7 +47,7 @@ export function ActionForm({
   }
 
   return (
-    <form id={id} onSubmit={onSubmit} className={className} data-unsaved-label={id && unsavedLabel ? unsavedLabel : undefined}>
+    <form id={id} onSubmit={onSubmit} className={className}>
       {children({ state, pending })}
     </form>
   );
@@ -99,42 +88,12 @@ export function IssueList({ issues }: { issues: ShownIssue[] }) {
   return (
     <ul className="pe-issues" aria-label="Problems in this section">
       {sorted.map((i, n) => (
-        <li key={n} data-level={i.level} id={i.anchor ? FIRST_PROBLEM_ID : undefined}>
+        <li key={n} data-level={i.level}>
           <span className="pe-issue-tag">{i.level === "error" ? "Fix" : "Check"}</span>
           {i.where && <span className="pe-issue-where">{i.where}: </span>}
           {i.message}
         </li>
       ))}
     </ul>
-  );
-}
-
-/** Save button + outcome, hidden entirely when the section is read-only. */
-export function SaveRow({
-  editable,
-  state,
-  pending,
-  label = "Save",
-  formId,
-  children,
-}: {
-  editable: boolean;
-  state: ActionState;
-  pending: boolean;
-  label?: string;
-  /** The form this row saves; while it has unsaved changes the button takes the primary style. */
-  formId?: string;
-  children?: ReactNode;
-}) {
-  const dirty = useFormDirty(formId);
-  if (!editable) return null;
-  return (
-    <div className="pe-save">
-      <button type="submit" className={`lx-btn ${dirty ? "lx-btn-pri" : "lx-btn-sec"} lx-btn-sm`} disabled={pending}>
-        {pending ? "Saving…" : label}
-      </button>
-      {children}
-      <Outcome state={state} pending={pending} />
-    </div>
   );
 }

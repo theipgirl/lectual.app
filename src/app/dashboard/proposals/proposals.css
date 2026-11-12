@@ -462,3 +462,63 @@ td.pq-mono { font-family: var(--mono); }
 .pe-link { flex: 1 1 100%; }
 /* "Let the client add classes" no longer sits against the class rows above it. */
 .pe-client-add { margin-top: 10px; }
+
+/* ============================================================
+   ONE-SCREEN EDITOR (Sprint 1): five sections, one Save.
+   The brand cards, the Advanced sections, the side column's
+   checklist and the one actions card. Tokens only.
+   ============================================================ */
+.pe-draft-form { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.pe-brands { display: flex; flex-direction: column; gap: 14px; }
+.pe-brand { background: var(--well); }
+.pe-brand-forms { display: block; }
+.pe-brand-forms form { display: block; }
+.pe-brand-forms .pe-msg { margin: 4px 0 0; }
+.pe-add-name { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
+.pe-adv { border: 1px solid var(--line-2); border-radius: 10px; padding: 0; }
+.pe-adv-sum { cursor: pointer; padding: 10px 14px; font-weight: 600; color: var(--ink); font-size: 14px; }
+.pe-adv-body { display: grid; gap: 12px; padding: 4px 14px 14px; }
+.pe-adv-sum:focus-visible { outline: 2px solid var(--ox); outline-offset: 2px; border-radius: 8px; }
+.pe-pkg-for { display: grid; gap: 8px; }
+.pe-pkg-modes { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.pe-mark-pkg { grid-column: 1 / -1; padding: 8px 0 0 12px; border-left: 2px solid var(--line-2); }
+.pe-apply-all { font-size: 14px; }
+.pe-unsaved { align-self: flex-start; }
+
+/* checklist */
+.pe-ready { display: grid; gap: 8px; }
+.pe-ready-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.pe-ready-list li { border-radius: 8px; border: 1px solid transparent; font-size: 14px; line-height: 1.4; }
+.pe-ready-list li[data-level="error"] { background: color-mix(in srgb, var(--wine) 8%, transparent); border-color: color-mix(in srgb, var(--wine) 22%, transparent); }
+.pe-ready-list li[data-level="warning"] { background: color-mix(in srgb, var(--warn) 10%, transparent); border-color: color-mix(in srgb, var(--warn) 20%, transparent); }
+.pe-ready-link { display: block; padding: 8px 10px; color: var(--ink); text-decoration: none; border-radius: 8px; }
+.pe-ready-link:hover { text-decoration: underline; }
+.pe-ready-link:focus-visible { outline: 2px solid var(--ox); outline-offset: 2px; }
+.pe-ready-ok { color: var(--ok); }
+.pe-price-note { margin: 0; }
+
+/* assistant draft: things to check */
+.pe-check-first { padding: 14px 18px; display: grid; gap: 8px; border-color: color-mix(in srgb, var(--warn) 30%, transparent); }
+.pe-check-list { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; line-height: 1.45; }
+
+/* the one actions card: last card of the sticky side column; the fixed bottom bar on phones */
+.pe-actions { display: grid; gap: 8px; padding: 12px 14px; }
+.pe-actions-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pe-actions-row .lx-btn { flex: 1 1 auto; justify-content: center; text-align: center; }
+.pe-actions .pe-msg, .pe-actions .lx-note { margin: 0; }
+.pe-actions .lx-btn:focus-visible { outline: 2px solid var(--ox); outline-offset: 2px; }
+@media (max-width: 900px) {
+  .pe-page { padding-bottom: 170px; }
+  .pe-actions {
+    position: fixed; left: 10px; right: 10px; bottom: 84px; z-index: 60;
+    box-shadow: 0 18px 50px -24px var(--ink);
+    max-height: 40vh; overflow: auto;
+  }
+  .pe-actions-row { flex-wrap: nowrap; }
+  .pe-actions-row .lx-btn { min-width: 0; padding-left: 8px; padding-right: 8px; font-size: 14px; }
+}
+@media (max-width: 640px) {
+  .pe-mark-pkg { padding-left: 8px; }
+}
+.pe-brand .pe-class-row { grid-template-columns: minmax(0, 1fr) auto auto auto; }
+@media (max-width: 760px) { .pe-brand .pe-class-row { grid-template-columns: minmax(0, 1fr) auto; } }

@@ -1,19 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
-vi.mock("@/app/dashboard/proposals/[id]/actions", () => ({
-  addNameAction: vi.fn(),
-  removeNameAction: vi.fn(),
-  saveAdjustmentsAction: vi.fn(),
-  saveDetailsAction: vi.fn(),
-  saveIncludesAction: vi.fn(),
-  saveMessageAction: vi.fn(),
-  saveNameAction: vi.fn(),
-  savePricingAction: vi.fn(),
-}));
+vi.mock("@/app/dashboard/proposals/[id]/actions", () => ({ addNameAction: vi.fn(), removeNameAction: vi.fn() }));
 
 import { NameCard, NameRowsProvider, type NameValues } from "@/components/proposal-editor/Sections";
 import { parseName } from "@/lib/proposal-editor/form";
+import { brandForm } from "@/lib/proposal-editor/save-draft";
 import { DEFAULT_CLIENT_ENTRY_PROMPT } from "@/lib/proposals/client-classes";
 import { sevetri } from "../proposals/fixture";
 
@@ -36,7 +28,7 @@ const VALUE: NameValues = {
 function render(value: NameValues = VALUE) {
   return renderToStaticMarkup(
     <NameRowsProvider names={[value]}>
-      <NameCard proposalId="prop-1" updatedAt="t" editable issues={[]} value={value} packageName="Essential" />
+      <NameCard index={0} editable issues={[]} value={value} packageName="Essential" firmPackages={["Essential", "Concierge"]} brandCount={1} />
     </NameRowsProvider>,
   );
 }
@@ -53,17 +45,18 @@ function postedForm(html: string): FormData {
     const value = isBox ? "on" : (/value="([^"]*)"/.exec(attrs)?.[1] ?? "");
     f.append(name, value);
   }
-  return f;
+  // The editor posts every brand under `b.<n>.`; the save strips the prefix and hands the brand parser what it always read.
+  return brandForm(f, 0);
 }
 
-describe("editor: Client describes this class / Let the client add classes", () => {
-  it("draws a 'Client describes this class' box per class, checked for an open one, and the add-classes number", () => {
+describe("editor: Let the client describe this / Let the client add classes", () => {
+  it("draws a 'Let the client describe this' box per class, checked for an open one, and the add-classes number", () => {
     const html = render();
-    expect(html.match(/<span>Client describes this class<\/span>/g)?.length).toBe(2);
-    expect(html).toMatch(/<input type="checkbox" name="class\.1\.clientEntry" checked=""\/>/);
-    expect(html).toMatch(/<input type="checkbox" name="class\.0\.clientEntry"\/>/);
+    expect(html.match(/<span>Let the client describe this<\/span>/g)?.length).toBe(2);
+    expect(html).toMatch(/<input type="checkbox" name="b\.0\.class\.1\.clientEntry" checked=""\/>/);
+    expect(html).toMatch(/<input type="checkbox" name="b\.0\.class\.0\.clientEntry"\/>/);
     expect(html).toContain('aria-label="Question the client answers"');
-    const tag = /<input[^>]*name="clientAddMax"[^>]*>/.exec(html)?.[0] ?? "";
+    const tag = /<input[^>]*name="b.0.clientAddMax"[^>]*>/.exec(html)?.[0] ?? "";
     expect(tag).toContain('type="number"');
     expect(tag).toContain('min="0"');
     expect(tag).toContain('max="10"');
@@ -75,8 +68,6 @@ describe("editor: Client describes this class / Let the client add classes", () 
   it("round-trips: what the card posts parses back to the same open class and client_add", () => {
     const content = sevetri();
     const form = postedForm(render());
-    form.set("nameId", "p");
-    form.set("name", "Prosperall");
     form.set("mark.0.kind", "word"); // a <select>, which the input scan above does not read
     const r = parseName(form, content, () => "x");
     if (!r.ok) throw new Error(r.error);
@@ -90,11 +81,9 @@ describe("editor: Client describes this class / Let the client add classes", () 
   it("the default: no open class and a blank number post no client_add (5, or none on a fixed offer)", () => {
     const value: NameValues = { ...VALUE, classes: [{ id: "p-c1", label: "Software", preselected: true }], clientAddMax: "" };
     const html = render(value);
-    expect(html).toMatch(/<input[^>]*name="clientAddMax"[^>]*value=""/);
+    expect(html).toMatch(/<input[^>]*name="b.0.clientAddMax"[^>]*value=""/);
     expect(html).toContain("Blank is the default: up to 5");
     const form = postedForm(html);
-    form.set("nameId", "p");
-    form.set("name", "Prosperall");
     form.set("mark.0.kind", "word"); // a <select>, which the input scan above does not read
     const r = parseName(form, sevetri(), () => "x");
     if (!r.ok) throw new Error(r.error);
