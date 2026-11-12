@@ -1,16 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Stage } from "@/lib/pipeline";
 import type { MemberIdentity } from "@/lib/members/directory";
 import type { ReferralSource } from "@/lib/intake";
 import { effectiveTemperature } from "@/lib/intake/effective-temperature";
 import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
-import { approvalsShown, filterNeedsRebecca, leadsNeedingApproval } from "@/lib/intake/needs-rebecca";
+import { approvalsShown, filterNeedsRebecca } from "@/lib/intake/needs-rebecca";
 import {
   EMPTY_INTAKE_FILTERS,
   applyFilters,
+  filtersToQueryString,
   intakeHref,
   naturalDir,
   sortRows,
@@ -20,20 +22,39 @@ import {
   type IntakeViewState,
   type SortKey,
 } from "@/lib/intake/rows";
-import { leadsSubline, topBarCounts } from "@/lib/intake/views";
+import { stageLabelFor } from "@/lib/intake/views";
 import { detailsNote } from "@/lib/intake/details-note";
+import { chipCountsWithin, leadsHeaderLine, ownerColumnShown } from "@/lib/intake/leads-view";
+import { SET_LABEL, allOpenData, drawnSet, leavesSet, rowsInSet, setChips, type LostRead, type SetData } from "@/lib/intake/sets";
+import { isPastFirstContact, type LeadSet } from "@/lib/intake/working";
+import type { DuplicateOf } from "@/lib/intake/duplicates";
+import { SHOW_STEP, nextShow, pageSlice } from "@/lib/intake/paging";
+import { inPipelineOrder } from "@/lib/pipeline/stage-order";
+import { moveTargetStages } from "@/lib/intake/board-columns";
+import { boardModel } from "@/lib/intake/board-columns";
+import { hiddenSelectedCount, movableIds, selectShown, selectionKey } from "@/lib/intake/selection";
 import type { IntakeTime } from "@/lib/time";
 import { ListHeader } from "@/components/list-page/ListHeader";
 import { ListToolbar } from "@/components/list-page/ListToolbar";
 import { MoreMenu } from "@/components/list-page/MoreMenu";
 import { leadsMoreItems } from "@/lib/intake/more-items";
 import "@/components/list-page/list-page.css";
-import { LEADS_NAME } from "@/lib/ui/words";
+import "../leads.css";
+import {
+  LEADS_ASSIGNED_TO,
+  LEADS_LOST_CUT,
+  LEADS_LOST_UNAVAILABLE,
+  LEADS_MOVED_TO,
+  LEADS_NAME,
+  LEADS_NO_MATCH_IN_SET,
+  LEADS_SELECT,
+  LEADS_SET_EMPTY,
+  LEADS_WORKING_UNAVAILABLE,
+  NO_LEADS_YET,
+} from "@/lib/ui/words";
 import { ViewToggle } from "@/components/ViewToggle";
 import { assignLeadAction, bulkMoveStageAction, moveStageAction, setLaneAction, setSourceAction } from "../actions";
-import { BULK_MOVE_MAX, bulkMoveSummary } from "@/lib/pipeline/bulk-move";
-import { decisionOpen } from "@/lib/intake/stage-decision";
-import { stageCodeFor, stageLabelFor } from "@/lib/intake/views";
+import { bulkMoveSummary } from "@/lib/pipeline/bulk-move";
 import type { Lane } from "@/lib/leads/lane";
 import AddLeadDialog from "./AddLeadDialog";
 import BulkMoveBar from "./BulkMoveBar";
@@ -45,25 +66,21 @@ import IntakeTable from "./IntakeTable";
 const URL_SYNC_DELAY_MS = 300;
 
 /**
- * Client orchestrator for /intake (blueprint §11) — three views of one list.
+ * Client orchestrator for /dashboard/intake: the filters, the set (Working, Event contacts, ...), the view and grouping,
+ * the sort and the paging (all mirrored into the URL by history.replaceState, so every state is a link), and the
+ * optimistic write flow the temperature pill, the "…" menu and both board drops share.
  *
- * Owns four things and nothing else: the filters, the view/grouping and the sort
- * (all mirrored into the URL so `?source=UGW`, `?view=board&group=owner` and
- * `?sort=lead&dir=asc` are bookmarkable Monday views), and the optimistic write
- * flow the temperature chip, the owner menu and both board drops share.
+ * Presentation only: every row was fetched and RLS-scoped by the server page, and every write goes back through a server
+ * action that re-checks the caller's role. A refused write reverts the optimistic change and prints the action's message.
  *
- * Presentation only — every row it renders was fetched and RLS-scoped by the
- * server component, and every write goes back through a server action that
- * re-checks the caller's role on every call. A refused write reverts the
- * optimistic change and prints the action's friendly message on that row,
- * rather than leaving the screen claiming something that didn't happen.
- *
- * The status counts ride in the header's sub-line, which is page data, so the header lives here too.
+ * Set membership is computed on the server and FROZEN for the life of the page: a lead moved here stays in the set it was
+ * in (and, on the board, is pinned at the top of its new column and announced) until the page is reloaded.
  */
 export default function IntakeWorkspace({
   rows: initialRows,
   stages,
   intakeStages,
+  lostStages = [],
   members,
   initialFilters,
   initialViewState,
@@ -72,47 +89,44 @@ export default function IntakeWorkspace({
   showReconcile = false,
   agentMoves,
   stageDecisions,
+  setData: setDataProp,
+  lost = { status: "none" },
+  lostView = false,
+  lostFailed = false,
+  lostCut = null,
+  notesUnavailable = false,
+  duplicates = {},
+  nurtureUnavailable = false,
   now: nowIso,
 }: {
+  /** The rows of the server's set: the intake list, or the lost leads when `lostView`. */
   rows: IntakeRow[];
-  /** Every stage the firm has — the temperature derivation reads the full set. */
   stages: Stage[];
-  /** Just the intake ones, in order — the board columns and the stage filter. */
   intakeStages: Stage[];
+  lostStages?: Stage[];
   members: MemberIdentity[];
   initialFilters: IntakeFilters;
   initialViewState: IntakeViewState;
-  /**
-   * This week's time per lead plus the caller's running timer (§13.1). A
-   * pass-through prop, never state: a router.refresh() after a start/stop has
-   * to reach the chips, and `rows` is deliberately seeded once and owned by the
-   * optimistic write path from then on. Null means the time read FAILED — the
-   * chips then show an em dash rather than a confident "0m".
-   */
+  /** This week's time per lead plus the caller's running timer. Null: the time read FAILED. */
   time: IntakeTime | null;
-  /**
-   * Drafts waiting in the approval queue, by lead. OPTIONAL and a pass-through
-   * prop like `time`: absent renders nothing at all (not "zero"), `unavailable`
-   * renders a notice, and only `ok` badges rows and enables the filter. See
-   * src/lib/intake/needs-rebecca.ts.
-   */
   pendingApprovals?: LeadPendingApprovals;
-  /** Owner, admin and senior admin only: a link to the stage reconciliation screen. */
   showReconcile?: boolean;
-  /**
-   * Whether the Stage Keeper's recent moves were read. `ok`: rows carry their chips and the "Agent
-   * moves" filter is offered. `unavailable`: no chip, the filter is neither offered nor applied (an
-   * unreadable list must never filter to "no leads"), and a one-line note says so. Absent: the same
-   * as unavailable, without the note.
-   */
   agentMoves?: { status: "ok"; truncated: boolean } | { status: "unavailable" };
-  /**
-   * Whether the Lawmatics-import stage flags were read. `ok`: rows carry their flag, the "Needs a stage decision"
-   * filter and the column badges are offered. `unavailable`: none of that is drawn or applied (an unreadable list must
-   * never filter to "no leads") and a one-line note says so. Absent: the same, without the note.
-   */
   stageDecisions?: { status: "ok"; truncated: boolean } | { status: "unavailable" };
-  /** The server's render clock, so "Next step" says the same thing on both sides. */
+  /** The sets (see sets.ts). Absent: every lead in the list is shown as All open and no note is drawn. */
+  setData?: SetData;
+  lost?: LostRead;
+  lostView?: boolean;
+  /** The Lost set was chosen and its read failed. */
+  lostFailed?: boolean;
+  /** The lost list is cut at its cap: how many are shown of how many exist. */
+  lostCut?: { shown: number; total: number } | null;
+  /** The latest-notes read failed: Next step says so instead of "No activity yet". */
+  notesUnavailable?: boolean;
+  /** Possible duplicates among the loaded open leads, by lead id (see duplicates.ts). */
+  duplicates?: Record<string, DuplicateOf>;
+  /** The nurture read failed: the Nurture chip has no number and the board says so (never an empty nurture column). */
+  nurtureUnavailable?: boolean;
   now: string;
 }) {
   const [rows, setRows] = useState(initialRows);
@@ -120,36 +134,30 @@ export default function IntakeWorkspace({
   const [viewState, setViewState] = useState(initialViewState);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [announce, setAnnounce] = useState("");
+  const [pinned, setPinned] = useState<string[]>([]);
+  const [colExtra, setColExtra] = useState<Record<string, number>>({});
+  const [showEmpty, setShowEmpty] = useState(false);
   const [, startTransition] = useTransition();
 
   const now = useMemo(() => new Date(nowIso), [nowIso]);
-  // A bookmarked `needs=rebecca` is ignored while the queue isn't readable, and
-  // its chip is hidden then, so it stays out of the URL (and "Save this view")
-  // rather than riding along as a filter nobody can see or turn off.
+  const setData = useMemo(() => setDataProp ?? allOpenData(initialRows, stages), [setDataProp, initialRows, stages]);
   const agentAvailable = agentMoves?.status === "ok";
   const decisionAvailable = stageDecisions?.status === "ok";
+  const drawn: LeadSet = lostView ? "lost" : drawnSet(setData, viewState.set);
+  const board = viewState.view === "board";
+
   const href = intakeHref(
     {
       ...(approvalsShown(pendingApprovals) ? filters : { ...filters, needsRebecca: false }),
       agent: agentAvailable ? filters.agent : null,
       decision: decisionAvailable ? filters.decision : undefined,
     },
+    // The set the person CHOSE, not the one drawn: while the All-open fallback shows, the URL must not lock `set=open` in.
     viewState,
   );
 
-  // The URL is a mirror of the state, never its source after first render:
-  // filtering happens locally against rows already in the browser, and the
-  // rewrite exists so the view can be bookmarked, shared, or reloaded.
-  // Debounced so the search box doesn't rewrite the URL once per keystroke.
-  //
-  // history.replaceState, NOT router.replace: this page is force-dynamic, so a
-  // router navigation re-runs the server component — listStages, the intake
-  // read, the member directory and a 180-day activity sweep, four Supabase
-  // round trips — every time someone pauses while typing in Search. And the
-  // rows that came back would be thrown away, because `rows` is seeded from
-  // the prop once and owned by the optimistic write path from then on. A
-  // search-param-only rewrite is exactly what the App Router documents
-  // history.replaceState for; it leaves the RSC payload alone.
+  // The URL mirrors the state (history.replaceState, not a router push: the page re-reads a dozen things on a navigation).
   const firstRender = useRef(true);
   useEffect(() => {
     if (firstRender.current) {
@@ -160,92 +168,117 @@ export default function IntakeWorkspace({
     return () => clearTimeout(timer);
   }, [href]);
 
-  const filtered = useMemo(
-    // The agent filter is only applied when the moves were read: otherwise every row would lack a
-    // chip and the list would filter to nobody.
-    () =>
-      filterNeedsRebecca(
-        applyFilters(rows, { ...filters, agent: agentAvailable ? filters.agent : null, decision: decisionAvailable ? filters.decision : undefined }),
+  // Anything that changes WHAT is shown puts the page back to the first 25 and clears the ticks.
+  const showKey = JSON.stringify([drawn, filtersToQueryString(filters), viewState.view, viewState.group, viewState.sort]);
+  const [seenShowKey, setSeenShowKey] = useState(showKey);
+  const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
+  const [selecting, setSelecting] = useState(false);
+  const [bulkPending, setBulkPending] = useState(false);
+  const [bulkMessage, setBulkMessage] = useState<{ tone: "ok" | "warn" | "error"; text: string } | null>(null);
+  const selKey = selectionKey({ set: drawn, query: filtersToQueryString(filters), show: viewState.show, view: viewState.view, group: viewState.group });
+  const [seenSelKey, setSeenSelKey] = useState(selKey);
+  if (seenShowKey !== showKey) {
+    setSeenShowKey(showKey);
+    if (viewState.show !== SHOW_STEP) setViewState((s) => ({ ...s, show: SHOW_STEP }));
+    setColExtra({});
+  }
+  if (seenSelKey !== selKey) {
+    setSeenSelKey(selKey);
+    if (selected.size > 0) setSelected(new Set());
+    setBulkMessage(null);
+  }
+
+  const inSetRows = useMemo(() => rowsInSet(rows, setData, drawn), [rows, setData, drawn]);
+  const chipCounts = useMemo(
+    () => chipCountsWithin(inSetRows, { approvals: pendingApprovals, decisionsRead: decisionAvailable, agentRead: agentAvailable, duplicates }),
+    [inSetRows, pendingApprovals, decisionAvailable, agentAvailable, duplicates],
+  );
+  const applyAll = useCallback(
+    (list: IntakeRow[]) => {
+      const kept = filterNeedsRebecca(
+        applyFilters(list, { ...filters, agent: agentAvailable ? filters.agent : null, decision: decisionAvailable ? filters.decision : undefined }),
         pendingApprovals,
         filters.needsRebecca,
-      ),
-    [rows, filters, pendingApprovals, agentAvailable, decisionAvailable],
+      );
+      return filters.dup ? kept.filter((r) => !!duplicates[r.lead.id]) : kept;
+    },
+    [filters, pendingApprovals, agentAvailable, decisionAvailable, duplicates],
   );
-  // Leads still waiting for a stage decision, over the whole list (like the agent counts), only when the flags were read.
-  const decisionCount = useMemo(
-    () => (decisionAvailable ? rows.filter((row) => decisionOpen(row.decision, row.lead.current_stage_id)).length : null),
-    [rows, decisionAvailable],
-  );
-  const agentMoveCounts = useMemo(
-    () => (agentAvailable ? { today: rows.filter((row) => row.agentMove?.today).length, week: rows.filter((row) => row.agentMove).length } : null),
-    [rows, agentAvailable],
-  );
-  // The toggle is offered only when the queue was actually read; the count is
-  // over leads in this list, not queue rows for leads that aren't in intake.
-  const needsRebeccaCount = useMemo(() => {
-    if (!approvalsShown(pendingApprovals)) return null;
-    const needing = leadsNeedingApproval(pendingApprovals);
-    return rows.filter((row) => needing.has(row.lead.id)).length;
-  }, [rows, pendingApprovals]);
+  const filtered = useMemo(() => applyAll(inSetRows), [inSetRows, applyAll]);
+  // Searching inside a set: how many matches All open has, offered as a link when that is more than this set shows.
+  const allOpenMatches = useMemo(() => {
+    if (filters.q.trim() === "" || drawn === "open" || drawn === "lost" || lostView) return null;
+    const n = applyAll(rowsInSet(rows, setData, "open")).length;
+    return n > filtered.length ? n : null;
+  }, [filters.q, drawn, lostView, rows, setData, applyAll, filtered.length]);
+  // Stage moves made on this page: a lead moved OUT of the set it was listed in keeps its row and gets a quiet "Moved" mark.
+  const [movedIds, setMovedIds] = useState<string[]>([]);
+  const movedOut = useMemo(() => {
+    const out = new Set<string>();
+    for (const id of movedIds) {
+      const r = rows.find((x) => x.lead.id === id);
+      if (!r) continue;
+      const cat = stages.find((s) => s.id === r.lead.current_stage_id)?.category;
+      if (leavesSet(drawn, cat, isPastFirstContact(r.lead.current_stage_id, stages))) out.add(id);
+    }
+    return out;
+  }, [movedIds, rows, stages, drawn]);
   const { sort } = viewState;
   const sorted = useMemo(() => sortRows(filtered, sort.key, sort.dir), [filtered, sort]);
-  const counts = useMemo(() => topBarCounts(filtered), [filtered]);
+  const page = useMemo(() => pageSlice(sorted, viewState.show), [sorted, viewState.show]);
+  const rowById = useCallback((id: string) => rows.find((r) => r.lead.id === id), [rows]);
 
-  // The sort rides in the view state, so it lands in the URL (and in "Save this
-  // view") by the same debounced rewrite as the filters.
+  const columnStages = lostView ? lostStages : intakeStages;
+  // The stage board ALWAYS ends with a Long-Term Nurture column (not in the Nurture set, which draws it already, and not
+  // in the Lost set, whose rows come from a different read): the nurture leads, with the same filters and sort.
+  const nurtureStages = useMemo(() => stages.filter((s) => s.category === "nurture"), [stages]);
+  const nurtureStage = useMemo(() => inPipelineOrder(nurtureStages)[0] ?? null, [nurtureStages]);
+  const nurtureColumn = useMemo(() => {
+    if (!board || viewState.group !== "stage" || lostView || drawn === "nurture" || !nurtureStage) return null;
+    const mine = rows.filter((r) => stages.find((s) => s.id === r.lead.current_stage_id)?.category === "nurture");
+    return { rows: sortRows(applyAll(mine), sort.key, sort.dir), stage: nurtureStage };
+  }, [board, viewState.group, lostView, drawn, nurtureStage, rows, stages, applyAll, sort]);
+  // Lost stages are offered as a destination ONLY while the Lost set is shown (so a lead can be moved back out). Elsewhere,
+  // moving a lead to Lost happens on the lead page or the weekly review, as before.
+  const moveStages = useMemo(() => moveTargetStages(intakeStages, lostStages, lostView, nurtureStages), [intakeStages, lostStages, lostView, nurtureStages]);
+  const model = useMemo(
+    () => boardModel({ rows: sorted, stages: columnStages, members, group: viewState.group, pinned, extra: colExtra, showEmpty, nurture: nurtureColumn }),
+    [sorted, columnStages, members, viewState.group, pinned, colExtra, showEmpty, nurtureColumn],
+  );
+  const renderedIds = useMemo(() => (board ? model.renderedIds : page.shown.map((r) => r.lead.id)), [board, model, page]);
+  const ownerColumn = ownerColumnShown(sorted);
+
   function toggleSort(key: SortKey) {
     setViewState((state) => ({
       ...state,
-      sort:
-        state.sort.key === key
-          ? { key, dir: state.sort.dir === "asc" ? "desc" : "asc" }
-          : { key, dir: naturalDir(key) },
+      sort: state.sort.key === key ? { key, dir: state.sort.dir === "asc" ? "desc" : "asc" } : { key, dir: naturalDir(key) },
     }));
   }
 
-  /**
-   * One optimistic write path for every row action: patch the row, call the
-   * action, and on refusal put the row back exactly as it was. `patch` returns
-   * the new row so each caller decides what "updated" means for its own write.
-   */
   const runWrite = useCallback(
-    (
-      leadId: string,
-      patch: (row: IntakeRow) => IntakeRow,
-      act: () => Promise<{ ok: true } | { ok: false; error: string }>,
-    ) => {
+    (leadId: string, patch: (row: IntakeRow) => IntakeRow, act: () => Promise<{ ok: true } | { ok: false; error: string }>, onOk?: () => void) => {
       const prior = rows;
       setErrors((current) => ({ ...current, [leadId]: "" }));
       setPendingId(leadId);
       setRows((current) => current.map((row) => (row.lead.id === leadId ? patch(row) : row)));
-
       startTransition(async () => {
         const result = await act();
         setPendingId(null);
         if (!result.ok) {
           setRows(prior);
           setErrors((current) => ({ ...current, [leadId]: result.error }));
-        }
+        } else onOk?.();
       });
     },
     [rows],
   );
 
-  // The Temperature chip's one write: set or clear the person's lane. The chip
-  // flips at once and is put back, with the action's sentence under the row, if
-  // the write is refused. The derived value and its reason are recomputed, so
-  // clearing falls back to exactly what the server will show.
   const setLane = useCallback(
     (leadId: string, lane: Lane | null) => {
       runWrite(
         leadId,
         (row) => {
-          const lead = {
-            ...row.lead,
-            lane,
-            lane_set_by: lane ? (row.lead.lane_set_by ?? "you") : null,
-            lane_set_at: lane ? nowIso : null,
-          };
+          const lead = { ...row.lead, lane, lane_set_by: lane ? (row.lead.lane_set_by ?? "you") : null, lane_set_at: lane ? nowIso : null };
           return { ...row, lead, temperature: effectiveTemperature(lead, stages, now, row.facts) };
         },
         () => setLaneAction(leadId, lane),
@@ -254,61 +287,56 @@ export default function IntakeWorkspace({
     [runWrite, stages, now, nowIso],
   );
 
+  const pin = useCallback((ids: string[]) => setPinned((p) => [...ids, ...p.filter((x) => !ids.includes(x))]), []);
+  const nameOf = (id: string) => {
+    const r = rows.find((x) => x.lead.id === id);
+    return r ? `${r.lead.first_name} ${r.lead.last_name}`.trim() || r.lead.email : "Lead";
+  };
+
   const assign = useCallback(
     (leadId: string, userId: string | null) => {
+      const who = userId ? (members.find((m) => m.userId === userId)?.displayName ?? "a teammate") : "nobody";
       runWrite(
         leadId,
-        (row) => ({
-          ...row,
-          lead: { ...row.lead, assigned_to: userId },
-          owner: userId ? (members.find((member) => member.userId === userId) ?? null) : null,
-        }),
+        (row) => ({ ...row, lead: { ...row.lead, assigned_to: userId }, owner: userId ? (members.find((m) => m.userId === userId) ?? null) : null }),
         () => assignLeadAction(leadId, userId),
+        () => {
+          pin([leadId]);
+          setAnnounce(LEADS_ASSIGNED_TO(nameOf(leadId), who));
+        },
       );
     },
-    [runWrite, members],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [runWrite, members, pin, rows],
   );
 
   const setSource = useCallback(
     (leadId: string, source: ReferralSource | null) => {
-      runWrite(
-        leadId,
-        (row) => ({ ...row, lead: { ...row.lead, referral_source: source } }),
-        () => setSourceAction(leadId, source),
-      );
+      runWrite(leadId, (row) => ({ ...row, lead: { ...row.lead, referral_source: source } }), () => setSourceAction(leadId, source));
     },
     [runWrite],
   );
 
-  /** The row after a person moved it: the one patch the drag, the menu and the bulk move all share. */
   const movedRow = useCallback(
     (row: IntakeRow, stageId: string): IntakeRow => {
       const lead = { ...row.lead, current_stage_id: stageId };
-      // A person's move takes the agent's chip off the card (the server drops it the same way).
-      return {
-        ...row,
-        agentMove: undefined,
-        lead,
-        stage: stages.find((stage) => stage.id === stageId) ?? null,
-        // Temperature rule 2 (nurture stage) keys on the stage, so it has to be re-derived
-        // with the lead's new home or the card would carry the old answer.
-        temperature: effectiveTemperature(lead, stages, now, row.facts),
-      };
+      return { ...row, agentMove: undefined, lead, stage: stages.find((s) => s.id === stageId) ?? null, temperature: effectiveTemperature(lead, stages, now, row.facts) };
     },
     [stages, now],
   );
 
   const moveStage = useCallback(
     (leadId: string, stageId: string) => {
-      runWrite(leadId, (row) => movedRow(row, stageId), () => moveStageAction(leadId, stageId));
+      const target = stages.find((s) => s.id === stageId);
+      runWrite(leadId, (row) => movedRow(row, stageId), () => moveStageAction(leadId, stageId), () => {
+        pin([leadId]);
+        setMovedIds((m) => (m.includes(leadId) ? m : [...m, leadId]));
+        setAnnounce(LEADS_MOVED_TO(nameOf(leadId), target ? stageLabelFor(target) : "that stage"));
+      });
     },
-    [runWrite, movedRow],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [runWrite, movedRow, stages, pin, rows],
   );
-
-  // ── bulk "Move to..." ───────────────────────────────────────────────────────
-  const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
-  const [bulkPending, setBulkPending] = useState(false);
-  const [bulkMessage, setBulkMessage] = useState<{ tone: "ok" | "warn" | "error"; text: string } | null>(null);
 
   const toggleSelect = useCallback((leadId: string) => {
     setBulkMessage(null);
@@ -318,11 +346,12 @@ export default function IntakeWorkspace({
       else next.add(leadId);
       return next;
     });
-  }, []);
+  }, [setBulkMessage, setSelected]);
 
   const bulkMove = useCallback(
     (stageId: string) => {
-      const ids = rows.map((row) => row.lead.id).filter((id) => selected.has(id));
+      // Only ticked cards that are ON SCREEN are sent.
+      const ids = movableIds(selected, renderedIds);
       if (ids.length === 0) return;
       setBulkMessage(null);
       setBulkPending(true);
@@ -342,28 +371,51 @@ export default function IntakeWorkspace({
         }
         const moved = new Set(result.moved);
         setRows((current) => current.map((row) => (moved.has(row.lead.id) ? movedRow(row, stageId) : row)));
-        // A lead that failed says why on its own card and stays ticked so it can be retried; the rest are done.
+        pin(result.moved);
+        setMovedIds((m) => [...m, ...result.moved.filter((id) => !m.includes(id))]);
         setErrors((current) => ({ ...current, ...Object.fromEntries(result.failed.map((f) => [f.leadId, f.error])) }));
         setSelected(new Set(result.failed.map((f) => f.leadId)));
-        const target = intakeStages.find((stage) => stage.id === stageId);
-        setBulkMessage({
-          tone: result.failed.length > 0 ? "warn" : "ok",
-          text: bulkMoveSummary(target ? `${stageCodeFor(target)} · ${stageLabelFor(target)}` : "that stage", result),
-        });
+        const target = stages.find((s) => s.id === stageId);
+        setBulkMessage({ tone: result.failed.length > 0 ? "warn" : "ok", text: bulkMoveSummary(target ? stageLabelFor(target) : "that stage", result) });
       });
     },
-    [rows, selected, movedRow, intakeStages],
+    [selected, renderedIds, movedRow, stages, pin],
   );
 
-  const board = viewState.view === "board";
   const router = useRouter();
-  const note = detailsNote({ approvals: pendingApprovals, agentMoves, stageDecisions });
+  const note = detailsNote({
+    approvals: pendingApprovals,
+    agentMoves,
+    stageDecisions,
+    notes: notesUnavailable ? { status: "unavailable" } : null,
+    time: time === null ? { status: "unavailable" } : null,
+    extra: [...setData.degraded.map((d) => (d === "booth" ? "event list" : d)), ...(nurtureUnavailable ? ["nurture leads"] : [])],
+  });
   const moreItems = leadsMoreItems({ showReconcile });
   const clearFilters = () => setFilters(() => ({ ...EMPTY_INTAKE_FILTERS }));
+  const filtersActive = filtersToQueryString(filters) !== "";
+  const label = SET_LABEL[drawn];
+  const chips = setChips(setData, lost, drawn, nurtureUnavailable);
+  const setHref = (set: LeadSet) => intakeHref({ ...EMPTY_INTAKE_FILTERS }, { ...viewState, set, show: SHOW_STEP });
+  const anyLeads = setData.counts.open + setData.counts.nurture > 0 || lost.status === "ok";
+
+  const emptyContent = !anyLeads ? (
+    <>
+      <p style={{ margin: 0 }}>{NO_LEADS_YET}</p>
+      <span style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
+        <AddLeadDialog stages={intakeStages} members={members} />
+        <Link href="/dashboard/forms/">Open your intake form</Link>
+      </span>
+    </>
+  ) : filtersActive ? (
+    <p style={{ margin: 0 }}>{LEADS_NO_MATCH_IN_SET(label)}</p>
+  ) : (
+    <p style={{ margin: 0 }}>{LEADS_SET_EMPTY(label)}</p>
+  );
 
   return (
     <div className="lp-root">
-      <ListHeader title={LEADS_NAME} sub={leadsSubline(counts, { board, group: viewState.group })} />
+      <ListHeader title={LEADS_NAME} sub={leadsHeaderLine(drawn, sorted)} />
 
       <ListToolbar
         search={{
@@ -373,91 +425,167 @@ export default function IntakeWorkspace({
           onChange: (q) => setFilters((current) => ({ ...current, q })),
           onClear: () => setFilters((current) => ({ ...current, q: "" })),
         }}
-        toggle={<ViewToggle value={viewState.view} onChange={(view) => setViewState((state) => ({ ...state, view }))} />}
+        toggle={
+          <>
+            <ViewToggle value={viewState.view} onChange={(view) => setViewState((state) => ({ ...state, view }))} />
+            {board && (
+              <button
+                type="button"
+                className="lp-btn"
+                aria-pressed={selecting}
+                onClick={() => {
+                  setSelecting((on) => !on);
+                  setSelected(new Set());
+                  setBulkMessage(null);
+                }}
+              >
+                {LEADS_SELECT}
+              </button>
+            )}
+          </>
+        }
         more={<MoreMenu items={moreItems} />}
         primary={<AddLeadDialog stages={intakeStages} members={members} />}
       />
 
-        <IntakeControls
-          filters={filters}
-          view={viewState.view}
-          group={viewState.group}
-          stages={intakeStages}
-          members={members}
-          visibleCount={filtered.length}
-          needsRebeccaCount={needsRebeccaCount}
-          agentMoveCounts={agentMoveCounts}
-          decisionCount={decisionCount}
-          currentHref={href}
-          onFilters={setFilters}
-          onGroup={(group: IntakeGroup) => setViewState((state) => ({ ...state, group }))}
+      <IntakeControls
+        filters={filters}
+        view={viewState.view}
+        group={viewState.group}
+        stages={columnStages}
+        members={members}
+        setChips={chips}
+        counts={chipCounts}
+        currentHref={href}
+        setHref={setHref}
+        lostView={lostView}
+        showOwnerFilter={ownerColumn}
+        onSet={(set) => setViewState((state) => ({ ...state, set, show: SHOW_STEP }))}
+        onFilters={setFilters}
+        onGroup={(group: IntakeGroup) => setViewState((state) => ({ ...state, group }))}
+        allOpenMatches={allOpenMatches}
+      />
+
+      {setDataProp !== undefined && setData.status === "unavailable" && !lostView && (
+        <p role="status" className="lp-note" data-working-unavailable>
+          <span>{LEADS_WORKING_UNAVAILABLE}</span>
+          <button type="button" className="lp-btn" onClick={() => router.refresh()}>
+            Refresh
+          </button>
+        </p>
+      )}
+      {note && (
+        <p role="status" className="lp-note" data-details-note>
+          <span>{note.text}</span>
+          <button type="button" className="lp-btn" onClick={() => router.refresh()}>
+            Refresh
+          </button>
+        </p>
+      )}
+      {lostView && lostCut && (
+        <p role="status" className="lp-note" data-lost-cut>
+          <span>{LEADS_LOST_CUT(lostCut.shown, lostCut.total)}</span>
+        </p>
+      )}
+      {lost.status === "unavailable" && lostView && (
+        <p role="alert" className="lp-note" data-lost-unavailable>
+          <span>{LEADS_LOST_UNAVAILABLE}</span>
+        </p>
+      )}
+
+      <div className="ix-live" aria-live="polite" data-announce>
+        {announce}
+      </div>
+
+      {board && selecting && (
+        <BulkMoveBar
+          selectedCount={movableIds(selected, renderedIds).length}
+          hiddenCount={hiddenSelectedCount(selected, renderedIds)}
+          shownCount={renderedIds.length}
+          stages={moveStages}
+          pending={bulkPending}
+          message={bulkMessage}
+          onSelectShown={() => {
+            setBulkMessage(null);
+            setSelected(new Set(selectShown(renderedIds)));
+          }}
+          onClear={() => {
+            setBulkMessage(null);
+            setSelected(new Set());
+          }}
+          onDone={() => {
+            setSelecting(false);
+            setSelected(new Set());
+            setBulkMessage(null);
+          }}
+          onMove={bulkMove}
         />
+      )}
 
-        {note && (
-          <p role="status" className="lp-note" data-details-note>
-            <span>{note.text}</span>
-            <button type="button" className="lp-btn" onClick={() => router.refresh()}>
-              Refresh
-            </button>
-          </p>
-        )}
-
-        {board && (
-          <BulkMoveBar
-            selectedCount={selected.size}
-            shownCount={sorted.length}
-            stages={intakeStages}
-            pending={bulkPending}
-            message={bulkMessage}
-            onSelectShown={() => {
-              setBulkMessage(null);
-              setSelected(new Set(sorted.slice(0, BULK_MOVE_MAX).map((row) => row.lead.id)));
-            }}
-            onClear={() => {
-              setBulkMessage(null);
-              setSelected(new Set());
-            }}
-            onMove={bulkMove}
-          />
-        )}
-
-        {board ? (
+      {lostFailed ? null : board ? (
+        sorted.length === 0 ? (
+          <div className="lp-empty" data-empty={!anyLeads ? "none" : "filtered"}>
+            {emptyContent}
+            {filtersActive && anyLeads && (
+              <button type="button" className="lp-clear" onClick={clearFilters}>
+                Clear filters
+              </button>
+            )}
+          </div>
+        ) : (
           <IntakeBoard
             group={viewState.group}
-            rows={sorted}
-            stages={intakeStages}
+            model={model}
+            moveStages={moveStages}
             members={members}
             now={now}
             pendingLeadId={pendingId}
             errors={errors}
             time={time}
             pendingApprovals={pendingApprovals}
+            rowById={rowById}
+            showEmpty={showEmpty}
+            onToggleEmpty={() => setShowEmpty((v) => !v)}
+            onMoreInColumn={(key) => setColExtra((e) => ({ ...e, [key]: (e[key] ?? 0) + 15 }))}
             onMoveStage={moveStage}
             onAssign={assign}
-            onSetSource={setSource}
+            selecting={selecting}
             selectedIds={selected}
             onToggleSelect={toggleSelect}
+            duplicates={duplicates}
+            movedOut={movedOut}
           />
-        ) : (
-          <IntakeTable
-            rows={sorted}
-            totalCount={rows.length}
-            members={members}
-            sortKey={sort.key}
-            sortDir={sort.dir}
-            now={now}
-            pendingLeadId={pendingId}
-            errors={errors}
-            time={time}
-            pendingApprovals={pendingApprovals}
-            onSort={toggleSort}
-            onSetLane={setLane}
-            onAssign={assign}
-            onSetSource={setSource}
-            onClearFilters={clearFilters}
-            emptyAction={<AddLeadDialog stages={intakeStages} members={members} />}
-          />
-        )}
+        )
+      ) : (
+        <IntakeTable
+          rows={page.shown}
+          total={page.total}
+          left={page.left}
+          setLabel={label}
+          hasOwnerColumn={ownerColumn}
+          members={members}
+          stages={moveStages}
+          sortKey={sort.key}
+          sortDir={sort.dir}
+          now={now}
+          pendingLeadId={pendingId}
+          errors={errors}
+          time={time}
+          pendingApprovals={pendingApprovals}
+          notesUnavailable={notesUnavailable}
+          duplicates={duplicates}
+          movedOut={movedOut}
+          onSort={toggleSort}
+          onSetLane={setLane}
+          onAssign={assign}
+          onSetSource={setSource}
+          onMoveStage={moveStage}
+          onShowMore={() => setViewState((s) => ({ ...s, show: nextShow(s.show) }))}
+          onClearFilters={filtersActive ? clearFilters : undefined}
+          emptyAction={emptyContent}
+          anyLeads={anyLeads}
+        />
+      )}
     </div>
   );
 }

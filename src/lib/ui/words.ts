@@ -583,3 +583,35 @@ export const WELCOME_CARD_4_BODY = `${REVIEW_NAME} shows your open matters and a
 export const WELCOME_CARD_4_STEP = "open it before Monday's meeting.";
 export const WELCOME_STEPS_NAV = "Steps";
 export const welcomeCardOf = (n: number, total: number) => `Card ${n} of ${total}`;
+
+/** Leads page (item L): sets, paging, board, selection. */
+export const LEADS_SELECT = "Select";
+export const LEADS_SELECT_DONE = "Done selecting";
+export const LEADS_SHOW_MORE = (step: number, left: number) => `Show ${step} more (${left} left)`;
+export const LEADS_SHOWING = (shown: number, total: number) => "Showing " + shown + " of " + total;
+export const LEADS_STAGE_FILTER = "Stage";
+export const LEADS_ANY_STAGE = "Every stage";
+export const LEADS_SUGGESTIONS = "Suggestions";
+export const LEADS_SUGGESTIONS_TITLE = "Leads the system suggests moving to Long-Term Nurture. Nothing moves by itself; open the lead to decide.";
+export const LEADS_NEEDS_STAGE = "Needs a stage";
+export const LEADS_NO_ACTIVITY_YET = "No activity yet";
+export const LEADS_NOTE_UNAVAILABLE = "Note couldn't load";
+export const LEADS_LOST_UNAVAILABLE = "Can't show lost leads right now. Refresh to try again.";
+export const LEADS_WORKING_UNAVAILABLE = "Can't tell which leads are being worked right now, so every open lead is shown. Refresh to try again.";
+export const LEADS_MOVED_TO = (name: string, stage: string) => `Moved ${name} to ${stage}`;
+export const LEADS_ASSIGNED_TO = (name: string, who: string) => `Assigned ${name} to ${who}`;
+export const LEADS_ROW_MENU = (name: string) => `Actions for ${name}`;
+export const LEADS_NO_MATCH_IN_SET = (set: string) => `No lead matches these filters in ${set}.`;
+export const LEADS_SET_EMPTY = (set: string) => `Nobody is in ${set} right now.`;
+export const LEADS_LOST_CUT = (shown: number, total: number) => "Showing the first " + shown + " of " + total + " lost leads.";
+export const LEADS_DUPLICATE = "Possible duplicate";
+export const LEADS_DUPLICATES = "Possible duplicates";
+export const LEADS_DUPLICATES_TITLE = "Leads with the same email or the same name as another open lead. Nothing is merged; open each to compare.";
+export const LEADS_MOVED_MARK = "Moved";
+export const LEADS_MOVED_MARK_TITLE = "You moved this lead; it no longer belongs in this list. It stays until you refresh.";
+export const LEADS_ALL_OPEN_MATCHES = (n: number) => "All open has " + n + (n === 1 ? " match" : " matches");
+export const LEADS_START_TIMER = "Start timer";
+export const LEADS_STOP_TIMER = "Stop timer";
+export const LEADS_ADD_TIME = "Add time";
+export const LEADS_UNKNOWN_TEAMMATE_DROP = "That teammate can't be named, so cards can't be dropped there.";
+export const LEADS_HIDDEN_SELECTED = (n: number) => `${n} selected but not shown`;

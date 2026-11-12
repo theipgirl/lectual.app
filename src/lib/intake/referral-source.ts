@@ -18,6 +18,10 @@ export const REFERRAL_SOURCES = [
   "Search engine",
   "Website",
   "Other",
+  // Leads from the intake assessment carry this bucket; it was missing, so the Source filter and menu could not name it.
+  "Assessment",
+  // What the public intake form writes (INTAKE_REFERRAL_SOURCE); the Source filter and menu could not name it either.
+  "Intake form",
 ] as const;
 
 export type ReferralSource = (typeof REFERRAL_SOURCES)[number];

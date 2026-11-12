@@ -89,14 +89,19 @@ export type OrgModule =
  * Returns [] on any failure — a module list we could not read must never be
  * treated as "everything is enabled".
  */
-async function readOrgModules(): Promise<string[]> {
+async function readOrgModulesState(): Promise<string[] | null> {
   try {
     const supabase = await getScopedClient();
-    const { data } = await supabase.from("crm_org").select("modules").maybeSingle();
+    const { data, error } = await supabase.from("crm_org").select("modules").maybeSingle();
+    if (error) return null;
     return data?.modules ?? [];
   } catch {
-    return [];
+    return null;
   }
+}
+
+async function readOrgModules(): Promise<string[]> {
+  return (await orgModulesState()) ?? [];
 }
 
 /**
@@ -105,7 +110,14 @@ async function readOrgModules(): Promise<string[]> {
  * a single crm_org SELECT. Outside a render (an action, a route) it simply
  * calls through, so a stale list can never be served across requests.
  */
+const orgModulesState: () => Promise<string[] | null> = cache(readOrgModulesState);
 export const activeOrgModules: () => Promise<string[]> = cache(readOrgModules);
+
+/**
+ * The module list, or null when it could NOT be read (a failed read is not "no modules"). For a caller that must treat
+ * unknown differently from off (the Leads page: a consult it could not look for is unavailable, not skipped).
+ */
+export const activeOrgModulesOrNull: () => Promise<string[] | null> = orgModulesState;
 
 /** True when the caller's active org holds `mod`. Fails closed. */
 export async function orgHasModule(mod: OrgModule): Promise<boolean> {

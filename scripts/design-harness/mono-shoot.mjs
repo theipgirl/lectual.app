@@ -16,7 +16,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.resolve(process.env.MONO_OUT || path.join(here, "out"));
 const CACHE = path.resolve(process.env.MONO_FONTS || path.join(here, "out/font-cache"));
 const H = Number(process.env.HARNESS_DESKTOP_HEIGHT) || 2400;
-const VIEWPORTS = { d: { width: 1440, height: H }, p: { width: 375, height: 812 } };
+const VIEWPORTS = { d: { width: 1440, height: H }, m: { width: 1280, height: H }, p: { width: 375, height: 812 } };
 const TYPES = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".json": "application/json" };
 const wanted = process.argv.slice(2);
 const ids = fs.readdirSync(OUT).filter((f) => /^mono-.*\.html$/.test(f)).map((f) => f.replace(/\.html$/, "")).filter((id) => !wanted.length || wanted.includes(id));
@@ -118,7 +118,7 @@ const AUDIT = () => {
 const browser = await chromium.launch();
 try {
   for (const id of ids) {
-    const vp = VIEWPORTS[id.endsWith("-p") ? "p" : "d"];
+    const vp = VIEWPORTS[id.endsWith("-p") ? "p" : id.endsWith("-m") ? "m" : "d"];
     const page = await browser.newPage({ viewport: vp, deviceScaleFactor: 1, colorScheme: "light" });
     await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, async (route) => {
       const url = route.request().url();

@@ -10,6 +10,8 @@ import { REFERRAL_SOURCES } from "./referral-source";
 import { LANE_RANK } from "@/lib/leads/lane";
 import type { AgentMoveChip } from "@/lib/stage-keeper/moves";
 import { decisionOpen, type DecisionFlag } from "./stage-decision";
+import { DEFAULT_LEAD_SET, parseLeadSet, type LeadSet } from "./working";
+import { SHOW_STEP, parseShow } from "./paging";
 
 /**
  * Pure view-model for /intake (blueprint §7, re-homed by §11): row building,
@@ -108,6 +110,10 @@ export type IntakeFilters = {
    * so the workspace turns it off when the flags couldn't be read: an unreadable list must never filter to "no leads".
    */
   decision?: boolean;
+  /** Only leads with a Long-Term Nurture suggestion (the "Suggestions" chip). */
+  suggest?: boolean;
+  /** Only leads with a "possible duplicate" (the workspace applies it: the duplicates are computed from the loaded leads). */
+  dup?: boolean;
   /** Free text over name / business / email / mark / referral detail / note. */
   q: string;
 };
@@ -174,6 +180,8 @@ export function parseIntakeFilters(params: IntakeSearchParams): IntakeFilters {
     // An unknown value is dropped, like every other param here: it must show the unfiltered list.
     ...(AGENT_MOVE_FILTERS.includes(agent) ? { agent } : {}),
     ...(firstValue(params.decision) === "1" ? { decision: true } : {}),
+    ...(firstValue(params.suggest) === "1" ? { suggest: true } : {}),
+    ...(firstValue(params.dup) === "1" ? { dup: true } : {}),
     q: firstValue(params.q),
   };
 }
@@ -193,6 +201,8 @@ export function filtersToQueryString(filters: IntakeFilters): string {
   if (filters.needsRebecca) params.set("needs", "rebecca");
   if (filters.agent) params.set("agent", filters.agent);
   if (filters.decision) params.set("decision", "1");
+  if (filters.suggest) params.set("suggest", "1");
+  if (filters.dup) params.set("dup", "1");
   if (filters.q.trim()) params.set("q", filters.q.trim());
   return params.toString();
 }
@@ -230,9 +240,17 @@ export type IntakeSort = { key: SortKey; dir: SortDir };
  */
 export const DEFAULT_SORT: IntakeSort = { key: "lastTouch", dir: "desc" };
 
-export type IntakeViewState = { view: IntakeView; group: IntakeGroup; sort: IntakeSort };
+export type IntakeViewState = {
+  view: IntakeView;
+  group: IntakeGroup;
+  sort: IntakeSort;
+  /** Which set of leads (`?set=`). Default: Working. */
+  set: LeadSet;
+  /** How many list rows are shown (`?show=`, steps of 25). */
+  show: number;
+};
 
-export const DEFAULT_VIEW_STATE: IntakeViewState = { view: "table", group: "stage", sort: DEFAULT_SORT };
+export const DEFAULT_VIEW_STATE: IntakeViewState = { view: "table", group: "stage", sort: DEFAULT_SORT, set: DEFAULT_LEAD_SET, show: SHOW_STEP };
 
 const VIEWS: readonly IntakeView[] = ["table", "board"];
 const GROUPS: readonly IntakeGroup[] = ["stage", "owner"];
@@ -284,6 +302,8 @@ export function parseIntakeViewState(params: IntakeSearchParams): IntakeViewStat
     view: VIEWS.includes(view) ? view : DEFAULT_VIEW_STATE.view,
     group: GROUPS.includes(group) ? group : DEFAULT_VIEW_STATE.group,
     sort: parseSort(params),
+    set: parseLeadSet(firstValue(params.set)),
+    show: parseShow(firstValue(params.show)),
   };
 }
 
@@ -303,6 +323,8 @@ export function intakeQueryString(filters: IntakeFilters, viewState: IntakeViewS
   if (viewState.view === "board" && viewState.group !== DEFAULT_VIEW_STATE.group) {
     params.set("group", viewState.group);
   }
+  if (viewState.set && viewState.set !== DEFAULT_VIEW_STATE.set) params.set("set", viewState.set);
+  if ((viewState.show ?? SHOW_STEP) > SHOW_STEP && viewState.view === "table") params.set("show", String(viewState.show));
   const { sort } = viewState;
   if (sort.key !== DEFAULT_SORT.key || sort.dir !== DEFAULT_SORT.dir) {
     params.set("sort", sort.key);
@@ -440,6 +462,7 @@ export function applyFilters(rows: IntakeRow[], filters: IntakeFilters): IntakeR
     if (filters.reply && row.reply !== filters.reply) return false;
     if (filters.agent && !(row.agentMove && (filters.agent === "7d" || row.agentMove.today))) return false;
     if (filters.decision && !decisionOpen(row.decision, row.lead.current_stage_id)) return false;
+    if (filters.suggest && row.temperature.suggestion !== "long_term_nurture") return false;
     if (query && !haystack(row).includes(query)) return false;
     return true;
   });

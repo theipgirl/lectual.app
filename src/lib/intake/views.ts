@@ -6,6 +6,7 @@ import { inPipelineOrder } from "@/lib/pipeline/stage-order";
 import type { MemberIdentity } from "@/lib/members/directory";
 import { intakeStages } from "./scope";
 import type { IntakeRow } from "./rows";
+import { LEADS_NOTE_UNAVAILABLE, LEADS_NO_ACTIVITY_YET } from "@/lib/ui/words";
 
 /**
  * Pure arrangement layer for /intake (blueprint §11): the same rows that
@@ -216,6 +217,8 @@ export type NextStep = {
   text: string;
   /** Render in NEXT_HOT: this row is past its stage's aging window, or unanswered. */
   urgent: boolean;
+  /** "No activity yet" and "Note couldn't load": drawn muted, because they say nothing happened (or that we could not look). */
+  muted: boolean;
 };
 
 /**
@@ -226,22 +229,23 @@ export type NextStep = {
  * anything a reader could mistake for legal advice. If nobody has written
  * anything and nothing has happened, it says so.
  */
-export function nextStepFor(row: IntakeRow, now: Date): NextStep {
+export function nextStepFor(row: IntakeRow, now: Date, opts: { notesUnavailable?: boolean } = {}): NextStep {
   const waited = daysSince(row.lastTouchAt, now);
   const urgent =
     row.stale || (row.reply === "replied" && waited != null && waited >= UNANSWERED_URGENT_DAYS);
 
   const note = row.latestNote?.trim();
-  if (note) return { text: note, urgent };
+  if (note) return { text: note, urgent, muted: false };
 
   const since = touchDate(row.lastTouchAt);
   if (row.reply === "replied" && since) {
-    return { text: `Waiting on our reply since ${since}`, urgent };
+    return { text: `Waiting on our reply since ${since}`, urgent, muted: false };
   }
   if (row.reply === "awaiting" && since) {
-    return { text: `Waiting on them since ${since}`, urgent };
+    return { text: `Waiting on them since ${since}`, urgent, muted: false };
   }
-  return { text: "No activity yet", urgent };
+  // A failed notes read is never "no activity": the row says it could not look.
+  return { text: opts.notesUnavailable ? LEADS_NOTE_UNAVAILABLE : LEADS_NO_ACTIVITY_YET, urgent, muted: true };
 }
 
 export type TopBarCounts = {
@@ -264,22 +268,6 @@ export function topBarCounts(rows: IntakeRow[]): TopBarCounts {
     needFirstReply: rows.filter((row) => row.reply === "replied").length,
     unassigned: rows.filter((row) => !row.lead.assigned_to).length,
   };
-}
-
-/**
- * The Leads page's sub-line: the former status strip folded into one short sentence, then one short
- * hint for the current view. `board` and `group` are the view state's own fields.
- */
-export const LEADS_VIEW_HINT = {
-  table: "Newest activity first.",
-  stage: "Drag a card to move it, or use the stage menu on the card.",
-  owner: "Leads with no owner are in the first column.",
-} as const;
-
-export function leadsSubline(counts: TopBarCounts, view: { board: boolean; group: "stage" | "owner" }): string {
-  const hint = view.board ? LEADS_VIEW_HINT[view.group] : LEADS_VIEW_HINT.table;
-  const total = `${counts.inIntake} ${counts.inIntake === 1 ? "lead" : "leads"}`;
-  return `${total} · ${counts.needFirstReply} need a first reply · ${counts.unassigned} unassigned. ${hint}`;
 }
 
 /** The counts as the one mono line the top bar renders. */

@@ -1,10 +1,16 @@
 import { listStages, type Stage } from "@/lib/pipeline";
 import type { Lead } from "@/lib/pipeline";
 import { listIntakeLeads } from "@/lib/intake/leads";
+import { loadLatestNotes, notesIncomplete, NOTE_LOOKBACK_DAYS } from "@/lib/intake/notes-read";
+import { loadWorkingFacts } from "@/lib/intake/working-load";
+import { classifyLeads } from "@/lib/intake/working";
+import { findDuplicates } from "@/lib/intake/duplicates";
+import { setDataFrom, withNurtureExtra, type SetData, type LostRead } from "@/lib/intake/sets";
+import { listLostLeads, readLostCount, readNurtureExtra, lostStageIds, type LostLeads } from "@/lib/intake/lost";
+import { activeOrgModulesOrNull } from "@/lib/org/modules";
 import { intakeStages } from "@/lib/intake/scope";
 import { inPipelineOrder } from "@/lib/pipeline/stage-order";
 import { loadTemperatureFacts, type TemperatureFactsRead } from "@/lib/intake/facts";
-import { leadActivitySince, type Activity } from "@/lib/matters";
 import { listMemberDirectory, type MemberIdentity } from "@/lib/members/directory";
 import { listForLeads, runningForMe } from "@/lib/time/entries";
 import { notifyTimeRunning } from "@/lib/notifications/producers";
@@ -32,42 +38,6 @@ import { pageTitle } from "@/lib/ui/page-title";
 export const metadata: Metadata = { title: pageTitle(LEADS_NAME) };
 
 export const dynamic = "force-dynamic";
-
-/** How far back the "latest note" lookup reaches. */
-const NOTE_LOOKBACK_DAYS = 180;
-
-/** Timeline types whose payload carries something worth showing as a next step. */
-const NOTE_ACTIVITY_TYPES = new Set(["note", "call_logged", "email_sent", "voice_note"]);
-
-/**
- * Pulls a one-line summary out of an activity payload. The key differs by type
- * (addLeadNote writes `note`, logged calls write `summary`, logged emails write
- * `subject`) — see src/lib/pipeline/notes.ts.
- */
-function noteTextOf(activity: Activity): string | null {
-  const payload = (activity.payload ?? {}) as Record<string, unknown>;
-  for (const key of ["note", "summary", "subject", "transcript", "notes"]) {
-    const value = payload[key];
-    if (typeof value === "string" && value.trim() !== "") return value.trim();
-  }
-  return null;
-}
-
-/**
- * lead id → newest note text. `activities` arrives newest-first from
- * leadActivitySince, so the first hit per lead is the latest one.
- */
-function latestNotesByLead(activities: Activity[]): Record<string, string> {
-  const byLead: Record<string, string> = {};
-  for (const activity of activities) {
-    const leadId = activity.lead_id;
-    if (!leadId || byLead[leadId]) continue;
-    if (!NOTE_ACTIVITY_TYPES.has(activity.type)) continue;
-    const text = noteTextOf(activity);
-    if (text) byLead[leadId] = text;
-  }
-  return byLead;
-}
 
 /**
  * The intake list (blueprint §11, canvas 10a–10c) — everyone who is in the
@@ -111,9 +81,6 @@ export default async function IntakePage({
   const membersPromise: Promise<MemberIdentity[]> = listMemberDirectory().catch(() => []);
 
   const sinceIso = new Date(now.getTime() - NOTE_LOOKBACK_DAYS * 86_400_000).toISOString();
-  // Same best-effort treatment: "Next step" degrades from the latest note to
-  // the factual reply state rather than taking the list down.
-  const notesPromise: Promise<Activity[]> = leadActivitySince(sinceIso).catch(() => []);
 
   // What is waiting on Rebecca, per lead. The loader reports an unreachable
   // queue as `unavailable` (never as "nothing pending"); the catch is only for
@@ -132,21 +99,21 @@ export default async function IntakePage({
   const decisionsPromise: Promise<StageDecisionsRead> = loadStageDecisions().catch((): StageDecisionsRead => ({ status: "unavailable" }));
 
   let stages: Stage[] = [];
-  let leads: Lead[] = [];
+  let intakeLeads: Lead[] = [];
   let loadFailed = false;
 
   // Stages and leads share one try: intake scope is derived FROM the stages, so
   // without them there is no honest list to draw — only a misleading one.
   try {
     stages = await listStages();
-    leads = await listIntakeLeads(stages);
+    intakeLeads = await listIntakeLeads(stages);
   } catch (err) {
     // The cause is for the server log only; the page says one fixed sentence.
     console.error("[intake] the lead list could not be read:", err instanceof Error ? err.message : "unknown error");
     loadFailed = true;
   }
 
-  const [members, noteActivity, pendingApprovals, agentMoves, decisions] = await Promise.all([membersPromise, notesPromise, approvalsPromise, agentMovesPromise, decisionsPromise]);
+  const [members, pendingApprovals, agentMoves, decisions] = await Promise.all([membersPromise, approvalsPromise, agentMovesPromise, decisionsPromise]);
 
   if (loadFailed) {
     return (
@@ -165,6 +132,35 @@ export default async function IntakePage({
       </div>
     );
   }
+
+  // The sets. The Working rule reads its facts once (activity, proposals, consults, booth; approvals are the queue read the
+  // page already holds) and classifies every lead in the list. Lost leads are NOT in the list (their own scope and reads: a
+  // head count for the chip every render, the lead list only when ?set=lost), so the rail badge and the Pipeline are untouched.
+  const lostView = viewState.set === "lost";
+  // A module list that could not be read is "unknown", not "off": the consult read is then UNAVAILABLE (missing data
+  // never hides a lead), where a firm without the Mailboxes feature simply has no consults.
+  const modules = await activeOrgModulesOrNull().catch(() => null);
+  const mailboxOn = modules ? modules.includes("mailbox") : null;
+  const [workingFacts, lostCount, lostLeads, nurtureExtra] = await Promise.all([
+    loadWorkingFacts({ leadIds: intakeLeads.map((l) => l.id), stages, approvals: pendingApprovals, mailboxOn: mailboxOn ?? false, mailboxUnknown: mailboxOn === null }),
+    readLostCount(stages),
+    lostView ? listLostLeads(stages) : Promise.resolve<LostLeads | null>(null),
+    readNurtureExtra(stages, new Set(intakeLeads.map((l) => l.id))),
+  ]);
+  const stageCategory = (id: string | null) => stages.find((s) => s.id === id)?.category ?? null;
+  const nurtureOnly = nurtureExtra.status === "ok" ? nurtureExtra.leads : [];
+  const setData: SetData = withNurtureExtra(setDataFrom(classifyLeads({ leads: intakeLeads, stages, facts: workingFacts }), intakeLeads, stageCategory), nurtureOnly.map((l) => l.id));
+  const lost: LostRead = lostCount;
+  // The leads the page draws: the list, or (Lost chosen) the lost leads. A failed lost read draws none and says so.
+  const leads: Lead[] = lostView ? (lostLeads && lostLeads.status === "ok" ? lostLeads.leads : []) : [...intakeLeads, ...nurtureOnly];
+  const lostFailed = lostView && (!lostLeads || lostLeads.status !== "ok");
+  // Possible duplicates among the OPEN leads already loaded (no query, nothing merged).
+  const duplicates = findDuplicates(leads, intakeLeads, stages);
+  const lostShown = lostLeads && lostLeads.status === "ok" ? { shown: lostLeads.leads.length, total: lostLeads.total } : null;
+
+  // "Next step" degrades from the latest note to the factual reply state rather than taking the list down, but a FAILED
+  // or cut-short read is reported, never turned into "no activity". Only the leads on screen are asked about.
+  const notes = await loadLatestNotes(sinceIso, leads.map((l) => l.id));
 
   // Time on cards (§13.1). Two reads: this week's entries for the leads on
   // screen, and the caller's own open timer (which may have started before the
@@ -215,7 +211,7 @@ export default async function IntakePage({
     leads,
     stages,
     members,
-    latestNoteByLeadId: latestNotesByLead(noteActivity),
+    latestNoteByLeadId: notes.status === "ok" ? notes.byLead : undefined,
     factsByLeadId: factsRead.status === "ok" ? factsRead.byLead : undefined,
     agentMoveByLeadId: agentMoves.status === "ok" ? agentMoves.chips : undefined,
     decisionByLeadId: decisions.status === "ok" ? decisions.byLead : undefined,
@@ -228,6 +224,15 @@ export default async function IntakePage({
       rows={rows}
       stages={stages}
       intakeStages={columns}
+      lostStages={stages.filter((s) => lostStageIds(stages).includes(s.id))}
+      setData={setData}
+      lost={lostView && lostFailed ? { status: "unavailable" } : lost}
+      lostView={lostView}
+      lostFailed={lostFailed}
+      notesUnavailable={notesIncomplete(notes)}
+      duplicates={duplicates}
+      nurtureUnavailable={!lostView && nurtureExtra.status === "unavailable"}
+      lostCut={lostShown && lostShown.total > lostShown.shown ? lostShown : null}
       members={members}
       initialFilters={filters}
       initialViewState={viewState}
