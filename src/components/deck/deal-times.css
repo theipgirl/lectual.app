@@ -1,0 +1,9 @@
+/* The deal-times dialog reuses the feedback dialog's frame. Its grid track is told it may shrink, so at 375px the
+   480px card narrows to the screen instead of running off the side. */
+.dt-root { grid-template-columns: minmax(0, 1fr); }
+.dt-dialog { width: min(480px, 100%); }
+.dt-dialog .lx-input { max-width: 100%; }
+@media (max-width: 640px) {
+  .dt-dialog { padding: 18px 16px; }
+  .dt-dialog .lx-input { font-size: 16px; min-height: 44px; }
+}

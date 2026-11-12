@@ -13,7 +13,8 @@ import { requestFeedback } from "@/lib/feedback/open";
 import { requestNameDialog } from "@/lib/account/name";
 import { roleLabel } from "@/lib/auth/roles";
 import { isOutsidePress, menuKeyAction } from "@/lib/shell/menu-behaviour";
-import { HELP_AND_TIPS, SETTINGS_NAME } from "@/lib/ui/words";
+import { requestDealTimesDialog } from "@/lib/deal/person-times";
+import { DEAL_TIMES_MENU_ITEM, HELP_AND_TIPS, SETTINGS_NAME } from "@/lib/ui/words";
 import type { ViewMenu } from "@/lib/views";
 import { ViewSwitch } from "./ViewSwitch";
 import "./account-menu.css";
@@ -149,6 +150,18 @@ export function AccountMenu({
               }}
             >
               Your name
+            </button>
+
+            <button
+              type="button"
+              role="menuitem"
+              className="lx-am-item"
+              onClick={() => {
+                closeMenu();
+                requestDealTimesDialog(window, avatar());
+              }}
+            >
+              {DEAL_TIMES_MENU_ITEM}
             </button>
 
             {viewMenu && <ViewSwitch menu={viewMenu} onDone={closeMenu} />}

@@ -401,3 +401,7 @@ a.dk-move--open { font-size: 15px; }
 .dk-sidestack { display: flex; flex-direction: column; gap: 14px; max-height: calc(100vh - 150px); overflow-y: auto; scrollbar-width: thin; min-width: 0; }
 .dk-side-note--card { padding: 0 4px; }
 .dk-sidestack .dk-sidecard { flex: none; }
+/* "Change deal times": a quiet text button under the page sentence. */
+.dk-linkbtn { appearance: none; background: none; border: 0; padding: 4px 0; margin: 0; font: inherit; font-size: 14px; color: var(--ox); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; justify-self: start; text-align: left; }
+.dk-linkbtn:focus-visible { outline: 2px solid var(--ox); outline-offset: 2px; border-radius: 3px; }
+@media (pointer: coarse) { .dk-linkbtn { min-height: 44px; } }

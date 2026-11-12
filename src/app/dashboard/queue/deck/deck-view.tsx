@@ -11,6 +11,7 @@ import { getFirmTimeZone } from "@/lib/org/profile";
 import { listMemberDirectory, type MemberIdentity } from "@/lib/members/directory";
 import { QUEUE_EDIT_ROLES } from "@/lib/queue/roles";
 import { whenLabel, dealFor, dealtAt, sameFirmDay } from "@/lib/deal/times";
+import { parseDealTimes } from "@/lib/deal/person-times";
 import {
   buildDeck,
   decidedToday,
@@ -124,7 +125,9 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
 
   const [load, tz] = await Promise.all([loadActiveQueue("pending"), getFirmTimeZone()]);
   const now = new Date();
-  const deal = dealFor(now, tz);
+  // The person's own two times, from their own account (the same session user resolved above).
+  const myTimes = parseDealTimes(session.user.user_metadata);
+  const deal = dealFor(now, tz, myTimes);
   const dealLine = dealNow ? DECK_DEALT_NOW : deal.current ? dealHeader(deal.current.label) : nextDealHeader(deal.next.label);
   const viewHref = (v: typeof view) => deckHref({ view: v, dealNow });
   const dealNowHref = deckHref({ view, dealNow: true });
@@ -158,7 +161,7 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
     loadActiveQueue("rejected"),
   ]);
   const routing = routed.status === "ok" ? routed.routing : {};
-  const base = { items: load.items, routing, viewer, cardState, now, dealtAt: dealNow ? null : dealtAt(now, tz), audit };
+  const base = { items: load.items, routing, viewer, cardState, now, dealtAt: dealNow ? null : dealtAt(now, tz, myTimes), audit };
   const first = buildDeck(base);
   const deck: Deck = buildDeck({ ...base, flags: await closerLookFlags(first.cards.map((c) => c.item)) });
 

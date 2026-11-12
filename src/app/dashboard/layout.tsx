@@ -22,6 +22,10 @@ import { FeedbackDialog } from "@/components/feedback/FeedbackDialog";
 import { NavProgress } from "@/components/shell/NavProgress";
 import { shouldShowTour } from "@/lib/onboarding/tour";
 import { FirmWordmark } from "@/components/shell/FirmWordmark";
+import { DealTimesDialog } from "@/components/deck/DealTimesDialog";
+import { parseDealTimes } from "@/lib/deal/person-times";
+import { friendlyZoneLabel } from "@/lib/org/firm-form";
+import { getFirmTimeZone } from "@/lib/org/profile";
 import { YourNameDialog } from "@/components/account/YourNameDialog";
 import { drawnNav, NO_PREVIEW, previewFor, shellFor, viewFor, viewMenuFor } from "@/lib/views";
 
@@ -138,6 +142,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <CopilotLauncher configured={aiConfigured()} />
       <FeedbackTrailRecorder />
       <FeedbackDialog />
+      {shell.variant === "owner" && <DealTimesDialog current={parseDealTimes(user.user_metadata)} zoneLabel={friendlyZoneLabel(await getFirmTimeZone())} />}
       <YourNameDialog currentFullName={typeof user.user_metadata?.full_name === "string" ? user.user_metadata.full_name : null} />
       <OnboardingTour open={shouldShowTour(user.user_metadata) && !actingAsStaff} role={role} navSlugs={drawn.map((i) => i.slug)} firmName={org.name} aiConfigured={aiConfigured()} />
       <GettingStartedRunner role={role} modules={org.modules} aiConfigured={aiConfigured()} />

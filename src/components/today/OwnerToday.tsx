@@ -7,6 +7,7 @@ import { listMemberDirectory } from "@/lib/members/directory";
 import { greetingName, greetingSuffix } from "@/lib/today/greeting-name";
 import { hourInZone } from "@/lib/today/priorities";
 import { civilInZone } from "@/lib/today/outcomes";
+import { parseDealTimes } from "@/lib/deal/person-times";
 import { loadDeckSummary, type DeckSummary } from "@/lib/queue/deck-summary";
 import { loadTodayConsults, type TodayConsultsResult } from "@/lib/calendar/consult-sources";
 import { liveConsultDeps } from "@/lib/calendar/consult-sources-live";
@@ -73,7 +74,7 @@ export async function OwnerToday({
 }) {
   const [hasProposals, tz] = await Promise.all([orgHasModule("proposals").catch(() => false), getFirmTimeZone()]);
   const [deckS, consultsS, deadlinesS, reviewS, proposalsS, membersS] = await Promise.allSettled([
-    loadDeckSummary({ userId, role }),
+    loadDeckSummary({ userId, role }, parseDealTimes(metadata)),
     loadTodayConsults(now, tz, liveConsultDeps),
     loadOwnerDeadlines(now, tz),
     loadOwnerNeedsReview(now, tz),

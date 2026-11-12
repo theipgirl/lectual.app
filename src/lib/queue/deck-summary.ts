@@ -1,6 +1,6 @@
 import "server-only";
 import type { Role } from "@/lib/auth/roles";
-import { dealFor, dealtAt } from "@/lib/deal/times";
+import { DEFAULT_DEAL_TIMES, dealFor, dealtAt } from "@/lib/deal/times";
 import { buildDeck, deckMinutes } from "@/lib/queue/deck";
 import { loadCardState } from "@/lib/queue/card-state";
 import { loadActiveQueue } from "@/lib/queue/load";
@@ -18,21 +18,21 @@ export type DeckSummary =
   | { status: "unconfigured" }
   | { status: "unavailable" };
 
-export async function loadDeckSummary(viewer: { userId: string; role: Role }): Promise<DeckSummary> {
+export async function loadDeckSummary(viewer: { userId: string; role: Role }, dealTimes: readonly string[] = DEFAULT_DEAL_TIMES): Promise<DeckSummary> {
   try {
     const load = await loadActiveQueue("pending");
     if (load.status === "unconfigured") return { status: "unconfigured" };
     if (load.status !== "ok") return { status: "unavailable" };
     const [routed, tz, cardState] = await Promise.all([loadApprovalRouting(), getFirmTimeZone(), loadCardState(load.items.map((i) => i.id))]);
     const now = new Date();
-    const deal = dealFor(now, tz);
+    const deal = dealFor(now, tz, dealTimes);
     const deck = buildDeck({
       items: load.items,
       routing: routed.status === "ok" ? routed.routing : {},
       viewer,
       cardState,
       now,
-      dealtAt: dealtAt(now, tz),
+      dealtAt: dealtAt(now, tz, dealTimes),
     });
     return {
       status: "ok",

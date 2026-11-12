@@ -11,6 +11,7 @@ import { cardCaller, cardContext, cardIdOf, cardNoteOf, noticeHandedTo, readCard
 import { listMemberDirectory } from "@/lib/members/directory";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { dealFor } from "@/lib/deal/times";
+import { readMyDealTimes } from "@/lib/deal/my-times";
 import { mySendAccess, sendFromMyOutlook } from "@/lib/mailbox/my-mailbox";
 import {
   DECK_BAD_PERSON,
@@ -155,7 +156,8 @@ export async function laterCardAction(rawId: unknown): Promise<DeckResult> {
   const ctx = await cardContext(id);
   if (!ctx.ok) return ctx;
   if (!ctx.mayDecide && ctx.holder?.userId !== ctx.who.userId) return { ok: false, error: DECK_NOT_YOURS };
-  const until = dealFor(new Date(), await getFirmTimeZone()).next.at.toISOString();
+  // The actor's own times, read from their account here, never from the form.
+  const until = dealFor(new Date(), await getFirmTimeZone(), await readMyDealTimes()).next.at.toISOString();
   const saved = await recordCardEvent({ orgId: ctx.who.orgId, queueItemId: id, kind: "later", until });
   if (!saved.ok) return { ok: false, error: saved.reason === "not-set-up" ? NOT_SWITCHED_ON : DECK_FAILED };
   revalidate();

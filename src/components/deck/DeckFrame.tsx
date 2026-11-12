@@ -19,6 +19,7 @@ import {
 } from "@/lib/ui/words";
 import type { DeckView } from "@/lib/queue/deck";
 import { DeckSide, type DeckSideLater, type DeckSideRow } from "./DeckSide";
+import { DealTimesButton } from "./DealTimesButton";
 
 export type { DeckSideRow } from "./DeckSide";
 
@@ -95,6 +96,7 @@ export function DeckFrame({
             {switcher("")}
           </div>
           {wideSub && <p className="dk-sub">{wideSub}</p>}
+          <DealTimesButton />
         </div>
         {children}
       </div>
@@ -117,6 +119,7 @@ export function DeckFrame({
             {switcher("")}
           </div>
           <p className="dk-sub">{DECK_PAGE_SUB}</p>
+          <DealTimesButton />
         </div>
         <DeckSide rows={side ?? []} failed={sideFailed} note={sideNote} later={sideLater} decidedFailed={sideDecidedFailed} />
         {laterArrivals > 0 && dealLabel && (

@@ -16,6 +16,7 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/dashboard/queue/deck/",
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
+vi.mock("@/lib/org/profile", () => ({ getFirmTimeZone: async () => "America/New_York" }));
 vi.mock("@/lib/ai/claude", () => ({ aiConfigured: () => true }));
 vi.mock("@/lib/auth/actions", () => ({ signOutAction: async () => {}, switchFirmAction: async () => ({}) }));
 vi.mock("@/lib/account/view-actions", () => ({ saveViewAction: vi.fn() }));
@@ -176,11 +177,11 @@ describe("account menu", () => {
   const menu = (extra: AnyProps) =>
     renderToStaticMarkup(createElement(AccountMenu, { initials: "AB", name: "Ada", email: "a@b.co", role: "owner", firmName: "F", activeOrgId: "o1", switchableFirms: [], ...extra } as never));
 
-  it("the owner menu: header, Your name, Settings, Help and tips, Sign out; no View group for a firm member", () => {
+  it("the owner menu: header, Your name, Deal times, Settings, Help and tips, Sign out; no View group for a firm member", () => {
     const html = menu({ settingsInMenu: true, variant: "owner" });
     expect(html).toContain('class="lx-am"');
     expect(html).toContain("Owner · F");
-    expect([...html.matchAll(/role="menuitem"[^>]*>([^<]+)</g)].map((m) => m[1])).toEqual(["Your name", "Settings", "Getting started", "Show tips again", "Send feedback", "Sign out"]);
+    expect([...html.matchAll(/role="menuitem"[^>]*>([^<]+)</g)].map((m) => m[1])).toEqual(["Your name", "Deal times", "Settings", "Getting started", "Show tips again", "Send feedback", "Sign out"]);
     expect(html).toMatch(/href="\/dashboard\/settings\/?"/);
     expect(html).not.toContain("menuitemradio");
     expect(html).not.toContain("Technician view");
