@@ -257,6 +257,7 @@ async function runStages(input: ConsultProposalRunInput, progress: Progress): Pr
       firm: { name: firmName, slug: firmSlug, teamSignOff },
       pricing: standardProposalPricing((setting as Row).pricing),
       packages: normalisePackages((setting as Row).pricing),
+      settingPricing: (setting as Row).pricing,
       reviewedConsult,
       today: firmCivilDate(new Date(now()), tz),
       llm: input.llm,

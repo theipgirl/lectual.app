@@ -2,7 +2,7 @@ import { Fragment } from "react";
 import { formatCents } from "@/lib/quotes/money";
 import { packageLineTitle } from "@/lib/proposals/name-package";
 import type { ProposalQuote } from "@/lib/proposals/types";
-import { EDITOR_WORDS } from "@/lib/proposal-editor/vocabulary";
+import { EDITOR_WORDS, checkTheseHeading } from "@/lib/proposal-editor/vocabulary";
 import { blockingCount, type ChecklistItem } from "@/lib/proposal-editor/checklist";
 import { UnsavedPriceNote } from "./UnsavedGuard";
 
@@ -107,6 +107,8 @@ function Credits({ quote }: { quote: ProposalQuote }) {
 /** "Ready to send?": what blocks the link, each item a link to its field. Shown from the first load, before any save. */
 export function ReadyChecklist({ items }: { items: ChecklistItem[] }) {
   const blocking = blockingCount(items);
+  const main = items.filter((i) => i.level !== "check");
+  const checks = items.filter((i) => i.level === "check");
   return (
     <section className="lx-card pe-ready" aria-label={EDITOR_WORDS.readyHeading} data-ready>
       <div className="lx-label">{EDITOR_WORDS.readyHeading}</div>
@@ -121,19 +123,33 @@ export function ReadyChecklist({ items }: { items: ChecklistItem[] }) {
               ? `${blocking} ${blocking === 1 ? "thing blocks" : "things block"} the link${items.length > blocking ? `, and ${items.length - blocking} to check` : ""}. Based on what is saved.`
               : `${items.length} ${items.length === 1 ? "thing" : "things"} to check. None blocks the link.`}
           </p>
-          <ul className="pe-ready-list">
-            {items.map((it, i) => (
-              <li key={i} data-level={it.level}>
-                <a className="pe-ready-link" href={it.href}>
-                  <span className="pe-issue-tag">{it.level === "error" ? "Fix" : "Check"}</span>
-                  {it.where ? <span className="pe-issue-where">{it.where}: </span> : null}
-                  {it.text}
-                </a>
-              </li>
-            ))}
-          </ul>
+          {main.length > 0 && <ChecklistList items={main} />}
+          {checks.length > 0 && (
+            <>
+              <p className="pe-ready-sub" data-ready-checks>
+                {checkTheseHeading(checks.length)}
+              </p>
+              <ChecklistList items={checks} />
+            </>
+          )}
         </>
       )}
     </section>
+  );
+}
+
+function ChecklistList({ items }: { items: ChecklistItem[] }) {
+  return (
+    <ul className="pe-ready-list">
+      {items.map((it, i) => (
+        <li key={i} data-level={it.level}>
+          <a className="pe-ready-link" href={it.href}>
+            <span className="pe-issue-tag">{it.level === "error" ? "Fix" : "Check"}</span>
+            {it.where ? <span className="pe-issue-where">{it.where}: </span> : null}
+            {it.text}
+          </a>
+        </li>
+      ))}
+    </ul>
   );
 }

@@ -24,6 +24,9 @@ import {
   type GeneralBlock,
   type GeneralItem,
   type MadeBy,
+  type ContentCheck,
+  MAX_CHECK_TEXT,
+  MAX_CONTENT_CHECKS,
   type MarkKind,
   type ProposalAdjustment,
   type ProposalContent,
@@ -53,7 +56,7 @@ export type DraftBrand = {
   /** Default: a word mark and a logo mark. */
   marks?: DraftMark[];
   /** Plain-language classes, at most 3. Never a class number. */
-  classes?: Array<string | { id?: string; label: string }>;
+  classes?: Array<string | { id?: string; label: string; preselected?: boolean }>;
   /** Absent: the firm's "New proposals offer". */
   offer?: DraftOffer;
   /** A whole percent, 0 to 50, off this brand name's legal fee. */
@@ -64,7 +67,7 @@ export type DraftBrand = {
 export type DraftCredit = { id?: string; label: string; kind: "amount" | "percent"; value: number };
 
 /** Something a person should look at, with where it came from and the field it is about. */
-export type DraftCheck = { text: string; source: "consult" | "copilot" | "assistant" | "person"; path: string };
+export type DraftCheck = ContentCheck;
 
 export type DraftWorkItem = { id?: string; label: string; hours?: number; hourlyRate?: number; value?: number };
 
@@ -175,6 +178,8 @@ export function buildDraftContent(spec: ProposalDraftSpec, firm: DraftFirm, newI
 
   content = withLoeSnapshot(content, firm.letter, true);
   content = { ...content, made_by: spec.madeBy, ...(spec.consultDate ? { made_from: { consult_date: spec.consultDate } } : {}) };
+  const checks = cleanChecks(spec.checks ?? []);
+  if (checks.length > 0) content = { ...content, checks };
 
   const issues = validateContent(content);
   const errors = issues.filter((i) => i.level === "error");
@@ -187,7 +192,15 @@ export function buildDraftContent(spec: ProposalDraftSpec, firm: DraftFirm, newI
     const loe = loeIssues(content.loe, spec.kind);
     if (loe.length > 0) return { ok: false, error: loe[0].message };
   }
-  return { ok: true, content, issues, checks: [...(spec.checks ?? [])] };
+  return { ok: true, content, issues, checks };
+}
+
+/** The checks as stored: words cut to the limit, at most 12, nothing empty. */
+function cleanChecks(checks: readonly DraftCheck[]): DraftCheck[] {
+  return checks
+    .map((c) => ({ ...c, text: c.text.replace(/\s+/g, " ").trim().slice(0, MAX_CHECK_TEXT) }))
+    .filter((c) => c.text.length > 0 && c.path.length > 0)
+    .slice(0, MAX_CONTENT_CHECKS);
 }
 
 type Fail = { ok: false; error: string; packages?: string[] };
@@ -280,7 +293,7 @@ function buildBrand(brand: DraftBrand, basePackage: string, firm: FirmContext, t
   }));
   const classes = (brand.classes ?? []).map((c) => {
     const label = (typeof c === "string" ? c : c.label).trim();
-    return { id: cleanId(typeof c === "string" ? "" : (c.id ?? ""), "c", taken, newId), label, preselected: true };
+    return { id: cleanId(typeof c === "string" ? "" : (c.id ?? ""), "c", taken, newId), label, preselected: typeof c === "string" ? true : (c.preselected ?? true) };
   });
   const name: ProposalName = {
     id,

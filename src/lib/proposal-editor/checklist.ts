@@ -71,17 +71,23 @@ export function targetForPath(path: string): string {
   return sectionId.brands;
 }
 
-export type ChecklistItem = { level: "error" | "warning"; text: string; where: string; href: string };
+export type ChecklistItem = { level: "error" | "warning" | "check"; text: string; where: string; href: string };
 
-/** The checklist: errors (they block the link) first, then things to check; page order within each. */
+/**
+ * The checklist: errors (they block the link) first, then warnings, then the checks the assistant or Copilot left
+ * (`content.checks`, Sprint 5; never blocking); page order within each.
+ */
 export function buildChecklist(issues: readonly ValidationIssue[], content: ProposalContent | null): ChecklistItem[] {
-  const items = issues.map((i) => ({
+  const items: ChecklistItem[] = issues.map((i) => ({
     level: i.level,
     text: i.message,
     where: describeIssuePath(i.path, content),
     href: `#${targetForPath(i.path)}`,
   }));
-  return [...items.filter((i) => i.level === "error"), ...items.filter((i) => i.level !== "error")];
+  const checks: ChecklistItem[] = (Array.isArray(content?.checks) ? content.checks : [])
+    .filter((c) => c && typeof c.text === "string" && typeof c.path === "string")
+    .map((c) => ({ level: "check", text: c.text, where: describeIssuePath(c.path, content), href: `#${targetForPath(c.path)}` }));
+  return [...items.filter((i) => i.level === "error"), ...items.filter((i) => i.level === "warning"), ...checks];
 }
 
 /** How many items block the link. */
