@@ -415,6 +415,9 @@ export function buildDraft(request: DraftRequest, lead: DraftLead, pricing: unkn
   }
   if (!request.payLink) checks.push({ source: "copilot", path: "pay_url", text: COPILOT_WORDS.checkNoPayLink });
 
+  // `letter: null` ON PURPOSE: what this function returns is summarised back to the model (the tool result), and the firm's
+  // engagement letter never comes near one. The executor attaches the letter at the moment of the insert, after the user's
+  // confirmation (`copilot-draft-proposal.ts`, `attachFirmLetter`).
   const built = buildDraftContent(spec, { pricing: pricing ?? {}, letter: null }, rand);
   if (!built.ok) {
     if (built.packages) return { ok: false, kind: "package_not_found", packages: built.packages };

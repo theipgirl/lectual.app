@@ -104,8 +104,13 @@ function Credits({ quote }: { quote: ProposalQuote }) {
   );
 }
 
-/** "Ready to send?": what blocks the link, each item a link to its field. Shown from the first load, before any save. */
-export function ReadyChecklist({ items }: { items: ChecklistItem[] }) {
+/**
+ * "Ready to send?": what blocks the link, each item a link to its field. Shown from the first load, before any save.
+ *
+ * `checksHeading` false = the page already shows the assistant's "Check these N things" panel at the top (`CheckFirstPanel`), so
+ * the stored checks are listed here WITHOUT a second "Check these" heading: a page has one.
+ */
+export function ReadyChecklist({ items, checksHeading = true }: { items: ChecklistItem[]; checksHeading?: boolean }) {
   const blocking = blockingCount(items);
   const main = items.filter((i) => i.level !== "check");
   const checks = items.filter((i) => i.level === "check");
@@ -126,10 +131,10 @@ export function ReadyChecklist({ items }: { items: ChecklistItem[] }) {
           {main.length > 0 && <ChecklistList items={main} />}
           {checks.length > 0 && (
             <>
-              <p className="pe-ready-sub" data-ready-checks>
-                {checkTheseHeading(checks.length)}
-              </p>
-              <ChecklistList items={checks} />
+              {checksHeading ? <p className="pe-ready-sub">{checkTheseHeading(checks.length)}</p> : null}
+              <div data-ready-checks>
+                <ChecklistList items={checks} />
+              </div>
             </>
           )}
         </>

@@ -68,12 +68,22 @@ export type SigningCheck = { ok: true; typedName: string; details: SignerDetails
 /** The shortest typed name accepted (a signature of one character is not a name). */
 export const MIN_SIGNED_NAME = 2;
 
+/**
+ * The typed signature name, cleaned. The ONE normaliser for it: the page (the letter it shows and the fingerprint it sends) and the
+ * server (`checkSigning`) both call this, so "Mary  Smith", a tab or a non-breaking space between the names, and spaces at either
+ * end all become "Mary Smith" on both sides and can never make the two fingerprints disagree. The nine details go through
+ * `cleanSigningDetails` on both sides the same way.
+ */
+export function cleanTypedName(raw: unknown): string {
+  return cleanClientText(raw);
+}
+
 /** Cleans and checks what was posted. The details are checked before the name, the name before the tick. */
 export function checkSigning(raw: unknown): SigningCheck {
   const src = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
   const details = cleanSigningDetails(src.details);
   if (missingDetails(details).length > 0) return { ok: false, reason: "details_required" };
-  const typedName = cleanClientText(src.typedName);
+  const typedName = cleanTypedName(src.typedName);
   if (typedName.length < MIN_SIGNED_NAME) return { ok: false, reason: "name_required" };
   if (src.agree !== true) return { ok: false, reason: "agree_required" };
   return { ok: true, typedName, details };
@@ -125,25 +135,71 @@ export type Agreement = {
   exhibit: Exhibit;
   /** The letter and the exhibit as plain text: what the signature row stores and the sha256 covers. */
   text: string;
-  /** The canonical string that is hashed into the fingerprint. */
+  /**
+   * The canonical string that is hashed into the fingerprint the page sends and the server compares. It is built from the letter
+   * with the two DATE fields (`date`, `signed_date`) replaced by a fixed placeholder, so a page opened one day and signed the next
+   * still matches: the server stamps the real date into `text` (what is stored and what the stored sha256 covers).
+   */
   canonical: string;
 };
+
+/** What stands in for `{{date}}` and `{{signed_date}}` in the canonical form. Never shown and never stored. */
+export const FINGERPRINT_DATE = "[date]";
 
 export type AgreementResult = { ok: true; agreement: Agreement } | { ok: false };
 
 /** Merges the stored letter with the client's details. Fail closed: any unmerged field means no agreement at all. */
 export function assembleAgreement(input: { body: string; inputs: LetterInputs; exhibit: Exhibit }): AgreementResult {
-  const letter = renderLetter(input.body, letterValues(input.inputs));
+  const values = letterValues(input.inputs);
+  const letter = renderLetter(input.body, values);
   if (!letter.ok) return { ok: false };
+  // The same letter with the date fields fixed: what the fingerprint covers (see `Agreement.canonical`).
+  const undated = renderLetter(input.body, { ...values, date: FINGERPRINT_DATE, signed_date: FINGERPRINT_DATE });
+  if (!undated.ok) return { ok: false };
   return {
     ok: true,
     agreement: {
       blocks: letter.blocks,
       exhibit: input.exhibit,
       text: agreementText(letter.blocks, input.exhibit),
-      canonical: agreementCanonical({ letter: letter.blocks, details: input.inputs.details, exhibit: input.exhibit }),
+      canonical: agreementCanonical({ letter: undated.blocks, details: input.inputs.details, exhibit: input.exhibit }),
     },
   };
+}
+
+/** What the PAGE holds while a client fills in the steps: raw typed values, exactly as the inputs hold them. */
+export type PageSigningState = {
+  body: string;
+  /** The nine details as typed (cleaned here, the way the server cleans them). */
+  details: unknown;
+  /** The signature name as typed (cleaned here with `cleanTypedName`, the way the server cleans it). */
+  typedName: string;
+  dateText: string;
+  clientEmail: string;
+  exhibit: Exhibit;
+};
+
+/**
+ * The agreement the page shows and fingerprints, from what the client typed. Pure, and the ONLY place the page turns typed values
+ * into an agreement, so the browser and the server cannot normalise a field differently. Null if the stored letter will not merge.
+ */
+export function pageAgreement(state: PageSigningState): Agreement | null {
+  const r = assembleAgreement({
+    body: state.body,
+    inputs: { details: cleanSigningDetails(state.details), typedName: cleanTypedName(state.typedName), dateText: state.dateText, clientEmail: state.clientEmail },
+    exhibit: state.exhibit,
+  });
+  return r.ok ? r.agreement : null;
+}
+
+/** What the sign action posts: the cleaned name and details, the tick, and the fingerprint of the agreement on screen. Null if it can't sign. */
+export async function pageSigningPayload(state: PageSigningState & { agree: boolean }): Promise<SigningInput | null> {
+  const details = cleanSigningDetails(state.details);
+  const typedName = cleanTypedName(state.typedName);
+  if (!canSign({ typedName, agree: state.agree, details })) return null;
+  const agreement = pageAgreement(state);
+  if (!agreement) return null;
+  return { typedName, agree: state.agree, details, fingerprint: await fingerprintOf(agreement) };
 }
 
 /** Every paragraph in order (bold lead-in first), then Exhibit A. Deterministic. */
@@ -173,13 +229,17 @@ export function letterDateText(now: Date, timeZone: string): string {
   }
 }
 
-/** "November 12, 2026 at 2:14 PM" in the firm's zone, or "" for an unreadable instant. */
+/**
+ * "November 12, 2026 at 2:14 PM EST" in the firm's zone, or "" for an unreadable instant. The zone is always NAMED (its short
+ * name from Intl, so daylight time reads EDT and an hour that happens twice in the autumn is not ambiguous): a signed time
+ * with no zone says nothing. An unusable zone falls back to UTC, which is named too.
+ */
 export function signedAtText(signedAtIso: string, timeZone: string): string {
   const at = new Date(signedAtIso);
   if (Number.isNaN(at.getTime())) return "";
   const fmt = (zone: string) => ({
     day: new Intl.DateTimeFormat("en-US", { timeZone: zone, year: "numeric", month: "long", day: "numeric" }).format(at),
-    time: new Intl.DateTimeFormat("en-US", { timeZone: zone, hour: "numeric", minute: "2-digit" }).format(at),
+    time: new Intl.DateTimeFormat("en-US", { timeZone: zone, hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(at),
   });
   let parts: { day: string; time: string };
   try {
@@ -190,7 +250,13 @@ export function signedAtText(signedAtIso: string, timeZone: string): string {
   return `${parts.day} at ${parts.time}`;
 }
 
-/** "Signed November 12, 2026 at 2:14 PM by Alex Sample". */
+/** The same instant in UTC, ISO 8601 ("2026-11-12T19:14:03.000Z"), for the PDF's signature record. "" for an unreadable instant. */
+export function signedAtUtcIso(signedAtIso: string): string {
+  const at = new Date(signedAtIso);
+  return Number.isNaN(at.getTime()) ? "" : at.toISOString();
+}
+
+/** "Signed November 12, 2026 at 2:14 PM EST by Alex Sample". */
 export function signedLineText(signedAtIso: string, timeZone: string, name: string): string {
   const when = signedAtText(signedAtIso, timeZone);
   return when ? `Signed ${when} by ${name}` : `Signed by ${name}`;

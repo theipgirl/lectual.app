@@ -88,7 +88,7 @@ describe("the client steps for a signed-letter flat-fee proposal", () => {
       onDownloadReview: undefined,
       onAccept: undefined,
     });
-    expect(html).toContain("Signed November 12, 2026 at 2:14 PM by Faithe Williams");
+    expect(html).toContain("Signed November 12, 2026 at 2:14 PM EST by Faithe Williams");
     expect(html).toContain(DOWNLOAD_SIGNED_LABEL);
     expect(html).toContain(`>${PAY_LABEL}</a>`);
     expect(html).toContain("Management agreement: notice of non-renewal and termination");

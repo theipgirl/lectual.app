@@ -19,6 +19,7 @@ import { firstNameOf, joinOr, statusLabelFor, statusTone } from "@/lib/proposal-
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { editorLetterState } from "@/lib/loe/editor-state";
 import { readSignature, type SignatureRead } from "@/lib/loe/signature-read";
+import { canReadSignature } from "@/lib/loe/signature-roles";
 import { buildSignedCard } from "@/lib/loe/signed-card";
 import { getApprovedLetter } from "@/lib/loe/templates-store";
 import { isSignedSnapshot } from "@/lib/proposals/signed-state";
@@ -47,7 +48,7 @@ import { UnsavedGuardProvider } from "@/components/proposal-editor/UnsavedGuard"
 import { DraftFormElement, DraftProvider } from "@/components/proposal-editor/DraftForm";
 import { EditorActions } from "@/components/proposal-editor/EditorActions";
 import { PayBox, ReadyChecklist } from "@/components/proposal-editor/EditorSide";
-import { CheckFirstPanel } from "@/components/proposal-editor/CheckFirstPanel";
+import { CheckFirstPanel, checkFirstShown } from "@/components/proposal-editor/CheckFirstPanel";
 import { EngagementLetterSlot } from "@/components/proposal-editor/EngagementLetterSlot";
 import { canDeleteProposal } from "@/lib/proposal-editor/delete-proposal";
 import { PaidPanel } from "@/components/proposal-editor/PaidPanel";
@@ -106,6 +107,8 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
   const session = await resolveFirmSession();
   if (session.kind !== "ok") notFound();
   const canWrite = PROPOSAL_STAFF_WRITE_ROLES.includes(session.role);
+  // Who may read a client's signature record (the one list, `signature-roles.ts`): the staff roles. Decides whether the read is attempted.
+  const mayReadSignature = canReadSignature(session.role);
 
   let detail: ProposalDetail | null;
   try {
@@ -160,7 +163,9 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
         )
       : Promise.resolve(null),
     // Sprint 6: the signature row of an accepted version that carries a letter (three-state).
-    proposal.status === "accepted" && content.loe
+    // Only a role that may read signature records is asked (the database hides them from everyone else, and an empty answer
+    // would read as "couldn't be loaded"). For other roles the card is drawn from the accepted snapshot: `mayReadSignature`.
+    proposal.status === "accepted" && content.loe && mayReadSignature
       ? getScopedClient().then(
           (db) => readSignature(db, proposal.id),
           (): SignatureRead => ({ status: "unavailable" }),
@@ -168,7 +173,8 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
       : Promise.resolve(null),
   ]);
   const letterState = editorLetterState({ read: letterRead, attached: content.loe });
-  const signedCard = signatureRead
+  const signedCard =
+    proposal.status === "accepted" && content.loe
     ? buildSignedCard({
         proposalId: proposal.id,
         status: proposal.status,
@@ -177,7 +183,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
         events: stepRead && stepRead.ok ? stepRead.events : null,
         tz,
         canRetry: PROPOSAL_PAID_ROLES.includes(session.role),
-        canDownload: canWrite,
+        canDownload: mayReadSignature,
       })
     : null;
   const signedAccepted = proposal.status === "accepted" && isSignedSnapshot(proposal.accepted_snapshot);
@@ -551,7 +557,8 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
             </section>
           )}
 
-              {statusEditable && <ReadyChecklist items={checklist} />}
+              {/* One "Check these" heading a page: when the assistant's panel is at the top, the checklist lists its checks without a second one. */}
+              {statusEditable && <ReadyChecklist items={checklist} checksHeading={!(isAssistantDraft && checkFirstShown(card.receipts))} />}
               {statusEditable && <EditorActions canSave={editable} canCreateLink={canCreateLink} askText={askText} blocking={blocking} />}
 
               <section className="lx-card pe-preview" id="pe-preview" aria-label="Preview of the client page">

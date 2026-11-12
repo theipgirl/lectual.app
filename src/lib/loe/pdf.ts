@@ -28,9 +28,14 @@ export type PdfMode = "review" | "signed";
 
 export type PdfSignature = {
   signerName: string;
-  /** "November 12, 2026 at 2:14 PM" in the firm's zone. */
+  /** "November 12, 2026 at 2:14 PM EST": the firm's zone, always named. */
   signedAtText: string;
-  /** The agreement's sha256 (hex), the fingerprint of exactly what was signed. */
+  /** The same instant in UTC, ISO 8601 ("2026-11-12T19:14:03.000Z"). Printed in the signature record beside the local time. */
+  signedAtUtc: string;
+  /**
+   * The sha256 (hex) of exactly the text printed above it. The caller must have checked that: a fingerprint is never printed
+   * beside text it does not match (`buildVerifiedSignedPdf`).
+   */
   fingerprint: string;
   signatureId?: string | null;
 };
@@ -38,6 +43,12 @@ export type PdfSignature = {
 export type BuildLetterPdfInput = {
   blocks: readonly LetterBlock[];
   exhibit: Exhibit;
+  /**
+   * Signed mode only: the STORED signed text (`client_proposal_signature.agreement_text`), drawn verbatim as plain paragraphs
+   * INSTEAD of `blocks` and the exhibit table. Used when today's code no longer rebuilds the text that was signed: the file
+   * then holds exactly the text the stored fingerprint covers.
+   */
+  storedText?: string;
   details: SignerDetails;
   mode: PdfMode;
   /** Required for `signed`. */
@@ -122,20 +133,31 @@ export async function buildLetterPdf(input: BuildLetterPdfInput): Promise<Uint8A
     doc.font("Regular").fontSize(BODY).fillColor("#000000");
   }
 
-  // The full letter: every paragraph, in order, bold lead-in first.
-  for (const block of input.blocks) {
-    doc.x = left;
-    if (block.lead) {
-      doc.font("Bold").text(block.lead, { width, continued: block.text.length > 0 });
-      if (block.text.length > 0) doc.font("Regular").text(` ${block.text}`, { width });
-      doc.font("Regular");
-    } else {
-      doc.font("Regular").text(block.text, { width });
+  if (input.mode === "signed" && typeof input.storedText === "string") {
+    // The stored signed text, verbatim: one plain paragraph per blank-line-separated block, line breaks kept. No lead-ins in
+    // bold and no exhibit table are re-derived, because the text itself is what was signed.
+    for (const para of input.storedText.split(/\n{2,}/)) {
+      if (para.length === 0) continue;
+      doc.x = left;
+      doc.font("Regular").text(para, { width });
+      doc.moveDown(GAP / BODY);
     }
-    doc.moveDown(GAP / BODY);
-  }
+  } else {
+    // The full letter: every paragraph, in order, bold lead-in first.
+    for (const block of input.blocks) {
+      doc.x = left;
+      if (block.lead) {
+        doc.font("Bold").text(block.lead, { width, continued: block.text.length > 0 });
+        if (block.text.length > 0) doc.font("Regular").text(` ${block.text}`, { width });
+        doc.font("Regular");
+      } else {
+        doc.font("Regular").text(block.text, { width });
+      }
+      doc.moveDown(GAP / BODY);
+    }
 
-  writeExhibit(doc, input.exhibit, left, width);
+    writeExhibit(doc, input.exhibit, left, width);
+  }
 
   if (input.mode === "signed" && input.signature) writeSignature(doc, input.signature, input.details, left, width);
 
@@ -215,6 +237,7 @@ function writeSignature(doc: PDFKit.PDFDocument, sig: PdfSignature, details: Sig
   doc.moveDown(0.4);
   line("Signer", sig.signerName);
   line("Signed", sig.signedAtText);
+  if (sig.signedAtUtc) line("Signed (UTC)", sig.signedAtUtc);
   if (details.entity_name) line("On behalf of", details.entity_name);
   if (details.title) line("Title", details.title);
   line("Fingerprint (sha256)", sig.fingerprint);

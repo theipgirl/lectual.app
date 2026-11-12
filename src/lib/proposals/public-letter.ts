@@ -6,12 +6,14 @@ import { PDF_MESSAGES } from "@/lib/loe/client-words";
 import type { LetterPdfResult } from "@/lib/loe/pdf-result";
 import { buildExhibit } from "@/lib/loe/exhibit";
 import { buildLetterPdf } from "@/lib/loe/pdf";
+import { buildVerifiedSignedPdf } from "@/lib/loe/signed-pdf";
 import { reviewAddressLimiter, reviewTokenLimiter } from "@/lib/loe/review-limit";
 import { assembleAgreement, checkSigning, cleanSigningDetails, letterDateText } from "@/lib/loe/signing";
 import { parseInet } from "@/lib/quotes/public";
 import { parseClientClassInput, quoteWithClientClasses } from "./client-classes";
 import { normalizeSelection } from "./pricing";
-import { readPublicProposal, type PublicProposalsDb } from "./public";
+import { readPublicProposal, readSignedSource, type PublicProposalsDb } from "./public";
+import { isSignedSnapshot } from "./signed-state";
 import { isWellFormedProposalToken } from "./types";
 
 /**
@@ -21,7 +23,8 @@ import { isWellFormedProposalToken } from "./types";
  *    signed". Built from the STORED letter, the recomputed quote and the CLEANED details: the browser sends details and
  *    ticks only, never letter text or money. Refuses a proposal that is not live (withdrawn, expired, replaced, or already
  *    signed), is rate limited, and logs nothing.
- *  - `signedLetterPdf`: the letter as signed, rebuilt from the accepted snapshot alone, with the signature record.
+ *  - `signedLetterPdf`: the letter as signed, with the signature record: rebuilt from the accepted snapshot and checked against
+ *    the stored fingerprint, or (when that no longer matches) produced from the stored signed text (`buildVerifiedSignedPdf`).
  *
  * There is no proposal-id or org-id parameter: a caller who could name one could not name someone else's. The result carries
  * base64 bytes or a fixed sentence, never raw error text.
@@ -99,21 +102,23 @@ export async function reviewLetterPdf(
 export async function signedLetterPdf(token: string, now: Date, opts: { db?: PublicProposalsDb } = {}): Promise<LetterPdfResult> {
   const read = await readPublicProposal(String(token ?? ""), now, opts.db);
   if (read.status !== "ok") return fail(read.status === "unavailable" || read.status === "unconfigured" ? PDF_MESSAGES.unavailable : PDF_MESSAGES.not_open);
-  const signed = read.view.letter?.signed;
-  if (read.handle.storedStatus !== "accepted" || !signed) return fail(PDF_MESSAGES.not_signed);
+  if (read.handle.storedStatus !== "accepted" || !read.view.content.loe) return fail(PDF_MESSAGES.not_signed);
+  // The snapshot as stored, by the token's own row. The file is built by the ONE signed-PDF builder, which prints a fingerprint
+  // only beside text it has hashed and matched (the rebuilt letter, or failing that the stored signed text).
+  const source = await readSignedSource(read.handle, opts.db);
+  if (!source) return fail(PDF_MESSAGES.unavailable);
+  if (!isSignedSnapshot(source.snapshot)) return fail(PDF_MESSAGES.not_signed);
   try {
-    const bytes = await buildLetterPdf({
-      blocks: signed.blocks,
-      exhibit: signed.exhibit,
-      details: signed.details,
-      mode: "signed",
-      signature: { signerName: signed.signerName, signedAtText: signed.signedAtText, fingerprint: signed.fingerprint, signatureId: signed.signatureId },
-      firmName: read.view.firm.displayName,
-      title: read.view.content.loe?.title ?? "Engagement letter",
+    const built = await buildVerifiedSignedPdf({
+      snapshot: source.snapshot,
+      // `readPublicProposal` answers `unavailable` for a letter proposal whose firm profile couldn't be read, so these are real.
+      firm: { displayName: read.view.firm.displayName, timeZone: read.view.firm.timeZone },
+      readStored: source.readStored,
     });
-    return { ok: true, base64: Buffer.from(bytes).toString("base64"), filename: filenameFor(signed.details.client_name, true) };
+    if (!built.ok) return fail(PDF_MESSAGES.unavailable);
+    const clientName = cleanSigningDetails(source.snapshot.signing?.details).client_name;
+    return { ok: true, base64: Buffer.from(built.bytes).toString("base64"), filename: filenameFor(clientName, true) };
   } catch {
     return fail(PDF_MESSAGES.unavailable);
   }
 }
-

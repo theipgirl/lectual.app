@@ -531,7 +531,6 @@ export const LETTER_LIVE_COPY_NOTE = "This is the copy the client reads and sign
 
 /* Signed letter card on the staff proposal page (Sprint 6). */
 export const SIGNED_CARD_HEADING = "Engagement letter";
-export const SIGNED_CARD_NOT_FOUND = "This version was accepted with an engagement letter, but its signature record wasn't found. It is not shown as signed here.";
 export const SIGNED_CARD_UNAVAILABLE = "The signature record couldn't be loaded. Refresh to try again.";
 export const SIGNED_DOWNLOAD = "Download the signed letter (PDF)";
 export const SIGNED_DOWNLOADING = "Preparing…";
@@ -541,3 +540,10 @@ export const SIGNED_FILING_OK = "Filed in the matter's Engagement folder.";
 export const SIGNED_TRY_AGAIN = "Try again";
 export const SIGNED_FINGERPRINT_LABEL = "Fingerprint (sha256)";
 export const SIGNED_DOWNLOAD_NOT_ALLOWED = "Your role can't download the signed letter.";
+/** For a role that may not read the signature record: who signed and when, from the accepted proposal itself. */
+export function signedSummaryLine(name: string, when: string): string {
+  return when ? `Signed by ${name} on ${when}` : `Signed by ${name}`;
+}
+/** Shown on the staff card when the signed PDF is produced from the stored signed text rather than rebuilt. */
+export const SIGNED_FROM_STORED_TEXT =
+  "This copy is produced from the stored signed text: the exact words that were signed, as plain paragraphs. Its fingerprint matches that text.";

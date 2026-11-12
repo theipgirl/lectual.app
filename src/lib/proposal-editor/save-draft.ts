@@ -7,6 +7,7 @@ import type { ActionState } from "@/app/dashboard/proposals/errors";
 import { wantedFromForm } from "@/lib/loe/editor-state";
 import type { ApprovedRead } from "@/lib/loe/templates-store";
 import { withLoeSnapshot } from "@/lib/proposals/loe-snapshot";
+import { withoutLetterCheck } from "@/lib/proposals/attach-letter";
 import { applyGeneralForm } from "./general-form";
 import {
   parseAdjustments,
@@ -181,8 +182,12 @@ export async function buildDraftUpdate(
     const currentlyOn = !!current.content.loe;
     const wanted = wantedFromForm(form, currentlyOn);
     const read = await deps.approvedLetter(isGeneralContent(current.content) ? "general" : "trademark");
-    if (read.status === "ok") content = withLoeSnapshot(content, read.letter, wanted);
-    else if (read.status === "unavailable" && wanted !== currentlyOn) return { ok: false, error: LETTER_SWITCH_UNREADABLE };
+    if (read.status === "ok") {
+      content = withLoeSnapshot(content, read.letter, wanted);
+      // A draft the assistant or Copilot made while the firm's letter couldn't be read carries a "couldn't be attached" check.
+      // A person saving with the switch on the page and the letter readable has chosen: the check is settled either way.
+      if (form.get("loeFields") === "1") content = withoutLetterCheck(content);
+    } else if (read.status === "unavailable" && wanted !== currentlyOn) return { ok: false, error: LETTER_SWITCH_UNREADABLE };
     // not-set-up, or unreadable with the switch unchanged: the copy stays exactly as it was (create-link re-checks it).
   }
 

@@ -1,6 +1,5 @@
-import { agreementFingerprint } from "@/lib/loe/fingerprint";
 import { buildExhibit } from "@/lib/loe/exhibit";
-import { assembleAgreement, cleanSigningDetails, type SignerDetails } from "@/lib/loe/signing";
+import { pageAgreement, pageSigningPayload, type SignerDetails } from "@/lib/loe/signing";
 import { money } from "@/components/client-proposal/format";
 import { parseClientClassInput, quoteWithClientClasses } from "@/lib/proposals/client-classes";
 import { defaultSelection, normalizeSelection } from "@/lib/proposals/pricing";
@@ -45,31 +44,42 @@ export function world(over: { content?: unknown; proposal?: Row; token?: string;
   );
 }
 
-/** What the page does in the browser: the same pure pipeline, over the same read, cleaned details, then the fingerprint. */
+/**
+ * What the page does in the browser: the REAL page pipeline (`pageAgreement` / `pageSigningPayload`, the functions `useLoeFlow`
+ * calls), over the same read. The typed name and details go in exactly as typed; nothing here cleans them for the page.
+ * `pageDate` overrides the date the page was opened with (the read's own by default).
+ */
 export async function browserSigning(
   db: ReturnType<typeof world>["db"],
-  over: { details?: SignerDetails | Record<string, unknown>; typedName?: string; agree?: boolean; selection?: Record<string, boolean> } = {},
+  over: { details?: SignerDetails | Record<string, unknown>; typedName?: string; agree?: boolean; selection?: Record<string, boolean>; pageDate?: string; readAt?: Date } = {},
 ) {
-  const read = await readPublicProposal(TOKEN, NOW, db);
+  const read = await readPublicProposal(TOKEN, over.readAt ?? NOW, db);
   if (read.status !== "ok" || !read.view.letter) throw new Error("no letter");
   const content = read.view.content;
   const selection = normalizeSelection(content, { ...defaultSelection(content), ...(over.selection ?? {}) });
   const priced = quoteWithClientClasses(content, selection, parseClientClassInput(content, undefined), { repair: true });
   if (!priced.ok) throw new Error("no quote");
-  const details = cleanSigningDetails(over.details ?? TEST_DETAILS);
   const typedName = over.typedName ?? "Sevetri Wilson";
-  const exhibit = buildExhibit(priced.content, priced.quote, money);
-  const assembled = assembleAgreement({
+  const state = {
     body: content.loe!.body,
-    inputs: { details, typedName: cleanSigningDetails({ client_name: typedName }).client_name, dateText: read.view.letter.dateText, clientEmail: read.view.letter.clientEmail },
-    exhibit,
-  });
-  if (!assembled.ok) throw new Error("no agreement");
-  const fingerprint = agreementFingerprint({ letter: assembled.agreement.blocks, details, exhibit });
+    details: over.details ?? TEST_DETAILS,
+    typedName,
+    dateText: over.pageDate ?? read.view.letter.dateText,
+    clientEmail: read.view.letter.clientEmail,
+    exhibit: buildExhibit(priced.content, priced.quote, money),
+  };
+  const agreement = pageAgreement(state);
+  if (!agreement) throw new Error("no agreement");
+  const payload = await pageSigningPayload({ ...state, agree: true });
+  if (!payload) throw new Error("the page could not sign");
   return {
     selection,
-    text: assembled.agreement.text,
-    signing: { typedName, agree: over.agree ?? true, details: over.details ?? TEST_DETAILS, fingerprint },
+    /** The agreement text as THE PAGE drew it (its own date). The server stamps its own date into what it stores. */
+    text: agreement.text,
+    pageDate: state.dateText,
+    /** What the page posts. `agree` may be overridden to play a hand-made post. */
+    signing: { ...payload, agree: over.agree ?? true },
+    /** A hand-made post: the page's fingerprint with the values exactly as typed (the server must clean them itself). */
+    rawSigning: { typedName, agree: over.agree ?? true, details: over.details ?? TEST_DETAILS, fingerprint: payload.fingerprint },
   };
 }
-

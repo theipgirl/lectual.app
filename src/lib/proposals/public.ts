@@ -1,6 +1,5 @@
 import "server-only";
 
-import { createHash } from "node:crypto";
 import { after } from "next/server";
 import { getAdminClient } from "@/lib/db/admin";
 import { resolveTimeZone } from "@/lib/org/profile-rules";
@@ -11,8 +10,9 @@ import { isProposalExpired } from "./expiry";
 import { DESCRIBE_BEFORE_ACCEPT, parseClientClassInput, quoteWithClientClasses } from "./client-classes";
 import { money } from "@/components/client-proposal/format";
 import { SIGN_MESSAGES } from "@/lib/loe/client-words";
-import { agreementFingerprint } from "@/lib/loe/fingerprint";
+import { agreementTextSha256, canonicalFingerprint } from "@/lib/loe/fingerprint";
 import { buildExhibit } from "@/lib/loe/exhibit";
+import { readStoredAgreement, type StoredAgreementDb } from "@/lib/loe/signature-read";
 import { rebuildSignedLetter, type SignedLetter } from "@/lib/loe/signed-letter";
 import { addressJson, assembleAgreement, checkSigning, letterDateText, signedLineText } from "@/lib/loe/signing";
 import { parseInet } from "@/lib/quotes/public";
@@ -440,6 +440,10 @@ export async function readPublicProposal(
     // A proposal with no firm behind it cannot be presented honestly.
     if (!firmName) return { status: "unavailable" };
     const profile = profileResult.error || !isObject(profileResult.data) ? null : profileResult.data;
+    // A firm with no profile row has the standard zone and its own name. A profile read that FAILED is different: the zone and the
+    // display name are then guesses. That only moves a date label on an ordinary proposal, but an engagement letter is dated and
+    // (once signed) timed in the firm's zone and carries the firm's name, so a letter proposal is unreadable below, never guessed.
+    const profileUnread = Boolean(profileResult.error && !isNoRowsError(profileResult.error));
     const firm: PublicProposalFirm = {
       name: firmName,
       slug: readString(org?.slug) ?? "",
@@ -480,6 +484,7 @@ export async function readPublicProposal(
     // proposal that carries a letter, and never added to the column allowlist); a signed one is rebuilt from its snapshot.
     let letter: PublicLetterView | null = null;
     if (content.loe) {
+      if (profileUnread) return { status: "unavailable" };
       if (accepted) {
         const signed = rebuildSignedLetter(snapshot, firm.timeZone);
         // The signature row's own id is a database id: it never reaches the browser.
@@ -608,7 +613,7 @@ export type AcceptRefusal =
   | "details_required"
   | "name_required"
   | "agree_required"
-  /** Engagement letter: what the browser showed is not what the server would have shown (a stale page). */
+  /** Engagement letter: what the browser showed is not what the server holds now (the proposal itself changed; the date never causes this). */
   | "stale"
   /** Engagement letter: the stored letter would not merge, or the proposal's data could not be read for it. */
   | "letter_unavailable"
@@ -627,8 +632,10 @@ export type AcceptResult =
       quote: ProposalQuote;
       /** Server-side only: never forward to the browser. */
       proposalId: string;
-      /** Engagement letter only: "Signed November 12, 2026 at 2:14 PM by Alex Sample". */
+      /** Engagement letter only: "Signed November 12, 2026 at 2:14 PM EST by Alex Sample" (the firm's zone, named). */
       signedLine?: string;
+      /** Engagement letter only: the letter's date as stamped here at signing ("November 13, 2026", the firm's calendar). */
+      signedDateText?: string;
     }
   | { ok: false; reason: AcceptRefusal; message: string };
 
@@ -769,8 +776,9 @@ function signRefusal(error: NonNullable<PublicDbError>): AcceptRefusal {
 /**
  * Signing and accepting are one act. Everything is decided from the token's own read and the cleaned submission, and NOTHING
  * is written before the one database call: a stale page, a missing name or tick, an unmergeable letter and a missing function
- * all leave the rows as they were. The agreement text is built HERE from the stored letter, the cleaned details and the
- * recomputed exhibit; the browser's fingerprint is only compared with ours.
+ * all leave the rows as they were. The agreement text is built HERE from the stored letter, the cleaned details, the
+ * recomputed exhibit and THIS server's date; the browser's fingerprint is only compared with ours, and it does not cover the
+ * date (a tab opened one day and signed the next is not stale).
  */
 async function signAndAccept(input: {
   read: Extract<PublicProposalRead, { status: "ok" }>;
@@ -792,21 +800,26 @@ async function signAndAccept(input: {
   const checked = checkSigning(input.signing);
   if (!checked.ok) return refuse(checked.reason);
 
+  // The letter's date: the firm's calendar date NOW, on this server. Never the date the page was opened with.
+  const dateText = letterDateText(now, read.view.firm.timeZone);
   const exhibit = buildExhibit(content, quote, money);
   const assembled = assembleAgreement({
     body: loe.body,
-    inputs: { details: checked.details, typedName: checked.typedName, dateText: letterDateText(now, read.view.firm.timeZone), clientEmail: letter.clientEmail },
+    inputs: { details: checked.details, typedName: checked.typedName, dateText, clientEmail: letter.clientEmail },
     exhibit,
   });
   if (!assembled.ok) return refuse("letter_unavailable");
   const { agreement } = assembled;
 
+  // The fingerprint covers the letter, the details and the exhibit with the DATE fields fixed (`Agreement.canonical`), so a page
+  // opened yesterday and signed today still matches. The date stamped into the stored text below is this server's.
   const posted = (input.signing as Record<string, unknown>).fingerprint;
-  const ours = agreementFingerprint({ letter: agreement.blocks, details: checked.details, exhibit });
+  const ours = canonicalFingerprint(agreement.canonical);
   if (typeof posted !== "string" || posted !== ours) return refuse("stale");
 
   const acceptedAt = now.toISOString();
-  const sha256 = createHash("sha256").update(agreement.text, "utf8").digest("hex");
+  // The stored sha256 is over the FINAL text, real dates included: the text the signature row keeps.
+  const sha256 = agreementTextSha256(agreement.text);
   const snapshot = buildAcceptedSnapshot({
     version: read.handle.version,
     content,
@@ -816,7 +829,7 @@ async function signAndAccept(input: {
     signed: {
       // The database fills `signature_id`, `signed_at` and the final `agreement` block itself; these are the same values it will write.
       agreement: { signature_id: null, signer_name: checked.typedName, signed_at: acceptedAt, sha256, template_version: null },
-      signing: { details: { ...checked.details }, date_text: letterDateText(now, read.view.firm.timeZone), client_email: letter.clientEmail },
+      signing: { details: { ...checked.details }, date_text: dateText, client_email: letter.clientEmail },
     },
   });
 
@@ -855,9 +868,34 @@ async function signAndAccept(input: {
       quote,
       proposalId,
       signedLine: signedLineText(signedAt, read.view.firm.timeZone, checked.typedName),
+      signedDateText: dateText,
     };
   } catch {
     return refuse("unavailable");
+  }
+}
+
+/**
+ * For the client's signed PDF only: the accepted snapshot AS STORED (the public view carries only what the page draws) and a
+ * reader of the stored signed text, both by the handle's own id and org (the handle came from the token's read; nothing here
+ * takes an id from a caller). Null when the row can't be read or holds no snapshot. Never logged.
+ */
+export async function readSignedSource(
+  handle: PublicProposalHandle,
+  db?: PublicProposalsDb,
+): Promise<{ snapshot: AcceptedSnapshot; readStored: () => Promise<{ text: string; sha256: string } | null> } | null> {
+  try {
+    const client = publicProposalsDb(db);
+    const { data, error } = await client.from("client_proposal").select("accepted_snapshot").eq("id", handle.proposalId).eq("org_id", handle.orgId).maybeSingle();
+    if (error || !isObject(data) || !isObject(data.accepted_snapshot)) return null;
+    const snapshot = data.accepted_snapshot as unknown as AcceptedSnapshot;
+    return {
+      snapshot,
+      readStored: () =>
+        readStoredAgreement(client as unknown as StoredAgreementDb, { proposalId: handle.proposalId, orgId: handle.orgId, signatureId: snapshot.agreement?.signature_id }),
+    };
+  } catch {
+    return null;
   }
 }
 

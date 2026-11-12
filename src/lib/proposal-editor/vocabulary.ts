@@ -23,7 +23,9 @@ export const STATUS_WORDS: Record<ProposalStatus, string> = {
 export const SIGNED_STATUS_WORD = "Signed by client";
 
 /** Create-link refusals about the engagement letter copy (Sprint 6). Fixed sentences; nothing of the letter is quoted. */
-export const LETTER_CHANGED_SENTENCE = "The firm's engagement letter has changed since this was saved. Save your changes, then create the link again.";
+/** One sentence for every path that turns a link on (Save and create link, Turn on the link, the approval queue's go-live). */
+export const LETTER_CHANGED_SENTENCE =
+  "The firm's engagement letter has changed since this proposal was saved, so the link wasn't turned on. Open the proposal and save it again (choose Edit again first if it is already saved), then create the link.";
 export const LETTER_UNREADABLE_SENTENCE = "Couldn't check the firm's engagement letter. Nothing was changed; try again shortly.";
 
 export const BUTTON_WORDS = {

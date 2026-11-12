@@ -1,8 +1,8 @@
 import "server-only";
 
 import { firmToken } from "@/lib/intake-forms/lawmatics-sync";
-import { buildSignedLetterPdf, signedLetterFileName } from "@/lib/loe/signed-pdf";
-import { rebuildSignedLetter } from "@/lib/loe/signed-letter";
+import { readStoredAgreement, type StoredAgreementDb } from "@/lib/loe/signature-read";
+import { buildVerifiedSignedPdf, signedLetterFileName } from "@/lib/loe/signed-pdf";
 import { resolveTimeZone } from "@/lib/org/profile-rules";
 import { addNote, uploadMatterFile, type FetchLike, type MultipartFetchLike } from "@/lib/lawmatics/writes";
 import { firmDisplayName } from "./commitment";
@@ -387,26 +387,40 @@ async function noteStep(db: FollowupDb, row: Row, deps: FollowupDeps): Promise<S
   }
 }
 
-/** The firm's name for the letterhead and its time zone, read for this org only. A failed read falls back to no name and the default zone. */
-async function firmLetterFacts(db: FollowupDb, orgId: string): Promise<{ displayName: string; timeZone: string }> {
-  const [org, profile] = await Promise.all([
-    db.from("crm_org").select("name").eq("id", orgId).maybeSingle(),
-    db.from("crm_org_profile").select("display_name, time_zone").eq("org_id", orgId).maybeSingle(),
-  ]);
-  const orgName = !org.error && isObject(org.data) && typeof org.data.name === "string" ? org.data.name : "";
-  const p = !profile.error && isObject(profile.data) ? profile.data : null;
-  return {
-    displayName: orgName ? firmDisplayName(p && typeof p.display_name === "string" ? p.display_name : null, orgName) : "",
-    timeZone: resolveTimeZone(p && typeof p.time_zone === "string" ? p.time_zone : null),
-  };
+/**
+ * The firm's name for the letterhead and its time zone, read for this org only. Three-state in effect: a firm with NO profile
+ * row has its own name and the standard zone (a real answer), but a FAILED read of the firm or of its profile is `unavailable`.
+ * The signed letter is never built with a guessed zone or a missing firm name.
+ */
+type FirmLetterFacts = { status: "ok"; displayName: string; timeZone: string } | { status: "unavailable" };
+
+async function firmLetterFacts(db: FollowupDb, orgId: string): Promise<FirmLetterFacts> {
+  try {
+    const [org, profile] = await Promise.all([
+      db.from("crm_org").select("name").eq("id", orgId).maybeSingle(),
+      db.from("crm_org_profile").select("display_name, time_zone").eq("org_id", orgId).maybeSingle(),
+    ]);
+    if (org.error || profile.error) return { status: "unavailable" };
+    const orgName = isObject(org.data) && typeof org.data.name === "string" ? org.data.name.trim() : "";
+    if (!orgName) return { status: "unavailable" };
+    const p = isObject(profile.data) ? profile.data : null;
+    return {
+      status: "ok",
+      displayName: firmDisplayName(p && typeof p.display_name === "string" ? p.display_name : null, orgName),
+      timeZone: resolveTimeZone(p && typeof p.time_zone === "string" ? p.time_zone : null),
+    };
+  } catch {
+    return { status: "unavailable" };
+  }
 }
 
 /** Files the signed letter (a PDF) in the matter's Engagement folder, through the firm's OWN connection. Schema-2 snapshots only. */
 async function signedUploadStep(db: FollowupDb, row: Row, deps: FollowupDeps): Promise<StepResult> {
   try {
     const facts = await firmLetterFacts(db, row.orgId);
-    const letter = rebuildSignedLetter(row.snapshot, facts.timeZone);
-    return await runSignedLoeUpload(letter, {
+    // A failed read of the firm's name or zone: the step is recorded as failed (Try again retries it), and no PDF is built.
+    if (facts.status !== "ok") return { outcome: "failed", reason: STEP_TEXT.signedFirmUnreadable };
+    return await runSignedLoeUpload(isSignedSnapshot(row.snapshot), {
       token: async () => {
         try {
           const t = await (deps.getToken ?? ((d, orgId) => firmToken(d as never, orgId)))(db, row.orgId);
@@ -421,7 +435,16 @@ async function signedUploadStep(db: FollowupDb, row: Row, deps: FollowupDeps): P
         if (target.reason === "unreadable") return { ok: false, kind: "failed", reason: STEP_TEXT.signedTargetUnreadable };
         return { ok: false, kind: "blocked", reason: target.reason === "none" ? STEP_TEXT.signedNoMatter : STEP_TEXT.signedManyMatters };
       },
-      buildPdf: () => buildSignedLetterPdf(letter!, { displayName: facts.displayName, title: row.snapshot.content.loe?.title ?? "Engagement letter" }),
+      buildPdf: async () => {
+        const built = await buildVerifiedSignedPdf({
+          snapshot: row.snapshot,
+          firm: { displayName: facts.displayName, timeZone: facts.timeZone },
+          // Only read when today's code no longer rebuilds the signed text; fenced on the proposal's own org.
+          readStored: () => readStoredAgreement(db as unknown as StoredAgreementDb, { proposalId: row.id, orgId: row.orgId, signatureId: row.snapshot.agreement?.signature_id }),
+        });
+        if (!built.ok) throw new Error("not built");
+        return built.bytes;
+      },
       upload: (token, file) => uploadMatterFile(token, { matterId: file.matterId, fileName: file.fileName, mime: file.mime, bytes: file.bytes }, deps.uploadFetch),
       fileName: signedLetterFileName(row.snapshot.agreement?.signer_name ?? "", row.snapshot.agreement?.signed_at ?? "", facts.timeZone),
     });

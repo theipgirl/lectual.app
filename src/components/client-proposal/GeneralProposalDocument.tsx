@@ -7,7 +7,7 @@ import { generalCommitmentSentence } from "@/lib/proposals/commitment";
 import type { ProposalQuote } from "@/lib/proposals/types";
 import type { ProposalDocumentProps } from "./ProposalDocument";
 import { RPB_FONT_VARS } from "./fonts";
-import { DOWNLOAD_REVIEW_LABEL, FOOTER_LETTER_LINE, LETTER_HEADING, LETTER_INTRO, READ_LETTER_FIRST, SIGN_MESSAGES } from "@/lib/loe/client-words";
+import { ATTORNEY_FOOTER_LETTER_LINE, DOWNLOAD_REVIEW_LABEL, LETTER_HEADING, LETTER_INTRO, READ_LETTER_FIRST, SIGN_MESSAGES } from "@/lib/loe/client-words";
 import type { SigningInput } from "@/lib/loe/signing";
 import { LoeDetailsForm } from "./LoeDetailsForm";
 import { LoeLetterPanel } from "./LoeLetterPanel";
@@ -33,7 +33,9 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
   const brand: ProposalBrand = brandForSlug(firm.slug);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<{ payUrl: string | null; opened: boolean; signedLine?: string | null } | null>(null);
+  const [done, setDone] = useState<{ payUrl: string | null; opened: boolean; signedLine?: string | null; letterDate?: string | null } | null>(() =>
+    props.initialDone ? { payUrl: props.initialDone.payUrl, opened: props.initialDone.opened ?? false, signedLine: props.initialDone.signedLine ?? null, letterDate: props.initialDone.letterDate ?? null } : null,
+  );
   const [previewOpen, setPreviewOpen] = useState(false);
 
   const accepted = mode === "accepted" || done !== null;
@@ -65,6 +67,8 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
     initialDetails: props.initialLoe?.details,
     initialTypedName: props.initialLoe?.typedName,
     initialAgree: props.initialLoe?.agree,
+    // Once signed, the letter on the page carries the date the server stamped, not the date the page was opened with.
+    signedDateText: done?.letterDate ?? null,
   });
   const loeOn = loeFlow.enabled;
   const stepOne = !loeOn || accepted || loeFlow.step === 1;
@@ -110,7 +114,7 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
         }
       }
       if (!opened) tab?.close();
-      setDone({ payUrl: url, opened, signedLine: result.signedLine ?? null });
+      setDone({ payUrl: url, opened, signedLine: result.signedLine ?? null, letterDate: result.letterDate ?? null });
     } catch {
       tab?.close();
       setError("We couldn’t record your acceptance. Please try again.");
@@ -245,9 +249,12 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
           <aside className="cp-side" id="cp-review" aria-labelledby="cp-s2">
             <div className="cp-panel">
               <div className="cp-panel-h">
-                <span className="cp-n" aria-hidden="true">
-                  2
-                </span>
+                {/* The "2" belongs to the two-part page. A proposal with a letter has its own four numbered steps above, so the panel has no number. */}
+                {loeOn ? null : (
+                  <span className="cp-n" aria-hidden="true">
+                    2
+                  </span>
+                )}
                 <h2 id="cp-s2">{accepted ? "Your acceptance" : "Review and accept"}</h2>
               </div>
               <div className="cp-panel-b" aria-live="polite">
@@ -298,7 +305,6 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
                     step={loeFlow.step}
                     accepted={accepted}
                     firstName={firstName}
-                    commitment={generalCommitmentSentence(firm.displayName ?? firm.name)}
                     signedLine={done?.signedLine ?? props.signedLine ?? letter?.signed?.signedLine ?? null}
                     payUrl={finalPayUrl}
                     opened={done?.opened ?? false}
@@ -394,8 +400,9 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
           {brand === "rpb" ? (
             <>
               <p className="cp-c">RPB Law, PLLC &middot; (305) 712-6960 &middot; info@rpblawfirm.com &middot; www.rpblawfirm.com</p>
-              {loeOn ? (
-                <p className="cp-d">{FOOTER_LETTER_LINE}</p>
+              {/* The firm's own footer line, the same on every proposal. A proposal with a letter shows the attorney's replacement only once one is set (it is not: see client-words.ts). */}
+              {loeOn && ATTORNEY_FOOTER_LETTER_LINE ? (
+                <p className="cp-d">{ATTORNEY_FOOTER_LETTER_LINE}</p>
               ) : (
                 <p className="cp-d">
                   Attorney advertising. Prepared for discussion purposes; does not constitute legal advice or create an

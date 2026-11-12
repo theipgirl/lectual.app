@@ -31,6 +31,7 @@ import { PAY_LINK_NEEDS_DB_UPDATE, PAY_LINK_NOT_HTTPS, PAY_LINK_NOT_LIVE, PAY_LI
 import { runDeleteProposalFamily, type DeleteFamilyResult } from "@/lib/proposal-editor/delete-proposal";
 import { RESET_NEEDS_DB_UPDATE, RESET_NOT_ACCEPTED } from "@/lib/proposal-editor/reset-acceptance";
 import { isSignedSnapshot } from "./signed-state";
+import { letterLiveCheck, letterLiveRefusal } from "@/lib/loe/live-guard";
 
 /**
  * The proposal data layer — every read and write the signed-in firm makes.
@@ -1059,6 +1060,10 @@ export async function unapproveProposal(id: string): Promise<ProposalRow> {
  * Approved -> sent, atomically, through `client_proposal_send`: any earlier
  * `sent` version of the family is superseded in the same call. The client's
  * link (`/p/<public_token>`) starts working here, and not before.
+ *
+ * This is the one function every make-live path calls ("Save and create link",
+ * "Turn on the link", the approval queue's go-live), which is why the
+ * engagement-letter guard lives here.
  */
 export async function sendProposal(id: string): Promise<ProposalRow> {
   const supabase = await getScopedClient();
@@ -1069,6 +1074,10 @@ export async function sendProposal(id: string): Promise<ProposalRow> {
   if (current.status !== "approved") {
     throw new ProposalError("conflict", "The link can only be turned on for a saved version. Save and create the link first.");
   }
+  // The ONE make-live guard (`live-guard.ts`): a version that carries an engagement letter goes live only while that copy is
+  // the firm's current approved letter, read fenced on this row's own org. Every way of turning a link on ends here.
+  const refusal = letterLiveRefusal(await letterLiveCheck(supabase, current));
+  if (refusal) throw new ProposalError("conflict", refusal);
   const { error } = await db.rpc("client_proposal_send", { p_id: current.id });
   if (error) throw friendlyProposalError(error, "turn on the link");
   return loadRow(db, current.id);

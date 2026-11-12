@@ -33,6 +33,7 @@ export const STEP_TEXT = {
   signedTargetUnreadable: "Couldn't read the matter or lead, so the signed letter wasn't filed.",
   signedAlready: "The signed engagement letter is already filed in Lawmatics.",
   signedNotBuilt: "The signed letter couldn't be built, so nothing was filed.",
+  signedFirmUnreadable: "Couldn't read the firm's name and time zone, so the signed letter wasn't built or filed. Try again.",
   signedPaidSkipped: "Signed on the proposal page",
   eventNotRecorded: "The step ran, but its line on the timeline couldn't be saved.",
 } as const;

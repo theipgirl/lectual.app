@@ -100,6 +100,9 @@ export default async function PublicProposalPage({ params }: { params: Promise<{
       onAccept={acceptProposalAction.bind(null, token)}
       letter={view.letter}
       onDownloadReview={view.letter ? downloadReviewLetterAction.bind(null, token) : undefined}
+      // Passed on the live page too: the receipt this page turns into the moment signing succeeds offers the signed PDF
+      // without a reload. The action is token-only and refuses until the proposal really is signed.
+      onDownloadSigned={view.letter ? downloadSignedLetterAction.bind(null, token) : undefined}
     />
   );
 }

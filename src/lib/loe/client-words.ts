@@ -1,14 +1,21 @@
 /**
  * Every client-facing word the engagement-letter steps add to the proposal page, in one place.
  *
- * ── ATTORNEY MUST APPROVE BEFORE USE ────────────────────────────────────────────────────────────
- * The sentences marked "REPLACEMENT" below stand in for two sentences that must not appear on a proposal that carries
- * an engagement letter (design doc 4.7):
- *   1. "Once your payment is received, we'll send your engagement agreement for review and signature."
- *   2. The footer line that the page "does not ... create an attorney-client relationship".
- * They are placeholders written by the software's builders, NOT by a lawyer. The firm's attorney must read and approve
- * (or replace) each one before a client sees it. Nothing else in the app edits this file; change the wording here only.
- * Lectual's own line ("software, not a law firm", `NOT_A_LAW_FIRM_DISCLAIMER`) is unchanged and stays on every state.
+ * ── WHO WRITES WHAT ─────────────────────────────────────────────────────────────────────────────
+ * The software's builders write only words that NAME A STEP or SAY WHAT THE PAGE DID: button labels, headings, "saved with
+ * your acceptance", "nothing has been signed". They never write a sentence about what a letter, a signature or this page
+ * means in law. That text is the firm's attorney's to write.
+ *
+ *  - The pay notes (`PAYNOTE_*`) only describe the steps. They stand where the no-letter page says the agreement is sent
+ *    after payment (which is not true of a proposal signed on this page). The attorney should still read them.
+ *  - The footer on a proposal that carries a letter is the firm's EXISTING footer line, unchanged: the same one every
+ *    proposal without a letter shows. `ATTORNEY_FOOTER_LETTER_LINE` below is an UNSET slot (null) for the attorney's own
+ *    replacement; the page uses it only once an attorney has written it here.
+ *  - The right-hand panel shows NO commitment sentence on a letter proposal: the letter and the "I have read and agree"
+ *    tick are the commitment, and nothing written here stands in for them.
+ *
+ * Nothing else in the app edits this file; change the wording here only. Lectual's own line ("software, not a law firm",
+ * `NOT_A_LAW_FIRM_DISCLAIMER`) is unchanged and stays on every state.
  */
 
 export const STEP_NAMES = ["Choose", "Your details", "Engagement letter", "Pay"] as const;
@@ -38,20 +45,27 @@ export const DOWNLOAD_SIGNED_LABEL = "Download your signed letter (PDF)";
 export const READ_AGAIN_LABEL = "Read it again";
 export const REVIEW_COPY_MARK = "Review copy - not yet signed";
 
-/** REPLACEMENT for 4.7 sentence 1 (shown before signing, beside the total). Attorney must approve. */
+/** Shown before signing, beside the total. Describes the steps only. */
 export const PAYNOTE_BEFORE_SIGNING = "You will read and sign the engagement letter before you pay. Your signed copy is saved with your acceptance.";
-/** REPLACEMENT for 4.7 sentence 1 (shown on the receipt). Attorney must approve. */
-export const PAYNOTE_AFTER_SIGNING = "Your signed engagement letter is saved with your acceptance. You can download it above.";
-/** REPLACEMENT for 4.7 sentence 2 (the footer line on a proposal that carries a letter). Attorney must approve. */
-export const FOOTER_LETTER_LINE =
-  "Attorney advertising. This page is prepared for discussion purposes. The engagement letter on this page is an agreement between you and the firm only once you have signed it.";
+/** Shown on the receipt. Describes what happened only. */
+export const PAYNOTE_AFTER_SIGNING = "Your signed engagement letter is saved with your acceptance.";
+/** Added to the receipt's note ONLY when the download button is drawn above it, so it is never said without the button. */
+export const PAYNOTE_DOWNLOAD_ABOVE = "You can download it above.";
+
+/**
+ * The attorney's own footer line for a proposal that carries a letter. UNSET (null): until the firm's attorney writes one here,
+ * such a proposal shows the firm's existing footer line, exactly as a proposal without a letter does. Software builders do not
+ * write this sentence.
+ */
+export const ATTORNEY_FOOTER_LETTER_LINE: string | null = null;
 
 /** Fixed refusals the sign step shows (never raw error text). */
 export const SIGN_MESSAGES = {
   details_required: "Please fill in your full legal name and your address before continuing.",
   name_required: "Please type your full legal name to sign.",
   agree_required: "Please tick the box to confirm you have read and agree to the letter.",
-  stale: "This page changed while you were reading it. Please reload the page and review the letter again. Nothing has been signed.",
+  // Only ever shown when the proposal itself changed after this page was opened (the date and how a name is spaced never cause it).
+  stale: "This proposal was updated after you opened this page. Please reload the page to see the current version and review the letter again. Nothing has been signed.",
   letter_unavailable: "We couldn't prepare your engagement letter just now. Nothing has been signed. Please try again, or contact the firm.",
   not_ready: "Signing isn't available on this page yet. Nothing has been signed. Please contact the firm.",
   signing_required: "This proposal has an engagement letter. Please review and sign it to continue.",

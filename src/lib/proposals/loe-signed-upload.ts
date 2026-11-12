@@ -1,4 +1,3 @@
-import type { SignedLetter } from "@/lib/loe/signed-letter";
 import { STEP_TEXT } from "./step-text";
 
 /**
@@ -23,15 +22,16 @@ export type SignedUploadDeps = {
   token: () => Promise<SignedUploadToken>;
   /** The Lawmatics record the proposal belongs to (the existing note-target resolution). */
   target: () => Promise<SignedUploadTarget>;
-  /** The signed letter as PDF bytes (`buildSignedLetterPdf`). */
+  /** The signed letter as PDF bytes (`buildVerifiedSignedPdf`); throws when no file can honestly be built. */
   buildPdf: () => Promise<Uint8Array>;
   upload: (token: string, file: { matterId: string; fileName: string; mime: "application/pdf"; bytes: Uint8Array }) => Promise<{ ok: true } | { ok: false; reason: string }>;
   fileName: string;
 };
 
-export async function runSignedLoeUpload(letter: SignedLetter | null, deps: SignedUploadDeps): Promise<SignedUploadResult> {
+/** `signed`: is there a signed letter on this version at all (a schema-2 snapshot)? Anything falsy is "nothing to file". */
+export async function runSignedLoeUpload(signed: unknown, deps: SignedUploadDeps): Promise<SignedUploadResult> {
   try {
-    if (!letter) return { outcome: "blocked", reason: STEP_TEXT.signedNoLetter };
+    if (!signed) return { outcome: "blocked", reason: STEP_TEXT.signedNoLetter };
     const token = await deps.token();
     if (token.status === "not_connected") return { outcome: "skipped", reason: STEP_TEXT.signedNotConnected };
     if (token.status === "unavailable") return { outcome: "failed", reason: STEP_TEXT.signedConnectionUnreadable };

@@ -26,7 +26,7 @@ import {
 } from "@/lib/proposals/new-picker";
 import { consultPrefill, filledFromLine, USE_CONSULT_LABEL } from "@/lib/proposals/prefill";
 import { readStartSubject } from "@/lib/proposals/start-subject";
-import { copilotHref, isStartScreen, type ConsultDoorState } from "@/lib/proposals/start-screen";
+import { consultDoorState, copilotHref, isStartScreen, type ConsultDoorState } from "@/lib/proposals/start-screen";
 import { listProposals } from "@/lib/proposals/store";
 import { PROPOSAL_STAFF_WRITE_ROLES } from "@/lib/proposals/types";
 import { CAN_WRITE_LEAD } from "@/lib/pipeline/leads";
@@ -72,20 +72,21 @@ async function readRecords(kind: RecordKind): Promise<ListRead> {
   }
 }
 
-/** The consult door's state: not connected (says what is needed), couldn't be read, or the rows. Never "no consults" for a failed read. */
-async function readConsultDoor(now: number, tz: string): Promise<ConsultDoorState> {
-  try {
-    const conns = await listMeetingConnections();
-    if (conns.ok && connectionHeader(conns.connections, now).status.kind === "none") return { kind: "not-connected" };
-    const proposals = await listProposals().then(
-      (rows) => rows.map((r) => ({ id: r.id, leadId: r.lead_id, createdAt: r.created_at, source: r.source })),
-      () => [],
-    );
-    const data = await loadConsultsStrip({ now, tz, proposals });
-    return data.meetings.status === "unavailable" ? { kind: "unavailable" } : { kind: "ok", data };
-  } catch {
-    return { kind: "unavailable" };
-  }
+/**
+ * The consult door's state: not connected (says what is needed), couldn't be read, or the rows. Never "no consults" for a failed
+ * read, and never rows built on a failed read of the firm's proposals (a consult that already has a proposal would then read as
+ * ready to draft): see `consultDoorState`.
+ */
+function readConsultDoor(now: number, tz: string): Promise<ConsultDoorState> {
+  return consultDoorState({
+    notConnected: async () => {
+      const conns = await listMeetingConnections();
+      return conns.ok && connectionHeader(conns.connections, now).status.kind === "none";
+    },
+    // `listProposals` throws when the read fails; it is NOT caught here, so the door says it couldn't load.
+    proposals: async () => (await listProposals()).map((r) => ({ id: r.id, leadId: r.lead_id, createdAt: r.created_at, source: r.source })),
+    strip: (proposals) => loadConsultsStrip({ now, tz, proposals }),
+  });
 }
 
 function Back() {

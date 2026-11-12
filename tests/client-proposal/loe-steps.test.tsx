@@ -11,7 +11,7 @@ import { rebuildSignedLetter } from "@/lib/loe/signed-letter";
 import { buildAcceptedSnapshot } from "@/lib/proposals/public";
 import { quoteWithClientClasses } from "@/lib/proposals/client-classes";
 import { defaultSelection } from "@/lib/proposals/pricing";
-import { STEP_NAMES, SIGN_LABEL, READ_LETTER_FIRST, CONTINUE_LABEL, DOWNLOAD_SIGNED_LABEL, READ_AGAIN_LABEL, PAY_LABEL, FOOTER_LETTER_LINE, PAYNOTE_BEFORE_SIGNING } from "@/lib/loe/client-words";
+import { STEP_NAMES, SIGN_LABEL, READ_LETTER_FIRST, CONTINUE_LABEL, DOWNLOAD_SIGNED_LABEL, READ_AGAIN_LABEL, PAY_LABEL, ATTORNEY_FOOTER_LETTER_LINE, PAYNOTE_BEFORE_SIGNING } from "@/lib/loe/client-words";
 import { sevetri } from "../proposals/fixture";
 import { danielle } from "../proposals/danielle-fixture";
 import { TEST_DETAILS, fullLetterBlocks, fullLetterBody, paragraphText } from "../loe/full-letter-fixture";
@@ -48,7 +48,8 @@ describe("step 1 is today's page", () => {
   it("keeps the totals panel and the includes table exactly as the page without a letter draws them", () => {
     const withLetter = render();
     const without = render({ content: twoBrandPerMark(), letter: undefined, onDownloadReview: undefined });
-    const totals = /<div class="cp-lines">[\s\S]*?<p class="cp-commit">/;
+    // The lines and the two totals. (The commitment sentence that used to end this slice is not drawn on a letter proposal.)
+    const totals = /<div class="cp-lines">[\s\S]*?<div class="cp-tot">[\s\S]*?<\/div><\/div><\/div>/;
     expect(between(withLetter, totals)).not.toBe("");
     expect(between(withLetter, totals)).toBe(between(without, totals));
     const includes = /<section class="cp-inc"[\s\S]*?<\/section>/;
@@ -69,13 +70,20 @@ describe("step 1 is today's page", () => {
     expect(html).not.toContain("Accept and pay my legal fee");
   });
 
-  it("does not show the two old sentences, and carries the replacement footer line", () => {
+  it("does not say the agreement is sent after payment, and its footer is the firm's existing footer line, unchanged", () => {
     const html = render();
     expect(html).not.toContain("we&rsquo;ll send your engagement agreement");
     expect(html).not.toContain("send your engagement agreement for review and signature");
+    // Review item 10: no footer sentence written by the software's builders. The footer of a proposal that carries a letter
+    // is, byte for byte, the footer of the same proposal without one.
     const footer = between(html, /<footer[\s\S]*<\/footer>/);
-    expect(footer).not.toContain("create an attorney-client relationship");
-    expect(footer).toContain(esc(FOOTER_LETTER_LINE));
+    const plain = between(render({ content: twoBrandPerMark(), letter: undefined, onDownloadReview: undefined }), /<footer[\s\S]*<\/footer>/);
+    expect(footer).not.toBe("");
+    expect(footer).toBe(plain);
+    expect(footer).toContain("Attorney advertising. Prepared for discussion purposes; does not constitute legal advice or create an attorney-client relationship.");
+    expect(html).not.toContain("only once you have signed it");
+    // The attorney's own replacement is an unset slot.
+    expect(ATTORNEY_FOOTER_LETTER_LINE).toBeNull();
     expect(html).toContain(esc(PAYNOTE_BEFORE_SIGNING));
     // Lectual's own line stays.
     expect(html).toContain("not a law firm");
@@ -233,7 +241,7 @@ describe("the receipt after signing", () => {
       onDownloadReview: undefined,
       onAccept: undefined,
     });
-    expect(html).toContain("Signed November 12, 2026 at 2:14 PM by Sevetri Wilson");
+    expect(html).toContain("Signed November 12, 2026 at 2:14 PM EST by Sevetri Wilson");
     expect(html).toContain(DOWNLOAD_SIGNED_LABEL);
     expect(html).toContain(READ_AGAIN_LABEL);
     expect(html).toContain(`>${PAY_LABEL}</a>`);

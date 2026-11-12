@@ -21,3 +21,17 @@ export function agreementFingerprint(parts: AgreementParts): string {
   const canonical = agreementCanonical(parts);
   return createHash("sha256").update(canonical, "utf8").digest("hex");
 }
+
+/**
+ * sha256 (hex) of an agreement's canonical string (`Agreement.canonical`, built by `assembleAgreement` with the date fields
+ * fixed). This is what the server compares with the fingerprint the page sent: equal to the browser's Web Crypto hash of the
+ * same string (`fingerprintOf`).
+ */
+export function canonicalFingerprint(canonical: string): string {
+  return createHash("sha256").update(canonical, "utf8").digest("hex");
+}
+
+/** sha256 (hex) of the agreement TEXT: what the signature row stores as `agreement_sha256` and the signed PDF prints. */
+export function agreementTextSha256(text: string): string {
+  return createHash("sha256").update(text, "utf8").digest("hex");
+}

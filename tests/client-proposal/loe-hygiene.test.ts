@@ -53,11 +53,18 @@ describe("the engagement-letter client page: hygiene", () => {
     expect(actions).not.toMatch(/\.from\(/);
   });
 
-  it("the client words file carries the attorney-approval comment and the two replacement sentences", () => {
+  it("the client words file says who writes what, holds no builder-written footer sentence, and leaves the attorney's slot unset", () => {
     const words = read("src/lib/loe/client-words.ts");
-    expect(words).toMatch(/ATTORNEY MUST APPROVE BEFORE USE/);
-    expect(words).toMatch(/REPLACEMENT for 4\.7 sentence 1/);
-    expect(words).toMatch(/REPLACEMENT for 4\.7 sentence 2/);
+    expect(words).toMatch(/WHO WRITES WHAT/);
+    expect(words).toMatch(/That text is the firm's attorney's to write/);
+    // Review item 10: the legal-sounding footer sentence the builders wrote is gone, and nothing replaces it.
+    expect(words).not.toMatch(/FOOTER_LETTER_LINE\s*=/);
+    expect(words).not.toMatch(/only once you have signed it/);
+    expect(words).not.toMatch(/agreement between you and the firm/);
+    expect(words).toMatch(/export const ATTORNEY_FOOTER_LETTER_LINE: string \| null = null;/);
+    // The pay notes describe steps only.
+    expect(words).toMatch(/export const PAYNOTE_BEFORE_SIGNING = "You will read and sign the engagement letter before you pay\. Your signed copy is saved with your acceptance\.";/);
+    expect(words).toMatch(/export const PAYNOTE_AFTER_SIGNING = "Your signed engagement letter is saved with your acceptance\.";/);
   });
 
   it("the old sentence is not drawn by the letter components, and the labels are the contract's", () => {

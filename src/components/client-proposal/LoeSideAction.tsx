@@ -5,6 +5,7 @@ import {
   DOWNLOAD_SIGNED_LABEL,
   PAYNOTE_AFTER_SIGNING,
   PAYNOTE_BEFORE_SIGNING,
+  PAYNOTE_DOWNLOAD_ABOVE,
   PAY_LABEL,
   READ_LETTER_FIRST,
   SIGN_LABEL,
@@ -18,7 +19,9 @@ import { DownloadPdfButton } from "./LoeReceipt";
  * receipt. Step 1: Continue. Step 2: Continue (until the details are given) and Back. Step 3: Sign and continue to payment
  * (until the name is typed and the box ticked) and Back. After signing: the signed line, the signed PDF and Pay my legal fee.
  *
- * The two sentences of the page that this replaces are NOT drawn here (see `client-words.ts`).
+ * No commitment sentence is drawn here: on a proposal that carries a letter, the letter and the "I have read and agree" tick
+ * are the commitment (see `client-words.ts`). The signed download is offered the moment the page is in its accepted state,
+ * whether it was loaded that way or the client has just signed, and the note only mentions it when the button is drawn.
  */
 
 export type LoeSideActionProps = {
@@ -26,7 +29,6 @@ export type LoeSideActionProps = {
   step: 1 | 2 | 3;
   accepted: boolean;
   firstName: string;
-  commitment: ReactNode;
   signedLine: string | null;
   payUrl: string | null;
   opened: boolean;
@@ -68,7 +70,10 @@ export function LoeSideAction(p: LoeSideActionProps) {
             {PAY_LABEL}
           </a>
         ) : null}
-        <p className="cp-paynote">{PAYNOTE_AFTER_SIGNING}</p>
+        <p className="cp-paynote">
+          {PAYNOTE_AFTER_SIGNING}
+          {p.onDownloadSigned ? ` ${PAYNOTE_DOWNLOAD_ABOVE}` : ""}
+        </p>
       </>
     );
   }
@@ -76,7 +81,6 @@ export function LoeSideAction(p: LoeSideActionProps) {
   const preview = p.mode === "preview";
   return (
     <>
-      <p className="cp-commit">{p.commitment}</p>
       {p.step === 1 ? (
         <button type="button" className="cp-btn" onClick={p.onContinue} disabled={!p.canContinue} aria-describedby={p.describedBy}>
           {CONTINUE_LABEL}

@@ -8,6 +8,13 @@ import { checkTheseHeading } from "@/lib/proposal-editor/vocabulary";
  * (nothing is rewritten and nothing is read again from the call). A person's own draft has no panel. If the stored
  * notes couldn't be read the panel says so; it never reads as "nothing to check".
  */
+/** Does the panel draw (and so put a "Check these" heading on the page)? The same test the component makes, for the page. */
+export function checkFirstShown(receipts: ProposalCardReceipts): boolean {
+  if (receipts.status === "none") return false;
+  if (receipts.status === "unavailable") return true;
+  return parseReviewerSummary(receipts.notes).filter((i) => i.checkFirst).length + receipts.unverified.length + receipts.verified.length > 0;
+}
+
 export function CheckFirstPanel({ receipts }: { receipts: ProposalCardReceipts }) {
   if (receipts.status === "none") return null;
   if (receipts.status === "unavailable") {

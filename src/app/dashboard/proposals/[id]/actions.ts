@@ -35,7 +35,7 @@ import { CAN_WRITE_LEAD } from "@/lib/pipeline/leads";
 import { getSiteOrigin } from "@/lib/site-origin";
 import { clientLinkOrigin, clientLinkUrl } from "@/lib/proposals/client-link-origin";
 import { runManualEmail } from "@/lib/consult-proposal/manual-email";
-import { letterCopyCheck } from "@/lib/loe/editor-state";
+import { letterLiveCheck } from "@/lib/loe/live-guard";
 import { getApprovedLetter } from "@/lib/loe/templates-store";
 import { runCreateLink } from "@/lib/proposal-editor/create-link";
 import { runSaveDraft, type SaveDraftDeps } from "@/lib/proposal-editor/save-draft";
@@ -201,14 +201,11 @@ export async function createLinkAction(_prev: ActionState, formData: FormData): 
     {
       gate: gateStaffAction,
       save: (form) => runSaveDraft(draftDeps(), form),
+      // The same guard `sendProposal` runs (`live-guard.ts`), asked here BEFORE approving so a stale copy leaves no saved version behind.
       letterCurrent: async (id) => {
         const row = (await getProposal(id))?.proposal ?? null;
-        if (!row || !row.content.loe) return "no_letter";
-        try {
-          return letterCopyCheck(row.content, await getApprovedLetter(await getScopedClient(), isGeneralContent(row.content) ? "general" : "trademark"));
-        } catch {
-          return "unreadable";
-        }
+        if (!row) return "no_letter";
+        return letterLiveCheck(await getScopedClient(), row);
       },
       approve: approveProposal,
       makeLive: sendProposal,
@@ -272,7 +269,10 @@ export async function unapproveAction(_prev: ActionState, formData: FormData): P
   return lifecycle(formData, unapproveProposal, EDIT_AGAIN_DONE, "Couldn't take this proposal back to editing.");
 }
 
-/** "Turn on the link": the recovery for a saved version whose link is not live. Nothing is emailed from here. */
+/**
+ * "Turn on the link": the recovery for a saved version whose link is not live. Nothing is emailed from here. The engagement
+ * letter copy is re-checked against the firm's current approved version inside `sendProposal` (the one make-live guard).
+ */
 export async function sendAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const refused = await gateStaffAction();
   if (refused) return refused;

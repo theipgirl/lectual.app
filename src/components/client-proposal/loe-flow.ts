@@ -8,10 +8,12 @@ import {
   canSign,
   cleanSigningDetails,
   emptyDetails,
-  fingerprintOf,
   letterDateText,
   missingDetails,
+  pageAgreement,
+  pageSigningPayload,
   type Agreement,
+  type PageSigningState,
   type SignerDetails,
   type SigningInput,
 } from "@/lib/loe/signing";
@@ -44,6 +46,11 @@ export type LoeFlowInput = {
   initialDetails?: SignerDetails;
   initialTypedName?: string;
   initialAgree?: boolean;
+  /**
+   * After a successful signing: the letter's date as the SERVER stamped it (the firm's calendar date at signing). The page was
+   * built with the date at page load; once signed, the letter shown is redrawn with the date that was actually stored.
+   */
+  signedDateText?: string | null;
 };
 
 /** Shown in a letter preview before the client has typed anything, so a merge field never reads as a blank line. */
@@ -66,16 +73,18 @@ export function useLoeFlow(input: LoeFlowInput) {
   const exhibit = useMemo(() => (enabled ? buildExhibit(input.shown, input.quote, money) : null), [enabled, input.shown, input.quote]);
 
   // The public page always passes the letter's date (worked out on the server in the firm's zone). The staff preview passes none, so it shows today.
-  const dateText = input.letter?.dateText || letterDateText(new Date(), "UTC");
+  const dateText = input.signedDateText || input.letter?.dateText || letterDateText(new Date(), "UTC");
   const clientEmail = input.letter?.clientEmail ?? "";
   const body = input.loe?.body ?? "";
 
+  /** What the client typed, as the inputs hold it. `pageAgreement` / `pageSigningPayload` clean it exactly as the server does. */
+  const state: PageSigningState | null = useMemo(
+    () => (enabled && exhibit ? { body, details, typedName, dateText, clientEmail, exhibit } : null),
+    [enabled, body, details, typedName, dateText, clientEmail, exhibit],
+  );
+
   /** The letter the client would sign: their cleaned details and typed name merged in. Null if the stored letter will not merge. */
-  const agreement: Agreement | null = useMemo(() => {
-    if (!enabled || !exhibit) return null;
-    const r = assembleAgreement({ body, inputs: { details: cleaned, typedName: typedName.trim(), dateText, clientEmail }, exhibit });
-    return r.ok ? r.agreement : null;
-  }, [enabled, body, cleaned, typedName, dateText, clientEmail, exhibit]);
+  const agreement: Agreement | null = useMemo(() => (state ? pageAgreement(state) : null), [state]);
 
   /** A read-only preview for step 1, before any details exist: blanks become bracketed prompts. */
   const preview: Agreement | null = useMemo(() => {
@@ -93,13 +102,13 @@ export function useLoeFlow(input: LoeFlowInput) {
   const signable = enabled && agreement !== null && canSign({ typedName, agree, details: cleaned });
 
   /**
-   * What the sign action posts. The fingerprint is hashed with Web Crypto (async) at the moment of signing, over exactly the
-   * letter, details and exhibit the page is showing. Null while the page cannot sign.
+   * What the sign action posts. The fingerprint is hashed with Web Crypto (async) at the moment of signing, over the letter,
+   * details and exhibit the page is showing with the date fields fixed (`Agreement.canonical`), so the server's date at
+   * signing never makes it disagree. Null while the page cannot sign.
    */
   async function signingPayload(): Promise<SigningInput | null> {
-    if (!signable || !agreement) return null;
-    const fingerprint = await fingerprintOf(agreement);
-    return { typedName: typedName.trim(), agree, details: cleaned, fingerprint };
+    if (!signable || !state) return null;
+    return pageSigningPayload({ ...state, agree });
   }
 
   return {

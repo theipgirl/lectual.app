@@ -81,6 +81,7 @@ export function describeIssuePath(path: string, content: ProposalContent | null)
     else if (key === "pay_url") parts.push("pay link");
     else if (key === "office_action_note") parts.push("office action note");
     else if (key === "client") parts.push("client");
+    else if (key === "loe") parts.push("engagement letter");
     else parts.push(FIELD_WORDS[key] ?? key.replace(/_/g, " "));
   }
   return parts.join(", ");

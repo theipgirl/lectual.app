@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { agreementFingerprint } from "@/lib/loe/fingerprint";
+import { agreementFingerprint, canonicalFingerprint } from "@/lib/loe/fingerprint";
 import { buildExhibit } from "@/lib/loe/exhibit";
 import {
   addressBlock,
@@ -15,6 +15,7 @@ import {
   missingDetails,
   sha256Hex,
   signedAtText,
+  signedAtUtcIso,
   signedLineText,
 } from "@/lib/loe/signing";
 import { money } from "@/components/client-proposal/format";
@@ -137,7 +138,10 @@ describe("the fingerprint", () => {
     const exhibit = exhibitFor();
     const r = assembleAgreement({ body: fullLetterBody(), inputs: INPUTS, exhibit });
     if (!r.ok) throw new Error("no agreement");
-    expect(await fingerprintOf(r.agreement)).toBe(agreementFingerprint({ letter: r.agreement.blocks, details: TEST_DETAILS, exhibit }));
+    // The fingerprint is over the canonical string, in which the date fields are a fixed placeholder (review item 4).
+    expect(await fingerprintOf(r.agreement)).toBe(canonicalFingerprint(r.agreement.canonical));
+    expect(await fingerprintOf(r.agreement)).not.toBe(agreementFingerprint({ letter: r.agreement.blocks, details: TEST_DETAILS, exhibit }));
+    expect(r.agreement.canonical).not.toContain(INPUTS.dateText);
     expect(await sha256Hex("abc")).toBe("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
   });
 });
@@ -153,8 +157,29 @@ describe("small helpers", () => {
     expect(letterDateText(at, "America/New_York")).toBe("November 12, 2026");
     expect(letterDateText(at, "Asia/Tokyo")).toBe("November 13, 2026");
     expect(letterDateText(at, "Not/AZone")).toBe("November 13, 2026");
-    expect(signedAtText("2026-11-12T19:14:00.000Z", "America/New_York")).toBe("November 12, 2026 at 2:14 PM");
-    expect(signedLineText("2026-11-12T19:14:00.000Z", "America/New_York", "Alex Sample")).toBe("Signed November 12, 2026 at 2:14 PM by Alex Sample");
+    // Review item 7: a signed time always names its zone (the zone's short name from Intl).
+    expect(signedAtText("2026-11-12T19:14:00.000Z", "America/New_York")).toBe("November 12, 2026 at 2:14 PM EST");
+    expect(signedLineText("2026-11-12T19:14:00.000Z", "America/New_York", "Alex Sample")).toBe("Signed November 12, 2026 at 2:14 PM EST by Alex Sample");
     expect(signedLineText("garbage", "America/New_York", "Alex Sample")).toBe("Signed by Alex Sample");
+  });
+
+  it("a signed time names its zone in summer, in the west, abroad, and when the zone is unusable", () => {
+    expect(signedAtText("2026-07-04T18:14:00.000Z", "America/New_York")).toBe("July 4, 2026 at 2:14 PM EDT");
+    expect(signedAtText("2026-11-12T19:14:00.000Z", "America/Los_Angeles")).toBe("November 12, 2026 at 11:14 AM PST");
+    expect(signedAtText("2026-11-12T19:14:00.000Z", "Europe/Berlin")).toBe("November 12, 2026 at 8:14 PM GMT+1");
+    expect(signedAtText("2026-11-12T19:14:00.000Z", "UTC")).toBe("November 12, 2026 at 7:14 PM UTC");
+    expect(signedAtText("2026-11-12T19:14:00.000Z", "Not/AZone")).toBe("November 12, 2026 at 7:14 PM UTC");
+    // The hour that happens twice when the clocks go back is told apart by the zone name.
+    expect(signedAtText("2026-11-01T05:30:00.000Z", "America/New_York")).toBe("November 1, 2026 at 1:30 AM EDT");
+    expect(signedAtText("2026-11-01T06:30:00.000Z", "America/New_York")).toBe("November 1, 2026 at 1:30 AM EST");
+    for (const zone of ["America/New_York", "America/Chicago", "Europe/London", "Asia/Tokyo", "UTC", "Not/AZone"]) {
+      expect(signedAtText("2026-11-12T19:14:00.000Z", zone), zone).toMatch(/ (AM|PM) \S+$/);
+    }
+    expect(signedAtText("garbage", "America/New_York")).toBe("");
+  });
+
+  it("the UTC form is ISO 8601", () => {
+    expect(signedAtUtcIso("2026-11-12T14:14:03-05:00")).toBe("2026-11-12T19:14:03.000Z");
+    expect(signedAtUtcIso("garbage")).toBe("");
   });
 });

@@ -7,8 +7,8 @@ import { generateTrademarkLoe } from "@/lib/documents/generate";
 import { listDraftsForProposal } from "@/lib/documents/store";
 import { renderAcceptedProposalDocx, DOCX_MIME } from "@/lib/documents/accepted-proposal-docx";
 import { setProspectCustomFields, uploadMatterFile } from "@/lib/lawmatics/writes";
-import { rebuildSignedLetter } from "@/lib/loe/signed-letter";
-import { buildSignedLetterPdf, signedLetterFileName } from "@/lib/loe/signed-pdf";
+import { readStoredAgreement, type StoredAgreementDb } from "@/lib/loe/signature-read";
+import { buildVerifiedSignedPdf, signedLetterFileName } from "@/lib/loe/signed-pdf";
 import { loadStaffFirmFacts } from "@/lib/loe/staff-firm";
 import { orgHasModule } from "@/lib/org/modules";
 import { firmCivilDate } from "@/lib/quotes/firm-time";
@@ -256,9 +256,8 @@ async function signedUploadRetryStep(supabase: ScopedClient, proposal: ProposalR
   const snapshot = proposal.accepted_snapshot;
   if (!isSignedSnapshot(snapshot)) return report(proposal, "signed_loe_upload", "blocked", STEP_TEXT.signedNoLetter);
   const facts = await loadStaffFirmFacts();
-  if (facts.status !== "ok") return report(proposal, "signed_loe_upload", "failed", STEP_TEXT.signedNotBuilt);
-  const letter = rebuildSignedLetter(snapshot, facts.timeZone);
-  const result = await runSignedLoeUpload(letter, {
+  if (facts.status !== "ok") return report(proposal, "signed_loe_upload", "failed", STEP_TEXT.signedFirmUnreadable);
+  const result = await runSignedLoeUpload(true, {
     token: signedInLawmaticsToken,
     target: async () => {
       const target = await resolveNoteTarget(supabase as unknown as LookupDb, {
@@ -271,7 +270,15 @@ async function signedUploadRetryStep(supabase: ScopedClient, proposal: ProposalR
       if (target.reason === "unreadable") return { ok: false, kind: "failed", reason: STEP_TEXT.signedTargetUnreadable };
       return { ok: false, kind: "blocked", reason: target.reason === "none" ? STEP_TEXT.signedNoMatter : STEP_TEXT.signedManyMatters };
     },
-    buildPdf: () => buildSignedLetterPdf(letter!, { displayName: facts.displayName, title: snapshot!.content.loe?.title ?? "Engagement letter" }),
+    buildPdf: async () => {
+      const built = await buildVerifiedSignedPdf({
+        snapshot,
+        firm: { displayName: facts.displayName, timeZone: facts.timeZone },
+        readStored: () => readStoredAgreement(supabase as unknown as StoredAgreementDb, { proposalId: proposal.id, orgId: proposal.org_id, signatureId: snapshot!.agreement?.signature_id }),
+      });
+      if (!built.ok) throw new Error("not built");
+      return built.bytes;
+    },
     upload: (token, file) => uploadMatterFile(token, { matterId: file.matterId, fileName: file.fileName, mime: file.mime, bytes: file.bytes }),
     fileName: signedLetterFileName(snapshot!.agreement?.signer_name ?? "", snapshot!.agreement?.signed_at ?? "", facts.timeZone),
   });

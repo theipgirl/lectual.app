@@ -949,6 +949,8 @@ export async function draftProposalFromConsult(input: DraftConsultProposalInput)
     madeBy: "assistant",
     ...(startedAt && isCivilDate(startedAt) ? { consultDate: startedAt } : {}),
   };
+  // `letter: null` ON PURPOSE: this file talks to a model, and the firm's engagement letter never comes near one. The run layer
+  // attaches the letter after this function returns (`run.ts`, `attachFirmLetter`).
   const built = buildDraftContent(spec, { pricing: firmPricing, letter: null, newOffer: offer }, () => `x${++ids}`);
   if (!built.ok) return fail("ai_failed", `The draft couldn't be built (${built.error}). Nothing was drafted.`, costUsd);
 

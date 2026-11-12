@@ -1,8 +1,7 @@
 import "server-only";
 
 import type { LetterPdfResult } from "./pdf-result";
-import { rebuildSignedLetter } from "./signed-letter";
-import { buildSignedLetterPdf, signedLetterFileName } from "./signed-pdf";
+import { buildVerifiedSignedPdf, signedLetterFileName, type StoredAgreement } from "./signed-pdf";
 import type { StaffFirmFacts } from "./staff-firm";
 import { isSignedSnapshot } from "@/lib/proposals/signed-state";
 import type { ProposalRow } from "@/lib/proposals/types";
@@ -10,7 +9,8 @@ import type { ProposalRow } from "@/lib/proposals/types";
 /**
  * The staff Download of a signed letter: the pure body of the server action, with every dependency passed in so the refusals and the bytes
  * are tested without a database. The proposal is read through the caller's scoped client (another firm's id is simply not found, with no letter
- * data), and the file is `buildSignedLetterPdf` of `rebuildSignedLetter(snapshot)`: the same input as the client's own signed download.
+ * data), and the file is `buildVerifiedSignedPdf(snapshot)`: the same builder as the client's own signed download and the Lawmatics
+ * filing. `fromStoredText` comes back true when the file had to be produced from the stored signed text (the card then says so).
  * Returns base64 bytes and a file name, or a fixed sentence. Never raw error text; the letter and the bytes are never logged.
  */
 
@@ -26,6 +26,8 @@ export type StaffDownloadDeps = {
   /** The proposal through the caller's scoped client; null when it isn't there for this firm. Throws when the read fails. */
   getProposal: (id: string) => Promise<ProposalRow | null>;
   firmFacts: () => Promise<StaffFirmFacts>;
+  /** The stored signed text of this version (scoped client, fenced on the row's own org). Only called when the rebuilt text no longer matches. */
+  readStored: (proposal: ProposalRow) => Promise<StoredAgreement | null>;
 };
 
 const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -42,10 +44,18 @@ export async function runStaffDownload(deps: StaffDownloadDeps, proposalId: unkn
     if (proposal.status !== "accepted" || !isSignedSnapshot(snapshot)) return { ok: false, message: STAFF_DOWNLOAD_MESSAGES.not_signed };
     const facts = await deps.firmFacts();
     if (facts.status !== "ok") return { ok: false, message: STAFF_DOWNLOAD_MESSAGES.unavailable };
-    const letter = rebuildSignedLetter(snapshot, facts.timeZone);
-    if (!letter) return { ok: false, message: STAFF_DOWNLOAD_MESSAGES.unavailable };
-    const bytes = await buildSignedLetterPdf(letter, { displayName: facts.displayName, title: snapshot!.content.loe?.title ?? "Engagement letter" });
-    return { ok: true, base64: Buffer.from(bytes).toString("base64"), filename: signedLetterFileName(letter.signerName, letter.signedAt, facts.timeZone) };
+    const built = await buildVerifiedSignedPdf({
+      snapshot,
+      firm: { displayName: facts.displayName, timeZone: facts.timeZone },
+      readStored: () => deps.readStored(proposal),
+    });
+    if (!built.ok) return { ok: false, message: STAFF_DOWNLOAD_MESSAGES.unavailable };
+    return {
+      ok: true,
+      base64: Buffer.from(built.bytes).toString("base64"),
+      filename: signedLetterFileName(built.signerName, built.signedAt, facts.timeZone),
+      ...(built.fromStoredText ? { fromStoredText: true } : {}),
+    };
   } catch {
     return { ok: false, message: STAFF_DOWNLOAD_MESSAGES.unavailable };
   }

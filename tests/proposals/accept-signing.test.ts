@@ -62,7 +62,9 @@ describe("a signed acceptance (content with an engagement letter)", () => {
     // No unsigned update of the proposal row is ever issued for a letter proposal.
     expect(w.calls.filter((c) => c.table === "client_proposal" && c.op === "update")).toHaveLength(0);
     if (r.ok) {
-      expect(r.signedLine).toBe("Signed October 20, 2026 at 11:00 AM by Sevetri Wilson");
+      // The zone is named (item 7): the firm is in New York and October is daylight time.
+      expect(r.signedLine).toBe("Signed October 20, 2026 at 11:00 AM EDT by Sevetri Wilson");
+      expect(r.signedDateText).toBe("October 20, 2026");
       expect(r.payUrl).toBe("https://app.lawmatics.com/forms/share/abc");
     }
     expect(mocks.after).toHaveBeenCalledTimes(1);
@@ -159,7 +161,8 @@ describe("a signed acceptance (content with an engagement letter)", () => {
     const w = world();
     const dirty = { ...TEST_DETAILS, street: "1 <script>alert(1)</script>\u0000Main\u0007St", city: "Mi\u2028ami" };
     const b = await browserSigning(w.db, { details: dirty, typedName: "Sevetri <b>Wilson</b>\u0000" });
-    const r = await acceptPublicProposal(TOKEN, b.selection, NOW, w.db, undefined, b.signing);
+    // Posted by hand with the values exactly as typed: the server cleans them itself and arrives at the page's fingerprint.
+    const r = await acceptPublicProposal(TOKEN, b.selection, NOW, w.db, undefined, b.rawSigning);
     expect(r.ok).toBe(true);
     const args = w.rpcCalls[0].args;
     expect(args.p_signer_name).toBe("Sevetri bWilson/b");

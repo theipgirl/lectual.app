@@ -23,7 +23,8 @@ import { PDF_MESSAGES } from "@/lib/loe/client-words";
  * name one could not name someone else's.
  *
  * The result is discriminated, never thrown (an uncaught throw reaches the
- * browser as a digest), and carries ONLY `{ ok, payUrl }` or `{ ok, message }`:
+ * browser as a digest), and carries ONLY `{ ok, payUrl }` (plus, for a signing, the signed line and
+ * the letter's date as text) or `{ ok, message }`:
  * no proposal id, no org id, no snapshot, no refusal code. The token is never
  * echoed, logged or put in a redirect. Nothing the client typed is logged.
  *
@@ -43,7 +44,13 @@ export async function acceptProposalAction(token: string, selection: unknown, cl
     const audit = { ip: h.get("x-forwarded-for") ?? h.get("x-real-ip"), userAgent: h.get("user-agent") };
     const result = await acceptPublicProposal(String(token ?? ""), selection, new Date(), undefined, clientClasses, signing, audit);
     if (!result.ok) return { ok: false, message: result.message };
-    return { ok: true, payUrl: safeHttpsUrl(result.payUrl) ?? "", ...(result.signedLine ? { signedLine: result.signedLine } : {}) };
+    return {
+      ok: true,
+      payUrl: safeHttpsUrl(result.payUrl) ?? "",
+      ...(result.signedLine ? { signedLine: result.signedLine } : {}),
+      // The letter's date as stamped here at signing: the receipt redraws the letter with it (the page was built with the date at page load).
+      ...(result.signedDateText ? { letterDate: result.signedDateText } : {}),
+    };
   } catch {
     return { ok: false, message: "We couldn’t record your acceptance. Please try again." };
   }

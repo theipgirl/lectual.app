@@ -79,15 +79,18 @@ export async function listLetterVersions(db: Db): Promise<VersionsRead> {
   }
 }
 
-/** The firm's currently approved letter of one kind (for `withLoeSnapshot`), or null when it has none. */
-export async function getApprovedLetter(db: Db, kind: LoeKindName): Promise<ApprovedRead> {
+/**
+ * The firm's currently approved letter of one kind (for `withLoeSnapshot`), or null when it has none.
+ *
+ * `orgId`, when given, fences the read on that firm as well. A signed-in person's scoped client is already limited to the active
+ * firm by RLS; a caller that holds a row and must read THAT row's firm's letter (the make-live guard, an assistant run that may be
+ * on the service role) passes the row's own `org_id`, so the answer never depends on what the connection can see.
+ */
+export async function getApprovedLetter(db: Db, kind: LoeKindName, orgId?: string): Promise<ApprovedRead> {
   try {
-    const { data, error } = await db
-      .from("client_proposal_loe_template")
-      .select(COLUMNS)
-      .eq("kind", kind)
-      .eq("status", "approved")
-      .maybeSingle();
+    let query = db.from("client_proposal_loe_template").select(COLUMNS).eq("kind", kind).eq("status", "approved");
+    if (orgId !== undefined) query = query.eq("org_id", orgId);
+    const { data, error } = await query.maybeSingle();
     if (error) return { status: failure(error) };
     if (!data) return { status: "ok", letter: null };
     const v = toVersion(data as Row);
