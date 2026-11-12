@@ -36,15 +36,15 @@ connector: the approval queue stays the only path out.
    money or turn on a client link.
 7. **`lawmatics-mcp` stays** for the lectual-plugin and its crons, unchanged.
 
-## Open decisions (Taylor)
-- **Lectual staff inside a firm they are not a member of** (platform admin, 0050): may they use the
-  connector there? Default in this plan: yes, because entering the firm was already written to
-  `platform_admin_audit` when they chose it in the app, and every tool result names the firm. Say no and
-  the consent page refuses `actingAsStaff`.
-- **Client information in Claude chats.** Tool results (names, marks, deadlines, proposal figures) are
-  stored in the person's Claude conversation history, outside Lectual. Copilot already sends the same
-  records to Claude's API, but it keeps no copy in a personal chat account. The firm's owner should OK this
-  per firm; switching on the module (4) is that OK. v1 returns no transcripts, consult notes or email bodies.
+## Decided 2026-11-12 (Taylor)
+- **Lectual staff inside a firm they are not a member of** (platform admin, 0050) MAY use the connector
+  there. Taylor had no preference, so the plan's default stands: entering the firm was already written to
+  `platform_admin_audit` when they chose it in the app, and every tool result names the firm. To reverse
+  it, the consent page refuses `actingAsStaff`.
+- **Client information in Claude chats needs the firm owner's agreement first.** Tool results (names,
+  marks, deadlines, proposal figures) are stored in the person's Claude conversation history, outside
+  Lectual. `claude-connector` is NOT added to a firm until its owner has agreed; for RPB Law that is
+  Rebecca, before step 4 of the rollout. v1 returns no transcripts, consult notes or email bodies.
 
 ## Phase 0 — prove the unverified parts on lectual-dev (before any tool is written)
 A half-day spike on a preview deployment. Stop and re-plan if one fails.
@@ -148,7 +148,7 @@ can produce is a draft a person then reviews.
 1. Phase 0 on dev + a preview (merge `main` into the branch first).
 2. Build B–E on the branch; review pass (security review of C and D by the most capable model).
 3. Taylor reads the consent wording.
-4. Merge to `main` (production ships from `main` only). Enable the OAuth server on lectual-prod, add
+4. Rebecca agrees to client information appearing in Claude chats (see Decided). Merge to `main` (production ships from `main` only). Enable the OAuth server on lectual-prod, add
    `claude-connector` to the first firm, add the connector in Claude, then Rebecca adds it with her own login.
 
 ## Disconnecting
