@@ -109,3 +109,11 @@ decisions that matter are in the AGENTS.md sections each sprint wrote.
   reachable; Expand shows the preview full width.
 - Lawmatics pay form: a generic shared form link cannot be pre-filled from Lectual. Open decision in the master to-do.
 - Checks: 649 test files, 10,823 tests, lint and build clean. Not checked in a real browser or against live Lawmatics.
+
+## Night: merged, letter version 2, address at the details step
+
+- Merged lectual.app#29, #30 and #31. #31 saves the address to the firm's Lawmatics (matter and contact) when the client presses Continue on
+  "Your details", deduplicated (same address = no request, changed address = update), shown to the client only when Lawmatics is connected.
+- Found on prod: Rebecca approved letter version 1 at 12:34 PM ET; one proposal with the letter is live and one client has signed. Version 2 (Word
+  layout, "RPB Law, PLLC" kept under the logo) was added as a draft built from v1 with markers only; its md5 matches the repo template.
+- Checks on the final branch: lint 0 errors, 652 test files / 10,849 tests, build passes. No real browser, no live Lawmatics.

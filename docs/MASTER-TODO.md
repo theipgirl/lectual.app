@@ -3,10 +3,21 @@
 One list across sessions. Each session adds its action items here and checks them against Omi.
 Newest section first. Tick an item when it is done; don't delete it.
 
+## 2026-11-12 (night): merged #29, #30, #31; letter version 2 waiting for approval
+
+### Taylor
+- [x] Merge lectual.app#29 (letter details, logo, footer, Word layout, editor fixes), #30 (keep "RPB Law, PLLC" line) and #31 (address to Lawmatics
+      on Continue from "Your details"). All merged Nov 12.
+- [ ] Approve RPB's letter VERSION 2 (the Word layout) in Settings, Client proposals, Engagement letter. Version 1 was approved by Rebecca at
+      12:34 PM ET Nov 12; version 2 is a draft on lectual-prod built from it with layout markers only (no word changed). Until approved, proposals use v1.
+- [ ] After approving v2: any unsent proposal still carrying v1 needs an ordinary Save before its link can go live. The live and signed ones stay on v1.
+- [ ] First real client after #31: check the address lands on the Lawmatics matter and contact, and whether the pay form fills it in.
+- [ ] Rebecca: read the client line "Your address is saved to your file with RPB Law Firm when you continue."
+
 ## 2026-11-12 (evening): letter layout, address, editor fixes — lectual.app#29
 
 ### Taylor
-- [ ] Merge lectual.app#29 (letter: full address required, RPB logo, Word layout, footer "RPB Law Firm, PLLC", address to Lawmatics; editor:
+- [x] Merge lectual.app#29 (letter: full address required, RPB logo, Word layout, footer "RPB Law Firm, PLLC", address to Lawmatics; editor:
       includes table saves, link box stays in the side column, scroll fix, Expand preview).
 - [ ] After merge, say go and Claude updates RPB's DRAFT letter body on lectual-prod to the new template (no "RPB Law, PLLC" top line, layout styles).
       Then Rebecca or Taylor approves it in Settings, Client proposals, Engagement letter.
