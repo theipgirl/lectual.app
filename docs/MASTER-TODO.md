@@ -5,16 +5,17 @@ Newest section first. Tick an item when it is done; don't delete it.
 
 ## 2026-11-12 (later): the build is done on the branch; what is left before RPB can use it
 
-Everything below is on `claude/optimistic-brahmagupta-18q0xn` in `lectual.app`, `lectual` and `lectual-plugin`. Nothing is on `main`,
-nothing is deployed, production is untouched.
+Merged to `main` in `lectual.app`, `lectual` and `lectual-plugin` on Nov 12, so the app code is deployed. The production database is
+untouched: 0106 is on lectual-dev only.
 
 ### Taylor
 
-- [ ] Open a preview of the branch and click through it at desktop and phone width. Nothing here has run in a real browser or against
+- [ ] Click through production at desktop and phone width (it is live now). Nothing here has run in a real browser or against
       real data: the new edit page, the three ways to start, the client page (choose, details, letter, sign, pay), the PDF download.
 - [ ] Say OK to apply migration 0106 to lectual-prod (it is on lectual-dev and checked there). The letter cannot be signed in
       production until it is.
-- [ ] Decide when this merges to `main` (that is what deploys it).
+- [x] Merge to `main`. Done Nov 12: lectual.app#28, lectual#37 and lectual-plugin#4 merged, so the new editor and start screen are live
+      for RPB. Signing a letter stays off until 0106 is on lectual-prod.
 - [ ] The live database credentials in the cloud build environment: decide whether they should be there. An agent's test run reached
       lectual-dev twice by accident (nothing was written). Removing the Supabase variables from the environment's settings prevents it.
 - [ ] Decide: may the owner still delete a proposal that has a signed engagement letter? Today yes, and the signed record goes with it.
