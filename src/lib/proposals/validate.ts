@@ -32,6 +32,7 @@ import { isMarkKind } from "./types";
 import { MAX_CLASSES_TOTAL_PER_BRAND, MAX_CLIENT_ADD } from "./client-classes";
 import { validatePackages } from "./package-list";
 import { MAX_NAME_DISCOUNT_PCT } from "./pricing";
+import { loeIssues } from "@/lib/loe/validate";
 
 export type ValidationLevel = "error" | "warning";
 export type ValidationIssue = { path: string; message: string; level: ValidationLevel };
@@ -284,6 +285,10 @@ export function validateContent(content: unknown, options: ValidateOptions = {})
   if (content.kind != null && content.kind !== "trademark" && content.kind !== "general") {
     err("kind", 'A proposal is either a "trademark" or a "general" proposal.');
     return out;
+  }
+  // The engagement letter (lectual 0106) rides on either kind and must match it.
+  if (content.loe !== undefined) {
+    for (const issue of loeIssues(content.loe, content.kind === "general" ? "general" : "trademark")) err(issue.path, issue.message);
   }
   if (content.kind === "general") {
     validateGeneralContent(content, out);

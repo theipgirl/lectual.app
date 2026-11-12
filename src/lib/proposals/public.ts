@@ -307,6 +307,9 @@ export function publicContent(raw: unknown): ProposalContent {
       return offer;
     });
   }
+  // The engagement letter (lectual 0106): the client reads its title, text and kind. template_id, template_version
+  // and any other key stay on the staff side.
+  if (isObject(c.loe)) out.loe = pick(c.loe, ["title", "body", "kind"]);
   // Spec 9: a general (flat-fee) proposal's matter, work items and fee. Only the keys `GeneralBlock` defines.
   if (c.kind === "trademark" || c.kind === "general") out.kind = c.kind;
   if (c.kind === "general" && isObject(c.general)) {

@@ -483,3 +483,31 @@ export function needsReviewPastDue(days: number): string {
 export function needsReviewCut(shown: number, total: number): string {
   return `Showing the oldest ${shown} of ${total}.`;
 }
+
+/* Engagement letter (Settings -> Proposals -> Engagement letter). The firm's own letter, shown and recorded by the software. */
+export const ENGAGEMENT_LETTER_NAME = "Engagement letter";
+export const ENGAGEMENT_LETTER_SUB =
+  "The letter a client reads and signs on their proposal. It is your firm's own text: Lectual shows it and records the signature, and writes none of it.";
+export const LETTER_KIND_WORDS = { trademark: "Trademark letter", general: "Flat-fee letter" } as const;
+export const LETTER_STATUS_WORDS = { draft: "Draft", approved: "Approved", retired: "Retired" } as const;
+export const LETTER_START_DRAFT = "Start a draft";
+export const LETTER_START_FROM_VERSION = "Start a new draft from this version";
+export const LETTER_SAVE_DRAFT = "Save draft";
+export const LETTER_APPROVE = "Approve";
+export const LETTER_PREVIEW_HEADING = "Preview with sample values";
+export const LETTER_PREVIEW_NOTE = "Made-up client details, so you can see a whole letter. The preview shows the saved draft: save first to refresh it.";
+export const LETTER_EMPTY_STATE = "No letter yet. Start a draft, and it can be approved once the text is final.";
+export const LETTER_NOT_YET_DRAFTED = "Nobody has written this letter yet.";
+export const LETTER_LOAD_FAILED = "The letters couldn't be loaded. Refresh to try again.";
+export const LETTER_READ_ONLY_NOTE = "You can read the letters. An owner, admin or senior admin writes them.";
+export const LETTER_FIELDS_HEADING = "Merge fields you can use";
+export const LETTER_FIELDS_NOTE = "Write a field in double braces, for example {{client_name}}. Anything else in braces is refused.";
+export const LETTER_APPROVAL_NOTE = "Approving makes this the letter new proposals attach. An approved version can't be edited; a change is a new draft.";
+export const LETTER_NO_APPROVERS = "No one is named yet. Name approvers under Client proposals, or no letter can be approved.";
+export function letterApproversLine(names: string): string {
+  return `Can approve: ${names}.`;
+}
+export const LETTER_APPROVERS_UNREADABLE = "Who can approve couldn't be loaded, so Approve is hidden. Refresh to try again.";
+export const LETTER_FIX_BEFORE_APPROVING = "Fix the problems above before approving.";
+export const LETTER_SETTINGS_LINK = "Engagement letter";
+export const LETTER_SETTINGS_LINK_NOTE = "The letter a client signs on their proposal, with its versions and who approves them.";

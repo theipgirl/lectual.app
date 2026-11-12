@@ -1617,3 +1617,47 @@ The edit page for a draft is five sections in ONE form with ONE Save. Nothing se
 - **Engagement letter** is `EngagementLetterSlot`, which renders nothing until Sprint 6 fills it (no heading, no placeholder).
 - Words: `EDITOR_WORDS` / `checkTheseHeading` in `vocabulary.ts` ("Selected to start", "Let the client describe this"); the menu beside the lifecycle buttons is named for what it holds (`moreMenuLabel`: Withdraw, Reset or delete, ...).
   New proposal still uses `BuilderLayout` and its "More options"; only the editor changed.
+
+## Engagement letter: database and firm template (Letter track, Sprint 2; needs lectual 0106, NOT applied yet)
+Design: `docs/specs/2026-11-12-proposal-loe-and-builder-design.md` (4.1, 4.2, 4.5). This sprint is the firm's letter and the rules around it; the
+client page, signing and the staff side come in later sprints. Nothing here sends, moves a stage or touches a price (`pricing.ts` has no diff).
+- **Migration 0106 is in `lectual`, not applied to any database.** Two tables: `client_proposal_loe_template` (versions per firm and kind) and
+  `client_proposal_signature` (written only by the service role's `client_proposal_sign_and_accept`). Hand-added types are in `src/lib/db/types.ts`.
+  Until 0106 is applied every read answers 42P01 / PGRST205 and the page says the letter "isn't switched on for your firm yet" with no form.
+- **The pure library is `src/lib/loe/`** (no `server-only`, no HTML): `fields.ts` (the seven fields `date`, `client_name`, `entity_name`,
+  `address_block`, `client_email`, `signer_name`, `signed_date`; one `findMergeFields`; the sample values), `render.ts` (`renderLetter`), `validate.ts`
+  (`validateTemplate`, `loeIssues`), `fingerprint.ts` (`agreementFingerprint`, sha256 hex over a key-sorted canonical form of letter + details +
+  exhibit). The database enforces the same seven fields when a version is approved, so a change to the list is a change to 0106 too.
+- **`renderLetter(body, values)` returns plain-text blocks `{ lead, text }`, never HTML.** The body is split into paragraphs (blank line) and a bold lead-in
+  `**Lead.**` is read from the TEMPLATE first, then values are merged in ONE pass, so a client's `<script>`, `{{x}}`, `}}` or `**` is literal text and is
+  never re-merged or re-parsed. An unknown field, an unclosed `{{` / `}}` or an allowed field with no value is an error and there is NO letter (a client
+  never sees a half-filled one). Callers draw the blocks as React text.
+- **`content.loe = { kind, template_id, template_version, title, body }`** is a snapshot of the firm's approved version (`ProposalLoe`,
+  `src/lib/proposals/types.ts`). `withLoeSnapshot(content, approved | null, wanted)` (`loe-snapshot.ts`, pure) attaches, refreshes or removes it, returns
+  a new object and removes it for a template of the other kind; `loeIsCurrent` is the check Sprint 6 uses before creating a link. `validateContent`
+  applies `loeIssues` on BOTH kinds (kind must equal the proposal's, title 1..200, body 1..60,000, no unknown merge field, malformed block = error);
+  content with no `loe` key validates and prices exactly as before (`tests/proposals/loe-engine-unchanged.test.ts` compares the Sevetri, Danielle and
+  Faithe fixtures with the engine at the sprint's base commit). `publicContent` publishes `loe.title`, `loe.body` and `loe.kind` only: `template_id`,
+  `template_version` and any other key stay staff-side. The DB rule `content ? 'loe'` means even `loe: null` counts as a letter, so `validateContent` refuses
+  any `loe` value that is not a well-formed object.
+- **Settings -> Client proposals -> Engagement letter** (`/dashboard/settings/proposals/engagement-letter/`, linked from the proposals settings page).
+  The page gate is the `proposals` feature (`requireProposalsModule`, `notFound()`); every member of such a firm reads the versions, the admin tier
+  (`PROPOSAL_ADMIN_ROLES`) writes a draft, and Approve is shown only to a named approver whose role can write proposals (`canApprove`). Who can approve is
+  listed by name. One draft per firm and kind (a second is 23505, "Open it to keep editing"). The preview merges the SAVED draft with made-up values
+  (`SAMPLE_VALUES`) as text; a draft with an unknown field shows the problem inline, shows no preview and has Approve disabled. "Start a new draft from this
+  version" re-reads the version on the server (the browser sends only its id).
+- **Reads are three-state** (`templates-store.ts`, scoped client only, no service role): ok / not-set-up (error CODE 42P01 or PGRST205, never message text) /
+  unavailable. A row the code cannot read makes the whole read unavailable. "No letter yet" shows only for a read that worked and found nothing. The store
+  never names `version`, `status`, `created_by` or `approved_*` on insert (no grant).
+- **Actions** (`actions.ts` is a thin wiring; the logic is `src/lib/loe/letter-actions.ts` with every dependency injected, tested without a database): each
+  of `runStartDraft`, `runStartFromVersion`, `runSaveDraft`, `runApprove` re-runs the feature gate and the role BEFORE any read, uses the scoped client, and
+  returns only fixed sentences. `src/lib/loe/errors.ts` maps lectual 0106's prefixes (`loe_template_not_approver`, `_edit_admin_only`, `_frozen`,
+  `_bad_transition`, `_body_invalid`) and 23505 / RLS / missing table to sentences; anything unmapped is "Couldn't save the letter. Try again." The letter
+  text and title are privileged firm content: no `console.*` in `src/lib/loe` (a test greps), no logging, never given to a model.
+- **Decisions.** (1) A named approver of any writing role may approve (the migration's update policy allows approvers and the admin tier); only the admin
+  tier edits. (2) A draft may be saved with a merge-field problem so a person can keep working; only Approve refuses it (the action and the database both).
+  (3) No seed letter text: the firm's own words are typed in Settings, and the empty state says so. (4) Words are in `src/lib/ui/words.ts` (`LETTER_*`).
+- **Test environment note.** The shell this was built in had live Supabase variables exported; every test run here unset them
+  (`env -u SUPABASE_SERVICE_ROLE_KEY ...`) because `tests/setup.ts` wipes whatever database those name. Do the same when no database is intended.
+- **NOT verified:** a real browser against the running app, any database (0106 was only run on a throwaway local Postgres in `lectual`), and a real
+  approver signing in.

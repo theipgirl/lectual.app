@@ -326,7 +326,22 @@ export function isGeneralContent(content: unknown): boolean {
   return !!content && typeof content === "object" && (content as { kind?: unknown }).kind === "general";
 }
 
+/**
+ * The firm's engagement letter, copied onto the proposal (lectual 0106). A SNAPSHOT of the firm's approved
+ * version, refreshed on every save of a draft by `withLoeSnapshot`, so the client signs exactly the letter this
+ * version carried. Plain text with `{{merge_fields}}`. `publicContent` publishes `title`, `body` and `kind` only.
+ */
+export type ProposalLoe = {
+  kind: ProposalKind;
+  template_id: string | null;
+  template_version: number;
+  title: string;
+  body: string;
+};
+
 export type ProposalContent = {
+  /** Engagement letter the client signs on the page. Absent = the page behaves as it always did. */
+  loe?: ProposalLoe;
   /** Spec 9: absent = "trademark". */
   kind?: ProposalKind;
   /** Spec 9: the matter, its work items and its flat fee. Only on `kind: "general"`. */

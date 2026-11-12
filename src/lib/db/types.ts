@@ -3937,6 +3937,80 @@ export type Database = {
           },
         ]
       }
+      // client_proposal_loe_template and client_proposal_signature: lectual migration 0106 (the firm's engagement
+      // letter, versioned, and the client's signature record). Hand-added until the next codegen run. `version`,
+      // `status`, `created_by`, `updated_by`, `approved_*` are stamped by the database and never sent on insert.
+      // A signature is written only by the service role's client_proposal_sign_and_accept; this app only reads it.
+      // Until 0106 is applied, reads answer 42P01 / PGRST205 (src/lib/loe/templates-store.ts).
+      client_proposal_loe_template: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          body: string
+          created_at: string
+          created_by: string | null
+          id: string
+          kind: string
+          org_id: string
+          status: string
+          title: string
+          updated_at: string
+          updated_by: string | null
+          version: number
+        }
+        Insert: {
+          body: string
+          kind: string
+          org_id: string
+          title: string
+        }
+        Update: {
+          body?: string
+          status?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_proposal_loe_template_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_org"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_proposal_signature: {
+        Row: {
+          address: Json | null
+          agreement_sha256: string
+          agreement_text: string
+          entity_name: string | null
+          family_id: string
+          id: string
+          ip: string | null
+          org_id: string
+          proposal_id: string
+          signed_at: string
+          signer_email: string | null
+          signer_name: string
+          signer_title: string | null
+          template_id: string | null
+          template_version: number | null
+          user_agent: string | null
+          version: number
+        }
+        Insert: Record<string, never>
+        Update: Record<string, never>
+        Relationships: [
+          {
+            foreignKeyName: "client_proposal_signature_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_org"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_org_preference: {
         Row: {
           active_org_id: string | null
