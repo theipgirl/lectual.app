@@ -10,7 +10,7 @@ import { DEFAULT_DEAL_TIMES, dealFor } from "@/lib/deal/times";
  *  - the person's CURRENT deal exists today (before the first deal there is none, even with cards carried over);
  *  - that deal opened AFTER the time the person last opened the deck (`lectual_deck_seen`), or there is no usable stamp.
  * A read that failed, or a queue that isn't connected, gives no nudge, never a 0 and never a guess. A malformed stamp
- * counts as no stamp.
+ * (not ISO-shaped, over 40 characters, unparseable) or one later than now + 5 minutes counts as no stamp.
  */
 export type NudgeRead = { status: "ok"; undecided: number } | { status: "unconfigured" } | { status: "unavailable" };
 export type DealNudge = { ready: true; label: string; count: number } | { ready: false };
@@ -25,8 +25,18 @@ export function parseDeckSeen(meta: unknown): Date | null {
   if (!meta || typeof meta !== "object") return null;
   const raw = (meta as Record<string, unknown>)[DECK_SEEN_KEY];
   if (typeof raw !== "string") return null;
+  if (raw.length > 40 || !ISO_SHAPED.test(raw)) return null;
   const at = new Date(raw);
   return Number.isNaN(at.getTime()) ? null : at;
+}
+
+const ISO_SHAPED = /^\d{4}-\d{2}-\d{2}T/;
+/** A stamp later than now by more than this is clock skew or a forged value: it counts as no stamp, so it gets rewritten. */
+const FUTURE_SLACK_MS = 5 * 60 * 1000;
+
+function usableSeen(seen: Date | null | undefined, now: Date): Date | null {
+  if (!seen || Number.isNaN(seen.getTime())) return null;
+  return seen.getTime() > now.getTime() + FUTURE_SLACK_MS ? null : seen;
 }
 
 /** `meta` with only the stamp set; every other key is kept. */
@@ -41,7 +51,8 @@ export function dealNudge(input: { now: Date; timeZone: string; times?: readonly
   if (!Number.isFinite(read.undecided) || read.undecided < 1) return NO_NUDGE;
   const deal = dealFor(input.now, input.timeZone, input.times ?? DEFAULT_DEAL_TIMES);
   if (!deal.current) return NO_NUDGE;
-  if (input.seen && input.seen.getTime() >= deal.current.at.getTime()) return NO_NUDGE;
+  const seen = usableSeen(input.seen, input.now);
+  if (seen && seen.getTime() >= deal.current.at.getTime()) return NO_NUDGE;
   return { ready: true, label: deal.current.label, count: Math.floor(read.undecided) };
 }
 
@@ -52,7 +63,7 @@ export function dealNudge(input: { now: Date; timeZone: string; times?: readonly
 export function deckSeenStamp(input: { now: Date; timeZone: string; times?: readonly string[]; meta: unknown }): Date | null {
   const deal = dealFor(input.now, input.timeZone, input.times ?? DEFAULT_DEAL_TIMES);
   if (!deal.current) return null;
-  const seen = parseDeckSeen(input.meta);
+  const seen = usableSeen(parseDeckSeen(input.meta), input.now);
   if (seen && seen.getTime() >= deal.current.at.getTime()) return null;
   return input.now;
 }

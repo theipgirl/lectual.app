@@ -26,8 +26,13 @@ describe("dealNudge with the deck-seen stamp", () => {
     expect(nudge(seen, new Date("2026-11-10T17:00:00Z"))).toEqual(NO_NUDGE);
     expect(nudge(seen)).toMatchObject({ ready: true, label: "2:00 PM" });
   });
-  it("a stamp in the future (clock skew) hides it rather than nagging", () => {
-    expect(nudge(new Date("2027-01-01T00:00:00Z"))).toEqual(NO_NUDGE);
+  // Changed on purpose: a far-future stamp used to hide the dot for good; now it counts as no stamp (the open then rewrites it).
+  it("a stamp more than 5 minutes in the future counts as no stamp: ready", () => {
+    expect(nudge(new Date("2027-01-01T00:00:00Z"))).toMatchObject({ ready: true });
+    expect(nudge(new Date(NOW.getTime() + 5 * 60_000 + 1))).toMatchObject({ ready: true });
+  });
+  it("a stamp up to 5 minutes ahead of now (small skew) still counts", () => {
+    expect(nudge(new Date(NOW.getTime() + 5 * 60_000))).toEqual(NO_NUDGE);
   });
   it("the other rules still hold with a usable stamp or none", () => {
     expect(dealNudge({ now: NOW, timeZone: NY, read: { status: "ok", undecided: 0 }, seen: null })).toEqual(NO_NUDGE);
@@ -42,6 +47,12 @@ describe("the stored stamp", () => {
     for (const bad of [{ [DECK_SEEN_KEY]: "not a date" }, { [DECK_SEEN_KEY]: 12345 }, { [DECK_SEEN_KEY]: null }, { [DECK_SEEN_KEY]: {} }, {}, null, undefined, "x"]) {
       expect(parseDeckSeen(bad)).toBeNull();
     }
+  });
+  it("a stamp over 40 characters or not ISO-shaped is no stamp", () => {
+    expect(parseDeckSeen({ [DECK_SEEN_KEY]: "2026-11-10T19:10:00.000Z" + "0".repeat(20) })).toBeNull();
+    expect(parseDeckSeen({ [DECK_SEEN_KEY]: "Nov 10 2026 7:10 PM" })).toBeNull();
+    expect(parseDeckSeen({ [DECK_SEEN_KEY]: "1762801800000" })).toBeNull();
+    expect(parseDeckSeen({ [DECK_SEEN_KEY]: "2026-11-10" })).toBeNull();
   });
   it("a malformed stamp leaves the nudge on and allows the write", () => {
     const meta = { [DECK_SEEN_KEY]: "garbage" };
@@ -66,6 +77,9 @@ describe("the stamp gate (at most two writes a day)", () => {
     expect(deckSeenStamp({ now: NOW, timeZone: NY, meta: { [DECK_SEEN_KEY]: "2026-11-10T19:05:00.000Z" } })).toBeNull();
     expect(deckSeenStamp({ now: NOW, timeZone: NY, meta: { [DECK_SEEN_KEY]: "2026-11-10T19:00:00.000Z" } })).toBeNull();
   });
+  it("a future stamp (beyond 5 minutes) is rewritten", () => {
+    expect(deckSeenStamp({ now: NOW, timeZone: NY, meta: { [DECK_SEEN_KEY]: "2027-01-01T00:00:00.000Z" } })).toEqual(NOW);
+  });
   it("writes nothing before today's first deal", () => {
     expect(deckSeenStamp({ now: new Date("2026-11-10T11:00:00Z"), timeZone: NY, meta: {} })).toBeNull();
   });
@@ -75,7 +89,22 @@ describe("the stamp gate (at most two writes a day)", () => {
   });
 });
 
-const h = vi.hoisted(() => ({ user: null as unknown, updateUser: vi.fn(), authError: null as unknown, throwClient: false }));
+const h = vi.hoisted(() => ({
+  user: null as unknown,
+  updateUser: vi.fn(),
+  authError: null as unknown,
+  throwClient: false,
+  session: null as unknown,
+  throwSession: false,
+  feature: true,
+}));
+vi.mock("@/lib/firm/session", () => ({
+  resolveFirmSession: async () => {
+    if (h.throwSession) throw new Error("boom");
+    return h.session;
+  },
+}));
+vi.mock("@/lib/org/modules", () => ({ orgHasModule: async () => h.feature }));
 vi.mock("@/lib/db/scoped-client", () => ({
   getScopedClient: async () => {
     if (h.throwClient) throw new Error("boom");
@@ -91,7 +120,10 @@ describe("markDeckSeenAction", () => {
     h.updateUser.mockReset().mockResolvedValue({ error: null });
     h.authError = null;
     h.throwClient = false;
+    h.throwSession = false;
+    h.feature = true;
     h.user = { user_metadata: { full_name: "Rebecca", lectual_deal_times: { v: 1, times: ["07:00", "14:00"] } } };
+    h.session = { kind: "ok", actingAsStaff: false, get user() { return h.user; } };
   });
 
   it("writes the stamp, keeping every other metadata key", async () => {
@@ -108,14 +140,38 @@ describe("markDeckSeenAction", () => {
     expect(h.updateUser).not.toHaveBeenCalled();
   });
 
-  it("fails quietly: signed out, auth error, update error, thrown client", async () => {
+  it("refuses, writing nothing: no session, signed out, no firm access, Lectual staff acting in a firm, role-views off, a throwing session read", async () => {
     const { markDeckSeenAction } = await import("@/lib/account/deck-seen-actions");
-    h.user = null;
-    expect(await markDeckSeenAction()).toEqual({ wrote: false });
+    const refused = async () => {
+      expect(await markDeckSeenAction()).toEqual({ wrote: false });
+      expect(h.updateUser).not.toHaveBeenCalled();
+    };
+    h.session = { kind: "signed-out", redirectTo: "/sign-in" };
+    await refused();
+    h.session = { kind: "no-access", user: h.user };
+    await refused();
+    h.session = null;
+    await refused();
+    h.session = { kind: "ok", actingAsStaff: true, user: h.user };
+    await refused();
+    h.session = { kind: "ok", actingAsStaff: false, user: h.user };
+    h.feature = false;
+    await refused();
+    h.feature = true;
+    h.throwSession = true;
+    await refused();
+  });
+
+  it("a stored stamp far in the future is rewritten", async () => {
+    const { markDeckSeenAction } = await import("@/lib/account/deck-seen-actions");
+    h.user = { user_metadata: { [DECK_SEEN_KEY]: "2027-01-01T00:00:00.000Z" } };
+    expect(await markDeckSeenAction()).toEqual({ wrote: true });
+    expect(h.updateUser).toHaveBeenCalledWith({ data: { [DECK_SEEN_KEY]: NOW.toISOString() } });
+  });
+
+  it("fails quietly: update error, thrown client", async () => {
+    const { markDeckSeenAction } = await import("@/lib/account/deck-seen-actions");
     h.user = { user_metadata: {} };
-    h.authError = new Error("x");
-    expect(await markDeckSeenAction()).toEqual({ wrote: false });
-    h.authError = null;
     h.updateUser.mockResolvedValue({ error: new Error("x") });
     expect(await markDeckSeenAction()).toEqual({ wrote: false });
     h.throwClient = true;
@@ -126,14 +182,22 @@ describe("markDeckSeenAction", () => {
     const src = readFileSync("src/lib/account/deck-seen-actions.ts", "utf8");
     expect(src).toMatch(/markDeckSeenAction\(\): Promise/);
     expect(src).not.toMatch(/getAdminClient/);
+    expect(src).toMatch(/resolveFirmSession\(\)/);
+    expect(src).toMatch(/actingAsStaff/);
+    expect(src).toMatch(/orgHasModule\("role-views"\)/);
   });
 });
 
 describe("wiring", () => {
-  it("the deck page mounts the stamp only when not Lectual staff acting inside a firm, and the mark runs in an effect", () => {
+  it("the deck page mounts the stamp only after an ok load, in the owner's shell and not for staff; the mark runs in an effect", () => {
     const view = readFileSync("src/app/dashboard/queue/deck/deck-view.tsx", "utf8");
-    expect(view).toMatch(/session\.actingAsStaff \? null : <DeckSeenMark \/>/);
-    expect(view.match(/\{seenMark\}/g)).toHaveLength(2);
+    expect(view).toMatch(/!actingAsStaff && canChangeDealTimes \? <DeckSeenMark \/> : null/);
+    expect(view.match(/<DeckSeenMark/g)).toHaveLength(1);
+    // Used once, inside the ok-load frame, after the unavailable early return.
+    expect(view.match(/\{seenMark\}/g)).toHaveLength(1);
+    expect(view.indexOf("{seenMark}")).toBeGreaterThan(view.indexOf('if (load.status !== "ok")'));
+    const unavailable = view.slice(view.indexOf('if (load.status !== "ok")'), view.indexOf("const [routed"));
+    expect(unavailable).not.toContain("seenMark");
     const mark = readFileSync("src/components/deck/DeckSeenMark.tsx", "utf8");
     expect(mark).toMatch(/useEffect\(\(\) => \{[\s\S]*markDeckSeenAction\(\)/);
   });

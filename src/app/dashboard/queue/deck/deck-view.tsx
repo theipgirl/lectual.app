@@ -129,8 +129,9 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
   const actingAsStaff = session.actingAsStaff ?? false;
   const canChangeDealTimes =
     shellFor(viewFor({ role: session.role, preview: actingAsStaff ? previewFor(session.user.user_metadata, session.org.id) : NO_PREVIEW, firmHasRoleViews: true, actingAsStaff })).variant === "owner";
-  // Stamps "the deck was opened" (clears the deal-ready dot). Never for Lectual staff acting inside a firm.
-  const seenMark = session.actingAsStaff ? null : <DeckSeenMark />;
+  // Stamps "the deck was opened" (clears the deal-ready dot): only after a real queue load (below), only in the owner's shell,
+  // never for Lectual staff acting inside a firm (the action refuses them too).
+  const seenMark = !actingAsStaff && canChangeDealTimes ? <DeckSeenMark /> : null;
 
   const [load, tz] = await Promise.all([loadActiveQueue("pending"), getFirmTimeZone()]);
   const now = new Date();
@@ -143,8 +144,6 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
 
   if (load.status !== "ok") {
     return (
-      <>
-      {seenMark}
       <DeckFrame
         dealLine={dealLine}
         view={view}
@@ -161,7 +160,6 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
       >
         <DeckUnavailable status={load.status} reason={load.reason} />
       </DeckFrame>
-      </>
     );
   }
 
