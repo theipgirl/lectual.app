@@ -543,6 +543,16 @@ Everything after a client accepts on `/p/<token>`. Internal only: nothing here s
   ever in a step payload, a note or a log. Once per signing and round (`stepSucceeded`), independent of every other step (none waits on it, a failure changes
   nothing), retried by the next run or Try again (`addressRetryStep`, no paid mark needed, the signed-in token). The staff Engagement letter card shows it
   ("Mailing address in Lawmatics", states from `addressView`, its own Try again). Tests: `tests/proposals/address-to-lawmatics.test.ts` (fake fetch).
+  **Two triggers, one core** (`writeAddressToLawmatics`; event payload `trigger: "details" | "signed"`, an event with none is `signed`): Continue on "Your
+  details" before signing (Sprint 4 bullet) and the signed run / Try again. **No duplicates:** a successful write records, as ids only, `address_sha256`
+  (sha256 of the cleaned address salted with the proposal id), `target_id`, `matter_address_id` / `contact_address_id` (ids Lawmatics returned) and `action`.
+  The newest successful write of the round (`lastAddressWrite`, `address-events.ts`; a reset starts a new round) is the baseline: same hash and matter = no
+  request (the details trigger records nothing; the signed one records `added`, `action: unchanged`); a different address = `PATCH /addresses/:id`
+  (`updateAddress`, same flat body) on the earlier records, a missing id or a 404 = create; another matter = write fresh. "Done" for the signed run is a
+  SIGNED-trigger success (`signedAddressDone`), so a details success never skips the signing's comparison. A details refusal is recorded once, not again for
+  the same outcome. The staff card says which trigger wrote it (`addressDoneText`). Concurrent writes are not serialised (two at once can still create two),
+  a 2xx with no readable id leaves nothing to PATCH later, and `POST`/`PATCH /addresses` are NOT verified against a live Lawmatics.
+  Tests: `tests/proposals/details-address.test.ts`, `tests/proposals/public-lawmatics-flag.test.ts`, `tests/client-proposal/details-saved-note.test.tsx`.
 ## New proposal picker and pre-fill (Sprint 20, no schema)
 `/dashboard/proposals/new/` starts from a lead or matter. Internal only: nothing here sends, moves a stage or opens a matter.
 - **"Who is this for?"** (`WhoIsThisFor.tsx`, rules in `src/lib/proposals/new-picker.ts`, pure): a Leads | Matters switch, a plain GET
@@ -1788,6 +1798,16 @@ anything; `pricing.ts` has no diff; one dependency was added (`pdfkit`, exact-pi
   (`canSign`), the server's `checkSigning` and the review PDF's check all read it). Optional, and labelled "(optional)": apartment or suite, business name,
   title. The country starts as "United States" (`DEFAULT_COUNTRY`, set in `startingDetails`; the client can change it, and a cleared one is refused again).
   `SIGN_MESSAGES.details_required` and `PDF_MESSAGES.details` name what is needed. An older signed snapshot with a partial address is untouched (snapshots are never re-checked).
+- **Continue on "Your details" saves the address to the firm's Lawmatics (owner's decision, Nov 12), so it is there at the pay form.** The live page's
+  `onSaveDetails` (`saveDetailsAction(token, details)`, token and typed details only) is fired, never awaited, from step 2's Continue with every required
+  detail given (`saveDetailsInBackground`); the page shows nothing about it except one line under the fields (`detailsSavedNote`, client-words.ts), drawn
+  ONLY when `firm.savesAddressToLawmatics` is true (`showsSavedNote`: live page, save action, flag). The public read sets that boolean for a letter proposal
+  whose org has a `lawmatics_connection` with status `active`, read as the service role fenced on the row's org, selecting `status` only (never a token
+  column); none, revoked or a failed read is false and never fails the page; the browser gets only the boolean. Server:
+  `savePublicDetailsAddress` (public.ts): token shape, its own rate limit (`detailsTokenLimiter` 10 per token / `detailsAddressLimiter` 30 per address per hour,
+  in memory, checked before the proposal is read), `cleanSigningDetails` + `missingDetails`, then a live (`sent`), unexpired version carrying `loe`; anything
+  else does nothing. The write runs in `after()` (`runDetailsAddress`, details-address.ts) through the address step's one core (Sprint 19 bullet). Nothing about
+  the address is stored in Lectual: the lead/matter "Mailing address" card still reads only the signed letter.
 - **The firm's logo above the letter (RPB only).** `src/lib/loe/letter-logo.ts` (pure) is the ONE map: `letterLogoForBrand("rpb")` / `letterLogoForSlug`
   return `/brand/rpb-logo-oxblood.png` (alt "RPB Law Firm", 984 x 168, in `public/brand/`) for the firm the page already brands as RPB (`brandForSlug(slug) === "rpb"`),
   and null for every other firm, so another firm never shows it. `LoeLetterPanel` takes an optional `logo` (a centred `<img class="cp-letter-logo">`, at most

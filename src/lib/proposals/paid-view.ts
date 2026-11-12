@@ -9,6 +9,7 @@
  */
 
 import { formatShortFirmDate } from "@/lib/quotes/labels";
+import { addressDoneText } from "./address-events";
 import { CHOOSE_LOE_TEMPLATE } from "./loe-adapter";
 import { paidStateFromEvents, stepStates, STEP_SUCCESS, type PaidState, type ProposalStep, type RetryableStep, type StepEventInput, type StepState } from "./paid";
 import { MARK_PAID_WORDS, notAddedText, notUploadedText, notWrittenText, STEP_TEXT } from "./step-text";
@@ -63,9 +64,13 @@ const SUCCESS_TEXT: Partial<Record<ProposalStep, string>> = {
 };
 
 /** One step's outcome as the sentence the page prints. */
-export function stepText(state: Pick<StepState, "step" | "outcome" | "reason">): string {
+export function stepText(state: Pick<StepState, "step" | "outcome" | "reason"> & { payload?: Record<string, unknown> }): string {
   const { step, outcome, reason } = state;
-  if (outcome === STEP_SUCCESS[step]) return [SUCCESS_TEXT[step], step === "custom_fields" || step === "address_to_lawmatics" ? reason : null].filter(Boolean).join(" ");
+  if (outcome === STEP_SUCCESS[step]) {
+    // The address step says which trigger wrote it (the client's details, or signing) when its event records one.
+    const success = step === "address_to_lawmatics" ? addressDoneText(state.payload) : SUCCESS_TEXT[step];
+    return [success, step === "custom_fields" || step === "address_to_lawmatics" ? reason : null].filter(Boolean).join(" ");
+  }
   switch (step) {
     case "accepted_file_upload":
     case "loe_file_upload":

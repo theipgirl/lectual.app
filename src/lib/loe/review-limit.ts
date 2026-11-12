@@ -22,3 +22,12 @@ export const reviewAddressLimiter = createRateLimiter({ max: REVIEW_PDF_PER_ADDR
  */
 export const signedTokenLimiter = createRateLimiter({ max: REVIEW_PDF_PER_TOKEN, windowMs: REVIEW_PDF_WINDOW_MS });
 export const signedAddressLimiter = createRateLimiter({ max: REVIEW_PDF_PER_ADDRESS, windowMs: REVIEW_PDF_WINDOW_MS });
+
+/**
+ * The client's address, written to the firm's Lawmatics when they press Continue on "Your details" (`savePublicDetailsAddress`).
+ * Its OWN counters, lower than the PDFs': each allowed call can reach Lawmatics. The same caveat: in memory, per server instance.
+ */
+export const DETAILS_ADDRESS_PER_TOKEN = 10;
+export const DETAILS_ADDRESS_PER_ADDRESS = 30;
+export const detailsTokenLimiter = createRateLimiter({ max: DETAILS_ADDRESS_PER_TOKEN, windowMs: REVIEW_PDF_WINDOW_MS });
+export const detailsAddressLimiter = createRateLimiter({ max: DETAILS_ADDRESS_PER_ADDRESS, windowMs: REVIEW_PDF_WINDOW_MS });

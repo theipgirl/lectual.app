@@ -1,10 +1,10 @@
-import { DETAILS_HEADING, DETAILS_INTRO } from "@/lib/loe/client-words";
+import { DETAILS_HEADING, DETAILS_INTRO, detailsSavedNote } from "@/lib/loe/client-words";
 import { MAX_CLIENT_TEXT_CHARS } from "@/lib/proposals/client-classes";
 import { REQUIRED_DETAIL_KEYS, type SignerDetails } from "@/lib/loe/signing";
 
 /**
  * Step 2: the details that go on the letter. Plain controlled inputs (React text, never HTML); the server cleans and checks
- * every one again. Required: full legal name, street, city, state, ZIP or postal code and country (`REQUIRED_DETAIL_KEYS`, the same list
+ * every one again. On the live page one line under the fields says Continue saves the address to the firm's file. Required: full legal name, street, city, state, ZIP or postal code and country (`REQUIRED_DETAIL_KEYS`, the same list
  * the server checks); the other three say "(optional)" in their label.
  */
 
@@ -26,10 +26,13 @@ export function LoeDetailsForm({
   details,
   onChange,
   readOnly,
+  savedWith,
 }: {
   details: SignerDetails;
   onChange: (key: keyof SignerDetails, value: string) => void;
   readOnly?: boolean;
+  /** The firm's name, on the live page only (where Continue saves the address to the firm's records): draws `detailsSavedNote`. */
+  savedWith?: string | null;
 }) {
   return (
     <section className="cp-choose cp-details" aria-labelledby="cp-details-h">
@@ -66,6 +69,7 @@ export function LoeDetailsForm({
           );
         })}
       </div>
+      {savedWith ? <p className="cp-details-note">{detailsSavedNote(savedWith)}</p> : null}
     </section>
   );
 }

@@ -1,7 +1,7 @@
 "use server";
 
 import { headers } from "next/headers";
-import { acceptPublicProposal } from "@/lib/proposals/public";
+import { acceptPublicProposal, savePublicDetailsAddress } from "@/lib/proposals/public";
 import { reviewLetterPdf, signedLetterPdf, type LetterPdfResult } from "@/lib/proposals/public-letter";
 import type { ProposalAcceptResult } from "@/components/client-proposal/ProposalDocument";
 import { safeHttpsUrl } from "@/components/client-proposal/format";
@@ -78,3 +78,16 @@ export async function downloadSignedLetterAction(token: string): Promise<LetterP
   }
 }
 
+
+/**
+ * Continue on "Your details": the typed mailing address goes to the firm's Lawmatics after the response (token and details only).
+ * Answers nothing either way: the page neither waits on it nor shows whether it worked.
+ */
+export async function saveDetailsAction(token: string, details: unknown): Promise<void> {
+  try {
+    const h = await headers();
+    await savePublicDetailsAddress(String(token ?? ""), details, new Date(), undefined, { ip: h.get("x-forwarded-for") ?? h.get("x-real-ip") });
+  } catch {
+    // Silent by design.
+  }
+}

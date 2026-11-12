@@ -16,7 +16,7 @@ import { DownloadPdfButton, LoeSignedLetter } from "./LoeReceipt";
 import { LoeSideAction } from "./LoeSideAction";
 import { LoeSignPanel } from "./LoeSignPanel";
 import { LoeStepBar } from "./LoeStepBar";
-import { useLoeFlow } from "./loe-flow";
+import { saveDetailsInBackground, showsSavedNote, useLoeFlow } from "./loe-flow";
 import { brandForSlug, formatCivilDate, money, paragraphs, richSegments, safeHttpsUrl, type ProposalBrand } from "./format";
 import "./proposal.css";
 
@@ -30,7 +30,7 @@ import "./proposal.css";
  * All firm text is rendered as React text. Same modes, footer and assets as the trademark page.
  */
 export function GeneralProposalDocument(props: ProposalDocumentProps) {
-  const { content, title, clientName, expiresOn, firm, mode, acceptedQuote, payUrl, onAccept, letter, onDownloadReview, onDownloadSigned } = props;
+  const { content, title, clientName, expiresOn, firm, mode, acceptedQuote, payUrl, onAccept, letter, onDownloadReview, onDownloadSigned, onSaveDetails } = props;
   const brand: ProposalBrand = brandForSlug(firm.slug);
   /** The firm's logo above its engagement letter: decided by the same brand signal as the rest of the page. */
   const letterLogo = letterLogoForBrand(brand);
@@ -163,7 +163,7 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
         ) : null}
         <div className="cp-wrap cp-layout">
           <div className="cp-left">
-            {loeOn && !accepted && loeFlow.step === 2 ? <LoeDetailsForm details={loeFlow.details} onChange={loeFlow.setDetail} /> : null}
+            {loeOn && !accepted && loeFlow.step === 2 ? <LoeDetailsForm details={loeFlow.details} onChange={loeFlow.setDetail} savedWith={showsSavedNote(mode, firm, onSaveDetails) ? (firm.displayName ?? firm.name) : null} /> : null}
             {loeOn && !accepted && loeFlow.step === 3 ? (
               <section className="cp-choose cp-letter-step" aria-labelledby="cp-letter-h">
                 <div className="cp-step-h">
@@ -330,6 +330,7 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
                     error={error}
                     legalTotalText={money(quote.legal_total_cents)}
                     onContinue={() => {
+                      if (loeFlow.step === 2) saveDetailsInBackground(onSaveDetails, loeFlow.detailsOk, loeFlow.cleaned);
                       loeFlow.setStep(loeFlow.step === 1 ? 2 : 3);
                       requestAnimationFrame(() => document.getElementById("cp-steps")?.scrollIntoView({ block: "start" }));
                     }}
