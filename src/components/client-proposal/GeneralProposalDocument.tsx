@@ -7,6 +7,15 @@ import { generalCommitmentSentence } from "@/lib/proposals/commitment";
 import type { ProposalQuote } from "@/lib/proposals/types";
 import type { ProposalDocumentProps } from "./ProposalDocument";
 import { RPB_FONT_VARS } from "./fonts";
+import { DOWNLOAD_REVIEW_LABEL, FOOTER_LETTER_LINE, LETTER_HEADING, LETTER_INTRO, READ_LETTER_FIRST, SIGN_MESSAGES } from "@/lib/loe/client-words";
+import type { SigningInput } from "@/lib/loe/signing";
+import { LoeDetailsForm } from "./LoeDetailsForm";
+import { LoeLetterPanel } from "./LoeLetterPanel";
+import { DownloadPdfButton, LoeSignedLetter } from "./LoeReceipt";
+import { LoeSideAction } from "./LoeSideAction";
+import { LoeSignPanel } from "./LoeSignPanel";
+import { LoeStepBar } from "./LoeStepBar";
+import { useLoeFlow } from "./loe-flow";
 import { brandForSlug, formatCivilDate, money, paragraphs, richSegments, safeHttpsUrl, type ProposalBrand } from "./format";
 import "./proposal.css";
 
@@ -20,11 +29,12 @@ import "./proposal.css";
  * All firm text is rendered as React text. Same modes, footer and assets as the trademark page.
  */
 export function GeneralProposalDocument(props: ProposalDocumentProps) {
-  const { content, title, clientName, expiresOn, firm, mode, acceptedQuote, payUrl, onAccept } = props;
+  const { content, title, clientName, expiresOn, firm, mode, acceptedQuote, payUrl, onAccept, letter, onDownloadReview, onDownloadSigned } = props;
   const brand: ProposalBrand = brandForSlug(firm.slug);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<{ payUrl: string | null; opened: boolean } | null>(null);
+  const [done, setDone] = useState<{ payUrl: string | null; opened: boolean; signedLine?: string | null } | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const accepted = mode === "accepted" || done !== null;
   const quote = useMemo<ProposalQuote>(
@@ -42,9 +52,28 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
   const finalPayUrl = safeHttpsUrl(done ? done.payUrl : payUrl);
   const heading = title?.trim() && title.trim() !== "Proposal" ? title.trim() : "Your Proposal";
   const canAccept = quote.legal_total_cents > 0 || (quote.general?.fee_cents ?? 0) > 0;
+  // Engagement letter (flat-fee kind): the same steps as the trademark page; without `loe` none of it runs.
+  const loeBlock = typeof content.loe?.body === "string" && content.loe.body.length > 0 ? { title: content.loe.title || LETTER_HEADING, body: content.loe.body } : null;
+  const loeFlow = useLoeFlow({
+    loe: loeBlock,
+    clientName: clientName ?? "",
+    company: content.client?.company ?? "",
+    letter: letter ?? null,
+    shown: content,
+    quote,
+    initialStep: props.initialLoe?.step,
+    initialDetails: props.initialLoe?.details,
+    initialTypedName: props.initialLoe?.typedName,
+    initialAgree: props.initialLoe?.agree,
+  });
+  const loeOn = loeFlow.enabled;
+  const stepOne = !loeOn || accepted || loeFlow.step === 1;
+  const signedView = letter?.signed ?? (done ? loeFlow.agreement : null);
 
   async function accept() {
     if (mode !== "live" || !onAccept || pending || done || !canAccept) return;
+    const signing: SigningInput | null = loeOn ? loeFlow.signingPayload() : null;
+    if (loeOn && !signing) return;
     setError(null);
     setPending(true);
     // Opened inside the click so the popup blocker allows it; pointed at the payment page once the server has recorded the acceptance.
@@ -57,7 +86,7 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
     }
     try {
       // Nothing to tick on a flat-fee proposal: an empty selection and nothing written by the client.
-      const result = await onAccept({}, { entries: {}, added: {} });
+      const result = signing ? await onAccept({}, { entries: {}, added: {} }, signing) : await onAccept({}, { entries: {}, added: {} });
       if (!result.ok) {
         tab?.close();
         setError(result.message);
@@ -75,7 +104,7 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
         }
       }
       if (!opened) tab?.close();
-      setDone({ payUrl: url, opened });
+      setDone({ payUrl: url, opened, signedLine: result.signedLine ?? null });
     } catch {
       tab?.close();
       setError("We couldn’t record your acceptance. Please try again.");
@@ -102,8 +131,41 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
       </header>
 
       <main className={`cp-main ${gutter}`}>
+        {loeOn ? (
+          <div className="cp-wrap cp-steps-wrap">
+            <LoeStepBar current={accepted ? 4 : loeFlow.step} onGo={(n) => loeFlow.setStep(n)} locked={accepted || pending} />
+          </div>
+        ) : null}
         <div className="cp-wrap cp-layout">
           <div className="cp-left">
+            {loeOn && !accepted && loeFlow.step === 2 ? <LoeDetailsForm details={loeFlow.details} onChange={loeFlow.setDetail} /> : null}
+            {loeOn && !accepted && loeFlow.step === 3 ? (
+              <section className="cp-choose cp-letter-step" aria-labelledby="cp-letter-h">
+                <div className="cp-step-h">
+                  <span className="cp-n" aria-hidden="true">
+                    3
+                  </span>
+                  <div>
+                    <h2 id="cp-letter-h">{LETTER_HEADING}</h2>
+                    <p>{LETTER_INTRO}</p>
+                  </div>
+                </div>
+                {loeFlow.agreement ? (
+                  <LoeLetterPanel agreement={loeFlow.agreement} title={loeBlock?.title ?? LETTER_HEADING} id="cp-letter" />
+                ) : (
+                  <p className="cp-warn" role="status">
+                    {SIGN_MESSAGES.letter_unavailable}
+                  </p>
+                )}
+                <DownloadPdfButton
+                  label={DOWNLOAD_REVIEW_LABEL}
+                  onDownload={onDownloadReview ? () => onDownloadReview({}, { entries: {}, added: {} }, loeFlow.cleaned) : undefined}
+                />
+                <LoeSignPanel typedName={loeFlow.typedName} onName={loeFlow.setTypedName} agree={loeFlow.agree} onAgree={loeFlow.setAgree} />
+              </section>
+            ) : null}
+            {stepOne ? (
+            <>
             <section className="cp-intro">
               {expires ? <p className="cp-date">Available through {expires}</p> : null}
               <h1>{heading}</h1>
@@ -156,6 +218,22 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
 
               {g?.terms_note?.trim() ? <p className="cp-hi">{g.terms_note}</p> : null}
             </section>
+            {loeOn && !accepted ? (
+              <section className="cp-letter-preview" aria-label={READ_LETTER_FIRST}>
+                <details
+                  id="cp-letter-preview"
+                  open={previewOpen}
+                  onToggle={(e) => setPreviewOpen((e.currentTarget as HTMLDetailsElement).open)}
+                >
+                  <summary>{READ_LETTER_FIRST}</summary>
+                  <p className="cp-note">You will fill in your details on the next step. Until then, brackets mark what is still to come.</p>
+                  {loeFlow.preview ? <LoeLetterPanel agreement={loeFlow.preview} title={loeBlock?.title ?? LETTER_HEADING} id="cp-letter-first" /> : null}
+                </details>
+              </section>
+            ) : null}
+            </>
+            ) : null}
+            {loeOn && accepted ? <LoeSignedLetter agreement={signedView} title={loeBlock?.title ?? LETTER_HEADING} /> : null}
           </div>
 
           <aside className="cp-side" id="cp-review" aria-labelledby="cp-s2">
@@ -208,7 +286,35 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
                   </div>
                 </div>
 
-                {accepted ? (
+                {loeOn ? (
+                  <LoeSideAction
+                    mode={mode}
+                    step={loeFlow.step}
+                    accepted={accepted}
+                    firstName={firstName}
+                    commitment={generalCommitmentSentence(firm.displayName ?? firm.name)}
+                    signedLine={done?.signedLine ?? props.signedLine ?? letter?.signed?.signedLine ?? null}
+                    payUrl={finalPayUrl}
+                    opened={done?.opened ?? false}
+                    canContinue={canAccept && mode !== "accepted"}
+                    detailsOk={loeFlow.detailsOk}
+                    signable={loeFlow.signable}
+                    pending={pending}
+                    error={error}
+                    legalTotalText={money(quote.legal_total_cents)}
+                    onContinue={() => {
+                      loeFlow.setStep(loeFlow.step === 1 ? 2 : 3);
+                      requestAnimationFrame(() => document.getElementById("cp-steps")?.scrollIntoView({ block: "start" }));
+                    }}
+                    onBack={() => loeFlow.setStep(loeFlow.step === 3 ? 2 : 1)}
+                    onSign={accept}
+                    onReadLetter={() => {
+                      setPreviewOpen(true);
+                      requestAnimationFrame(() => document.getElementById("cp-letter-preview")?.scrollIntoView({ block: "start" }));
+                    }}
+                    onDownloadSigned={onDownloadSigned}
+                  />
+                ) : accepted ? (
                   <>
                     <div className="cp-done" role="status">
                       <h3>Thank you{firstName ? `, ${firstName}` : ""}.</h3>
@@ -282,10 +388,14 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
           {brand === "rpb" ? (
             <>
               <p className="cp-c">RPB Law, PLLC &middot; (305) 712-6960 &middot; info@rpblawfirm.com &middot; www.rpblawfirm.com</p>
-              <p className="cp-d">
-                Attorney advertising. Prepared for discussion purposes; does not constitute legal advice or create an
-                attorney-client relationship.
-              </p>
+              {loeOn ? (
+                <p className="cp-d">{FOOTER_LETTER_LINE}</p>
+              ) : (
+                <p className="cp-d">
+                  Attorney advertising. Prepared for discussion purposes; does not constitute legal advice or create an
+                  attorney-client relationship.
+                </p>
+              )}
             </>
           ) : (
             <p className="cp-c">{[firm.name, firm.contactLine].filter(Boolean).join(" · ")}</p>

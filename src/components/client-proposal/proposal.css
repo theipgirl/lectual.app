@@ -423,3 +423,85 @@ footer.cp-footer { background: var(--cp-ink); color: var(--cp-on-brand); padding
 @container cp (max-width: 560px) {
   .cp-pkg-mark { padding-left: 0; }
 }
+
+/* ── Engagement letter steps (Sprint 4, Letter track). Only drawn for a proposal that carries a letter. ──
+   The totals panel (.cp-side, position: sticky above) stays on every step. Nothing in this block sets overflow on an ancestor
+   of .cp-side (overflow hidden, auto or scroll would silently break sticky); the letter scrolls inside ITS OWN box, which is
+   not an ancestor of the panel. */
+.cp-steps-wrap { padding-bottom: 18px; }
+.cp-steps ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.cp-step { min-width: 0; }
+.cp-step-btn {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border-radius: 10px;
+  border: 1px solid var(--cp-line); background: var(--cp-sheet); color: var(--cp-soft); font: inherit; font-size: 15px;
+  text-align: left; min-width: 0;
+}
+button.cp-step-btn { cursor: pointer; }
+button.cp-step-btn:hover { border-color: var(--cp-brand); color: var(--cp-ink); }
+button.cp-step-btn:focus-visible { outline: 3px solid var(--cp-brand); outline-offset: 2px; }
+.cp-step-n {
+  flex: none; width: 26px; height: 26px; border-radius: 999px; display: grid; place-items: center; font-weight: 700; font-size: 14px;
+  background: var(--cp-tint); color: var(--cp-soft);
+}
+.cp-step-current .cp-step-btn { border-color: var(--cp-brand); color: var(--cp-ink); font-weight: 700; }
+.cp-step-current .cp-step-n, .cp-step-done .cp-step-n { background: var(--cp-brand); color: var(--cp-on-brand); }
+.cp-step-todo .cp-step-btn { opacity: 0.75; }
+
+.cp-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 16px; }
+.cp-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; font-size: 15px; color: var(--cp-soft); }
+.cp-field-wide { grid-column: 1 / -1; }
+.cp-field input[type="text"] {
+  font: inherit; font-size: 17px; color: var(--cp-ink); background: var(--cp-box); border: 1px solid var(--cp-line-2);
+  border-radius: 8px; padding: 10px 12px; min-width: 0; width: 100%; box-sizing: border-box;
+}
+.cp-field input[type="text"]:focus-visible { outline: 3px solid var(--cp-brand); outline-offset: 1px; }
+.cp-back-includes { margin: 0 0 4px; font-size: 15px; }
+.cp-back-includes a { color: var(--cp-brand); font-weight: 600; text-underline-offset: 3px; }
+
+.cp-letter {
+  background: var(--cp-sheet); border: 1px solid var(--cp-line-2); border-radius: 12px; padding: 22px 26px;
+  max-height: 1500px; overflow-y: auto; font-size: 16px; line-height: 1.55; min-width: 0;
+}
+.cp-letter:focus-visible { outline: 3px solid var(--cp-brand); outline-offset: 2px; }
+.cp-letter-title { font-size: 20px; margin-bottom: 14px; }
+.cp-letter-p { margin: 0 0 12px; white-space: pre-line; overflow-wrap: anywhere; max-width: 78ch; }
+.cp-exhibit { margin-top: 26px; padding-top: 18px; border-top: 2px solid var(--cp-line-2); }
+.cp-exhibit h3 { font-size: 20px; margin-bottom: 12px; }
+.cp-ex-group { margin-bottom: 16px; }
+.cp-ex-group h4 { font-size: 16px; margin-bottom: 6px; overflow-wrap: anywhere; }
+.cp-ex-table { width: 100%; border-collapse: collapse; font-size: 15.5px; }
+.cp-ex-table th, .cp-ex-table td { padding: 7px 0; border-bottom: 1px solid var(--cp-line); vertical-align: top; text-align: left; }
+.cp-ex-table th { font-weight: 400; padding-right: 12px; overflow-wrap: anywhere; }
+.cp-ex-table th small { display: block; color: var(--cp-soft); font-size: 14px; }
+.cp-ex-table td { text-align: right; white-space: nowrap; }
+.cp-ex-totals { margin: 12px 0 0; display: grid; gap: 6px; }
+.cp-ex-totals div { display: flex; justify-content: space-between; gap: 16px; font-weight: 700; }
+.cp-ex-totals dt, .cp-ex-totals dd { margin: 0; }
+
+.cp-sign { background: var(--cp-sheet); border: 1px solid var(--cp-line); border-radius: 12px; padding: 20px 22px; display: grid; gap: 14px; }
+.cp-sign h3 { font-size: 20px; }
+.cp-agree { padding: 4px 0; }
+.cp-root .cp-recording { margin: 0; font-size: 14.5px; color: var(--cp-soft); line-height: 1.45; }
+
+.cp-letter-preview details, .cp-signed-letter details { background: var(--cp-sheet); border: 1px solid var(--cp-line); border-radius: 12px; padding: 14px 20px; }
+.cp-letter-preview summary, .cp-signed-letter summary { cursor: pointer; font-weight: 700; font-size: 17px; color: var(--cp-brand); }
+.cp-letter-preview details[open] summary, .cp-signed-letter details[open] summary { margin-bottom: 12px; }
+.cp-root .cp-letter-preview .cp-note { margin: 0 0 12px; font-size: 15px; color: var(--cp-soft); }
+
+.cp-btn-ghost { background: transparent; color: var(--cp-brand); }
+.cp-btn-ghost:hover { background: var(--cp-tint); color: var(--cp-brand-dark); }
+.cp-linkbtn { background: none; border: 0; padding: 0; font: inherit; color: var(--cp-brand); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.cp-linkbtn:focus-visible { outline: 3px solid var(--cp-brand); outline-offset: 2px; }
+.cp-dl { display: grid; gap: 8px; }
+.cp-root .cp-signed-line { font-weight: 700; color: var(--cp-ink); margin-bottom: 6px; }
+
+@container cp (max-width: 940px) {
+  .cp-letter { max-height: 70vh; }
+}
+@container cp (max-width: 640px) {
+  .cp-steps ol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cp-form { grid-template-columns: minmax(0, 1fr); }
+  .cp-letter { padding: 16px 16px; }
+  .cp-sign { padding: 16px; }
+  .cp-ex-table td { white-space: normal; }
+}

@@ -458,13 +458,37 @@ export type ProposalChange = {
  * browser.
  */
 export type AcceptedSnapshot = {
-  /** Bump when this shape changes. */
-  schema: 1;
+  /**
+   * Bump when this shape changes. 1 = every acceptance before the engagement letter; 2 = a signed acceptance (the
+   * 0106 function stamps `schema: 2` and `agreement`). Every reader accepts both.
+   */
+  schema: 1 | 2;
   version: number;
   content: ProposalContent;
   selection: Selection;
   quote: ProposalQuote;
   accepted_at: string;
+  /** Schema 2 only: who signed, when, and the sha256 of the agreement text. `signature_id` is null until the database fills it. */
+  agreement?: AcceptedAgreement;
+  /** Schema 2 only: what the letter was merged with, so "Read it again" and the signed PDF rebuild exactly what was signed. */
+  signing?: AcceptedSigning;
+};
+
+export type AcceptedAgreement = {
+  signature_id: string | null;
+  signer_name: string;
+  signed_at: string;
+  sha256: string;
+  template_version: number | null;
+};
+
+export type AcceptedSigning = {
+  /** The cleaned details the client typed on the "Your details" step. */
+  details: Record<string, string>;
+  /** The letter's date as shown at signing, in the firm's zone ("November 12, 2026"). */
+  date_text: string;
+  /** The proposal's own client email, merged into `{{client_email}}`. */
+  client_email: string;
 };
 
 /* ─────────────────────────── the quote (pricing.ts output) ───────────────── */

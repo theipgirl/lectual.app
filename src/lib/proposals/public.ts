@@ -1,5 +1,6 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
 import { after } from "next/server";
 import { getAdminClient } from "@/lib/db/admin";
 import { resolveTimeZone } from "@/lib/org/profile-rules";
@@ -8,6 +9,13 @@ import { firmDisplayName } from "./commitment";
 import { contactLine, firmContactFromSignoff } from "./firm-contact";
 import { isProposalExpired } from "./expiry";
 import { DESCRIBE_BEFORE_ACCEPT, parseClientClassInput, quoteWithClientClasses } from "./client-classes";
+import { money } from "@/components/client-proposal/format";
+import { SIGN_MESSAGES } from "@/lib/loe/client-words";
+import { agreementFingerprint } from "@/lib/loe/fingerprint";
+import { buildExhibit } from "@/lib/loe/exhibit";
+import { rebuildSignedLetter, type SignedLetter } from "@/lib/loe/signed-letter";
+import { addressJson, assembleAgreement, checkSigning, letterDateText, signedLineText } from "@/lib/loe/signing";
+import { parseInet } from "@/lib/quotes/public";
 import { normalizeSelection, quoteHasItems } from "./pricing";
 import {
   isWellFormedProposalToken,
@@ -87,6 +95,8 @@ export interface PublicDbQuery<T = unknown> extends PromiseLike<PublicDbResult<T
 
 export interface PublicProposalsDb {
   from(table: string): PublicDbQuery;
+  /** A database function call (the 0106 sign-and-accept function). Absent on a double that never signs. */
+  rpc?(fn: string, args: Record<string, unknown>): PromiseLike<PublicDbResult>;
 }
 
 /**
@@ -184,6 +194,20 @@ export type PublicProposalView = {
   /** Only once accepted: before acceptance the link is handed out by `acceptPublicProposal`. */
   payUrl: string | null;
   firm: PublicProposalFirm;
+  /**
+   * Engagement letter only. Before signing: what the letter merges with that the browser may not type (the proposal's own client
+   * email) and the letter's date. After signing: the letter as signed, rebuilt from the snapshot (`rebuildSignedLetter`).
+   * Null for every proposal without a letter.
+   */
+  letter: PublicLetterView | null;
+};
+
+export type PublicLetterView = {
+  /** "November 12, 2026" in the firm's zone, worked out here so the page and the server agree. */
+  dateText: string;
+  /** The proposal's own email, for `{{client_email}}`. Only on a proposal that carries a letter. */
+  clientEmail: string;
+  signed: SignedLetter | null;
 };
 
 /** The server-side half of a resolved token. Never passed to a client component. */
@@ -232,15 +256,18 @@ export function buildAcceptedSnapshot(input: {
   selection: Selection;
   quote: ProposalQuote;
   acceptedAt: string;
+  /** A signed acceptance (engagement letter): schema 2 with who signed and what the letter was merged with. */
+  signed?: { agreement: NonNullable<AcceptedSnapshot["agreement"]>; signing: NonNullable<AcceptedSnapshot["signing"]> };
 }): AcceptedSnapshot {
-  return {
-    schema: 1,
+  const base = {
     version: input.version,
     content: input.content,
     selection: input.selection,
     quote: input.quote,
     accepted_at: input.acceptedAt,
   };
+  if (input.signed) return { schema: 2, ...base, agreement: input.signed.agreement, signing: input.signed.signing };
+  return { schema: 1, ...base };
 }
 
 /* ─────────────────────────── the content allowlist ──────────────────────── */
@@ -336,6 +363,18 @@ function asNullableString(value: unknown): string | null {
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+/**
+ * The proposal's own client email, for the letter's `{{client_email}}` and nothing else. A separate single-row read by the row's
+ * own id and org, made only for a proposal that carries an engagement letter, so the column allowlist above stays free of it.
+ * "" when the proposal has none; null when the read failed (the caller treats that as unavailable, never as a blank email).
+ */
+async function readLetterEmail(client: PublicProposalsDb, proposalId: string, orgId: string): Promise<string | null> {
+  const { data, error } = await client.from("client_proposal").select("client_email").eq("id", proposalId).eq("org_id", orgId).maybeSingle();
+  if (error && !isNoRowsError(error)) return null;
+  const email = isObject(data) ? data.client_email : null;
+  return typeof email === "string" ? email.trim() : "";
 }
 
 /* ─────────────────────────── the read ───────────────────────────────────── */
@@ -437,6 +476,21 @@ export async function readPublicProposal(
     const snapshot = isObject(row.accepted_snapshot) ? (row.accepted_snapshot as unknown as AcceptedSnapshot) : null;
     const accepted = storedStatus === "accepted";
 
+    // The engagement letter: a live proposal needs its own client email for the letter's merge field (read ONLY for a
+    // proposal that carries a letter, and never added to the column allowlist); a signed one is rebuilt from its snapshot.
+    let letter: PublicLetterView | null = null;
+    if (content.loe) {
+      if (accepted) {
+        const signed = rebuildSignedLetter(snapshot, firm.timeZone);
+        // The signature row's own id is a database id: it never reaches the browser.
+        letter = { dateText: snapshot?.signing?.date_text ?? "", clientEmail: "", signed: signed ? { ...signed, signatureId: null } : null };
+      } else {
+        const email = await readLetterEmail(client, proposalId, orgId);
+        if (email === null) return { status: "unavailable" };
+        letter = { dateText: letterDateText(now, firm.timeZone), clientEmail: email, signed: null };
+      }
+    }
+
     const view: PublicProposalView = {
       status: storedStatus,
       version: typeof row.version === "number" ? row.version : 1,
@@ -449,6 +503,7 @@ export async function readPublicProposal(
       acceptedQuote: accepted ? snapshot?.quote ?? null : null,
       payUrl: accepted ? asNullableString(row.pay_url) : null,
       firm,
+      letter,
     };
 
     return {
@@ -548,6 +603,17 @@ export type AcceptRefusal =
   | "nothing_selected"
   /** A ticked class the client describes (open or added) has no description. */
   | "missing_description"
+  /** Engagement letter: nothing was sent to sign, the details or name are missing, or the tick is not given. */
+  | "signing_required"
+  | "details_required"
+  | "name_required"
+  | "agree_required"
+  /** Engagement letter: what the browser showed is not what the server would have shown (a stale page). */
+  | "stale"
+  /** Engagement letter: the stored letter would not merge, or the proposal's data could not be read for it. */
+  | "letter_unavailable"
+  /** Engagement letter: lectual 0106 is not applied (the database function is missing). Nothing was written. */
+  | "not_ready"
   | "unconfigured"
   | "unavailable";
 
@@ -561,6 +627,8 @@ export type AcceptResult =
       quote: ProposalQuote;
       /** Server-side only: never forward to the browser. */
       proposalId: string;
+      /** Engagement letter only: "Signed November 12, 2026 at 2:14 PM by Alex Sample". */
+      signedLine?: string;
     }
   | { ok: false; reason: AcceptRefusal; message: string };
 
@@ -570,6 +638,13 @@ const REFUSAL_MESSAGE: Record<AcceptRefusal, string> = {
   already_resolved: "This proposal has already been accepted.",
   nothing_selected: "Choose at least one mark and one class to accept.",
   missing_description: DESCRIBE_BEFORE_ACCEPT,
+  signing_required: SIGN_MESSAGES.signing_required,
+  details_required: SIGN_MESSAGES.details_required,
+  name_required: SIGN_MESSAGES.name_required,
+  agree_required: SIGN_MESSAGES.agree_required,
+  stale: SIGN_MESSAGES.stale,
+  letter_unavailable: SIGN_MESSAGES.letter_unavailable,
+  not_ready: SIGN_MESSAGES.not_ready,
   unconfigured: "This page isn't available right now. Please try again later.",
   unavailable: "We couldn't record your acceptance. Please try again.",
 };
@@ -600,6 +675,13 @@ export async function acceptPublicProposal(
    * `parseClientClassInput`, never trusted.
    */
   clientClasses?: unknown,
+  /**
+   * Engagement letter only: `{ typedName, agree, details, fingerprint }` as the browser sent it. Cleaned and checked here
+   * (`checkSigning`), and ignored for a proposal without a letter.
+   */
+  signing?: unknown,
+  /** The request's network address and browser, read the way the quote engine reads them (`parseInet`, 400 characters). */
+  audit?: AcceptAudit,
 ): Promise<AcceptResult> {
   const read = await readPublicProposal(token, now, db);
   if (read.status === "unconfigured") return refuse("unconfigured");
@@ -623,6 +705,13 @@ export async function acceptPublicProposal(
   if (!quoteHasItems(quote)) return refuse("nothing_selected");
 
   const acceptedAt = now.toISOString();
+
+  // A proposal that carries an engagement letter is accepted ONLY by signing it, through the database function that writes
+  // the signature and the acceptance together. It never falls through to the plain update below.
+  if (read.view.content.loe) {
+    return signAndAccept({ read, token, content, selection: finalSelection, quote, now, db, signing, audit });
+  }
+
   const snapshot = buildAcceptedSnapshot({
     version: read.handle.version,
     content,
@@ -663,6 +752,119 @@ export async function acceptPublicProposal(
   } catch {
     return refuse("unavailable");
   }
+}
+
+export type AcceptAudit = { ip: string | null; userAgent: string | null };
+
+function signRefusal(error: NonNullable<PublicDbError>): AcceptRefusal {
+  const code = error.code ?? "";
+  const message = error.message ?? "";
+  // The function is not there (lectual 0106 not applied): PostgreSQL 42883, or PostgREST's schema-cache miss PGRST202.
+  if (code === "42883" || code === "PGRST202") return "not_ready";
+  if (message.startsWith("loe_sign_not_sent")) return "already_resolved";
+  if (message.startsWith("loe_sign_expired")) return "closed";
+  return "unavailable";
+}
+
+/**
+ * Signing and accepting are one act. Everything is decided from the token's own read and the cleaned submission, and NOTHING
+ * is written before the one database call: a stale page, a missing name or tick, an unmergeable letter and a missing function
+ * all leave the rows as they were. The agreement text is built HERE from the stored letter, the cleaned details and the
+ * recomputed exhibit; the browser's fingerprint is only compared with ours.
+ */
+async function signAndAccept(input: {
+  read: Extract<PublicProposalRead, { status: "ok" }>;
+  token: string;
+  content: ProposalContent;
+  selection: Selection;
+  quote: ProposalQuote;
+  now: Date;
+  db?: PublicProposalsDb;
+  signing: unknown;
+  audit?: AcceptAudit;
+}): Promise<AcceptResult> {
+  const { read, content, selection, quote, now } = input;
+  const letter = read.view.letter;
+  const loe = content.loe;
+  if (!letter || !loe || typeof loe.body !== "string") return refuse("letter_unavailable");
+
+  if (input.signing === undefined || input.signing === null) return refuse("signing_required");
+  const checked = checkSigning(input.signing);
+  if (!checked.ok) return refuse(checked.reason);
+
+  const exhibit = buildExhibit(content, quote, money);
+  const assembled = assembleAgreement({
+    body: loe.body,
+    inputs: { details: checked.details, typedName: checked.typedName, dateText: letterDateText(now, read.view.firm.timeZone), clientEmail: letter.clientEmail },
+    exhibit,
+  });
+  if (!assembled.ok) return refuse("letter_unavailable");
+  const { agreement } = assembled;
+
+  const posted = (input.signing as Record<string, unknown>).fingerprint;
+  const ours = agreementFingerprint({ letter: agreement.blocks, details: checked.details, exhibit });
+  if (typeof posted !== "string" || posted !== ours) return refuse("stale");
+
+  const acceptedAt = now.toISOString();
+  const sha256 = createHash("sha256").update(agreement.text, "utf8").digest("hex");
+  const snapshot = buildAcceptedSnapshot({
+    version: read.handle.version,
+    content,
+    selection,
+    quote,
+    acceptedAt,
+    signed: {
+      // The database fills `signature_id`, `signed_at` and the final `agreement` block itself; these are the same values it will write.
+      agreement: { signature_id: null, signer_name: checked.typedName, signed_at: acceptedAt, sha256, template_version: null },
+      signing: { details: { ...checked.details }, date_text: letterDateText(now, read.view.firm.timeZone), client_email: letter.clientEmail },
+    },
+  });
+
+  try {
+    const client = publicProposalsDb(input.db);
+    if (typeof client.rpc !== "function") return refuse("not_ready");
+    const { proposalId, orgId } = read.handle;
+    const { data, error } = await client.rpc("client_proposal_sign_and_accept", {
+      p_proposal_id: proposalId,
+      p_org_id: orgId,
+      p_signer_name: checked.typedName,
+      p_signer_title: checked.details.title || null,
+      p_entity_name: checked.details.entity_name || null,
+      p_address: addressJson(checked.details),
+      p_ip: parseInet(input.audit?.ip),
+      p_user_agent: truncateUserAgent(input.audit?.userAgent),
+      p_agreement_text: agreement.text,
+      p_agreement_sha256: sha256,
+      p_selection: selection,
+      p_snapshot: snapshot,
+    });
+    if (error) return refuse(signRefusal(error));
+    if (typeof data !== "string" || data.length === 0) return refuse("unavailable");
+
+    await notifyFirmOfAcceptance({ proposalId, orgId }, client);
+
+    // What the database stamped (its own clock) and where to pay; a failed read only costs the receipt line, not the signing.
+    const after = await client.from("client_proposal").select("pay_url, accepted_snapshot").eq("id", proposalId).eq("org_id", orgId).maybeSingle();
+    const row = !after.error && isObject(after.data) ? after.data : null;
+    const stored = row && isObject(row.accepted_snapshot) ? (row.accepted_snapshot as unknown as AcceptedSnapshot) : null;
+    const signedAt = stored?.agreement?.signed_at ?? acceptedAt;
+    return {
+      ok: true,
+      payUrl: row ? asNullableString(row.pay_url) : null,
+      acceptedAt: signedAt,
+      quote,
+      proposalId,
+      signedLine: signedLineText(signedAt, read.view.firm.timeZone, checked.typedName),
+    };
+  } catch {
+    return refuse("unavailable");
+  }
+}
+
+/** The e-sign audit keeps the raw header (evidence about the signing session), bounded as `src/lib/quotes/public.ts` bounds it. */
+function truncateUserAgent(value: string | null | undefined): string | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  return value.slice(0, 400);
 }
 
 /**
