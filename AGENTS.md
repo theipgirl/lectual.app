@@ -1979,3 +1979,12 @@ Four bugs the owner hit on a draft's edit page (`/dashboard/proposals/<id>/`). N
   full-width modal dialog portalled to `<body>` (the sticky side column is a stacking context). While open the preview is drawn only
   there; focus goes to Close, Esc / Close / the backdrop close it, Tab wraps (`expandKeyAction`), `.lx-page`, `html` and `body` are
   locked (`lockScroll`) and focus returns to Expand. Words in `EDITOR_WORDS`.
+
+- **Package notes were lost (2026-11-12, display only).** `includesComparison` took a row's worth, note and highlight from the FIRST package that had
+  that label, so a note typed on another package's row never showed. Now the row-level worth / note / highlight come from the first package with a
+  non-empty one, and a package whose own note differs gets it under its own cell (`cellNotes`, `.cp-sub-note`, present only when some note differs, so
+  other tables are unchanged). The editor preview uses the same component. The save path (3 packages x 17 rows, the real page's fields as a browser posts
+  them, one `runSaveDraft`, then the client page for each package, then a second save after the firm's rows change) is pinned in
+  `tests/proposal-editor/package-includes-e2e.test.tsx` and needed no fix. A live ("Link live") version's includes table is inside the disabled
+  fieldset with no Add row / Remove, and a browser posts none of it (same test). The preview shows only the CHOSEN package's column (default Enhanced),
+  so an edit to another package shows once that package is chosen in the preview.
