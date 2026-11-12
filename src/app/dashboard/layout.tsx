@@ -24,6 +24,8 @@ import { shouldShowTour } from "@/lib/onboarding/tour";
 import { FirmWordmark } from "@/components/shell/FirmWordmark";
 import { DealTimesDialog } from "@/components/deck/DealTimesDialog";
 import { parseDealTimes } from "@/lib/deal/person-times";
+import { loadDealNudge } from "@/lib/queue/deal-nudge-load";
+import { dealReadyLine } from "@/lib/ui/words";
 import { friendlyZoneLabel } from "@/lib/org/firm-form";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { YourNameDialog } from "@/components/account/YourNameDialog";
@@ -71,6 +73,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
   ]);
   // The badge counts what is the viewer's own (a routing read that fails counts every pending item).
   const queue = await mineQueue(allQueue, { userId: user.id, role });
+  // The owner shell's deal-ready dot, from the queue read above (no second queue read). The technician shell never asks.
+  const nudge = shell.variant === "owner" ? await loadDealNudge(allQueue, { userId: user.id, role }, parseDealTimes(user.user_metadata)) : null;
+  const dealReady = nudge && nudge.ready ? dealReadyLine(nudge.label, nudge.count) : null;
   const railPinned = railIsPinned(cookieStore.get(RAIL_PIN_COOKIE)?.value);
 
   return (
@@ -125,6 +130,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           showReports={shell.showReports}
           tree={shell.tree}
           variant={shell.variant}
+          dealReady={dealReady}
         />
         <div className="lx-content">
           <div className="lx-page">{children}</div>
@@ -138,6 +144,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         bar={shell.bar}
         groups={shell.moreGroups}
         variant={shell.variant}
+        dealReady={dealReady}
       />
       <CopilotLauncher configured={aiConfigured()} />
       <FeedbackTrailRecorder />

@@ -4,6 +4,7 @@ import { deadlineKindLabel, deadlineNeedsReview } from "@/lib/matters/deadline-r
 import type { UpcomingDeadline } from "@/lib/matters";
 import type { ConsultItem } from "@/lib/calendar/consult-sources";
 import type { DeckSummary } from "@/lib/queue/deck-summary";
+import type { DealNudge } from "@/lib/deal/nudge";
 import {
   ownerCardsAbout,
   ownerCardsCount,
@@ -15,6 +16,7 @@ import {
   OWNER_CARDS_NONE_STATUS,
   OWNER_CARDS_NOT_CONNECTED,
   OWNER_CARDS_UNREACHABLE,
+  dealReadyLine,
   OWNER_WEEK_DUE,
   OWNER_WEEK_LAST_DAY,
 } from "@/lib/ui/words";
@@ -52,11 +54,13 @@ export type CardsHero = {
   message: string | null;
   dealLine: string | null;
   canStart: boolean;
+  /** "Your 2:00 PM deal is ready \u00b7 3 cards" only while the nudge says so; null otherwise (nothing else changes). */
+  readyLine: string | null;
 };
 
-export function cardsHero(summary: DeckSummary): CardsHero {
+export function cardsHero(summary: DeckSummary, nudge?: DealNudge): CardsHero {
   const line = cardsLine(summary);
-  const none = { big: null, unit: "", cards: "", about: "", dealLine: null };
+  const none = { big: null, unit: "", cards: "", about: "", dealLine: null, readyLine: null };
   if (summary.status !== "ok") return { state: line.state, ...none, message: line.headline, canStart: false };
   const dealLine = ownerDealLine(summary.dealLabel, summary.nextDealLabel, summary.laterArrivals);
   if (summary.count === 0) return { state: "ok", ...none, message: line.headline, canStart: false };
@@ -69,6 +73,7 @@ export function cardsHero(summary: DeckSummary): CardsHero {
     message: null,
     dealLine,
     canStart: true,
+    readyLine: nudge && nudge.ready ? dealReadyLine(nudge.label, nudge.count) : null,
   };
 }
 

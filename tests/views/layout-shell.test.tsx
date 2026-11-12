@@ -7,6 +7,8 @@ const resolveFirmSession = vi.fn();
 vi.mock("@/lib/firm/session", () => ({ resolveFirmSession: (...a: unknown[]) => resolveFirmSession(...a) }));
 vi.mock("@/lib/queue/load", () => ({ loadActiveQueue: async () => ({ status: "ok", items: [] }) }));
 vi.mock("@/lib/queue/mine-load", () => ({ mineQueue: async () => ({ status: "ok", items: [{ id: "q1" }, { id: "q2" }] }) }));
+const loadDealNudge = vi.fn(async () => ({ ready: false }));
+vi.mock("@/lib/queue/deal-nudge-load", () => ({ loadDealNudge: (...a: unknown[]) => loadDealNudge(...a) }));
 vi.mock("@/lib/nav-counts", () => ({ loadRailCounts: async () => ({}) }));
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }) }));
 vi.mock("next/navigation", () => ({
@@ -69,7 +71,10 @@ async function mount(s: unknown) {
 
 const MODULES = ["mailbox", "agents", "proposals"];
 
-beforeEach(() => resolveFirmSession.mockReset());
+beforeEach(() => {
+  resolveFirmSession.mockReset();
+  loadDealNudge.mockClear();
+});
 
 describe("switch off: today's shell, byte for byte", () => {
   it.each(["owner", "admin", "attorney"])("%s gets visibleNav's own list and every default", async (role) => {
@@ -88,6 +93,10 @@ describe("switch off: today's shell, byte for byte", () => {
       expect(m.menu.props.variant).toBeUndefined();
       expect(m.label).toHaveLength(1);
       expect(m.header.props.className).toBe("lx-top");
+      // The deal-ready nudge is the owner shell's alone: no read, no dot words.
+      expect(loadDealNudge).not.toHaveBeenCalled();
+      expect(m.rail.props.dealReady).toBeNull();
+      expect(m.bar.props.dealReady).toBeNull();
     }
   });
 
@@ -105,6 +114,16 @@ describe("switch off: today's shell, byte for byte", () => {
 });
 
 describe("switch on", () => {
+  it("the owner shell derives the deal-ready words from the queue it already loaded; a nudge that is off passes null", async () => {
+    loadDealNudge.mockResolvedValueOnce({ ready: true, label: "2:00 PM", count: 3 } as never);
+    const on = await mount(session("owner", [...MODULES, "role-views"]));
+    expect(loadDealNudge).toHaveBeenCalledTimes(1);
+    expect(on.rail.props.dealReady).toBe("Your 2:00 PM deal is ready \u00b7 3 cards");
+    expect(on.bar.props.dealReady).toBe("Your 2:00 PM deal is ready \u00b7 3 cards");
+    const off = await mount(session("owner", [...MODULES, "role-views"]));
+    expect(off.rail.props.dealReady).toBeNull();
+  });
+
   it("an owner gets the owner shell: drawn items, owner tree, no Settings/Reports rows, no section label", async () => {
     const m = await mount(session("owner", [...MODULES, "role-views"]));
     const slugs = (m.rail.props.items as { slug: string }[]).map((i) => i.slug);

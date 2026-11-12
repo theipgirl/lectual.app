@@ -13,6 +13,8 @@ import "./owner-shell.css";
 type Props = {
   items: NavItem[];
   queueStatus: QueueLoadStatus;
+  /** Owner shell only: the deal-ready words, or null. */
+  dealReady?: string | null;
   pendingCount: number;
   counts: Partial<Record<string, number>>;
   /** A view's own bar (default: Today, Leads, Approvals, Mail or Matters). Still filtered through `items`. */
@@ -62,7 +64,7 @@ export function MoreSheet({ sections, onClose, sheetRef, note }: { sections: Mor
  * keeps the queue's three states. Hiding an entry is a courtesy; every page
  * still checks its own gate.
  */
-export function MobileBar({ items, queueStatus, pendingCount, counts, bar: barSpec, groups, variant, initialOpen = false }: Props) {
+export function MobileBar({ items, queueStatus, pendingCount, counts, dealReady = null, bar: barSpec, groups, variant, initialOpen = false }: Props) {
   const pathname = usePathname() ?? "/dashboard/";
   const [open, setOpen] = useState(initialOpen);
   const moreButton = useRef<HTMLButtonElement>(null);
@@ -120,19 +122,22 @@ export function MobileBar({ items, queueStatus, pendingCount, counts, bar: barSp
       <nav className={`lx-mbar${variant === "owner" ? " lx-mbar--owner" : ""}`} aria-label="Main">
         {bar.map((item) => {
           const count = railCountFor(item.countKey, queueStatus, pendingCount, counts);
+          const ready = variant === "owner" && item.countKey === "queue" ? dealReady : null;
           return (
             <Link
               key={item.slug || "today"}
               href={item.href}
               className={`lx-mbar-item${item.active && !sheetOwnsTile ? " is-active" : ""}`}
               aria-current={item.active ? "page" : undefined}
-              aria-label={count ? `${item.label} (${count === "!" ? "couldn't reach the queue" : count})` : item.label}
+              aria-label={`${count ? `${item.label} (${count === "!" ? "couldn't reach the queue" : count})` : item.label}${ready ? `, ${ready}` : ""}`}
             >
               <span className="lx-mbar-icon">
                 <Icon d={item.icon} />
                 {count && <span className={`lx-mbar-badge${count === "!" ? " is-alert" : ""}`}>{count}</span>}
+                {ready && <span className="lx-ready-dot lx-ready-dot--bar" aria-hidden="true" />}
               </span>
               <span className="lx-mbar-label">{item.label}</span>
+              {ready && <span className="lx-vh">{ready}</span>}
             </Link>
           );
         })}

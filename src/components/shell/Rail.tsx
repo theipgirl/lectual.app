@@ -14,6 +14,8 @@ import "./owner-shell.css";
 type Props = {
   items: NavItem[];
   queueStatus: QueueLoadStatus;
+  /** Owner shell only: the deal-ready words ("Your 2:00 PM deal is ready \u00b7 3 cards"), or null. */
+  dealReady?: string | null;
   pendingCount: number;
   /** Section counts keyed by slug. Absent = unknown, and nothing is drawn (never a false 0). */
   counts: Partial<Record<string, number>>;
@@ -53,7 +55,7 @@ function Icon({ d, size }: { d: string; size: number }) {
  * it, "!" when we could not (an outage never reads as "nothing waiting"),
  * nothing when there is no queue.
  */
-export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, showSettings = true, showReports: reportsAllowed = true, tree, variant, initialFlyout = false }: Props) {
+export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, dealReady = null, showSettings = true, showReports: reportsAllowed = true, tree, variant, initialFlyout = false }: Props) {
   const pathname = usePathname() ?? "/dashboard/";
   const [pinned, setPinned] = useState(initialPinned);
   const [flyout, setFlyout] = useState(initialFlyout);
@@ -128,6 +130,7 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
               {gi > 0 && <div className="lx-rail-spacer" aria-hidden="true" />}
               {group.map((entry) => {
                 const count = countFor(entry.countKey);
+                const ready = owner && entry.countKey === "queue" ? dealReady : null;
                 return (
                   <div key={entry.key} className="lx-rail-node">
                     <Link
@@ -144,7 +147,7 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
                       data-tour={(entry.kids.length > 0 ? entry.kids.map((k) => k.key) : [entry.key]).map(navTourToken).join(" ")}
                       className={`lx-rail-item${entry.active ? " is-active" : entry.childActive ? " is-parent" : ""}`}
                       aria-current={entry.active ? "page" : undefined}
-                      aria-label={count ? `${entry.label} (${count === "!" ? "couldn't reach the queue" : count})` : entry.label}
+                      aria-label={`${count ? `${entry.label} (${count === "!" ? "couldn't reach the queue" : count})` : entry.label}${ready ? `, ${ready}` : ""}`}
                       title={count && entry.countKey ? RAIL_COUNT_TITLE[entry.countKey] : undefined}
                     >
                       <span className="lx-rail-icon">
@@ -152,6 +155,12 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
                         {count && !entry.active && <span className={`lx-rail-dot${count === "!" ? " is-alert" : ""}`} aria-hidden="true" />}
                       </span>
                       <span className="lx-rail-label">{entry.label}</span>
+                      {ready && (
+                        <>
+                          <span className="lx-ready-dot" aria-hidden="true" />
+                          <span className="lx-vh">{ready}</span>
+                        </>
+                      )}
                       {count && <span className={`lx-rail-count${count === "!" ? " is-alert" : ""}`}>{count}</span>}
                       {owner && entry.kids.length > 0 && (
                         <span className="lx-rail-chev">

@@ -333,6 +333,10 @@ export function ownerCardsNextDeal(count: number, label: string, later: number):
   const more = later > 0 ? ` ${later} more at ${label}.` : "";
   return count > 0 ? `Next deal ${label}.${more}` : `All decided. Next deal ${label}.${more}`;
 }
+/* ── Phase 2 item 4: deal-ready nudge (Today tile, Approvals rail row and phone item) ── */
+export function dealReadyLine(label: string, count: number): string {
+  return `Your ${label} deal is ready · ${count} ${count === 1 ? "card" : "cards"}`;
+}
 export const OWNER_DEADLINES_HEADING = "Deadlines, next 14 days";
 export const OWNER_DEADLINES_NONE = "Nothing due in the next 14 days.";
 export const OWNER_DEADLINES_FAILED = "Couldn't load deadlines.";
