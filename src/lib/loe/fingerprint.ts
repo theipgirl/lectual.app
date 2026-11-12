@@ -12,9 +12,12 @@ export type { AgreementParts };
  * order or in how they were serialised agree, and changing one letter, one
  * detail or one exhibit character does not.
  *
- * Pure and deterministic. The server builds the agreement text itself and
- * compares its fingerprint with the one the browser saw; a mismatch means the
- * page was stale and nothing is written.
+ * Pure and deterministic. This is the general hash of three parts. What the
+ * server actually COMPARES with the browser at signing is `canonicalFingerprint`
+ * below, over `Agreement.canonical`: the same three parts with the letter's two
+ * date fields fixed, so the date the page was opened on never makes a signing
+ * "stale". A mismatch there means the proposal itself changed, and nothing is
+ * written.
  */
 
 export function agreementFingerprint(parts: AgreementParts): string {

@@ -88,7 +88,7 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
       tab = null;
     }
     try {
-      // The fingerprint is hashed now (async), after the tab is open, over what is on screen.
+      // The fingerprint is hashed now (async), after the tab is open, over what is on screen (the date aside: the server stamps its own).
       const signing: SigningInput | null = loeOn ? await loeFlow.signingPayload() : null;
       if (loeOn && !signing) {
         tab?.close();

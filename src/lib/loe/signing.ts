@@ -215,7 +215,7 @@ export async function sha256Hex(text: string): Promise<string> {
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-/** The fingerprint the page sends: sha256 of the canonical agreement. Equal to `agreementFingerprint` on the server. */
+/** The fingerprint the page sends: sha256 of the canonical agreement (date fields fixed). Equal to `canonicalFingerprint(agreement.canonical)` on the server. */
 export function fingerprintOf(agreement: Agreement): Promise<string> {
   return sha256Hex(agreement.canonical);
 }

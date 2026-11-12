@@ -1611,9 +1611,11 @@ The edit page for a draft is five sections in ONE form with ONE Save. Nothing se
 - **One marker.** `UnsavedGuard` holds one page-level state (`unsaved.ts`): typing, and adding or removing a row (`useRows`, the mark and class rows) set it; a good save clears it, a refusal does not.
   Exactly one "Unsaved changes" element. "Save and create link" is never disabled by it (it shows "Saves first"); "Turn on the link" (a saved version) still waits ("Save your changes first.").
 - **Side column.** `PayBox` (saved prices from `quoteProposal`, "Prices update when you save" only while unsaved), `ReadyChecklist` (`checklist.ts`: the same `validateContent(..., forApproval)` issues, each
-  an `<a href="#pe-f-...">`; `fieldId` / `targetForPath` are the one id map; "Nothing is blocking the link." when empty), then `EditorActions`. DECISION: Preview / Save / Save and create link are ONE element
+  an `<a href="#pe-f-...">`; `fieldId` / `targetForPath` are the one id map; "Nothing is blocking the link." when empty), then `EditorActions`. One thing is said once: a stored check
+  (`content.checks`) about a field that already has a blocking "Fix" on the same path is left out (a Copilot draft with no pay link shows the Fix, not a Fix and a Check). DECISION: Preview / Save / Save and create link are ONE element
   (`EditorActions`), the last card of the sticky column on desktop and the fixed bottom bar under 900px (CSS only, above the phone nav), so a page never has two copies of Save.
 - **Assistant drafts** show `CheckFirstPanel` ("Check these N things": the stored CHECK FIRST notes and call quotes) instead of the old glance card; a person's draft shows no panel. `ProposalCard` stays for other pages.
+  A page has ONE "Check these" heading: when the panel draws (`checkFirstShown`), `ReadyChecklist` lists the stored checks with no heading of its own (`checksHeading={false}`).
 - **Engagement letter** is `EngagementLetterSlot`, which renders nothing until Sprint 6 fills it (no heading, no placeholder).
 - Words: `EDITOR_WORDS` / `checkTheseHeading` in `vocabulary.ts` ("Selected to start", "Let the client describe this"); the menu beside the lifecycle buttons is named for what it holds (`moreMenuLabel`: Withdraw, Reset or delete, ...).
   New proposal still uses `BuilderLayout` and its "More options"; only the editor changed.
@@ -1627,7 +1629,8 @@ client page, signing and the staff side come in later sprints. Nothing here send
 - **The pure library is `src/lib/loe/`** (no `server-only`, no HTML): `fields.ts` (the seven fields `date`, `client_name`, `entity_name`,
   `address_block`, `client_email`, `signer_name`, `signed_date`; one `findMergeFields`; the sample values), `render.ts` (`renderLetter`), `validate.ts`
   (`validateTemplate`, `loeIssues`), `fingerprint.ts` (`agreementFingerprint`, sha256 hex over a key-sorted canonical form of letter + details +
-  exhibit). The database enforces the same seven fields when a version is approved, so a change to the list is a change to 0106 too.
+  exhibit; `canonicalFingerprint`, the hash of `Agreement.canonical`, which is what signing compares: the same form with the letter's two date
+  fields fixed; `agreementTextSha256`, the hash of the final agreement text that the signature row stores). The database enforces the same seven fields when a version is approved, so a change to the list is a change to 0106 too.
 - **`renderLetter(body, values)` returns plain-text blocks `{ lead, text }`, never HTML.** The body is split into paragraphs (blank line) and a bold lead-in
   `**Lead.**` is read from the TEMPLATE first, then values are merged in ONE pass, so a client's `<script>`, `{{x}}`, `}}` or `**` is literal text and is
   never re-merged or re-parsed. An unknown field, an unclosed `{{` / `}}` or an allowed field with no value is an error and there is NO letter (a client
@@ -1669,7 +1672,7 @@ New proposal is one step, and every way of starting a proposal goes through ONE 
 - **"One" offer.** A brand whose offer is `one` package equal to the proposal's base package has no choice; a different one is a one-option `package_choice`. The base package is the spec's `package`, else the firm's "New proposals offer" (`mode: one`), else the firm's first.
 - **`content.made_by`** (`assistant` | `copilot` | `person`) and **`content.made_from.consult_date`** (a civil date) are staff-only: `validateContent` checks them (`made_by` refuses anything else), `publicContent` is an allowlist and never returns either. The editor header line is `madeByLine` (`src/lib/proposals/made-by.ts`, words in `vocabulary.ts`): "Made by the assistant from the Nov 10 consult" (a consult date), "Made by the assistant", "Made with Copilot", nothing for `person` or absent; an older assistant draft with no `made_by` keeps "Drafted by an assistant".
 - **`createProposalAction` is one step.** The form posts an id (`leadId` or `matterId`; the matter wins) or, for Start blank, a typed full name (and optional first name, company, email), plus `kind` (`general` for a flat-fee draft) and optionally `useConsult`. The record is read ON THE SERVER through the caller's scoped client (`readStartSubject`, `src/lib/proposals/start-subject.ts`: found / not found / couldn't be read, so another firm's id is "not found"); a posted name, email or price is ignored. It reads the firm's settings (unreadable = the standard defaults, the draft is still made) and the approved letter of that kind (a missing table = no letter; a FAILED read creates nothing), builds with `buildDraftContent` (`madeBy: "person"`), makes ONE `createProposal` call (no pay link: the editor sets it; expiry = 14 days on the firm's calendar) and redirects to `/dashboard/proposals/<id>/`. `useConsult` with a lead still re-reads the newest consult and refuses (`CHANGED_SINCE_LOAD`) unless it is reviewed; `brandPlan` (prefill.ts) is the one rule for which brand names a lead's own brand and the consult make.
-- **The start screen** (`/dashboard/proposals/new/`, `isStartScreen`: none of `lead`, `matter`, `blank`, `door`, and also none of the picker's own `kind`, `q`, `type`): three doors, `StartDoors` over the pure `startDoors({ canWrite, aiOn })`. **From a consult** shows the same rows as the proposals list (`ConsultRows`, exported from `ConsultsStrip.tsx`, with "Draft the proposal" going to the existing consult drafter); no Zoom or Fathom connection = a sentence saying what is needed and no rows; a failed read = "Can't show consults right now" (never "no consults"). **Ask Copilot** is a plain link `/dashboard/copilot/?q=<encoded request>` (typed in, never sent; the request is `copilotRequest(name)`: the chosen lead's name or a generic line, never a price) and is not drawn at all when `aiConfigured()` is false. **Start from scratch** goes to `?door=scratch`: "Who is this for?", where each row is a form that CREATES the draft (`StartDraftRow`), plus Start blank (`?blank=1`, `StartBlankForm`). A role that can't write proposals sees the existing role card and no door. A link from a lead or matter page (`?lead=` / `?matter=`) shows who it is for and one "Create draft" button (`CreateDraftForm`; opening the page writes nothing) with the reviewed-consult tick when one has marks.
+- **The start screen** (`/dashboard/proposals/new/`, `isStartScreen`: none of `lead`, `matter`, `blank`, `door`, and also none of the picker's own `kind`, `q`, `type`): three doors, `StartDoors` over the pure `startDoors({ canWrite, aiOn })`. **From a consult** shows the same rows as the proposals list (`ConsultRows`, exported from `ConsultsStrip.tsx`, with "Draft the proposal" going to the existing consult drafter); no Zoom or Fathom connection = a sentence saying what is needed and no rows; a failed read = "Can't show consults right now" (never "no consults"). The door's state is `consultDoorState` (`start-screen.ts`, pure, the reads passed in), and EVERY read counts: a failed read of the firm's proposals is the same "couldn't load" state with no rows, because the proposals are what tell a consult that already has one from a consult that is ready to draft. It is never turned into an empty list. **Ask Copilot** is a plain link `/dashboard/copilot/?q=<encoded request>` (typed in, never sent; the request is `copilotRequest(name)`: the chosen lead's name or a generic line, never a price) and is not drawn at all when `aiConfigured()` is false. **Start from scratch** goes to `?door=scratch`: "Who is this for?", where each row is a form that CREATES the draft (`StartDraftRow`), plus Start blank (`?blank=1`, `StartBlankForm`). A role that can't write proposals sees the existing role card and no door. A link from a lead or matter page (`?lead=` / `?matter=`) shows who it is for and one "Create draft" button (`CreateDraftForm`; opening the page writes nothing) with the reviewed-consult tick when one has marks.
 - **"New proposals offer"** (Settings, Proposals; `src/lib/proposals/new-offer.ts`, `NewOfferSection` inside the ONE settings form): `pricing.new_offer = { mode: "one" | "choice", per: "brand" | "mark", options (1..3 package names), start }`, NAMES only. `parseNewOffer` drops names not on the firm's list and keeps at most 3; `readNewOffer` reads it; the form's `newOffer.present` marker means a post without the control leaves the key alone; `withNewOffer` refuses (fixed sentence) a serialised pricing over 64 KB and otherwise touches only its own key, so approvers, `approval_routing`, `lawmatics_loe_fields`, package rows and includes stay as they were (`withPackages` and `parseSettingsPricing` already spread the rest). The action checks names against the list AS IT WILL BE after the same save, so a package renamed in that post can't be offered. Admin tier only (the existing `gateAdminAction`). All doors use it as the starting point; none set = one package, the firm's first.
 - **Not verified in a real browser:** the start screen and settings control are tested with `renderToStaticMarkup` and Playwright screenshots of a static render only; Copilot actually opening with the request typed in is not exercised.
 
@@ -1690,31 +1693,53 @@ anything; `pricing.ts` has no diff; one dependency was added (`pdfkit`, exact-pi
   included), legal fee lines, discounts, credits, "Legal fee due now" and "USPTO filing fees, due at filing"; a flat-fee proposal shows the matter, the work
   and the fee and no USPTO line.
 - **Signing and accepting are one act** (`signAndAccept` in `public.ts`). `acceptProposalAction(token, selection, clientClasses, signing)`; `signing` =
-  `{ typedName, agree, details, fingerprint }`. The server cleans every field with the `cleanClientText` rules (`checkSigning`), refuses a missing
-  name, address or tick with a fixed sentence, builds the agreement text ITSELF from the stored letter, the cleaned details and the recomputed exhibit,
-  compares its fingerprint (`agreementFingerprint`) with the browser's (Web Crypto over the same canonical string, `canonical.ts`), and only then calls
+  `{ typedName, agree, details, fingerprint }`. The server cleans every field (`checkSigning`), refuses a missing name, address or tick with a fixed
+  sentence, builds the agreement text ITSELF from the stored letter, the cleaned details, the recomputed exhibit and ITS OWN date, compares its
+  fingerprint (`canonicalFingerprint`) with the browser's (Web Crypto over the same canonical string, `canonical.ts`), and only then calls
   `client_proposal_sign_and_accept` through the service role, once, with `p_agreement_text` and its sha256, the IP (`parseInet`) and the browser (400
   characters). NOTHING is written before that call. A missing function (42883 / PGRST202, or a client with no `rpc`) is "Signing isn't available on this
-  page yet": it NEVER falls back to the unsigned update for `loe` content. Content without `loe` takes the old path and ignores `signing`. The letter's date
-  is the firm's calendar date, worked out on the server; a signing across midnight reads as a stale page and asks for a reload.
+  page yet": it NEVER falls back to the unsigned update for `loe` content. Content without `loe` takes the old path and ignores `signing`.
+- **One normaliser for what a client types.** `cleanTypedName` (the signature name) and `cleanSigningDetails` (the nine details) are the `cleanClientText`
+  rules, and BOTH sides call them: the page builds its agreement and its payload only through `pageAgreement` / `pageSigningPayload` (`signing.ts`, the
+  functions `useLoeFlow` calls), the server through `checkSigning`. A double space, a tab or a non-breaking space in a name can therefore never make the two
+  fingerprints disagree. Never clean a typed field with anything else on either side.
+- **The fingerprint does not cover the date.** `Agreement.canonical` is built from the letter with `{{date}}` and `{{signed_date}}` replaced by a fixed
+  placeholder (`FINGERPRINT_DATE`), so a tab opened one day and signed the next still matches. The date in the stored agreement text is the server's (the
+  firm's calendar date at signing), `agreement_sha256` is over that final text, and the snapshot's `signing.date_text` records it. The receipt redraws the
+  letter with the server's date (`ProposalAcceptResult.letterDate`), and the PDF is built from the snapshot, so both show it. "Stale" now means only that
+  the proposal itself changed after the page was opened; the sentence says so and asks for a reload. A refusal never clears what the client typed (it lives in
+  `useLoeFlow`'s state; only a reload loses it).
+- **The firm's zone and name must be real.** A proposal that carries a letter is dated, and once signed timed, in the firm's zone and carries its name. A
+  firm with no profile row has the standard zone (a real answer); a profile read that FAILED makes `readPublicProposal` answer `unavailable` for a letter
+  proposal (the page says try again; nothing is dated, signed or printed in a guessed zone). A proposal without a letter is unchanged.
+- **The signed download is there the moment signing succeeds.** The public page hands the LIVE page `onDownloadSigned` too (token-bound; the action refuses
+  until the proposal is signed), so the receipt the page turns into offers "Download your signed letter (PDF)" with no reload. The note under it adds
+  "You can download it above." only when the button is drawn (`PAYNOTE_DOWNLOAD_ABOVE`).
 - **Snapshot schema 2.** `buildAcceptedSnapshot` writes `schema: 2` with `agreement` ({ signature_id, signer_name, signed_at, sha256, template_version };
   the database stamps the final block) and `signing` ({ details, date_text, client_email }) for a signed acceptance; schema 1 is every other acceptance.
   Every reader accepts both (`tests/proposals/snapshot-schema.test.ts`). `rebuildSignedLetter` rebuilds the letter AS SIGNED from the snapshot alone, so
-  "Read it again" and the signed PDF never follow a later change to the firm's letter.
+  "Read it again" and the signed PDF never follow a later change to the firm's letter. (The signed PDF also checks that rebuild against the stored
+  fingerprint: Sprint 6, "One PDF".)
 - **The client email is read only for a proposal that has a letter** (`readLetterEmail`, a separate single-row read; it is NOT in
   `PUBLIC_PROPOSAL_COLUMNS`) because the letter merges `{{client_email}}`. It reaches the browser in `view.letter` only for that proposal.
 - **PDF: one builder, `src/lib/loe/pdf.ts` (pdfkit).** Review copy ("Review copy - not yet signed" on every page) and signed copy (signature record: signer,
-  time, fingerprint) come from it; there is no docx of the letter and no print view. Font: DejaVu Sans regular and bold in `src/lib/loe/fonts/` with its licence,
+  the signed time WITH its zone, the same instant in UTC as ISO 8601, fingerprint) come from it; there is no docx of the letter and no print view. Font: DejaVu Sans regular and bold in `src/lib/loe/fonts/` with its licence,
   read with `fs` from the project root and shipped by `outputFileTracingIncludes: { "/p/*": ["./src/lib/loe/fonts/**"] }` in `next.config.ts` (Sprint 6's staff
   download needs its own route key there). The embedded font is pdfkit's default font, so no standard-font data file is read. Server actions return base64
   (`LetterPdfResult`) and the page saves it through a Blob link (`download-pdf.ts`).
 - **`downloadReviewLetterAction(token, selection, clientClasses, details)`** is anonymous and token-only (no id parameter): refuses a withdrawn, expired,
   replaced, signed or letterless proposal with one sentence, builds from the stored letter and the recomputed quote, logs nothing, and is rate limited
   (20 per token and 60 per address per hour) IN MEMORY per server instance, so on serverless it is a courtesy limit (`review-limit.ts`). The quote page's
-  actions have no limiter at all. `downloadSignedLetterAction(token)` rebuilds from the snapshot.
-- **The two 4.7 sentences are not shown on a letter proposal.** Replacement wording is in `src/lib/loe/client-words.ts` with an "ATTORNEY MUST APPROVE BEFORE
-  USE" comment: the pay note and the footer line. Button labels are Continue, Sign and continue to payment, Pay my legal fee. Lectual's own "not a law firm"
-  line stays on every state.
+  actions have no limiter at all. `downloadSignedLetterAction(token)` builds through `buildVerifiedSignedPdf` (Sprint 6).
+- **Software builders write no legal-sounding text.** `src/lib/loe/client-words.ts` holds every word the letter steps add, and its header says who writes
+  what: the builders write only words that name a step or say what the page did (button labels Continue, Sign and continue to payment, Pay my legal fee;
+  the pay notes, which describe the steps). On a proposal that carries a letter: the sentence that the agreement is sent after payment is not shown;
+  the FOOTER is the firm's existing footer line, unchanged, the same one a no-letter proposal shows (`ATTORNEY_FOOTER_LETTER_LINE` is an unset slot, null,
+  for the attorney's own replacement, drawn only once set); and the "Review and accept" panel draws NO commitment sentence and no "2" badge (the letter and
+  the "I have read and agree" tick are the commitment, and the four numbered steps are above it). A proposal without a letter keeps its sentence, badge and
+  footer byte for byte. Lectual's own "not a law firm" line stays on every state. Never add a sentence about what a letter, a signature or the page means.
+- **Every signed time names its zone** (`signedAtText`: "November 12, 2026 at 2:14 PM EST", the zone's short name from Intl, so the hour that happens
+  twice in autumn is not ambiguous): the receipt, the PDF, the staff card. The Lawmatics note's line gives the UTC ISO time and says "(UTC)".
 - **Firm notice and Lawmatics note** gain only that the letter was signed, by whom and when (`acceptanceHeadline`'s `signedBy`, `signedNoteLine`): never the
   letter, the details, the address or the fingerprint.
 - **NOT verified:** a real browser (the Blob download, focus order, the popup tab opened for payment), Vercel's real bundling of the font (a local
@@ -1728,6 +1753,16 @@ No migration, no dependency, `pricing.ts` untouched. Nothing here approves, make
   with `madeBy: "assistant"` and `made_from` = the meeting's date. The spec has no price. With no "New proposals offer" saved the content equals the pre-sprint content
   except `made_by`, `made_from` and `checks` (`tests/consult-proposal/frozen/pre-sprint.json` was generated from commit 81cb513; `frozen-scenarios.ts` lists the cases).
   `input.settingPricing` (run.ts passes the raw setting) carries the package list with its per-package includes and the offer; without it the list is rebuilt from `packages`.
+- **Every door attaches the firm's approved engagement letter, and the letter never reaches a model.** The two model-facing builders call
+  `buildDraftContent` with `letter: null` on purpose. The letter is read and attached AFTER the model's work, in the run / executor layer, by
+  `attachFirmLetter` (`src/lib/proposals/attach-letter.ts`, the same `withLoeSnapshot` the from-scratch door's builder uses): `run.ts` after
+  `draftProposalFromConsult` returns (the read fenced on the firm, since the run may be on the service role), `copilot-draft-proposal.ts` only in the
+  CONFIRMED branch, immediately before the insert. The content that carries the letter goes to the insert and nowhere else: not a prompt, a tool result, the
+  queued email, the evidence event or a log (`tests/proposals/letter-never-in-prompts.test.ts` plants a marker in the letter and scans every model-facing
+  file). A letter read that FAILS still creates the draft, and never silently: the content carries a check (`path: "loe"`, drawn in "Ready to send?" as a
+  Check linked to the Engagement letter section), the consult reviewer's notes start with a CHECK FIRST line, and Copilot's result lists it. The editor's
+  Save drops that check once a person has saved with the switch on the page and the letter readable. (A person at the keyboard gets the stricter answer:
+  the from-scratch door creates nothing and says "Couldn't read your engagement letter".)
 - **"Client chooses" on a consult** (`consultChoice`): the setting's options with the package recommended on the call as the start; a recommended package missing from the options is
   added and the last other option dropped (never over 3). No recommendation on the list: the setting's own start stands and the CHECK FIRST package flag stays. Per brand or per mark as the setting says.
   Call-evidenced price edits are applied AFTER the builder under today's rules and force ONE package where they apply: a brand with an applied base price is built with no choice
@@ -1761,24 +1796,42 @@ Nothing here sends, moves a stage, opens a matter or calls a model. No migration
 - **Save refreshes the copy.** `buildDraftUpdate` calls `withLoeSnapshot(content, approved, wanted)` with `wanted` from the switch (`wantedFromForm`): a form that
   doesn't carry the switch keeps it as it is. An approved-letter read that fails refuses a CHANGE of the switch (a person must not turn a letter off on a guess) and
   otherwise leaves the copy untouched. A general template never attaches to a trademark proposal (kind mismatch removes `loe`).
-- **Create link re-checks.** `runCreateLink` gains an optional `letterCurrent` dependency, run AFTER the save and BEFORE approve or send: `stale` or `unreadable`
-  returns a fixed sentence (`LETTER_CHANGED_SENTENCE`, `LETTER_UNREADABLE_SENTENCE`) and neither `approve` nor `makeLive` runs. "Save and create link" saves
-  first when the page has unsaved changes (it is not disabled), so a Save that refreshed the copy passes. "Turn on the link" (`sendAction`) is not re-checked.
+- **One guard on making a version live** (`src/lib/loe/live-guard.ts`: `letterLiveCheck`, `letterLiveRefusal`). A version that carries a letter goes live
+  only while that copy is the firm's CURRENT approved letter. The guard runs inside `sendProposal` (the store), which every make-live path ends in: "Save
+  and create link", "Turn on the link" (`sendAction`) and the approval queue's go-live (`makeProposalLive`). `stale` or `unreadable` refuses with the same
+  fixed sentence on every path (`LETTER_CHANGED_SENTENCE`, `LETTER_UNREADABLE_SENTENCE`) and the database is never asked to send. The firm's letter is read
+  fenced on the proposal ROW'S OWN org (`getApprovedLetter(db, kind, orgId)`), so the answer does not depend on what the connection can see. `runCreateLink`
+  also asks the same guard (`letterCurrent`) AFTER the save and BEFORE approve, so a stale copy leaves no saved version behind; "Save and create link" saves
+  first when the page has unsaved changes, so a Save that refreshed the copy passes. Never add a second way to make a version live.
 - **Signed means a schema-2 snapshot with an agreement** (`isSignedSnapshot`). The pill reads "Signed by client" and the list's Accepted column "Signed Oct 21";
   an unsigned accepted version stays "Accepted by client" / "Accepted Oct 21", and a list row whose `signed` is unknown reads as accepted, never as signed.
-- **Staff card** (`EngagementLetterCard`, view in `src/lib/loe/signed-card.ts`): only for an ACCEPTED version whose snapshot carries a letter. The signature ROW
-  (`client_proposal_signature`, `signature-read.ts`, named columns, never `agreement_text`, address, IP or user agent) is the source of the signer, the time and the
-  fingerprint: `ok` draws it, `none` says the record wasn't found (never "Signed" from the snapshot alone), `unavailable` says it couldn't be loaded. Download is
-  `downloadSignedLetterStaffAction` (module gate with `notFound()`, a proposal-writing role, scoped client, fixed sentences). Try again is `retryUploadAction` with
+- **Who may read a signature record is ONE list** (`src/lib/loe/signature-roles.ts`, `SIGNATURE_READ_ROLES`: owner, admin, senior_admin, attorney, intake,
+  paralegal, law_clerk, clerk; the database policy names the same eight, so a viewer or social media reads nothing). The staff page attempts the read only
+  for those roles, the card draws the detail and the Download only for them, and the download action's gate is `gateSignedLetterDownload`. The proposals
+  list reads no signature row (its "Signed Oct 21" is the accepted snapshot, `isSignedSnapshot`).
+- **Staff card** (`EngagementLetterCard`, view in `src/lib/loe/signed-card.ts`): only for an ACCEPTED version whose snapshot carries a letter. For a staff
+  role the signature ROW (`client_proposal_signature`, `signature-read.ts`, named columns, never `agreement_text`, address, IP or user agent) is the source
+  of the signer, the time (zone named) and the fingerprint: `ok` draws it; a read that FAILED or came back with NOTHING is "couldn't be loaded" (never "not
+  signed", and never "Signed" made up from the snapshot). For any other role the read is not attempted: the card is one line, "Signed by <name> on
+  <date/time>", from the accepted snapshot's `agreement` block, with no Download, no fingerprint and no filing state. Download is
+  `downloadSignedLetterStaffAction` (module gate with `notFound()`, the role list, scoped client, fixed sentences). Try again is `retryUploadAction` with
   step `signed_loe_upload`, offered to `PROPOSAL_PAID_ROLES` (the roles that already retry the other upload steps).
-- **One PDF, no docx.** `buildLetterPdf` (mode `signed`) via `buildSignedLetterPdf(rebuildSignedLetter(snapshot))` is the file the client downloads, the staff
-  download and the file filed in Lawmatics, so their text is the same. The PDF now starts with a letterhead line, the firm's display name
-  (`firmDisplayName(profile, org name)`). File name: `<signer>-engagement-letter-signed-<firm-zone date>.pdf`. `next.config.ts` traces the fonts for
-  `/dashboard/proposals/*` as well as `/p/*`.
+- **One PDF, no docx, and a fingerprint is never printed beside text it does not match.** `buildVerifiedSignedPdf` (`signed-pdf.ts`) is the only place a
+  signed letter PDF is built: the client's download, the staff Download and the file filed in Lawmatics all call it. It rebuilds the text from the snapshot
+  with today's code (`rebuildSignedLetter`), hashes it and compares with the stored sha256. Equal: the letter is drawn as before (lead-ins, the exhibit as a
+  table) with the stored fingerprint. Different (the rendering changed since the signing): the PDF is the STORED signed text
+  (`client_proposal_signature.agreement_text`, read by `stored-agreement.ts` fenced on the proposal's own org) verbatim as plain paragraphs, that text is
+  hashed too and must equal the stored fingerprint, and `fromStoredText` comes back so the staff card says in one fixed sentence that the copy was produced
+  from the stored signed text. The stored text unreadable, or not matching its own fingerprint: NO file. The firm's name and zone must come from a read that
+  worked; an empty one builds nothing. The signature record prints the signed time with its zone and the same instant in UTC (ISO 8601). The PDF starts with
+  a letterhead line, the firm's display name (`firmDisplayName(profile, org name)`). File name: `<signer>-engagement-letter-signed-<firm-zone date>.pdf`.
+  `next.config.ts` traces the fonts for `/dashboard/proposals/*` as well as `/p/*`. Test fixtures of a signed snapshot carry the REAL sha256 of their text
+  (`stampRealFingerprint`), because a made-up one is not a snapshot the app could have produced.
 - **`signed_loe_upload`** (a ninth step, success word `uploaded`, in `RETRYABLE_STEPS`): `runAcceptanceFollowups` runs it after the note for a signed snapshot only, as the
   service role fenced on the proposal's org, with the firm's own token (`firmToken`; never an env token). Core: `loe-signed-upload.ts` (deps injected). Outcomes:
   `uploaded`; `skipped` (no active Lawmatics connection); `blocked` (no Lawmatics record, or more than one, from `resolveNoteTarget`); `failed` (the request, an
-  unreadable lookup, the connection check, the PDF). Once per signing and round (`stepSucceeded`; a reset starts a fresh round). A failed upload never changes the acceptance or
+  unreadable lookup, the connection check, the PDF, or a FAILED read of the firm's name or time zone: the PDF is then not built at all, never with a guessed
+  zone or a missing firm name, and the step is retried by the next run or Try again; a firm with no profile row is not a failed read). Once per signing and round (`stepSucceeded`; a reset starts a fresh round). A failed upload never changes the acceptance or
   the paid state. Retry (`retryProposalStep`) needs no paid mark for this step, uses the signed-in token and the same core. Step events carry an outcome and a fixed
   sentence or an HTTP status, never letter text, an address or bytes.
 - **Mark paid on a signed version** records `loe_draft` as `skipped` ("Signed on the proposal page") before any module check, lookup or `generateTrademarkLoe`.

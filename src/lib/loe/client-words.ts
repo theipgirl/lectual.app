@@ -32,7 +32,8 @@ export const BACK_LABEL = "Back";
 export const DETAILS_HEADING = "Your details";
 export const DETAILS_INTRO = "These go on your engagement letter. Please give your full legal name and the address where the firm can write to you.";
 export const LETTER_HEADING = "Your engagement letter";
-export const LETTER_INTRO = "Please read the whole letter and the exhibit that follows it. Your details and today's date are filled in.";
+/** The letter is dated by the server at the moment of signing (the firm's calendar date), so the intro says so rather than "today's date". */
+export const LETTER_INTRO = "Please read the whole letter and the exhibit that follows it. Your details are filled in, and the letter is dated the day you sign it.";
 
 export const SIGN_HEADING = "Sign";
 export const SIGN_NAME_LABEL = "Type your full legal name to sign";
