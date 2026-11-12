@@ -1878,3 +1878,32 @@ Nothing here sends, moves a stage, opens a matter or calls a model. No migration
   Also not verified: the tightened signature policy itself (viewer and social media reading nothing is 0106's to enforce; the app only stops asking), the
   stored-text copy of a signed PDF against a real signature row, and, in a real browser, the receipt appearing with the signed download straight after
   signing and Web Crypto producing the same fingerprint as the server (proved here with node's Web Crypto over the page's own functions).
+
+## Editor fixes (2026-11-12, no schema)
+Four bugs the owner hit on a draft's edit page (`/dashboard/proposals/<id>/`). Nothing sends; `pricing.ts` has no diff.
+- **"What the package includes" did not apply.** Cause: when the offered packages carry their own rows (Settings -> Proposals ->
+  Packages), the client page draws ONE comparison from `content.packages[].includes` (`includesComparison`) and never reads
+  `content.includes`, which was the only table the editor edited; and each save refreshed the package rows from the firm's list.
+  Rule: the editor edits the table the client sees. `editorPackageIncludes` (`src/lib/proposal-editor/package-includes.ts`, same
+  rule as `includesComparison`, test-pinned) gives one table per offered package (`pkgInc.<n>.package`, rows `pkgInc.<n>.<row>.*`,
+  marker `pkgIncFields`) instead of the single table; `applyPackageIncludes` (in `runSaveDraft`, after the snapshot refresh) writes a
+  package's rows only when they differ from what the page was drawn with, and marks the entry `includes_edited: true`.
+  `withPackageSnapshot` keeps an `includes_edited` entry's own rows; untouched entries still take the firm's rows (#23). The flag is
+  staff-side (`publicContent` picks fields). The table's columns are `minmax(0, …)` plus two fixed widths (header and rows are
+  separate grids, so never `max-content`), so "HIGHLIGHT" no longer runs past the card.
+- **The link box went to the bottom after Save.** Cause: the lifecycle block (Copy / Open, Turn on the link, Edit again, Start a new
+  version, More) was the last card of the MAIN column, so once Save and create link made the version `sent` (no more actions card) the
+  page's actions were under every form. Rule: it is the `data-pe-lifecycle` card in the side column, right under the one actions card,
+  for every status; on phones the actions card stays the bottom bar.
+- **Scrolling showed blank space and hid the preview.** Cause: the dashboard scrolls `.lx-page`, not the window, and it is 112px
+  shorter than the window; `.pe-side` was `max-height: calc(100vh - 24px)`, so its bottom (the end of the preview) hung 88px below the
+  visible area, cut off by `.lx-content { overflow: hidden }`, and the 70vh `.pe-preview-body` scrolled on its own inside the
+  scrolling side column. Rule: one page scroller, and beside it ONE side-column scroller exactly as tall as what is visible: from
+  1081px `.lx-page:has(.pe-cols > .pe-side)` is a size container and `.pe-side` is `top: 0; max-height: 100cqh` (a `100dvh - 124px`
+  fallback), with no overscroll containment so its ends hand the wheel to the page; the preview body never scrolls on its own. Never
+  size anything in the dashboard against `100vh`. Checked only in a static render of the real shell CSS in headless Chromium, not the
+  live app or Safari/trackpad elastic scrolling.
+- **Expand.** "What the client sees" has an Expand button (`ExpandablePreview`): the same `ProposalDocument` and saved content in a
+  full-width modal dialog portalled to `<body>` (the sticky side column is a stacking context). While open the preview is drawn only
+  there; focus goes to Close, Esc / Close / the backdrop close it, Tab wraps (`expandKeyAction`), `.lx-page`, `html` and `body` are
+  locked (`lockScroll`) and focus returns to Expand. Words in `EDITOR_WORDS`.
