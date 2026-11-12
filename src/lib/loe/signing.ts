@@ -45,10 +45,18 @@ export function cleanSigningDetails(raw: unknown): SignerDetails {
   return out;
 }
 
-/** Details the client must give before the letter can be built: their name and where to write to them. */
+/**
+ * What the client MUST give before the letter can be built and signed: their full legal name and a full mailing address (street, city,
+ * state, ZIP or postal code, country). Apartment or suite, business name and title are optional. This is the ONE rule: the page's
+ * form, its Continue / Sign buttons and the server's `checkSigning` all read this list.
+ */
+export const REQUIRED_DETAIL_KEYS = ["client_name", "street", "city", "region", "postal", "country"] as const satisfies ReadonlyArray<keyof SignerDetails>;
+
+/** The country the form starts with; the client can change it. */
+export const DEFAULT_COUNTRY = "United States";
+
 export function missingDetails(d: SignerDetails): Array<keyof SignerDetails> {
-  const need: Array<keyof SignerDetails> = ["client_name", "street", "city"];
-  return need.filter((k) => d[k].length === 0);
+  return REQUIRED_DETAIL_KEYS.filter((k) => d[k].length === 0);
 }
 
 export type SigningInput = {

@@ -30,8 +30,9 @@ function freshToken(): string {
 
 async function textOf(base64: string): Promise<string> {
   const pdf = await getDocumentProxy(new Uint8Array(Buffer.from(base64, "base64")));
-  const { text } = await extractText(pdf, { mergePages: true });
-  return squash(text.split(REVIEW_COPY_MARK).join(" ").replace(/Page \d+ of \d+/g, " "));
+  // Pages are joined with a space: a lead-in at the foot of one page and its text at the top of the next must not read as one word.
+  const { text } = await extractText(pdf, { mergePages: false });
+  return squash(text.join(" ").split(REVIEW_COPY_MARK).join(" ").replace(/Page \d+ of \d+/g, " "));
 }
 
 beforeEach(() => {

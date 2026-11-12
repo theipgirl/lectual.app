@@ -8,6 +8,8 @@ import {
   canSign,
   checkSigning,
   cleanSigningDetails,
+  DEFAULT_COUNTRY,
+  REQUIRED_DETAIL_KEYS,
   emptyDetails,
   fingerprintOf,
   letterDateText,
@@ -58,9 +60,31 @@ describe("cleaning what a client typed", () => {
     expect(cleanSigningDetails([1])).toEqual(emptyDetails());
   });
 
-  it("requires a name, a street and a city", () => {
-    expect(missingDetails(emptyDetails())).toEqual(["client_name", "street", "city"]);
+  it("requires a full legal name and a full mailing address (street, city, state, ZIP, country)", () => {
+    expect(missingDetails(emptyDetails())).toEqual(["client_name", "street", "city", "region", "postal", "country"]);
     expect(missingDetails(TEST_DETAILS)).toEqual([]);
+  });
+
+  for (const key of REQUIRED_DETAIL_KEYS) {
+    it(`refuses when only ${key} is missing (server checkSigning and the page's canSign)`, () => {
+      const details = { ...TEST_DETAILS, [key]: "   " };
+      const input = { typedName: "Sevetri Wilson", agree: true, details, fingerprint: "x" };
+      expect(missingDetails(cleanSigningDetails(details))).toEqual([key]);
+      expect(checkSigning(input)).toEqual({ ok: false, reason: "details_required" });
+      expect(canSign(input)).toBe(false);
+    });
+  }
+
+  it("passes with the three optional fields empty", () => {
+    const details = { ...TEST_DETAILS, entity_name: "", title: "", street2: "" };
+    const input = { typedName: "Sevetri Wilson", agree: true, details, fingerprint: "x" };
+    expect(missingDetails(details)).toEqual([]);
+    expect(checkSigning(input).ok).toBe(true);
+    expect(canSign(input)).toBe(true);
+  });
+
+  it("starts the form with United States as the country", () => {
+    expect(DEFAULT_COUNTRY).toBe("United States");
   });
 });
 
@@ -91,7 +115,7 @@ describe("the agreement", () => {
   it("merges the seven fields; the entity falls back to the client's own name", () => {
     const values = letterValues({ ...INPUTS, details: { ...TEST_DETAILS, entity_name: "" } });
     expect(values.entity_name).toBe("Sevetri Wilson");
-    expect(values.address_block).toBe("100 Example Street\nSuite 4\nMiami, FL 33101");
+    expect(values.address_block).toBe("100 Example Street\nSuite 4\nMiami, FL 33101\nUnited States");
     expect(Object.keys(values).sort()).toEqual(["address_block", "client_email", "client_name", "date", "entity_name", "signed_date", "signer_name"]);
   });
 
@@ -149,7 +173,7 @@ describe("the fingerprint", () => {
 describe("small helpers", () => {
   it("formats the address and the address record", () => {
     expect(addressBlock({ ...emptyDetails(), street: "Ærøskøbing 12, 5970 Ærø", city: "Ærø", country: "Denmark" })).toBe("Ærøskøbing 12, 5970 Ærø\nÆrø\nDenmark");
-    expect(addressJson(TEST_DETAILS)).toEqual({ street: "100 Example Street", street2: "Suite 4", city: "Miami", region: "FL", postal: "33101" });
+    expect(addressJson(TEST_DETAILS)).toEqual({ street: "100 Example Street", street2: "Suite 4", city: "Miami", region: "FL", postal: "33101", country: "United States" });
   });
 
   it("shows dates in the firm's zone", () => {
