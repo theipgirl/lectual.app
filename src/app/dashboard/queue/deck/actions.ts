@@ -7,7 +7,7 @@ import { QUEUE_EDIT_ROLES } from "@/lib/queue/roles";
 import { classifyQueueItem } from "@/lib/queue/routing";
 import { runQueueReview, type ReviewOutcome } from "@/lib/queue/review-core";
 import { recordCardEvent } from "@/lib/queue/card-state";
-import { cardCaller, cardContext, cardIdOf, cardNoteOf, noticeHandedTo, readCardItem, sendCardBack } from "@/lib/queue/card-moves";
+import { cardCaller, cardContext, staffPreviewRefusal, cardIdOf, cardNoteOf, noticeHandedTo, readCardItem, sendCardBack } from "@/lib/queue/card-moves";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { dealFor } from "@/lib/deal/times";
@@ -126,6 +126,8 @@ export async function handOffCardAction(rawId: unknown, rawTarget: unknown, rawN
   await gate();
   const id = cardIdOf(rawId);
   if (!id) return { ok: false, error: DECK_FAILED };
+  const preview = await staffPreviewRefusal();
+  if (preview) return { ok: false, error: preview };
   const target = typeof rawTarget === "string" ? rawTarget.trim() : "";
   if (!target) return { ok: false, error: DECK_PICK_PERSON };
   const ctx = await cardContext(id);

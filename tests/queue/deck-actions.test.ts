@@ -173,6 +173,18 @@ describe("every action re-checks the caller", () => {
   });
 });
 
+describe("Lectual staff viewing as the firm (no membership: the fold would drop their events)", () => {
+  const PREVIEW_ONLY = "Preview only: hand-offs aren't saved while you're viewing as the firm.";
+  it("hand off and send back refuse with the preview sentence and write nothing", async () => {
+    state.session = { ...sessionFor(U.rebecca, "attorney"), actingAsStaff: true };
+    state.cardState = { status: "ok", events: [{ queueItemId: "q1", kind: "handoff", actorId: U.rebecca, targetUserId: U.caitlyn, until: null, note: null, createdAt: "2026-11-10T13:00:00Z" }] };
+    expect(await A.handOffCardAction("q1", U.caitlyn, "")).toEqual({ ok: false, error: PREVIEW_ONLY });
+    expect(await A.returnCardAction("q1", "")).toEqual({ ok: false, error: PREVIEW_ONLY });
+    expect(state.record).not.toHaveBeenCalled();
+    expect(state.notify).not.toHaveBeenCalled();
+  });
+});
+
 describe("hand off", () => {
   it("records a hand-off to a staff member, the org from the session", async () => {
     const r = await A.handOffCardAction("q1", U.caitlyn, "  tidy  ");

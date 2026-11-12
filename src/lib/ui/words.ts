@@ -256,6 +256,8 @@ export const DECK_COL_DECIDED = "Decided today";
 export const DECK_DECIDED_UNREAD = "Decided today couldn't be loaded. Refresh to try again.";
 export const DECK_EVENTS_UNREAD = "Hand-offs and Later couldn't be loaded, so every card is shown.";
 export const DECK_NOTHING_HERE = "Nothing here.";
+/** Lectual staff viewing a firm have no membership, so a hand-off or send-back would be dropped by the fold: refuse it plainly. */
+export const DECK_PREVIEW_ONLY = "Preview only: hand-offs aren't saved while you're viewing as the firm.";
 export const DECK_NOT_YOURS = "This card isn't on your deck any more. Refresh to see what's left.";
 export const DECK_FAILED = "That didn't go through. Nothing was sent. Refresh to try again.";
 export const DECK_PICK_PERSON = "Choose who to hand it to.";

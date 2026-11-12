@@ -51,10 +51,44 @@ describe("forged events are ignored", () => {
     expect(holderOf([handoff(U.ghost, U.caitlyn)])).toBeNull();
   });
 
-  it("a return by someone who is neither holder, hander nor approver", () => {
-    const events = [handoff(U.rebecca, U.caitlyn), returned(MALLORY)];
+  // Changed on purpose: any current STAFF member's return counts (it only moves a card back toward the approvers), so the
+  // forged-return case is now someone who is not staff: a viewer.
+  it("a return by someone who is not staff (a viewer) and neither holder, hander nor approver", () => {
+    const events = [handoff(U.rebecca, U.caitlyn), returned(U.viewer)];
     expect(holderOf(events)).toMatchObject({ userId: U.caitlyn, by: U.rebecca });
     expect(ids(deckFor(events, known()).handedOff)).toEqual(["pc"]);
+  });
+
+  it("a return by any other current staff member counts while the card is handed off", () => {
+    const events = [handoff(U.rebecca, U.caitlyn), returned(MALLORY)];
+    expect(holderOf(events)).toBeNull();
+    expect(trustedEvents(events, items, known())).toEqual(events);
+  });
+
+  it("a return by a member who has since left (no role) is dropped unless they held or handed the card", () => {
+    expect(holderOf([handoff(U.rebecca, U.caitlyn), returned(U.ghost)])).toMatchObject({ userId: U.caitlyn });
+  });
+
+  it("R hands to B, X hands to C, C sends back; X is later demoted: the return still counts", () => {
+    const X = "00000000-0000-4000-8000-0000000000bb";
+    const B = U.caitlyn;
+    const C = MALLORY;
+    const events = [handoff(U.rebecca, B), handoff(X, C), returned(C)];
+    const withX = (role: Role) => eventTrust({ status: "ok", routing: {}, members: [...members, { userId: X, role, displayName: "X", email: "x@example.com" }] });
+    // While X is still an approver all three count and the card is back with the approvers.
+    expect(holderOf(events, "pc", withX("attorney"))).toBeNull();
+    // X demoted to viewer: X's hand-off is dropped, but C's return (C is staff) still sends the card back from B.
+    expect(trustedEvents(events, items, withX("viewer"))).toEqual([events[0], events[2]]);
+    expect(holderOf(events, "pc", withX("viewer"))).toBeNull();
+    expect(ids(deckFor(events, withX("viewer")).handedOff)).toEqual([]);
+  });
+
+  it("two events on one item with the same created_at are folded in the order given (database order)", () => {
+    const stamp = "2026-11-10T13:00:00Z";
+    const h = { ...handoff(U.rebecca, U.caitlyn), createdAt: stamp };
+    const r = { ...returned(U.caitlyn), createdAt: stamp };
+    expect(holderOf([h, r])).toBeNull(); // hand-off then return: back with the approvers
+    expect(holderOf([r, h])).toMatchObject({ userId: U.caitlyn }); // return first has nothing to return: dropped, the hand-off stands
   });
 
   it("a return with nothing handed off is dropped", () => {
@@ -154,5 +188,16 @@ describe("every reader of the card events folds them with the trust rule", () =>
     const readers = walk("src").filter((f) => !f.endsWith("card-state.ts") && /loadCardState\(/.test(readFileSync(f, "utf8")));
     expect(readers.length).toBeGreaterThan(0);
     for (const f of readers) expect(readFileSync(f, "utf8"), f).toMatch(/eventTrust\(|viewEventTrust\(|trustedCardState\(/);
+  });
+  it("no file hands a raw loadCardState(...) result to currentHolder(", () => {
+    // Heuristic: a file that calls currentHolder( and loadCardState( must route events through trustedCardState /
+    // trustedEvents / buildDeck, and must not pass the read (inline or through a variable) straight in.
+    for (const f of walk("src")) {
+      const src = readFileSync(f, "utf8");
+      if (f.endsWith("deck.ts") || !/currentHolder\(/.test(src)) continue;
+      if (/loadCardState\(/.test(src)) expect(src, f).toMatch(/trustedCardState\(|trustedEvents\(|buildDeck\(/);
+      expect(src, f).not.toMatch(/currentHolder\(\s*(await\s+)?loadCardState\(/);
+      expect(src, f).not.toMatch(/(\w+)\s*=\s*await\s+loadCardState\([^;]*;[\s\S]*currentHolder\(\s*\1(\.events)?\s*[,)]/);
+    }
   });
 });

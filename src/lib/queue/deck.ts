@@ -67,8 +67,11 @@ export function viewEventTrust(view: { routing: ApprovalRouting; members: readon
  * The card events with the forged ones left out, in their order. Per item, walking oldest first:
  *  · a `handoff` counts only when its actor may approve the item (`canApproveItem` with the actor's role and the
  *    routing) or is the current holder (a holder may hand it on);
- *  · a `returned` counts only while the card is handed off, and only from the current holder, the person who made that
- *    hand-off, or someone who may approve the item.
+ *  · a `returned` counts only while the card is handed off, and only from a current staff member (any member of the
+ *    firm in a staff role: not viewer / social media), the current holder or the person who made that hand-off, or someone
+ *    who may approve the item. A return only ever moves a card back toward the approvers, so it can't hide anything; this
+ *    keeps it counting after an earlier hand-off in the chain was dropped (its actor was demoted).
+ * Events are folded in the order given (the database order); two rows with the same `created_at` keep that order.
  * `later` rows only ever change their own actor's deck and are kept. With trust `unknown` nothing is dropped. With trust
  * `known`, a hand-off or return for an item not in `items` can't be checked and is dropped. Idempotent.
  */
@@ -93,7 +96,9 @@ export function trustedEvents(events: readonly CardEvent[], items: readonly (Rou
       out.push(e);
     } else if (e.kind === "returned") {
       if (!holder) continue;
-      if (e.actorId !== holder.userId && e.actorId !== holder.by && !mayApprove(e.actorId, item)) continue;
+      const actorRole = trust.roles.get(e.actorId);
+      const isStaff = !!actorRole && QUEUE_EDIT_ROLES.includes(actorRole);
+      if (!isStaff && e.actorId !== holder.userId && e.actorId !== holder.by && !mayApprove(e.actorId, item)) continue;
       holders.set(e.queueItemId, null);
       out.push(e);
     }

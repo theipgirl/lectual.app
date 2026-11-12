@@ -53,7 +53,17 @@ beforeEach(() => {
   state.redirect.mockReset();
 });
 
+const PREVIEW_ONLY = "Preview only: hand-offs aren't saved while you're viewing as the firm.";
+
 describe("sendBackAction", () => {
+  it("refuses Lectual staff viewing as the firm, with the preview sentence, writing and notifying nothing", async () => {
+    state.session = { ...sessionFor(U.caitlyn, "paralegal"), actingAsStaff: true };
+    expect(await A.sendBackAction({}, form("q1", "x"))).toEqual({ error: PREVIEW_ONLY });
+    expect(state.record).not.toHaveBeenCalled();
+    expect(state.notify).not.toHaveBeenCalled();
+    expect(state.redirect).not.toHaveBeenCalled();
+  });
+
   it("the current holder sends it back: a returned event with the note, a notice to the hander, then a redirect", async () => {
     await expect(A.sendBackAction({}, form("q1", "  all good, over to you  "))).rejects.toMatchObject({ message: "NEXT_REDIRECT" });
     expect(state.record).toHaveBeenCalledWith({ orgId: "org-1", queueItemId: "q1", kind: "returned", note: "all good, over to you" });

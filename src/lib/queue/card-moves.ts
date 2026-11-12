@@ -11,7 +11,7 @@ import { cardNoticePayload, returnDecision, SEND_BACK_NOTE_MAX } from "@/lib/que
 import { notify } from "@/lib/notifications/core";
 import { NOTIFICATION_KIND_FOR } from "@/lib/notifications/kinds";
 import type { Role } from "@/lib/auth/roles";
-import { DECK_FAILED, DECK_NOT_YOURS, NOT_SWITCHED_ON } from "@/lib/ui/words";
+import { DECK_FAILED, DECK_NOT_YOURS, DECK_PREVIEW_ONLY, NOT_SWITCHED_ON } from "@/lib/ui/words";
 
 /**
  * The card moves the approval deck and the technician approval page SHARE: who is calling, the item, the card events,
@@ -26,6 +26,12 @@ export async function cardCaller(): Promise<CardCaller | null> {
   if (!session || session.kind !== "ok") return null;
   if (!QUEUE_EDIT_ROLES.includes(session.role)) return null;
   return { userId: session.user.id, role: session.role, email: session.user.email ?? null, orgId: session.org.id };
+}
+
+/** A fixed sentence when the caller is Lectual staff standing inside a firm (no membership row: the fold would drop their hand-offs and returns), else null. */
+export async function staffPreviewRefusal(): Promise<string | null> {
+  const session = await resolveFirmSession().catch(() => null);
+  return session && session.kind === "ok" && session.actingAsStaff ? DECK_PREVIEW_ONLY : null;
 }
 
 export function cardIdOf(raw: unknown): string | null {
@@ -78,6 +84,8 @@ export async function cardContext(id: string): Promise<
  * records a `returned` event and tells the person who handed it (bell only). Fixed sentences only.
  */
 export async function sendCardBack(args: { id: string; note: string; allowHander: boolean }): Promise<{ ok: true } | { ok: false; error: string }> {
+  const preview = await staffPreviewRefusal();
+  if (preview) return { ok: false, error: preview };
   const who = await cardCaller();
   if (!who) return { ok: false, error: DECK_NOT_YOURS };
   const item = await readCardItem(args.id);
