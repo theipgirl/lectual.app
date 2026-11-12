@@ -3,6 +3,26 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 import noGluedJsxText from "./eslint-rules/no-glued-jsx-text.mjs";
 
+const CREATE_CLIENT_BAN = {
+  name: "@supabase/supabase-js",
+  importNames: ["createClient"],
+  message:
+    "Direct createClient is banned outside the admin module. " +
+    "Use getAdminClient() (src/lib/db/admin.ts) or getScopedClient() (src/lib/db/scoped-client.ts).",
+};
+const MCP_SETTER_MESSAGE =
+  "runWithMcpClient is for the Claude connector route only (src/app/api/mcp/**).";
+const MCP_SETTER_BAN = {
+  name: "@/lib/mcp/request-client",
+  importNames: ["runWithMcpClient"],
+  message: MCP_SETTER_MESSAGE,
+};
+const MCP_SETTER_PATTERN = {
+  group: ["**/request-client", "**/mcp/request-client"],
+  importNames: ["runWithMcpClient"],
+  message: MCP_SETTER_MESSAGE,
+};
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
@@ -28,20 +48,18 @@ const eslintConfig = defineConfig([
   // Security fence: only the admin module may call createClient with the
   // service-role key. Everything else must use getScopedClient() or
   // getAdminClient() — never reach for the raw primitives.
+  //
+  // Second fence: runWithMcpClient (src/lib/mcp/request-client.ts) makes
+  // getScopedClient() answer with a token client. Only the Claude connector
+  // route (src/app/api/mcp/**) may call it. tests/mcp/hygiene.test.ts repeats
+  // both fences as a grep.
   {
     rules: {
       "no-restricted-imports": [
         "error",
         {
-          paths: [
-            {
-              name: "@supabase/supabase-js",
-              importNames: ["createClient"],
-              message:
-                "Direct createClient is banned outside the admin module. " +
-                "Use getAdminClient() (src/lib/db/admin.ts) or getScopedClient() (src/lib/db/scoped-client.ts).",
-            },
-          ],
+          paths: [CREATE_CLIENT_BAN, MCP_SETTER_BAN],
+          patterns: [MCP_SETTER_PATTERN],
         },
       ],
       "no-restricted-syntax": [
@@ -69,6 +87,22 @@ const eslintConfig = defineConfig([
     rules: {
       "no-restricted-imports": "off",
       "no-restricted-syntax": "off",
+    },
+  },
+  // The Claude connector route is the one place that may set the token client.
+  {
+    files: ["src/app/api/mcp/**"],
+    rules: {
+      "no-restricted-imports": ["error", { paths: [CREATE_CLIENT_BAN] }],
+    },
+  },
+  // The connector's token client: createClient with the ANON key and the
+  // caller's own Bearer token (never the service role; the
+  // SUPABASE_SERVICE_ROLE_KEY ban above still applies here).
+  {
+    files: ["src/lib/mcp/token-client.ts"],
+    rules: {
+      "no-restricted-imports": ["error", { paths: [MCP_SETTER_BAN], patterns: [MCP_SETTER_PATTERN] }],
     },
   },
   // env.ts parses the raw key once; allow the member-expression access there.

@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 import { env } from "@/lib/env";
+import { currentMcpClient } from "@/lib/mcp/request-client";
 
 /**
  * The ONLY sanctioned server-side DB entry point.
@@ -12,6 +13,10 @@ import { env } from "@/lib/env";
  * — service-role access lives in a separate, lint-fenced admin module (Task 15).
  */
 export async function getScopedClient(): Promise<SupabaseClient<Database>> {
+  // A Claude connector tool call (/api/mcp/) runs with the caller's verified OAuth token client;
+  // everywhere else this is undefined and the cookie client below is built exactly as before.
+  const mcpClient = currentMcpClient();
+  if (mcpClient) return mcpClient;
   const cookieStore = await cookies();
   return createServerClient(
     env.NEXT_PUBLIC_SUPABASE_URL,

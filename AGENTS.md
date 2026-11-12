@@ -1594,3 +1594,27 @@ Display only; `pricing.ts`, `paid.ts` and `paid-view.ts` are untouched.
 - The Mark paid sentence (`MARK_PAID_NOTE`) is the button's title and appears once in the table footer (only when some row has the button).
 - The default segment is "Current" (`PROPOSALS_EVERYTHING_SEGMENT`). Open offers is a KPI-style tile (`lx-card lx-kpi pq-out`).
 - **List-only brand headline:** a row titled "Trademark Proposal" (`DEFAULT_PROPOSAL_TITLE`) with brand names shows the brand names as its headline and "Trademark proposal" first in the sub-line; stored titles never change.
+
+## Claude connector, Phase 0 spike (no schema; plan `docs/plans/2026-11-12-lectual-mcp-connector.md`)
+Lectual as a Claude connector at `https://<origin>/api/mcp/`, signed in through Supabase Auth's OAuth 2.1 server. One tool so far,
+`whoami`. Nothing on this path sends, approves, moves a stage or moves money, and nothing uses the service role.
+- **Switch:** `claude-connector` in `crm_org.modules`, a rollout switch like `role-views` (kept out of Settings -> Features). It is
+  added to a firm only after the firm owner agrees to client information appearing in Claude chats. The consent page, the decision
+  endpoint and EVERY tool call check it; off = nothing approved, every call refused with one sentence (`MCP_TOOL_REFUSED`).
+- **Discovery:** `/.well-known/oauth-protected-resource/api/mcp/` and the bare `/.well-known/oauth-protected-resource/` (RFC 9728;
+  `src/lib/mcp/discovery.ts`). Paths under `/.well-known/` are exempt from `trailingSlash` in both directions, so both forms answer 200
+  with no redirect (checked with `next start`). `/api/mcp` (no slash) answers 308 to `/api/mcp/`; every URL we publish has the slash.
+  No or a bad token: 401 + `WWW-Authenticate: Bearer resource_metadata="<origin>/.well-known/oauth-protected-resource/api/mcp/"`.
+- **Consent:** `/oauth/consent/?authorization_id=...` (page, noindex) and `POST /api/oauth/decision/`. Both run `evaluateConsent`
+  (`src/lib/mcp/consent.ts` over the pure `consent-rules.ts`): a parsed id, signed in (else sign-in with `next` kept; `safeNext` is
+  unchanged and already keeps it), a firm session, the switch, a fresh `auth.oauth.getAuthorizationDetails`, and a redirect URI on
+  `MCP_ALLOWED_REDIRECTS` (default Claude's two callbacks). An "already consented" answer is held to the same checks before the
+  redirect. The decision endpoint also requires a same-site Origin, and follows an approve/deny answer only to an allowed URL.
+- **The seam:** `src/lib/mcp/request-client.ts` (AsyncLocalStorage). `getScopedClient()` asks `currentMcpClient()` first; inside the
+  route it is the caller's token client (`token-client.ts`: anon key, `Authorization: Bearer <token>`, `auth.getUser()` wrapped to
+  verify that token), everywhere else undefined and the cookie client is built as before. `runWithMcpClient` is lint-fenced to
+  `src/app/api/mcp/**` (and grep-tested in `tests/mcp/hygiene.test.ts`). The token is verified with `auth.getUser(token)` BEFORE its
+  `active_org_id` claim is decoded; the tool gate also refuses when that claim and the session's firm disagree.
+- **Every call:** token -> `resolveFirmSession` ok -> `claude-connector` -> the tool's gate (`src/lib/mcp/gate.ts`). Results begin with
+  the firm's name. Logs are `[mcp] tool=<name> org=<id> outcome=<ok|refused|failed> ms=<n>`, never arguments or results.
+- **Not verified here:** a real Supabase OAuth server, a real Claude client, a browser. Phase 0 step 2 of the plan is still to do.
