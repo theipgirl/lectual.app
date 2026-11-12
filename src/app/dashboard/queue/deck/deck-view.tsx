@@ -203,6 +203,7 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
             current: false,
             decided: false,
             chip: laterBackPill(c.until, now, tz),
+            timeChip: true,
             tone: "quiet" as const,
           })),
         }

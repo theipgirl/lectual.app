@@ -5,20 +5,24 @@ vi.mock("next/link", () => ({ default: ({ href, children, ...rest }: { href: str
 
 import { DeckLists } from "@/components/deck/DeckLists";
 import { DeckSide } from "@/components/deck/DeckSide";
-import { DECK_LISTS_HANDOFF_NOTE } from "@/lib/ui/words";
 
 const decided = { status: "ok" as const, rows: [{ id: "a", href: "/dashboard/queue/a/", title: "Maya", sub: "Approved 7:12 AM · draft in Outlook", pill: "Approved", tone: "ok" as const }] };
 const handed = { status: "ok" as const, rows: [{ id: "h", href: "/dashboard/queue/h/", title: "Priya", sub: "To Caitlyn 7:24 AM", pill: "With Caitlyn", tone: "line" as const, back: false }] };
 const later = { status: "ok" as const, rows: [] };
 
 describe("DeckLists", () => {
-  it("marks the active chip, shows counts and the hand-off line exactly once", () => {
+  it("has neither the sub-line nor the hand-off footer caption", () => {
+    const html = renderToStaticMarkup(<DeckLists active="decided" needCount={1} decided={{ status: "ok", rows: [] }} handed={{ status: "ok", rows: [] }} later={{ status: "ok", rows: [] }} />);
+    expect(html).not.toContain("What you decided today and what you handed");
+    expect(html).not.toContain("Handing off changes whose deck");
+    expect(html).toContain("Nothing handed off.");
+  });
+  it("marks the active chip and shows counts", () => {
     const html = renderToStaticMarkup(<DeckLists active="decided" needCount={3} decided={decided} handed={handed} later={later} />);
     expect(html).toMatch(/aria-current="page"[^>]*>Decided · 1</);
     expect(html).toContain("Needs your yes · 3");
     expect(html).toContain("Handed off · 1");
     expect(html).toContain("Later · 0");
-    expect(html.split(DECK_LISTS_HANDOFF_NOTE).length - 1).toBe(1);
     expect(html).toContain("← Back to today");
     expect(html).not.toMatch(/https?:|sha256/);
   });
@@ -43,8 +47,12 @@ describe("DeckLists", () => {
 describe("DeckSide sections", () => {
   const row = { id: "x", title: "T", href: "/x", current: false, decided: false };
   it("draws Needs your yes, Later and Decided today, each with its count", () => {
-    const html = renderToStaticMarkup(<DeckSide rows={[row, { ...row, id: "d", decided: true }]} later={{ status: "ok", rows: [{ ...row, id: "l", chip: "Back in the 2:00 PM deal" }] }} />);
-    for (const w of ["Needs your yes", "Later", "Decided today", "Back in the 2:00 PM deal", "Decided today, full list", "Later, full list"]) expect(html).toContain(w);
+    const html = renderToStaticMarkup(<DeckSide rows={[row, { ...row, id: "d", decided: true }]} later={{ status: "ok", rows: [{ ...row, id: "l", chip: "2:00 PM", timeChip: true }] }} />);
+    for (const w of ["Needs your yes", "Later", "Decided today", "2:00 PM"]) expect(html).toContain(w);
+    expect(html).toContain('aria-label="See all decided today"');
+    expect(html).toContain('aria-label="See all later"');
+    expect(html.match(/>See all</g)?.length).toBe(2);
+    expect(html).toContain("dk-chip--time");
   });
   it("a Later that could not be read says so rather than showing none", () => {
     const html = renderToStaticMarkup(<DeckSide rows={[row]} later={{ status: "unavailable" }} />);
@@ -59,7 +67,7 @@ describe("DeckSide sections", () => {
     const html = renderToStaticMarkup(<DeckSide rows={[row]} decidedFailed />);
     expect(html).toContain("Can&#x27;t show this list right now.");
     expect(html).not.toContain("Nothing decided yet");
-    expect(html).not.toContain("Decided today, full list");
+    expect(html).not.toContain("See all decided today");
   });
   it("without a later prop (technician-less callers) the Later section is not drawn", () => {
     expect(renderToStaticMarkup(<DeckSide rows={[row]} />)).not.toContain("Nothing put off.");

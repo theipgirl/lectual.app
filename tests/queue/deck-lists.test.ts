@@ -167,7 +167,7 @@ describe("handed off", () => {
 describe("later", () => {
   const pend = [item({ id: "l1", headline: "Welcome Jordan Park" }), item({ id: "l2" })];
   const back = (until: string) => laterBackPill(until, NOW, TZ);
-  it("lists a Later still in force with the deal it is back in; an expired one is not listed", () => {
+  it("lists a Later still in force with just its time; an expired one is not listed", () => {
     const rows = laterRows(
       pend,
       [
@@ -181,10 +181,12 @@ describe("later", () => {
       back,
     );
     expect(rows.map((r) => r.id)).toEqual(["l1"]);
-    expect(rows[0].pill).toBe("Back in the 2:00 PM deal");
+    expect(rows[0].pill).toBe("2:00 PM");
   });
-  it("a Later that runs to another day names the day", () => {
-    expect(back("2026-11-11T12:00:00Z")).toBe("Back tomorrow at 7:00 AM");
+  it("pill format: bare time today, Tomorrow + time the next day, date + time after that", () => {
+    expect(back("2026-11-10T19:00:00Z")).toBe("2:00 PM");
+    expect(back("2026-11-11T12:00:00Z")).toBe("Tomorrow 7:00 AM");
+    expect(back("2026-11-14T12:00:00Z")).toBe("Nov 14 7:00 AM");
   });
   it("only the viewer's own Later counts", () => {
     expect(laterRows(pend, [ev({ queueItemId: "l1", kind: "later", actorId: CAIT, until: "2026-11-10T19:00:00Z", createdAt: "2026-11-10T13:00:00Z" })], ME, NOW, DEC, () => "", back)).toEqual([]);

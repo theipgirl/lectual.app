@@ -119,7 +119,8 @@ describe("DeckFrame", () => {
     expect(h).toMatch(/Decided[\s\S]*Done one/);
     expect(h).toContain("3 more at 2:00 PM");
     expect(h).toContain(">Deal them now<");
-    expect(h).not.toMatch(/See all/i);
+    // Changed on purpose: the side column now carries a "See all" link on its Decided card (named for its list).
+    expect(h).toContain('aria-label="See all decided today"');
   });
 
   it("no later arrivals, no footer", () => {

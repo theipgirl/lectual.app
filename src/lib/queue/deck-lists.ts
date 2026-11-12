@@ -2,7 +2,7 @@ import type { QueueItem } from "@/lib/queue/api";
 import { currentHolder, decidedToday, laterUntil, type CardEvent, type CardState } from "@/lib/queue/deck";
 import { mineItems } from "@/lib/queue/mine";
 import { canApproveItem, classifyQueueItem, type ApprovalRouting, type Viewer } from "@/lib/queue/routing";
-import { dealFor, sameFirmDay, whenLabel } from "@/lib/deal/times";
+import { sameFirmDay } from "@/lib/deal/times";
 import {
   DECK_CHIP_APPROVED,
   DECK_CHIP_REJECTED,
@@ -10,8 +10,8 @@ import {
   DECK_LIST_TAIL_CLIENT_EMAIL,
   DECK_LIST_TAIL_INTERNAL,
   DECK_LIST_TAIL_NOTE_KEPT,
-  deckListBackAt,
-  deckListBackIn,
+  deckLaterOtherDay,
+  deckLaterTomorrow,
   deckListDecidedSub,
   deckListHandedTo,
   deckListQuote,
@@ -158,9 +158,9 @@ export function laterRows(pending: readonly QueueItem[], events: readonly CardEv
   return out.sort((a, b) => a.until.localeCompare(b.until) || a.id.localeCompare(b.id)).map(dropKey("until"));
 }
 
-/** "Back in the 2:00 PM deal" when that deal is today, else "Back tomorrow at 7:00 AM". */
-export function laterPill(dealLabel: string | null, sameDay: boolean, when: string): string {
-  return sameDay && dealLabel ? deckListBackIn(dealLabel) : deckListBackAt(when);
+/** The pill of a Later row: "2:00 PM" today, "Tomorrow 7:00 AM" the next day, else "Nov 14 7:00 AM". Time only, no sentence. */
+export function laterTimePill(time: string, dayDiff: number, day: string): string {
+  return dayDiff === 0 ? time : dayDiff === 1 ? deckLaterTomorrow(time) : deckLaterOtherDay(day, time);
 }
 
 /** Handed off and Later come from the card events and the pending list; either failing makes them unavailable. */
@@ -209,9 +209,13 @@ export function makeListFormat(now: Date, tz: string): ListFormat {
   };
 }
 
-/** Where a Later card comes back: the deal it is dealt in when that is today, else the day. */
+/** Where a Later card comes back, in the firm's clock. */
 export function laterBackPill(untilIso: string, now: Date, tz: string): string {
   const at = new Date(untilIso);
-  const same = sameFirmDay(at, now, tz);
-  return laterPill(dealFor(at, tz).current?.label ?? null, same, whenLabel(at, now, tz));
+  const fmt = makeListFormat(now, tz);
+  const dayNumber = (d: Date) => {
+    const p = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(d).split("-").map(Number);
+    return Date.UTC(p[0], p[1] - 1, p[2]) / 86_400_000;
+  };
+  return laterTimePill(fmt.time(untilIso), dayNumber(at) - dayNumber(now), fmt.day(untilIso));
 }

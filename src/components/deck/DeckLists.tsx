@@ -9,9 +9,7 @@ import {
   DECK_DECIDED_UNREAD,
   DECK_LISTS_BACK,
   DECK_LISTS_CHIP_DECIDED,
-  DECK_LISTS_HANDOFF_NOTE,
   DECK_LISTS_NAV,
-  DECK_LISTS_SUB,
   DECK_META_NOT_CONNECTED,
   DECK_LIST_HANDED_CANT,
   DECK_LIST_HANDED_EMPTY,
@@ -26,7 +24,7 @@ import { listHref, sourceCount, type DecidedRow, type HandedRow, type LaterRow, 
 
 type Tone = "ok" | "crit" | "line" | "warn" | "accent";
 
-function ListCard<T extends { id: string }>({ title, source, empty, cant, render, foot }: { title: string; source: ListSource<T>; empty: string; cant: string; render: (r: T) => React.ReactNode; foot?: string }) {
+function ListCard<T extends { id: string }>({ title, source, empty, cant, render }: { title: string; source: ListSource<T>; empty: string; cant: string; render: (r: T) => React.ReactNode }) {
   return (
     <section className="dk-lcard" aria-label={title}>
       <div className="dk-sidecard-head">
@@ -44,19 +42,18 @@ function ListCard<T extends { id: string }>({ title, source, empty, cant, render
           {source.status === "not-set-up" ? NOT_SWITCHED_ON : source.status === "not-connected" ? DECK_META_NOT_CONNECTED : cant}
         </p>
       )}
-      {foot && <p className="dk-lfoot">{foot}</p>}
     </section>
   );
 }
 
-function Row({ href, title, sub, pill, tone }: { href: string; title: string; sub: string; pill: string; tone: Tone }) {
+function Row({ href, title, sub, pill, tone, time }: { href: string; title: string; sub: string; pill: string; tone: Tone; time?: boolean }) {
   return (
     <Link href={href} className="dk-side-row dk-lrow">
       <span className="dk-side-main">
         <span className="dk-side-title">{title}</span>
         <span className="dk-side-sub">{sub}</span>
       </span>
-      <span className={`dk-chip dk-chip--${tone}`}>{pill}</span>
+      <span className={`dk-chip dk-chip--${tone}${time ? " dk-chip--time" : ""}`}>{pill}</span>
     </Link>
   );
 }
@@ -93,7 +90,6 @@ export function DeckLists({
           {DECK_LISTS_BACK}
         </Link>
         <h1 className="dk-h1 dk-h1--wide">{APPROVALS_NAME}</h1>
-        <p className="dk-sub">{DECK_LISTS_SUB}</p>
       </div>
       <nav className="dk-chips" aria-label={DECK_LISTS_NAV}>
         {chips.map((c) => (
@@ -111,12 +107,11 @@ export function DeckLists({
             empty={DECK_LIST_HANDED_EMPTY}
             cant={DECK_LIST_HANDED_CANT}
             render={(r) => <Row href={r.href} title={r.title} sub={r.sub} pill={r.pill} tone={r.tone} />}
-            foot={DECK_LISTS_HANDOFF_NOTE}
           />
         </div>
       ) : (
         <div className="dk-lgrid dk-lgrid--one">
-          <ListCard title={DECK_COL_LATER} source={later} empty={DECK_LIST_LATER_EMPTY} cant={DECK_LIST_LATER_CANT} render={(r) => <Row href={r.href} title={r.title} sub={r.kind} pill={r.pill} tone="line" />} />
+          <ListCard title={DECK_COL_LATER} source={later} empty={DECK_LIST_LATER_EMPTY} cant={DECK_LIST_LATER_CANT} render={(r) => <Row href={r.href} title={r.title} sub={r.kind} pill={r.pill} tone="line" time />} />
         </div>
       )}
     </div>

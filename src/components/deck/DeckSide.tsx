@@ -9,15 +9,16 @@ import {
   DECK_SIDE_LATER_NOTHING,
   DECK_SIDE_NOTHING_DECIDED,
   DECK_SIDE_NOTHING_LEFT,
-  DECK_SIDE_SEE_ALL_DECIDED,
-  DECK_SIDE_SEE_ALL_LATER,
+  DECK_SIDE_SEE_ALL,
+  DECK_SIDE_SEE_ALL_DECIDED_LABEL,
+  DECK_SIDE_SEE_ALL_LATER_LABEL,
   DECK_SIDE_TITLE,
   NOT_SWITCHED_ON,
 } from "@/lib/ui/words";
 import { listHref } from "@/lib/queue/deck-lists";
 import type { ChipTone } from "./deck-rows";
 
-export type DeckSideRow = { id: string; title: string; href: string; current: boolean; decided: boolean; sub?: string; chip?: string; tone?: ChipTone };
+export type DeckSideRow = { id: string; /** The chip is a bare time ("2:00 PM"): it never wraps. */ timeChip?: boolean; title: string; href: string; current: boolean; decided: boolean; sub?: string; chip?: string; tone?: ChipTone };
 
 /** The viewer's own Later cards, in the same three states every read here has. */
 export type DeckSideLater = { status: "ok"; rows: DeckSideRow[] } | { status: "not-set-up" } | { status: "unavailable" };
@@ -36,7 +37,7 @@ function Row({ r }: { r: DeckSideRow }) {
         <span className="dk-side-title">{r.title}</span>
         {r.sub && <span className="dk-side-sub">{r.sub}</span>}
       </span>
-      {r.chip && <span className={`dk-chip dk-chip--${r.tone ?? "warn"}`}>{r.chip}</span>}
+      {r.chip && <span className={`dk-chip dk-chip--${r.tone ?? "warn"}${r.timeChip ? " dk-chip--time" : ""}`}>{r.chip}</span>}
     </>
   );
   return (
@@ -89,8 +90,8 @@ export function DeckSide({ rows, failed, note, later, decidedFailed }: { rows: D
                     <Row key={r.id} r={r} />
                   ))}
                 </ol>
-                <Link href={listHref("later")} className="dk-side-more">
-                  {DECK_SIDE_SEE_ALL_LATER}
+                <Link href={listHref("later")} className="dk-side-more" aria-label={DECK_SIDE_SEE_ALL_LATER_LABEL}>
+                  {DECK_SIDE_SEE_ALL}
                 </Link>
               </>
             )
@@ -107,8 +108,8 @@ export function DeckSide({ rows, failed, note, later, decidedFailed }: { rows: D
                 <Row key={r.id} r={r} />
               ))}
             </ol>
-            <Link href={listHref("decided")} className="dk-side-more">
-              {DECK_SIDE_SEE_ALL_DECIDED}
+            <Link href={listHref("decided")} className="dk-side-more" aria-label={DECK_SIDE_SEE_ALL_DECIDED_LABEL}>
+              {DECK_SIDE_SEE_ALL}
             </Link>
           </>
         )}
