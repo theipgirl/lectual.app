@@ -11,8 +11,10 @@ import type { LetterPageModel, LetterVersion } from "@/lib/loe/page-model";
 
 const load = vi.fn<() => Promise<LetterPageModel>>();
 const gate = vi.fn(async () => undefined);
+const session = vi.fn<() => Promise<{ kind: "ok"; org: { slug: string | null } } | { kind: "none" }>>(async () => ({ kind: "ok", org: { slug: "hartwell-ip" } }));
 
 vi.mock("@/lib/loe/page-load", () => ({ loadLetterPage: () => load() }));
+vi.mock("@/lib/firm/session", () => ({ resolveFirmSession: () => session() }));
 vi.mock("@/app/dashboard/proposals/gate", () => ({ requireProposalsModule: () => gate() }));
 vi.mock("@/app/dashboard/settings/proposals/engagement-letter/actions", () => ({
   startDraftAction: vi.fn(),
@@ -70,6 +72,7 @@ function writeShot(name: string, body: string) {
 beforeEach(() => {
   load.mockReset();
   gate.mockClear();
+  session.mockClear();
 });
 
 describe("Engagement letter settings: seven states", () => {
@@ -209,5 +212,18 @@ describe("Engagement letter settings: seven states", () => {
     const html = await render(ok({ canEdit: false, canApprove: false, versions: [version({ status: "approved", body: "<script>alert(1)</script> {{client_name}}" })] }));
     expect(html).not.toContain("<script>alert");
     expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+  });
+});
+
+describe("the firm's logo above the preview", () => {
+  const draft = () => ok({ versions: [version({})] });
+  it("RPB's preview carries its logo; another firm's, and a failed session read, none", async () => {
+    load.mockResolvedValue(draft());
+    session.mockResolvedValueOnce({ kind: "ok", org: { slug: "rpb-law" } });
+    const rpb = await render(draft());
+    expect(rpb).toContain('class="loe-preview-logo" src="/brand/rpb-logo-oxblood.png"');
+    expect(await render(draft())).not.toContain("loe-preview-logo");
+    session.mockResolvedValueOnce({ kind: "none" });
+    expect(await render(draft())).not.toContain("loe-preview-logo");
   });
 });

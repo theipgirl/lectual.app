@@ -1,7 +1,7 @@
 import { stepStates, STEP_SUCCESS, type StepEventInput } from "@/lib/proposals/paid";
 import { stepText, type Tone } from "@/lib/proposals/paid-view";
 import type { AcceptedSnapshot } from "@/lib/proposals/types";
-import { SIGNED_CARD_UNAVAILABLE, SIGNED_FILING_NOT_YET, signedSummaryLine } from "@/lib/ui/words";
+import { SIGNED_ADDRESS_NOT_YET, SIGNED_CARD_UNAVAILABLE, SIGNED_FILING_NOT_YET, signedSummaryLine } from "@/lib/ui/words";
 import type { SignatureRead } from "./signature-read";
 import { rebuiltTextMatches } from "./signed-text-check";
 import { signedAtText } from "./signing";
@@ -44,6 +44,8 @@ export type SignedCardView =
        */
       fromStoredText: boolean;
       filing: FilingView;
+      /** Whether the signer's mailing address was added to the Lawmatics matter (`address_to_lawmatics`), same states as `filing`. */
+      address: FilingView;
     }
   /** A role that may not read the signature record: who signed and when, from the snapshot. Nothing else. */
   | { kind: "summary"; text: string }
@@ -86,6 +88,7 @@ export function buildSignedCard(input: {
     canDownload: input.canDownload,
     fromStoredText: !rebuiltTextMatches(input.snapshot),
     filing: filingView(input.events, input.proposalId, input.canRetry),
+    address: addressView(input.events, input.proposalId, input.canRetry),
   };
 }
 
@@ -94,6 +97,16 @@ export function filingView(events: readonly StepEventInput[] | null, proposalId:
   const s = stepStates(events, proposalId).signed_loe_upload;
   if (!s) return { state: "not_yet", text: SIGNED_FILING_NOT_YET, tone: "mute", retry: false };
   if (s.outcome === STEP_SUCCESS.signed_loe_upload) return { state: "done", text: stepText(s), tone: "ok", retry: false };
+  const state = s.outcome === "failed" ? "failed" : s.outcome === "skipped" ? "skipped" : "blocked";
+  return { state, text: stepText(s), tone: state === "skipped" ? "mute" : "warn", retry: canRetry };
+}
+
+/** The same states for the mailing-address step: not yet, done, failed, blocked, skipped, or the events couldn't be read. */
+export function addressView(events: readonly StepEventInput[] | null, proposalId: string, canRetry: boolean): FilingView {
+  if (events === null) return { state: "unreadable", text: FILING_UNREADABLE, tone: "warn", retry: false };
+  const s = stepStates(events, proposalId).address_to_lawmatics;
+  if (!s) return { state: "not_yet", text: SIGNED_ADDRESS_NOT_YET, tone: "mute", retry: false };
+  if (s.outcome === STEP_SUCCESS.address_to_lawmatics) return { state: "done", text: stepText(s), tone: "ok", retry: false };
   const state = s.outcome === "failed" ? "failed" : s.outcome === "skipped" ? "skipped" : "blocked";
   return { state, text: stepText(s), tone: state === "skipped" ? "mute" : "warn", retry: canRetry };
 }
