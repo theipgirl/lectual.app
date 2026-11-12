@@ -330,8 +330,8 @@ lectual-prod, without her OK. The LOE stays switched off for a firm until its le
   is switched on for RPB until they do.
 - L1. Migration 0106 (both tables, the accept-and-sign function, `copilot` source), isolation
   cases, applied to dev. Settings page for the letter, with approval.
-- L2. Client page: details, letter with exhibit, sign, receipt, print view. The server side of 4.4.
-- L3. Staff side: the letter card, the signed docx, the Lawmatics upload, paid-flow changes,
+- L2. Client page: details, letter with exhibit, sign, receipt, PDF download. The server side of 4.4.
+- L3. Staff side: the letter card, the signed PDF, the Lawmatics upload, paid-flow changes,
   status wording, the editor's Engagement letter section (joins Track 1 here).
 - L4. Flat-fee proposals with the general letter.
 
@@ -341,7 +341,7 @@ lectual-prod, without her OK. The LOE stays switched off for a firm until its le
 |---|---|
 | Migration 0106, RLS, the accept-and-sign function, the server side of signing, review of every sprint | Most capable model |
 | Client-facing wording drafts for Rebecca | Most capable model, then Rebecca |
-| Editor layout, start screen, client-page UI, docx, tests | Fast coding model |
+| Editor layout, start screen, client-page UI, PDF, tests | Fast coding model |
 | File searches, copy sweeps, the plugin skill edits | Lightest model |
 
 Also in scope: `lectual-plugin`'s `draft-engagement-letter` skill has a hard rule "Payment
@@ -353,7 +353,7 @@ for sign-then-pay, or the Cowork skills will contradict the app.
 1. Rebecca has approved the template in Settings, the typed signature, and the wording in 4.7.
 2. On a preview behind the firm's proposals domain, the recorded IP is the visitor's, not the
    proxy's.
-3. A test signing files the docx in the right Lawmatics matter (the `/files` call has never
+3. A test signing files the PDF in the right Lawmatics matter (the `/files` call has never
    been checked against a live account).
 4. A two-brand, per-mark-package test proposal produces a complete Exhibit A.
 5. Sign, reset, sign again leaves two signature rows and one live acceptance.
