@@ -8,6 +8,7 @@ import { wantedFromForm } from "@/lib/loe/editor-state";
 import type { ApprovedRead } from "@/lib/loe/templates-store";
 import { withLoeSnapshot } from "@/lib/proposals/loe-snapshot";
 import { withoutLetterCheck } from "@/lib/proposals/attach-letter";
+import { hasPendingLetterCheck } from "@/lib/proposals/letter-check";
 import { applyGeneralForm } from "./general-form";
 import {
   parseAdjustments,
@@ -108,6 +109,32 @@ export function applyPackagesToAll(names: ProposalName[], sourceIndex: number): 
   return { ok: true, value: next };
 }
 
+/**
+ * A save of a draft that still carries the unresolved "engagement letter couldn't be attached" check (`letter-check.ts`): made
+ * while the firm's letter couldn't be read, no letter on it, and nobody having chosen to send without one. The DEFAULT for such
+ * a draft is the default every door applies: attach the firm's approved letter. So:
+ *
+ *  - the firm's letter reads, and the form's switch is on (the editor draws it ON for such a draft) or the form carries no
+ *    switch at all (the page could not read the letter when it was drawn): the letter is ATTACHED, and only then is the check
+ *    cleared;
+ *  - the form's switch is OFF: that is a person's explicit choice to send without the letter; the check is cleared with no letter;
+ *  - a successful read shows the firm has NO approved letter (or no letter table): there is nothing to attach, so the check is
+ *    cleared (it could otherwise never be);
+ *  - the read FAILS again: the save still succeeds, nothing is attached, and the check STAYS. It keeps blocking the link.
+ *
+ * The check is never cleared by an ordinary Save that did not attach the letter.
+ */
+export function settlePendingLetter(content: ProposalContent, form: FormData, read: ApprovedRead): ProposalContent {
+  if (read.status === "unavailable") return content;
+  if (read.status === "not-set-up" || read.letter === null) return withoutLetterCheck(content);
+  const switchPosted = form.get("loeFields") === "1";
+  const wanted = switchPosted ? form.get("loeOn") === "on" : true;
+  if (!wanted) return withoutLetterCheck(withLoeSnapshot(content, read.letter, false));
+  const attached = withLoeSnapshot(content, read.letter, true);
+  // A letter of the other kind is not attached by `withLoeSnapshot`: there is then nothing of this kind to attach.
+  return withoutLetterCheck(attached);
+}
+
 function usesPackageChoice(names: readonly ProposalName[]): boolean {
   return names.some((n) => !!n.package_choice || n.marks.some((m) => !!m.package_choice));
 }
@@ -179,16 +206,16 @@ export async function buildDraftUpdate(
 
   // The engagement letter: the switch decides, and a save refreshes the copy from the firm's CURRENT approved version (or removes it).
   if (deps.approvedLetter) {
-    const currentlyOn = !!current.content.loe;
-    const wanted = wantedFromForm(form, currentlyOn);
     const read = await deps.approvedLetter(isGeneralContent(current.content) ? "general" : "trademark");
-    if (read.status === "ok") {
-      content = withLoeSnapshot(content, read.letter, wanted);
-      // A draft the assistant or Copilot made while the firm's letter couldn't be read carries a "couldn't be attached" check.
-      // A person saving with the switch on the page and the letter readable has chosen: the check is settled either way.
-      if (form.get("loeFields") === "1") content = withoutLetterCheck(content);
-    } else if (read.status === "unavailable" && wanted !== currentlyOn) return { ok: false, error: LETTER_SWITCH_UNREADABLE };
-    // not-set-up, or unreadable with the switch unchanged: the copy stays exactly as it was (create-link re-checks it).
+    if (hasPendingLetterCheck(current.content)) {
+      content = settlePendingLetter(content, form, read);
+    } else {
+      const currentlyOn = !!current.content.loe;
+      const wanted = wantedFromForm(form, currentlyOn);
+      if (read.status === "ok") content = withLoeSnapshot(content, read.letter, wanted);
+      else if (read.status === "unavailable" && wanted !== currentlyOn) return { ok: false, error: LETTER_SWITCH_UNREADABLE };
+      // not-set-up, or unreadable with the switch unchanged: the copy stays exactly as it was (create-link re-checks it).
+    }
   }
 
   const { clientName, clientEmail, title, expiresOn, payUrl } = details.value;

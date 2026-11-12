@@ -7,15 +7,18 @@ import { checkTheseHeading } from "@/lib/proposal-editor/vocabulary";
  * assistant's own CHECK FIRST notes and the quotes from the call it relied on, exactly as stored on the proposal
  * (nothing is rewritten and nothing is read again from the call). A person's own draft has no panel. If the stored
  * notes couldn't be read the panel says so; it never reads as "nothing to check".
+ *
+ * One line is not from the stored notes: `letterCheck`, the text of the unresolved "engagement letter couldn't be attached" check
+ * on the content itself, shown first. It goes when the check goes (a Save attached the letter, or a person turned it off).
  */
 /** Does the panel draw (and so put a "Check these" heading on the page)? The same test the component makes, for the page. */
-export function checkFirstShown(receipts: ProposalCardReceipts): boolean {
+export function checkFirstShown(receipts: ProposalCardReceipts, letterCheck: string | null = null): boolean {
   if (receipts.status === "none") return false;
   if (receipts.status === "unavailable") return true;
-  return parseReviewerSummary(receipts.notes).filter((i) => i.checkFirst).length + receipts.unverified.length + receipts.verified.length > 0;
+  return (letterCheck ? 1 : 0) + parseReviewerSummary(receipts.notes).filter((i) => i.checkFirst).length + receipts.unverified.length + receipts.verified.length > 0;
 }
 
-export function CheckFirstPanel({ receipts }: { receipts: ProposalCardReceipts }) {
+export function CheckFirstPanel({ receipts, letterCheck = null }: { receipts: ProposalCardReceipts; letterCheck?: string | null }) {
   if (receipts.status === "none") return null;
   if (receipts.status === "unavailable") {
     return (
@@ -27,7 +30,9 @@ export function CheckFirstPanel({ receipts }: { receipts: ProposalCardReceipts }
       </section>
     );
   }
-  const flags = parseReviewerSummary(receipts.notes).filter((i) => i.checkFirst);
+  // The engagement-letter line is DERIVED from the unresolved check on the content (`pendingLetterCheck`), never read from the
+  // stored notes: it is there while the letter is not attached and nobody has chosen, and gone the moment that is settled.
+  const flags = [...(letterCheck ? [{ text: letterCheck }] : []), ...parseReviewerSummary(receipts.notes).filter((i) => i.checkFirst)];
   const unverified = receipts.unverified.map((q) => ({ text: q, kind: "Heard on the call, not matched word for word" }));
   const verified = receipts.verified.map((q) => ({ text: q, kind: "Heard on the call" }));
   const total = flags.length + unverified.length + verified.length;

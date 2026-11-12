@@ -550,7 +550,16 @@ export function signedSummaryLine(name: string, when: string): string {
  * from the from-scratch door, which creates nothing in that case.
  */
 export const LETTER_NOT_ATTACHED_CHECK =
-  "Couldn't read your engagement letter when this draft was made, so it isn't attached. Turn it on in the Engagement letter section and save.";
+  "Couldn't read your engagement letter when this draft was made, so it isn't attached yet. Open the proposal and save it: the letter is attached if your firm has one.";
+/**
+ * The blocking "Fix" the editor shows while that check is unresolved (`validateContent` with `forApproval`), and what the link
+ * buttons answer. It never says "turn it on": the switch starts on, and where the firm has no letter there is no switch and a
+ * Save clears the item.
+ */
+export const LETTER_PENDING_FIX =
+  "The engagement letter isn't attached yet. Save this proposal: the letter is attached if your firm has one, or turn it off in the Engagement letter section to send without it.";
+/** Under the switch while it is on by default for such a draft. */
+export const LETTER_PENDING_SWITCH_NOTE = "Not attached yet. Save this proposal to attach it, or turn it off to send without a letter.";
 /** Shown on the staff card when the signed PDF is produced from the stored signed text rather than rebuilt. */
 export const SIGNED_FROM_STORED_TEXT =
   "This copy is produced from the stored signed text: the exact words that were signed, as plain paragraphs. Its fingerprint matches that text.";

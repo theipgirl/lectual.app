@@ -281,33 +281,8 @@ describe("P1a: Save attaches, removes and refreshes the copy", () => {
     expect(deps.approvedLetter).not.toHaveBeenCalled();
   });
 
-  it("review item 1: the assistant's 'couldn't be attached' check is settled once a person saves with the switch on the page and the letter readable", async () => {
-    const check = { text: "Couldn't read your engagement letter when this draft was made, so it isn't attached.", source: "assistant" as const, path: "loe" };
-    const other = { text: "A credit was applied. Check it.", source: "consult" as const, path: "adjustments[0]" };
-    const drafted: ProposalContent = { ...sevetri(), checks: [check, other] };
-
-    // Turned on and saved: the letter is attached and the check about it goes; the other check stays.
-    const on = saveDeps(row(drafted), ok(APPROVED));
-    expect((await runSaveDraft(on.deps, trademarkForm({ loeFields: "1", loeOn: "on" }))).saved).toBe(true);
-    expect(written(on.update).loe?.template_id).toBe(APPROVED.id);
-    expect(written(on.update).checks).toEqual([other]);
-
-    // Left off on purpose, with the switch in front of the person: they have chosen, so the note has done its job.
-    const off = saveDeps(row(drafted), ok(APPROVED));
-    await runSaveDraft(off.deps, trademarkForm({ loeFields: "1" }));
-    expect("loe" in written(off.update)).toBe(false);
-    expect(written(off.update).checks).toEqual([other]);
-
-    // The firm's letter still can't be read: nothing is settled, the check stays where it was.
-    const stillDown = saveDeps(row(drafted), { status: "unavailable" });
-    await runSaveDraft(stillDown.deps, trademarkForm({}));
-    expect(written(stillDown.update).checks).toEqual([check, other]);
-
-    // A save from a form that doesn't carry the switch leaves the check alone too.
-    const noSwitch = saveDeps(row(drafted), ok(APPROVED));
-    await runSaveDraft(noSwitch.deps, trademarkForm({}));
-    expect(written(noSwitch.update).checks).toEqual([check, other]);
-  });
+  // The draft whose letter couldn't be attached when it was made (the pending check) has its own file: tests/loe/pending-letter.test.tsx.
+  // An earlier test here pinned "left off on purpose" for a switch that merely STARTED off; that was wrong (every Save posts the switch).
 
   it("helpers: wantedFromForm and letterCopyCheck", () => {
     const f = new FormData();

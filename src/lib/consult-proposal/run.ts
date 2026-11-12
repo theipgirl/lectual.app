@@ -299,7 +299,9 @@ async function runStages(input: ConsultProposalRunInput, progress: Progress): Pr
   // `withLoeSnapshot` the from-scratch door's builder uses, and the result goes ONLY to the insert below: the letter is the
   // firm's privileged text and never reaches a prompt, the email, the queue item or a log. The read is fenced on this firm
   // (`db` may be the service role on the cron). A read that fails does not lose the draft and does not pass silently: the draft
-  // carries a "Check" item for the editor's checklist and the reviewer's notes say it first.
+  // carries the check on its CONTENT (a blocking "Fix" in the editor until a Save attaches the letter or a person turns it off;
+  // the assistant's panel derives its line from that check), and the queue item's summary says it first at draft time. It is
+  // NOT written into the stored reviewer notes: text stored there would keep saying so after the letter was attached.
   let letterRead: ApprovedRead;
   try {
     letterRead = await getApprovedLetter(db as unknown as SupabaseClient<Database>, "trademark", orgId);
@@ -307,7 +309,7 @@ async function runStages(input: ConsultProposalRunInput, progress: Progress): Pr
     letterRead = { status: "unavailable" };
   }
   const withLetter = attachFirmLetter(draft.content, letterRead, "assistant");
-  const reviewerNotes = withLetter.letter === "unreadable" ? `CHECK FIRST: ${LETTER_NOT_ATTACHED_CHECK}\n${draft.reviewerNotes}` : draft.reviewerNotes;
+  const queueNotes = withLetter.letter === "unreadable" ? `CHECK FIRST: ${LETTER_NOT_ATTACHED_CHECK}\n${draft.reviewerNotes}` : draft.reviewerNotes;
 
   // 1. The proposal: a DRAFT, source 'agent'. Not visible to the client; it
   //    needs a named approver and then "Mark as sent" before its link works.
@@ -338,7 +340,7 @@ async function runStages(input: ConsultProposalRunInput, progress: Progress): Pr
   await recordConsultDraftEvent(admin as unknown as ProposalsDbClient, proposal, {
     source: CONSULT_PROPOSAL_SOURCE,
     evidence: draft.evidence,
-    notes: reviewerNotes,
+    notes: draft.reviewerNotes,
     ...(source.kind === "meeting" ? { meeting_id: source.meetingId, meeting_title: source.title } : {}),
   });
 
@@ -356,7 +358,7 @@ async function runStages(input: ConsultProposalRunInput, progress: Progress): Pr
     return refuse("unavailable", `${describeConsultFailure("email", err, { origin })}`, draft.costUsd);
   }
   const testPrefix = input.testPrefix ?? (process.env.VERCEL_ENV === "production" ? "" : "[TEST] ");
-  const summary = queueSummary(reviewerNotes, staffUrl, draft.issues);
+  const summary = queueSummary(queueNotes, staffUrl, draft.issues);
 
   progress.stage = "queue";
   let queueId: string;

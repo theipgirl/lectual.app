@@ -1,6 +1,7 @@
 import { loeIssues } from "@/lib/loe/validate";
 import type { ApprovedRead } from "@/lib/loe/templates-store";
 import { LETTER_NOT_ATTACHED_CHECK } from "@/lib/ui/words";
+import { LETTER_CHECK_PATH } from "./letter-check";
 import { withLoeSnapshot } from "./loe-snapshot";
 import { MAX_CONTENT_CHECKS, isGeneralContent, type CheckSource, type ContentCheck, type ProposalContent } from "./types";
 
@@ -16,16 +17,16 @@ import { MAX_CONTENT_CHECKS, isGeneralContent, type CheckSource, type ContentChe
  * `tests/proposals/letter-never-in-prompts.test.ts` holds both halves.
  *
  * A read that FAILED never produces a draft that silently lacks its letter. The draft is still made (an assistant's work is
- * not thrown away over a read that will work a minute later), and it carries a "Check" item, drawn in the editor's
- * "Ready to send?" list with a link to the Engagement letter section, saying the letter couldn't be attached. A person at
- * the keyboard gets the stricter answer (the from-scratch door creates nothing and says "Couldn't read your engagement
- * letter"); the check below says the same thing in the same words.
+ * not thrown away over a read that will work a minute later), and it carries the check below. While that check is on a content
+ * with no letter the draft is PENDING (`letter-check.ts`): the editor shows it as a blocking "Fix", starts the Engagement letter
+ * switch on so an ordinary Save attaches the letter, and no link can be created or turned on. A person at the keyboard gets the
+ * stricter answer (the from-scratch door creates nothing and says "Couldn't read your engagement letter"); the check says the
+ * same thing in the same opening words.
  *
  * Pure: the caller does the read (`getApprovedLetter`, fenced on the org when it may be on the service role) and passes it in.
  */
 
-/** The path of the letter's check: `targetForPath` sends it to the editor's Engagement letter section. */
-export const LETTER_CHECK_PATH = "loe";
+export { LETTER_CHECK_PATH };
 
 /** The check's words live with the other words a person reads (`words.ts`); re-exported here for the doors that write it. */
 export { LETTER_NOT_ATTACHED_CHECK };
@@ -57,9 +58,9 @@ function withLetterCheck(content: ProposalContent, source: CheckSource): Proposa
 }
 
 /**
- * Removes the "couldn't be attached" check. Called by the editor's Save once a person has saved with the firm's letter readable
- * and the Engagement letter switch on the page: they have then seen the switch and chosen, so the note has done its job.
- * Returns the same object when there is nothing to remove.
+ * Removes the "couldn't be attached" check. The editor's Save calls it in exactly three cases (`settlePendingLetter` in
+ * `save-draft.ts`): the letter was attached, a person turned the switch off, or a successful read showed the firm has no
+ * approved letter. Returns the same object when there is nothing to remove.
  */
 export function withoutLetterCheck(content: ProposalContent): ProposalContent {
   if (!Array.isArray(content.checks) || !content.checks.some((c) => c?.path === LETTER_CHECK_PATH)) return content;

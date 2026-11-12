@@ -29,6 +29,8 @@
  */
 
 import { CHECK_SOURCES, isMarkKind, MADE_BY_VALUES, MAX_CHECK_TEXT, MAX_CONTENT_CHECKS } from "./types";
+import { LETTER_CHECK_PATH, hasPendingLetterCheck } from "./letter-check";
+import { LETTER_PENDING_FIX } from "@/lib/ui/words";
 import { MAX_CLASSES_TOTAL_PER_BRAND, MAX_CLIENT_ADD } from "./client-classes";
 import { validatePackages } from "./package-list";
 import { MAX_NAME_DISCOUNT_PCT } from "./pricing";
@@ -320,6 +322,10 @@ export function validateContent(content: unknown, options: ValidateOptions = {})
   if (content.loe !== undefined) {
     for (const issue of loeIssues(content.loe, content.kind === "general" ? "general" : "trademark")) err(issue.path, issue.message);
   }
+  // A draft made while the firm's letter couldn't be read, with no letter attached since and nobody having chosen to send
+  // without one (`letter-check.ts`): it may be edited and saved, but it cannot be approved for a link. A firm with an approved
+  // letter never gets a live proposal that silently lacks it.
+  if (options.forApproval && hasPendingLetterCheck(content)) err(LETTER_CHECK_PATH, LETTER_PENDING_FIX);
   if (content.kind === "general") {
     validateGeneralContent(content, out);
     return out;

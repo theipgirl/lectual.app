@@ -20,6 +20,7 @@ import { getScopedClient } from "@/lib/db/scoped-client";
 import { editorLetterState } from "@/lib/loe/editor-state";
 import { readSignature, type SignatureRead } from "@/lib/loe/signature-read";
 import { canReadSignature } from "@/lib/loe/signature-roles";
+import { hasPendingLetterCheck, pendingLetterCheck } from "@/lib/proposals/letter-check";
 import { buildSignedCard } from "@/lib/loe/signed-card";
 import { getApprovedLetter } from "@/lib/loe/templates-store";
 import { isSignedSnapshot } from "@/lib/proposals/signed-state";
@@ -172,7 +173,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
         )
       : Promise.resolve(null),
   ]);
-  const letterState = editorLetterState({ read: letterRead, attached: content.loe });
+  const letterState = editorLetterState({ read: letterRead, attached: content.loe, pending: hasPendingLetterCheck(content) });
   const signedCard =
     proposal.status === "accepted" && content.loe
     ? buildSignedCard({
@@ -428,7 +429,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
 
       {paidView && <PaidPanel proposalId={proposal.id} view={paidView} />}
 
-      {isAssistantDraft && statusEditable && <CheckFirstPanel receipts={card.receipts} />}
+      {isAssistantDraft && statusEditable && <CheckFirstPanel receipts={card.receipts} letterCheck={pendingLetterCheck(content)?.text ?? null} />}
       {consult && proposal.lead_id && <ConsultStrip state={consult} leadId={proposal.lead_id} tz={tz} />}
 
       <UnsavedGuardProvider>
@@ -439,7 +440,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
                 <WhoSection editable={editable} issues={shown(groups.details.filter((i) => i.path !== "pay_url"))} values={detailsValues} />
                 {general ? null : (
                   <NameRowsProvider key={nameValues.map((n) => n.id).join("|")} names={nameValues}>
-                    <BrandsSection editable={editable} issues={shown(groups.general)}>
+                    <BrandsSection editable={editable} issues={shown(groups.general.filter((i) => !/^loe(\.|$)/.test(i.path)))}>
                       {nameValues.map((n, i) => (
                         <NameCard
                           key={n.id}
@@ -558,7 +559,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
           )}
 
               {/* One "Check these" heading a page: when the assistant's panel is at the top, the checklist lists its checks without a second one. */}
-              {statusEditable && <ReadyChecklist items={checklist} checksHeading={!(isAssistantDraft && checkFirstShown(card.receipts))} />}
+              {statusEditable && <ReadyChecklist items={checklist} checksHeading={!(isAssistantDraft && checkFirstShown(card.receipts, pendingLetterCheck(content)?.text ?? null))} />}
               {statusEditable && <EditorActions canSave={editable} canCreateLink={canCreateLink} askText={askText} blocking={blocking} />}
 
               <section className="lx-card pe-preview" id="pe-preview" aria-label="Preview of the client page">

@@ -260,11 +260,12 @@ describe("the consult assistant's draft", () => {
       expect(content.checks?.[0]).toEqual({ text: LETTER_NOT_ATTACHED_CHECK, source: "assistant", path: LETTER_CHECK_PATH });
       // The editor draws it.
       expect(buildChecklist([], content).some((i) => i.level === "check" && i.text === LETTER_NOT_ATTACHED_CHECK && i.href === "#pe-sec-letter")).toBe(true);
-      // The reviewer's notes say it first, on the queue item and on the evidence event.
+      // The queue item's summary says it first at draft time. It is NOT stored in the reviewer notes on the evidence event:
+      // the editor's panel derives its line from the check on the content, so it goes when the check goes.
       const queued = (t.createDraft.mock.calls[0] as unknown as [{ summary: string }])[0];
       expect(queued.summary.startsWith(`CHECK FIRST: ${LETTER_NOT_ATTACHED_CHECK}`)).toBe(true);
       const [ev] = writes(t.admin.log, "client_proposal_event", "insert");
-      expect((ev.values as { payload: { notes: string } }).payload.notes.startsWith(`CHECK FIRST: ${LETTER_NOT_ATTACHED_CHECK}`)).toBe(true);
+      expect((ev.values as { payload: { notes: string } }).payload.notes).not.toContain("engagement letter");
     });
   }
 });

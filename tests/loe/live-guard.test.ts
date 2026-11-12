@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LETTER_CHANGED_SENTENCE, LETTER_UNREADABLE_SENTENCE, LINK_TURNED_ON } from "@/lib/proposal-editor/vocabulary";
+import { LETTER_PENDING_FIX } from "@/lib/ui/words";
 import type { ProposalContent } from "@/lib/proposals/types";
 import { sevetri } from "../proposals/fixture";
 
@@ -304,6 +305,43 @@ describe("path 3: 'Save and create link' (createLinkAction)", () => {
     expect(state.updates).toEqual([{ status: "approved" }]);
     expect(sent()).toBe(true);
     expect(state.templateReads).toBe(2);
+  });
+});
+
+describe("a draft whose letter couldn't be attached, still unresolved, never goes live", () => {
+  /** No letter on the content, and the check an assistant's draft carries when the firm's letter couldn't be read. */
+  const pending = (): ProposalContent => ({ ...sevetri(), checks: [{ text: "Couldn't read your engagement letter when this draft was made, so it isn't attached yet.", source: "assistant", path: "loe" }] });
+
+  it("the guard answers 'unattached' without reading the firm's letter, and refuses with the fixed sentence", async () => {
+    const { letterLiveCheck, letterLiveRefusal } = await import("@/lib/loe/live-guard");
+    const check = await letterLiveCheck(fakeClient() as never, { org_id: ORG, content: pending() });
+    expect(check).toBe("unattached");
+    expect(letterLiveRefusal(check)).toBe(LETTER_PENDING_FIX);
+    expect(state.templateReads).toBe(0);
+  });
+
+  it("'Save and create link': refused before approving, nothing written, nothing sent", async () => {
+    state.proposal = proposalRow({ status: "draft", content: pending() });
+    const { createLinkAction } = await import("../../src/app/dashboard/proposals/[id]/actions");
+    expect(await createLinkAction({}, form())).toEqual({ error: LETTER_PENDING_FIX });
+    expect(state.updates).toEqual([]);
+    expect(sent()).toBe(false);
+  });
+
+  it("'Turn on the link' and the queue's go-live: refused inside the send, even for a row that somehow got saved", async () => {
+    state.proposal = proposalRow({ status: "approved", content: pending() });
+    const { sendAction } = await import("../../src/app/dashboard/proposals/[id]/actions");
+    expect(await sendAction({}, form())).toEqual({ error: LETTER_PENDING_FIX });
+    const { makeProposalLive } = await import("@/lib/consult-proposal/link");
+    expect(await makeProposalLive(ID)).toEqual({ ok: false, error: LETTER_PENDING_FIX });
+    expect(sent()).toBe(false);
+  });
+
+  it("the approve step itself refuses it (the store validates for approval)", async () => {
+    state.proposal = proposalRow({ status: "draft", content: pending() });
+    const { approveProposal } = await import("@/lib/proposals/store");
+    await expect(approveProposal(ID)).rejects.toMatchObject({ code: "validation" });
+    expect(state.updates).toEqual([]);
   });
 });
 

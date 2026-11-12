@@ -89,7 +89,10 @@ function Body({ state, editable }: { state: EditorLetterState; editable: boolean
       return (
         <div data-letter-state={state.state}>
           <LetterSwitch
-            defaultOn={state.state === "on"}
+            // On when the saved copy exists, and ALSO for a draft whose letter couldn't be attached when it was made (`startOn`):
+            // the default for every proposal is to carry the firm's letter, so an ordinary Save attaches it.
+            defaultOn={state.state === "on" || (state.state === "off" && state.startOn)}
+            pending={state.state === "off" && state.startOn}
             disabled={false}
             version={state.version}
             newerAvailable={state.state === "on" && state.newerAvailable}

@@ -5,6 +5,7 @@ import type { LetterBlock } from "@/lib/loe/render";
 import {
   LETTER_LIVE_COPY_NOTE,
   LETTER_NEWER_VERSION_NOTE,
+  LETTER_PENDING_SWITCH_NOTE,
   LETTER_PREVIEW_CONTROL,
   LETTER_PREVIEW_PLACEHOLDER_NOTE,
   LETTER_SWITCH_LABEL,
@@ -17,6 +18,10 @@ import {
  * The engagement letter switch. It is a plain checkbox INSIDE the editor's one form, so the page's unsaved-changes guard
  * (which listens for `change` on that form) marks the page and "Save and create link" waits for the one Save. Turning it off hides the
  * Preview at once. The letter is drawn as React text from plain-text blocks: nothing here can become markup.
+ *
+ * Because it is in the one form, EVERY Save posts `loeFields=1` with the box as it stands. So what the box starts as matters:
+ * for a draft whose letter couldn't be attached when it was made, it starts ON (`pending`), never off, or the first Save of
+ * anything else would quietly settle the question as "no letter".
  */
 export function LetterSwitch(props: {
   defaultOn: boolean;
@@ -25,6 +30,11 @@ export function LetterSwitch(props: {
   newerAvailable: boolean;
   blocks: LetterBlock[] | null;
   problems: string[];
+  /**
+   * The draft was made while the firm's letter couldn't be read, and the letter is not attached yet: the switch starts ON
+   * (`defaultOn`), a note says a Save attaches it, and turning it off is the person's choice to send without one.
+   */
+  pending?: boolean;
 }) {
   const [on, setOn] = useState(props.defaultOn);
   return (
@@ -34,6 +44,11 @@ export function LetterSwitch(props: {
         <input type="checkbox" name="loeOn" value="on" checked={on} disabled={props.disabled} onChange={(e) => setOn(e.target.checked)} /> {LETTER_SWITCH_LABEL}
       </label>
       <p className="lx-note pe-hint">{on ? LETTER_SWITCH_ON_NOTE : LETTER_SWITCH_OFF_NOTE}</p>
+      {props.pending && on ? (
+        <p className="lx-note pe-hint" role="status" data-letter-pending>
+          {LETTER_PENDING_SWITCH_NOTE}
+        </p>
+      ) : null}
       {on ? (
         <>
           <p className="pe-letter-version">

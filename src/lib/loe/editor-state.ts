@@ -1,4 +1,5 @@
 import type { ApprovedRead } from "./templates-store";
+import { hasPendingLetterCheck } from "@/lib/proposals/letter-check";
 import { loeIsCurrent } from "@/lib/proposals/loe-snapshot";
 import type { ProposalContent, ProposalLoe } from "@/lib/proposals/types";
 import type { LoeValues } from "./fields";
@@ -20,10 +21,26 @@ export type EditorLetterState =
   | { state: "none" }
   | { state: "unreadable" }
   | { state: "on"; version: number; title: string; body: string; newerAvailable: boolean; switchable: boolean }
-  | { state: "off"; version: number; title: string; body: string; switchable: boolean }
+  | {
+      state: "off";
+      version: number;
+      title: string;
+      body: string;
+      switchable: boolean;
+      /**
+       * The draft was made while the firm's letter couldn't be read and nobody has chosen since (`letter-check.ts`): the switch is
+       * drawn ON, so an ordinary Save attaches the letter. Turning it off is then a person's explicit choice.
+       */
+      startOn: boolean;
+    }
   | { state: "absent" };
 
-export function editorLetterState(input: { read: ApprovedRead | null; attached: ProposalLoe | undefined }): EditorLetterState {
+export function editorLetterState(input: {
+  read: ApprovedRead | null;
+  attached: ProposalLoe | undefined;
+  /** The content still carries the unresolved "couldn't be attached" check (`hasPendingLetterCheck`). */
+  pending?: boolean;
+}): EditorLetterState {
   const { read, attached } = input;
   // Not editable (live, accepted...): nothing is read and nothing can change; show what the version carries.
   if (read === null) {
@@ -36,7 +53,7 @@ export function editorLetterState(input: { read: ApprovedRead | null; attached: 
     const newer = attached.template_id !== approved.id || attached.template_version !== approved.version || attached.body !== approved.body || attached.title !== approved.title;
     return { state: "on", version: attached.template_version, title: attached.title, body: attached.body, newerAvailable: newer, switchable: true };
   }
-  return { state: "off", version: approved.version, title: approved.title, body: approved.body, switchable: true };
+  return { state: "off", version: approved.version, title: approved.title, body: approved.body, switchable: true, startOn: input.pending === true };
 }
 
 /** Merge fields shown as [placeholders] in the editor's preview: nothing is merged for a real person here. */
@@ -59,11 +76,19 @@ export function wantedFromForm(form: FormData, currentlyOn: boolean): boolean {
 /**
  * Create-link's check of the letter copy: `no_letter` (the content carries none: nothing to check), `current` (it is the firm's
  * approved version), `stale` (it differs in id, version, title or body, or the firm no longer has an approved letter) or
- * `unreadable` (the approved-letter read failed: the link is not made on a guess).
+ * `unreadable` (the approved-letter read failed: the link is not made on a guess), or `unattached` (no letter, and the draft
+ * still carries the unresolved "couldn't be attached" check: a Save attaches the letter or a person turns it off first).
  */
-export type LetterCopyCheck = "no_letter" | "current" | "stale" | "unreadable";
+export type LetterCopyCheck =
+  | "no_letter"
+  | "current"
+  | "stale"
+  | "unreadable"
+  /** No letter on the content, but the "couldn't be attached" check is still unresolved: the link is not made. */
+  | "unattached";
 
 export function letterCopyCheck(content: ProposalContent, read: ApprovedRead): LetterCopyCheck {
+  if (hasPendingLetterCheck(content)) return "unattached";
   if (!content.loe) return "no_letter";
   if (read.status !== "ok") return "unreadable";
   return loeIsCurrent(content, read.letter) ? "current" : "stale";

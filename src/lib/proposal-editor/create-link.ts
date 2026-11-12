@@ -1,6 +1,7 @@
 import type { ProposalRow } from "@/lib/proposals/types";
 import type { ActionState } from "@/app/dashboard/proposals/errors";
 import type { LetterCopyCheck } from "@/lib/loe/editor-state";
+import { LETTER_PENDING_FIX } from "@/lib/ui/words";
 import { LETTER_CHANGED_SENTENCE, LETTER_UNREADABLE_SENTENCE, LINK_CREATED, LINK_NOT_TURNED_ON } from "./vocabulary";
 
 /**
@@ -50,6 +51,7 @@ export async function runCreateLink(
     }
     if (check === "stale") return { error: LETTER_CHANGED_SENTENCE };
     if (check === "unreadable") return { error: LETTER_UNREADABLE_SENTENCE };
+    if (check === "unattached") return { error: LETTER_PENDING_FIX };
   }
 
   try {
