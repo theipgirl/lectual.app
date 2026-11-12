@@ -24,15 +24,20 @@ describe("one price calculation", () => {
 
   it("the page and the accept path both price through quoteWithClientClasses (Spec 3's one effective-content builder)", () => {
     expect(read("src/components/client-proposal/ProposalDocument.tsx")).toContain("quoteWithClientClasses(");
-    expect(read("src/lib/proposals/public.ts")).toContain("quoteWithClientClasses(");
-    expect(read("src/lib/proposals/client-classes.ts")).toContain("quoteProposal(");
+    // The accept path reaches it through `quoteForAcceptance` (one function for the accept path, the letter PDFs and the page's
+    // letter steps, so all three clean and price the same input the same way). It is a thin wrapper and nothing else.
+    expect(read("src/lib/proposals/public.ts")).toContain("quoteForAcceptance(read.view.content, selection, clientClasses)");
+    const helper = read("src/lib/proposals/client-classes.ts");
+    const fn = helper.slice(helper.indexOf("export function quoteForAcceptance"));
+    expect(fn.slice(0, fn.indexOf("\n}\n"))).toContain("return quoteWithClientClasses(content, normalizeSelection(content, selection), parseClientClassInput(content, clientClasses), { repair: true });");
+    expect(helper).toContain("quoteProposal(");
   });
 });
 
 describe("nothing money-shaped is read from the browser in the accept action", () => {
-  it("acceptProposalAction takes the token, the ticks and what the client wrote only", () => {
+  it("acceptProposalAction takes the token, the ticks, what the client wrote and (engagement letter) the signing only", () => {
     const src = read("src/app/p/[token]/actions.ts");
-    expect(src).toMatch(/acceptProposalAction\(token: string, selection: unknown, clientClasses\?: unknown\)/);
+    expect(src).toMatch(/acceptProposalAction\(token: string, selection: unknown, clientClasses\?: unknown, signing\?: unknown\)/);
     expect((src.split("export async function")[1] ?? "").match(/price|total|cents|classCount/i)).toBeNull();
   });
 
@@ -63,7 +68,7 @@ describe("hard rules", () => {
     "src/components/proposal-editor/LeadLink.tsx",
     "src/components/proposal-editor/LinkLeadForm.tsx",
     "src/components/proposal-editor/Sections.tsx",
-    "src/components/proposal-editor/NewProposalForm.tsx",
+    "src/components/proposal-editor/StartDraft.tsx",
     "src/components/client-proposal/ProposalDocument.tsx",
     "src/app/dashboard/proposals/[id]/page.tsx",
   ];

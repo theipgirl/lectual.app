@@ -8,6 +8,8 @@ import { saveProposalSettingsAction } from "@/app/dashboard/settings/proposals/a
 import { SETTINGS_APPROVERS_HEADING } from "@/lib/proposal-editor/vocabulary";
 import { ActionForm, Outcome } from "./ActionForm";
 import { IncludesFields } from "./IncludesFields";
+import { NewOfferSection } from "./NewOfferSection";
+import type { NewOffer } from "@/lib/proposals/new-offer";
 import { PackagePricesSection, type SettingsPackageValues } from "./PackagePricesForm";
 
 export type SettingsMember = { userId: string; name: string; email: string | null; role: string };
@@ -24,7 +26,7 @@ export type SettingsValues = {
  * prices, where acceptance notices go, and the standard includes table. Admins only (the action re-checks).
  * `packages` is omitted when the prices aren't being edited here.
  */
-export function SettingsForm({ members, values, packages }: { members: SettingsMember[]; values: SettingsValues; packages?: SettingsPackageValues[] }) {
+export function SettingsForm({ members, values, packages, newOffer = null }: { members: SettingsMember[]; values: SettingsValues; packages?: SettingsPackageValues[]; newOffer?: NewOffer | null }) {
   const [chosen, setChosen] = useState<string[]>(values.approverUserIds);
   const pick = approverPick(chosen);
   return (
@@ -64,6 +66,7 @@ export function SettingsForm({ members, values, packages }: { members: SettingsM
           </section>
 
           {packages ? <PackagePricesSection packages={packages} /> : null}
+          {packages ? <NewOfferSection packageNames={packages.map((p) => p.package)} offer={newOffer} /> : null}
 
           <section className="lx-card pe-card">
             <header className="pe-card-head">

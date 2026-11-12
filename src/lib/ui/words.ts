@@ -506,3 +506,83 @@ export const CONSENT_FAILED = "Couldn't finish connecting Claude. Nothing was ap
 /** Every refusal from a Claude connector tool call: one sentence, never which firms have what. */
 export const MCP_TOOL_REFUSED = "Lectual can't answer this from Claude for your account right now.";
 export const MCP_TOOL_FAILED = "Lectual couldn't answer this right now. Try again in a moment.";
+
+/* Engagement letter (Settings -> Proposals -> Engagement letter). The firm's own letter, shown and recorded by the software. */
+export const ENGAGEMENT_LETTER_NAME = "Engagement letter";
+export const ENGAGEMENT_LETTER_SUB =
+  "The letter a client reads and signs on their proposal. It is your firm's own text: Lectual shows it and records the signature, and writes none of it.";
+export const LETTER_KIND_WORDS = { trademark: "Trademark letter", general: "Flat-fee letter" } as const;
+export const LETTER_STATUS_WORDS = { draft: "Draft", approved: "Approved", retired: "Retired" } as const;
+export const LETTER_START_DRAFT = "Start a draft";
+export const LETTER_START_FROM_VERSION = "Start a new draft from this version";
+export const LETTER_SAVE_DRAFT = "Save draft";
+export const LETTER_APPROVE = "Approve";
+export const LETTER_PREVIEW_HEADING = "Preview with sample values";
+export const LETTER_PREVIEW_NOTE = "Made-up client details, so you can see a whole letter. The preview shows the saved draft: save first to refresh it.";
+export const LETTER_EMPTY_STATE = "No letter yet. Start a draft, and it can be approved once the text is final.";
+export const LETTER_NOT_YET_DRAFTED = "Nobody has written this letter yet.";
+export const LETTER_LOAD_FAILED = "The letters couldn't be loaded. Refresh to try again.";
+export const LETTER_READ_ONLY_NOTE = "You can read the letters. An owner, admin or senior admin writes them.";
+export const LETTER_FIELDS_HEADING = "Merge fields you can use";
+export const LETTER_FIELDS_NOTE = "Write a field in double braces, for example {{client_name}}. Anything else in braces is refused.";
+export const LETTER_APPROVAL_NOTE = "Approving makes this the letter new proposals attach. An approved version can't be edited; a change is a new draft.";
+export const LETTER_NO_APPROVERS = "No one is named yet. Name approvers under Client proposals, or no letter can be approved.";
+export function letterApproversLine(names: string): string {
+  return `Can approve: ${names}.`;
+}
+export const LETTER_APPROVERS_UNREADABLE = "Who can approve couldn't be loaded, so Approve is hidden. Refresh to try again.";
+export const LETTER_FIX_BEFORE_APPROVING = "Fix the problems above before approving.";
+export const LETTER_SETTINGS_LINK = "Engagement letter";
+export const LETTER_SETTINGS_LINK_NOTE = "The letter a client signs on their proposal, with its versions and who approves them.";
+
+/* Engagement letter section of the proposal editor (Sprint 6). */
+export const LETTER_SECTION_HEADING = "Engagement letter";
+export const LETTER_SECTION_HINT = "The letter your client reads and signs on the proposal page before paying. It is your firm's own text.";
+export const LETTER_SWITCH_LABEL = "Include the engagement letter";
+export const LETTER_SWITCH_ON_NOTE = "The client reads the letter, signs it, then pays. Saving this proposal copies your firm's current approved letter onto it.";
+export const LETTER_SWITCH_OFF_NOTE = "Off: the client accepts and pays with no letter to sign.";
+export const LETTER_SETUP_LINE = "Your firm has no approved engagement letter for this kind of proposal yet. Write and approve one, then turn it on here.";
+export const LETTER_SETUP_LINK = "Set up the engagement letter";
+export const LETTER_SECTION_UNREADABLE = "Your firm's engagement letter couldn't be loaded, so the switch is hidden. Refresh to try again. Nothing was changed.";
+export const LETTER_ABSENT_NOTE = "This proposal has no engagement letter.";
+export const LETTER_PREVIEW_CONTROL = "Preview the letter";
+export const LETTER_PREVIEW_PLACEHOLDER_NOTE = "Fields the client fills in or that are set when they sign show in [brackets].";
+export const LETTER_READ_ONLY_SECTION_NOTE = "Your role can read this but not change it.";
+export const letterAttachedLabel = (version: number): string => `Version ${version}, approved`;
+export const LETTER_NEWER_VERSION_NOTE = "Your firm has approved a newer version. Save this proposal to use it.";
+export const LETTER_LIVE_COPY_NOTE = "This is the copy the client reads and signs.";
+
+/* Signed letter card on the staff proposal page (Sprint 6). */
+export const SIGNED_CARD_HEADING = "Engagement letter";
+export const SIGNED_CARD_UNAVAILABLE = "The signature record couldn't be loaded. Refresh to try again.";
+export const SIGNED_DOWNLOAD = "Download the signed letter (PDF)";
+export const SIGNED_DOWNLOADING = "Preparing…";
+export const SIGNED_FILING_HEADING = "Filed in Lawmatics";
+export const SIGNED_FILING_NOT_YET = "Not filed yet.";
+export const SIGNED_FILING_OK = "Filed in the matter's Engagement folder.";
+export const SIGNED_TRY_AGAIN = "Try again";
+export const SIGNED_FINGERPRINT_LABEL = "Fingerprint (sha256)";
+export const SIGNED_DOWNLOAD_NOT_ALLOWED = "Your role can't download the signed letter.";
+/** For a role that may not read the signature record: who signed and when, from the accepted proposal itself. */
+export function signedSummaryLine(name: string, when: string): string {
+  return when ? `Signed by ${name} on ${when}` : `Signed by ${name}`;
+}
+/**
+ * The check an assistant's or Copilot's draft carries when the firm's engagement letter couldn't be read as the draft was made
+ * (drawn in the editor's "Ready to send?" list, linked to the Engagement letter section). The same opening words a person gets
+ * from the from-scratch door, which creates nothing in that case.
+ */
+export const LETTER_NOT_ATTACHED_CHECK =
+  "Couldn't read your engagement letter when this draft was made, so it isn't attached yet. Open the proposal and save it: the letter is attached if your firm has one.";
+/**
+ * The blocking "Fix" the editor shows while that check is unresolved (`validateContent` with `forApproval`), and what the link
+ * buttons answer. It never says "turn it on": the switch starts on, and where the firm has no letter there is no switch and a
+ * Save clears the item.
+ */
+export const LETTER_PENDING_FIX =
+  "The engagement letter isn't attached yet. Save this proposal: the letter is attached if your firm has one, or turn it off in the Engagement letter section to send without it.";
+/** Under the switch while it is on by default for such a draft. */
+export const LETTER_PENDING_SWITCH_NOTE = "Not attached yet. Save this proposal to attach it, or turn it off to send without a letter.";
+/** Shown on the staff card when the signed PDF is produced from the stored signed text rather than rebuilt. */
+export const SIGNED_FROM_STORED_TEXT =
+  "This copy is produced from the stored signed text: the exact words that were signed, as plain paragraphs. Its fingerprint matches that text.";

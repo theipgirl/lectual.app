@@ -1,5 +1,5 @@
 import type { ProposalStatus } from "@/lib/proposals/types";
-import { STATUS_WORDS } from "./vocabulary";
+import { SIGNED_STATUS_WORD, STATUS_WORDS } from "./vocabulary";
 
 /** Pill wording per status (the words themselves live in vocabulary.ts). */
 export const STATUS_LABEL: Record<ProposalStatus, string> = STATUS_WORDS;
@@ -21,6 +21,11 @@ export function statusTone(status: string): "ok" | "warn" | "risk" | "mute" {
 
 export function statusLabel(status: string): string {
   return STATUS_LABEL[status as ProposalStatus] ?? status;
+}
+
+/** The pill for a stored status; an accepted version that was SIGNED reads "Signed by client". */
+export function statusLabelFor(status: string, signed: boolean): string {
+  return status === "accepted" && signed ? SIGNED_STATUS_WORD : statusLabel(status);
 }
 
 /** "Rebecca Bryant" -> "Rebecca"; an email -> its local part; blank -> null. */

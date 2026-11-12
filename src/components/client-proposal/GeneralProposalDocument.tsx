@@ -7,6 +7,15 @@ import { generalCommitmentSentence } from "@/lib/proposals/commitment";
 import type { ProposalQuote } from "@/lib/proposals/types";
 import type { ProposalDocumentProps } from "./ProposalDocument";
 import { RPB_FONT_VARS } from "./fonts";
+import { ATTORNEY_FOOTER_LETTER_LINE, DOWNLOAD_REVIEW_LABEL, LETTER_HEADING, LETTER_INTRO, READ_LETTER_FIRST, SIGN_MESSAGES } from "@/lib/loe/client-words";
+import type { SigningInput } from "@/lib/loe/signing";
+import { LoeDetailsForm } from "./LoeDetailsForm";
+import { LoeLetterPanel } from "./LoeLetterPanel";
+import { DownloadPdfButton, LoeSignedLetter } from "./LoeReceipt";
+import { LoeSideAction } from "./LoeSideAction";
+import { LoeSignPanel } from "./LoeSignPanel";
+import { LoeStepBar } from "./LoeStepBar";
+import { useLoeFlow } from "./loe-flow";
 import { brandForSlug, formatCivilDate, money, paragraphs, richSegments, safeHttpsUrl, type ProposalBrand } from "./format";
 import "./proposal.css";
 
@@ -20,11 +29,22 @@ import "./proposal.css";
  * All firm text is rendered as React text. Same modes, footer and assets as the trademark page.
  */
 export function GeneralProposalDocument(props: ProposalDocumentProps) {
-  const { content, title, clientName, expiresOn, firm, mode, acceptedQuote, payUrl, onAccept } = props;
+  const { content, title, clientName, expiresOn, firm, mode, acceptedQuote, payUrl, onAccept, letter, onDownloadReview, onDownloadSigned } = props;
   const brand: ProposalBrand = brandForSlug(firm.slug);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<{ payUrl: string | null; opened: boolean } | null>(null);
+  const [done, setDone] = useState<{ payUrl: string | null; opened: boolean; signedLine?: string | null; letterDate?: string | null; letterVerified?: boolean } | null>(() =>
+    props.initialDone
+      ? {
+          payUrl: props.initialDone.payUrl,
+          opened: props.initialDone.opened ?? false,
+          signedLine: props.initialDone.signedLine ?? null,
+          letterDate: props.initialDone.letterDate ?? null,
+          letterVerified: props.initialDone.letterVerified === true,
+        }
+      : null,
+  );
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const accepted = mode === "accepted" || done !== null;
   const quote = useMemo<ProposalQuote>(
@@ -42,9 +62,31 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
   const finalPayUrl = safeHttpsUrl(done ? done.payUrl : payUrl);
   const heading = title?.trim() && title.trim() !== "Proposal" ? title.trim() : "Your Proposal";
   const canAccept = quote.legal_total_cents > 0 || (quote.general?.fee_cents ?? 0) > 0;
+  // Engagement letter (flat-fee kind): the same steps as the trademark page; without `loe` none of it runs.
+  const loeBlock = typeof content.loe?.body === "string" && content.loe.body.length > 0 ? { title: content.loe.title || LETTER_HEADING, body: content.loe.body } : null;
+  const loeFlow = useLoeFlow({
+    loe: loeBlock,
+    clientName: clientName ?? "",
+    company: content.client?.company ?? "",
+    letter: letter ?? null,
+    shown: content,
+    quote,
+    initialStep: props.initialLoe?.step,
+    initialDetails: props.initialLoe?.details,
+    initialTypedName: props.initialLoe?.typedName,
+    initialAgree: props.initialLoe?.agree,
+    // Once signed, the letter on the page carries the date the server stamped, not the date the page was opened with.
+    signedDateText: done?.letterDate ?? null,
+  });
+  const loeOn = loeFlow.enabled;
+  const stepOne = !loeOn || accepted || loeFlow.step === 1;
+  // The letter shown as SIGNED: the server's verified copy on a receipt; on the just-signed page the page's own letter, and only
+  // when its text hashed to the sha256 the server stored (`letterVerified`). Otherwise nothing is shown under that label.
+  const signedView = letter?.signed ?? (done?.letterVerified ? loeFlow.agreement : null);
 
   async function accept() {
     if (mode !== "live" || !onAccept || pending || done || !canAccept) return;
+    if (loeOn && !loeFlow.signable) return;
     setError(null);
     setPending(true);
     // Opened inside the click so the popup blocker allows it; pointed at the payment page once the server has recorded the acceptance.
@@ -56,8 +98,15 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
       tab = null;
     }
     try {
+      // The fingerprint is hashed now (async), after the tab is open, over what is on screen (the date aside: the server stamps its own).
+      const signing: SigningInput | null = loeOn ? await loeFlow.signingPayload() : null;
+      if (loeOn && !signing) {
+        tab?.close();
+        setError(SIGN_MESSAGES.generic);
+        return;
+      }
       // Nothing to tick on a flat-fee proposal: an empty selection and nothing written by the client.
-      const result = await onAccept({}, { entries: {}, added: {} });
+      const result = signing ? await onAccept({}, { entries: {}, added: {} }, signing) : await onAccept({}, { entries: {}, added: {} });
       if (!result.ok) {
         tab?.close();
         setError(result.message);
@@ -75,7 +124,9 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
         }
       }
       if (!opened) tab?.close();
-      setDone({ payUrl: url, opened });
+      // Before anything is shown as "signed": does this page's letter, with the server's date, hash to what the server stored?
+      const letterVerified = loeOn ? await loeFlow.signedTextVerified(result.letterDate, result.textSha256) : false;
+      setDone({ payUrl: url, opened, signedLine: result.signedLine ?? null, letterDate: result.letterDate ?? null, letterVerified });
     } catch {
       tab?.close();
       setError("We couldn’t record your acceptance. Please try again.");
@@ -102,8 +153,41 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
       </header>
 
       <main className={`cp-main ${gutter}`}>
+        {loeOn ? (
+          <div className="cp-wrap cp-steps-wrap">
+            <LoeStepBar current={accepted ? 4 : loeFlow.step} onGo={(n) => loeFlow.setStep(n)} locked={accepted || pending} />
+          </div>
+        ) : null}
         <div className="cp-wrap cp-layout">
           <div className="cp-left">
+            {loeOn && !accepted && loeFlow.step === 2 ? <LoeDetailsForm details={loeFlow.details} onChange={loeFlow.setDetail} /> : null}
+            {loeOn && !accepted && loeFlow.step === 3 ? (
+              <section className="cp-choose cp-letter-step" aria-labelledby="cp-letter-h">
+                <div className="cp-step-h">
+                  <span className="cp-n" aria-hidden="true">
+                    3
+                  </span>
+                  <div>
+                    <h2 id="cp-letter-h">{LETTER_HEADING}</h2>
+                    <p>{LETTER_INTRO}</p>
+                  </div>
+                </div>
+                {loeFlow.agreement ? (
+                  <LoeLetterPanel agreement={loeFlow.agreement} title={loeBlock?.title ?? LETTER_HEADING} id="cp-letter" />
+                ) : (
+                  <p className="cp-warn" role="status">
+                    {SIGN_MESSAGES.letter_unavailable}
+                  </p>
+                )}
+                <DownloadPdfButton
+                  label={DOWNLOAD_REVIEW_LABEL}
+                  onDownload={onDownloadReview ? () => onDownloadReview({}, { entries: {}, added: {} }, loeFlow.cleaned) : undefined}
+                />
+                <LoeSignPanel typedName={loeFlow.typedName} onName={loeFlow.setTypedName} agree={loeFlow.agree} onAgree={loeFlow.setAgree} />
+              </section>
+            ) : null}
+            {stepOne ? (
+            <>
             <section className="cp-intro">
               {expires ? <p className="cp-date">Available through {expires}</p> : null}
               <h1>{heading}</h1>
@@ -156,14 +240,33 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
 
               {g?.terms_note?.trim() ? <p className="cp-hi">{g.terms_note}</p> : null}
             </section>
+            {loeOn && !accepted ? (
+              <section className="cp-letter-preview" aria-label={READ_LETTER_FIRST}>
+                <details
+                  id="cp-letter-preview"
+                  open={previewOpen}
+                  onToggle={(e) => setPreviewOpen((e.currentTarget as HTMLDetailsElement).open)}
+                >
+                  <summary>{READ_LETTER_FIRST}</summary>
+                  <p className="cp-note">You will fill in your details on the next step. Until then, brackets mark what is still to come.</p>
+                  {loeFlow.preview ? <LoeLetterPanel agreement={loeFlow.preview} title={loeBlock?.title ?? LETTER_HEADING} id="cp-letter-first" /> : null}
+                </details>
+              </section>
+            ) : null}
+            </>
+            ) : null}
+            {loeOn && accepted ? <LoeSignedLetter agreement={signedView} title={loeBlock?.title ?? LETTER_HEADING} /> : null}
           </div>
 
           <aside className="cp-side" id="cp-review" aria-labelledby="cp-s2">
             <div className="cp-panel">
               <div className="cp-panel-h">
-                <span className="cp-n" aria-hidden="true">
-                  2
-                </span>
+                {/* The "2" belongs to the two-part page. A proposal with a letter has its own four numbered steps above, so the panel has no number. */}
+                {loeOn ? null : (
+                  <span className="cp-n" aria-hidden="true">
+                    2
+                  </span>
+                )}
                 <h2 id="cp-s2">{accepted ? "Your acceptance" : "Review and accept"}</h2>
               </div>
               <div className="cp-panel-b" aria-live="polite">
@@ -208,7 +311,34 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
                   </div>
                 </div>
 
-                {accepted ? (
+                {loeOn ? (
+                  <LoeSideAction
+                    mode={mode}
+                    step={loeFlow.step}
+                    accepted={accepted}
+                    firstName={firstName}
+                    signedLine={done?.signedLine ?? props.signedLine ?? letter?.signed?.signedLine ?? null}
+                    payUrl={finalPayUrl}
+                    opened={done?.opened ?? false}
+                    canContinue={canAccept && mode !== "accepted"}
+                    detailsOk={loeFlow.detailsOk}
+                    signable={loeFlow.signable}
+                    pending={pending}
+                    error={error}
+                    legalTotalText={money(quote.legal_total_cents)}
+                    onContinue={() => {
+                      loeFlow.setStep(loeFlow.step === 1 ? 2 : 3);
+                      requestAnimationFrame(() => document.getElementById("cp-steps")?.scrollIntoView({ block: "start" }));
+                    }}
+                    onBack={() => loeFlow.setStep(loeFlow.step === 3 ? 2 : 1)}
+                    onSign={accept}
+                    onReadLetter={() => {
+                      setPreviewOpen(true);
+                      requestAnimationFrame(() => document.getElementById("cp-letter-preview")?.scrollIntoView({ block: "start" }));
+                    }}
+                    onDownloadSigned={onDownloadSigned}
+                  />
+                ) : accepted ? (
                   <>
                     <div className="cp-done" role="status">
                       <h3>Thank you{firstName ? `, ${firstName}` : ""}.</h3>
@@ -266,13 +396,13 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
         </div>
       </main>
 
-      {accepted ? null : (
+      {accepted && !loeOn ? null : (
         <div className="cp-bar">
           <div className="cp-bar-in">
             <span>
               Flat fee due now <b className="cp-num">{money(quote.legal_total_cents)}</b>
             </span>
-            <a href="#cp-review">Review and accept</a>
+            <a href="#cp-review">{accepted ? "Your receipt" : "Review and accept"}</a>
           </div>
         </div>
       )}
@@ -282,10 +412,15 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
           {brand === "rpb" ? (
             <>
               <p className="cp-c">RPB Law, PLLC &middot; (305) 712-6960 &middot; info@rpblawfirm.com &middot; www.rpblawfirm.com</p>
-              <p className="cp-d">
-                Attorney advertising. Prepared for discussion purposes; does not constitute legal advice or create an
-                attorney-client relationship.
-              </p>
+              {/* The firm's own footer line, the same on every proposal. A proposal with a letter shows the attorney's replacement only once one is set (it is not: see client-words.ts). */}
+              {loeOn && ATTORNEY_FOOTER_LETTER_LINE ? (
+                <p className="cp-d">{ATTORNEY_FOOTER_LETTER_LINE}</p>
+              ) : (
+                <p className="cp-d">
+                  Attorney advertising. Prepared for discussion purposes; does not constitute legal advice or create an
+                  attorney-client relationship.
+                </p>
+              )}
             </>
           ) : (
             <p className="cp-c">{[firm.name, firm.contactLine].filter(Boolean).join(" · ")}</p>

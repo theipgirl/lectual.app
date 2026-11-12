@@ -28,7 +28,7 @@
  */
 
 import { repairSelection } from "./class-lock";
-import { isFixedOffer, quoteProposal } from "./pricing";
+import { isFixedOffer, normalizeSelection, quoteProposal } from "./pricing";
 import type { ProposalClass, ProposalContent, ProposalName, ProposalQuote, Selection } from "./types";
 
 /** The longest description a client may type for one class. */
@@ -237,6 +237,17 @@ export function quoteWithClientClasses(
     quote: quoteProposal(effective.content, picked),
     missing: missingClientText(effective.content, picked),
   };
+}
+
+/**
+ * What an ACCEPTANCE is made over: the stored content, the posted ticks and what the client wrote, exactly as the accept path
+ * treats them (ticks normalised, the client's words cleaned and checked against the content, the selection repaired). The
+ * accept path, the letter PDFs and the client PAGE's engagement-letter steps all call this one function, so the exhibit the
+ * page fingerprints is built from the same cleaned words the server will sign over: a class description typed with a double
+ * space or a trailing space can never make the two disagree. Prices only through `quoteProposal`, like everything else.
+ */
+export function quoteForAcceptance(content: ProposalContent, selection: unknown, clientClasses: unknown): PricedWithClientClasses {
+  return quoteWithClientClasses(content, normalizeSelection(content, selection), parseClientClassInput(content, clientClasses), { repair: true });
 }
 
 /** How many classes the client added, across all brand names (what notes and notices count); with a selection, only the ticked ones. */

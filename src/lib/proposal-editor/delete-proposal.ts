@@ -19,7 +19,7 @@ import { notReadyYet } from "@/lib/ui/words";
 
 export const DELETE_LABEL = "Delete proposal";
 export const DELETE_CONFIRM =
-  "Delete this proposal and all its versions? The client link stops working and its history is removed. This can't be undone.";
+  "Delete this proposal and all its versions? The client link stops working and its history is removed, and the signed letter's record is removed too. This can't be undone.";
 export const DELETE_DONE = "Proposal deleted.";
 export const DELETE_OWNER_ONLY = "Only the firm's owner can delete a proposal.";
 export const DELETE_NOT_FOUND = "Proposal not found.";
@@ -93,4 +93,12 @@ export function moreMenuItems(input: { status: ProposalStatus; canWrite: boolean
   if (input.canWrite && input.status === "accepted" && input.canReset) items.push("reset");
   if (input.canDelete) items.push("delete");
   return items;
+}
+
+/** The menu is named for what it holds: "Withdraw", "Withdraw or delete", "Reset or delete", "Delete". */
+export function moreMenuLabel(items: readonly MoreMenuItem[]): string {
+  const words: Record<MoreMenuItem, string> = { withdraw: "withdraw", reset: "reset", delete: "delete" };
+  const names = items.map((i) => words[i]);
+  const joined = names.join(" or ");
+  return joined ? joined[0].toUpperCase() + joined.slice(1) : "More actions";
 }

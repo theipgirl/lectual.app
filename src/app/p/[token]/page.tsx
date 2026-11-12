@@ -4,7 +4,7 @@ import { ProposalDocument } from "@/components/client-proposal/ProposalDocument"
 import { ProposalNotice } from "@/components/client-proposal/ProposalNotice";
 import { readPublicProposal, recordProposalViewed } from "@/lib/proposals/public";
 import { isSignedInFirmMember } from "@/lib/proposals/staff-view";
-import { acceptProposalAction } from "./actions";
+import { acceptProposalAction, downloadReviewLetterAction, downloadSignedLetterAction } from "./actions";
 
 /**
  * `/p/<token>` — the client's proposal. No login; the token is the credential.
@@ -78,6 +78,13 @@ export default async function PublicProposalPage({ params }: { params: Promise<{
         initialSelection={view.acceptedSelection ?? undefined}
         acceptedQuote={view.acceptedQuote ?? undefined}
         payUrl={view.payUrl}
+        // Engagement letter: the letter as signed (rebuilt from the stored snapshot) and its PDF. Both props are null/absent
+        // for a proposal without a letter, which renders as it always did. The download is offered for every signed
+        // proposal, even when the letter could not be rebuilt for "Read it again": the PDF builder can still produce the
+        // file from the stored signed text, and it refuses with a fixed sentence when it cannot.
+        letter={view.letter}
+        signedLine={view.letter?.signed?.signedLine ?? null}
+        onDownloadSigned={view.letter ? downloadSignedLetterAction.bind(null, token) : undefined}
       />
     );
   }
@@ -93,6 +100,11 @@ export default async function PublicProposalPage({ params }: { params: Promise<{
       // The token is bound here, server-side, so the browser calls the action
       // with the ticks only.
       onAccept={acceptProposalAction.bind(null, token)}
+      letter={view.letter}
+      onDownloadReview={view.letter ? downloadReviewLetterAction.bind(null, token) : undefined}
+      // Passed on the live page too: the receipt this page turns into the moment signing succeeds offers the signed PDF
+      // without a reload. The action is token-only and refuses until the proposal really is signed.
+      onDownloadSigned={view.letter ? downloadSignedLetterAction.bind(null, token) : undefined}
     />
   );
 }

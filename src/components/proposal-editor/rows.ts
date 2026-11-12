@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useUnsaved } from "./UnsavedGuard";
 
 export type Keyed<T> = T & { key: string };
 
@@ -13,17 +14,22 @@ export type Keyed<T> = T & { key: string };
 export function useRows<T extends object>(initial: readonly T[]) {
   const counter = useRef(initial.length);
   const [rows, setRows] = useState<Keyed<T>[]>(() => initial.map((r, i) => ({ ...r, key: `k${i}` })));
+  // Adding or removing a row fires no input event, so it marks the page unsaved itself.
+  const { rowAdded, rowRemoved, markDirty } = useUnsaved();
 
   return {
     rows,
     add(row: T) {
       const key = `k${counter.current++}`;
       setRows((rs) => [...rs, { ...row, key }]);
+      rowAdded();
     },
     remove(key: string) {
       setRows((rs) => rs.filter((r) => r.key !== key));
+      rowRemoved();
     },
     move(key: string, by: -1 | 1) {
+      markDirty();
       setRows((rs) => {
         const i = rs.findIndex((r) => r.key === key);
         const j = i + by;

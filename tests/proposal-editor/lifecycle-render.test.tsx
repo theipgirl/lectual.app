@@ -24,32 +24,20 @@ const render = (over: Partial<Parameters<typeof Lifecycle>[0]> = {}) =>
       status: "draft",
       version: 1,
       canWrite: true,
-      isApprover: true,
-      blockingErrors: 0,
-      approverNames: ["Rebecca", "Taylor"],
       clientUrl: null,
       ...over,
     }),
   );
 
 describe("Lifecycle", () => {
-  it("draft + approver: one primary button, no old words, no link", () => {
+  it("draft: Save and create link moved to the editor's side column; the menu is named for what it holds", () => {
     const html = render();
-    expect(html).toContain("Save and create link");
-    expect(html).not.toMatch(/Approve|Mark as sent|Back to draft|Client link/);
-    // Withdraw lives in the More menu (closed in a static render), never as a main button.
-    expect(html).toContain(">More<");
-    expect(html).not.toContain(">Withdraw<");
-  });
-
-  it("draft + approver is held back while problems remain", () => {
-    expect(render({ blockingErrors: 2 })).toMatch(/<button[^>]*disabled[^>]*>Save and create link/);
-  });
-
-  it("draft + non-approver names who to ask", () => {
-    const html = render({ isApprover: false });
-    expect(html).toContain("Ask Rebecca or Taylor to create the link");
     expect(html).not.toContain("Save and create link");
+    expect(html).not.toMatch(/Approve|Mark as sent|Back to draft|Client link|Ask .* to create the link/);
+    // Sprint 1: the menu is named for what it holds ("Withdraw"), not "More"; its confirm is closed in a static render.
+    expect(html).toContain(">Withdraw<");
+    expect(html).not.toContain(">More<");
+    expect(html).not.toContain("Withdraw this version?");
   });
 
   it("approved (the send step failed): Turn on the link and Edit again, no URL", () => {
@@ -60,14 +48,14 @@ describe("Lifecycle", () => {
     expect(html).not.toMatch(/\/p\/|Client link|Copy client link/);
   });
 
-  it("sent: link box with Copy and Open, Start a new version, Withdraw", () => {
+  it("sent: link box with Copy and Open, Start a new version, the Withdraw menu", () => {
     const html = render({ status: "sent", clientUrl: URL_ });
     expect(html).toContain("Copy client link");
     expect(html).toMatch(/<a [^>]*href="https:\/\/proposals\.example\.com\/p\/tok123\/"[^>]*>\s*Open/);
     expect(html).toContain(`value="${URL_}"`);
     expect(html).toContain("Start a new version");
-    expect(html).toContain(">More<");
-    expect(html).not.toContain(">Withdraw<");
+    expect(html).toContain(">Withdraw<");
+    expect(html).not.toContain(">More<");
     expect(html).not.toMatch(/Revise|Turn on the link|Edit again/);
   });
 

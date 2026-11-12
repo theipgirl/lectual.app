@@ -170,7 +170,7 @@ describe("D1/D4: reuse and gates", () => {
     expect(read("src/app/dashboard/documents/new/page.tsx")).not.toMatch(/db\/admin|getAdminClient/);
   });
 
-  it("New proposal keeps its blank form and its own text", async () => {
+  it("New proposal keeps its Start blank and its own text (Sprint 3: a pick creates the draft)", async () => {
     vi.resetModules();
     const { WhoIsThisFor } = await import("@/components/proposal-editor/WhoIsThisFor");
     const { buildPicker } = await import("@/lib/proposals/new-picker");
@@ -178,6 +178,6 @@ describe("D1/D4: reuse and gates", () => {
     const html = renderToStaticMarkup(WhoIsThisFor({ view, chosen: null }));
     expect(html).toContain("Start blank");
     expect(html).toContain('action="/dashboard/proposals/new/"');
-    expect(html).toContain("the form below is filled from it");
+    expect(html).toContain("the draft is created from it");
   });
 });

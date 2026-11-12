@@ -2,7 +2,9 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import type { Lead } from "@/lib/pipeline";
 import type { Role } from "@/lib/auth/roles";
-import { PROPOSAL_STAFF_WRITE_ROLES, type ProposalContent } from "@/lib/proposals/types";
+import type { ApprovedRead } from "@/lib/loe/templates-store";
+import { LETTER_NOT_ATTACHED_CHECK, attachFirmLetter } from "@/lib/proposals/attach-letter";
+import { PROPOSAL_STAFF_WRITE_ROLES, isGeneralContent, type ProposalContent } from "@/lib/proposals/types";
 import {
   askedForProposal,
   buildDraft,
@@ -29,6 +31,17 @@ import {
  * anything unreadable counts as no (fail closed). Module off and role refused
  * give the same sentence, so the answer says nothing about which firms hold
  * the module.
+ *
+ * ── THE ENGAGEMENT LETTER ───────────────────────────────────────────────────
+ * Like every other way of starting a proposal, a Copilot draft carries the firm's
+ * approved engagement letter by default. The letter is the firm's privileged text
+ * and never reaches the model: it is read (`readLetter`, the caller's scoped
+ * client) and attached (`attachFirmLetter`, the same `withLoeSnapshot` the
+ * from-scratch door's builder uses) only in the CONFIRMED branch, immediately
+ * before the insert, and the content that carries it goes to `create` and
+ * nowhere else. No tool result returned from this file contains the content. A
+ * letter read that fails still creates the draft, with a "Check" item saying the
+ * letter couldn't be attached; it is never a silent letterless draft.
  */
 
 export type DraftProposalDeps = {
@@ -38,6 +51,8 @@ export type DraftProposalDeps = {
   searchLeads: (term: string) => Promise<Lead[]>;
   /** `client_proposal_setting.pricing`, `{}` when none is saved. Throws when the read fails. */
   readPricing: () => Promise<unknown>;
+  /** The firm's approved engagement letter of this kind, through the caller's scoped client. Three-state; must not throw. */
+  readLetter: (kind: "trademark" | "general") => Promise<ApprovedRead>;
   create: (input: {
     clientName: string;
     clientEmail: string | null;
@@ -68,11 +83,12 @@ function asDraftLead(l: Lead): DraftLead {
 }
 
 export async function defaultDraftProposalDeps(): Promise<DraftProposalDeps> {
-  const [{ orgHasModule }, { currentRole }, pipeline, store] = await Promise.all([
+  const [{ orgHasModule }, { currentRole }, pipeline, store, letters] = await Promise.all([
     import("@/lib/org/modules"),
     import("@/lib/auth/current-role"),
     import("@/lib/pipeline"),
     import("@/lib/proposals/store"),
+    import("@/lib/loe/approved-letter-read"),
   ]);
   return {
     mayDraft: async () => {
@@ -87,6 +103,7 @@ export async function defaultDraftProposalDeps(): Promise<DraftProposalDeps> {
     getLead: (id) => pipeline.getLead(id),
     searchLeads: (term) => pipeline.listLeads({ search: term }),
     readPricing: async () => (await store.getProposalSettings())?.pricing ?? {},
+    readLetter: (kind) => letters.readApprovedLetterScoped(kind),
     create: async (input) => {
       const row = await store.createProposal({ ...input, source: "agent" });
       return { id: row.id };
@@ -157,6 +174,12 @@ export async function runDraftProposal(
     if (built.kind === "package_not_found") {
       return { status: "package_not_found", message: "That package isn't on the firm's list. Nothing was created. Ask the user which of these to use.", packages: built.packages };
     }
+    if (built.kind === "needs_package") {
+      return { status: "needs_input", ask: "Which of the firm's packages should the proposal use?", packages: built.packages, message: "Nothing was created. Ask the user this." };
+    }
+    if (built.kind === "needs_changes") {
+      return { status: "needs_changes", message: "Nothing was created. Ask the user to change these, in plain words:", problems: built.problems };
+    }
     return { status: "needs_input", ask: "This lead has no name on record. Add the client's name to the lead first.", message: "Nothing was created." };
   }
   const draft: BuiltDraft = built.draft;
@@ -181,8 +204,18 @@ export async function runDraftProposal(
     };
   }
 
+  // Confirmed. Only now, after every model call that shaped this draft, is the firm's letter read and attached; the content
+  // that carries it is handed to the insert and to nothing else (see the header).
+  let letterRead: ApprovedRead;
   try {
-    const created = await deps.create({ clientName: draft.clientName, clientEmail: draft.clientEmail, content: draft.content, leadId: lead.id, payUrl: draft.payLink });
+    letterRead = await deps.readLetter(isGeneralContent(draft.content) ? "general" : "trademark");
+  } catch {
+    letterRead = { status: "unavailable" };
+  }
+  const withLetter = attachFirmLetter(draft.content, letterRead, "copilot");
+
+  try {
+    const created = await deps.create({ clientName: draft.clientName, clientEmail: draft.clientEmail, content: withLetter.content, leadId: lead.id, payUrl: draft.payLink });
     ctx.sink.created = { id: created.id, clientName: draft.clientName };
     ctx.sink.pending = null;
     ctx.citeProposal(created.id, `Draft proposal — ${draft.clientName}`);
@@ -191,7 +224,8 @@ export async function runDraftProposal(
       message: "A DRAFT was created. Nothing was approved, no client link was made and nothing was sent. Staff review and edit it in the proposal editor.",
       proposalId: created.id,
       link: proposalHref(created.id),
-      issuesToFixInEditor: draft.issues,
+      // Fixed words only: whether the letter went on, never a word of it.
+      issuesToFixInEditor: withLetter.letter === "unreadable" ? [...draft.issues, LETTER_NOT_ATTACHED_CHECK] : draft.issues,
     };
   } catch {
     return { status: "failed", message: "The draft couldn't be created, so nothing was saved. Suggest trying again or using New proposal." };

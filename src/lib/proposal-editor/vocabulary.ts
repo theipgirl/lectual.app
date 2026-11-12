@@ -19,6 +19,15 @@ export const STATUS_WORDS: Record<ProposalStatus, string> = {
   withdrawn: "Withdrawn",
 };
 
+/** A signed acceptance (the client signed the engagement letter): the pill and header say so. Unsigned stays "Accepted by client". */
+export const SIGNED_STATUS_WORD = "Signed by client";
+
+/** Create-link refusals about the engagement letter copy (Sprint 6). Fixed sentences; nothing of the letter is quoted. */
+/** One sentence for every path that turns a link on (Save and create link, Turn on the link, the approval queue's go-live). */
+export const LETTER_CHANGED_SENTENCE =
+  "The firm's engagement letter has changed since this proposal was saved, so the link wasn't turned on. Open the proposal and save it again (choose Edit again first if it is already saved), then create the link.";
+export const LETTER_UNREADABLE_SENTENCE = "Couldn't check the firm's engagement letter. Nothing was changed; try again shortly.";
+
 export const BUTTON_WORDS = {
   createLink: "Save and create link",
   creatingLink: "Creating link…",
@@ -27,7 +36,30 @@ export const BUTTON_WORDS = {
   editAgain: "Edit again",
   startNewVersion: "Start a new version",
   withdraw: "Withdraw",
+  save: "Save",
+  saving: "Saving…",
+  preview: "Preview as the client",
 } as const;
+
+/** Section and field words of the one-screen editor (design 6.4). */
+export const EDITOR_WORDS = {
+  selectedToStart: "Selected to start",
+  clientDescribes: "Let the client describe this",
+  packageForBrand: "Package for this brand",
+  discountOnBrand: "Discount on this brand",
+  everyBrand: "Use these package options for every brand",
+  advancedBrand: "Advanced for this brand",
+  advancedPricing: "Advanced pricing",
+  readyHeading: "Ready to send?",
+  readyNothing: "Nothing is blocking the link.",
+  clientPays: "What the client pays",
+  pricesUpdateOnSave: "Prices update when you save",
+} as const;
+
+/** "Check these 3 things" (assistant drafts). */
+export function checkTheseHeading(n: number): string {
+  return `Check these ${n} ${n === 1 ? "thing" : "things"}`;
+}
 
 /** `Ask Rebecca or Taylor to create the link`. */
 export function askToCreateLink(approvers: string): string {
@@ -51,4 +83,82 @@ export const EVENT_WORDS = {
   unapprovedByEdit: "edited it after it was saved, so it went back to draft",
   sent: "turned on the client link (nothing was emailed from here)",
   superseded: "turned on a newer version, which replaced this one",
+} as const;
+
+/** Sprint 3: the editor header's "who made this" line (`content.made_by`). */
+export const MADE_WITH_COPILOT = "Made with Copilot";
+export const MADE_BY_ASSISTANT = "Made by the assistant";
+export function madeByAssistantFrom(date: string): string {
+  return `Made by the assistant from the ${date} consult`;
+}
+
+/** Sprint 3: the start screen at New proposal (three doors). */
+export const START_DOORS = {
+  consult: {
+    title: "From a consult",
+    body: "The assistant drafts a proposal from a consult you have already had, and you review it.",
+    notReady: "To draft from a consult, connect Zoom or Fathom first. Until then, start from scratch.",
+    connect: "Connect Zoom or Fathom",
+    couldntLoad: "Can't show consults right now. Refresh to try again.",
+    none: "No consults in the last 14 days.",
+  },
+  copilot: {
+    title: "Ask Copilot",
+    body: "Say what you want in a sentence. Copilot opens with the request typed in, and nothing happens until you send it.",
+    action: "Ask Copilot",
+  },
+  scratch: {
+    title: "Start from scratch",
+    body: "Choose who it is for, and the draft opens in the editor with your firm's packages.",
+    action: "Choose who it is for",
+  },
+} as const;
+
+/** The request typed into Copilot. A name from a chosen lead, else a generic request. Never a price. */
+export function copilotRequest(name: string | null): string {
+  const who = name?.trim();
+  return who ? `Draft a proposal for ${who}` : "Draft a proposal";
+}
+
+/** Settings, Proposals: "New proposals offer". */
+export const NEW_OFFER_WORDS = {
+  heading: "New proposals offer",
+  hint: "What a new proposal starts with, from every way of starting one. The client page and the editor can still change it.",
+  modeDefault: "One package: the first on the list",
+  modeOne: "One package",
+  modeChoice: "The client chooses among these packages",
+  per: "Choice is made",
+  perBrand: "Per brand name",
+  perMark: "Per mark",
+  options: "Packages offered (up to 3)",
+  start: "Starts on",
+  tooLarge: "These settings are too large to save. Remove some included items first.",
+  tooMany: "Offer at most 3 packages.",
+  needsOne: "Pick at least one package to offer.",
+} as const;
+
+/** Sprint 5: the labels of the summary Copilot shows before it creates a draft (`src/lib/copilot/draft-proposal.ts`). */
+export const COPILOT_WORDS = {
+  heading: "Draft proposal to create:",
+  client: "Client",
+  package: "Package",
+  discount: "Discount",
+  credit: "Credit on the whole proposal",
+  brandDiscount: "discount on this brand name",
+  payLink: "Pay link",
+  noPayLink: "none yet (add it before the link is created)",
+  matter: "Matter",
+  work: "Work",
+  flatFee: "Flat fee",
+  notIncluded: "Not included",
+  onePackage: "one package",
+  startingOn: "starting on",
+  choiceOf: "the client chooses among",
+  perMark: "a package chosen for each mark",
+  draftOnly:
+    "It is created as a draft only: nothing is approved, no client link is made and nothing is sent. Staff review it before anything reaches the client.",
+  checkFeeTyped: "The flat fee came from your request. Check it is the fee you meant.",
+  checkCredit: "A credit was applied from your request. Check it.",
+  checkBrandDiscount: "A discount on this brand name was applied from your request. Check it.",
+  checkNoPayLink: "Add the client's pay link before creating the link.",
 } as const;

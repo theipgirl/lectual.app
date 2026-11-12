@@ -24,7 +24,7 @@ import { notReadyYet } from "@/lib/ui/words";
 
 export const RESET_LABEL = "Reset acceptance";
 export const RESET_CONFIRM =
-  "Reset this acceptance? The client link opens again and they can accept again. The Lawmatics note and alerts already sent stay as they are.";
+  "Reset this acceptance? The client link opens again and they can accept again. The Lawmatics note and alerts already sent stay as they are. Earlier signature records are kept.";
 export const RESET_CONFIRM_BUTTON = "Yes, reset";
 export const RESET_PENDING = "Resetting…";
 export const RESET_DONE = "Acceptance reset. The client link is live again, and the client can accept again.";
@@ -35,6 +35,14 @@ export const RESET_NOT_ACCEPTED = "Only an accepted proposal can have its accept
 export const RESET_WITH_EDIT = "Reset the acceptance on its own, without other changes. Refresh and try again.";
 export const RESET_NEEDS_DB_UPDATE = notReadyYet("Resetting an acceptance");
 export const RESET_FAILED = "Couldn't reset the acceptance.";
+/**
+ * A reset puts the version back to "Link live", so it passes the same guard as every other way of making a version live
+ * (`live-guard.ts`). A proposal whose engagement letter copy is no longer the firm's current approved letter is not put back in
+ * front of a client to sign: the firm starts a new version, which carries the current letter.
+ */
+export const RESET_LETTER_CHANGED =
+  "The firm's engagement letter has changed since this proposal went out, so its acceptance can't be reset. Start a new version instead.";
+export const RESET_LETTER_UNREADABLE = "Couldn't check the firm's engagement letter, so the acceptance wasn't reset. Try again shortly.";
 
 /** Who may reset: the admin tier, or a named approver (any staff role). Mirrors 0101's trigger. */
 export function mayResetAcceptance(role: Role | null | undefined, isApprover: boolean): boolean {

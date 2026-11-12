@@ -7,13 +7,19 @@ import { generateTrademarkLoe } from "@/lib/documents/generate";
 import { listDraftsForProposal } from "@/lib/documents/store";
 import { renderAcceptedProposalDocx, DOCX_MIME } from "@/lib/documents/accepted-proposal-docx";
 import { setProspectCustomFields, uploadMatterFile } from "@/lib/lawmatics/writes";
+import { readStoredAgreement, type StoredAgreementDb } from "@/lib/loe/stored-agreement";
+import { buildVerifiedSignedPdf, signedLetterFileName } from "@/lib/loe/signed-pdf";
+import { loadStaffFirmFacts } from "@/lib/loe/staff-firm";
 import { orgHasModule } from "@/lib/org/modules";
 import { firmCivilDate } from "@/lib/quotes/firm-time";
-import { addAcceptanceNote, type LookupDb } from "./accept-followups";
+import { addAcceptanceNote, resolveNoteTarget, type LookupDb } from "./accept-followups";
 import { lawmaticsMatterAccess, resolveProposalMatter, signedInLawmaticsToken } from "./lawmatics-access";
 import { loeInputFromAcceptedProposal, loeFieldValues, LOE_REFUSAL_TEXT, type LoeAdapterResult } from "./loe-adapter";
 import { fieldWrites, readLoeFieldsConfig, type LoeFieldsConfig } from "./loe-fields";
 import { retryLoeFileUpload } from "./loe-upload";
+import { SignedUploadBlocked, runSignedLoeUpload } from "./loe-signed-upload";
+import { logSignedMismatch } from "./signed-mismatch-log";
+import { isSignedSnapshot } from "./signed-state";
 import { normalisePackages } from "./package-list";
 import {
   draftsInRound,
@@ -139,6 +145,9 @@ async function loadFacts(proposal: ProposalRow): Promise<Facts> {
 /* ─────────────────────────── the steps ──────────────────────────────────── */
 
 async function loeDraftStep(supabase: ScopedClient, proposal: ProposalRow, events: ProposalStepEvent[], facts: Facts): Promise<FlowReport | { note: string } | null> {
+  // Sprint 6: a version the client SIGNED already carries its letter (signed on the proposal page, filed by its own step),
+  // so there is no engagement letter to draft and nothing is queued. Decided before any module check, lookup or generate call.
+  if (isSignedSnapshot(proposal.accepted_snapshot)) return report(proposal, "loe_draft", "skipped", STEP_TEXT.signedPaidSkipped, { code: "signed" });
   if (stepSucceeded(events, proposal.id, "loe_draft")) return { note: STEP_TEXT.alreadyQueued };
   if (!(await orgHasModule("document-center"))) return report(proposal, "loe_draft", "blocked", STEP_TEXT.documentCenterOff, { code: "module_off" });
 
@@ -242,6 +251,47 @@ async function noteStep(supabase: ScopedClient, proposal: ProposalRow, events: P
   return report(proposal, "lawmatics_note", result.outcome, result.reason ?? null);
 }
 
+/** Files the signed letter again (Try again on the proposal page). Signed-in person, the firm's own active connection. */
+async function signedUploadRetryStep(supabase: ScopedClient, proposal: ProposalRow, events: ProposalStepEvent[]): Promise<FlowReport | { note: string } | null> {
+  if (stepSucceeded(events, proposal.id, "signed_loe_upload")) return { note: STEP_TEXT.signedAlready };
+  const snapshot = proposal.accepted_snapshot;
+  if (!isSignedSnapshot(snapshot)) return report(proposal, "signed_loe_upload", "blocked", STEP_TEXT.signedNoLetter);
+  const facts = await loadStaffFirmFacts();
+  if (facts.status !== "ok") return report(proposal, "signed_loe_upload", "failed", STEP_TEXT.signedFirmUnreadable);
+  const result = await runSignedLoeUpload(true, {
+    token: signedInLawmaticsToken,
+    target: async () => {
+      const target = await resolveNoteTarget(supabase as unknown as LookupDb, {
+        orgId: proposal.org_id,
+        matterId: proposal.matter_id,
+        leadId: proposal.lead_id,
+        clientEmail: proposal.client_email,
+      });
+      if (target.ok) return { ok: true, lawmaticsId: target.notableId };
+      if (target.reason === "unreadable") return { ok: false, kind: "failed", reason: STEP_TEXT.signedTargetUnreadable };
+      return { ok: false, kind: "blocked", reason: target.reason === "none" ? STEP_TEXT.signedNoMatter : STEP_TEXT.signedManyMatters };
+    },
+    buildPdf: async () => {
+      const built = await buildVerifiedSignedPdf({
+        snapshot,
+        firm: { displayName: facts.displayName, timeZone: facts.timeZone },
+        readStored: () => readStoredAgreement(supabase as unknown as StoredAgreementDb, { proposalId: proposal.id, orgId: proposal.org_id, signatureId: snapshot!.agreement?.signature_id }),
+      });
+      if (!built.ok) {
+        if (built.reason === "mismatch") {
+          logSignedMismatch(proposal.id, "signed_loe_upload");
+          throw new SignedUploadBlocked();
+        }
+        throw new Error("not built");
+      }
+      return built.bytes;
+    },
+    upload: (token, file) => uploadMatterFile(token, { matterId: file.matterId, fileName: file.fileName, mime: file.mime, bytes: file.bytes }),
+    fileName: signedLetterFileName(snapshot!.agreement?.signer_name ?? "", snapshot!.agreement?.signed_at ?? "", facts.timeZone),
+  });
+  return report(proposal, "signed_loe_upload", result.outcome, result.reason ?? null);
+}
+
 function split(results: Array<FlowReport | { note: string } | null>): { reports: FlowReport[]; notes: string[] } {
   const reports: FlowReport[] = [];
   const notes: string[] = [];
@@ -305,7 +355,8 @@ export async function retryProposalStep(id: string, step: RetryableStep): Promis
   const loaded = await loadAccepted(id);
   if (!loaded.ok) return loaded;
   const { proposal, events } = loaded;
-  if (paidStateFromEvents(events).state !== "paid") return { ok: false, error: "Mark the proposal paid first." };
+  // The signed letter is filed when the client signs, before any payment, so its retry does not need the paid mark.
+  if (step !== "signed_loe_upload" && paidStateFromEvents(events).state !== "paid") return { ok: false, error: "Mark the proposal paid first." };
 
   const supabase = await getScopedClient();
   const run = async (): Promise<FlowReport | { note: string } | null> => {
@@ -318,6 +369,8 @@ export async function retryProposalStep(id: string, step: RetryableStep): Promis
         return customFieldsStep(supabase, proposal, events, await loadFacts(proposal));
       case "lawmatics_note":
         return noteStep(supabase, proposal, events);
+      case "signed_loe_upload":
+        return signedUploadRetryStep(supabase, proposal, events);
       case "loe_file_upload": {
         if (stepSucceeded(events, proposal.id, "loe_file_upload")) return { note: "The engagement letter is already uploaded to Lawmatics." };
         const r = await retryLoeFileUpload(proposal);

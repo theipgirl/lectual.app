@@ -3,8 +3,8 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { NewProposalForm } from "@/components/proposal-editor/NewProposalForm";
-import { PricingForm } from "@/components/proposal-editor/Sections";
+import { CreateDraftForm, StartBlankForm } from "@/components/proposal-editor/StartDraft";
+import { FeesSection } from "@/components/proposal-editor/Sections";
 import { SettingsForm } from "@/components/proposal-editor/SettingsForm";
 import { validateContent } from "@/lib/proposals/validate";
 import { sevetri } from "./fixture";
@@ -13,44 +13,36 @@ import { sevetri } from "./fixture";
 
 vi.mock("@/app/dashboard/proposals/actions", () => ({ createProposalAction: vi.fn() }));
 vi.mock("@/app/dashboard/settings/proposals/actions", () => ({ saveProposalSettingsAction: vi.fn() }));
-vi.mock("@/components/proposal-editor/actions", () => ({ saveDetailsAction: vi.fn() }));
+vi.mock("@/app/dashboard/proposals/[id]/actions", () => ({ addNameAction: vi.fn(), removeNameAction: vi.fn() }));
 
 const DEFAULT_URL = "https://default.example/pay-me";
 const inputOf = (html: string, name: string) => html.match(new RegExp(`<input[^>]*name="${name}"[^>]*>`))?.[0] ?? "";
 
-describe("A1: the new-proposal form", () => {
-  it("renders an empty pay-link input with the new label and placeholder", () => {
-    const html = renderToStaticMarkup(
-      createElement(NewProposalForm, {
-        defaults: { leadId: "", matterId: "", fullName: "", firstName: "", company: "", clientEmail: "", brandName: "", title: "T", expiresOn: "2026-11-10", payUrl: "" },
-        hasSettings: true,
-        packages: null,
-      }),
-    );
-    const input = inputOf(html, "payUrl");
-    expect(input).toContain('placeholder="Enter custom pay link"');
-    expect(input).toContain('value=""');
-    expect(html).toContain(">Pay link<");
-    expect(html).not.toContain("Pay link (https)");
-    expect(html).not.toContain(DEFAULT_URL);
+describe("A1: New proposal asks for no pay link (Sprint 3: the editor sets it)", () => {
+  it("neither one-step form renders a pay-link input, and none carries the firm default", () => {
+    const blank = renderToStaticMarkup(createElement(StartBlankForm, { type: "trademark" }));
+    const chosen = renderToStaticMarkup(createElement(CreateDraftForm, { leadId: "l", matterId: "", type: "trademark" }));
+    for (const html of [blank, chosen]) {
+      expect(inputOf(html, "payUrl")).toBe("");
+      expect(html).not.toContain("Pay link");
+      expect(html).not.toContain(DEFAULT_URL);
+    }
   });
 });
 
-describe("A2: createProposalAction does not copy the firm default", () => {
+describe("A2: createProposalAction stores no pay link and does not copy the firm default", () => {
   beforeEach(() => vi.resetModules());
   class Redirected extends Error {}
   async function setup() {
-    const inserted: unknown[] = [];
-    const created = vi.fn(async (input: { payUrl: string | null }) => {
-      const { checkDraftColumns } = await vi.importActual<typeof import("@/lib/proposals/store")>("@/lib/proposals/store");
-      checkDraftColumns({ payUrl: input.payUrl });
-      inserted.push(input);
-      return { id: "new-1" };
-    });
+    const created = vi.fn(async () => ({ id: "new-1" }));
     vi.doUnmock("@/app/dashboard/proposals/actions");
     vi.doMock("next/navigation", () => ({ redirect: vi.fn((): never => { throw new Redirected(); }) }));
     vi.doMock("next/cache", () => ({ revalidatePath: vi.fn() }));
     vi.doMock("@/app/dashboard/proposals/gate", () => ({ gateStaffAction: vi.fn(async () => null) }));
+    vi.doMock("@/lib/db/scoped-client", () => ({ getScopedClient: vi.fn(async () => ({})) }));
+    vi.doMock("@/lib/loe/templates-store", () => ({ getApprovedLetter: vi.fn(async () => ({ status: "ok", letter: null })) }));
+    vi.doMock("@/lib/org/profile", () => ({ getFirmTimeZone: vi.fn(async () => "America/New_York") }));
+    vi.doMock("@/lib/proposals/consult-prefill-load", () => ({ loadConsultForPrefill: vi.fn() }));
     vi.doMock("@/lib/proposals/store", () => ({
       createProposal: created,
       getProposalSettings: vi.fn(async () => ({ default_pay_url: DEFAULT_URL, pricing: {} })),
@@ -58,44 +50,35 @@ describe("A2: createProposalAction does not copy the firm default", () => {
     const { createProposalAction } = await import("../../src/app/dashboard/proposals/actions");
     const run = (extra: Record<string, string>) => {
       const f = new FormData();
-      for (const [k, v] of Object.entries({ fullName: "Ana Ruiz", firstName: "Ana", expiresOn: "2026-11-10", ...extra })) f.set(k, v);
+      for (const [k, v] of Object.entries({ fullName: "Ana Ruiz", firstName: "Ana", ...extra })) f.set(k, v);
       return createProposalAction({}, f);
     };
-    return { created, inserted, run };
+    return { created, run };
   }
 
-  it("a blank pay link stays null", async () => {
+  it("a blank-start draft has a null pay link even when the firm has a default", async () => {
     const { created, run } = await setup();
-    await expect(run({ payUrl: "" })).rejects.toBeInstanceOf(Redirected);
-    expect(created.mock.calls[0][0].payUrl).toBeNull();
+    await expect(run({})).rejects.toBeInstanceOf(Redirected);
+    expect((created.mock.calls[0] as unknown as [{ payUrl: string | null }])[0].payUrl).toBeNull();
   });
 
-  it("a typed https link is stored", async () => {
+  it("a posted pay link is ignored: the editor is where it is set", async () => {
     const { created, run } = await setup();
     await expect(run({ payUrl: "https://pay.example/ana" })).rejects.toBeInstanceOf(Redirected);
-    expect(created.mock.calls[0][0].payUrl).toBe("https://pay.example/ana");
-  });
-
-  it("an http link is refused with the real check and nothing is created", async () => {
-    const { created, inserted, run } = await setup();
-    const r = await run({ payUrl: "http://insecure.example/pay" });
-    expect(r).toMatchObject({ error: "The pay link must be an https:// address." });
-    expect(created).toHaveBeenCalledTimes(1);
-    expect(inserted).toEqual([]);
+    expect((created.mock.calls[0] as unknown as [{ payUrl: string | null }])[0].payUrl).toBeNull();
   });
 });
 
 describe("A3: the existing-proposal editor", () => {
   const render = (payUrl: string) =>
     renderToStaticMarkup(
-      // Sprint 28: the pay link moved from the client form to Step 3, the package and pay link form.
-      createElement(PricingForm, {
-        proposalId: "p",
-        updatedAt: "2026-10-22T00:00:00Z",
+      // Sprint 1: the pay link is in Fees and payment, part of the one editor form.
+      createElement(FeesSection, {
         editable: true,
         expiresOn: "2026-11-10",
         issues: [],
-        values: { package: "Concierge", base: "4950", includedClasses: "3", perClass: "825", secondMarkPct: "20", govPerClass: "350" },
+        adjustments: [],
+        pricing: { package: "Concierge", base: "4950", includedClasses: "3", perClass: "825", secondMarkPct: "20", govPerClass: "350" },
         payUrl,
       }),
     );

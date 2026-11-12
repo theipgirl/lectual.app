@@ -4,6 +4,8 @@ import { currentRole } from "@/lib/auth/current-role";
 import { orgHasModule } from "@/lib/org/modules";
 import { PROPOSAL_PAID_ROLES } from "@/lib/proposals/paid";
 import { MARK_PAID_WORDS } from "@/lib/proposals/step-text";
+import { canReadSignature } from "@/lib/loe/signature-roles";
+import { SIGNED_DOWNLOAD_NOT_ALLOWED } from "@/lib/ui/words";
 import { PROPOSAL_ADMIN_ROLES, PROPOSAL_STAFF_WRITE_ROLES } from "@/lib/proposals/types";
 import { NOT_ALLOWED, type ActionState } from "./errors";
 import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
@@ -42,6 +44,15 @@ export async function gateAdminAction(): Promise<ActionState | null> {
   return role && PROPOSAL_ADMIN_ROLES.includes(role)
     ? null
     : { error: `${ADMIN_TIER_PHRASE} can change the proposal settings.` };
+}
+
+/**
+ * Module on, and the caller's role may read a client's signature record (`SIGNATURE_READ_ROLES`, the one list): who may download
+ * a signed engagement letter. A viewer or social media gets the fixed sentence and nothing is read. Null means go ahead.
+ */
+export async function gateSignedLetterDownload(): Promise<ActionState | null> {
+  await requireProposalsModule();
+  return canReadSignature(await currentRole()) ? null : { error: SIGNED_DOWNLOAD_NOT_ALLOWED };
 }
 
 /** Module on, and the caller is owner / admin / senior_admin / intake: who may mark a proposal paid, undo it, or retry a step. Null means go ahead. */

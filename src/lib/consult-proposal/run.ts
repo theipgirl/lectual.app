@@ -1,6 +1,9 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { StructuredCall } from "@/lib/ai/claude";
+import type { Database } from "@/lib/db/types";
+import { getApprovedLetter, type ApprovedRead } from "@/lib/loe/templates-store";
+import { LETTER_NOT_ATTACHED_CHECK, attachFirmLetter } from "@/lib/proposals/attach-letter";
 import type { NewQueueDraft } from "@/lib/queue/api";
 import { firmCivilDate } from "@/lib/quotes/firm-time";
 import { resolveTimeZone } from "@/lib/org/profile-rules";
@@ -257,6 +260,7 @@ async function runStages(input: ConsultProposalRunInput, progress: Progress): Pr
       firm: { name: firmName, slug: firmSlug, teamSignOff },
       pricing: standardProposalPricing((setting as Row).pricing),
       packages: normalisePackages((setting as Row).pricing),
+      settingPricing: (setting as Row).pricing,
       reviewedConsult,
       today: firmCivilDate(new Date(now()), tz),
       llm: input.llm,
@@ -290,6 +294,23 @@ async function runStages(input: ConsultProposalRunInput, progress: Progress): Pr
   const clientName = draft.clientName;
   const hasRealAddress = Boolean(lead.email && !lead.email.toLowerCase().endsWith(".invalid"));
 
+  // The firm's approved engagement letter, attached by default like every other way of starting a proposal. It is read and
+  // attached HERE, after the model's last call (`draftProposalFromConsult` above; nothing below calls `input.llm`), by the same
+  // `withLoeSnapshot` the from-scratch door's builder uses, and the result goes ONLY to the insert below: the letter is the
+  // firm's privileged text and never reaches a prompt, the email, the queue item or a log. The read is fenced on this firm
+  // (`db` may be the service role on the cron). A read that fails does not lose the draft and does not pass silently: the draft
+  // carries the check on its CONTENT (a blocking "Fix" in the editor until a Save attaches the letter or a person turns it off;
+  // the assistant's panel derives its line from that check), and the queue item's summary says it first at draft time. It is
+  // NOT written into the stored reviewer notes: text stored there would keep saying so after the letter was attached.
+  let letterRead: ApprovedRead;
+  try {
+    letterRead = await getApprovedLetter(db as unknown as SupabaseClient<Database>, "trademark", orgId);
+  } catch {
+    letterRead = { status: "unavailable" };
+  }
+  const withLetter = attachFirmLetter(draft.content, letterRead, "assistant");
+  const queueNotes = withLetter.letter === "unreadable" ? `CHECK FIRST: ${LETTER_NOT_ATTACHED_CHECK}\n${draft.reviewerNotes}` : draft.reviewerNotes;
+
   // 1. The proposal: a DRAFT, source 'agent'. Not visible to the client; it
   //    needs a named approver and then "Mark as sent" before its link works.
   progress.stage = "insert";
@@ -301,7 +322,8 @@ async function runStages(input: ConsultProposalRunInput, progress: Progress): Pr
       clientName,
       clientEmail: hasRealAddress ? draft.clientEmail : null,
       title: draft.title,
-      content: draft.content,
+      // The drafted content plus the firm's letter (or the "couldn't be attached" check). `draft` itself stays letterless.
+      content: withLetter.content,
       leadId: lead.id,
       matterId: input.matterId,
       expiresOn: draft.expiresOn,
@@ -336,7 +358,7 @@ async function runStages(input: ConsultProposalRunInput, progress: Progress): Pr
     return refuse("unavailable", `${describeConsultFailure("email", err, { origin })}`, draft.costUsd);
   }
   const testPrefix = input.testPrefix ?? (process.env.VERCEL_ENV === "production" ? "" : "[TEST] ");
-  const summary = queueSummary(draft.reviewerNotes, staffUrl, draft.issues);
+  const summary = queueSummary(queueNotes, staffUrl, draft.issues);
 
   progress.stage = "queue";
   let queueId: string;

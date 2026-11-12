@@ -28,10 +28,13 @@
  * required too (they are columns, not content, so the caller passes them in).
  */
 
-import { isMarkKind } from "./types";
+import { CHECK_SOURCES, isMarkKind, MADE_BY_VALUES, MAX_CHECK_TEXT, MAX_CONTENT_CHECKS } from "./types";
+import { LETTER_CHECK_PATH, hasPendingLetterCheck } from "./letter-check";
+import { LETTER_PENDING_FIX } from "@/lib/ui/words";
 import { MAX_CLASSES_TOTAL_PER_BRAND, MAX_CLIENT_ADD } from "./client-classes";
 import { validatePackages } from "./package-list";
 import { MAX_NAME_DISCOUNT_PCT } from "./pricing";
+import { loeIssues } from "@/lib/loe/validate";
 
 export type ValidationLevel = "error" | "warning";
 export type ValidationIssue = { path: string; message: string; level: ValidationLevel };
@@ -285,6 +288,44 @@ export function validateContent(content: unknown, options: ValidateOptions = {})
     err("kind", 'A proposal is either a "trademark" or a "general" proposal.');
     return out;
   }
+  // Sprint 3: who made the draft, and which consult it came from. Staff-only notes, never published.
+  if (content.made_by !== undefined && !(MADE_BY_VALUES as readonly unknown[]).includes(content.made_by)) {
+    err("made_by", "Who made this proposal must be the assistant, Copilot or a person.");
+  }
+  if (content.made_from !== undefined) {
+    const from = content.made_from;
+    if (!isObj(from) || typeof from.consult_date !== "string" || !isCivilDate(from.consult_date)) {
+      err("made_from", "The consult date must be a real date.");
+    }
+  }
+  // Sprint 5: things to check, left by the assistant or Copilot. Staff-only notes; a bad shape is an error.
+  if (content.checks !== undefined) {
+    const checks = content.checks as unknown;
+    if (!Array.isArray(checks)) err("checks", "The list of things to check isn't readable.");
+    else {
+      if (checks.length > MAX_CONTENT_CHECKS) err("checks", `A proposal can carry at most ${MAX_CONTENT_CHECKS} things to check.`);
+      checks.forEach((c, i) => {
+        const ok =
+          isObj(c) &&
+          typeof c.text === "string" &&
+          c.text.trim().length >= 1 &&
+          c.text.length <= MAX_CHECK_TEXT &&
+          (CHECK_SOURCES as readonly unknown[]).includes(c.source) &&
+          typeof c.path === "string" &&
+          c.path.length >= 1 &&
+          c.path.length <= 120;
+        if (!ok) err(`checks[${i}]`, "A thing to check needs its words (300 characters at most), who left it and the field it is about.");
+      });
+    }
+  }
+  // The engagement letter (lectual 0106) rides on either kind and must match it.
+  if (content.loe !== undefined) {
+    for (const issue of loeIssues(content.loe, content.kind === "general" ? "general" : "trademark")) err(issue.path, issue.message);
+  }
+  // A draft made while the firm's letter couldn't be read, with no letter attached since and nobody having chosen to send
+  // without one (`letter-check.ts`): it may be edited and saved, but it cannot be approved for a link. A firm with an approved
+  // letter never gets a live proposal that silently lacks it.
+  if (options.forApproval && hasPendingLetterCheck(content)) err(LETTER_CHECK_PATH, LETTER_PENDING_FIX);
   if (content.kind === "general") {
     validateGeneralContent(content, out);
     return out;

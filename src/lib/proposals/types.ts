@@ -326,7 +326,39 @@ export function isGeneralContent(content: unknown): boolean {
   return !!content && typeof content === "object" && (content as { kind?: unknown }).kind === "general";
 }
 
+/**
+ * The firm's engagement letter, copied onto the proposal (lectual 0106). A SNAPSHOT of the firm's approved
+ * version, refreshed on every save of a draft by `withLoeSnapshot`, so the client signs exactly the letter this
+ * version carried. Plain text with `{{merge_fields}}`. `publicContent` publishes `title`, `body` and `kind` only.
+ */
+export type ProposalLoe = {
+  kind: ProposalKind;
+  template_id: string | null;
+  template_version: number;
+  title: string;
+  body: string;
+};
+
+/** Sprint 3: who made a proposal. Staff-only; `publicContent` never returns it. Absent = a proposal from before this field. */
+export const MADE_BY_VALUES = ["assistant", "copilot", "person"] as const;
+export type MadeBy = (typeof MADE_BY_VALUES)[number];
+
+/** Sprint 5: a thing to look at, left by the assistant or Copilot, with the field it is about. Staff-only. */
+export const CHECK_SOURCES = ["consult", "copilot", "assistant", "person"] as const;
+export type CheckSource = (typeof CHECK_SOURCES)[number];
+export const MAX_CONTENT_CHECKS = 12;
+export const MAX_CHECK_TEXT = 300;
+export type ContentCheck = { text: string; source: CheckSource; /** A `validateContent` path, e.g. `pay_url` or `names[0].discount_pct`. */ path: string };
+
 export type ProposalContent = {
+  /** Sprint 5: things to check, shown in the editor's "Ready to send?" list. Staff-only; `publicContent` never returns it; never blocks. */
+  checks?: ContentCheck[];
+  /** Sprint 3: who made this draft. Staff-only. */
+  made_by?: MadeBy;
+  /** Sprint 3: the consult an assistant draft came from (a civil date, YYYY-MM-DD). Staff-only, read by the editor's header line. */
+  made_from?: { consult_date: string };
+  /** Engagement letter the client signs on the page. Absent = the page behaves as it always did. */
+  loe?: ProposalLoe;
   /** Spec 9: absent = "trademark". */
   kind?: ProposalKind;
   /** Spec 9: the matter, its work items and its flat fee. Only on `kind: "general"`. */
@@ -443,13 +475,37 @@ export type ProposalChange = {
  * browser.
  */
 export type AcceptedSnapshot = {
-  /** Bump when this shape changes. */
-  schema: 1;
+  /**
+   * Bump when this shape changes. 1 = every acceptance before the engagement letter; 2 = a signed acceptance (the
+   * 0106 function stamps `schema: 2` and `agreement`). Every reader accepts both.
+   */
+  schema: 1 | 2;
   version: number;
   content: ProposalContent;
   selection: Selection;
   quote: ProposalQuote;
   accepted_at: string;
+  /** Schema 2 only: who signed, when, and the sha256 of the agreement text. `signature_id` is null until the database fills it. */
+  agreement?: AcceptedAgreement;
+  /** Schema 2 only: what the letter was merged with, so "Read it again" and the signed PDF rebuild exactly what was signed. */
+  signing?: AcceptedSigning;
+};
+
+export type AcceptedAgreement = {
+  signature_id: string | null;
+  signer_name: string;
+  signed_at: string;
+  sha256: string;
+  template_version: number | null;
+};
+
+export type AcceptedSigning = {
+  /** The cleaned details the client typed on the "Your details" step. */
+  details: Record<string, string>;
+  /** The letter's date as shown at signing, in the firm's zone ("November 12, 2026"). */
+  date_text: string;
+  /** The proposal's own client email, merged into `{{client_email}}`. */
+  client_email: string;
 };
 
 /* ─────────────────────────── the quote (pricing.ts output) ───────────────── */

@@ -177,26 +177,29 @@ export function consultPrefill(read: ReviewedConsultRead | null): ConsultFill {
  */
 export function buildBrandNames(input: { typed: string; brands: readonly ConsultBrand[]; rand: () => string }): ProposalName[] {
   const taken = new Set<string>();
-  const typed = input.typed.trim();
+  return brandPlan(input.typed, input.brands).map((p) => ({
+    id: cleanId("", "n", taken, input.rand),
+    name: p.name,
+    marks: p.kinds.map((kind) => ({ id: cleanId("", "m", taken, input.rand), kind, desc: MARK_KIND_DEFAULT_DESC[kind], preselected: true })),
+    classes: p.classes.map((label) => ({ id: cleanId("", "c", taken, input.rand), label, preselected: true })),
+  }));
+}
+
+/** The brand names a typed name and a reviewed consult make together, in order, before any id is drawn (see `buildBrandNames`). */
+export function brandPlan(typedName: string, brands: readonly ConsultBrand[]): Array<{ name: string; kinds: readonly MarkKind[]; classes: readonly string[] }> {
+  const typed = typedName.trim();
   const typedKey = typed ? markKey(typed) || typed.toLowerCase() : "";
   const keyOf = (b: ConsultBrand) => markKey(b.name) || b.name.toLowerCase();
-  const matched = typedKey ? input.brands.find((b) => keyOf(b) === typedKey) : undefined;
+  const matched = typedKey ? brands.find((b) => keyOf(b) === typedKey) : undefined;
 
-  const make = (name: string, kinds: readonly MarkKind[], classes: readonly string[]): ProposalName => ({
-    id: cleanId("", "n", taken, input.rand),
-    name,
-    marks: kinds.map((kind) => ({ id: cleanId("", "m", taken, input.rand), kind, desc: MARK_KIND_DEFAULT_DESC[kind], preselected: true })),
-    classes: classes.map((label) => ({ id: cleanId("", "c", taken, input.rand), label, preselected: true })),
-  });
-
-  const names: ProposalName[] = [];
-  if (typed && !matched) names.push(make(typed, ["word", "logo"], []));
-  if (matched) names.push(make(typed, matched.kinds, matched.classes));
-  for (const b of input.brands) {
+  const plan: Array<{ name: string; kinds: readonly MarkKind[]; classes: readonly string[] }> = [];
+  if (typed && !matched) plan.push({ name: typed, kinds: ["word", "logo"], classes: [] });
+  if (matched) plan.push({ name: typed, kinds: matched.kinds, classes: matched.classes });
+  for (const b of brands) {
     if (b === matched) continue;
-    names.push(make(b.name, b.kinds, b.classes));
+    plan.push({ name: b.name, kinds: b.kinds, classes: b.classes });
   }
-  return names.slice(0, MAX_MARKS);
+  return plan.slice(0, MAX_MARKS);
 }
 
 /* ───────────────────────── the package ──────────────────────────────────── */
