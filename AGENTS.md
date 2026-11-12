@@ -1560,6 +1560,16 @@ A second shell for the managing attorney, beside today's (the TECHNICIAN view, u
   `card-state.ts`, three states: ok / not-set-up (42P01, PGRST205: Hand off and Later drawn disabled with `NOT_SWITCHED_ON`, actions refuse)
   / unavailable (EVERY card is shown, never fewer). `actor_id` is never sent from the browser; a hand-off target must be a current staff
   member; a hand-off never widens who may approve (an attorney-only item's Yes stays with an approver).
+- **Forged hand-offs are ignored (fold hardening).** 0103's RLS lets any staff member insert a `handoff` / `returned` row for any item,
+  so the fold doesn't take a row's word for it: `trustedEvents` / `trustedCardState` (`deck.ts`, pure) walk each item's events oldest
+  first and keep a `handoff` only when its actor may approve the item (`canApproveItem`, actor's role + routing; a routed non-approver
+  counts for a non-attorney item) or is the CURRENT holder (a holder may hand on), and a `returned` only while handed off and only from
+  the current holder, the hander of the current hand-off, or someone who may approve. A removed member has no role, so only their holder
+  rights count. `later` rows are kept (they only touch their own actor's deck). Trust comes from `eventTrust(loadApprovalRouting())` /
+  `viewEventTrust(view)`; a failed routing or member read is `unknown` and trusts every event (today's behaviour, never fewer cards).
+  `buildDeck` requires `trust`; `handedToViewer`, the item page, the deck lists, `cardContext` (Hand off / Later) and `sendCardBack` all
+  fold with it, so the write side decides "holder" from trusted events too. `tests/queue/fold-trust.test.ts` greps that every
+  `loadCardState(` caller applies trust. It never changes approval; the list views still show every card.
 - **Send from Outlook now** (`outlook-send.ts`, the ONE file allowed a send call; `tests/agents/new-agents-hygiene.test.ts` pins it): a
   button the approver presses herself, after approving. The caller's own personal Microsoft mailbox only, with `Mail.Send` in its stored
   scopes; the draft id is checked (a draft, addressed to the item's recipient, item approved by this session). `Mail.Send` is requested only

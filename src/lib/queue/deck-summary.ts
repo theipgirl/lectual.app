@@ -2,7 +2,7 @@ import "server-only";
 import type { Role } from "@/lib/auth/roles";
 import { DEFAULT_DEAL_TIMES, dealFor, dealtAt } from "@/lib/deal/times";
 import type { QueueItem } from "@/lib/queue/api";
-import { buildDeck, deckMinutes } from "@/lib/queue/deck";
+import { buildDeck, deckMinutes, eventTrust } from "@/lib/queue/deck";
 import { loadCardState } from "@/lib/queue/card-state";
 import { loadActiveQueue } from "@/lib/queue/load";
 import { loadApprovalRouting } from "@/lib/queue/routing-load";
@@ -28,6 +28,7 @@ export async function viewerDeck(items: readonly QueueItem[], viewer: { userId: 
     routing: routed.status === "ok" ? routed.routing : {},
     viewer,
     cardState,
+    trust: eventTrust(routed),
     now,
     dealtAt: dealtAt(now, tz, dealTimes),
   });

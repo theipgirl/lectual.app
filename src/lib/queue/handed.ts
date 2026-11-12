@@ -1,6 +1,6 @@
 import type { Role } from "@/lib/auth/roles";
 import type { QueueItem } from "@/lib/queue/api";
-import { currentHolder, type CardState, type Holder } from "@/lib/queue/deck";
+import { currentHolder, trustedEvents, type CardState, type EventTrust, type Holder } from "@/lib/queue/deck";
 import { isAttorneyOnly, memberName, ownerOf, type ApprovalRouting, type RoutableItem, type RoutingMember } from "@/lib/queue/routing";
 import { QUEUE_EDIT_ROLES } from "@/lib/queue/roles";
 import { A_TEAMMATE, SEND_BACK_NEEDS_APPROVER, sendBackNeedsPerson } from "@/lib/ui/words";
@@ -13,11 +13,12 @@ import { A_TEAMMATE, SEND_BACK_NEEDS_APPROVER, sendBackNeedsPerson } from "@/lib
 export const SEND_BACK_NOTE_MAX = 500;
 
 /** The items currently handed to `viewerId`, with the hand-off. Empty unless the card events were READ. */
-export function handedToViewer(items: readonly Pick<QueueItem, "id">[], state: CardState, viewerId: string | null | undefined): Map<string, Holder> {
+export function handedToViewer(items: readonly (RoutableItem & { id: string })[], state: CardState, viewerId: string | null | undefined, trust: EventTrust): Map<string, Holder> {
   const out = new Map<string, Holder>();
   if (!viewerId || state.status !== "ok") return out;
+  const events = trustedEvents(state.events, items, trust);
   for (const item of items) {
-    const holder = currentHolder(state.events, item.id);
+    const holder = currentHolder(events, item.id);
     if (holder && holder.userId === viewerId) out.set(item.id, holder);
   }
   return out;

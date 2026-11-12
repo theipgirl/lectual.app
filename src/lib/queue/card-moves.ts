@@ -6,7 +6,7 @@ import { QUEUE_EDIT_ROLES } from "@/lib/queue/roles";
 import { canApproveItem } from "@/lib/queue/routing";
 import { loadApprovalRouting } from "@/lib/queue/routing-load";
 import { loadCardState, recordCardEvent } from "@/lib/queue/card-state";
-import { currentHolder } from "@/lib/queue/deck";
+import { currentHolder, eventTrust, trustedCardState } from "@/lib/queue/deck";
 import { cardNoticePayload, returnDecision, SEND_BACK_NOTE_MAX } from "@/lib/queue/handed";
 import { notify } from "@/lib/notifications/core";
 import { NOTIFICATION_KIND_FOR } from "@/lib/notifications/kinds";
@@ -61,12 +61,14 @@ export async function cardContext(id: string): Promise<
   if (state.status !== "ok") return { ok: false, error: DECK_FAILED };
   const routed = await loadApprovalRouting();
   const routing = routed.status === "ok" ? routed.routing : {};
+  // A forged hand-off or return (any staff member can insert one) never makes anyone the holder.
+  const trusted = trustedCardState(state, [item], eventTrust(routed));
   return {
     ok: true,
     who,
     item,
     mayDecide: canApproveItem({ role: who.role, userId: who.userId, item, routing }),
-    holder: currentHolder(state.events, id),
+    holder: trusted.status === "ok" ? currentHolder(trusted.events, id) : null,
   };
 }
 
@@ -80,7 +82,9 @@ export async function sendCardBack(args: { id: string; note: string; allowHander
   if (!who) return { ok: false, error: DECK_NOT_YOURS };
   const item = await readCardItem(args.id);
   if (!item) return { ok: false, error: DECK_FAILED };
-  const state = await loadCardState([args.id]);
+  const [loaded, routed] = await Promise.all([loadCardState([args.id]), loadApprovalRouting()]);
+  // The holder comes from the trusted events only: a forged hand-off can't make the caller the holder or the hander.
+  const state = trustedCardState(loaded, [item], eventTrust(routed));
   const decision = returnDecision({ callerId: who.userId, callerRole: who.role, itemStatus: item.status, cardState: state, itemId: args.id, allowHander: args.allowHander });
   if (!decision.ok) return { ok: false, error: decision.reason === "not-set-up" ? NOT_SWITCHED_ON : decision.reason === "failed" ? DECK_FAILED : DECK_NOT_YOURS };
   const saved = await recordCardEvent({ orgId: who.orgId, queueItemId: args.id, kind: "returned", note: args.note || null });

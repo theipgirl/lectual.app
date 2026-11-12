@@ -20,6 +20,7 @@ import {
   deckEmptyState,
   deckHref,
   draftOpening,
+  eventTrust,
   parseAtParam,
   parseDeckView,
   positionOf,
@@ -173,7 +174,7 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
     loadActiveQueue("rejected"),
   ]);
   const routing = routed.status === "ok" ? routed.routing : {};
-  const base = { items: load.items, routing, viewer, cardState, now, dealtAt: dealNow ? null : dealtAt(now, tz, myTimes), audit };
+  const base = { items: load.items, routing, viewer, cardState, trust: eventTrust(routed), now, dealtAt: dealNow ? null : dealtAt(now, tz, myTimes), audit };
   const first = buildDeck(base);
   const deck: Deck = buildDeck({ ...base, flags: await closerLookFlags(first.cards.map((c) => c.item)) });
 

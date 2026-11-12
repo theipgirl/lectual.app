@@ -15,6 +15,7 @@ import { pageTitle } from "@/lib/ui/page-title";
 import { APPROVALS_NAME, HANDED_TO_YOU_MARKER } from "@/lib/ui/words";
 import { loadCardState } from "@/lib/queue/card-state";
 import { handedToViewer, showHandedPill } from "@/lib/queue/handed";
+import { viewEventTrust } from "@/lib/queue/deck";
 import "@/components/queue/handed.css";
 
 export const metadata: Metadata = { title: pageTitle(APPROVALS_NAME) };
@@ -53,7 +54,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
   // no hand-offs is exactly the page it always was.
   const handed =
     status === "pending" && load.status === "ok" && allItems.length > 0 && viewer
-      ? handedToViewer(allItems, await loadCardState(allItems.map((i) => i.id)), viewer.userId)
+      ? handedToViewer(allItems, await loadCardState(allItems.map((i) => i.id)), viewer.userId, viewEventTrust(view))
       : new Map();
   const handedPill = showHandedPill(handed);
   const handedActive = handedPill && rawWho === "handed";

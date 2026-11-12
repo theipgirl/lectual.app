@@ -13,7 +13,7 @@ const rebecca = { userId: U.rebecca, role: "attorney" as Role };
 const caitlyn = { userId: U.caitlyn, role: "paralegal" as Role };
 
 const deck = (items: QueueItem[], over: Partial<Parameters<typeof buildDeck>[0]> = {}) =>
-  buildDeck({ items, routing: {}, viewer: rebecca, cardState: ok(), now: NOW, dealtAt: DEALT, ...over });
+  buildDeck({ items, routing: {}, viewer: rebecca, cardState: ok(), trust: { status: "unknown" }, now: NOW, dealtAt: DEALT, ...over });
 
 const ids = (cards: { item: QueueItem }[]) => cards.map((c) => c.item.id);
 
@@ -36,7 +36,7 @@ describe("membership", () => {
     for (const routing of routings)
       for (const role of roles) {
         const viewer = { userId: U.caitlyn, role };
-        const d = buildDeck({ items: pool, routing, viewer, cardState: ok(), now: NOW, dealtAt: null });
+        const d = buildDeck({ items: pool, routing, viewer, cardState: ok(), trust: { status: "unknown" }, now: NOW, dealtAt: null });
         for (const c of [...d.cards, ...d.laterArrivals, ...d.later, ...d.handedOff]) {
           expect(c.canYes, `${role} ${c.item.id}`).toBe(true);
           expect(canApproveItem({ role, userId: viewer.userId, item: c.item, routing }), `${role} ${c.item.id}`).toBe(true);

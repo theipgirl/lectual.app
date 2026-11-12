@@ -18,7 +18,7 @@ import { loadLinkedPanel } from "@/lib/consult-proposal/link";
 import { loadQueueViewContext } from "@/lib/queue/view-context";
 import { approvalRefusal, canApproveItem, classifyQueueItem, kindLabel, memberName, ownerText } from "@/lib/queue/routing";
 import { loadCardState } from "@/lib/queue/card-state";
-import { currentHolder } from "@/lib/queue/deck";
+import { currentHolder, trustedCardState, viewEventTrust } from "@/lib/queue/deck";
 import { handedCantApprove } from "@/lib/queue/handed";
 import { HandedToYouCard } from "@/components/queue/HandedToYouCard";
 import { loadAuditContext } from "@/lib/queue/audit-context";
@@ -105,7 +105,8 @@ export default async function QueueItemPage({
   // current hand-off target is this person. A failed or missing read draws nothing and changes nothing else.
   let handedCard: { byName: string; when: string; note: string | null; cantApprove: string | null } | null = null;
   if (!resolved && view.viewer) {
-    const events = await loadCardState([item.id]);
+    // Forged hand-offs (any staff member can insert one) are left out: the deck's own rule.
+    const events = trustedCardState(await loadCardState([item.id]), [item], viewEventTrust(view));
     const holder = events.status === "ok" ? currentHolder(events.events, item.id) : null;
     if (holder && holder.userId === view.viewer.userId) {
       const by = (view.members ?? []).find((m) => m.userId === holder.by);

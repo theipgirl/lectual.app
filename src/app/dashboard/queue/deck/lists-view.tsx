@@ -5,7 +5,7 @@ import { loadApprovalRouting } from "@/lib/queue/routing-load";
 import { loadCardState } from "@/lib/queue/card-state";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { listMemberDirectory } from "@/lib/members/directory";
-import { buildDeck, DECK_BASE, type CardState } from "@/lib/queue/deck";
+import { buildDeck, DECK_BASE, eventTrust, trustedCardState, type CardState } from "@/lib/queue/deck";
 import { dealtAt } from "@/lib/deal/times";
 import { classifyQueueItem, kindShort } from "@/lib/queue/routing";
 import { agentLabel } from "@/components/queue/format";
@@ -34,7 +34,9 @@ export async function DeckListsView({ list }: { list: ListParam }) {
   const now = new Date();
   const fmt = makeListFormat(now, tz);
   const pendingItems = pending.status === "ok" ? pending.items : [];
-  const cardState: CardState | null = pending.status === "ok" ? await loadCardState(pendingItems.map((i) => i.id)) : null;
+  // Forged hand-offs and returns are left out before any list reads the events (the deck's own rule).
+  const trust = eventTrust(routed);
+  const cardState: CardState | null = pending.status === "ok" ? trustedCardState(await loadCardState(pendingItems.map((i) => i.id)), pendingItems, trust) : null;
 
   const members = directory ?? [];
   const firstNameOf = (id: string) => {
@@ -56,7 +58,7 @@ export async function DeckListsView({ list }: { list: ListParam }) {
 
   let needCount: number | null = null;
   if (pending.status === "ok") {
-    const deck = buildDeck({ items: pendingItems, routing, viewer, cardState: cardState ?? { status: "unavailable" }, now, dealtAt: dealtAt(now, tz) });
+    const deck = buildDeck({ items: pendingItems, routing, viewer, cardState: cardState ?? { status: "unavailable" }, trust, now, dealtAt: dealtAt(now, tz) });
     needCount = deck.cards.length;
   }
 

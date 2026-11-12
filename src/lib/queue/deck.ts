@@ -5,7 +5,7 @@ import { mineItems } from "@/lib/queue/mine";
 import { parseReviewerSummary } from "@/lib/queue/reviewer-summary";
 import { QUEUE_APPROVE_ROLES, QUEUE_EDIT_ROLES } from "@/lib/queue/roles";
 import { DECK_NOTHING_FOR_YOU, DECK_NOTHING_NOW, deckAllDecided, deckHandedCount, deckOthersWaiting, deckLaterArrivals, deckLaterBack, deckLaterBackWhen } from "@/lib/ui/words";
-import { canApproveItem, classifyQueueItem, type ApprovalRouting, type QueueKind, type Viewer } from "@/lib/queue/routing";
+import { canApproveItem, classifyQueueItem, type ApprovalRouting, type QueueKind, type RoutableItem, type Viewer } from "@/lib/queue/routing";
 
 /**
  * The approval deck: which pending approvals are dealt to one person, in what order, and what each card says. Pure.
@@ -42,6 +42,68 @@ export function currentHolder(events: readonly CardEvent[], itemId: string): Hol
     else if (e.kind === "returned") holder = null;
   }
   return holder;
+}
+
+/**
+ * Who could have written a hand-off or a return. RLS (lectual 0103) lets any staff member insert a `handoff` or `returned`
+ * row for any queue item, so the fold does not take a row's word for it: it checks the actor against the members' roles
+ * and the routing, with the same `canApproveItem` the actions use. `unknown` (the routing or the member list could not
+ * be read) keeps the old behaviour: every event is trusted, so a failed read never hides a card.
+ */
+export type EventTrust = { status: "known"; roles: ReadonlyMap<string, Role>; routing: ApprovalRouting } | { status: "unknown" };
+
+/** The trust input from a routing load (`loadApprovalRouting`): known only when the routing AND its member list were read. */
+export function eventTrust(routed: { status: "ok"; routing: ApprovalRouting; members: readonly { userId: string; role: Role }[] } | { status: "failed" }): EventTrust {
+  if (routed.status !== "ok") return { status: "unknown" };
+  return { status: "known", roles: new Map(routed.members.map((m) => [m.userId, m.role])), routing: routed.routing };
+}
+
+/** The same, from the Approvals pages' view context (`loadQueueViewContext`): a failed routing or member read is unknown. */
+export function viewEventTrust(view: { routing: ApprovalRouting; members: readonly { userId: string; role: Role }[] | null; routingFailed: boolean }): EventTrust {
+  return view.routingFailed || !view.members ? { status: "unknown" } : eventTrust({ status: "ok", routing: view.routing, members: view.members });
+}
+
+/**
+ * The card events with the forged ones left out, in their order. Per item, walking oldest first:
+ *  · a `handoff` counts only when its actor may approve the item (`canApproveItem` with the actor's role and the
+ *    routing) or is the current holder (a holder may hand it on);
+ *  · a `returned` counts only while the card is handed off, and only from the current holder, the person who made that
+ *    hand-off, or someone who may approve the item.
+ * `later` rows only ever change their own actor's deck and are kept. With trust `unknown` nothing is dropped. With trust
+ * `known`, a hand-off or return for an item not in `items` can't be checked and is dropped. Idempotent.
+ */
+export function trustedEvents(events: readonly CardEvent[], items: readonly (RoutableItem & { id: string })[], trust: EventTrust): CardEvent[] {
+  if (trust.status !== "known") return [...events];
+  const byId = new Map(items.map((i) => [i.id, i]));
+  const holders = new Map<string, Holder | null>();
+  const mayApprove = (actorId: string, item: RoutableItem) => canApproveItem({ role: trust.roles.get(actorId) ?? null, userId: actorId, item, routing: trust.routing });
+  const out: CardEvent[] = [];
+  for (const e of events) {
+    if (e.kind === "later") {
+      out.push(e);
+      continue;
+    }
+    const item = byId.get(e.queueItemId);
+    if (!item) continue;
+    const holder = holders.get(e.queueItemId) ?? null;
+    if (e.kind === "handoff") {
+      if (!e.targetUserId) continue;
+      if (holder?.userId !== e.actorId && !mayApprove(e.actorId, item)) continue;
+      holders.set(e.queueItemId, { userId: e.targetUserId, by: e.actorId, note: e.note, at: e.createdAt });
+      out.push(e);
+    } else if (e.kind === "returned") {
+      if (!holder) continue;
+      if (e.actorId !== holder.userId && e.actorId !== holder.by && !mayApprove(e.actorId, item)) continue;
+      holders.set(e.queueItemId, null);
+      out.push(e);
+    }
+  }
+  return out;
+}
+
+/** `trustedEvents` over a card-event read; a read that failed or isn't set up is returned as it is. */
+export function trustedCardState(state: CardState, items: readonly (RoutableItem & { id: string })[], trust: EventTrust): CardState {
+  return state.status === "ok" ? { status: "ok", events: trustedEvents(state.events, items, trust) } : state;
 }
 
 /** The viewer's own "later" on an item that is still in force: its `until`, else null. */
@@ -136,6 +198,8 @@ export function buildDeck(args: {
   routing: ApprovalRouting;
   viewer: Viewer;
   cardState: CardState;
+  /** Who could have written the card events: forged hand-offs and returns are left out (`trustedEvents`). */
+  trust: EventTrust;
   now: Date;
   /** The deal on the table; null deals everything now ("Deal them now"). */
   dealtAt: Date | null;
@@ -145,7 +209,7 @@ export function buildDeck(args: {
   const { routing, viewer, cardState, now, dealtAt } = args;
   const pending = args.items.filter((i) => i.status === "pending");
   const audit = args.audit ?? null;
-  const events = cardState.status === "ok" ? cardState.events : [];
+  const events = cardState.status === "ok" ? trustedEvents(cardState.events, pending, args.trust) : [];
   const eventsApplied = cardState.status === "ok";
 
   // The viewer's own approvals: the same "Mine" the Approvals page and Today count, then only those they may decide.

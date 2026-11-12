@@ -15,7 +15,7 @@ vi.mock("@/lib/firm/session", () => ({
   resolveFirmSession: vi.fn(async () => ({ kind: "ok", user: { id: U.rebecca, email: "rebecca@example.com" }, role: state.role, org: { id: "org-1" } })),
 }));
 vi.mock("@/lib/queue/load", () => ({ loadActiveQueue: vi.fn(async (s: string) => state.loads[s]) }));
-vi.mock("@/lib/queue/routing-load", () => ({ loadApprovalRouting: vi.fn(async () => ({ status: "ok", routing: {}, members: [], dropped: 0, settingsExist: true })) }));
+vi.mock("@/lib/queue/routing-load", () => ({ loadApprovalRouting: vi.fn(async () => ({ status: "ok", routing: {}, members: (await import("./routing-fixtures")).MEMBERS, dropped: 0, settingsExist: true })) }));
 vi.mock("@/lib/queue/card-state", () => ({ loadCardState: vi.fn(async () => state.cardState) }));
 vi.mock("@/lib/queue/audit-context", () => ({ loadAuditContext: vi.fn(async () => ({ signOff: "The Team", teamSignOff: "The Team", memberNames: [] })) }));
 vi.mock("@/lib/queue/stale", () => ({ checkDraftStaleness: vi.fn(async () => ({ status: "not_applicable" })), stalenessRequiresConfirm: vi.fn(() => false) }));

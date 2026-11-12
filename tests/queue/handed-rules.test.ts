@@ -24,18 +24,19 @@ describe("holder detection", () => {
 });
 
 describe("handedToViewer and the pill", () => {
-  const items = [{ id: "q1" }, { id: "q2" }, { id: "q3" }];
+  const items = [qitem({ id: "q1" }), qitem({ id: "q2" }), qitem({ id: "q3" })];
+  const UNKNOWN = { status: "unknown" } as const;
   it("lists only the items handed to the viewer", () => {
-    const handed = handedToViewer(items, ok([ev({}), ev({ queueItemId: "q2", targetUserId: U.taylor })]), U.caitlyn);
+    const handed = handedToViewer(items, ok([ev({}), ev({ queueItemId: "q2", targetUserId: U.taylor })]), U.caitlyn, UNKNOWN);
     expect([...handed.keys()]).toEqual(["q1"]);
     expect(showHandedPill(handed)).toBe(true);
   });
   it("draws nothing with no hand-offs, and nothing when the events were not read", () => {
-    expect(showHandedPill(handedToViewer(items, ok([]), U.caitlyn))).toBe(false);
-    expect(showHandedPill(handedToViewer(items, ok([ev({ targetUserId: U.taylor })]), U.caitlyn))).toBe(false);
-    expect(showHandedPill(handedToViewer(items, { status: "not-set-up" }, U.caitlyn))).toBe(false);
-    expect(showHandedPill(handedToViewer(items, { status: "unavailable" }, U.caitlyn))).toBe(false);
-    expect(showHandedPill(handedToViewer(items, ok([ev({})]), null))).toBe(false);
+    expect(showHandedPill(handedToViewer(items, ok([]), U.caitlyn, UNKNOWN))).toBe(false);
+    expect(showHandedPill(handedToViewer(items, ok([ev({ targetUserId: U.taylor })]), U.caitlyn, UNKNOWN))).toBe(false);
+    expect(showHandedPill(handedToViewer(items, { status: "not-set-up" }, U.caitlyn, UNKNOWN))).toBe(false);
+    expect(showHandedPill(handedToViewer(items, { status: "unavailable" }, U.caitlyn, UNKNOWN))).toBe(false);
+    expect(showHandedPill(handedToViewer(items, ok([ev({})]), null, UNKNOWN))).toBe(false);
   });
 });
 

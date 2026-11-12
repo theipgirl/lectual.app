@@ -80,6 +80,7 @@ beforeEach(() => {
   state.cardState = { status: "ok", events: [] };
   state.record.mockReset().mockResolvedValue({ ok: true });
   state.members = MEMBERS;
+  state.routed = { status: "ok", routing: {}, members: MEMBERS, dropped: 0, settingsExist: true };
   state.membersFail = false;
   state.sendAccess = "ready";
   state.send.mockReset().mockResolvedValue({ ok: true });

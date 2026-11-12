@@ -24,7 +24,7 @@ vi.mock("@/lib/firm/session", () => ({ resolveFirmSession: vi.fn(async () => sta
 vi.mock("@/lib/queue/org", () => ({ activeQueueOrgKey: vi.fn(async () => "firm-key") }));
 vi.mock("@/lib/queue/api", () => ({ getQueueItem: vi.fn(async () => state.item), resolveQueueItem: vi.fn() }));
 vi.mock("@/lib/queue/review-core", () => ({ runQueueReview: vi.fn(), requireFirmReviewer: vi.fn(), ReviewerRefusal: class extends Error {} }));
-vi.mock("@/lib/queue/routing-load", () => ({ loadApprovalRouting: vi.fn(async () => ({ status: "ok", routing: {}, members: [], dropped: 0 })) }));
+vi.mock("@/lib/queue/routing-load", () => ({ loadApprovalRouting: vi.fn(async () => ({ status: "ok", routing: {}, members: (await import("./routing-fixtures")).MEMBERS, dropped: 0 })) }));
 vi.mock("@/lib/queue/load", () => ({ loadActiveQueue: vi.fn() }));
 vi.mock("@/lib/queue/card-state", () => ({
   loadCardState: vi.fn(async () => state.cardState),
