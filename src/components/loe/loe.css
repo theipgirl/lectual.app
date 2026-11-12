@@ -1,0 +1,27 @@
+/* Settings -> Client proposals -> Engagement letter. Tokens only. */
+.loe-page { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.loe-kind { padding: 16px 18px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.loe-kind-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.loe-versions { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.loe-version { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 0; border-top: 1px solid var(--line-2); font-size: 14px; color: var(--body); }
+.loe-version:first-child { border-top: 0; }
+.loe-version-name { color: var(--ink); font-weight: 500; }
+.loe-version-when { color: var(--muted); font-size: 13px; }
+.loe-form { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.loe-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.loe-body { font-family: var(--mono); font-size: 14px; line-height: 1.55; min-height: 280px; width: 100%; resize: vertical; box-sizing: border-box; }
+.loe-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.loe-fields { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.loe-fields code { font-family: var(--mono); font-size: 12.5px; background: var(--well); border: 1px solid var(--line-2); border-radius: 6px; padding: 2px 6px; color: var(--ink); }
+.loe-readonly { margin: 0; padding: 14px 16px; background: var(--well); border: 1px solid var(--line-2); border-radius: 10px; font-family: var(--mono); font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--body); }
+.loe-preview { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-top: 12px; border-top: 1px solid var(--line-2); }
+.loe-preview-paper { max-width: 68ch; display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); font-size: 15px; line-height: 1.6; color: var(--ink); overflow-wrap: anywhere; }
+.loe-preview-paper p { margin: 0; white-space: pre-line; }
+.loe-preview-paper strong { font-weight: 600; }
+.loe-problems { margin: 0; padding: 10px 14px 10px 28px; border: 1px solid var(--line); border-left: 3px solid var(--wine); border-radius: 8px; background: var(--card); color: var(--wine); font-size: 13.5px; line-height: 1.5; }
+.loe-approve-note { margin: 0; }
+@media (max-width: 640px) {
+  .loe-kind { padding: 14px; }
+  .loe-preview-paper { padding: 14px; }
+  .loe-body { min-height: 220px; }
+}
