@@ -289,3 +289,19 @@ describe("what the rail and the Pipeline share is untouched", () => {
     expect(SHOW_STEP).toBe(25);
   });
 });
+
+describe("chip strips, header and menus (review fixes)", () => {
+  it("a popover wrapper inside a no-wrap chip strip does not shrink (it made chips draw over each other)", async () => {
+    const { readFileSync } = await import("node:fs");
+    expect(readFileSync("src/components/list-page/list-page.css", "utf8")).toMatch(/\.lp-chips > \.lp-pop[^{]*\{ flex: 0 0 auto; \}/);
+    expect(readFileSync("src/app/dashboard/intake/leads.css", "utf8")).toContain(".ix-sets > *, .ix-filters > * { flex: 0 0 auto; }");
+  });
+  it("the grouping reads By stage / By owner so 'Stage' is not said twice side by side; the row menu is named for its lead", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync("src/app/dashboard/intake/_components/IntakeControls.tsx", "utf8");
+    expect(src).toContain("By stage");
+    expect(src).toContain("By owner");
+    const { LEADS_ROW_MENU } = await import("@/lib/ui/words");
+    expect(LEADS_ROW_MENU("Ana Ruiz")).toBe("Actions for Ana Ruiz");
+  });
+});

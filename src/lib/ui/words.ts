@@ -500,7 +500,7 @@ export const LEADS_LOST_UNAVAILABLE = "Can't show lost leads right now. Refresh 
 export const LEADS_WORKING_UNAVAILABLE = "Can't tell which leads are being worked right now, so every open lead is shown. Refresh to try again.";
 export const LEADS_MOVED_TO = (name: string, stage: string) => `Moved ${name} to ${stage}`;
 export const LEADS_ASSIGNED_TO = (name: string, who: string) => `Assigned ${name} to ${who}`;
-export const LEADS_ROW_MENU = (name: string) => `More for ${name}`;
+export const LEADS_ROW_MENU = (name: string) => `Actions for ${name}`;
 export const LEADS_NO_MATCH_IN_SET = (set: string) => `No lead matches these filters in ${set}.`;
 export const LEADS_SET_EMPTY = (set: string) => `Nobody is in ${set} right now.`;
 export const LEADS_START_TIMER = "Start timer";

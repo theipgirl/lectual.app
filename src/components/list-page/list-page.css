@@ -340,3 +340,6 @@
 /* ---- Matters sub-line: the matter number is Courier, the client and the note are Geist ---- */
 .lp-root .mt-sub { font-family: var(--sans); font-size: var(--lp-meta, 13px); line-height: 1.4; }
 .lp-root .mt-sub .lx-num { font-size: inherit; }
+
+/* A popover wrapper is a flex item of a no-wrap chip strip: it must not shrink, or its chip spills out over the next one. */
+.lp-chips > .lp-pop, .lp-chips > .lp-chip { flex: 0 0 auto; }

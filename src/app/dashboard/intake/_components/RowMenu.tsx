@@ -76,7 +76,11 @@ export default function RowMenu({
         width={220}
         trigger={({ onClick, ref, ...aria }) => (
           <button {...aria} ref={ref} type="button" onClick={onClick} className="ix-icon-btn" disabled={pending}>
-            <span aria-hidden>…</span>
+            <svg aria-hidden width="16" height="4" viewBox="0 0 16 4" fill="currentColor" style={{ display: "block" }}>
+              <circle cx="2" cy="2" r="1.6" />
+              <circle cx="8" cy="2" r="1.6" />
+              <circle cx="14" cy="2" r="1.6" />
+            </svg>
           </button>
         )}
       >

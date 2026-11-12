@@ -105,3 +105,5 @@
   .ix-sets .lp-chip, .ix-filters .lp-chip, .ix-filters .lp-chips { flex: 0 0 auto; white-space: nowrap; }
   .ix-filters .lp-chips-end { margin-left: 0; white-space: nowrap; }
 }
+.ix-sets > *, .ix-filters > * { flex: 0 0 auto; }
+@media (max-width: 640px) { .intake-root .lp-header .lp-sub { white-space: normal; overflow: visible; text-overflow: clip; text-wrap: wrap; } }

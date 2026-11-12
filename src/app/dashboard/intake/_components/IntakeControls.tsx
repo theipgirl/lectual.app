@@ -121,12 +121,12 @@ export default function IntakeControls({
       <div className="ix-filters">
         {view === "board" && (
           <div className="lp-chips" role="group" aria-label="Group by">
-            <span className="lp-legend">Columns</span>
+            <span className="lp-legend">Group by</span>
             <button type="button" className={chipClass(group === "stage")} aria-pressed={group === "stage"} onClick={() => onGroup("stage")}>
-              Stage
+              By stage
             </button>
             <button type="button" className={chipClass(group === "owner")} aria-pressed={group === "owner"} onClick={() => onGroup("owner")}>
-              Owner
+              By owner
             </button>
           </div>
         )}
