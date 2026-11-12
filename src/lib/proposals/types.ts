@@ -343,7 +343,16 @@ export type ProposalLoe = {
 export const MADE_BY_VALUES = ["assistant", "copilot", "person"] as const;
 export type MadeBy = (typeof MADE_BY_VALUES)[number];
 
+/** Sprint 5: a thing to look at, left by the assistant or Copilot, with the field it is about. Staff-only. */
+export const CHECK_SOURCES = ["consult", "copilot", "assistant", "person"] as const;
+export type CheckSource = (typeof CHECK_SOURCES)[number];
+export const MAX_CONTENT_CHECKS = 12;
+export const MAX_CHECK_TEXT = 300;
+export type ContentCheck = { text: string; source: CheckSource; /** A `validateContent` path, e.g. `pay_url` or `names[0].discount_pct`. */ path: string };
+
 export type ProposalContent = {
+  /** Sprint 5: things to check, shown in the editor's "Ready to send?" list. Staff-only; `publicContent` never returns it; never blocks. */
+  checks?: ContentCheck[];
   /** Sprint 3: who made this draft. Staff-only. */
   made_by?: MadeBy;
   /** Sprint 3: the consult an assistant draft came from (a civil date, YYYY-MM-DD). Staff-only, read by the editor's header line. */

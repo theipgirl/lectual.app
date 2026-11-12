@@ -328,12 +328,12 @@ describe("the builder is pure and keeps the checks it was given", () => {
     expect(ids.every((i) => /^[a-z]-x[0-9a-z]{4}$/.test(i))).toBe(true);
   });
 
-  it("returns the spec's checks (source and field path) beside the content and never inside it", () => {
+  it("returns the spec's checks (source and field path) and, since Sprint 5, stores them on the content for the checklist", () => {
     const r: DraftResult = buildDraftContent({ ...DANIELLE_SPEC, checks: [{ text: "Confirm the second brand's classes", source: "consult", path: "names[1].classes" }] }, firm(), newId);
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect(r.checks).toEqual([{ text: "Confirm the second brand's classes", source: "consult", path: "names[1].classes" }]);
-      expect(JSON.stringify(r.content)).not.toContain("Confirm the second brand");
+      expect(r.content.checks).toEqual(r.checks);
     }
   });
 

@@ -56,6 +56,11 @@ export type DraftConsultProposalInput = {
    * flat `pricing` package is used and a flag says so.
    */
   packages?: readonly ProposalPricing[] | null;
+  /**
+   * The firm's raw settings pricing (`client_proposal_setting.pricing`): its package list with each package's own
+   * "what it includes" rows, and the "New proposals offer". Left out = rebuilt from `pricing` and `packages`, with no offer.
+   */
+  settingPricing?: unknown;
   /** The lead's reviewed consult details (`loadReviewedConsult`): a package named there wins over the call's. */
   reviewedConsult?: ReviewedConsultRead | null;
   /** YYYY-MM-DD in the firm's time zone. */

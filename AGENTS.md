@@ -1720,3 +1720,32 @@ anything; `pricing.ts` has no diff; one dependency was added (`pdfkit`, exact-pi
 - **NOT verified:** a real browser (the Blob download, focus order, the popup tab opened for payment), Vercel's real bundling of the font (a local
   `next start` of a production build did build a Unicode PDF, and the font is in the route's trace), and the real 0106 function (proved against a double
   and by reading the migration text).
+
+## Sprint 5: The assistant and Copilot use the builder (no schema)
+No migration, no dependency, `pricing.ts` untouched. Nothing here approves, makes a link, queues mail or sends.
+- **Every door builds through `buildDraftContent`.** The consult drafter (`src/lib/consult-proposal/draft.ts`) keeps its extraction, quote checks, money
+  evidence, second-mark, reduced-package and reasoning steps, then maps what was VERIFIED to a `TrademarkDraftSpec` (ids `b1`, `b1-word`, `b1-c1`, `adj-1` are passed in)
+  with `madeBy: "assistant"` and `made_from` = the meeting's date. The spec has no price. With no "New proposals offer" saved the content equals the pre-sprint content
+  except `made_by`, `made_from` and `checks` (`tests/consult-proposal/frozen/pre-sprint.json` was generated from commit 81cb513; `frozen-scenarios.ts` lists the cases).
+  `input.settingPricing` (run.ts passes the raw setting) carries the package list with its per-package includes and the offer; without it the list is rebuilt from `packages`.
+- **"Client chooses" on a consult** (`consultChoice`): the setting's options with the package recommended on the call as the start; a recommended package missing from the options is
+  added and the last other option dropped (never over 3). No recommendation on the list: the setting's own start stands and the CHECK FIRST package flag stays. Per brand or per mark as the setting says.
+  Call-evidenced price edits are applied AFTER the builder under today's rules and force ONE package where they apply: a brand with an applied base price is built with no choice
+  (the validator refuses a price beside a choice), and an applied custom package (`reduce_under_included`) makes every brand one package. Each says why in a flag. An applied
+  second-mark percent edits the root pricing and, when a choice is on, only the recommended package's snapshot entry (flagged). Credits are capped after the builder as before.
+- **`content.checks`** (staff only, `ContentCheck`: text 1..300, source consult/copilot/assistant/person, a `validateContent` path; at most 12; a bad shape is a `validateContent` error).
+  `buildDraftContent` stores `spec.checks` there; `publicContent` never returns them; the Save keeps them (the parsers spread the stored content); they never block. `buildChecklist`
+  appends them last as level `check`; `ReadyChecklist` draws them under "Check these N things" with a link from `targetForPath(path)`. The consult drafter writes one for a price
+  applied to a brand, a credit, the second-mark percent, a package choice, a custom package, an unmatched package, no pay link and no usable email. Narrative flags stay in the queue notes.
+- **Copilot `draft_proposal` is wider** (`src/lib/copilot/draft-proposal.ts`, tool schema in `matters-chat.ts`): per brand ONE of `package` / `choice {options 1..3, start}` /
+  `perMark {word?, logo?}` (two is a question back) and `discountPercent` (whole 0..50); `discount` (alias `credit`) is the whole-proposal credit; `payLink`; and `matter {title,
+  summary?, items[{label, hours?, hourlyRate?}], fee, excludes?}` for a flat-fee proposal (a matter with brands or a package is a question back). Top-level `package` is needed only
+  when some brand has no offer of its own and the firm has no "New proposals offer". A name is resolved against the firm's CURRENT list (any spelling of case); one not on it returns
+  `package_not_found` with the list and creates nothing. A named top-level package beats the firm's setting for brands with no offer of their own. The content comes from `buildDraftContent`
+  with `madeBy: "copilot"` and checks (flat fee typed from the request, credit, brand discount, no pay link). What is wrong in what the user said (a class number) is `needs_changes`.
+- **The ref covers every field.** `draftRef` hashes the org, lead, resolved package(s) (canonical spelling), brand names/marks/classes/discounts, credit, pay link and the flat-fee matter
+  (title, each item's label/hours/rate, fee, excludes), so "concierge" and "Concierge" are one request and any other change is a new ref. Confirmation is otherwise unchanged: a plain yes
+  whose previous answer carries that exact ref, one draft per question, `source: "agent"` through `createProposal`, the module and role gate before any read.
+- Existing assertions changed on purpose: `tests/proposals/draft-spec.test.ts` (checks now ARE stored on the content, and still returned); `tests/copilot/draft-proposal.test.ts` (a class number
+  now comes back as `needs_changes` from the builder instead of a built draft with `blocking`).
+- Not verified: the real model (no key here), a database, a real browser. `tests/proposals/sprint5-hygiene.test.ts` greps the new code for approve/link/queue/mail/service-role paths and price fields.

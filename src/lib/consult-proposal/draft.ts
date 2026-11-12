@@ -8,8 +8,13 @@ import {
   type ProposalAdjustment,
   type ProposalContent,
   type ProposalName,
+  MAX_CHECK_TEXT,
+  MAX_CONTENT_CHECKS,
 } from "@/lib/proposals/types";
 import { defaultSelection, quoteProposal } from "@/lib/proposals/pricing";
+import { buildDraftContent, type DraftBrand, type DraftCheck, type DraftChoice, type DraftOffer, type TrademarkDraftSpec } from "@/lib/proposals/draft-spec";
+import { normalisePackages } from "@/lib/proposals/package-list";
+import { readNewOffer, type NewOffer } from "@/lib/proposals/new-offer";
 import { isCivilDate, validateContent } from "@/lib/proposals/validate";
 import { buildReasoningBlock, proposalEmailSubject } from "./email";
 import { choosePackage, type PackageSource } from "./package-choice";
@@ -682,6 +687,10 @@ export async function draftProposalFromConsult(input: DraftConsultProposalInput)
   };
 
   const overrides = new Map<string, number>();
+  /** What the call set on the package itself; applied to the built content after the builder (Sprint 5, D3). */
+  let secondMarkPct: number | null = null;
+  let reducedApplied = false;
+  const checks: DraftCheck[] = [];
   for (const pc of extract.price_changes) {
     const brand = brandFor(pc.brand);
     const cents = Number.isFinite(pc.amount_usd) ? Math.round(pc.amount_usd * 100) : NaN;
@@ -709,6 +718,7 @@ export async function draftProposalFromConsult(input: DraftConsultProposalInput)
     }
     overrides.set(key(brand.name), cents);
     flags.push(`CHECK: applied a price of ${amountShown} for ${brand.name} as its base price (first mark, up to ${input.pricing.pricing.included_classes} classes), from: "${oneLine(pc.quote, 200)}".`);
+    checks.push({ source: "consult", path: `names[${usable.indexOf(brand)}].price_override`, text: `A base price of ${amountShown} for ${brand.name} was applied from the call. Check it is what the attorney agreed.` });
   }
 
   const adjustments: ProposalAdjustment[] = [];
@@ -745,6 +755,7 @@ export async function draftProposalFromConsult(input: DraftConsultProposalInput)
       }
       adjustments.push({ id: `adj-${adjustments.length + 1}`, label, kind: "amount", value: cents });
       flags.push(`CHECK: applied the credit "${label}" of ${shown}, from: "${oneLine(cr.quote, 200)}".`);
+      checks.push({ source: "consult", path: `adjustments[${adjustments.length - 1}]`, text: `The credit "${label}" of ${shown} was applied from the call. Check it is what the attorney offered.` });
     } else {
       const pct = cr.percent as number;
       if (!Number.isFinite(pct) || pct <= 0 || pct > 100) {
@@ -758,6 +769,7 @@ export async function draftProposalFromConsult(input: DraftConsultProposalInput)
       }
       adjustments.push({ id: `adj-${adjustments.length + 1}`, label, kind: "percent", value: pct });
       flags.push(`CHECK: applied the discount "${label}" of ${pct}%, from: "${oneLine(cr.quote, 200)}".`);
+      checks.push({ source: "consult", path: `adjustments[${adjustments.length - 1}]`, text: `The discount "${label}" of ${pct}% was applied from the call. Check it is what the attorney offered.` });
     }
   }
 
@@ -778,6 +790,9 @@ export async function draftProposalFromConsult(input: DraftConsultProposalInput)
   flags.push(...chosen.flags);
   const pricing = chosen.pricing;
   const packageSource = chosen.source;
+  if (packageSource === "default" || packageSource === "flat") {
+    checks.push({ source: "consult", path: "pricing.package", text: `No package from the call matched your list, so ${pricing.package} was used. Choose the package.` });
+  }
 
   /* ── second-mark percent: only the attorney's words, 0 to 50 ── */
   const smd = extract.second_mark_discount;
@@ -794,6 +809,7 @@ export async function draftProposalFromConsult(input: DraftConsultProposalInput)
       flags.push(`Second-mark discount of ${pct}% was ignored, because ${problem} ("${q}"). The firm's ${pricing.second_mark_discount_pct}% stays.`);
     } else {
       pricing.second_mark_discount_pct = pct;
+      secondMarkPct = pct;
       flags.push(`CHECK: second-mark discount set to ${pct}% (the firm's is ${input.pricing.pricing.second_mark_discount_pct}%), from the call: "${q}".`);
     }
   } else {
@@ -810,6 +826,8 @@ export async function draftProposalFromConsult(input: DraftConsultProposalInput)
       flags.push(`Not applied: a reduced or custom package, because ${problem} ("${q}"). The package is a flat price up to its included classes.`);
     } else {
       pricing.reduce_under_included = true;
+      reducedApplied = true;
+      checks.push({ source: "consult", path: "pricing.reduce_under_included", text: `Priced as a custom package: ${fmtCents(pricing.per_class_cents)} less for each class under the ${pricing.included_classes} included. Confirm that is what was agreed.` });
       flags.push(`CHECK FIRST: priced as a custom package: ${fmtCents(pricing.per_class_cents)} less for each class under the ${pricing.included_classes} included, because the attorney said: "${q}". Confirm that is what was agreed, or turn it off under More options.`);
     }
   }
@@ -848,48 +866,118 @@ export async function draftProposalFromConsult(input: DraftConsultProposalInput)
   const principle = rp.principle && someBoth;
   const reasoning = buildReasoningBlock({ principle, riskBrand, fallbackBrand });
 
-  /* ── the content document ── */
+  /* ── the content document: map what was verified to the ONE builder (Sprint 5) ── */
   const { first, full } = clientNames(input.lead);
   if (!first) flags.push("The lead has no first name, so the greeting and the email need one before approval.");
-  const names: ProposalName[] = usable.map((b, i) => {
-    const id = `b${i + 1}`;
-    const name: ProposalName = {
-      id,
-      name: b.name,
-      marks: b.marks.map((m) => ({
-        id: `${id}-${m.kind}`,
-        kind: m.kind,
-        desc: m.kind === "word" ? wordDesc(b.name) : logoDesc(b.name),
-        preselected: m.preselected,
-      })),
-      classes: b.classes.map((c, j) => ({ id: `${id}-c${j + 1}`, label: c.label, preselected: c.preselected })),
-    };
-    if (b.what) name.what = b.what;
-    const note = brandNote(b.name, riskBrand === b.name, fallbackBrand === b.name);
-    if (note) name.note = note;
-    const override = overrides.get(key(b.name));
-    if (override != null) name.price_override = { base_cents: override };
-    return name;
-  });
-
   const company = oneLine(input.lead.businessName, 200);
-  const content: ProposalContent = {
-    client: { first_name: first, full_name: full, ...(company ? { company } : {}) },
-    greeting: `Hi ${first || "there"}, thank you again for meeting with us for your strategy call. Your proposal is outlined below for your review and acceptance.`,
-    recommendation: someBoth
-      ? "Getting a word mark and a logo mark for each of your brands is best practice and provides comprehensive protection. Rebecca's recommendation is preselected below."
-      : "Rebecca's recommendation is preselected below.",
-    pricing,
-    names,
-    adjustments,
-    includes: input.pricing.includes.map((r) => ({ ...r })),
+
+  const firmPricing = input.settingPricing ?? {
+    ...(input.packages && input.packages.length > 0 ? { packages: input.packages } : { ...input.pricing.pricing }),
+    includes: input.pricing.includes,
     office_action_note: input.pricing.office_action_note,
   };
+  const baseName = pricing.package;
+  const offer = readNewOffer(firmPricing);
+  const firmList = normalisePackages(firmPricing);
+  const choiceOn = offer?.mode === "choice" && !reducedApplied && firmList.length > 0;
+  const recommendedOnList = packageSource === "reviewed" || packageSource === "call";
+  const single: DraftOffer = { mode: "one", package: baseName };
+
+  if (offer?.mode === "choice" && reducedApplied) {
+    flags.push("The firm's \"client chooses\" package setting was not used: a custom package from the call is priced as one package.");
+  }
+
+  const choicePackages: DraftChoice | null = choiceOn && offer ? consultChoice(offer, recommendedOnList ? baseName : null) : null;
+  const brandOffer = (b: WorkingBrand, i: number): DraftOffer => {
+    if (!choicePackages || !offer) return single;
+    if (overrides.has(key(b.name))) {
+      flags.push(`The firm's "client chooses" package setting was not used for ${b.name}: a base price from the call was applied, so it is offered one package.`);
+      return single;
+    }
+    if (offer.per === "mark") {
+      const marks: Partial<Record<MarkKind, DraftChoice>> = {};
+      for (const m of b.marks) marks[m.kind] = { options: [...choicePackages.options], start: choicePackages.start };
+      checks.push({ source: "consult", path: `names[${i}].marks[0].package_choice`, text: `Each mark lets the client choose among ${choicePackages.options.join(", ")}, starting on ${choicePackages.start}.` });
+      return { mode: "per_mark", marks };
+    }
+    checks.push({ source: "consult", path: `names[${i}].package_choice`, text: `The client can choose among ${choicePackages.options.join(", ")}, starting on ${choicePackages.start}.` });
+    return { mode: "choice", options: [...choicePackages.options], start: choicePackages.start };
+  };
+  if (choicePackages) {
+    flags.push(
+      `CHECK: the firm's "client chooses" setting is on. Each brand offers ${choicePackages.options.join(", ")}, starting on ${choicePackages.start}${recommendedOnList ? " (the package recommended on the call)" : " (the setting's own start: no recommended package matched your list)"}.`,
+    );
+  }
+
+  const noteFor = (b: WorkingBrand) => brandNote(b.name, riskBrand === b.name, fallbackBrand === b.name);
+  const brandsSpec: DraftBrand[] = usable.map((b, i) => {
+    const id = `b${i + 1}`;
+    const note = noteFor(b);
+    return {
+      id,
+      name: b.name,
+      ...(b.what ? { what: b.what } : {}),
+      ...(note ? { note } : {}),
+      marks: b.marks.map((m) => ({ id: `${id}-${m.kind}`, kind: m.kind, desc: m.kind === "word" ? wordDesc(b.name) : logoDesc(b.name), preselected: m.preselected })),
+      classes: b.classes.map((c, j) => ({ id: `${id}-c${j + 1}`, label: c.label, preselected: c.preselected })),
+      offer: brandOffer(b, i),
+    };
+  });
+
+  const rawEmail = oneLine(input.lead.email, 320);
+  const clientEmail = rawEmail && !rawEmail.toLowerCase().endsWith(".invalid") ? rawEmail : null;
+  if (!clientEmail) {
+    flags.push("The lead has no usable email address. Add it before creating the link.");
+    checks.push({ source: "consult", path: "client_email", text: "The lead has no usable email address. Add it before creating the link." });
+  }
+  flags.push("Add the client's pay link before creating the link.");
+  checks.push({ source: "consult", path: "pay_url", text: "Add the client's pay link before creating the link." });
+
+  const startedAt = input.source.kind === "meeting" ? input.source.startedAt?.slice(0, 10) : undefined;
+  let ids = 0;
+  const spec: TrademarkDraftSpec = {
+    kind: "trademark",
+    client: { fullName: full, firstName: first, ...(company ? { company } : {}) },
+    greeting: `Hi ${first || "there"}, thank you again for meeting with us for your strategy call. Your proposal is outlined below for your review and acceptance.`,
+    recommendation: usable.some(offersBoth)
+      ? "Getting a word mark and a logo mark for each of your brands is best practice and provides comprehensive protection. Rebecca's recommendation is preselected below."
+      : "Rebecca's recommendation is preselected below.",
+    package: baseName,
+    names: brandsSpec,
+    credits: adjustments.map((a) => ({ id: a.id, label: a.label, kind: a.kind, value: a.value })),
+    checks,
+    madeBy: "assistant",
+    ...(startedAt && isCivilDate(startedAt) ? { consultDate: startedAt } : {}),
+  };
+  const built = buildDraftContent(spec, { pricing: firmPricing, letter: null, newOffer: offer }, () => `x${++ids}`);
+  if (!built.ok) return fail("ai_failed", `The draft couldn't be built (${built.error}). Nothing was drafted.`, costUsd);
+
+  // What the call set on the package and on a brand is applied AFTER the builder, under today's evidence rules.
+  const content: ProposalContent = built.content;
+  const lateChecks: DraftCheck[] = [];
+  content.client = { ...content.client, first_name: first };
+  content.pricing = { ...content.pricing };
+  if (secondMarkPct !== null) {
+    content.pricing.second_mark_discount_pct = secondMarkPct;
+    if (choicePackages && content.packages) {
+      content.packages = content.packages.map((p) => (p.package === baseName ? { ...p, second_mark_discount_pct: secondMarkPct as number } : p));
+      flags.push(`The second-mark discount from the call applies to ${baseName} only; the other offered packages keep the firm's own percent.`);
+      lateChecks.push({ source: "consult", path: "pricing.second_mark_discount_pct", text: `The ${secondMarkPct}% second-mark discount from the call applies to ${baseName} only, not the other offered packages.` });
+    } else {
+      lateChecks.push({ source: "consult", path: "pricing.second_mark_discount_pct", text: `The second-mark discount was set to ${secondMarkPct}% from the call. Check it is what the attorney said.` });
+    }
+  }
+  if (reducedApplied) content.pricing.reduce_under_included = true;
+  const names: ProposalName[] = content.names.map((n, i) => {
+    const override = overrides.get(key(usable[i].name));
+    return override != null ? { ...n, price_override: { base_cents: override } } : n;
+  });
+  content.names = names;
 
   // A credit is never more than the legal fee it comes off: capped here, and said so.
   const subtotal = quoteProposal({ ...content, adjustments: [] }, defaultSelection(content)).legal_subtotal_cents;
   let room = subtotal;
-  content.adjustments = adjustments.map((a) => {
+  content.adjustments = content.adjustments.map((a) => {
     if (a.kind !== "amount") return a;
     if (a.value > room) {
       flags.push(`The credit "${a.label}" of ${fmtCents(a.value)} is more than the legal fee it comes off (${fmtCents(room)}), so it was capped at ${fmtCents(room)}.`);
@@ -901,14 +989,13 @@ export async function draftProposalFromConsult(input: DraftConsultProposalInput)
     return a;
   });
   adjustments.splice(0, adjustments.length, ...content.adjustments);
+  if (lateChecks.length > 0) {
+    content.checks = [...(content.checks ?? []), ...lateChecks.map((c) => ({ ...c, text: c.text.slice(0, MAX_CHECK_TEXT) }))].slice(0, MAX_CONTENT_CHECKS);
+  }
 
   const title = "Trademark Proposal";
   const expiresOn = addDays(input.today, PROPOSAL_VALID_DAYS);
-  const rawEmail = oneLine(input.lead.email, 320);
-  const clientEmail = rawEmail && !rawEmail.toLowerCase().endsWith(".invalid") ? rawEmail : null;
-  if (!clientEmail) flags.push("The lead has no usable email address. Add it before creating the link.");
   const payUrl: string | null = null;
-  flags.push("Add the client's pay link before creating the link.");
 
   const issues = validateContent(content, {
     forApproval: true,
@@ -946,6 +1033,18 @@ export async function draftProposalFromConsult(input: DraftConsultProposalInput)
     email: { subject: proposalEmailSubject(input.firm.name), reasoning },
     costUsd,
   };
+}
+
+/**
+ * What a "client chooses" firm offers on a consult (Sprint 5, D2): the setting's options, starting on the package
+ * recommended on the call. A recommended package missing from the options is added, dropping the last option when
+ * three are already offered. With no recommended package on the list, the setting's own start stands.
+ */
+export function consultChoice(offer: NewOffer, recommended: string | null): DraftChoice {
+  if (!recommended) return { options: [...offer.options], start: offer.start };
+  if (offer.options.includes(recommended)) return { options: [...offer.options], start: recommended };
+  const kept = offer.options.length >= 3 ? offer.options.slice(0, 2) : [...offer.options];
+  return { options: [...kept, recommended], start: recommended };
 }
 
 const SOURCE_WORDS: Record<PackageSource, string> = {
