@@ -96,7 +96,14 @@ export default async function PublicProposalPage({ params }: { params: Promise<{
       title={view.title}
       clientName={view.clientName}
       expiresOn={view.expiresOn}
-      firm={{ name: view.firm.name, slug: view.firm.slug, displayName: view.firm.displayName, contactLine: view.firm.contactLine }}
+      firm={{
+        name: view.firm.name,
+        slug: view.firm.slug,
+        displayName: view.firm.displayName,
+        contactLine: view.firm.contactLine,
+        // A boolean only: whether step 2 may say the address is saved to the firm's file.
+        savesAddressToLawmatics: view.firm.savesAddressToLawmatics,
+      }}
       // The token is bound here, server-side, so the browser calls the action
       // with the ticks only.
       onAccept={acceptProposalAction.bind(null, token)}

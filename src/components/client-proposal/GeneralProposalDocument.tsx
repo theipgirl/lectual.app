@@ -16,7 +16,7 @@ import { DownloadPdfButton, LoeSignedLetter } from "./LoeReceipt";
 import { LoeSideAction } from "./LoeSideAction";
 import { LoeSignPanel } from "./LoeSignPanel";
 import { LoeStepBar } from "./LoeStepBar";
-import { saveDetailsInBackground, useLoeFlow } from "./loe-flow";
+import { saveDetailsInBackground, showsSavedNote, useLoeFlow } from "./loe-flow";
 import { brandForSlug, formatCivilDate, money, paragraphs, richSegments, safeHttpsUrl, type ProposalBrand } from "./format";
 import "./proposal.css";
 
@@ -163,7 +163,7 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
         ) : null}
         <div className="cp-wrap cp-layout">
           <div className="cp-left">
-            {loeOn && !accepted && loeFlow.step === 2 ? <LoeDetailsForm details={loeFlow.details} onChange={loeFlow.setDetail} savedWith={onSaveDetails ? (firm.displayName ?? firm.name) : null} /> : null}
+            {loeOn && !accepted && loeFlow.step === 2 ? <LoeDetailsForm details={loeFlow.details} onChange={loeFlow.setDetail} savedWith={showsSavedNote(mode, firm, onSaveDetails) ? (firm.displayName ?? firm.name) : null} /> : null}
             {loeOn && !accepted && loeFlow.step === 3 ? (
               <section className="cp-choose cp-letter-step" aria-labelledby="cp-letter-h">
                 <div className="cp-step-h">

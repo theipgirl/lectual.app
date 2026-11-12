@@ -179,6 +179,12 @@ export type PublicProposalFirm = {
   displayName: string;
   /** "(305) 555-0100 · info@firm.com" from the profile's sign-off, or null (the page omits the line). */
   contactLine: string | null;
+  /**
+   * True only for a proposal that carries an engagement letter AND whose firm has an ACTIVE Lawmatics connection: then Continue on
+   * "Your details" really does save the address to the firm's file, and the page may say so (`detailsSavedNote`). False otherwise,
+   * and false when the connection could not be read. A plain boolean: nothing else about the connection reaches the browser.
+   */
+  savesAddressToLawmatics: boolean;
 };
 
 /**
@@ -458,6 +464,7 @@ export async function readPublicProposal(
       timeZone: resolveTimeZone(profile ? readString(profile.time_zone) : null),
       displayName: firmDisplayName(profile ? readString(profile.display_name) : null, firmName),
       contactLine: contactLine(firmContactFromSignoff(profile ? readString(profile.email_signature) : null)),
+      savesAddressToLawmatics: false,
     };
 
     // FAIL CLOSED when the firm's proposals module is off (or its module list
@@ -514,6 +521,9 @@ export async function readPublicProposal(
       }
     }
 
+    // Whether Continue on "Your details" saves the address to the firm's Lawmatics: only with a letter, only with an active connection.
+    if (content.loe) firm.savesAddressToLawmatics = await readHasActiveLawmatics(client, orgId);
+
     const view: PublicProposalView = {
       status: storedStatus,
       version: typeof row.version === "number" ? row.version : 1,
@@ -545,6 +555,22 @@ export async function readPublicProposal(
     // difference between "does not exist" and "we could not check" is the whole
     // reason this function is not two-state.
     return { status: "unavailable" };
+  }
+}
+
+/**
+ * Whether the firm has an ACTIVE Lawmatics connection (lectual 0077), fenced on the proposal row's org and selecting `status` ONLY:
+ * the sealed token column is never named. Any error, a missing row or any other status is false (the page then just omits the line
+ * that says the address is saved). Never throws.
+ */
+export const LAWMATICS_CONNECTION_PUBLIC_COLUMNS = "status";
+
+async function readHasActiveLawmatics(client: PublicProposalsDb, orgId: string): Promise<boolean> {
+  try {
+    const { data, error } = await client.from("lawmatics_connection").select(LAWMATICS_CONNECTION_PUBLIC_COLUMNS).eq("org_id", orgId).eq("status", "active").maybeSingle();
+    return !error && isObject(data) && data.status === "active";
+  } catch {
+    return false;
   }
 }
 

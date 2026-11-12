@@ -54,7 +54,7 @@ import { DownloadPdfButton, LoeSignedLetter } from "./LoeReceipt";
 import { LoeSideAction } from "./LoeSideAction";
 import { LoeSignPanel } from "./LoeSignPanel";
 import { LoeStepBar } from "./LoeStepBar";
-import { saveDetailsInBackground, useLoeFlow, type LoeLetterData, type LoeStep } from "./loe-flow";
+import { saveDetailsInBackground, showsSavedNote, useLoeFlow, type LoeLetterData, type LoeStep } from "./loe-flow";
 import { RPB_FONT_VARS } from "./fonts";
 import {
   brandForSlug,
@@ -102,6 +102,8 @@ export type ProposalDocumentProps = {
     displayName?: string;
     /** From the firm's profile; absent = no contact line. */
     contactLine?: string | null;
+    /** The public read's `savesAddressToLawmatics`: a letter AND an active Lawmatics connection. Absent = false (no "saved" line). */
+    savesAddressToLawmatics?: boolean;
   };
   mode: "live" | "preview" | "accepted";
   /** Starting ticks (accepted mode: what was accepted). Defaults to the firm's preselected offer. */
@@ -572,7 +574,7 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
             {loeOn && !accepted && loeFlow.step === 2 ? (
               <>
                 <LoeIncludesLink onBackToStepOne={() => loeFlow.setStep(1)} />
-                <LoeDetailsForm details={loeFlow.details} onChange={loeFlow.setDetail} savedWith={onSaveDetails ? (firm.displayName ?? firm.name) : null} />
+                <LoeDetailsForm details={loeFlow.details} onChange={loeFlow.setDetail} savedWith={showsSavedNote(mode, firm, onSaveDetails) ? (firm.displayName ?? firm.name) : null} />
               </>
             ) : null}
             {loeOn && !accepted && loeFlow.step === 3 ? (
