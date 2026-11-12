@@ -248,7 +248,22 @@ export function describeStepEvent(payload: unknown): string | null {
   if (!parsed) return null;
   const text = pickWords(HISTORY_WORDS[parsed.step], parsed.outcome, parsed.step);
   const base = parsed.reason ? `${text}: ${parsed.reason}` : text;
-  return base + addedClassesSuffix(parsed.payload);
+  return base + addressTriggerSuffix(parsed.payload) + addedClassesSuffix(parsed.payload);
+}
+
+/**
+ * The mailing-address step has two triggers (`address-events.ts`): " (when the client entered their details)", " (unchanged at
+ * signing)" and so on, or "" for an event with no trigger (written after signing, before the details trigger existed).
+ */
+function addressTriggerSuffix(payload: Record<string, unknown>): string {
+  if (payload.step !== "address_to_lawmatics" || payload.outcome !== STEP_SUCCESS.address_to_lawmatics) return "";
+  if (payload.trigger === "details") return payload.action === "updated" ? " (updated when the client changed their details)" : " (when the client entered their details)";
+  if (payload.trigger === "signed") {
+    if (payload.action === "unchanged") return " (unchanged at signing)";
+    if (payload.action === "updated") return " (updated at signing)";
+    return " (after signing)";
+  }
+  return "";
 }
 
 /** " (2 classes added by the client; legal fee now $4,950)" for an acceptance step that carries them, else "". Counts and a total only. */

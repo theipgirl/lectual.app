@@ -54,7 +54,7 @@ import { DownloadPdfButton, LoeSignedLetter } from "./LoeReceipt";
 import { LoeSideAction } from "./LoeSideAction";
 import { LoeSignPanel } from "./LoeSignPanel";
 import { LoeStepBar } from "./LoeStepBar";
-import { useLoeFlow, type LoeLetterData, type LoeStep } from "./loe-flow";
+import { saveDetailsInBackground, useLoeFlow, type LoeLetterData, type LoeStep } from "./loe-flow";
 import { RPB_FONT_VARS } from "./fonts";
 import {
   brandForSlug,
@@ -130,6 +130,11 @@ export type ProposalDocumentProps = {
    * until the proposal is signed.
    */
   onDownloadSigned?: () => Promise<LetterPdfResult>;
+  /**
+   * live, with a letter: called when the client presses Continue on "Your details" with every required detail given. The server
+   * writes the address to the firm's Lawmatics after its response; the page neither waits for it nor shows the outcome.
+   */
+  onSaveDetails?: (details: SignerDetails) => Promise<void>;
   /** accepted, with a letter: "Signed November 12, 2026 at 2:14 PM EST by ..." for the receipt. */
   signedLine?: string | null;
   /** Starting step and typed values: for tests and the staff preview, never set by the public page. */
@@ -257,7 +262,7 @@ export function ProposalDocument(props: ProposalDocumentProps) {
 }
 
 function TrademarkProposalDocument(props: ProposalDocumentProps) {
-  const { content, title, clientName, expiresOn, firm, mode, initialSelection, acceptedQuote, payUrl, onAccept, initialClientClasses, letter, onDownloadReview, onDownloadSigned } = props;
+  const { content, title, clientName, expiresOn, firm, mode, initialSelection, acceptedQuote, payUrl, onAccept, initialClientClasses, letter, onDownloadReview, onDownloadSigned, onSaveDetails } = props;
   const brand: ProposalBrand = brandForSlug(firm.slug);
   /** The firm's logo above its engagement letter: decided by the same brand signal as the rest of the page. */
   const letterLogo = letterLogoForBrand(brand);
@@ -567,7 +572,7 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
             {loeOn && !accepted && loeFlow.step === 2 ? (
               <>
                 <LoeIncludesLink onBackToStepOne={() => loeFlow.setStep(1)} />
-                <LoeDetailsForm details={loeFlow.details} onChange={loeFlow.setDetail} />
+                <LoeDetailsForm details={loeFlow.details} onChange={loeFlow.setDetail} savedWith={onSaveDetails ? (firm.displayName ?? firm.name) : null} />
               </>
             ) : null}
             {loeOn && !accepted && loeFlow.step === 3 ? (
@@ -1196,6 +1201,8 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
                     }
                     legalTotalText={money(quote.legal_total_cents)}
                     onContinue={() => {
+                      // Leaving "Your details": the address goes to the firm's records, without waiting and without a word on the page.
+                      if (loeFlow.step === 2) saveDetailsInBackground(onSaveDetails, loeFlow.detailsOk, loeFlow.cleaned);
                       loeFlow.setStep(loeFlow.step === 1 ? 2 : 3);
                       requestAnimationFrame(() => document.getElementById("cp-steps")?.scrollIntoView({ block: "start" }));
                     }}

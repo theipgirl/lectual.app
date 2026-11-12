@@ -450,6 +450,7 @@ button.cp-step-btn:focus-visible { outline: 3px solid var(--cp-brand); outline-o
 .cp-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 16px; }
 .cp-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; font-size: 15px; color: var(--cp-soft); }
 .cp-field-wide { grid-column: 1 / -1; }
+.cp-details-note { margin: 14px 0 0; font-size: 14px; color: var(--cp-soft); }
 .cp-field input[type="text"] {
   font: inherit; font-size: 17px; color: var(--cp-ink); background: var(--cp-box); border: 1px solid var(--cp-line-2);
   border-radius: 8px; padding: 10px 12px; min-width: 0; width: 100%; box-sizing: border-box;

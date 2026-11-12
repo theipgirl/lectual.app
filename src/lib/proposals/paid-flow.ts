@@ -17,6 +17,7 @@ import { lawmaticsMatterAccess, resolveProposalMatter, signedInLawmaticsToken } 
 import { loeInputFromAcceptedProposal, loeFieldValues, LOE_REFUSAL_TEXT, type LoeAdapterResult } from "./loe-adapter";
 import { fieldWrites, readLoeFieldsConfig, type LoeFieldsConfig } from "./loe-fields";
 import { retryLoeFileUpload } from "./loe-upload";
+import { lastAddressWrite, signedAddressDone } from "./address-events";
 import { runAddressToLawmatics } from "./address-to-lawmatics";
 import { SignedUploadBlocked, runSignedLoeUpload } from "./loe-signed-upload";
 import { logSignedMismatch } from "./signed-mismatch-log";
@@ -252,9 +253,12 @@ async function noteStep(supabase: ScopedClient, proposal: ProposalRow, events: P
   return report(proposal, "lawmatics_note", result.outcome, result.reason ?? null);
 }
 
-/** Adds the signer's mailing address to Lawmatics again (Try again on the proposal page). Signed-in person, the firm's own active connection. */
+/**
+ * Adds the signer's mailing address to Lawmatics again (Try again on the proposal page). Signed-in person, the firm's own active
+ * connection. Same dedupe as the signed run: the address the client's details already wrote this round is not written twice.
+ */
 async function addressRetryStep(supabase: ScopedClient, proposal: ProposalRow, events: ProposalStepEvent[]): Promise<FlowReport | { note: string } | null> {
-  if (stepSucceeded(events, proposal.id, "address_to_lawmatics")) return { note: STEP_TEXT.addressAlready };
+  if (signedAddressDone(events, proposal.id)) return { note: STEP_TEXT.addressAlready };
   const result = await runAddressToLawmatics(proposal.accepted_snapshot, {
     token: signedInLawmaticsToken,
     target: async () => {
@@ -268,8 +272,10 @@ async function addressRetryStep(supabase: ScopedClient, proposal: ProposalRow, e
       if (target.reason === "unreadable") return { ok: false, kind: "failed", reason: STEP_TEXT.addressTargetUnreadable };
       return { ok: false, kind: "blocked", reason: target.reason === "none" ? STEP_TEXT.addressNoMatter : STEP_TEXT.addressManyMatters };
     },
+    proposalId: proposal.id,
+    previous: lastAddressWrite(events, proposal.id),
   });
-  return report(proposal, "address_to_lawmatics", result.outcome, result.reason ?? null);
+  return report(proposal, "address_to_lawmatics", result.outcome, result.reason ?? null, result.extra ?? {});
 }
 
 /** Files the signed letter again (Try again on the proposal page). Signed-in person, the firm's own active connection. */

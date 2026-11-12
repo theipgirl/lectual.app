@@ -49,7 +49,7 @@ function retryableStatus(status: number): boolean {
 
 async function send(
   token: string,
-  method: "POST" | "PUT",
+  method: "POST" | "PUT" | "PATCH",
   path: string,
   body: Record<string, unknown>,
   fetchImpl: FetchLike,
@@ -142,9 +142,42 @@ export async function createAddress(
   address: LawmaticsAddressInput,
   owner: LawmaticsAddressOwner,
   fetchImpl: FetchLike = defaultFetch,
-): Promise<LawmaticsWriteResult> {
+): Promise<LawmaticsWriteResult<{ id: string | null }>> {
   const r = await send(token, "POST", LAWMATICS_ADDRESS_PATH, toAddressPayload(address, owner), fetchImpl, true);
-  return r.ok ? { ok: true } : r;
+  return r.ok ? { ok: true, id: addressIdFrom(r.body) } : r;
+}
+
+/** An address id Lawmatics gave back, or one we stored: a plain token we can put in a path, else null. */
+const ADDRESS_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+export function isAddressId(value: unknown): value is string {
+  return typeof value === "string" && ADDRESS_ID.test(value);
+}
+
+/** The new address's id from whichever envelope comes back (`{data: {id}}` or `{id}`), or null when none can be read. */
+export function addressIdFrom(body: unknown): string | null {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return null;
+  const root = body as Record<string, unknown>;
+  const data = root.data && typeof root.data === "object" && !Array.isArray(root.data) ? (root.data as Record<string, unknown>) : root;
+  const id = typeof data.id === "number" ? String(data.id) : data.id;
+  return isAddressId(id) ? id : null;
+}
+
+/**
+ * `PATCH /addresses/:id` with the same flat body as `createAddress` (the address written earlier, changed in place, so a client who
+ * edits their details does not leave two addresses in Lawmatics). NOT verified against a live account. A 404 comes back as
+ * `{ ok: false, status: 404 }`; the caller then creates. Logs the status only.
+ */
+export async function updateAddress(
+  token: string,
+  addressId: string,
+  address: LawmaticsAddressInput,
+  owner: LawmaticsAddressOwner,
+  fetchImpl: FetchLike = defaultFetch,
+): Promise<LawmaticsWriteResult<{ id: string }>> {
+  if (!isAddressId(addressId)) return { ok: false, reason: "unknown address id", retryable: false, status: 404 };
+  const r = await send(token, "PATCH", `${LAWMATICS_ADDRESS_PATH}/${encodeURIComponent(addressId)}`, toAddressPayload(address, owner), fetchImpl, true);
+  return r.ok ? { ok: true, id: addressId } : r;
 }
 
 export type GetFetchLike = (url: string, init: { method: "GET"; headers: Record<string, string> }) => Promise<{

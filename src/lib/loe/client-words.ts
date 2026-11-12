@@ -31,6 +31,11 @@ export const BACK_LABEL = "Back";
 
 export const DETAILS_HEADING = "Your details";
 export const DETAILS_INTRO = "These go on your engagement letter. Please give your full legal name and your full mailing address. Fields marked * are required.";
+/**
+ * Under the address fields on the live page: what Continue does with the address (it is written to the firm's own client records,
+ * `savePublicDetailsAddress`). A statement of what the page does, nothing more.
+ */
+export const detailsSavedNote = (firmName: string): string => `Your address is saved to your file with ${firmName.trim() || "the firm"} when you continue.`;
 export const LETTER_HEADING = "Your engagement letter";
 /** The letter is dated by the server at the moment of signing (the firm's calendar date), so the intro says so rather than "today's date". */
 export const LETTER_INTRO = "Please read the whole letter and the exhibit that follows it. Your details are filled in, and the letter is dated the day you sign it.";

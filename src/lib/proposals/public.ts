@@ -3,7 +3,10 @@ import "server-only";
 import { after } from "next/server";
 import { getAdminClient } from "@/lib/db/admin";
 import { resolveTimeZone } from "@/lib/org/profile-rules";
-import { runAcceptanceFollowups, type FollowupDb } from "./accept-followups";
+import { createHash } from "node:crypto";
+import { runAcceptanceFollowups, type FollowupDb, type FollowupDeps } from "./accept-followups";
+import { runDetailsAddress } from "./details-address";
+import { detailsAddressLimiter, detailsTokenLimiter } from "@/lib/loe/review-limit";
 import { firmDisplayName } from "./commitment";
 import { contactLine, firmContactFromSignoff } from "./firm-contact";
 import { isProposalExpired } from "./expiry";
@@ -16,7 +19,7 @@ import { readStoredAgreement, type StoredAgreementDb } from "@/lib/loe/stored-ag
 import { storedSignedLetterView, type SignedLetterView } from "@/lib/loe/signed-letter";
 import { verifySignedCopy } from "@/lib/loe/signed-text-check";
 import { logSignedMismatch } from "./signed-mismatch-log";
-import { addressJson, assembleAgreement, checkSigning, letterDateText, signedLineText } from "@/lib/loe/signing";
+import { addressJson, assembleAgreement, checkSigning, cleanSigningDetails, letterDateText, missingDetails, signedLineText } from "@/lib/loe/signing";
 import { parseInet } from "@/lib/quotes/public";
 import { quoteHasItems } from "./pricing";
 import {
@@ -58,6 +61,8 @@ import {
  * ── WHAT THE CLIENT CAN CAUSE, ALL OF IT ────────────────────────────────────
  *   OPENING THE PAGE   one `viewed` event, deduped to one per window.
  *   TICKING BOXES      nothing. The pick lives on the client's page.
+ *   CONTINUE ON "YOUR DETAILS" (letter proposals only) nothing in Lectual but a step event: after the
+ *                      response, the typed address goes to the firm's Lawmatics (details-address.ts).
  *   ACCEPTING          one conditional update (`status = 'sent'` -> accepted,
  *                      with `accepted_selection` and `accepted_snapshot`) that
  *                      cannot fire twice, then, after the response, the firm
@@ -945,5 +950,49 @@ export async function notifyFirmOfAcceptance(input: { proposalId: string; orgId:
     } catch {
       // Never let a notice break an acceptance.
     }
+  }
+}
+
+/**
+ * The client pressed Continue on "Your details" (step 2) of a proposal that carries an engagement letter: their mailing address goes
+ * to the firm's Lawmatics now, so it is there when they reach the pay form (`details-address.ts`). Token and typed details only.
+ *
+ * In order, every refusal silent (the page is told nothing either way, and nothing here throws): a token of the wrong shape; the
+ * rate limit (its own in-memory counters, checked before the proposal is read); details that don't meet the signing rule, cleaned
+ * with the signing normaliser; then the token's read: a live (`sent`), unexpired version whose content carries a letter. Only then is
+ * a slot used and the write scheduled with `after()` (awaited where there is no request scope), so Continue never waits on Lawmatics.
+ * Nothing about the address is stored in Lectual or logged.
+ */
+export async function savePublicDetailsAddress(
+  token: string,
+  rawDetails: unknown,
+  now: Date,
+  db?: PublicProposalsDb,
+  opts: { ip?: string | null; deps?: FollowupDeps } = {},
+): Promise<void> {
+  try {
+    const t = String(token ?? "");
+    if (!isWellFormedProposalToken(t)) return;
+    const tokenKey = `t:${createHash("sha256").update(t).digest("hex")}`;
+    const ipKey = `ip:${parseInet(opts.ip) ?? "unknown"}`;
+    if (!detailsTokenLimiter.allowed(tokenKey) || !detailsAddressLimiter.allowed(ipKey)) return;
+    const details = cleanSigningDetails(rawDetails);
+    if (missingDetails(details).length > 0) return;
+
+    const read = await readPublicProposal(t, now, db);
+    if (read.status !== "ok" || read.handle.storedStatus !== "sent" || !read.view.content.loe) return;
+    const client = publicProposalsDb(db);
+    detailsTokenLimiter.record(tokenKey);
+    detailsAddressLimiter.record(ipKey);
+
+    const input = { proposalId: read.handle.proposalId, orgId: read.handle.orgId };
+    const run = () => runDetailsAddress(client as unknown as FollowupDb, input, details, opts.deps).catch(() => {});
+    try {
+      after(run);
+    } catch {
+      await run();
+    }
+  } catch {
+    // Never let the address write touch the client's Continue.
   }
 }

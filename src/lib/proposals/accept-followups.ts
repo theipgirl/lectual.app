@@ -8,7 +8,8 @@ import { signedAtUtcIso } from "@/lib/loe/signing";
 import { resolveTimeZone } from "@/lib/org/profile-rules";
 import { addNote, uploadMatterFile, type FetchLike, type GetFetchLike, type MultipartFetchLike } from "@/lib/lawmatics/writes";
 import { firmDisplayName } from "./commitment";
-import { runAddressToLawmatics } from "./address-to-lawmatics";
+import { lastAddressWrite, signedAddressDone } from "./address-events";
+import { runAddressToLawmatics, type AddressStepDeps } from "./address-to-lawmatics";
 import { SignedUploadBlocked, runSignedLoeUpload } from "./loe-signed-upload";
 import { logSignedMismatch } from "./signed-mismatch-log";
 import { isSignedSnapshot } from "./signed-state";
@@ -27,7 +28,8 @@ import { MARK_KIND_LABEL, isGeneralContent, type AcceptedSnapshot } from "./type
  *      approvers and the firm's intake staff: a headline, nothing else;
  *   2. a Lawmatics NOTE on the right record, through the firm's OWN connection;
  *   3. (Sprint 6, a SIGNED acceptance only) the signed letter's PDF filed in the matter's Engagement folder;
- *   4. (a SIGNED acceptance only) the signer's mailing address added to the Lawmatics matter and its contact (`address-to-lawmatics.ts`).
+ *   4. (a SIGNED acceptance only) the signer's mailing address added to the Lawmatics matter and its contact (`address-to-lawmatics.ts`),
+ *      or, when the client's details were already written from "Your details" (`details-address.ts`), confirmed unchanged or updated.
  *
  * Each step is independent, records its outcome on the proposal's timeline, and runs once
  * per accepted version (a version has its own id, so the dedupe is by proposal id). NOTHING
@@ -225,7 +227,7 @@ export async function resolveNoteTarget(db: LookupDb, input: NoteTargetInput): P
 
 /* ─────────────────────────── one step's result ─────────────────────────── */
 
-export type StepResult = { outcome: string; reason?: string };
+export type StepResult = { outcome: string; reason?: string; extra?: Record<string, string | number> };
 
 export type NoteProposal = {
   id: string;
@@ -294,7 +296,7 @@ async function readProposal(db: FollowupDb, input: FollowupInput): Promise<Row |
  * either could not be read. A reset starts a fresh round (paid.ts `currentRound`), so a client who
  * accepts again after a reset gets the notice and the note again; steps from before it don't count.
  */
-async function readEarlierSteps(db: FollowupDb, row: Row): Promise<StepEventInput[] | null> {
+export async function readEarlierSteps(db: FollowupDb, row: { id: string; orgId: string }): Promise<StepEventInput[] | null> {
   const [steps, resets] = await Promise.all([
     db
       .from("client_proposal_event")
@@ -302,7 +304,9 @@ async function readEarlierSteps(db: FollowupDb, row: Row): Promise<StepEventInpu
       .eq("proposal_id", row.id)
       .eq("org_id", row.orgId)
       .in("payload->>step", ["accept_notice", "lawmatics_note", "signed_loe_upload", "address_to_lawmatics"])
-      .limit(50),
+      // Newest first: the address step's "Your details" trigger can add a few events before signing, and the newest are the ones read.
+      .order("created_at", { ascending: false })
+      .limit(100),
     db
       .from("client_proposal_event")
       .select("proposal_id, type, created_at")
@@ -323,7 +327,7 @@ async function readEarlierSteps(db: FollowupDb, row: Row): Promise<StepEventInpu
 }
 
 /** Writes the step to the timeline as the system. Returns whether the line landed. */
-async function recordStep(db: FollowupDb, row: Row, payload: StepPayload): Promise<boolean> {
+export async function recordStep(db: FollowupDb, row: { id: string; orgId: string; familyId: string }, payload: StepPayload): Promise<boolean> {
   try {
     const { error } = await db.from("client_proposal_event").insert({
       org_id: row.orgId,
@@ -428,28 +432,42 @@ async function firmLetterFacts(db: FollowupDb, orgId: string): Promise<FirmLette
 }
 
 /**
- * Writes the signer's mailing address (from the signed snapshot only) to the Lawmatics matter, and a copy to its contact when one can
- * be read, through the firm's OWN connection. Signed (schema 2) snapshots only. NOT verified against a live Lawmatics.
+ * The firm's OWN Lawmatics token and the address's target (the note's target resolution), for both triggers of the address step
+ * (`address-to-lawmatics.ts`): the signed run below and the "Your details" run (`details-address.ts`). Fenced on the proposal row's org.
  */
-async function addressStep(db: FollowupDb, row: Row, deps: FollowupDeps): Promise<StepResult> {
+export function addressAccess(db: FollowupDb, row: NoteTargetInput, deps: FollowupDeps): Pick<AddressStepDeps, "token" | "target" | "fetchImpl" | "getFetchImpl"> {
+  return {
+    token: async () => {
+      try {
+        const t = await (deps.getToken ?? ((d, orgId) => firmToken(d as never, orgId)))(db, row.orgId);
+        return t ? { status: "ok", token: t } : { status: "not_connected" };
+      } catch {
+        return { status: "unavailable" };
+      }
+    },
+    target: async () => {
+      const target = await resolveNoteTarget(db, row);
+      if (target.ok) return { ok: true, lawmaticsId: target.notableId };
+      if (target.reason === "unreadable") return { ok: false, kind: "failed", reason: STEP_TEXT.addressTargetUnreadable };
+      return { ok: false, kind: "blocked", reason: target.reason === "none" ? STEP_TEXT.addressNoMatter : STEP_TEXT.addressManyMatters };
+    },
+    fetchImpl: deps.fetchImpl,
+    getFetchImpl: deps.getFetch,
+  };
+}
+
+/**
+ * Writes the signer's mailing address (from the signed snapshot only) to the Lawmatics matter, and a copy to its contact when one can
+ * be read, through the firm's OWN connection. Signed (schema 2) snapshots only. When the client's details already put an address in
+ * Lawmatics this round, the same address is recorded with no request and a changed one updates those records. NOT verified against a
+ * live Lawmatics.
+ */
+async function addressStep(db: FollowupDb, row: Row, deps: FollowupDeps, earlier: StepEventInput[] | null): Promise<StepResult> {
   try {
     return await runAddressToLawmatics(row.snapshot, {
-      token: async () => {
-        try {
-          const t = await (deps.getToken ?? ((d, orgId) => firmToken(d as never, orgId)))(db, row.orgId);
-          return t ? { status: "ok", token: t } : { status: "not_connected" };
-        } catch {
-          return { status: "unavailable" };
-        }
-      },
-      target: async () => {
-        const target = await resolveNoteTarget(db, row);
-        if (target.ok) return { ok: true, lawmaticsId: target.notableId };
-        if (target.reason === "unreadable") return { ok: false, kind: "failed", reason: STEP_TEXT.addressTargetUnreadable };
-        return { ok: false, kind: "blocked", reason: target.reason === "none" ? STEP_TEXT.addressNoMatter : STEP_TEXT.addressManyMatters };
-      },
-      fetchImpl: deps.fetchImpl,
-      getFetchImpl: deps.getFetch,
+      ...addressAccess(db, row, deps),
+      proposalId: row.id,
+      previous: earlier ? lastAddressWrite(earlier, row.id) : null,
     });
   } catch {
     return { outcome: "failed", reason: "unexpected error" };
@@ -502,12 +520,20 @@ async function signedUploadStep(db: FollowupDb, row: Row, deps: FollowupDeps): P
   }
 }
 
-async function runStep(db: FollowupDb, row: Row, step: ProposalStep, earlier: StepEventInput[] | null, run: () => Promise<StepResult>, blockWhenUnchecked: boolean): Promise<void> {
-  if (earlier && stepSucceeded(earlier, row.id, step)) return;
+async function runStep(
+  db: FollowupDb,
+  row: Row,
+  step: ProposalStep,
+  earlier: StepEventInput[] | null,
+  run: () => Promise<StepResult>,
+  blockWhenUnchecked: boolean,
+  done: (events: StepEventInput[]) => boolean = (events) => stepSucceeded(events, row.id, step),
+): Promise<void> {
+  if (earlier && done(earlier)) return;
   const result = earlier === null && blockWhenUnchecked ? ({ outcome: "blocked", reason: "couldn't check for an earlier one" } as StepResult) : await run();
   // Counts and the new legal total only: never what the client typed.
   const added = addedClassCount(row.snapshot.content, row.snapshot.selection);
-  const extra: Record<string, number> = added > 0 ? { added_classes: added, legal_total_cents: row.snapshot.quote.legal_total_cents } : {};
+  const extra: Record<string, string | number> = { ...(result.extra ?? {}), ...(added > 0 ? { added_classes: added, legal_total_cents: row.snapshot.quote.legal_total_cents } : {}) };
   await recordStep(db, row, stepPayload(step, result.outcome, result.reason, extra));
 }
 
@@ -527,7 +553,9 @@ export async function runAcceptanceFollowups(db: FollowupDb, input: FollowupInpu
     // Sprint 6: a signed (schema 2) acceptance also files the signed letter. Earlier acceptances never run this step.
     if (isSignedSnapshot(row.snapshot)) await runStep(db, row, "signed_loe_upload", earlier, () => signedUploadStep(db, row, deps), true);
     // The signer's mailing address goes to the same Lawmatics matter. Independent of the steps above: none waits on it or is changed by it.
-    if (isSignedSnapshot(row.snapshot)) await runStep(db, row, "address_to_lawmatics", earlier, () => addressStep(db, row, deps), true);
+    // A success of the "Your details" trigger does not end it: the signed address is still compared with what was written.
+    if (isSignedSnapshot(row.snapshot))
+      await runStep(db, row, "address_to_lawmatics", earlier, () => addressStep(db, row, deps, earlier), true, (events) => signedAddressDone(events, row.id));
   } catch {
     console.error("[proposals] the acceptance follow-ups stopped early");
   }

@@ -4,7 +4,7 @@ import { ProposalDocument } from "@/components/client-proposal/ProposalDocument"
 import { ProposalNotice } from "@/components/client-proposal/ProposalNotice";
 import { readPublicProposal, recordProposalViewed } from "@/lib/proposals/public";
 import { isSignedInFirmMember } from "@/lib/proposals/staff-view";
-import { acceptProposalAction, downloadReviewLetterAction, downloadSignedLetterAction } from "./actions";
+import { acceptProposalAction, saveDetailsAction, downloadReviewLetterAction, downloadSignedLetterAction } from "./actions";
 
 /**
  * `/p/<token>` — the client's proposal. No login; the token is the credential.
@@ -102,6 +102,8 @@ export default async function PublicProposalPage({ params }: { params: Promise<{
       onAccept={acceptProposalAction.bind(null, token)}
       letter={view.letter}
       onDownloadReview={view.letter ? downloadReviewLetterAction.bind(null, token) : undefined}
+      // Continue on "Your details" writes the typed address to the firm's Lawmatics (after the response; the page shows nothing).
+      onSaveDetails={view.letter ? saveDetailsAction.bind(null, token) : undefined}
       // Passed on the live page too: the receipt this page turns into the moment signing succeeds offers the signed PDF
       // without a reload. The action is token-only and refuses until the proposal really is signed.
       onDownloadSigned={view.letter ? downloadSignedLetterAction.bind(null, token) : undefined}

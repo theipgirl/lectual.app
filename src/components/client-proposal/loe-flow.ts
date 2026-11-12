@@ -140,3 +140,17 @@ export function useLoeFlow(input: LoeFlowInput) {
 }
 
 export type LoeFlow = ReturnType<typeof useLoeFlow>;
+
+/**
+ * Continue on "Your details": hands the CLEANED details to the page's save action (the server cleans and checks them again), only
+ * when every required detail is given. Fire and forget: never awaited, never thrown, never shown. Returns whether it was called.
+ */
+export function saveDetailsInBackground(save: ((details: SignerDetails) => Promise<void>) | undefined, detailsOk: boolean, cleaned: SignerDetails): boolean {
+  if (!save || !detailsOk) return false;
+  try {
+    void Promise.resolve(save(cleaned)).catch(() => {});
+  } catch {
+    // A save that throws synchronously still never stops Continue.
+  }
+  return true;
+}
