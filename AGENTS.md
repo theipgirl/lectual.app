@@ -1842,3 +1842,6 @@ Nothing here sends, moves a stage, opens a matter or calls a model. No migration
   The owner's delete stays allowed for a signed proposal (the design's "keep or refuse" is still Taylor's open item).
 - **NOT verified:** the real 0106 table and function, Lawmatics' `/files` multipart (same unverified shape as the accepted-proposal upload), a real browser (the Blob
   download, the switch's hide/show of Preview, focus), Vercel's bundling of the font for the dashboard route (traced in `next.config.ts`; checked by build only).
+  Also not verified: the tightened signature policy itself (viewer and social media reading nothing is 0106's to enforce; the app only stops asking), the
+  stored-text copy of a signed PDF against a real signature row, and, in a real browser, the receipt appearing with the signed download straight after
+  signing and Web Crypto producing the same fingerprint as the server (proved here with node's Web Crypto over the page's own functions).
