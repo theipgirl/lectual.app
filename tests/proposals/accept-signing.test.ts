@@ -6,7 +6,6 @@ import type { Row } from "./public-db-double";
 import { SIGN_MESSAGES } from "@/lib/loe/client-words";
 import { sevetri } from "./fixture";
 import { TEST_DETAILS } from "../loe/full-letter-fixture";
-import { twoBrandPerMark, withLoe } from "../loe/loe-fixtures";
 
 const mocks = vi.hoisted(() => ({
   after: vi.fn<(fn: () => unknown) => void>(),

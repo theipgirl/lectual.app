@@ -9,6 +9,7 @@ import {
   cleanSigningDetails,
   emptyDetails,
   fingerprintOf,
+  letterDateText,
   missingDetails,
   type Agreement,
   type SignerDetails,
@@ -64,7 +65,8 @@ export function useLoeFlow(input: LoeFlowInput) {
   const detailsOk = missingDetails(cleaned).length === 0;
   const exhibit = useMemo(() => (enabled ? buildExhibit(input.shown, input.quote, money) : null), [enabled, input.shown, input.quote]);
 
-  const dateText = input.letter?.dateText ?? "";
+  // The public page always passes the letter's date (worked out on the server in the firm's zone). The staff preview passes none, so it shows today.
+  const dateText = input.letter?.dateText || letterDateText(new Date(), "UTC");
   const clientEmail = input.letter?.clientEmail ?? "";
   const body = input.loe?.body ?? "";
 

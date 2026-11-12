@@ -455,7 +455,7 @@ button.cp-step-btn:focus-visible { outline: 3px solid var(--cp-brand); outline-o
   border-radius: 8px; padding: 10px 12px; min-width: 0; width: 100%; box-sizing: border-box;
 }
 .cp-field input[type="text"]:focus-visible { outline: 3px solid var(--cp-brand); outline-offset: 1px; }
-.cp-back-includes { margin: 0 0 4px; font-size: 15px; }
+.cp-root .cp-back-includes { margin: 0 0 4px; font-size: 15px; }
 .cp-back-includes a { color: var(--cp-brand); font-weight: 600; text-underline-offset: 3px; }
 
 .cp-letter {
@@ -463,8 +463,8 @@ button.cp-step-btn:focus-visible { outline: 3px solid var(--cp-brand); outline-o
   max-height: 1500px; overflow-y: auto; font-size: 16px; line-height: 1.55; min-width: 0;
 }
 .cp-letter:focus-visible { outline: 3px solid var(--cp-brand); outline-offset: 2px; }
-.cp-letter-title { font-size: 20px; margin-bottom: 14px; }
-.cp-letter-p { margin: 0 0 12px; white-space: pre-line; overflow-wrap: anywhere; max-width: 78ch; }
+.cp-root .cp-letter-title { font-size: 20px; margin-bottom: 14px; }
+.cp-root .cp-letter-p { margin: 0 0 12px; white-space: pre-line; overflow-wrap: anywhere; max-width: 78ch; }
 .cp-exhibit { margin-top: 26px; padding-top: 18px; border-top: 2px solid var(--cp-line-2); }
 .cp-exhibit h3 { font-size: 20px; margin-bottom: 12px; }
 .cp-ex-group { margin-bottom: 16px; }
