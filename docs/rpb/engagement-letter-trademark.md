@@ -11,9 +11,11 @@ rewritten.
 **Formatting change (November 12, 2026).** The letter now carries the layout of the Word letter.
 Exactly this changed in the text below the line, and no word of the letter:
 
-- The first line, "RPB Law, PLLC", is removed: the RPB logo is drawn above the letter and names the firm.
-- Seven style markers were added, each on its own line at the start of a paragraph. They are
+- The first line, "RPB Law, PLLC", stays, directly under the RPB logo, centred and bold (Taylor, Nov 12). It is
+  now its own paragraph, so the address line can carry its own style.
+- Eight style markers were added, each on its own line at the start of a paragraph. They are
   instructions to the software, never printed, and they are not part of the signed text:
+  - `{center, bold}` before "RPB Law, PLLC";
   - `{center, small, rule-below}` before the address line (centred, smaller, a thick rule under it);
   - `{bold-underline-first-line}` before "Via Email: ..." (that first line in bold, underlined);
   - `{center, bold, space-before}` before "Re: Letter of Engagement for Legal Services";
@@ -38,6 +40,9 @@ The changes from the November 9 letter are:
 Everything below the line is the letter.
 
 ---
+
+{center, bold}
+RPB Law, PLLC
 
 {center, small, rule-below}
 333 S.E. 2nd Avenue Suite 2000, Miami, FL 33131 | (305) 712-6960 | info@rpblawfirm.com

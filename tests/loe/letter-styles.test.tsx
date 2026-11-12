@@ -192,32 +192,34 @@ describe("the web views draw each style", () => {
       expect(html).toMatch(/class="[^"]*loe-s-center loe-s-bold loe-s-space-before"[^>]*>Re: Letter of Engagement for Legal Services</);
       expect(html).toMatch(/class="[^"]*loe-s-indent"[^>]*>Sincerely yours,</);
       expect(html).toMatch(/class="[^"]*loe-s-indent loe-s-space-before"[^>]*>Rebecca P\. Beliard, Esq\.</);
-      expect(html).not.toContain("RPB Law, PLLC\n");
+      expect(html).toMatch(/class="[^"]*loe-s-center loe-s-bold"[^>]*>RPB Law, PLLC</);
       expect(html).not.toMatch(/\{(center|indent|space-before|bold-underline-first-line)/);
     }
-    // The logo comes first, then the address line: no firm-name line between them.
-    expect(panel.indexOf("rpb-logo")).toBeLessThan(panel.indexOf("333 S.E."));
+    // The logo comes first, then the firm-name line, then the address line.
+    expect(panel.indexOf("rpb-logo")).toBeLessThan(panel.indexOf("RPB Law, PLLC"));
+    expect(panel.indexOf("RPB Law, PLLC")).toBeLessThan(panel.indexOf("333 S.E."));
   });
 });
 
 describe("the RPB letter: logo, address line, rule, and the words", () => {
-  it("the first paragraph is the address line (the firm-name line is gone); the template changed no word", () => {
+  it("the firm-name line, then the address line, each its own paragraph; the template changed no word", () => {
     const blocks = fullLetterBlocks();
-    expect(blocks[0]).toEqual({ lead: null, text: "333 S.E. 2nd Avenue Suite 2000, Miami, FL 33131 | (305) 712-6960 | info@rpblawfirm.com", style: ["center", "small", "rule-below"] });
-    expect(hasStyle(blocks[2], "bold-underline-first-line")).toBe(true);
-    // Strip the markers and put the old first line back: exactly the letter as it was before markers.
+    expect(blocks[0]).toEqual({ lead: null, text: "RPB Law, PLLC", style: ["center", "bold"] });
+    expect(blocks[1]).toEqual({ lead: null, text: "333 S.E. 2nd Avenue Suite 2000, Miami, FL 33131 | (305) 712-6960 | info@rpblawfirm.com", style: ["center", "small", "rule-below"] });
+    expect(hasStyle(blocks[3], "bold-underline-first-line")).toBe(true);
+    // Strip the markers and join the first two lines back into one paragraph: exactly the letter as it was before markers.
     const unmarked = fullLetterBody().replace(/^\{[^{}\n]*\}[ \t]*\n/gm, "");
-    expect(`RPB Law, PLLC\n${unmarked}`).toBe(letterBeforeMarkers());
+    expect(unmarked.replace("RPB Law, PLLC\n\n", "RPB Law, PLLC\n")).toBe(letterBeforeMarkers());
   });
 
-  it("the agreement text is the words only: the old text minus the firm-name line", () => {
+  it("the agreement text is the words only: the old text with the firm-name line as its own paragraph", () => {
     const exhibit = exhibitForSevetri();
     const before = assembleAgreement({ body: letterBeforeMarkers(), inputs: INPUTS, exhibit });
     const after = assembleAgreement({ body: fullLetterBody(), inputs: INPUTS, exhibit });
     if (!before.ok || !after.ok) throw new Error("no agreement");
     expect(after.agreement.text).not.toMatch(/\{(center|bold|small|indent|rule-below|space-before|bold-underline-first-line)/);
     expect(before.agreement.text.startsWith("RPB Law, PLLC\n")).toBe(true);
-    expect(after.agreement.text).toBe(before.agreement.text.slice("RPB Law, PLLC\n".length));
+    expect(after.agreement.text).toBe(before.agreement.text.replace("RPB Law, PLLC\n", "RPB Law, PLLC\n\n"));
     // The canonical form covers the words only, never a style.
     expect(after.agreement.canonical).not.toContain('"style"');
   });
@@ -265,7 +267,8 @@ describe("the RPB letter: logo, address line, rule, and the words", () => {
     const rebuilt = rebuildSignedLetter(snapshot, "America/New_York");
     expect(rebuilt).not.toBeNull();
     expect(agreementTextSha256(signedLetterText(rebuilt!))).toBe(sha256);
-    expect(rebuilt!.blocks[0].style).toEqual(["center", "small", "rule-below"]);
+    expect(rebuilt!.blocks[0].style).toEqual(["center", "bold"]);
+    expect(rebuilt!.blocks[1].style).toEqual(["center", "small", "rule-below"]);
     const verified = await verifySignedCopy(snapshot, "America/New_York", async () => null);
     expect(verified.kind).toBe("rebuilt");
   });
@@ -278,7 +281,7 @@ describe("the RPB letter: logo, address line, rule, and the words", () => {
     const r = await acceptPublicProposal(TOKEN, b.selection, NOW, w.db, undefined, b.signing, { ip: null, userAgent: null });
     expect(r.ok).toBe(true);
     const text = String(w.rpcCalls[0].args.p_agreement_text);
-    expect(text.startsWith("333 S.E. 2nd Avenue")).toBe(true);
+    expect(text.startsWith("RPB Law, PLLC\n\n333 S.E. 2nd Avenue")).toBe(true);
     expect(text).not.toMatch(/\{(center|bold|small|indent|rule-below|space-before|bold-underline-first-line)/);
     const snapshot = (w.tables.client_proposal[0] as { accepted_snapshot: AcceptedSnapshot }).accepted_snapshot;
     const verified = await verifySignedCopy(snapshot, "America/New_York", async () => ({ text, sha256: agreementTextSha256(text) }));
