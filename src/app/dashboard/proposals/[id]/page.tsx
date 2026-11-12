@@ -15,7 +15,7 @@ import { buildPaidPanelView } from "@/lib/proposals/paid-view";
 import { PROPOSAL_STAFF_WRITE_ROLES, isProposalEditable, type ProposalRow } from "@/lib/proposals/types";
 import { validateContent } from "@/lib/proposals/validate";
 import { describeProposalEvent, formatDollars } from "@/lib/proposal-editor/events";
-import { firstNameOf, joinOr, statusLabel, statusLabelFor, statusTone } from "@/lib/proposal-editor/labels";
+import { firstNameOf, joinOr, statusLabelFor, statusTone } from "@/lib/proposal-editor/labels";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { editorLetterState } from "@/lib/loe/editor-state";
 import { readSignature, type SignatureRead } from "@/lib/loe/signature-read";
