@@ -274,7 +274,7 @@ async function signedUploadRetryStep(supabase: ScopedClient, proposal: ProposalR
     buildPdf: async () => {
       const built = await buildVerifiedSignedPdf({
         snapshot,
-        firm: { displayName: facts.displayName, timeZone: facts.timeZone },
+        firm: { displayName: facts.displayName, timeZone: facts.timeZone, logo: facts.logo ?? null },
         readStored: () => readStoredAgreement(supabase as unknown as StoredAgreementDb, { proposalId: proposal.id, orgId: proposal.org_id, signatureId: snapshot!.agreement?.signature_id }),
       });
       if (!built.ok) {

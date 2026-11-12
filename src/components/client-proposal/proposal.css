@@ -505,3 +505,6 @@ button.cp-step-btn:focus-visible { outline: 3px solid var(--cp-brand); outline-o
   .cp-sign { padding: 16px; }
   .cp-ex-table td { white-space: normal; }
 }
+
+/* The firm's logo above its engagement letter: centred, 220-260px on a desktop, scaling down on a phone. */
+.cp-letter-logo { display: block; margin: 0 auto 18px; width: 100%; max-width: 250px; height: auto; }

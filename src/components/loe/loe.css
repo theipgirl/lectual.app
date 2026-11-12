@@ -25,3 +25,4 @@
   .loe-preview-paper { padding: 14px; }
   .loe-body { min-height: 220px; }
 }
+.loe-preview-logo { display: block; margin: 0 auto 6px; width: 100%; max-width: 240px; height: auto; }

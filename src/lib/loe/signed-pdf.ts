@@ -4,6 +4,7 @@ import { firmCivilDate } from "@/lib/quotes/firm-time";
 import { isSignedSnapshot } from "@/lib/proposals/signed-state";
 import type { AcceptedSnapshot } from "@/lib/proposals/types";
 import type { Exhibit } from "./exhibit";
+import type { LetterLogo } from "./letter-logo";
 import { buildLetterPdf } from "./pdf";
 import { cleanSigningDetails, signedAtText, signedAtUtcIso } from "./signing";
 
@@ -44,7 +45,7 @@ export type SignedPdfBuild =
 export type SignedPdfInput = {
   snapshot: AcceptedSnapshot | null | undefined;
   /** The firm's letterhead name and zone, from a read that WORKED. An empty name or zone builds nothing. */
-  firm: { displayName: string; timeZone: string };
+  firm: { displayName: string; timeZone: string; /** The firm's own letter logo (`letterLogoForSlug`), if it has one. */ logo?: LetterLogo | null };
   /** Reads the stored signed text. Called ONLY when the rebuilt text does not match the stored fingerprint. */
   readStored: () => Promise<StoredAgreement | null>;
 };
@@ -74,6 +75,7 @@ export async function buildVerifiedSignedPdf(input: SignedPdfInput): Promise<Sig
       mode: "signed",
       signature: { signerName: letter.signerName, signedAtText: letter.signedAtText, signedAtUtc: letter.signedAtUtc, fingerprint: agreement.sha256, signatureId: letter.signatureId },
       firmName: firm.displayName,
+      logo: firm.logo ?? null,
       title,
     });
     return done(bytes, false);
@@ -94,6 +96,7 @@ export async function buildVerifiedSignedPdf(input: SignedPdfInput): Promise<Sig
       signatureId: agreement.signature_id,
     },
     firmName: firm.displayName,
+    logo: firm.logo ?? null,
     title,
   });
   return done(bytes, true);

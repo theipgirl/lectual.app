@@ -48,6 +48,7 @@ import type { LetterPdfResult } from "@/lib/loe/pdf-result";
 import type { SignerDetails, SigningInput } from "@/lib/loe/signing";
 import { LoeDetailsForm } from "./LoeDetailsForm";
 import { LoeIncludesLink } from "./LoeIncludesLink";
+import { letterLogoForBrand } from "@/lib/loe/letter-logo";
 import { LoeLetterPanel } from "./LoeLetterPanel";
 import { DownloadPdfButton, LoeSignedLetter } from "./LoeReceipt";
 import { LoeSideAction } from "./LoeSideAction";
@@ -258,6 +259,8 @@ export function ProposalDocument(props: ProposalDocumentProps) {
 function TrademarkProposalDocument(props: ProposalDocumentProps) {
   const { content, title, clientName, expiresOn, firm, mode, initialSelection, acceptedQuote, payUrl, onAccept, initialClientClasses, letter, onDownloadReview, onDownloadSigned } = props;
   const brand: ProposalBrand = brandForSlug(firm.slug);
+  /** The firm's logo above its engagement letter: decided by the same brand signal as the rest of the page. */
+  const letterLogo = letterLogoForBrand(brand);
 
   // Ticks the visitor changed. Layered over the firm's defaults (and any given
   // starting ticks), so editing the content in the preview never loses a tick
@@ -580,7 +583,7 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
                 </div>
                 <LoeIncludesLink onBackToStepOne={() => loeFlow.setStep(1)} />
                 {loeFlow.agreement ? (
-                  <LoeLetterPanel agreement={loeFlow.agreement} title={loeBlock?.title ?? LETTER_HEADING} id="cp-letter" />
+                  <LoeLetterPanel agreement={loeFlow.agreement} title={loeBlock?.title ?? LETTER_HEADING} id="cp-letter" logo={letterLogo} />
                 ) : (
                   <p className="cp-warn" role="status">
                     {SIGN_MESSAGES.letter_unavailable}
@@ -1068,7 +1071,7 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
                 >
                   <summary>{READ_LETTER_FIRST}</summary>
                   <p className="cp-note">You will fill in your details on the next step. Until then, brackets mark what is still to come.</p>
-                  {loeFlow.preview ? <LoeLetterPanel agreement={loeFlow.preview} title={loeBlock?.title ?? LETTER_HEADING} id="cp-letter-first" /> : null}
+                  {loeFlow.preview ? <LoeLetterPanel agreement={loeFlow.preview} title={loeBlock?.title ?? LETTER_HEADING} id="cp-letter-first" logo={letterLogo} /> : null}
                 </details>
               </section>
             ) : null}
@@ -1077,7 +1080,7 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
             {loeOn && accepted ? (
               <>
                 <LoeIncludesLink />
-                <LoeSignedLetter agreement={signedView} title={loeBlock?.title ?? LETTER_HEADING} />
+                <LoeSignedLetter agreement={signedView} title={loeBlock?.title ?? LETTER_HEADING} logo={letterLogo} />
               </>
             ) : null}
           </div>
@@ -1314,7 +1317,7 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
         <div className="cp-wrap">
           {brand === "rpb" ? (
             <>
-              <p className="cp-c">RPB Law, PLLC &middot; (305) 712-6960 &middot; info@rpblawfirm.com &middot; www.rpblawfirm.com</p>
+              <p className="cp-c">RPB Law Firm, PLLC &middot; (305) 712-6960 &middot; info@rpblawfirm.com &middot; www.rpblawfirm.com</p>
               {/* The firm's own footer line, the same on every proposal. A proposal with a letter shows the attorney's replacement only once one is set (it is not: see client-words.ts). */}
               {loeOn && ATTORNEY_FOOTER_LETTER_LINE ? (
                 <p className="cp-d">{ATTORNEY_FOOTER_LETTER_LINE}</p>

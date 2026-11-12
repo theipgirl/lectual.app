@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { LetterLogo } from "@/lib/loe/letter-logo";
 import type { LetterBlock } from "@/lib/loe/render";
 import {
   LETTER_LIVE_COPY_NOTE,
@@ -30,6 +31,8 @@ export function LetterSwitch(props: {
   newerAvailable: boolean;
   blocks: LetterBlock[] | null;
   problems: string[];
+  /** The firm's own logo drawn above the preview (RPB only today). */
+  logo?: LetterLogo | null;
   /**
    * The draft was made while the firm's letter couldn't be read, and the letter is not attached yet: the switch starts ON
    * (`defaultOn`), a note says a Save attaches it, and turning it off is the person's choice to send without one.
@@ -55,14 +58,14 @@ export function LetterSwitch(props: {
             <span className="lx-pill lx-pill-ok">{letterAttachedLabel(props.version)}</span>
             {props.newerAvailable ? <span className="lx-note"> {LETTER_NEWER_VERSION_NOTE}</span> : null}
           </p>
-          <PreviewBlock blocks={props.blocks} problems={props.problems} />
+          <PreviewBlock blocks={props.blocks} problems={props.problems} logo={props.logo} />
         </>
       ) : null}
     </div>
   );
 }
 
-export function PreviewBlock({ blocks, problems }: { blocks: LetterBlock[] | null; problems: string[] }) {
+export function PreviewBlock({ blocks, problems, logo }: { blocks: LetterBlock[] | null; problems: string[]; logo?: LetterLogo | null }) {
   return (
     <details className="pe-letter-preview">
       <summary className="lx-btn lx-btn-ghost">{LETTER_PREVIEW_CONTROL}</summary>
@@ -71,6 +74,10 @@ export function PreviewBlock({ blocks, problems }: { blocks: LetterBlock[] | nul
       </p>
       {blocks ? (
         <div className="pe-letter-paper" data-testid="editor-letter-preview">
+          {logo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img className="pe-letter-logo" src={logo.src} alt={logo.alt} width={984} height={168} />
+          ) : null}
           {blocks.map((block, i) => (
             <p key={i}>
               {block.lead ? <strong>{block.lead}</strong> : null}

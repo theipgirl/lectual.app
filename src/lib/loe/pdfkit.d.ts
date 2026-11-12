@@ -17,6 +17,7 @@ declare namespace PDFKit {
     strokeColor(color: string): this;
     lineWidth(width: number): this;
     text(text: string, x?: number | Record<string, unknown>, y?: number | Record<string, unknown>, options?: Record<string, unknown>): this;
+    image(src: Buffer, x?: number, y?: number, options?: Record<string, unknown>): this;
     moveDown(lines?: number): this;
     moveTo(x: number, y: number): this;
     lineTo(x: number, y: number): this;

@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import PDFDocument from "pdfkit";
 import { REVIEW_COPY_MARK } from "./client-words";
+import type { LetterLogo } from "./letter-logo";
 import type { Exhibit } from "./exhibit";
 import type { LetterBlock } from "./render";
 import type { SignerDetails } from "./signing";
@@ -54,6 +55,11 @@ export type BuildLetterPdfInput = {
   /** Required for `signed`. */
   signature?: PdfSignature;
   firmName?: string;
+  /**
+   * The firm's own logo (RPB only today, `letterLogoForSlug`), drawn centred at the top of page 1 before the letterhead. A logo whose
+   * file cannot be read is simply not drawn: never a broken picture, never a failed letter.
+   */
+  logo?: LetterLogo | null;
   /** Document title ("Engagement letter"). */
   title?: string;
 };
@@ -67,6 +73,22 @@ function loadFonts(): { regular: Buffer; bold: Buffer } {
     bold: readFileSync(join(FONT_DIR, "DejaVuSans-Bold.ttf")),
   };
   return fonts;
+}
+
+/** The logo's width on the page, in points (the file is 984 x 168). */
+export const LOGO_WIDTH_PT = 200;
+
+/**
+ * Reads a `/brand/` logo from `public/` with `fs` from the project root, the way the fonts are read (so `next.config.ts` lists the file
+ * for the routes that build a PDF). Null when it is not a `/brand/` file or cannot be read.
+ */
+export function loadLogoBytes(logo: LetterLogo | null | undefined): Buffer | null {
+  if (!logo || !logo.src.startsWith("/brand/") || logo.src.includes("..")) return null;
+  try {
+    return readFileSync(join(process.cwd(), "public", logo.src));
+  } catch {
+    return null;
+  }
 }
 
 const MARGIN = 64;
@@ -117,6 +139,19 @@ export async function buildLetterPdf(input: BuildLetterPdfInput): Promise<Uint8A
   });
 
   doc.font("Regular").fontSize(BODY).fillColor("#000000");
+
+  // The firm's logo, centred, first on page 1. Aspect ratio kept (width only).
+  const logoBytes = loadLogoBytes(input.logo);
+  if (logoBytes) {
+    try {
+      const top = doc.y;
+      doc.image(logoBytes, left + (width - LOGO_WIDTH_PT) / 2, top, { width: LOGO_WIDTH_PT });
+      doc.x = left;
+      doc.y = top + LOGO_WIDTH_PT * (168 / 984) + 12;
+    } catch {
+      // An unreadable picture is left out; the letter goes on without it.
+    }
+  }
 
   // The letterhead line: the firm's display name, first on the first page, before any paragraph of the letter.
   const letterhead = (input.firmName ?? "").replace(/\s+/g, " ").trim();

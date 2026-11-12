@@ -561,3 +561,4 @@ td.pq-mono { font-family: var(--mono); }
 .pe-signed-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .pe-signed-filing { display: flex; flex-direction: column; gap: 6px; padding-top: 10px; border-top: 1px solid var(--line-2); }
 @media (max-width: 640px) { .pe-signed-dl { grid-template-columns: 1fr; gap: 2px; } .pe-signed-dl dd { margin-bottom: 8px; } }
+.pe-letter-logo { display: block; margin: 0 auto 6px; width: 100%; max-width: 240px; height: auto; }

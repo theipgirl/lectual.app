@@ -10,6 +10,7 @@ import { RPB_FONT_VARS } from "./fonts";
 import { ATTORNEY_FOOTER_LETTER_LINE, DOWNLOAD_REVIEW_LABEL, LETTER_HEADING, LETTER_INTRO, READ_LETTER_FIRST, SIGN_MESSAGES } from "@/lib/loe/client-words";
 import type { SigningInput } from "@/lib/loe/signing";
 import { LoeDetailsForm } from "./LoeDetailsForm";
+import { letterLogoForBrand } from "@/lib/loe/letter-logo";
 import { LoeLetterPanel } from "./LoeLetterPanel";
 import { DownloadPdfButton, LoeSignedLetter } from "./LoeReceipt";
 import { LoeSideAction } from "./LoeSideAction";
@@ -31,6 +32,8 @@ import "./proposal.css";
 export function GeneralProposalDocument(props: ProposalDocumentProps) {
   const { content, title, clientName, expiresOn, firm, mode, acceptedQuote, payUrl, onAccept, letter, onDownloadReview, onDownloadSigned } = props;
   const brand: ProposalBrand = brandForSlug(firm.slug);
+  /** The firm's logo above its engagement letter: decided by the same brand signal as the rest of the page. */
+  const letterLogo = letterLogoForBrand(brand);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ payUrl: string | null; opened: boolean; signedLine?: string | null; letterDate?: string | null; letterVerified?: boolean } | null>(() =>
@@ -173,7 +176,7 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
                   </div>
                 </div>
                 {loeFlow.agreement ? (
-                  <LoeLetterPanel agreement={loeFlow.agreement} title={loeBlock?.title ?? LETTER_HEADING} id="cp-letter" />
+                  <LoeLetterPanel agreement={loeFlow.agreement} title={loeBlock?.title ?? LETTER_HEADING} id="cp-letter" logo={letterLogo} />
                 ) : (
                   <p className="cp-warn" role="status">
                     {SIGN_MESSAGES.letter_unavailable}
@@ -249,13 +252,13 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
                 >
                   <summary>{READ_LETTER_FIRST}</summary>
                   <p className="cp-note">You will fill in your details on the next step. Until then, brackets mark what is still to come.</p>
-                  {loeFlow.preview ? <LoeLetterPanel agreement={loeFlow.preview} title={loeBlock?.title ?? LETTER_HEADING} id="cp-letter-first" /> : null}
+                  {loeFlow.preview ? <LoeLetterPanel agreement={loeFlow.preview} title={loeBlock?.title ?? LETTER_HEADING} id="cp-letter-first" logo={letterLogo} /> : null}
                 </details>
               </section>
             ) : null}
             </>
             ) : null}
-            {loeOn && accepted ? <LoeSignedLetter agreement={signedView} title={loeBlock?.title ?? LETTER_HEADING} /> : null}
+            {loeOn && accepted ? <LoeSignedLetter agreement={signedView} title={loeBlock?.title ?? LETTER_HEADING} logo={letterLogo} /> : null}
           </div>
 
           <aside className="cp-side" id="cp-review" aria-labelledby="cp-s2">
@@ -411,7 +414,7 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
         <div className="cp-wrap">
           {brand === "rpb" ? (
             <>
-              <p className="cp-c">RPB Law, PLLC &middot; (305) 712-6960 &middot; info@rpblawfirm.com &middot; www.rpblawfirm.com</p>
+              <p className="cp-c">RPB Law Firm, PLLC &middot; (305) 712-6960 &middot; info@rpblawfirm.com &middot; www.rpblawfirm.com</p>
               {/* The firm's own footer line, the same on every proposal. A proposal with a letter shows the attorney's replacement only once one is set (it is not: see client-words.ts). */}
               {loeOn && ATTORNEY_FOOTER_LETTER_LINE ? (
                 <p className="cp-d">{ATTORNEY_FOOTER_LETTER_LINE}</p>

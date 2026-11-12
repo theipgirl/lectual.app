@@ -50,6 +50,7 @@ import { DraftFormElement, DraftProvider } from "@/components/proposal-editor/Dr
 import { EditorActions } from "@/components/proposal-editor/EditorActions";
 import { PayBox, ReadyChecklist } from "@/components/proposal-editor/EditorSide";
 import { CheckFirstPanel, checkFirstShown } from "@/components/proposal-editor/CheckFirstPanel";
+import { letterLogoForSlug } from "@/lib/loe/letter-logo";
 import { EngagementLetterSlot } from "@/components/proposal-editor/EngagementLetterSlot";
 import { canDeleteProposal } from "@/lib/proposal-editor/delete-proposal";
 import { PaidPanel } from "@/components/proposal-editor/PaidPanel";
@@ -489,7 +490,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
                   issues={shown(groups.message)}
                   values={{ greeting: content.greeting ?? "", recommendation: content.recommendation ?? "", officeActionNote: content.office_action_note ?? "" }}
                 />
-                <EngagementLetterSlot state={letterState} editable={editable} />
+                <EngagementLetterSlot state={letterState} editable={editable} logo={letterLogoForSlug(session.org.slug)} />
               </DraftFormElement>
               {general ? null : <BrandForms proposalId={proposal.id} updatedAt={proposal.updated_at} names={nameValues} editable={editable} />}
               <section className="lx-card pe-card" aria-label="Proposal actions">

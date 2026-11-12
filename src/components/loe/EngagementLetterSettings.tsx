@@ -19,6 +19,7 @@ import {
   notReadyYet,
 } from "@/lib/ui/words";
 import { DraftEditor, StartDraftForm, StartFromVersionForm } from "./LetterForms";
+import type { LetterLogo } from "@/lib/loe/letter-logo";
 import { LetterPreview } from "./LetterPreview";
 import "./loe.css";
 
@@ -86,11 +87,13 @@ function KindSection({
   versions,
   canEdit,
   canApprove,
+  logo,
 }: {
   kind: LoeKindName;
   versions: LetterVersion[];
   canEdit: boolean;
   canApprove: boolean;
+  logo?: LetterLogo | null;
 }) {
   const draft = draftOf(versions);
   const approved = approvedOf(versions);
@@ -135,12 +138,12 @@ function KindSection({
             <pre className="loe-readonly">{draft.body}</pre>
           </>
         )}
-        {draft && <LetterPreview body={draft.body} />}
+        {draft && <LetterPreview body={draft.body} logo={logo} />}
         {!draft && approved && (
           <>
             <h3 className="lx-label" style={{ margin: 0 }}>{`${approved.title}, version ${approved.version}`}</h3>
             <pre className="loe-readonly">{approved.body}</pre>
-            <LetterPreview body={approved.body} />
+            <LetterPreview body={approved.body} logo={logo} />
           </>
         )}
         {!draft && !approved && newest && (
@@ -172,7 +175,7 @@ function KindSection({
  * a missing table says it isn't switched on (no form), a failed read says it couldn't be loaded (never the
  * empty state), and only a read that worked shows versions or the start-a-draft form.
  */
-export function EngagementLetterSettings({ model }: { model: LetterPageModel }) {
+export function EngagementLetterSettings({ model, logo }: { model: LetterPageModel; logo?: LetterLogo | null }) {
   if (model.status === "not-set-up") {
     return (
       <div className="loe-page">
@@ -216,7 +219,7 @@ export function EngagementLetterSettings({ model }: { model: LetterPageModel }) 
         {approversLine}
       </p>
       {LOE_KIND_NAMES.map((kind) => (
-        <KindSection key={kind} kind={kind} versions={versionsOfKind(versions, kind)} canEdit={canEdit} canApprove={canApprove} />
+        <KindSection key={kind} kind={kind} versions={versionsOfKind(versions, kind)} canEdit={canEdit} canApprove={canApprove} logo={logo} />
       ))}
     </div>
   );

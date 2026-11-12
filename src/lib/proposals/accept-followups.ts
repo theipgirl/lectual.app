@@ -2,6 +2,7 @@ import "server-only";
 
 import { firmToken } from "@/lib/intake-forms/lawmatics-sync";
 import { readStoredAgreement, type StoredAgreementDb } from "@/lib/loe/stored-agreement";
+import { letterLogoForSlug, type LetterLogo } from "@/lib/loe/letter-logo";
 import { buildVerifiedSignedPdf, signedLetterFileName } from "@/lib/loe/signed-pdf";
 import { signedAtUtcIso } from "@/lib/loe/signing";
 import { resolveTimeZone } from "@/lib/org/profile-rules";
@@ -399,12 +400,12 @@ async function noteStep(db: FollowupDb, row: Row, deps: FollowupDeps): Promise<S
  * row has its own name and the standard zone (a real answer), but a FAILED read of the firm or of its profile is `unavailable`.
  * The signed letter is never built with a guessed zone or a missing firm name.
  */
-type FirmLetterFacts = { status: "ok"; displayName: string; timeZone: string } | { status: "unavailable" };
+type FirmLetterFacts = { status: "ok"; displayName: string; timeZone: string; logo: LetterLogo | null } | { status: "unavailable" };
 
 async function firmLetterFacts(db: FollowupDb, orgId: string): Promise<FirmLetterFacts> {
   try {
     const [org, profile] = await Promise.all([
-      db.from("crm_org").select("name").eq("id", orgId).maybeSingle(),
+      db.from("crm_org").select("name, slug").eq("id", orgId).maybeSingle(),
       db.from("crm_org_profile").select("display_name, time_zone").eq("org_id", orgId).maybeSingle(),
     ]);
     if (org.error || profile.error) return { status: "unavailable" };
@@ -415,6 +416,7 @@ async function firmLetterFacts(db: FollowupDb, orgId: string): Promise<FirmLette
       status: "ok",
       displayName: firmDisplayName(p && typeof p.display_name === "string" ? p.display_name : null, orgName),
       timeZone: resolveTimeZone(p && typeof p.time_zone === "string" ? p.time_zone : null),
+      logo: letterLogoForSlug(isObject(org.data) && typeof org.data.slug === "string" ? org.data.slug : null),
     };
   } catch {
     return { status: "unavailable" };
@@ -445,7 +447,7 @@ async function signedUploadStep(db: FollowupDb, row: Row, deps: FollowupDeps): P
       buildPdf: async () => {
         const built = await buildVerifiedSignedPdf({
           snapshot: row.snapshot,
-          firm: { displayName: facts.displayName, timeZone: facts.timeZone },
+          firm: { displayName: facts.displayName, timeZone: facts.timeZone, logo: facts.logo },
           // Only read when today's code no longer rebuilds the signed text; fenced on the proposal's own org.
           readStored: () => readStoredAgreement(db as unknown as StoredAgreementDb, { proposalId: row.id, orgId: row.orgId, signatureId: row.snapshot.agreement?.signature_id }),
         });
