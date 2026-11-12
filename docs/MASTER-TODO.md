@@ -3,6 +3,24 @@
 One list across sessions. Each session adds its action items here and checks them against Omi.
 Newest section first. Tick an item when it is done; don't delete it.
 
+## 2026-11-12 (evening): letter layout, address, editor fixes — lectual.app#29
+
+### Taylor
+- [ ] Merge lectual.app#29 (letter: full address required, RPB logo, Word layout, footer "RPB Law Firm, PLLC", address to Lawmatics; editor:
+      includes table saves, link box stays in the side column, scroll fix, Expand preview).
+- [ ] After merge, say go and Claude updates RPB's DRAFT letter body on lectual-prod to the new template (no "RPB Law, PLLC" top line, layout styles).
+      Then Rebecca or Taylor approves it in Settings, Client proposals, Engagement letter.
+- [ ] Check the editor scroll on your Mac (Safari / trackpad). The blank-page effect was never reproduced in testing.
+- [ ] Decide how the Lawmatics pay form gets the address: a generic shared form link can't be pre-filled. Options: a Lawmatics automation that sends a
+      record-specific pay link (test whether it pre-fills the address), or take payment in Lectual through LawPay later.
+
+### Checks after the first real signing
+- [ ] The signed mailing address lands on the Lawmatics matter and contact (`POST /addresses` never run against a live account).
+- [ ] The logo appears in the PDF built on Vercel.
+
+### Rebecca (through Taylor)
+- [ ] Typo in her letter text: "outcome of you matter" (should be "your"). Her wording, so not changed by Claude.
+
 ## 2026-11-12 (later): the build is done on the branch; what is left before RPB can use it
 
 Merged to `main` in `lectual.app`, `lectual` and `lectual-plugin` on Nov 12, so the app code is deployed. The production database is
