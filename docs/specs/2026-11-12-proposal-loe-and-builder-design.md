@@ -109,7 +109,9 @@ Two rules from Taylor (Nov 12, after the first mockup):
   right stays in view on every step and keeps updating, and "what the package includes" stays
   on the page.
 - **The letter is the full letter.** Every paragraph, in order, nothing shortened or cut off, on
-  the page, in the print view and in the signed file.
+  the page and in the PDF.
+- **The total really sticks, and the letter can be saved.** The panel on the right stays on
+  screen while the page scrolls. The letter downloads as a PDF before and after signing.
 
 Four steps on the same page, same link, same domain:
 
@@ -123,9 +125,13 @@ Four steps on the same page, same link, same domain:
    legal fee lines and any discount, the legal fee due now, and the USPTO fees due at filing.
    Only what they selected. Then: type your full legal name, tick "I have read and agree to
    this engagement letter", press "Sign and continue to payment".
-4. **Pay.** A receipt ("Signed Nov 12 at 2:14 PM by ..."), a link to view or print their signed
-   copy (`/p/<token>/?agreement=1`, a print view on the same route so the firm-domain rewrite
-   already covers it), and the pay button, which opens the firm's Lawmatics pay link as today.
+4. **Pay.** A receipt ("Signed Nov 12 at 2:14 PM by ..."), "Download your signed letter (PDF)",
+   and the pay button, which opens the firm's Lawmatics pay link as today.
+
+The client can also download the letter as a PDF before signing (a review copy with their
+details, marked not yet signed). PDF is the one format of the signed letter: the client's
+download, the staff download and the file sent to Lawmatics are the same document. This needs
+one PDF library added to the app.
 
 A flat-fee (general) proposal follows the same steps with the general letter; its exhibit is
 the matter, the work and the flat fee.
@@ -175,8 +181,8 @@ is signed.
 
 - The firm notice and the Lawmatics note say the letter was signed, by whom and when.
 - New follow-up step `signed_loe_upload`: render the signed letter (letterhead, body, signature
-  block "Signed electronically by ... on ...", Exhibit A, and a last page with the signature
-  record) as a docx with the `docx` library already installed, and upload it to the matter's
+  block "Signed electronically by ... on ...", Exhibit A, and the signature record) as a PDF,
+  the same file the client downloads, and upload it to the matter's
   Engagement folder in the firm's own Lawmatics. Recorded as a step event with a retry, like
   the existing uploads. Nothing is stored in a bucket; the signature row is the source.
 - Staff proposal page: an "Engagement letter" card with signer, date and time, the fingerprint,
@@ -356,8 +362,8 @@ for sign-then-pay, or the Cowork skills will contradict the app.
 
 - Delete of a signed proposal: allow for the owner (current rule) or refuse. Recommended: allow,
   with the warning, because the signed letter is already in Lawmatics.
-- The client's copy is a print view. A PDF by email would go through Approvals and is not in
-  this build.
+- The client downloads their copy as a PDF. Emailing it to them would go through Approvals and
+  is not in this build.
 - LawPay taking the payment on the proposal would replace the pay link and Mark paid. Separate
   work; Rebecca wants payment in Lawmatics for now.
 - Moving the matter to Hired in Lawmatics when signed and paid is still done in Lawmatics.
