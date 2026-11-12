@@ -142,19 +142,27 @@ export async function buildLetterPdf(input: BuildLetterPdfInput): Promise<Uint8A
 
   // The firm's logo, centred, first on page 1. Aspect ratio kept (width only).
   const logoBytes = loadLogoBytes(input.logo);
+  let logoDrawn = false;
   if (logoBytes) {
     try {
       const top = doc.y;
       doc.image(logoBytes, left + (width - LOGO_WIDTH_PT) / 2, top, { width: LOGO_WIDTH_PT });
       doc.x = left;
       doc.y = top + LOGO_WIDTH_PT * (168 / 984) + 12;
+      logoDrawn = true;
     } catch {
       // An unreadable picture is left out; the letter goes on without it.
     }
   }
 
   // The letterhead line: the firm's display name, first on the first page, before any paragraph of the letter.
-  const letterhead = (input.firmName ?? "").replace(/\s+/g, " ").trim();
+  // When the firm's logo was drawn it already names the firm, so the text line is left out (the rule stays).
+  const letterhead = logoDrawn ? "" : (input.firmName ?? "").replace(/\s+/g, " ").trim();
+  if (logoDrawn) {
+    doc.moveTo(left, doc.y).lineTo(left + width, doc.y).strokeColor("#999999").lineWidth(0.5).stroke();
+    doc.moveDown(0.8);
+    doc.font("Regular").fontSize(BODY).fillColor("#000000");
+  }
   if (letterhead) {
     doc.font("Bold").fontSize(14).text(letterhead, left, doc.y, { width });
     doc.moveDown(0.3);
