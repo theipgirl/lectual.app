@@ -301,7 +301,7 @@ export function buildDraft(request: DraftRequest, lead: DraftLead, pricing: unkn
 
   const checks: DraftCheck[] = [];
   let spec: ProposalDraftSpec;
-  let resolved: ResolvedOffer[] = [];
+  const resolved: ResolvedOffer[] = [];
   let packageName: string;
   let packageWords: string | null = null;
 
@@ -385,7 +385,7 @@ export function buildDraft(request: DraftRequest, lead: DraftLead, pricing: unkn
         ...(offer ? { offer } : {}),
         ...(b.discountPercent != null ? { discountPct: b.discountPercent } : {}),
       });
-      if (b.discountPercent != null) checks.push({ source: "copilot", path: `names[${i}].discount_pct`, text: `${b.name}: ${COPILOT_WORDS.checkBrandDiscount}` });
+      if (b.discountPercent != null) checks.push({ source: "copilot", path: `names[${i}].discount_pct`, text: COPILOT_WORDS.checkBrandDiscount });
     });
     // A package name the loop above could not resolve: report the first one, creating nothing.
     for (const b of request.brands) {
@@ -459,13 +459,21 @@ function offerWords(o: ResolvedOffer): string | null {
     .join("; ");
 }
 
+/** " (1 hr at $500/hr)" for a piece of work, or "" when no hours or rate were given. */
+function workTime(it: DraftMatterItem): string {
+  const rate = it.hourlyRate != null ? cents(it.hourlyRate) + "/hr" : "";
+  if (it.hours == null) return rate ? " (" + rate + ")" : "";
+  const unit = it.hours === 1 ? "hr" : "hrs";
+  return " (" + it.hours + " " + unit + (rate ? " at " + rate : "") + ")";
+}
+
 function draftSummary(draft: Omit<BuiltDraft, "summary">, packageWords: string | null, request: DraftRequest): string {
   const lines = [`- ${COPILOT_WORDS.client}: ${draft.clientName}${draft.clientEmail ? ` (${draft.clientEmail})` : ""}`];
   if (request.matter) {
     const m = request.matter;
     lines.push(`- ${COPILOT_WORDS.matter}: ${m.title}`);
     for (const it of m.items) {
-      const hours = it.hours != null ? ` (${it.hours} ${it.hours === 1 ? "hr" : "hrs"}${it.hourlyRate != null ? ` at ${cents(it.hourlyRate)}/hr` : ""})` : it.hourlyRate != null ? ` (${cents(it.hourlyRate)}/hr)` : "";
+      const hours = workTime(it);
       lines.push(`- ${COPILOT_WORDS.work}: ${it.label}${hours}`);
     }
     lines.push(`- ${COPILOT_WORDS.flatFee}: ${cents(m.fee)}`);

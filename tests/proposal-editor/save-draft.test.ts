@@ -206,3 +206,17 @@ describe("brand field helpers", () => {
     expect([...brandForm(f, 1).entries()]).toEqual([["nameId", "t"], ["name", "T"]]);
   });
 });
+
+describe("Sprint 5: the whole-draft Save keeps content.checks and made_by as they were", () => {
+  it("carries the checks and who made the draft through an ordinary save", async () => {
+    const content = { ...sevetri(), made_by: "copilot" as const, checks: [{ text: "Add the client's pay link before creating the link.", source: "copilot" as const, path: "pay_url" }] };
+    const r0 = row({ content, source: "agent" });
+    const d = deps({}, r0);
+    const r = await runSaveDraft(d, form({ greeting: "Changed greeting." }));
+    expect(r).toEqual({ saved: true });
+    const [, input] = (d.update as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(input.content.greeting).toBe("Changed greeting.");
+    expect(input.content.checks).toEqual(content.checks);
+    expect(input.content.made_by).toBe("copilot");
+  });
+});

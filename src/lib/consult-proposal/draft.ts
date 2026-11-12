@@ -897,10 +897,10 @@ export async function draftProposalFromConsult(input: DraftConsultProposalInput)
     if (offer.per === "mark") {
       const marks: Partial<Record<MarkKind, DraftChoice>> = {};
       for (const m of b.marks) marks[m.kind] = { options: [...choicePackages.options], start: choicePackages.start };
-      checks.push({ source: "consult", path: `names[${i}].marks[0].package_choice`, text: `${b.name}: each mark lets the client choose among ${choicePackages.options.join(", ")}, starting on ${choicePackages.start}.` });
+      checks.push({ source: "consult", path: `names[${i}].marks[0].package_choice`, text: `Each mark lets the client choose among ${choicePackages.options.join(", ")}, starting on ${choicePackages.start}.` });
       return { mode: "per_mark", marks };
     }
-    checks.push({ source: "consult", path: `names[${i}].package_choice`, text: `${b.name}: the client can choose among ${choicePackages.options.join(", ")}, starting on ${choicePackages.start}.` });
+    checks.push({ source: "consult", path: `names[${i}].package_choice`, text: `The client can choose among ${choicePackages.options.join(", ")}, starting on ${choicePackages.start}.` });
     return { mode: "choice", options: [...choicePackages.options], start: choicePackages.start };
   };
   if (choicePackages) {
