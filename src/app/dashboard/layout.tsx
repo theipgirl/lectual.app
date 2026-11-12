@@ -21,7 +21,7 @@ import { FeedbackTrailRecorder } from "@/components/feedback/FeedbackTrailRecord
 import { FeedbackDialog } from "@/components/feedback/FeedbackDialog";
 import { NavProgress } from "@/components/shell/NavProgress";
 import { shouldShowTour } from "@/lib/onboarding/tour";
-import { guideFor } from "@/lib/onboarding/welcome-deal";
+import { guideFor, shouldShowWelcomeDeal } from "@/lib/onboarding/welcome-deal";
 import { WelcomeDeal } from "@/components/onboarding/WelcomeDeal";
 import { FirmWordmark } from "@/components/shell/FirmWordmark";
 import { DealTimesDialog } from "@/components/deck/DealTimesDialog";
@@ -159,7 +159,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <YourNameDialog currentFullName={typeof user.user_metadata?.full_name === "string" ? user.user_metadata.full_name : null} />
       {/* One first-sign-in guide, never both: the owner shell draws the welcome deal, every other shell the tour. */}
       {guideFor(shell.variant) === "welcome" ? (
-        <WelcomeDeal open={shouldShowTour(user.user_metadata) && !actingAsStaff} dealTimes={parseDealTimes(user.user_metadata)} />
+        <WelcomeDeal open={shouldShowWelcomeDeal({ userMetadata: user.user_metadata, shellVariant: shell.variant, actingAsStaff })} dealTimes={parseDealTimes(user.user_metadata)} persist={!actingAsStaff} />
       ) : (
         <OnboardingTour open={shouldShowTour(user.user_metadata) && !actingAsStaff} role={role} navSlugs={drawn.map((i) => i.slug)} firmName={org.name} aiConfigured={aiConfigured()} />
       )}

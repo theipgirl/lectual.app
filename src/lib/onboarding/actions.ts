@@ -2,6 +2,7 @@
 
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { buildTourMeta, isTourOutcome } from "./tour";
+import { buildWelcomeMeta } from "./welcome-deal";
 
 export type MarkTourSeenResult = { ok: true } | { ok: false; error: string };
 
@@ -28,6 +29,32 @@ export async function markTourSeenAction(outcome: unknown): Promise<MarkTourSeen
     const existing = (user.user_metadata ?? {}) as Record<string, unknown>;
     const { error } = await supabase.auth.updateUser({
       data: { ...existing, lectual_tour: buildTourMeta(outcome, new Date()) },
+    });
+    if (error) return { ok: false, error: NOT_SAVED };
+    return { ok: true };
+  } catch {
+    return { ok: false, error: NOT_SAVED };
+  }
+}
+
+/**
+ * The owner view's welcome deal: the same shape as `markTourSeenAction`, but its own key (`lectual_welcome`). Session
+ * client only, no user or org argument, other metadata keys (the tour's included) are kept untouched.
+ */
+export async function markWelcomeSeenAction(outcome: unknown): Promise<MarkTourSeenResult> {
+  if (!isTourOutcome(outcome)) return { ok: false, error: NOT_SAVED };
+  try {
+    const supabase = await getScopedClient();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+    if (userError) return { ok: false, error: NOT_SAVED };
+    if (!user) return { ok: false, error: NOT_SIGNED_IN };
+
+    const existing = (user.user_metadata ?? {}) as Record<string, unknown>;
+    const { error } = await supabase.auth.updateUser({
+      data: { ...existing, lectual_welcome: buildWelcomeMeta(outcome, new Date()) },
     });
     if (error) return { ok: false, error: NOT_SAVED };
     return { ok: true };

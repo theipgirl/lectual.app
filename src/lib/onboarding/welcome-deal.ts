@@ -15,14 +15,33 @@ import {
   welcomeCard3Body,
 } from "@/lib/ui/words";
 import { stepTour, type StepAction } from "./engine";
-import { shouldShowTour, type TourOutcome } from "./tour";
+import type { TourOutcome } from "./tour";
 
 /**
  * The welcome deal: the owner view's first-sign-in guide, four cards in the deck's own look. In the owner view it
  * REPLACES the Sprint 21 tour (the technician view keeps the tour; the layout draws one or the other, never both).
- * It writes the SAME `lectual_tour` flag through `markTourSeenAction`, at the same version, so it is drawn only for a
- * person who has not seen the tour. The flag decides what is DRAWN, never what anyone may see or do. Pure.
+ * It has its OWN flag, `user_metadata.lectual_welcome = { version, seen_at, outcome }`, written by
+ * `markWelcomeSeenAction`; `lectual_tour` is never read or written here, so a person who finished the tour in the
+ * technician view still sees the welcome deal the first time they are in the owner view. The flag decides what is DRAWN,
+ * never what anyone may see or do. Pure.
  */
+export const WELCOME_VERSION = 1;
+export type WelcomeMeta = { version: number; seen_at: string; outcome: TourOutcome };
+
+/** True when the stored welcome version is missing, malformed or older than `version`. Never throws. */
+export function shouldShowWelcome(userMetadata: unknown, version: number = WELCOME_VERSION): boolean {
+  if (typeof userMetadata !== "object" || userMetadata === null) return true;
+  const stored = (userMetadata as Record<string, unknown>).lectual_welcome;
+  if (typeof stored !== "object" || stored === null || Array.isArray(stored)) return true;
+  const seen = (stored as Record<string, unknown>).version;
+  if (typeof seen !== "number" || !Number.isFinite(seen)) return true;
+  return seen < version;
+}
+
+export function buildWelcomeMeta(outcome: TourOutcome, now: Date, version: number = WELCOME_VERSION): WelcomeMeta {
+  return { version, seen_at: now.toISOString(), outcome };
+}
+
 export const SHOW_WELCOME_EVENT = "lectual:show-welcome-deal";
 
 export type WelcomeCard = {
@@ -53,7 +72,7 @@ export function guideFor(shellVariant: "owner" | undefined): "welcome" | "tour" 
 
 /** The server's "draw it on load" answer: owner shell, a member (never staff acting in a firm), and the tour flag unseen. */
 export function shouldShowWelcomeDeal(input: { userMetadata: unknown; shellVariant: "owner" | undefined; actingAsStaff: boolean }): boolean {
-  return guideFor(input.shellVariant) === "welcome" && !input.actingAsStaff && shouldShowTour(input.userMetadata);
+  return guideFor(input.shellVariant) === "welcome" && !input.actingAsStaff && shouldShowWelcome(input.userMetadata);
 }
 
 export type WelcomeState = { index: number; outcome: TourOutcome | null };

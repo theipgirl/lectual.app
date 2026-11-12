@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { FOCUSABLE_SELECTOR } from "@/lib/copilot/launcher";
-import { markTourSeenAction } from "@/lib/onboarding/actions";
+import { markWelcomeSeenAction } from "@/lib/onboarding/actions";
 import { closeTour, focusRestoreTarget, hasVisibleModal, readGuard, shouldOpenOnLoad, tourKeyAction } from "@/lib/onboarding/engine";
 import type { TourOutcome } from "@/lib/onboarding/tour";
 import { isLastCard, SHOW_WELCOME_EVENT, startWelcome, stepWelcome, welcomeCards, type WelcomeCard } from "@/lib/onboarding/welcome-deal";
@@ -92,6 +92,8 @@ type Props = {
   open: boolean;
   /** The person's two deal times ("HH:MM", firm time); card 3 names them. */
   dealTimes: readonly string[];
+  /** False for Lectual staff acting inside a firm: the deal can be looked at (replay) but never writes the flag. */
+  persist?: boolean;
 };
 
 function sessionStore(): Storage | null {
@@ -105,9 +107,9 @@ function sessionStore(): Storage | null {
 /**
  * The owner view's welcome deal. Opens once on load when the server says so (same session guard and visible-modal check
  * as the tour), and again from the account menu's "Show tips again". Closing is optimistic, like the tour: it goes away
- * at once, the guard is set, then the existing `lectual_tour` flag is written; a failed save is swallowed.
+ * at once, the guard is set, then the `lectual_welcome` flag is written; a failed save is swallowed.
  */
-export function WelcomeDeal({ open, dealTimes }: Props) {
+export function WelcomeDeal({ open, dealTimes, persist = true }: Props) {
   const cards = useMemo(() => welcomeCards(dealTimes), [dealTimes]);
   const [active, setActive] = useState(false);
   const [index, setIndex] = useState(0);
@@ -136,7 +138,7 @@ export function WelcomeDeal({ open, dealTimes }: Props) {
   const finish = useCallback((outcome: TourOutcome) => {
     void closeTour({
       outcome,
-      action: markTourSeenAction,
+      action: persist ? markWelcomeSeenAction : async () => ({ ok: true }),
       storage: sessionStore(),
       onClosed: () => {
         setActive(false);
@@ -144,7 +146,7 @@ export function WelcomeDeal({ open, dealTimes }: Props) {
         returnTo.current = null;
       },
     });
-  }, []);
+  }, [persist]);
 
   const go = useCallback(
     (action: "next" | "back" | "skip") => {

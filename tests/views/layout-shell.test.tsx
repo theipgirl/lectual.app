@@ -134,7 +134,7 @@ describe("switch on", () => {
     // The owner shell draws the welcome deal INSTEAD of the tour (Phase 2 item 5).
     expect(m.tour).toBeUndefined();
     expect(m.welcome).toBeDefined();
-    expect(Object.keys(m.welcome.props).sort()).toEqual(["dealTimes", "open"]);
+    expect(Object.keys(m.welcome.props).sort()).toEqual(["dealTimes", "open", "persist"]);
     expect(m.rail.props).toMatchObject({ showSettings: false, showReports: false, variant: "owner" });
     expect(m.bar.props).toMatchObject({ variant: "owner" });
     expect(m.menu.props).toMatchObject({ settingsInMenu: true, variant: "owner" });

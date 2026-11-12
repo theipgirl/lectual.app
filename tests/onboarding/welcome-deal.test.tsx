@@ -4,6 +4,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { TOUR_VERSION } from "@/lib/onboarding/tour";
 import {
   guideFor,
+  shouldShowWelcome,
+  WELCOME_VERSION,
   isLastCard,
   requestWelcomeAgain,
   shouldShowWelcomeDeal,
@@ -16,7 +18,8 @@ import { closeTour } from "@/lib/onboarding/engine";
 import { WelcomeDealView } from "@/components/onboarding/WelcomeDeal";
 import { DEAL_TIMES_MENU_ITEM, DEAL_TIMES_OPEN } from "@/lib/ui/words";
 
-const seen = { lectual_tour: { version: TOUR_VERSION, seen_at: "x", outcome: "finished" } };
+const seen = { lectual_welcome: { version: WELCOME_VERSION, seen_at: "x", outcome: "finished" } };
+const tourSeen = { lectual_tour: { version: TOUR_VERSION, seen_at: "x", outcome: "finished" } };
 
 describe("welcomeCards", () => {
   it("is four cards in the board's order, each tagged and with a first step", () => {
@@ -118,7 +121,12 @@ describe("who sees it", () => {
   it("owner shell, member, unseen: yes", () => {
     expect(shouldShowWelcomeDeal({ userMetadata: {}, shellVariant: "owner", actingAsStaff: false })).toBe(true);
   });
-  it("not when the tour flag is seen at this version", () => {
+  it("a person who finished the tour but not the welcome deal still sees it", () => {
+    expect(shouldShowWelcomeDeal({ userMetadata: tourSeen, shellVariant: "owner", actingAsStaff: false })).toBe(true);
+    expect(shouldShowWelcome({ lectual_welcome: [] })).toBe(true);
+    expect(shouldShowWelcome({ lectual_welcome: { version: 0 } })).toBe(true);
+  });
+  it("not when the welcome flag is seen at this version", () => {
     expect(shouldShowWelcomeDeal({ userMetadata: seen, shellVariant: "owner", actingAsStaff: false })).toBe(false);
   });
   it("not for staff acting in a firm", () => {
@@ -155,6 +163,14 @@ describe("the dialog", () => {
 });
 
 describe("wiring", () => {
+  it("the dialog writes only its own flag, and staff in a firm write nothing", () => {
+    const src = readFileSync("src/components/onboarding/WelcomeDeal.tsx", "utf8");
+    expect(src).toContain("markWelcomeSeenAction");
+    expect(src).not.toContain("markTourSeenAction");
+    expect(src).toContain("persist ? markWelcomeSeenAction");
+    expect(readFileSync("src/app/dashboard/layout.tsx", "utf8")).toContain("persist={!actingAsStaff}");
+  });
+
   it("the layout draws the tour only for the technician shell and the welcome deal only for the owner shell", () => {
     const src = readFileSync("src/app/dashboard/layout.tsx", "utf8");
     expect(src).toContain('guideFor(shell.variant) === "welcome"');

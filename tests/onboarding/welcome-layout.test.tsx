@@ -28,6 +28,7 @@ import DashboardLayout from "@/app/dashboard/layout";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { WelcomeDeal } from "@/components/onboarding/WelcomeDeal";
 import { TOUR_VERSION } from "@/lib/onboarding/tour";
+import { WELCOME_VERSION } from "@/lib/onboarding/welcome-deal";
 
 function findAll(node: ReactNode, type: unknown, out: ReactElement[] = []): ReactElement[] {
   if (Array.isArray(node)) node.forEach((n) => findAll(n, type, out));
@@ -74,9 +75,16 @@ describe("which first-sign-in guide the layout draws", () => {
     expect(welcome[0].props.dealTimes).toEqual(["08:00", "15:00"]);
   });
 
-  it("owner view with the tour flag seen: the welcome deal is closed", async () => {
+  it("owner view with the tour seen but no welcome flag: the welcome deal still opens", async () => {
     resolveFirmSession.mockResolvedValue(
       session({ lectual_tour: { version: TOUR_VERSION, seen_at: "x", outcome: "skipped" } }, ["role-views"]),
+    );
+    expect((await drawn()).welcome[0].props.open).toBe(true);
+  });
+
+  it("owner view with the welcome flag seen: closed", async () => {
+    resolveFirmSession.mockResolvedValue(
+      session({ lectual_welcome: { version: WELCOME_VERSION, seen_at: "x", outcome: "finished" } }, ["role-views"]),
     );
     expect((await drawn()).welcome[0].props.open).toBe(false);
   });
