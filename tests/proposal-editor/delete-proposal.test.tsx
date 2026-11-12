@@ -138,17 +138,15 @@ describe("who may delete, and the More menu", () => {
           status,
           version: 1,
           canWrite: true,
-          isApprover: true,
-          blockingErrors: 0,
-          approverNames: [],
           clientUrl: null,
           canDelete,
         }),
       ),
     );
 
-  it("an accepted proposal shows More only to the owner", async () => {
-    expect(await render(true, "accepted")).toContain(">More<");
+  it("an accepted proposal shows the Delete menu only to the owner (the menu is named for what it holds)", async () => {
+    expect(await render(true, "accepted")).toContain(">Delete<");
+    expect(await render(false, "accepted")).not.toContain(">Delete<");
     expect(await render(false, "accepted")).not.toContain(">More<");
   });
 
@@ -156,7 +154,7 @@ describe("who may delete, and the More menu", () => {
     const { DeleteConfirm } = await import("@/components/proposal-editor/Lifecycle");
     const html = renderToStaticMarkup(createElement(DeleteConfirm, { proposalId: "p1", onCancel: () => {} }));
     expect(DELETE_CONFIRM).toBe(
-      "Delete this proposal and all its versions? The client link stops working and its history is removed. This can't be undone.",
+      "Delete this proposal and all its versions? The client link stops working and its history is removed, and the signed letter's record is removed too. This can't be undone.",
     );
     expect(html).toContain("all its versions");
     expect(html).toContain("can&#x27;t be undone");

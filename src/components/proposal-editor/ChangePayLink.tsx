@@ -37,7 +37,7 @@ export function ChangePayLink({ proposalId, updatedAt, payUrl }: { proposalId: s
             </label>
             <div className="pe-bar">
               <button type="submit" className="lx-btn lx-btn-sec" disabled={pending}>
-                {pending ? "Saving…" : "Save"}
+                {pending ? "Saving…" : "Save pay link"}
               </button>
               <Outcome state={state} pending={pending} />
             </div>

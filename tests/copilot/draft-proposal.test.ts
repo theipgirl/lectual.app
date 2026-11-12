@@ -97,8 +97,9 @@ describe("buildDraft uses the New proposal helpers and the firm's own list", () 
 
   it("blocks a class number in a class label (validateContent's rule), so the user is asked to reword it", () => {
     const built = buildDraft(req({ brands: [{ name: "DOEWARE", marks: ["word"], classes: ["Class 25 clothing"] }] }), LEAD, PRICING, rand);
-    if (!built.ok) throw new Error("expected a draft");
-    expect(built.draft.blocking.length).toBeGreaterThan(0);
+    // Sprint 5: the one builder refuses what is wrong in what the user said, so the user is asked to reword it.
+    expect(built).toMatchObject({ ok: false, kind: "needs_changes" });
+    if (!built.ok && built.kind === "needs_changes") expect(built.problems.join(" ")).toMatch(/Class/i);
   });
 
   it("reports what a draft may carry (no first name on a business-only lead) without blocking", () => {

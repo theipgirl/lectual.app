@@ -207,6 +207,12 @@ export async function gateLinkedProposal(queueId: string): Promise<ApproveGate> 
  * Called after the queue approval and BEFORE the mailbox draft exists, so the
  * link in the email works the moment a person opens the draft. Returns a
  * sentence on failure; never throws.
+ *
+ * A proposal that carries an engagement letter goes live only while that copy
+ * is the firm's current approved letter: `sendProposal` runs the one make-live
+ * guard (`src/lib/loe/live-guard.ts`, the firm's letter read fenced on the
+ * proposal row's own org) and its fixed sentence comes back from here as the
+ * reason the email was not approved.
  */
 export async function makeProposalLive(proposalId: string): Promise<{ ok: true } | { ok: false; error: string }> {
   try {

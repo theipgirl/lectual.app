@@ -1,12 +1,9 @@
 "use client";
 
-import { saveGeneralAction } from "@/app/dashboard/proposals/[id]/actions";
 import { GENERAL_LIMITS } from "@/lib/proposals/validate";
 import type { GeneralFormValues } from "@/lib/proposal-editor/general-form";
-import { ActionForm, IssueList, SaveRow, type ShownIssue } from "./ActionForm";
-import { ExpiryField } from "./ExpiryField";
+import { fieldId } from "@/lib/proposal-editor/checklist";
 import { newRowId, useRows } from "./rows";
-import { UnsavedPill } from "./UnsavedGuard";
 
 /**
  * Spec 9: the fields of a general (flat-fee) proposal: the matter, a summary, the work (each piece with hours and
@@ -18,7 +15,7 @@ export function GeneralFields({ values, editable = true }: { values: GeneralForm
   const start = values.items.length > 0 ? values.items : [{ id: "", label: "", hours: "", rate: "", value: "" }];
   const list = useRows(start);
   return (
-    <div className="pe-general">
+    <div className="pe-general" id={fieldId.general}>
       <label className="lx-field">
         <span className="lx-label">Matter</span>
         <input
@@ -89,64 +86,5 @@ export function GeneralFields({ values, editable = true }: { values: GeneralForm
         <textarea className="lx-input" name="termsNote" rows={2} maxLength={GENERAL_LIMITS.termsNote} defaultValue={values.termsNote} />
       </label>
     </div>
-  );
-}
-
-export const generalFormId = (proposalId: string) => `pe-general-${proposalId}`;
-
-/** The editor's one section for a general draft. Tracked for unsaved changes, so "Save and create link" waits for it. */
-export function GeneralForm({
-  proposalId,
-  updatedAt,
-  editable,
-  issues,
-  values,
-  greeting,
-  payUrl,
-  expiresOn,
-  today,
-}: {
-  proposalId: string;
-  updatedAt: string;
-  editable: boolean;
-  issues: ShownIssue[];
-  values: GeneralFormValues;
-  greeting: string;
-  payUrl: string;
-  expiresOn: string;
-  today?: string;
-}) {
-  const id = generalFormId(proposalId);
-  return (
-    <section className="lx-card pe-card">
-      <header className="pe-card-head">
-        <h2 className="pe-h">
-          Matter and flat fee <UnsavedPill formId={id} />
-        </h2>
-        <p className="lx-note pe-hint">A contract or other matter at one flat fee. No packages, classes or USPTO fees.</p>
-      </header>
-      <ActionForm action={saveGeneralAction} id={id} unsavedLabel="Matter and flat fee">
-        {({ state, pending }) => (
-          <fieldset className="pe-fieldset" disabled={!editable}>
-            <input type="hidden" name="proposalId" value={proposalId} />
-            <input type="hidden" name="updatedAt" value={updatedAt} />
-            <label className="lx-field">
-              <span className="lx-label">Greeting</span>
-              <textarea className="lx-input" name="greeting" rows={3} maxLength={4000} defaultValue={greeting} />
-            </label>
-            <GeneralFields values={values} editable={editable} />
-            <div className="lx-form-grid">
-              <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
-                <span className="lx-label">Pay link</span>
-                <input className="lx-input" name="payUrl" type="url" maxLength={2000} defaultValue={payUrl} placeholder="Enter custom pay link" />
-              </label>
-              <ExpiryField defaultValue={expiresOn} today={today} disabled={!editable} />
-            </div>
-            <IssueList issues={issues} />
-            <SaveRow editable={editable} state={state} pending={pending} label="Save matter and fee" formId={id} />
-          </fieldset>
-        )}
-      </ActionForm>
-    </section>
   );
 }

@@ -105,18 +105,20 @@ async function render(proposal: ProposalRow, events: ProposalEventRow[], strip: 
   }));
   vi.doMock("@/app/dashboard/proposals/[id]/paid-actions", () => ({ markPaidAction: vi.fn(), undoPaidAction: vi.fn(), retryUploadAction: vi.fn() }));
   vi.doMock("@/components/proposal-editor/Sections", () => ({
-    AddNameForm: stub("add-name"),
-    AdjustmentsForm: stub("adjustments"),
-    DetailsForm: stub("details"),
-    DetailsMoreFields: stub("details-more"),
-    IncludesForm: stub("includes"),
-    MessageForm: stub("message"),
+    BrandForms: stub("brand-forms"),
+    BrandsSection: ({ children }: { children: unknown }) => children,
+    FeesSection: stub("fees"),
+    MessageSection: stub("message"),
     NameCard: stub("name-card"),
-    NameMoreFields: stub("name-more"),
     NameRowsProvider: ({ children }: { children: unknown }) => children,
-    PricingForm: stub("pricing"),
-    PricingMoreFields: stub("pricing-more"),
+    WhoSection: stub("who"),
   }));
+  vi.doMock("@/components/proposal-editor/DraftForm", () => ({
+    DraftProvider: ({ children }: { children: unknown }) => children,
+    DraftFormElement: ({ children }: { children: unknown }) => children,
+  }));
+  vi.doMock("@/components/proposal-editor/EditorActions", () => ({ EditorActions: stub("editor-actions") }));
+  vi.doMock("@/components/proposal-editor/GeneralFields", () => ({ GeneralFields: stub("general-fields") }));
   vi.doMock("@/lib/proposals/lead-link", () => ({
     loadLeadLink: vi.fn(async (id: string | null) => (id ? { state: "linked", id, name: "Sevetri Wilson" } : { state: "none" })),
   }));
@@ -132,9 +134,11 @@ describe("proposal detail page", () => {
 
   it("puts the card above the editor; the fees are shown once, in the one totals box", async () => {
     const { html } = await render(row(), [EVIDENCE]);
-    const card = html.indexOf("Proposal at a glance");
-    expect(card).toBeGreaterThan(-1);
-    expect(card).toBeLessThan(html.indexOf('data-stub="details"'));
+    // Sprint 1: the "Proposal at a glance" card is gone; an assistant's draft shows "Check these N things" at the top.
+    expect(html).not.toContain("Proposal at a glance");
+    const panel = html.indexOf("Check these 1 thing");
+    expect(panel).toBeGreaterThan(-1);
+    expect(panel).toBeLessThan(html.indexOf('data-stub="who"'));
     expect(html).not.toContain("At signing (legal fee)");
     expect(html).not.toContain("pre-ticked");
     expect(html).toContain("What the client pays");
@@ -147,8 +151,8 @@ describe("proposal detail page", () => {
     const { html, loadStrip } = await render(row(), [], { status: "none" });
     expect(loadStrip).toHaveBeenCalledWith("lead-9");
     const strip = html.indexOf("Latest consult");
-    expect(strip).toBeGreaterThan(html.indexOf("Proposal at a glance"));
-    expect(strip).toBeLessThan(html.indexOf('data-stub="details"'));
+    expect(strip).toBeGreaterThan(html.indexOf("Check these"));
+    expect(strip).toBeLessThan(html.indexOf('data-stub="who"'));
     expect(html).toContain("No consult recorded");
   });
 
@@ -162,12 +166,13 @@ describe("proposal detail page", () => {
     const { html, loadStrip } = await render(row({ lead_id: null }), []);
     expect(loadStrip).not.toHaveBeenCalled();
     expect(html).not.toContain("Latest consult");
-    expect(html).toContain("Proposal at a glance");
+    expect(html).not.toContain("Proposal at a glance");
   });
 
-  it("a proposal with no agent event renders its card without receipts", async () => {
+  it("a person's own draft has neither the glance card nor the check panel", async () => {
     const { html } = await render(row({ source: "manual" }), []);
-    expect(html).toContain("Proposal at a glance");
+    expect(html).not.toContain("Proposal at a glance");
+    expect(html).not.toContain("Check these");
     expect(html).not.toContain("Heard on the call");
   });
 });

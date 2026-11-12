@@ -42,6 +42,8 @@ export type ListRowInput = {
   package_basis: ProposalPackageBasis | null;
   /** Spec 9: set (non-empty) only on a general (flat-fee) proposal. Absent or null = trademark. */
   matter_title?: string | null;
+  /** Sprint 6: the accepted snapshot carries a signature (schema 2 with an agreement). Absent or null = unknown, read as not signed. */
+  signed?: boolean | null;
 };
 
 /**
@@ -88,7 +90,7 @@ export type ProposalRowView = {
   paid: PaidMarker | null;
   /** Mark paid is offered: an accepted row that is read as not paid, for a role that may mark. Never while the read failed. */
   canMarkPaid: boolean;
-  /** The Accepted column: "Accepted Oct 21", or "Not yet". */
+  /** The Accepted column: "Signed Oct 21" for a signed version, "Accepted Oct 21" otherwise, or "Not yet". */
   accepted: string;
   /** The Paid column (see `PaidCellView`). */
   paidCell: PaidCellView;
@@ -148,7 +150,8 @@ export function buildProposalRowView(
     } else paidCell = { kind: "not_paid", text: "Not paid", canMark: canMarkPaid };
   }
   const acceptedWhen = item.accepted_at ? formatShortFirmDate(item.accepted_at, ctx.tz) : "";
-  const accepted = item.status === "accepted" || item.accepted_at ? (acceptedWhen ? `Accepted ${acceptedWhen}` : "Accepted") : "Not yet";
+  const acceptedWord = item.status === "accepted" && item.signed === true ? "Signed" : "Accepted";
+  const accepted = item.status === "accepted" || item.accepted_at ? (acceptedWhen ? `${acceptedWord} ${acceptedWhen}` : acceptedWord) : "Not yet";
   const edited = item.package_basis && item.package_basis.edited.length > 0 ? item.package_basis.name : null;
   // Spec 9: a general (flat-fee) proposal is named by its matter, has one flat fee and no USPTO fee.
   const matterTitle = typeof item.matter_title === "string" && item.matter_title.trim() ? item.matter_title.trim() : null;

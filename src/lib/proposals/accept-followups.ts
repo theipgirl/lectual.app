@@ -1,7 +1,16 @@
 import "server-only";
 
 import { firmToken } from "@/lib/intake-forms/lawmatics-sync";
-import { addNote, type FetchLike } from "@/lib/lawmatics/writes";
+import { readStoredAgreement, type StoredAgreementDb } from "@/lib/loe/stored-agreement";
+import { buildVerifiedSignedPdf, signedLetterFileName } from "@/lib/loe/signed-pdf";
+import { signedAtUtcIso } from "@/lib/loe/signing";
+import { resolveTimeZone } from "@/lib/org/profile-rules";
+import { addNote, uploadMatterFile, type FetchLike, type MultipartFetchLike } from "@/lib/lawmatics/writes";
+import { firmDisplayName } from "./commitment";
+import { SignedUploadBlocked, runSignedLoeUpload } from "./loe-signed-upload";
+import { logSignedMismatch } from "./signed-mismatch-log";
+import { isSignedSnapshot } from "./signed-state";
+import { STEP_TEXT } from "./step-text";
 import { formatDollars } from "@/lib/proposal-editor/events";
 import { addedClassCount } from "./client-classes";
 import { chosenPackagesText, packageLineTitle } from "./name-package";
@@ -14,7 +23,8 @@ import { MARK_KIND_LABEL, isGeneralContent, type AcceptedSnapshot } from "./type
  *
  *   1. an in-app notice (crm_notification, kind `approval_needed`) to the proposal's
  *      approvers and the firm's intake staff: a headline, nothing else;
- *   2. a Lawmatics NOTE on the right record, through the firm's OWN connection.
+ *   2. a Lawmatics NOTE on the right record, through the firm's OWN connection;
+ *   3. (Sprint 6, a SIGNED acceptance only) the signed letter's PDF filed in the matter's Engagement folder.
  *
  * Each step is independent, records its outcome on the proposal's timeline, and runs once
  * per accepted version (a version has its own id, so the dedupe is by proposal id). NOTHING
@@ -67,11 +77,25 @@ function text(value: unknown): string {
 /* ─────────────────────────── the words ─────────────────────────────────── */
 
 /** "<client> accepted <package> · legal $4,950". Legal fee only: the USPTO fee is not part of a headline. */
-export function acceptanceHeadline(input: { clientName: string; packageName: string; legalTotalCents: number; addedClasses?: number }): string {
+export function acceptanceHeadline(input: { clientName: string; packageName: string; legalTotalCents: number; addedClasses?: number; signedBy?: string }): string {
   const client = text(input.clientName) || "A client";
   const pkg = text(input.packageName);
   const added = input.addedClasses && input.addedClasses > 0 ? ` · ${input.addedClasses} ${input.addedClasses === 1 ? "class" : "classes"} added by the client` : "";
-  return `${client} accepted ${pkg ? `${pkg} ` : "their proposal "}· legal ${formatDollars(input.legalTotalCents)}${added}`;
+  // An engagement letter was signed (lectual 0106): the notice says only THAT it was signed and by whom, never the letter or what the client typed beyond the name.
+  const signed = text(input.signedBy) ? ` · engagement letter signed by ${text(input.signedBy)}` : "";
+  return `${client} accepted ${pkg ? `${pkg} ` : "their proposal "}· legal ${formatDollars(input.legalTotalCents)}${added}${signed}`;
+}
+
+/**
+ * "Engagement letter signed by Alex Sample on 2026-11-12T19:14:00.000Z (UTC)." for a schema-2 snapshot, else null. Nothing of the
+ * letter itself. The time is the stored instant in UTC, ISO 8601, and SAYS it is UTC: this line is written on a path that may not
+ * know the firm's zone, and a signed time with no zone says nothing.
+ */
+export function signedNoteLine(snapshot: AcceptedSnapshot): string | null {
+  const agreement = snapshot.agreement;
+  if (!agreement || !text(agreement.signer_name)) return null;
+  const when = signedAtUtcIso(text(agreement.signed_at) || snapshot.accepted_at);
+  return when ? `Engagement letter signed by ${text(agreement.signer_name)} on ${when} (UTC).` : `Engagement letter signed by ${text(agreement.signer_name)}.`;
 }
 
 /**
@@ -106,6 +130,8 @@ export function acceptanceNoteBody(snapshot: AcceptedSnapshot, clientName: strin
   if (addedIds.size > 0) lines.push(`Classes added by the client: ${addedIds.size} (priced into the totals below)`);
   lines.push(`Legal fee, due when accepted: ${formatDollars(quote.legal_total_cents)}`);
   lines.push(`USPTO fees, due at filing: ${formatDollars(quote.gov_total_cents)} (separate; not part of the legal fee)`);
+  const signedLine = signedNoteLine(snapshot);
+  if (signedLine) lines.push(signedLine);
   return { name: `Proposal accepted: ${pkg}`.slice(0, 120), body: lines.join("\n") };
 }
 
@@ -128,6 +154,8 @@ function generalAcceptanceNoteBody(snapshot: AcceptedSnapshot, clientName: strin
     lines.push(`Adjustment: ${text(a.label) || "Adjustment"} −${formatDollars(a.discount_cents)}`);
   }
   lines.push(`Legal fee, due when accepted: ${formatDollars(quote.legal_total_cents)}`);
+  const signedLine = signedNoteLine(snapshot);
+  if (signedLine) lines.push(signedLine);
   return { name: `Proposal accepted: ${title}`.slice(0, 120), body: lines.join("\n") };
 }
 
@@ -231,6 +259,8 @@ export type FollowupDeps = {
   /** The firm's Lawmatics token for this org, or null. Default: `firmToken` over the same client. */
   getToken?: (db: FollowupDb, orgId: string) => Promise<string | null>;
   fetchImpl?: FetchLike;
+  /** The multipart request that files the signed letter (tests only; the default is `fetch`). */
+  uploadFetch?: MultipartFetchLike;
 };
 
 const PROPOSAL_COLUMNS = "id, org_id, family_id, status, client_name, client_email, lead_id, matter_id, accepted_snapshot";
@@ -266,7 +296,7 @@ async function readEarlierSteps(db: FollowupDb, row: Row): Promise<StepEventInpu
       .select("proposal_id, created_at, payload")
       .eq("proposal_id", row.id)
       .eq("org_id", row.orgId)
-      .in("payload->>step", ["accept_notice", "lawmatics_note"])
+      .in("payload->>step", ["accept_notice", "lawmatics_note", "signed_loe_upload"])
       .limit(50),
     db
       .from("client_proposal_event")
@@ -337,6 +367,7 @@ async function noticeStep(db: FollowupDb, row: Row): Promise<StepResult> {
         : chosenPackagesText(row.snapshot.quote.names) || (row.snapshot.content.pricing?.package ?? ""),
       legalTotalCents: row.snapshot.quote.legal_total_cents,
       addedClasses: addedClassCount(row.snapshot.content, row.snapshot.selection),
+      signedBy: row.snapshot.agreement?.signer_name,
     });
     const { error } = await db.from("crm_notification").insert(
       recipients.map((userId) => ({
@@ -358,6 +389,79 @@ async function noteStep(db: FollowupDb, row: Row, deps: FollowupDeps): Promise<S
   try {
     const token = await (deps.getToken ?? ((d, orgId) => firmToken(d as never, orgId)))(db, row.orgId);
     return await addAcceptanceNote(db, row, token, deps.fetchImpl);
+  } catch {
+    return { outcome: "failed", reason: "unexpected error" };
+  }
+}
+
+/**
+ * The firm's name for the letterhead and its time zone, read for this org only. Three-state in effect: a firm with NO profile
+ * row has its own name and the standard zone (a real answer), but a FAILED read of the firm or of its profile is `unavailable`.
+ * The signed letter is never built with a guessed zone or a missing firm name.
+ */
+type FirmLetterFacts = { status: "ok"; displayName: string; timeZone: string } | { status: "unavailable" };
+
+async function firmLetterFacts(db: FollowupDb, orgId: string): Promise<FirmLetterFacts> {
+  try {
+    const [org, profile] = await Promise.all([
+      db.from("crm_org").select("name").eq("id", orgId).maybeSingle(),
+      db.from("crm_org_profile").select("display_name, time_zone").eq("org_id", orgId).maybeSingle(),
+    ]);
+    if (org.error || profile.error) return { status: "unavailable" };
+    const orgName = isObject(org.data) && typeof org.data.name === "string" ? org.data.name.trim() : "";
+    if (!orgName) return { status: "unavailable" };
+    const p = isObject(profile.data) ? profile.data : null;
+    return {
+      status: "ok",
+      displayName: firmDisplayName(p && typeof p.display_name === "string" ? p.display_name : null, orgName),
+      timeZone: resolveTimeZone(p && typeof p.time_zone === "string" ? p.time_zone : null),
+    };
+  } catch {
+    return { status: "unavailable" };
+  }
+}
+
+/** Files the signed letter (a PDF) in the matter's Engagement folder, through the firm's OWN connection. Schema-2 snapshots only. */
+async function signedUploadStep(db: FollowupDb, row: Row, deps: FollowupDeps): Promise<StepResult> {
+  try {
+    const facts = await firmLetterFacts(db, row.orgId);
+    // A failed read of the firm's name or zone: the step is recorded as failed (Try again retries it), and no PDF is built.
+    if (facts.status !== "ok") return { outcome: "failed", reason: STEP_TEXT.signedFirmUnreadable };
+    return await runSignedLoeUpload(isSignedSnapshot(row.snapshot), {
+      token: async () => {
+        try {
+          const t = await (deps.getToken ?? ((d, orgId) => firmToken(d as never, orgId)))(db, row.orgId);
+          return t ? { status: "ok", token: t } : { status: "not_connected" };
+        } catch {
+          return { status: "unavailable" };
+        }
+      },
+      target: async () => {
+        const target = await resolveNoteTarget(db, row);
+        if (target.ok) return { ok: true, lawmaticsId: target.notableId };
+        if (target.reason === "unreadable") return { ok: false, kind: "failed", reason: STEP_TEXT.signedTargetUnreadable };
+        return { ok: false, kind: "blocked", reason: target.reason === "none" ? STEP_TEXT.signedNoMatter : STEP_TEXT.signedManyMatters };
+      },
+      buildPdf: async () => {
+        const built = await buildVerifiedSignedPdf({
+          snapshot: row.snapshot,
+          firm: { displayName: facts.displayName, timeZone: facts.timeZone },
+          // Only read when today's code no longer rebuilds the signed text; fenced on the proposal's own org.
+          readStored: () => readStoredAgreement(db as unknown as StoredAgreementDb, { proposalId: row.id, orgId: row.orgId, signatureId: row.snapshot.agreement?.signature_id }),
+        });
+        if (!built.ok) {
+          if (built.reason === "mismatch") {
+            // Not a hiccup: the stored signed text does not hash to its recorded fingerprint. Blocked, said once in the log.
+            logSignedMismatch(row.id, "signed_loe_upload");
+            throw new SignedUploadBlocked();
+          }
+          throw new Error("not built");
+        }
+        return built.bytes;
+      },
+      upload: (token, file) => uploadMatterFile(token, { matterId: file.matterId, fileName: file.fileName, mime: file.mime, bytes: file.bytes }, deps.uploadFetch),
+      fileName: signedLetterFileName(row.snapshot.agreement?.signer_name ?? "", row.snapshot.agreement?.signed_at ?? "", facts.timeZone),
+    });
   } catch {
     return { outcome: "failed", reason: "unexpected error" };
   }
@@ -385,6 +489,8 @@ export async function runAcceptanceFollowups(db: FollowupDb, input: FollowupInpu
     // a second note in the firm's CRM is worse than a missing one, so that step waits for a readable history.
     await runStep(db, row, "accept_notice", earlier, () => noticeStep(db, row), false);
     await runStep(db, row, "lawmatics_note", earlier, () => noteStep(db, row, deps), true);
+    // Sprint 6: a signed (schema 2) acceptance also files the signed letter. Earlier acceptances never run this step.
+    if (isSignedSnapshot(row.snapshot)) await runStep(db, row, "signed_loe_upload", earlier, () => signedUploadStep(db, row, deps), true);
   } catch {
     console.error("[proposals] the acceptance follow-ups stopped early");
   }

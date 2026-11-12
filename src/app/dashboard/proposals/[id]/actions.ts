@@ -24,19 +24,10 @@ import type { ProposalContent, ProposalRow } from "@/lib/proposals/types";
 import { GOES_LIVE_ON_APPROVAL, pendingProposalEmail, proposalSendBlock } from "@/lib/consult-proposal/link";
 import {
   newBrandName,
-  parseAdjustments,
-  parseDateInput,
-  parseDetails,
-  parseIncludes,
-  parseMessage,
-  parseName,
-  parsePricing,
   removeName,
-  replaceName,
   takenIds,
   type Parsed,
 } from "@/lib/proposal-editor/form";
-import { applyGeneralForm } from "@/lib/proposal-editor/general-form";
 import { isGeneralContent } from "@/lib/proposals/types";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { getScopedClient } from "@/lib/db/scoped-client";
@@ -44,11 +35,13 @@ import { CAN_WRITE_LEAD } from "@/lib/pipeline/leads";
 import { getSiteOrigin } from "@/lib/site-origin";
 import { clientLinkOrigin, clientLinkUrl } from "@/lib/proposals/client-link-origin";
 import { runManualEmail } from "@/lib/consult-proposal/manual-email";
+import { letterLiveCheck } from "@/lib/loe/live-guard";
+import { getApprovedLetter } from "@/lib/loe/templates-store";
 import { runCreateLink } from "@/lib/proposal-editor/create-link";
+import { runSaveDraft, type SaveDraftDeps } from "@/lib/proposal-editor/save-draft";
 import { runChangePayLink } from "@/lib/proposal-editor/pay-link";
 import { DELETE_OWNER_ONLY, canDeleteProposal } from "@/lib/proposal-editor/delete-proposal";
 import { runResetAcceptance } from "@/lib/proposal-editor/reset-acceptance";
-import { withPackageSnapshot } from "@/lib/proposals/package-snapshot";
 import { paidStateFromEvents } from "@/lib/proposals/paid";
 import { currentRole } from "@/lib/auth/current-role";
 import { createDraft, listQueue } from "@/lib/queue/api";
@@ -58,7 +51,8 @@ import { proposalActionError, type ActionState } from "../errors";
 import { gateStaffAction, requireProposalsModule } from "../gate";
 
 /**
- * The proposal editor's write surface. Every function is its own POST entry
+ * The proposal editor's write surface. (Sprint 1: the draft is saved by ONE action, `saveDraftAction`; the per-section
+ * save actions are gone. Add / remove brand name and link-to-lead stay: they are not saves of the document's fields.) Every function is its own POST entry
  * point, so every one calls `gateStaffAction()` first (module gate with
  * notFound(), then the staff-role list) — the page's own gate protects the page
  * and nothing else.
@@ -142,79 +136,8 @@ export async function linkLeadAction(_prev: ActionState, formData: FormData): Pr
   });
 }
 
-export async function saveDetailsAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  return edit(formData, (current) => {
-    const r = parseDetails(formData, current.content);
-    return r.ok ? { ok: true, value: r.value } : r;
-  });
-}
-
-/**
- * Spec 9: a general (flat-fee) draft's one section: the matter, its work, the flat fee, the not-included lines,
- * the terms note, the greeting, and the pay link and expiry date beside them. Refused on a trademark proposal.
- */
-export async function saveGeneralAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  return edit(formData, (current) => {
-    const r = applyGeneralForm(formData, current.content, rand);
-    if (!r.ok) return r;
-    const payUrl = formData.has("payUrl") ? { payUrl: field(formData, "payUrl") || null } : {};
-    let expiresOn: { expiresOn: string | null } | Record<string, never> = {};
-    if (formData.has("expiresOn")) {
-      const e = parseDateInput(field(formData, "expiresOn"), "Expiry date");
-      if (!e.ok) return e;
-      expiresOn = { expiresOn: e.value };
-    }
-    return { ok: true, value: { content: r.value, ...payUrl, ...expiresOn } };
-  });
-}
-
-/** The trademark sections (package, brand names, included items) are refused on a general (flat-fee) proposal. */
+/** Adding or removing a brand name is refused on a general (flat-fee) proposal. */
 const NOT_ON_GENERAL: Parsed<never> = { ok: false, error: "This is a flat-fee proposal. It has no packages, brand names or classes." };
-
-export async function saveMessageAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  return edit(formData, (current) => withContent(parseMessage(formData, current.content)));
-}
-
-export async function savePricingAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  return edit(formData, (current) => {
-    if (isGeneralContent(current.content)) return NOT_ON_GENERAL;
-    const r = parsePricing(formData);
-    if (!r.ok) return r;
-    // The pay link rides on this form (Step 3); a form that did not carry it leaves the stored one alone.
-    const payUrl = formData.has("payUrl") ? { payUrl: field(formData, "payUrl") || null } : {};
-    // So does the expiry date; a form that did not carry it leaves the stored one alone.
-    let expiresOn: { expiresOn: string | null } | Record<string, never> = {};
-    if (formData.has("expiresOn")) {
-      const e = parseDateInput(field(formData, "expiresOn"), "Expiry date");
-      if (!e.ok) return e;
-      expiresOn = { expiresOn: e.value };
-    }
-    return { ok: true, value: { content: { ...current.content, pricing: r.value }, ...payUrl, ...expiresOn } };
-  });
-}
-
-export async function saveNameAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  // Spec 6: a brand name (Spec 7: or a mark) whose package the client chooses snapshots the firm's CURRENT package list into the
-  // proposal. Read through the scoped client; an unreadable list saves nothing rather than guess at prices.
-  let settingPricing: unknown = null;
-  // Spec 7: a mark's own choice (`mark.<n>.pkgChoice`) needs the same snapshot.
-  const anyMarkChoice = [...formData.keys()].some((k) => /^mark\.\d+\.pkgChoice$/.test(k) && formData.get(k) === "on");
-  if (formData.get("pkgFields") === "1" && (formData.get("pkgChoice") === "on" || anyMarkChoice)) {
-    try {
-      settingPricing = (await getProposalSettings())?.pricing ?? {};
-    } catch {
-      return { error: "Couldn't load the firm's packages. Try again." };
-    }
-  }
-  return edit(formData, (current) => {
-    if (isGeneralContent(current.content)) return NOT_ON_GENERAL;
-    const name = parseName(formData, current.content, rand);
-    if (!name.ok) return name;
-    const replaced = replaceName(current.content, name.value);
-    if (!replaced.ok) return replaced;
-    return withContent({ ok: true, value: settingPricing === null ? replaced.value : withPackageSnapshot(replaced.value, settingPricing) });
-  });
-}
 
 export async function addNameAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   return edit(formData, (current) => {
@@ -230,19 +153,31 @@ export async function removeNameAction(_prev: ActionState, formData: FormData): 
   return edit(formData, (current) => (isGeneralContent(current.content) ? NOT_ON_GENERAL : withContent(removeName(current.content, field(formData, "nameId")))));
 }
 
-export async function saveAdjustmentsAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  return edit(formData, (current) => {
-    const r = parseAdjustments(formData, rand);
-    return r.ok ? { ok: true, value: { content: { ...current.content, adjustments: r.value } } } : r;
-  });
+/**
+ * "Save": the whole draft from one form post, ONE `updateProposal` call (see `runSaveDraft`). Every function in this
+ * file is its own POST entry point, so the module gate and staff role run first, before any read.
+ */
+export async function saveDraftAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  return runSaveDraft(draftDeps(), formData);
 }
 
-export async function saveIncludesAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  return edit(formData, (current) => {
-    if (isGeneralContent(current.content)) return NOT_ON_GENERAL;
-    const r = parseIncludes(formData);
-    return r.ok ? { ok: true, value: { content: { ...current.content, includes: r.value } } } : r;
-  });
+function draftDeps(): SaveDraftDeps {
+  return {
+    gate: gateStaffAction,
+    getRow: async (id) => (await getProposal(id))?.proposal ?? null,
+    settingPricing: async () => (await getProposalSettings())?.pricing ?? {},
+    approvedLetter: async (kind) => {
+      try {
+        return await getApprovedLetter(await getScopedClient(), kind);
+      } catch {
+        return { status: "unavailable" };
+      }
+    },
+    update: updateProposal,
+    describe: proposalActionError,
+    revalidate,
+    rand,
+  };
 }
 
 /* ── lifecycle ──────────────────────────────────────────────────────────── */
@@ -263,8 +198,24 @@ export async function approveAction(_prev: ActionState, formData: FormData): Pro
  */
 export async function createLinkAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   return runCreateLink(
-    { gate: gateStaffAction, approve: approveProposal, makeLive: sendProposal, describe: proposalActionError, revalidate },
+    {
+      gate: gateStaffAction,
+      save: (form) => runSaveDraft(draftDeps(), form),
+      // The same guard `sendProposal` runs (`live-guard.ts`), asked here BEFORE approving so a stale copy leaves no saved version behind.
+      letterCurrent: async (id) => {
+        const row = (await getProposal(id))?.proposal ?? null;
+        if (!row) return "no_letter";
+        return letterLiveCheck(await getScopedClient(), row);
+      },
+      approve: approveProposal,
+      makeLive: sendProposal,
+      describe: proposalActionError,
+      revalidate,
+    },
     field(formData, "proposalId"),
+    // `dirty=1` is only a hint that the page has unsaved changes: when it is posted the form is saved first.
+    // When it is absent nothing is saved and the server works from the row it re-reads.
+    { dirty: formData.get("dirty") === "1", form: formData },
   );
 }
 
@@ -318,7 +269,10 @@ export async function unapproveAction(_prev: ActionState, formData: FormData): P
   return lifecycle(formData, unapproveProposal, EDIT_AGAIN_DONE, "Couldn't take this proposal back to editing.");
 }
 
-/** "Turn on the link": the recovery for a saved version whose link is not live. Nothing is emailed from here. */
+/**
+ * "Turn on the link": the recovery for a saved version whose link is not live. Nothing is emailed from here. The engagement
+ * letter copy is re-checked against the firm's current approved version inside `sendProposal` (the one make-live guard).
+ */
 export async function sendAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const refused = await gateStaffAction();
   if (refused) return refused;

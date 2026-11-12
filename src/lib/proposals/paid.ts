@@ -31,6 +31,8 @@ export const PROPOSAL_STEPS = [
   "accepted_file_upload",
   "loe_file_upload",
   "custom_fields",
+  // Sprint 6: the signed letter's PDF, filed in the matter's Engagement folder right after the client signs.
+  "signed_loe_upload",
 ] as const;
 export type ProposalStep = (typeof PROPOSAL_STEPS)[number];
 
@@ -55,10 +57,11 @@ export const STEP_SUCCESS: Record<ProposalStep, string> = {
   accepted_file_upload: "uploaded",
   loe_file_upload: "uploaded",
   custom_fields: "written",
+  signed_loe_upload: "uploaded",
 };
 
 /** The steps the page offers to run again, in the order the page lists them. */
-export const RETRYABLE_STEPS = ["loe_draft", "accepted_file_upload", "custom_fields", "lawmatics_note", "loe_file_upload"] as const;
+export const RETRYABLE_STEPS = ["loe_draft", "accepted_file_upload", "custom_fields", "lawmatics_note", "loe_file_upload", "signed_loe_upload"] as const;
 export type RetryableStep = (typeof RETRYABLE_STEPS)[number];
 
 export function isRetryableStep(value: unknown): value is RetryableStep {
@@ -221,6 +224,7 @@ const HISTORY_WORDS: Record<ProposalStep, Words> = {
   loe_draft: { success: "queued the engagement letter draft for approval", blocked: "didn’t draft the engagement letter", failed: "couldn’t draft the engagement letter", skipped: "skipped the engagement letter draft" },
   accepted_file_upload: { success: "uploaded the accepted proposal to Lawmatics", blocked: "didn’t upload the accepted proposal to Lawmatics", failed: "couldn’t upload the accepted proposal to Lawmatics", skipped: "skipped uploading the accepted proposal to Lawmatics" },
   loe_file_upload: { success: "uploaded the approved engagement letter to Lawmatics", blocked: "didn’t upload the approved engagement letter to Lawmatics", failed: "couldn’t upload the approved engagement letter to Lawmatics", skipped: "skipped uploading the approved engagement letter to Lawmatics" },
+  signed_loe_upload: { success: "filed the signed engagement letter in Lawmatics", blocked: "didn’t file the signed engagement letter in Lawmatics", failed: "couldn’t file the signed engagement letter in Lawmatics", skipped: "skipped filing the signed engagement letter in Lawmatics" },
   custom_fields: { success: "wrote the LOE fields to the Lawmatics matter", blocked: "didn’t write the LOE fields to Lawmatics", failed: "couldn’t write the LOE fields to Lawmatics", skipped: "skipped the Lawmatics LOE fields" },
 };
 
@@ -274,5 +278,7 @@ export function stepActivityLabel(payload: unknown): string | null {
       return ok ? "Engagement letter uploaded to Lawmatics" : "Engagement letter not uploaded";
     case "custom_fields":
       return ok ? "LOE fields written to Lawmatics" : "LOE fields not written";
+    case "signed_loe_upload":
+      return ok ? "Signed letter filed in Lawmatics" : "Signed letter not filed in Lawmatics";
   }
 }

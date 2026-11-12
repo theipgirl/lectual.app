@@ -3,6 +3,7 @@ import { listMemberDirectory, type MemberIdentity } from "@/lib/members/director
 import { getProposalSettings } from "@/lib/proposals/store";
 import { PROPOSAL_ADMIN_ROLES, standardProposalPricing } from "@/lib/proposals/types";
 import { packageOffersFromSetting } from "@/lib/proposals/package-snapshot";
+import { readNewOffer } from "@/lib/proposals/new-offer";
 import { moneyInput } from "@/lib/proposal-editor/form";
 import { firstNameOf } from "@/lib/proposal-editor/labels";
 import { SettingsForm } from "@/components/proposal-editor/SettingsForm";
@@ -11,6 +12,8 @@ import "../../proposals/proposals.css";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
+import Link from "next/link";
+import { LETTER_SETTINGS_LINK, LETTER_SETTINGS_LINK_NOTE } from "@/lib/ui/words";
 
 export const metadata: Metadata = { title: pageTitle("Proposal settings") };
 
@@ -92,7 +95,19 @@ export default async function ProposalSettingsPage() {
           Nothing is saved yet. The values below are the defaults a new proposal uses until you save. Name at least one person who may create client links, or no one can.
         </p>
       )}
+      <section className="lx-card pe-card">
+        <div className="pe-card-head-row">
+          <div className="pe-card-head">
+            <h2 className="pe-h">{LETTER_SETTINGS_LINK}</h2>
+            <p className="lx-note pe-hint">{LETTER_SETTINGS_LINK_NOTE}</p>
+          </div>
+          <Link className="lx-btn lx-btn-sec lx-btn-sm" href="/dashboard/settings/proposals/engagement-letter/">
+            Open
+          </Link>
+        </div>
+      </section>
       <SettingsForm
+        newOffer={readNewOffer(settings?.pricing ?? {})}
         packages={packages.map((p) => ({
           package: p.package,
           base: moneyInput(p.base_cents),

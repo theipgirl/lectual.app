@@ -25,6 +25,17 @@ export const STEP_TEXT = {
   alreadyWritten: "The LOE fields are already written to Lawmatics.",
   alreadyNoted: "The acceptance note is already in Lawmatics.",
   followupsNotStarted: "Marked paid, but the follow-up steps couldn't start. Undo the paid mark and mark it paid again to run them.",
+  signedNotConnected: "Lawmatics isn't connected, so the signed letter wasn't filed there.",
+  signedConnectionUnreadable: "Couldn't check the Lawmatics connection, so the signed letter wasn't filed.",
+  signedNoLetter: "There is no signed letter on this version, so nothing was filed.",
+  signedNoMatter: "No Lawmatics record was found for this client, so the signed letter wasn't filed.",
+  signedManyMatters: "More than one Lawmatics record matches this client, so the signed letter wasn't filed.",
+  signedTargetUnreadable: "Couldn't read the matter or lead, so the signed letter wasn't filed.",
+  signedAlready: "The signed engagement letter is already filed in Lawmatics.",
+  signedNotBuilt: "The signed letter couldn't be built, so nothing was filed.",
+  signedMismatch: "The stored signed letter doesn't match its recorded fingerprint, so no copy was made or filed. Lectual has been told.",
+  signedFirmUnreadable: "Couldn't read the firm's name and time zone, so the signed letter wasn't built or filed. Try again.",
+  signedPaidSkipped: "Signed on the proposal page",
   eventNotRecorded: "The step ran, but its line on the timeline couldn't be saved.",
 } as const;
 

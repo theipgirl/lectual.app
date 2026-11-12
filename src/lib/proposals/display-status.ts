@@ -1,4 +1,4 @@
-import { STATUS_WORDS } from "@/lib/proposal-editor/vocabulary";
+import { SIGNED_STATUS_WORD, STATUS_WORDS } from "@/lib/proposal-editor/vocabulary";
 import { isProposalExpired } from "./expiry";
 import type { ProposalStatus } from "./types";
 
@@ -11,7 +11,7 @@ import type { ProposalStatus } from "./types";
  *   draft / approved with an issue      -> Blocked (sub-label: the first issue)
  *   sent, not past its expiry           -> Link live
  *   sent, past its expiry               -> Expired (derived here, never stored)
- *   accepted                            -> Accepted by client
+ *   accepted                            -> Accepted by client (Signed by client when the letter was signed)
  *   withdrawn / superseded              -> Closed
  *
  * Pure: the list read has no validation inputs of its own, so the caller hands
@@ -69,12 +69,12 @@ export function parseDisplayFilter(value: unknown): ProposalDisplayKey | undefin
   return undefined;
 }
 
-function make(key: ProposalDisplayKey, sub: string | null = null): ProposalDisplayStatus {
-  return { key, label: PROPOSAL_DISPLAY_LABEL[key], sub };
+function make(key: ProposalDisplayKey, sub: string | null = null, label?: string): ProposalDisplayStatus {
+  return { key, label: label ?? PROPOSAL_DISPLAY_LABEL[key], sub };
 }
 
 export function proposalDisplayStatus(
-  row: { status: ProposalStatus; expires_on: string | null },
+  row: { status: ProposalStatus; expires_on: string | null; /** Sprint 6: an accepted version whose snapshot carries a signature. Absent or null reads "Accepted by client". */ signed?: boolean | null },
   ctx: {
     /** The firm's civil date, "YYYY-MM-DD". */
     today: string;
@@ -92,7 +92,7 @@ export function proposalDisplayStatus(
       // `today` is a civil date; noon UTC read in UTC is that same civil date.
       return isProposalExpired(row.expires_on, new Date(`${ctx.today}T12:00:00Z`), "UTC") ? make("expired") : make("sent");
     case "accepted":
-      return make("accepted");
+      return row.signed === true ? make("accepted", null, SIGNED_STATUS_WORD) : make("accepted");
     default:
       return make("closed");
   }

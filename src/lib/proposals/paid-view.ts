@@ -47,6 +47,7 @@ export const STEP_LABEL: Record<ProposalStep, string> = {
   accepted_file_upload: "Accepted proposal file",
   loe_file_upload: "Engagement letter file",
   custom_fields: "LOE fields",
+  signed_loe_upload: "Signed engagement letter",
 };
 
 const SUCCESS_TEXT: Partial<Record<ProposalStep, string>> = {
@@ -56,6 +57,7 @@ const SUCCESS_TEXT: Partial<Record<ProposalStep, string>> = {
   accepted_file_upload: "Accepted proposal uploaded to Lawmatics.",
   loe_file_upload: "LOE file uploaded to Lawmatics.",
   custom_fields: "LOE fields written to Lawmatics.",
+  signed_loe_upload: "Signed engagement letter filed in Lawmatics.",
 };
 
 /** One step's outcome as the sentence the page prints. */
@@ -65,6 +67,7 @@ export function stepText(state: Pick<StepState, "step" | "outcome" | "reason">):
   switch (step) {
     case "accepted_file_upload":
     case "loe_file_upload":
+    case "signed_loe_upload":
       // A request that went out and was refused carries the unverified-shape caution; "not connected" and "not linked" do not.
       return outcome === "failed" ? notUploadedText(reason ?? "the request failed") : (reason ?? "Not uploaded to Lawmatics.");
     case "custom_fields":

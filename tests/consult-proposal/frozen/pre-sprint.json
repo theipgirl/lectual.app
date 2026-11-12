@@ -1,0 +1,836 @@
+{
+  "sevetri_default": {
+    "content": {
+      "client": {
+        "first_name": "Sevetri",
+        "full_name": "Sevetri Wilson",
+        "company": "Prosperall"
+      },
+      "greeting": "Hi Sevetri, thank you again for meeting with us for your strategy call. Your proposal is outlined below for your review and acceptance.",
+      "recommendation": "Getting a word mark and a logo mark for each of your brands is best practice and provides comprehensive protection. Rebecca's recommendation is preselected below.",
+      "pricing": {
+        "package": "Concierge",
+        "base_cents": 495000,
+        "included_classes": 3,
+        "per_class_cents": 82500,
+        "second_mark_discount_pct": 20,
+        "gov_per_class_cents": 35000
+      },
+      "names": [
+        {
+          "id": "b1",
+          "name": "Prosperall",
+          "marks": [
+            {
+              "id": "b1-word",
+              "kind": "word",
+              "desc": "Protects the name Prosperall. It does not protect the font or style.",
+              "preselected": true
+            },
+            {
+              "id": "b1-logo",
+              "kind": "logo",
+              "desc": "Protects your Prosperall logo design, including its fonts, styles and colors.",
+              "preselected": true
+            }
+          ],
+          "classes": [
+            {
+              "id": "b1-c1",
+              "label": "Cloud-Based Software as a Service (SaaS)",
+              "preselected": true
+            },
+            {
+              "id": "b1-c2",
+              "label": "Consulting & Professional Services",
+              "preselected": true
+            }
+          ],
+          "what": "Your company name"
+        },
+        {
+          "id": "b2",
+          "name": "Tech4PublicGood",
+          "marks": [
+            {
+              "id": "b2-logo",
+              "kind": "logo",
+              "desc": "Protects your Tech4PublicGood logo design, including its fonts, styles and colors.",
+              "preselected": true
+            },
+            {
+              "id": "b2-word",
+              "kind": "word",
+              "desc": "Protects the name Tech4PublicGood. It does not protect the font or style.",
+              "preselected": true
+            }
+          ],
+          "classes": [
+            {
+              "id": "b2-c1",
+              "label": "Charitable Services",
+              "preselected": true
+            },
+            {
+              "id": "b2-c2",
+              "label": "Educational Workshops & AI Upskilling Programs",
+              "preselected": true
+            }
+          ],
+          "what": "Your nonprofit initiative",
+          "note": "**A note from Rebecca.** Based on the preliminary search, she does think it may be difficult to secure the word mark for Tech4PublicGood. She always recommends both, so both are included. If you choose only one, she thinks the logo mark may be the stronger mark at this stage. If anything changes after the searches, she will update you."
+        }
+      ],
+      "adjustments": [],
+      "includes": [
+        {
+          "label": "Classes included",
+          "included": "Your choice (up to 3)",
+          "highlight": true
+        },
+        {
+          "label": "Preliminary Consultation Strategy Call",
+          "value": "$450",
+          "included": "✓"
+        },
+        {
+          "label": "USPTO Knockout Searches",
+          "value": "$900",
+          "included": "Unlimited"
+        },
+        {
+          "label": "Comprehensive Trademark Search Report",
+          "value": "$675 each",
+          "included": "2 included"
+        },
+        {
+          "label": "Trademark Opinion Letter",
+          "value": "$900 each",
+          "included": "2 if high risk"
+        },
+        {
+          "label": "Post Search Strategy Call",
+          "value": "$450 each",
+          "included": "2 included"
+        },
+        {
+          "label": "Trademark Application Preparation and Filing",
+          "value": "$900",
+          "included": "✓"
+        },
+        {
+          "label": "Dedicated Attorney Support (8 to 18 months)",
+          "value": "$2,250",
+          "included": "✓"
+        },
+        {
+          "label": "Monthly Monitoring of Application and Email Updates",
+          "value": "$350",
+          "included": "✓"
+        },
+        {
+          "label": "Non-Substantive Office Action Response",
+          "value": "$450 each",
+          "included": "Unlimited"
+        },
+        {
+          "label": "Statement of Use Legal Fee",
+          "value": "$500",
+          "included": "✓"
+        },
+        {
+          "label": "Extension Legal Fees",
+          "value": "$225 each",
+          "included": "Unlimited"
+        },
+        {
+          "label": "Comprehensive IP Audit (Trademarks + Copyright)",
+          "value": "$1,500",
+          "included": "✓"
+        },
+        {
+          "label": "Substantive Office Action Legal Strategy Review",
+          "value": "$675",
+          "note": "Does not include the response itself",
+          "included": "✓"
+        },
+        {
+          "label": "Post Registration Monitoring (12 months)",
+          "value": "$1,800",
+          "included": "✓"
+        },
+        {
+          "label": "Cease and Desist Letter Template",
+          "value": "$750",
+          "included": "✓"
+        },
+        {
+          "label": "Trademark Assignment Agreement",
+          "value": "$1,500",
+          "included": "✓"
+        }
+      ],
+      "office_action_note": "If a substantive office action is issued, your package includes Rebecca's strategy review. The response itself is quoted separately, and we will get your approval before any work begins."
+    },
+    "issues": [
+      {
+        "path": "pay_url",
+        "message": "Add the pay link before creating the link.",
+        "level": "error"
+      }
+    ],
+    "clientEmail": "sevetri@example.com",
+    "expiresOn": "2026-10-26",
+    "title": "Trademark Proposal"
+  },
+  "sevetri_price_override": {
+    "content": {
+      "client": {
+        "first_name": "Sevetri",
+        "full_name": "Sevetri Wilson",
+        "company": "Prosperall"
+      },
+      "greeting": "Hi Sevetri, thank you again for meeting with us for your strategy call. Your proposal is outlined below for your review and acceptance.",
+      "recommendation": "Getting a word mark and a logo mark for each of your brands is best practice and provides comprehensive protection. Rebecca's recommendation is preselected below.",
+      "pricing": {
+        "package": "Concierge",
+        "base_cents": 495000,
+        "included_classes": 3,
+        "per_class_cents": 82500,
+        "second_mark_discount_pct": 20,
+        "gov_per_class_cents": 35000
+      },
+      "names": [
+        {
+          "id": "b1",
+          "name": "Prosperall",
+          "marks": [
+            {
+              "id": "b1-word",
+              "kind": "word",
+              "desc": "Protects the name Prosperall. It does not protect the font or style.",
+              "preselected": true
+            },
+            {
+              "id": "b1-logo",
+              "kind": "logo",
+              "desc": "Protects your Prosperall logo design, including its fonts, styles and colors.",
+              "preselected": true
+            }
+          ],
+          "classes": [
+            {
+              "id": "b1-c1",
+              "label": "Cloud-Based Software as a Service (SaaS)",
+              "preselected": true
+            },
+            {
+              "id": "b1-c2",
+              "label": "Consulting & Professional Services",
+              "preselected": true
+            }
+          ],
+          "what": "Your company name",
+          "price_override": {
+            "base_cents": 400000
+          }
+        },
+        {
+          "id": "b2",
+          "name": "Tech4PublicGood",
+          "marks": [
+            {
+              "id": "b2-logo",
+              "kind": "logo",
+              "desc": "Protects your Tech4PublicGood logo design, including its fonts, styles and colors.",
+              "preselected": true
+            },
+            {
+              "id": "b2-word",
+              "kind": "word",
+              "desc": "Protects the name Tech4PublicGood. It does not protect the font or style.",
+              "preselected": true
+            }
+          ],
+          "classes": [
+            {
+              "id": "b2-c1",
+              "label": "Charitable Services",
+              "preselected": true
+            },
+            {
+              "id": "b2-c2",
+              "label": "Educational Workshops & AI Upskilling Programs",
+              "preselected": true
+            }
+          ],
+          "what": "Your nonprofit initiative",
+          "note": "**A note from Rebecca.** Based on the preliminary search, she does think it may be difficult to secure the word mark for Tech4PublicGood. She always recommends both, so both are included. If you choose only one, she thinks the logo mark may be the stronger mark at this stage. If anything changes after the searches, she will update you."
+        }
+      ],
+      "adjustments": [],
+      "includes": [
+        {
+          "label": "Classes included",
+          "included": "Your choice (up to 3)",
+          "highlight": true
+        },
+        {
+          "label": "Preliminary Consultation Strategy Call",
+          "value": "$450",
+          "included": "✓"
+        },
+        {
+          "label": "USPTO Knockout Searches",
+          "value": "$900",
+          "included": "Unlimited"
+        },
+        {
+          "label": "Comprehensive Trademark Search Report",
+          "value": "$675 each",
+          "included": "2 included"
+        },
+        {
+          "label": "Trademark Opinion Letter",
+          "value": "$900 each",
+          "included": "2 if high risk"
+        },
+        {
+          "label": "Post Search Strategy Call",
+          "value": "$450 each",
+          "included": "2 included"
+        },
+        {
+          "label": "Trademark Application Preparation and Filing",
+          "value": "$900",
+          "included": "✓"
+        },
+        {
+          "label": "Dedicated Attorney Support (8 to 18 months)",
+          "value": "$2,250",
+          "included": "✓"
+        },
+        {
+          "label": "Monthly Monitoring of Application and Email Updates",
+          "value": "$350",
+          "included": "✓"
+        },
+        {
+          "label": "Non-Substantive Office Action Response",
+          "value": "$450 each",
+          "included": "Unlimited"
+        },
+        {
+          "label": "Statement of Use Legal Fee",
+          "value": "$500",
+          "included": "✓"
+        },
+        {
+          "label": "Extension Legal Fees",
+          "value": "$225 each",
+          "included": "Unlimited"
+        },
+        {
+          "label": "Comprehensive IP Audit (Trademarks + Copyright)",
+          "value": "$1,500",
+          "included": "✓"
+        },
+        {
+          "label": "Substantive Office Action Legal Strategy Review",
+          "value": "$675",
+          "note": "Does not include the response itself",
+          "included": "✓"
+        },
+        {
+          "label": "Post Registration Monitoring (12 months)",
+          "value": "$1,800",
+          "included": "✓"
+        },
+        {
+          "label": "Cease and Desist Letter Template",
+          "value": "$750",
+          "included": "✓"
+        },
+        {
+          "label": "Trademark Assignment Agreement",
+          "value": "$1,500",
+          "included": "✓"
+        }
+      ],
+      "office_action_note": "If a substantive office action is issued, your package includes Rebecca's strategy review. The response itself is quoted separately, and we will get your approval before any work begins."
+    },
+    "issues": [
+      {
+        "path": "pay_url",
+        "message": "Add the pay link before creating the link.",
+        "level": "error"
+      }
+    ],
+    "clientEmail": "sevetri@example.com",
+    "expiresOn": "2026-10-26",
+    "title": "Trademark Proposal"
+  },
+  "melvin_list_credit_second_mark": {
+    "content": {
+      "client": {
+        "first_name": "Melvin",
+        "full_name": "Melvin Larry",
+        "company": "Larrytech"
+      },
+      "greeting": "Hi Melvin, thank you again for meeting with us for your strategy call. Your proposal is outlined below for your review and acceptance.",
+      "recommendation": "Getting a word mark and a logo mark for each of your brands is best practice and provides comprehensive protection. Rebecca's recommendation is preselected below.",
+      "pricing": {
+        "package": "Essential",
+        "base_cents": 195000,
+        "included_classes": 1,
+        "per_class_cents": 82500,
+        "second_mark_discount_pct": 10,
+        "gov_per_class_cents": 35000
+      },
+      "names": [
+        {
+          "id": "b1",
+          "name": "Larrytech",
+          "marks": [
+            {
+              "id": "b1-word",
+              "kind": "word",
+              "desc": "Protects the name Larrytech. It does not protect the font or style.",
+              "preselected": true
+            },
+            {
+              "id": "b1-logo",
+              "kind": "logo",
+              "desc": "Protects your Larrytech logo design, including its fonts, styles and colors.",
+              "preselected": true
+            }
+          ],
+          "classes": [
+            {
+              "id": "b1-c1",
+              "label": "Online Coaching Services",
+              "preselected": true
+            }
+          ],
+          "what": "Your company name"
+        }
+      ],
+      "adjustments": [
+        {
+          "id": "adj-1",
+          "label": "Consult credit",
+          "kind": "amount",
+          "value": 15000
+        }
+      ],
+      "includes": [
+        {
+          "label": "Classes included",
+          "included": "Your choice (up to 3)",
+          "highlight": true
+        },
+        {
+          "label": "Preliminary Consultation Strategy Call",
+          "value": "$450",
+          "included": "✓"
+        },
+        {
+          "label": "USPTO Knockout Searches",
+          "value": "$900",
+          "included": "Unlimited"
+        },
+        {
+          "label": "Comprehensive Trademark Search Report",
+          "value": "$675 each",
+          "included": "2 included"
+        },
+        {
+          "label": "Trademark Opinion Letter",
+          "value": "$900 each",
+          "included": "2 if high risk"
+        },
+        {
+          "label": "Post Search Strategy Call",
+          "value": "$450 each",
+          "included": "2 included"
+        },
+        {
+          "label": "Trademark Application Preparation and Filing",
+          "value": "$900",
+          "included": "✓"
+        },
+        {
+          "label": "Dedicated Attorney Support (8 to 18 months)",
+          "value": "$2,250",
+          "included": "✓"
+        },
+        {
+          "label": "Monthly Monitoring of Application and Email Updates",
+          "value": "$350",
+          "included": "✓"
+        },
+        {
+          "label": "Non-Substantive Office Action Response",
+          "value": "$450 each",
+          "included": "Unlimited"
+        },
+        {
+          "label": "Statement of Use Legal Fee",
+          "value": "$500",
+          "included": "✓"
+        },
+        {
+          "label": "Extension Legal Fees",
+          "value": "$225 each",
+          "included": "Unlimited"
+        },
+        {
+          "label": "Comprehensive IP Audit (Trademarks + Copyright)",
+          "value": "$1,500",
+          "included": "✓"
+        },
+        {
+          "label": "Substantive Office Action Legal Strategy Review",
+          "value": "$675",
+          "note": "Does not include the response itself",
+          "included": "✓"
+        },
+        {
+          "label": "Post Registration Monitoring (12 months)",
+          "value": "$1,800",
+          "included": "✓"
+        },
+        {
+          "label": "Cease and Desist Letter Template",
+          "value": "$750",
+          "included": "✓"
+        },
+        {
+          "label": "Trademark Assignment Agreement",
+          "value": "$1,500",
+          "included": "✓"
+        }
+      ],
+      "office_action_note": "If a substantive office action is issued, your package includes Rebecca's strategy review. The response itself is quoted separately, and we will get your approval before any work begins."
+    },
+    "issues": [
+      {
+        "path": "pay_url",
+        "message": "Add the pay link before creating the link.",
+        "level": "error"
+      }
+    ],
+    "clientEmail": "melvin@example.com",
+    "expiresOn": "2026-10-26",
+    "title": "Trademark Proposal"
+  },
+  "melvin_reduced_package": {
+    "content": {
+      "client": {
+        "first_name": "Melvin",
+        "full_name": "Melvin Larry",
+        "company": "Larrytech"
+      },
+      "greeting": "Hi Melvin, thank you again for meeting with us for your strategy call. Your proposal is outlined below for your review and acceptance.",
+      "recommendation": "Getting a word mark and a logo mark for each of your brands is best practice and provides comprehensive protection. Rebecca's recommendation is preselected below.",
+      "pricing": {
+        "package": "Enhanced",
+        "base_cents": 295000,
+        "included_classes": 2,
+        "per_class_cents": 82500,
+        "second_mark_discount_pct": 10,
+        "gov_per_class_cents": 35000,
+        "reduce_under_included": true
+      },
+      "names": [
+        {
+          "id": "b1",
+          "name": "Larrytech",
+          "marks": [
+            {
+              "id": "b1-word",
+              "kind": "word",
+              "desc": "Protects the name Larrytech. It does not protect the font or style.",
+              "preselected": true
+            },
+            {
+              "id": "b1-logo",
+              "kind": "logo",
+              "desc": "Protects your Larrytech logo design, including its fonts, styles and colors.",
+              "preselected": true
+            }
+          ],
+          "classes": [
+            {
+              "id": "b1-c1",
+              "label": "Online Coaching Services",
+              "preselected": true
+            }
+          ],
+          "what": "Your company name"
+        }
+      ],
+      "adjustments": [
+        {
+          "id": "adj-1",
+          "label": "Consult credit",
+          "kind": "amount",
+          "value": 15000
+        }
+      ],
+      "includes": [
+        {
+          "label": "Classes included",
+          "included": "Your choice (up to 3)",
+          "highlight": true
+        },
+        {
+          "label": "Preliminary Consultation Strategy Call",
+          "value": "$450",
+          "included": "✓"
+        },
+        {
+          "label": "USPTO Knockout Searches",
+          "value": "$900",
+          "included": "Unlimited"
+        },
+        {
+          "label": "Comprehensive Trademark Search Report",
+          "value": "$675 each",
+          "included": "2 included"
+        },
+        {
+          "label": "Trademark Opinion Letter",
+          "value": "$900 each",
+          "included": "2 if high risk"
+        },
+        {
+          "label": "Post Search Strategy Call",
+          "value": "$450 each",
+          "included": "2 included"
+        },
+        {
+          "label": "Trademark Application Preparation and Filing",
+          "value": "$900",
+          "included": "✓"
+        },
+        {
+          "label": "Dedicated Attorney Support (8 to 18 months)",
+          "value": "$2,250",
+          "included": "✓"
+        },
+        {
+          "label": "Monthly Monitoring of Application and Email Updates",
+          "value": "$350",
+          "included": "✓"
+        },
+        {
+          "label": "Non-Substantive Office Action Response",
+          "value": "$450 each",
+          "included": "Unlimited"
+        },
+        {
+          "label": "Statement of Use Legal Fee",
+          "value": "$500",
+          "included": "✓"
+        },
+        {
+          "label": "Extension Legal Fees",
+          "value": "$225 each",
+          "included": "Unlimited"
+        },
+        {
+          "label": "Comprehensive IP Audit (Trademarks + Copyright)",
+          "value": "$1,500",
+          "included": "✓"
+        },
+        {
+          "label": "Substantive Office Action Legal Strategy Review",
+          "value": "$675",
+          "note": "Does not include the response itself",
+          "included": "✓"
+        },
+        {
+          "label": "Post Registration Monitoring (12 months)",
+          "value": "$1,800",
+          "included": "✓"
+        },
+        {
+          "label": "Cease and Desist Letter Template",
+          "value": "$750",
+          "included": "✓"
+        },
+        {
+          "label": "Trademark Assignment Agreement",
+          "value": "$1,500",
+          "included": "✓"
+        }
+      ],
+      "office_action_note": "If a substantive office action is issued, your package includes Rebecca's strategy review. The response itself is quoted separately, and we will get your approval before any work begins."
+    },
+    "issues": [
+      {
+        "path": "pay_url",
+        "message": "Add the pay link before creating the link.",
+        "level": "error"
+      }
+    ],
+    "clientEmail": "melvin@example.com",
+    "expiresOn": "2026-10-26",
+    "title": "Trademark Proposal"
+  },
+  "melvin_unlisted_package": {
+    "content": {
+      "client": {
+        "first_name": "Melvin",
+        "full_name": "Melvin Larry",
+        "company": "Larrytech"
+      },
+      "greeting": "Hi Melvin, thank you again for meeting with us for your strategy call. Your proposal is outlined below for your review and acceptance.",
+      "recommendation": "Getting a word mark and a logo mark for each of your brands is best practice and provides comprehensive protection. Rebecca's recommendation is preselected below.",
+      "pricing": {
+        "package": "Concierge",
+        "base_cents": 495000,
+        "included_classes": 3,
+        "per_class_cents": 82500,
+        "second_mark_discount_pct": 10,
+        "gov_per_class_cents": 35000
+      },
+      "names": [
+        {
+          "id": "b1",
+          "name": "Larrytech",
+          "marks": [
+            {
+              "id": "b1-word",
+              "kind": "word",
+              "desc": "Protects the name Larrytech. It does not protect the font or style.",
+              "preselected": true
+            },
+            {
+              "id": "b1-logo",
+              "kind": "logo",
+              "desc": "Protects your Larrytech logo design, including its fonts, styles and colors.",
+              "preselected": true
+            }
+          ],
+          "classes": [
+            {
+              "id": "b1-c1",
+              "label": "Online Coaching Services",
+              "preselected": true
+            }
+          ],
+          "what": "Your company name"
+        }
+      ],
+      "adjustments": [
+        {
+          "id": "adj-1",
+          "label": "Consult credit",
+          "kind": "amount",
+          "value": 15000
+        }
+      ],
+      "includes": [
+        {
+          "label": "Classes included",
+          "included": "Your choice (up to 3)",
+          "highlight": true
+        },
+        {
+          "label": "Preliminary Consultation Strategy Call",
+          "value": "$450",
+          "included": "✓"
+        },
+        {
+          "label": "USPTO Knockout Searches",
+          "value": "$900",
+          "included": "Unlimited"
+        },
+        {
+          "label": "Comprehensive Trademark Search Report",
+          "value": "$675 each",
+          "included": "2 included"
+        },
+        {
+          "label": "Trademark Opinion Letter",
+          "value": "$900 each",
+          "included": "2 if high risk"
+        },
+        {
+          "label": "Post Search Strategy Call",
+          "value": "$450 each",
+          "included": "2 included"
+        },
+        {
+          "label": "Trademark Application Preparation and Filing",
+          "value": "$900",
+          "included": "✓"
+        },
+        {
+          "label": "Dedicated Attorney Support (8 to 18 months)",
+          "value": "$2,250",
+          "included": "✓"
+        },
+        {
+          "label": "Monthly Monitoring of Application and Email Updates",
+          "value": "$350",
+          "included": "✓"
+        },
+        {
+          "label": "Non-Substantive Office Action Response",
+          "value": "$450 each",
+          "included": "Unlimited"
+        },
+        {
+          "label": "Statement of Use Legal Fee",
+          "value": "$500",
+          "included": "✓"
+        },
+        {
+          "label": "Extension Legal Fees",
+          "value": "$225 each",
+          "included": "Unlimited"
+        },
+        {
+          "label": "Comprehensive IP Audit (Trademarks + Copyright)",
+          "value": "$1,500",
+          "included": "✓"
+        },
+        {
+          "label": "Substantive Office Action Legal Strategy Review",
+          "value": "$675",
+          "note": "Does not include the response itself",
+          "included": "✓"
+        },
+        {
+          "label": "Post Registration Monitoring (12 months)",
+          "value": "$1,800",
+          "included": "✓"
+        },
+        {
+          "label": "Cease and Desist Letter Template",
+          "value": "$750",
+          "included": "✓"
+        },
+        {
+          "label": "Trademark Assignment Agreement",
+          "value": "$1,500",
+          "included": "✓"
+        }
+      ],
+      "office_action_note": "If a substantive office action is issued, your package includes Rebecca's strategy review. The response itself is quoted separately, and we will get your approval before any work begins."
+    },
+    "issues": [
+      {
+        "path": "pay_url",
+        "message": "Add the pay link before creating the link.",
+        "level": "error"
+      }
+    ],
+    "clientEmail": "melvin@example.com",
+    "expiresOn": "2026-10-26",
+    "title": "Trademark Proposal"
+  }
+}

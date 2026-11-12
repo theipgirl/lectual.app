@@ -81,21 +81,8 @@ export function describeIssuePath(path: string, content: ProposalContent | null)
     else if (key === "pay_url") parts.push("pay link");
     else if (key === "office_action_note") parts.push("office action note");
     else if (key === "client") parts.push("client");
+    else if (key === "loe") parts.push("engagement letter");
     else parts.push(FIELD_WORDS[key] ?? key.replace(/_/g, " "));
   }
   return parts.join(", ");
 }
-
-/**
- * The first problem a person should look at: errors before warnings, and within each in the order
- * the sections are drawn (who, general, each brand name, package, then the More options sections).
- * Returns the very issue object, so the page can mark exactly that one with the "first problem" anchor.
- */
-export function firstProblem(groups: IssueGroups): ValidationIssue | null {
-  const names = [...groups.names.entries()].sort((a, b) => a[0] - b[0]).flatMap(([, list]) => list);
-  const inPageOrder = [...groups.details, ...groups.general, ...names, ...groups.pricing, ...groups.message, ...groups.adjustments, ...groups.includes];
-  return inPageOrder.find((i) => i.level === "error") ?? inPageOrder[0] ?? null;
-}
-
-/** The id the first problem's list item carries, and the "Go to first problem" link points at. */
-export const FIRST_PROBLEM_ID = "pe-first-problem";

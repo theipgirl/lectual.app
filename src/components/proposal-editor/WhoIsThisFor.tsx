@@ -1,5 +1,6 @@
 import "@/app/dashboard/proposals/proposals.css";
 import { SEARCH_MAX, NEW_PROPOSAL_PATH, showingLine, type PickerView } from "@/lib/proposals/new-picker";
+import { StartDraftRow } from "./StartDraft";
 import type { RecordKind } from "@/lib/skills/catalog";
 
 const PLURAL: Record<RecordKind, string> = { lead: "leads", matter: "matters" };
@@ -21,9 +22,12 @@ export function WhoIsThisFor({
   view,
   chosen,
   basePath = NEW_PROPOSAL_PATH,
-  intro = "Pick a lead or a matter and the form below is filled from it. You can change anything before you create the draft.",
+  intro = "Pick a lead or a matter and the draft is created from it. You can change anything in the editor before the link goes live.",
   hidden,
+  create,
 }: {
+  /** New proposal: a row creates the draft in one step (a form posting the record's id) instead of linking to a page. */
+  create?: { type: "trademark" | "general" };
   /** Spec 9: extra query values the search keeps (New proposal's `type=general`). */
   hidden?: Record<string, string>;
   view: PickerView | null;
@@ -102,11 +106,15 @@ export function WhoIsThisFor({
           <ul className="lx-list pe-who-list">
             {list.rows.map((r) => (
               <li key={r.id}>
+                {create ? (
+                  <StartDraftRow recordKind={kind} id={r.id} name={r.name} secondary={r.secondary} type={create.type} />
+                ) : (
                 <a href={r.href} className="pe-who-row" aria-current={r.selected ? "true" : undefined} data-selected={r.selected ? "true" : undefined}>
                   <span className="pe-who-name">{r.name}</span>
                   {r.secondary && <span className="pe-who-sub">{r.secondary}</span>}
                   {r.selected && <span className="pe-who-mark">Selected</span>}
                 </a>
+                )}
               </li>
             ))}
           </ul>

@@ -46,6 +46,65 @@ function Cta({ row, canDraft, draftNote, leads }: { row: ConsultRowView; canDraf
   }
 }
 
+
+/**
+ * The consult rows alone (no card, heading or connection line): used by the section above and by New proposal's
+ * "From a consult" door, so both draw the same rows, states and buttons. Three states, never two.
+ */
+export function ConsultRows({
+  meetings,
+  canDraft,
+  draftNote,
+  leads,
+}: {
+  meetings: ConsultsStripData["meetings"];
+  canDraft: boolean;
+  draftNote: string | null;
+  leads?: { id: string; label: string }[] | null;
+}) {
+  return (
+    <>
+      {meetings.status === "unavailable" ? (
+        <div className="pq-consults-empty" role="status">
+          <b>{CONSULTS_UNAVAILABLE}</b>
+        </div>
+      ) : meetings.rows.length === 0 ? (
+        <div className="pq-consults-empty">
+          <b>{CONSULTS_EMPTY}</b>
+        </div>
+      ) : (
+        <ul className="pq-rows pq-rows-scroll">
+          {meetings.rows.map((row) => {
+            const pill = CONSULT_STATE_PILL[row.state];
+            return (
+              <li key={row.id} className="pq-row" data-state={row.state}>
+                <a href={meetingRowHref(row.id)} className="pq-row-link">
+                  <span className="pq-row-main">
+                    <span className="pq-name">{row.title}</span>
+                    <span className="pq-mono">
+                      {row.whenLabel} · {PROVIDER_LABEL[row.provider]} · {row.linkedTo ? `Linked to ${row.linkedTo}` : "Not linked"}
+                    </span>
+                  </span>
+                  <span className={`lx-pill lx-pill-${pill.tone}`}>{pill.label}</span>
+                </a>
+                <div className="pq-row-actions">
+                  <Cta row={row} canDraft={canDraft} draftNote={draftNote} leads={leads} />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {meetings.status === "ok" && meetings.more > 0 && (
+        <div className="pq-more">
+          {consultsCapNote(meetings.rows.length)}{" "}
+          <Link href="/dashboard/meetings/">See all in Meetings</Link>
+        </div>
+      )}
+    </>
+  );
+}
+
 /**
  * The "Consults and client meetings" section under the proposals table. Always open: a heading
  * and a scrollable box (about six rows) of consult-type meetings plus any meeting already linked
@@ -114,43 +173,7 @@ export function ConsultsStrip({
         <div className="pq-consults-head">{head}</div>
       )}
 
-      {meetings.status === "unavailable" ? (
-        <div className="pq-consults-empty" role="status">
-          <b>{CONSULTS_UNAVAILABLE}</b>
-        </div>
-      ) : meetings.rows.length === 0 ? (
-        <div className="pq-consults-empty">
-          <b>{CONSULTS_EMPTY}</b>
-        </div>
-      ) : (
-        <ul className="pq-rows pq-rows-scroll">
-          {meetings.rows.map((row) => {
-            const pill = CONSULT_STATE_PILL[row.state];
-            return (
-              <li key={row.id} className="pq-row" data-state={row.state}>
-                <a href={meetingRowHref(row.id)} className="pq-row-link">
-                  <span className="pq-row-main">
-                    <span className="pq-name">{row.title}</span>
-                    <span className="pq-mono">
-                      {row.whenLabel} · {PROVIDER_LABEL[row.provider]} · {row.linkedTo ? `Linked to ${row.linkedTo}` : "Not linked"}
-                    </span>
-                  </span>
-                  <span className={`lx-pill lx-pill-${pill.tone}`}>{pill.label}</span>
-                </a>
-                <div className="pq-row-actions">
-                  <Cta row={row} canDraft={canDraft} draftNote={draftNote} leads={leads} />
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-      {meetings.status === "ok" && meetings.more > 0 && (
-        <div className="pq-more">
-          {consultsCapNote(meetings.rows.length)}{" "}
-          <Link href="/dashboard/meetings/">See all in Meetings</Link>
-        </div>
-      )}
+      <ConsultRows meetings={meetings} canDraft={canDraft} draftNote={draftNote} leads={leads} />
     </section>
   );
 }

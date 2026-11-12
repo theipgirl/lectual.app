@@ -29,7 +29,9 @@ import {
 import { MAX_CONTENT_BYTES, hasErrors, isCivilDate, isPlausibleEmail, validateContent, validateSettingInput } from "./validate";
 import { PAY_LINK_NEEDS_DB_UPDATE, PAY_LINK_NOT_HTTPS, PAY_LINK_NOT_LIVE, PAY_LINK_UNCHANGED } from "@/lib/proposal-editor/pay-link";
 import { runDeleteProposalFamily, type DeleteFamilyResult } from "@/lib/proposal-editor/delete-proposal";
-import { RESET_NEEDS_DB_UPDATE, RESET_NOT_ACCEPTED } from "@/lib/proposal-editor/reset-acceptance";
+import { RESET_LETTER_CHANGED, RESET_LETTER_UNREADABLE, RESET_NEEDS_DB_UPDATE, RESET_NOT_ACCEPTED } from "@/lib/proposal-editor/reset-acceptance";
+import { isSignedSnapshot } from "./signed-state";
+import { letterLiveCheck, letterLiveRefusal } from "@/lib/loe/live-guard";
 
 /**
  * The proposal data layer — every read and write the signed-in firm makes.
@@ -506,6 +508,8 @@ export type ProposalListItem = {
   package_basis: ProposalPackageBasis | null;
   /** Spec 9: a general (flat-fee) proposal's matter title; null on a trademark proposal. */
   matter_title?: string | null;
+  /** Sprint 6: the accepted snapshot carries a signature (schema 2 with an agreement). */
+  signed?: boolean;
   /** What the client pays now: the accepted total once accepted, else the firm's preselected offer. */
   legal_total_cents: number;
   /** USPTO fees, due at filing. */
@@ -543,7 +547,7 @@ export async function listProposals(options: ProposalListOptions = {}): Promise<
   const rows = (Array.isArray(data) ? data : []) as Array<
     Omit<
       ProposalListItem,
-      "legal_total_cents" | "gov_total_cents" | "blocking_issue" | "brands" | "offered" | "class_count" | "signed_package" | "package_basis" | "matter_title"
+      "legal_total_cents" | "gov_total_cents" | "blocking_issue" | "brands" | "offered" | "class_count" | "signed_package" | "package_basis" | "matter_title" | "signed"
     > & {
       client_email: string | null;
       pay_url: string | null;
@@ -577,6 +581,7 @@ export async function listProposals(options: ProposalListOptions = {}): Promise<
       ...rest,
       ...totals,
       blocking_issue,
+      signed: isSignedSnapshot(accepted_snapshot),
       brands: names.map((n) => (typeof n?.name === "string" ? n.name.trim() : "")).filter(Boolean),
       matter_title: isGeneralContent(content) && typeof content.general?.matter_title === "string" ? content.general.matter_title.trim() || null : null,
       offered: offeredPackages(content),
@@ -978,6 +983,8 @@ export async function deleteProposalFamily(proposalId: string): Promise<DeleteFa
  * accepted_at / accepted_selection / accepted_snapshot, refuses a paid version, a caller who is not
  * the admin tier or a named approver, and any other change, and writes the `reset` event itself with
  * the previous acceptance). Fenced on `status = accepted` and the rendered `updated_at`.
+ *
+ * It is one of the ways a version becomes live, so the engagement-letter guard runs here too (see below).
  */
 export async function resetProposalAcceptance(id: string, options: UpdateProposalOptions): Promise<ProposalRow> {
   const expected = typeof options?.expectedUpdatedAt === "string" ? options.expectedUpdatedAt.trim() : "";
@@ -990,6 +997,13 @@ export async function resetProposalAcceptance(id: string, options: UpdateProposa
   const current = await loadRow(db, id);
   if (Date.parse(current.updated_at) !== Date.parse(expected)) throw new ProposalError("conflict", PROPOSAL_SAVE_CONFLICT);
   if (current.status !== "accepted") throw new ProposalError("conflict", RESET_NOT_ACCEPTED);
+
+  // A reset writes `sent`: the client link is live again and the client is asked to sign again. That is making a version live,
+  // so it runs the ONE make-live guard. A proposal with no letter, or whose copy is still the firm's current approved letter,
+  // resets as before; a copy the firm has since replaced is not put back in front of a client.
+  const letter = await letterLiveCheck(supabase, current);
+  if (letter === "stale") throw new ProposalError("conflict", RESET_LETTER_CHANGED);
+  if (letter === "unreadable" || letter === "unattached") throw new ProposalError("unavailable", RESET_LETTER_UNREADABLE);
 
   const { data, error } = await db
     .from("client_proposal")
@@ -1055,6 +1069,10 @@ export async function unapproveProposal(id: string): Promise<ProposalRow> {
  * Approved -> sent, atomically, through `client_proposal_send`: any earlier
  * `sent` version of the family is superseded in the same call. The client's
  * link (`/p/<public_token>`) starts working here, and not before.
+ *
+ * This is the one function every make-live path calls ("Save and create link",
+ * "Turn on the link", the approval queue's go-live), which is why the
+ * engagement-letter guard lives here.
  */
 export async function sendProposal(id: string): Promise<ProposalRow> {
   const supabase = await getScopedClient();
@@ -1065,6 +1083,10 @@ export async function sendProposal(id: string): Promise<ProposalRow> {
   if (current.status !== "approved") {
     throw new ProposalError("conflict", "The link can only be turned on for a saved version. Save and create the link first.");
   }
+  // The ONE make-live guard (`live-guard.ts`): a version that carries an engagement letter goes live only while that copy is
+  // the firm's current approved letter, read fenced on this row's own org. Every way of turning a link on ends here.
+  const refusal = letterLiveRefusal(await letterLiveCheck(supabase, current));
+  if (refusal) throw new ProposalError("conflict", refusal);
   const { error } = await db.rpc("client_proposal_send", { p_id: current.id });
   if (error) throw friendlyProposalError(error, "turn on the link");
   return loadRow(db, current.id);
