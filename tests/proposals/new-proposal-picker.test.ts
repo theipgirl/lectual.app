@@ -5,9 +5,11 @@ import type { ConsultMark, StoredConsultDetails } from "@/lib/consult/vocab";
 import type { ReviewedConsultRead } from "@/lib/consult/store";
 
 /**
- * New proposal, Sprint 20: the "Who is this for?" picker, and what choosing a lead or matter fills in.
- * The page is rendered with a fake scoped client, mocked list reads and a mocked consult read, the same
- * way tests/proposals/new-proposal.test.ts does. Nothing here touches a database.
+ * New proposal: the "Who is this for?" picker (Sprint 20, reworked in Sprint 3) and the one-button page a lead or
+ * matter link opens. In Sprint 3 a picker row CREATES the draft (a form posting only the record's id) and the
+ * second-stage form is gone, so what choosing a record "fills in" is tested where it is built
+ * (create-proposal-one-step.test.ts); this file keeps the picker's own rules and the chosen-record page.
+ * The page is rendered with a fake scoped client and mocked list and consult reads. Nothing touches a database.
  */
 
 const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -136,18 +138,26 @@ async function render(opts: Opts = {}) {
   vi.doMock("@/lib/db/scoped-client", () => ({ getScopedClient: h.scoped }));
   vi.doMock("@/lib/org/profile", () => ({ getFirmTimeZone: vi.fn(async () => "America/New_York") }));
   vi.doMock("@/lib/proposals/store", () => ({
+    listProposals: vi.fn(async () => []),
     getProposalSettings: vi.fn(async () => {
       if (opts.settingsFails) throw new Error("db down");
       return opts.settings === undefined ? { default_pay_url: "https://pay.example/x", pricing: { packages: PACKAGES } } : opts.settings;
     }),
   }));
   vi.doMock("@/lib/proposals/consult-strip-load", () => ({ loadConsultStrip: h.stripLoad }));
+  vi.doMock("@/lib/consult-proposal/draft-gate", () => ({ loadDraftBlock: vi.fn(async () => null) }));
+  vi.doMock("@/lib/meetings/connection", () => ({ listMeetingConnections: vi.fn(async () => ({ ok: true, connections: [] })) }));
+  vi.doMock("@/lib/proposals/consults-load", () => ({ loadConsultsStrip: vi.fn() }));
+  vi.doMock("@/lib/proposals/lead-options", () => ({ loadLeadOptions: vi.fn(async () => ({ status: "ok", leads: [] })) }));
   vi.doMock("@/lib/proposals/consult-prefill-load", () => ({ loadConsultForPrefill: h.consultLoad }));
   vi.doMock("@/lib/pipeline", () => ({ listLeads: h.listLeads }));
   vi.doMock("@/lib/matters", () => ({ listMatters: h.listMatters }));
   vi.doMock("@/app/dashboard/proposals/actions", () => ({ createProposalAction: vi.fn() }));
   const { default: Page } = await import("../../src/app/dashboard/proposals/new/page");
-  return renderToStaticMarkup(createElement("div", null, await Page({ searchParams: Promise.resolve(opts.search ?? {}) })));
+  // Sprint 3: with nothing chosen the page is the start screen; "Who is this for?" is the Start from scratch door.
+  const search = opts.search ?? {};
+  const chosenOrBlank = ["lead", "matter", "blank", "door"].some((k) => k in search);
+  return renderToStaticMarkup(createElement("div", null, await Page({ searchParams: Promise.resolve(chosenOrBlank ? search : { door: "scratch", ...search }) })));
 }
 
 const text = (html: string) => html.replaceAll("&#x27;", "'").replaceAll("&quot;", '"').replaceAll("&amp;", "&");
@@ -157,8 +167,11 @@ const picker = (html: string) => html.slice(html.indexOf('aria-labelledby="who-t
 
 beforeEach(() => vi.resetModules());
 
+const rowForms = (html: string) => [...html.matchAll(/<form[^>]*>[\s\S]*?<\/form>/g)].map((m) => m[0]);
+const idsPosted = (html: string, field: string) => [...html.matchAll(new RegExp(`<input[^>]*name="${field}"[^>]*value="([^"]*)"`, "g"))].map((m) => m[1]);
+
 describe("the picker, with nothing chosen", () => {
-  it("shows 'Who is this for?', Leads selected, a search box, Start blank and the recent leads as links", async () => {
+  it("shows 'Who is this for?', Leads selected, a search box, Start blank and the recent leads, each creating the draft", async () => {
     const html = await render({ leads: [lead(1), lead(2)], matters: [matter(1)] });
     const p = picker(html);
     expect(p).toContain("Who is this for?");
@@ -166,25 +179,28 @@ describe("the picker, with nothing chosen", () => {
     expect(p).toMatch(/<a href="\/dashboard\/proposals\/new\/\?kind=matter"(?![^>]*aria-current)[^>]*>Matters</);
     expect(p).toMatch(/<input[^>]*type="search"[^>]*aria-label="Search leads"/);
     expect(p).toContain('<a href="/dashboard/proposals/new/?blank=1" class="pe-who-blank">Start blank</a>');
-    expect(hrefs(p)).toContain(`/dashboard/proposals/new/?lead=${uuid(101)}`);
-    expect(hrefs(p)).toContain(`/dashboard/proposals/new/?lead=${uuid(102)}`);
+    // A row is a form posting ONLY the id (and the type), never a link that carries it into a second form.
+    expect(idsPosted(p, "leadId")).toEqual([uuid(101), uuid(102)]);
+    expect(p.match(/data-start-row/g)).toHaveLength(2);
+    expect(p).toContain("Create draft");
+    expect(hrefs(p).some((x) => x.includes("?lead="))).toBe(false);
     expect(text(p)).toContain("Showing 2 of 2.");
   });
 
-  it("the blank form is still drawn below the picker", async () => {
+  it("no brand name, package or pay-link field is drawn anywhere", async () => {
     const html = await render({ leads: [lead(1)] });
-    expect(input(html, "fullName")).toContain('value=""');
-    expect(html).toContain('name="package"');
+    for (const n of ["brandName", "package", "payUrl", "base", "perClass", "useConsult"]) expect(input(html, n)).toBe("");
+    expect(html).not.toContain('name="package"');
     expect(html).not.toContain("Filled from");
   });
 
-  it("?kind=matter shows the matters, and only the matters", async () => {
+  it("?kind=matter shows the matters, and only the matters; a row posts the matter id", async () => {
     const html = await render({ search: { kind: "matter" }, leads: [lead(1)], matters: [matter(1), matter(2)] });
     const p = picker(html);
     expect(p).toMatch(/\?kind=matter"[^>]*aria-current="page"/);
     expect(p).toContain("MARK1");
     expect(p).not.toContain("Pat1");
-    expect(hrefs(p)).toContain(`/dashboard/proposals/new/?matter=${uuid(1001)}`);
+    expect(idsPosted(p, "matterId")).toEqual([uuid(1001), uuid(1002)]);
     expect(p).toMatch(/<input[^>]*aria-label="Search matters"/);
   });
 
@@ -197,18 +213,19 @@ describe("the picker, with nothing chosen", () => {
   it("more than 8 matches draw exactly 8, in the order read, and say 'Showing 8 of 12.'", async () => {
     const html = await render({ leads: Array.from({ length: 12 }, (_, i) => lead(i + 1)) });
     const p = picker(html);
-    expect(p.match(/<li>/g)).toHaveLength(8);
+    expect(p.match(/data-start-row/g)).toHaveLength(8);
     expect(p.indexOf("Pat1 ")).toBeLessThan(p.indexOf("Pat2 "));
     expect(p).not.toContain("Pat9 ");
     expect(text(p)).toContain("Showing 8 of 12.");
   });
 
-  it("a search narrows the list, is shown again in the box, and rides on the choose links", async () => {
+  it("a search narrows the list and is shown again in the box; it stays on the picker (door=scratch)", async () => {
     const html = await render({ search: { q: "  pat2  " }, leads: [lead(1), lead(2), lead(20)] });
     const p = picker(html);
     expect(p).toMatch(/<input[^>]*name="q"[^>]*value="pat2"/);
+    expect(input(html, "door")).toContain('value="scratch"');
     expect(text(p)).toContain("Showing 2 of 2.");
-    expect(hrefs(p)).toContain(`/dashboard/proposals/new/?lead=${uuid(102)}&q=pat2`);
+    expect(idsPosted(p, "leadId")).toEqual([uuid(102), uuid(120)]);
     expect(p).not.toContain("Pat1 ");
   });
 
@@ -227,21 +244,26 @@ describe("the picker, with nothing chosen", () => {
     expect(text(picker(noneMatters))).toContain("No matters on file yet.");
   });
 
-  it("no label, name or email is in any href; ids are encoded; labels are escaped", async () => {
+  it("no label, name or email is in any href; ids are posted, not linked; labels are escaped", async () => {
     const html = await render({ leads: [lead(1, { id: 'a&b"c', first_name: "<b>Ana</b>", last_name: "Ruiz", business_name: "Zephyr", email: "ana@example.com" })] });
     const p = picker(html);
-    expect(p).toContain('href="/dashboard/proposals/new/?lead=a%26b%22c"');
     expect(p).toContain('<span class="pe-who-name">&lt;b&gt;Ana&lt;/b&gt; Ruiz</span>');
     expect(p).toContain('<span class="pe-who-sub">Zephyr · ana@example.com</span>');
     expect(p).not.toContain("<b>Ana");
-    const choose = hrefs(p).filter((x) => x.includes("lead=a"));
-    for (const href of choose) for (const word of ["Ana", "Ruiz", "Zephyr", "example"]) expect(href).not.toContain(word);
+    for (const href of hrefs(p)) for (const word of ["Ana", "Ruiz", "Zephyr", "example"]) expect(href).not.toContain(word);
   });
 
   it("the search is a plain GET form to the same page, carrying the kind", async () => {
     const html = await render({ search: { kind: "matter" } });
     expect(html).toMatch(/<form[^>]*role="search"[^>]*action="\/dashboard\/proposals\/new\/"[^>]*method="get"/);
     expect(input(html, "kind")).toContain('value="matter"');
+  });
+
+  it("the type switch keeps the picker: a flat-fee type rides on the rows' forms and the search", async () => {
+    const html = await render({ search: { type: "general" }, leads: [lead(1)] });
+    expect(text(html)).toContain("Contract or other matter (flat fee)");
+    expect(rowForms(picker(html)).some((f) => /name="kind" value="general"/.test(f))).toBe(true);
+    expect(input(html, "type")).toContain('value="general"');
   });
 });
 
@@ -264,23 +286,23 @@ describe("three states: a failed read is never 'No matches'", () => {
     expect(picker(leads)).toContain("Pat1");
   });
 
-  it("both failed names both, and still offers Start blank and the blank form", async () => {
+  it("both failed names both, and still offers Start blank", async () => {
     const html = await render({ leads: "error", matters: "error" });
     expect(text(picker(html))).toContain("We couldn't load your leads.");
     expect(text(picker(html))).toContain("We couldn't load your matters.");
     expect(picker(html)).toContain("Start blank");
-    expect(input(html, "fullName")).toContain('value=""');
   });
 });
 
 describe("Start blank", () => {
-  it("hides the picker's list and keeps today's blank form", async () => {
+  it("hides the picker's list and shows a name form that creates the draft", async () => {
     const html = await render({ search: { blank: "1" }, leads: [lead(1)] });
     expect(html).not.toContain("who-title");
     expect(html).not.toContain("Pat1");
     expect(text(html)).toContain("Starting blank");
-    expect(hrefs(html)).toContain("/dashboard/proposals/new/");
-    expect(input(html, "fullName")).toContain('value=""');
+    expect(input(html, "fullName")).toContain("required");
+    expect(html).toContain("Create draft");
+    for (const n of ["brandName", "package", "payUrl"]) expect(input(html, n)).toBe("");
     expect(h.listLeads).not.toHaveBeenCalled();
   });
 });
@@ -293,10 +315,11 @@ describe("access is unchanged", () => {
     expect(h.scoped).not.toHaveBeenCalled();
   });
 
-  it.each(["viewer", "social_media", null])("a role that can't write proposals (%s) sees the role message, no picker, and no list is read", async (role) => {
+  it.each(["viewer", "social_media", null])("a role that can't write proposals (%s) sees the role message, no door, no picker, and no list is read", async (role) => {
     const html = await render({ role, leads: [lead(1)] });
     expect(text(html)).toContain("Your role can't start proposals");
     expect(html).not.toContain("Who is this for?");
+    expect(html).not.toContain("data-door");
     expect(html).not.toContain('name="fullName"');
     expect(h.listLeads).not.toHaveBeenCalled();
     expect(h.listMatters).not.toHaveBeenCalled();
@@ -304,190 +327,116 @@ describe("access is unchanged", () => {
   });
 });
 
-describe("choosing a record collapses the picker", () => {
-  it("?lead=<id> shows 'For: <label> . Change', not the list", async () => {
+describe("a lead or matter chosen from its own page: who it is for, one button", () => {
+  it("?lead=<id> shows 'For: <label> . Change' and a Create draft form, not the list; opening it creates nothing", async () => {
     const html = await render({ search: { lead: LEAD }, tables: { crm_lead: ANA }, leads: [lead(1)] });
     expect(text(html)).toContain("For:</span> <strong>Ana Ruiz · Zephyr Co</strong> · <a");
     expect(html).not.toContain("who-title");
     expect(html).not.toContain("Pat1");
-    expect(hrefs(html)).toContain("/dashboard/proposals/new/?kind=lead");
+    expect(hrefs(html)).toContain("/dashboard/proposals/new/?door=scratch");
+    expect(idsPosted(html, "leadId")).toEqual([LEAD]);
+    expect(html).toContain("Create draft");
+    for (const n of ["brandName", "package", "payUrl", "base"]) expect(input(html, n)).toBe("");
     expect(h.listLeads).not.toHaveBeenCalled();
   });
 
-  it("?matter=<id> is labelled by the matter's mark, and Change returns to the matters picker with the typed search", async () => {
-    const html = await render({
-      search: { matter: MATTER, q: "zeph" },
-      tables: { crm_matter: { id: MATTER, lead_id: null, owner_name: "Dana Lopez", mark_text: "Zephyr", title: "Zephyr filing", matter_number: "TM-2026-0001" } },
-    });
+  it("?matter=<id> is labelled by the matter's mark and posts the matter id", async () => {
+    const html = await render({ search: { matter: MATTER }, tables: { crm_matter: { id: MATTER, lead_id: null, owner_name: "Dana Lopez", mark_text: "Zephyr", title: "Zephyr filing", matter_number: "TM-2026-0001" } } });
     expect(text(html)).toContain("<strong>Zephyr</strong>");
-    expect(hrefs(html)).toContain("/dashboard/proposals/new/?kind=matter&q=zeph");
+    expect(idsPosted(html, "matterId")).toEqual([MATTER]);
   });
 
   it("a matter with no mark is labelled by its title, else its number", async () => {
     const byTitle = await render({ search: { matter: MATTER }, tables: { crm_matter: { id: MATTER, lead_id: null, owner_name: null, mark_text: null, title: "Acme refresh", matter_number: "TM-1" } } });
-    expect(byTitle).toContain("<strong>Acme refresh</strong>");
-    const byNumber = await render({ search: { matter: MATTER }, tables: { crm_matter: { id: MATTER, lead_id: null, owner_name: null, mark_text: null, title: null, matter_number: "TM-2026-0009" } } });
-    expect(byNumber).toContain("<strong>TM-2026-0009</strong>");
+    expect(text(byTitle)).toContain("<strong>Acme refresh</strong>");
+    const byNumber = await render({ search: { matter: MATTER }, tables: { crm_matter: { id: MATTER, lead_id: null, owner_name: null, mark_text: null, title: null, matter_number: "TM-1" } } });
+    expect(text(byNumber)).toContain("<strong>TM-1</strong>");
   });
 
   it("?matter= wins when ?lead= is given too", async () => {
-    const html = await render({
-      search: { matter: MATTER, lead: LEAD },
-      tables: { crm_matter: { id: MATTER, lead_id: null, owner_name: "Dana Lopez", mark_text: "Birch", title: null, matter_number: "TM-1" }, crm_lead: ANA },
-    });
-    expect(html).toContain("<strong>Birch</strong>");
-    expect(input(html, "fullName")).toContain('value="Dana Lopez"');
-    expect(input(html, "leadId")).toContain('value=""');
+    const html = await render({ search: { matter: MATTER, lead: LEAD }, tables: { crm_matter: { id: MATTER, lead_id: null, owner_name: "x", mark_text: "Birch", title: null, matter_number: "TM-1" }, crm_lead: ANA } });
+    expect(text(html)).toContain("<strong>Birch</strong>");
+    expect(idsPosted(html, "matterId")).toEqual([MATTER]);
   });
 
   it.each([
-    ["an invalid id", { lead: "not-a-uuid" }, {}, "That lead link isn't valid"],
-    ["an id that isn't there (or is another firm's)", { lead: LEAD }, { crm_lead: null }, "That lead couldn't be found"],
-    ["a read that fails", { lead: LEAD }, { crm_lead: { error: true } }, "That lead couldn't be loaded just now"],
-    ["an invalid matter id", { matter: "nope" }, {}, "That matter link isn't valid"],
-    ["a matter that isn't there", { matter: MATTER }, { crm_matter: null }, "That matter couldn't be found"],
-    ["a matter read that fails", { matter: MATTER }, { crm_matter: { error: true } }, "That matter couldn't be loaded just now"],
-  ])("%s shows the picker (not the collapsed bar), the note and the blank form", async (_name, search, tables, note) => {
-    const html = await render({ search, tables, leads: [lead(1)] });
-    expect(html).toContain("who-title");
-    expect(html).not.toContain("pe-who-bar");
-    expect(text(html)).toContain(note);
-    expect(input(html, "fullName")).toContain('value=""');
-    expect(html).not.toContain("Filled from");
-    // The consult is never read for a record that wasn't found.
+    ["an invalid id", { lead: "not-a-uuid" }, {}, "That lead or matter couldn't be found."],
+    ["an invalid matter id", { matter: "nope" }, {}, "That lead or matter couldn't be found."],
+    ["an id that isn't there (or is another firm's)", { lead: LEAD }, { crm_lead: null }, "That lead or matter couldn't be found."],
+    ["a matter that isn't there", { matter: MATTER }, { crm_matter: null }, "That lead or matter couldn't be found."],
+    ["a read that fails", { lead: LEAD }, { crm_lead: { error: "boom" } }, "That record couldn't be loaded just now. Refresh to try again."],
+    ["a matter read that fails", { matter: MATTER }, { crm_matter: { error: "boom" } }, "That record couldn't be loaded just now. Refresh to try again."],
+  ])("%s says so, offers the picker link, draws no Create draft and no consult read", async (_name, search, tables, sentence) => {
+    const html = await render({ search, tables });
+    expect(text(html)).toContain(sentence);
+    expect(hrefs(html).some((x) => /^\/dashboard\/proposals\/new\/?\?door=scratch$/.test(x))).toBe(true);
+    expect(html).not.toContain("Create draft");
     expect(h.consultLoad).not.toHaveBeenCalled();
   });
 });
 
-describe("pre-fill from a lead", () => {
-  it("fills name, first name, company, email and the first brand name from the lead's mark; all editable", async () => {
-    const html = await render({ search: { lead: LEAD }, tables: { crm_lead: ANA } });
-    expect(input(html, "fullName")).toContain('value="Ana Ruiz"');
-    expect(input(html, "firstName")).toContain('value="Ana"');
-    expect(input(html, "company")).toContain('value="Zephyr Co"');
-    expect(input(html, "clientEmail")).toContain('value="ana@example.com"');
-    expect(input(html, "brandName")).toContain('value="Zephyr"');
-    expect(input(html, "leadId")).toContain(`value="${LEAD}"`);
-    for (const n of ["fullName", "firstName", "company", "clientEmail", "brandName"]) expect(input(html, n)).not.toMatch(/disabled|readonly/i);
-  });
+describe("the reviewed consult on the chosen-record page", () => {
+  const go = (consult: ReviewedConsultRead, extra: Partial<Opts> = {}) => render({ search: { lead: LEAD }, tables: { crm_lead: ANA }, consult, ...extra });
 
-  it("with no mark the brand name is the business name; with neither it is blank", async () => {
-    const byBusiness = await render({ search: { lead: LEAD }, tables: { crm_lead: { ...ANA, mark_text: null } } });
-    expect(input(byBusiness, "brandName")).toContain('value="Zephyr Co"');
-    const none = await render({ search: { lead: LEAD }, tables: { crm_lead: { ...ANA, mark_text: null, business_name: null } } });
-    expect(input(none, "brandName")).toContain('value=""');
-  });
-
-  it("says 'Filled from: lead <label>.' and nothing about a consult or package that wasn't used", async () => {
-    const html = await render({ search: { lead: LEAD }, tables: { crm_lead: ANA } });
-    expect(text(html)).toContain("Filled from: lead Ana Ruiz · Zephyr Co.");
-    expect(html).not.toContain("consult details reviewed");
-    expect(html).not.toContain("; package");
-  });
-});
-
-describe("pre-fill from a matter", () => {
-  const row = { id: MATTER, lead_id: LEAD, owner_name: "Owner Name", mark_text: "Birch", title: "Birch filing", matter_number: "TM-2026-0003" };
-
-  it("links the matter and takes its lead's details plus the matter's own mark", async () => {
-    const html = await render({ search: { matter: MATTER }, tables: { crm_matter: row, crm_lead: ANA } });
-    expect(input(html, "matterId")).toContain(`value="${MATTER}"`);
-    expect(input(html, "leadId")).toContain(`value="${LEAD}"`);
-    expect(input(html, "fullName")).toContain('value="Ana Ruiz"');
-    expect(input(html, "clientEmail")).toContain('value="ana@example.com"');
-    expect(input(html, "brandName")).toContain('value="Birch"');
-    expect(text(html)).toContain("Filled from: matter Birch; lead Ana Ruiz · Zephyr Co.");
-  });
-
-  it("a matter with no mark uses its title; with neither, its lead's brand", async () => {
-    const byTitle = await render({ search: { matter: MATTER }, tables: { crm_matter: { ...row, mark_text: null }, crm_lead: ANA } });
-    expect(input(byTitle, "brandName")).toContain('value="Birch filing"');
-    const byLead = await render({ search: { matter: MATTER }, tables: { crm_matter: { ...row, mark_text: null, title: null }, crm_lead: ANA } });
-    expect(input(byLead, "brandName")).toContain('value="Zephyr"');
-  });
-
-  it("a matter with no lead fills the owner name and the brand name, and says there are no consult details", async () => {
-    const html = await render({ search: { matter: MATTER }, tables: { crm_matter: { ...row, lead_id: null } } });
-    expect(input(html, "fullName")).toContain('value="Owner Name"');
-    expect(input(html, "brandName")).toContain('value="Birch"');
-    expect(input(html, "leadId")).toContain('value=""');
-    expect(text(html)).toContain("This matter has no linked lead, so there are no consult details to fill from.");
-    expect(h.consultLoad).not.toHaveBeenCalled();
-    expect(text(html)).toContain("Filled from: matter Birch.");
-  });
-
-  it("another firm's matter (the scoped client returns no row) is not found, and no consult is read", async () => {
-    const html = await render({ search: { matter: MATTER }, tables: { crm_matter: null } });
-    expect(text(html)).toContain("That matter couldn't be found, so the form is blank.");
-    expect(h.consultLoad).not.toHaveBeenCalled();
-  });
-});
-
-describe("reviewed consult details", () => {
-  const withConsult = (d: StoredConsultDetails, extra: Partial<Opts> = {}) =>
-    render({ search: { lead: LEAD }, tables: { crm_lead: ANA }, consult: reviewed(d), ...extra });
-
-  it("shows the ticked box and what it will add: each mark, its kinds and its classes as labels", async () => {
-    const html = await withConsult(details([ZEPHYR, mark("m2", "Swirl", "design")]));
-    expect(html).toMatch(/<input type="checkbox" name="useConsult" checked=""/);
+  it("reviewed: shows the ticked box and what it will add (each mark, its kinds and classes), and the 'Filled from' line", async () => {
+    const html = await go(reviewed(details([ZEPHYR])));
+    expect(html).toMatch(/<input[^>]*type="checkbox"[^>]*name="useConsult"[^>]*checked/);
     expect(text(html)).toContain("Use the marks and classes from the reviewed consult");
-    expect(text(html)).toContain("Zephyr</strong><span class=\"lx-note\"> · Word mark");
     expect(html).toContain("Clothing, namely t-shirts");
     expect(html).toContain("Online retail store services");
-    expect(text(html)).toContain("Swirl");
-    expect(text(html)).toContain("Logo mark");
-    // The consult read goes through the lead the page resolved, and only that.
+    expect(text(html)).toContain("Rebecca Beliard");
     expect(h.consultLoad).toHaveBeenCalledWith(LEAD);
-  });
-
-  it("names the review in the 'Filled from' line, with the date in the firm's zone", async () => {
-    const html = await withConsult(details([ZEPHYR]));
-    expect(text(html)).toContain("Filled from: lead Ana Ruiz · Zephyr Co; consult details reviewed by Rebecca Beliard on Oct 21, 2026.");
-  });
-
-  it("a package on the current list selects the dropdown, and the five fields equal that package's", async () => {
-    const html = await withConsult(details([ZEPHYR], { recommended_package: "  enhanced " }));
-    expect(html).toMatch(/<option value="Enhanced" selected="">/);
-    expect(input(html, "base")).toContain('value="3250.00"');
-    expect(input(html, "includedClasses")).toContain('value="2"');
-    expect(input(html, "perClass")).toContain('value="700.00"');
-    expect(input(html, "secondMarkPct")).toContain('value="15"');
-    expect(input(html, "govPerClass")).toContain('value="350.00"');
-    expect(text(html)).toContain("; package Enhanced.");
-    expect(html).not.toContain("isn't on your list");
-    expect(html).not.toContain("isn&#x27;t on your list");
-  });
-
-  it("a package that isn't on the list leaves the first package and says so, with the name escaped", async () => {
-    const html = await withConsult(details([ZEPHYR], { recommended_package: "Plat<i>num" }));
-    expect(html).toMatch(/<option value="Concierge" selected="">/);
-    expect(input(html, "base")).toContain('value="4950.00"');
-    expect(text(html)).toContain("Package from the consult (Plat&lt;i&gt;num) isn't on your list. Choose one.");
-    expect(html).not.toContain("Plat<i>num");
-    expect(html).not.toContain("; package");
-  });
-
-  it("no package named: the default, and no package note", async () => {
-    const html = await withConsult(details([ZEPHYR]));
-    expect(html).toMatch(/<option value="Concierge" selected="">/);
-    expect(html).not.toContain("Package from the consult");
-  });
-
-  it("if the firm's settings couldn't be read there is no dropdown and no package note", async () => {
-    const html = await withConsult(details([ZEPHYR], { recommended_package: "Enhanced" }), { settingsFails: true });
-    expect(html).not.toContain('name="package"');
-    expect(html).not.toContain("Package from the consult");
-    expect(html).toContain("Your packages couldn&#x27;t be loaded just now");
   });
 
   it("says how many classes the per-brand limit left off", async () => {
     const many = mark("m1", "Zephyr", "word", [[1, "A goods"], [2, "B goods"], [3, "C goods"], [4, "D goods"], [5, "E goods"]]);
-    const html = await withConsult(details([many]));
+    const html = await go(reviewed(details([many])));
     expect(text(html)).toContain("2 more classes weren't added (3 per brand name).");
     expect(html).not.toContain("D goods");
   });
 
-  it("no price is read from any record: the matter's package, the lead's and consult's discount change nothing", async () => {
+  const nothingFromConsult = (html: string) => {
+    expect(html).not.toContain("useConsult");
+    expect(html).not.toContain("Use the marks and classes");
+    expect(html).not.toContain("Clothing, namely");
+    expect(html).toContain("Create draft");
+  };
+
+  it("not reviewed: the review line with a link to the lead; the draft can still be created", async () => {
+    const html = await go({ status: "ok", details: null, unreadable: false, unreviewed: true });
+    expect(text(html)).toContain("Consult details aren't reviewed yet, so marks and classes weren't filled.");
+    expect(html).toContain(`<a href="/dashboard/leads/${LEAD}/">Review them on the lead.</a>`);
+    nothingFromConsult(html);
+  });
+
+  it("an unreadable record, and a failed read, say they couldn't be loaded (never 'no consult')", async () => {
+    for (const consult of [{ status: "ok", details: null, unreadable: true, unreviewed: false } as ReviewedConsultRead, { status: "unavailable" } as ReviewedConsultRead]) {
+      const html = await go(consult);
+      expect(text(html)).toContain("Consult details couldn't be loaded.");
+      nothingFromConsult(html);
+    }
+  });
+
+  it("reviewed but listing no marks", async () => {
+    const html = await go(reviewed(details([])));
+    expect(text(html)).toContain("The reviewed consult details list no marks, so none were filled.");
+    nothingFromConsult(html);
+  });
+
+  it("no consult details at all has no line of its own", async () => {
+    const html = await go({ status: "ok", details: null, unreadable: false, unreviewed: false });
+    expect(html).not.toContain("aren't reviewed");
+    expect(html).not.toContain("Consult details couldn");
+    nothingFromConsult(html);
+  });
+
+  it("a flat-fee proposal reads no consult at all", async () => {
+    const html = await go(reviewed(details([ZEPHYR])), { search: { lead: LEAD, type: "general" } });
+    expect(h.consultLoad).not.toHaveBeenCalled();
+    expect(html).not.toContain("useConsult");
+  });
+
+  it("no price is read from any record: a matter's package and a consult's discount draw nothing", async () => {
     const html = await render({
       search: { matter: MATTER },
       tables: {
@@ -496,70 +445,7 @@ describe("reviewed consult details", () => {
       },
       consult: reviewed(details([ZEPHYR], { discount_discussed: "20% off for a second mark" })),
     });
-    expect(input(html, "base")).toContain('value="4950.00"');
-    expect(input(html, "perClass")).toContain('value="825.00"');
-    expect(html).toMatch(/<option value="Concierge" selected="">/);
     expect(html).not.toContain("20% off");
-  });
-
-  it("every pre-filled input stays editable", async () => {
-    const html = await withConsult(details([ZEPHYR], { recommended_package: "Enhanced" }));
-    for (const n of ["fullName", "firstName", "company", "clientEmail", "brandName", "base", "includedClasses", "perClass", "secondMarkPct", "govPerClass"]) {
-      expect(input(html, n)).not.toMatch(/disabled|readonly/i);
-    }
-  });
-});
-
-describe("a consult that fills nothing says why, and the rest is still filled", () => {
-  const go = (consult: ReviewedConsultRead) => render({ search: { lead: LEAD }, tables: { crm_lead: ANA }, consult });
-  const stillFilled = (html: string) => {
-    expect(input(html, "fullName")).toContain('value="Ana Ruiz"');
-    expect(input(html, "company")).toContain('value="Zephyr Co"');
-    expect(input(html, "clientEmail")).toContain('value="ana@example.com"');
-    expect(input(html, "brandName")).toContain('value="Zephyr"');
-  };
-  const nothingFromConsult = (html: string) => {
-    expect(html).not.toContain("useConsult");
-    expect(html).not.toContain("Use the marks and classes");
-    expect(html).not.toContain("consult details reviewed");
-    expect(html).not.toContain("Clothing, namely");
-  };
-
-  it("not reviewed: the review line with a link to the lead", async () => {
-    const html = await go({ status: "ok", details: null, unreadable: false, unreviewed: true });
-    expect(text(html)).toContain("Consult details aren't reviewed yet, so marks and classes weren't filled.");
-    expect(html).toContain(`<a href="/dashboard/leads/${LEAD}/">Review them on the lead.</a>`);
-    nothingFromConsult(html);
-    stillFilled(html);
-  });
-
-  it("an unreadable record", async () => {
-    const html = await go({ status: "ok", details: null, unreadable: true, unreviewed: false });
-    expect(text(html)).toContain("Consult details couldn't be loaded.");
-    nothingFromConsult(html);
-    stillFilled(html);
-  });
-
-  it("a failed read", async () => {
-    const html = await go({ status: "unavailable" });
-    expect(text(html)).toContain("Consult details couldn't be loaded.");
-    nothingFromConsult(html);
-    stillFilled(html);
-  });
-
-  it("reviewed but listing no marks, even with a package named", async () => {
-    const html = await go(reviewed(details([], { recommended_package: "Enhanced" })));
-    expect(text(html)).toContain("The reviewed consult details list no marks, so none were filled.");
-    nothingFromConsult(html);
-    expect(html).toMatch(/<option value="Concierge" selected="">/);
-    stillFilled(html);
-  });
-
-  it("no consult details at all has no line of its own (the consult strip says so)", async () => {
-    const html = await go({ status: "ok", details: null, unreadable: false, unreviewed: false });
-    expect(html).not.toContain("aren't reviewed");
-    expect(html).not.toContain("Consult details couldn");
-    nothingFromConsult(html);
-    stillFilled(html);
+    expect(html).not.toMatch(/\$\d/);
   });
 });

@@ -3,19 +3,22 @@
 import { randomBytes } from "node:crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { getScopedClient } from "@/lib/db/scoped-client";
+import { getApprovedLetter } from "@/lib/loe/templates-store";
+import { getFirmTimeZone } from "@/lib/org/profile";
+import { firmCivilDate, FIRM_TIME_ZONE } from "@/lib/quotes/firm-time";
 import { createProposal, getProposalSettings } from "@/lib/proposals/store";
-import { findPackage, normalisePackages } from "@/lib/proposals/package-list";
-import { standardProposalPricing, type ProposalName, type ProposalPackageBasis, type ProposalSettingRow } from "@/lib/proposals/types";
-import { buildNewContent, parseDateInput, pricingFromPackage } from "@/lib/proposal-editor/form";
-import { applyNewProposalPackageFields } from "@/lib/proposal-editor/create-package-choice";
 import { loadConsultForPrefill } from "@/lib/proposals/consult-prefill-load";
-import { buildBrandNames, CHANGED_SINCE_LOAD, consultPrefill } from "@/lib/proposals/prefill";
-import { buildGeneralContent, GENERAL_PROPOSAL_TITLE, parseGeneralForm } from "@/lib/proposal-editor/general-form";
-import { validateContent } from "@/lib/proposals/validate";
+import { buildDraftContent, type DraftBrand, type ProposalDraftSpec } from "@/lib/proposals/draft-spec";
+import { brandPlan, packageFromConsult, consultPrefill, CHANGED_SINCE_LOAD } from "@/lib/proposals/prefill";
+import { normalisePackages } from "@/lib/proposals/package-list";
+import { readStartSubject } from "@/lib/proposals/start-subject";
+import { GENERAL_PROPOSAL_TITLE } from "@/lib/proposal-editor/general-form";
 import { proposalActionError, type ActionState } from "./errors";
 import { gateStaffAction } from "./gate";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const DEFAULT_OPEN_DAYS = 14;
 
 function field(form: FormData, key: string): string {
   const v = form.get(key);
@@ -23,130 +26,112 @@ function field(form: FormData, key: string): string {
 }
 
 /**
- * "New proposal". The prices, includes and office action note come from the
- * firm's own settings read HERE. The form carries who the proposal is for and
- * the NAME of one of the firm's packages; the server re-reads that package from
- * the saved list through the caller's own scoped client, so the browser never
- * decides what a package costs. The five numbers the form fills in are kept
- * only where the person changed one from the package, and then they are this
- * proposal's own price and are named in `content.package_basis.edited` ("Edited
- * from Concierge"). A package name that is not on the firm's list is refused.
+ * "New proposal", in ONE step (Sprint 3). A person chooses a lead or a matter (or starts blank with a name), and
+ * the draft is created and the editor opens. Everything else is chosen in the editor.
  *
- * If the settings cannot be read the form offers no package (it says so), and a
- * draft is still created from the standard defaults rather than lost; a package
- * name posted anyway is refused, because there is nothing to check it against.
- * The lead and matter ids are re-checked by 0089's composite foreign keys, so
- * another firm's cannot be linked.
+ * The form carries an id, never the client's details: the lead or matter is read HERE through the caller's own
+ * scoped client, so another firm's id is "not found". Blank carries only the name the person typed. The content
+ * is built by `buildDraftContent` (the one builder every way of starting a proposal uses) from the firm's saved
+ * packages, its "New proposals offer" and its approved engagement letter; the browser decides no price.
  *
- * "Use the marks and classes from the reviewed consult" (`useConsult`) carries
- * no marks or classes: the browser is never trusted for them. When it is ticked
- * and a lead is posted, the action reads that lead's consult details itself
- * (the caller's scoped client), requires the newest to still be reviewed, and
- * builds the brand names from that read. If they are no longer reviewed, can't
- * be read, or are not that firm's, nothing is created.
+ * "Use the marks and classes from the reviewed consult" (`useConsult`) carries no marks or classes: when it is
+ * posted with a lead the action reads that lead's consult details itself, requires the newest to still be
+ * reviewed, and builds the brand names from that read. If they changed or can't be read, nothing is created.
+ *
+ * The settings read failing falls back to the standard defaults rather than losing the draft. The lead and
+ * matter ids are re-checked by 0089's composite foreign keys, so another firm's cannot be linked.
  */
 export async function createProposalAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const refused = await gateStaffAction();
   if (refused) return refused;
 
-  const fullName = field(formData, "fullName");
-  if (!fullName) return { error: "Enter the client's full name." };
-  const firstName = field(formData, "firstName");
+  const kind = field(formData, "kind") === "general" ? "general" : "trademark";
   const leadRaw = field(formData, "leadId");
   if (leadRaw && !UUID.test(leadRaw)) return { error: "That lead isn't valid." };
   const matterRaw = field(formData, "matterId");
   if (matterRaw && !UUID.test(matterRaw)) return { error: "That matter isn't valid." };
-  const packageName = field(formData, "package");
-  const expires = parseDateInput(field(formData, "expiresOn"), "Expiry date");
-  if (!expires.ok) return { error: expires.error };
 
-  // Spec 9: a contract or other matter at a flat fee. Built here from the posted fields, checked by
-  // `validateContent`, and never given a package, a brand name or a USPTO fee.
-  if (field(formData, "kind") === "general") {
-    const general = parseGeneralForm(formData, () => randomBytes(4).toString("hex"));
-    if (!general.ok) return { error: general.error };
-    const content = buildGeneralContent({ firstName: firstName || fullName.split(/\s+/)[0], fullName, company: field(formData, "company"), general: general.value });
-    const problem = validateContent(content).find((i) => i.level === "error");
-    if (problem) return { error: problem.message };
-    let createdId: string;
-    try {
-      const created = await createProposal({
-        clientName: fullName,
-        clientEmail: field(formData, "clientEmail") || null,
-        title: field(formData, "title") || GENERAL_PROPOSAL_TITLE,
-        content,
-        leadId: leadRaw || null,
-        matterId: matterRaw || null,
-        expiresOn: expires.value,
-        payUrl: field(formData, "payUrl") || null,
-      });
-      createdId = created.id;
-    } catch (err) {
-      return proposalActionError(err, "Couldn't create this proposal.");
-    }
-    revalidatePath("/dashboard/proposals/");
-    redirect(`/dashboard/proposals/${createdId}/`);
+  // Who it is for: a record read on the server, or (blank) the name typed.
+  let client: { fullName: string; firstName: string; company: string; clientEmail: string };
+  let brand = "";
+  let leadId: string | null = null;
+  let matterId: string | null = null;
+  if (leadRaw || matterRaw) {
+    const read = await readStartSubject({ leadId: leadRaw || null, matterId: matterRaw || null });
+    if (read.status === "not-found") return { error: "That lead or matter couldn't be found." };
+    if (read.status === "unavailable") return { error: "Couldn't read that record, so nothing was created. Try again shortly." };
+    const s = read.subject;
+    if (!s.fullName) return { error: "That record has no client name yet. Add one on the lead, or start blank." };
+    client = { fullName: s.fullName, firstName: s.firstName, company: s.company, clientEmail: s.clientEmail };
+    brand = s.brand;
+    leadId = s.leadId;
+    matterId = s.matterId;
+  } else {
+    const fullName = field(formData, "fullName");
+    if (!fullName) return { error: "Enter the client's full name." };
+    client = { fullName, firstName: field(formData, "firstName"), company: field(formData, "company"), clientEmail: field(formData, "clientEmail") };
   }
 
-  let settings: ProposalSettingRow | null = null;
+  // The firm's packages and offer. Unreadable settings = the standard defaults (a draft is still created).
+  let settingsPricing: Record<string, unknown> = {};
   let settingsRead = true;
   try {
-    settings = await getProposalSettings();
+    settingsPricing = (await getProposalSettings())?.pricing ?? {};
   } catch {
     settingsRead = false;
   }
 
-  const standard = standardProposalPricing(settings?.pricing ?? {});
-  let basis: ProposalPackageBasis | null = null;
-  if (packageName) {
-    if (!settingsRead) return { error: "Couldn't read your packages, so nothing was created. Try again shortly." };
-    const chosen = findPackage(normalisePackages(settings?.pricing ?? {}), packageName);
-    if (!chosen) return { error: "That package isn't one of your firm's packages. Pick one from the list." };
-    const priced = pricingFromPackage(formData, chosen);
-    if (!priced.ok) return { error: priced.error };
-    standard.pricing = priced.value.pricing;
-    basis = { name: chosen.package, edited: priced.value.edited };
+  // The firm's approved letter. A missing table means no letter yet; a failed read creates nothing (a draft
+  // that silently lacks the letter would be mistaken for one that has it).
+  const letterRead = await getApprovedLetter(await getScopedClient(), kind);
+  if (letterRead.status === "unavailable") return { error: "Couldn't read your engagement letter, so nothing was created. Try again shortly." };
+  const letter = letterRead.status === "ok" ? letterRead.letter : null;
+
+  let brands: DraftBrand[] = brand ? [{ name: brand }] : [];
+  let recommended: string | undefined;
+  if (kind === "trademark" && field(formData, "useConsult") && leadId) {
+    const fill = consultPrefill(await loadConsultForPrefill(leadId));
+    if (fill.state !== "filled" && fill.state !== "no_marks") return { error: CHANGED_SINCE_LOAD };
+    if (fill.state === "filled") {
+      brands = brandPlan(brand, fill.brands).map((p) => ({ name: p.name, marks: p.kinds.map((k) => ({ kind: k })), classes: [...p.classes] }));
+      const pick = packageFromConsult(fill.recommendedPackage, settingsRead ? normalisePackages(settingsPricing) : null);
+      if (pick.kind === "match") recommended = pick.name;
+    }
   }
+
+  const spec: ProposalDraftSpec =
+    kind === "general"
+      ? {
+          kind: "general",
+          client,
+          madeBy: "person",
+          general: { matterTitle: "", items: [], flatFee: 0 },
+        }
+      : { kind: "trademark", client, madeBy: "person", names: brands, ...(recommended ? { package: recommended } : {}) };
 
   const rand = () => randomBytes(4).toString("hex");
-  const brandName = field(formData, "brandName");
-  let names: ProposalName[] | undefined;
-  if (field(formData, "useConsult") && leadRaw) {
-    const fill = consultPrefill(await loadConsultForPrefill(leadRaw));
-    if (fill.state !== "filled" && fill.state !== "no_marks") return { error: CHANGED_SINCE_LOAD };
-    names = buildBrandNames({ typed: brandName, brands: fill.state === "filled" ? fill.brands : [], rand });
-  }
-
-  // Spec 6 / Spec 7 under More options: the first brand name's package choice, its discount and its marks' choices, read by the
-  // editor's own parsers, checked against the firm's CURRENT list (none when it couldn't be read) and snapshotted. A refusal creates nothing.
-  const built = applyNewProposalPackageFields(
-    formData,
-    buildNewContent({
-      firstName,
-      fullName,
-      company: field(formData, "company"),
-      brandName,
-      names,
-      standard,
-      packageBasis: basis,
-      rand,
-    }),
-    settingsRead ? settings?.pricing ?? {} : null,
-  );
+  const built = buildDraftContent(spec, { pricing: settingsPricing, letter }, rand);
   if (!built.ok) return { error: built.error };
+
+  let tz = FIRM_TIME_ZONE;
+  try {
+    tz = await getFirmTimeZone();
+  } catch {
+    /* the default zone */
+  }
+  const expiresOn = firmCivilDate(new Date(Date.now() + DEFAULT_OPEN_DAYS * 86_400_000), tz);
 
   let id: string;
   try {
-    const content = built.value;
     const created = await createProposal({
-      clientName: fullName,
-      clientEmail: field(formData, "clientEmail") || null,
-      title: field(formData, "title") || undefined,
-      content,
-      leadId: leadRaw || null,
-      matterId: matterRaw || null,
-      expiresOn: expires.value,
-      payUrl: field(formData, "payUrl") || null,
+      clientName: client.fullName,
+      clientEmail: client.clientEmail || null,
+      title: kind === "general" ? GENERAL_PROPOSAL_TITLE : undefined,
+      content: built.content,
+      leadId,
+      matterId,
+      expiresOn,
+      payUrl: null,
     });
     id = created.id;
   } catch (err) {

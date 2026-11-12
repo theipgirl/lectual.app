@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { getProposalSettings, saveProposalSettings } from "@/lib/proposals/store";
 import { parsePackageList, parseSettingsPricing } from "@/lib/proposal-editor/form";
-import { validatePackages, withPackages } from "@/lib/proposals/package-list";
+import { normalisePackages, validatePackages, withPackages } from "@/lib/proposals/package-list";
+import { parseNewOfferForm, withNewOffer } from "@/lib/proposals/new-offer";
 import { proposalActionError, type ActionState } from "../../proposals/errors";
 import { gateAdminAction } from "../../proposals/gate";
 
@@ -49,6 +50,15 @@ export async function saveProposalSettingsAction(_prev: ActionState, formData: F
       const problems = validatePackages(list.value);
       if (problems.length > 0) return { error: problems[0].message };
       nextPricing = withPackages(nextPricing, list.value);
+    }
+
+    // Sprint 3: "New proposals offer". Package names are checked against the list as it will be AFTER this save.
+    const offer = parseNewOfferForm(formData, normalisePackages(nextPricing).map((p) => p.package));
+    if (!offer.ok) return { error: offer.error };
+    if (offer.value !== undefined) {
+      const withOffer = withNewOffer(nextPricing, offer.value);
+      if (!withOffer.ok) return { error: withOffer.error };
+      nextPricing = withOffer.value;
     }
 
     await saveProposalSettings({
