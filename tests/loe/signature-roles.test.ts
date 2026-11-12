@@ -59,7 +59,7 @@ describe("the one list", () => {
     expect(action).toContain("gate: gateSignedLetterDownload");
   });
 
-  it("only the staff page's card and the signed-PDF's stored-text reader touch the signature table: the proposals list never does", () => {
+  it("only the staff page's card, the lead/matter mailing-address reader (role-gated by loadSignedAddress) and the signed-PDF's stored-text reader touch the signature table: the proposals list never does", () => {
     const hits: string[] = [];
     const walk = (dir: string) => {
       for (const name of readdirSync(dir)) {
@@ -69,7 +69,8 @@ describe("the one list", () => {
       }
     };
     walk(join(process.cwd(), "src"));
-    expect(hits.sort()).toEqual(["src/lib/loe/signature-read.ts", "src/lib/loe/stored-agreement.ts"]);
+    expect(hits.sort()).toEqual(["src/lib/loe/signature-read.ts", "src/lib/loe/signed-address.ts", "src/lib/loe/stored-agreement.ts"]);
+    expect(readFileSync(join(process.cwd(), "src/lib/loe/signed-address.ts"), "utf8")).toContain("if (!canReadSignature(role)) return null;");
     // The list's "Signed Oct 21" comes from the accepted snapshot (`isSignedSnapshot`), not from a signature read.
     for (const f of ["src/app/dashboard/proposals/page.tsx", "src/lib/proposals/list-rows.ts"]) {
       const src = readFileSync(join(process.cwd(), f), "utf8");
