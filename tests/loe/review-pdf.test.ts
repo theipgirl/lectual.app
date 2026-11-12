@@ -30,8 +30,9 @@ function freshToken(): string {
 
 async function textOf(base64: string): Promise<string> {
   const pdf = await getDocumentProxy(new Uint8Array(Buffer.from(base64, "base64")));
-  const { text } = await extractText(pdf, { mergePages: true });
-  return squash(text.split(REVIEW_COPY_MARK).join(" ").replace(/Page \d+ of \d+/g, " "));
+  // Pages are joined with a space: a lead-in at the foot of one page and its text at the top of the next must not read as one word.
+  const { text } = await extractText(pdf, { mergePages: false });
+  return squash(text.join(" ").split(REVIEW_COPY_MARK).join(" ").replace(/Page \d+ of \d+/g, " "));
 }
 
 beforeEach(() => {
@@ -51,7 +52,9 @@ describe("the review-copy PDF action", () => {
     const raw = await getDocumentProxy(new Uint8Array(Buffer.from(r.base64, "base64")));
     expect((await extractText(raw, { mergePages: true })).text).toContain(REVIEW_COPY_MARK);
     const text = await textOf(r.base64);
-    for (const b of fullLetterBlocks({ typedName: "Sevetri Wilson", dateText: "October 20, 2026" })) expect(text).toContain(squash(paragraphText(b)));
+    // Compared with all whitespace removed: where a bold lead-in ends a line, text extraction may join it to the next word.
+    const bare = (t: string) => t.replace(/\s+/g, "");
+    for (const b of fullLetterBlocks({ typedName: "Sevetri Wilson", dateText: "October 20, 2026" })) expect(bare(text)).toContain(bare(paragraphText(b)));
     expect(text).toContain("Exhibit A: Fee Structure and Estimated Costs");
     expect(text).toContain("The Fold");
     // Nothing was written.

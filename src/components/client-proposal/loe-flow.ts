@@ -8,6 +8,7 @@ import {
   canSign,
   cleanSigningDetails,
   emptyDetails,
+  DEFAULT_COUNTRY,
   letterDateText,
   missingDetails,
   pageAgreement,
@@ -59,7 +60,7 @@ const PLACEHOLDER_NAME = "[your full legal name]";
 const PLACEHOLDER_ADDRESS = "[your address]";
 
 export function startingDetails(clientName: string, company: string, given?: SignerDetails): SignerDetails {
-  return given ?? { ...emptyDetails(), client_name: clientName.trim(), entity_name: company.trim() };
+  return given ?? { ...emptyDetails(), client_name: clientName.trim(), entity_name: company.trim(), country: DEFAULT_COUNTRY };
 }
 
 export function useLoeFlow(input: LoeFlowInput) {

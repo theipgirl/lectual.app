@@ -3,6 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { resolveFirmSession } from "@/lib/firm/session";
+import { MailingAddressCard } from "@/components/loe/MailingAddressCard";
+import { loadSignedAddress } from "@/lib/loe/signed-address";
 import { CAN_MOVE_STAGE, CAN_WRITE_LEAD, getLead, listStages } from "@/lib/pipeline";
 import { effectiveTemperature } from "@/lib/intake/effective-temperature";
 import { loadTemperatureFacts, type TemperatureFactsRead } from "@/lib/intake/facts";
@@ -110,7 +112,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const voiceUrls = await voiceNotePlaybackUrls(rows);
 
   // Lane + next step (SOP Stage 2) and the lead's sequences (SOP rule 1).
-  const [{ links, failed: linksFailed }, tz, enrollments, approvals, factsRead, mattersRead, answersRead, documentsRead, consultRead] = await Promise.all([
+  const [{ links, failed: linksFailed }, tz, enrollments, approvals, factsRead, mattersRead, answersRead, documentsRead, consultRead, mailingRead] = await Promise.all([
     getLaneLinks(),
     getFirmTimeZone(),
     listLeadEnrollments(id).catch(() => null),
@@ -126,6 +128,8 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     loadDocumentsRead({ kind: "lead", id: lead.id }, { includeLetters: false }),
     // Outlook consults exist only for a firm with the mailbox module: without it, no read. Never throws (three states).
     hasMailbox ? loadBookedConsult(lead.id) : Promise.resolve(null),
+    // The address the client gave when they signed their letter: staff roles only (null = not asked). Never throws (three states).
+    loadSignedAddress(session.role, { leadId: lead.id }),
   ]);
   const temperature = effectiveTemperature(lead, stages, new Date(), factsRead.status === "ok" ? factsRead.byLead[lead.id] : undefined);
   const lane = laneView(lead);
@@ -363,6 +367,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
               <span>Came from</span>
               <span>{[lead.referral_source, lead.referral_detail].filter(Boolean).join(" — ") || "—"}</span>
             </div>
+            <MailingAddressCard read={mailingRead} />
             <LeadMattersLine read={mattersRead} />
           </CollapsibleAside>
         </aside>

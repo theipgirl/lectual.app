@@ -530,6 +530,19 @@ Everything after a client accepts on `/p/<token>`. Internal only: nothing here s
 - **NOT verified against a live Lawmatics:** the `/files` multipart shape, the custom-field write shape and the `/notes` body come from the
   public API reference. Every non-2xx is "not done" and the page says the shape hasn't been checked; every 2xx is "done".
 
+- **`address_to_lawmatics`** (a tenth step, success word `added`, in `RETRYABLE_STEPS`; NOT verified against a live Lawmatics): after a SIGNED
+  acceptance, `runAcceptanceFollowups` writes the signer's mailing address to the same Lawmatics matter the note goes to (`resolveNoteTarget`), with the
+  firm's own token, as the service role fenced on the proposal's org. Core: `src/lib/proposals/address-to-lawmatics.ts` (`runAddressToLawmatics`, deps
+  injected, never throws). The address comes ONLY from `accepted_snapshot.signing.details` (`signedAddress`, cleaned again; street and city at least), never
+  from the browser. One request on the matter (`POST /addresses`, `createAddress` in `src/lib/lawmatics/writes.ts`; the flat shape is `toAddressPayload` in
+  `contact-payload.ts`: `label` "Mailing", `street`, `street2`, `city`, `state`, `zipcode`, `country`, `addressable_type` "Prospect" + `addressable_id`), then
+  `readProspectContactId` (`GET /prospects/:id`, the answer checked to be for the record asked) and, when a contact is named, a copy with `addressable_type`
+  "Contact". A contact that can't be read or whose copy is refused NEVER fails the step: it stays `added` with the fixed `ADDRESS_CONTACT_NOTE`. Outcomes:
+  `skipped` (no active connection), `blocked` (no signed letter, no usable address, no Lawmatics record or more than one), `failed` (the matter's request,
+  the connection check or the record lookup: the reason is `HTTP <status>` or a fixed sentence). No part of the address, and no Lawmatics response text, is
+  ever in a step payload, a note or a log. Once per signing and round (`stepSucceeded`), independent of every other step (none waits on it, a failure changes
+  nothing), retried by the next run or Try again (`addressRetryStep`, no paid mark needed, the signed-in token). The staff Engagement letter card shows it
+  ("Mailing address in Lawmatics", states from `addressView`, its own Try again). Tests: `tests/proposals/address-to-lawmatics.test.ts` (fake fetch).
 ## New proposal picker and pre-fill (Sprint 20, no schema)
 `/dashboard/proposals/new/` starts from a lead or matter. Internal only: nothing here sends, moves a stage or opens a matter.
 - **"Who is this for?"** (`WhoIsThisFor.tsx`, rules in `src/lib/proposals/new-picker.ts`, pure): a Leads | Matters switch, a plain GET
@@ -1639,6 +1652,16 @@ client page, signing and the staff side come in later sprints. Nothing here send
   `**Lead.**` is read from the TEMPLATE first, then values are merged in ONE pass, so a client's `<script>`, `{{x}}`, `}}` or `**` is literal text and is
   never re-merged or re-parsed. An unknown field, an unclosed `{{` / `}}` or an allowed field with no value is an error and there is NO letter (a client
   never sees a half-filled one). Callers draw the blocks as React text.
+- **Paragraph styles (template-only, Nov 12).** A paragraph of the TEMPLATE may start with a style marker in SINGLE braces, usually on its own line:
+  `{center, small, rule-below}`. The seven names live in ONE place, `src/lib/loe/letter-styles.ts` (`center`, `bold`, `small`, `indent`, `rule-below`,
+  `bold-underline-first-line`, `space-before`). Single braces never form a `{{` / `}}`, so `findMergeFields` and lectual 0106's approve check pass; a paragraph
+  starting `{{` is a merge field, never a marker. The marker is read before merging (like the lead-in), so a value that looks like a marker is literal text.
+  An unknown name, an empty `{}` or a marker with no text is an error (`validateTemplate`, `loeIssues`, `renderLetter`: no letter, Approve refused). A block
+  gains `style` ONLY when the template set one, so an unmarked letter's blocks are exactly `{ lead, text }`. **Styles are drawing only:** `agreementText`
+  and the canonical form (`wordsOnly`) cover the words, so the stored text, its sha256 and the page/server fingerprint never include a style, and a letter
+  with no markers hashes exactly as before (`tests/loe/letter-styles.test.tsx` pins the pre-marker RPB letter's text and canonical sha256). Every web view
+  draws a block through `LetterParagraph` (`loe-s-<name>` classes, `src/components/loe/letter-styles.css`); the PDF through `writeBlock` in `pdf.ts`
+  (indent 2.25in, a 2pt black rule under `rule-below`; the thin letterhead rule is left out when the letter draws its own).
 - **`content.loe = { kind, template_id, template_version, title, body }`** is a snapshot of the firm's approved version (`ProposalLoe`,
   `src/lib/proposals/types.ts`). `withLoeSnapshot(content, approved | null, wanted)` (`loe-snapshot.ts`, pure) attaches, refreshes or removes it, returns
   a new object and removes it for a template of the other kind; `loeIsCurrent` is the check Sprint 6 uses before creating a link. `validateContent`
@@ -1760,6 +1783,26 @@ anything; `pricing.ts` has no diff; one dependency was added (`pdfkit`, exact-pi
   `next start` of a production build did build a Unicode PDF, and the font is in the route's trace), and the real 0106 function (proved against a double
   and by reading the migration text).
 
+- **The details are a full mailing address (owner's decision, Nov 12).** Required before signing: full legal name, street, city, state, ZIP or postal code and
+  country (`REQUIRED_DETAIL_KEYS` / `missingDetails` in `signing.ts`, the ONE rule: the form's `required` and `aria-required`, the Continue and Sign buttons
+  (`canSign`), the server's `checkSigning` and the review PDF's check all read it). Optional, and labelled "(optional)": apartment or suite, business name,
+  title. The country starts as "United States" (`DEFAULT_COUNTRY`, set in `startingDetails`; the client can change it, and a cleared one is refused again).
+  `SIGN_MESSAGES.details_required` and `PDF_MESSAGES.details` name what is needed. An older signed snapshot with a partial address is untouched (snapshots are never re-checked).
+- **The firm's logo above the letter (RPB only).** `src/lib/loe/letter-logo.ts` (pure) is the ONE map: `letterLogoForBrand("rpb")` / `letterLogoForSlug`
+  return `/brand/rpb-logo-oxblood.png` (alt "RPB Law Firm", 984 x 168, in `public/brand/`) for the firm the page already brands as RPB (`brandForSlug(slug) === "rpb"`),
+  and null for every other firm, so another firm never shows it. `LoeLetterPanel` takes an optional `logo` (a centred `<img class="cp-letter-logo">`, at most
+  250px, scaling down on a phone) and draws it wherever the letter is drawn: the letter step, "Read the engagement letter first", "Read it again" (`LoeSignedLetter`),
+  the staff editor's Preview (`PreviewBlock`) and Settings' letter preview (`LetterPreview`). The PDF (`pdf.ts`, `input.logo`) draws it centred, 200pt wide, at the top
+  of page 1 before the letterhead, for the review, signed and stored-text copies; the bytes are read with `fs` from `public/` (`loadLogoBytes`, `/brand/` files only), a
+  missing or unreadable file means NO logo, never a failed letter. The server paths get the logo from the org's slug (`firm.logo` on `buildVerifiedSignedPdf`, from
+  `loadStaffFirmFacts`, `firmLetterFacts` and the public read's `firm.slug`). `next.config.ts` lists the file beside the fonts for `/p/*` and `/dashboard/proposals/*`.
+  The cream logo is for dark backgrounds and is never used on a letter. A new firm's logo is a new entry in `letter-logo.ts` plus its `/brand/` file, nothing else.
+  In `LoeLetterPanel` the panel's title comes first and the logo directly above the letter's own first paragraph. RPB's template
+  (`docs/rpb/engagement-letter-trademark.md`) no longer has an "RPB Law, PLLC" first line (the logo names the firm) and carries style markers for
+  the Word letter's layout: centred small address line with a thick rule, bold-underlined "Via Email" line, centred bold "Re:" line, indented
+  signature block.
+- **RPB's footer line reads "RPB Law Firm, PLLC"** (both documents). The footer is drawn on every state (every step, the receipt, letter and no-letter,
+  trademark and flat fee); `tests/client-proposal/footer-name.test.tsx` renders each. The letter text itself (the firm's own, in the database) is not ours to change.
 ## Sprint 5: The assistant and Copilot use the builder (no schema)
 No migration, no dependency, `pricing.ts` untouched. Nothing here approves, makes a link, queues mail or sends.
 - **Every door builds through `buildDraftContent`.** The consult drafter (`src/lib/consult-proposal/draft.ts`) keeps its extraction, quote checks, money
@@ -1878,3 +1921,41 @@ Nothing here sends, moves a stage, opens a matter or calls a model. No migration
   Also not verified: the tightened signature policy itself (viewer and social media reading nothing is 0106's to enforce; the app only stops asking), the
   stored-text copy of a signed PDF against a real signature row, and, in a real browser, the receipt appearing with the signed download straight after
   signing and Web Crypto producing the same fingerprint as the server (proved here with node's Web Crypto over the page's own functions).
+- **The signer's mailing address (no schema).** The staff lead page and matter page (aside, near the contact details) show "Mailing address (from the signed
+  engagement letter)": `loadSignedAddress(role, { leadId, matterId })` (`src/lib/loe/signed-address.ts`) reads the NEWEST `client_proposal_signature` row of a proposal
+  linked to the lead or matter (the matter page also takes proposals filed on the matter's lead), through the scoped client, columns named (`id, proposal_id, address,
+  signed_at`; never the letter text, IP or user agent), and ONLY for the roles in `signature-roles.ts` (any other role gets `null`: nothing is asked and nothing, not even a
+  heading, is drawn). Three states: shown; nothing (no proposal, no signature or no usable address: the card renders nothing); couldn't be loaded (one quiet line, never
+  "no address"). `MailingAddressCard` draws the lines as React text. The same address is written to Lawmatics by `address_to_lawmatics` (Sprint 19 section).
+- **NOT verified (Nov 12 additions):** Lawmatics' `POST /addresses` and `GET /prospects/:id` contact relationship (shape from the API reference, never run against a
+  live account), the logo in a real browser at 375px and in Vercel's bundled PDF function (file traced in `next.config.ts`, checked by build only), and the signed address
+  on the lead and matter pages against a real 0106 table.
+
+## Editor fixes (2026-11-12, no schema)
+Four bugs the owner hit on a draft's edit page (`/dashboard/proposals/<id>/`). Nothing sends; `pricing.ts` has no diff.
+- **"What the package includes" did not apply.** Cause: when the offered packages carry their own rows (Settings -> Proposals ->
+  Packages), the client page draws ONE comparison from `content.packages[].includes` (`includesComparison`) and never reads
+  `content.includes`, which was the only table the editor edited; and each save refreshed the package rows from the firm's list.
+  Rule: the editor edits the table the client sees. `editorPackageIncludes` (`src/lib/proposal-editor/package-includes.ts`, same
+  rule as `includesComparison`, test-pinned) gives one table per offered package (`pkgInc.<n>.package`, rows `pkgInc.<n>.<row>.*`,
+  marker `pkgIncFields`) instead of the single table; `applyPackageIncludes` (in `runSaveDraft`, after the snapshot refresh) writes a
+  package's rows only when they differ from what the page was drawn with, and marks the entry `includes_edited: true`.
+  `withPackageSnapshot` keeps an `includes_edited` entry's own rows; untouched entries still take the firm's rows (#23). The flag is
+  staff-side (`publicContent` picks fields). The table's columns are `minmax(0, …)` plus two fixed widths (header and rows are
+  separate grids, so never `max-content`), so "HIGHLIGHT" no longer runs past the card.
+- **The link box went to the bottom after Save.** Cause: the lifecycle block (Copy / Open, Turn on the link, Edit again, Start a new
+  version, More) was the last card of the MAIN column, so once Save and create link made the version `sent` (no more actions card) the
+  page's actions were under every form. Rule: it is the `data-pe-lifecycle` card in the side column, right under the one actions card,
+  for every status; on phones the actions card stays the bottom bar.
+- **Scrolling showed blank space and hid the preview.** Cause: the dashboard scrolls `.lx-page`, not the window, and it is 112px
+  shorter than the window; `.pe-side` was `max-height: calc(100vh - 24px)`, so its bottom (the end of the preview) hung 88px below the
+  visible area, cut off by `.lx-content { overflow: hidden }`, and the 70vh `.pe-preview-body` scrolled on its own inside the
+  scrolling side column. Rule: one page scroller, and beside it ONE side-column scroller exactly as tall as what is visible: from
+  1081px `.lx-page:has(.pe-cols > .pe-side)` is a size container and `.pe-side` is `top: 0; max-height: 100cqh` (a `100dvh - 124px`
+  fallback), with no overscroll containment so its ends hand the wheel to the page; the preview body never scrolls on its own. Never
+  size anything in the dashboard against `100vh`. Checked only in a static render of the real shell CSS in headless Chromium, not the
+  live app or Safari/trackpad elastic scrolling.
+- **Expand.** "What the client sees" has an Expand button (`ExpandablePreview`): the same `ProposalDocument` and saved content in a
+  full-width modal dialog portalled to `<body>` (the sticky side column is a stacking context). While open the preview is drawn only
+  there; focus goes to Close, Esc / Close / the backdrop close it, Tab wraps (`expandKeyAction`), `.lx-page`, `html` and `body` are
+  locked (`lockScroll`) and focus returns to Expand. Words in `EDITOR_WORDS`.

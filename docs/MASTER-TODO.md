@@ -3,18 +3,39 @@
 One list across sessions. Each session adds its action items here and checks them against Omi.
 Newest section first. Tick an item when it is done; don't delete it.
 
+## 2026-11-12 (evening): letter layout, address, editor fixes — lectual.app#29
+
+### Taylor
+- [ ] Merge lectual.app#29 (letter: full address required, RPB logo, Word layout, footer "RPB Law Firm, PLLC", address to Lawmatics; editor:
+      includes table saves, link box stays in the side column, scroll fix, Expand preview).
+- [ ] After merge, say go and Claude updates RPB's DRAFT letter body on lectual-prod to the new template (no "RPB Law, PLLC" top line, layout styles).
+      Then Rebecca or Taylor approves it in Settings, Client proposals, Engagement letter.
+- [ ] Check the editor scroll on your Mac (Safari / trackpad). The blank-page effect was never reproduced in testing.
+- [ ] Decide how the Lawmatics pay form gets the address: a generic shared form link can't be pre-filled. Options: a Lawmatics automation that sends a
+      record-specific pay link (test whether it pre-fills the address), or take payment in Lectual through LawPay later.
+
+### Checks after the first real signing
+- [ ] The signed mailing address lands on the Lawmatics matter and contact (`POST /addresses` never run against a live account).
+- [ ] The logo appears in the PDF built on Vercel.
+
+### Rebecca (through Taylor)
+- [ ] Typo in her letter text: "outcome of you matter" (should be "your"). Her wording, so not changed by Claude.
+
 ## 2026-11-12 (later): the build is done on the branch; what is left before RPB can use it
 
-Everything below is on `claude/optimistic-brahmagupta-18q0xn` in `lectual.app`, `lectual` and `lectual-plugin`. Nothing is on `main`,
-nothing is deployed, production is untouched.
+Merged to `main` in `lectual.app`, `lectual` and `lectual-plugin` on Nov 12, so the app code is deployed. The production database is
+untouched: 0106 is on lectual-dev only.
 
 ### Taylor
 
-- [ ] Open a preview of the branch and click through it at desktop and phone width. Nothing here has run in a real browser or against
+- [ ] Click through production at desktop and phone width (it is live now). Nothing here has run in a real browser or against
       real data: the new edit page, the three ways to start, the client page (choose, details, letter, sign, pay), the PDF download.
-- [ ] Say OK to apply migration 0106 to lectual-prod (it is on lectual-dev and checked there). The letter cannot be signed in
-      production until it is.
-- [ ] Decide when this merges to `main` (that is what deploys it).
+- [x] 0106 applied to lectual-prod (Nov 12, on Taylor's instruction). RPB's trademark letter is in Settings as a DRAFT (version 1),
+      taken from the Nov 9 letter with the client's details turned into fill-in fields.
+- [ ] Approve the letter: Settings, Client proposals, Engagement letter, Approve. Only a signed-in named approver can (Rebecca or
+      Taylor). Until then no proposal carries it.
+- [x] Merge to `main`. Done Nov 12: lectual.app#28, lectual#37 and lectual-plugin#4 merged, so the new editor and start screen are live
+      for RPB. Signing a letter stays off until 0106 is on lectual-prod.
 - [ ] The live database credentials in the cloud build environment: decide whether they should be there. An agent's test run reached
       lectual-dev twice by accident (nothing was written). Removing the Supabase variables from the environment's settings prevents it.
 - [ ] Decide: may the owner still delete a proposal that has a signed engagement letter? Today yes, and the signed record goes with it.

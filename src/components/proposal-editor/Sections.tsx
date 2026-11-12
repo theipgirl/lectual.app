@@ -135,6 +135,7 @@ export function FeesSection({
   customLabel,
   customHelp,
   includes,
+  packageIncludes = null,
 }: Editable & {
   issues: ShownIssue[];
   general?: boolean;
@@ -150,6 +151,8 @@ export function FeesSection({
   customLabel?: string;
   customHelp?: string;
   includes?: ProposalInclude[];
+  /** The offered packages' own rows (`editorPackageIncludes`): when given, these are the tables the client sees, and the single table is not offered. */
+  packageIncludes?: { package: string; includes: ProposalInclude[] }[] | null;
 }) {
   return (
     <Section id={sectionId.fees} title="Fees and payment" hint="Totals are always worked out from the package, never typed. Packages are edited in Settings → Proposals.">
@@ -207,12 +210,31 @@ export function FeesSection({
                   <span className="lx-note">{customHelp}</span>
                 </div>
               </div>
-              <div className="lx-label">What the package includes</div>
-              <p className="lx-note pe-hint">The table the client sees under the totals. The substantive office action response is never listed here; the strategy review is fine.</p>
-              <input type="hidden" name="incFields" value="1" />
-              <div id={fieldId.includes}>
-                <IncludesFields initial={includes ?? []} editable={editable} />
-              </div>
+              {packageIncludes && packageIncludes.length > 0 ? (
+                <>
+                  <div className="lx-label">{EDITOR_WORDS.packageIncludesHeading}</div>
+                  <p className="lx-note pe-hint">{EDITOR_WORDS.packageIncludesHint}</p>
+                  <input type="hidden" name="pkgIncFields" value="1" />
+                  <div id={fieldId.includes} className="pe-pkg-incs">
+                    {packageIncludes.map((p, n) => (
+                      <div key={p.package} className="pe-pkg-inc-table" role="group" aria-label={`${p.package}: what it includes`}>
+                        <div className="pe-pkg-inc-name">{p.package}</div>
+                        <input type="hidden" name={`pkgInc.${n}.package`} value={p.package} />
+                        <IncludesFields initial={p.includes} editable={editable} prefix={`pkgInc.${n}`} />
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="lx-label">What the package includes</div>
+                  <p className="lx-note pe-hint">The table the client sees under the totals. The substantive office action response is never listed here; the strategy review is fine.</p>
+                  <input type="hidden" name="incFields" value="1" />
+                  <div id={fieldId.includes}>
+                    <IncludesFields initial={includes ?? []} editable={editable} />
+                  </div>
+                </>
+              )}
             </div>
           </details>
         )}

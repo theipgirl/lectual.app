@@ -50,7 +50,7 @@ export async function runStaffDownload(deps: StaffDownloadDeps, proposalId: unkn
     if (facts.status !== "ok") return { ok: false, message: STAFF_DOWNLOAD_MESSAGES.unavailable };
     const built = await buildVerifiedSignedPdf({
       snapshot,
-      firm: { displayName: facts.displayName, timeZone: facts.timeZone },
+      firm: { displayName: facts.displayName, timeZone: facts.timeZone, logo: facts.logo ?? null },
       readStored: () => deps.readStored(proposal),
     });
     if (!built.ok) {

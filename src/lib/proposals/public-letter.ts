@@ -5,6 +5,7 @@ import { money } from "@/components/client-proposal/format";
 import { PDF_MESSAGES } from "@/lib/loe/client-words";
 import type { LetterPdfResult } from "@/lib/loe/pdf-result";
 import { buildExhibit } from "@/lib/loe/exhibit";
+import { letterLogoForSlug } from "@/lib/loe/letter-logo";
 import { buildLetterPdf } from "@/lib/loe/pdf";
 import { buildVerifiedSignedPdf } from "@/lib/loe/signed-pdf";
 import { reviewAddressLimiter, reviewTokenLimiter, signedAddressLimiter, signedTokenLimiter } from "@/lib/loe/review-limit";
@@ -90,6 +91,7 @@ export async function reviewLetterPdf(
       details,
       mode: "review",
       firmName: read.view.firm.displayName,
+      logo: letterLogoForSlug(read.view.firm.slug),
       title: loe.title,
     });
     return { ok: true, base64: Buffer.from(bytes).toString("base64"), filename: filenameFor(details.client_name, false) };
@@ -120,7 +122,7 @@ export async function signedLetterPdf(token: string, now: Date, opts: { db?: Pub
     const built = await buildVerifiedSignedPdf({
       snapshot: source.snapshot,
       // `readPublicProposal` answers `unavailable` for a letter proposal whose firm profile couldn't be read, so these are real.
-      firm: { displayName: read.view.firm.displayName, timeZone: read.view.firm.timeZone },
+      firm: { displayName: read.view.firm.displayName, timeZone: read.view.firm.timeZone, logo: letterLogoForSlug(read.view.firm.slug) },
       readStored: source.readStored,
     });
     if (!built.ok) {

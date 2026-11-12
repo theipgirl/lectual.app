@@ -45,10 +45,18 @@ export function cleanSigningDetails(raw: unknown): SignerDetails {
   return out;
 }
 
-/** Details the client must give before the letter can be built: their name and where to write to them. */
+/**
+ * What the client MUST give before the letter can be built and signed: their full legal name and a full mailing address (street, city,
+ * state, ZIP or postal code, country). Apartment or suite, business name and title are optional. This is the ONE rule: the page's
+ * form, its Continue / Sign buttons and the server's `checkSigning` all read this list.
+ */
+export const REQUIRED_DETAIL_KEYS = ["client_name", "street", "city", "region", "postal", "country"] as const satisfies ReadonlyArray<keyof SignerDetails>;
+
+/** The country the form starts with; the client can change it. */
+export const DEFAULT_COUNTRY = "United States";
+
 export function missingDetails(d: SignerDetails): Array<keyof SignerDetails> {
-  const need: Array<keyof SignerDetails> = ["client_name", "street", "city"];
-  return need.filter((k) => d[k].length === 0);
+  return REQUIRED_DETAIL_KEYS.filter((k) => d[k].length === 0);
 }
 
 export type SigningInput = {
@@ -133,7 +141,7 @@ export function letterValues(i: LetterInputs): LoeValues {
 export type Agreement = {
   blocks: LetterBlock[];
   exhibit: Exhibit;
-  /** The letter and the exhibit as plain text: what the signature row stores and the sha256 covers. */
+  /** The letter and the exhibit as plain text (words only, no styles): what the signature row stores and the sha256 covers. */
   text: string;
   /**
    * The canonical string that is hashed into the fingerprint the page sends and the server compares. It is built from the letter
@@ -162,9 +170,18 @@ export function assembleAgreement(input: { body: string; inputs: LetterInputs; e
       blocks: letter.blocks,
       exhibit: input.exhibit,
       text: agreementText(letter.blocks, input.exhibit),
-      canonical: agreementCanonical({ letter: undated.blocks, details: input.inputs.details, exhibit: input.exhibit }),
+      canonical: agreementCanonical({ letter: wordsOnly(undated.blocks), details: input.inputs.details, exhibit: input.exhibit }),
     },
   };
+}
+
+/**
+ * The blocks as words only: each paragraph's lead-in and text, never its drawing style (`letter-styles.ts`). The canonical form
+ * (and so the fingerprint the page and the server compare) covers what the letter SAYS; a letter with no style markers gives
+ * exactly the canonical form it gave before styles existed. `agreementText` reads only `lead` and `text` too.
+ */
+export function wordsOnly(blocks: readonly LetterBlock[]): Array<{ lead: string | null; text: string }> {
+  return blocks.map((b) => ({ lead: b.lead, text: b.text }));
 }
 
 /** What the PAGE holds while a client fills in the steps: raw typed values, exactly as the inputs hold them. */
@@ -219,7 +236,7 @@ export async function pageSigningPayload(state: PageSigningState & { agree: bool
   return { typedName, agree: state.agree, details, fingerprint: await fingerprintOf(agreement) };
 }
 
-/** Every paragraph in order (bold lead-in first), then Exhibit A. Deterministic. */
+/** Every paragraph in order (bold lead-in first), then Exhibit A. Words only: a paragraph's style is never part of it. Deterministic. */
 export function agreementText(blocks: readonly LetterBlock[], exhibit: Exhibit): string {
   const paras = blocks.map((b) => (b.lead ? `${b.lead} ${b.text}` : b.text));
   return `${paras.join("\n\n")}\n\n${exhibitLines(exhibit).join("\n")}`;

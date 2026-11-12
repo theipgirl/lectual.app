@@ -35,6 +35,14 @@ export const STEP_TEXT = {
   signedNotBuilt: "The signed letter couldn't be built, so nothing was filed.",
   signedMismatch: "The stored signed letter doesn't match its recorded fingerprint, so no copy was made or filed. Lectual has been told.",
   signedFirmUnreadable: "Couldn't read the firm's name and time zone, so the signed letter wasn't built or filed. Try again.",
+  addressNotConnected: "Lawmatics isn't connected, so the mailing address wasn't added there.",
+  addressConnectionUnreadable: "Couldn't check the Lawmatics connection, so the mailing address wasn't added.",
+  addressNoLetter: "There is no signed letter on this version, so there is no address to add.",
+  addressNoAddress: "The signed letter has no complete mailing address, so nothing was added.",
+  addressNoMatter: "No Lawmatics record was found for this client, so the mailing address wasn't added.",
+  addressManyMatters: "More than one Lawmatics record matches this client, so the mailing address wasn't added.",
+  addressTargetUnreadable: "Couldn't read the matter or lead, so the mailing address wasn't added.",
+  addressAlready: "The mailing address is already added to Lawmatics.",
   signedPaidSkipped: "Signed on the proposal page",
   eventNotRecorded: "The step ran, but its line on the timeline couldn't be saved.",
 } as const;
@@ -53,6 +61,12 @@ export const accessText = (did: "uploaded" | "written") =>
 export function notUploadedText(reason: string): string {
   const why = reason.trim().replace(/[.\s]+$/, "");
   return `Not uploaded to Lawmatics: ${why}. ${STEP_TEXT.unverifiedShape}`;
+}
+
+/** The same for the signer's mailing address (`address_to_lawmatics`). */
+export function notAddedText(reason: string): string {
+  const why = reason.trim().replace(/[.\s]+$/, "");
+  return `The mailing address was not added to Lawmatics: ${why}. ${STEP_TEXT.unverifiedShape}`;
 }
 
 /** The same for the LOE fields write (same unverified-shape caution). */

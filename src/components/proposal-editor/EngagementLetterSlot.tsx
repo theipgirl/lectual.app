@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { UnsavedMarker } from "./UnsavedGuard";
+import type { LetterLogo } from "@/lib/loe/letter-logo";
 import { LetterSwitch, PreviewBlock } from "./LetterSwitch";
 import { PLACEHOLDER_VALUES, type EditorLetterState } from "@/lib/loe/editor-state";
 import { renderLetter, type LetterBlock } from "@/lib/loe/render";
@@ -28,7 +29,7 @@ function previewOf(body: string): { blocks: LetterBlock[] | null; problems: stri
  * the switch off, an unreadable approved-letter read (says so, no switch), and a version that can no longer be edited.
  * `canWrite` false (viewer, social media) never gets the switch input.
  */
-export function EngagementLetterSlot({ state, editable }: { state: EditorLetterState; editable: boolean }) {
+export function EngagementLetterSlot({ state, editable, logo }: { state: EditorLetterState; editable: boolean; logo?: LetterLogo | null }) {
   return (
     <section className="lx-card pe-card" id="pe-sec-letter" aria-label={LETTER_SECTION_HEADING}>
       <header className="pe-card-head pe-card-head-row">
@@ -38,12 +39,12 @@ export function EngagementLetterSlot({ state, editable }: { state: EditorLetterS
         </div>
         <UnsavedMarker />
       </header>
-      <Body state={state} editable={editable} />
+      <Body state={state} editable={editable} logo={logo} />
     </section>
   );
 }
 
-function Body({ state, editable }: { state: EditorLetterState; editable: boolean }) {
+function Body({ state, editable, logo }: { state: EditorLetterState; editable: boolean; logo?: LetterLogo | null }) {
   switch (state.state) {
     case "none":
       return (
@@ -77,7 +78,7 @@ function Body({ state, editable }: { state: EditorLetterState; editable: boolean
                 <p className="pe-letter-version">
                   <span className="lx-pill lx-pill-ok">{letterAttachedLabel(state.version)}</span>
                 </p>
-                <PreviewBlock blocks={blocks} problems={problems} />
+                <PreviewBlock blocks={blocks} problems={problems} logo={logo} />
               </>
             ) : (
               <p className="lx-note">{LETTER_ABSENT_NOTE}</p>
@@ -98,6 +99,7 @@ function Body({ state, editable }: { state: EditorLetterState; editable: boolean
             newerAvailable={state.state === "on" && state.newerAvailable}
             blocks={blocks}
             problems={problems}
+            logo={logo}
           />
         </div>
       );

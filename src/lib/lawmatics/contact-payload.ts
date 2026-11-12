@@ -226,6 +226,49 @@ export function indexCustomFieldsByName(records: unknown[]): Map<string, string>
   return byName;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Addresses (proposal signing). NOT VERIFIED AGAINST A LIVE LAWMATICS ACCOUNT.
+//
+// Lawmatics stores an address as its own resource. The public API reference (read, never exercised) says
+// `POST /v1/addresses` creates one and attaches it to a matter, contact or company through a polymorphic owner:
+// `addressable_type` ("Prospect" for a matter, "Contact") and `addressable_id`, with flat attributes `label`,
+// `street`, `street2`, `city`, `state`, `zipcode` and `country`. If the live API disagrees, this function and
+// `LAWMATICS_ADDRESS_PATH` are the only things to change. Any non-2xx is "not added" on the proposal's timeline
+// (HTTP status only, never address text) and the step says the shape hasn't been checked.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** `POST {base}/addresses`. */
+export const LAWMATICS_ADDRESS_PATH = "/addresses";
+
+/** The label the signer's address carries in Lawmatics. */
+export const LAWMATICS_MAILING_LABEL = "Mailing";
+
+export type LawmaticsAddressInput = {
+  street: string;
+  street2?: string | null;
+  city: string;
+  /** State or region. */
+  region?: string | null;
+  /** ZIP or postal code. */
+  postal?: string | null;
+  country?: string | null;
+};
+
+/** The record an address belongs to: a matter is a `Prospect`, a person is a `Contact`. */
+export type LawmaticsAddressOwner = { type: "Prospect" | "Contact"; id: string };
+
+/** The flat request body for `POST /addresses`. Blank parts are left out rather than sent empty. */
+export function toAddressPayload(address: LawmaticsAddressInput, owner: LawmaticsAddressOwner): Record<string, string> {
+  const body: Record<string, string> = { label: LAWMATICS_MAILING_LABEL, street: address.street, city: address.city };
+  if (address.street2) body.street2 = address.street2;
+  if (address.region) body.state = address.region;
+  if (address.postal) body.zipcode = address.postal;
+  if (address.country) body.country = address.country;
+  body.addressable_type = owner.type;
+  body.addressable_id = owner.id;
+  return body;
+}
+
 /** Pulls an id out of whichever envelope shape comes back. */
 export function extractContactId(body: unknown): string | null {
   if (!body || typeof body !== "object") return null;

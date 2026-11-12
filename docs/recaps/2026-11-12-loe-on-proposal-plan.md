@@ -97,3 +97,15 @@ credentials; an agent's test run reached lectual-dev twice by accident and wrote
 
 `pge-workspace/` in the build container (contracts, handoffs, evaluations) was not committed and goes when the container does. The
 decisions that matter are in the AGENTS.md sections each sprint wrote.
+
+## Evening: letter details, layout and editor fixes (lectual.app#29)
+
+- 0106 applied to lectual-prod on Taylor's instruction; RPB's trademark letter saved there as a DRAFT (Sevetri's letter with her details turned into fields).
+- Signing now needs the full legal name and mailing address (street, city, state, ZIP, country). The address is written to the Lawmatics matter and contact
+  after signing (unverified against live Lawmatics) and shown on the lead and matter pages for staff.
+- RPB logo on the letter (page and PDF); footer "RPB Law Firm, PLLC"; the letter keeps the Word layout (centred address line with rule, bold underlined
+  Via Email, centred Re line, indented signature) through template-only styles that never change the signed text.
+- Editor: the per-package "what's included" tables now save; the link box stays in the side column; the side column fits the screen so the preview end is
+  reachable; Expand shows the preview full width.
+- Lawmatics pay form: a generic shared form link cannot be pre-filled from Lectual. Open decision in the master to-do.
+- Checks: 649 test files, 10,823 tests, lint and build clean. Not checked in a real browser or against live Lawmatics.

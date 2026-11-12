@@ -2,11 +2,13 @@ import "server-only";
 
 import { firmToken } from "@/lib/intake-forms/lawmatics-sync";
 import { readStoredAgreement, type StoredAgreementDb } from "@/lib/loe/stored-agreement";
+import { letterLogoForSlug, type LetterLogo } from "@/lib/loe/letter-logo";
 import { buildVerifiedSignedPdf, signedLetterFileName } from "@/lib/loe/signed-pdf";
 import { signedAtUtcIso } from "@/lib/loe/signing";
 import { resolveTimeZone } from "@/lib/org/profile-rules";
-import { addNote, uploadMatterFile, type FetchLike, type MultipartFetchLike } from "@/lib/lawmatics/writes";
+import { addNote, uploadMatterFile, type FetchLike, type GetFetchLike, type MultipartFetchLike } from "@/lib/lawmatics/writes";
 import { firmDisplayName } from "./commitment";
+import { runAddressToLawmatics } from "./address-to-lawmatics";
 import { SignedUploadBlocked, runSignedLoeUpload } from "./loe-signed-upload";
 import { logSignedMismatch } from "./signed-mismatch-log";
 import { isSignedSnapshot } from "./signed-state";
@@ -24,7 +26,8 @@ import { MARK_KIND_LABEL, isGeneralContent, type AcceptedSnapshot } from "./type
  *   1. an in-app notice (crm_notification, kind `approval_needed`) to the proposal's
  *      approvers and the firm's intake staff: a headline, nothing else;
  *   2. a Lawmatics NOTE on the right record, through the firm's OWN connection;
- *   3. (Sprint 6, a SIGNED acceptance only) the signed letter's PDF filed in the matter's Engagement folder.
+ *   3. (Sprint 6, a SIGNED acceptance only) the signed letter's PDF filed in the matter's Engagement folder;
+ *   4. (a SIGNED acceptance only) the signer's mailing address added to the Lawmatics matter and its contact (`address-to-lawmatics.ts`).
  *
  * Each step is independent, records its outcome on the proposal's timeline, and runs once
  * per accepted version (a version has its own id, so the dedupe is by proposal id). NOTHING
@@ -261,6 +264,8 @@ export type FollowupDeps = {
   fetchImpl?: FetchLike;
   /** The multipart request that files the signed letter (tests only; the default is `fetch`). */
   uploadFetch?: MultipartFetchLike;
+  /** The GET that reads which contact a matter belongs to, for the mailing address (tests only; the default is `fetch`). */
+  getFetch?: GetFetchLike;
 };
 
 const PROPOSAL_COLUMNS = "id, org_id, family_id, status, client_name, client_email, lead_id, matter_id, accepted_snapshot";
@@ -296,7 +301,7 @@ async function readEarlierSteps(db: FollowupDb, row: Row): Promise<StepEventInpu
       .select("proposal_id, created_at, payload")
       .eq("proposal_id", row.id)
       .eq("org_id", row.orgId)
-      .in("payload->>step", ["accept_notice", "lawmatics_note", "signed_loe_upload"])
+      .in("payload->>step", ["accept_notice", "lawmatics_note", "signed_loe_upload", "address_to_lawmatics"])
       .limit(50),
     db
       .from("client_proposal_event")
@@ -399,12 +404,12 @@ async function noteStep(db: FollowupDb, row: Row, deps: FollowupDeps): Promise<S
  * row has its own name and the standard zone (a real answer), but a FAILED read of the firm or of its profile is `unavailable`.
  * The signed letter is never built with a guessed zone or a missing firm name.
  */
-type FirmLetterFacts = { status: "ok"; displayName: string; timeZone: string } | { status: "unavailable" };
+type FirmLetterFacts = { status: "ok"; displayName: string; timeZone: string; logo: LetterLogo | null } | { status: "unavailable" };
 
 async function firmLetterFacts(db: FollowupDb, orgId: string): Promise<FirmLetterFacts> {
   try {
     const [org, profile] = await Promise.all([
-      db.from("crm_org").select("name").eq("id", orgId).maybeSingle(),
+      db.from("crm_org").select("name, slug").eq("id", orgId).maybeSingle(),
       db.from("crm_org_profile").select("display_name, time_zone").eq("org_id", orgId).maybeSingle(),
     ]);
     if (org.error || profile.error) return { status: "unavailable" };
@@ -415,9 +420,39 @@ async function firmLetterFacts(db: FollowupDb, orgId: string): Promise<FirmLette
       status: "ok",
       displayName: firmDisplayName(p && typeof p.display_name === "string" ? p.display_name : null, orgName),
       timeZone: resolveTimeZone(p && typeof p.time_zone === "string" ? p.time_zone : null),
+      logo: letterLogoForSlug(isObject(org.data) && typeof org.data.slug === "string" ? org.data.slug : null),
     };
   } catch {
     return { status: "unavailable" };
+  }
+}
+
+/**
+ * Writes the signer's mailing address (from the signed snapshot only) to the Lawmatics matter, and a copy to its contact when one can
+ * be read, through the firm's OWN connection. Signed (schema 2) snapshots only. NOT verified against a live Lawmatics.
+ */
+async function addressStep(db: FollowupDb, row: Row, deps: FollowupDeps): Promise<StepResult> {
+  try {
+    return await runAddressToLawmatics(row.snapshot, {
+      token: async () => {
+        try {
+          const t = await (deps.getToken ?? ((d, orgId) => firmToken(d as never, orgId)))(db, row.orgId);
+          return t ? { status: "ok", token: t } : { status: "not_connected" };
+        } catch {
+          return { status: "unavailable" };
+        }
+      },
+      target: async () => {
+        const target = await resolveNoteTarget(db, row);
+        if (target.ok) return { ok: true, lawmaticsId: target.notableId };
+        if (target.reason === "unreadable") return { ok: false, kind: "failed", reason: STEP_TEXT.addressTargetUnreadable };
+        return { ok: false, kind: "blocked", reason: target.reason === "none" ? STEP_TEXT.addressNoMatter : STEP_TEXT.addressManyMatters };
+      },
+      fetchImpl: deps.fetchImpl,
+      getFetchImpl: deps.getFetch,
+    });
+  } catch {
+    return { outcome: "failed", reason: "unexpected error" };
   }
 }
 
@@ -445,7 +480,7 @@ async function signedUploadStep(db: FollowupDb, row: Row, deps: FollowupDeps): P
       buildPdf: async () => {
         const built = await buildVerifiedSignedPdf({
           snapshot: row.snapshot,
-          firm: { displayName: facts.displayName, timeZone: facts.timeZone },
+          firm: { displayName: facts.displayName, timeZone: facts.timeZone, logo: facts.logo },
           // Only read when today's code no longer rebuilds the signed text; fenced on the proposal's own org.
           readStored: () => readStoredAgreement(db as unknown as StoredAgreementDb, { proposalId: row.id, orgId: row.orgId, signatureId: row.snapshot.agreement?.signature_id }),
         });
@@ -491,6 +526,8 @@ export async function runAcceptanceFollowups(db: FollowupDb, input: FollowupInpu
     await runStep(db, row, "lawmatics_note", earlier, () => noteStep(db, row, deps), true);
     // Sprint 6: a signed (schema 2) acceptance also files the signed letter. Earlier acceptances never run this step.
     if (isSignedSnapshot(row.snapshot)) await runStep(db, row, "signed_loe_upload", earlier, () => signedUploadStep(db, row, deps), true);
+    // The signer's mailing address goes to the same Lawmatics matter. Independent of the steps above: none waits on it or is changed by it.
+    if (isSignedSnapshot(row.snapshot)) await runStep(db, row, "address_to_lawmatics", earlier, () => addressStep(db, row, deps), true);
   } catch {
     console.error("[proposals] the acceptance follow-ups stopped early");
   }

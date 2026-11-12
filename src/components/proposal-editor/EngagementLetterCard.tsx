@@ -5,7 +5,7 @@ import { downloadSignedLetterStaffAction } from "@/app/dashboard/proposals/[id]/
 import { retryUploadAction } from "@/app/dashboard/proposals/[id]/paid-actions";
 import { saveBase64Pdf } from "@/components/client-proposal/download-pdf";
 import type { SignedCardView } from "@/lib/loe/signed-card";
-import { SIGNED_CARD_HEADING, SIGNED_DOWNLOAD, SIGNED_DOWNLOADING, SIGNED_FILING_HEADING, SIGNED_FINGERPRINT_LABEL, SIGNED_FROM_STORED_TEXT, SIGNED_TRY_AGAIN } from "@/lib/ui/words";
+import { SIGNED_CARD_HEADING, SIGNED_DOWNLOAD, SIGNED_DOWNLOADING, SIGNED_ADDRESS_HEADING, SIGNED_FILING_HEADING, SIGNED_FINGERPRINT_LABEL, SIGNED_FROM_STORED_TEXT, SIGNED_TRY_AGAIN } from "@/lib/ui/words";
 import { ActionForm, Outcome } from "./ActionForm";
 
 /**
@@ -75,16 +75,37 @@ function SignedBody({ proposalId, view }: { proposalId: string; view: Extract<Si
           </ActionForm>
         ) : null}
       </div>
+      <div className="pe-signed-filing pe-signed-address" data-address={view.address.state}>
+        <span className="lx-label">{SIGNED_ADDRESS_HEADING}</span>
+        <span className="pe-signed-actions">
+          <span className={`lx-pill lx-pill-${view.address.tone}`}>{filingPill(view.address.state, "Added", "Not added")}</span>
+          <span className="pe-step-text">{view.address.text}</span>
+        </span>
+        {view.address.retry ? (
+          <ActionForm action={retryUploadAction} className="pe-signed-actions">
+            {({ state, pending }) => (
+              <>
+                <input type="hidden" name="proposalId" value={proposalId} />
+                <input type="hidden" name="step" value="address_to_lawmatics" />
+                <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending}>
+                  {pending ? "Trying…" : SIGNED_TRY_AGAIN}
+                </button>
+                <Outcome state={state} pending={pending} />
+              </>
+            )}
+          </ActionForm>
+        ) : null}
+      </div>
     </>
   );
 }
 
-function filingPill(state: Extract<SignedCardView, { kind: "signed" }>["filing"]["state"]): string {
+function filingPill(state: Extract<SignedCardView, { kind: "signed" }>["filing"]["state"], done = "Filed", failed = "Not filed"): string {
   switch (state) {
     case "done":
-      return "Filed";
+      return done;
     case "failed":
-      return "Not filed";
+      return failed;
     case "blocked":
       return "Needs a look";
     case "skipped":

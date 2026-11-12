@@ -11,7 +11,7 @@
 import { formatShortFirmDate } from "@/lib/quotes/labels";
 import { CHOOSE_LOE_TEMPLATE } from "./loe-adapter";
 import { paidStateFromEvents, stepStates, STEP_SUCCESS, type PaidState, type ProposalStep, type RetryableStep, type StepEventInput, type StepState } from "./paid";
-import { MARK_PAID_WORDS, notUploadedText, notWrittenText, STEP_TEXT } from "./step-text";
+import { MARK_PAID_WORDS, notAddedText, notUploadedText, notWrittenText, STEP_TEXT } from "./step-text";
 
 export type Tone = "ok" | "warn" | "risk" | "mute";
 
@@ -48,6 +48,7 @@ export const STEP_LABEL: Record<ProposalStep, string> = {
   loe_file_upload: "Engagement letter file",
   custom_fields: "LOE fields",
   signed_loe_upload: "Signed engagement letter",
+  address_to_lawmatics: "Mailing address",
 };
 
 const SUCCESS_TEXT: Partial<Record<ProposalStep, string>> = {
@@ -58,18 +59,21 @@ const SUCCESS_TEXT: Partial<Record<ProposalStep, string>> = {
   loe_file_upload: "LOE file uploaded to Lawmatics.",
   custom_fields: "LOE fields written to Lawmatics.",
   signed_loe_upload: "Signed engagement letter filed in Lawmatics.",
+  address_to_lawmatics: "Mailing address added to Lawmatics.",
 };
 
 /** One step's outcome as the sentence the page prints. */
 export function stepText(state: Pick<StepState, "step" | "outcome" | "reason">): string {
   const { step, outcome, reason } = state;
-  if (outcome === STEP_SUCCESS[step]) return [SUCCESS_TEXT[step], step === "custom_fields" ? reason : null].filter(Boolean).join(" ");
+  if (outcome === STEP_SUCCESS[step]) return [SUCCESS_TEXT[step], step === "custom_fields" || step === "address_to_lawmatics" ? reason : null].filter(Boolean).join(" ");
   switch (step) {
     case "accepted_file_upload":
     case "loe_file_upload":
     case "signed_loe_upload":
       // A request that went out and was refused carries the unverified-shape caution; "not connected" and "not linked" do not.
       return outcome === "failed" ? notUploadedText(reason ?? "the request failed") : (reason ?? "Not uploaded to Lawmatics.");
+    case "address_to_lawmatics":
+      return outcome === "failed" ? notAddedText(reason ?? "the request failed") : (reason ?? "The mailing address was not added to Lawmatics.");
     case "custom_fields":
       return outcome === "failed" ? notWrittenText(reason ?? "the request failed") : (reason ?? "Not written to Lawmatics.");
     case "lawmatics_note":

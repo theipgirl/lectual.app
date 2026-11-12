@@ -17,6 +17,7 @@ import { lawmaticsMatterAccess, resolveProposalMatter, signedInLawmaticsToken } 
 import { loeInputFromAcceptedProposal, loeFieldValues, LOE_REFUSAL_TEXT, type LoeAdapterResult } from "./loe-adapter";
 import { fieldWrites, readLoeFieldsConfig, type LoeFieldsConfig } from "./loe-fields";
 import { retryLoeFileUpload } from "./loe-upload";
+import { runAddressToLawmatics } from "./address-to-lawmatics";
 import { SignedUploadBlocked, runSignedLoeUpload } from "./loe-signed-upload";
 import { logSignedMismatch } from "./signed-mismatch-log";
 import { isSignedSnapshot } from "./signed-state";
@@ -251,6 +252,26 @@ async function noteStep(supabase: ScopedClient, proposal: ProposalRow, events: P
   return report(proposal, "lawmatics_note", result.outcome, result.reason ?? null);
 }
 
+/** Adds the signer's mailing address to Lawmatics again (Try again on the proposal page). Signed-in person, the firm's own active connection. */
+async function addressRetryStep(supabase: ScopedClient, proposal: ProposalRow, events: ProposalStepEvent[]): Promise<FlowReport | { note: string } | null> {
+  if (stepSucceeded(events, proposal.id, "address_to_lawmatics")) return { note: STEP_TEXT.addressAlready };
+  const result = await runAddressToLawmatics(proposal.accepted_snapshot, {
+    token: signedInLawmaticsToken,
+    target: async () => {
+      const target = await resolveNoteTarget(supabase as unknown as LookupDb, {
+        orgId: proposal.org_id,
+        matterId: proposal.matter_id,
+        leadId: proposal.lead_id,
+        clientEmail: proposal.client_email,
+      });
+      if (target.ok) return { ok: true, lawmaticsId: target.notableId };
+      if (target.reason === "unreadable") return { ok: false, kind: "failed", reason: STEP_TEXT.addressTargetUnreadable };
+      return { ok: false, kind: "blocked", reason: target.reason === "none" ? STEP_TEXT.addressNoMatter : STEP_TEXT.addressManyMatters };
+    },
+  });
+  return report(proposal, "address_to_lawmatics", result.outcome, result.reason ?? null);
+}
+
 /** Files the signed letter again (Try again on the proposal page). Signed-in person, the firm's own active connection. */
 async function signedUploadRetryStep(supabase: ScopedClient, proposal: ProposalRow, events: ProposalStepEvent[]): Promise<FlowReport | { note: string } | null> {
   if (stepSucceeded(events, proposal.id, "signed_loe_upload")) return { note: STEP_TEXT.signedAlready };
@@ -274,7 +295,7 @@ async function signedUploadRetryStep(supabase: ScopedClient, proposal: ProposalR
     buildPdf: async () => {
       const built = await buildVerifiedSignedPdf({
         snapshot,
-        firm: { displayName: facts.displayName, timeZone: facts.timeZone },
+        firm: { displayName: facts.displayName, timeZone: facts.timeZone, logo: facts.logo ?? null },
         readStored: () => readStoredAgreement(supabase as unknown as StoredAgreementDb, { proposalId: proposal.id, orgId: proposal.org_id, signatureId: snapshot!.agreement?.signature_id }),
       });
       if (!built.ok) {
@@ -356,7 +377,7 @@ export async function retryProposalStep(id: string, step: RetryableStep): Promis
   if (!loaded.ok) return loaded;
   const { proposal, events } = loaded;
   // The signed letter is filed when the client signs, before any payment, so its retry does not need the paid mark.
-  if (step !== "signed_loe_upload" && paidStateFromEvents(events).state !== "paid") return { ok: false, error: "Mark the proposal paid first." };
+  if (step !== "signed_loe_upload" && step !== "address_to_lawmatics" && paidStateFromEvents(events).state !== "paid") return { ok: false, error: "Mark the proposal paid first." };
 
   const supabase = await getScopedClient();
   const run = async (): Promise<FlowReport | { note: string } | null> => {
@@ -371,6 +392,8 @@ export async function retryProposalStep(id: string, step: RetryableStep): Promis
         return noteStep(supabase, proposal, events);
       case "signed_loe_upload":
         return signedUploadRetryStep(supabase, proposal, events);
+      case "address_to_lawmatics":
+        return addressRetryStep(supabase, proposal, events);
       case "loe_file_upload": {
         if (stepSucceeded(events, proposal.id, "loe_file_upload")) return { note: "The engagement letter is already uploaded to Lawmatics." };
         const r = await retryLoeFileUpload(proposal);

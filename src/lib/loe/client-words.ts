@@ -30,7 +30,7 @@ export const PAY_LABEL = "Pay my legal fee";
 export const BACK_LABEL = "Back";
 
 export const DETAILS_HEADING = "Your details";
-export const DETAILS_INTRO = "These go on your engagement letter. Please give your full legal name and the address where the firm can write to you.";
+export const DETAILS_INTRO = "These go on your engagement letter. Please give your full legal name and your full mailing address. Fields marked * are required.";
 export const LETTER_HEADING = "Your engagement letter";
 /** The letter is dated by the server at the moment of signing (the firm's calendar date), so the intro says so rather than "today's date". */
 export const LETTER_INTRO = "Please read the whole letter and the exhibit that follows it. Your details are filled in, and the letter is dated the day you sign it.";
@@ -64,7 +64,7 @@ export const ATTORNEY_FOOTER_LETTER_LINE: string | null = null;
 
 /** Fixed refusals the sign step shows (never raw error text). */
 export const SIGN_MESSAGES = {
-  details_required: "Please fill in your full legal name and your address before continuing.",
+  details_required: "Please fill in your full legal name and your full mailing address: street, city, state, ZIP code and country.",
   name_required: "Please type your full legal name to sign.",
   agree_required: "Please tick the box to confirm you have read and agree to the letter.",
   // Only ever shown when the proposal itself changed after this page was opened (the date and how a name is spaced never cause it).
@@ -79,6 +79,6 @@ export const PDF_MESSAGES = {
   unavailable: "We couldn't prepare the PDF just now. Please try again.",
   not_open: "This proposal is no longer open.",
   limit: "Too many downloads just now. Please wait a few minutes and try again.",
-  details: "Please fill in your full legal name and your address first.",
+  details: "Please fill in your full legal name and your full mailing address first: street, city, state, ZIP code and country.",
   not_signed: "There is no signed letter to download.",
 } as const;

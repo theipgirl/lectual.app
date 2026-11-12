@@ -16,10 +16,19 @@ import { sevetri } from "../proposals/fixture";
 import { danielle } from "../proposals/danielle-fixture";
 import { TEST_DETAILS, fullLetterBlocks, fullLetterBody, paragraphText } from "../loe/full-letter-fixture";
 import { generalWithLoe, twoBrandPerMark, withLoe } from "../loe/loe-fixtures";
+import { hasStyle, splitFirstLine } from "@/lib/loe/letter-styles";
+import type { LetterBlock } from "@/lib/loe/render";
 
 /** React's text escaping, so a paragraph can be looked for in the markup. */
 function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
+}
+
+/** A paragraph's text as the page draws it: a `bold-underline-first-line` paragraph wraps its first line in a span. */
+function drawnText(b: LetterBlock): string {
+  if (!hasStyle(b, "bold-underline-first-line")) return esc(b.text);
+  const { first, rest } = splitFirstLine(b.text);
+  return `<span class="loe-s-first-line">${esc(first)}</span>${esc(rest)}`;
 }
 
 const LETTER = { dateText: "November 12, 2026", clientEmail: "sevetri@example.com" };
@@ -148,15 +157,15 @@ describe("step 3: the engagement letter", () => {
         expect(li, `lead-in ${b.lead}`).toBeGreaterThan(-1);
         at = li;
       }
-      const ti = html.indexOf(esc(b.text), at);
+      const ti = html.indexOf(drawnText(b), at);
       expect(ti, paragraphText(b).slice(0, 50)).toBeGreaterThan(-1);
       at = ti;
     }
     const exhibit = html.indexOf("Exhibit A: Fee Structure and Estimated Costs", at);
     expect(exhibit).toBeGreaterThan(at);
     // Nothing is collapsed or summarised: the first and the last paragraph.
-    expect(html).toContain(esc(blocks[0].text));
-    expect(html).toContain(esc(blocks[blocks.length - 1].text));
+    expect(html).toContain(drawnText(blocks[0]));
+    expect(html).toContain(drawnText(blocks[blocks.length - 1]));
     expect(html).toContain("Dear Sevetri Wilson:");
     expect(html).toContain("100 Example Street");
     expect(html).toContain("November 12, 2026");
@@ -249,7 +258,7 @@ describe("the receipt after signing", () => {
     expect(count(html, 'class="cp-side"')).toBe(1);
     expect(html).toContain("Legal fee due now");
     // The letter as signed, in full, from the snapshot.
-    for (const b of r.signed.blocks) expect(html).toContain(esc(b.text));
+    for (const b of r.signed.blocks) expect(html).toContain(drawnText(b));
     expect(html).toContain("Exhibit A: Fee Structure and Estimated Costs");
     // No print view, no old sentence.
     expect(html).not.toMatch(/print/i);

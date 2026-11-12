@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderLetter, type LetterBlock } from "@/lib/loe/render";
 import type { SignerDetails } from "@/lib/loe/signing";
-import { emptyDetails } from "@/lib/loe/signing";
+import { addressBlock, emptyDetails } from "@/lib/loe/signing";
 
 /**
  * The full-length RPB trademark letter (about 2,300 words) from `docs/rpb/engagement-letter-trademark.md`: everything under
@@ -25,6 +25,7 @@ export const TEST_DETAILS: SignerDetails = {
   city: "Miami",
   region: "FL",
   postal: "33101",
+  country: "United States",
 };
 
 export function fullLetterBlocks(over: { details?: SignerDetails; typedName?: string; dateText?: string } = {}): LetterBlock[] {
@@ -33,7 +34,7 @@ export function fullLetterBlocks(over: { details?: SignerDetails; typedName?: st
     date: over.dateText ?? "November 12, 2026",
     client_name: d.client_name,
     entity_name: d.entity_name || d.client_name,
-    address_block: [d.street, d.street2, `${d.city}, ${d.region} ${d.postal}`].filter(Boolean).join("\n"),
+    address_block: addressBlock(d),
     client_email: "sevetri@example.com",
     signer_name: over.typedName ?? d.client_name,
     signed_date: over.dateText ?? "November 12, 2026",

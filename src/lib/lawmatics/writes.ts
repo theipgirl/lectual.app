@@ -1,7 +1,12 @@
 import "server-only";
 
+import { field, idOf, relatedId, type Raw } from "./jsonapi";
 import {
   extractContactId,
+  toAddressPayload,
+  LAWMATICS_ADDRESS_PATH,
+  type LawmaticsAddressInput,
+  type LawmaticsAddressOwner,
   prospectPath,
   toContactPayload,
   toProspectUpdatePayload,
@@ -126,6 +131,51 @@ export async function addNote(
     true,
   );
   return r.ok ? { ok: true } : r;
+}
+
+/**
+ * `POST /addresses`: the signer's mailing address on a matter or a contact (`toAddressPayload` in contact-payload.ts holds the
+ * shape). NOT verified against a live account. Logs the status only: an error body can echo the address.
+ */
+export async function createAddress(
+  token: string,
+  address: LawmaticsAddressInput,
+  owner: LawmaticsAddressOwner,
+  fetchImpl: FetchLike = defaultFetch,
+): Promise<LawmaticsWriteResult> {
+  const r = await send(token, "POST", LAWMATICS_ADDRESS_PATH, toAddressPayload(address, owner), fetchImpl, true);
+  return r.ok ? { ok: true } : r;
+}
+
+export type GetFetchLike = (url: string, init: { method: "GET"; headers: Record<string, string> }) => Promise<{
+  ok: boolean;
+  status: number;
+  json(): Promise<unknown>;
+}>;
+
+const defaultGet: GetFetchLike = (url, init) => fetch(url, init);
+
+/**
+ * `GET /prospects/:id`, reading only which Contact the matter belongs to (a to-one relationship, or a `contact_id` attribute).
+ * `contactId` is null when the response names none, or names a different record than the one asked for (Lawmatics ignores
+ * parameters silently, so the answer is checked, never trusted). Never throws; a failed read is `{ ok: false }`.
+ */
+export async function readProspectContactId(
+  token: string,
+  prospectId: string,
+  fetchImpl: GetFetchLike = defaultGet,
+): Promise<{ ok: true; contactId: string | null } | { ok: false; status?: number }> {
+  try {
+    const res = await fetchImpl(`${LAWMATICS_DEFAULT_BASE}${prospectPath(prospectId)}`, { method: "GET", headers: { Authorization: `Bearer ${token}`, Accept: LAWMATICS_HEADERS.Accept } });
+    if (!res.ok) return { ok: false, status: res.status };
+    const payload = (await res.json().catch(() => null)) as unknown;
+    const root = payload && typeof payload === "object" && !Array.isArray(payload) ? (payload as Raw) : null;
+    const rec = root && root.data && typeof root.data === "object" && !Array.isArray(root.data) ? (root.data as Raw) : root;
+    if (!rec || idOf(rec) !== prospectId) return { ok: true, contactId: null };
+    return { ok: true, contactId: relatedId(rec, "contact") ?? relatedId(rec, "client") ?? field(rec, "contact_id") };
+  } catch {
+    return { ok: false };
+  }
 }
 
 /** `PUT /prospects/:id` with `custom_fields: [{id, value}]` and nothing else: no stage, no tags. */

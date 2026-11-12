@@ -52,7 +52,7 @@ describe("a signed acceptance (content with an engagement letter)", () => {
     expect(call.args.p_org_id).toBe("org-1");
     expect(call.args.p_signer_name).toBe("Sevetri Wilson");
     expect(call.args.p_entity_name).toBe("Prosperall Inc.");
-    expect(call.args.p_address).toEqual({ street: "100 Example Street", street2: "Suite 4", city: "Miami", region: "FL", postal: "33101" });
+    expect(call.args.p_address).toEqual({ street: "100 Example Street", street2: "Suite 4", city: "Miami", region: "FL", postal: "33101", country: "United States" });
     expect(call.args.p_ip).toBe("203.0.113.7");
     expect(String(call.args.p_user_agent)).toHaveLength(400);
     const snapshot = call.args.p_snapshot as { schema: number; agreement: { signer_name: string }; signing: { date_text: string } };

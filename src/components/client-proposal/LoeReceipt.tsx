@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { LETTER_HEADING, PDF_MESSAGES, READ_AGAIN_LABEL, SIGNED_VIEW_UNAVAILABLE } from "@/lib/loe/client-words";
+import type { LetterLogo } from "@/lib/loe/letter-logo";
 import type { LetterPdfResult } from "@/lib/loe/pdf-result";
 import { LoeLetterPanel, type LetterView } from "./LoeLetterPanel";
 import { saveBase64Pdf } from "./download-pdf";
@@ -14,13 +15,13 @@ import { saveBase64Pdf } from "./download-pdf";
  * the just-signed page the page's own hash check). When it couldn't be, it is null and the fixed sentence is shown: never
  * unverified text under a "signed" label.
  */
-export function LoeSignedLetter({ agreement, title }: { agreement: LetterView | null; title: string }) {
+export function LoeSignedLetter({ agreement, title, logo }: { agreement: LetterView | null; title: string; logo?: LetterLogo | null }) {
   return (
     <section className="cp-signed-letter" aria-labelledby="cp-again-h">
       <details>
         <summary id="cp-again-h">{READ_AGAIN_LABEL}</summary>
         {agreement ? (
-          <LoeLetterPanel agreement={agreement} title={title || LETTER_HEADING} id="cp-letter-signed" />
+          <LoeLetterPanel agreement={agreement} title={title || LETTER_HEADING} id="cp-letter-signed" logo={logo} />
         ) : (
           <p className="cp-warn" role="status" data-signed-unavailable>
             {SIGNED_VIEW_UNAVAILABLE}

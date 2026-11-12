@@ -7,11 +7,12 @@ const nextConfig: NextConfig = {
   trailingSlash: true,
   // The engagement letter's PDF builder reads its bundled font (DejaVu Sans) with fs from the project root. Next's file tracing
   // cannot see a path built at run time, so the font files are listed for the route whose server actions build the PDF
-  // (the client proposal page); without this the serverless function ships without them and the PDF fails.
+  // (the client proposal page); without this the serverless function ships without them and the PDF fails. The same goes for the
+  // firm's letter logo (`public/brand/rpb-logo-oxblood.png`, read with fs by `loadLogoBytes`): list it wherever the fonts are.
   outputFileTracingIncludes: {
-    "/p/*": ["./src/lib/loe/fonts/**"],
+    "/p/*": ["./src/lib/loe/fonts/**", "./public/brand/rpb-logo-oxblood.png"],
     // Sprint 6: the staff Download and "Try again" (filing the signed letter) build the same PDF from the proposal page's actions.
-    "/dashboard/proposals/*": ["./src/lib/loe/fonts/**"],
+    "/dashboard/proposals/*": ["./src/lib/loe/fonts/**", "./public/brand/rpb-logo-oxblood.png"],
   },
   experimental: {
     // The stage reconciliation screen posts an intake sheet (up to 5 MB, see
