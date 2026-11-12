@@ -565,7 +565,7 @@ export const WELCOME_CARD_1_BODY =
   "Each card says who drafted it, who it is to, and the opening of the draft. Nothing on a card has been sent.";
 export const WELCOME_CARD_1_STEP = "when a card has a line at the bottom, it says what to check first.";
 export const WELCOME_CARD_2_TITLE = "The moves";
-export const WELCOME_CARD_2_BODY = `Yes approves after a 5-second hold you can undo. Some cards show "${DECK_OPEN_TO_REVIEW}" or "${DECK_MARK_READ}" instead. ${DECK_APPROVING_NEVER_SENDS} A client email becomes a draft in your firm's or your own mailbox, when one is connected. Nothing goes out until someone presses Send there. Reject needs a note. Later puts a card in your next deal. Hand off puts it in a colleague's deck. The arrows move to the previous or next card.`;
+export const WELCOME_CARD_2_BODY = `Yes approves after a 5-second hold you can undo. ${DECK_APPROVING_NEVER_SENDS} A client email becomes a draft in your firm's or your own mailbox, when one is connected. Nothing goes out until someone presses Send there. Reject needs a note. Later waits for your next deal; Hand off goes to a colleague. The arrows move between cards.`;
 export const WELCOME_CARD_2_STEP = "try the arrows. They only move between cards, and nothing is stored.";
 export const WELCOME_CARD_3_TITLE = "Two deals a day";
 export const welcomeCard3Body = (first: string, second: string) =>
