@@ -67,11 +67,20 @@ function text(value: unknown): string {
 /* ─────────────────────────── the words ─────────────────────────────────── */
 
 /** "<client> accepted <package> · legal $4,950". Legal fee only: the USPTO fee is not part of a headline. */
-export function acceptanceHeadline(input: { clientName: string; packageName: string; legalTotalCents: number; addedClasses?: number }): string {
+export function acceptanceHeadline(input: { clientName: string; packageName: string; legalTotalCents: number; addedClasses?: number; signedBy?: string }): string {
   const client = text(input.clientName) || "A client";
   const pkg = text(input.packageName);
   const added = input.addedClasses && input.addedClasses > 0 ? ` · ${input.addedClasses} ${input.addedClasses === 1 ? "class" : "classes"} added by the client` : "";
-  return `${client} accepted ${pkg ? `${pkg} ` : "their proposal "}· legal ${formatDollars(input.legalTotalCents)}${added}`;
+  // An engagement letter was signed (lectual 0106): the notice says only THAT it was signed and by whom, never the letter or what the client typed beyond the name.
+  const signed = text(input.signedBy) ? ` · engagement letter signed by ${text(input.signedBy)}` : "";
+  return `${client} accepted ${pkg ? `${pkg} ` : "their proposal "}· legal ${formatDollars(input.legalTotalCents)}${added}${signed}`;
+}
+
+/** "Engagement letter signed by Alex Sample on 2026-11-12T19:14:00.000Z." for a schema-2 snapshot, else null. Nothing of the letter itself. */
+export function signedNoteLine(snapshot: AcceptedSnapshot): string | null {
+  const agreement = snapshot.agreement;
+  if (!agreement || !text(agreement.signer_name)) return null;
+  return `Engagement letter signed by ${text(agreement.signer_name)} on ${text(agreement.signed_at) || snapshot.accepted_at}.`;
 }
 
 /**
@@ -106,6 +115,8 @@ export function acceptanceNoteBody(snapshot: AcceptedSnapshot, clientName: strin
   if (addedIds.size > 0) lines.push(`Classes added by the client: ${addedIds.size} (priced into the totals below)`);
   lines.push(`Legal fee, due when accepted: ${formatDollars(quote.legal_total_cents)}`);
   lines.push(`USPTO fees, due at filing: ${formatDollars(quote.gov_total_cents)} (separate; not part of the legal fee)`);
+  const signedLine = signedNoteLine(snapshot);
+  if (signedLine) lines.push(signedLine);
   return { name: `Proposal accepted: ${pkg}`.slice(0, 120), body: lines.join("\n") };
 }
 
@@ -128,6 +139,8 @@ function generalAcceptanceNoteBody(snapshot: AcceptedSnapshot, clientName: strin
     lines.push(`Adjustment: ${text(a.label) || "Adjustment"} −${formatDollars(a.discount_cents)}`);
   }
   lines.push(`Legal fee, due when accepted: ${formatDollars(quote.legal_total_cents)}`);
+  const signedLine = signedNoteLine(snapshot);
+  if (signedLine) lines.push(signedLine);
   return { name: `Proposal accepted: ${title}`.slice(0, 120), body: lines.join("\n") };
 }
 
@@ -337,6 +350,7 @@ async function noticeStep(db: FollowupDb, row: Row): Promise<StepResult> {
         : chosenPackagesText(row.snapshot.quote.names) || (row.snapshot.content.pricing?.package ?? ""),
       legalTotalCents: row.snapshot.quote.legal_total_cents,
       addedClasses: addedClassCount(row.snapshot.content, row.snapshot.selection),
+      signedBy: row.snapshot.agreement?.signer_name,
     });
     const { error } = await db.from("crm_notification").insert(
       recipients.map((userId) => ({

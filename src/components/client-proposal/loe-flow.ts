@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { money } from "./format";
 import { buildExhibit } from "@/lib/loe/exhibit";
 import {
@@ -87,26 +87,16 @@ export function useLoeFlow(input: LoeFlowInput) {
     return r.ok ? r.agreement : null;
   }, [enabled, body, cleaned, dateText, clientEmail, exhibit]);
 
-  // The fingerprint is hashed with Web Crypto (async), keyed by the canonical string it was computed for, so a stale hash is
-  // never sent after the client types one more letter.
-  const [hashed, setHashed] = useState<{ canonical: string; fingerprint: string } | null>(null);
-  useEffect(() => {
-    if (!agreement) return;
-    let live = true;
-    void fingerprintOf(agreement).then((fingerprint) => {
-      if (live) setHashed({ canonical: agreement.canonical, fingerprint });
-    });
-    return () => {
-      live = false;
-    };
-  }, [agreement]);
-  const fingerprint = agreement && hashed && hashed.canonical === agreement.canonical ? hashed.fingerprint : null;
+  /** Whether the page can sign: the letter merged and the name and tick given (the same rule the server applies). */
+  const signable = enabled && agreement !== null && canSign({ typedName, agree, details: cleaned });
 
-  const signable = enabled && agreement !== null && fingerprint !== null && canSign({ typedName, agree, details: cleaned });
-
-  /** What the sign action posts. Null until the page can sign. */
-  function signingPayload(): SigningInput | null {
-    if (!signable || !fingerprint) return null;
+  /**
+   * What the sign action posts. The fingerprint is hashed with Web Crypto (async) at the moment of signing, over exactly the
+   * letter, details and exhibit the page is showing. Null while the page cannot sign.
+   */
+  async function signingPayload(): Promise<SigningInput | null> {
+    if (!signable || !agreement) return null;
+    const fingerprint = await fingerprintOf(agreement);
     return { typedName: typedName.trim(), agree, details: cleaned, fingerprint };
   }
 
@@ -125,7 +115,6 @@ export function useLoeFlow(input: LoeFlowInput) {
     agreement,
     preview,
     exhibit,
-    fingerprint,
     signable,
     signingPayload,
   };

@@ -72,8 +72,7 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
 
   async function accept() {
     if (mode !== "live" || !onAccept || pending || done || !canAccept) return;
-    const signing: SigningInput | null = loeOn ? loeFlow.signingPayload() : null;
-    if (loeOn && !signing) return;
+    if (loeOn && !loeFlow.signable) return;
     setError(null);
     setPending(true);
     // Opened inside the click so the popup blocker allows it; pointed at the payment page once the server has recorded the acceptance.
@@ -85,6 +84,13 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
       tab = null;
     }
     try {
+      // The fingerprint is hashed now (async), after the tab is open, over what is on screen.
+      const signing: SigningInput | null = loeOn ? await loeFlow.signingPayload() : null;
+      if (loeOn && !signing) {
+        tab?.close();
+        setError(SIGN_MESSAGES.generic);
+        return;
+      }
       // Nothing to tick on a flat-fee proposal: an empty selection and nothing written by the client.
       const result = signing ? await onAccept({}, { entries: {}, added: {} }, signing) : await onAccept({}, { entries: {}, added: {} });
       if (!result.ok) {
@@ -372,13 +378,13 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
         </div>
       </main>
 
-      {accepted ? null : (
+      {accepted && !loeOn ? null : (
         <div className="cp-bar">
           <div className="cp-bar-in">
             <span>
               Flat fee due now <b className="cp-num">{money(quote.legal_total_cents)}</b>
             </span>
-            <a href="#cp-review">Review and accept</a>
+            <a href="#cp-review">{accepted ? "Your receipt" : "Review and accept"}</a>
           </div>
         </div>
       )}

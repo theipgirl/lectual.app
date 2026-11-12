@@ -449,9 +449,8 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
 
   async function accept() {
     if (mode !== "live" || !onAccept || pending || done || !canAccept) return;
-    // Engagement letter: the click is a signing, and only when the typed name and the tick are given and the fingerprint is ready.
-    const signing = loeOn ? loeFlow.signingPayload() : null;
-    if (loeOn && !signing) return;
+    // Engagement letter: the click is a signing, and only when the typed name and the tick are given.
+    if (loeOn && !loeFlow.signable) return;
     setError(null);
     setPending(true);
     // Open the tab NOW, inside the click, or the browser's popup blocker treats
@@ -465,6 +464,13 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
       tab = null;
     }
     try {
+      // The fingerprint is hashed now (async), after the tab is open, over what is on screen.
+      const signing: SigningInput | null = loeOn ? await loeFlow.signingPayload() : null;
+      if (loeOn && !signing) {
+        tab?.close();
+        setError(SIGN_MESSAGES.generic);
+        return;
+      }
       const result = signing ? await onAccept(selection, { entries, added }, signing) : await onAccept(selection, { entries, added });
       if (!result.ok) {
         tab?.close();
@@ -1256,13 +1262,13 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
         </div>
       </main>
 
-      {accepted ? null : (
+      {accepted && !loeOn ? null : (
         <div className="cp-bar">
           <div className="cp-bar-in">
             <span>
               Legal fee due now <b className="cp-num">{money(quote.legal_total_cents)}</b>
             </span>
-            <a href="#cp-review">Review and accept</a>
+            <a href="#cp-review">{accepted ? "Your receipt" : "Review and accept"}</a>
           </div>
         </div>
       )}
