@@ -10,6 +10,7 @@ import { withLoeSnapshot } from "@/lib/proposals/loe-snapshot";
 import { withoutLetterCheck } from "@/lib/proposals/attach-letter";
 import { hasPendingLetterCheck } from "@/lib/proposals/letter-check";
 import { applyGeneralForm } from "./general-form";
+import { applyPackageIncludes } from "./package-includes";
 import {
   parseAdjustments,
   parseDetails,
@@ -194,6 +195,13 @@ export async function buildDraftUpdate(
       } catch {
         return { ok: false, error: PACKAGES_UNREADABLE };
       }
+    }
+
+    // The offered packages' own "what's included" rows, which are the table the client sees when they exist.
+    if (form.has("pkgIncFields")) {
+      const packageRows = applyPackageIncludes(content, form, current.content);
+      if (!packageRows.ok) return refuse("Fees and payment", packageRows.error);
+      content = packageRows.value;
     }
   }
 

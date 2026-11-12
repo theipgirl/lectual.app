@@ -224,6 +224,12 @@ export type PackageOffer = {
   second_mark_discount_pct: number;
   includes?: ProposalInclude[];
   /**
+   * Editor fixes (2026-11-12): this proposal's `includes` rows were edited in its own editor, so a refresh from the
+   * firm's list (`withPackageSnapshot`) keeps them instead of taking the firm's rows. Staff-side only: the public
+   * content never carries it.
+   */
+  includes_edited?: true;
+  /**
    * A discount that applies ONLY when this package is chosen (2026-11-03): `per_class_under_cents` off the package
    * price for each class UNDER `included_classes`, shown to the client as its own line labelled `label`. Taken off
    * before the second-mark percent; never below zero; never touches the USPTO fee. Data only (no editor yet).
