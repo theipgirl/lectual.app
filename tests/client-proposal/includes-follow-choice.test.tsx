@@ -194,3 +194,40 @@ describe("withPackages keeps each package's includes across a settings save", ()
     expect(out.package).toBe("Essential");
   });
 });
+
+describe("a note typed on any package's row is shown (2026-11-12)", () => {
+  const withNotes = (): ProposalContent => ({
+    ...danielle(),
+    packages: danielle().packages!.map((p) => ({
+      ...p,
+      includes: [
+        { label: "Search report", value: p.package === "Concierge" ? "$900" : undefined, included: "✓", note: p.package === "Essential" ? undefined : p.package === "Enhanced" ? "Shared note" : "Concierge only" },
+        { label: "Monitoring", included: p.package === "Essential" ? "—" : "1 year", highlight: p.package === "Concierge" ? true : undefined },
+      ],
+    })),
+  });
+
+  it("the row's note, worth and highlight come from the first package that has one; a different note goes under its own cell", () => {
+    const table = includesComparison(withNotes());
+    const search = table!.rows[0];
+    expect(search.note).toBe("Shared note");
+    expect(search.value).toBe("$900");
+    expect(search.cellNotes).toEqual([undefined, undefined, "Concierge only"]);
+    expect(table!.rows[1].highlight).toBe(true);
+    expect(table!.rows[1].cellNotes).toBeUndefined();
+  });
+
+  it("a note on the only chosen package (not the first offered) is drawn", () => {
+    const c = withNotes();
+    const html = render(c, { initialSelection: sel(c, { packages: { fold: "Concierge", ci: "Concierge" } }) });
+    expect(html).toContain("Concierge only");
+    expect(html).toContain("$900");
+  });
+
+  it("side by side, the differing note sits under that package's cell and the shared one under the label", () => {
+    const c = withNotes();
+    const html = render(c, { initialSelection: sel(c, { packages: { fold: "Enhanced", ci: "Concierge" } }) });
+    expect(html).toContain('<span class="cp-sub-note">Shared note</span></th>');
+    expect(html).toContain('<td class="cp-vcell">\u2713<span class="cp-sub-note">Concierge only</span></td>');
+  });
+});

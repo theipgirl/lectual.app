@@ -220,7 +220,7 @@ export function addMarkLabel(kind: keyof typeof MARK_PACKAGE_WORDS): string {
 export function includesComparison(
   content: ProposalContent,
   packageNames?: readonly string[],
-): { mode: "chosen" | "all"; packages: string[]; rows: { label: string; value?: string; note?: string; highlight?: boolean; cells: string[] }[] } | null {
+): { mode: "chosen" | "all"; packages: string[]; rows: { label: string; value?: string; note?: string; highlight?: boolean; cells: string[]; cellNotes?: (string | undefined)[] }[] } | null {
   const offered = offeredPackages(content);
   const listed = (o: PackageOffer): ProposalInclude[] =>
     Array.isArray(o.includes) ? o.includes.filter((r) => r && typeof r.label === "string" && r.label.trim()) : [];
@@ -235,13 +235,27 @@ export function includesComparison(
   return {
     mode: useChosen ? "chosen" : "all",
     packages: offers.map((o) => o.package),
-    rows: labels.map((l) => ({
-      label: l.label,
-      value: l.value,
-      note: l.note,
-      highlight: l.highlight,
-      cells: offers.map((o) => listed(o).find((r) => r.label === l.label)?.included?.trim() || "—"),
-    })),
+    rows: labels.map((l) => {
+      // Each package's own row of this label (a label is a row; a package may or may not have it).
+      const mine = offers.map((o) => listed(o).find((r) => r.label === l.label));
+      const firstText = (pick: (r: ProposalInclude) => string | undefined) => mine.map((r) => (r ? pick(r)?.trim() : undefined)).find((t) => !!t) || undefined;
+      // The row-level worth, note and highlight come from the first package that has one. A note typed on another package's row
+      // is not lost: it is drawn under that package's own cell when it differs from the row's.
+      const note = firstText((r) => r.note);
+      const cellNotes = mine.map((r) => {
+        const own = r?.note?.trim();
+        return own && own !== note ? own : undefined;
+      });
+      return {
+        label: l.label,
+        value: firstText((r) => r.value),
+        note,
+        highlight: mine.some((r) => r?.highlight === true) ? true : undefined,
+        cells: mine.map((r) => r?.included?.trim() || "—"),
+        // Present only when some package's own note differs from the row's, so a table without such notes is unchanged.
+        ...(cellNotes.some((n) => n) ? { cellNotes } : {}),
+      };
+    }),
   };
 }
 
@@ -1033,6 +1047,7 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
                             {r.cells.map((cell, j) => (
                               <td key={j} className="cp-vcell">
                                 {cell}
+                                {r.cellNotes?.[j] ? <span className="cp-sub-note">{r.cellNotes[j]}</span> : null}
                               </td>
                             ))}
                           </tr>
