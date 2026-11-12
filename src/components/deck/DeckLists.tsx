@@ -12,6 +12,7 @@ import {
   DECK_LISTS_HANDOFF_NOTE,
   DECK_LISTS_NAV,
   DECK_LISTS_SUB,
+  DECK_META_NOT_CONNECTED,
   DECK_LIST_HANDED_CANT,
   DECK_LIST_HANDED_EMPTY,
   DECK_LIST_LATER_CANT,
@@ -40,7 +41,7 @@ function ListCard<T extends { id: string }>({ title, source, empty, cant, render
         )
       ) : (
         <p className={`dk-side-note${source.status === "unavailable" ? " dk-side-note--risk" : ""}`} role={source.status === "unavailable" ? "status" : undefined}>
-          {source.status === "not-set-up" ? NOT_SWITCHED_ON : cant}
+          {source.status === "not-set-up" ? NOT_SWITCHED_ON : source.status === "not-connected" ? DECK_META_NOT_CONNECTED : cant}
         </p>
       )}
       {foot && <p className="dk-lfoot">{foot}</p>}

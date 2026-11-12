@@ -29,6 +29,11 @@ describe("DeckLists", () => {
     expect(html).toContain("Hand-offs couldn&#x27;t be loaded");
     expect(html).toContain("Maya");
   });
+  it("a queue that is not connected says so on each card", () => {
+    const html = renderToStaticMarkup(<DeckLists active="handed" needCount={null} decided={{ status: "not-connected" }} handed={{ status: "not-connected" }} later={{ status: "not-connected" }} />);
+    expect(html).toContain("Not connected");
+    expect(html).not.toContain("couldn&#x27;t be loaded");
+  });
   it("an empty source is a dashed empty card", () => {
     const html = renderToStaticMarkup(<DeckLists active="decided" needCount={0} decided={{ status: "ok", rows: [] }} handed={{ status: "ok", rows: [] }} later={later} />);
     expect(html.match(/dk-empty-card/g)?.length).toBe(2);
@@ -45,6 +50,17 @@ describe("DeckSide sections", () => {
     const html = renderToStaticMarkup(<DeckSide rows={[row]} later={{ status: "unavailable" }} />);
     expect(html).toContain("Can&#x27;t show Later right now.");
     expect(html).not.toContain("Nothing put off.");
+  });
+  it("empty sections are dashed empty cards, not loose text", () => {
+    const html = renderToStaticMarkup(<DeckSide rows={[]} later={{ status: "ok", rows: [] }} />);
+    expect(html.match(/dk-empty-card/g)?.length).toBe(3);
+  });
+  it("a failed decided read is a dash and the sentence, with no 0 and no full-list link", () => {
+    const html = renderToStaticMarkup(<DeckSide rows={[row]} decidedFailed />);
+    expect(html).toContain("Can&#x27;t show this list right now.");
+    expect(html).not.toContain("Nothing decided yet");
+    expect(html).not.toContain("Decided today, full list");
+    expect(html).toContain("1 waiting \u00B7 \u2014 decided");
   });
   it("without a later prop (technician-less callers) the Later section is not drawn", () => {
     expect(renderToStaticMarkup(<DeckSide rows={[row]} />)).not.toContain("Nothing put off.");

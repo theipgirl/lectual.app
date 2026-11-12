@@ -10,7 +10,7 @@ import { dealtAt } from "@/lib/deal/times";
 import { classifyQueueItem, kindShort } from "@/lib/queue/routing";
 import { agentLabel } from "@/components/queue/format";
 import { DeckLists } from "@/components/deck/DeckLists";
-import { decidedSource, eventSources, handedRows, laterBackPill, laterRows, makeListFormat, type ListParam } from "@/lib/queue/deck-lists";
+import { decidableIds, decidedSource, eventSources, handedRows, laterBackPill, laterRows, makeListFormat, type ListParam } from "@/lib/queue/deck-lists";
 
 /**
  * `/dashboard/queue/deck/?list=decided|handed|later`. The caller has already passed the deck's gate (role-views on, a
@@ -45,16 +45,18 @@ export async function DeckListsView({ list }: { list: ListParam }) {
 
   const events = cardState?.status === "ok" ? cardState.events : [];
   const decided = decidedSource(approved, rejected, session.user.email ?? null, fmt);
+  const routing = routed.status === "ok" ? routed.routing : {};
+  const decidable = decidableIds(pendingItems, routing, viewer);
   const { handed, later } = eventSources({
-    pendingOk: pending.status === "ok",
+    pendingStatus: pending.status,
     cardState,
-    handed: () => handedRows(pendingItems, events, viewer.userId, firstNameOf, fmt),
-    later: () => laterRows(pendingItems, events, viewer.userId, now, (i) => `${agentLabel(i.agent)} · ${kindShort(classifyQueueItem(i))}`, (until) => laterBackPill(until, now, tz)),
+    handed: () => handedRows(pendingItems, events, viewer.userId, firstNameOf, fmt, decidable),
+    later: () => laterRows(pendingItems, events, viewer.userId, now, decidable, (i) => `${agentLabel(i.agent)} · ${kindShort(classifyQueueItem(i))}`, (until) => laterBackPill(until, now, tz)),
   });
 
   let needCount: number | null = null;
   if (pending.status === "ok") {
-    const deck = buildDeck({ items: pendingItems, routing: routed.status === "ok" ? routed.routing : {}, viewer, cardState: cardState ?? { status: "unavailable" }, now, dealtAt: dealtAt(now, tz) });
+    const deck = buildDeck({ items: pendingItems, routing, viewer, cardState: cardState ?? { status: "unavailable" }, now, dealtAt: dealtAt(now, tz) });
     needCount = deck.cards.length;
   }
 

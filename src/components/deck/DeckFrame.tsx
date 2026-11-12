@@ -42,6 +42,7 @@ export function DeckFrame({
   sideNote,
   sideFailed,
   sideLater,
+  sideDecidedFailed,
   laterArrivals,
   nextDealLabel,
   dealLabel,
@@ -58,6 +59,7 @@ export function DeckFrame({
   sideFailed?: boolean;
   /** The viewer's own Later cards for the side column. */
   sideLater?: DeckSideLater;
+  sideDecidedFailed?: boolean;
   laterArrivals: number;
   nextDealLabel: string;
   /** The deal that is open now ("7:00 AM"), null before the first. */
@@ -116,7 +118,7 @@ export function DeckFrame({
           </div>
           <p className="dk-sub">{DECK_PAGE_SUB}</p>
         </div>
-        <DeckSide rows={side ?? []} failed={sideFailed} note={sideNote} later={sideLater} />
+        <DeckSide rows={side ?? []} failed={sideFailed} note={sideNote} later={sideLater} decidedFailed={sideDecidedFailed} />
         {laterArrivals > 0 && dealLabel && (
           <section className="dk-arrived" aria-label={deckArrivedTitle(dealLabel)}>
             <div className="dk-sidecard-head">

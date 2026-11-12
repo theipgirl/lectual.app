@@ -499,7 +499,7 @@ export const deckListWith = (first: string) => `With ${first}`;
 export const deckListBackIn = (label: string) => `Back in the ${label} deal`;
 export const deckListBackAt = (when: string) => `Back ${when}`;
 export const deckListDecidedSub = (what: "Approved" | "Rejected", time: string, tail: string | null) => (tail ? `${what} ${time} · ${tail}` : `${what} ${time}`);
-export const DECK_LIST_TAIL_DRAFT = "draft in Outlook";
+export const DECK_LIST_TAIL_CLIENT_EMAIL = "client email";
 export const DECK_LIST_TAIL_INTERNAL = "internal";
 export const DECK_LIST_TAIL_NOTE_KEPT = "note kept";
 export const deckListQuote = (note: string) => `“${note}”`;

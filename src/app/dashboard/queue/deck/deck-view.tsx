@@ -194,6 +194,7 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
       : { status: cardState.status };
   const frameProps = {
     sideLater,
+    sideDecidedFailed: !decidedReadable,
     dealLine,
     view,
     viewHref,

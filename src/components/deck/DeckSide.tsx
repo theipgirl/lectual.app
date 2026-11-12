@@ -59,19 +59,20 @@ function Sep({ label, count, first }: { label: string; count: string | number; f
 }
 
 /** "All your approvals": three card sections, Needs your yes, Later, Decided today. */
-export function DeckSide({ rows, failed, note, later }: { rows: DeckSideRow[]; failed?: boolean; note?: string | null; later?: DeckSideLater }) {
+export function DeckSide({ rows, failed, note, later, decidedFailed }: { rows: DeckSideRow[]; failed?: boolean; /** The approved / rejected lists could not be read: Decided is a dash and a sentence, never 0. */ decidedFailed?: boolean; note?: string | null; later?: DeckSideLater }) {
   const need = rows.filter((r) => !r.decided);
   const done = rows.filter((r) => r.decided);
+  const noDecided = failed || decidedFailed;
   return (
     <nav className="dk-sidecard" aria-label={DECK_SIDE_TITLE}>
       <div className="dk-sidecard-head">
         <h2>{DECK_SIDE_TITLE}</h2>
-        <span className="dk-sub-mono">{deckSideCounts(failed ? "—" : String(need.length), failed ? "—" : String(done.length))}</span>
+        <span className="dk-sub-mono">{deckSideCounts(failed ? "—" : String(need.length), noDecided ? "—" : String(done.length))}</span>
       </div>
       <div className="dk-side-scroll">
         {note && <p className="dk-side-note">{note}</p>}
         <Sep first label={DECK_COL_NEEDS_YES} count={failed ? "—" : need.length} />
-        {failed ? <p className="dk-side-note dk-side-note--risk">{DECK_SIDE_CANT}</p> : need.length === 0 ? <p className="dk-side-note">{DECK_SIDE_NOTHING_LEFT}</p> : (
+        {failed ? <p className="dk-side-note dk-side-note--risk">{DECK_SIDE_CANT}</p> : need.length === 0 ? <p className="dk-empty-card">{DECK_SIDE_NOTHING_LEFT}</p> : (
           <ol className="dk-side-rows">
             {need.map((r) => (
               <Row key={r.id} r={r} />
@@ -83,7 +84,7 @@ export function DeckSide({ rows, failed, note, later }: { rows: DeckSideRow[]; f
             <Sep label={DECK_COL_LATER} count={later.status === "ok" ? later.rows.length : "—"} />
             {later.status === "ok" ? (
               later.rows.length === 0 ? (
-                <p className="dk-side-note">{DECK_SIDE_LATER_NOTHING}</p>
+                <p className="dk-empty-card">{DECK_SIDE_LATER_NOTHING}</p>
               ) : (
                 <>
                   <ol className="dk-side-rows">
@@ -101,8 +102,8 @@ export function DeckSide({ rows, failed, note, later }: { rows: DeckSideRow[]; f
             )}
           </>
         )}
-        <Sep label={DECK_COL_DECIDED} count={failed ? "—" : done.length} />
-        {failed ? <p className="dk-side-note dk-side-note--risk">{DECK_SIDE_CANT_DECIDED}</p> : done.length === 0 ? <p className="dk-side-note">{DECK_SIDE_NOTHING_DECIDED}</p> : (
+        <Sep label={DECK_COL_DECIDED} count={noDecided ? "—" : done.length} />
+        {noDecided ? <p className="dk-side-note dk-side-note--risk">{DECK_SIDE_CANT_DECIDED}</p> : done.length === 0 ? <p className="dk-empty-card">{DECK_SIDE_NOTHING_DECIDED}</p> : (
           <>
             <ol className="dk-side-rows">
               {done.map((r) => (
