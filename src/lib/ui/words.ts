@@ -262,7 +262,9 @@ export const DECK_PICK_PERSON = "Choose who to hand it to.";
 export const DECK_BAD_PERSON = "That person can't take approvals. Choose someone else on your team.";
 /* Deck page, card, side list, list and board (owner view fidelity rebuild). */
 export const DECK_PAGE_TITLE = "Your deal";
-export const DECK_PAGE_SUB = "Drafts wait here until you decide. Approving a client email places a draft in Outlook; a person sends it.";
+/** Shared by the deck intro and the welcome deal's card 2. */
+export const DECK_APPROVING_NEVER_SENDS = "Approving never sends.";
+export const DECK_PAGE_SUB = `Drafts wait here until you decide. ${DECK_APPROVING_NEVER_SENDS} A client email becomes a draft in a connected mailbox; a person presses Send.`;
 export const DECK_DEAL_NEW = "Deal new cards";
 export const deckLeft = (n: number, minutes: number) => `${n} left · about ${minutes} min`;
 export const DECK_META_ALL_DECIDED = "All decided";
@@ -551,7 +553,6 @@ export const DEAL_TIMES_STEP = "Deal times go in 5-minute steps.";
 export const DEAL_TIMES_APART = "Deal times need to be at least 2 hours apart.";
 
 /* Phase 2 item 5: the welcome deal (owner view's first-sign-in guide; the technician view keeps the tour). */
-export const WELCOME_ARIA = "Welcome to your approval deck";
 export const WELCOME_SOURCE = "Lectual";
 export const WELCOME_TAG = "Welcome · 1 min";
 export const WELCOME_SKIP = "Skip the tour";
@@ -561,16 +562,17 @@ export const WELCOME_FORWARD = "Next step";
 export const WELCOME_FINISH = "Finish";
 export const WELCOME_CARD_1_TITLE = "One card is one thing waiting on you";
 export const WELCOME_CARD_1_BODY =
-  "Each card says which assistant drafted it, who it is to, and the opening of the draft. Nothing on a card has been sent.";
-export const WELCOME_CARD_1_STEP = "the line at the bottom of a card says what to check first.";
+  "Each card says who drafted it, who it is to, and the opening of the draft. Nothing on a card has been sent.";
+export const WELCOME_CARD_1_STEP = "when a card has a line at the bottom, it says what to check first.";
 export const WELCOME_CARD_2_TITLE = "The moves";
-export const WELCOME_CARD_2_BODY =
-  "Yes approves after a 5-second hold you can undo. For a client email, approving puts a draft in your mailbox, and nothing is sent until someone presses Send. Reject needs a note. Later puts a card in your next deal, and Hand off puts it in a colleague's deck. The arrows beside the position move to the previous or next card.";
+export const WELCOME_CARD_2_BODY = `Yes approves after a 5-second hold you can undo. Some cards show "${DECK_OPEN_TO_REVIEW}" or "${DECK_MARK_READ}" instead. ${DECK_APPROVING_NEVER_SENDS} A client email becomes a draft in your firm's or your own mailbox, when one is connected. Nothing goes out until someone presses Send there. Reject needs a note. Later puts a card in your next deal. Hand off puts it in a colleague's deck. The arrows move to the previous or next card.`;
 export const WELCOME_CARD_2_STEP = "try the arrows. They only move between cards, and nothing is stored.";
 export const WELCOME_CARD_3_TITLE = "Two deals a day";
 export const welcomeCard3Body = (first: string, second: string) =>
-  `Your cards are dealt at ${first} and ${second}. Anything that arrives after a deal opens waits for the next one. The List view always shows everything.`;
+  `Your cards are dealt at ${first} and ${second}, firm time. Anything that arrives after a deal waits for the next one, or press ${DECK_DEAL_NOW}. The List view shows everything waiting on you, not only this deal.`;
 export const WELCOME_CARD_3_STEP = `use "${DEAL_TIMES_OPEN}" in the deck header or "${DEAL_TIMES_MENU_ITEM}" in your account menu to pick your own times.`;
 export const WELCOME_CARD_4_TITLE = "The weekly review";
-export const WELCOME_CARD_4_BODY = `${REVIEW_NAME} shows every open matter and lead, by person, with ${OUR_TURN} and Waiting on client. The Monday meeting runs from it.`;
+export const WELCOME_CARD_4_BODY = `${REVIEW_NAME} shows your open matters and active leads by person, with ${OUR_TURN} and Waiting on client. It is built for the Monday meeting.`;
 export const WELCOME_CARD_4_STEP = "open it before Monday's meeting.";
+export const WELCOME_STEPS_NAV = "Steps";
+export const welcomeCardOf = (n: number, total: number) => `Card ${n} of ${total}`;

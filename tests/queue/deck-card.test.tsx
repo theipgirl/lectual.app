@@ -126,3 +126,19 @@ describe("DeckFrame", () => {
     expect(frame({ laterArrivals: 0 })).not.toContain("Deal them now");
   });
 });
+
+describe("the after-approve line claims a mailbox only when the approve result returned a draft", () => {
+  const ok = (draft: unknown, message = "Approved.") => html({ initial: { result: { ok: true, message, draft } as never } });
+  it("no draft: no Outlook or Gmail claim", () => {
+    expect(ok(null, "Approved. Nothing was sent.")).not.toMatch(/Draft is in (Outlook|Gmail)/);
+  });
+  it("a draft with no provider says no draft was made", () => {
+    const h = ok({ provider: null, webLink: null, draftId: null, canSend: false, sendNote: null });
+    expect(h).not.toMatch(/Draft is in (Outlook|Gmail)/);
+    expect(h).toContain("No draft was made");
+  });
+  it("a Microsoft draft says Outlook, a Google draft says Gmail", () => {
+    expect(ok({ provider: "microsoft", webLink: null, draftId: null, canSend: false, sendNote: null })).toContain("Draft is in Outlook");
+    expect(ok({ provider: "google", webLink: null, draftId: null, canSend: false, sendNote: null })).toContain("Draft is in Gmail");
+  });
+});

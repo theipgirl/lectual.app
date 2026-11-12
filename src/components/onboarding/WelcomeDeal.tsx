@@ -8,7 +8,8 @@ import type { TourOutcome } from "@/lib/onboarding/tour";
 import { isLastCard, SHOW_WELCOME_EVENT, startWelcome, stepWelcome, welcomeCards, type WelcomeCard } from "@/lib/onboarding/welcome-deal";
 import {
   DECK_FIRST_STEP,
-  WELCOME_ARIA,
+  WELCOME_STEPS_NAV,
+  welcomeCardOf,
   WELCOME_BACK,
   WELCOME_FINISH,
   WELCOME_FORWARD,
@@ -39,7 +40,7 @@ export function WelcomeDealView({ cards, index, onNext, onBack, onSkip, popRef, 
   return (
     <div className="wd-root">
       <div className="wd-scrim" />
-      <div ref={popRef} className="wd-dialog" role="dialog" aria-modal="true" aria-label={WELCOME_ARIA} aria-labelledby={titleId} tabIndex={-1}>
+      <div ref={popRef} className="wd-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}>
         <div className="dk-cardwrap">
           <div className="dk-cardwrap-in">
             <article className="dk-card">
@@ -56,11 +57,14 @@ export function WelcomeDealView({ cards, index, onNext, onBack, onSkip, popRef, 
               <p className="dk-ctx">{card.body}</p>
               <div className="dk-card-foot">
                 <span className="dk-why">{`${DECK_FIRST_STEP} ${card.step}`}</span>
-                <nav className="dk-pos wd-pos" aria-label="Steps">
+                <nav className="dk-pos wd-pos" aria-label={WELCOME_STEPS_NAV}>
                   <button type="button" className="dk-arrow" aria-label={WELCOME_BACK} title={WELCOME_BACK} disabled={index === 0} onClick={onBack}>
                     ‹
                   </button>
-                  <span aria-label={`Card ${index + 1} of ${cards.length}`}>{deckPosition(index + 1, cards.length)}</span>
+                  <span>
+                    <span aria-hidden="true">{deckPosition(index + 1, cards.length)}</span>
+                    <span className="wd-sr">{welcomeCardOf(index + 1, cards.length)}</span>
+                  </span>
                   <button type="button" className="dk-arrow" aria-label={WELCOME_FORWARD} title={WELCOME_FORWARD} disabled={last} onClick={onNext}>
                     ›
                   </button>

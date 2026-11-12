@@ -52,7 +52,7 @@ describe("welcomeCards", () => {
     expect(c.body).toMatch(/Reject needs a note/);
     expect(c.body).toMatch(/Later/);
     expect(c.body).toMatch(/Hand off/);
-    expect(c.body).toMatch(/nothing is sent until someone presses Send/);
+    expect(c.body).toMatch(/Approving never sends/);
     expect(c.step).toMatch(/nothing is stored/);
   });
 });

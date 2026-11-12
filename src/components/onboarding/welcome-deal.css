@@ -14,3 +14,4 @@
   .wd-dialog .dk-ctx { font-size: 16px; }
   .wd-dialog .dk-card-foot { flex-wrap: wrap; }
 }
+.wd-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
