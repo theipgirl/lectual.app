@@ -7,7 +7,10 @@ const resolveFirmSession = vi.fn();
 vi.mock("@/lib/firm/session", () => ({ resolveFirmSession: (...a: unknown[]) => resolveFirmSession(...a) }));
 vi.mock("@/lib/queue/load", () => ({ loadActiveQueue: async () => ({ status: "ok", items: [] }) }));
 vi.mock("@/lib/queue/mine-load", () => ({ mineQueue: async () => ({ status: "ok", items: [{ id: "q1" }, { id: "q2" }] }) }));
-const loadDealNudge = vi.fn(async (..._args: unknown[]) => ({ ready: false }));
+const loadDealNudge = vi.fn(async (...args: unknown[]) => {
+  void args;
+  return { ready: false };
+});
 vi.mock("@/lib/queue/deal-nudge-load", () => ({ loadDealNudge: (...a: unknown[]) => loadDealNudge(...a) }));
 vi.mock("@/lib/nav-counts", () => ({ loadRailCounts: async () => ({}) }));
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }) }));
