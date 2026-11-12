@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { NewProposalForm } from "@/components/proposal-editor/NewProposalForm";
-import { countChangedFields, editorChangedCount, messageInMoreOptions, moreOptionsSummary, pathInMoreOptions, shouldOpenMore } from "@/lib/proposal-editor/more-options";
+import { countChangedFields, messageInMoreOptions, moreOptionsSummary } from "@/lib/proposal-editor/more-options";
 import { packageOption } from "@/lib/proposals/package-list";
 import type { ProposalDetail } from "@/lib/proposals/store";
 import type { ProposalRow } from "@/lib/proposals/types";
@@ -22,26 +22,6 @@ describe("More options: the pure rules", () => {
   it("counts fields that differ from the defaults, trimmed", () => {
     expect(countChangedFields([{ current: "4950", baseline: "4950" }, { current: " 3 ", baseline: "3" }])).toBe(0);
     expect(countChangedFields([{ current: "5000", baseline: "4950" }, { current: "21", baseline: "20" }, { current: "x", baseline: "x" }])).toBe(2);
-  });
-
-  it("the editor's count: 0 at the firm's package, 2 when two numbers differ, and a discount is one more", () => {
-    const base = { pricing: { ...CONCIERGE }, firmPackage: CONCIERGE, adjustments: 0, brandPriceOverrides: 0 };
-    expect(editorChangedCount(base)).toBe(0);
-    expect(editorChangedCount({ ...base, pricing: { ...CONCIERGE, base_cents: 500_000, second_mark_discount_pct: 25 } })).toBe(2);
-    expect(editorChangedCount({ ...base, adjustments: 1 })).toBe(1);
-    expect(editorChangedCount({ ...base, brandPriceOverrides: 1, pricing: { ...CONCIERGE, reduce_under_included: true } })).toBe(2);
-  });
-
-  it("a package that is not on the firm's list has nothing to differ from", () => {
-    expect(editorChangedCount({ pricing: { ...CONCIERGE, package: "Custom" }, firmPackage: null, adjustments: 0, brandPriceOverrides: 0 })).toBe(0);
-  });
-
-  it("a problem on a field inside More options opens it; one on a step field does not", () => {
-    expect(shouldOpenMore(["pricing.second_mark_discount_pct"])).toBe(true);
-    expect(shouldOpenMore(["names[0].marks[1].desc"])).toBe(true);
-    expect(shouldOpenMore(["adjustments[0].label", "client_email"])).toBe(true);
-    expect(shouldOpenMore(["client_email", "pay_url", "pricing.package", "names[0].classes"])).toBe(false);
-    expect(pathInMoreOptions("names[0].marks[0].kind")).toBe(false);
   });
 
   it("a refusal sentence is placed by its label", () => {

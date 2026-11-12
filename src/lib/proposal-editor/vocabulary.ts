@@ -45,8 +45,6 @@ export const EDITOR_WORDS = {
   readyNothing: "Nothing is blocking the link.",
   clientPays: "What the client pays",
   pricesUpdateOnSave: "Prices update when you save",
-  menuName: "Withdraw or delete",
-  menuNameDelete: "Delete",
 } as const;
 
 /** "Check these 3 things" (assistant drafts). */

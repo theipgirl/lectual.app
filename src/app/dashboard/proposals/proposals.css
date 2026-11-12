@@ -520,3 +520,5 @@ td.pq-mono { font-family: var(--mono); }
 @media (max-width: 640px) {
   .pe-mark-pkg { padding-left: 8px; }
 }
+.pe-brand .pe-class-row { grid-template-columns: minmax(0, 1fr) auto auto auto; }
+@media (max-width: 760px) { .pe-brand .pe-class-row { grid-template-columns: minmax(0, 1fr) auto; } }

@@ -73,3 +73,51 @@ describe("the action file", () => {
     expect(actions).toContain("export async function sendAction");
   });
 });
+
+describe("Save and create link saves first (Sprint 1, F4)", () => {
+  const form = () => new FormData();
+
+  it("dirty: save, then approve, then makeLive, in that order", async () => {
+    const calls: string[] = [];
+    const { d } = deps({
+      save: vi.fn(async () => (calls.push("save"), { saved: true })),
+      approve: vi.fn(async () => (calls.push("approve"), row)),
+      makeLive: vi.fn(async () => (calls.push("live"), row)),
+    });
+    const r = await runCreateLink(d, "p1", { dirty: true, form: form() });
+    expect(r.saved).toBe(true);
+    expect(calls).toEqual(["save", "approve", "live"]);
+  });
+
+  it("a refused save stops there: approve and makeLive are never called and the refusal is returned", async () => {
+    const { d } = deps({ save: vi.fn(async () => ({ error: "Who: Client name: enter the client's full name." })) });
+    const r = await runCreateLink(d, "p1", { dirty: true, form: form() });
+    expect(r).toEqual({ error: "Who: Client name: enter the client's full name." });
+    expect(d.approve).not.toHaveBeenCalled();
+    expect(d.makeLive).not.toHaveBeenCalled();
+  });
+
+  it("clean: the save is skipped", async () => {
+    const save = vi.fn(async () => ({ saved: true }));
+    const { d } = deps({ save });
+    const r = await runCreateLink(d, "p1", { dirty: false, form: form() });
+    expect(r.saved).toBe(true);
+    expect(save).not.toHaveBeenCalled();
+    expect(d.approve).toHaveBeenCalledTimes(1);
+  });
+
+  it("the gate still runs first: a refusal never saves", async () => {
+    const save = vi.fn(async () => ({ saved: true }));
+    const { d } = deps({ save, gate: vi.fn(async () => ({ error: "no" })) });
+    expect(await runCreateLink(d, "p1", { dirty: true, form: form() })).toEqual({ error: "no" });
+    expect(save).not.toHaveBeenCalled();
+    expect(d.approve).not.toHaveBeenCalled();
+  });
+
+  it("an approve failure after a good save never calls makeLive", async () => {
+    const { d } = deps({ save: vi.fn(async () => ({ saved: true })), approve: vi.fn(async () => { throw new Error("x"); }) });
+    const r = await runCreateLink(d, "p1", { dirty: true, form: form() });
+    expect(r.error).toBe("Couldn't save this proposal.");
+    expect(d.makeLive).not.toHaveBeenCalled();
+  });
+});

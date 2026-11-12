@@ -190,7 +190,7 @@ function MoreMenu({
   return (
     <div className="pe-more-menu">
       <Popover
-        label="More actions"
+        label={moreMenuLabel(items)}
         align="left"
         width={190}
         trigger={({ onClick, ref, ...aria }) => (

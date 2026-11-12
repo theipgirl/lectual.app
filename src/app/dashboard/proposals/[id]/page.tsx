@@ -19,7 +19,7 @@ import { firstNameOf, joinOr, statusLabel, statusTone } from "@/lib/proposal-edi
 import { moneyInput } from "@/lib/proposal-editor/form";
 import { addedClassesPhrase, clientAddedClasses, clientDescribedClasses } from "@/lib/proposals/added-view";
 import { explicitClientAddMax } from "@/lib/proposals/client-classes";
-import { findPackage, normalisePackages } from "@/lib/proposals/package-list";
+import { normalisePackages } from "@/lib/proposals/package-list";
 import { loadLeadLink } from "@/lib/proposals/lead-link";
 import { loadLeadOptions } from "@/lib/proposals/lead-options";
 import { defaultSelection, generalValueOverFee, priceForClassCount, quoteProposal } from "@/lib/proposals/pricing";
