@@ -1,6 +1,5 @@
 import "server-only";
 import { getScopedClient } from "@/lib/db/scoped-client";
-import { listOutlookCalendarEvents } from "@/lib/calendar/outlook-read";
 import { readProposalExpiries } from "@/lib/review/load";
 import type { LeadPendingApprovals } from "./pending-approvals";
 import { leadsWithLiveProposal, type FactSet, type WorkingFacts } from "./working";
@@ -15,8 +14,9 @@ import { leadsWithLiveProposal, type FactSet, type WorkingFacts } from "./workin
  *                 (so ~4 round trips for 310 leads, in parallel), each paged 1,000 rows at a time.
  *   2. proposals  `readProposalExpiries` (the weekly review's own read): `client_proposal` by lead id,
  *                 chunks of 80, the columns id, family_id, version, status, lead_id, matter_id, expires_on.
- *   3. consults   `listOutlookCalendarEvents` (the Calendar page's own read): one query for the next 60
- *                 days, capped at 500 rows. Only with the Mailboxes feature on.
+ *   3. consults   its OWN scoped query on `crm_calendar_event`: `is_consult = true`, `lead_id` not null, `starts_at`
+ *                 from now on, `lead_id` only, paged. Never the calendar page's read (that one covers every event and
+ *                 is capped at 500, which a busy calendar would hit). Only with the Mailboxes feature on.
  *   4. booth      `crm_booth_scorecard`, `lead_id` only, paged. Distinct leads in JS.
  * Approvals add NO read: the page already holds `loadPendingApprovalsByLead()`'s result and passes it in.
  *
@@ -35,21 +35,20 @@ export const ACTIVITY_PAGE = 1000;
 export const ACTIVITY_MAX_PAGES = 10;
 export const LEAD_ID_CHUNK = 100;
 export const BOOTH_MAX_PAGES = 20;
-export const CONSULT_WINDOW_DAYS = 60;
-/** `listOutlookCalendarEvents` stops at this many rows; reaching it means the window may be cut short. */
-export const CONSULT_ROW_CAP = 500;
+export const CONSULT_MAX_PAGES = 10;
 
 /** The activity types that are real contact, whoever made them. */
 export const REAL_ACTIVITY_TYPES = ["email_sent", "email_received", "call_logged", "note", "voice_note"] as const;
 
 /**
- * One PostgREST `or`: the real types, or a stage move a PERSON made. A person's move is the signed-in
- * default (`actor_type = user`) with no `payload.actor` stamp: the Stage Keeper writes `actor_type = ai`
- * and `payload.actor = agent:stage-keeper`, the hired-matter sync writes `system` and
- * `lawmatics-sync`, imports write `system`, and automations write `automation`. A person's accept or
- * undo of a Stage Keeper card is theirs (`user`, no actor stamp) and counts.
+ * One PostgREST `or`. Mail counts whoever wrote it (the mailbox sync writes `email_sent` / `email_received` as
+ * `system`). A call, note or voice note counts only when a PERSON wrote it: the public intake form files its
+ * answers as a `note` with `actor_type = system`, and that is not work on the lead. A stage move counts only
+ * when a person made it (`actor_type = user`, no `payload.actor` stamp): the Stage Keeper writes `ai` +
+ * `agent:stage-keeper`, the hired-matter sync `system` + `lawmatics-sync`, imports `system`, automations
+ * `automation`. A person's accept or undo of a Stage Keeper card is theirs (`user`, no stamp) and counts.
  */
-export const REAL_ACTIVITY_FILTER = `type.in.(${REAL_ACTIVITY_TYPES.join(",")}),and(type.eq.stage_changed,actor_type.eq.user,payload->>actor.is.null)`;
+export const REAL_ACTIVITY_FILTER = `type.in.(email_sent,email_received),and(type.in.(call_logged,note,voice_note),actor_type.eq.user),and(type.eq.stage_changed,actor_type.eq.user,payload->>actor.is.null)`;
 
 type Row = Record<string, unknown>;
 type Page = PromiseLike<{ data: Row[] | null; error: unknown }>;
@@ -59,11 +58,17 @@ export type WorkingDb = {
     select(columns: string): {
       in(column: string, values: readonly string[]): ActivityQuery;
       not(column: string, op: string, value: unknown): BoothQuery;
+      eq(column: string, value: unknown): ConsultQuery;
     };
   };
 };
 type ActivityQuery = {
   or(filter: string): { order(column: string): { range(from: number, to: number): Page } };
+};
+type ConsultQuery = {
+  not(column: string, op: string, value: unknown): {
+    gte(column: string, value: string): { order(column: string): { range(from: number, to: number): Page } };
+  };
 };
 type BoothQuery = { order(column: string): { range(from: number, to: number): Page } };
 
@@ -117,6 +122,30 @@ export async function readBoothLeadIds(db: WorkingDb): Promise<Set<string>> {
   throw new Error("booth read exceeded its page budget");
 }
 
+/** Lead ids with a booked (future) consult. Throws when a page fails; before lectual 0098 (no columns) it is `null`. */
+export async function readConsultLeadIds(db: WorkingDb, now: Date): Promise<Set<string> | null> {
+  const found = new Set<string>();
+  for (let i = 0; i < CONSULT_MAX_PAGES; i++) {
+    const { data, error } = await db
+      .from("crm_calendar_event")
+      .select("lead_id")
+      .eq("is_consult", true)
+      .not("lead_id", "is", null)
+      .gte("starts_at", now.toISOString())
+      .order("starts_at")
+      .range(i * ACTIVITY_PAGE, i * ACTIVITY_PAGE + ACTIVITY_PAGE - 1);
+    if (error) {
+      const code = (error as { code?: string }).code;
+      if (code === "42703" || code === "PGRST204" || code === "42P01" || code === "PGRST205") return null;
+      throw new Error("consult read failed");
+    }
+    const rows = data ?? [];
+    for (const r of rows) if (typeof r.lead_id === "string") found.add(r.lead_id);
+    if (rows.length < ACTIVITY_PAGE) return found;
+  }
+  throw new Error("consult read exceeded its page budget");
+}
+
 /** The queue's three states as a fact set: no queue connected means nothing can be pending. */
 export function approvalsFact(read: LeadPendingApprovals): FactSet {
   if (read.status === "ok") {
@@ -129,7 +158,6 @@ export type WorkingFactsDeps = {
   db: WorkingDb;
   now: Date;
   readProposals: (leadIds: readonly string[]) => Promise<{ family_id: string; version: number; status: string; lead_id: string | null }[]>;
-  readConsults: (from: string, to: string) => ReturnType<typeof listOutlookCalendarEvents>;
 };
 
 async function settle(read: () => Promise<FactSet>): Promise<FactSet> {
@@ -139,8 +167,6 @@ async function settle(read: () => Promise<FactSet>): Promise<FactSet> {
     return { status: "unavailable" };
   }
 }
-
-const civil = (d: Date) => d.toISOString().slice(0, 10);
 
 /**
  * Every fact the classifier needs. Never throws; each source is reported on its own.
@@ -158,7 +184,6 @@ export async function loadWorkingFacts(
       db,
       now: new Date(),
       readProposals: (ids) => readProposalExpiries(db as never, [], ids),
-      readConsults: listOutlookCalendarEvents,
     };
   }
   const live = d;
@@ -169,18 +194,8 @@ export async function loadWorkingFacts(
     settle(async () => ({ status: "ok", leadIds: leadsWithLiveProposal(await live.readProposals(leadIds)) })),
     settle(async (): Promise<FactSet> => {
       if (!opts.mailboxOn) return { status: "skipped" };
-      const r = await live.readConsults(civil(live.now), civil(new Date(live.now.getTime() + CONSULT_WINDOW_DAYS * 86_400_000)));
-      // Before lectual 0098 no calendar rows can exist: nothing to find, not a failure.
-      if (r.status === "database-update-needed") return { status: "skipped" };
-      if (r.status !== "ok") return { status: "unavailable" };
-      // A read that hit the row cap may have dropped later consults: not knowing is not "none".
-      if (r.events.length >= CONSULT_ROW_CAP) return { status: "unavailable" };
-      const nowMs = live.now.getTime();
-      const ids = new Set<string>();
-      for (const e of r.events) {
-        if (e.is_consult && e.lead_id && Date.parse(e.starts_at) >= nowMs) ids.add(e.lead_id);
-      }
-      return { status: "ok", leadIds: ids };
+      const ids = await readConsultLeadIds(live.db, live.now);
+      return ids ? { status: "ok", leadIds: ids } : { status: "skipped" };
     }),
     settle(async () => ({ status: "ok", leadIds: await readBoothLeadIds(live.db) })),
   ]);

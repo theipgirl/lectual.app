@@ -1,14 +1,14 @@
 import { describe, it, expect } from "vitest";
 import {
   classifyLeads,
-  effectiveView,
+  effectiveSet,
   firstContactBoundary,
-  inWorkingView,
+  inLeadSet,
   isEventSource,
   isFollowUpStage,
   isPastFirstContact,
   leadsWithLiveProposal,
-  parseWorkingView,
+  parseLeadSet,
   type FactSet,
   type WorkingFacts,
   type WorkingLead,
@@ -61,6 +61,23 @@ describe("first-contact boundary", () => {
   });
 });
 
+describe("the Follow-Up boundary is anchored", () => {
+  it("a late 'Post Consultation Follow Up' stage does not move the boundary", () => {
+    const st = [
+      { id: "pnc", name: "Potential New Client", category: "open", order_index: 1 },
+      { id: "fu", name: "Follow-Up", category: "open", order_index: 2 },
+      { id: "cs", name: "Consultation Scheduled", category: "open", order_index: 3 },
+      { id: "pcf", name: "Post Consultation Follow Up", category: "open", order_index: 4 },
+      { id: "loe", name: "LOE Sent", category: "open", order_index: 6 },
+    ];
+    expect(firstContactBoundary(st)?.stageId).toBe("fu");
+    const res = classifyLeads({ leads: [lead("a", "cs"), lead("b", "pcf"), lead("c", "fu")].map((l) => ({ ...l, current_stage_id: l.current_stage_id })), stages: st, facts: facts() });
+    expect(kind(res, "a").kind).toBe("working");
+    expect(kind(res, "b").kind).toBe("working");
+    expect(kind(res, "c").kind).toBe("not_started");
+  });
+});
+
 describe("classifyLeads: the RPB shape", () => {
   it("follow-up / PNC leads with no activity are Not started, or Event contacts by source or booth", () => {
     const res = classifyLeads({
@@ -76,12 +93,6 @@ describe("classifyLeads: the RPB shape", () => {
     expect(kind(res, "f")).toMatchObject({ kind: "event", viaBooth: true });
     if (res.status !== "ok") throw new Error();
     expect(res.counts).toMatchObject({ working: 0, eventContacts: 3, notStarted: 3, open: 6 });
-  });
-
-  it("an importer or agent stage move is not activity (the loader never reports it), so the lead stays Not started", () => {
-    // The loader reports lead ids only for real activity; an importer-only lead is simply absent.
-    const res = classifyLeads({ leads: [lead("a", "pnc")], stages, facts: facts({ activity: ok() }) });
-    expect(kind(res, "a").kind).toBe("not_started");
   });
 
   it("real activity makes a lead Working even in the first stage", () => {
@@ -140,9 +151,11 @@ describe("classifyLeads: three-state sources", () => {
     if (res.status !== "unavailable") throw new Error();
     expect(res.failed).toEqual(["activity"]);
     expect(res.counts).toMatchObject({ open: 2, nurture: 1, inScope: 3 });
-    expect(effectiveView(res, "working")).toBe("all");
-    expect(inWorkingView(res, "a", "working")).toBe(true);
-    expect(inWorkingView(res, "b", "event")).toBe(true);
+    expect(effectiveSet(res, "working")).toBe("open");
+    expect(effectiveSet(res, "nurture")).toBe("nurture");
+    expect(inLeadSet(res, "a", "open", "open")).toBe(true);
+    expect(inLeadSet(res, "n", "open", "nurture")).toBe(false);
+    expect(inLeadSet(res, "n", "nurture", "nurture")).toBe(true);
   });
 
   it("a failed optional source fails toward showing: unverified leads stay in the Working view and the source is named", () => {
@@ -157,13 +170,15 @@ describe("classifyLeads: three-state sources", () => {
       expect(res.counts.uncertain).toBe(2);
       expect(kind(res, "quiet")).toEqual({ kind: "not_started", uncertain: true });
       expect(kind(res, "ugw")).toMatchObject({ kind: "event", uncertain: true });
-      expect(inWorkingView(res, "quiet", "working")).toBe(true);
-      expect(inWorkingView(res, "ugw", "working")).toBe(true);
-      expect(inWorkingView(res, "busy", "working")).toBe(true);
+      expect(inLeadSet(res, "quiet", "working")).toBe(true);
+      expect(inLeadSet(res, "ugw", "working")).toBe(true);
+      expect(inLeadSet(res, "busy", "working")).toBe(true);
       // Honest buckets are unchanged: the Not started chip still lists "quiet" only.
-      expect(inWorkingView(res, "quiet", "not_started")).toBe(true);
-      expect(inWorkingView(res, "ugw", "not_started")).toBe(false);
+      expect(inLeadSet(res, "quiet", "not-started")).toBe(true);
+      expect(inLeadSet(res, "ugw", "not-started")).toBe(false);
       expect(res.counts.working).toBe(1);
+      // The chip counts what the Working set lists: confirmed plus uncertain.
+      expect(res.counts.workingShown).toBe(3);
     }
   });
 
@@ -173,7 +188,7 @@ describe("classifyLeads: three-state sources", () => {
     expect(res.splitApproximate).toBe(true);
     expect(res.degraded).toEqual(["booth"]);
     expect(res.counts.uncertain).toBe(0);
-    expect(inWorkingView(res, "a", "working")).toBe(false);
+    expect(inLeadSet(res, "a", "working")).toBe(false);
     expect(kind(res, "b").kind).toBe("event");
   });
 
@@ -192,20 +207,24 @@ describe("views", () => {
     facts: facts(),
   });
   it("lists each lead in exactly the right chip; All lists everything passed", () => {
-    expect(inWorkingView(res, "w", "working")).toBe(true);
-    expect(inWorkingView(res, "e", "working")).toBe(false);
-    expect(inWorkingView(res, "e", "event")).toBe(true);
-    expect(inWorkingView(res, "n", "not_started")).toBe(true);
-    expect(inWorkingView(res, "nur", "working")).toBe(false);
-    expect(inWorkingView(res, "nur", "event")).toBe(false);
-    expect(inWorkingView(res, "nur", "not_started")).toBe(false);
-    expect(inWorkingView(res, "nur", "all")).toBe(true);
+    expect(inLeadSet(res, "w", "working")).toBe(true);
+    expect(inLeadSet(res, "e", "working")).toBe(false);
+    expect(inLeadSet(res, "e", "event")).toBe(true);
+    expect(inLeadSet(res, "n", "not-started")).toBe(true);
+    expect(inLeadSet(res, "nur", "working")).toBe(false);
+    expect(inLeadSet(res, "nur", "event")).toBe(false);
+    expect(inLeadSet(res, "nur", "not-started")).toBe(false);
+    expect(inLeadSet(res, "nur", "nurture")).toBe(true);
+    expect(inLeadSet(res, "nur", "open")).toBe(false);
+    expect(inLeadSet(res, "w", "open")).toBe(true);
+    expect(inLeadSet(res, "w", "lost")).toBe(false);
   });
-  it("the URL value defaults to working and ignores unknown values", () => {
-    expect(parseWorkingView(undefined)).toBe("working");
-    expect(parseWorkingView("bogus")).toBe("working");
-    expect(parseWorkingView("all")).toBe("all");
-    expect(parseWorkingView("event")).toBe("event");
+  it("the URL value (?set=) defaults to working and ignores unknown values, including the old view names", () => {
+    expect(parseLeadSet(undefined)).toBe("working");
+    expect(parseLeadSet("bogus")).toBe("working");
+    expect(parseLeadSet("all")).toBe("working");
+    expect(parseLeadSet("not_started")).toBe("working");
+    for (const v of ["working", "event", "not-started", "open", "nurture", "lost"]) expect(parseLeadSet(v)).toBe(v);
   });
 });
 

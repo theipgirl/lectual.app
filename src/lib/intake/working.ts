@@ -80,6 +80,8 @@ export type LeadBucket =
 export type WorkingCounts = {
   /** Confirmed Working. */
   working: number;
+  /** What the Working set lists: confirmed Working plus the uncertain ones (a source was down). The chip shows this. */
+  workingShown: number;
   eventContacts: number;
   notStarted: number;
   /** Event or Not started leads that might be Working on a source that could not be read. */
@@ -113,7 +115,8 @@ export type WorkingResult =
       counts: Pick<WorkingCounts, "open" | "nurture" | "lost" | "won" | "noStage" | "inScope">;
     };
 
-const FOLLOW_UP = /\bfollow up\b/;
+// Anchored like the weekly review's rule (src/lib/review/build.ts): "Post Consultation Follow Up" is a late stage, not Follow-Up.
+const FOLLOW_UP = /^follow ?up\b/;
 
 /** A Follow-Up stage by name (spelling and punctuation ignored: "Follow-Up", "4. Follow up"). */
 export function isFollowUpStage(stage: Pick<WorkingStage, "name">): boolean {
@@ -261,36 +264,49 @@ export function classifyLeads(input: {
   return {
     status: "ok",
     byLead,
-    counts: { working, eventContacts, notStarted, uncertain, ...base, inScope },
+    counts: { working, workingShown: working + uncertain, eventContacts, notStarted, uncertain, ...base, inScope },
     degraded,
     splitApproximate,
   };
 }
 
-export type WorkingView = "working" | "event" | "not_started" | "all";
+/** The Leads page's sets, as the URL names them (`?set=`). */
+export type LeadSet = "working" | "event" | "not-started" | "open" | "nurture" | "lost";
+export const LEAD_SETS: readonly LeadSet[] = ["working", "event", "not-started", "open", "nurture", "lost"];
 
-/** The default view when the URL names none or an unknown one. */
-export const DEFAULT_WORKING_VIEW: WorkingView = "working";
+/** The set when the URL names none or an unknown one. */
+export const DEFAULT_LEAD_SET: LeadSet = "working";
 
-export function parseWorkingView(value: string | null | undefined): WorkingView {
-  return value === "working" || value === "event" || value === "not_started" || value === "all" ? value : DEFAULT_WORKING_VIEW;
+export function parseLeadSet(value: string | null | undefined): LeadSet {
+  return (LEAD_SETS as readonly string[]).includes(value ?? "") ? (value as LeadSet) : DEFAULT_LEAD_SET;
 }
 
 /**
- * Is this lead listed in this view? "Working" also lists the uncertain ones (fail toward showing).
- * "All" is every lead the caller passes (the page's scope today, open + nurture): nothing becomes
- * unreachable. With the Working rule unavailable every view is All (`effectiveView`).
+ * Is this lead listed in this set? "Working" also lists the uncertain ones (fail toward showing). "All open" is
+ * every open-stage lead; "Nurture" the leads in a nurture stage. "Lost" is never answered here: lost leads are not
+ * in the page's list at all and have their own read. With the Working rule unavailable the three Working sets are
+ * "All open" (`effectiveSet`), and membership then follows stage category alone (`stageCategory`).
  */
-export function inWorkingView(result: WorkingResult, leadId: string, view: WorkingView): boolean {
-  if (result.status === "unavailable" || view === "all") return true;
+export function inLeadSet(result: WorkingResult, leadId: string, set: LeadSet, stageCategory?: string | null): boolean {
+  if (set === "lost") return false;
+  if (result.status === "unavailable") return set === "nurture" ? stageCategory === "nurture" : stageCategory === "open";
   const b = result.byLead.get(leadId);
   if (!b) return false;
-  if (view === "working") return b.kind === "working" || ((b.kind === "event" || b.kind === "not_started") && b.uncertain);
-  if (view === "event") return b.kind === "event";
-  return b.kind === "not_started";
+  switch (set) {
+    case "working":
+      return b.kind === "working" || ((b.kind === "event" || b.kind === "not_started") && b.uncertain);
+    case "event":
+      return b.kind === "event";
+    case "not-started":
+      return b.kind === "not_started";
+    case "open":
+      return b.kind === "working" || b.kind === "event" || b.kind === "not_started";
+    case "nurture":
+      return b.kind === "closed" && b.as === "nurture";
+  }
 }
 
-/** The view the page should actually draw: the one asked for, or All when Working could not be computed. */
-export function effectiveView(result: WorkingResult, asked: WorkingView): WorkingView {
-  return result.status === "unavailable" ? "all" : asked;
+/** The set the page should actually draw: the one asked for, or All open when Working could not be computed. */
+export function effectiveSet(result: WorkingResult, asked: LeadSet): LeadSet {
+  return result.status === "unavailable" && (asked === "working" || asked === "event" || asked === "not-started") ? "open" : asked;
 }
