@@ -128,27 +128,17 @@ export async function OwnerToday({
             <div className="ot-hero-main ot-only-wide">
               <span className="ot-big">{hero.big}</span>
               <div className="ot-hero-text">
-                {hero.readyLine && (
-                  <Link href={DECK_PATH} className="ot-hero-ready">
-                    {hero.readyLine}
-                  </Link>
-                )}
                 <span className="ot-hero-title">
                   {hero.unit} &middot; {hero.about}
                 </span>
-                <span className="ot-hero-sub">{hero.dealLine}</span>
+                <span className="ot-hero-sub" data-ready={hero.ready ? "true" : undefined}>{hero.dealLine}</span>
               </div>
             </div>
             <div className="ot-hero-main ot-only-narrow">
-              {hero.readyLine && (
-                <Link href={DECK_PATH} className="ot-hero-ready">
-                  {hero.readyLine}
-                </Link>
-              )}
               <p className="ot-hero-count">
                 {hero.big} {hero.cards} <span className="ot-hero-about">&middot; {hero.about}</span>
               </p>
-              <p className="ot-hero-sub">{hero.dealLine}</p>
+              <p className="ot-hero-sub" data-ready={hero.ready ? "true" : undefined}>{hero.dealLine}</p>
             </div>
           </>
         ) : (

@@ -86,20 +86,22 @@ describe("the words", () => {
 describe("Today's tile (cardsHero)", () => {
   const summary = { status: "ok" as const, count: 3, minutes: 5, dealLabel: "2:00 PM", nextDealLabel: "7:00 AM", laterArrivals: 0 };
 
-  it("carries the ready line only when the nudge is ready, and nothing else changes", () => {
+  it("turns the sub-line into the ready sentence only when the nudge is ready, and nothing else changes", () => {
     const off = cardsHero(summary);
-    expect(off.readyLine).toBeNull();
+    expect(off.ready).toBe(false);
+    expect(off.dealLine).toBe("Deal opened 2:00 PM. Next deal 7:00 AM.");
     const on = cardsHero(summary, { ready: true, label: "2:00 PM", count: 3 });
-    expect(on.readyLine).toBe("Your 2:00 PM deal is ready · 3 cards");
-    expect({ ...on, readyLine: null }).toEqual(off);
+    expect(on.ready).toBe(true);
+    expect(on.dealLine).toBe("Your 2:00 PM deal is ready. Next deal 7:00 AM.");
+    expect({ ...on, ready: false, dealLine: off.dealLine }).toEqual(off);
     expect(cardsHero(summary, NO_NUDGE)).toEqual(off);
   });
 
   it("failed, unconfigured and empty states never carry it", () => {
     const ready = { ready: true as const, label: "2:00 PM", count: 3 };
-    expect(cardsHero({ status: "unavailable" }, ready).readyLine).toBeNull();
-    expect(cardsHero({ status: "unconfigured" }, ready).readyLine).toBeNull();
-    expect(cardsHero({ ...summary, count: 0 }, ready).readyLine).toBeNull();
+    expect(cardsHero({ status: "unavailable" }, ready).ready).toBe(false);
+    expect(cardsHero({ status: "unconfigured" }, ready).ready).toBe(false);
+    expect(cardsHero({ ...summary, count: 0 }, ready).ready).toBe(false);
   });
 });
 

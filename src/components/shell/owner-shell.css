@@ -163,11 +163,12 @@
 
 /* The phone More sheet's note is gone (founder, Nov 10); the MORE label stays 12px or more. */
 
-/* Deal-ready nudge (Phase 2 item 4): a small ox dot with a cream ring on the oxblood rail and the phone bar, plus the
-   same words in the link's aria-label. Tokens only. */
-.lx-ready-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--ox); box-shadow: 0 0 0 2px var(--cream); flex: 0 0 auto; margin-left: 6px; }
-.lx-rail-item.is-active .lx-ready-dot { box-shadow: none; }
+/* Deal-ready nudge: a solid cream dot, no ring, on the oxblood rail and phone bar (cream on #550E1A is 13.4:1; on the dark
+   #4A0C17 it is 14.5:1, on the tile's dark #6A1F2B 10.7:1). On an active (cream) tile the dot goes oxblood so it still shows. The same words are in the link's aria-label. Tokens only. */
+.lx-ready-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--cream); flex: 0 0 auto; margin-left: 6px; }
+.lx-rail-item.is-active .lx-ready-dot,
+.lx-mbar-item.is-active .lx-ready-dot { background: var(--ox); }
 .lx-ready-dot--bar { position: absolute; top: -3px; right: -5px; margin: 0; }
 /* Collapsed rail: the open-rail dot (after the label) is clipped, so the dot goes on the icon in place of the count dot. */
-.lx-rail--owner .lx-rail-dot.is-ready { background: var(--ox); box-shadow: 0 0 0 1.5px var(--cream); width: 7px; height: 7px; }
+.lx-rail--owner .lx-rail-dot.is-ready { background: var(--cream); box-shadow: none; width: 7px; height: 7px; }
 .lx-rail--owner:not(:hover):not(.is-pinned):not(:has(:focus-visible)) .lx-ready-dot { display: none; }

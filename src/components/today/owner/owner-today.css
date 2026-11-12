@@ -66,11 +66,9 @@
 .ot-hero-text { display: flex; flex-direction: column; gap: 6px; padding-bottom: 8px; }
 .ot-hero-title { font-family: var(--serif); font-size: 30px; line-height: 1.1; }
 .ot-hero-sub { color: var(--ot-hero-sub); font-size: 15px; margin: 0; }
-/* The deal-ready nudge: a plain link line above the count, with an ox-ringed dot (tokens only). */
-.ot-hero-ready { display: inline-flex; align-items: center; gap: 8px; color: var(--ot-deck-ink) !important; font: 500 15px var(--sans); text-decoration: none !important; }
-.ot-hero-ready::before { content: ""; width: 8px; height: 8px; border-radius: 999px; background: var(--ox); box-shadow: 0 0 0 2px var(--ot-deck-ink); flex: 0 0 auto; }
-.ot-hero-ready:hover { text-decoration: underline !important; }
-.ot-hero-ready:focus-visible { outline: 2px solid var(--ot-dot); outline-offset: 2px; }
+/* The deal-ready nudge is a solid cream dot (no ring) in front of the sub-line, on the oxblood panel; on the phone's light card it is oxblood. */
+.ot-hero-sub[data-ready="true"] { display: flex; align-items: flex-start; gap: 8px; }
+.ot-hero-sub[data-ready="true"]::before { content: ""; width: 8px; height: 8px; margin-top: 0.45em; border-radius: 999px; background: var(--ot-deck-ink); flex: 0 0 auto; }
 .ot-hero-message { font-family: var(--serif); font-size: 30px; line-height: 1.15; margin: 0; }
 .ot-start { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; height: 56px; padding: 0 40px; border-radius: 999px; background: var(--ot-deck-ink); color: var(--ot-deck-bg) !important; font: 500 17px var(--sans); text-decoration: none !important; }
 .ot-start:focus-visible, .ot-btn:focus-visible, .ot-chip:focus-visible, .ot-day:focus-visible { outline: 2px solid var(--ot-dot); outline-offset: 2px; }
@@ -147,8 +145,7 @@ a.ot-row-title:hover { text-decoration: underline; }
   .ot-hero-count { font-family: var(--serif); font-size: 30px; line-height: 1; margin: 0; }
   .ot-hero-about { font-size: 20px; color: var(--muted); }
   .ot-hero-sub { color: var(--body); font-size: 14px; }
-  .ot-hero-ready { color: var(--ox) !important; font-size: 14px; }
-  .ot-hero-ready::before { box-shadow: none; }
+  .ot-hero-sub[data-ready="true"]::before { background: var(--ox); }
   .ot-hero-message { font-size: 22px; color: var(--ink); }
   .ot-start { width: 100%; height: 44px; padding: 0 20px; background: var(--ox); color: var(--cream) !important; font-size: 15px; }
 

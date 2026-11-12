@@ -266,7 +266,7 @@ export const DECK_BAD_PERSON = "That person can't take approvals. Choose someone
 export const DECK_PAGE_TITLE = "Your deal";
 /** Shared by the deck intro and the welcome deal's card 2. */
 export const DECK_APPROVING_NEVER_SENDS = "Approving never sends.";
-export const DECK_PAGE_SUB = `Drafts wait here until you decide. ${DECK_APPROVING_NEVER_SENDS} A client email becomes a draft in a connected mailbox; a person presses Send.`;
+export const DECK_PAGE_SUB = `${DECK_APPROVING_NEVER_SENDS} A client email becomes a draft; a person presses Send.`;
 export const DECK_DEAL_NEW = "Deal new cards";
 export const deckLeft = (n: number, minutes: number) => `${n} left · about ${minutes} min`;
 export const DECK_META_ALL_DECIDED = "All decided";
@@ -407,6 +407,11 @@ export function ownerDealLine(openedLabel: string | null, nextLabel: string, lat
   const more = later > 0 ? ` ${later} more at ${nextLabel}.` : "";
   return `${opened}Next deal ${nextLabel}.${more}`;
 }
+/** Today tile sub-line while a deal is ready (the dot is drawn in front of it); otherwise ownerDealLine. */
+export function ownerDealReadyLine(readyLabel: string, nextLabel: string, later: number): string {
+  const more = later > 0 ? ` ${later} more at ${nextLabel}.` : "";
+  return `Your ${readyLabel} deal is ready. Next deal ${nextLabel}.${more}`;
+}
 export function ownerProposalOpens(opens: number | "unavailable" | undefined): string | null {
   if (opens === undefined) return null;
   if (opens === "unavailable") return "Couldn't load opens";
@@ -543,8 +548,8 @@ export const DEAL_TIMES_OPEN = "Change deal times";
 export const DEAL_TIMES_MENU_ITEM = "Deal times";
 export const DEAL_TIMES_FIRST = "First deal";
 export const DEAL_TIMES_SECOND = "Second deal";
-export const DEAL_TIMES_NOTE = "Your cards are dealt twice a day, at these times. This changes only your own deck.";
-export const dealTimesZoneLine = (zoneLabel: string) => `Firm time, ${zoneLabel}`;
+export const DEAL_TIMES_NOTE = "Changes only your own deck.";
+export const dealTimesZoneLine = (zoneLabel: string) => zoneLabel;
 export const DEAL_TIMES_SAVE = "Save";
 export const DEAL_TIMES_SAVING = "Saving…";
 export const DEAL_TIMES_CANCEL = "Cancel";

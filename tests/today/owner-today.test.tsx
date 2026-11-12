@@ -67,7 +67,8 @@ describe("Owner Today", () => {
     expect(html).toContain("Good morning, Rebecca.");
     expect(html).toContain('<span class="ot-big">3</span>');
     expect(html).toContain("cards for you · about 6 min");
-    expect(html).toContain("Deal opened 7:00 AM. Next deal 2:00 PM.");
+    expect(html).toContain("Your 7:00 AM deal is ready. Next deal 2:00 PM.");
+    expect(html).not.toContain("ot-hero-ready");
     expect(html).toMatch(/href="\/dashboard\/queue\/deck\/"[^>]*>Start</);
   });
 

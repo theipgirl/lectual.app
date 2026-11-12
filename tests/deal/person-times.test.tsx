@@ -199,7 +199,7 @@ describe("the dialog and where it is opened", () => {
     expect(html.match(/<select/g)).toHaveLength(2);
     expect(html.match(/<option/g)).toHaveLength(576);
     expect(html).toContain('<option value="07:00" selected="">7:00 AM</option>');
-    expect(html).toContain("Firm time, Eastern Time (New York).");
+    expect(html).toContain("Eastern Time (New York). Changes only your own deck.");
     expect(html).toContain("Save");
     expect(html).toContain("Cancel");
   });
