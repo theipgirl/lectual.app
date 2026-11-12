@@ -127,3 +127,29 @@ export const NEW_OFFER_WORDS = {
   tooMany: "Offer at most 3 packages.",
   needsOne: "Pick at least one package to offer.",
 } as const;
+
+/** Sprint 5: the labels of the summary Copilot shows before it creates a draft (`src/lib/copilot/draft-proposal.ts`). */
+export const COPILOT_WORDS = {
+  heading: "Draft proposal to create:",
+  client: "Client",
+  package: "Package",
+  discount: "Discount",
+  credit: "Credit on the whole proposal",
+  brandDiscount: "discount on this brand name",
+  payLink: "Pay link",
+  noPayLink: "none yet (add it before the link is created)",
+  matter: "Matter",
+  work: "Work",
+  flatFee: "Flat fee",
+  notIncluded: "Not included",
+  onePackage: "one package",
+  startingOn: "starting on",
+  choiceOf: "the client chooses among",
+  perMark: "a package chosen for each mark",
+  draftOnly:
+    "It is created as a draft only: nothing is approved, no client link is made and nothing is sent. Staff review it before anything reaches the client.",
+  checkFeeTyped: "The flat fee came from your request. Check it is the fee you meant.",
+  checkCredit: "A credit was applied from your request. Check it.",
+  checkBrandDiscount: "A discount on this brand name was applied from your request. Check it.",
+  checkNoPayLink: "Add the client's pay link before creating the link.",
+} as const;

@@ -124,7 +124,14 @@ export type DraftFirm = {
 
 export type DraftResult =
   | { ok: true; content: ProposalContent; issues: ValidationIssue[]; checks: DraftCheck[] }
-  | { ok: false; error: string; /** Set when the refusal is an unknown package name: the names the firm does have. */ packages?: string[] };
+  | {
+      ok: false;
+      error: string;
+      /** Set when the refusal is an unknown package name: the names the firm does have. */
+      packages?: string[];
+      /** Every blocking sentence when the content itself was refused (the first is `error`). */
+      problems?: string[];
+    };
 
 /* ─────────────────────────── the builder ─────────────────────────── */
 
@@ -187,7 +194,7 @@ export function buildDraftContent(spec: ProposalDraftSpec, firm: DraftFirm, newI
   const unwritten = spec.kind === "general" && !spec.general.matterTitle.trim() && spec.general.items.length === 0 && spec.general.flatFee === 0;
   const incomplete = spec.kind === "general" ? (unwritten ? GENERAL_INCOMPLETE_OK : /^$/) : INCOMPLETE_OK;
   const blocking = errors.filter((i) => !incomplete.test(i.path));
-  if (blocking.length > 0) return { ok: false, error: blocking[0].message };
+  if (blocking.length > 0) return { ok: false, error: blocking[0].message, problems: [...new Set(blocking.map((i) => i.message))] };
   if (content.loe) {
     const loe = loeIssues(content.loe, spec.kind);
     if (loe.length > 0) return { ok: false, error: loe[0].message };

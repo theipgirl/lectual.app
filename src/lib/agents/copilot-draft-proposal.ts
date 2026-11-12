@@ -157,6 +157,12 @@ export async function runDraftProposal(
     if (built.kind === "package_not_found") {
       return { status: "package_not_found", message: "That package isn't on the firm's list. Nothing was created. Ask the user which of these to use.", packages: built.packages };
     }
+    if (built.kind === "needs_package") {
+      return { status: "needs_input", ask: "Which of the firm's packages should the proposal use?", packages: built.packages, message: "Nothing was created. Ask the user this." };
+    }
+    if (built.kind === "needs_changes") {
+      return { status: "needs_changes", message: "Nothing was created. Ask the user to change these, in plain words:", problems: built.problems };
+    }
     return { status: "needs_input", ask: "This lead has no name on record. Add the client's name to the lead first.", message: "Nothing was created." };
   }
   const draft: BuiltDraft = built.draft;
