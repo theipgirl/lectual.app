@@ -1,8 +1,9 @@
 import "server-only";
 
 import { firmToken } from "@/lib/intake-forms/lawmatics-sync";
-import { readStoredAgreement, type StoredAgreementDb } from "@/lib/loe/signature-read";
+import { readStoredAgreement, type StoredAgreementDb } from "@/lib/loe/stored-agreement";
 import { buildVerifiedSignedPdf, signedLetterFileName } from "@/lib/loe/signed-pdf";
+import { signedAtUtcIso } from "@/lib/loe/signing";
 import { resolveTimeZone } from "@/lib/org/profile-rules";
 import { addNote, uploadMatterFile, type FetchLike, type MultipartFetchLike } from "@/lib/lawmatics/writes";
 import { firmDisplayName } from "./commitment";
@@ -84,11 +85,16 @@ export function acceptanceHeadline(input: { clientName: string; packageName: str
   return `${client} accepted ${pkg ? `${pkg} ` : "their proposal "}· legal ${formatDollars(input.legalTotalCents)}${added}${signed}`;
 }
 
-/** "Engagement letter signed by Alex Sample on 2026-11-12T19:14:00.000Z." for a schema-2 snapshot, else null. Nothing of the letter itself. */
+/**
+ * "Engagement letter signed by Alex Sample on 2026-11-12T19:14:00.000Z (UTC)." for a schema-2 snapshot, else null. Nothing of the
+ * letter itself. The time is the stored instant in UTC, ISO 8601, and SAYS it is UTC: this line is written on a path that may not
+ * know the firm's zone, and a signed time with no zone says nothing.
+ */
 export function signedNoteLine(snapshot: AcceptedSnapshot): string | null {
   const agreement = snapshot.agreement;
   if (!agreement || !text(agreement.signer_name)) return null;
-  return `Engagement letter signed by ${text(agreement.signer_name)} on ${text(agreement.signed_at) || snapshot.accepted_at}.`;
+  const when = signedAtUtcIso(text(agreement.signed_at) || snapshot.accepted_at);
+  return when ? `Engagement letter signed by ${text(agreement.signer_name)} on ${when} (UTC).` : `Engagement letter signed by ${text(agreement.signer_name)}.`;
 }
 
 /**

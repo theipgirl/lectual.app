@@ -7,7 +7,9 @@ import type { MultipartFetchLike } from "@/lib/lawmatics/writes";
 import type { AcceptedSnapshot } from "@/lib/proposals/types";
 import { acceptedSnapshot } from "./accepted-fixture";
 import { fakeFollowupDb, type Row } from "./followup-db";
-import { signedTrademark, FINGERPRINT } from "../loe/signed-fixtures";
+import { agreementTextSha256 } from "@/lib/loe/fingerprint";
+import { STEP_TEXT } from "@/lib/proposals/step-text";
+import { signedTrademark, storedTextOf, FINGERPRINT } from "../loe/signed-fixtures";
 import { paragraphText, squash } from "../loe/full-letter-fixture";
 
 vi.mock("next/server", () => ({ after: () => {} }));
@@ -206,10 +208,111 @@ describe("P3: the signed letter is filed in Lawmatics", () => {
   });
 });
 
+/* ── Review item 7: a failed firm-profile read never builds a PDF with a guessed zone or a missing firm name ── */
+
+describe("item 7: the follow-up path and the firm's name and zone", () => {
+  for (const table of ["crm_org_profile", "crm_org"]) {
+    it(`a failed ${table} read records the step as failed, builds no PDF, uploads nothing, and the next run retries it`, async () => {
+      let broken = true;
+      const { db, tables } = fakeFollowupDb(tablesFor(signedTrademark()), { failSelect: (t) => broken && t === table });
+      const up = fakeUpload();
+      await run(db, up.fetchImpl);
+      expect(up.sent).toHaveLength(0);
+      expect(filed(tables)).toHaveLength(1);
+      expect(filed(tables)[0].payload).toMatchObject({ step: "signed_loe_upload", outcome: "failed", reason: STEP_TEXT.signedFirmUnreadable });
+      // The acceptance itself is untouched.
+      expect(tables.client_proposal[0].status).toBe("accepted");
+
+      // `failed` is retryable: the next run (the read works now) files the letter, in the firm's real zone and under its name.
+      broken = false;
+      await run(db, up.fetchImpl);
+      expect(up.sent).toHaveLength(1);
+      expect(filed(tables).map((e) => (e.payload as Row).outcome)).toEqual(["failed", "uploaded"]);
+      const text = await pdfTextOf(up.sent[0].form);
+      expect(text.startsWith("RPB Law")).toBe(true);
+      expect(text).toContain("Signed: November 12, 2026 at 2:14 PM EST");
+      expect(text).toContain("Signed (UTC): 2026-11-12T19:14:00.000Z");
+    });
+  }
+
+  it("a firm whose org row has no name is unreadable too: no letterhead is ever left blank", async () => {
+    const { db, tables } = fakeFollowupDb(tablesFor(signedTrademark(), { crm_org: [{ id: ORG, name: "" }] }));
+    const up = fakeUpload();
+    await run(db, up.fetchImpl);
+    expect(up.sent).toHaveLength(0);
+    expect(filed(tables)[0].payload).toMatchObject({ outcome: "failed", reason: STEP_TEXT.signedFirmUnreadable });
+  });
+
+  it("a firm that simply has no profile row is NOT a failed read: its own name and the standard zone are real answers", async () => {
+    const { db, tables } = fakeFollowupDb(tablesFor(signedTrademark(), { crm_org_profile: [] }));
+    const up = fakeUpload();
+    await run(db, up.fetchImpl);
+    expect(up.sent).toHaveLength(1);
+    expect(filed(tables)[0].payload).toMatchObject({ outcome: "uploaded" });
+    expect((await pdfTextOf(up.sent[0].form)).startsWith("RPB Law Firm")).toBe(true);
+  });
+
+  it("the failed step is one the staff card offers Try again for", async () => {
+    const { RETRYABLE_STEPS } = await import("@/lib/proposals/paid");
+    expect(RETRYABLE_STEPS).toContain("signed_loe_upload");
+    const { filingView } = await import("@/lib/loe/signed-card");
+    const events = [{ proposal_id: PID, type: "edited", actor: "system", actor_user_id: null, created_at: "2026-11-12T19:15:00.000Z", payload: { step: "signed_loe_upload", outcome: "failed", reason: STEP_TEXT.signedFirmUnreadable } }];
+    expect(filingView(events as never, PID, true)).toMatchObject({ state: "failed", retry: true });
+  });
+});
+
+/* ── Review item 6 on the filing path: the file is the stored signed text when today's code no longer rebuilds it ── */
+
+describe("item 6: the filed letter never carries a fingerprint beside other text", () => {
+  function olderSigning() {
+    const today = signedTrademark();
+    const storedText = `${storedTextOf(today)}\n\nA line only the stored text has.`;
+    const sha256 = agreementTextSha256(storedText);
+    return { snapshot: { ...today, agreement: { ...today.agreement!, sha256 } } as AcceptedSnapshot, storedText, sha256 };
+  }
+
+  it("uploads the stored signed text, fenced on the proposal's org and the snapshot's signature id", async () => {
+    const { snapshot, storedText, sha256 } = olderSigning();
+    const { db, tables, calls } = fakeFollowupDb(
+      tablesFor(snapshot, {
+        client_proposal_signature: [
+          { id: "sig-1", proposal_id: PID, org_id: ORG, agreement_text: storedText, agreement_sha256: sha256, signed_at: "2026-11-12T19:14:00.000Z" },
+          // Another firm's row for the same proposal id must never be picked up.
+          { id: "sig-1", proposal_id: PID, org_id: "other-org", agreement_text: "another firm's text", agreement_sha256: "f".repeat(64), signed_at: "2026-11-13T19:14:00.000Z" },
+        ],
+      }),
+    );
+    const up = fakeUpload();
+    await run(db, up.fetchImpl);
+    expect(filed(tables)[0].payload).toMatchObject({ outcome: "uploaded" });
+    const text = await pdfTextOf(up.sent[0].form);
+    expect(text).toContain("A line only the stored text has.");
+    expect(text).toContain(`Fingerprint (sha256): ${sha256}`);
+    expect(text).not.toContain("another firm's text");
+    const read = calls.find((c) => c.table === "client_proposal_signature")!;
+    expect(read.filters).toEqual([["proposal_id", PID], ["org_id", ORG], ["id", "sig-1"]]);
+  });
+
+  it("no stored text to fall back on: failed, nothing uploaded", async () => {
+    const { snapshot } = olderSigning();
+    const { db, tables } = fakeFollowupDb(tablesFor(snapshot));
+    const up = fakeUpload();
+    await run(db, up.fetchImpl);
+    expect(up.sent).toHaveLength(0);
+    expect(filed(tables)[0].payload).toMatchObject({ outcome: "failed", reason: STEP_TEXT.signedNotBuilt });
+  });
+
+  it("when the snapshot rebuilds to the signed text, the signature table is never read", async () => {
+    const { db, calls } = fakeFollowupDb(tablesFor(signedTrademark()));
+    await run(db, fakeUpload().fetchImpl);
+    expect(calls.some((c) => c.table === "client_proposal_signature")).toBe(false);
+  });
+});
+
 /* ── Try again (signed in): `retryProposalStep` runs the same core with the signed-in token ── */
 
 describe("Try again uploads and writes `uploaded`", () => {
-  async function setup(events: Array<Record<string, unknown>>) {
+  async function setup(events: Array<Record<string, unknown>>, over: { facts?: unknown } = {}) {
     vi.resetModules();
     const snapshot = signedTrademark();
     const { acceptedProposalRow } = await import("../loe/signed-fixtures");
@@ -232,7 +335,7 @@ describe("Try again uploads and writes `uploaded`", () => {
     vi.doMock("@/lib/org/profile", () => ({ getFirmTimeZone: vi.fn(async () => "America/New_York") }));
     vi.doMock("@/lib/documents/generate", () => ({ generateTrademarkLoe: vi.fn() }));
     vi.doMock("@/lib/documents/store", () => ({ listDraftsForProposal: vi.fn(async () => []) }));
-    vi.doMock("@/lib/loe/staff-firm", () => ({ loadStaffFirmFacts: vi.fn(async () => ({ status: "ok", displayName: "RPB Law", timeZone: "America/New_York" })) }));
+    vi.doMock("@/lib/loe/staff-firm", () => ({ loadStaffFirmFacts: vi.fn(async () => over.facts ?? { status: "ok", displayName: "RPB Law", timeZone: "America/New_York" }) }));
     vi.doMock("@/lib/proposals/lawmatics-access", async () => {
       const actual = await vi.importActual<typeof import("@/lib/proposals/lawmatics-access")>("@/lib/proposals/lawmatics-access");
       return { ...actual, signedInLawmaticsToken: vi.fn(async () => ({ status: "ok", token: "SIGNED-IN-TOKEN" })), resolveProposalMatter: vi.fn() };
@@ -273,6 +376,14 @@ describe("Try again uploads and writes `uploaded`", () => {
     const again = await flow.retryProposalStep(id, "signed_loe_upload");
     expect(again.ok && again.notes).toEqual(["The signed engagement letter is already filed in Lawmatics."]);
     expect(uploadMatterFile).toHaveBeenCalledTimes(1);
+  });
+
+  it("item 7: Try again with the firm's name and zone unreadable records `failed` again and uploads nothing", async () => {
+    const id = "44444444-4444-4444-8444-444444444444";
+    const { flow, recorded, uploadMatterFile } = await setup([failedEvent(id)], { facts: { status: "unavailable" } });
+    await flow.retryProposalStep(id, "signed_loe_upload");
+    expect(uploadMatterFile).not.toHaveBeenCalled();
+    expect(recorded).toEqual([{ step: "signed_loe_upload", outcome: "failed", reason: STEP_TEXT.signedFirmUnreadable }]);
   });
 
   it("every other retry still needs the paid mark", async () => {

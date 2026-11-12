@@ -4,7 +4,7 @@ import type { LetterPdfResult } from "@/lib/loe/pdf-result";
 import { runStaffDownload } from "@/lib/loe/staff-download";
 import { loadStaffFirmFacts } from "@/lib/loe/staff-firm";
 import { getScopedClient } from "@/lib/db/scoped-client";
-import { readStoredAgreement, type StoredAgreementDb } from "@/lib/loe/signature-read";
+import { readStoredAgreement, type StoredAgreementDb } from "@/lib/loe/stored-agreement";
 import { getProposalRow } from "@/lib/proposals/store";
 import { gateSignedLetterDownload } from "../gate";
 

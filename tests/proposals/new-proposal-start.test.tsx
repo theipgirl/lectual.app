@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
-import { copilotHref, isStartScreen, startDoors } from "@/lib/proposals/start-screen";
+import { consultDoorState, copilotHref, isStartScreen, startDoors, type DoorProposal } from "@/lib/proposals/start-screen";
 import { copilotRequest, START_DOORS } from "@/lib/proposal-editor/vocabulary";
 
 /**
@@ -20,6 +20,8 @@ type Opts = {
   search?: Record<string, string>;
   /** The lead the scoped client finds, for a page opened with ?lead=. */
   lead?: Record<string, unknown>;
+  /** The firm's proposals read: the rows, or a failure (the store throws). */
+  proposals?: "fails" | Array<Record<string, unknown>>;
 };
 
 const h = vi.hoisted(() => ({ listLeads: vi.fn(), listMatters: vi.fn(), listConnections: vi.fn(), loadStrip: vi.fn(), scoped: vi.fn() }));
@@ -45,7 +47,13 @@ async function render(opts: Opts = {}) {
   vi.doMock("@/lib/ai/claude", () => ({ aiConfigured: () => opts.ai !== false }));
   vi.doMock("@/lib/db/scoped-client", () => ({ getScopedClient: h.scoped }));
   vi.doMock("@/lib/org/profile", () => ({ getFirmTimeZone: vi.fn(async () => "America/New_York") }));
-  vi.doMock("@/lib/proposals/store", () => ({ listProposals: vi.fn(async () => []), getProposalSettings: vi.fn(async () => null) }));
+  vi.doMock("@/lib/proposals/store", () => ({
+    listProposals: vi.fn(async () => {
+      if (opts.proposals === "fails") throw new Error("Can't show this right now.");
+      return opts.proposals ?? [];
+    }),
+    getProposalSettings: vi.fn(async () => null),
+  }));
   vi.doMock("@/lib/consult-proposal/draft-gate", () => ({ loadDraftBlock: vi.fn(async () => null) }));
   vi.doMock("@/lib/meetings/connection", () => ({ listMeetingConnections: h.listConnections }));
   vi.doMock("@/lib/proposals/consults-load", () => ({ loadConsultsStrip: h.loadStrip }));
@@ -107,6 +115,26 @@ describe("F5: the three doors", () => {
     }
     const unreadable = await render({ connections: "error", strip: "unavailable" });
     expect(text(unreadable)).toContain(START_DOORS.consult.couldntLoad);
+  });
+
+  it("review item 8: a failed read of the firm's PROPOSALS is the door's couldn't-load state, with no rows and no 'Draft the proposal'", async () => {
+    const html = await render({ proposals: "fails" });
+    expect(doors(html)).toEqual(["consult", "copilot", "scratch"]);
+    expect(text(html)).toContain(START_DOORS.consult.couldntLoad);
+    // A consult that already has a proposal must not read as ready to draft, so nothing is listed at all.
+    expect(html).not.toContain("Draft the proposal");
+    expect(html).not.toContain("pq-row");
+    expect(html).not.toContain(`name="meetingId"`);
+    expect(text(html)).not.toMatch(/No consults/);
+    // The meetings were never read on top of a failed proposals read.
+    expect(h.loadStrip).not.toHaveBeenCalled();
+  });
+
+  it("review item 8: when the proposals read works, its rows are what the consult rows are judged against", async () => {
+    const rows = [{ id: "p1", lead_id: "l1", created_at: "2026-11-10T20:00:00Z", source: "agent" }];
+    await render({ proposals: rows });
+    expect(h.loadStrip).toHaveBeenCalledTimes(1);
+    expect(h.loadStrip.mock.calls[0][0].proposals).toEqual([{ id: "p1", leadId: "l1", createdAt: "2026-11-10T20:00:00Z", source: "agent" }]);
   });
 
   it("a read that worked and found nothing says so (and only then)", async () => {
@@ -188,5 +216,71 @@ describe("Q4: nothing here sends, queues, approves or reads with the service rol
     const page = readFileSync("src/app/dashboard/proposals/new/page.tsx", "utf8");
     expect(page).toContain("requireProposalsModule()");
     expect(page).toContain("aiConfigured()");
+  });
+});
+
+describe("review item 8: consultDoorState is three-state on every read", () => {
+  const strip = { header: { title: "Zoom consults", status: { kind: "connected", text: "connected" } }, meetings: { status: "ok", rows: [], more: 0 } } as never;
+  const reads = (over: Partial<Parameters<typeof consultDoorState>[0]> = {}) => ({
+    notConnected: vi.fn(async () => false),
+    proposals: vi.fn(async (): Promise<DoorProposal[]> => []),
+    strip: vi.fn(async () => strip),
+    ...over,
+  });
+
+  it("ok: the rows, built on the proposals that were read", async () => {
+    const mine: DoorProposal[] = [{ id: "p1", leadId: "l1", createdAt: "2026-11-10T20:00:00Z", source: "agent" }];
+    const r = reads({ proposals: vi.fn(async () => mine) });
+    expect(await consultDoorState(r)).toEqual({ kind: "ok", data: strip });
+    expect(r.strip).toHaveBeenCalledWith(mine);
+  });
+
+  it("not connected: says what is needed and reads nothing else", async () => {
+    const r = reads({ notConnected: vi.fn(async () => true) });
+    expect(await consultDoorState(r)).toEqual({ kind: "not-connected" });
+    expect(r.proposals).not.toHaveBeenCalled();
+    expect(r.strip).not.toHaveBeenCalled();
+  });
+
+  it("a failed proposals read is unavailable, NEVER an empty list handed to the rows", async () => {
+    const r = reads({
+      proposals: vi.fn(async (): Promise<DoorProposal[]> => {
+        throw new Error("db down");
+      }),
+    });
+    expect(await consultDoorState(r)).toEqual({ kind: "unavailable" });
+    expect(r.strip).not.toHaveBeenCalled();
+  });
+
+  it("a failed meetings read, a throwing strip and a throwing connection check are unavailable too", async () => {
+    expect(await consultDoorState(reads({ strip: vi.fn(async () => ({ header: {}, meetings: { status: "unavailable" } }) as never) }))).toEqual({ kind: "unavailable" });
+    expect(
+      await consultDoorState(
+        reads({
+          strip: vi.fn(async () => {
+            throw new Error("boom");
+          }),
+        }),
+      ),
+    ).toEqual({ kind: "unavailable" });
+    expect(
+      await consultDoorState(
+        reads({
+          notConnected: vi.fn(async () => {
+            throw new Error("boom");
+          }),
+        }),
+      ),
+    ).toEqual({ kind: "unavailable" });
+  });
+
+  it("the page no longer turns a failed proposals read into an empty list", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync("src/app/dashboard/proposals/new/page.tsx", "utf8");
+    const fn = src.slice(src.indexOf("function readConsultDoor"), src.indexOf("function Back()"));
+    expect(fn).toContain("consultDoorState({");
+    expect(fn).not.toMatch(/\(\) => \[\]/);
+    expect(fn).not.toMatch(/\.then\(/);
+    expect(fn).not.toMatch(/catch/);
   });
 });

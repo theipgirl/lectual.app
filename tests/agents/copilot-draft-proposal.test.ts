@@ -33,6 +33,7 @@ function deps(o: Partial<DraftProposalDeps> = {}) {
     getLead: vi.fn(async (id: string) => (id === LEAD_ID ? lead() : null)),
     searchLeads: vi.fn(async () => [lead()]),
     readPricing: vi.fn(async () => PRICING as unknown),
+    readLetter: vi.fn(async () => ({ status: "ok" as const, letter: null })),
     create: vi.fn(async () => ({ id: "33333333-3333-4333-8333-333333333333" })),
     ...o,
   };

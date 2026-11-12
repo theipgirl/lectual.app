@@ -83,13 +83,12 @@ function asDraftLead(l: Lead): DraftLead {
 }
 
 export async function defaultDraftProposalDeps(): Promise<DraftProposalDeps> {
-  const [{ orgHasModule }, { currentRole }, pipeline, store, letters, scoped] = await Promise.all([
+  const [{ orgHasModule }, { currentRole }, pipeline, store, letters] = await Promise.all([
     import("@/lib/org/modules"),
     import("@/lib/auth/current-role"),
     import("@/lib/pipeline"),
     import("@/lib/proposals/store"),
-    import("@/lib/loe/templates-store"),
-    import("@/lib/db/scoped-client"),
+    import("@/lib/loe/approved-letter-read"),
   ]);
   return {
     mayDraft: async () => {
@@ -104,13 +103,7 @@ export async function defaultDraftProposalDeps(): Promise<DraftProposalDeps> {
     getLead: (id) => pipeline.getLead(id),
     searchLeads: (term) => pipeline.listLeads({ search: term }),
     readPricing: async () => (await store.getProposalSettings())?.pricing ?? {},
-    readLetter: async (kind) => {
-      try {
-        return await letters.getApprovedLetter(await scoped.getScopedClient(), kind);
-      } catch {
-        return { status: "unavailable" };
-      }
-    },
+    readLetter: (kind) => letters.readApprovedLetterScoped(kind),
     create: async (input) => {
       const row = await store.createProposal({ ...input, source: "agent" });
       return { id: row.id };

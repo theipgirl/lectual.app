@@ -85,8 +85,8 @@ describe("P4c: the firm notice and the Lawmatics note for a signed snapshot", ()
     const headline = acceptanceHeadline({ clientName: "Sevetri Wilson", packageName: "Enhanced", legalTotalCents: snap.quote.legal_total_cents, signedBy: snap.agreement!.signer_name });
     expect(headline).toContain("engagement letter signed by Sevetri Wilson");
     const note = acceptanceNoteBody(snap, "Sevetri Wilson");
-    expect(note.body).toContain("Engagement letter signed by Sevetri Wilson on 2026-11-12T19:14:00.000Z.");
-    for (const never of ["100 Example Street", "Miami", "Dear ", "sevetri@example.com", "Gaming consoles", "c".repeat(64), "Engagement letter\n"]) {
+    expect(note.body).toContain("Engagement letter signed by Sevetri Wilson on 2026-11-12T19:14:00.000Z (UTC).");
+    for (const never of ["100 Example Street", "Miami", "Dear ", "sevetri@example.com", "Gaming consoles", snap.agreement!.sha256, "Engagement letter\n"]) {
       expect(note.body, never).not.toContain(never);
       expect(headline, never).not.toContain(never);
     }

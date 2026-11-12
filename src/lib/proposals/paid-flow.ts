@@ -7,7 +7,7 @@ import { generateTrademarkLoe } from "@/lib/documents/generate";
 import { listDraftsForProposal } from "@/lib/documents/store";
 import { renderAcceptedProposalDocx, DOCX_MIME } from "@/lib/documents/accepted-proposal-docx";
 import { setProspectCustomFields, uploadMatterFile } from "@/lib/lawmatics/writes";
-import { readStoredAgreement, type StoredAgreementDb } from "@/lib/loe/signature-read";
+import { readStoredAgreement, type StoredAgreementDb } from "@/lib/loe/stored-agreement";
 import { buildVerifiedSignedPdf, signedLetterFileName } from "@/lib/loe/signed-pdf";
 import { loadStaffFirmFacts } from "@/lib/loe/staff-firm";
 import { orgHasModule } from "@/lib/org/modules";

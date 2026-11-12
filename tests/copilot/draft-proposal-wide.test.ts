@@ -179,7 +179,7 @@ describe("F8: a package that is not on the list returns the list and creates not
 const lead = (): Lead => ({ id: LEAD.id, org_id: ORG, first_name: "Jane", last_name: "Doe", business_name: "Doe Studio", email: "jane@example.com", mark_text: null }) as unknown as Lead;
 function deps() {
   const create = vi.fn(async () => ({ id: "33333333-3333-4333-8333-333333333333" }));
-  const d: DraftProposalDeps = { mayDraft: async () => true, getLead: async () => lead(), searchLeads: async () => [lead()], readPricing: async () => PRICING, create };
+  const d: DraftProposalDeps = { mayDraft: async () => true, getLead: async () => lead(), searchLeads: async () => [lead()], readPricing: async () => PRICING, readLetter: async () => ({ status: "ok", letter: null }), create };
   return { d, create };
 }
 async function call(input: unknown, question: string, history: Array<{ role: "user" | "assistant"; content: string }>, d: DraftProposalDeps) {

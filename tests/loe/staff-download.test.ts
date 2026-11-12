@@ -2,10 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { extractText, getDocumentProxy } from "unpdf";
 import { runStaffDownload, STAFF_DOWNLOAD_MESSAGES, type StaffDownloadDeps } from "@/lib/loe/staff-download";
-import { rebuildSignedLetter } from "@/lib/loe/signed-letter";
-import { buildSignedLetterPdf } from "@/lib/loe/signed-pdf";
+import { agreementTextSha256 } from "@/lib/loe/fingerprint";
+import { buildVerifiedSignedPdf } from "@/lib/loe/signed-pdf";
+import { SIGNATURE_READ_ROLES } from "@/lib/loe/signature-roles";
+import { ROLES } from "@/lib/auth/roles";
 import { acceptedSnapshot } from "../proposals/accepted-fixture";
-import { acceptedProposalRow, signedTrademark } from "./signed-fixtures";
+import { acceptedProposalRow, signedTrademark, storedTextOf } from "./signed-fixtures";
 import { squash } from "./full-letter-fixture";
 
 const ID = "44444444-4444-4444-8444-444444444444";
@@ -16,6 +18,7 @@ function deps(over: Partial<StaffDownloadDeps> = {}): StaffDownloadDeps {
     gate: async () => null,
     getProposal: async () => acceptedProposalRow(signedTrademark()),
     firmFacts: async () => FACTS,
+    readStored: async () => null,
     ...over,
   };
 }
@@ -33,10 +36,29 @@ describe("the staff Download of a signed letter", () => {
     const bytes = new Uint8Array(Buffer.from(r.base64, "base64"));
     expect(Buffer.from(bytes.slice(0, 4)).toString()).toBe("%PDF");
     expect(r.filename).toBe("Sevetri-Wilson-engagement-letter-signed-2026-11-12.pdf");
-    // The same bytes input as the client's own signed download (buildLetterPdf mode signed over rebuildSignedLetter): the same text read back.
-    const letter = rebuildSignedLetter(signedTrademark(), "America/New_York")!;
-    const clientSide = await buildSignedLetterPdf(letter, { displayName: "RPB Law Firm", title: "Engagement letter" });
-    expect(await text(bytes)).toBe(await text(clientSide));
+    // The same builder as the client's own signed download and the Lawmatics filing: the same text read back.
+    const clientSide = await buildVerifiedSignedPdf({ snapshot: signedTrademark(), firm: { displayName: "RPB Law Firm", timeZone: "America/New_York" }, readStored: async () => null });
+    if (!clientSide.ok) throw new Error("no file");
+    expect(await text(bytes)).toBe(await text(clientSide.bytes));
+    // Rebuilt and matched: no flag, and the stored text was never asked for.
+    expect(r.fromStoredText).toBeUndefined();
+  });
+
+  it("review item 6: when today's code no longer rebuilds the signed text, the file is the stored text and the result says so", async () => {
+    const today = signedTrademark();
+    const storedText = `${storedTextOf(today)}\n\nA line only the stored text has.`;
+    const sha256 = agreementTextSha256(storedText);
+    const row = acceptedProposalRow({ ...today, agreement: { ...today.agreement!, sha256 } });
+    const readStored = vi.fn(async () => ({ text: storedText, sha256 }));
+    const r = await runStaffDownload(deps({ getProposal: async () => row, readStored }), ID);
+    if (!r.ok) throw new Error(r.message);
+    expect(r.fromStoredText).toBe(true);
+    expect(readStored).toHaveBeenCalledWith(row);
+    const read = await text(new Uint8Array(Buffer.from(r.base64, "base64")));
+    expect(read).toContain("A line only the stored text has.");
+    expect(read).toContain(`Fingerprint (sha256): ${sha256}`);
+    // No stored text to fall back on: one fixed sentence, no file.
+    expect(await runStaffDownload(deps({ getProposal: async () => row }), ID)).toEqual({ ok: false, message: STAFF_DOWNLOAD_MESSAGES.unavailable });
   });
 
   it("refuses an unsigned accepted version", async () => {
@@ -75,9 +97,17 @@ describe("the staff Download of a signed letter", () => {
   it("the server action re-resolves the module and the role on every call, and reads through the scoped client only", () => {
     const src = readFileSync("src/app/dashboard/proposals/[id]/signed-letter-actions.ts", "utf8");
     expect(src).toContain('"use server"');
-    expect(src).toContain("gateStaffAction");
-    expect(src).not.toMatch(/admin|service/i);
+    // Review item 11: the gate is the ONE list of roles that may read a signature record.
+    expect(src).toContain("gate: gateSignedLetterDownload");
+    expect(src).not.toMatch(/gateStaffAction/);
+    expect(src.replace(/\/\*[\s\S]*?\*\//g, "")).not.toMatch(/admin|service/i);
     const gate = readFileSync("src/app/dashboard/proposals/gate.ts", "utf8");
-    expect(gate).toMatch(/gateStaffAction[\s\S]*requireProposalsModule\(\)[\s\S]*PROPOSAL_STAFF_WRITE_ROLES/);
+    const fn = gate.slice(gate.indexOf("export async function gateSignedLetterDownload"));
+    expect(fn.slice(0, fn.indexOf("\n}\n"))).toMatch(/requireProposalsModule\(\);\s*return canReadSignature\(await currentRole\(\)\) \? null : \{ error: SIGNED_DOWNLOAD_NOT_ALLOWED \};/);
+  });
+
+  it("the one list is the eight staff roles; a viewer and social media are not in it", () => {
+    expect([...SIGNATURE_READ_ROLES].sort()).toEqual(["admin", "attorney", "clerk", "intake", "law_clerk", "owner", "paralegal", "senior_admin"]);
+    expect(ROLES.filter((r) => !SIGNATURE_READ_ROLES.includes(r)).sort()).toEqual(["social_media", "viewer"]);
   });
 });

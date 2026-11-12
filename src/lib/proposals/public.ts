@@ -12,7 +12,7 @@ import { money } from "@/components/client-proposal/format";
 import { SIGN_MESSAGES } from "@/lib/loe/client-words";
 import { agreementTextSha256, canonicalFingerprint } from "@/lib/loe/fingerprint";
 import { buildExhibit } from "@/lib/loe/exhibit";
-import { readStoredAgreement, type StoredAgreementDb } from "@/lib/loe/signature-read";
+import { readStoredAgreement, type StoredAgreementDb } from "@/lib/loe/stored-agreement";
 import { rebuildSignedLetter, type SignedLetter } from "@/lib/loe/signed-letter";
 import { addressJson, assembleAgreement, checkSigning, letterDateText, signedLineText } from "@/lib/loe/signing";
 import { parseInet } from "@/lib/quotes/public";

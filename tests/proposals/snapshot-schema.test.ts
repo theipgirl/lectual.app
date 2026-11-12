@@ -74,7 +74,7 @@ describe("every reader of the snapshot takes schema 1 and 2", () => {
     const n1 = acceptanceNoteBody(v1, "Sevetri Wilson");
     const n2 = acceptanceNoteBody(v2, "Sevetri Wilson");
     expect(n1.body).not.toContain("Engagement letter signed");
-    expect(n2.body).toContain("Engagement letter signed by Sevetri Wilson on 2026-10-21T15:00:05.000Z.");
+    expect(n2.body).toContain("Engagement letter signed by Sevetri Wilson on 2026-10-21T15:00:05.000Z (UTC).");
     // Everything else in the note is identical; none of the letter, the details or the address is in it.
     expect(n2.body.replace(/\nEngagement letter signed[^\n]*$/, "")).toBe(n1.body);
     for (const never of ["100 Example Street", "Miami", "Dear ", "sevetri@example.com", "d".repeat(64)]) expect(n2.body).not.toContain(never);

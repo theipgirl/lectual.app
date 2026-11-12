@@ -32,7 +32,8 @@ describe("create link with an engagement letter on the proposal", () => {
     expect(d.approve).not.toHaveBeenCalled();
     expect(d.makeLive).not.toHaveBeenCalled();
     expect(calls).toEqual(["gate", "letter"]);
-    expect(LETTER_CHANGED_SENTENCE).toContain("Save your changes");
+    // One sentence for every make-live path (review item 5), so it does not assume the page has unsaved changes.
+    expect(LETTER_CHANGED_SENTENCE).toContain("save it again");
   });
 
   it("an unreadable approved-letter read refuses with its own fixed sentence, before approve or send", async () => {
@@ -91,7 +92,10 @@ describe("create link with an engagement letter on the proposal", () => {
   it("the real action wires the check (module and role first, then the approved letter through the scoped client)", () => {
     const src = readFileSync("src/app/dashboard/proposals/[id]/actions.ts", "utf8");
     expect(src).toMatch(/letterCurrent:\s*async/);
-    expect(src).toContain("letterCopyCheck");
-    expect(src).toContain("getApprovedLetter");
+    // The check is the ONE make-live guard (review item 5), the same one `sendProposal` runs.
+    expect(src).toContain("letterLiveCheck(await getScopedClient(), row)");
+    const guard = readFileSync("src/lib/loe/live-guard.ts", "utf8");
+    expect(guard).toContain("letterCopyCheck(");
+    expect(guard).toContain("getApprovedLetter(");
   });
 });

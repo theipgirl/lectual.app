@@ -5,7 +5,7 @@ import type { ProposalDetail } from "@/lib/proposals/store";
 import type { ProposalRow } from "@/lib/proposals/types";
 import type { SignatureRead } from "@/lib/loe/signature-read";
 import { acceptedSnapshot } from "../proposals/accepted-fixture";
-import { acceptedProposalRow, FINGERPRINT, signedTrademark } from "./signed-fixtures";
+import { acceptedProposalRow, FINGERPRINT, WRONG_FINGERPRINT, signedTrademark } from "./signed-fixtures";
 
 /** The staff proposal page for a SIGNED version: header wording, the Engagement letter card in each of its states, roles, and no card when there is nothing to show. */
 
@@ -23,8 +23,12 @@ type Extra = {
   notFound?: boolean;
 };
 
+/** How many times the last render asked the database for the signature row. */
+let signatureReads = 0;
+
 async function render(proposal: ProposalRow, extra: Extra = {}) {
   vi.resetModules();
+  signatureReads = 0;
   vi.doMock("@/app/dashboard/proposals/gate", () => ({ requireProposalsModule: vi.fn(async () => undefined), gateStaffAction: vi.fn(async () => null) }));
   vi.doMock("@/lib/firm/session", () => ({
     resolveFirmSession: vi.fn(async () => ({ kind: "ok", role: extra.role ?? "owner", org: { id: "o", name: "RPB Law", slug: "rpb" }, user: { id: "u" } })),
@@ -33,7 +37,12 @@ async function render(proposal: ProposalRow, extra: Extra = {}) {
   vi.doMock("@/lib/members/directory", () => ({ listMemberDirectory: vi.fn(async () => []) }));
   vi.doMock("@/lib/site-origin", () => ({ getSiteOrigin: vi.fn(async () => "https://app.example") }));
   vi.doMock("@/lib/db/scoped-client", () => ({ getScopedClient: vi.fn(async () => ({})) }));
-  vi.doMock("@/lib/loe/signature-read", () => ({ readSignature: vi.fn(async () => extra.signature ?? SIGNED_OK) }));
+  vi.doMock("@/lib/loe/signature-read", () => ({
+    readSignature: vi.fn(async () => {
+      signatureReads += 1;
+      return extra.signature ?? SIGNED_OK;
+    }),
+  }));
   vi.doMock("@/lib/loe/templates-store", () => ({ getApprovedLetter: vi.fn(async () => ({ status: "ok", letter: null })) }));
   vi.doMock("@/lib/proposals/store", () => ({
     getProposal: vi.fn(async (): Promise<ProposalDetail | null> => (extra.notFound ? null : { proposal, versions: [], events: [] })),
@@ -65,8 +74,11 @@ describe("P4b / P5b: a signed version on the staff page", () => {
     expect(html).not.toContain("Accepted by client");
     expect(html).toContain('data-signed-card="signed"');
     expect(html).toContain("Sevetri Wilson");
-    expect(html).toContain("Signed November 12, 2026 at 2:14 PM");
+    // Review item 7: the signed time names its zone.
+    expect(html).toContain("Signed November 12, 2026 at 2:14 PM EST");
     expect(html).toContain(FINGERPRINT);
+    // The snapshot rebuilds to the signed text, so the card does not say the copy comes from the stored text.
+    expect(html).not.toContain("data-stored-text");
     expect(html).toContain("Download the signed letter (PDF)");
     expect(html).toContain("Not filed yet.");
   });
@@ -112,12 +124,27 @@ describe("P4b / P5b: a signed version on the staff page", () => {
     expect(html).not.toContain("Try again");
   });
 
-  it("signature read `none`: says the record wasn't found, never Signed from the snapshot alone (no fingerprint, no Download)", async () => {
-    const html = await render(signed(), { signature: { status: "none" } });
-    expect(html).toContain('data-signed-card="not_found"');
-    expect(html).toContain("signature record wasn&#x27;t found");
-    expect(html).not.toContain("Download the signed letter");
-    expect(html).not.toContain(FINGERPRINT);
+  it("signature read `none` for a staff role: couldn't be loaded, never 'not signed' and never Signed from the snapshot alone (no fingerprint, no Download)", async () => {
+    for (const role of ["owner", "paralegal"]) {
+      const html = await render(signed(), { role, signature: { status: "none" } });
+      expect(signatureReads, role).toBe(1);
+      expect(html, role).toContain('data-signed-card="unavailable"');
+      expect(html, role).toContain("The signature record couldn&#x27;t be loaded.");
+      expect(html, role).not.toMatch(/not signed|wasn&#x27;t found|not shown as signed/i);
+      expect(html, role).not.toContain("Download the signed letter");
+      expect(html, role).not.toContain(FINGERPRINT);
+      // The card never makes "Signed by <name> on ..." up from the snapshot for a role that should have been able to read the row.
+      expect(html, role).not.toContain("Signed by Sevetri Wilson on");
+    }
+  });
+
+  it("review item 6: when today's code no longer rebuilds the signed text, the card says the copy is produced from the stored signed text", async () => {
+    const today = signedTrademark();
+    const older = acceptedProposalRow({ ...today, agreement: { ...today.agreement!, sha256: WRONG_FINGERPRINT } });
+    const html = await render(older, { signature: { ...SIGNED_OK, signature: { ...(SIGNED_OK as Extract<SignatureRead, { status: "ok" }>).signature, fingerprint: WRONG_FINGERPRINT } } });
+    expect(html).toContain("data-stored-text");
+    expect(html).toContain("This copy is produced from the stored signed text");
+    expect(html).toContain("Download the signed letter (PDF)");
   });
 
   it("signature read `unavailable`: says it couldn't be loaded", async () => {
@@ -141,12 +168,39 @@ describe("P5d: roles and another firm", () => {
     expect(html).not.toContain("Try again");
   });
 
-  it("a viewer and social media get neither Download nor Try again", async () => {
+  it("review item 11: a viewer and social media are never asked for the signature row; the card says who signed and when from the snapshot, and nothing else", async () => {
     for (const role of ["viewer", "social_media"]) {
+      // Even if the database WOULD answer (it will not, once the policy is tightened), the read is not attempted.
       const html = await render(signed(), { role, steps: [step({ step: "signed_loe_upload", outcome: "failed", reason: "HTTP 500" })] });
-      expect(html, role).toContain('data-signed-card="signed"');
+      expect(signatureReads, role).toBe(0);
+      expect(html, role).toContain('data-signed-card="summary"');
+      expect(html, role).toContain("Signed by Sevetri Wilson on November 12, 2026 at 2:14 PM EST");
       expect(html, role).not.toContain("Download the signed letter");
+      expect(html, role).not.toContain(FINGERPRINT);
+      expect(html, role).not.toContain("Fingerprint");
       expect(html, role).not.toContain("Try again");
+      // It does not lie in either direction: not "couldn't be loaded", not "not signed".
+      expect(html, role).not.toContain("couldn&#x27;t be loaded");
+      expect(html, role).not.toMatch(/not signed|wasn&#x27;t found/i);
+      // The header still says the client signed.
+      expect(html, role).toContain("Signed by client");
+    }
+  });
+
+  it("review item 11: a viewer whose database answer would be empty still gets the snapshot line (the empty answer is never read)", async () => {
+    const html = await render(signed(), { role: "viewer", signature: { status: "none" } });
+    expect(signatureReads).toBe(0);
+    expect(html).toContain('data-signed-card="summary"');
+    expect(html).toContain("Signed by Sevetri Wilson on November 12, 2026 at 2:14 PM EST");
+  });
+
+  it("review item 11: a paralegal and an owner are asked, and get the signer, the fingerprint and the Download", async () => {
+    for (const role of ["paralegal", "owner", "attorney", "clerk", "law_clerk", "admin", "senior_admin", "intake"]) {
+      const html = await render(signed(), { role });
+      expect(signatureReads, role).toBe(1);
+      expect(html, role).toContain('data-signed-card="signed"');
+      expect(html, role).toContain(FINGERPRINT);
+      expect(html, role).toContain("Download the signed letter (PDF)");
     }
   });
 

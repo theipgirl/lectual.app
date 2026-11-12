@@ -3,6 +3,8 @@ import { normalizeSelection } from "@/lib/proposals/pricing";
 import { buildAcceptedSnapshot } from "@/lib/proposals/public";
 import type { AcceptedSnapshot, ProposalContent, ProposalRow } from "@/lib/proposals/types";
 import { faithe } from "../proposals/general-fixture";
+import { agreementTextSha256 } from "@/lib/loe/fingerprint";
+import { rebuildSignedLetter, signedLetterText } from "@/lib/loe/signed-letter";
 import { TEST_DETAILS } from "./full-letter-fixture";
 import { twoBrandPerMark, withLoe } from "./loe-fixtures";
 
@@ -16,7 +18,27 @@ export const GENERAL_LETTER_BODY = [
 ].join("\n\n");
 
 export const SIGNED_AT = "2026-11-12T19:14:00.000Z";
-export const FINGERPRINT = "c".repeat(64);
+
+/**
+ * Stamps the snapshot the way the server does at signing: `agreement.sha256` is the sha256 of the agreement TEXT (every
+ * paragraph, then Exhibit A). A fixture with a made-up fingerprint is not a signed snapshot the app could have produced, and
+ * the signed PDF refuses to print a fingerprint beside text it does not match.
+ */
+export function stampRealFingerprint(snapshot: AcceptedSnapshot): AcceptedSnapshot {
+  const letter = rebuildSignedLetter(snapshot, "UTC");
+  if (!letter || !snapshot.agreement) throw new Error("not a signed snapshot");
+  return { ...snapshot, agreement: { ...snapshot.agreement, sha256: agreementTextSha256(signedLetterText(letter)) } };
+}
+
+/** The exact text that was signed, as the signature row stores it (`agreement_text`). */
+export function storedTextOf(snapshot: AcceptedSnapshot): string {
+  const letter = rebuildSignedLetter(snapshot, "UTC");
+  if (!letter) throw new Error("not a signed snapshot");
+  return signedLetterText(letter);
+}
+
+/** A fingerprint that matches no text: for snapshots that play "today's code no longer rebuilds what was signed". */
+export const WRONG_FINGERPRINT = "c".repeat(64);
 
 /** The two-brand per-mark fixture: partial selection (Essential, "Online retail" and "Consulting" NOT selected) plus a class the client typed. */
 export function signedTrademark(): AcceptedSnapshot {
@@ -33,18 +55,23 @@ export function signedTrademark(): AcceptedSnapshot {
   });
   const priced = quoteWithClientClasses(content, selection, { entries: {}, added: { ci: [{ text: "Gaming consoles", on: true }] } }, { repair: true });
   if (!priced.ok) throw new Error("no quote");
-  return buildAcceptedSnapshot({
-    version: 1,
-    content: priced.content,
-    selection: priced.selection,
-    quote: priced.quote,
-    acceptedAt: SIGNED_AT,
-    signed: {
-      agreement: { signature_id: "sig-1", signer_name: "Sevetri Wilson", signed_at: SIGNED_AT, sha256: FINGERPRINT, template_version: 3 },
-      signing: { details: { ...TEST_DETAILS }, date_text: "November 12, 2026", client_email: "sevetri@example.com" },
-    },
-  });
+  return stampRealFingerprint(
+    buildAcceptedSnapshot({
+      version: 1,
+      content: priced.content,
+      selection: priced.selection,
+      quote: priced.quote,
+      acceptedAt: SIGNED_AT,
+      signed: {
+        agreement: { signature_id: "sig-1", signer_name: "Sevetri Wilson", signed_at: SIGNED_AT, sha256: WRONG_FINGERPRINT, template_version: 3 },
+        signing: { details: { ...TEST_DETAILS }, date_text: "November 12, 2026", client_email: "sevetri@example.com" },
+      },
+    }),
+  );
 }
+
+/** The trademark fixture's real fingerprint: the sha256 of its signed text. */
+export const FINGERPRINT = signedTrademark().agreement!.sha256;
 
 /** Faithe Williams' flat-fee proposal, signed: matter, three work lines worth $1,250, flat fee $500. */
 export function signedGeneral(): AcceptedSnapshot {
@@ -55,17 +82,19 @@ export function signedGeneral(): AcceptedSnapshot {
   };
   const priced = quoteWithClientClasses(content, normalizeSelection(content, {}), { entries: {}, added: {} }, { repair: true });
   if (!priced.ok) throw new Error("no quote");
-  return buildAcceptedSnapshot({
-    version: 1,
-    content: priced.content,
-    selection: priced.selection,
-    quote: priced.quote,
-    acceptedAt: SIGNED_AT,
-    signed: {
-      agreement: { signature_id: "sig-2", signer_name: "Faithe Williams", signed_at: SIGNED_AT, sha256: "e".repeat(64), template_version: 1 },
-      signing: { details: { ...TEST_DETAILS, client_name: "Faithe Williams", entity_name: "" }, date_text: "November 12, 2026", client_email: "faithe@example.com" },
-    },
-  });
+  return stampRealFingerprint(
+    buildAcceptedSnapshot({
+      version: 1,
+      content: priced.content,
+      selection: priced.selection,
+      quote: priced.quote,
+      acceptedAt: SIGNED_AT,
+      signed: {
+        agreement: { signature_id: "sig-2", signer_name: "Faithe Williams", signed_at: SIGNED_AT, sha256: WRONG_FINGERPRINT, template_version: 1 },
+        signing: { details: { ...TEST_DETAILS, client_name: "Faithe Williams", entity_name: "" }, date_text: "November 12, 2026", client_email: "faithe@example.com" },
+      },
+    }),
+  );
 }
 
 export function acceptedProposalRow(snapshot: AcceptedSnapshot, over: Partial<ProposalRow> = {}): ProposalRow {

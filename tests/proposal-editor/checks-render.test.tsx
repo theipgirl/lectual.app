@@ -67,6 +67,8 @@ function checkTargets(html: string): string[] {
   return [...list.matchAll(/href="#([^"]+)"/g)].map((m) => m[1]);
 }
 const hasId = (html: string, id: string) => html.includes(`id="${id}"`);
+/** Every drawn "Check these N things" heading (the panel's aria-label is not a heading a person reads twice). */
+const headings = (html: string) => html.match(/>Check these \d+ things?</g) ?? [];
 
 const assistantContent = (): ProposalContent => {
   const c = sevetri();
@@ -101,7 +103,12 @@ describe("I2 and F9: an assistant draft with the 'client chooses' setting", () =
     const html = await render(row({ content: assistantContent() }), [EVIDENCE]);
     save("assistant-draft", html);
     expect(html).toContain("Made by the assistant from the Oct 15 consult");
-    expect(html).toContain("Check these 3 things");
+    // Review item 9: ONE "Check these" heading on the page. The assistant's panel at the top has it (3 CHECK FIRST notes and
+    // 1 quote); the checklist lists its field-linked checks under it with no second heading.
+    expect(html).toContain("Check these 4 things");
+    expect(headings(html)).toHaveLength(1);
+    expect(html.indexOf("Check these 4 things")).toBeLessThan(html.indexOf("data-ready-checks"));
+    expect(html).not.toContain('class="pe-ready-sub"');
     const targets = checkTargets(html);
     expect(targets).toEqual(["pe-f-brand-0-package", "pe-f-adjustments", "pe-f-pricing-second_mark_discount_pct"]);
     for (const t of targets) expect(hasId(html, t), t).toBe(true);
@@ -126,10 +133,28 @@ describe("I1 and F9: a Copilot draft", () => {
     const html = await render(row({ content: copilotContent(), pay_url: null }));
     save("copilot-draft", html);
     expect(html).toContain("Made with Copilot");
+    // Review item 9: the missing pay link is said ONCE, as the blocking Fix. Copilot's own "add the pay link" check for the
+    // same field is not listed beside it.
     const targets = checkTargets(html);
-    expect(targets).toEqual(["pe-f-brand-0-discount", "pe-f-payUrl"]);
+    expect(targets).toEqual(["pe-f-brand-0-discount"]);
     for (const t of targets) expect(hasId(html, t), t).toBe(true);
+    const ready = html.slice(html.indexOf("data-ready"));
+    const payItems = [...ready.slice(0, ready.indexOf("</section>")).matchAll(/<li data-level="(\w+)"><a class="pe-ready-link" href="#pe-f-payUrl">/g)].map((m) => m[1]);
+    expect(payItems).toEqual(["error"]);
+    expect(ready.slice(0, ready.indexOf("</section>"))).toContain("Add the pay link before creating the link.");
+    expect(ready.slice(0, ready.indexOf("</section>"))).not.toContain("Add the client&#x27;s pay link before creating the link.");
+    expect(hasId(html, "pe-f-payUrl")).toBe(true);
+    // No assistant panel on a Copilot draft, so the checklist keeps its own (single) heading.
+    expect(html).toContain("Check these 1 thing");
+    expect(headings(html)).toHaveLength(1);
+  });
+
+  it("review item 9: once the pay link is saved, Copilot's other checks stay and nothing about the pay link is listed", async () => {
+    const html = await render(row({ content: copilotContent(), pay_url: "https://pay.example/x" }));
+    // The stored check about the pay link is still there (it never blocks), now the only item for that field.
+    expect(checkTargets(html)).toEqual(["pe-f-brand-0-discount", "pe-f-payUrl"]);
     expect(html).toContain("Check these 2 things");
+    expect(headings(html)).toHaveLength(1);
   });
 
   it("the checks never reach the client: the public content has none", async () => {

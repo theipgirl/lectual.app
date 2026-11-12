@@ -50,6 +50,24 @@ describe("readSignature", () => {
     expect(await readSignature(fakeDb({ data: [{ ...ROW, agreement_sha256: null }] }).db, "p1")).toEqual({ status: "unavailable" });
   });
 
+  it("the stored signed text has its own reader: fenced on the org, the row the snapshot names, null for anything unreadable", async () => {
+    const { readStoredAgreement } = await import("@/lib/loe/stored-agreement");
+    const row = { id: "s1", agreement_text: "The signed text.", agreement_sha256: "b".repeat(64) };
+    const ok = fakeDb({ data: [row] });
+    expect(await readStoredAgreement(ok.db, { proposalId: "p1", orgId: "org-1", signatureId: "s1" })).toEqual({ text: "The signed text.", sha256: "b".repeat(64) });
+    expect(ok.calls[0].table).toBe("client_proposal_signature");
+    expect(ok.calls[0].filters).toEqual([["proposal_id", "p1"], ["org_id", "org-1"], ["id", "s1"]]);
+    expect(ok.calls[0].columns).toBe("id, agreement_text, agreement_sha256");
+    // No signature id on the snapshot: the newest row of the version, still fenced on the org.
+    const newest = fakeDb({ data: [row] });
+    await readStoredAgreement(newest.db, { proposalId: "p1", orgId: "org-1" });
+    expect(newest.calls[0].filters).toEqual([["proposal_id", "p1"], ["org_id", "org-1"]]);
+    expect(await readStoredAgreement(fakeDb({ data: [] }).db, { proposalId: "p1", orgId: "org-1" })).toBeNull();
+    expect(await readStoredAgreement(fakeDb({ error: { code: "42501" } }).db, { proposalId: "p1", orgId: "org-1" })).toBeNull();
+    expect(await readStoredAgreement(fakeDb("throw").db, { proposalId: "p1", orgId: "org-1" })).toBeNull();
+    expect(await readStoredAgreement(fakeDb({ data: [{ id: "s1", agreement_text: null, agreement_sha256: "b" }] }).db, { proposalId: "p1", orgId: "org-1" })).toBeNull();
+  });
+
   it("the source never names the privileged columns", () => {
     const src = readFileSync("src/lib/loe/signature-read.ts", "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
     expect(src).not.toMatch(/agreement_text|user_agent|\bip\b/);
