@@ -80,7 +80,7 @@ describe("Approvals page: handed to you (technician shell)", () => {
   });
 
   it("the queue's own three states are untouched: an unreadable queue shows no pill and reads no events", async () => {
-    const r = await renderList({ status: "ok", events: [handoff("f1", U.caitlyn)] }, caitlyn, {}, { status: "unavailable", reason: "network" } as QueueLoad);
+    const r = await renderList({ status: "ok", events: [handoff("f1", U.caitlyn)] }, caitlyn, {}, { status: "unavailable", reason: "network" } as unknown as QueueLoad);
     expect(r.loadCardState).not.toHaveBeenCalled();
     expect(r.html).not.toContain("Handed to you");
   });
@@ -135,7 +135,7 @@ describe("approval item page: handed to you", () => {
     expect(plain).not.toContain("data-handed-to-you");
     expect(plain).not.toContain("Send back");
     expect(await renderItem(row, { userId: U.taylor, role: "owner" }, handed)).not.toContain("data-handed-to-you");
-    const back: CardState = { status: "ok", events: [...(handed as { events: never[] }).events, { ...handoff("q1", U.caitlyn), kind: "returned", targetUserId: null, createdAt: "2026-10-28T10:00:00Z" }] };
+    const back: CardState = { status: "ok", events: [...(handed as unknown as { events: never[] }).events, { ...handoff("q1", U.caitlyn), kind: "returned", targetUserId: null, createdAt: "2026-10-28T10:00:00Z" }] };
     expect(await renderItem(row, caitlyn, back)).toBe(plain);
     expect(await renderItem(row, caitlyn, { status: "not-set-up" })).toBe(plain);
     expect(await renderItem(row, caitlyn, { status: "unavailable" })).toBe(plain);

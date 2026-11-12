@@ -120,7 +120,7 @@ describe("rail dot and phone item (owner shell only)", () => {
     // The words exist once per link (the aria-label); no second hidden copy.
     expect(rail.split(words)).toHaveLength(2);
     // Collapsed rail: the dot is on the icon, in place of the count dot (the open-rail dot is clipped there).
-    expect(rail).toMatch(/<span class="lx-rail-icon">(?:(?!<\/span>\s*<span class="lx-rail-label").)*?lx-rail-dot is-ready/s);
+    expect(rail).toMatch(/<span class="lx-rail-icon">(?:(?!<\/span>\s*<span class="lx-rail-label")[\s\S])*?lx-rail-dot is-ready/);
     const bar = renderToStaticMarkup(<MobileBar items={items} queueStatus="ok" pendingCount={3} counts={{}} bar={shell.bar} groups={shell.moreGroups} variant="owner" dealReady={words} />);
     expect(bar).toContain("lx-ready-dot--bar");
     expect(bar.split(words)).toHaveLength(2);

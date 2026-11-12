@@ -7,6 +7,7 @@ import { getFirmTimeZone } from "@/lib/org/profile";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { buildDeck, DECK_BASE, eventTrust, trustedCardState, type CardState } from "@/lib/queue/deck";
 import { dealtAt } from "@/lib/deal/times";
+import { parseDealTimes } from "@/lib/deal/person-times";
 import { classifyQueueItem, kindShort } from "@/lib/queue/routing";
 import { agentLabel } from "@/components/queue/format";
 import { DeckLists } from "@/components/deck/DeckLists";
@@ -21,6 +22,8 @@ export async function DeckListsView({ list }: { list: ListParam }) {
   if (list === "need") redirect(DECK_BASE);
   const session = await resolveFirmSession().catch(() => null);
   if (!session || session.kind !== "ok") return null;
+  // The person's own two deal times from their own account (as the deck itself does), so "Needs your yes" counts the same cards.
+  const myTimes = parseDealTimes(session.user.user_metadata);
   const viewer = { userId: session.user.id, role: session.role };
 
   const [pending, approved, rejected, tz, directory, routed] = await Promise.all([
@@ -58,7 +61,7 @@ export async function DeckListsView({ list }: { list: ListParam }) {
 
   let needCount: number | null = null;
   if (pending.status === "ok") {
-    const deck = buildDeck({ items: pendingItems, routing, viewer, cardState: cardState ?? { status: "unavailable" }, trust, now, dealtAt: dealtAt(now, tz) });
+    const deck = buildDeck({ items: pendingItems, routing, viewer, cardState: cardState ?? { status: "unavailable" }, trust, now, dealtAt: dealtAt(now, tz, myTimes) });
     needCount = deck.cards.length;
   }
 
