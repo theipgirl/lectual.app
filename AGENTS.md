@@ -603,6 +603,10 @@ ran), intake triage failed on one truncated answer, and Run now could not be cli
 - **`callClaude` checks `stop_reason` before parsing** (`readStructuredResponse`); the SDK's `parse()` parsed first, so a
   max_tokens cut-off surfaced as "Failed to parse structured output". `AiOutputError.kind` is refusal/truncated/shape, and a
   list agent skips the one item (`isUnusableModelAnswer`). Intake triage asks for 16000 tokens.
+- **Cron times (vercel.json, UTC):** lawmatics-matters 09:08, meetings-import 09:38, mailbox-sync 09:53, agents 10:23, so the
+  agents finish by 10:28 UTC (5:28 AM EST, 6:28 AM EDT), before the 7:00 AM deal. Keep that order (hired matters and meetings
+  before the mail sync's Stage Keeper, the mail sync before the agents) and keep agents at or after 10:00 UTC: earlier is the
+  previous day for a Pacific/Honolulu firm's morning brief. On Hobby a cron fires anywhere in its hour, so only the hour orders them.
 - **Run now's button stacks above the card footer** (`.lx-agent-slot-run` has `position: relative; z-index: 1`). It shares
   the footer's grid cell and comes first in the markup, so without that the footer took every click.
 
