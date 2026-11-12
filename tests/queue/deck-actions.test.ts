@@ -21,6 +21,10 @@ const state = vi.hoisted(() => ({
   sendAccess: "ready" as string,
   send: vi.fn(),
   notify: vi.fn(),
+  meta: {} as Record<string, unknown>,
+}));
+vi.mock("@/lib/db/scoped-client", () => ({
+  getScopedClient: vi.fn(async () => ({ auth: { getUser: vi.fn(async () => ({ data: { user: { user_metadata: state.meta } }, error: null })) } })),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -80,6 +84,7 @@ beforeEach(() => {
   state.sendAccess = "ready";
   state.send.mockReset().mockResolvedValue({ ok: true });
   state.notify.mockReset().mockResolvedValue(undefined);
+  state.meta = {};
 });
 
 const NOT_SWITCHED_ON = "This isn't switched on for your firm yet. Lectual will turn it on.";
@@ -231,6 +236,26 @@ describe("later and send back", () => {
     expect(until - Date.now()).toBeLessThanOrEqual(25 * 3600_000);
   });
 
+  it("Later's until is the next deal of the actor's STORED times, and nothing posted changes it", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-10T14:30:00Z")); // 9:30 AM New York (EST)
+    try {
+      state.meta = { lectual_deal_times: { v: 1, times: ["10:00", "16:30"] } };
+      expect((await laterWithExtras()).ok).toBe(true);
+      expect(state.record.mock.calls[0][0].until).toBe("2026-11-10T15:00:00.000Z"); // 10:00 AM EST
+      state.record.mockClear();
+      state.meta = { lectual_deal_times: { v: 1, times: ["08:00", "16:30"] } };
+      await A.laterCardAction("q1");
+      expect(state.record.mock.calls[0][0].until).toBe("2026-11-10T21:30:00.000Z"); // 4:30 PM EST
+      state.record.mockClear();
+      state.meta = {}; // no stored times: the defaults, 2:00 PM
+      await A.laterCardAction("q1");
+      expect(state.record.mock.calls[0][0].until).toBe("2026-11-10T19:00:00.000Z");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("Send back is for the holder (or whoever handed it)", async () => {
     expect((await A.returnCardAction("q1", "")).ok).toBe(false);
     state.cardState = { status: "ok", events: [{ queueItemId: "q1", kind: "handoff", actorId: U.rebecca, targetUserId: U.caitlyn, until: null, note: null, createdAt: "2026-11-10T13:00:00Z" }] };
@@ -306,3 +331,7 @@ describe("bell notices for hand-offs (Phase 2 item 2)", () => {
     expect(JSON.stringify(arg)).not.toContain("back to you");
   });
 });
+/** Calls Later with extra arguments a forged client might add (an "until", times): the action ignores them. */
+function laterWithExtras() {
+  return (A.laterCardAction as unknown as (...a: unknown[]) => Promise<{ ok: boolean }>)("q1", { until: "2030-01-01T00:00:00Z", times: ["23:00", "23:55"] }, "2030-01-01T00:00:00Z");
+}

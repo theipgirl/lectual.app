@@ -101,19 +101,24 @@ export function DealTimesDialog({ current, zoneLabel }: { current: DealTimesPair
   const cancel = useRef<HTMLButtonElement>(null);
   const save = useRef<HTMLButtonElement>(null);
   const opener = useRef<OpenerLike | null>(null);
+  const currentRef = useRef(current);
   const inFlight = useRef(false);
+
+  useEffect(() => {
+    currentRef.current = current;
+  }, [current]);
 
   useEffect(() => {
     const onShow = (e: Event) => {
       opener.current = (e as CustomEvent<{ opener?: OpenerLike | null }>).detail?.opener ?? null;
-      setFirst(current[0]);
-      setSecond(current[1]);
+      setFirst(currentRef.current[0]);
+      setSecond(currentRef.current[1]);
       setError(null);
       setOpen(true);
     };
     window.addEventListener(SHOW_DEAL_TIMES_EVENT, onShow);
     return () => window.removeEventListener(SHOW_DEAL_TIMES_EVENT, onShow);
-  }, [current]);
+  }, []);
 
   useEffect(() => {
     if (open) (firstEl.current ?? dialog.current)?.focus();

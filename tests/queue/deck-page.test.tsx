@@ -37,6 +37,26 @@ beforeEach(() => {
   state.cardState = { status: "ok", events: [] };
 });
 
+describe("the Change deal times opener", () => {
+  it.each(["cards", "list", "board"])("is drawn for the owner view (%s)", async (view) => {
+    state.role = "owner";
+    expect(await render({ view })).toContain("Change deal times");
+  });
+  it.each(["cards", "list", "board"])("is not drawn for a role in the technician view (%s)", async (view) => {
+    for (const role of ["attorney", "paralegal", "admin"]) {
+      state.role = role;
+      expect(await render({ view })).not.toContain("Change deal times");
+    }
+  });
+  it("is not drawn when the queue can't be read, unless the owner view", async () => {
+    state.loads.pending = { status: "unavailable", items: [] };
+    state.role = "attorney";
+    expect(await render()).not.toContain("Change deal times");
+    state.role = "owner";
+    expect(await render()).toContain("Change deal times");
+  });
+});
+
 describe("the deck page", () => {
   it("is notFound without the switch", async () => {
     state.modules = [];

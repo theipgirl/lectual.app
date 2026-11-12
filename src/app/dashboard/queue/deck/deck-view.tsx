@@ -12,6 +12,7 @@ import { listMemberDirectory, type MemberIdentity } from "@/lib/members/director
 import { QUEUE_EDIT_ROLES } from "@/lib/queue/roles";
 import { whenLabel, dealFor, dealtAt, sameFirmDay } from "@/lib/deal/times";
 import { parseDealTimes } from "@/lib/deal/person-times";
+import { NO_PREVIEW, previewFor, shellFor, viewFor } from "@/lib/views";
 import {
   buildDeck,
   decidedToday,
@@ -122,6 +123,10 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
   const at = parseAtParam(params.at);
   const dealNow = (Array.isArray(params.deal) ? params.deal[0] : params.deal) === "now";
   const viewer = { userId: session.user.id, role: session.role };
+  // The dialog is mounted only in the owner shell, so the opener is drawn only there (the layout's own computation).
+  const actingAsStaff = session.actingAsStaff ?? false;
+  const canChangeDealTimes =
+    shellFor(viewFor({ role: session.role, preview: actingAsStaff ? previewFor(session.user.user_metadata, session.org.id) : NO_PREVIEW, firmHasRoleViews: true, actingAsStaff })).variant === "owner";
 
   const [load, tz] = await Promise.all([loadActiveQueue("pending"), getFirmTimeZone()]);
   const now = new Date();
@@ -145,6 +150,7 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
         nextDealLabel={deal.next.label}
         dealLabel={deal.current?.label ?? null}
         dealNowHref={dealNowHref}
+        canChangeDealTimes={canChangeDealTimes}
         wideSub={view === "board" ? DECK_BOARD_SUB : undefined}
       >
         <DeckUnavailable status={load.status} reason={load.reason} />
@@ -206,6 +212,7 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
     nextDealLabel: deal.next.label,
     dealLabel,
     dealNowHref,
+    canChangeDealTimes,
   };
   const frame = (side: DeckSideRow[] | null, meta: string | null, children: React.ReactNode, wideSub?: string) => (
     <DeckFrame {...frameProps} side={side} meta={meta} wideSub={wideSub}>

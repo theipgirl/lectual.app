@@ -27,7 +27,9 @@ export function validateDealTimes(a: unknown, b: unknown): DealTimesCheck {
   if (typeof a !== "string" || typeof b !== "string" || !STRICT_HHMM.test(a) || !STRICT_HHMM.test(b)) return { ok: false, error: DEAL_TIMES_INVALID };
   if (minutesOf(a) % DEAL_STEP_MINUTES !== 0 || minutesOf(b) % DEAL_STEP_MINUTES !== 0) return { ok: false, error: DEAL_TIMES_STEP };
   const sorted: DealTimesPair = minutesOf(a) <= minutesOf(b) ? [a, b] : [b, a];
-  if (minutesOf(sorted[1]) - minutesOf(sorted[0]) < DEAL_MIN_GAP_MINUTES) return { ok: false, error: DEAL_TIMES_APART };
+  // At least 2 hours apart on the clock both ways round, so the second deal and the next day's first are not close either.
+  const gap = minutesOf(sorted[1]) - minutesOf(sorted[0]);
+  if (gap < DEAL_MIN_GAP_MINUTES || 24 * 60 - gap < DEAL_MIN_GAP_MINUTES) return { ok: false, error: DEAL_TIMES_APART };
   return { ok: true, times: sorted };
 }
 

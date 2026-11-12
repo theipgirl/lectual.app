@@ -48,6 +48,7 @@ export function DeckFrame({
   nextDealLabel,
   dealLabel,
   dealNowHref,
+  canChangeDealTimes = false,
   meta,
   wideSub,
   children,
@@ -66,6 +67,8 @@ export function DeckFrame({
   /** The deal that is open now ("7:00 AM"), null before the first. */
   dealLabel?: string | null;
   dealNowHref: string;
+  /** True only in the owner view, where the dialog is mounted. */
+  canChangeDealTimes?: boolean;
   /** "6 left · about 8 min", "All decided", "Can't show". */
   meta?: string | null;
   /** The sentence under the wide head (List and Board). */
@@ -96,7 +99,7 @@ export function DeckFrame({
             {switcher("")}
           </div>
           {wideSub && <p className="dk-sub">{wideSub}</p>}
-          <DealTimesButton />
+          {canChangeDealTimes && <DealTimesButton />}
         </div>
         {children}
       </div>
@@ -119,7 +122,7 @@ export function DeckFrame({
             {switcher("")}
           </div>
           <p className="dk-sub">{DECK_PAGE_SUB}</p>
-          <DealTimesButton />
+          {canChangeDealTimes && <DealTimesButton />}
         </div>
         <DeckSide rows={side ?? []} failed={sideFailed} note={sideNote} later={sideLater} decidedFailed={sideDecidedFailed} />
         {laterArrivals > 0 && dealLabel && (

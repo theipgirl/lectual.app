@@ -29,6 +29,7 @@ describe("validateDealTimes", () => {
   });
   it("accepts 23:55 as the later time and 00:00 as the earlier", () => {
     expect(validateDealTimes("07:00", "23:55")).toEqual({ ok: true, times: ["07:00", "23:55"] });
+    expect(validateDealTimes("02:00", "23:55")).toEqual({ ok: true, times: ["02:00", "23:55"] });
     expect(validateDealTimes("00:00", "02:00")).toEqual({ ok: true, times: ["00:00", "02:00"] });
   });
   it("sorts reversed input", () => {
@@ -37,7 +38,11 @@ describe("validateDealTimes", () => {
   it("refuses duplicates as too close", () => {
     expect(validateDealTimes("07:00", "07:00")).toEqual({ ok: false, error: DEAL_TIMES_APART });
   });
-  it("does not wrap past midnight: 23:00 and 01:00 are 22 hours apart on one day", () => {
+  it("holds across midnight too: the later deal and the next day's first are 2 hours apart at least", () => {
+    expect(validateDealTimes("23:00", "00:30")).toEqual({ ok: false, error: DEAL_TIMES_APART });
+    expect(validateDealTimes("00:00", "23:55")).toEqual({ ok: false, error: DEAL_TIMES_APART });
+    expect(validateDealTimes("00:00", "22:00")).toEqual({ ok: true, times: ["00:00", "22:00"] }); // exactly 120 the other way
+    expect(validateDealTimes("00:00", "22:05")).toEqual({ ok: false, error: DEAL_TIMES_APART });
     expect(validateDealTimes("23:00", "01:00")).toEqual({ ok: true, times: ["01:00", "23:00"] });
     expect(validateDealTimes("22:00", "23:55")).toEqual({ ok: false, error: DEAL_TIMES_APART });
   });
