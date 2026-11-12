@@ -3,6 +3,8 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveFirmSession } from "@/lib/firm/session";
+import { MailingAddressCard } from "@/components/loe/MailingAddressCard";
+import { loadSignedAddress } from "@/lib/loe/signed-address";
 import {
   activityForMatter,
   getMatter,
@@ -130,7 +132,7 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
   const client = await resolveMatterClientNameFrom(matter, primaryContact);
   const canSendIntake = canSendIntakeRequest(session.role);
   const canWrite = MATTER_WRITE_ROLES.includes(session.role);
-  const [voiceUrls, intakeRequests, origin, meetings, signedQuotes, answersRead, tz, documentsRead] = await Promise.all([
+  const [voiceUrls, intakeRequests, origin, meetings, signedQuotes, answersRead, tz, documentsRead, mailingRead] = await Promise.all([
     voiceNotePlaybackUrls(activity),
     // Intake questions (0079): a failed read says so on the card; it never
     // reads as "no links sent".
@@ -147,6 +149,8 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
     // Stored files, and the generated letters only for a firm with Document Center. Never throws:
     // each part reports its own failure on the card.
     loadDocumentsRead({ kind: "matter", id: matter.id }, { includeLetters: hasDocumentCenter }),
+    // The address the client gave when they signed their letter (this matter's proposals, or the lead's): staff roles only, null = not asked. Never throws.
+    loadSignedAddress(session.role, { matterId: matter.id, leadId: matter.lead_id }),
   ]);
   const hasSignedQuote = signedQuotes?.status === "ok" && signedQuotes.quotes.length > 0;
 
@@ -456,6 +460,12 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
 
         <aside className="lx-col lx-col-aside" data-tour="matter-aside">
           <ClientContactCard matterId={matter.id} read={contactsRead} canWrite={canWrite} />
+
+          {mailingRead !== null && mailingRead.status !== "none" ? (
+            <section className="lx-card lx-aside">
+              <MailingAddressCard read={mailingRead} />
+            </section>
+          ) : null}
 
           {canStartProposal && <MatterProposalCard matterId={matter.id} />}
 
