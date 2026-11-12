@@ -3,6 +3,48 @@
 One list across sessions. Each session adds its action items here and checks them against Omi.
 Newest section first. Tick an item when it is done; don't delete it.
 
+## 2026-11-12 (later): the build is done on the branch; what is left before RPB can use it
+
+Everything below is on `claude/optimistic-brahmagupta-18q0xn` in `lectual.app`, `lectual` and `lectual-plugin`. Nothing is on `main`,
+nothing is deployed, production is untouched.
+
+### Taylor
+
+- [ ] Open a preview of the branch and click through it at desktop and phone width. Nothing here has run in a real browser or against
+      real data: the new edit page, the three ways to start, the client page (choose, details, letter, sign, pay), the PDF download.
+- [ ] Say OK to apply migration 0106 to lectual-prod (it is on lectual-dev and checked there). The letter cannot be signed in
+      production until it is.
+- [ ] Decide when this merges to `main` (that is what deploys it).
+- [ ] The live database credentials in the cloud build environment: decide whether they should be there. An agent's test run reached
+      lectual-dev twice by accident (nothing was written). Removing the Supabase variables from the environment's settings prevents it.
+- [ ] Decide: may the owner still delete a proposal that has a signed engagement letter? Today yes, and the signed record goes with it.
+
+### Rebecca (through Taylor)
+
+- [ ] Read and approve the full trademark letter: `docs/rpb/engagement-letter-trademark.md`. Then it is pasted into Settings,
+      Proposals, Engagement letter, and she approves it there.
+- [ ] Supply the general (flat-fee) engagement letter text.
+- [ ] Confirm a typed full name is an acceptable signature for her engagement letters.
+- [ ] Supply the footer line for a proposal that carries the letter. Until she does, the page shows the firm's usual footer, which says
+      the page does not create an attorney-client relationship, on the same page where the client signs the letter.
+- [ ] Read the short step wording the client sees (`src/lib/loe/client-words.ts`): the details intro, the letter intro, the signing
+      notice ("we record your typed name, the date and time, your device's network address and browser details...").
+- [ ] Confirm the hand-built engagement letter path (a client with no Lectual proposal) should still wait for payment first. The
+      plugin skill kept that rule; her Nov 11 direction was sign first.
+
+### Checks still to do before go-live (design doc section 8)
+
+- [ ] On a preview behind proposals.rpblawfirm.com: sign a test proposal and confirm the recorded IP is the visitor's, not the proxy's.
+- [ ] Confirm the signed PDF lands in the right Lawmatics matter's Engagement folder (never tested against a live Lawmatics).
+- [ ] Confirm the PDF builds on Vercel (the fonts are bundled; not run in a deployed function).
+- [ ] A two-brand, per-mark-package test proposal end to end: complete Exhibit A, download before and after signing.
+- [ ] Sign, reset, sign again on dev: two signature records, one live acceptance.
+
+### Claude, next session
+
+- [ ] Apply 0106 to lectual-prod after Taylor's OK; update both AGENTS.md files.
+- [ ] Fix what the preview walk-through turns up.
+
 ## 2026-11-12: LOE on the proposal, one builder, simpler editor
 
 Spec: `docs/specs/2026-11-12-proposal-loe-and-builder-design.md`

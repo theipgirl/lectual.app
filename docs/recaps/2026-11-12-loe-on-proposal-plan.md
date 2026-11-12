@@ -66,3 +66,34 @@ session: once the plan is written, start a workflow and the PGE pipeline to buil
 ## Action items
 
 See `docs/MASTER-TODO.md`, section 2026-11-12.
+
+## Later the same day: the build ran
+
+- Six sprints, two tracks in parallel, each contracted, built and evaluated by separate agents; all six passed on the first attempt.
+  30 agents in the pipeline, then a security review, a database audit, two fix passes and an independent check of the fixes.
+- Tests: 9,975 before, 10,705 after, all passing; lint and build clean. `pricing.ts` unchanged. One library added (pdfkit, for the letter PDF).
+- Migration 0106 (letter templates, signature records, sign-and-accept) was hardened after the audit, applied to lectual-dev and checked
+  there with about 35 scenarios in rolled-back transactions. It is NOT on lectual-prod.
+- The plugin's `draft-engagement-letter` and `process-consult` skills now describe sign-then-pay on the proposal page.
+- After Taylor saw the mockup: the client page keeps its look (total on the right on every step, what the package includes), the letter
+  is shown in full, the total panel sticks while scrolling, and the letter downloads as a PDF before and after signing.
+
+### What the reviews caught and fixed
+
+- Assistant and Copilot drafts did not carry the letter; now every way of creating does, and a letter that could not be attached blocks
+  the link until it is attached or turned off on purpose.
+- No signed-letter download until the page was reloaded.
+- A double space in the typed name, or signing the day after opening the page, wrongly refused the signature.
+- A legal-sounding footer line written by the builders was removed; the firm's own footer shows until Rebecca supplies hers.
+- Signature records: staff roles only can read them; nobody, the server role included, can edit or delete one on its own.
+- A signed PDF is only ever built from text that matches the recorded fingerprint.
+
+### Not verified
+
+No real browser, no production database, no live Lawmatics, no deployed build. The build environment turned out to hold live database
+credentials; an agent's test run reached lectual-dev twice by accident and wrote nothing.
+
+### Where the pipeline's own files are
+
+`pge-workspace/` in the build container (contracts, handoffs, evaluations) was not committed and goes when the container does. The
+decisions that matter are in the AGENTS.md sections each sprint wrote.

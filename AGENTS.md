@@ -1624,10 +1624,10 @@ The edit page for a draft is five sections in ONE form with ONE Save. Nothing se
 - Words: `EDITOR_WORDS` / `checkTheseHeading` in `vocabulary.ts` ("Selected to start", "Let the client describe this"); the menu beside the lifecycle buttons is named for what it holds (`moreMenuLabel`: Withdraw, Reset or delete, ...).
   New proposal still uses `BuilderLayout` and its "More options"; only the editor changed.
 
-## Engagement letter: database and firm template (Letter track, Sprint 2; needs lectual 0106, NOT applied yet)
+## Engagement letter: database and firm template (Letter track, Sprint 2; needs lectual 0106: on dev since 2026-11-12, NOT on prod)
 Design: `docs/specs/2026-11-12-proposal-loe-and-builder-design.md` (4.1, 4.2, 4.5). This sprint is the firm's letter and the rules around it; the
 client page, signing and the staff side come in later sprints. Nothing here sends, moves a stage or touches a price (`pricing.ts` has no diff).
-- **Migration 0106 is in `lectual`, not applied to any database.** Two tables: `client_proposal_loe_template` (versions per firm and kind) and
+- **Migration 0106 is in `lectual`. It was applied to lectual-dev on 2026-11-12 and verified there; it is NOT applied to lectual-prod (needs the owner's OK).** Two tables: `client_proposal_loe_template` (versions per firm and kind) and
   `client_proposal_signature` (written only by the service role's `client_proposal_sign_and_accept`). Hand-added types are in `src/lib/db/types.ts`.
   Until 0106 is applied every read answers 42P01 / PGRST205 and the page says the letter "isn't switched on for your firm yet" with no form.
 - **The pure library is `src/lib/loe/`** (no `server-only`, no HTML): `fields.ts` (the seven fields `date`, `client_name`, `entity_name`,
@@ -1680,7 +1680,7 @@ New proposal is one step, and every way of starting a proposal goes through ONE 
 - **"New proposals offer"** (Settings, Proposals; `src/lib/proposals/new-offer.ts`, `NewOfferSection` inside the ONE settings form): `pricing.new_offer = { mode: "one" | "choice", per: "brand" | "mark", options (1..3 package names), start }`, NAMES only. `parseNewOffer` drops names not on the firm's list and keeps at most 3; `readNewOffer` reads it; the form's `newOffer.present` marker means a post without the control leaves the key alone; `withNewOffer` refuses (fixed sentence) a serialised pricing over 64 KB and otherwise touches only its own key, so approvers, `approval_routing`, `lawmatics_loe_fields`, package rows and includes stay as they were (`withPackages` and `parseSettingsPricing` already spread the rest). The action checks names against the list AS IT WILL BE after the same save, so a package renamed in that post can't be offered. Admin tier only (the existing `gateAdminAction`). All doors use it as the starting point; none set = one package, the firm's first.
 - **Not verified in a real browser:** the start screen and settings control are tested with `renderToStaticMarkup` and Playwright screenshots of a static render only; Copilot actually opening with the request typed in is not exercised.
 
-## Sprint 4 (Letter track): Client page: details, letter, sign (needs lectual 0106 for signing; NOT applied yet)
+## Sprint 4 (Letter track): Client page: details, letter, sign (needs lectual 0106 for signing: on dev since 2026-11-12, NOT on prod)
 A proposal whose content carries `loe` (Sprint 2) adds four steps to the client page: Choose, Your details, Engagement letter, Pay. Content with no
 `loe` renders byte for byte as before (`tests/client-proposal/loe-baseline.test.tsx` against `__baseline__/`, rendered from 29f6329). Nothing here sends
 anything; `pricing.ts` has no diff; one dependency was added (`pdfkit`, exact-pinned 0.20.2).
@@ -1809,7 +1809,7 @@ No migration, no dependency, `pricing.ts` untouched. Nothing here approves, make
   now comes back as `needs_changes` from the builder instead of a built draft with `blocking`).
 - Not verified: the real model (no key here), a database, a real browser. `tests/proposals/sprint5-hygiene.test.ts` greps the new code for approve/link/queue/mail/service-role paths and price fields.
 
-## Sprint 6 (Letter track): Signed letter on the staff side, and the flat-fee letter (needs lectual 0106; NOT applied yet)
+## Sprint 6 (Letter track): Signed letter on the staff side, and the flat-fee letter (needs lectual 0106: on dev since 2026-11-12, NOT on prod)
 Nothing here sends, moves a stage, opens a matter or calls a model. No migration, no dependency. Pricing is untouched.
 - **The editor's Engagement letter section** (`EngagementLetterSlot`, rules in `src/lib/loe/editor-state.ts`, pure) draws one of five states from the firm's
   approved letter, read through the scoped client (`getApprovedLetter`): `none` (no approved letter of this kind, or the table isn't there: the set-up line
