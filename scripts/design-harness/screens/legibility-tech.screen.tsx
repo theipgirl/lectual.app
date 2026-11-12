@@ -16,7 +16,7 @@ import type { Screen } from "../registry";
  * The TECHNICIAN shell (no `.lx-top--owner`, default rail and phone bar) around the technician weekly review, so the legibility pass
  * can prove, pixel for pixel against an older commit, that no owner-only rule reaches the technician view. Not a design-board screen.
  */
-function TechShell({ children, railPinned = true }: { children: ReactNode; railPinned?: boolean }) {
+export function TechShell({ children, railPinned = true }: { children: ReactNode; railPinned?: boolean }) {
   const items = visibleNav(MODULES, "owner");
   const shell = shellFor("technician");
   const drawn = drawnNav(items, "technician");

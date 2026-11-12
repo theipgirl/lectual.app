@@ -510,3 +510,22 @@ export const DECK_SIDE_SEE_ALL_LATER = "Later, full list";
 export const DECK_SIDE_LATER_NOTHING = "Nothing put off.";
 export const DECK_SIDE_LATER_CANT = "Can't show Later right now.";
 export const DECK_LISTS_CHIP_DECIDED = "Decided";
+
+/* Handed-to-you on the Approvals page and the approval item page (Phase 2 item 2, technician shell). */
+export const HANDED_TO_YOU_MARKER = "Handed to you";
+export const handedPillLabel = (n: number) => `Handed to you (${n})`;
+export const handedToYouAt = (name: string, time: string) => `Handed to you by ${name} · ${time}`;
+export const HANDED_NOTE_LABEL = "Their note";
+export const sendBackTo = (name: string) => `Send back to ${name}`;
+export const SEND_BACK_NOTE_LABEL = "Add a note (optional)";
+export const SEND_BACK_NOTE_HINT = "Up to 500 characters. It goes to them with the card.";
+export const SEND_BACK_NEEDS_APPROVER = "This one needs an approver's yes. You can edit it and send it back.";
+export const sendBackNeedsPerson = (name: string) => `This one is for ${name}. You can edit it and send it back.`;
+export const SEND_BACK_DONE = "Sent back. It's on their cards again.";
+export const SEND_BACK_NOTE_TOO_LONG = "That note is too long. Keep it to 500 characters.";
+export const A_TEAMMATE = "a teammate";
+/* The bell: a card handed to someone, or sent back. */
+export const NOTICE_HANDED_LABEL = "Handed to you";
+export const NOTICE_RETURNED_LABEL = "Sent back";
+export const noticeHandedSentence = (first: string) => `${first} handed you an approval`;
+export const noticeReturnedSentence = (first: string) => `${first} sent an approval back`;

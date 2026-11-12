@@ -20,6 +20,7 @@ const state = vi.hoisted(() => ({
   routed: { status: "ok", routing: {}, members: [], dropped: 0, settingsExist: true } as unknown,
   sendAccess: "ready" as string,
   send: vi.fn(),
+  notify: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -44,6 +45,7 @@ vi.mock("@/lib/members/directory", () => ({
     return state.members;
   }),
 }));
+vi.mock("@/lib/notifications/core", () => ({ notify: (...a: unknown[]) => state.notify(...a) }));
 vi.mock("@/lib/org/profile", () => ({ getFirmTimeZone: vi.fn(async () => "America/New_York") }));
 vi.mock("@/lib/mailbox/my-mailbox", () => ({
   mySendAccess: vi.fn(async () => state.sendAccess),
@@ -77,6 +79,7 @@ beforeEach(() => {
   state.membersFail = false;
   state.sendAccess = "ready";
   state.send.mockReset().mockResolvedValue({ ok: true });
+  state.notify.mockReset().mockResolvedValue(undefined);
 });
 
 const NOT_SWITCHED_ON = "This isn't switched on for your firm yet. Lectual will turn it on.";
@@ -271,5 +274,35 @@ describe("Send from Outlook now", () => {
     const r = await A.sendDraftNowAction("q1", "AAMk1");
     expect(r.ok).toBe(false);
     expect(!r.ok && r.error).toMatch(re);
+  });
+});
+
+describe("bell notices for hand-offs (Phase 2 item 2)", () => {
+  it("handing a card off tells the person it was handed to, with ids and the headline only", async () => {
+    state.item = qitem({ id: "q1", headline: "Post-consult follow-up — Ana", draft_body: "SECRET BODY", recipient: "ana@example.com", subject: "SECRET SUBJECT" });
+    expect((await A.handOffCardAction("q1", U.caitlyn, "a private note")).ok).toBe(true);
+    expect(state.notify).toHaveBeenCalledTimes(1);
+    const arg = state.notify.mock.calls[0][0];
+    expect(arg).toMatchObject({ userId: U.caitlyn, kind: "approval_needed", actorId: U.rebecca });
+    expect(arg.payload).toEqual({ source: "card_handoff", queue_id: "q1", headline: "Post-consult follow-up — Ana" });
+    const text = JSON.stringify(arg);
+    for (const leak of ["SECRET BODY", "SECRET SUBJECT", "a private note", "ana@example.com"]) expect(text).not.toContain(leak);
+  });
+
+  it("a hand-off that is refused or fails to save raises no notice", async () => {
+    expect((await A.handOffCardAction("q1", U.ghost, "")).ok).toBe(false);
+    state.record.mockResolvedValue({ ok: false, reason: "failed" });
+    expect((await A.handOffCardAction("q1", U.caitlyn, "")).ok).toBe(false);
+    expect(state.notify).not.toHaveBeenCalled();
+  });
+
+  it("sending a card back tells the person who handed it", async () => {
+    state.cardState = { status: "ok", events: [{ queueItemId: "q1", kind: "handoff", actorId: U.rebecca, targetUserId: U.caitlyn, until: null, note: "my note", createdAt: "2026-11-10T13:00:00Z" }] };
+    state.session = sessionFor(U.caitlyn, "paralegal", "caitlyn@example.com");
+    expect((await A.returnCardAction("q1", "back to you")).ok).toBe(true);
+    const arg = state.notify.mock.calls[0][0];
+    expect(arg).toMatchObject({ userId: U.rebecca, kind: "approval_needed", actorId: U.caitlyn });
+    expect(arg.payload).toEqual({ source: "card_returned", queue_id: "q1", headline: "Post-consult follow-up — Ana" });
+    expect(JSON.stringify(arg)).not.toContain("back to you");
   });
 });

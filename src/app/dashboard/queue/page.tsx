@@ -12,7 +12,10 @@ import { DismissFollowups } from "@/components/queue/DismissFollowups";
 import { STATUS_PILL, agentLabel, fmtWhen, parseQueueStatus, preview, typeLabel, type QueueStatus } from "@/components/queue/format";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
-import { APPROVALS_NAME } from "@/lib/ui/words";
+import { APPROVALS_NAME, HANDED_TO_YOU_MARKER } from "@/lib/ui/words";
+import { loadCardState } from "@/lib/queue/card-state";
+import { handedToViewer, showHandedPill } from "@/lib/queue/handed";
+import "@/components/queue/handed.css";
 
 export const metadata: Metadata = { title: pageTitle(APPROVALS_NAME) };
 
@@ -42,10 +45,20 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
   const members = view.members ?? [];
   // Mine is the default only for someone who can hold work; anyone else starts on Everyone.
   const mineEnabled = !!viewer && QUEUE_EDIT_ROLES.includes(viewer.role);
-  const who = parseWho(Array.isArray(params.who) ? params.who[0] : params.who, { mineEnabled, members });
+  const rawWho = Array.isArray(params.who) ? params.who[0] : params.who;
+  const who = parseWho(rawWho, { mineEnabled, members });
   const allItems = load.status === "ok" ? load.items : [];
+  // Hand-offs are additive information: read only for the pending tab, and drawn only when the events were READ and at
+  // least one card is handed to this viewer. A failed or missing read draws nothing (never "none handed"); a page with
+  // no hand-offs is exactly the page it always was.
+  const handed =
+    status === "pending" && load.status === "ok" && allItems.length > 0 && viewer
+      ? handedToViewer(allItems, await loadCardState(allItems.map((i) => i.id)), viewer.userId)
+      : new Map();
+  const handedPill = showHandedPill(handed);
+  const handedActive = handedPill && rawWho === "handed";
   const counts = countsByPerson(allItems, routing, members, viewer);
-  const shown = load.status === "ok" ? filterByWho(allItems, who, routing, members, viewer) : [];
+  const shown = load.status === "ok" ? (handedActive ? allItems.filter((i) => handed.has(i.id)) : filterByWho(allItems, who, routing, members, viewer)) : [];
   const waitingOnOthers = allItems.length - shown.length;
   const dismissable = status === "pending" && load.status === "ok" ? dismissableFollowups(allItems, { routing, viewer, now: view.now }).length : 0;
   // Only what is still waiting can be approved twice.
@@ -72,7 +85,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
 
       {load.status === "ok" && (
         <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-          <PersonSwitch status={status} who={who} counts={counts} mineEnabled={mineEnabled} />
+          <PersonSwitch status={status} who={who} counts={counts} mineEnabled={mineEnabled} handed={handedPill ? { count: handed.size, active: handedActive } : undefined} />
           {dismissable > 0 && <DismissFollowups count={dismissable} />}
         </div>
       )}
@@ -122,6 +135,11 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
                     <Link href={`/dashboard/queue/${item.id}/`} className="lx-rowlink">
                       {item.headline}
                     </Link>
+                    {handed.has(item.id) && (
+                      <span className="lx-pill lx-pill-ox lx-handed-pill" data-handed-marker>
+                        {HANDED_TO_YOU_MARKER}
+                      </span>
+                    )}
                     {possibleDuplicates.has(item.id) && (
                       <span className="lx-pill lx-pill-warn" style={{ marginLeft: 8 }} title="Nearly identical to a draft that was queued minutes earlier">
                         Possible duplicate

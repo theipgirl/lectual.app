@@ -16,11 +16,15 @@ import { ReviewerSummary } from "@/components/queue/ReviewerSummary";
 import "@/components/queue/review.css";
 import { loadLinkedPanel } from "@/lib/consult-proposal/link";
 import { loadQueueViewContext } from "@/lib/queue/view-context";
-import { approvalRefusal, canApproveItem, classifyQueueItem, kindLabel, ownerText } from "@/lib/queue/routing";
+import { approvalRefusal, canApproveItem, classifyQueueItem, kindLabel, memberName, ownerText } from "@/lib/queue/routing";
+import { loadCardState } from "@/lib/queue/card-state";
+import { currentHolder } from "@/lib/queue/deck";
+import { handedCantApprove } from "@/lib/queue/handed";
+import { HandedToYouCard } from "@/components/queue/HandedToYouCard";
 import { loadAuditContext } from "@/lib/queue/audit-context";
 import type { Metadata } from "next";
 import { recordPageTitle } from "@/lib/ui/page-title";
-import { APPROVALS_NAME } from "@/lib/ui/words";
+import { A_TEAMMATE, APPROVALS_NAME, SEND_BACK_DONE } from "@/lib/ui/words";
 
 /** Tab title: the item's headline, so several open approvals can be told apart; "Approval" when it can't be read. */
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -50,10 +54,10 @@ export default async function QueueItemPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ resolved?: string; send?: string }>;
+  searchParams: Promise<{ resolved?: string; send?: string; returned?: string }>;
 }) {
   const { id } = await params;
-  const { resolved: justResolved, send } = await searchParams;
+  const { resolved: justResolved, send, returned } = await searchParams;
 
   // Outside the try on purpose: notFound() throws a control-flow error that a
   // catch would turn into "couldn't reach the queue" (a lesson from lectual).
@@ -97,6 +101,23 @@ export default async function QueueItemPage({
   const outcome = outcomeText(justResolved, send);
   const resolved = item.status !== "pending";
 
+  // Handed to the viewer right now? Additive: read only while pending, shown only when the events were READ and the
+  // current hand-off target is this person. A failed or missing read draws nothing and changes nothing else.
+  let handedCard: { byName: string; when: string; note: string | null; cantApprove: string | null } | null = null;
+  if (!resolved && view.viewer) {
+    const events = await loadCardState([item.id]);
+    const holder = events.status === "ok" ? currentHolder(events.events, item.id) : null;
+    if (holder && holder.userId === view.viewer.userId) {
+      const by = (view.members ?? []).find((m) => m.userId === holder.by);
+      handedCard = {
+        byName: by ? memberName(by) : A_TEAMMATE,
+        when: fmtWhen(holder.at, tz),
+        note: holder.note,
+        cantApprove: handedCantApprove({ canApprove: mayApprove, item, routing: view.routing, members: view.members ?? [] }),
+      };
+    }
+  }
+
   // SOP §2.5: has this client signed, paid or become a client since the
   // draft was queued? Never auto-rejects — a person decides, with the fact in
   // front of them, and the action re-checks before it approves.
@@ -115,6 +136,11 @@ export default async function QueueItemPage({
           {outcome && (
             <div role="status" className={`lx-banner lx-banner-${outcome.tone === "ok" ? "ok" : outcome.tone === "risk" ? "risk" : "mute"}`}>
               {outcome.text}
+            </div>
+          )}
+          {returned === "1" && (
+            <div role="status" className="lx-banner lx-banner-ok">
+              {SEND_BACK_DONE}
             </div>
           )}
           <div>
@@ -144,6 +170,7 @@ export default async function QueueItemPage({
               was queued. Check before approving.
             </p>
           )}
+          {handedCard && <HandedToYouCard id={item.id} byName={handedCard.byName} when={handedCard.when} note={handedCard.note} cantApprove={handedCard.cantApprove} />}
           <section className="lx-card lx-qi-card" style={{ padding: 20 }}>
             {resolved ? (
               <>
@@ -154,7 +181,7 @@ export default async function QueueItemPage({
               </>
             ) : (
               <>
-              {!mayApprove && editRole !== null && refusal && (
+              {!mayApprove && editRole !== null && refusal && !handedCard && (
                 <p role="status" className="lx-note" data-queue-refusal style={{ margin: "0 0 12px" }}>
                   {refusal}
                 </p>

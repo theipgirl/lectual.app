@@ -1,4 +1,5 @@
 import { QUEUE_ID, UUID } from "@/lib/queue/link-rules";
+import { NOTICE_HANDED_LABEL, NOTICE_RETURNED_LABEL, noticeHandedSentence, noticeReturnedSentence } from "@/lib/ui/words";
 import { CONSULT_OUTCOME_LABEL, isConsultOutcome } from "@/lib/pipeline/consult-outcome-labels";
 
 /**
@@ -80,7 +81,9 @@ export function describeNotification(
   const event =
     (row.kind === "approval_needed" || row.kind === "mentioned") && source === "proposal_accepted"
       ? "proposal_accepted"
-      : row.kind === "consult_outcome" || (row.kind === "mentioned" && source === "consult_outcome")
+      : row.kind === "approval_needed" && (source === "card_handoff" || source === "card_returned")
+        ? source
+        : row.kind === "consult_outcome" || (row.kind === "mentioned" && source === "consult_outcome")
         ? "consult_outcome"
         : row.kind === "approval_needed" || (row.kind === "mentioned" && source === "approval_needed")
           ? "approval_needed"
@@ -134,6 +137,16 @@ export function describeNotification(
         label: "Proposal accepted",
         sentence: headline ? truncate(headline, HEADLINE_MAX) : "A client accepted a proposal",
         href: id ? `/dashboard/proposals/${id}/` : null,
+      };
+    }
+    case "card_handoff":
+    case "card_returned": {
+      const first = actor.split(/\s+/)[0] || actor;
+      return {
+        icon: "approval",
+        label: event === "card_handoff" ? NOTICE_HANDED_LABEL : NOTICE_RETURNED_LABEL,
+        sentence: event === "card_handoff" ? noticeHandedSentence(first) : noticeReturnedSentence(first),
+        href: hrefFor(row, payload, true),
       };
     }
     case "approval_needed": {
