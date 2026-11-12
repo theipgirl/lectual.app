@@ -483,3 +483,30 @@ export function needsReviewPastDue(days: number): string {
 export function needsReviewCut(shown: number, total: number): string {
   return `Showing the oldest ${shown} of ${total}.`;
 }
+
+/* Approval deck: Decided and Handed off lists, and the side column's three sections (Phase 2 item 1). */
+export const DECK_LISTS_BACK = "← Back to today's deal";
+export const DECK_LISTS_SUB = "What you decided today and what you handed to colleagues.";
+export const DECK_LISTS_NAV = "Approval lists";
+export const deckListChip = (label: string, count: string) => `${label} · ${count}`;
+export const DECK_LISTS_HANDOFF_NOTE = "Handing off changes whose deck shows a card. It never changes who may approve it.";
+export const DECK_LIST_HANDED_CANT = "Hand-offs couldn't be loaded. Refresh to try again.";
+export const DECK_LIST_LATER_CANT = "Later couldn't be loaded. Refresh to try again.";
+export const DECK_LIST_HANDED_EMPTY = "Nothing handed off.";
+export const DECK_LIST_LATER_EMPTY = "Nothing put off until later.";
+export const DECK_LIST_BACK_WITH_YOU = "Back with you";
+export const deckListWith = (first: string) => `With ${first}`;
+export const deckListBackIn = (label: string) => `Back in the ${label} deal`;
+export const deckListBackAt = (when: string) => `Back ${when}`;
+export const deckListDecidedSub = (what: "Approved" | "Rejected", time: string, tail: string | null) => (tail ? `${what} ${time} · ${tail}` : `${what} ${time}`);
+export const DECK_LIST_TAIL_DRAFT = "draft in Outlook";
+export const DECK_LIST_TAIL_INTERNAL = "internal";
+export const DECK_LIST_TAIL_NOTE_KEPT = "note kept";
+export const deckListQuote = (note: string) => `“${note}”`;
+export const deckListHandedTo = (first: string, when: string, note: string | null) => (note ? `To ${first} ${when} · ${deckListQuote(note)}` : `To ${first} ${when}`);
+export const deckListSentBack = (first: string, day: string, time: string) => `To ${first} ${day} · sent back ${time}`;
+export const DECK_SIDE_SEE_ALL_DECIDED = "Decided today, full list";
+export const DECK_SIDE_SEE_ALL_LATER = "Later, full list";
+export const DECK_SIDE_LATER_NOTHING = "Nothing put off.";
+export const DECK_SIDE_LATER_CANT = "Can't show Later right now.";
+export const DECK_LISTS_CHIP_DECIDED = "Decided";

@@ -18,7 +18,7 @@ import {
   deckLaterArrivals,
 } from "@/lib/ui/words";
 import type { DeckView } from "@/lib/queue/deck";
-import { DeckSide, type DeckSideRow } from "./DeckSide";
+import { DeckSide, type DeckSideLater, type DeckSideRow } from "./DeckSide";
 
 export type { DeckSideRow } from "./DeckSide";
 
@@ -41,6 +41,7 @@ export function DeckFrame({
   side,
   sideNote,
   sideFailed,
+  sideLater,
   laterArrivals,
   nextDealLabel,
   dealLabel,
@@ -55,6 +56,8 @@ export function DeckFrame({
   side: DeckSideRow[] | null;
   sideNote?: string | null;
   sideFailed?: boolean;
+  /** The viewer's own Later cards for the side column. */
+  sideLater?: DeckSideLater;
   laterArrivals: number;
   nextDealLabel: string;
   /** The deal that is open now ("7:00 AM"), null before the first. */
@@ -113,7 +116,7 @@ export function DeckFrame({
           </div>
           <p className="dk-sub">{DECK_PAGE_SUB}</p>
         </div>
-        <DeckSide rows={side ?? []} failed={sideFailed} note={sideNote} />
+        <DeckSide rows={side ?? []} failed={sideFailed} note={sideNote} later={sideLater} />
         {laterArrivals > 0 && dealLabel && (
           <section className="dk-arrived" aria-label={deckArrivedTitle(dealLabel)}>
             <div className="dk-sidecard-head">

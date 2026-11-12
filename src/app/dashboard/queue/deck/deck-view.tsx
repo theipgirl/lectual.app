@@ -28,6 +28,9 @@ import {
 import type { QueueItem } from "@/lib/queue/api";
 import { DeckFrame, type DeckSideRow } from "@/components/deck/DeckFrame";
 import { ApprovalCard, type ApprovalCardProps } from "@/components/deck/ApprovalCard";
+import { DeckListsView } from "./lists-view";
+import { laterBackPill, parseListParam } from "@/lib/queue/deck-lists";
+import type { DeckSideLater } from "@/components/deck/DeckSide";
 import { DeckBoard, DeckList, type BoardColumn } from "@/components/deck/DeckList";
 import { DeckClean, DeckEmpty, DeckUnavailable } from "@/components/deck/DeckStates";
 import { queuedLabel, waitingText, ageText, type BoardCard, type ListRow } from "@/components/deck/deck-rows";
@@ -77,7 +80,7 @@ import {
 const FLAG_CHECK_LIMIT = 30;
 
 export type DeckInitial = Pick<NonNullable<ApprovalCardProps["initial"]>, "mode" | "holding" | "result" | "note">;
-type Search = { view?: string | string[]; at?: string | string[]; deal?: string | string[] };
+type Search = { view?: string | string[]; at?: string | string[]; deal?: string | string[]; list?: string | string[] };
 
 function memberName(m: MemberIdentity | undefined): string {
   return m?.displayName?.trim() || m?.email?.trim() || "a teammate";
@@ -112,6 +115,8 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
   if (!session || session.kind !== "ok") notFound();
 
   const params = await searchParams;
+  const list = parseListParam(params.list);
+  if (list) return DeckListsView({ list });
   const view = parseDeckView(params.view);
   const at = parseAtParam(params.at);
   const dealNow = (Array.isArray(params.deal) ? params.deal[0] : params.deal) === "now";
@@ -171,7 +176,24 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
   const dealLabel = deal.current?.label ?? null;
 
   const waiting = deck.cards.length + deck.laterArrivals.length + deck.later.length;
+  const sideLater: DeckSideLater =
+    cardState.status === "ok"
+      ? {
+          status: "ok",
+          rows: deck.later.map((c) => ({
+            id: `later-${c.item.id}`,
+            title: c.item.headline,
+            sub: `${agentLabel(c.item.agent)} · ${kindRowWord(c.kind)}`,
+            href: `/dashboard/queue/${encodeURIComponent(c.item.id)}/`,
+            current: false,
+            decided: false,
+            chip: laterBackPill(c.until, now, tz),
+            tone: "quiet" as const,
+          })),
+        }
+      : { status: cardState.status };
   const frameProps = {
+    sideLater,
     dealLine,
     view,
     viewHref,

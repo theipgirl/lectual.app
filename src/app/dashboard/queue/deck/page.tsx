@@ -5,6 +5,6 @@ import { DeckView } from "./deck-view";
 
 export const metadata: Metadata = { title: pageTitle(DECK_TITLE) };
 
-export default async function DeckPage({ searchParams }: { searchParams: Promise<{ view?: string | string[]; at?: string | string[]; deal?: string | string[] }> }) {
+export default async function DeckPage({ searchParams }: { searchParams: Promise<{ view?: string | string[]; at?: string | string[]; deal?: string | string[]; list?: string | string[] }> }) {
   return DeckView({ searchParams });
 }

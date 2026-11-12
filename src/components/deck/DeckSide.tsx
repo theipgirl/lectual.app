@@ -1,8 +1,27 @@
 import Link from "next/link";
-import { DECK_COL_DECIDED, DECK_SIDE_CANT, DECK_SIDE_CANT_DECIDED, DECK_SIDE_NOTHING_DECIDED, DECK_SIDE_NOTHING_LEFT, DECK_SIDE_TITLE, deckSideCounts } from "@/lib/ui/words";
+import {
+  DECK_COL_DECIDED,
+  DECK_COL_LATER,
+  DECK_COL_NEEDS_YES,
+  DECK_SIDE_CANT,
+  DECK_SIDE_CANT_DECIDED,
+  DECK_SIDE_LATER_CANT,
+  DECK_SIDE_LATER_NOTHING,
+  DECK_SIDE_NOTHING_DECIDED,
+  DECK_SIDE_NOTHING_LEFT,
+  DECK_SIDE_SEE_ALL_DECIDED,
+  DECK_SIDE_SEE_ALL_LATER,
+  DECK_SIDE_TITLE,
+  NOT_SWITCHED_ON,
+  deckSideCounts,
+} from "@/lib/ui/words";
+import { listHref } from "@/lib/queue/deck-lists";
 import type { ChipTone } from "./deck-rows";
 
 export type DeckSideRow = { id: string; title: string; href: string; current: boolean; decided: boolean; sub?: string; chip?: string; tone?: ChipTone };
+
+/** The viewer's own Later cards, in the same three states every read here has. */
+export type DeckSideLater = { status: "ok"; rows: DeckSideRow[] } | { status: "not-set-up" } | { status: "unavailable" };
 
 function Row({ r }: { r: DeckSideRow }) {
   const body = (
@@ -30,8 +49,17 @@ function Row({ r }: { r: DeckSideRow }) {
   );
 }
 
-/** "All your approvals": one scrolling list, status words, then "Decided today". */
-export function DeckSide({ rows, failed, note }: { rows: DeckSideRow[]; failed?: boolean; note?: string | null }) {
+function Sep({ label, count, first }: { label: string; count: string | number; first?: boolean }) {
+  return (
+    <div className={first ? "dk-sep dk-sep--first" : "dk-sep"}>
+      <span>{label}</span>
+      <span>{count}</span>
+    </div>
+  );
+}
+
+/** "All your approvals": three card sections, Needs your yes, Later, Decided today. */
+export function DeckSide({ rows, failed, note, later }: { rows: DeckSideRow[]; failed?: boolean; note?: string | null; later?: DeckSideLater }) {
   const need = rows.filter((r) => !r.decided);
   const done = rows.filter((r) => r.decided);
   return (
@@ -42,6 +70,7 @@ export function DeckSide({ rows, failed, note }: { rows: DeckSideRow[]; failed?:
       </div>
       <div className="dk-side-scroll">
         {note && <p className="dk-side-note">{note}</p>}
+        <Sep first label={DECK_COL_NEEDS_YES} count={failed ? "—" : need.length} />
         {failed ? <p className="dk-side-note dk-side-note--risk">{DECK_SIDE_CANT}</p> : need.length === 0 ? <p className="dk-side-note">{DECK_SIDE_NOTHING_LEFT}</p> : (
           <ol className="dk-side-rows">
             {need.map((r) => (
@@ -49,16 +78,41 @@ export function DeckSide({ rows, failed, note }: { rows: DeckSideRow[]; failed?:
             ))}
           </ol>
         )}
-        <div className="dk-sep">
-          <span>{DECK_COL_DECIDED}</span>
-          <span>{failed ? "—" : done.length}</span>
-        </div>
+        {later && (
+          <>
+            <Sep label={DECK_COL_LATER} count={later.status === "ok" ? later.rows.length : "—"} />
+            {later.status === "ok" ? (
+              later.rows.length === 0 ? (
+                <p className="dk-side-note">{DECK_SIDE_LATER_NOTHING}</p>
+              ) : (
+                <>
+                  <ol className="dk-side-rows">
+                    {later.rows.map((r) => (
+                      <Row key={r.id} r={r} />
+                    ))}
+                  </ol>
+                  <Link href={listHref("later")} className="dk-side-more">
+                    {DECK_SIDE_SEE_ALL_LATER}
+                  </Link>
+                </>
+              )
+            ) : (
+              <p className={`dk-side-note${later.status === "unavailable" ? " dk-side-note--risk" : ""}`}>{later.status === "not-set-up" ? NOT_SWITCHED_ON : DECK_SIDE_LATER_CANT}</p>
+            )}
+          </>
+        )}
+        <Sep label={DECK_COL_DECIDED} count={failed ? "—" : done.length} />
         {failed ? <p className="dk-side-note dk-side-note--risk">{DECK_SIDE_CANT_DECIDED}</p> : done.length === 0 ? <p className="dk-side-note">{DECK_SIDE_NOTHING_DECIDED}</p> : (
-          <ol className="dk-side-rows">
-            {done.map((r) => (
-              <Row key={r.id} r={r} />
-            ))}
-          </ol>
+          <>
+            <ol className="dk-side-rows">
+              {done.map((r) => (
+                <Row key={r.id} r={r} />
+              ))}
+            </ol>
+            <Link href={listHref("decided")} className="dk-side-more">
+              {DECK_SIDE_SEE_ALL_DECIDED}
+            </Link>
+          </>
         )}
       </div>
     </nav>
