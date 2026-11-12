@@ -164,8 +164,10 @@
 /* The phone More sheet's note is gone (founder, Nov 10); the MORE label stays 12px or more. */
 
 /* Deal-ready nudge (Phase 2 item 4): a small ox dot with a cream ring on the oxblood rail and the phone bar, plus the
-   same words for screen readers. Tokens only. */
-.lx-vh { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+   same words in the link's aria-label. Tokens only. */
 .lx-ready-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--ox); box-shadow: 0 0 0 2px var(--cream); flex: 0 0 auto; margin-left: 6px; }
 .lx-rail-item.is-active .lx-ready-dot { box-shadow: none; }
 .lx-ready-dot--bar { position: absolute; top: -3px; right: -5px; margin: 0; }
+/* Collapsed rail: the open-rail dot (after the label) is clipped, so the dot goes on the icon in place of the count dot. */
+.lx-rail--owner .lx-rail-dot.is-ready { background: var(--ox); box-shadow: 0 0 0 1.5px var(--cream); width: 7px; height: 7px; }
+.lx-rail--owner:not(:hover):not(.is-pinned):not(:has(:focus-visible)) .lx-ready-dot { display: none; }

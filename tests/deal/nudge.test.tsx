@@ -5,11 +5,18 @@ import { cardsHero } from "@/lib/today/owner-rules";
 import { dealReadyLine } from "@/lib/ui/words";
 import { qitem, U } from "../queue/routing-fixtures";
 
-const state = vi.hoisted(() => ({ cardState: { status: "ok", events: [] } as unknown }));
+const state = vi.hoisted(() => ({ cardState: { status: "ok", events: [] } as unknown, rejectCards: false, rejectZone: false, cardReads: 0 }));
 vi.mock("next/navigation", () => ({ usePathname: () => "/dashboard/", useRouter: () => ({ push() {}, refresh() {} }) }));
 vi.mock("@/lib/queue/routing-load", () => ({ loadApprovalRouting: vi.fn(async () => ({ status: "failed" })) }));
-vi.mock("@/lib/queue/card-state", () => ({ loadCardState: vi.fn(async () => state.cardState) }));
-vi.mock("@/lib/org/profile", () => ({ getFirmTimeZone: vi.fn(async () => "America/New_York") }));
+vi.mock("@/lib/queue/card-state", () => ({ loadCardState: vi.fn(async () => {
+    state.cardReads += 1;
+    if (state.rejectCards) throw new Error("boom");
+    return state.cardState;
+  }) }));
+vi.mock("@/lib/org/profile", () => ({ getFirmTimeZone: vi.fn(async () => {
+    if (state.rejectZone) throw new Error("boom");
+    return "America/New_York";
+  }) }));
 vi.mock("@/lib/queue/load", () => ({ loadActiveQueue: vi.fn() }));
 
 const NY = "America/New_York";
@@ -109,11 +116,14 @@ describe("rail dot and phone item (owner shell only)", () => {
     const words = dealReadyLine("2:00 PM", 3);
     const rail = renderToStaticMarkup(<Rail items={items} queueStatus="ok" pendingCount={3} counts={{}} initialPinned tree={shell.tree} variant="owner" dealReady={words} />);
     expect(rail).toContain("lx-ready-dot");
-    expect(rail).toContain(`<span class="lx-vh">${words}</span>`);
     expect(rail.match(/lx-ready-dot/g)).toHaveLength(1);
+    // The words exist once per link (the aria-label); no second hidden copy.
+    expect(rail.split(words)).toHaveLength(2);
+    // Collapsed rail: the dot is on the icon, in place of the count dot (the open-rail dot is clipped there).
+    expect(rail).toMatch(/<span class="lx-rail-icon">(?:(?!<\/span>\s*<span class="lx-rail-label").)*?lx-rail-dot is-ready/s);
     const bar = renderToStaticMarkup(<MobileBar items={items} queueStatus="ok" pendingCount={3} counts={{}} bar={shell.bar} groups={shell.moreGroups} variant="owner" dealReady={words} />);
     expect(bar).toContain("lx-ready-dot--bar");
-    expect(bar).toContain(`<span class="lx-vh">${words}</span>`);
+    expect(bar.split(words)).toHaveLength(2);
   });
 
   it("draws nothing without the nudge, and nothing in the technician shell even if handed words", async () => {
@@ -126,7 +136,7 @@ describe("rail dot and phone item (owner shell only)", () => {
       const rail = renderToStaticMarkup(<Rail items={items} queueStatus="ok" pendingCount={3} counts={{}} initialPinned variant={undefined} dealReady={dealReady} />);
       const bar = renderToStaticMarkup(<MobileBar items={items} queueStatus="ok" pendingCount={3} counts={{}} variant={undefined} dealReady={dealReady} />);
       expect(rail + bar).not.toContain("lx-ready-dot");
-      expect(rail + bar).not.toContain("lx-vh");
+      expect(rail + bar).not.toContain("is-ready");
     }
     const none = renderToStaticMarkup(<Rail items={items} queueStatus="ok" pendingCount={3} counts={{}} initialPinned variant="owner" />);
     expect(none).not.toContain("lx-ready-dot");
@@ -137,7 +147,7 @@ describe("the layout wires it for the owner shell only", () => {
   it("asks loadDealNudge only inside the owner branch and passes dealReady to both", async () => {
     const { readFileSync } = await import("node:fs");
     const src = readFileSync("src/app/dashboard/layout.tsx", "utf8");
-    expect(src).toMatch(/shell\.variant === "owner" \? await loadDealNudge\(allQueue/);
+    expect(src).toMatch(/shell\.variant === "owner" \? loadDealNudge\(allQueue/);
     expect(src.match(/dealReady=\{dealReady\}/g)).toHaveLength(2);
   });
 });
@@ -162,10 +172,27 @@ describe("loadDealNudge", () => {
     expect(await loadDealNudge({ status: "ok", items: [] }, viewer, ["07:00", "14:00"])).toEqual(NO_NUDGE);
     expect(await loadDealNudge({ status: "unavailable", items: [] }, viewer, ["07:00", "14:00"])).toEqual(NO_NUDGE);
     expect(await loadDealNudge({ status: "unconfigured", items: [], reason: "org-key" }, viewer, ["07:00", "14:00"])).toEqual(NO_NUDGE);
-    state.cardState = null;
     const load = { status: "ok" as const, items: [qitem({ id: "a", created_at: "2026-11-10T11:00:00Z" })] };
     // card events that can't be read deal every card, and a throw is swallowed
     state.cardState = { status: "unavailable" };
     expect((await loadDealNudge(load, viewer, ["07:00", "14:00"])).ready).toBe(true);
+  });
+
+  it("an empty queue makes no card-state read", async () => {
+    const { loadDealNudge } = await import("@/lib/queue/deal-nudge-load");
+    state.cardReads = 0;
+    expect(await loadDealNudge({ status: "ok", items: [] }, viewer, ["07:00", "14:00"])).toEqual(NO_NUDGE);
+    expect(state.cardReads).toBe(0);
+  });
+
+  it("a rejecting card-state or time-zone read is no nudge and does not throw", async () => {
+    const { loadDealNudge } = await import("@/lib/queue/deal-nudge-load");
+    const load = { status: "ok" as const, items: [qitem({ id: "a", created_at: "2026-11-10T11:00:00Z" })] };
+    state.rejectCards = true;
+    await expect(loadDealNudge(load, viewer, ["07:00", "14:00"])).resolves.toEqual(NO_NUDGE);
+    state.rejectCards = false;
+    state.rejectZone = true;
+    await expect(loadDealNudge(load, viewer, ["07:00", "14:00"])).resolves.toEqual(NO_NUDGE);
+    state.rejectZone = false;
   });
 });

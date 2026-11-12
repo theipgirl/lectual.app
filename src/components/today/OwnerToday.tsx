@@ -76,7 +76,7 @@ export async function OwnerToday({
   const [hasProposals, tz] = await Promise.all([orgHasModule("proposals").catch(() => false), getFirmTimeZone()]);
   const dealTimes = parseDealTimes(metadata);
   const [deckS, consultsS, deadlinesS, reviewS, proposalsS, membersS] = await Promise.allSettled([
-    loadDeckSummary({ userId, role }, dealTimes),
+    loadDeckSummary({ userId, role }, dealTimes, now),
     loadTodayConsults(now, tz, liveConsultDeps),
     loadOwnerDeadlines(now, tz),
     loadOwnerNeedsReview(now, tz),

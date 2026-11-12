@@ -20,9 +20,9 @@ export type DeckSummary =
   | { status: "unavailable" };
 
 /** The viewer's deck from an already-loaded queue: the one `buildDeck` call the Today tile and the deal-ready nudge share. */
-export async function viewerDeck(items: readonly QueueItem[], viewer: { userId: string; role: Role }, dealTimes: readonly string[]) {
+export async function viewerDeck(items: readonly QueueItem[], viewer: { userId: string; role: Role }, dealTimes: readonly string[], at?: Date) {
   const [routed, tz, cardState] = await Promise.all([loadApprovalRouting(), getFirmTimeZone(), loadCardState(items.map((i) => i.id))]);
-  const now = new Date();
+  const now = at ?? new Date();
   const deck = buildDeck({
     items: [...items],
     routing: routed.status === "ok" ? routed.routing : {},
@@ -34,12 +34,12 @@ export async function viewerDeck(items: readonly QueueItem[], viewer: { userId: 
   return { deck, now, tz };
 }
 
-export async function loadDeckSummary(viewer: { userId: string; role: Role }, dealTimes: readonly string[] = DEFAULT_DEAL_TIMES): Promise<DeckSummary> {
+export async function loadDeckSummary(viewer: { userId: string; role: Role }, dealTimes: readonly string[] = DEFAULT_DEAL_TIMES, at?: Date): Promise<DeckSummary> {
   try {
     const load = await loadActiveQueue("pending");
     if (load.status === "unconfigured") return { status: "unconfigured" };
     if (load.status !== "ok") return { status: "unavailable" };
-    const { deck, now, tz } = await viewerDeck(load.items, viewer, dealTimes);
+    const { deck, now, tz } = await viewerDeck(load.items, viewer, dealTimes, at);
     const deal = dealFor(now, tz, dealTimes);
     return {
       status: "ok",

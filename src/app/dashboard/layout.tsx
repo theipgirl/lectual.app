@@ -72,9 +72,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
     cookies(),
   ]);
   // The badge counts what is the viewer's own (a routing read that fails counts every pending item).
-  const queue = await mineQueue(allQueue, { userId: user.id, role });
-  // The owner shell's deal-ready dot, from the queue read above (no second queue read). The technician shell never asks.
-  const nudge = shell.variant === "owner" ? await loadDealNudge(allQueue, { userId: user.id, role }, parseDealTimes(user.user_metadata)) : null;
+  // The owner shell's deal-ready dot, from the queue read above (no second queue read), in parallel with the badge count.
+  // The technician shell never asks.
+  const [queue, nudge] = await Promise.all([
+    mineQueue(allQueue, { userId: user.id, role }),
+    shell.variant === "owner" ? loadDealNudge(allQueue, { userId: user.id, role }, parseDealTimes(user.user_metadata)) : Promise.resolve(null),
+  ]);
   const dealReady = nudge && nudge.ready ? dealReadyLine(nudge.label, nudge.count) : null;
   const railPinned = railIsPinned(cookieStore.get(RAIL_PIN_COOKIE)?.value);
 

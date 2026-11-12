@@ -137,7 +137,6 @@ export function MobileBar({ items, queueStatus, pendingCount, counts, dealReady 
                 {ready && <span className="lx-ready-dot lx-ready-dot--bar" aria-hidden="true" />}
               </span>
               <span className="lx-mbar-label">{item.label}</span>
-              {ready && <span className="lx-vh">{ready}</span>}
             </Link>
           );
         })}

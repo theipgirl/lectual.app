@@ -152,15 +152,14 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
                     >
                       <span className="lx-rail-icon">
                         <Icon d={entry.icon} size={17} />
-                        {count && !entry.active && <span className={`lx-rail-dot${count === "!" ? " is-alert" : ""}`} aria-hidden="true" />}
+                        {ready && !entry.active ? (
+                          <span className="lx-rail-dot is-ready" aria-hidden="true" />
+                        ) : (
+                          count && !entry.active && <span className={`lx-rail-dot${count === "!" ? " is-alert" : ""}`} aria-hidden="true" />
+                        )}
                       </span>
                       <span className="lx-rail-label">{entry.label}</span>
-                      {ready && (
-                        <>
-                          <span className="lx-ready-dot" aria-hidden="true" />
-                          <span className="lx-vh">{ready}</span>
-                        </>
-                      )}
+                      {ready && <span className="lx-ready-dot" aria-hidden="true" />}
                       {count && <span className={`lx-rail-count${count === "!" ? " is-alert" : ""}`}>{count}</span>}
                       {owner && entry.kids.length > 0 && (
                         <span className="lx-rail-chev">
