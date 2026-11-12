@@ -32,6 +32,7 @@ import { buildProposalCard } from "@/lib/proposals/card";
 import { loadConsultStrip } from "@/lib/proposals/consult-strip-load";
 import { ProposalDocument } from "@/components/client-proposal/ProposalDocument";
 import { ConsultStrip } from "@/components/proposal-editor/ConsultStrip";
+import { MadeByLine } from "@/components/proposal-editor/MadeByLine";
 import { LeadLink } from "@/components/proposal-editor/LeadLink";
 import { LinkLeadForm } from "@/components/proposal-editor/LinkLeadForm";
 import { Lifecycle } from "@/components/proposal-editor/Lifecycle";
@@ -351,7 +352,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
             </span>
             <span>{proposal.title}</span>
             {proposal.expires_on && <span>Open until {formatShortFirmDate(`${proposal.expires_on}T12:00:00Z`, "UTC")}</span>}
-            {isAssistantDraft && <span className="lx-note">Drafted by an assistant</span>}
+            {content.made_by ? <MadeByLine content={content} /> : isAssistantDraft && <span className="lx-note">Drafted by an assistant</span>}
           </div>
           <LeadLink
             lead={leadLink}

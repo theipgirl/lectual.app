@@ -339,7 +339,15 @@ export type ProposalLoe = {
   body: string;
 };
 
+/** Sprint 3: who made a proposal. Staff-only; `publicContent` never returns it. Absent = a proposal from before this field. */
+export const MADE_BY_VALUES = ["assistant", "copilot", "person"] as const;
+export type MadeBy = (typeof MADE_BY_VALUES)[number];
+
 export type ProposalContent = {
+  /** Sprint 3: who made this draft. Staff-only. */
+  made_by?: MadeBy;
+  /** Sprint 3: the consult an assistant draft came from (a civil date, YYYY-MM-DD). Staff-only, read by the editor's header line. */
+  made_from?: { consult_date: string };
   /** Engagement letter the client signs on the page. Absent = the page behaves as it always did. */
   loe?: ProposalLoe;
   /** Spec 9: absent = "trademark". */

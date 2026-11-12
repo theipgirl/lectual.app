@@ -75,3 +75,55 @@ export const EVENT_WORDS = {
   sent: "turned on the client link (nothing was emailed from here)",
   superseded: "turned on a newer version, which replaced this one",
 } as const;
+
+/** Sprint 3: the editor header's "who made this" line (`content.made_by`). */
+export const MADE_WITH_COPILOT = "Made with Copilot";
+export const MADE_BY_ASSISTANT = "Made by the assistant";
+export function madeByAssistantFrom(date: string): string {
+  return `Made by the assistant from the ${date} consult`;
+}
+
+/** Sprint 3: the start screen at New proposal (three doors). */
+export const START_DOORS = {
+  consult: {
+    title: "From a consult",
+    body: "The assistant drafts from a consult you have already had. Pick one below and review the draft.",
+    notReady: "To draft from a consult, connect Zoom or Fathom first. Until then, start from scratch.",
+    connect: "Connect Zoom or Fathom",
+    couldntLoad: "Can't show consults right now. Refresh to try again.",
+    none: "No consults in the last 14 days.",
+  },
+  copilot: {
+    title: "Ask Copilot",
+    body: "Say what you want in a sentence. Copilot opens with the request typed in, and nothing happens until you send it.",
+    action: "Ask Copilot",
+  },
+  scratch: {
+    title: "Start from scratch",
+    body: "Choose who it is for, and the draft opens in the editor with your firm's packages.",
+    action: "Choose who it is for",
+  },
+} as const;
+
+/** The request typed into Copilot. A name from a chosen lead, else a generic request. Never a price. */
+export function copilotRequest(name: string | null): string {
+  const who = name?.trim();
+  return who ? `Draft a proposal for ${who}` : "Draft a proposal";
+}
+
+/** Settings, Proposals: "New proposals offer". */
+export const NEW_OFFER_WORDS = {
+  heading: "New proposals offer",
+  hint: "What a new proposal starts with, from every way of starting one. The client page and the editor can still change it.",
+  modeDefault: "One package: the first on the list",
+  modeOne: "One package",
+  modeChoice: "The client chooses among these packages",
+  per: "Choice is made",
+  perBrand: "Per brand name",
+  perMark: "Per mark",
+  options: "Packages offered (up to 3)",
+  start: "Starts on",
+  tooLarge: "These settings are too large to save. Remove some included items first.",
+  tooMany: "Offer at most 3 packages.",
+  needsOne: "Pick at least one package to offer.",
+} as const;

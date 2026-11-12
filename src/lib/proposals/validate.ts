@@ -28,7 +28,7 @@
  * required too (they are columns, not content, so the caller passes them in).
  */
 
-import { isMarkKind } from "./types";
+import { isMarkKind, MADE_BY_VALUES } from "./types";
 import { MAX_CLASSES_TOTAL_PER_BRAND, MAX_CLIENT_ADD } from "./client-classes";
 import { validatePackages } from "./package-list";
 import { MAX_NAME_DISCOUNT_PCT } from "./pricing";
@@ -285,6 +285,16 @@ export function validateContent(content: unknown, options: ValidateOptions = {})
   if (content.kind != null && content.kind !== "trademark" && content.kind !== "general") {
     err("kind", 'A proposal is either a "trademark" or a "general" proposal.');
     return out;
+  }
+  // Sprint 3: who made the draft, and which consult it came from. Staff-only notes, never published.
+  if (content.made_by !== undefined && !(MADE_BY_VALUES as readonly unknown[]).includes(content.made_by)) {
+    err("made_by", "Who made this proposal must be the assistant, Copilot or a person.");
+  }
+  if (content.made_from !== undefined) {
+    const from = content.made_from;
+    if (!isObj(from) || typeof from.consult_date !== "string" || !isCivilDate(from.consult_date)) {
+      err("made_from", "The consult date must be a real date.");
+    }
   }
   // The engagement letter (lectual 0106) rides on either kind and must match it.
   if (content.loe !== undefined) {

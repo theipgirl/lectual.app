@@ -3,6 +3,7 @@ import { listMemberDirectory, type MemberIdentity } from "@/lib/members/director
 import { getProposalSettings } from "@/lib/proposals/store";
 import { PROPOSAL_ADMIN_ROLES, standardProposalPricing } from "@/lib/proposals/types";
 import { packageOffersFromSetting } from "@/lib/proposals/package-snapshot";
+import { readNewOffer } from "@/lib/proposals/new-offer";
 import { moneyInput } from "@/lib/proposal-editor/form";
 import { firstNameOf } from "@/lib/proposal-editor/labels";
 import { SettingsForm } from "@/components/proposal-editor/SettingsForm";
@@ -106,6 +107,7 @@ export default async function ProposalSettingsPage() {
         </div>
       </section>
       <SettingsForm
+        newOffer={readNewOffer(settings?.pricing ?? {})}
         packages={packages.map((p) => ({
           package: p.package,
           base: moneyInput(p.base_cents),
