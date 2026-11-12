@@ -549,3 +549,28 @@ export const DEAL_TIMES_NOT_SAVED = "We couldn't save your deal times. Try again
 export const DEAL_TIMES_INVALID = "Pick two times from the lists.";
 export const DEAL_TIMES_STEP = "Deal times go in 5-minute steps.";
 export const DEAL_TIMES_APART = "Deal times need to be at least 2 hours apart.";
+
+/* Phase 2 item 5: the welcome deal (owner view's first-sign-in guide; the technician view keeps the tour). */
+export const WELCOME_ARIA = "Welcome to your approval deck";
+export const WELCOME_SOURCE = "Lectual";
+export const WELCOME_TAG = "Welcome · 1 min";
+export const WELCOME_SKIP = "Skip the tour";
+export const WELCOME_NEXT = "Next";
+export const WELCOME_BACK = "Previous step";
+export const WELCOME_FORWARD = "Next step";
+export const WELCOME_FINISH = "Finish";
+export const WELCOME_CARD_1_TITLE = "One card is one thing waiting on you";
+export const WELCOME_CARD_1_BODY =
+  "Each card says which assistant drafted it, who it is to, and the opening of the draft. Nothing on a card has been sent.";
+export const WELCOME_CARD_1_STEP = "the line at the bottom of a card says what to check first.";
+export const WELCOME_CARD_2_TITLE = "The moves";
+export const WELCOME_CARD_2_BODY =
+  "Yes approves after a 5-second hold you can undo. For a client email, approving puts a draft in your mailbox, and nothing is sent until someone presses Send. Reject needs a note. Later puts a card in your next deal, and Hand off puts it in a colleague's deck. The arrows beside the position move to the previous or next card.";
+export const WELCOME_CARD_2_STEP = "try the arrows. They only move between cards, and nothing is stored.";
+export const WELCOME_CARD_3_TITLE = "Two deals a day";
+export const welcomeCard3Body = (first: string, second: string) =>
+  `Your cards are dealt at ${first} and ${second}. Anything that arrives after a deal opens waits for the next one. The List view always shows everything.`;
+export const WELCOME_CARD_3_STEP = `use "${DEAL_TIMES_OPEN}" in the deck header or "${DEAL_TIMES_MENU_ITEM}" in your account menu to pick your own times.`;
+export const WELCOME_CARD_4_TITLE = "The weekly review";
+export const WELCOME_CARD_4_BODY = `${REVIEW_NAME} shows every open matter and lead, by person, with ${OUR_TURN} and Waiting on client. The Monday meeting runs from it.`;
+export const WELCOME_CARD_4_STEP = "open it before Monday's meeting.";

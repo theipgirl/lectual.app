@@ -27,6 +27,7 @@ vi.mock("@/components/shell/NoFirmAccess", () => ({ NoFirmAccess: () => null }))
 vi.mock("@/components/notifications/NotificationBell", () => ({ NotificationBell: () => null }));
 vi.mock("@/components/copilot/CopilotLauncher", () => ({ CopilotLauncher: () => null }));
 vi.mock("@/components/onboarding/OnboardingTour", () => ({ OnboardingTour: () => null }));
+vi.mock("@/components/onboarding/WelcomeDeal", () => ({ WelcomeDeal: () => null }));
 vi.mock("@/components/onboarding/GettingStartedRunner", () => ({ GettingStartedRunner: () => null }));
 
 import DashboardLayout from "@/app/dashboard/layout";
@@ -35,6 +36,7 @@ import { MobileBar } from "@/components/shell/MobileBar";
 import { AccountMenu } from "@/components/shell/AccountMenu";
 import { SectionLabel } from "@/components/shell/SectionLabel";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
+import { WelcomeDeal } from "@/components/onboarding/WelcomeDeal";
 import { mobileBarItems, moreSections, railGroups, visibleNav } from "@/lib/nav";
 import { DECK_PATH } from "@/lib/views";
 
@@ -66,7 +68,7 @@ async function mount(s: unknown) {
   resolveFirmSession.mockResolvedValue(s);
   const tree = await DashboardLayout({ children: null });
   const one = (t: unknown) => findAll(tree, t)[0] as ReactElement<AnyProps> | undefined;
-  return { tree, rail: one(Rail)!, bar: one(MobileBar)!, menu: one(AccountMenu)!, tour: one(OnboardingTour)!, label: findAll(tree, SectionLabel), header: findAll(tree, "header")[0] as ReactElement<AnyProps> };
+  return { tree, rail: one(Rail)!, bar: one(MobileBar)!, menu: one(AccountMenu)!, tour: one(OnboardingTour), welcome: one(WelcomeDeal)!, label: findAll(tree, SectionLabel), header: findAll(tree, "header")[0] as ReactElement<AnyProps> };
 }
 
 const MODULES = ["mailbox", "agents", "proposals"];
@@ -83,7 +85,7 @@ describe("switch off: today's shell, byte for byte", () => {
       const items = visibleNav(MODULES, role as never);
       expect(m.rail.props.items).toEqual(items);
       expect(m.bar.props.items).toEqual(items);
-      expect(m.tour.props.navSlugs).toEqual(items.map((i) => i.slug));
+      expect(m.tour!.props.navSlugs).toEqual(items.map((i) => i.slug));
       for (const k of ["tree", "variant"]) expect(m.rail.props[k]).toBeUndefined();
       expect(m.rail.props.showSettings).toBe(true);
       expect(m.rail.props.showReports).toBe(true);
@@ -129,8 +131,10 @@ describe("switch on", () => {
     const slugs = (m.rail.props.items as { slug: string }[]).map((i) => i.slug);
     expect(slugs).toEqual(["", "queue", "review", "proposals", "intake", "matters", "calendar"]);
     expect(m.bar.props.items).toBe(m.rail.props.items);
-    expect(m.tour.props.navSlugs).toEqual(slugs);
-    expect(Object.keys(m.tour.props).sort()).toEqual(["aiConfigured", "firmName", "navSlugs", "open", "role"]);
+    // The owner shell draws the welcome deal INSTEAD of the tour (Phase 2 item 5).
+    expect(m.tour).toBeUndefined();
+    expect(m.welcome).toBeDefined();
+    expect(Object.keys(m.welcome.props).sort()).toEqual(["dealTimes", "open"]);
     expect(m.rail.props).toMatchObject({ showSettings: false, showReports: false, variant: "owner" });
     expect(m.bar.props).toMatchObject({ variant: "owner" });
     expect(m.menu.props).toMatchObject({ settingsInMenu: true, variant: "owner" });
