@@ -16,7 +16,7 @@ import type { Screen } from "../registry";
  * back afterwards (so the other mono screens are untouched), and every read the page makes is counted per table into out/leads-real-reads.json.
  * The shell is released from its fixed height so a full-page screenshot is the whole list.
  */
-const EXTRA = ["crm_drip_enrollment", "crm_meeting", "crm_discovery_session", "crm_drip_step", "crm_time_entry", "crm_booth_scorecard"];
+const EXTRA = ["crm_drip_enrollment", "crm_meeting", "crm_discovery_session", "crm_drip_step", "crm_time_entry", "crm_booth_scorecard", "crm_calendar_event", "client_proposal"];
 const MINE: Record<string, Record<string, unknown>[]> = { crm_stage: stages, crm_lead: leads, crm_activity: activities, crm_booth_scorecard: boothScorecards };
 
 async function withRealData<T>(label: string, fn: () => Promise<T>): Promise<T> {
@@ -46,24 +46,27 @@ const RELEASE = "<style>.lx-app{height:auto!important;min-height:0!important;ove
 const VPS = [["d", "desktop"], ["m", "desktop"], ["p", "phone"]] as const;
 const VIEWS = [["list", {}], ["board", { view: "board" }]] as const;
 
-export const screens: Screen[] = VIEWS.flatMap(([view, search]) =>
-  (["tech", "owner"] as const).flatMap((shell) =>
-    VPS.map(([vp, viewport]) => ({
-      id: `mono-leadsreal-${view}-${shell}-${vp}`,
-      title: `Leads ${view} with real-shaped data (${shell}, ${vp})`,
-      designBoard: "none",
-      viewport,
-      pathname: "/dashboard/intake/",
-      shell: "none" as const,
-      prepare: () => {
-        resetState();
-        state.pathname = "/dashboard/intake/";
-      },
-      render: async () => {
-        const page = (await withRealData(`${view}-${shell}-${vp}`, () => IntakePage({ searchParams: Promise.resolve(search) }))) as unknown as ReactElement;
-        return shell === "owner" ? <OwnerShell>{page}</OwnerShell> : <TechShell>{page}</TechShell>;
-      },
-      transformHtml: (html: string) => RELEASE + html,
-    })),
-  ),
-);
+const mk = (id: string, view: string, shell: "tech" | "owner", vp: string, viewport: "desktop" | "phone", search: Record<string, string>): Screen => ({
+  id,
+  title: `Leads ${view} with real-shaped data (${shell}, ${vp}) ${JSON.stringify(search)}`,
+  designBoard: "none",
+  viewport,
+  pathname: "/dashboard/intake/",
+  shell: "none" as const,
+  prepare: () => {
+    resetState();
+    state.pathname = "/dashboard/intake/";
+  },
+  render: async () => {
+    const page = (await withRealData(id, () => IntakePage({ searchParams: Promise.resolve(search) }))) as unknown as ReactElement;
+    return shell === "owner" ? <OwnerShell>{page}</OwnerShell> : <TechShell>{page}</TechShell>;
+  },
+  transformHtml: (html: string) => RELEASE + html,
+});
+
+export const screens: Screen[] = [
+  ...VIEWS.flatMap(([view, search]) => (["tech", "owner"] as const).flatMap((shell) => VPS.map(([vp, viewport]) => mk(`mono-leadsreal-${view}-${shell}-${vp}`, view, shell, vp, viewport, search)))),
+  mk("mono-leadsreal-list-tech-d-open", "list", "tech", "d", "desktop", { set: "open" }),
+  mk("mono-leadsreal-list-tech-d-lost", "list", "tech", "d", "desktop", { set: "lost" }),
+  mk("mono-leadsreal-board-tech-d-open", "board", "tech", "d", "desktop", { view: "board", set: "open" }),
+];

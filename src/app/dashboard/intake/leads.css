@@ -87,11 +87,11 @@
   .ix-table.ix-has-owner .ix-row { grid-template-columns: minmax(0, 1fr) auto; }
   .ix-row > [data-col="lead"] { grid-area: lead; }
   .ix-row > [data-col="menu"] { grid-area: menu; align-self: start; }
-  .ix-row > [data-col="stage"] { grid-area: stage; display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; }
+  .ix-row > [data-col="stage"] { grid-area: stage; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; min-width: 0; overflow: hidden; }
   .ix-row > [data-col="next"] { grid-area: next; }
   .ix-row > [data-col="source"], .ix-row > [data-col="owner"], .ix-row > [data-col="temp"], .ix-row > [data-col="touch"] { display: none; }
-  .ix-phone-meta { display: flex; margin-left: auto; }
-  .ix-row > [data-col="stage"] .ix-stage { flex: 0 1 auto; min-width: 0; }
+  .ix-row .ix-phone-meta { display: flex; margin-left: auto; flex: none; }
+  .ix-row > [data-col="stage"] .ix-stage, .ix-row > [data-col="stage"] .ix-marker { flex: 0 1 auto; min-width: 0; }
   .ix-next { -webkit-line-clamp: 1; font-size: 14px; }
   .ix-sub, .ix-stage, .ix-marker { font-size: 14px; }
   .ix-board { grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: minmax(0, 1fr); overflow-x: visible; }
@@ -99,3 +99,9 @@
 .ix-phone-meta { display: none; align-items: center; gap: 8px; min-width: 0; }
 
 @media (pointer: coarse) { .ix-icon-btn, .ix-more { min-height: 44px; min-width: 44px; } }
+@media (max-width: 640px) { .intake-root .lp-toolbar-actions .lp-btn { padding: 0 6px; } .intake-root .lp-toolbar-actions { gap: 4px; } }
+@media (max-width: 640px) {
+  .ix-sets, .ix-filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  .ix-sets .lp-chip, .ix-filters .lp-chip, .ix-filters .lp-chips { flex: 0 0 auto; white-space: nowrap; }
+  .ix-filters .lp-chips-end { margin-left: 0; white-space: nowrap; }
+}
