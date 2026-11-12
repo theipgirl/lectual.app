@@ -127,7 +127,16 @@ export function handedRows(pending: readonly QueueItem[], events: readonly CardE
       at: ret.createdAt,
     });
   }
-  return out.sort((a, b) => b.at.localeCompare(a.at) || a.id.localeCompare(b.id)).map(({ at: _at, ...r }) => r);
+  return out.sort((a, b) => b.at.localeCompare(a.at) || a.id.localeCompare(b.id)).map(dropKey("at"));
+}
+
+/** A copy of a row without its sort key. */
+function dropKey<K extends string>(key: K) {
+  return <T extends Record<K, unknown>>(row: T): Omit<T, K> => {
+    const copy: Record<string, unknown> = { ...row };
+    delete copy[key];
+    return copy as Omit<T, K>;
+  };
 }
 
 /** The viewer's own Later cards still in force. An expired Later is back on the deck, so it is not listed. */
@@ -141,7 +150,7 @@ export function laterRows(pending: readonly QueueItem[], events: readonly CardEv
     if (currentHolder(events, item.id)) continue;
     out.push({ id: item.id, href: itemHref(item.id), title: item.headline, kind: kindOf(item), pill: backLabel(until), until });
   }
-  return out.sort((a, b) => a.until.localeCompare(b.until) || a.id.localeCompare(b.id)).map(({ until: _until, ...r }) => r);
+  return out.sort((a, b) => a.until.localeCompare(b.until) || a.id.localeCompare(b.id)).map(dropKey("until"));
 }
 
 /** "Back in the 2:00 PM deal" when that deal is today, else "Back tomorrow at 7:00 AM". */
