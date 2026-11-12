@@ -12,8 +12,10 @@ untouched: 0106 is on lectual-dev only.
 
 - [ ] Click through production at desktop and phone width (it is live now). Nothing here has run in a real browser or against
       real data: the new edit page, the three ways to start, the client page (choose, details, letter, sign, pay), the PDF download.
-- [ ] Say OK to apply migration 0106 to lectual-prod (it is on lectual-dev and checked there). The letter cannot be signed in
-      production until it is.
+- [x] 0106 applied to lectual-prod (Nov 12, on Taylor's instruction). RPB's trademark letter is in Settings as a DRAFT (version 1),
+      taken from the Nov 9 letter with the client's details turned into fill-in fields.
+- [ ] Approve the letter: Settings, Client proposals, Engagement letter, Approve. Only a signed-in named approver can (Rebecca or
+      Taylor). Until then no proposal carries it.
 - [x] Merge to `main`. Done Nov 12: lectual.app#28, lectual#37 and lectual-plugin#4 merged, so the new editor and start screen are live
       for RPB. Signing a letter stays off until 0106 is on lectual-prod.
 - [ ] The live database credentials in the cloud build environment: decide whether they should be there. An agent's test run reached
