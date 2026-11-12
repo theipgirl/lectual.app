@@ -54,6 +54,12 @@ export const EDITOR_WORDS = {
   readyNothing: "Nothing is blocking the link.",
   clientPays: "What the client pays",
   pricesUpdateOnSave: "Prices update when you save",
+  packageIncludesHeading: "What each package includes",
+  packageIncludesHint:
+    "The table the client sees, one column per package. Changes here are for this proposal only; Settings → Proposals keeps the firm's standard rows. The substantive office action response is never listed here; the strategy review is fine.",
+  expandPreview: "Expand",
+  closePreview: "Close",
+  previewShownFullWidth: "Shown full width.",
 } as const;
 
 /** "Check these 3 things" (assistant drafts). */

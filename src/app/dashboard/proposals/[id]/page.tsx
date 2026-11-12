@@ -48,6 +48,8 @@ import { Lifecycle } from "@/components/proposal-editor/Lifecycle";
 import { UnsavedGuardProvider } from "@/components/proposal-editor/UnsavedGuard";
 import { DraftFormElement, DraftProvider } from "@/components/proposal-editor/DraftForm";
 import { EditorActions } from "@/components/proposal-editor/EditorActions";
+import { ExpandablePreview } from "@/components/proposal-editor/ExpandablePreview";
+import { editorPackageIncludes } from "@/lib/proposal-editor/package-includes";
 import { PayBox, ReadyChecklist } from "@/components/proposal-editor/EditorSide";
 import { CheckFirstPanel, checkFirstShown } from "@/components/proposal-editor/CheckFirstPanel";
 import { letterLogoForSlug } from "@/lib/loe/letter-logo";
@@ -483,6 +485,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
                   customLabel={customLabel}
                   customHelp={customHelp}
                   includes={content.includes ?? []}
+                  packageIncludes={general ? null : editorPackageIncludes(content)}
                 />
                 <MessageSection
                   editable={editable}
@@ -493,9 +496,6 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
                 <EngagementLetterSlot state={letterState} editable={editable} logo={letterLogoForSlug(session.org.slug)} />
               </DraftFormElement>
               {general ? null : <BrandForms proposalId={proposal.id} updatedAt={proposal.updated_at} names={nameValues} editable={editable} />}
-              <section className="lx-card pe-card" aria-label="Proposal actions">
-                {createBlock}
-              </section>
             </div>
 
             <aside className="pe-side" aria-label="Figures and preview">
@@ -562,23 +562,22 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
               {/* One "Check these" heading a page: when the assistant's panel is at the top, the checklist lists its checks without a second one. */}
               {statusEditable && <ReadyChecklist items={checklist} checksHeading={!(isAssistantDraft && checkFirstShown(card.receipts, pendingLetterCheck(content)?.text ?? null))} />}
               {statusEditable && <EditorActions canSave={editable} canCreateLink={canCreateLink} askText={askText} blocking={blocking} />}
-
-              <section className="lx-card pe-preview" id="pe-preview" aria-label="Preview of the client page">
-                <div className="pe-preview-head">
-                  <span className="lx-label">What the client sees</span>
-                  <span className="lx-note">Updates when you save</span>
-                </div>
-                <div className="pe-preview-body">
-                  <ProposalDocument
-                    content={content}
-                    title={proposal.title}
-                    clientName={proposal.client_name}
-                    expiresOn={proposal.expires_on}
-                    firm={{ name: session.org.name, slug: session.org.slug }}
-                    mode="preview"
-                  />
-                </div>
+              {/* The lifecycle (link box, Turn on the link, Edit again, Start a new version, More) lives HERE on every status, right
+                  under the one actions card, so Save and "Save and create link" never send it to the bottom of the page. */}
+              <section className="lx-card pe-card pe-lifecycle" aria-label="Link and versions" data-pe-lifecycle>
+                {createBlock}
               </section>
+
+              <ExpandablePreview>
+                <ProposalDocument
+                  content={content}
+                  title={proposal.title}
+                  clientName={proposal.client_name}
+                  expiresOn={proposal.expires_on}
+                  firm={{ name: session.org.name, slug: session.org.slug }}
+                  mode="preview"
+                />
+              </ExpandablePreview>
             </aside>
           </div>
         </DraftProvider>

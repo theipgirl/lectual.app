@@ -59,7 +59,8 @@ export function usesPackageChoice(content: ProposalContent): boolean {
  * - an entry's `custom_discount` (2026-11-03);
  * - an entry's `includes` rows when the firm's list has none for that package: taking its (empty) rows wiped every
  *   package's "What each package includes" table on the first editor save. When the firm's list HAS rows for the
- *   package (Settings -> Proposals, 2026-11-10), the firm's rows win, as its prices do (#23);
+ *   package (Settings -> Proposals, 2026-11-10), the firm's rows win, as its prices do (#23), UNLESS the entry is
+ *   `includes_edited` (a person edited this proposal's rows in its editor, 2026-11-12): then its own rows stay;
  * - the proposal's own ORDER: its entries stay where they were (an entry no longer on the firm's list keeps its
  *   place, unpriced by the refresh), and a package new to the proposal is added after them, in the firm's order.
  *
@@ -72,10 +73,13 @@ export function withPackageSnapshot(content: ProposalContent, settingPricing: un
   const offers = packageOffersFromSetting(settingPricing);
   const refresh = (before: PackageOffer, offer: PackageOffer): PackageOffer => {
     const { includes: firmIncludes, ...prices } = offer;
-    const includes = firmIncludes ?? includeRows(before.includes);
+    // Rows a person edited in this proposal's editor stay; otherwise the firm's rows win when it has some (#23).
+    const edited = before.includes_edited === true;
+    const includes = edited ? includeRows(before.includes) : (firmIncludes ?? includeRows(before.includes));
     return {
       ...prices,
       ...(includes ? { includes } : {}),
+      ...(edited ? { includes_edited: true as const } : {}),
       ...(isObj(before.custom_discount) ? { custom_discount: before.custom_discount } : {}),
     };
   };
