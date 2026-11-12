@@ -74,7 +74,8 @@ describe("the client page draws the logo above the letter for RPB only", () => {
     const rpb3 = render("rpb-law", { initialLoe: { step: 3, details: TEST_DETAILS } });
     expect(rpb3).toContain(LOGO_IMG);
     expect(rpb3).toContain('alt="RPB Law Firm"');
-    expect(rpb3).toMatch(/<div class="cp-letter" id="cp-letter"[^>]*><img class="cp-letter-logo"/);
+    // The panel's title, then the logo, then the letter's own first line (the centred address): nothing between logo and letterhead.
+    expect(rpb3).toMatch(/<div class="cp-letter" id="cp-letter"[^>]*><h3 class="cp-letter-title">[^<]*<\/h3><img class="cp-letter-logo"[^>]*\/><p class="cp-letter-p loe-s-center/);
     const rpb1 = render("rpb-law");
     expect(rpb1).toMatch(/id="cp-letter-preview"[\s\S]*?<img class="cp-letter-logo"/);
     const other3 = render("hartwell-ip", { initialLoe: { step: 3, details: TEST_DETAILS } });

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { LetterLogo } from "@/lib/loe/letter-logo";
 import type { LetterBlock } from "@/lib/loe/render";
+import { LetterParagraph } from "@/components/loe/LetterParagraph";
 import {
   LETTER_LIVE_COPY_NOTE,
   LETTER_NEWER_VERSION_NOTE,
@@ -79,11 +80,7 @@ export function PreviewBlock({ blocks, problems, logo }: { blocks: LetterBlock[]
             <img className="pe-letter-logo" src={logo.src} alt={logo.alt} width={984} height={168} />
           ) : null}
           {blocks.map((block, i) => (
-            <p key={i}>
-              {block.lead ? <strong>{block.lead}</strong> : null}
-              {block.lead && block.text ? " " : null}
-              {block.text}
-            </p>
+            <LetterParagraph key={i} block={block} variant="staff" />
           ))}
         </div>
       ) : (

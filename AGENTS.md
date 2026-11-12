@@ -1652,6 +1652,16 @@ client page, signing and the staff side come in later sprints. Nothing here send
   `**Lead.**` is read from the TEMPLATE first, then values are merged in ONE pass, so a client's `<script>`, `{{x}}`, `}}` or `**` is literal text and is
   never re-merged or re-parsed. An unknown field, an unclosed `{{` / `}}` or an allowed field with no value is an error and there is NO letter (a client
   never sees a half-filled one). Callers draw the blocks as React text.
+- **Paragraph styles (template-only, Nov 12).** A paragraph of the TEMPLATE may start with a style marker in SINGLE braces, usually on its own line:
+  `{center, small, rule-below}`. The seven names live in ONE place, `src/lib/loe/letter-styles.ts` (`center`, `bold`, `small`, `indent`, `rule-below`,
+  `bold-underline-first-line`, `space-before`). Single braces never form a `{{` / `}}`, so `findMergeFields` and lectual 0106's approve check pass; a paragraph
+  starting `{{` is a merge field, never a marker. The marker is read before merging (like the lead-in), so a value that looks like a marker is literal text.
+  An unknown name, an empty `{}` or a marker with no text is an error (`validateTemplate`, `loeIssues`, `renderLetter`: no letter, Approve refused). A block
+  gains `style` ONLY when the template set one, so an unmarked letter's blocks are exactly `{ lead, text }`. **Styles are drawing only:** `agreementText`
+  and the canonical form (`wordsOnly`) cover the words, so the stored text, its sha256 and the page/server fingerprint never include a style, and a letter
+  with no markers hashes exactly as before (`tests/loe/letter-styles.test.tsx` pins the pre-marker RPB letter's text and canonical sha256). Every web view
+  draws a block through `LetterParagraph` (`loe-s-<name>` classes, `src/components/loe/letter-styles.css`); the PDF through `writeBlock` in `pdf.ts`
+  (indent 2.25in, a 2pt black rule under `rule-below`; the thin letterhead rule is left out when the letter draws its own).
 - **`content.loe = { kind, template_id, template_version, title, body }`** is a snapshot of the firm's approved version (`ProposalLoe`,
   `src/lib/proposals/types.ts`). `withLoeSnapshot(content, approved | null, wanted)` (`loe-snapshot.ts`, pure) attaches, refreshes or removes it, returns
   a new object and removes it for a template of the other kind; `loeIsCurrent` is the check Sprint 6 uses before creating a link. `validateContent`
@@ -1787,6 +1797,10 @@ anything; `pricing.ts` has no diff; one dependency was added (`pdfkit`, exact-pi
   missing or unreadable file means NO logo, never a failed letter. The server paths get the logo from the org's slug (`firm.logo` on `buildVerifiedSignedPdf`, from
   `loadStaffFirmFacts`, `firmLetterFacts` and the public read's `firm.slug`). `next.config.ts` lists the file beside the fonts for `/p/*` and `/dashboard/proposals/*`.
   The cream logo is for dark backgrounds and is never used on a letter. A new firm's logo is a new entry in `letter-logo.ts` plus its `/brand/` file, nothing else.
+  In `LoeLetterPanel` the panel's title comes first and the logo directly above the letter's own first paragraph. RPB's template
+  (`docs/rpb/engagement-letter-trademark.md`) no longer has an "RPB Law, PLLC" first line (the logo names the firm) and carries style markers for
+  the Word letter's layout: centred small address line with a thick rule, bold-underlined "Via Email" line, centred bold "Re:" line, indented
+  signature block.
 - **RPB's footer line reads "RPB Law Firm, PLLC"** (both documents). The footer is drawn on every state (every step, the receipt, letter and no-letter,
   trademark and flat fee); `tests/client-proposal/footer-name.test.tsx` renders each. The letter text itself (the firm's own, in the database) is not ours to change.
 ## Sprint 5: The assistant and Copilot use the builder (no schema)
