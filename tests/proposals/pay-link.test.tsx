@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { NewProposalForm } from "@/components/proposal-editor/NewProposalForm";
-import { PricingForm } from "@/components/proposal-editor/Sections";
+import { FeesSection } from "@/components/proposal-editor/Sections";
 import { SettingsForm } from "@/components/proposal-editor/SettingsForm";
 import { validateContent } from "@/lib/proposals/validate";
 import { sevetri } from "./fixture";
@@ -13,7 +13,7 @@ import { sevetri } from "./fixture";
 
 vi.mock("@/app/dashboard/proposals/actions", () => ({ createProposalAction: vi.fn() }));
 vi.mock("@/app/dashboard/settings/proposals/actions", () => ({ saveProposalSettingsAction: vi.fn() }));
-vi.mock("@/components/proposal-editor/actions", () => ({ saveDetailsAction: vi.fn() }));
+vi.mock("@/app/dashboard/proposals/[id]/actions", () => ({ addNameAction: vi.fn(), removeNameAction: vi.fn() }));
 
 const DEFAULT_URL = "https://default.example/pay-me";
 const inputOf = (html: string, name: string) => html.match(new RegExp(`<input[^>]*name="${name}"[^>]*>`))?.[0] ?? "";
@@ -88,14 +88,13 @@ describe("A2: createProposalAction does not copy the firm default", () => {
 describe("A3: the existing-proposal editor", () => {
   const render = (payUrl: string) =>
     renderToStaticMarkup(
-      // Sprint 28: the pay link moved from the client form to Step 3, the package and pay link form.
-      createElement(PricingForm, {
-        proposalId: "p",
-        updatedAt: "2026-10-22T00:00:00Z",
+      // Sprint 1: the pay link is in Fees and payment, part of the one editor form.
+      createElement(FeesSection, {
         editable: true,
         expiresOn: "2026-11-10",
         issues: [],
-        values: { package: "Concierge", base: "4950", includedClasses: "3", perClass: "825", secondMarkPct: "20", govPerClass: "350" },
+        adjustments: [],
+        pricing: { package: "Concierge", base: "4950", includedClasses: "3", perClass: "825", secondMarkPct: "20", govPerClass: "350" },
         payUrl,
       }),
     );

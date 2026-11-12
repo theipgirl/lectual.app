@@ -27,7 +27,32 @@ export const BUTTON_WORDS = {
   editAgain: "Edit again",
   startNewVersion: "Start a new version",
   withdraw: "Withdraw",
+  save: "Save",
+  saving: "Saving…",
+  preview: "Preview as the client",
 } as const;
+
+/** Section and field words of the one-screen editor (design 6.4). */
+export const EDITOR_WORDS = {
+  selectedToStart: "Selected to start",
+  clientDescribes: "Let the client describe this",
+  packageForBrand: "Package for this brand",
+  discountOnBrand: "Discount on this brand",
+  everyBrand: "Use these package options for every brand",
+  advancedBrand: "Advanced for this brand",
+  advancedPricing: "Advanced pricing",
+  readyHeading: "Ready to send?",
+  readyNothing: "Nothing is blocking the link.",
+  clientPays: "What the client pays",
+  pricesUpdateOnSave: "Prices update when you save",
+  menuName: "Withdraw or delete",
+  menuNameDelete: "Delete",
+} as const;
+
+/** "Check these 3 things" (assistant drafts). */
+export function checkTheseHeading(n: number): string {
+  return `Check these ${n} ${n === 1 ? "thing" : "things"}`;
+}
 
 /** `Ask Rebecca or Taylor to create the link`. */
 export function askToCreateLink(approvers: string): string {

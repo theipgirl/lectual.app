@@ -2,11 +2,8 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { FIRST_PROBLEM_ID, firstProblem, groupIssues } from "@/lib/proposal-editor/issues";
-import { IssueList } from "@/components/proposal-editor/ActionForm";
 import { Lifecycle } from "@/components/proposal-editor/Lifecycle";
 import { MANUAL_EMAIL_LABEL, NOT_EMAILED } from "@/lib/consult-proposal/manual-email";
-import type { ValidationIssue } from "@/lib/proposals/validate";
 
 vi.mock("@/app/dashboard/proposals/[id]/actions", () => ({
   createLinkAction: vi.fn(),
@@ -22,7 +19,7 @@ vi.mock("@/app/dashboard/proposals/[id]/actions", () => ({
 const URL_ = "https://proposals.example.com/p/tok123/";
 const life = (over: Partial<Parameters<typeof Lifecycle>[0]> = {}) =>
   renderToStaticMarkup(
-    createElement(Lifecycle, { proposalId: "p1", status: "draft", version: 1, canWrite: true, isApprover: true, blockingErrors: 0, approverNames: [], clientUrl: null, ...over }),
+    createElement(Lifecycle, { proposalId: "p1", status: "draft", version: 1, canWrite: true, clientUrl: null, ...over }),
   );
 const page = readFileSync("src/app/dashboard/proposals/[id]/page.tsx", "utf8");
 
@@ -46,10 +43,11 @@ describe("F9 + PR #4: the one client-email button in the editor", () => {
 });
 
 describe("F10/P2: Withdraw in a More menu with a confirm", () => {
-  it("Withdraw is not a main button", () => {
+  it("Withdraw is a menu with a confirm, not a main button", () => {
     const html = life({ status: "sent", clientUrl: URL_ });
-    expect(html).toContain(">More<");
-    expect(html).not.toContain(">Withdraw<");
+    // Sprint 1: the menu is named for what it holds; the confirm stays closed until it is chosen.
+    expect(html).toContain(">Withdraw<");
+    expect(html).not.toContain("Withdraw this version?");
   });
   it("the menu is the shared Popover (Esc / outside click) and the confirm has an explicit Cancel", () => {
     const src = readFileSync("src/components/proposal-editor/Lifecycle.tsx", "utf8");
@@ -57,29 +55,16 @@ describe("F10/P2: Withdraw in a More menu with a confirm", () => {
     expect(src).toMatch(/onClick=\{\(\) => setConfirming\(null\)\}[\s\S]*Cancel/);
     expect(src).toContain("Yes, withdraw");
   });
-  it("Go to first problem points at the first issue's list item", () => {
-    const issues: ValidationIssue[] = [
-      { level: "warning", path: "greeting", message: "w" },
-      { level: "error", path: "pricing.base_cents", message: "e2" },
-      { level: "error", path: "title", message: "e1" },
-    ] as ValidationIssue[];
-    const first = firstProblem(groupIssues(issues));
-    expect(first?.message).toBe("e1"); // errors first, in page order (who before package)
-    const html = renderToStaticMarkup(createElement(IssueList, { issues: [{ level: "error", message: "e1", where: "title", anchor: true }, { level: "warning", message: "w", where: "" }] }));
-    expect(html.match(new RegExp(`id="${FIRST_PROBLEM_ID}"`, "g"))).toHaveLength(1);
-    expect(page).toContain("Go to first problem");
-    expect(page).toContain("#${FIRST_PROBLEM_ID}");
-  });
-  it("no problems, no first problem", () => {
-    expect(firstProblem(groupIssues([]))).toBeNull();
-  });
 });
 
 describe("F10: one totals box, one History card, header links, tab title", () => {
   it("drops the pre-ticked wording and the card's duplicate fees", () => {
     expect(page).not.toContain("pre-ticked offer");
-    expect(page).toContain("showFees={false}");
-    expect(page.match(/className="lx-card pe-totals"/g)?.length).toBe(2); // the totals box and the accepted record, not a third summary
+    // Sprint 1: the glance card is gone and the totals box (PayBox) is the one place the fees are listed.
+    expect(page).not.toContain("<ProposalCard");
+    expect(page).not.toContain("components/proposal-editor/ProposalCard");
+    expect(page).toContain("<PayBox");
+    expect(page.match(/className="lx-card pe-totals"/g)?.length).toBe(1); // the accepted record, not a second summary
   });
   it("merges Versions and Activity into History", () => {
     expect(page).toContain('aria-label="History"');

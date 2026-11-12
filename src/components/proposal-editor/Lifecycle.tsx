@@ -3,14 +3,13 @@
 import Link from "next/link";
 import { useState } from "react";
 import type { ProposalStatus } from "@/lib/proposals/types";
-import { joinOr } from "@/lib/proposal-editor/labels";
-import { createLinkAction, deleteProposalAction, resetAcceptanceAction, reviseAction, sendAction, unapproveAction, withdrawAction } from "@/app/dashboard/proposals/[id]/actions";
-import { DELETE_CONFIRM, DELETE_LABEL, moreMenuItems, type MoreMenuItem } from "@/lib/proposal-editor/delete-proposal";
+import { deleteProposalAction, resetAcceptanceAction, reviseAction, sendAction, unapproveAction, withdrawAction } from "@/app/dashboard/proposals/[id]/actions";
+import { DELETE_CONFIRM, DELETE_LABEL, moreMenuItems, moreMenuLabel, type MoreMenuItem } from "@/lib/proposal-editor/delete-proposal";
 import Popover from "@/components/list-page/Popover";
 import { NOT_EMAILED } from "@/lib/consult-proposal/manual-email";
-import { BUTTON_WORDS, LINK_NOT_LIVE_YET, askToCreateLink } from "@/lib/proposal-editor/vocabulary";
+import { BUTTON_WORDS, LINK_NOT_LIVE_YET } from "@/lib/proposal-editor/vocabulary";
 import { RESET_CONFIRM, RESET_CONFIRM_BUTTON, RESET_LABEL, RESET_PENDING } from "@/lib/proposal-editor/reset-acceptance";
-import { finishButtonState } from "@/lib/proposal-editor/unsaved";
+import { SAVE_FIRST_SENTENCE } from "@/lib/proposal-editor/unsaved";
 import { ActionForm, Outcome } from "./ActionForm";
 import { useUnsaved } from "./UnsavedGuard";
 import { PostConsultEmail } from "./PostConsultEmail";
@@ -30,9 +29,6 @@ export function Lifecycle({
   status,
   version,
   canWrite,
-  isApprover,
-  blockingErrors,
-  approverNames,
   clientUrl,
   queueNote = null,
   canDelete = false,
@@ -43,10 +39,6 @@ export function Lifecycle({
   status: ProposalStatus;
   version: number;
   canWrite: boolean;
-  isApprover: boolean;
-  /** `validateContent` errors at approval strictness; "Save and create link" is held back while any remain. */
-  blockingErrors: number;
-  approverNames: string[];
   /** The client link (the firm's own domain when configured). Only passed once the link is live (sent / accepted). */
   clientUrl: string | null;
   /** Set when this proposal's email is still pending in the approval queue (or can't be read): shown instead of "Turn on the link". */
@@ -59,41 +51,14 @@ export function Lifecycle({
   updatedAt?: string;
 }) {
   const hidden = <input type="hidden" name="proposalId" value={proposalId} />;
-  const approvers = approverNames.length > 0 ? joinOr(approverNames) : "a named approver";
   const menu = moreMenuItems({ status, canWrite, canDelete, canReset });
-  // A change in a step form that has not been saved is not in the link. UX guard only: the actions read the saved document.
-  const { labels } = useUnsaved();
-  const blockedBy = finishButtonState({ pending: false, unsavedLabels: labels }).sentence;
+  // A change that has not been saved is not in the link. UX guard only: the actions read the saved document.
+  const { any: unsaved } = useUnsaved();
+  const blockedBy = unsaved ? SAVE_FIRST_SENTENCE : null;
   const unsavedId = `pe-unsaved-why-${proposalId}`;
 
   return (
     <div className="pe-bar" role="group" aria-label="Proposal actions">
-      {canWrite && status === "draft" && isApprover && (
-        <ActionForm action={createLinkAction} className="pe-act">
-          {({ state, pending }) => (
-            <>
-              {hidden}
-              <button
-                type="submit"
-                className="lx-btn lx-btn-pri"
-                disabled={finishButtonState({ pending, blockingErrors, unsavedLabels: labels }).disabled}
-                title={blockingErrors > 0 ? "Fix the problems listed first" : undefined}
-                aria-describedby={blockedBy ? unsavedId : undefined}
-              >
-                {pending ? BUTTON_WORDS.creatingLink : BUTTON_WORDS.createLink}
-              </button>
-              {blockedBy && (
-                <span className="lx-note" id={unsavedId} role="note">
-                  {blockedBy}
-                </span>
-              )}
-              <Outcome state={state} pending={pending} />
-            </>
-          )}
-        </ActionForm>
-      )}
-      {canWrite && status === "draft" && !isApprover && <span className="lx-note">{askToCreateLink(approvers)}.</span>}
-
       {canWrite && status === "approved" && queueNote && (
         <span className="lx-note" role="note">
           {queueNote.text}{" "}
@@ -114,7 +79,7 @@ export function Lifecycle({
               <button
                 type="submit"
                 className="lx-btn lx-btn-pri"
-                disabled={finishButtonState({ pending, unsavedLabels: labels }).disabled}
+                disabled={pending || unsaved}
                 aria-describedby={blockedBy ? unsavedId : undefined}
               >
                 {pending ? BUTTON_WORDS.turningOnLink : BUTTON_WORDS.turnOnLink}
@@ -230,7 +195,7 @@ function MoreMenu({
         width={190}
         trigger={({ onClick, ref, ...aria }) => (
           <button {...aria} ref={ref} type="button" onClick={onClick} className="lx-btn lx-btn-sec">
-            More
+            {moreMenuLabel(items)}
             <span aria-hidden> ▾</span>
           </button>
         )}

@@ -11,6 +11,8 @@ import { LINK_CREATED, LINK_NOT_TURNED_ON } from "./vocabulary";
 export type CreateLinkDeps = {
   /** The module gate and staff-role check; a refusal is returned as is. */
   gate: () => Promise<ActionState | null>;
+  /** Saves the posted form first (the one Save). Only called when the page said it has unsaved changes. */
+  save?: (form: FormData) => Promise<ActionState>;
   approve: (id: string) => Promise<ProposalRow>;
   makeLive: (id: string) => Promise<ProposalRow>;
   /** Maps a thrown failure to the fixed sentence the person reads. */
@@ -18,9 +20,19 @@ export type CreateLinkDeps = {
   revalidate: (id: string) => void;
 };
 
-export async function runCreateLink(deps: CreateLinkDeps, id: string): Promise<ActionState> {
+export async function runCreateLink(
+  deps: CreateLinkDeps,
+  id: string,
+  options: { dirty?: boolean; form?: FormData } = {},
+): Promise<ActionState> {
   const refused = await deps.gate();
   if (refused) return refused;
+
+  // Unsaved changes are saved first. A refused save stops here: nothing is approved and no link is turned on.
+  if (options.dirty && deps.save && options.form) {
+    const saved = await deps.save(options.form);
+    if (saved.error) return saved;
+  }
 
   try {
     await deps.approve(id);

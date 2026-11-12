@@ -94,3 +94,11 @@ export function moreMenuItems(input: { status: ProposalStatus; canWrite: boolean
   if (input.canDelete) items.push("delete");
   return items;
 }
+
+/** The menu is named for what it holds: "Withdraw", "Withdraw or delete", "Reset or delete", "Delete". */
+export function moreMenuLabel(items: readonly MoreMenuItem[]): string {
+  const words: Record<MoreMenuItem, string> = { withdraw: "withdraw", reset: "reset", delete: "delete" };
+  const names = items.map((i) => words[i]);
+  const joined = names.join(" or ");
+  return joined ? joined[0].toUpperCase() + joined.slice(1) : "More actions";
+}

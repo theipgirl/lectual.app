@@ -1,40 +1,38 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, type ReactNode } from "react";
-import {
-  EMPTY_DIRTY,
-  LEAVE_WARNING,
-  UNSAVED_PILL,
-  anyDirty,
-  dirtyReducer,
-  isDirty,
-  unsavedLabels,
-  type DirtyState,
-} from "@/lib/proposal-editor/unsaved";
+import { DRAFT_FORM_ID, EMPTY_DIRTY, LEAVE_WARNING, UNSAVED_PILL, anyDirty, dirtyReducer, type DirtyState } from "@/lib/proposal-editor/unsaved";
 
-type Ctx = { state: DirtyState; markClean: (id: string) => void };
+type Ctx = {
+  state: DirtyState;
+  markDirty: () => void;
+  rowAdded: () => void;
+  rowRemoved: () => void;
+  markSaved: () => void;
+};
+
+const noop = () => {};
 
 /** Outside a provider (New proposal, tests) nothing is ever unsaved. */
-const GuardContext = createContext<Ctx>({ state: EMPTY_DIRTY, markClean: () => {} });
+const GuardContext = createContext<Ctx>({ state: EMPTY_DIRTY, markDirty: noop, rowAdded: noop, rowRemoved: noop, markSaved: noop });
 
 export function useUnsaved() {
-  const { state, markClean } = useContext(GuardContext);
-  return { state, labels: unsavedLabels(state), any: anyDirty(state), isDirty: (id: string) => isDirty(state, id), markClean };
+  const ctx = useContext(GuardContext);
+  return { any: anyDirty(ctx.state), markDirty: ctx.markDirty, rowAdded: ctx.rowAdded, rowRemoved: ctx.rowRemoved, markSaved: ctx.markSaved };
 }
 
 /**
- * Listens for `input` / `change` on the whole document and asks the event's own form
- * (`target.form`, which follows the `form=` attribute, so More options fields count) whether it
- * is one the editor tracks (`data-unsaved-label`). Keyed by that form's id.
+ * ONE marker for the whole edit page. It listens for `input` / `change` on the document and asks the event's
+ * own form (`target.form`, which follows the `form=` attribute) whether it is the editor's one form. Adding or
+ * removing a row fires no `input` event, so the row buttons call `rowAdded` / `rowRemoved` themselves.
  */
-export function UnsavedGuardProvider({ children, initial = EMPTY_DIRTY }: { children?: ReactNode; /** Tests only: start with these sections unsaved. */ initial?: DirtyState }) {
+export function UnsavedGuardProvider({ children, initial = EMPTY_DIRTY }: { children?: ReactNode; /** Tests only: start unsaved. */ initial?: DirtyState }) {
   const [state, dispatch] = useReducer(dirtyReducer, initial);
 
   useEffect(() => {
     function onEdit(e: Event) {
       const form = (e.target as { form?: HTMLFormElement | null } | null)?.form;
-      const label = form?.dataset?.unsavedLabel;
-      if (form && form.id && label) dispatch({ type: "dirty", id: form.id, label });
+      if (form && form.id === DRAFT_FORM_ID) dispatch({ type: "edit" });
     }
     document.addEventListener("input", onEdit);
     document.addEventListener("change", onEdit);
@@ -55,36 +53,32 @@ export function UnsavedGuardProvider({ children, initial = EMPTY_DIRTY }: { chil
     return () => window.removeEventListener("beforeunload", onLeave);
   }, [dirty]);
 
-  const markClean = useCallback((id: string) => dispatch({ type: "clean", id }), []);
-  const value = useMemo(() => ({ state, markClean }), [state, markClean]);
+  const markDirty = useCallback(() => dispatch({ type: "edit" }), []);
+  const rowAdded = useCallback(() => dispatch({ type: "rowAdded" }), []);
+  const rowRemoved = useCallback(() => dispatch({ type: "rowRemoved" }), []);
+  const markSaved = useCallback(() => dispatch({ type: "saved" }), []);
+  const value = useMemo(() => ({ state, markDirty, rowAdded, rowRemoved, markSaved }), [state, markDirty, rowAdded, rowRemoved, markSaved]);
   return <GuardContext.Provider value={value}>{children}</GuardContext.Provider>;
 }
 
-/** "Unsaved changes" beside a section heading; nothing when the section is saved. */
-export function UnsavedPill({ formId }: { formId: string }) {
-  const { isDirty: dirty } = useUnsaved();
-  if (!dirty(formId)) return null;
+/** The one "Unsaved changes" marker; nothing when the page is saved. */
+export function UnsavedMarker() {
+  const { any } = useUnsaved();
+  if (!any) return null;
   return (
-    <span className="lx-pill lx-pill-warn pe-unsaved" data-unsaved-for={formId} role="status">
+    <span className="lx-pill lx-pill-warn pe-unsaved" data-unsaved-marker role="status">
       {UNSAVED_PILL}
     </span>
   );
 }
 
-/** True when the form is unsaved: the Save button then takes the primary style. */
-export function useFormDirty(formId: string | undefined): boolean {
-  const { isDirty: dirty } = useUnsaved();
-  return formId ? dirty(formId) : false;
-}
-
-/** A Save button placed away from its form (More options), tied to it by the `form` attribute. */
-export function MoreSaveButton({ formId, label }: { formId: string; label: string }) {
-  const dirty = useFormDirty(formId);
+/** "Prices update when you save", only while the page has unsaved changes. */
+export function UnsavedPriceNote({ text }: { text: string }) {
+  const { any } = useUnsaved();
+  if (!any) return null;
   return (
-    <div className="pe-save">
-      <button type="submit" form={formId} className={`lx-btn ${dirty ? "lx-btn-pri" : "lx-btn-sec"} lx-btn-sm`} data-more-save={formId}>
-        {label}
-      </button>
-    </div>
+    <p className="lx-note pe-price-note" role="status" data-price-note>
+      {text}
+    </p>
   );
 }

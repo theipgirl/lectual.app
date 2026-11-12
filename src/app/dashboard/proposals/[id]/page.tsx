@@ -1,4 +1,3 @@
-import { Fragment } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveFirmSession } from "@/lib/firm/session";
@@ -16,10 +15,8 @@ import { buildPaidPanelView } from "@/lib/proposals/paid-view";
 import { PROPOSAL_STAFF_WRITE_ROLES, isProposalEditable, type ProposalRow } from "@/lib/proposals/types";
 import { validateContent } from "@/lib/proposals/validate";
 import { describeProposalEvent, formatDollars } from "@/lib/proposal-editor/events";
-import { FIRST_PROBLEM_ID, describeIssuePath, firstProblem, groupIssues } from "@/lib/proposal-editor/issues";
 import { firstNameOf, joinOr, statusLabel, statusTone } from "@/lib/proposal-editor/labels";
 import { moneyInput } from "@/lib/proposal-editor/form";
-import { editorChangedCount, shouldOpenMore } from "@/lib/proposal-editor/more-options";
 import { addedClassesPhrase, clientAddedClasses, clientDescribedClasses } from "@/lib/proposals/added-view";
 import { explicitClientAddMax } from "@/lib/proposals/client-classes";
 import { findPackage, normalisePackages } from "@/lib/proposals/package-list";
@@ -28,35 +25,37 @@ import { loadLeadOptions } from "@/lib/proposals/lead-options";
 import { defaultSelection, generalValueOverFee, priceForClassCount, quoteProposal } from "@/lib/proposals/pricing";
 import { isGeneralContent } from "@/lib/proposals/types";
 import { generalFormValues } from "@/lib/proposal-editor/general-form";
-import { GeneralForm } from "@/components/proposal-editor/GeneralFields";
+import { GeneralFields } from "@/components/proposal-editor/GeneralFields";
+import { IssueList, type ShownIssue } from "@/components/proposal-editor/ActionForm";
+import { describeIssuePath, groupIssues } from "@/lib/proposal-editor/issues";
 import { buildProposalCard } from "@/lib/proposals/card";
 import { loadConsultStrip } from "@/lib/proposals/consult-strip-load";
 import { ProposalDocument } from "@/components/client-proposal/ProposalDocument";
-import { BuilderLayout } from "@/components/proposal-editor/BuilderLayout";
 import { ConsultStrip } from "@/components/proposal-editor/ConsultStrip";
 import { LeadLink } from "@/components/proposal-editor/LeadLink";
 import { LinkLeadForm } from "@/components/proposal-editor/LinkLeadForm";
-import { ProposalCard } from "@/components/proposal-editor/ProposalCard";
-import { IssueList, type ShownIssue } from "@/components/proposal-editor/ActionForm";
 import { Lifecycle } from "@/components/proposal-editor/Lifecycle";
 import { UnsavedGuardProvider } from "@/components/proposal-editor/UnsavedGuard";
+import { DraftFormElement, DraftProvider } from "@/components/proposal-editor/DraftForm";
+import { EditorActions } from "@/components/proposal-editor/EditorActions";
+import { PayBox, ReadyChecklist } from "@/components/proposal-editor/EditorSide";
+import { CheckFirstPanel } from "@/components/proposal-editor/CheckFirstPanel";
+import { EngagementLetterSlot } from "@/components/proposal-editor/EngagementLetterSlot";
 import { canDeleteProposal } from "@/lib/proposal-editor/delete-proposal";
 import { PaidPanel } from "@/components/proposal-editor/PaidPanel";
 import { ChangePayLink } from "@/components/proposal-editor/ChangePayLink";
 import {
-  AddNameForm,
-  AdjustmentsForm,
-  DetailsForm,
-  DetailsMoreFields,
-  IncludesForm,
-  MessageForm,
+  BrandForms,
+  BrandsSection,
+  FeesSection,
+  MessageSection,
   NameCard,
-  NameMoreFields,
   NameRowsProvider,
-  PricingForm,
-  PricingMoreFields,
+  WhoSection,
   type NameValues,
 } from "@/components/proposal-editor/Sections";
+import { buildChecklist, blockingCount } from "@/lib/proposal-editor/checklist";
+import { askToCreateLink } from "@/lib/proposal-editor/vocabulary";
 import { GOES_LIVE_ON_APPROVAL, proposalSendBlock } from "@/lib/consult-proposal/link";
 import { requireProposalsModule } from "../gate";
 import "../proposals.css";
@@ -157,7 +156,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
   const statusEditable = isProposalEditable(proposal.status);
   const editable = statusEditable && canWrite;
 
-  /* ── validation, shown beside the form that can fix it ── */
+  /* ── what blocks the link: the SAME issues approval uses, from the first load ── */
   const issues = statusEditable
     ? validateContent(content, {
         forApproval: true,
@@ -167,12 +166,9 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
         client_email: proposal.client_email,
       })
     : [];
-  const errors = issues.filter((i) => i.level === "error").length;
-  const warnings = issues.length - errors;
   const groups = groupIssues(issues);
-  const first = firstProblem(groups);
-  const shown = (list: typeof issues): ShownIssue[] =>
-    list.map((i) => ({ level: i.level, message: i.message, where: describeIssuePath(i.path, content), ...(i === first ? { anchor: true } : {}) }));
+  const checklist = buildChecklist(issues, content);
+  const blocking = blockingCount(checklist);
 
   /* ── the figures the client starts from ── */
   const quote = quoteProposal(content, defaultSelection(content));
@@ -275,20 +271,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
     ? [...new Set([...normalisePackages(settings.pricing ?? {}).map((p) => p.package), ...(content.packages ?? []).map((p) => p.package)])]
     : null;
 
-  const common = { proposalId: proposal.id, updatedAt: proposal.updated_at, editable };
-
-  // More options: how many of its fields differ from the firm's defaults, and whether a problem is inside it.
   const pricing = content.pricing;
-  const firmPackage = (settings && pricing ? findPackage(normalisePackages(settings.pricing ?? {}), pricing.package) : null) ?? null;
-  const changedCount = pricing
-    ? editorChangedCount({
-        pricing,
-        firmPackage,
-        adjustments: (content.adjustments ?? []).length,
-        brandPriceOverrides: (content.names ?? []).filter((n) => n.price_override && Object.keys(n.price_override).length > 0).length,
-      })
-    : 0;
-  const moreOpen = shouldOpenMore(issues.map((i) => i.path));
   const customLabel = `Custom package: ${formatDollars(pricing?.per_class_cents ?? 0)} less per class under the package's included classes`;
   const customHelp = pricing
     ? `Off (the default): ${pricing.package} is a flat ${formatDollars(priceForClassCount({ ...pricing, reduce_under_included: false }, 1))} for one class. On: one class is ${formatDollars(priceForClassCount({ ...pricing, reduce_under_included: true }, 1))}. Turn it on only when the firm has agreed a reduced package.`
@@ -320,9 +303,6 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
         status={proposal.status}
         version={proposal.version}
         canWrite={canWrite}
-        isApprover={isApprover}
-        blockingErrors={errors}
-        approverNames={approverNames}
         clientUrl={clientUrl}
         queueNote={sendBlock.blocked ? { text: GOES_LIVE_ON_APPROVAL, queueId: sendBlock.queueId } : null}
         canDelete={canDeleteProposal(session.role)}
@@ -336,6 +316,22 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
       ) : null}
     </>
   );
+
+  const shown = (list: typeof issues): ShownIssue[] =>
+    list.map((i) => ({ level: i.level, message: i.message, where: describeIssuePath(i.path, content) }));
+  const issuesFor = (re: RegExp) => shown(issues.filter((i) => re.test(i.path)));
+  const adjustmentValues = (content.adjustments ?? []).map((a) => ({
+    id: a.id,
+    label: a.label,
+    kind: a.kind,
+    value: a.kind === "percent" ? String(a.value) : moneyInput(a.value),
+  }));
+  const hasBrandPackage = nameValues.some((n) => n.packageChoice || n.marks.some((m) => m.packageChoice));
+  const today = firmCivilDate(new Date(), tz);
+  const isAssistantDraft = proposal.source === "agent";
+  const canCreateLink = editable && proposal.status === "draft" && isApprover;
+  const askText =
+    editable && proposal.status === "draft" && !isApprover ? `${askToCreateLink(approverNames.length > 0 ? joinOr(approverNames) : "a named approver")}.` : null;
 
   return (
     <div className="pe-page">
@@ -355,7 +351,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
             </span>
             <span>{proposal.title}</span>
             {proposal.expires_on && <span>Open until {formatShortFirmDate(`${proposal.expires_on}T12:00:00Z`, "UTC")}</span>}
-            {proposal.source === "agent" && <span className="lx-note">Drafted by an assistant</span>}
+            {isAssistantDraft && <span className="lx-note">Drafted by an assistant</span>}
           </div>
           <LeadLink
             lead={leadLink}
@@ -388,185 +384,76 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
 
       {paidView && <PaidPanel proposalId={proposal.id} view={paidView} />}
 
-      <ProposalCard card={card} showFees={false} />
+      {isAssistantDraft && statusEditable && <CheckFirstPanel receipts={card.receipts} />}
       {consult && proposal.lead_id && <ConsultStrip state={consult} leadId={proposal.lead_id} tz={tz} />}
 
-      {statusEditable && (errors > 0 || warnings > 0) && (
-        <div className={`lx-banner ${errors > 0 ? "lx-banner-risk" : "lx-banner-mute"}`} role="status">
-          {errors > 0
-            ? `${errors} ${errors === 1 ? "problem blocks" : "problems block"} creating the link${warnings > 0 ? `, and ${warnings} to check` : ""}. Each is listed in the section that can fix it.`
-            : `${warnings} ${warnings === 1 ? "thing" : "things"} to check before creating the link. None blocks it.`}{" "}
-          <a href={`#${FIRST_PROBLEM_ID}`}>Go to first problem</a>
-        </div>
-      )}
-      {statusEditable && errors === 0 && warnings === 0 && (
-        <div className="lx-banner lx-banner-ok" role="status">
-          Nothing blocks creating the link.
-        </div>
-      )}
-
-      <div className="pe-cols">
-        <div className="pe-forms">
-          <UnsavedGuardProvider>
-          {general ? (
-            // Spec 9: a general (flat-fee) proposal. The client step, then ONE section for the matter and its fee,
-            // then the same lifecycle button (it waits while that section has unsaved changes).
-            <>
-              <DetailsForm {...common} issues={shown(groups.details)} values={detailsValues} />
-              <section className="lx-card pe-card" aria-label="Client details and title">
-                <DetailsMoreFields proposalId={proposal.id} editable={editable} values={detailsValues} />
+      <UnsavedGuardProvider>
+        <DraftProvider>
+          <div className="pe-cols">
+            <div className="pe-forms">
+              <DraftFormElement proposalId={proposal.id} updatedAt={proposal.updated_at}>
+                <WhoSection editable={editable} issues={shown(groups.details.filter((i) => i.path !== "pay_url"))} values={detailsValues} />
+                {general ? null : (
+                  <NameRowsProvider key={nameValues.map((n) => n.id).join("|")} names={nameValues}>
+                    <BrandsSection editable={editable} issues={shown(groups.general)}>
+                      {nameValues.map((n, i) => (
+                        <NameCard
+                          key={n.id}
+                          index={i}
+                          editable={editable}
+                          issues={shown(groups.names.get(i) ?? [])}
+                          value={n}
+                          packageName={content.pricing?.package ?? ""}
+                          firmPackages={firmPackageNames}
+                          brandCount={nameValues.length}
+                        />
+                      ))}
+                    </BrandsSection>
+                  </NameRowsProvider>
+                )}
+                {general ? (
+                  <section className="lx-card pe-card" aria-label="Matter and flat fee">
+                    <header className="pe-card-head">
+                      <h2 className="pe-h">Matter and flat fee</h2>
+                      <p className="lx-note pe-hint">A contract or other matter at one flat fee. No packages, classes or USPTO fees.</p>
+                    </header>
+                    <fieldset className="pe-fieldset" disabled={!editable}>
+                      <GeneralFields values={generalFormValues(content.general)} editable={editable} />
+                      <IssueList issues={issuesFor(/^general(\.|$)/)} />
+                    </fieldset>
+                  </section>
+                ) : null}
+                <FeesSection
+                  editable={editable}
+                  general={general}
+                  issues={shown([...groups.details.filter((i) => i.path === "pay_url"), ...groups.pricing, ...groups.adjustments, ...groups.includes])}
+                  payUrl={proposal.pay_url ?? ""}
+                  expiresOn={proposal.expires_on ?? ""}
+                  today={today}
+                  adjustments={adjustmentValues}
+                  pricing={general ? undefined : pricingValues}
+                  hasBrandPackage={hasBrandPackage}
+                  reduceUnderIncluded={content.pricing?.reduce_under_included === true}
+                  customLabel={customLabel}
+                  customHelp={customHelp}
+                  includes={content.includes ?? []}
+                />
+                <MessageSection
+                  editable={editable}
+                  general={general}
+                  issues={shown(groups.message)}
+                  values={{ greeting: content.greeting ?? "", recommendation: content.recommendation ?? "", officeActionNote: content.office_action_note ?? "" }}
+                />
+                <EngagementLetterSlot />
+              </DraftFormElement>
+              {general ? null : <BrandForms proposalId={proposal.id} updatedAt={proposal.updated_at} names={nameValues} editable={editable} />}
+              <section className="lx-card pe-card" aria-label="Proposal actions">
+                {createBlock}
               </section>
-              <GeneralForm
-                {...common}
-                issues={shown(issues.filter((i) => !groups.details.includes(i)))}
-                values={generalFormValues(content.general)}
-                greeting={content.greeting ?? ""}
-                payUrl={proposal.pay_url ?? ""}
-                expiresOn={proposal.expires_on ?? ""}
-                today={firmCivilDate(new Date(), tz)}
-              />
-              <section className="lx-card pe-card">{createBlock}</section>
-            </>
-          ) : (
-          <NameRowsProvider key={nameValues.map((n) => n.id).join("|")} names={nameValues}>
-            <BuilderLayout
-              changed={changedCount}
-              moreOpen={moreOpen}
-              who={<DetailsForm {...common} issues={shown(groups.details)} values={detailsValues} />}
-              names={
-                <>
-                  <IssueList issues={shown(groups.general)} />
-                  {nameValues.map((n, i) => (
-                    <NameCard key={n.id} {...common} issues={shown(groups.names.get(i) ?? [])} value={n} packageName={content.pricing?.package ?? ""} />
-                  ))}
-                  <AddNameForm proposalId={proposal.id} updatedAt={proposal.updated_at} editable={editable} />
-                </>
-              }
-              packageStep={<PricingForm {...common} issues={shown(groups.pricing)} values={pricingValues} payUrl={proposal.pay_url ?? ""} expiresOn={proposal.expires_on ?? ""} today={firmCivilDate(new Date(), tz)} />}
-              create={createBlock}
-              more={
-                <>
-                  <DetailsMoreFields proposalId={proposal.id} editable={editable} values={detailsValues} />
-                  <PricingMoreFields
-                    proposalId={proposal.id}
-                    editable={editable}
-                    values={pricingValues}
-                    reduceUnderIncluded={content.pricing?.reduce_under_included === true}
-                    customLabel={customLabel}
-                    customHelp={customHelp}
-                  />
-                  {nameValues.map((n) => (
-                    <NameMoreFields key={n.id} proposalId={proposal.id} editable={editable} value={n} packageName={content.pricing?.package ?? ""} firmPackages={firmPackageNames} />
-                  ))}
-                  <MessageForm
-                    {...common}
-                    issues={shown(groups.message)}
-                    values={{ greeting: content.greeting ?? "", recommendation: content.recommendation ?? "", officeActionNote: content.office_action_note ?? "" }}
-                  />
-                  <AdjustmentsForm
-                    {...common}
-                    issues={shown(groups.adjustments)}
-                    value={(content.adjustments ?? []).map((a) => ({
-                      id: a.id,
-                      label: a.label,
-                      kind: a.kind,
-                      value: a.kind === "percent" ? String(a.value) : moneyInput(a.value),
-                    }))}
-                  />
-                  <IncludesForm {...common} issues={shown(groups.includes)} initial={content.includes ?? []} />
-                </>
-              }
-            />
-          </NameRowsProvider>
-          )}
-          </UnsavedGuardProvider>
-        </div>
+            </div>
 
-        <aside className="pe-side" aria-label="Figures and preview">
-          <section className="lx-card pe-totals" aria-label="What the client pays">
-            <div className="lx-label">What the client pays</div>
-            {general ? (
-              <>
-                <dl>
-                  {quote.general?.items.map((it, n) => (
-                    <div key={n} className="pe-line pe-line-mute">
-                      <dt>
-                        {it.label}
-                        {typeof it.hours === "number" ? ` (${it.hours} ${it.hours === 1 ? "hr" : "hrs"})` : ""}
-                      </dt>
-                      <dd>{formatCents(it.value_cents)}</dd>
-                    </div>
-                  ))}
-                  {valueOverFee && (
-                    <div className="pe-line pe-line-mute">
-                      <dt>Value of the work</dt>
-                      <dd>{formatCents(valueOverFee.value_cents)}</dd>
-                    </div>
-                  )}
-                  <div className="pe-line">
-                    <dt>Flat fee</dt>
-                    <dd>{formatCents(quote.legal_subtotal_cents)}</dd>
-                  </div>
-                  {quote.adjustments
-                    .filter((a) => a.discount_cents > 0)
-                    .map((a) => (
-                      <div key={a.id} className="pe-line pe-line-mute">
-                        <dt>{a.label || "Adjustment"}</dt>
-                        <dd>−{formatCents(a.discount_cents)}</dd>
-                      </div>
-                    ))}
-                  <div className="pe-line pe-line-total">
-                    <dt>Legal fee, due when accepted</dt>
-                    <dd>{formatCents(quote.legal_total_cents)}</dd>
-                  </div>
-                </dl>
-                <p className="lx-note" style={{ margin: 0 }}>
-                  Worked out from the saved fee. A flat fee: no packages, classes or USPTO fees.
-                </p>
-              </>
-            ) : (
-            <>
-            <dl>
-              {quote.names.map((n) => (
-                <Fragment key={n.id}>
-                  <div className="pe-line">
-                    <dt>{packageLineTitle(n)}</dt>
-                    <dd>{n.included ? formatCents(n.legal_cents) : "none ticked"}</dd>
-                  </div>
-                  {n.included && n.custom_discount_cents ? (
-                    <div className="pe-line pe-line-mute">
-                      <dt>{`${n.custom_discount_label || "Discount"} (in the fee above)`}</dt>
-                      <dd>−{formatCents(n.custom_discount_cents)}</dd>
-                    </div>
-                  ) : null}
-                </Fragment>
-              ))}
-              {quote.adjustments
-                .filter((a) => a.discount_cents > 0)
-                .map((a) => (
-                  <div key={a.id} className="pe-line pe-line-mute">
-                    <dt>{a.label || "Adjustment"}</dt>
-                    <dd>−{formatCents(a.discount_cents)}</dd>
-                  </div>
-                ))}
-              <div className="pe-line pe-line-total">
-                <dt>Legal fee, due when accepted</dt>
-                <dd>{formatCents(quote.legal_total_cents)}</dd>
-              </div>
-              <div className="pe-line pe-line-mute">
-                <dt>
-                  USPTO fees, due at filing
-                  {quote.gov_class_count > 0 ? ` (${quote.gov_class_count} ${quote.gov_class_count === 1 ? "filing" : "filings"})` : ""}
-                </dt>
-                <dd>{formatCents(quote.gov_total_cents)}</dd>
-              </div>
-            </dl>
-            <p className="lx-note" style={{ margin: 0 }}>
-              Worked out from the saved prices. The client can untick marks and classes; their total follows.
-            </p>
-            </>
-            )}
-          </section>
+            <aside className="pe-side" aria-label="Figures and preview">
+              <PayBox quote={quote} general={general} valueOverFee={valueOverFee} />
 
           {proposal.status === "accepted" && proposal.accepted_snapshot?.quote && (
             <section className="lx-card pe-totals" aria-label="What the client accepted">
@@ -626,24 +513,29 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
             </section>
           )}
 
-          <section className="lx-card pe-preview" aria-label="Preview of the client page">
-            <div className="pe-preview-head">
-              <span className="lx-label">What the client sees</span>
-              <span className="lx-note">Updates when you save a section</span>
-            </div>
-            <div className="pe-preview-body">
-              <ProposalDocument
-                content={content}
-                title={proposal.title}
-                clientName={proposal.client_name}
-                expiresOn={proposal.expires_on}
-                firm={{ name: session.org.name, slug: session.org.slug }}
-                mode="preview"
-              />
-            </div>
-          </section>
-        </aside>
-      </div>
+              {statusEditable && <ReadyChecklist items={checklist} />}
+              {statusEditable && <EditorActions canSave={editable} canCreateLink={canCreateLink} askText={askText} blocking={blocking} />}
+
+              <section className="lx-card pe-preview" id="pe-preview" aria-label="Preview of the client page">
+                <div className="pe-preview-head">
+                  <span className="lx-label">What the client sees</span>
+                  <span className="lx-note">Updates when you save</span>
+                </div>
+                <div className="pe-preview-body">
+                  <ProposalDocument
+                    content={content}
+                    title={proposal.title}
+                    clientName={proposal.client_name}
+                    expiresOn={proposal.expires_on}
+                    firm={{ name: session.org.name, slug: session.org.slug }}
+                    mode="preview"
+                  />
+                </div>
+              </section>
+            </aside>
+          </div>
+        </DraftProvider>
+      </UnsavedGuardProvider>
 
       <section className="lx-card pe-card" aria-label="History">
         <header className="pe-card-head">

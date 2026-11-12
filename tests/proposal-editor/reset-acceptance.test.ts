@@ -216,19 +216,16 @@ describe("Lifecycle: Reset acceptance in More", () => {
         status: "accepted",
         version: 1,
         canWrite: true,
-        isApprover: false,
-        blockingErrors: 0,
-        approverNames: ["Rebecca"],
         clientUrl: "https://proposals.example.com/p/tok/",
         updatedAt: T,
         ...over,
       }),
     );
 
-  it("an accepted version shows More only when the page allows a reset", () => {
-    expect(render({ canReset: true })).toContain(">More<");
-    expect(render({ canReset: false })).not.toContain(">More<");
-    expect(render({ canReset: true, canWrite: false })).not.toContain(">More<");
+  it("an accepted version shows the Reset menu only when the page allows a reset", () => {
+    expect(render({ canReset: true })).toContain(">Reset<");
+    expect(render({ canReset: false })).not.toContain(">Reset<");
+    expect(render({ canReset: true, canWrite: false })).not.toContain(">Reset<");
   });
 
   it("the confirm is not drawn until asked for, and Withdraw is never offered on an accepted version", () => {
