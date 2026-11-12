@@ -10,6 +10,7 @@ import { BOARD_COLUMN_CAP, SHOW_STEP } from "@/lib/intake/paging";
 import { emptyStagesLabel, ownerDrop, stageDrop, type BoardModel } from "@/lib/intake/board-columns";
 import { LEADS_SHOW_MORE, LEADS_UNKNOWN_TEAMMATE_DROP } from "@/lib/ui/words";
 import IntakeCard from "./IntakeCard";
+import type { DuplicateOf } from "@/lib/intake/duplicates";
 
 /**
  * Both boards, drawn from a `BoardModel` (the pure rules live in board-columns.ts). A column's title is its stage name in
@@ -35,6 +36,8 @@ export default function IntakeBoard({
   selecting,
   selectedIds,
   onToggleSelect,
+  duplicates = {},
+  movedOut,
 }: {
   group: "stage" | "owner";
   model: BoardModel;
@@ -54,6 +57,8 @@ export default function IntakeBoard({
   selecting: boolean;
   selectedIds: ReadonlySet<string>;
   onToggleSelect: (leadId: string) => void;
+  duplicates?: Record<string, DuplicateOf>;
+  movedOut?: ReadonlySet<string>;
 }) {
   const [over, setOver] = useState<string | null>(null);
   const [refused, setRefused] = useState<string | null>(null);
@@ -82,7 +87,7 @@ export default function IntakeBoard({
         {model.columns.map((column) => (
           <section
             key={column.key}
-            className="ix-col"
+            className={`ix-col${column.quiet ? " ix-col-quiet" : ""}`}
             data-over={over === column.key ? "" : undefined}
             aria-label={`${column.label}, ${column.count} leads`}
             onDragOver={(e) => {
@@ -128,6 +133,8 @@ export default function IntakeBoard({
                 selecting={selecting}
                 selected={selectedIds.has(row.lead.id)}
                 onToggleSelect={onToggleSelect}
+                duplicate={duplicates[row.lead.id]}
+                movedOut={movedOut?.has(row.lead.id) ?? false}
               />
             ))}
             {column.shown.length === 0 && <p className="ix-empty-stage">Nothing here</p>}
@@ -142,7 +149,7 @@ export default function IntakeBoard({
       {group === "stage" && (emptyCount > 0 || showEmpty) && (
         <div className="ix-empty-stages">
           <button type="button" className="lp-link-button" aria-expanded={showEmpty} onClick={onToggleEmpty}>
-            {emptyStagesLabel(showEmpty ? model.columns.filter((c) => c.count === 0).length : emptyCount, showEmpty)}
+            {emptyStagesLabel(showEmpty ? model.columns.filter((c) => c.count === 0).length : emptyCount, showEmpty, model.empty.map((e) => e.label))}
           </button>
         </div>
       )}

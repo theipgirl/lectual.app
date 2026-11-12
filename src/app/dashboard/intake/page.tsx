@@ -4,6 +4,7 @@ import { listIntakeLeads } from "@/lib/intake/leads";
 import { loadLatestNotes, notesIncomplete, NOTE_LOOKBACK_DAYS } from "@/lib/intake/notes-read";
 import { loadWorkingFacts } from "@/lib/intake/working-load";
 import { classifyLeads } from "@/lib/intake/working";
+import { findDuplicates } from "@/lib/intake/duplicates";
 import { setDataFrom, type SetData, type LostRead } from "@/lib/intake/sets";
 import { listLostLeads, readLostCount, lostStageIds, type LostLeads } from "@/lib/intake/lost";
 import { activeOrgModulesOrNull } from "@/lib/org/modules";
@@ -151,6 +152,8 @@ export default async function IntakePage({
   // The leads the page draws: the list, or (Lost chosen) the lost leads. A failed lost read draws none and says so.
   const leads: Lead[] = lostView ? (lostLeads && lostLeads.status === "ok" ? lostLeads.leads : []) : intakeLeads;
   const lostFailed = lostView && (!lostLeads || lostLeads.status !== "ok");
+  // Possible duplicates among the OPEN leads already loaded (no query, nothing merged).
+  const duplicates = findDuplicates(leads, intakeLeads, stages);
   const lostShown = lostLeads && lostLeads.status === "ok" ? { shown: lostLeads.leads.length, total: lostLeads.total } : null;
 
   // "Next step" degrades from the latest note to the factual reply state rather than taking the list down, but a FAILED
@@ -225,6 +228,7 @@ export default async function IntakePage({
       lostView={lostView}
       lostFailed={lostFailed}
       notesUnavailable={notesIncomplete(notes)}
+      duplicates={duplicates}
       lostCut={lostShown && lostShown.total > lostShown.shown ? lostShown : null}
       members={members}
       initialFilters={filters}

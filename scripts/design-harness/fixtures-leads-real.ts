@@ -1,7 +1,9 @@
 /**
  * RPB's real SHAPE for the Leads page (item L, step 1), with INVENTED names. Deterministic (seeded), so a re-run draws the same page.
  *
- *  - 23 stages (the firm's order), 310 leads: Follow-Up 144, Potential New Client 156, Consultation Scheduled 1,
+ *  - 23 stages (the firm's order), 310 leads as production stood on Nov 12 after the cleanup: Follow-Up 34, Potential New Client 141,
+ *    Consultation Scheduled 1, Post Consultation Email Sent 5 (181 open), Long-Term Nurture 123, Lost 1, Signed LOE 5 (won). No enrollments.
+ *  - (older description follows) Follow-Up 144, Potential New Client 156, Consultation Scheduled 1,
  *    Post Consultation Email Sent 6, Signed LOE / Deposit Received (won) 2, Lost 1. All unassigned.
  *  - 301 carry lawmatics_id (Lawmatics import), none a sheet_key. Sources as counted below. 142 created Sept 3-5 2026.
  *  - The import STAMPED last_activity_at (= created_at) on every imported lead, so "activity in the last 90 days" is true of all
@@ -53,7 +55,7 @@ export const stages = STAGE_DEFS.map(([name, category], i) => ({
   id: uuid("5", i + 1), org_id: O, name, order_index: i + 1, category, aging_threshold_days: category === "open" && i < 7 ? [14, 7, 7, 7, 10, 10, 10][i] : null, created_at: day(1, 2, 12),
 }));
 const S = (name: string) => stages.find((s) => s.name === name)!.id;
-export const STAGE = { fu: S("Follow-Up"), pnc: S("Potential New Client"), sched: S("Consultation Scheduled"), post: S("Post Consultation Email Sent"), won: S("Signed LOE / Deposit Received"), lost: S("Lost") };
+export const STAGE = { nur: S("Long-Term Nurture"), fu: S("Follow-Up"), pnc: S("Potential New Client"), sched: S("Consultation Scheduled"), post: S("Post Consultation Email Sent"), won: S("Signed LOE / Deposit Received"), lost: S("Lost") };
 
 /* ── names ── */
 const FIRST = ["Aaliyah", "Marcus", "Priya", "Tomas", "Nia", "Jordan", "Camille", "Devon", "Elena", "Hassan", "Imani", "Kofi", "Lucía", "Malik", "Noor", "Owen", "Paloma", "Quincy", "Renata", "Soren", "Tamika", "Uriel", "Valentina", "Wen", "Ximena", "Yusuf", "Zora", "Brielle", "Caleb", "Dahlia", "Emeka", "Fatima", "Gideon", "Harper", "Isaiah", "Jasmine", "Keisha", "Leandro", "Mireille", "Nikhil", "Odette", "Preston", "Rosalind", "Sade", "Terrence", "Una", "Viviana", "Winston", "Anika", "Bao"];
@@ -99,11 +101,12 @@ for (const p of plan) {
 }
 
 // stages: 3 won/lost + 7 consult/post among the active leads; the rest of the active ones sit in Follow-Up / PNC
-const activeStages = [STAGE.sched, ...Array(6).fill(STAGE.post), STAGE.won, STAGE.won, STAGE.lost, ...Array(6).fill(STAGE.pnc), ...Array(9).fill(STAGE.fu)];
+const activeStages = [STAGE.sched, ...Array(5).fill(STAGE.post), STAGE.won, STAGE.won, STAGE.lost, STAGE.nur, ...Array(6).fill(STAGE.pnc), ...Array(9).fill(STAGE.fu)];
 activeIdx.forEach((i, k) => (plan[i].stage = activeStages[k]));
 const rest = shuffle(plan.filter((p) => !p.active).map((p) => p.i));
-const fuLeft = 144 - activeStages.filter((s) => s === STAGE.fu).length;
-rest.forEach((i, k) => (plan[i].stage = k < fuLeft ? STAGE.fu : STAGE.pnc));
+// the other 285: 3 signed, 122 nurture, 135 PNC, 25 Follow-Up (production totals: FU 34, PNC 141, nurture 123, won 5)
+const restStages = shuffle([...Array(3).fill(STAGE.won), ...Array(122).fill(STAGE.nur), ...Array(135).fill(STAGE.pnc), ...Array(25).fill(STAGE.fu)]);
+rest.forEach((i, k) => (plan[i].stage = restStages[k]));
 
 // sources: bulk = UGW 130 + Event 12; the other 168 = UGW 6, none 105, Event 16, Referral 20, Other 9, Social media 6, Assessment 3, three singles
 const sources = {
@@ -267,6 +270,16 @@ boothLeads.forEach((l, k) => {
     temperature: pick(["hot", "warm", "cold"]), track: "trademark", mark_name: l.mark_text, mark_goods: null, lawmatics_contact_id: null, lawmatics_synced_at: null, lawmatics_tagged_at: null,
   });
 });
+
+/* ── two possible duplicates among the OPEN leads: one shared email (different case), one shared first + last name ── */
+{
+  const open = leads.filter((l) => l.current_stage_id === STAGE.pnc || l.current_stage_id === STAGE.fu);
+  const hasActivity = new Set(activities.filter((x) => ["email_sent", "email_received", "call_logged", "note", "voice_note"].includes(String(x.type))).map((x) => x.lead_id));
+  const quiet = open.filter((l) => hasActivity.has(l.id));
+  quiet[0].email = String(quiet[1].email).toUpperCase();
+  quiet[2].first_name = quiet[3].first_name;
+  quiet[2].last_name = quiet[3].last_name;
+}
 
 /* ── what the page reads, newest activity first (the real list is ordered by last_activity_at desc) ── */
 leads.sort((a, b) => Date.parse(b.last_activity_at as string) - Date.parse(a.last_activity_at as string));

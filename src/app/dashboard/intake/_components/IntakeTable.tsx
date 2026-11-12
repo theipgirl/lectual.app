@@ -22,7 +22,8 @@ import AgentMoveChip from "./AgentMoveChip";
 import SourceCell from "./SourceCell";
 import RowMenu from "./RowMenu";
 import type { Lane } from "@/lib/leads/lane";
-import { LEADS_NEEDS_STAGE, LEADS_SHOWING, LEADS_SHOW_MORE } from "@/lib/ui/words";
+import { LEADS_DUPLICATE, LEADS_MOVED_MARK, LEADS_MOVED_MARK_TITLE, LEADS_NEEDS_STAGE, LEADS_SHOWING, LEADS_SHOW_MORE } from "@/lib/ui/words";
+import { duplicateTitle, type DuplicateOf } from "@/lib/intake/duplicates";
 import { SHOW_STEP } from "@/lib/intake/paging";
 
 const COLUMNS: Array<{ key: SortKey; label: string; col: string }> = [
@@ -59,6 +60,8 @@ export default function IntakeTable({
   time,
   pendingApprovals,
   notesUnavailable,
+  duplicates = {},
+  movedOut,
   onSort,
   onSetLane,
   onAssign,
@@ -85,6 +88,9 @@ export default function IntakeTable({
   time: IntakeTime | null;
   pendingApprovals?: LeadPendingApprovals;
   notesUnavailable?: boolean;
+  duplicates?: Record<string, DuplicateOf>;
+  /** Leads moved this session out of the set they were listed in: a quiet "Moved" mark. */
+  movedOut?: ReadonlySet<string>;
   onSort: (key: SortKey) => void;
   onSetLane: (leadId: string, lane: Lane | null) => void;
   onAssign: (leadId: string, userId: string | null) => void;
@@ -144,6 +150,16 @@ export default function IntakeTable({
                     </Link>
                     <NeedsRebeccaBadge pending={pendingDrafts} />
                     <AgentMoveChip move={row.agentMove} />
+                    {duplicates[lead.id] && (
+                      <a className="ix-marker ix-marker-dup" data-duplicate href={`/dashboard/leads/${duplicates[lead.id].leadId}/`} title={duplicateTitle(duplicates[lead.id])}>
+                        {LEADS_DUPLICATE}
+                      </a>
+                    )}
+                    {movedOut?.has(lead.id) && (
+                      <span className="ix-marker ix-marker-quiet" data-moved title={LEADS_MOVED_MARK_TITLE}>
+                        {LEADS_MOVED_MARK}
+                      </span>
+                    )}
                   </span>
                   <span className="ix-sub" title={business || undefined}>
                     {business || "—"}

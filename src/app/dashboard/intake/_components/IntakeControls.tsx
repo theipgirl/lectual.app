@@ -13,7 +13,7 @@ import type { LeadSet } from "@/lib/intake/working";
 import type { ChipCounts } from "@/lib/intake/leads-view";
 import Popover, { PopoverItem } from "./Popover";
 import { chipClass } from "@/components/list-page/Chips";
-import { LEADS_ANY_STAGE, LEADS_STAGE_FILTER, LEADS_SUGGESTIONS, LEADS_SUGGESTIONS_TITLE, MOVED_AUTOMATICALLY, NOT_RATED, TEMPERATURE_TOOLTIP } from "@/lib/ui/words";
+import { LEADS_DUPLICATES, LEADS_DUPLICATES_TITLE, LEADS_ALL_OPEN_MATCHES, LEADS_ANY_STAGE, LEADS_STAGE_FILTER, LEADS_SUGGESTIONS, LEADS_SUGGESTIONS_TITLE, MOVED_AUTOMATICALLY, NOT_RATED, TEMPERATURE_TOOLTIP } from "@/lib/ui/words";
 import { COPIED_MS, copyViewLabel, viewUrl } from "@/lib/intake/copy-view";
 
 /** `?reply=` has no chip of its own; the chip below appears ONLY while the filter is active, says what it does, and clears it. */
@@ -52,6 +52,7 @@ export default function IntakeControls({
   onSet,
   onFilters,
   onGroup,
+  allOpenMatches = null,
 }: {
   filters: IntakeFilters;
   view: IntakeView;
@@ -71,6 +72,8 @@ export default function IntakeControls({
   onSet: (set: LeadSet) => void;
   onFilters: (next: IntakeFilters) => void;
   onGroup: (next: IntakeGroup) => void;
+  /** While searching inside a set: how many matches All open has, when that is more than this set shows. */
+  allOpenMatches?: number | null;
 }) {
   const [copied, setCopied] = useState(false);
   useEffect(() => {
@@ -276,6 +279,19 @@ export default function IntakeControls({
           <button type="button" className={chipClass(Boolean(filters.suggest))} aria-pressed={Boolean(filters.suggest)} title={LEADS_SUGGESTIONS_TITLE} onClick={() => onFilters({ ...filters, suggest: filters.suggest ? undefined : true })}>
             {LEADS_SUGGESTIONS}
             <span className="lp-chip-count">{counts.suggestions}</span>
+          </button>
+        )}
+
+        {(counts.duplicates > 0 || filters.dup) && (
+          <button type="button" className={chipClass(Boolean(filters.dup))} aria-pressed={Boolean(filters.dup)} title={LEADS_DUPLICATES_TITLE} onClick={() => onFilters({ ...filters, dup: filters.dup ? undefined : true })}>
+            {LEADS_DUPLICATES}
+            <span className="lp-chip-count">{counts.duplicates}</span>
+          </button>
+        )}
+
+        {allOpenMatches !== null && allOpenMatches > 0 && (
+          <button type="button" className="lp-link-button" data-all-open-matches onClick={() => onSet("open")}>
+            {LEADS_ALL_OPEN_MATCHES(allOpenMatches)}
           </button>
         )}
 

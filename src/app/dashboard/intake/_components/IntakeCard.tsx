@@ -15,7 +15,8 @@ import { temperaturePill } from "@/lib/intake/temperature-pill";
 import NeedsRebeccaBadge from "./NeedsRebeccaBadge";
 import AgentMoveChip from "./AgentMoveChip";
 import RowMenu from "./RowMenu";
-import { LEADS_NEEDS_STAGE } from "@/lib/ui/words";
+import { LEADS_DUPLICATE, LEADS_MOVED_MARK, LEADS_MOVED_MARK_TITLE, LEADS_NEEDS_STAGE } from "@/lib/ui/words";
+import { duplicateTitle, type DuplicateOf } from "@/lib/intake/duplicates";
 
 /**
  * One lead on either board. Draggable (the lead id travels as `text/plain`). The card is small on purpose: the name (two
@@ -38,6 +39,8 @@ export default function IntakeCard({
   selecting = false,
   selected = false,
   onToggleSelect,
+  duplicate,
+  movedOut = false,
 }: {
   row: IntakeRow;
   stages: Stage[];
@@ -52,6 +55,8 @@ export default function IntakeCard({
   selecting?: boolean;
   selected?: boolean;
   onToggleSelect?: (leadId: string) => void;
+  duplicate?: DuplicateOf;
+  movedOut?: boolean;
 }) {
   const lead = row.lead;
   const name = `${lead.first_name} ${lead.last_name}`.trim() || lead.email;
@@ -83,7 +88,7 @@ export default function IntakeCard({
       <span className="ix-sub" title={line || undefined}>
         {line || "—"}
       </span>
-      {(pill || drafts.length > 0 || decision || row.agentMove) && (
+      {(pill || drafts.length > 0 || decision || row.agentMove || duplicate || movedOut) && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
           {pill && (
             <span className="ix-temp" data-tone={pill.tone} data-suggested={pill.suggested ? "" : undefined} title={pill.title} aria-label={pill.ariaLabel}>
@@ -97,6 +102,16 @@ export default function IntakeCard({
             </span>
           )}
           <AgentMoveChip move={row.agentMove} />
+          {duplicate && (
+            <a className="ix-marker ix-marker-dup" data-duplicate href={`/dashboard/leads/${duplicate.leadId}/`} title={duplicateTitle(duplicate)}>
+              {LEADS_DUPLICATE}
+            </a>
+          )}
+          {movedOut && (
+            <span className="ix-marker ix-marker-quiet" data-moved title={LEADS_MOVED_MARK_TITLE}>
+              {LEADS_MOVED_MARK}
+            </span>
+          )}
         </div>
       )}
       <div className="ix-card-foot">

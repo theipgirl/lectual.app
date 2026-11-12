@@ -102,6 +102,28 @@ export function rowsInSet<T extends { lead: { id: string } }>(rows: readonly T[]
   });
 }
 
+/**
+ * Did a stage move take this lead OUT of the set it was listed in? (Membership is frozen until the page reloads, so the
+ * row stays; it gets a quiet "Moved" mark instead.) `bucket` is where it was listed, `category` its new stage's category,
+ * `past` whether the new stage is past first contact.
+ *   open / Working / Nurture / Lost: leaves unless the new stage is of the set's kind (open, open, nurture, lost)
+ *   Event contacts / Not started: also leaves when it moves past first contact (it is Working now)
+ */
+export function leavesSet(set: LeadSet, category: string | null | undefined, past: boolean): boolean {
+  switch (set) {
+    case "open":
+    case "working":
+      return category !== "open";
+    case "event":
+    case "not-started":
+      return category !== "open" || past;
+    case "nurture":
+      return category !== "nurture";
+    case "lost":
+      return category !== "lost";
+  }
+}
+
 export type LostRead = { status: "ok"; count: number } | { status: "unavailable" } | { status: "none" };
 
 export type SetChip = { set: LeadSet; label: string; count: number | null; active: boolean };

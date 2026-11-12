@@ -32,8 +32,10 @@ export function moveTargetStages(intake: readonly Stage[], lost: readonly Stage[
   return [...intake, ...(lostShown ? lost : [])].filter((s) => s.category !== "won");
 }
 
-export function emptyStagesLabel(n: number, shown: boolean): string {
-  return `${n} empty ${n === 1 ? "stage" : "stages"} · ${shown ? "Hide" : "Show"}`;
+/** "3 empty stages: A, B, C · Show": every empty stage is NAMED, so one like "Undecided / Questions" is findable. */
+export function emptyStagesLabel(n: number, shown: boolean, names: readonly string[] = []): string {
+  const list = names.length > 0 && !shown ? `: ${names.join(", ")}` : "";
+  return `${n} empty ${n === 1 ? "stage" : "stages"}${list} · ${shown ? "Hide" : "Show"}`;
 }
 
 /** The owner board: a column is a real person, "Unassigned", or a teammate the directory could not name. */
@@ -66,6 +68,8 @@ export type BoardColumn = {
   undecided: number;
   initials?: string;
   load?: string;
+  /** The Long-Term Nurture column at the end of the stage board: drawn a little quieter. */
+  quiet?: boolean;
   drop: { kind: "stage"; stageId: string } | { kind: "owner"; key: string | null; stray: boolean };
 };
 
@@ -85,6 +89,12 @@ export function boardModel(input: {
   pinned: readonly string[];
   extra: Readonly<Record<string, number>>;
   showEmpty: boolean;
+  /**
+   * The stage board ALWAYS ends with a Long-Term Nurture column, whatever set is chosen: the leads in nurture stages (already
+   * filtered and sorted by the caller) and the stage a drop lands on. Null = no such column (the owner board, the Nurture
+   * set, which already draws it, or a firm with no nurture stage).
+   */
+  nurture?: { rows: readonly IntakeRow[]; stage: Stage } | null;
 }): BoardModel {
   const { rows, group, pinned, extra } = input;
   const draw = (key: string, mine: IntakeRow[]) => {
@@ -94,14 +104,19 @@ export function boardModel(input: {
   const columns: BoardColumn[] = [];
   let empty: BoardModel["empty"] = [];
   if (group === "stage") {
-    const { populated, empty: none } = splitStageColumns(rows, input.stages);
+    const nurture = input.nurture ?? null;
+    const { populated, empty: none } = splitStageColumns(rows, nurture ? input.stages.filter((s) => s.category !== "nurture") : input.stages);
     for (const c of populated) columns.push({ key: c.stage.id, label: c.label, count: c.rows.length, ...draw(c.stage.id, c.rows), drop: { kind: "stage", stageId: c.stage.id } });
     if (input.showEmpty) {
       for (const c of none) columns.push({ key: c.stage.id, label: c.label, count: 0, shown: [], left: 0, undecided: 0, drop: { kind: "stage", stageId: c.stage.id } });
       const order = new Map(inPipelineOrder([...input.stages]).map((s, i) => [s.id, i]));
-      columns.sort((a, b) => (order.get(a.key) ?? 0) - (order.get(b.key) ?? 0));
+      columns.sort((a, b) => (a.quiet ? 1 : 0) - (b.quiet ? 1 : 0) || (order.get(a.key) ?? 0) - (order.get(b.key) ?? 0));
     } else {
       empty = none.map((c) => ({ key: c.stage.id, label: c.label, stageId: c.stage.id }));
+    }
+    if (nurture) {
+      const mine = [...nurture.rows];
+      columns.push({ key: nurture.stage.id, label: stageLabelFor(nurture.stage), count: mine.length, ...draw(nurture.stage.id, mine), quiet: true, drop: { kind: "stage", stageId: nurture.stage.id } });
     }
   } else {
     const known = new Set(input.members.map((m) => m.userId));

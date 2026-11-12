@@ -71,7 +71,7 @@ describe("REFERRAL_SOURCES", () => {
   it("keeps the original order and appends the Lawmatics-origin buckets", () => {
     expect([...REFERRAL_SOURCES]).toEqual([
       "UGW", "Melanin Money", "Flourish Media", "Instagram", "Referral", "Event", "Inbound",
-      "Social media", "Search engine", "Website", "Other", "Assessment",
+      "Social media", "Search engine", "Website", "Other", "Assessment", "Intake form",
     ]);
   });
 });

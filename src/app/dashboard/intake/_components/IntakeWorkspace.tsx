@@ -25,8 +25,9 @@ import {
 import { stageLabelFor } from "@/lib/intake/views";
 import { detailsNote } from "@/lib/intake/details-note";
 import { chipCountsWithin, leadsHeaderLine, ownerColumnShown } from "@/lib/intake/leads-view";
-import { SET_LABEL, allOpenData, drawnSet, rowsInSet, setChips, type LostRead, type SetData } from "@/lib/intake/sets";
-import type { LeadSet } from "@/lib/intake/working";
+import { SET_LABEL, allOpenData, drawnSet, leavesSet, rowsInSet, setChips, type LostRead, type SetData } from "@/lib/intake/sets";
+import { isPastFirstContact, type LeadSet } from "@/lib/intake/working";
+import type { DuplicateOf } from "@/lib/intake/duplicates";
 import { SHOW_STEP, nextShow, pageSlice } from "@/lib/intake/paging";
 import { moveTargetStages } from "@/lib/intake/board-columns";
 import { boardModel } from "@/lib/intake/board-columns";
@@ -93,6 +94,7 @@ export default function IntakeWorkspace({
   lostFailed = false,
   lostCut = null,
   notesUnavailable = false,
+  duplicates = {},
   now: nowIso,
 }: {
   /** The rows of the server's set: the intake list, or the lost leads when `lostView`. */
@@ -119,6 +121,8 @@ export default function IntakeWorkspace({
   lostCut?: { shown: number; total: number } | null;
   /** The latest-notes read failed: Next step says so instead of "No activity yet". */
   notesUnavailable?: boolean;
+  /** Possible duplicates among the loaded open leads, by lead id (see duplicates.ts). */
+  duplicates?: Record<string, DuplicateOf>;
   now: string;
 }) {
   const [rows, setRows] = useState(initialRows);
@@ -182,30 +186,59 @@ export default function IntakeWorkspace({
 
   const inSetRows = useMemo(() => rowsInSet(rows, setData, drawn), [rows, setData, drawn]);
   const chipCounts = useMemo(
-    () => chipCountsWithin(inSetRows, { approvals: pendingApprovals, decisionsRead: decisionAvailable, agentRead: agentAvailable }),
-    [inSetRows, pendingApprovals, decisionAvailable, agentAvailable],
+    () => chipCountsWithin(inSetRows, { approvals: pendingApprovals, decisionsRead: decisionAvailable, agentRead: agentAvailable, duplicates }),
+    [inSetRows, pendingApprovals, decisionAvailable, agentAvailable, duplicates],
   );
-  const filtered = useMemo(
-    () =>
-      filterNeedsRebecca(
-        applyFilters(inSetRows, { ...filters, agent: agentAvailable ? filters.agent : null, decision: decisionAvailable ? filters.decision : undefined }),
+  const applyAll = useCallback(
+    (list: IntakeRow[]) => {
+      const kept = filterNeedsRebecca(
+        applyFilters(list, { ...filters, agent: agentAvailable ? filters.agent : null, decision: decisionAvailable ? filters.decision : undefined }),
         pendingApprovals,
         filters.needsRebecca,
-      ),
-    [inSetRows, filters, pendingApprovals, agentAvailable, decisionAvailable],
+      );
+      return filters.dup ? kept.filter((r) => !!duplicates[r.lead.id]) : kept;
+    },
+    [filters, pendingApprovals, agentAvailable, decisionAvailable, duplicates],
   );
+  const filtered = useMemo(() => applyAll(inSetRows), [inSetRows, applyAll]);
+  // Searching inside a set: how many matches All open has, offered as a link when that is more than this set shows.
+  const allOpenMatches = useMemo(() => {
+    if (filters.q.trim() === "" || drawn === "open" || drawn === "lost" || lostView) return null;
+    const n = applyAll(rowsInSet(rows, setData, "open")).length;
+    return n > filtered.length ? n : null;
+  }, [filters.q, drawn, lostView, rows, setData, applyAll, filtered.length]);
+  // Stage moves made on this page: a lead moved OUT of the set it was listed in keeps its row and gets a quiet "Moved" mark.
+  const [movedIds, setMovedIds] = useState<string[]>([]);
+  const movedOut = useMemo(() => {
+    const out = new Set<string>();
+    for (const id of movedIds) {
+      const r = rows.find((x) => x.lead.id === id);
+      if (!r) continue;
+      const cat = stages.find((s) => s.id === r.lead.current_stage_id)?.category;
+      if (leavesSet(drawn, cat, isPastFirstContact(r.lead.current_stage_id, stages))) out.add(id);
+    }
+    return out;
+  }, [movedIds, rows, stages, drawn]);
   const { sort } = viewState;
   const sorted = useMemo(() => sortRows(filtered, sort.key, sort.dir), [filtered, sort]);
   const page = useMemo(() => pageSlice(sorted, viewState.show), [sorted, viewState.show]);
   const rowById = useCallback((id: string) => rows.find((r) => r.lead.id === id), [rows]);
 
   const columnStages = lostView ? lostStages : intakeStages;
+  // The stage board ALWAYS ends with a Long-Term Nurture column (not in the Nurture set, which draws it already, and not
+  // in the Lost set, whose rows come from a different read): the nurture leads, with the same filters and sort.
+  const nurtureStage = useMemo(() => intakeStages.find((s) => s.category === "nurture") ?? null, [intakeStages]);
+  const nurtureColumn = useMemo(() => {
+    if (!board || viewState.group !== "stage" || lostView || drawn === "nurture" || !nurtureStage) return null;
+    const mine = rows.filter((r) => stages.find((s) => s.id === r.lead.current_stage_id)?.category === "nurture");
+    return { rows: sortRows(applyAll(mine), sort.key, sort.dir), stage: nurtureStage };
+  }, [board, viewState.group, lostView, drawn, nurtureStage, rows, stages, applyAll, sort]);
   // Lost stages are offered as a destination ONLY while the Lost set is shown (so a lead can be moved back out). Elsewhere,
   // moving a lead to Lost happens on the lead page or the weekly review, as before.
   const moveStages = useMemo(() => moveTargetStages(intakeStages, lostStages, lostView), [intakeStages, lostStages, lostView]);
   const model = useMemo(
-    () => boardModel({ rows: sorted, stages: columnStages, members, group: viewState.group, pinned, extra: colExtra, showEmpty }),
-    [sorted, columnStages, members, viewState.group, pinned, colExtra, showEmpty],
+    () => boardModel({ rows: sorted, stages: columnStages, members, group: viewState.group, pinned, extra: colExtra, showEmpty, nurture: nurtureColumn }),
+    [sorted, columnStages, members, viewState.group, pinned, colExtra, showEmpty, nurtureColumn],
   );
   const renderedIds = useMemo(() => (board ? model.renderedIds : page.shown.map((r) => r.lead.id)), [board, model, page]);
   const ownerColumn = ownerColumnShown(sorted);
@@ -292,6 +325,7 @@ export default function IntakeWorkspace({
       const target = stages.find((s) => s.id === stageId);
       runWrite(leadId, (row) => movedRow(row, stageId), () => moveStageAction(leadId, stageId), () => {
         pin([leadId]);
+        setMovedIds((m) => (m.includes(leadId) ? m : [...m, leadId]));
         setAnnounce(LEADS_MOVED_TO(nameOf(leadId), target ? stageLabelFor(target) : "that stage"));
       });
     },
@@ -333,6 +367,7 @@ export default function IntakeWorkspace({
         const moved = new Set(result.moved);
         setRows((current) => current.map((row) => (moved.has(row.lead.id) ? movedRow(row, stageId) : row)));
         pin(result.moved);
+        setMovedIds((m) => [...m, ...result.moved.filter((id) => !m.includes(id))]);
         setErrors((current) => ({ ...current, ...Object.fromEntries(result.failed.map((f) => [f.leadId, f.error])) }));
         setSelected(new Set(result.failed.map((f) => f.leadId)));
         const target = stages.find((s) => s.id === stageId);
@@ -423,6 +458,7 @@ export default function IntakeWorkspace({
         onSet={(set) => setViewState((state) => ({ ...state, set, show: SHOW_STEP }))}
         onFilters={setFilters}
         onGroup={(group: IntakeGroup) => setViewState((state) => ({ ...state, group }))}
+        allOpenMatches={allOpenMatches}
       />
 
       {setDataProp !== undefined && setData.status === "unavailable" && !lostView && (
@@ -511,6 +547,8 @@ export default function IntakeWorkspace({
             selecting={selecting}
             selectedIds={selected}
             onToggleSelect={toggleSelect}
+            duplicates={duplicates}
+            movedOut={movedOut}
           />
         )
       ) : (
@@ -530,6 +568,8 @@ export default function IntakeWorkspace({
           time={time}
           pendingApprovals={pendingApprovals}
           notesUnavailable={notesUnavailable}
+          duplicates={duplicates}
+          movedOut={movedOut}
           onSort={toggleSort}
           onSetLane={setLane}
           onAssign={assign}

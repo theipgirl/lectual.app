@@ -15,8 +15,8 @@
 .ix-chip-warn { border-color: var(--warn); color: var(--warn); }
 
 /* ---- the table ------------------------------------------------------ */
-.ix-table { --ix-cols: minmax(0, 2fr) minmax(0, 1.5fr) 104px minmax(0, 1fr) 112px minmax(0, 2fr) 40px; --ix-row-h: 60px; }
-.ix-table.ix-has-owner { --ix-cols: minmax(0, 2fr) minmax(0, 1.5fr) 104px minmax(0, 1fr) 52px 112px minmax(0, 2fr) 40px; }
+.ix-table { --ix-cols: minmax(0, 1.8fr) minmax(0, 1.7fr) 104px minmax(0, 1fr) 112px minmax(0, 1.8fr) 40px; --ix-row-h: 60px; }
+.ix-table.ix-has-owner { --ix-cols: minmax(0, 1.8fr) minmax(0, 1.7fr) 104px minmax(0, 1fr) 52px 112px minmax(0, 1.8fr) 40px; }
 .ix-head, .ix-row { display: grid; grid-template-columns: var(--ix-cols); gap: 10px; align-items: center; padding: 0 16px; }
 .ix-head { min-height: 40px; border-bottom: 1px solid var(--line); font-family: var(--font-courier-prime), monospace; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mute); }
 .ix-head button { font: inherit; letter-spacing: inherit; text-transform: inherit; text-align: left; border: 0; background: transparent; padding: 0; color: var(--mute); cursor: pointer; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -26,7 +26,8 @@
 .ix-cell { min-width: 0; overflow: hidden; }
 .ix-name { display: block; font-size: 14px; font-weight: 500; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: inherit; }
 .ix-sub { display: block; font-size: 13px; line-height: 1.4; color: var(--mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ix-stage { display: inline-block; max-width: 100%; padding: 2px 8px; border-radius: 6px; background: var(--surface2); color: var(--ink2); font-size: 13px; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+/* A stage name is never cut with an ellipsis: the pill wraps to two lines at its words. */
+.ix-stage { display: inline-block; max-width: 100%; padding: 2px 8px; border-radius: 6px; background: var(--surface2); color: var(--ink2); font-size: 13px; line-height: 1.3; white-space: normal; overflow-wrap: normal; vertical-align: middle; }
 .ix-stage-warn { background: var(--warnbg); color: var(--warn); }
 .ix-touch { font-family: var(--font-courier-prime), monospace; font-size: 13px; white-space: nowrap; color: var(--mute); }
 .ix-touch[data-in] { color: var(--burg); }
@@ -107,3 +108,10 @@
 }
 .ix-sets > *, .ix-filters > * { flex: 0 0 auto; }
 @media (max-width: 640px) { .intake-root .lp-header .lp-sub { white-space: normal; overflow: visible; text-overflow: clip; text-wrap: wrap; } }
+
+.ix-marker-dup { background: var(--critbg); color: var(--crit); text-decoration: none; }
+.ix-marker-dup:hover { text-decoration: underline; }
+.ix-marker-quiet { background: transparent; color: var(--mute); border: 1px dashed var(--line); }
+.ix-col-quiet { background: transparent; border-style: dashed; }
+.ix-col-quiet .ix-card { background: var(--surface); }
+.ix-col-quiet .ix-col-name { color: var(--ink2); font-weight: 400; }

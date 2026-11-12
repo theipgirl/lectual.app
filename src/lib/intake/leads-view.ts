@@ -54,6 +54,8 @@ export type ChipCounts = {
   decision: number | null;
   needsAttorney: number | null;
   suggestions: number;
+  /** Leads in the set with a possible duplicate. */
+  duplicates: number;
   agent: { today: number; week: number } | null;
 };
 
@@ -63,12 +65,13 @@ export type ChipCounts = {
  */
 export function chipCountsWithin(
   setRows: readonly IntakeRow[],
-  reads: { approvals: LeadPendingApprovals | undefined; decisionsRead: boolean; agentRead: boolean },
+  reads: { approvals: LeadPendingApprovals | undefined; decisionsRead: boolean; agentRead: boolean; duplicates?: Readonly<Record<string, unknown>> },
 ): ChipCounts {
   const needing = leadsNeedingApproval(reads.approvals);
   return {
     decision: reads.decisionsRead ? setRows.filter((r) => decisionOpen(r.decision, r.lead.current_stage_id)).length : null,
     needsAttorney: reads.approvals?.status === "ok" ? setRows.filter((r) => needing.has(r.lead.id)).length : null,
+    duplicates: setRows.filter((r) => !!reads.duplicates?.[r.lead.id]).length,
     suggestions: setRows.filter((r) => r.temperature.suggestion === "long_term_nurture").length,
     agent: reads.agentRead ? { today: setRows.filter((r) => r.agentMove?.today).length, week: setRows.filter((r) => r.agentMove).length } : null,
   };

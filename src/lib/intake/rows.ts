@@ -112,6 +112,8 @@ export type IntakeFilters = {
   decision?: boolean;
   /** Only leads with a Long-Term Nurture suggestion (the "Suggestions" chip). */
   suggest?: boolean;
+  /** Only leads with a "possible duplicate" (the workspace applies it: the duplicates are computed from the loaded leads). */
+  dup?: boolean;
   /** Free text over name / business / email / mark / referral detail / note. */
   q: string;
 };
@@ -179,6 +181,7 @@ export function parseIntakeFilters(params: IntakeSearchParams): IntakeFilters {
     ...(AGENT_MOVE_FILTERS.includes(agent) ? { agent } : {}),
     ...(firstValue(params.decision) === "1" ? { decision: true } : {}),
     ...(firstValue(params.suggest) === "1" ? { suggest: true } : {}),
+    ...(firstValue(params.dup) === "1" ? { dup: true } : {}),
     q: firstValue(params.q),
   };
 }
@@ -199,6 +202,7 @@ export function filtersToQueryString(filters: IntakeFilters): string {
   if (filters.agent) params.set("agent", filters.agent);
   if (filters.decision) params.set("decision", "1");
   if (filters.suggest) params.set("suggest", "1");
+  if (filters.dup) params.set("dup", "1");
   if (filters.q.trim()) params.set("q", filters.q.trim());
   return params.toString();
 }
