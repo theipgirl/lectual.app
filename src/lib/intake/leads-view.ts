@@ -41,9 +41,11 @@ export function ownerColumnShown(rows: readonly IntakeRow[]): boolean {
 
 /**
  * The time chip on a row or card: only when time was logged on the lead this week, or the caller's timer is running on
- * it. Starting a timer and adding time live in the row menu.
+ * it, or the time read failed (then the em dash). Starting a timer and adding time live in the row menu.
  */
-export function showTimeChip(summary: LeadTimeSummary | undefined, running: RunningSummary | null, leadId: string): boolean {
+export function showTimeChip(summary: LeadTimeSummary | undefined, running: RunningSummary | null, leadId: string, unavailable = false): boolean {
+  // The week's time could not be read: every row keeps its em dash placeholder (never a confident "0m", never nothing).
+  if (unavailable) return true;
   return (summary?.seconds ?? 0) > 0 || running?.leadId === leadId;
 }
 

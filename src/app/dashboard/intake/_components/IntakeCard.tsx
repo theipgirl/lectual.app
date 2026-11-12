@@ -104,7 +104,7 @@ export default function IntakeCard({
           <span className="lx-sr">{touch.waitingOnUs ? "Waiting on us: " : "Waiting on them: "}</span>
           {touch.text}
         </span>
-        {showTimeChip(time?.byLeadId[lead.id], time?.running ?? null, lead.id) && (
+        {showTimeChip(time?.byLeadId[lead.id], time?.running ?? null, lead.id, time === null) && (
           <TimeChip leadId={lead.id} leadName={name} summary={time?.byLeadId[lead.id]} unavailable={time === null} running={time?.running ?? null} members={members} compact />
         )}
         <RowMenu lead={lead} name={name} stages={stages} members={members} running={time?.running ?? null} onMoveStage={onMoveStage} onAssign={onAssign} />

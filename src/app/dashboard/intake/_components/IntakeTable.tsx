@@ -194,7 +194,7 @@ export default function IntakeTable({
                   <span className="ix-next" data-urgent={step.urgent ? "" : undefined} data-muted={step.muted ? "" : undefined} title={step.text}>
                     {step.text}
                   </span>
-                  {showTimeChip(time?.byLeadId[lead.id], time?.running ?? null, lead.id) && (
+                  {showTimeChip(time?.byLeadId[lead.id], time?.running ?? null, lead.id, time === null) && (
                     <TimeChip leadId={lead.id} leadName={name} summary={time?.byLeadId[lead.id]} unavailable={time === null} running={time?.running ?? null} members={members} />
                   )}
                 </div>

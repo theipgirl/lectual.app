@@ -28,6 +28,7 @@ import { chipCountsWithin, leadsHeaderLine, ownerColumnShown } from "@/lib/intak
 import { SET_LABEL, allOpenData, drawnSet, rowsInSet, setChips, type LostRead, type SetData } from "@/lib/intake/sets";
 import type { LeadSet } from "@/lib/intake/working";
 import { SHOW_STEP, nextShow, pageSlice } from "@/lib/intake/paging";
+import { moveTargetStages } from "@/lib/intake/board-columns";
 import { boardModel } from "@/lib/intake/board-columns";
 import { hiddenSelectedCount, movableIds, selectShown, selectionKey } from "@/lib/intake/selection";
 import type { IntakeTime } from "@/lib/time";
@@ -39,6 +40,7 @@ import "@/components/list-page/list-page.css";
 import "../leads.css";
 import {
   LEADS_ASSIGNED_TO,
+  LEADS_LOST_CUT,
   LEADS_LOST_UNAVAILABLE,
   LEADS_MOVED_TO,
   LEADS_NAME,
@@ -89,6 +91,7 @@ export default function IntakeWorkspace({
   lost = { status: "none" },
   lostView = false,
   lostFailed = false,
+  lostCut = null,
   notesUnavailable = false,
   now: nowIso,
 }: {
@@ -112,6 +115,8 @@ export default function IntakeWorkspace({
   lostView?: boolean;
   /** The Lost set was chosen and its read failed. */
   lostFailed?: boolean;
+  /** The lost list is cut at its cap: how many are shown of how many exist. */
+  lostCut?: { shown: number; total: number } | null;
   /** The latest-notes read failed: Next step says so instead of "No activity yet". */
   notesUnavailable?: boolean;
   now: string;
@@ -140,7 +145,8 @@ export default function IntakeWorkspace({
       agent: agentAvailable ? filters.agent : null,
       decision: decisionAvailable ? filters.decision : undefined,
     },
-    { ...viewState, set: drawn },
+    // The set the person CHOSE, not the one drawn: while the All-open fallback shows, the URL must not lock `set=open` in.
+    viewState,
   );
 
   // The URL mirrors the state (history.replaceState, not a router push: the page re-reads a dozen things on a navigation).
@@ -194,7 +200,9 @@ export default function IntakeWorkspace({
   const rowById = useCallback((id: string) => rows.find((r) => r.lead.id === id), [rows]);
 
   const columnStages = lostView ? lostStages : intakeStages;
-  const moveStages = useMemo(() => [...intakeStages, ...lostStages].filter((s) => s.category !== "won"), [intakeStages, lostStages]);
+  // Lost stages are offered as a destination ONLY while the Lost set is shown (so a lead can be moved back out). Elsewhere,
+  // moving a lead to Lost happens on the lead page or the weekly review, as before.
+  const moveStages = useMemo(() => moveTargetStages(intakeStages, lostStages, lostView), [intakeStages, lostStages, lostView]);
   const model = useMemo(
     () => boardModel({ rows: sorted, stages: columnStages, members, group: viewState.group, pinned, extra: colExtra, showEmpty }),
     [sorted, columnStages, members, viewState.group, pinned, colExtra, showEmpty],
@@ -431,6 +439,11 @@ export default function IntakeWorkspace({
           <button type="button" className="lp-btn" onClick={() => router.refresh()}>
             Refresh
           </button>
+        </p>
+      )}
+      {lostView && lostCut && (
+        <p role="status" className="lp-note" data-lost-cut>
+          <span>{LEADS_LOST_CUT(lostCut.shown, lostCut.total)}</span>
         </p>
       )}
       {lost.status === "unavailable" && lostView && (

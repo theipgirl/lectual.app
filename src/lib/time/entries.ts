@@ -421,7 +421,7 @@ export async function listForLeads(leadIds: string[], since: Date | string): Pro
   return parts.flat().sort((a, b) => (a.started_at < b.started_at ? 1 : a.started_at > b.started_at ? -1 : 0));
 }
 
-/** Lead ids per `.in()`: 100 uuids stay well inside a request URL. */
+/** Lead ids per `.in()`: 80 uuids stay well inside a request URL. */
 export const LEAD_ID_CHUNK = 80;
 
 /**

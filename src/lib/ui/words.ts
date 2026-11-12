@@ -503,6 +503,7 @@ export const LEADS_ASSIGNED_TO = (name: string, who: string) => `Assigned ${name
 export const LEADS_ROW_MENU = (name: string) => `Actions for ${name}`;
 export const LEADS_NO_MATCH_IN_SET = (set: string) => `No lead matches these filters in ${set}.`;
 export const LEADS_SET_EMPTY = (set: string) => `Nobody is in ${set} right now.`;
+export const LEADS_LOST_CUT = (shown: number, total: number) => "Showing the first " + shown + " of " + total + " lost leads.";
 export const LEADS_START_TIMER = "Start timer";
 export const LEADS_STOP_TIMER = "Stop timer";
 export const LEADS_ADD_TIME = "Add time";

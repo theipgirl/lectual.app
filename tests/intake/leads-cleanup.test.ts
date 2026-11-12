@@ -3,10 +3,10 @@ import { classifyLeads, type WorkingFacts, type FactSet } from "@/lib/intake/wor
 import { allOpenData, drawnSet, inSet, rowsInSet, setChips, setDataFrom } from "@/lib/intake/sets";
 import { BOARD_COLUMN_CAP, SHOW_MAX, SHOW_STEP, capColumn, nextShow, pageSlice, parseShow } from "@/lib/intake/paging";
 import { hiddenSelectedCount, movableIds, selectShown, selectionKey } from "@/lib/intake/selection";
-import { boardModel, emptyStagesLabel, ownerDrop, splitStageColumns, stageDrop } from "@/lib/intake/board-columns";
+import { boardModel, emptyStagesLabel, moveTargetStages, ownerDrop, splitStageColumns, stageDrop } from "@/lib/intake/board-columns";
 import { temperaturePill } from "@/lib/intake/temperature-pill";
 import { chipCountsWithin, leadsHeaderLine, needsStageTitle, ownerColumnShown, showTimeChip } from "@/lib/intake/leads-view";
-import { latestNotes, loadLatestNotes, NOTE_MAX_PAGES, NOTE_PAGE, type NotesDb } from "@/lib/intake/notes-read";
+import { latestNotes, loadLatestNotes, notesIncomplete, NOTE_ID_CHUNK, NOTE_MAX_PAGES, NOTE_PAGE, type NotesDb } from "@/lib/intake/notes-read";
 import { readLostCount } from "@/lib/intake/lost";
 import { LEAD_ID_CHUNK } from "@/lib/time/entries";
 import { buildIntakeRows, sortRows, type IntakeRow } from "@/lib/intake/rows";
@@ -236,20 +236,20 @@ describe("reads", () => {
     expect(LEAD_ID_CHUNK).toBeLessThanOrEqual(80);
   });
 
-  it("the notes read asks only for note-carrying types and pages, so import rows cannot eat a cap", async () => {
-    const calls: Array<{ types: readonly string[]; range: [number, number] }> = [];
-    const db = (pages: Array<Array<Record<string, unknown>>>, error = false): NotesDb =>
+  it("the notes read is scoped to the listed leads in chunks, asks only for note-carrying types, pages, and reports a cut-short chunk", async () => {
+    const calls: Array<{ ids: readonly string[]; types: readonly string[]; range: [number, number] }> = [];
+    const db = (pages: (ids: readonly string[], page: number) => Array<Record<string, unknown>>, error = false): NotesDb =>
       ({
         from: () => ({
           select: () => ({
-            in: (_c: string, types: readonly string[]) => ({
-              not: () => ({
+            in: (_c: string, ids: readonly string[]) => ({
+              in: (_t: string, types: readonly string[]) => ({
                 gte: () => ({
                   order: () => ({
                     order: () => ({
                       range: (a: number, b: number) => {
-                        calls.push({ types, range: [a, b] });
-                        return Promise.resolve({ data: error ? null : (pages[a / NOTE_PAGE] ?? []), error: error ? {} : null });
+                        calls.push({ ids, types, range: [a, b] });
+                        return Promise.resolve({ data: error ? null : pages(ids, a / NOTE_PAGE), error: error ? {} : null });
                       },
                     }),
                   }),
@@ -259,19 +259,63 @@ describe("reads", () => {
           }),
         }),
       }) as never;
-    const full = Array.from({ length: NOTE_PAGE }, (_, i) => ({ lead_id: `l${i}`, type: "note", payload: { note: `n${i}` } }));
-    const r = await loadLatestNotes("2026-01-01", db([full, [{ lead_id: "late", type: "note", payload: { summary: "s" } }]]));
+    const ids = Array.from({ length: 250 }, (_, i) => `l${i}`);
+    const full = (id: string) => Array.from({ length: NOTE_PAGE }, () => ({ lead_id: id, type: "note", payload: { note: "n" } }));
+    const r = await loadLatestNotes("2026-01-01", ids, db((chunk, page) => (page === 0 ? full(chunk[0]) : [{ lead_id: "late", type: "note", payload: { summary: "s" } }])));
     expect(r).toMatchObject({ status: "ok", truncated: false });
     expect(r.status === "ok" && r.byLead.late).toBe("s");
     expect(calls[0].types).toEqual(["note", "call_logged", "email_sent", "voice_note"]);
-    expect(calls).toHaveLength(2);
+    expect(calls.map((c) => c.ids.length).filter((n, i, a) => a.indexOf(n) === i).sort((x, y) => y - x)).toEqual([100, 50]);
+    expect(calls.every((c) => c.ids.length <= NOTE_ID_CHUNK)).toBe(true);
     calls.length = 0;
-    const endless = await loadLatestNotes("2026-01-01", db(Array.from({ length: NOTE_MAX_PAGES }, () => full)));
+    // A chunk that never ends is truncated: reported, and the page then says "Note couldn't load" instead of "No activity yet".
+    const endless = await loadLatestNotes("2026-01-01", ["a"], db((chunk) => full(chunk[0])));
     expect(endless).toMatchObject({ status: "ok", truncated: true });
+    expect(notesIncomplete(endless)).toBe(true);
     expect(calls).toHaveLength(NOTE_MAX_PAGES);
-    // A failed read is unavailable, never an empty map.
-    expect(await loadLatestNotes("2026-01-01", db([], true))).toEqual({ status: "unavailable" });
+    expect(await loadLatestNotes("2026-01-01", ["a"], db(() => [], true))).toEqual({ status: "unavailable" });
+    expect(notesIncomplete({ status: "unavailable" })).toBe(true);
+    expect(notesIncomplete({ status: "ok", byLead: {}, truncated: false })).toBe(false);
+    expect(await loadLatestNotes("2026-01-01", [], db(() => []))).toEqual({ status: "ok", byLead: {}, truncated: false });
     expect(latestNotes([{ lead_id: "a", type: "note", payload: { note: " new " } }, { lead_id: "a", type: "note", payload: { note: "old" } }])).toEqual({ a: "new" });
+  });
+
+  it("the page asks the notes read only about the leads it shows and the row says so when it was cut short", async () => {
+    const { readFileSync } = await import("node:fs");
+    const page = readFileSync("src/app/dashboard/intake/page.tsx", "utf8");
+    expect(page).toContain("loadLatestNotes(sinceIso, leads.map");
+    expect(page).toContain("notesUnavailable={notesIncomplete(notes)}");
+  });
+
+  it("an unreadable module list makes consults unavailable (never skipped); a readable list without Mailboxes is skipped", async () => {
+    const { loadWorkingFacts } = await import("@/lib/intake/working-load");
+    const db = { from: () => ({ select: () => ({ in: () => ({ or: () => ({ order: () => ({ range: async () => ({ data: [], error: null }) }) }) }), not: () => ({ order: () => ({ range: async () => ({ data: [], error: null }) }) }), eq: () => ({ not: () => ({ gte: () => ({ order: () => ({ range: async () => ({ data: [], error: null }) }) }) }) }) }) }) } as never;
+    const base = { leadIds: ["a"], approvals: { status: "ok", byLead: {} } as never };
+    const deps = { db, now: NOW, readProposals: async () => [] };
+    expect((await loadWorkingFacts({ ...base, mailboxOn: false, mailboxUnknown: true }, deps)).consults).toEqual({ status: "unavailable" });
+    expect((await loadWorkingFacts({ ...base, mailboxOn: false }, deps)).consults).toEqual({ status: "skipped" });
+    expect((await loadWorkingFacts({ ...base, mailboxOn: true }, deps)).consults).toEqual({ status: "ok", leadIds: new Set() });
+  });
+
+  it("lost stages are a move destination only while the Lost set is shown, and never a won stage", () => {
+    const intake = STAGES.filter((s) => s.category === "open" || s.category === "nurture");
+    const lostStages = STAGES.filter((s) => s.category === "lost");
+    expect(moveTargetStages(intake, lostStages, false).map((s) => s.id)).not.toContain("lost");
+    expect(moveTargetStages(intake, lostStages, true).map((s) => s.id)).toContain("lost");
+    expect(moveTargetStages([...intake, STAGES.find((s) => s.id === "won")!], lostStages, true).map((s) => s.id)).not.toContain("won");
+  });
+
+  it("the URL keeps the set the person chose while the All-open fallback is drawn", async () => {
+    const { readFileSync } = await import("node:fs");
+    const ws = readFileSync("src/app/dashboard/intake/_components/IntakeWorkspace.tsx", "utf8");
+    expect(ws).not.toContain("{ ...viewState, set: drawn }");
+    const { intakeHref, DEFAULT_VIEW_STATE, EMPTY_INTAKE_FILTERS } = await import("@/lib/intake/rows");
+    expect(intakeHref(EMPTY_INTAKE_FILTERS, { ...DEFAULT_VIEW_STATE, set: "event" })).toBe("/dashboard/intake/?set=event");
+  });
+
+  it("the time chip keeps its em dash on every row when the time read failed", () => {
+    expect(showTimeChip(undefined, null, "a", true)).toBe(true);
+    expect(showTimeChip(undefined, null, "a", false)).toBe(false);
   });
 
   it("the lost count is none without a lost stage and never reads one", async () => {

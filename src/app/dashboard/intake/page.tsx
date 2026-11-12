@@ -1,12 +1,12 @@
 import { listStages, type Stage } from "@/lib/pipeline";
 import type { Lead } from "@/lib/pipeline";
 import { listIntakeLeads } from "@/lib/intake/leads";
-import { loadLatestNotes, NOTE_LOOKBACK_DAYS, type NotesRead } from "@/lib/intake/notes-read";
+import { loadLatestNotes, notesIncomplete, NOTE_LOOKBACK_DAYS } from "@/lib/intake/notes-read";
 import { loadWorkingFacts } from "@/lib/intake/working-load";
 import { classifyLeads } from "@/lib/intake/working";
 import { setDataFrom, type SetData, type LostRead } from "@/lib/intake/sets";
 import { listLostLeads, readLostCount, lostStageIds, type LostLeads } from "@/lib/intake/lost";
-import { orgHasModule } from "@/lib/org/modules";
+import { activeOrgModulesOrNull } from "@/lib/org/modules";
 import { intakeStages } from "@/lib/intake/scope";
 import { inPipelineOrder } from "@/lib/pipeline/stage-order";
 import { loadTemperatureFacts, type TemperatureFactsRead } from "@/lib/intake/facts";
@@ -80,9 +80,6 @@ export default async function IntakePage({
   const membersPromise: Promise<MemberIdentity[]> = listMemberDirectory().catch(() => []);
 
   const sinceIso = new Date(now.getTime() - NOTE_LOOKBACK_DAYS * 86_400_000).toISOString();
-  // "Next step" degrades from the latest note to the factual reply state rather than taking the list down, but a FAILED
-  // read is reported (`unavailable`), never turned into "no activity".
-  const notesPromise: Promise<NotesRead> = loadLatestNotes(sinceIso);
 
   // What is waiting on Rebecca, per lead. The loader reports an unreachable
   // queue as `unavailable` (never as "nothing pending"); the catch is only for
@@ -115,7 +112,7 @@ export default async function IntakePage({
     loadFailed = true;
   }
 
-  const [members, notes, pendingApprovals, agentMoves, decisions] = await Promise.all([membersPromise, notesPromise, approvalsPromise, agentMovesPromise, decisionsPromise]);
+  const [members, pendingApprovals, agentMoves, decisions] = await Promise.all([membersPromise, approvalsPromise, agentMovesPromise, decisionsPromise]);
 
   if (loadFailed) {
     return (
@@ -139,9 +136,12 @@ export default async function IntakePage({
   // page already holds) and classifies every lead in the list. Lost leads are NOT in the list (their own scope and reads: a
   // head count for the chip every render, the lead list only when ?set=lost), so the rail badge and the Pipeline are untouched.
   const lostView = viewState.set === "lost";
-  const mailboxOn = await orgHasModule("mailbox").catch(() => false);
+  // A module list that could not be read is "unknown", not "off": the consult read is then UNAVAILABLE (missing data
+  // never hides a lead), where a firm without the Mailboxes feature simply has no consults.
+  const modules = await activeOrgModulesOrNull().catch(() => null);
+  const mailboxOn = modules ? modules.includes("mailbox") : null;
   const [workingFacts, lostCount, lostLeads] = await Promise.all([
-    loadWorkingFacts({ leadIds: intakeLeads.map((l) => l.id), approvals: pendingApprovals, mailboxOn }),
+    loadWorkingFacts({ leadIds: intakeLeads.map((l) => l.id), approvals: pendingApprovals, mailboxOn: mailboxOn ?? false, mailboxUnknown: mailboxOn === null }),
     readLostCount(stages),
     lostView ? listLostLeads(stages) : Promise.resolve<LostLeads | null>(null),
   ]);
@@ -151,6 +151,11 @@ export default async function IntakePage({
   // The leads the page draws: the list, or (Lost chosen) the lost leads. A failed lost read draws none and says so.
   const leads: Lead[] = lostView ? (lostLeads && lostLeads.status === "ok" ? lostLeads.leads : []) : intakeLeads;
   const lostFailed = lostView && (!lostLeads || lostLeads.status !== "ok");
+  const lostShown = lostLeads && lostLeads.status === "ok" ? { shown: lostLeads.leads.length, total: lostLeads.total } : null;
+
+  // "Next step" degrades from the latest note to the factual reply state rather than taking the list down, but a FAILED
+  // or cut-short read is reported, never turned into "no activity". Only the leads on screen are asked about.
+  const notes = await loadLatestNotes(sinceIso, leads.map((l) => l.id));
 
   // Time on cards (§13.1). Two reads: this week's entries for the leads on
   // screen, and the caller's own open timer (which may have started before the
@@ -219,7 +224,8 @@ export default async function IntakePage({
       lost={lostView && lostFailed ? { status: "unavailable" } : lost}
       lostView={lostView}
       lostFailed={lostFailed}
-      notesUnavailable={notes.status !== "ok"}
+      notesUnavailable={notesIncomplete(notes)}
+      lostCut={lostShown && lostShown.total > lostShown.shown ? lostShown : null}
       members={members}
       initialFilters={filters}
       initialViewState={viewState}

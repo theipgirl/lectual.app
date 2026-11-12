@@ -174,7 +174,7 @@ async function settle(read: () => Promise<FactSet>): Promise<FactSet> {
  * consults exist only with it; off = `skipped`, not "no consult").
  */
 export async function loadWorkingFacts(
-  opts: { leadIds: readonly string[]; approvals: LeadPendingApprovals; mailboxOn: boolean },
+  opts: { leadIds: readonly string[]; approvals: LeadPendingApprovals; mailboxOn: boolean; /** The firm's module list could not be read: consults are unavailable, not skipped. */ mailboxUnknown?: boolean },
   deps?: WorkingFactsDeps,
 ): Promise<WorkingFacts> {
   let d = deps;
@@ -193,6 +193,7 @@ export async function loadWorkingFacts(
     settle(async () => ({ status: "ok", leadIds: await readRealActivityLeadIds(live.db, leadIds) })),
     settle(async () => ({ status: "ok", leadIds: leadsWithLiveProposal(await live.readProposals(leadIds)) })),
     settle(async (): Promise<FactSet> => {
+      if (opts.mailboxUnknown) return { status: "unavailable" };
       if (!opts.mailboxOn) return { status: "skipped" };
       const ids = await readConsultLeadIds(live.db, live.now);
       return ids ? { status: "ok", leadIds: ids } : { status: "skipped" };
