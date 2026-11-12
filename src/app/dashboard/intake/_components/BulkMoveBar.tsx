@@ -3,32 +3,39 @@
 import { useState } from "react";
 import type { Stage } from "@/lib/pipeline";
 import { BULK_MOVE_MAX } from "@/lib/pipeline/bulk-move";
-import { stageCodeFor, stageLabelFor } from "@/lib/intake/views";
+import { stageLabelFor } from "@/lib/intake/views";
+import { LEADS_HIDDEN_SELECTED, LEADS_SELECT_DONE } from "@/lib/ui/words";
 
 /**
- * "Move to..." for the cards ticked on the board. It only chooses: the move itself is `bulkMoveStageAction`, one
- * `moveLeadStage` per lead. A stage that opens a matter is not offered (the action refuses it too), and more than
- * BULK_MOVE_MAX cards cannot be moved in one go. Nothing here sends anything.
+ * "Move to..." for the cards ticked on the board, drawn only while the board is in select mode. It only chooses: the move
+ * itself is `bulkMoveStageAction`, one `moveLeadStage` per lead, and the ids it sends are the ticked cards that are
+ * on screen (never one that a filter, a set, a page or a column cap has hidden). A stage that opens a matter is not
+ * offered, and more than BULK_MOVE_MAX cards cannot be moved in one go. Nothing here sends anything.
  */
 export default function BulkMoveBar({
   selectedCount,
+  hiddenCount,
   shownCount,
   stages,
   pending,
   message,
   onSelectShown,
   onClear,
+  onDone,
   onMove,
 }: {
+  /** Ticked AND shown: what a Move would send. */
   selectedCount: number;
-  /** Cards on the board right now (after filters). */
+  /** Ticked but not shown (cleared by the workspace on any change, so normally 0). */
+  hiddenCount: number;
+  /** Cards drawn on the board right now. */
   shownCount: number;
-  /** The stages a lead can be moved to in bulk. Any `won` stage is dropped here as well. */
   stages: Stage[];
   pending: boolean;
   message: { tone: "ok" | "warn" | "error"; text: string } | null;
   onSelectShown: () => void;
   onClear: () => void;
+  onDone: () => void;
   onMove: (stageId: string) => void;
 }) {
   const choices = stages.filter((stage) => stage.category !== "won");
@@ -56,7 +63,7 @@ export default function BulkMoveBar({
               <option value="">Choose a stage</option>
               {choices.map((stage) => (
                 <option key={stage.id} value={stage.id}>
-                  {`${stageCodeFor(stage)} · ${stageLabelFor(stage)}`}
+                  {stageLabelFor(stage)}
                 </option>
               ))}
             </select>
@@ -70,6 +77,10 @@ export default function BulkMoveBar({
           {tooMany && <span role="status">{`Select at most ${BULK_MOVE_MAX} at a time.`}</span>}
         </>
       )}
+      {hiddenCount > 0 && <span className="ix-bulk-note">{LEADS_HIDDEN_SELECTED(hiddenCount)}</span>}
+      <button type="button" className="lx-btn" onClick={onDone} disabled={pending}>
+        {LEADS_SELECT_DONE}
+      </button>
       {message && (
         <span role={message.tone === "error" ? "alert" : "status"} data-bulk-message={message.tone}>
           {message.text}

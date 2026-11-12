@@ -3,22 +3,14 @@
 import { LANES, LANE_LABEL, type Lane } from "@/lib/leads/lane";
 import { NOT_RATED } from "@/lib/ui/words";
 import { temperatureLabel, temperatureTitle, type EffectiveTemperature } from "@/lib/intake/effective-temperature";
+import { temperaturePill } from "@/lib/intake/temperature-pill";
 import Popover, { PopoverItem } from "./Popover";
-import { TEMP_NONE, TEMP_PILL } from "./styles";
 
 /**
- * The one Temperature cell: the chip and the menu that sets it (intake SOP
- * Stage 2).
- *
- * A temperature a PERSON set is a solid chip. A derived one is a dashed chip
- * that says "Suggested" in words, never the same chip in a different shade,
- * because "a routing suggestion once rendered as an assignment status on the
- * dashboard and read as fact". A lead with neither shows a dashed neutral
- * "Not rated". The tooltip is the reason, so the team can see why someone
- * went cold without asking anyone.
- *
- * Choosing Hot, Warm or Cold sets the person's lane (recorded on the timeline,
- * who and from → to); Clear removes it and the derived value shows again.
+ * The one Temperature cell: ONE pill style and the menu that sets it (intake SOP Stage 2). A level a person set is the
+ * filled pill ("Hot"); a level the system suggests is the same pill, lighter, with "suggested" in its title and accessible
+ * name; no level draws nothing (the button is still there, and shows "Set" on hover and focus). Choosing Hot, Warm or Cold
+ * sets the person's lane; Not rated clears it and the suggestion shows again.
  */
 export default function TemperatureCell({
   leadName,
@@ -31,70 +23,60 @@ export default function TemperatureCell({
   pending: boolean;
   onSet: (lane: Lane | null) => void;
 }) {
-  const { value, source } = temperature;
-  const title = temperatureTitle(temperature);
-  const person = source === "person" && value !== null;
+  const pill = temperaturePill(temperature);
+  const person = temperature.source === "person" && temperature.value !== null;
+  const title = pill ? pill.title : "No temperature yet. Click to set one.";
 
   return (
-    <div style={{ minWidth: 0, display: "flex" }}>
-      <Popover
-        label={`${leadName}: ${temperatureLabel(temperature)}. ${title.replace("\n", ". ")}. Set temperature`}
-        width={165}
-        trigger={({ onClick, ref, ...aria }) => (
-          <button
-            {...aria}
-            ref={ref}
-            type="button"
-            title={title}
-            disabled={pending}
-            onClick={onClick}
-            data-testid="temperature-cell"
-            style={{
-              ...(value ? TEMP_PILL[value] : TEMP_NONE),
-              ...(person
-                ? { border: "1px solid currentColor", textTransform: "uppercase", letterSpacing: "0.06em" }
-                : value
-                  ? { border: "1px dashed currentColor", background: "transparent", fontStyle: "italic", fontFamily: "var(--font-geist), system-ui, sans-serif", fontSize: "var(--lp-meta, 13px)" }
-                  : { border: "1px dashed var(--line)", background: "transparent", padding: "3px 7px", borderRadius: 5 }),
-              maxWidth: "100%",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              lineHeight: 1.5,
-              cursor: pending ? "progress" : "pointer",
-              opacity: pending ? 0.6 : 1,
-            }}
-          >
-            {temperatureLabel(temperature)}
-          </button>
-        )}
-      >
-        {(close) => (
-          <>
-            {LANES.map((lane) => (
-              <PopoverItem
-                key={lane}
-                checked={person && value === lane}
-                onSelect={() => {
-                  close();
-                  onSet(lane);
-                }}
-              >
-                {LANE_LABEL[lane]}
-              </PopoverItem>
-            ))}
+    <Popover
+      label={`${leadName}: ${pill ? pill.ariaLabel : NOT_RATED}. ${temperatureTitle(temperature).replace("\n", ". ")}. Set temperature`}
+      width={165}
+      trigger={({ onClick, ref, ...aria }) => (
+        <button
+          {...aria}
+          ref={ref}
+          type="button"
+          title={title}
+          disabled={pending}
+          onClick={onClick}
+          data-testid="temperature-cell"
+          className={`ix-temp${pill ? "" : " ix-temp-empty"}`}
+          data-tone={pill?.tone}
+          data-suggested={pill?.suggested ? "" : undefined}
+          style={{ cursor: pending ? "progress" : "pointer", opacity: pending ? 0.6 : undefined }}
+        >
+          {pill ? pill.text : "Set"}
+        </button>
+      )}
+    >
+      {(close) => (
+        <>
+          {LANES.map((lane) => (
             <PopoverItem
-              muted
-              checked={false}
+              key={lane}
+              checked={person && temperature.value === lane}
               onSelect={() => {
                 close();
-                onSet(null);
+                onSet(lane);
               }}
             >
-              {NOT_RATED}
+              {LANE_LABEL[lane]}
             </PopoverItem>
-          </>
-        )}
-      </Popover>
-    </div>
+          ))}
+          <PopoverItem
+            muted
+            checked={false}
+            onSelect={() => {
+              close();
+              onSet(null);
+            }}
+          >
+            {NOT_RATED}
+          </PopoverItem>
+        </>
+      )}
+    </Popover>
   );
 }
+
+export { temperatureLabel };

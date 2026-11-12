@@ -1,0 +1,101 @@
+/* ============================================================
+   LEADS (item L): the cleaned-up list and board. Tokens only (the page's own `.intake-root` tokens), text 13px and up
+   (14px on a phone), no sideways scroll at 1440, 1280 or 375. The page scrolls; nothing inside it does except a board
+   that has more columns than fit.
+   ============================================================ */
+
+/* The page scrolls (the old rule made the table scroll inside itself). */
+.lx-page > .intake-root { flex: 0 0 auto; min-height: auto; display: flex; flex-direction: column; }
+.intake-root .lp-root { min-width: 0; }
+
+/* ---- chips ---------------------------------------------------------- */
+.ix-sets { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.ix-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.ix-sets .lp-chip, .ix-filters .lp-chip { text-decoration: none; }
+.ix-chip-warn { border-color: var(--warn); color: var(--warn); }
+
+/* ---- the table ------------------------------------------------------ */
+.ix-table { --ix-cols: minmax(0, 2fr) minmax(0, 1.5fr) 104px minmax(0, 1fr) 112px minmax(0, 2fr) 40px; --ix-row-h: 60px; }
+.ix-table.ix-has-owner { --ix-cols: minmax(0, 2fr) minmax(0, 1.5fr) 104px minmax(0, 1fr) 52px 112px minmax(0, 2fr) 40px; }
+.ix-head, .ix-row { display: grid; grid-template-columns: var(--ix-cols); gap: 10px; align-items: center; padding: 0 16px; }
+.ix-head { min-height: 40px; border-bottom: 1px solid var(--line); font-family: var(--font-courier-prime), monospace; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mute); }
+.ix-head button { font: inherit; letter-spacing: inherit; text-transform: inherit; text-align: left; border: 0; background: transparent; padding: 0; color: var(--mute); cursor: pointer; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ix-head button[data-on] { color: var(--ox); }
+.ix-row { height: var(--ix-row-h); border-bottom: 1px solid var(--line); font-size: 13px; cursor: pointer; }
+.ix-row:hover { background: color-mix(in srgb, var(--ox) 4%, transparent); }
+.ix-cell { min-width: 0; overflow: hidden; }
+.ix-name { display: block; font-size: 14px; font-weight: 500; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: inherit; }
+.ix-sub { display: block; font-size: 13px; line-height: 1.4; color: var(--mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ix-stage { display: inline-block; max-width: 100%; padding: 2px 8px; border-radius: 6px; background: var(--surface2); color: var(--ink2); font-size: 13px; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+.ix-stage-warn { background: var(--warnbg); color: var(--warn); }
+.ix-touch { font-family: var(--font-courier-prime), monospace; font-size: 13px; white-space: nowrap; color: var(--mute); }
+.ix-touch[data-in] { color: var(--burg); }
+.ix-next { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 13px; line-height: 1.4; color: var(--ink2); overflow-wrap: anywhere; }
+.ix-next[data-urgent] { color: var(--ox); font-weight: 500; }
+.ix-next[data-muted] { color: var(--mute); }
+.ix-next-wrap { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ix-next-wrap .ix-next { flex: 1; min-width: 0; }
+.ix-err { padding: 6px 16px; font-size: 13px; color: var(--crit); background: var(--critbg); border-bottom: 1px solid var(--line); }
+.ix-foot { padding: 10px 16px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; border-top: 1px solid var(--line); font-size: 13px; color: var(--mute); }
+.ix-more { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 8px; padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+.ix-more:hover { border-color: var(--ox); color: var(--ox); }
+
+/* ---- pills, markers, small buttons ---------------------------------- */
+.ix-temp { display: inline-block; max-width: 100%; padding: 2px 9px; border-radius: 999px; border: 1px solid transparent; font-family: var(--font-geist), system-ui, sans-serif; font-size: 13px; line-height: 1.4; cursor: pointer; background: transparent; white-space: nowrap; }
+.ix-temp[data-tone="hot"] { background: var(--critbg); color: var(--crit); }
+.ix-temp[data-tone="warm"] { background: var(--warnbg); color: var(--warn); }
+.ix-temp[data-tone="cold"] { background: var(--oxbg); color: var(--ox); }
+.ix-temp[data-suggested] { opacity: 0.7; background: transparent; border-color: currentColor; }
+.ix-temp-empty { color: transparent; border-radius: 6px; }
+.ix-row:hover .ix-temp-empty, .ix-temp-empty:focus-visible { color: var(--mute); border-color: var(--line); }
+.ix-icon-btn { border: 1px solid var(--line); background: var(--surface); color: var(--mute); border-radius: 6px; font-size: 15px; line-height: 1; padding: 5px 9px; cursor: pointer; min-width: 32px; }
+.ix-icon-btn:hover { color: var(--ox); border-color: var(--ox); }
+.ix-marker { display: inline-block; max-width: 100%; padding: 1px 7px; border-radius: 5px; background: var(--warnbg); color: var(--warn); font-size: 13px; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ix-marker-auto { background: var(--oxbg); color: var(--ox); }
+.ix-menu-h { display: block; padding: 6px 8px 2px; font-family: var(--font-courier-prime), monospace; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--mute); }
+.ix-menu-scroll { max-height: 260px; overflow: auto; }
+.ix-time-chip { border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; font-family: var(--font-courier-prime), monospace; font-size: 13px; color: var(--mute); }
+
+/* ---- the board ------------------------------------------------------ */
+.intake-root, .intake-root .lp-root, .ix-boardwrap { min-width: 0; max-width: 100%; }
+.ix-board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(148px, 1fr); gap: 8px; align-items: start; overflow-x: auto; padding-bottom: 6px; scrollbar-width: thin; min-width: 0; }
+.ix-col { display: flex; flex-direction: column; gap: 8px; min-width: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 8px; }
+.ix-col[data-over] { border-color: var(--ox); background: var(--cream); }
+.ix-col-head { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ix-col-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; }
+.ix-col-name { font-size: 14px; font-weight: 500; line-height: 1.3; min-width: 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: break-word; }
+.ix-col-count { font-family: var(--font-courier-prime), monospace; font-size: 13px; color: var(--mute); flex: none; }
+.ix-col-badge { align-self: flex-start; padding: 1px 7px; border-radius: 5px; background: var(--warnbg); color: var(--warn); font-size: 13px; line-height: 1.4; }
+.ix-card { display: flex; flex-direction: column; gap: 4px; min-width: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--cream); padding: 8px 9px; cursor: grab; }
+.ix-card[data-selected] { border-color: var(--ox); background: var(--oxbg); }
+.ix-card-top { display: flex; align-items: flex-start; gap: 6px; min-width: 0; }
+.ix-card-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 500; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: break-word; word-break: normal; hyphens: none; color: inherit; }
+.ix-card-foot { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ix-card-foot .ix-touch { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ix-empty-stages { margin-top: 8px; }
+.ix-empty-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.ix-empty-stage { border: 1px dashed var(--line); border-radius: 8px; padding: 6px 10px; font-size: 13px; color: var(--mute); min-width: 0; }
+.ix-empty-stage[data-over] { border-color: var(--ox); color: var(--ox); }
+.ix-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.ix-bulk-note { font-size: 13px; color: var(--warn); }
+
+/* ---- under 640px: each row is a card of about 120px ---------------- */
+@media (max-width: 640px) {
+  .ix-table { --ix-row-h: auto; }
+  .ix-table .ix-head { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); padding: 0; border: 0; }
+  .ix-row { height: auto; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "lead menu" "stage stage" "next next"; row-gap: 6px; padding: 10px 12px; font-size: 14px; }
+  .ix-table.ix-has-owner .ix-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .ix-row > [data-col="lead"] { grid-area: lead; }
+  .ix-row > [data-col="menu"] { grid-area: menu; align-self: start; }
+  .ix-row > [data-col="stage"] { grid-area: stage; display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; }
+  .ix-row > [data-col="next"] { grid-area: next; }
+  .ix-row > [data-col="source"], .ix-row > [data-col="owner"], .ix-row > [data-col="temp"], .ix-row > [data-col="touch"] { display: none; }
+  .ix-phone-meta { display: flex; margin-left: auto; }
+  .ix-row > [data-col="stage"] .ix-stage { flex: 0 1 auto; min-width: 0; }
+  .ix-next { -webkit-line-clamp: 1; font-size: 14px; }
+  .ix-sub, .ix-stage, .ix-marker { font-size: 14px; }
+  .ix-board { grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: minmax(0, 1fr); overflow-x: visible; }
+}
+.ix-phone-meta { display: none; align-items: center; gap: 8px; min-width: 0; }
+
+@media (pointer: coarse) { .ix-icon-btn, .ix-more { min-height: 44px; min-width: 44px; } }

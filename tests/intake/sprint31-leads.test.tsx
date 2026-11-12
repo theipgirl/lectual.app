@@ -10,7 +10,7 @@ import {
   type IntakeSearchParams,
 } from "@/lib/intake/rows";
 import { intakeStages } from "@/lib/intake/scope";
-import { LEADS_VIEW_HINT, leadsSubline } from "@/lib/intake/views";
+import { leadsHeaderLine } from "@/lib/intake/leads-view";
 import { DETAIL_NAMES, detailsNote } from "@/lib/intake/details-note";
 import { COPIED_MS, copyViewLabel, viewUrl } from "@/lib/intake/copy-view";
 import { leadsMoreItems } from "@/lib/intake/more-items";
@@ -56,7 +56,7 @@ function render(leads: Lead[], params: IntakeSearchParams = {}, reads: Reads = {
       members={MEMBERS}
       initialFilters={parseIntakeFilters(params)}
       initialViewState={parseIntakeViewState(params)}
-      time={null}
+      time={{ weekStartIso: NOW.toISOString(), byLeadId: {}, running: null }}
       now={NOW.toISOString()}
       {...(reads as object)}
     />,
@@ -64,14 +64,13 @@ function render(leads: Lead[], params: IntakeSearchParams = {}, reads: Reads = {
 }
 
 describe("the Leads sub-line", () => {
-  const counts = { inIntake: 25, needFirstReply: 6, unassigned: 3 };
+  const row = (assigned: boolean, replied = false) => ({ lead: { assigned_to: assigned ? "u" : null }, reply: replied ? "replied" : "unknown" }) as never;
 
-  it("folds the former status strip into one short sentence per view", () => {
-    expect(leadsSubline(counts, { board: false, group: "stage" })).toBe("25 leads · 6 need a first reply · 3 unassigned. Newest activity first.");
-    expect(leadsSubline(counts, { board: true, group: "stage" })).toContain(LEADS_VIEW_HINT.stage);
-    expect(LEADS_VIEW_HINT.stage).toBe("Drag a card to move it, or use the stage menu on the card.");
-    expect(leadsSubline(counts, { board: true, group: "owner" })).toContain("Leads with no owner are in the first column.");
-    expect(leadsSubline({ inIntake: 1, needFirstReply: 0, unassigned: 0 }, { board: false, group: "stage" })).toMatch(/^1 lead · /);
+  it("is one short sentence for every view (changed on purpose: no 'Newest activity first', no drag hint)", () => {
+    const rows = [row(true, true), row(false), row(false)];
+    expect(leadsHeaderLine("working", rows)).toBe("3 working leads · 1 need a first reply · 2 unassigned");
+    expect(leadsHeaderLine("open", [row(false)])).toBe("1 open lead · 0 need a first reply · Nobody is assigned yet");
+    expect(leadsHeaderLine("lost", [])).toBe("0 lost leads · 0 need a first reply");
   });
 });
 
@@ -115,11 +114,10 @@ describe("one note for the side reads that did not land", () => {
 });
 
 describe("the arrows, the temperature words and the copy button", () => {
-  it("prints the arrow legend beside the Last touch column header and no footer legend", () => {
+  it("no longer prints the arrow legend (changed on purpose): each arrow carries a title and a hidden label", () => {
     const html = render([lead("a", "Ana")]);
-    expect(html).toMatch(/aria-label="Sort by Last touch"[^>]*>Last touch[^<]*<\/button><span class="lp-legend" data-arrow-legend="true">← waiting on us, → waiting on them<\/span>/);
-    expect(html.match(/waiting on us, → waiting on them/g)).toHaveLength(1);
-    expect(html).not.toContain("waiting on us · → waiting on them");
+    expect(html).not.toContain("data-arrow-legend");
+    expect(html).not.toContain("waiting on us, → waiting on them");
   });
 
   it("gives each row's arrow a title and a visually hidden label", () => {
@@ -131,7 +129,8 @@ describe("the arrows, the temperature words and the copy button", () => {
   it("uses the exact temperature tooltip and calls the no-rating level Not rated", () => {
     const html = render([lead("a", "Ana")]);
     expect(html).toContain(`title="${TEMPERATURE_TOOLTIP.replace(/'/g, "&#x27;")}"`);
-    expect(html).toContain(">Not rated<");
+    // No pill for an unrated lead (changed on purpose); the button's accessible name still says Not rated.
+    expect(html).toContain("Not rated");
     expect(html).not.toContain("Not routed");
   });
 
@@ -155,7 +154,8 @@ describe("empty states", () => {
 
   it("filtered to nothing: the sentence and a Clear filters button", () => {
     const html = render([lead("a", "Ana")], { q: "zzzz" });
-    expect(html).toContain(NO_LEAD_MATCHES);
+    expect(html).toContain("No lead matches these filters in All open.");
+    expect(NO_LEAD_MATCHES).toBe("No lead matches these filters.");
     expect(html).toContain('data-empty="filtered"');
     expect(html).toMatch(/<button type="button" class="lp-clear">Clear filters<\/button>/);
   });
@@ -169,12 +169,13 @@ describe("More menu items", () => {
 });
 
 describe("the table starts on the first screen (768px tall)", () => {
-  it("above the table there is only the header, one toolbar row and one chip row", () => {
+  it("above the table there is only the header, one toolbar row and two chip rows (the sets, then the filters)", () => {
     const html = render([lead("a", "Ana")]);
     const above = html.slice(0, html.indexOf('class="lp-panel"'));
     expect(above.match(/class="lp-header"/g)).toHaveLength(1);
     expect(above.match(/class="lp-toolbar"/g)).toHaveLength(1);
-    expect(above.match(/class="lp-chips"/g)).toHaveLength(1);
+    expect(above.match(/class="ix-sets"/g)).toHaveLength(1);
+    expect(above.match(/class="ix-filters"/g)).toHaveLength(1);
     // Nothing else is stacked up there: no status strip, no warning lines while every read is fine.
     expect(above).not.toContain("intake-statusline");
     expect(above).not.toContain("data-details-note");
