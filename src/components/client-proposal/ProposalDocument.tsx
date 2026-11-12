@@ -6,6 +6,7 @@ import {
   DESCRIBE_BEFORE_ACCEPT,
   MAX_CLIENT_TEXT_CHARS,
   clientAddMax,
+  quoteForAcceptance,
   quoteWithClientClasses,
   type ClientAddedEntry,
   type ClientClassInput,
@@ -307,6 +308,15 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
     [mode, acceptedQuote, priced],
   );
   const display = useMemo(() => markDisplayPrices(shown, shownSelection), [shown, shownSelection]);
+  // What a SIGNING is made over. The letter's Exhibit A, and so the fingerprint the page sends, must be built from exactly what
+  // the server will sign: the same content with the client's own class words CLEANED the way the server cleans them
+  // (`quoteForAcceptance`, the function the accept path calls). The cards above show what the client typed as typed; the
+  // exhibit shows it as it will be stored, so a class description with a double or trailing space can never read as "stale".
+  const signBasis = useMemo(() => {
+    if (mode === "accepted") return { content: shown, quote };
+    const basis = quoteForAcceptance(content, selection, { entries, added });
+    return basis.ok ? { content: basis.content, quote: basis.quote } : { content: shown, quote };
+  }, [mode, content, selection, entries, added, shown, quote]);
   // Engagement letter: a proposal whose content carries one adds Your details, the letter and signing to today's page.
   // Content without `loe` runs none of it and renders exactly as before.
   const loeBlock = typeof content.loe?.body === "string" && content.loe.body.length > 0 ? { title: content.loe.title || LETTER_HEADING, body: content.loe.body } : null;
@@ -315,8 +325,8 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
     clientName: clientName ?? "",
     company: content.client?.company ?? "",
     letter: letter ?? null,
-    shown,
-    quote,
+    shown: signBasis.content,
+    quote: signBasis.quote,
     initialStep: props.initialLoe?.step,
     initialDetails: props.initialLoe?.details,
     initialTypedName: props.initialLoe?.typedName,

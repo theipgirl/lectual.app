@@ -544,6 +544,13 @@ export const SIGNED_DOWNLOAD_NOT_ALLOWED = "Your role can't download the signed 
 export function signedSummaryLine(name: string, when: string): string {
   return when ? `Signed by ${name} on ${when}` : `Signed by ${name}`;
 }
+/**
+ * The check an assistant's or Copilot's draft carries when the firm's engagement letter couldn't be read as the draft was made
+ * (drawn in the editor's "Ready to send?" list, linked to the Engagement letter section). The same opening words a person gets
+ * from the from-scratch door, which creates nothing in that case.
+ */
+export const LETTER_NOT_ATTACHED_CHECK =
+  "Couldn't read your engagement letter when this draft was made, so it isn't attached. Turn it on in the Engagement letter section and save.";
 /** Shown on the staff card when the signed PDF is produced from the stored signed text rather than rebuilt. */
 export const SIGNED_FROM_STORED_TEXT =
   "This copy is produced from the stored signed text: the exact words that were signed, as plain paragraphs. Its fingerprint matches that text.";

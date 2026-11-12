@@ -7,7 +7,7 @@ import { runAcceptanceFollowups, type FollowupDb } from "./accept-followups";
 import { firmDisplayName } from "./commitment";
 import { contactLine, firmContactFromSignoff } from "./firm-contact";
 import { isProposalExpired } from "./expiry";
-import { DESCRIBE_BEFORE_ACCEPT, parseClientClassInput, quoteWithClientClasses } from "./client-classes";
+import { DESCRIBE_BEFORE_ACCEPT, quoteForAcceptance } from "./client-classes";
 import { money } from "@/components/client-proposal/format";
 import { SIGN_MESSAGES } from "@/lib/loe/client-words";
 import { agreementTextSha256, canonicalFingerprint } from "@/lib/loe/fingerprint";
@@ -16,7 +16,7 @@ import { readStoredAgreement, type StoredAgreementDb } from "@/lib/loe/stored-ag
 import { rebuildSignedLetter, type SignedLetter } from "@/lib/loe/signed-letter";
 import { addressJson, assembleAgreement, checkSigning, letterDateText, signedLineText } from "@/lib/loe/signing";
 import { parseInet } from "@/lib/quotes/public";
-import { normalizeSelection, quoteHasItems } from "./pricing";
+import { quoteHasItems } from "./pricing";
 import {
   isWellFormedProposalToken,
   type AcceptedSnapshot,
@@ -697,15 +697,15 @@ export async function acceptPublicProposal(
   if (read.status === "closed") return refuse("closed");
   if (read.handle.storedStatus !== "sent") return refuse("already_resolved");
 
-  const picked = normalizeSelection(read.view.content, selection);
-  // Unknown ids, entries for classes that are not open, adds past a brand name's max (or for a brand
-  // name without one) are dropped; every description is cleaned.
-  const input = parseClientClassInput(read.view.content, clientClasses);
+  // The ticks are normalised. Unknown ids, entries for classes that are not open, adds past a brand name's max (or
+  // for a brand name without one) are dropped; every description is cleaned.
   // One price path: the stored content plus the ticks plus what the client wrote, through the
   // helper the page uses. The result is the EFFECTIVE content (open classes carry the client's
   // words, added classes have server-made ids), and that is what is quoted and stored. A mark
   // ticked with no class is repaired to its first class; one with no class to fall back on is refused.
-  const priced = quoteWithClientClasses(read.view.content, picked, input, { repair: true });
+  // `quoteForAcceptance` is the one function for this, called by the page's letter steps too (so their fingerprint
+  // is over the same cleaned words).
+  const priced = quoteForAcceptance(read.view.content, selection, clientClasses);
   if (!priced.ok) return refuse("nothing_selected");
   const { content, selection: finalSelection, quote } = priced;
   if (priced.missing.length > 0) return refuse("missing_description");

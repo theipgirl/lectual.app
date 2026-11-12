@@ -1,5 +1,6 @@
 import { loeIssues } from "@/lib/loe/validate";
 import type { ApprovedRead } from "@/lib/loe/templates-store";
+import { LETTER_NOT_ATTACHED_CHECK } from "@/lib/ui/words";
 import { withLoeSnapshot } from "./loe-snapshot";
 import { MAX_CONTENT_CHECKS, isGeneralContent, type CheckSource, type ContentCheck, type ProposalContent } from "./types";
 
@@ -26,8 +27,8 @@ import { MAX_CONTENT_CHECKS, isGeneralContent, type CheckSource, type ContentChe
 /** The path of the letter's check: `targetForPath` sends it to the editor's Engagement letter section. */
 export const LETTER_CHECK_PATH = "loe";
 
-export const LETTER_NOT_ATTACHED_CHECK =
-  "Couldn't read your engagement letter when this draft was made, so it isn't attached. Turn it on in the Engagement letter section and save.";
+/** The check's words live with the other words a person reads (`words.ts`); re-exported here for the doors that write it. */
+export { LETTER_NOT_ATTACHED_CHECK };
 
 export type LetterAttach =
   /** The firm's approved letter of this kind is now on the content. */

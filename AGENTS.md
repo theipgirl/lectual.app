@@ -1701,8 +1701,10 @@ anything; `pricing.ts` has no diff; one dependency was added (`pdfkit`, exact-pi
   page yet": it NEVER falls back to the unsigned update for `loe` content. Content without `loe` takes the old path and ignores `signing`.
 - **One normaliser for what a client types.** `cleanTypedName` (the signature name) and `cleanSigningDetails` (the nine details) are the `cleanClientText`
   rules, and BOTH sides call them: the page builds its agreement and its payload only through `pageAgreement` / `pageSigningPayload` (`signing.ts`, the
-  functions `useLoeFlow` calls), the server through `checkSigning`. A double space, a tab or a non-breaking space in a name can therefore never make the two
-  fingerprints disagree. Never clean a typed field with anything else on either side.
+  functions `useLoeFlow` calls), the server through `checkSigning`. The client's own CLASS words feed the exhibit, so they follow the same rule: the page
+  builds what it signs over with `quoteForAcceptance` (`client-classes.ts`: ticks normalised, the client's words cleaned and checked, the selection
+  repaired), the one function the accept path and the letter PDFs call. A double space, a tab or a non-breaking space in a name, an address or a class
+  description can therefore never make the two fingerprints disagree. Never clean a typed field with anything else on either side.
 - **The fingerprint does not cover the date.** `Agreement.canonical` is built from the letter with `{{date}}` and `{{signed_date}}` replaced by a fixed
   placeholder (`FINGERPRINT_DATE`), so a tab opened one day and signed the next still matches. The date in the stored agreement text is the server's (the
   firm's calendar date at signing), `agreement_sha256` is over that final text, and the snapshot's `signing.date_text` records it. The receipt redraws the

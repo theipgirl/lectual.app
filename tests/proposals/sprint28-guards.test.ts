@@ -24,8 +24,13 @@ describe("one price calculation", () => {
 
   it("the page and the accept path both price through quoteWithClientClasses (Spec 3's one effective-content builder)", () => {
     expect(read("src/components/client-proposal/ProposalDocument.tsx")).toContain("quoteWithClientClasses(");
-    expect(read("src/lib/proposals/public.ts")).toContain("quoteWithClientClasses(");
-    expect(read("src/lib/proposals/client-classes.ts")).toContain("quoteProposal(");
+    // The accept path reaches it through `quoteForAcceptance` (one function for the accept path, the letter PDFs and the page's
+    // letter steps, so all three clean and price the same input the same way). It is a thin wrapper and nothing else.
+    expect(read("src/lib/proposals/public.ts")).toContain("quoteForAcceptance(read.view.content, selection, clientClasses)");
+    const helper = read("src/lib/proposals/client-classes.ts");
+    const fn = helper.slice(helper.indexOf("export function quoteForAcceptance"));
+    expect(fn.slice(0, fn.indexOf("\n}\n"))).toContain("return quoteWithClientClasses(content, normalizeSelection(content, selection), parseClientClassInput(content, clientClasses), { repair: true });");
+    expect(helper).toContain("quoteProposal(");
   });
 });
 

@@ -7,7 +7,7 @@ import { canonicalFingerprint } from "@/lib/loe/fingerprint";
 import { buildExhibit } from "@/lib/loe/exhibit";
 import { FINGERPRINT_DATE, checkSigning, cleanTypedName, pageAgreement, pageSigningPayload, type PageSigningState } from "@/lib/loe/signing";
 import { money } from "@/components/client-proposal/format";
-import { quoteWithClientClasses } from "@/lib/proposals/client-classes";
+import { quoteForAcceptance, quoteWithClientClasses } from "@/lib/proposals/client-classes";
 import { defaultSelection, normalizeSelection } from "@/lib/proposals/pricing";
 import { acceptPublicProposal } from "@/lib/proposals/public";
 import type { Row } from "./public-db-double";
@@ -89,6 +89,39 @@ describe("item 3: one normaliser for what a client types", () => {
       expect(r.ok, r.ok ? "" : r.message).toBe(true);
       expect(fresh.rpcCalls[0].args.p_address).toMatchObject({ street: "100 Example Street", city: "Miami" });
     }
+  });
+
+  it("the client's own class words feed the exhibit, and they are cleaned the same way on both sides too", async () => {
+    // Typed into "Add a class" with a leading space, a run of spaces, a tab and a non-breaking space.
+    const typed = { entries: {}, added: { ci: [{ text: `  Gaming   consoles\t${NBSP}`, on: true }] } };
+    const w = world();
+    const b = await browserSigning(w.db, { clientClasses: typed });
+    const r = await acceptPublicProposal(TOKEN, b.selection, NOW, w.db, typed, b.signing);
+    expect(r.ok, r.ok ? "" : r.message).toBe(true);
+    const stored = String(w.rpcCalls[0].args.p_agreement_text);
+    expect(stored).toContain("Gaming consoles");
+    expect(stored).not.toMatch(/Gaming {2,}consoles/);
+    // The page's own agreement text (the exhibit it showed) already held the cleaned words.
+    expect(b.text).toContain("Gaming consoles");
+    expect(b.text).not.toMatch(/Gaming {2,}consoles/);
+
+    // What the page used to do (the exhibit from the words as typed) is NOT what the server signs over: that was the "stale".
+    const content = withLoe(twoBrandPerMark());
+    const selection = normalizeSelection(content, defaultSelection(content));
+    const asTyped = quoteWithClientClasses(content, selection, typed as never);
+    const asSigned = quoteForAcceptance(content, selection, typed);
+    if (!asTyped.ok || !asSigned.ok) throw new Error("no quote");
+    expect(JSON.stringify(buildExhibit(asTyped.content, asTyped.quote, money))).not.toBe(JSON.stringify(buildExhibit(asSigned.content, asSigned.quote, money)));
+  });
+
+  it("the page builds its signing exhibit through the accept path's own function, and the server calls the same one", () => {
+    const page = readFileSync(join(process.cwd(), "src/components/client-proposal/ProposalDocument.tsx"), "utf8");
+    expect(page).toContain("const basis = quoteForAcceptance(content, selection, { entries, added });");
+    expect(page).toMatch(/useLoeFlow\(\{[\s\S]*?shown: signBasis\.content,\s*quote: signBasis\.quote,/);
+    const server = readFileSync(join(process.cwd(), "src/lib/proposals/public.ts"), "utf8");
+    expect(server).toContain("const priced = quoteForAcceptance(read.view.content, selection, clientClasses);");
+    const pdf = readFileSync(join(process.cwd(), "src/lib/proposals/public-letter.ts"), "utf8");
+    expect(pdf).toContain("const priced = quoteForAcceptance(read.view.content, selection, clientClasses);");
   });
 
   it("the page hook builds its agreement and its payload only through the shared pipeline (no trim() of its own)", () => {

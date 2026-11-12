@@ -75,6 +75,16 @@ const SCREENS: Array<[string, () => ProposalDocumentProps]> = [
   ["step2", () => base({ initialLoe: { step: 2 } })],
   ["step3", () => base({ initialLoe: { step: 3, details: TEST_DETAILS, typedName: "Sevetri Wilson", agree: true } })],
   ["receipt", receiptProps],
+  // The live page the moment signing succeeded (no reload): the receipt with the signed download and the server's date.
+  [
+    "just-signed",
+    () =>
+      base({
+        initialLoe: { step: 3, details: TEST_DETAILS, typedName: "Sevetri Wilson", agree: true },
+        initialDone: { payUrl: "https://example.com/pay", opened: true, signedLine: "Signed November 13, 2026 at 10:30 AM EST by Sevetri Wilson", letterDate: "November 13, 2026" },
+        onDownloadSigned: async () => ({ ok: false, message: "x" }),
+      }),
+  ],
 ];
 
 describe("the four screens render with the full letter", () => {

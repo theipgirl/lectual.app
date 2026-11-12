@@ -10,8 +10,7 @@ import { buildVerifiedSignedPdf } from "@/lib/loe/signed-pdf";
 import { reviewAddressLimiter, reviewTokenLimiter } from "@/lib/loe/review-limit";
 import { assembleAgreement, checkSigning, cleanSigningDetails, letterDateText } from "@/lib/loe/signing";
 import { parseInet } from "@/lib/quotes/public";
-import { parseClientClassInput, quoteWithClientClasses } from "./client-classes";
-import { normalizeSelection } from "./pricing";
+import { quoteForAcceptance } from "./client-classes";
 import { readPublicProposal, readSignedSource, type PublicProposalsDb } from "./public";
 import { isSignedSnapshot } from "./signed-state";
 import { isWellFormedProposalToken } from "./types";
@@ -69,8 +68,7 @@ export async function reviewLetterPdf(
   const needed = checkSigning({ details, typedName: details.client_name, agree: true });
   if (!needed.ok) return fail(PDF_MESSAGES.details);
 
-  const picked = normalizeSelection(read.view.content, selection);
-  const priced = quoteWithClientClasses(read.view.content, picked, parseClientClassInput(read.view.content, clientClasses), { repair: true });
+  const priced = quoteForAcceptance(read.view.content, selection, clientClasses);
   if (!priced.ok) return fail(PDF_MESSAGES.unavailable);
 
   const exhibit = buildExhibit(priced.content, priced.quote, money);

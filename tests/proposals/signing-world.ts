@@ -1,7 +1,7 @@
 import { buildExhibit } from "@/lib/loe/exhibit";
 import { pageAgreement, pageSigningPayload, type SignerDetails } from "@/lib/loe/signing";
 import { money } from "@/components/client-proposal/format";
-import { parseClientClassInput, quoteWithClientClasses } from "@/lib/proposals/client-classes";
+import { quoteForAcceptance } from "@/lib/proposals/client-classes";
 import { defaultSelection, normalizeSelection } from "@/lib/proposals/pricing";
 import { readPublicProposal } from "@/lib/proposals/public";
 import { fakeDb, signAndAcceptImpl, type Row } from "./public-db-double";
@@ -51,13 +51,23 @@ export function world(over: { content?: unknown; proposal?: Row; token?: string;
  */
 export async function browserSigning(
   db: ReturnType<typeof world>["db"],
-  over: { details?: SignerDetails | Record<string, unknown>; typedName?: string; agree?: boolean; selection?: Record<string, boolean>; pageDate?: string; readAt?: Date } = {},
+  over: {
+    details?: SignerDetails | Record<string, unknown>;
+    typedName?: string;
+    agree?: boolean;
+    selection?: Record<string, boolean>;
+    pageDate?: string;
+    readAt?: Date;
+    /** What the client wrote in the class boxes, exactly as typed: `{ entries, added }`. */
+    clientClasses?: unknown;
+  } = {},
 ) {
   const read = await readPublicProposal(TOKEN, over.readAt ?? NOW, db);
   if (read.status !== "ok" || !read.view.letter) throw new Error("no letter");
   const content = read.view.content;
   const selection = normalizeSelection(content, { ...defaultSelection(content), ...(over.selection ?? {}) });
-  const priced = quoteWithClientClasses(content, selection, parseClientClassInput(content, undefined), { repair: true });
+  // The page builds what it signs over with `quoteForAcceptance` (ProposalDocument's `signBasis`), the function the server calls.
+  const priced = quoteForAcceptance(content, selection, over.clientClasses);
   if (!priced.ok) throw new Error("no quote");
   const typedName = over.typedName ?? "Sevetri Wilson";
   const state = {
@@ -74,6 +84,8 @@ export async function browserSigning(
   if (!payload) throw new Error("the page could not sign");
   return {
     selection,
+    /** What the client wrote, as typed: posted beside the ticks. */
+    clientClasses: over.clientClasses,
     /** The agreement text as THE PAGE drew it (its own date). The server stamps its own date into what it stores. */
     text: agreement.text,
     pageDate: state.dateText,
