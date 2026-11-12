@@ -483,3 +483,26 @@ export function needsReviewPastDue(days: number): string {
 export function needsReviewCut(shown: number, total: number): string {
   return `Showing the oldest ${shown} of ${total}.`;
 }
+
+/* Claude connector: the consent page (/oauth/consent/) and the tool refusals (/api/mcp/). */
+export const CONSENT_TITLE = "Connect Claude";
+export function consentQuestion(firm: string, you: string): string {
+  return `Allow Claude to use Lectual for ${firm} as ${you}?`;
+}
+export const CONSENT_POINTS: readonly string[] = [
+  "It can read your firm's records that you can see in Lectual.",
+  "It can create drafts. Drafts wait for approval in Lectual, like every other draft.",
+  "It never sends anything to a client or anyone else.",
+  "What it reads appears in your Claude chats, outside Lectual.",
+];
+export const CONSENT_OTHER_FIRM = "Working in another firm? Switch firm in Lectual first, then start again from Claude.";
+export const CONSENT_ALLOW = "Allow";
+export const CONSENT_DENY = "Deny";
+export const CONSENT_MISSING = "This link is missing its request. Start again from Claude.";
+export const CONSENT_EXPIRED = "This request has expired or was already used. Start again from Claude.";
+export const CONSENT_NOT_AVAILABLE = "Claude can't be connected to Lectual from this account. Nothing was approved.";
+export const CONSENT_APP_NOT_ALLOWED = "Only Claude can be connected to Lectual. Nothing was approved.";
+export const CONSENT_FAILED = "Couldn't finish connecting Claude. Nothing was approved. Start again from Claude.";
+/** Every refusal from a Claude connector tool call: one sentence, never which firms have what. */
+export const MCP_TOOL_REFUSED = "Lectual can't answer this from Claude for your account right now.";
+export const MCP_TOOL_FAILED = "Lectual couldn't answer this right now. Try again in a moment.";

@@ -70,6 +70,14 @@ import { getScopedClient } from "@/lib/db/scoped-client";
  *                      what is DRAWN; every page and action keeps its own gate. Off
  *                      (the default) = today's shell for everyone. Kept out of the
  *                      Settings -> Features list on purpose: Lectual turns it on.
+ *  - `claude-connector` A ROLLOUT SWITCH like `role-views`: with it on, the firm's
+ *                      members may connect Claude to Lectual (the consent page
+ *                      /oauth/consent/ and every /api/mcp/ tool call check it). Off
+ *                      (the default) = nothing can be approved and every tool
+ *                      call is refused. Turned on only after the firm owner agrees
+ *                      to client information appearing in Claude chats
+ *                      (docs/plans/2026-11-12-lectual-mcp-connector.md). Kept out
+ *                      of the Settings -> Features list on purpose.
  */
 export type OrgModule =
   | "litigation"
@@ -80,7 +88,8 @@ export type OrgModule =
   | "mailbox"
   | "agents"
   | "proposals"
-  | "role-views";
+  | "role-views"
+  | "claude-connector";
 
 /**
  * Modules on the caller's ACTIVE org. Read through the RLS-scoped client, so

@@ -79,6 +79,9 @@ const fieldSchemas = {
   // Must match the Zoom app's registered redirect exactly. Unset = derived
   // from the request origin: <origin>/api/meetings/zoom/callback/.
   ZOOM_OAUTH_REDIRECT_URI: z.string().optional(),
+  // Claude connector (src/lib/mcp/redirects.ts): the OAuth redirect URIs the consent page may approve,
+  // comma-separated exact URLs. Unset = Claude's two callbacks only. Anything else is refused.
+  MCP_ALLOWED_REDIRECTS: z.string().optional(),
   // Set by Vercel itself (host only, no scheme). Last-resort site address when
   // a call has no request and SITE_URL is unset; see src/lib/site-origin.ts.
   VERCEL_PROJECT_PRODUCTION_URL: z.string().optional(),
