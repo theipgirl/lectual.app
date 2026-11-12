@@ -1798,8 +1798,8 @@ anything; `pricing.ts` has no diff; one dependency was added (`pdfkit`, exact-pi
   `loadStaffFirmFacts`, `firmLetterFacts` and the public read's `firm.slug`). `next.config.ts` lists the file beside the fonts for `/p/*` and `/dashboard/proposals/*`.
   The cream logo is for dark backgrounds and is never used on a letter. A new firm's logo is a new entry in `letter-logo.ts` plus its `/brand/` file, nothing else.
   In `LoeLetterPanel` the panel's title comes first and the logo directly above the letter's own first paragraph. RPB's template
-  (`docs/rpb/engagement-letter-trademark.md`) no longer has an "RPB Law, PLLC" first line (the logo names the firm) and carries style markers for
-  the Word letter's layout: centred small address line with a thick rule, bold-underlined "Via Email" line, centred bold "Re:" line, indented
+  (`docs/rpb/engagement-letter-trademark.md`) keeps "RPB Law, PLLC" as its first line, centred and bold directly under the logo (Taylor, Nov 12),
+  and carries style markers for the Word letter's layout: centred small address line with a thick rule, bold-underlined "Via Email" line, centred bold "Re:" line, indented
   signature block.
 - **RPB's footer line reads "RPB Law Firm, PLLC"** (both documents). The footer is drawn on every state (every step, the receipt, letter and no-letter,
   trademark and flat fee); `tests/client-proposal/footer-name.test.tsx` renders each. The letter text itself (the firm's own, in the database) is not ours to change.
