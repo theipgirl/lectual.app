@@ -1988,3 +1988,12 @@ Four bugs the owner hit on a draft's edit page (`/dashboard/proposals/<id>/`). N
   `tests/proposal-editor/package-includes-e2e.test.tsx` and needed no fix. A live ("Link live") version's includes table is inside the disabled
   fieldset with no Add row / Remove, and a browser posts none of it (same test). The preview shows only the CHOSEN package's column (default Enhanced),
   so an edit to another package shows once that package is chosen in the preview.
+- **Sign fields, address inputs, quoted marks (Nov 12, no schema).** Step 3's two controls (typed name, "I have read and agree") are marked `*`, `required` and
+  `aria-required`; the disabled sign button is described (`aria-describedby="cp-sign-need"`) by `SIGN_REQUIRED_NOTE` ("Type your full legal name and tick the box to sign."),
+  drawn only while `canSign` is false. `canSign` / `checkSigning` are unchanged (the server still refuses a missing name or tick). Step 2 groups the address in a
+  `<fieldset>` "Address" (one column on a phone; street, apartment, then city / state / ZIP, then country on a desktop); each input's `name` is its autocomplete token.
+  When the country is the United States (`isUnitedStates`) State is a `<select>` of `US_STATES` (`src/lib/loe/us-states.ts`, the ONE list: 50 + DC + 8 territory and
+  military codes, value = the two-letter code, label "Florida (FL)") and ZIP is `inputmode="numeric"`; otherwise State is free text ("State, province or region"). Stored
+  detail keys and values are unchanged, so the agreement text, fingerprint and Lawmatics address payload are as before. `quotedMark(name)`
+  (`src/lib/proposals/quoted-mark.ts`) wraps a brand name in “ ” on the CLIENT page only (card heading, fee labels, review panel, receipt, editor preview); the letter,
+  Exhibit A, agreement text, `packageLineTitle` (staff page, Lawmatics note), emails and stored content stay plain (pinned by `tests/client-proposal/sign-and-address-fields.test.tsx`).

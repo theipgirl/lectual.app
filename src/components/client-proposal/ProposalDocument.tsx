@@ -42,6 +42,7 @@ import { isGeneralContent } from "@/lib/proposals/types";
 import { GeneralProposalDocument } from "./GeneralProposalDocument";
 import { usptoLine } from "@/lib/proposals/uspto-line";
 import { MARK_PACKAGE_WORDS, packageLineTitle } from "@/lib/proposals/name-package";
+import { quotedMark } from "@/lib/proposals/quoted-mark";
 import { markDisplayPrices } from "./display";
 import { ATTORNEY_FOOTER_LETTER_LINE, DOWNLOAD_REVIEW_LABEL, LETTER_HEADING, LETTER_INTRO, READ_LETTER_FIRST, SIGN_MESSAGES } from "@/lib/loe/client-words";
 import type { LetterPdfResult } from "@/lib/loe/pdf-result";
@@ -692,11 +693,11 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
                     <article className="cp-card" key={nm.id} aria-labelledby={`cp-h-${nm.id}`}>
                       <div className="cp-card-h">
                         <div>
-                          <h3 id={`cp-h-${nm.id}`}>{nm.name}</h3>
+                          <h3 id={`cp-h-${nm.id}`}>{quotedMark(nm.name)}</h3>
                           {nm.what ? <p className="cp-what">{nm.what}</p> : null}
                         </div>
                         <div className="cp-sub">
-                          <span className="cp-k">Legal fee for {nm.name}</span>
+                          <span className="cp-k">Legal fee for {quotedMark(nm.name)}</span>
                           <span className="cp-v cp-num">{money(qn?.legal_cents ?? 0)}</span>
                         </div>
                       </div>
@@ -731,7 +732,7 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
                             </>
                           )}
                           <p className="cp-how-add" id={`cp-pkg-${nm.id}-terms`}>
-                            {qn?.included ? `${offer.package}: ${money(qn.legal_cents)} legal fee for ${nm.name}` : offer.package}
+                            {qn?.included ? `${offer.package}: ${money(qn.legal_cents)} legal fee for ${quotedMark(nm.name)}` : offer.package}
                             {qn?.included && qn.discount_cents ? ` (after ${Math.round(nm.discount_pct ?? 0)}% off)` : ""}
                             {qn?.included && qn.custom_discount_cents ? " (after the discount below)" : ""}
                             {` · ${packageTermsWords(namePr)}`}
@@ -993,7 +994,7 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
                             </button>
                           ) : (
                             <p className="cp-how-add" role="status">
-                              You can add up to {plural(addMax, "class", "classes")} for {nm.name}.
+                              You can add up to {plural(addMax, "class", "classes")} for {quotedMark(nm.name)}.
                             </p>
                           )}
                         </div>
@@ -1001,7 +1002,7 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
 
                       {!readOnly && pickedMarks > 0 && pickedClasses === 0 ? (
                         <p className="cp-warn" role="status">
-                          Please select at least one class to include {nm.name}.
+                          Please select at least one class to include {quotedMark(nm.name)}.
                         </p>
                       ) : null}
                       {holdsLast ? (
@@ -1122,7 +1123,7 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
                 <div className="cp-lines">
                   {quote.names.map((qn) => (
                     <div className="cp-grp" key={qn.id}>
-                      <h3>{packageLineTitle(qn)}</h3>
+                      <h3>{packageLineTitle({ ...qn, name: quotedMark(qn.name) })}</h3>
                       {qn.included ? (
                         qn.marks.map((m) => (
                           <div className="cp-ln" key={m.id}>
