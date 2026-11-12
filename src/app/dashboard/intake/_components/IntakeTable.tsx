@@ -155,11 +155,6 @@ export default function IntakeTable({
                     <span className="ix-sub" title={business || undefined}>
                       {business || "—"}
                     </span>
-                    {duplicates[lead.id] && (
-                      <a className="ix-marker ix-marker-dup" data-duplicate href={`/dashboard/leads/${duplicates[lead.id].leadId}/`} title={duplicateTitle(duplicates[lead.id])}>
-                        {LEADS_DUPLICATE}
-                      </a>
-                    )}
                     {movedOut?.has(lead.id) && (
                       <span className="ix-marker ix-marker-quiet" data-moved title={LEADS_MOVED_MARK_TITLE}>
                         {LEADS_MOVED_MARK}
@@ -176,6 +171,12 @@ export default function IntakeTable({
                     <span className="ix-marker" data-needs-decision title={needsStageTitle(decision)}>
                       {LEADS_NEEDS_STAGE}
                     </span>
+                  )}
+                  {decision && duplicates[lead.id] ? " " : null}
+                  {duplicates[lead.id] && (
+                    <a className="ix-marker ix-marker-dup" data-duplicate href={`/dashboard/leads/${duplicates[lead.id].leadId}/`} title={duplicateTitle(duplicates[lead.id])}>
+                      {LEADS_DUPLICATE}
+                    </a>
                   )}
                   <span className="ix-phone-meta">
                     {pill && (
