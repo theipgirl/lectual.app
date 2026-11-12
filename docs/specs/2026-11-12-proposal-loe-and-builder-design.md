@@ -103,6 +103,14 @@ LOE needs its own review. Taylor decided those on Nov 12 (section 3).
 
 ### 4.3 What the client does
 
+Two rules from Taylor (Nov 12, after the first mockup):
+
+- **The proposal keeps its look.** The steps are added to today's page. The totals panel on the
+  right stays in view on every step and keeps updating, and "what the package includes" stays
+  on the page.
+- **The letter is the full letter.** Every paragraph, in order, nothing shortened or cut off, on
+  the page, in the print view and in the signed file.
+
 Four steps on the same page, same link, same domain:
 
 1. **Choose.** As today. A link, "Read the engagement letter first", shows the letter at any

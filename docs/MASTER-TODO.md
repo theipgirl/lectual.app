@@ -15,7 +15,7 @@ Spec: `docs/specs/2026-11-12-proposal-loe-and-builder-design.md`
 - [ ] Copy the session recap into the Obsidian second brain (`docs/recaps/2026-11-12-loe-on-proposal-plan.md`). This cloud session can't reach the vault; sharing the vault folder through the desktop app (Settings, Claude Code, Remote Control) would let a session write it directly.
 - [ ] Decide: may the owner still delete a proposal that has a signed engagement letter? (Recommended: yes, with a warning.)
 - [ ] Show Rebecca the mockup and get from her:
-  - [ ] the clean engagement letter text, trademark and general (the copy Dawn has holds a prior client's data);
+  - [ ] her read and OK of the full trademark letter as it will appear: `docs/rpb/engagement-letter-trademark.md` (her Nov 9 letter with the client details turned into fill-in fields; the four changes are listed at the top). The general (flat-fee) letter text is still needed from her;
   - [ ] her OK that a typed full name is an acceptable signature for her engagement letters;
   - [ ] replacement wording for the two client-page lines that no longer fit (spec 4.7);
   - [ ] which details the letter needs from the client (legal name, business, address, title);

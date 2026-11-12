@@ -28,6 +28,10 @@ session: once the plan is written, start a workflow and the PGE pipeline to buil
 3. Rebecca approves the letter wording once; no approval step per client.
 4. Editor work and letter work are built at the same time.
 5. Start the build with a workflow and PGE.
+6. After seeing the mockup: the client proposal keeps its look (the total on the right on every
+   step, and what the package includes), and the engagement letter is shown in full. Both are
+   now pass/fail requirements of Sprint 4, and the full letter is in
+   `docs/rpb/engagement-letter-trademark.md` for Rebecca to confirm.
 
 ## What was produced
 
