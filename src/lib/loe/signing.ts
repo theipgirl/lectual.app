@@ -141,7 +141,7 @@ export function letterValues(i: LetterInputs): LoeValues {
 export type Agreement = {
   blocks: LetterBlock[];
   exhibit: Exhibit;
-  /** The letter and the exhibit as plain text: what the signature row stores and the sha256 covers. */
+  /** The letter and the exhibit as plain text (words only, no styles): what the signature row stores and the sha256 covers. */
   text: string;
   /**
    * The canonical string that is hashed into the fingerprint the page sends and the server compares. It is built from the letter
@@ -170,9 +170,18 @@ export function assembleAgreement(input: { body: string; inputs: LetterInputs; e
       blocks: letter.blocks,
       exhibit: input.exhibit,
       text: agreementText(letter.blocks, input.exhibit),
-      canonical: agreementCanonical({ letter: undated.blocks, details: input.inputs.details, exhibit: input.exhibit }),
+      canonical: agreementCanonical({ letter: wordsOnly(undated.blocks), details: input.inputs.details, exhibit: input.exhibit }),
     },
   };
+}
+
+/**
+ * The blocks as words only: each paragraph's lead-in and text, never its drawing style (`letter-styles.ts`). The canonical form
+ * (and so the fingerprint the page and the server compare) covers what the letter SAYS; a letter with no style markers gives
+ * exactly the canonical form it gave before styles existed. `agreementText` reads only `lead` and `text` too.
+ */
+export function wordsOnly(blocks: readonly LetterBlock[]): Array<{ lead: string | null; text: string }> {
+  return blocks.map((b) => ({ lead: b.lead, text: b.text }));
 }
 
 /** What the PAGE holds while a client fills in the steps: raw typed values, exactly as the inputs hold them. */
@@ -227,7 +236,7 @@ export async function pageSigningPayload(state: PageSigningState & { agree: bool
   return { typedName, agree: state.agree, details, fingerprint: await fingerprintOf(agreement) };
 }
 
-/** Every paragraph in order (bold lead-in first), then Exhibit A. Deterministic. */
+/** Every paragraph in order (bold lead-in first), then Exhibit A. Words only: a paragraph's style is never part of it. Deterministic. */
 export function agreementText(blocks: readonly LetterBlock[], exhibit: Exhibit): string {
   const paras = blocks.map((b) => (b.lead ? `${b.lead} ${b.text}` : b.text));
   return `${paras.join("\n\n")}\n\n${exhibitLines(exhibit).join("\n")}`;

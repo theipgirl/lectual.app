@@ -1,4 +1,5 @@
 import { LOE_MAX_BODY, LOE_MAX_TITLE, findMergeFields } from "./fields";
+import { letterStyleProblems } from "./letter-styles";
 
 /**
  * Template and content rules for the engagement letter. Pure; every problem is
@@ -26,6 +27,8 @@ export function validateTemplate(input: { title: unknown; body: unknown }): Lett
       out.push({ path: "body", message: `{{${name}}} is not a merge field. Use only the ones listed below the letter.` });
     }
     if (unclosed) out.push({ path: "body", message: "The letter has a {{ or }} that does not close." });
+    // A style marker the software doesn't know is an error too (fail closed): Approve refuses it, the preview shows it.
+    for (const message of letterStyleProblems(body)) out.push({ path: "body", message });
   }
   return out;
 }
@@ -53,6 +56,9 @@ export function loeIssues(loe: unknown, proposalKind: "trademark" | "general"): 
     const { fields, unclosed } = findMergeFields(l.body);
     if (fields.some((f) => !f.allowed) || unclosed) {
       out.push({ path: "loe.body", message: "The engagement letter has a merge field that does not exist." });
+    }
+    if (letterStyleProblems(l.body).length > 0) {
+      out.push({ path: "loe.body", message: "The engagement letter has a paragraph style that does not exist." });
     }
   }
   if (l.template_id != null && typeof l.template_id !== "string") {

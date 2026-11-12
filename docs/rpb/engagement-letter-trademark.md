@@ -6,7 +6,26 @@ reasons: so the build is tested against the real, full-length letter, and so it 
 into Settings, Proposals, "Engagement letter" once Rebecca has confirmed it.
 
 **Rebecca must read and approve this text before any client sees it.** Nothing here was
-rewritten. The only changes from the November 9 letter are:
+rewritten.
+
+**Formatting change (November 12, 2026).** The letter now carries the layout of the Word letter.
+Exactly this changed in the text below the line, and no word of the letter:
+
+- The first line, "RPB Law, PLLC", is removed: the RPB logo is drawn above the letter and names the firm.
+- Seven style markers were added, each on its own line at the start of a paragraph. They are
+  instructions to the software, never printed, and they are not part of the signed text:
+  - `{center, small, rule-below}` before the address line (centred, smaller, a thick rule under it);
+  - `{bold-underline-first-line}` before "Via Email: ..." (that first line in bold, underlined);
+  - `{center, bold, space-before}` before "Re: Letter of Engagement for Legal Services";
+  - `{indent}` before "Sincerely yours,";
+  - `{indent, space-before}` before "Rebecca P. Beliard, Esq.";
+  - `{space-before}` before "ACKNOWLEDGED AND AGREED TO:" and before the signer's entity line.
+
+The styles a marker may name are: center, bold, small, indent, rule-below,
+bold-underline-first-line, space-before (`src/lib/loe/letter-styles.ts`). Anything else is
+refused in Settings.
+
+The changes from the November 9 letter are:
 
 1. The client's name, company, address, email, the dates and the signature tag became merge
    fields in double braces.
@@ -20,16 +39,18 @@ Everything below the line is the letter.
 
 ---
 
-RPB Law, PLLC
+{center, small, rule-below}
 333 S.E. 2nd Avenue Suite 2000, Miami, FL 33131 | (305) 712-6960 | info@rpblawfirm.com
 
 {{date}}
 
+{bold-underline-first-line}
 Via Email: {{client_email}}
 Attention: {{client_name}}
 {{entity_name}}
 {{address_block}}
 
+{center, bold, space-before}
 Re: Letter of Engagement for Legal Services
 
 Dear {{client_name}}:
@@ -76,12 +97,16 @@ If we elect to terminate our representation, you will timely take all steps reas
 
 By signing this agreement, I confirm that I have read this engagement agreement, understand its provisions, and agree to abide by it.
 
+{indent}
 Sincerely yours,
 
+{indent, space-before}
 Rebecca P. Beliard, Esq.
 
+{space-before}
 ACKNOWLEDGED AND AGREED TO:
 
+{space-before}
 {{entity_name}}
 
 By: {{signer_name}}

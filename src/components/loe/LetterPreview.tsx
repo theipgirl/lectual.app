@@ -1,6 +1,7 @@
 import type { LetterLogo } from "@/lib/loe/letter-logo";
 import { SAMPLE_VALUES } from "@/lib/loe/fields";
 import { renderLetter } from "@/lib/loe/render";
+import { LetterParagraph } from "./LetterParagraph";
 import { LETTER_PREVIEW_HEADING, LETTER_PREVIEW_NOTE } from "@/lib/ui/words";
 
 /**
@@ -25,11 +26,7 @@ export function LetterPreview({ body, logo }: { body: string; logo?: LetterLogo 
             <img className="loe-preview-logo" src={logo.src} alt={logo.alt} width={984} height={168} />
           ) : null}
           {result.blocks.map((block, i) => (
-            <p key={i}>
-              {block.lead ? <strong>{block.lead}</strong> : null}
-              {block.lead && block.text ? " " : null}
-              {block.text}
-            </p>
+            <LetterParagraph key={i} block={block} variant="staff" />
           ))}
         </div>
       ) : (

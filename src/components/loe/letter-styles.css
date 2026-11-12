@@ -1,0 +1,17 @@
+/*
+ * Paragraph styles of the engagement letter (`src/lib/loe/letter-styles.ts`), shared by every web view of a letter: the client
+ * page (.cp-letter), the editor's Preview (.pe-letter-paper) and Settings' preview (.loe-preview-paper). Each class is one style a
+ * firm wrote in its template. Spacing uses padding (never margin) so each view's own paragraph margins stay as they are.
+ */
+.loe-s-center { text-align: center; }
+.loe-s-bold { font-weight: 700; }
+.loe-s-small { font-size: 0.875em; }
+/* About a third of the page (2.25in on paper); a narrow screen gets less. */
+.loe-s-indent { padding-left: min(2.25in, 30%); }
+.loe-s-rule-below { border-bottom: 3px solid currentColor; padding-bottom: 8px; }
+.loe-s-space-before { padding-top: 1.2em; }
+.loe-s-bold-underline-first-line .loe-s-first-line { font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+
+/* A centred line or a full-width rule spans the whole letter, not the reading measure the client page sets on paragraphs. */
+.cp-root .cp-letter-p.loe-s-center,
+.cp-root .cp-letter-p.loe-s-rule-below { max-width: none; }
