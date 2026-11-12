@@ -9,7 +9,10 @@ Spec: `docs/specs/2026-11-12-proposal-loe-and-builder-design.md`
 
 ### Taylor
 
-- [ ] Read the spec and say go (or what to change).
+- [x] Say go. Done Nov 12: the build is running (six sprints, two tracks, PGE as a workflow).
+- [ ] Look at the mockup and the spec; anything to change can still go into a later sprint. Mockup: https://claude.ai/artifact/S6dcsicKW5iBFFYE1mgeoM
+- [ ] Check each merged sprint on a preview at desktop and phone width. The build environment has no database or live app, so nothing has been seen in a real browser.
+- [ ] Copy the session recap into the Obsidian second brain (`docs/recaps/2026-11-12-loe-on-proposal-plan.md`). This cloud session can't reach the vault; sharing the vault folder through the desktop app (Settings, Claude Code, Remote Control) would let a session write it directly.
 - [ ] Decide: may the owner still delete a proposal that has a signed engagement letter? (Recommended: yes, with a warning.)
 - [ ] Show Rebecca the mockup and get from her:
   - [ ] the clean engagement letter text, trademark and general (the copy Dawn has holds a prior client's data);
@@ -25,9 +28,10 @@ Spec: `docs/specs/2026-11-12-proposal-loe-and-builder-design.md`
 
 ### Claude, next session
 
-- [ ] Write the task-level implementation plan for sprints E1 and L1.
-- [ ] Start Track 1 (E1 editor) and Track 2 (L1 migration and letter settings) in parallel after Taylor's go.
-- [ ] Rewrite the two lectual-plugin skills that still say "payment first" (`draft-engagement-letter`, `process-consult`).
+- [x] Write the sprint plan and start both tracks (running).
+- [ ] When the pipeline reports: read the final security review and the isolation audit of 0106, fix what they find, then apply 0106 to lectual-dev and check it with SQL in a rolled-back transaction.
+- [ ] Review the rewritten lectual-plugin skills (`draft-engagement-letter`, `process-consult`) before pushing them.
+- [ ] Clean up the two build worktrees (`/home/user/wt/editor`, `/home/user/wt/loe`) and their local branches when the last merge is in.
 
 ### Omi cross-check (2026-11-12)
 

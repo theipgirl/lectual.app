@@ -159,8 +159,7 @@ is signed.
 - It goes when its proposal is deleted. Only the owner can delete a proposal (0102), and the
   confirm text will say the signed letter's record goes too. By then the signed letter is also
   filed in Lawmatics (4.6). **Open for Taylor:** keep this, or refuse to delete a signed proposal.
-- The same migration adds `client_proposal_loe_template` (4.1) and the value `copilot` to the
-  proposal `source` check (5.3).
+- The same migration adds `client_proposal_loe_template` (4.1).
 - Privileged content: never logged. Isolation cases for both tables go in
   `lectual/tests/tenant-isolation.test.ts`. Applied to dev first, then prod with Taylor's OK.
 
@@ -229,8 +228,9 @@ itself; hidden when Copilot isn't switched on), Start from scratch.
 
 ### 5.3 Telling them apart
 
-`client_proposal.source` gains `copilot` (0106). The editor header says "Made by the assistant
-from the Nov 10 consult", "Made with Copilot" or nothing. Things to check appear in the
+The content carries `made_by` (`assistant`, `copilot` or `person`), never shown to the client,
+so this needs no database change. The editor header says "Made by the assistant from the
+Nov 10 consult", "Made with Copilot" or nothing. Things to check appear in the
 editor's checklist with a link to the field they are about.
 
 A new firm setting, in the proposals settings: "New proposals offer" one package, or a choice
