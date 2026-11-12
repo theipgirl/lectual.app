@@ -168,7 +168,7 @@
 .lx-ready-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--cream); flex: 0 0 auto; margin-left: 6px; }
 .lx-rail-item.is-active .lx-ready-dot,
 .lx-mbar-item.is-active .lx-ready-dot { background: var(--ox); }
-.lx-ready-dot--bar { position: absolute; top: -3px; right: -5px; margin: 0; }
+.lx-ready-dot--bar { position: absolute; top: -3px; left: -5px; right: auto; margin: 0; } /* top-left: the count badge keeps the top-right corner */
 /* Collapsed rail: the open-rail dot (after the label) is clipped, so the dot goes on the icon in place of the count dot. */
 .lx-rail--owner .lx-rail-dot.is-ready { background: var(--cream); box-shadow: none; width: 7px; height: 7px; }
 .lx-rail--owner:not(:hover):not(.is-pinned):not(:has(:focus-visible)) .lx-ready-dot { display: none; }
