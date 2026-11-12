@@ -292,9 +292,9 @@ describe("reads", () => {
     const db = { from: () => ({ select: () => ({ in: () => ({ or: () => ({ order: () => ({ range: async () => ({ data: [], error: null }) }) }) }), not: () => ({ order: () => ({ range: async () => ({ data: [], error: null }) }) }), eq: () => ({ not: () => ({ gte: () => ({ order: () => ({ range: async () => ({ data: [], error: null }) }) }) }) }) }) }) } as never;
     const base = { leadIds: ["a"], approvals: { status: "ok", byLead: {} } as never };
     const deps = { db, now: NOW, readProposals: async () => [] };
-    expect((await loadWorkingFacts({ ...base, mailboxOn: false, mailboxUnknown: true }, deps)).consults).toEqual({ status: "unavailable" });
-    expect((await loadWorkingFacts({ ...base, mailboxOn: false }, deps)).consults).toEqual({ status: "skipped" });
-    expect((await loadWorkingFacts({ ...base, mailboxOn: true }, deps)).consults).toEqual({ status: "ok", leadIds: new Set() });
+    expect((await loadWorkingFacts({ stages: [], ...base, mailboxOn: false, mailboxUnknown: true }, deps)).consults).toEqual({ status: "unavailable" });
+    expect((await loadWorkingFacts({ stages: [], ...base, mailboxOn: false }, deps)).consults).toEqual({ status: "skipped" });
+    expect((await loadWorkingFacts({ stages: [], ...base, mailboxOn: true }, deps)).consults).toEqual({ status: "ok", leadIds: new Set() });
   });
 
   it("lost stages are a move destination only while the Lost set is shown, and never a won stage", () => {

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   ACTIVITY_MAX_PAGES,
   ACTIVITY_PAGE,
+  ACTIVITY_SELECT,
   CONSULT_MAX_PAGES,
   readConsultLeadIds,
   REAL_ACTIVITY_FILTER,
@@ -75,11 +76,12 @@ const ids = (n: number) => Array.from({ length: n }, (_, i) => `lead-${i}`);
 
 describe("readRealActivityLeadIds", () => {
   it("selects lead_id only, filters to the real types and a person's stage move, and returns distinct ids", async () => {
-    const { db, calls } = fakeDb(() => ({ data: [{ lead_id: "lead-1" }, { lead_id: "lead-1" }, { lead_id: "lead-3" }, { lead_id: null }], error: null }));
+    const { db, calls } = fakeDb(() => ({ data: [{ lead_id: "lead-1", type: "note" }, { lead_id: "lead-1", type: "note" }, { lead_id: "lead-3", type: "email_sent" }, { lead_id: null, type: "note" }], error: null }));
     const got = await readRealActivityLeadIds(db, ids(5));
     expect([...got].sort()).toEqual(["lead-1", "lead-3"]);
     expect(calls).toHaveLength(1);
-    expect(calls[0]).toMatchObject({ table: "crm_activity", select: "lead_id", or: REAL_ACTIVITY_FILTER });
+    expect(calls[0]).toMatchObject({ table: "crm_activity", select: ACTIVITY_SELECT, or: REAL_ACTIVITY_FILTER });
+    expect(ACTIVITY_SELECT).toBe("lead_id, type, to_stage_id:payload->>to_stage_id");
   });
 
   it("the filter names every real type, mail for any actor, the rest only for a person, and no importer/agent/system shape", () => {
@@ -116,6 +118,33 @@ describe("readRealActivityLeadIds", () => {
   const counts = (row: Record<string, unknown>) => splitTop(REAL_ACTIVITY_FILTER).some((c) => evalClause(c, row));
   const R = (type: string, actor_type: string, payload: Record<string, unknown> = {}) => ({ type, actor_type, payload });
 
+  it("a stage move counts only when it lands PAST first contact; unknown or first-stage destinations do not", async () => {
+    const stages = [
+      { id: "fu", name: "Follow-Up", category: "open", order_index: 1 },
+      { id: "pnc", name: "Potential New Client", category: "open", order_index: 2 },
+      { id: "cs", name: "Consultation Scheduled", category: "open", order_index: 3 },
+      { id: "nur", name: "Nurture", category: "nurture", order_index: 4 },
+    ];
+    const { isPastFirstContact } = await import("@/lib/intake/working");
+    const rows = [
+      { lead_id: "filed", type: "stage_changed", to_stage_id: "fu" },
+      { lead_id: "filed2", type: "stage_changed", to_stage_id: "pnc" },
+      { lead_id: "past", type: "stage_changed", to_stage_id: "cs" },
+      { lead_id: "old", type: "stage_changed", to_stage_id: null },
+      { lead_id: "nurture", type: "stage_changed", to_stage_id: "nur" },
+      { lead_id: "mail", type: "email_sent", to_stage_id: null },
+    ];
+    const { db } = fakeDb(() => ({ data: rows, error: null }));
+    const got = await readRealActivityLeadIds(db, ids(2), (to) => isPastFirstContact(to, stages));
+    expect([...got].sort()).toEqual(["mail", "past"]);
+  });
+
+  it("a cleanup-script move (and every other stamped or system move) is excluded by the filter itself", () => {
+    expect(counts(R("stage_changed", "user", { actor: "cleanup-script" }))).toBe(false);
+    expect(counts(R("stage_changed", "system", { actor: "cleanup-script" }))).toBe(false);
+    expect(counts(R("stage_changed", "system"))).toBe(false);
+  });
+
   it("pins the real writers' shapes against the filter", () => {
     // Counts: mail from the mailbox sync (system), a person's note / call / voice note, a person's stage move.
     expect(counts(R("email_sent", "system"))).toBe(true);
@@ -135,10 +164,10 @@ describe("readRealActivityLeadIds", () => {
   });
 
   it("chunks the lead ids (100 per query) and pages past 1,000 rows", async () => {
-    const full = Array.from({ length: ACTIVITY_PAGE }, () => ({ lead_id: "lead-0" }));
+    const full = Array.from({ length: ACTIVITY_PAGE }, () => ({ lead_id: "lead-0", type: "note" }));
     const { db, calls } = fakeDb((c) => {
-      if (c.in![1][0] === "lead-100") return { data: [{ lead_id: "lead-100" }], error: null };
-      return c.range![0] === 0 ? { data: full, error: null } : { data: [{ lead_id: "lead-2" }], error: null };
+      if (c.in![1][0] === "lead-100") return { data: [{ lead_id: "lead-100", type: "note" }], error: null };
+      return c.range![0] === 0 ? { data: full, error: null } : { data: [{ lead_id: "lead-2", type: "note" }], error: null };
     });
     const got = await readRealActivityLeadIds(db, ids(150));
     expect([...got].sort()).toEqual(["lead-0", "lead-100", "lead-2"]);
@@ -153,7 +182,7 @@ describe("readRealActivityLeadIds", () => {
   it("fails (never a partial set) when a page errors, throws, or the page budget runs out", async () => {
     await expect(readRealActivityLeadIds(fakeDb(() => ({ data: null, error: { code: "x" } })).db, ids(3))).rejects.toThrow();
     await expect(readRealActivityLeadIds(fakeDb(() => "throw").db, ids(3))).rejects.toThrow();
-    const full = Array.from({ length: ACTIVITY_PAGE }, () => ({ lead_id: "lead-0" }));
+    const full = Array.from({ length: ACTIVITY_PAGE }, () => ({ lead_id: "lead-0", type: "note" }));
     const { db, calls } = fakeDb(() => ({ data: full, error: null }));
     await expect(readRealActivityLeadIds(db, ids(3))).rejects.toThrow(/page budget/);
     expect(calls).toHaveLength(ACTIVITY_MAX_PAGES);
@@ -200,7 +229,7 @@ describe("loadWorkingFacts", () => {
 
   it("fills every source from its own read", async () => {
     const f = await loadWorkingFacts(
-      { leadIds: ["a", "b"], approvals: { status: "ok", byLead: { a: [{} as never] } }, mailboxOn: true },
+      { stages: [], leadIds: ["a", "b"], approvals: { status: "ok", byLead: { a: [{} as never] } }, mailboxOn: true },
       deps({ readProposals: async () => [{ family_id: "f", version: 1, status: "sent", lead_id: "b" }] }, (c) =>
         c.table === "crm_activity" ? { data: [{ lead_id: "a" }], error: null } : c.table === "crm_calendar_event" ? { data: [{ lead_id: "a" }, { lead_id: null }], error: null } : { data: [{ lead_id: "b" }], error: null },
       ),
@@ -214,7 +243,7 @@ describe("loadWorkingFacts", () => {
 
   it("a failing source is unavailable on its own and never throws", async () => {
     const f = await loadWorkingFacts(
-      { leadIds: ["a"], approvals: { status: "unavailable" }, mailboxOn: true },
+      { stages: [], leadIds: ["a"], approvals: { status: "unavailable" }, mailboxOn: true },
       deps({ readProposals: async () => { throw new Error("x"); } }, () => "throw"),
     );
     for (const k of ["activity", "proposals", "consults", "booth"] as const) expect(f[k]).toEqual({ status: "unavailable" });
@@ -237,9 +266,9 @@ describe("loadWorkingFacts", () => {
   });
 
   it("consults: feature off or no calendar columns is skipped", async () => {
-    const off = await loadWorkingFacts({ leadIds: ["a"], approvals, mailboxOn: false }, deps());
+    const off = await loadWorkingFacts({ stages: [], leadIds: ["a"], approvals, mailboxOn: false }, deps());
     expect(off.consults).toEqual({ status: "skipped" });
-    const before = await loadWorkingFacts({ leadIds: ["a"], approvals, mailboxOn: true }, deps({}, (c) => (c.table === "crm_calendar_event" ? { data: null, error: { code: "42703" } } : { data: [], error: null })));
+    const before = await loadWorkingFacts({ stages: [], leadIds: ["a"], approvals, mailboxOn: true }, deps({}, (c) => (c.table === "crm_calendar_event" ? { data: null, error: { code: "42703" } } : { data: [], error: null })));
     expect(before.consults).toEqual({ status: "skipped" });
   });
 });

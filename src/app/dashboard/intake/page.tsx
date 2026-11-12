@@ -141,7 +141,7 @@ export default async function IntakePage({
   const modules = await activeOrgModulesOrNull().catch(() => null);
   const mailboxOn = modules ? modules.includes("mailbox") : null;
   const [workingFacts, lostCount, lostLeads] = await Promise.all([
-    loadWorkingFacts({ leadIds: intakeLeads.map((l) => l.id), approvals: pendingApprovals, mailboxOn: mailboxOn ?? false, mailboxUnknown: mailboxOn === null }),
+    loadWorkingFacts({ leadIds: intakeLeads.map((l) => l.id), stages, approvals: pendingApprovals, mailboxOn: mailboxOn ?? false, mailboxUnknown: mailboxOn === null }),
     readLostCount(stages),
     lostView ? listLostLeads(stages) : Promise.resolve<LostLeads | null>(null),
   ]);

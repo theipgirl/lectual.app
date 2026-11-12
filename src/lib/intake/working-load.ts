@@ -2,7 +2,7 @@ import "server-only";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { readProposalExpiries } from "@/lib/review/load";
 import type { LeadPendingApprovals } from "./pending-approvals";
-import { leadsWithLiveProposal, type FactSet, type WorkingFacts } from "./working";
+import { isPastFirstContact, leadsWithLiveProposal, type FactSet, type WorkingFacts, type WorkingStage } from "./working";
 
 /**
  * The reads behind the Leads page's Working rule (rules in `working.ts`). Scoped client only (RLS on
@@ -46,11 +46,19 @@ export const REAL_ACTIVITY_TYPES = ["email_sent", "email_received", "call_logged
  * answers as a `note` with `actor_type = system`, and that is not work on the lead. A stage move counts only
  * when a person made it (`actor_type = user`, no `payload.actor` stamp): the Stage Keeper writes `ai` +
  * its own stamp, the hired-matter sync `system` + `lawmatics-sync`, imports `system`, automations
- * `automation`. A person's accept or undo of a Stage Keeper card is theirs (`user`, no stamp) and counts.
+ * `automation`; the cleanup script stamps its own name. A person's accept or undo of a Stage Keeper card is theirs
+ * (`user`, no stamp).
+ *
+ * A person's stage move is work only when it moves the lead PAST first contact: its destination (`payload.to_stage_id`,
+ * which `moveLeadStage` writes) is an open stage after the new-enquiry and Follow-Up stages. Moving a lead between the
+ * first stages is filing. That is decided in JS (`countsMove`, from `isPastFirstContact`) over the same paged read; a row
+ * with no usable destination id does not count. An Undo counts only if it lands past the boundary too.
  */
 export const REAL_ACTIVITY_FILTER = `type.in.(email_sent,email_received),and(type.in.(call_logged,note,voice_note),actor_type.eq.user),and(type.eq.stage_changed,actor_type.eq.user,payload->>actor.is.null)`;
 
 type Row = Record<string, unknown>;
+/** The columns the activity read selects: the lead, the type, and a stage move's destination stage id. */
+export const ACTIVITY_SELECT = "lead_id, type, to_stage_id:payload->>to_stage_id";
 type Page = PromiseLike<{ data: Row[] | null; error: unknown }>;
 /** The narrow slice of the scoped client this module uses (so tests can hand in a fake). */
 export type WorkingDb = {
@@ -79,7 +87,12 @@ function chunksOf<T>(items: readonly T[], size: number): T[][] {
 }
 
 /** Lead ids with real activity. Throws when any page fails or a chunk runs out of page budget. */
-export async function readRealActivityLeadIds(db: WorkingDb, leadIds: readonly string[]): Promise<Set<string>> {
+export async function readRealActivityLeadIds(
+  db: WorkingDb,
+  leadIds: readonly string[],
+  /** Does a person's stage move to this stage (null when unknown) count as work? */
+  countsMove: (toStageId: string | null) => boolean = () => false,
+): Promise<Set<string>> {
   const found = new Set<string>();
   const parts = await Promise.all(
     chunksOf(leadIds, LEAD_ID_CHUNK).map(async (chunk) => {
@@ -87,14 +100,18 @@ export async function readRealActivityLeadIds(db: WorkingDb, leadIds: readonly s
       for (let i = 0; i < ACTIVITY_MAX_PAGES; i++) {
         const { data, error } = await db
           .from("crm_activity")
-          .select("lead_id")
+          .select(ACTIVITY_SELECT)
           .in("lead_id", chunk)
           .or(REAL_ACTIVITY_FILTER)
           .order("id")
           .range(i * ACTIVITY_PAGE, i * ACTIVITY_PAGE + ACTIVITY_PAGE - 1);
         if (error) throw new Error("activity read failed");
         const rows = data ?? [];
-        for (const r of rows) if (typeof r.lead_id === "string") ids.add(r.lead_id);
+        for (const r of rows) {
+          if (typeof r.lead_id !== "string") continue;
+          if (r.type === "stage_changed" && !countsMove(typeof r.to_stage_id === "string" && r.to_stage_id ? r.to_stage_id : null)) continue;
+          ids.add(r.lead_id);
+        }
         if (rows.length < ACTIVITY_PAGE) return ids;
       }
       throw new Error("activity read exceeded its page budget");
@@ -174,7 +191,7 @@ async function settle(read: () => Promise<FactSet>): Promise<FactSet> {
  * consults exist only with it; off = `skipped`, not "no consult").
  */
 export async function loadWorkingFacts(
-  opts: { leadIds: readonly string[]; approvals: LeadPendingApprovals; mailboxOn: boolean; /** The firm's module list could not be read: consults are unavailable, not skipped. */ mailboxUnknown?: boolean },
+  opts: { leadIds: readonly string[]; stages: readonly WorkingStage[]; approvals: LeadPendingApprovals; mailboxOn: boolean; /** The firm's module list could not be read: consults are unavailable, not skipped. */ mailboxUnknown?: boolean },
   deps?: WorkingFactsDeps,
 ): Promise<WorkingFacts> {
   let d = deps;
@@ -190,7 +207,7 @@ export async function loadWorkingFacts(
   const { leadIds } = opts;
 
   const [activity, proposals, consults, booth] = await Promise.all([
-    settle(async () => ({ status: "ok", leadIds: await readRealActivityLeadIds(live.db, leadIds) })),
+    settle(async () => ({ status: "ok", leadIds: await readRealActivityLeadIds(live.db, leadIds, (to) => isPastFirstContact(to, opts.stages)) })),
     settle(async () => ({ status: "ok", leadIds: leadsWithLiveProposal(await live.readProposals(leadIds)) })),
     settle(async (): Promise<FactSet> => {
       if (opts.mailboxUnknown) return { status: "unavailable" };
