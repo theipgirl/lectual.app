@@ -45,7 +45,7 @@ export const REAL_ACTIVITY_TYPES = ["email_sent", "email_received", "call_logged
  * `system`). A call, note or voice note counts only when a PERSON wrote it: the public intake form files its
  * answers as a `note` with `actor_type = system`, and that is not work on the lead. A stage move counts only
  * when a person made it (`actor_type = user`, no `payload.actor` stamp): the Stage Keeper writes `ai` +
- * `agent:stage-keeper`, the hired-matter sync `system` + `lawmatics-sync`, imports `system`, automations
+ * its own stamp, the hired-matter sync `system` + `lawmatics-sync`, imports `system`, automations
  * `automation`. A person's accept or undo of a Stage Keeper card is theirs (`user`, no stamp) and counts.
  */
 export const REAL_ACTIVITY_FILTER = `type.in.(email_sent,email_received),and(type.in.(call_logged,note,voice_note),actor_type.eq.user),and(type.eq.stage_changed,actor_type.eq.user,payload->>actor.is.null)`;
