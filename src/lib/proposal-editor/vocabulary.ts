@@ -87,7 +87,7 @@ export function madeByAssistantFrom(date: string): string {
 export const START_DOORS = {
   consult: {
     title: "From a consult",
-    body: "The assistant drafts from a consult you have already had. Pick one below and review the draft.",
+    body: "The assistant drafts a proposal from a consult you have already had, and you review it.",
     notReady: "To draft from a consult, connect Zoom or Fathom first. Until then, start from scratch.",
     connect: "Connect Zoom or Fathom",
     couldntLoad: "Can't show consults right now. Refresh to try again.",
