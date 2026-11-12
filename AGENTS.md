@@ -1672,3 +1672,51 @@ New proposal is one step, and every way of starting a proposal goes through ONE 
 - **The start screen** (`/dashboard/proposals/new/`, `isStartScreen`: none of `lead`, `matter`, `blank`, `door`, and also none of the picker's own `kind`, `q`, `type`): three doors, `StartDoors` over the pure `startDoors({ canWrite, aiOn })`. **From a consult** shows the same rows as the proposals list (`ConsultRows`, exported from `ConsultsStrip.tsx`, with "Draft the proposal" going to the existing consult drafter); no Zoom or Fathom connection = a sentence saying what is needed and no rows; a failed read = "Can't show consults right now" (never "no consults"). **Ask Copilot** is a plain link `/dashboard/copilot/?q=<encoded request>` (typed in, never sent; the request is `copilotRequest(name)`: the chosen lead's name or a generic line, never a price) and is not drawn at all when `aiConfigured()` is false. **Start from scratch** goes to `?door=scratch`: "Who is this for?", where each row is a form that CREATES the draft (`StartDraftRow`), plus Start blank (`?blank=1`, `StartBlankForm`). A role that can't write proposals sees the existing role card and no door. A link from a lead or matter page (`?lead=` / `?matter=`) shows who it is for and one "Create draft" button (`CreateDraftForm`; opening the page writes nothing) with the reviewed-consult tick when one has marks.
 - **"New proposals offer"** (Settings, Proposals; `src/lib/proposals/new-offer.ts`, `NewOfferSection` inside the ONE settings form): `pricing.new_offer = { mode: "one" | "choice", per: "brand" | "mark", options (1..3 package names), start }`, NAMES only. `parseNewOffer` drops names not on the firm's list and keeps at most 3; `readNewOffer` reads it; the form's `newOffer.present` marker means a post without the control leaves the key alone; `withNewOffer` refuses (fixed sentence) a serialised pricing over 64 KB and otherwise touches only its own key, so approvers, `approval_routing`, `lawmatics_loe_fields`, package rows and includes stay as they were (`withPackages` and `parseSettingsPricing` already spread the rest). The action checks names against the list AS IT WILL BE after the same save, so a package renamed in that post can't be offered. Admin tier only (the existing `gateAdminAction`). All doors use it as the starting point; none set = one package, the firm's first.
 - **Not verified in a real browser:** the start screen and settings control are tested with `renderToStaticMarkup` and Playwright screenshots of a static render only; Copilot actually opening with the request typed in is not exercised.
+
+## Sprint 4 (Letter track): Client page: details, letter, sign (needs lectual 0106 for signing; NOT applied yet)
+A proposal whose content carries `loe` (Sprint 2) adds four steps to the client page: Choose, Your details, Engagement letter, Pay. Content with no
+`loe` renders byte for byte as before (`tests/client-proposal/loe-baseline.test.tsx` against `__baseline__/`, rendered from 29f6329). Nothing here sends
+anything; `pricing.ts` has no diff; one dependency was added (`pdfkit`, exact-pinned 0.20.2).
+- **Step 1 is today's page.** Intro, brand cards, the includes table and the totals panel are the same components with the same figures. The totals panel
+  (`.cp-side`, `position: sticky`) is on EVERY step and the receipt, and only its action area changes (`LoeSideAction`: Continue, Continue, Sign and
+  continue to payment, then the receipt). No ancestor of it may have overflow hidden, auto or scroll (`overflow: clip` is fine): the letter scrolls inside
+  its own `.cp-letter` box, which is not an ancestor. `tests/client-proposal/loe-sticky.test.ts` finds the real ancestors in the rendered markup and checks
+  every CSS rule. The phone total bar is drawn on every step, and on the receipt of a letter proposal ("Your receipt").
+- **"Read the engagement letter first"** is a `<details>` on step 1 (letter and exhibit for the current selection; blanks read `[your address]`).
+  Steps 2 to 4 link back to the includes table (`LoeIncludesLink`; from steps 2 and 3 it returns to step 1 first).
+- **The full letter, in React text, then Exhibit A.** `renderLetter` blocks, every paragraph, nothing collapsed; a client-typed value that looks like
+  `{{field}}`, `}}` or markup is shown as those characters. Exhibit A is `src/lib/loe/exhibit.ts`, a pure formatter over the engine's quote with NO money
+  arithmetic (a grep test forbids `*` and `+`). It lists only selected names, marks (with the package each is on), classes (the client's own words
+  included), legal fee lines, discounts, credits, "Legal fee due now" and "USPTO filing fees, due at filing"; a flat-fee proposal shows the matter, the work
+  and the fee and no USPTO line.
+- **Signing and accepting are one act** (`signAndAccept` in `public.ts`). `acceptProposalAction(token, selection, clientClasses, signing)`; `signing` =
+  `{ typedName, agree, details, fingerprint }`. The server cleans every field with the `cleanClientText` rules (`checkSigning`), refuses a missing
+  name, address or tick with a fixed sentence, builds the agreement text ITSELF from the stored letter, the cleaned details and the recomputed exhibit,
+  compares its fingerprint (`agreementFingerprint`) with the browser's (Web Crypto over the same canonical string, `canonical.ts`), and only then calls
+  `client_proposal_sign_and_accept` through the service role, once, with `p_agreement_text` and its sha256, the IP (`parseInet`) and the browser (400
+  characters). NOTHING is written before that call. A missing function (42883 / PGRST202, or a client with no `rpc`) is "Signing isn't available on this
+  page yet": it NEVER falls back to the unsigned update for `loe` content. Content without `loe` takes the old path and ignores `signing`. The letter's date
+  is the firm's calendar date, worked out on the server; a signing across midnight reads as a stale page and asks for a reload.
+- **Snapshot schema 2.** `buildAcceptedSnapshot` writes `schema: 2` with `agreement` ({ signature_id, signer_name, signed_at, sha256, template_version };
+  the database stamps the final block) and `signing` ({ details, date_text, client_email }) for a signed acceptance; schema 1 is every other acceptance.
+  Every reader accepts both (`tests/proposals/snapshot-schema.test.ts`). `rebuildSignedLetter` rebuilds the letter AS SIGNED from the snapshot alone, so
+  "Read it again" and the signed PDF never follow a later change to the firm's letter.
+- **The client email is read only for a proposal that has a letter** (`readLetterEmail`, a separate single-row read; it is NOT in
+  `PUBLIC_PROPOSAL_COLUMNS`) because the letter merges `{{client_email}}`. It reaches the browser in `view.letter` only for that proposal.
+- **PDF: one builder, `src/lib/loe/pdf.ts` (pdfkit).** Review copy ("Review copy - not yet signed" on every page) and signed copy (signature record: signer,
+  time, fingerprint) come from it; there is no docx of the letter and no print view. Font: DejaVu Sans regular and bold in `src/lib/loe/fonts/` with its licence,
+  read with `fs` from the project root and shipped by `outputFileTracingIncludes: { "/p/*": ["./src/lib/loe/fonts/**"] }` in `next.config.ts` (Sprint 6's staff
+  download needs its own route key there). The embedded font is pdfkit's default font, so no standard-font data file is read. Server actions return base64
+  (`LetterPdfResult`) and the page saves it through a Blob link (`download-pdf.ts`).
+- **`downloadReviewLetterAction(token, selection, clientClasses, details)`** is anonymous and token-only (no id parameter): refuses a withdrawn, expired,
+  replaced, signed or letterless proposal with one sentence, builds from the stored letter and the recomputed quote, logs nothing, and is rate limited
+  (20 per token and 60 per address per hour) IN MEMORY per server instance, so on serverless it is a courtesy limit (`review-limit.ts`). The quote page's
+  actions have no limiter at all. `downloadSignedLetterAction(token)` rebuilds from the snapshot.
+- **The two 4.7 sentences are not shown on a letter proposal.** Replacement wording is in `src/lib/loe/client-words.ts` with an "ATTORNEY MUST APPROVE BEFORE
+  USE" comment: the pay note and the footer line. Button labels are Continue, Sign and continue to payment, Pay my legal fee. Lectual's own "not a law firm"
+  line stays on every state.
+- **Firm notice and Lawmatics note** gain only that the letter was signed, by whom and when (`acceptanceHeadline`'s `signedBy`, `signedNoteLine`): never the
+  letter, the details, the address or the fingerprint.
+- **NOT verified:** a real browser (the Blob download, focus order, the popup tab opened for payment), Vercel's real bundling of the font (a local
+  `next start` of a production build did build a Unicode PDF, and the font is in the route's trace), and the real 0106 function (proved against a double
+  and by reading the migration text).

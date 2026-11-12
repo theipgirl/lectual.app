@@ -1,4 +1,8 @@
 import { createHash } from "node:crypto";
+import { agreementCanonical, canonicalJson, type AgreementParts } from "./canonical";
+
+export { agreementCanonical, canonicalJson };
+export type { AgreementParts };
 
 /**
  * sha256 (hex) over a CANONICAL form of what a client is about to sign: the
@@ -13,33 +17,7 @@ import { createHash } from "node:crypto";
  * page was stale and nothing is written.
  */
 
-export function canonicalJson(value: unknown): string {
-  if (value === null) return "null";
-  switch (typeof value) {
-    case "string":
-      return JSON.stringify(value);
-    case "number":
-      return Number.isFinite(value) ? JSON.stringify(value) : "null";
-    case "boolean":
-      return value ? "true" : "false";
-    case "undefined":
-      return "null";
-    case "object": {
-      if (Array.isArray(value)) return `[${value.map((v) => canonicalJson(v)).join(",")}]`;
-      const obj = value as Record<string, unknown>;
-      const keys = Object.keys(obj)
-        .filter((k) => obj[k] !== undefined)
-        .sort();
-      return `{${keys.map((k) => `${JSON.stringify(k)}:${canonicalJson(obj[k])}`).join(",")}}`;
-    }
-    default:
-      return "null";
-  }
-}
-
-export type AgreementParts = { letter: unknown; details: unknown; exhibit: unknown };
-
 export function agreementFingerprint(parts: AgreementParts): string {
-  const canonical = canonicalJson({ letter: parts.letter, details: parts.details, exhibit: parts.exhibit });
+  const canonical = agreementCanonical(parts);
   return createHash("sha256").update(canonical, "utf8").digest("hex");
 }

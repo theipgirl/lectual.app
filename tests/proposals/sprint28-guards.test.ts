@@ -30,9 +30,9 @@ describe("one price calculation", () => {
 });
 
 describe("nothing money-shaped is read from the browser in the accept action", () => {
-  it("acceptProposalAction takes the token, the ticks and what the client wrote only", () => {
+  it("acceptProposalAction takes the token, the ticks, what the client wrote and (engagement letter) the signing only", () => {
     const src = read("src/app/p/[token]/actions.ts");
-    expect(src).toMatch(/acceptProposalAction\(token: string, selection: unknown, clientClasses\?: unknown\)/);
+    expect(src).toMatch(/acceptProposalAction\(token: string, selection: unknown, clientClasses\?: unknown, signing\?: unknown\)/);
     expect((src.split("export async function")[1] ?? "").match(/price|total|cents|classCount/i)).toBeNull();
   });
 
