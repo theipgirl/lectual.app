@@ -8,7 +8,7 @@ import { greetingName, greetingSuffix } from "@/lib/today/greeting-name";
 import { hourInZone } from "@/lib/today/priorities";
 import { civilInZone } from "@/lib/today/outcomes";
 import { parseDealTimes } from "@/lib/deal/person-times";
-import { dealNudge } from "@/lib/deal/nudge";
+import { dealNudge, parseDeckSeen } from "@/lib/deal/nudge";
 import { loadDeckSummary, type DeckSummary } from "@/lib/queue/deck-summary";
 import { loadTodayConsults, type TodayConsultsResult } from "@/lib/calendar/consult-sources";
 import { liveConsultDeps } from "@/lib/calendar/consult-sources-live";
@@ -95,7 +95,7 @@ export async function OwnerToday({
   const today = civilInZone(now, tz);
   const firstName = greetingName({ userId, members, metadata, email });
   // Ready only when the same read that drew the tile says there are cards in the person's current deal (never from a failed read).
-  const nudge = dealNudge({ now, timeZone: tz, times: dealTimes, read: deck.status === "ok" ? { status: "ok", undecided: deck.count } : { status: deck.status } });
+  const nudge = dealNudge({ now, timeZone: tz, times: dealTimes, seen: parseDeckSeen(metadata), read: deck.status === "ok" ? { status: "ok", undecided: deck.count } : { status: deck.status } });
   const hero = cardsHero(deck, nudge);
   const week = weekStrip({ now, tz, consults: consults ? consults.consults : null, deadlines, proposals: Array.isArray(proposals) ? proposals : null });
   const weekNote =

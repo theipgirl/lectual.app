@@ -24,6 +24,7 @@ import { shouldShowTour } from "@/lib/onboarding/tour";
 import { FirmWordmark } from "@/components/shell/FirmWordmark";
 import { DealTimesDialog } from "@/components/deck/DealTimesDialog";
 import { parseDealTimes } from "@/lib/deal/person-times";
+import { parseDeckSeen } from "@/lib/deal/nudge";
 import { loadDealNudge } from "@/lib/queue/deal-nudge-load";
 import { dealReadyLine } from "@/lib/ui/words";
 import { friendlyZoneLabel } from "@/lib/org/firm-form";
@@ -76,7 +77,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // The technician shell never asks.
   const [queue, nudge] = await Promise.all([
     mineQueue(allQueue, { userId: user.id, role }),
-    shell.variant === "owner" ? loadDealNudge(allQueue, { userId: user.id, role }, parseDealTimes(user.user_metadata)) : Promise.resolve(null),
+    shell.variant === "owner" ? loadDealNudge(allQueue, { userId: user.id, role }, parseDealTimes(user.user_metadata), parseDeckSeen(user.user_metadata)) : Promise.resolve(null),
   ]);
   const dealReady = nudge && nudge.ready ? dealReadyLine(nudge.label, nudge.count) : null;
   const railPinned = railIsPinned(cookieStore.get(RAIL_PIN_COOKIE)?.value);

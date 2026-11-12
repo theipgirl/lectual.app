@@ -28,6 +28,7 @@ import {
   type DeckCard,
 } from "@/lib/queue/deck";
 import type { QueueItem } from "@/lib/queue/api";
+import { DeckSeenMark } from "@/components/deck/DeckSeenMark";
 import { DeckFrame, type DeckSideRow } from "@/components/deck/DeckFrame";
 import { ApprovalCard, type ApprovalCardProps } from "@/components/deck/ApprovalCard";
 import { DeckListsView } from "./lists-view";
@@ -127,6 +128,8 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
   const actingAsStaff = session.actingAsStaff ?? false;
   const canChangeDealTimes =
     shellFor(viewFor({ role: session.role, preview: actingAsStaff ? previewFor(session.user.user_metadata, session.org.id) : NO_PREVIEW, firmHasRoleViews: true, actingAsStaff })).variant === "owner";
+  // Stamps "the deck was opened" (clears the deal-ready dot). Never for Lectual staff acting inside a firm.
+  const seenMark = session.actingAsStaff ? null : <DeckSeenMark />;
 
   const [load, tz] = await Promise.all([loadActiveQueue("pending"), getFirmTimeZone()]);
   const now = new Date();
@@ -139,6 +142,8 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
 
   if (load.status !== "ok") {
     return (
+      <>
+      {seenMark}
       <DeckFrame
         dealLine={dealLine}
         view={view}
@@ -155,6 +160,7 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
       >
         <DeckUnavailable status={load.status} reason={load.reason} />
       </DeckFrame>
+      </>
     );
   }
 
@@ -215,6 +221,8 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
     canChangeDealTimes,
   };
   const frame = (side: DeckSideRow[] | null, meta: string | null, children: React.ReactNode, wideSub?: string) => (
+    <>
+    {seenMark}
     <DeckFrame {...frameProps} side={side} meta={meta} wideSub={wideSub}>
       {routed.status !== "ok" && (
         <p role="status" className="lx-note" style={{ margin: 0 }}>
@@ -223,6 +231,7 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
       )}
       {children}
     </DeckFrame>
+    </>
   );
 
   const statusOf = (c: DeckCard): { label: string; tone: ListRow["statusTone"] } =>

@@ -9,12 +9,12 @@ import { viewerDeck } from "@/lib/queue/deck-summary";
  * read) and the viewer's own deal times. Only the owner shell calls this; the technician shell never does. Never throws:
  * a failure is no nudge, never a number.
  */
-export async function loadDealNudge(load: QueueLoad, viewer: { userId: string; role: Role }, times: readonly string[]): Promise<DealNudge> {
+export async function loadDealNudge(load: QueueLoad, viewer: { userId: string; role: Role }, times: readonly string[], seen: Date | null = null): Promise<DealNudge> {
   try {
     // Nothing queued: no nudge, and no routing or card-state read.
     if (load.status !== "ok" || load.items.length === 0) return NO_NUDGE;
     const { deck, now, tz } = await viewerDeck(load.items, viewer, times);
-    return dealNudge({ now, timeZone: tz, times, read: { status: "ok", undecided: deck.cards.length } });
+    return dealNudge({ now, timeZone: tz, times, read: { status: "ok", undecided: deck.cards.length }, seen });
   } catch {
     return NO_NUDGE;
   }
