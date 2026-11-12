@@ -3,6 +3,29 @@
 One list across sessions. Each session adds its action items here and checks them against Omi.
 Newest section first. Tick an item when it is done; don't delete it.
 
+## 2026-11-12 (evening): Lectual as a Claude connector (Phase 0 built, test blocked by Vercel login)
+
+Plan: `docs/plans/2026-11-12-lectual-mcp-connector.md`. Branch `claude/eloquent-babbage-ba7e6l` (merged with `main` 2026-11-12). Recap: `docs/recaps/2026-11-12-claude-connector.md`.
+Omi checked 2026-11-12: no related open items (Omi is read-only from the cloud session).
+
+### Taylor
+
+- [ ] **Decide how Claude can reach the test address** (Vercel puts its own login in front of every preview, including a domain tied to a branch):
+      A) repoint ALL previews at lectual-dev, then turn Vercel Authentication off for previews; B) a separate small Vercel project for the
+      test only, with this branch as its production branch (recommended: nothing else is exposed).
+- [ ] Supabase lectual-dev, Authentication, URL Configuration: Site URL `https://connector-test.lectual.app`, and add `https://connector-test.lectual.app/**` to Redirect URLs.
+- [ ] Vercel `lectual-app` (or the new test project): add the lectual-dev `SUPABASE_SERVICE_ROLE_KEY` for this branch's previews (a secret: paste it in Vercel only).
+- [ ] Tell me which login to test with on dev (`taylormcghee93@gmail.com` is not a member of any dev firm), or say "create one in hartwell-ip".
+- [ ] **Previews point at lectual-prod.** In Vercel `lectual-app`, the general Preview and Development settings `NEXT_PUBLIC_SUPABASE_URL` / `_ANON_KEY` are
+      `qpbogzkdpynhhqmaradu`, which is lectual-prod (the note on them says lectual-dev). Check which project the Preview `SUPABASE_SERVICE_ROLE_KEY` belongs to and repoint all previews at lectual-dev.
+- [ ] Send Rebecca the note asking her OK for client information to appear in Claude chats. `claude-connector` stays off for RPB until she agrees.
+
+### Claude, next
+
+- [ ] After the Vercel decision: finish Phase 0 on dev (add the connector in Claude, sign in, `whoami`; confirm OAuth tokens carry `active_org_id` and a `client_id` claim).
+- [ ] Then require the `client_id` claim in `verifyBearer` so an ordinary browser session token can't be used at `/api/mcp/`; then the read and draft tools (plan section E).
+- [ ] Done: discovery, consent page, decision endpoint, `/api/mcp/` route with `whoami`, `claude-connector` switch (dev `hartwell-ip` only), 10,763 tests pass, build passes.
+
 ## 2026-11-12 (later): the build is done on the branch; what is left before RPB can use it
 
 Everything below is on `claude/optimistic-brahmagupta-18q0xn` in `lectual.app`, `lectual` and `lectual-plugin`. Nothing is on `main`,
