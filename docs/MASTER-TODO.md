@@ -3,6 +3,20 @@
 One list across sessions. Each session adds its action items here and checks them against Omi.
 Newest section first. Tick an item when it is done; don't delete it.
 
+## 2026-11-13: merged #33 (package notes), #34 (sign fields, address inputs, quoted marks); test proposal on lectual-prod
+
+### Taylor
+- [x] Merge lectual.app#33 (each package's own notes show in "What's included") and #34 (sign name and "I agree" required, real address
+      fields with a US state list, brand names in quotation marks on the client page). Both merged Nov 13.
+- [ ] Run the test: draft 813f42e6 (lead "51.glee.snowmen", Lawmatics matter 19989543) at
+      app.lectual.app/dashboard/proposals/813f42e6-3564-4952-948a-987e214b636f/. Replace the pay link (copied from Anthony's), Save and create link,
+      then open the link as the client: choose, details, sign, pay.
+- [ ] Tell Claude when the test is signed. Claude checks lectual-prod for the signature row and the timeline steps, and you check matter 19989543 in
+      Lawmatics for the address, the acceptance note and the signed letter PDF.
+- [ ] After the test: delete the test proposal (owner, More, Delete proposal) and say whether to remove test lead 4065b888.
+- [ ] Re-check the includes table: edits made before the 20:33 UTC deploy on Nov 12 weren't saved. Edit and Save again, then pick each package in
+      the preview (it shows only the chosen package's column).
+
 ## 2026-11-12 (night): merged #29, #30, #31; letter version 2 waiting for approval
 
 ### Taylor

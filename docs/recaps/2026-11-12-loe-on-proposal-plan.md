@@ -117,3 +117,16 @@ decisions that matter are in the AGENTS.md sections each sprint wrote.
 - Found on prod: Rebecca approved letter version 1 at 12:34 PM ET; one proposal with the letter is live and one client has signed. Version 2 (Word
   layout, "RPB Law, PLLC" kept under the logo) was added as a draft built from v1 with markers only; its md5 matches the repo template.
 - Checks on the final branch: lint 0 errors, 652 test files / 10,849 tests, build passes. No real browser, no live Lawmatics.
+
+
+## Nov 13 follow-up
+
+- **#33 merged:** "What's included" took every row's note from the first package only. Each package's own note now shows under its cell. The
+  save path (3 packages x 17 rows, then the client page per package) is pinned by an end-to-end test. The table looked unchanged because the
+  edits were made before the Nov 12 deploy, and because the preview shows only the chosen package.
+- **#34 merged:** on the client page, the typed name and the "I have read and agree" tick are required (asterisks, a line saying what's
+  missing). "Your details" is a real address form (street, apartment, city, a state list for the US, numeric ZIP, country). Brand names show in
+  quotation marks on the client page only; the letter, Exhibit A and the stored text are unchanged, so fingerprints don't move.
+- **Test setup:** a duplicate draft for the test matter (Lawmatics 19989543) on lectual-prod, id 813f42e6-3564-4952-948a-987e214b636f, linked to test
+  lead 4065b888-0885-477a-9daf-377987727f15. Nothing was sent.
+- Verification for #34: lint 0 errors, 10,881 tests passed, build passed; `pricing.ts`, `exhibit.ts`, `signing.ts` untouched.
