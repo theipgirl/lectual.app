@@ -120,7 +120,7 @@ describe("the client page: Add a class (explicit max, else 5, else none on a fix
   it("at the max the button gives way to a sentence", () => {
     const html = render({ content: withRoom(1), initialClientClasses: added("p", ["Online store", true]) });
     expect(html).not.toContain("cp-add-btn");
-    expect(html).toContain("You can add up to 1 class for Prosperall.");
+    expect(html).toContain("You can add up to 1 class for “Prosperall”.");
   });
 
   it("says in words what the package includes and what the next class costs", () => {

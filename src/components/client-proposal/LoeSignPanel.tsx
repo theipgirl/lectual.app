@@ -22,21 +22,29 @@ export function LoeSignPanel({
     <section className="cp-sign" aria-labelledby="cp-sign-h">
       <h3 id="cp-sign-h">{SIGN_HEADING}</h3>
       <label className="cp-field cp-field-wide">
-        <span>{SIGN_NAME_LABEL}</span>
+        <span>
+          {SIGN_NAME_LABEL}
+          <b aria-hidden="true"> *</b>
+        </span>
         <input
           type="text"
           name="typed_name"
           value={typedName}
           maxLength={MAX_CLIENT_TEXT_CHARS}
           autoComplete="name"
+          required
+          aria-required={true}
           readOnly={readOnly}
           onChange={(e) => onName(e.target.value)}
         />
       </label>
       <label className="cp-opt cp-agree">
-        <input type="checkbox" checked={agree} disabled={readOnly} onChange={(e) => onAgree(e.target.checked)} />
+        <input type="checkbox" name="agree" checked={agree} disabled={readOnly} required aria-required={true} onChange={(e) => onAgree(e.target.checked)} />
         <span className="cp-box" aria-hidden="true" />
-        <span>{SIGN_AGREE_LABEL}</span>
+        <span>
+          {SIGN_AGREE_LABEL}
+          <b aria-hidden="true"> *</b>
+        </span>
       </label>
       <p className="cp-recording">{SIGN_RECORDING_NOTICE}</p>
     </section>

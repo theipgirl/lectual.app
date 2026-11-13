@@ -43,6 +43,8 @@ export const LETTER_INTRO = "Please read the whole letter and the exhibit that f
 export const SIGN_HEADING = "Sign";
 export const SIGN_NAME_LABEL = "Type your full legal name to sign";
 export const SIGN_AGREE_LABEL = "I have read and agree to this engagement letter";
+/** Beside the disabled sign button: says what is still needed. A label only (both fields are marked * and required). */
+export const SIGN_REQUIRED_NOTE = "Type your full legal name and tick the box to sign.";
 export const SIGN_RECORDING_NOTICE =
   "When you sign, we record your typed name, the date and time, your device's network address and browser details, and the exact text of this letter and its exhibit.";
 

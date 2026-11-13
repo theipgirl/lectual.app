@@ -55,7 +55,7 @@ describe("a package per mark on the client page (Spec 7)", () => {
     expect(sel).toMatch(/<option value="Essential" selected="">/);
     expect(html).toContain("Essential: $2,220 legal fee for the design mark (20% off as your second mark)");
     expect(html).toContain("$5,470");
-    expect(html).toContain("The Fold — word mark, Enhanced; design mark, Essential");
+    expect(html).toContain("“The Fold” — word mark, Enhanced; design mark, Essential");
   });
 
   it("the receipt names the package per mark and shows no select", () => {
@@ -65,7 +65,7 @@ describe("a package per mark on the client page (Spec 7)", () => {
     expect(html).not.toContain("<select");
     expect(html).toContain("Package for the word mark: Concierge");
     expect(html).toContain("Package for the design mark: Essential");
-    expect(html).toContain("The Fold — word mark, Concierge; design mark, Essential");
+    expect(html).toContain("“The Fold” — word mark, Concierge; design mark, Essential");
   });
 
   it("every package a mark offers counts as offered", () => {

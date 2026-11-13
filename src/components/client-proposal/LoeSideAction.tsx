@@ -10,6 +10,7 @@ import {
   READ_LETTER_FIRST,
   SIGN_LABEL,
   SIGN_MESSAGES,
+  SIGN_REQUIRED_NOTE,
 } from "@/lib/loe/client-words";
 import type { LetterPdfResult } from "@/lib/loe/pdf-result";
 import { DownloadPdfButton } from "./LoeReceipt";
@@ -108,9 +109,20 @@ export function LoeSideAction(p: LoeSideActionProps) {
               Preview
             </button>
           ) : (
-            <button type="button" className="cp-btn" onClick={p.onSign} disabled={!p.signable || p.pending}>
+            <button
+              type="button"
+              className="cp-btn"
+              onClick={p.onSign}
+              disabled={!p.signable || p.pending}
+              aria-describedby={p.signable ? undefined : "cp-sign-need"}
+            >
               {p.pending ? "Recording…" : SIGN_LABEL}
             </button>
+          )}
+          {preview || p.signable ? null : (
+            <p className="cp-warn" id="cp-sign-need" role="status">
+              {SIGN_REQUIRED_NOTE}
+            </p>
           )}
           <button type="button" className="cp-btn cp-btn-ghost" onClick={p.onBack} disabled={p.pending}>
             {BACK_LABEL}
