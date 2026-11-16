@@ -3,6 +3,16 @@
 One list across sessions. Each session adds its action items here and checks them against Omi.
 Newest section first. Tick an item when it is done; don't delete it.
 
+## 2026-11-16: Anthony Harris proposal without the letter; Adobe Sign question
+
+### Taylor
+- [ ] Review Anthony Harris's draft v6 (same offer as live v5, no engagement letter), then "Save and create link". The same client link then shows v6
+      and v5 is replaced. Leave the Engagement letter switch off.
+- [ ] Anthony reached "Your details" on v5 on Nov 16; saving his address to Lawmatics was blocked (no single Lawmatics record matched his lead).
+      Link his lead to his Lawmatics matter if he has one.
+- [ ] Adobe Sign: Rebecca checks for an API Applications menu in her Adobe Sign account and sends the plan name; you answer pay-before-or-after
+      countersign, signing inside the page or by Adobe email, and whether a typed name is enough. Then Claude writes the design.
+
 ## 2026-11-13: merged #33 (package notes), #34 (sign fields, address inputs, quoted marks); test proposal on lectual-prod
 
 ### Taylor
