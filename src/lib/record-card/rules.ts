@@ -233,6 +233,17 @@ export function savedMark(result: unknown): SavedMark {
   return { saved: false, error: null };
 }
 
+/**
+ * Every pending approval named on the lead, from `readLeadApprovals`: ALL of them (`refs`, not the enriched `items`,
+ * which stop at the enrich cap), plus the internal briefings, so the count is the Intake page's. Without `refs` (an
+ * older shape) the items are used.
+ */
+export function approvalQueueIds(read: { items: readonly { id: string }[]; refs?: readonly { id: string }[]; briefings?: readonly { id: string }[] }): string[] {
+  const ids = (read.refs ?? read.items).map((r) => r.id);
+  for (const b of read.briefings ?? []) if (!ids.includes(b.id)) ids.push(b.id);
+  return ids;
+}
+
 /** The pending approvals named on one lead, as the Intake page already reads them (`LeadPendingApprovals`). */
 export type CardApprovals = { status: "ok"; queueIds: readonly string[] } | { status: "unconfigured" } | { status: "unavailable" };
 export type ApprovalsChip = { text: string; href: string | null; tone: "warn" | "muted" } | null;

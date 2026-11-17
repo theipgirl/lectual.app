@@ -12,6 +12,11 @@ import { A_TEAMMATE, SEND_BACK_NEEDS_APPROVER, sendBackNeedsPerson } from "@/lib
 
 export const SEND_BACK_NOTE_MAX = 500;
 
+/** A Send back note over the limit is refused (SEND_BACK_NOTE_TOO_LONG), never silently cut. Every Send back uses this. */
+export function sendBackNoteTooLong(raw: unknown): boolean {
+  return typeof raw === "string" && raw.trim().length > SEND_BACK_NOTE_MAX;
+}
+
 /** The items currently handed to `viewerId`, with the hand-off. Empty unless the card events were READ. */
 export function handedToViewer(items: readonly (RoutableItem & { id: string })[], state: CardState, viewerId: string | null | undefined, trust: EventTrust): Map<string, Holder> {
   const out = new Map<string, Holder>();

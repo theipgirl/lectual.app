@@ -2234,3 +2234,25 @@ Intake and Matters, Board and List: temperature, source, owner, next step and st
 - **Mark no-show is one hold:** a second request while one is held is ignored (`beginOnce`) and the menu item is hidden while held. "No-show logged." is drawn only from the action's own `{ saved: true }`. Leaving the page inside the 5 seconds cancels the hold exactly as Undo does (nothing is written; no component is left to say "Not logged.").
 - **A lead is labelled by the person first** (`leadLabel`): business and mark are the sub-line; the company is the name only when there is no person's name.
 - **Matter cards** show owner, source and next step but no last activity (the docket pages read none per matter). The Weekly review keeps its drawer until its redesign; then `?open=` there should render `RecordCardHost` (see the contract).
+
+## Sprint 10 review fixes (Nov 17, no schema)
+- **Lead page order:** under the status row, the top card first, then `OtherApprovals` (the OTHER pending drafts and briefings) SECOND, then
+  "What Lectual did", then the four facts. Keep `OtherApprovals` right under the top card.
+- **Yes approves only the text on screen.** The lead page's Yes and the deck's Yes post the sha256 (hex) of the body the card drew, computed on
+  the server (`shownBodySha256`, `src/lib/queue/shown-text.ts`; `PendingDraft.bodySha256` / `NeedsYesView.bodySha256`, the deck's `shownSha256` prop).
+  `runQueueReview` with `requireShown` compares it with `final_body ?? draft_body` of the item as re-read, before anything is saved and again on the read
+  the approval is built from; a mismatch, a missing hash or an edit posted with it is refused with `DRAFT_CHANGED_REFRESH` ("The draft changed. Refresh to
+  see it.") and nothing is approved, saved or drafted. The full approval page does not set `requireShown` (it posts the text it shows as its edit), and
+  Mark read (internal briefings) does not either.
+- **Team accounts (Settings -> Setup) and lectual 0108.** An owner's view of colleagues' mailboxes comes only from `mailbox_connections_for_owner()`
+  (`loadColleagueMailboxes`, scoped client, owner only; proposal text in `docs/pge/2026-11-17-agentic-ip-os/0108-proposed.sql.txt`, NOT applied). A missing
+  function (42883 / PGRST202) is "not switched on" and shows "Only <name> can see this"; any other failure is couldn't check. An answer is trusted only when it
+  contains every connection the caller can see; an EMPTY answer is trusted (it reads "No Outlook mailbox connected yet.") only when the caller's own read is empty too.
+- **Weekly review's last-changed line** ("Changed by Caitlyn · Nov 16", `LastChanged` over `pickLastChanges`) draws nothing when its read failed, never "not changed".
+- **A matter's lead mail** (filed on the lead before it signed) feeds the matter's Sent line and last contact date, NOT its direction: whose turn it is
+  comes from the matter's own mail, so an overdue step is not moved to "Waiting on client" by the proposal email. A board card keeps its due chip when
+  its bucket is overdue or due this week, in either list.
+- **Send back notes** over `SEND_BACK_NOTE_MAX` are refused with `SEND_BACK_NOTE_TOO_LONG` on every path (`sendBackNoteTooLong`), never cut.
+- **Matters intake line** follows the chip in use (Closed, Unassigned, Needs your review, any `?seg=`), and "Show them" keeps the chip. A firm with phases but no
+  signed-engagement stage (`isHiredStage`) gets one quiet warn line (`MATTER_NO_HIRED_STAGE`). Copilot's stalled/open counts leave intake-stage matters out too
+  (`withoutIntake`; a failed stage read counts every matter).

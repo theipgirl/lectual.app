@@ -104,6 +104,8 @@ export type NeedsYesView = {
   headline: string;
   attorneyOnly: boolean;
   email: { to: string | null; subject: string | null; body: string } | null;
+  /** sha256 hex of the body shown (server-computed); Yes posts it, and a draft changed since is refused. */
+  bodySha256: string | null;
   proposal: { rows: { label: string; value: string }[]; href: string } | null;
   /** The reviewer notes the drafter left (CHECK FIRST ones marked). */
   why: { text: string; checkFirst: boolean }[];
@@ -229,6 +231,7 @@ function needsYesView(facts: LeadStepFacts, item: PendingDraft, others: number):
     headline: item.headline,
     attorneyOnly: item.attorneyOnly,
     email: item.type === "CLIENT_EMAIL" ? { to: item.recipient, subject: item.subject, body: item.body } : { to: null, subject: null, body: item.body },
+    bodySha256: item.bodySha256 ?? null,
     proposal,
     why: item.reviewer.map((r) => ({ text: r.text, checkFirst: r.checkFirst })),
     others: others > 0 ? leadStepOthers(others) : null,

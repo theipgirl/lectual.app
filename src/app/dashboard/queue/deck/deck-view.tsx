@@ -6,6 +6,7 @@ import { loadActiveQueue } from "@/lib/queue/load";
 import { loadApprovalRouting } from "@/lib/queue/routing-load";
 import { loadCardState } from "@/lib/queue/card-state";
 import { loadAuditContext } from "@/lib/queue/audit-context";
+import { shownBodySha256 } from "@/lib/queue/shown-text";
 import { checkDraftStaleness, stalenessRequiresConfirm } from "@/lib/queue/stale";
 import { gateLinkedProposal } from "@/lib/consult-proposal/link";
 import { getFirmTimeZone } from "@/lib/org/profile";
@@ -404,6 +405,7 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
         canMove={card.canYes || !!card.handedToMe}
         movesUnavailable={movesUnavailable}
         people={people}
+        shownSha256={shownBodySha256(card.item.final_body ?? card.item.draft_body)}
         review={{ initialBody: card.item.final_body ?? card.item.draft_body, canApprove: card.canYes, canEdit, audit: { type: card.item.type, ...audit } }}
         initial={initial}
       />

@@ -4,8 +4,17 @@
 -- This file is a draft for the `lectual` repo (theipgirl/lectual), where migrations live (AGENTS.md: "No migrations in this
 -- repo"). To use it: copy it to `lectual/supabase/migrations/0108_mailbox_connections_for_owner.sql` (first-merged-wins
 -- numbering: renumber if 0108 is taken), review it there, apply to lectual-dev, run the tests below, and apply to
--- lectual-prod only with the owner's OK. Names of helpers (`current_org_id()`) and of the `crm_role` value are assumptions
--- taken from this app's code and AGENTS.md; verify them against lectual's 0031 / 0075 before copying.
+-- lectual-prod only with the owner's OK.
+--
+-- Checked against this app's code (Nov 17 review), NOT against lectual's migrations or a live database:
+--   * `public.current_org_id()` exists and takes no arguments: the generated types list it (src/lib/db/types.ts:
+--     `current_org_id: { Args: never; Returns: string }`) and the app calls `supabase.rpc("current_org_id")` in several places
+--     (src/lib/automation/rules.ts, src/lib/matters/matters.ts, src/lib/quotes/store.ts, ...).
+--   * `public.crm_org_member` has `org_id`, `user_id` and `role` (enum `crm_role`, which includes 'owner'): generated types, and
+--     src/lib/firm/session.ts selects `role, org_id` filtered on `user_id`.
+--   * `mailbox_connection.scope`, `.provider`, `.email`, `.status` are typed `string` in the generated types; whether each is text,
+--     varchar or a domain is not visible from here, so the function casts each to text (a RETURNS TABLE column must match exactly).
+-- Still verify against lectual's 0031 / 0075 before copying.
 --
 -- Why (PGE Sprint 1, Taylor Nov 17, question T7): "owners can see what mailbox is connected". A colleague's PERSONAL mailbox
 -- is invisible to everyone else by RLS (0075), so Settings -> Setup -> Team accounts can only say "Only <name> can see this".
@@ -32,8 +41,10 @@ returns table (
 language plpgsql
 stable
 security definer
--- pinned: a caller's search_path must never decide which table or function runs. pg_temp is LAST so a temp object cannot shadow a real one.
-set search_path = pg_catalog, public, pg_temp
+-- pinned EMPTY: a caller's search_path must never decide which table or function runs. Every name below is schema-qualified
+-- (public.*, auth.uid()); pg_catalog is still searched implicitly (for `text`, `exists`), and pg_temp is not searched for functions
+-- or operators, so no temp object can shadow anything.
+set search_path = ''
 as $$
 begin
   -- A caller who is not an owner of the ACTIVE org does not get an empty list, they get an error. An empty answer can therefore only
@@ -51,7 +62,7 @@ begin
   end if;
 
   return query
-    select c.id, c.user_id, c.scope, c.provider, c.email, c.status
+    select c.id, c.user_id, c.scope::text, c.provider::text, c.email::text, c.status::text
     from public.mailbox_connection c
     where c.org_id = public.current_org_id();
 end;
@@ -86,7 +97,7 @@ comment on function public.mailbox_connections_for_owner() is
 --      future edit cannot add one without failing the test).
 --   7. A signed-out (anon) call is refused (permission denied), and `public` has no EXECUTE.
 --   8. After the call, `select access_token_enc from mailbox_connection` is still permission denied for an owner (no side effect on grants).
---   9. `proconfig` of the function is exactly `search_path=pg_catalog, public, pg_temp`.
+--   9. `proconfig` of the function is exactly `search_path=""` (empty).
 --
 -- App side (this repo): the page maps the 42501 refusal, any other error and a malformed answer to "couldn't check". An answer is trusted only
 -- when every connection the caller can see through the table's own RLS (firm-scope as well as personal) is in it; an empty answer, or a

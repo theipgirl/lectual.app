@@ -830,6 +830,8 @@ export const MATTER_MOVED_TO = "Moved to";
 export const MATTER_INTAKE_STAGES = (n: number, matching = false) =>
   `${n} ${matching ? "matching " : ""}${n === 1 ? "matter is" : "matters are"} in intake stages`;
 export const MATTER_INTAKE_SHOW = "Show them";
+/** Phases are set but no signed-engagement stage was found, so every intake-phase stage is treated as intake. */
+export const MATTER_NO_HIRED_STAGE = "No signed-engagement stage was found, so matters on every intake stage are left out here. Check your matter stage names.";
 export const MATTER_SHOWING_INTAKE = "Showing matters still in intake stages.";
 export const MATTER_BACK_TO_PAST_INTAKE = "Back to matters";
 export const MATTER_ALL_INTAKE_TITLE = "No matters past intake yet";
@@ -1248,6 +1250,8 @@ export const LEAD_PAGE_STEP_OWNER = "Assigned to";
 export const LEAD_PAGE_DID_ALL = (n: number) => `Show all (${n})`;
 export const LEAD_PAGE_APPROVALS_LINK = "See them in Approvals";
 export const LEAD_PAGE_YES_UNCONFIRMED = "We couldn't confirm that. Check Approvals before trying again. Nothing was sent.";
+/** Yes approves only the text that was shown: the draft was edited (or changed) after the card was drawn. */
+export const DRAFT_CHANGED_REFRESH = "The draft changed. Refresh to see it.";
 export const LEAD_PAGE_STALE_DRAFT = "This client's status changed since the draft was queued, so it can't be approved from here. Open it in Approvals to decide.";
 export const LEAD_PAGE_ALSO_WAITING = "Also waiting on this lead";
 export const LEAD_PAGE_BRIEFINGS = "Internal briefings for this lead";

@@ -10,6 +10,8 @@ import type { HandoffFact } from "@/lib/lead-step/facts";
 import { LEAD, MERGED, ME, RAYN } from "./fixtures";
 
 const ITEM = "q-1";
+/** sha256 hex of the body the card drew (any well-formed value: the core does the compare). */
+const SHA = "b".repeat(64);
 
 function item(over: Partial<QueueItem> = {}): QueueItem {
   return {
@@ -59,16 +61,30 @@ function deps(over: Partial<LeadStepActionDeps> = {}, role: Role = "attorney", s
 describe("Yes", () => {
   it("goes through the existing approve core, with a receipt, and never passes the stale confirm", async () => {
     const d = deps();
-    const r = await runLeadStepYes(d, LEAD, ITEM);
+    const r = await runLeadStepYes(d, LEAD, ITEM, SHA);
     expect(r).toEqual({ ok: true, message: W.leadStepDraftInMailbox(null, "Outlook"), webLink: "https://outlook.example/d/1", warn: false });
-    expect(d.review).toHaveBeenCalledWith({ id: ITEM, intent: "approve", withReceipt: true });
+    expect(d.review).toHaveBeenCalledWith({ id: ITEM, intent: "approve", withReceipt: true, requireShown: true, shownSha256: SHA });
     expect(d.revalidate).toHaveBeenCalledWith(LEAD);
+  });
+
+  it("Yes without the hash of the text shown is refused and approves nothing", async () => {
+    for (const bad of [undefined, null, "", "xyz", "B".repeat(64)]) {
+      const d = deps();
+      expect(await runLeadStepYes(d, LEAD, ITEM, bad)).toEqual({ ok: false, error: W.DRAFT_CHANGED_REFRESH });
+      expect(d.review).not.toHaveBeenCalled();
+    }
+  });
+
+  it("a changed draft: the core's refusal comes back as it is, and nothing is revalidated as approved", async () => {
+    const d = deps({ review: vi.fn(async (): Promise<ReviewOutcome> => ({ kind: "error", error: W.DRAFT_CHANGED_REFRESH })) });
+    expect(await runLeadStepYes(d, LEAD, ITEM, SHA)).toEqual({ ok: false, error: W.DRAFT_CHANGED_REFRESH });
+    expect(d.revalidate).not.toHaveBeenCalled();
   });
 
   it("a role that can't act is refused before any read", async () => {
     for (const caller of [null, { userId: ME, role: "viewer" as Role }, { userId: ME, role: "social_media" as Role }]) {
       const d = deps({ caller: vi.fn(async () => caller) });
-      expect(await runLeadStepYes(d, LEAD, ITEM)).toEqual({ ok: false, error: W.LEAD_STEP_NO_APPROVE });
+      expect(await runLeadStepYes(d, LEAD, ITEM, SHA)).toEqual({ ok: false, error: W.LEAD_STEP_NO_APPROVE });
       expect(d.readItem).not.toHaveBeenCalled();
       expect(d.leadIdsOf).not.toHaveBeenCalled();
       expect(d.review).not.toHaveBeenCalled();
@@ -77,7 +93,7 @@ describe("Yes", () => {
 
   it("Lectual staff viewing as the firm are refused before anything else", async () => {
     const d = deps({ staffPreview: vi.fn(async () => W.DECK_PREVIEW_ONLY) });
-    expect(await runLeadStepYes(d, LEAD, ITEM)).toEqual({ ok: false, error: W.LEAD_STEP_PREVIEW_ONLY });
+    expect(await runLeadStepYes(d, LEAD, ITEM, SHA)).toEqual({ ok: false, error: W.LEAD_STEP_PREVIEW_ONLY });
     expect(d.caller).not.toHaveBeenCalled();
     expect(d.readItem).not.toHaveBeenCalled();
     expect(d.review).not.toHaveBeenCalled();
@@ -85,7 +101,7 @@ describe("Yes", () => {
 
   it("attorney-only for a non-approver: refused by the routing rule, the core is never called", async () => {
     const d = deps({}, "law_clerk", item({ agent: "post-consult", headline: "Post-consult email" }));
-    expect(await runLeadStepYes(d, LEAD, ITEM)).toEqual({ ok: false, error: "Only an attorney can approve this kind of message." });
+    expect(await runLeadStepYes(d, LEAD, ITEM, SHA)).toEqual({ ok: false, error: "Only an attorney can approve this kind of message." });
     expect(d.review).not.toHaveBeenCalled();
     // The same for a routine kind whose text reads as legal advice, even routed to the clerk.
     const routed = deps(
@@ -93,48 +109,48 @@ describe("Yes", () => {
       "law_clerk",
       item({ final_body: "Your mark will be registered." }),
     );
-    expect(await runLeadStepYes(routed, LEAD, ITEM)).toEqual({ ok: false, error: "Only an attorney can approve this kind of message." });
+    expect(await runLeadStepYes(routed, LEAD, ITEM, SHA)).toEqual({ ok: false, error: "Only an attorney can approve this kind of message." });
     expect(routed.review).not.toHaveBeenCalled();
   });
 
   it("routed to someone else: their sentence", async () => {
     const d = deps({ routing: vi.fn(async () => ({ status: "ok" as const, routing: { stalled_followup: RAYN }, members: [{ userId: RAYN, role: "law_clerk" as Role, displayName: "Rayn" }] })) }, "paralegal");
-    expect(await runLeadStepYes(d, LEAD, ITEM)).toEqual({ ok: false, error: "This one is for Rayn. Ask them to approve it, or an owner or admin." });
+    expect(await runLeadStepYes(d, LEAD, ITEM, SHA)).toEqual({ ok: false, error: "This one is for Rayn. Ask them to approve it, or an owner or admin." });
   });
 
   it("a stale draft or a refused linked proposal: refused here, the core is never called", async () => {
     for (const reasons of [["stale"], ["linked-proposal"], ["check-first"], ["draft-issue"]] as const) {
       const d = deps({ closerLook: vi.fn(async () => ({ reasons: [...reasons], linkNotLive: false })) });
-      expect(await runLeadStepYes(d, LEAD, ITEM)).toEqual({ ok: false, error: W.LEAD_STEP_CLOSER_LOOK });
+      expect(await runLeadStepYes(d, LEAD, ITEM, SHA)).toEqual({ ok: false, error: W.LEAD_STEP_CLOSER_LOOK });
       expect(d.review).not.toHaveBeenCalled();
     }
     const unchecked = deps({ closerLook: vi.fn(async () => null) });
-    expect(await runLeadStepYes(unchecked, LEAD, ITEM)).toEqual({ ok: false, error: W.LEAD_STEP_CANT_CHECK });
+    expect(await runLeadStepYes(unchecked, LEAD, ITEM, SHA)).toEqual({ ok: false, error: W.LEAD_STEP_CANT_CHECK });
     expect(unchecked.review).not.toHaveBeenCalled();
   });
 
   it("the core's own refusal (it checks everything again) is shown as it is, and nothing is revalidated", async () => {
     const d = deps({ review: vi.fn(async (): Promise<ReviewOutcome> => ({ kind: "error", error: "Couldn't check the proposal linked to this email. Nothing was approved. Try again shortly." })) });
-    expect(await runLeadStepYes(d, LEAD, ITEM)).toEqual({ ok: false, error: "Couldn't check the proposal linked to this email. Nothing was approved. Try again shortly." });
+    expect(await runLeadStepYes(d, LEAD, ITEM, SHA)).toEqual({ ok: false, error: "Couldn't check the proposal linked to this email. Nothing was approved. Try again shortly." });
     expect(d.revalidate).not.toHaveBeenCalled();
   });
 
   it("a draft that is no longer on this lead, already decided, or unreadable is refused", async () => {
-    expect(await runLeadStepYes(deps({ leadIdsOf: vi.fn(async () => ["99999999-9999-4999-8999-999999999999"]) }), LEAD, ITEM)).toEqual({ ok: false, error: W.LEAD_STEP_NOT_ON_LEAD });
-    expect(await runLeadStepYes(deps({ leadIdsOf: vi.fn(async () => null) }), LEAD, ITEM)).toEqual({ ok: false, error: W.LEAD_STEP_FAILED });
-    expect(await runLeadStepYes(deps({}, "attorney", item({ status: "approved" })), LEAD, ITEM)).toEqual({ ok: false, error: W.LEAD_STEP_ALREADY_DECIDED });
-    expect(await runLeadStepYes(deps({ readItem: vi.fn(async () => null) }), LEAD, ITEM)).toEqual({ ok: false, error: W.LEAD_STEP_FAILED });
+    expect(await runLeadStepYes(deps({ leadIdsOf: vi.fn(async () => ["99999999-9999-4999-8999-999999999999"]) }), LEAD, ITEM, SHA)).toEqual({ ok: false, error: W.LEAD_STEP_NOT_ON_LEAD });
+    expect(await runLeadStepYes(deps({ leadIdsOf: vi.fn(async () => null) }), LEAD, ITEM, SHA)).toEqual({ ok: false, error: W.LEAD_STEP_FAILED });
+    expect(await runLeadStepYes(deps({}, "attorney", item({ status: "approved" })), LEAD, ITEM, SHA)).toEqual({ ok: false, error: W.LEAD_STEP_ALREADY_DECIDED });
+    expect(await runLeadStepYes(deps({ readItem: vi.fn(async () => null) }), LEAD, ITEM, SHA)).toEqual({ ok: false, error: W.LEAD_STEP_FAILED });
   });
 
   it("a draft filed on a lead merged into this one counts as this lead's", async () => {
     const d = deps({ leadIdsOf: vi.fn(async () => [MERGED]) });
-    expect((await runLeadStepYes(d, LEAD, ITEM)).ok).toBe(true);
+    expect((await runLeadStepYes(d, LEAD, ITEM, SHA)).ok).toBe(true);
   });
 
   it("bad ids are refused without a call", async () => {
     const d = deps();
-    expect(await runLeadStepYes(d, "not-a-uuid", ITEM)).toEqual({ ok: false, error: W.LEAD_STEP_FAILED });
-    expect(await runLeadStepYes(d, LEAD, "../x")).toEqual({ ok: false, error: W.LEAD_STEP_FAILED });
+    expect(await runLeadStepYes(d, "not-a-uuid", ITEM, SHA)).toEqual({ ok: false, error: W.LEAD_STEP_FAILED });
+    expect(await runLeadStepYes(d, LEAD, "../x", SHA)).toEqual({ ok: false, error: W.LEAD_STEP_FAILED });
     expect(d.caller).not.toHaveBeenCalled();
   });
 });
@@ -154,7 +170,7 @@ describe("the after-Yes sentence comes from the approve core's own result", () =
 
   it("the action returns that sentence", async () => {
     const d = deps({ review: vi.fn(async () => resolved({ send: "none", provider: null, webLink: null })) });
-    expect(await runLeadStepYes(d, LEAD, ITEM)).toEqual({ ok: true, message: W.LEAD_STEP_APPROVED_NO_DRAFT, webLink: null, warn: true });
+    expect(await runLeadStepYes(d, LEAD, ITEM, SHA)).toEqual({ ok: true, message: W.LEAD_STEP_APPROVED_NO_DRAFT, webLink: null, warn: true });
   });
 });
 
@@ -214,7 +230,7 @@ describe("Edit", () => {
     expect(d.revalidate).toHaveBeenCalledWith(LEAD);
     // After an edit that adds advice text, the next Yes is refused for the clerk (the item is re-read and re-classified).
     await runLeadStepEdit(d, LEAD, ITEM, "Hi Maya, your mark is likely to be registered.");
-    expect(await runLeadStepYes(d, LEAD, ITEM)).toEqual({ ok: false, error: "Only an attorney can approve this kind of message." });
+    expect(await runLeadStepYes(d, LEAD, ITEM, SHA)).toEqual({ ok: false, error: "Only an attorney can approve this kind of message." });
   });
 
   it("an empty edit is refused before any read; a viewer is refused before any read", async () => {
@@ -230,17 +246,17 @@ describe("Edit", () => {
 describe("review findings", () => {
   it("a linked proposal that isn't live: Yes is refused here with its own sentence (it would turn the link on)", async () => {
     const d = deps({ closerLook: vi.fn(async () => ({ reasons: ["linked-proposal" as const], linkNotLive: true })) });
-    expect(await runLeadStepYes(d, LEAD, ITEM)).toEqual({ ok: false, error: W.LEAD_STEP_LINK_NOT_LIVE });
+    expect(await runLeadStepYes(d, LEAD, ITEM, SHA)).toEqual({ ok: false, error: W.LEAD_STEP_LINK_NOT_LIVE });
     expect(d.review).not.toHaveBeenCalled();
   });
 
   it("the hander of a card now with someone else gets no Yes; the holder and an unknown state are unchanged", async () => {
     const away = deps({ handoff: vi.fn(async (): Promise<HandoffFact> => ({ status: "ok", holder: { userId: RAYN, by: ME, note: null, at: "2026-11-17T12:00:00.000Z" } })) });
-    expect(await runLeadStepYes(away, LEAD, ITEM)).toEqual({ ok: false, error: W.LEAD_STEP_HANDED_AWAY });
+    expect(await runLeadStepYes(away, LEAD, ITEM, SHA)).toEqual({ ok: false, error: W.LEAD_STEP_HANDED_AWAY });
     expect(away.review).not.toHaveBeenCalled();
     const held = deps({ handoff: vi.fn(async (): Promise<HandoffFact> => ({ status: "ok", holder: { userId: ME, by: RAYN, note: null, at: "2026-11-17T12:00:00.000Z" } })) });
-    expect((await runLeadStepYes(held, LEAD, ITEM)).ok).toBe(true);
-    expect((await runLeadStepYes(deps(), LEAD, ITEM)).ok).toBe(true);
+    expect((await runLeadStepYes(held, LEAD, ITEM, SHA)).ok).toBe(true);
+    expect((await runLeadStepYes(deps(), LEAD, ITEM, SHA)).ok).toBe(true);
   });
 
   it("Send back goes through the deck's own path after the same checks", async () => {
@@ -254,8 +270,16 @@ describe("review findings", () => {
     expect(await runLeadStepSendBack(refused, LEAD, ITEM, "")).toEqual({ ok: false, error: W.DECK_NOT_YOURS });
   });
 
+  it("a Send back note over the limit is refused, never cut, and nothing is written", async () => {
+    const d = deps();
+    expect(await runLeadStepSendBack(d, LEAD, ITEM, "x".repeat(501))).toEqual({ ok: false, error: W.SEND_BACK_NOTE_TOO_LONG });
+    expect(d.sendBack).not.toHaveBeenCalled();
+    expect(await runLeadStepSendBack(d, LEAD, ITEM, "x".repeat(500))).toMatchObject({ ok: true });
+    expect(d.sendBack).toHaveBeenCalledWith(ITEM, "x".repeat(500));
+  });
+
   it("a lead set that couldn't be read in full says 'failed', never 'not on this lead'", async () => {
-    expect(await runLeadStepYes(deps({ leadSet: vi.fn(async () => null) }), LEAD, ITEM)).toEqual({ ok: false, error: W.LEAD_STEP_FAILED });
+    expect(await runLeadStepYes(deps({ leadSet: vi.fn(async () => null) }), LEAD, ITEM, SHA)).toEqual({ ok: false, error: W.LEAD_STEP_FAILED });
   });
 
   it("after a yes: 'sent' reads Approved., and a letter says its document is made", () => {

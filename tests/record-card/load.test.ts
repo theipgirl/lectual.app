@@ -226,6 +226,14 @@ describe("loadRecordCard: each lead source fails on its own", () => {
     m.loadLeadStepFacts.mockResolvedValueOnce({ ...facts, facts: { ...facts.facts, approvals: { status: "unavailable" } } });
     expect((await leadOk()).approvals).toEqual({ status: "unavailable" });
   });
+  it("the chip counts every pending approval (refs past the enrich cap, and briefings), not only the enriched items", async () => {
+    const refs = Array.from({ length: 12 }, (_, i) => ({ id: `q${i + 1}`, headline: "h", createdAt: null }));
+    const items = refs.slice(0, 10).map((r) => ({ id: r.id }));
+    m.loadLeadStepFacts.mockResolvedValueOnce({ ...facts, facts: { ...facts.facts, approvals: { status: "ok", value: { items, total: 12, refs, briefings: [{ id: "b1", headline: "brief", createdAt: null }] } } } });
+    const r = await leadOk();
+    expect(r.approvals.status === "ok" && r.approvals.queueIds.length).toBe(13);
+    expect(r.approvals).toEqual({ status: "ok", queueIds: [...refs.map((x) => x.id), "b1"] });
+  });
   it("documents", async () => {
     m.readRecordDocuments.mockRejectedValueOnce(new Error("x"));
     expect((await leadOk()).documents).toEqual({ status: "unavailable" });

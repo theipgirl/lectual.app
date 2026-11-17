@@ -111,8 +111,10 @@ function colleagueItems(p: PersonIn, input: FirstUsersInput): AccountItem[] {
   if (c.kind === "unavailable") return pair("couldnt-check", CANT);
 
   // The answer is trusted only when it is checked against EVERY connection the caller can see themselves (firm-scope as well as personal):
-  // each must be in it. An empty answer, or a caller whose own read failed, cannot be checked, so nothing reads "not connected".
-  if (!input.own.ok || c.rows.length === 0) return pair("couldnt-check", CANT);
+  // each must be in it. A caller whose own read failed cannot check it, so nothing reads "not connected". An empty answer is
+  // trusted only when the caller's own read is empty too (the function answered, and there is nothing it could have left out).
+  if (!input.own.ok) return pair("couldnt-check", CANT);
+  if (c.rows.length === 0 && input.own.value.length > 0) return pair("couldnt-check", CANT);
   const answered = new Set(c.rows.map((r) => r.id));
   if (!input.own.value.every((x) => answered.has(x.id))) return pair("couldnt-check", CANT);
 

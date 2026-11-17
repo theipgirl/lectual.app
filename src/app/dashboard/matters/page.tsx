@@ -38,7 +38,8 @@ import {
   parseGroupChoice,
   phaseGroupCounts,
 } from "@/lib/matters/phase-group";
-import { searchPlaceholder, BLANK, MATTERS_NAME, OWNER_COLUMN, TEAMMATE, UNASSIGNED, MATTER_GROUPS_NAV, MATTER_GROUP_ALL, MATTER_INTAKE_STAGES, MATTER_INTAKE_SHOW, MATTER_SHOWING_INTAKE, MATTER_BACK_TO_PAST_INTAKE, MATTER_ALL_INTAKE_BODY, MATTER_ALL_INTAKE_TITLE, MATTER_GROUP_EMPTY, MATTER_GROUP_LABEL, MATTER_PHASES_UNAVAILABLE, MATTER_STATUS_NAV } from "@/lib/ui/words";
+import { isHiredStage } from "@/lib/matters/hired-stage";
+import { searchPlaceholder, BLANK, MATTERS_NAME, OWNER_COLUMN, TEAMMATE, UNASSIGNED, MATTER_GROUPS_NAV, MATTER_GROUP_ALL, MATTER_INTAKE_STAGES, MATTER_INTAKE_SHOW, MATTER_SHOWING_INTAKE, MATTER_BACK_TO_PAST_INTAKE, MATTER_ALL_INTAKE_BODY, MATTER_ALL_INTAKE_TITLE, MATTER_GROUP_EMPTY, MATTER_GROUP_LABEL, MATTER_PHASES_UNAVAILABLE, MATTER_NO_HIRED_STAGE, MATTER_STATUS_NAV } from "@/lib/ui/words";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import { matterIdsNeedingReview } from "./list-utils";
@@ -126,8 +127,11 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
   const shown = searchMatters(filterBySegment(inGroup, seg, sets), search);
   const boardStages = showIntake ? stageList.filter((s) => !drawableStages.some((d) => d.id === s.id)) : grouped ? boardStagesForChoice(drawableStages, group, shown) : stageList;
   const bands = groupIntoBands(shown);
-  // The intake line is about the Open chip only; with a search it counts the matches only.
-  const stillInIntake = intakeView && seg === "open" ? searchMatters(filterBySegment(intakeView.intake, seg, sets), search).length : 0;
+  // The intake line is about the chip in use (the intake matters are left out of every chip, so each says how many it
+  // left out); with a search it counts the matches only. "Show them" keeps the chip.
+  const stillInIntake = intakeView ? searchMatters(filterBySegment(intakeView.intake, seg, sets), search).length : 0;
+  // Phases are on but no signed-engagement stage was found: every intake-phase stage counts as intake. Said, never silent.
+  const noHiredStage = grouped && !stageList.some((s) => isHiredStage(s));
   const everyMatterInIntake = !showIntake && !!intakeView && all.length > 0 && pastLoe.length === 0;
   const memberName = new Map(members.map((m) => [m.userId, m.displayName ?? m.email ?? TEAMMATE]));
   const leadOptions = leads.map((l) => ({
@@ -216,6 +220,11 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
         <p role="status" className="lx-note lx-state-line">
           {MATTER_INTAKE_STAGES(stillInIntake, !!search)} · <Link href={href({ intake: true })}>{MATTER_INTAKE_SHOW}</Link>
         </p>
+      )}
+      {noHiredStage && (
+        <Notice tone="warn" role="status">
+          {MATTER_NO_HIRED_STAGE}
+        </Notice>
       )}
       {phasesFailed && (
         <Notice tone="warn" role="status">

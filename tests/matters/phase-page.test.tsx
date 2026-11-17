@@ -174,12 +174,42 @@ describe("phase groups on the Matters page", () => {
     expect(html).toMatch(/<a href="\/dashboard\/matters\/?\?view=table">Back to matters<\/a>/);
   });
 
-  it("the intake line is about the Open chip and, with a search, counts the matches only", async () => {
+  it("the intake line follows the chip in use and, with a search, counts the matches only", async () => {
     const closed = await render({ matters: sample(), read: ok, params: { seg: "closed" } });
     expect(closed).not.toContain("in intake stages");
     n = 0;
     const found = await render({ matters: sample(), read: ok, params: { q: "Mk1z" } });
     expect(found).toContain("1 matching matter is in intake stages");
+  });
+
+  it("Closed: a closed matter on an intake stage is named on the Closed chip, and Show them keeps the chip", async () => {
+    n = 0;
+    const list = [m("TM", S.a, { status: "closed" }), m("TM", S.c, { status: "closed" }), m("TM", S.a)];
+    const html = await render({ matters: list, read: ok, params: { seg: "closed", view: "table" } });
+    expect(html).toContain("1 matter is in intake stages · ");
+    expect(html).toMatch(/<a href="\/dashboard\/matters\/?\?intake=1&amp;seg=closed&amp;view=table">Show them<\/a>/);
+    n = 0;
+    const shown = await render({ matters: [m("TM", S.a, { status: "closed" }), m("TM", S.c, { status: "closed" }), m("TM", S.a)], read: ok, params: { seg: "closed", intake: "1", view: "table" } });
+    expect(shown).toContain("Mk1z");
+    expect(shown).not.toContain("Mk3z");
+  });
+
+  it("Unassigned: intake matters left out of the Unassigned chip are counted there too", async () => {
+    n = 0;
+    const list = [m("TM", S.a), m("TM", S.a, { assigned_to: "u1" } as Partial<Matter>), m("TM", S.c)];
+    const html = await render({ matters: list, read: ok, params: { seg: "unassigned" } });
+    expect(html).toContain("1 matter is in intake stages · ");
+    expect(html).toMatch(/\?intake=1&amp;seg=unassigned">Show them<\/a>/);
+  });
+
+  it("phases with no signed-engagement stage say so in one quiet warn line; with one, nothing is said", async () => {
+    n = 0;
+    const without = await render({ matters: sample(), read: ok });
+    expect(without).toContain("No signed-engagement stage was found");
+    n = 0;
+    const hired = st("sh", "Signed LOE / Deposit Received", "pipeline", 1.5);
+    const withIt = await render({ matters: sample(), read: { status: "ok", stages: [...Object.values(S), hired] } });
+    expect(withIt).not.toContain("No signed-engagement stage was found");
   });
 
   it("when every matter is in an intake stage the empty state says so, not 'match these filters'", async () => {

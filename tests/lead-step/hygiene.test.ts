@@ -87,7 +87,7 @@ describe("the lead step engine", () => {
     expect(wiring).toMatch(/^"use server";/m);
     const core = code("actions-core.ts");
     expect(core.match(/deps\.review\(/g)?.length).toBe(3);
-    expect(core).toMatch(/intent: "approve", withReceipt: true \}/);
+    expect(core).toMatch(/intent: "approve", withReceipt: true, requireShown: true, shownSha256 \}/);
     expect(core).not.toMatch(/confirmStale/);
     expect(core).toMatch(/intent: "reject", note: reason/);
     expect(core).toMatch(/intent: "save", body/);

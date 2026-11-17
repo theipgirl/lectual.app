@@ -20,6 +20,7 @@ import type { ActivityRow } from "@/lib/stage-keeper/moves";
 import { RECORD_CARD_A_TEAMMATE } from "@/lib/ui/words";
 import { nextOpenDeadline, type CardMember, type CardProposal, type CardRead, type CardStage, type CardTag, type CardTask, type RecordCardLoad } from "./model";
 import type { CardRef } from "./open";
+import { approvalQueueIds } from "./rules";
 
 /**
  * Re-reads ONE record for the opened card (`?open=`), through the caller's scoped client only: no service role, no
@@ -145,7 +146,7 @@ async function loadLead(db: Awaited<ReturnType<typeof getScopedClient>>, askedId
   const approvals: Extract<RecordCardLoad, { kind: "lead" }>["approvals"] = !facts
     ? { status: "unavailable" }
     : facts.approvals.status === "ok"
-      ? { status: "ok", queueIds: facts.approvals.value.items.map((i) => i.id) }
+      ? { status: "ok", queueIds: approvalQueueIds(facts.approvals.value) }
       : facts.approvals.status === "not-set-up"
         ? { status: "unconfigured" }
         : { status: "unavailable" };

@@ -101,7 +101,7 @@ export function NeedsYourYes({ leadId, view, initial }: { leadId: string; view: 
       if (!step.fire) return;
       if (timer.current) clearInterval(timer.current);
       timer.current = null;
-      run("yes", () => leadStepYesAction(leadId, view.itemId));
+      run("yes", () => leadStepYesAction(leadId, view.itemId, view.bodySha256));
     }, 1000);
   };
   const undo = () => {

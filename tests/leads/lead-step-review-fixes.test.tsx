@@ -66,9 +66,9 @@ describe("2. a failed-draft approval is a warning with a link, not a green succe
       closerLook: async () => ({ reasons: [], linkNotLive: false }), handoff: async () => ({ status: "unknown" as const }), sendBack: async () => ({ ok: true as const }),
       review: async () => r("mailbox-failed"), revalidate: () => {},
     };
-    expect(await runLeadStepYes(d, LEAD, "q-1")).toMatchObject({ ok: true, warn: true, message: W.LEAD_STEP_APPROVED_DRAFT_FAILED });
+    expect(await runLeadStepYes(d, LEAD, "q-1", "c".repeat(64))).toMatchObject({ ok: true, warn: true, message: W.LEAD_STEP_APPROVED_DRAFT_FAILED });
     // 7: a stale draft says this page's own sentence, never a confirmation box
-    const stale = await runLeadStepYes({ ...d, review: async () => ({ kind: "error" as const, error: "Status changed. Tick the confirmation box to approve it anyway, or reject it." }) }, LEAD, "q-1");
+    const stale = await runLeadStepYes({ ...d, review: async () => ({ kind: "error" as const, error: "Status changed. Tick the confirmation box to approve it anyway, or reject it." }) }, LEAD, "q-1", "c".repeat(64));
     expect(stale).toEqual({ ok: false, error: W.LEAD_PAGE_STALE_DRAFT });
     expect(W.LEAD_PAGE_STALE_DRAFT).not.toMatch(/box|tick/i);
   });

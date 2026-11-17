@@ -7,6 +7,8 @@ import { QUEUE_EDIT_ROLES } from "@/lib/queue/roles";
 import { classifyQueueItem } from "@/lib/queue/routing";
 import { isDoneNote } from "@/lib/queue/done";
 import { runQueueReview, type ReviewOutcome } from "@/lib/queue/review-core";
+import { shownShaOf } from "@/lib/queue/shown-text";
+import { sendBackNoteTooLong } from "@/lib/queue/handed";
 import { recordCardEvent } from "@/lib/queue/card-state";
 import { cardCaller, cardContext, staffPreviewRefusal, cardIdOf, cardNoteOf, noticeHandedTo, readCardItem, sendCardBack } from "@/lib/queue/card-moves";
 import { listMemberDirectory } from "@/lib/members/directory";
@@ -33,6 +35,8 @@ import {
   DECK_SENT_BACK,
   NOT_SWITCHED_ON,
   deckSentAt,
+  DRAFT_CHANGED_REFRESH,
+  SEND_BACK_NOTE_TOO_LONG,
 } from "@/lib/ui/words";
 
 /**
@@ -93,13 +97,18 @@ function approvedText(send: string | null): string {
   return "Approved. Nothing has gone out.";
 }
 
-/** Yes: the existing approve path, with a receipt of the approved text on the note. */
-export async function approveCardAction(rawId: unknown): Promise<DeckResult> {
+/**
+ * Yes: the existing approve path, with a receipt of the approved text on the note. It approves only the text the card
+ * showed: the sha256 the card posts must match the re-read item (a missing one is refused).
+ */
+export async function approveCardAction(rawId: unknown, rawShownSha256?: unknown): Promise<DeckResult> {
   await gate();
   const id = cardIdOf(rawId);
   if (!id) return { ok: false, error: DECK_FAILED };
+  const shownSha256 = shownShaOf(rawShownSha256);
+  if (!shownSha256) return { ok: false, error: DRAFT_CHANGED_REFRESH };
   if (!(await cardCaller())) return { ok: false, error: "You don't have permission to approve or reject client communications." };
-  return approveResult(await runQueueReview({ id, intent: "approve", withReceipt: true }));
+  return approveResult(await runQueueReview({ id, intent: "approve", withReceipt: true, requireShown: true, shownSha256 }));
 }
 
 /** Mark read: an internal briefing is approved (nothing goes to a client). Refused for anything else. */
@@ -196,6 +205,7 @@ export async function returnCardAction(rawId: unknown, rawNote: unknown): Promis
   await gate();
   const id = cardIdOf(rawId);
   if (!id) return { ok: false, error: DECK_FAILED };
+  if (sendBackNoteTooLong(rawNote)) return { ok: false, error: SEND_BACK_NOTE_TOO_LONG };
   // The same core the approval page's Send back uses; the deck also lets whoever handed the card recall it.
   const sent = await sendCardBack({ id, note: cardNoteOf(rawNote), allowHander: true });
   if (!sent.ok) return sent;

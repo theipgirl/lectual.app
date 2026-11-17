@@ -41,11 +41,14 @@ export function Timeline({
   mediaUrls = {},
   timeZone,
   undo,
+  now,
 }: {
   rows: readonly Row[];
   mediaUrls?: Record<string, string>;
   timeZone?: string;
   undo?: TimelineUndo;
+  /** "Today" for the dates (tests pass a fixed one); the current time otherwise. */
+  now?: Date;
 }) {
   if (rows.length === 0) return <EmptyState variant="line">{noneYet("timeline entries")}</EmptyState>;
   // Undo reads only the lead's OWN rows: a merged lead's rows (M5) are history, never acted on.
@@ -61,7 +64,7 @@ export function Timeline({
           <li key={r.id} data-tone={d.tone}>
             <div className="lx-timeline-head">
               <span>{d.title}</span>
-              <span className="lx-note">{timelineDate(r.created_at, timeZone)}</span>
+              <span className="lx-note">{timelineDate(r.created_at, timeZone, now)}</span>
             </div>
             {audio && <audio controls preload="none" src={audio} aria-label="Voice note" style={{ width: "100%", height: 34, marginTop: 6 }} />}
             {d.detail && <p>{d.detail}</p>}

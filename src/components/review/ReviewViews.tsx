@@ -63,6 +63,7 @@ function ReviewCard({ row, bucket, today, members, canWrite, params, waitingOnCl
   const due = row.nextStep ? dueText(row.nextStep.dueDate, today) : null;
   const href = openHref(params, row);
   // The chip at the right of the name: the due date, else "Approval" for a record waiting on one, else a nudge to set a step.
+  // A "Waiting on client" card draws none, EXCEPT an overdue or due-this-week step, which keeps its due chip in either list.
   const chip: { text: string; tone: PillTone } | null = due
     ? { text: due.text, tone: due.overdue ? "risk" : due.text.startsWith("Due") ? "warn" : "mute" }
     : row.waiting === "approval"
@@ -80,7 +81,7 @@ function ReviewCard({ row, bucket, today, members, canWrite, params, waitingOnCl
       data-key={openToken(row)}
       meta={cardSubline(row)}
       step={row.nextStep ? row.nextStep.title : "No next step"}
-      chip={!waitingOnClient && chip ? <Pill tone={chip.tone}>{chip.text}</Pill> : undefined}
+      chip={chip && (!waitingOnClient || bucket === "overdue" || bucket === "week") ? <Pill tone={chip.tone}>{chip.text}</Pill> : undefined}
     >
       <div className="rv-card-sent lx-note" data-sent={row.lastOutbound ? "yes" : row.contactKnown ? "none" : "unknown"}>
         {sentText(row, today, { days: waitingOnClient })}

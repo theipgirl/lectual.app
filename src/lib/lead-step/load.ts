@@ -17,6 +17,7 @@ import { loadApprovalRouting } from "@/lib/queue/routing-load";
 import { parseReviewerSummary } from "@/lib/queue/reviewer-summary";
 import { currentHolder, eventTrust, linkGateFlags, needsCloserLook, trustedCardState } from "@/lib/queue/deck";
 import { loadCardState } from "@/lib/queue/card-state";
+import { shownBodySha256 } from "@/lib/queue/shown-text";
 import { PREP_SOURCE } from "@/lib/agents/consult-prep/constants";
 import { CONSULT_PROPOSAL_SOURCE } from "@/lib/consult-proposal/source";
 import type { Role } from "@/lib/auth/roles";
@@ -152,6 +153,7 @@ async function enrich(item: QueueItem, payloadKind: string | null, audit: Audit 
     recipient: item.recipient,
     subject: item.subject,
     body,
+    bodySha256: shownBodySha256(body),
     draftBody: item.draft_body,
     finalBody: item.final_body,
     createdAt: item.created_at || null,

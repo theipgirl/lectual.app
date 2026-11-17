@@ -89,10 +89,10 @@ export default async function TodayPage() {
     return <OwnerToday userId={session.user.id} role={session.role} email={session.user.email} metadata={session.user.user_metadata} />;
   }
   const now = new Date();
-  const [hasAgents, tz, intakeIds] = await Promise.all([orgHasModule("agents"), getFirmTimeZone(), loadIntakeStageIds()]);
+  const [hasAgents, tz] = await Promise.all([orgHasModule("agents"), getFirmTimeZone()]);
   const monthFloor = monthQueryFloor(now, tz);
 
-  const [queueS, leadsS, mattersS, deadlinesS, tasksS, runsS, autopilotS, quotesS, connectionsS, submissionsS, closedS, membersS] =
+  const [queueS, leadsS, mattersS, deadlinesS, tasksS, runsS, autopilotS, quotesS, connectionsS, submissionsS, closedS, membersS, intakeIdsS] =
     await Promise.allSettled([
       loadActiveQueue(),
       listLeads(),
@@ -119,6 +119,8 @@ export default async function TodayPage() {
       loadUnreviewedSubmissions(),
       loadDeadlinesClosedSince(monthFloor),
       listMemberDirectory(),
+      // Read beside the matters it filters (it never throws; null = a failed stage read, which counts every matter).
+      loadIntakeStageIds(),
     ]);
 
   // loadActiveQueue never throws; a rejection would be a bug, shown as unavailable.
@@ -135,6 +137,7 @@ export default async function TodayPage() {
   const submissions = submissionsS.status === "fulfilled" ? submissionsS.value : null;
   const closedDeadlines = closedS.status === "fulfilled" ? closedS.value : null;
   const members = membersS.status === "fulfilled" ? membersS.value : [];
+  const intakeIds = intakeIdsS.status === "fulfilled" ? intakeIdsS.value : null;
 
   // Matters still in an intake stage are not on the Matters page, so they are not "open matters" here either.
   const docket = matters ? summarizeDocket(withoutIntake(matters, intakeIds), now) : null;

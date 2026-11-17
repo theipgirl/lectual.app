@@ -30,6 +30,7 @@ import {
   type MatterDeadline,
 } from "@/lib/matters";
 import { summarizeDocket } from "@/lib/matters/docket-summary";
+import { loadIntakeStageIds, withoutIntake } from "@/lib/matters/intake-ids";
 import { listLeads, type Lead } from "@/lib/pipeline";
 import { confirmationContext, withConfirmation, DRAFT_PROPOSAL_TOOL, type ConfirmationContext } from "@/lib/copilot/draft-proposal";
 import {
@@ -355,7 +356,9 @@ function buildTools(
       inputSchema: { type: "object", properties: {} },
       execute: async () => {
         const all = await loadMatters();
-        const { open, stalled } = summarizeDocket(all);
+        // Counted the way the Matters page draws them: a matter still in an intake stage is not an open matter. A failed
+        // stage read (null) counts every matter, as before the rule.
+        const { open, stalled } = summarizeDocket(withoutIntake(all, await loadIntakeStageIds()));
         const shown = stalled.slice(0, 15);
         const byId = new Map(all.map((m) => [m.id, m]));
         shown.forEach((s) => {

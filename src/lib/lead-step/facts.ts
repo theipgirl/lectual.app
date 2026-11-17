@@ -67,6 +67,8 @@ export type PendingDraft = {
   subject: string | null;
   /** What would go out: the saved edit, else the draft. */
   body: string;
+  /** sha256 hex of `body`, computed on the server; Yes posts it back so only the text shown is approved. */
+  bodySha256?: string;
   draftBody: string;
   finalBody: string | null;
   createdAt: string | null;

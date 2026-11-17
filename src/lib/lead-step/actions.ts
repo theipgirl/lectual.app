@@ -76,8 +76,8 @@ const deps: LeadStepActionDeps = {
   },
 };
 
-export async function leadStepYesAction(leadId: unknown, itemId: unknown): Promise<YesResult> {
-  return runLeadStepYes(deps, leadId, itemId);
+export async function leadStepYesAction(leadId: unknown, itemId: unknown, shownSha256: unknown): Promise<YesResult> {
+  return runLeadStepYes(deps, leadId, itemId, shownSha256);
 }
 
 export async function leadStepNotThisAction(leadId: unknown, itemId: unknown, reason: unknown): Promise<NotThisResult> {

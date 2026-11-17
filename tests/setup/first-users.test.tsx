@@ -155,9 +155,16 @@ describe("a colleague's mailbox: owner through 0108, everyone else 'Only <name> 
     expect(JSON.stringify(rowOf(r, ME))).not.toContain("Gmail");
   });
 
-  it("an empty answer is never 'not connected': the caller's own visible connections, firm-scope too, must be in the answer (item 1c)", () => {
+  it("an empty answer is trusted only when the caller's own read is empty too: then it is 'not connected' (review fix)", () => {
     const empty = firstUsers(input({ colleagues: { kind: "ok", rows: [] }, own: ok([]) }));
-    expect(item(empty, "u-c", "outlook").status).toBe("couldnt-check");
+    expect(item(empty, "u-c", "outlook")).toMatchObject({ status: "to-do", text: "No Outlook mailbox connected yet." });
+    expect(item(empty, "u-r", "drafts").status).toBe("to-do");
+    // an empty answer while the caller sees a connection of their own: not trusted
+    const leftOut = firstUsers(input({ colleagues: { kind: "ok", rows: [] } }));
+    expect(item(leftOut, "u-c", "outlook").status).toBe("couldnt-check");
+  });
+
+  it("the caller's own visible connections, firm-scope too, must be in the answer (item 1c)", () => {
     // a firm-scope mailbox the caller sees but the answer lacks: not trusted
     const missingFirm = firstUsers(input({ own: ok([own(), own({ id: "c-firm", scope: "firm", userId: null })]), colleagues: { kind: "ok", rows: [theirs(ME, { id: "c-me" })] } }));
     expect(item(missingFirm, "u-c", "outlook").status).toBe("couldnt-check");

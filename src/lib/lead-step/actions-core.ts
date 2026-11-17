@@ -1,7 +1,7 @@
 import type { Role } from "@/lib/auth/roles";
 import type { QueueItem } from "@/lib/queue/api";
 import { DOCUMENT_QUEUE_TYPES } from "@/lib/documents/types";
-import { SEND_BACK_NOTE_MAX } from "@/lib/queue/handed";
+import { SEND_BACK_NOTE_MAX, sendBackNoteTooLong } from "@/lib/queue/handed";
 import { isDoneNote } from "@/lib/queue/done";
 import { QUEUE_EDIT_ROLES } from "@/lib/queue/roles";
 import { approvalRefusal } from "@/lib/queue/routing";
@@ -30,6 +30,8 @@ import {
   LEAD_STEP_PREVIEW_ONLY,
   LEAD_STEP_REASON_NEEDED,
   REJECT_NOTE_IS_DONE_MARKER,
+  DRAFT_CHANGED_REFRESH,
+  SEND_BACK_NOTE_TOO_LONG,
   leadStepDraftInMailbox,
 } from "@/lib/ui/words";
 import type { HandoffFact, RoutingFacts } from "./facts";
@@ -98,6 +100,8 @@ export type SendBackResult = { ok: true; message: string } | { ok: false; error:
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const QUEUE_ID = /^[A-Za-z0-9_-]{1,128}$/;
+/** The same shape `src/lib/queue/shown-text.ts` checks (that file uses node:crypto, which this pure file can't import). */
+const SHOWN_SHA256 = /^[0-9a-f]{64}$/;
 /** The approve core asks for a ticked confirmation box on a stale draft; this page has none, so it says its own sentence. */
 const STALE_CONFIRM = /confirmation box/i;
 export const REASON_MAX = 200;
@@ -186,7 +190,7 @@ function refusalFor(c: Extract<Checked, { ok: true }>): string | null {
   });
 }
 
-export async function runLeadStepYes(deps: LeadStepActionDeps, rawLeadId: unknown, rawItemId: unknown): Promise<YesResult> {
+export async function runLeadStepYes(deps: LeadStepActionDeps, rawLeadId: unknown, rawItemId: unknown, rawShownSha256?: unknown): Promise<YesResult> {
   const leadId = leadIdOf(rawLeadId);
   const itemId = itemIdOf(rawItemId);
   if (!leadId || !itemId) return { ok: false, error: LEAD_STEP_FAILED };
@@ -202,7 +206,11 @@ export async function runLeadStepYes(deps: LeadStepActionDeps, rawLeadId: unknow
   if (look === null) return { ok: false, error: LEAD_STEP_CANT_CHECK };
   if (look.linkNotLive) return { ok: false, error: LEAD_STEP_LINK_NOT_LIVE };
   if (look.reasons.length > 0) return { ok: false, error: LEAD_STEP_CLOSER_LOOK };
-  const outcome = await deps.review({ id: itemId, intent: "approve", withReceipt: true });
+  // Yes approves the text on screen: the card posts the sha256 of the body it drew; none (or a malformed one) is
+  // refused, and the core compares it with the item as re-read (a colleague's edit since is refused there).
+  const shownSha256 = typeof rawShownSha256 === "string" && SHOWN_SHA256.test(rawShownSha256) ? rawShownSha256 : null;
+  if (!shownSha256) return { ok: false, error: DRAFT_CHANGED_REFRESH };
+  const outcome = await deps.review({ id: itemId, intent: "approve", withReceipt: true, requireShown: true, shownSha256 });
   if (outcome.kind === "error") return { ok: false, error: STALE_CONFIRM.test(outcome.error) ? LEAD_PAGE_STALE_DRAFT : outcome.error };
   if (outcome.kind !== "resolved" || outcome.intent !== "approve") return { ok: false, error: LEAD_STEP_FAILED };
   deps.revalidate(leadId);
@@ -248,6 +256,8 @@ export async function runLeadStepSendBack(deps: LeadStepActionDeps, rawLeadId: u
   const leadId = leadIdOf(rawLeadId);
   const itemId = itemIdOf(rawItemId);
   if (!leadId || !itemId) return { ok: false, error: LEAD_STEP_FAILED };
+  // Over the limit is refused, never cut (the same rule as the Approvals page and the deck).
+  if (sendBackNoteTooLong(rawNote)) return { ok: false, error: SEND_BACK_NOTE_TOO_LONG };
   const note = typeof rawNote === "string" ? rawNote.replace(/\p{Cf}/gu, "").replace(/[\u0000-\u001F\u007F]/g, " ").replace(/\s+/g, " ").trim().slice(0, SEND_BACK_NOTE_MAX) : "";
   const c = await checkCallerAndItem(deps, leadId, itemId, LEAD_STEP_NO_EDIT);
   if (!c.ok) return c;

@@ -12,7 +12,7 @@ import { loadActiveQueue } from "@/lib/queue/load";
 import { dismissStale, dismissableFollowups, type DismissResult } from "@/lib/queue/dismiss";
 import type { Role } from "@/lib/auth/roles";
 import { cardIdOf, cardNoteOf, sendCardBack } from "@/lib/queue/card-moves";
-import { SEND_BACK_NOTE_MAX } from "@/lib/queue/handed";
+import { sendBackNoteTooLong } from "@/lib/queue/handed";
 import { isDoneNote } from "@/lib/queue/done";
 import { DECK_FAILED, REJECT_NOTE_IS_DONE_MARKER, SEND_BACK_NOTE_TOO_LONG } from "@/lib/ui/words";
 
@@ -112,7 +112,7 @@ export async function sendBackAction(_prev: SendBackState, formData: FormData): 
   const id = cardIdOf(formData.get("id"));
   if (!id) return { error: DECK_FAILED };
   const rawNote = formData.get("note");
-  if (typeof rawNote === "string" && rawNote.trim().length > SEND_BACK_NOTE_MAX) return { error: SEND_BACK_NOTE_TOO_LONG };
+  if (sendBackNoteTooLong(rawNote)) return { error: SEND_BACK_NOTE_TOO_LONG };
   const sent = await sendCardBack({ id, note: cardNoteOf(rawNote), allowHander: false });
   if (!sent.ok) return { error: sent.error };
   revalidatePath("/dashboard/queue/");
