@@ -2028,3 +2028,22 @@ No new rail row and no My cards page in today's shell. Additive only: with no ca
 - **Source:** `REFERRAL_SOURCES` gained "Assessment" and "Intake form" (what the public form writes). Searching inside a set offers "All open has N matches" when All open has more.
 - **Departure from the list-page pattern, on purpose:** Leads rows and cards use `ix-row` / `ix-card` (`leads.css`), not the shared `lp-row` / `lp-board-card`, so every row is one even height, the page scrolls instead of the table, and nothing scrolls sideways at 1280. `tests/list-page` was changed to match. The section name is one export (`LEADS_NAME`); the page is not renamed.
 - **Not verified:** a real browser, the aria-live announcements, keyboard use of the row menu on the board, the 148px board column floor with 7 or more populated stages at 1280 (it scrolls inside itself).
+
+## Master-class worksheet endpoint (`POST /api/worksheet/`, no schema)
+The RPB master-class worksheet (lectual-plugin `sites/rpb-masterclass/trademark/worksheet/`, a static site) posts JSON here
+(`SUBMIT_MODE = "post-json"`). Public, unauthenticated; rules in `src/lib/worksheet/handle.ts` (deps injected, tested in `tests/worksheet/`).
+- **No org from the body.** The firm is the owner of the LIVE intake form named by `WORKSHEET_INTAKE_SLUG`, read with the public intake's
+  `readIntakeHandle`; the write is the public intake's contact-first pair (`startPublicIntake` with a derived token, then `completeStartedIntake`),
+  so the org_id is that form row's, the lead lands in the new-enquiry stage and carries the form's source tag. A scored assessment form is refused.
+- Answers are stored as `IntakeAnswer` rows whose question text comes from `src/lib/worksheet/answers.ts`, not the browser; the posted
+  `summaryText` is accepted (capped) but never stored or mailed: the summary is rebuilt on the server.
+- **Retries:** the page sends a uuid; the resume token is HMAC(`INTAKE_EVENT_SALT`) of form + uuid, so a retry finishes or finds the same row
+  (no second lead), and both emails carry Resend idempotency keys from it. A replayed uuid only mails the address the row already holds.
+- **Hardening:** CORS only for `WORKSHEET_ALLOWED_ORIGINS` (default `https://masterclass.rpblawfirm.com`; a POST from any other or no Origin is 403),
+  JSON only, 64 KB body cap, zod caps on every field, honeypot `website` (answered 200, nothing written), in-memory per-IP (20/10 min) and
+  per-email (4/10 min) courtesy limits, fixed sentences, logs carry counts only. 2xx only after the lead is written; email failures never fail it.
+- **Email** through `sendInternalMail` only: the attendee's copy (only with consent, to the address they typed, reply-to `WORKSHEET_REPLY_TO`) and
+  the firm notice to `WORKSHEET_NOTIFY_TO` (reply-to the attendee; first line says whether they want a Legal Strategy Session). Sender
+  `WORKSHEET_FROM` must be on a domain verified on `RESEND_API_KEY`'s account; unset sender or key = no email, the lead is still filed.
+- `WORKSHEET_LAWMATICS_SYNC=on` also pushes each new person to the firm's own Lawmatics like any intake (source tag = Lawmatics tag, which can
+  fire the firm's Lawmatics automations). Default off.

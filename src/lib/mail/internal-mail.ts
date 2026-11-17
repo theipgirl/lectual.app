@@ -1,9 +1,10 @@
 import { fetchWithTimeout } from "@/lib/http/timeout";
 
 /**
- * The one place this app talks to Resend for INTERNAL mail (agent failure alerts, "Send feedback").
- * Recipients are always supplied by the caller from a deployment env var, never from a record, so
- * nothing sent here can reach a firm's client.
+ * The one place this app talks to Resend for INTERNAL mail (agent failure alerts, "Send feedback") and for the
+ * master-class worksheet's two emails (src/lib/worksheet/: the firm's notice, to addresses from an env var, and the
+ * attendee's own copy, sent only to the address they typed and only when they ticked the box asking for it).
+ * Nothing else here reaches a firm's client, and no record's address is ever used.
  *
  * Never throws and never returns or logs Resend's response body or an exception message: the result is
  * `sent` or `failed` plus the HTTP status (null when no response came back). The caller decides what
@@ -24,6 +25,8 @@ export type InternalMail = {
   fetchImpl?: typeof fetch;
   /** Log prefix, e.g. "failure-alert". */
   label?: string;
+  /** Sent as Resend's Idempotency-Key header: a retried send with the same key within 24 h is not delivered twice. */
+  idempotencyKey?: string;
 };
 
 export type InternalMailResult = { status: "sent" } | { status: "failed"; http: number | null };
@@ -34,7 +37,11 @@ export async function sendInternalMail(mail: InternalMail): Promise<InternalMail
     const post = fetchWithTimeout(mail.fetchImpl ?? fetch, INTERNAL_MAIL_TIMEOUT_MS);
     const res = await post(RESEND_URL, {
       method: "POST",
-      headers: { Authorization: `Bearer ${mail.apiKey}`, "Content-Type": "application/json" },
+      headers: {
+        Authorization: `Bearer ${mail.apiKey}`,
+        "Content-Type": "application/json",
+        ...(mail.idempotencyKey ? { "Idempotency-Key": mail.idempotencyKey.slice(0, 256) } : {}),
+      },
       body: JSON.stringify({
         from: mail.from,
         to: mail.to,
