@@ -239,7 +239,7 @@ export default async function TodayPage() {
           <section className="lx-card lx-aside">
             <div className="lx-label">This month</div>
             <div className="lx-task" style={{ padding: "2px 0" }}>
-              <Link href="/dashboard/matters/">Matters opened</Link>
+              <Link href="/dashboard/matters/?group=all">Matters opened</Link>
               <span className="lx-num">{opened ?? "—"}</span>
             </div>
             <div className="lx-task" style={{ padding: "2px 0" }}>

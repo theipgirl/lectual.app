@@ -18,7 +18,7 @@ export type StatCardData = {
 };
 
 const CARDS: Array<Pick<StatCardData, "id" | "label" | "href"> & { note: string; unconfiguredNote?: string }> = [
-  { id: "open", label: "Open matters", href: "/dashboard/matters/", note: "on the docket right now" },
+  { id: "open", label: "Open matters", href: "/dashboard/matters/?group=all", note: "on the docket right now" },
   { id: "stalled", label: "Stalled matters", href: "/dashboard/matters/?group=all&seg=stalled", note: "past their stage's threshold" },
   { id: "deadlines", label: "Deadlines, next 14 days", href: "/dashboard/calendar/", note: "open, including any overdue" },
   {

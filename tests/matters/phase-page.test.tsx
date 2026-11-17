@@ -94,6 +94,21 @@ describe("phase groups on the Matters page", () => {
     expect(html).not.toContain("Mk5z<");
   });
 
+  it("falls back to All when Pre-filing is empty for the status, and links agree", async () => {
+    n = 0;
+    const onlyPost = [m("TM", S.c), m("BL", null)];
+    const html = await render({ matters: onlyPost, read: ok });
+    expect(groupNav(html)).toMatch(/aria-current="page"[^>]*>All</);
+    expect(html).toContain("Mk1z");
+    expect(html).toContain("Mk2z");
+    // All is the default here, so its chip omits group; Pre-filing becomes the explicit one
+    expect(groupNav(html)).toMatch(/href="\/dashboard\/matters\/?"[^>]*>All</);
+    expect(groupNav(html)).toMatch(/href="\/dashboard\/matters\/?\?group=pre"[^>]*>Pre-filing/);
+    // an explicit, empty group still wins
+    const pre = await render({ matters: onlyPost, read: ok, params: { group: "pre" } });
+    expect(groupNav(pre)).toMatch(/aria-current="page"[^>]*>Pre-filing/);
+  });
+
   it("?group= picks the group; a bad value is the default", async () => {
     const intake = await render({ matters: sample(), read: ok, params: { group: "intake" } });
     expect(groupNav(intake)).toMatch(/aria-current="page"[^>]*>Intake/);
@@ -122,7 +137,7 @@ describe("phase groups on the Matters page", () => {
   });
 
   it("an empty group says so in words", async () => {
-    const html = await render({ matters: [m("TM", S.a)], read: ok });
+    const html = await render({ matters: [m("TM", S.a)], read: ok, params: { group: "pre" } });
     expect(html).toContain("No matters in Pre-filing match these filters.");
   });
 

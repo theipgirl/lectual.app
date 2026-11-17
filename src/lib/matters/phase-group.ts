@@ -23,7 +23,7 @@ export const FILING_TYPES: readonly string[] = ["TM", "CR", "PATENT"];
 /** The phases a stage can carry. Anything else (including null) means "no phase". */
 export const KNOWN_PHASES: readonly string[] = ["pipeline", "pre_filing", "post_filing", "maintenance"];
 
-/** Shown when the URL names no group. Pre-filing is the working set the firm walks through daily. */
+/** Preferred when the URL names no group. Pre-filing is the working set the firm walks through daily. */
 export const DEFAULT_PHASE_GROUP: PhaseGroup = "pre";
 
 type StageLike = { phase?: string | null } | null | undefined;
@@ -37,6 +37,16 @@ export type GroupChoice = PhaseGroup | typeof ALL_GROUPS;
 export function parseGroupChoice(value: unknown): GroupChoice | null {
   if (value === ALL_GROUPS) return ALL_GROUPS;
   return isPhaseGroup(value) ? value : null;
+}
+
+/**
+ * The group shown when the URL names none. Pre-filing, but ONLY when it holds at least one matter for the status filter
+ * in force (`counts` are the group counts under that filter); otherwise All, so a firm whose TM work is all post-filing
+ * (or all contracts) never opens on an empty tab. An explicit `?group=` never reaches this: the caller uses
+ * `parseGroupChoice(raw) ?? defaultGroupChoice(counts)`, so a named group wins even when it is empty.
+ */
+export function defaultGroupChoice(counts: Readonly<Record<PhaseGroup, number>>): GroupChoice {
+  return counts[DEFAULT_PHASE_GROUP] > 0 ? DEFAULT_PHASE_GROUP : ALL_GROUPS;
 }
 
 /** Matters the chosen group shows: all of them for "All", else exactly the group's. */

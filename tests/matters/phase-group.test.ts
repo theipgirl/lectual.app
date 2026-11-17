@@ -152,3 +152,24 @@ describe("links from other pages carry group=all so their numbers match on arriv
     expect(text).not.toMatch(/dashboard\/matters\/\?(seg|view)=/);
   });
 });
+
+describe("defaultGroupChoice", () => {
+  const counts = (o: Partial<Record<"intake" | "pre" | "post" | "other", number>>) => ({ intake: 0, pre: 0, post: 0, other: 0, ...o });
+  it("is Pre-filing when it holds a matter for the status filter", async () => {
+    const { defaultGroupChoice } = await import("../../src/lib/matters/phase-group");
+    expect(defaultGroupChoice(counts({ pre: 1, post: 5 }))).toBe("pre");
+  });
+  it("falls back to All when Pre-filing is empty", async () => {
+    const { defaultGroupChoice } = await import("../../src/lib/matters/phase-group");
+    expect(defaultGroupChoice(counts({ post: 4 }))).toBe("all");
+    expect(defaultGroupChoice(counts({ other: 2 }))).toBe("all");
+    expect(defaultGroupChoice(counts({}))).toBe("all");
+  });
+  it("an explicit ?group= wins, even an empty group", async () => {
+    const { defaultGroupChoice, parseGroupChoice } = await import("../../src/lib/matters/phase-group");
+    const c = counts({ post: 4 });
+    expect(parseGroupChoice("intake") ?? defaultGroupChoice(c)).toBe("intake");
+    expect(parseGroupChoice("pre") ?? defaultGroupChoice(c)).toBe("pre");
+    expect(parseGroupChoice("nope") ?? defaultGroupChoice(c)).toBe("all");
+  });
+});

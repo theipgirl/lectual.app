@@ -25,7 +25,7 @@ import { MatterBoard } from "@/components/matters/MatterBoard";
 import { MovedOutNotice } from "@/components/matters/MovedOutNotice";
 import { loadMatterStages, type MatterStageRead } from "@/lib/matters/stages";
 import {
-  DEFAULT_PHASE_GROUP,
+  defaultGroupChoice,
   PHASE_GROUPS,
   ALL_GROUPS,
   boardStagesForChoice,
@@ -88,7 +88,11 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
   const stageList = stageRead.status === "unavailable" ? [] : stageRead.stages;
   const phasesFailed = stageRead.status === "unavailable";
   const grouped = stageRead.status === "ok" && firmHasPhases(stageList);
-  const group = parseGroupChoice(groupRaw) ?? DEFAULT_PHASE_GROUP;
+  // The default group depends on the status chip (Pre-filing only while it holds a matter under that filter), so it is
+  // worked out for every status once; a link that omits `group` means "the default for the status it names".
+  const groupCountsBySeg = new Map(SEGMENTS.map((s) => [s.key, phaseGroupCounts(filterBySegment(all, s.key, sets))]));
+  const defaultFor = (s: SegmentKey) => defaultGroupChoice(groupCountsBySeg.get(s)!);
+  const group = parseGroupChoice(groupRaw) ?? defaultFor(seg);
   const inGroup = grouped ? filterByGroupChoice(all, group) : all;
   const counts = new Map(SEGMENTS.map((s) => [s.key, filterBySegment(inGroup, s.key, sets).length]));
   const groupCounts = phaseGroupCounts(filterBySegment(all, seg, sets));
@@ -107,8 +111,8 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
   const href = (next: { seg?: string; q?: string; view?: string | null; group?: string }) => {
     const p = new URLSearchParams();
     const g = next.group ?? group;
-    if (grouped && g !== DEFAULT_PHASE_GROUP) p.set("group", g);
-    const s = next.seg ?? seg;
+    const s = (next.seg ?? seg) as SegmentKey;
+    if (grouped && g !== defaultFor(s)) p.set("group", g);
     if (s !== "open") p.set("seg", s);
     const term = next.q ?? search;
     if (term) p.set("q", term);
@@ -127,7 +131,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
           label: "Search matters",
           placeholder: "Mark, number, owner or serial",
           defaultValue: search,
-          hidden: { ...(boardView ? { view: "board" } : {}), ...(seg !== "open" ? { seg } : {}), ...(grouped && group !== DEFAULT_PHASE_GROUP ? { group } : {}) },
+          hidden: { ...(boardView ? { view: "board" } : {}), ...(seg !== "open" ? { seg } : {}), ...(grouped && group !== defaultFor(seg) ? { group } : {}) },
           clearHref: href({ q: "" }),
         }}
         toggle={<ViewToggle value={boardView ? "board" : "table"} hrefFor={(next) => href({ view: next === "board" ? "board" : null })} />}
