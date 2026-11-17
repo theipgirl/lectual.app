@@ -22,7 +22,17 @@ import { Chip, FilterChips } from "@/components/list-page/Chips";
 import "@/components/list-page/list-page.css";
 import { NewMatterForm } from "@/components/matters/MatterForms";
 import { MatterBoard } from "@/components/matters/MatterBoard";
-import { listMatterStages } from "@/lib/matters/stages";
+import { loadMatterStages, type MatterStageRead } from "@/lib/matters/stages";
+import {
+  DEFAULT_PHASE_GROUP,
+  PHASE_GROUPS,
+  boardStagesForGroup,
+  filterByPhaseGroup,
+  firmHasPhases,
+  isPhaseGroup,
+  phaseGroupCounts,
+} from "@/lib/matters/phase-group";
+import { MATTER_GROUPS_NAV, MATTER_GROUP_EMPTY, MATTER_GROUP_LABEL, MATTER_PHASES_UNAVAILABLE, MATTER_STATUS_NAV } from "@/lib/ui/words";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import { matterIdsNeedingReview } from "./list-utils";
@@ -41,8 +51,8 @@ export const dynamic = "force-dynamic";
  * Filters are links (a filtered worklist is a shareable URL); the server
  * re-filters on navigation.
  */
-export default async function MattersPage({ searchParams }: { searchParams: Promise<{ seg?: string; q?: string; view?: string }> }) {
-  const { seg: segRaw, q, view } = await searchParams;
+export default async function MattersPage({ searchParams }: { searchParams: Promise<{ seg?: string; q?: string; view?: string; group?: string }> }) {
+  const { seg: segRaw, q, view, group: groupRaw } = await searchParams;
   const boardView = view === "board";
   const seg: SegmentKey = isSegment(segRaw) ? segRaw : "open";
   const search = (q ?? "").trim().slice(0, 80);
@@ -55,12 +65,12 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
     loadError = true;
   }
 
-  const [queue, members, leads, canCreateLitigation, stages, role] = await Promise.all([
+  const [queue, members, leads, canCreateLitigation, stageRead, role] = await Promise.all([
     loadActiveQueue(),
     listMemberDirectory().catch(() => []),
     listLeads().catch(() => []),
     orgHasModule("litigation"),
-    boardView ? listMatterStages().catch(() => []) : Promise.resolve([]),
+    loadMatterStages().catch((error): MatterStageRead => ({ status: "unavailable", error })),
     resolveFirmSession().then((x) => (x.kind === "ok" ? x.role : null)),
   ]);
 
@@ -70,11 +80,21 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
   const reviewItems = queue.status === "ok" ? reviewItemByMatter(queue.items) : new Map<string, string>();
   const stalledIds = new Set(summarizeDocket(all).stalled.map((m) => m.id));
   const sets = { review: reviewIds, stalled: stalledIds };
-  const counts = new Map(SEGMENTS.map((s) => [s.key, filterBySegment(all, s.key, sets).length]));
+
+  // Phase groups (Intake / Pre-filing / Post-filing / Matters). Drawn only for a firm whose stages carry a phase: a
+  // database with no phase column, or stages with none set, sees today's page. A FAILED read says so and shows today's page.
+  const stageList = stageRead.status === "unavailable" ? [] : stageRead.stages;
+  const phasesFailed = stageRead.status === "unavailable";
+  const grouped = stageRead.status === "ok" && firmHasPhases(stageList);
+  const group = isPhaseGroup(groupRaw) ? groupRaw : DEFAULT_PHASE_GROUP;
+  const inGroup = grouped ? filterByPhaseGroup(all, group) : all;
+  const counts = new Map(SEGMENTS.map((s) => [s.key, filterBySegment(inGroup, s.key, sets).length]));
+  const groupCounts = phaseGroupCounts(filterBySegment(all, seg, sets));
   // Four chips. Review only when the queue was reached; the bands stay as headings below.
   const segments = LIST_CHIPS.filter((s) => s.key !== "review" || queue.status === "ok");
 
-  const shown = searchMatters(filterBySegment(all, seg, sets), search);
+  const shown = searchMatters(filterBySegment(inGroup, seg, sets), search);
+  const boardStages = grouped ? boardStagesForGroup(stageList, group, shown) : stageList;
   const bands = groupIntoBands(shown);
   const memberName = new Map(members.map((m) => [m.userId, m.displayName ?? m.email ?? "Teammate"]));
   const leadOptions = leads.map((l) => ({
@@ -82,8 +102,10 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
     label: [l.business_name?.trim() || `${l.first_name} ${l.last_name}`.trim(), l.email].filter(Boolean).join(" · "),
   }));
 
-  const href = (next: { seg?: string; q?: string; view?: string | null }) => {
+  const href = (next: { seg?: string; q?: string; view?: string | null; group?: string }) => {
     const p = new URLSearchParams();
+    const g = next.group ?? group;
+    if (grouped && g !== DEFAULT_PHASE_GROUP) p.set("group", g);
     const s = next.seg ?? seg;
     if (s !== "open") p.set("seg", s);
     const term = next.q ?? search;
@@ -103,20 +125,34 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
           label: "Search matters",
           placeholder: "Mark, number, owner or serial",
           defaultValue: search,
-          hidden: { ...(boardView ? { view: "board" } : {}), ...(seg !== "open" ? { seg } : {}) },
+          hidden: { ...(boardView ? { view: "board" } : {}), ...(seg !== "open" ? { seg } : {}), ...(grouped && group !== DEFAULT_PHASE_GROUP ? { group } : {}) },
           clearHref: href({ q: "" }),
         }}
         toggle={<ViewToggle value={boardView ? "board" : "table"} hrefFor={(next) => href({ view: next === "board" ? "board" : null })} />}
         primary={<OpenMatterButton />}
       />
 
-      <FilterChips as="nav" label="Filter matters">
+      {grouped && (
+        <FilterChips as="nav" label={MATTER_GROUPS_NAV}>
+          {PHASE_GROUPS.map((g) => (
+            <Chip key={g} href={href({ group: g })} active={group === g} count={groupCounts[g]}>
+              {MATTER_GROUP_LABEL[g]}
+            </Chip>
+          ))}
+        </FilterChips>
+      )}
+      <FilterChips as="nav" label={MATTER_STATUS_NAV}>
         {segments.map((s) => (
           <Chip key={s.key} href={href({ seg: s.key })} active={seg === s.key} count={counts.get(s.key) ?? 0}>
             {s.label}
           </Chip>
         ))}
       </FilterChips>
+      {phasesFailed && (
+        <p className="lx-banner lx-banner-warn" role="status" style={{ margin: 0 }}>
+          {MATTER_PHASES_UNAVAILABLE}
+        </p>
+      )}
       {queue.status === "unavailable" && (
         <p className="lx-banner lx-banner-warn" role="status" style={{ margin: 0 }}>
           The approval queue can&apos;t be reached right now, so matters can&apos;t be checked for drafts waiting on review.
@@ -137,7 +173,9 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
         </div>
       ) : boardView && shown.length > 0 ? (
         <MatterBoard
-          stages={stages}
+          stages={boardStages}
+          moveStages={stageList}
+          collapseEmpty={grouped}
           matters={shown}
           canMove={!!role && MATTER_WRITE_ROLES.includes(role)}
           reviewIds={reviewIds}
@@ -148,7 +186,11 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
         <div className="lx-card lx-empty-card">
           <h2 className="lx-h2" style={{ fontSize: 25 }}>{all.length === 0 ? "No matters yet" : "Nothing matches"}</h2>
           <p className="lx-note" style={{ margin: 0 }}>
-            {all.length === 0 ? "A matter opens when a lead signs, or from the form above." : "Try another filter or search."}
+            {all.length === 0
+              ? "A matter opens when a lead signs, or from the form above."
+              : grouped && !search
+                ? MATTER_GROUP_EMPTY(MATTER_GROUP_LABEL[group])
+                : "Try another filter or search."}
           </p>
         </div>
       ) : (

@@ -2776,6 +2776,9 @@ export type Database = {
           label: string
           order_index: number
           org_id: string
+          // Hand-added: the docket's phase (pipeline / pre_filing / post_filing / maintenance). Null or absent on a
+          // database that has not got the column yet. Replace with the generated type on the next codegen run.
+          phase: string | null
           updated_at: string
           waiting_on: Database["public"]["Enums"]["crm_matter_waiting_on"]
         }
@@ -2787,6 +2790,7 @@ export type Database = {
           label: string
           order_index: number
           org_id: string
+          phase?: string | null
           updated_at?: string
           waiting_on?: Database["public"]["Enums"]["crm_matter_waiting_on"]
         }
@@ -2798,6 +2802,7 @@ export type Database = {
           label?: string
           order_index?: number
           org_id?: string
+          phase?: string | null
           updated_at?: string
           waiting_on?: Database["public"]["Enums"]["crm_matter_waiting_on"]
         }

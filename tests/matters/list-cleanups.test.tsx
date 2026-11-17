@@ -62,7 +62,7 @@ async function render(opts: { queue: unknown; matters: Matter[]; view?: string; 
   vi.doMock("@/lib/members/directory", () => ({ listMemberDirectory: vi.fn(async () => []) }));
   vi.doMock("@/lib/queue/load", () => ({ loadActiveQueue: vi.fn(async () => opts.queue) }));
   vi.doMock("@/lib/org/modules", () => ({ orgHasModule: vi.fn(async () => false) }));
-  vi.doMock("@/lib/matters/stages", () => ({ listMatterStages: vi.fn(async () => [stage]) }));
+  vi.doMock("@/lib/matters/stages", () => ({ listMatterStages: vi.fn(async () => [stage]), loadMatterStages: vi.fn(async () => ({ status: "ok", stages: [stage] })) }));
   vi.doMock("@/lib/firm/session", () => ({ resolveFirmSession: vi.fn(async () => ({ kind: "ok", role: "attorney" })) }));
   vi.doMock("@/components/matters/MatterForms", () => ({ NewMatterForm: () => null }));
   vi.doMock("@/app/dashboard/matters/[id]/actions", () => ({ updateMatterStageAction: vi.fn() }));

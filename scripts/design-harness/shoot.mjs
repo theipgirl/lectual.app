@@ -14,8 +14,9 @@ const { chromium } = require("playwright");
 const here = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(here, "out");
 const SHOTS = path.join(OUT, "shots");
+// HARNESS_DESKTOP_WIDTH: a narrower desktop viewport (1280 with the rail open).
 // HARNESS_DESKTOP_HEIGHT: a taller desktop viewport, to see a page below the fold (the shell scrolls inside itself).
-const VIEWPORTS = { desktop: { width: 1440, height: Number(process.env.HARNESS_DESKTOP_HEIGHT) || 900 }, phone: { width: 375, height: 812 } };
+const VIEWPORTS = { desktop: { width: Number(process.env.HARNESS_DESKTOP_WIDTH) || 1440, height: Number(process.env.HARNESS_DESKTOP_HEIGHT) || 900 }, phone: { width: 375, height: 812 } };
 const TYPES = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".json": "application/json" };
 
 const wanted = process.argv.slice(2);

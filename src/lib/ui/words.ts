@@ -698,3 +698,15 @@ export const LEADS_STOP_TIMER = "Stop timer";
 export const LEADS_ADD_TIME = "Add time";
 export const LEADS_UNKNOWN_TEAMMATE_DROP = "That teammate can't be named, so cards can't be dropped there.";
 export const LEADS_HIDDEN_SELECTED = (n: number) => `${n} selected but not shown`;
+
+// Matters page: phase groups (pre-filing / post-filing). The owner's names, Nov 12.
+export const MATTER_GROUP_LABEL = {
+  intake: "Intake",
+  pre: "Pre-filing",
+  post: "Post-filing",
+  other: "Matters",
+} as const;
+export const MATTER_GROUPS_NAV = "Matter group";
+export const MATTER_STATUS_NAV = "Filter matters";
+export const MATTER_PHASES_UNAVAILABLE = "Can't show the Intake, Pre-filing and Post-filing groups right now, so every matter is shown together. Refresh to try again.";
+export const MATTER_GROUP_EMPTY = (group: string) => `No matters in ${group} match these filters.`;
