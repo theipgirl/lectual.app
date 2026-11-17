@@ -2,8 +2,9 @@ import { notFound, redirect } from "next/navigation";
 import { orgHasModule } from "@/lib/org/modules";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { ASSISTANTS_NAME } from "@/lib/ui/words";
 
-export const metadata: Metadata = { title: pageTitle("Agents settings") };
+export const metadata: Metadata = { title: pageTitle(ASSISTANTS_NAME) };
 
 /**
  * Agents live on the rail (/dashboard/agents/); this keeps the old Settings
