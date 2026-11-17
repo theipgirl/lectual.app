@@ -160,6 +160,8 @@ export async function handOffCardAction(rawId: unknown, rawTarget: unknown, rawN
   await gate();
   const id = cardIdOf(rawId);
   if (!id) return { ok: false, error: DECK_FAILED };
+  // Same limit and sentence as Send back: an over-long note is refused, never trimmed, and nothing is written.
+  if (sendBackNoteTooLong(rawNote)) return { ok: false, error: SEND_BACK_NOTE_TOO_LONG };
   const preview = await staffPreviewRefusal();
   if (preview) return { ok: false, error: preview };
   const target = typeof rawTarget === "string" ? rawTarget.trim() : "";

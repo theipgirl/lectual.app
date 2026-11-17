@@ -236,6 +236,18 @@ describe("hand off", () => {
     expect(Object.keys(state.record.mock.calls[0][0])).not.toContain("actorId");
   });
 
+  it("a Hand off note over the limit is refused, never cut, and nothing is written", async () => {
+    expect(await A.handOffCardAction("q1", U.caitlyn, "x".repeat(501))).toEqual({ ok: false, error: "That note is too long. Keep it to 500 characters." });
+    expect(state.record).not.toHaveBeenCalled();
+    expect(state.notify).not.toHaveBeenCalled();
+  });
+
+  it("a Hand off note of exactly 500 characters is accepted whole", async () => {
+    const note = "y".repeat(500);
+    expect((await A.handOffCardAction("q1", U.caitlyn, note)).ok).toBe(true);
+    expect(state.record).toHaveBeenCalledWith(expect.objectContaining({ kind: "handoff", note }));
+  });
+
   it.each([
     ["no one", ""],
     ["a viewer", U.viewer],
