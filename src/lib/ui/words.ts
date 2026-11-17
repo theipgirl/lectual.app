@@ -1200,3 +1200,33 @@ export const LEAD_PAGE_BRIEFINGS = "Internal briefings for this lead";
 export const leadPageQueued = (day: string) => `queued ${day}`;
 export const leadPageMoreInApprovals = (n: number) => `${n} more in Approvals`;
 export const leadStepTheyLastWrote = (day: string) => `They last wrote ${day}`;
+// PGE Sprint 1: sync check and first-user readiness
+/** The stamps a change is credited to. A person is named by first name from the member directory. */
+export const CHANGED_BY_LAWMATICS_SYNC = "Lawmatics sync";
+export const CHANGED_BY_AUTOMATION = "an automation";
+export const CHANGED_BY_ASSISTANT = "an assistant";
+export const UPDATED_AUTOMATICALLY = "Updated automatically";
+export const CAME_IN_THROUGH_A_FORM = "Came in through a form";
+export const OPENED_WHEN_CLIENT_SIGNED = "Opened when the client signed";
+/** The Stage Keeper is never named to a firm (the glossary bans it): its move reads as an automatic one. */
+export const changedAutomaticallyLine = (when: string) => `Changed automatically · ${when}`;
+/** The weekly review's quiet "last changed" line. A date is "Nov 16". */
+export const changedByLine = (who: string, when: string) => `Changed by ${who} · ${when}`;
+export const NOT_CHANGED_SINCE_IMPORT = "Not changed since import";
+export const NO_CHANGES_LAST_YEAR = "No changes in the last year";
+export const LAST_CHANGED_LABEL = "Last changed";
+
+/** Settings → Setup → Team accounts. */
+export const TEAM_ACCOUNTS_NAME = "Team accounts";
+export const TEAM_ACCOUNTS_SUB = "Each person's role and Outlook, read from what is saved. Nothing here sends mail or changes anything.";
+export const TEAM_ACCOUNTS_CANT_CHECK = "Team accounts couldn't be checked right now. Refresh to try again.";
+export const TEAM_ACCOUNTS_OUTLOOK = "Outlook connected";
+export const TEAM_ACCOUNTS_DRAFTS = "Can receive drafts";
+export const TEAM_ACCOUNTS_YOU = "You";
+/** A colleague's personal mailbox is hidden by the database from everyone but them (and, through Lectual's owner view, the owner). */
+export const onlyCanSeeThis = (first: string | null) => `Only ${first ?? "that person"} can see this`;
+export const TEAM_ACCOUNTS_PRIVATE_PILL = "Private";
+export const TEAM_ACCOUNTS_NO_MEMBERS = "No team members were found.";
+
+/** The one line on Getting started that shows a person their own Outlook state. */
+export const YOUR_SETUP_LABEL = "Your setup";

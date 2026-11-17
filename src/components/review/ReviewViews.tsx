@@ -11,7 +11,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadFailedLine } from "@/components/ui/LoadFailed";
 import { Pill } from "@/components/ui/Pill";
 import type { PillTone } from "@/lib/ui/tones";
-import { Avatar, DocTag, openHref, Tags, type Common } from "./shared";
+import { Avatar, DocTag, LastChanged, openHref, Tags, type Common } from "./shared";
 import "@/components/list-page/list-page.css";
 import "./review.css";
 import { ViewToggle } from "@/components/ViewToggle";
@@ -58,7 +58,7 @@ const BUCKET_TONE: Record<BucketKey, PillTone> = { overdue: "risk", week: "warn"
  * ONE review card, in the shared board-card look: a bold name, one quiet line, the next step, a due or age chip. The whole top is one
  * link to the panel; Done and Open sit OUTSIDE it as plain text links, so nothing interactive is nested.
  */
-function ReviewCard({ row, bucket, today, canWrite, params, followUp }: Common & { row: ReviewRow; bucket: BucketKey; /** A "Waiting on client" card says when we last followed up. */ followUp?: boolean }) {
+function ReviewCard({ row, bucket, today, members, canWrite, params, followUp }: Common & { row: ReviewRow; bucket: BucketKey; /** A "Waiting on client" card says when we last followed up. */ followUp?: boolean }) {
   const due = row.nextStep ? dueText(row.nextStep.dueDate, today) : null;
   const href = openHref(params, row);
   // The chip at the right of the name: the due date, else "Approval" for a record waiting on one, else a nudge to set a step.
@@ -84,6 +84,7 @@ function ReviewCard({ row, bucket, today, canWrite, params, followUp }: Common &
         </span>
         <span className="lx-board-card-step">{row.nextStep ? row.nextStep.title : "No next step"}</span>
         {followUp && <span className="rv-card-followup lx-note">{followUpText(row, today)}</span>}
+        <LastChanged row={row} members={members} today={today} />
         <Tags row={row} today={today} max={2} skip={["waiting", "expiry"]} />
         <DocTag row={row} />
       </Link>

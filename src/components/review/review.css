@@ -180,3 +180,6 @@
 /* Documents (panel and deck): layout only. */
 .rv-doc-link { overflow-wrap: anywhere; color: var(--ox); font-weight: 500; }
 .rv-docs li { display: block; }
+
+/* The quiet "Changed by ... · Nov 16" line on a card, a sheet row and in the panel. */
+.rv-changed { display: block; font-size: var(--fs-1); }

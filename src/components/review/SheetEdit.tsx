@@ -2,6 +2,7 @@ import type { ReviewRow } from "@/lib/review/buckets";
 import { lastContactText, shortDate } from "@/lib/review/format";
 import { sheetSections, waitingCell } from "@/lib/review/sheet";
 import { documentsTag } from "@/lib/review/documents";
+import { lastChangedText } from "@/lib/review/last-changed";
 import { contactWords } from "@/lib/review/contact";
 import { EDITABLE_COLUMNS, cellEditable, type SheetEditRow, type SheetPerms } from "@/lib/review/sheet-edit";
 import { roleLabel } from "@/lib/auth/roles";
@@ -13,7 +14,7 @@ import { SheetEditTable, type SheetEditInitial, type SheetPerson } from "./Sheet
 import { openHref, type Common } from "./shared";
 import "./review-sheet-edit.css";
 
-function toSheetRow(r: ReviewRow, href: string, today: string): SheetEditRow {
+function toSheetRow(r: ReviewRow, href: string, today: string, names: ReadonlyMap<string, string>): SheetEditRow {
   return {
     key: r.key,
     kind: r.kind,
@@ -30,6 +31,7 @@ function toSheetRow(r: ReviewRow, href: string, today: string): SheetEditRow {
     contactIsDate: r.contactKnown && !!r.lastContact,
     contactText: r.contactKnown && r.lastContact ? shortDate(r.lastContact.date, today) : lastContactText(r, today),
     documentsText: documentsTag(r.documentCount),
+    changedText: lastChangedText(r.lastChange, names, today),
     contactTitle: r.contactKnown && r.lastContact ? lastContactText(r, today) : r.lastContact ? contactWords(r.lastContact.type) : null,
   };
 }
@@ -40,10 +42,11 @@ function toSheetRow(r: ReviewRow, href: string, today: string): SheetEditRow {
  * write gets the same table with no editors. On a phone the rows stack and every edit happens in the record panel.
  */
 export function SheetEdit({ rows, today, members, params, perms, initial }: Common & { rows: ReviewRow[]; perms: SheetPerms; initial?: SheetEditInitial }) {
+  const names = new Map(members.map((m) => [m.userId, m.name]));
   const { trademarks, contracts } = sheetSections(rows);
   const sections = [
-    { id: "trademarks", title: "Trademarks", rows: trademarks.map((r) => toSheetRow(r, openHref(params, r), today)) },
-    { id: "contracts", title: "Contracts", rows: contracts.map((r) => toSheetRow(r, openHref(params, r), today)) },
+    { id: "trademarks", title: "Trademarks", rows: trademarks.map((r) => toSheetRow(r, openHref(params, r), today, names)) },
+    { id: "contracts", title: "Contracts", rows: contracts.map((r) => toSheetRow(r, openHref(params, r), today, names)) },
   ];
   const first = (n: string) => n.trim().split(/\s+/)[0] ?? n;
   const people: SheetPerson[] = members.map((m) => ({
