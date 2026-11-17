@@ -9,11 +9,13 @@ import {
 } from "@/lib/auth/actions";
 import type { SwitchableFirmRef } from "@/lib/firm/session";
 import { requestTourAgain } from "@/lib/onboarding/tour";
+import { requestWelcomeAgain } from "@/lib/onboarding/welcome-deal";
 import { requestFeedback } from "@/lib/feedback/open";
 import { requestNameDialog } from "@/lib/account/name";
 import { roleLabel } from "@/lib/auth/roles";
 import { isOutsidePress, menuKeyAction } from "@/lib/shell/menu-behaviour";
-import { HELP_AND_TIPS, SETTINGS_NAME } from "@/lib/ui/words";
+import { requestDealTimesDialog } from "@/lib/deal/person-times";
+import { DEAL_TIMES_MENU_ITEM, HELP_AND_TIPS, SETTINGS_NAME } from "@/lib/ui/words";
 import type { ViewMenu } from "@/lib/views";
 import { ViewSwitch } from "./ViewSwitch";
 import "./account-menu.css";
@@ -56,6 +58,8 @@ export function AccountMenu({
   const [open, setOpen] = useState(false);
 
   const closeMenu = () => menu.current?.removeAttribute("open");
+  // "Show tips again": the owner view replays the welcome deal, every other view the tour.
+  const replayGuide = () => (variant === "owner" ? requestWelcomeAgain(window) : requestTourAgain(window));
   const avatar = () => menu.current?.querySelector("summary") ?? null;
 
   // Esc and a press outside close the menu; Esc returns focus to the avatar.
@@ -151,6 +155,18 @@ export function AccountMenu({
               Your name
             </button>
 
+            <button
+              type="button"
+              role="menuitem"
+              className="lx-am-item"
+              onClick={() => {
+                closeMenu();
+                requestDealTimesDialog(window, avatar());
+              }}
+            >
+              {DEAL_TIMES_MENU_ITEM}
+            </button>
+
             {viewMenu && <ViewSwitch menu={viewMenu} onDone={closeMenu} />}
 
             {settingsInMenu && (
@@ -189,7 +205,7 @@ export function AccountMenu({
                 className="lx-am-item lx-am-item--sm"
                 onClick={() => {
                   closeMenu();
-                  requestTourAgain(window);
+                  replayGuide();
                 }}
               >
                 Show tips again
@@ -334,7 +350,7 @@ export function AccountMenu({
                 style={{ width: "100%" }}
                 onClick={() => {
                   closeMenu();
-                  requestTourAgain(window);
+                  replayGuide();
                 }}
               >
                 Show tips again

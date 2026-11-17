@@ -256,13 +256,17 @@ export const DECK_COL_DECIDED = "Decided today";
 export const DECK_DECIDED_UNREAD = "Decided today couldn't be loaded. Refresh to try again.";
 export const DECK_EVENTS_UNREAD = "Hand-offs and Later couldn't be loaded, so every card is shown.";
 export const DECK_NOTHING_HERE = "Nothing here.";
+/** Lectual staff viewing a firm have no membership, so a hand-off or send-back would be dropped by the fold: refuse it plainly. */
+export const DECK_PREVIEW_ONLY = "Preview only: hand-offs aren't saved while you're viewing as the firm.";
 export const DECK_NOT_YOURS = "This card isn't on your deck any more. Refresh to see what's left.";
 export const DECK_FAILED = "That didn't go through. Nothing was sent. Refresh to try again.";
 export const DECK_PICK_PERSON = "Choose who to hand it to.";
 export const DECK_BAD_PERSON = "That person can't take approvals. Choose someone else on your team.";
 /* Deck page, card, side list, list and board (owner view fidelity rebuild). */
 export const DECK_PAGE_TITLE = "Your deal";
-export const DECK_PAGE_SUB = "Drafts wait here until you decide. Approving a client email places a draft in Outlook; a person sends it.";
+/** Shared by the deck intro and the welcome deal's card 2. */
+export const DECK_APPROVING_NEVER_SENDS = "Approving never sends.";
+export const DECK_PAGE_SUB = `${DECK_APPROVING_NEVER_SENDS} A client email becomes a draft; a person presses Send.`;
 export const DECK_DEAL_NEW = "Deal new cards";
 export const deckLeft = (n: number, minutes: number) => `${n} left · about ${minutes} min`;
 export const DECK_META_ALL_DECIDED = "All decided";
@@ -333,6 +337,10 @@ export function ownerCardsNextDeal(count: number, label: string, later: number):
   const more = later > 0 ? ` ${later} more at ${label}.` : "";
   return count > 0 ? `Next deal ${label}.${more}` : `All decided. Next deal ${label}.${more}`;
 }
+/* ── Phase 2 item 4: deal-ready nudge (Today tile, Approvals rail row and phone item) ── */
+export function dealReadyLine(label: string, count: number): string {
+  return `Your ${label} deal is ready · ${count} ${count === 1 ? "card" : "cards"}`;
+}
 export const OWNER_DEADLINES_HEADING = "Deadlines, next 14 days";
 export const OWNER_DEADLINES_NONE = "Nothing due in the next 14 days.";
 export const OWNER_DEADLINES_FAILED = "Couldn't load deadlines.";
@@ -398,6 +406,11 @@ export function ownerDealLine(openedLabel: string | null, nextLabel: string, lat
   const opened = openedLabel ? `Deal opened ${openedLabel}. ` : "";
   const more = later > 0 ? ` ${later} more at ${nextLabel}.` : "";
   return `${opened}Next deal ${nextLabel}.${more}`;
+}
+/** Today tile sub-line while a deal is ready (the dot is drawn in front of it); otherwise ownerDealLine. */
+export function ownerDealReadyLine(readyLabel: string, nextLabel: string, later: number): string {
+  const more = later > 0 ? ` ${later} more at ${nextLabel}.` : "";
+  return `Your ${readyLabel} deal is ready. Next deal ${nextLabel}.${more}`;
 }
 export function ownerProposalOpens(opens: number | "unavailable" | undefined): string | null {
   if (opens === undefined) return null;
@@ -567,3 +580,121 @@ export const LETTER_PENDING_SWITCH_NOTE = "Not attached yet. Save this proposal 
 /** Shown on the staff card when the signed PDF is produced from the stored signed text rather than rebuilt. */
 export const SIGNED_FROM_STORED_TEXT =
   "This copy is produced from the stored signed text: the exact words that were signed, as plain paragraphs. Its fingerprint matches that text.";
+/* Approval deck: Decided and Handed off lists, and the side column's three sections (Phase 2 item 1). */
+export const DECK_LISTS_BACK = "← Back to today's deal";
+export const DECK_LISTS_NAV = "Approval lists";
+export const deckListChip = (label: string, count: string) => `${label} · ${count}`;
+export const DECK_LIST_HANDED_CANT = "Hand-offs couldn't be loaded. Refresh to try again.";
+export const DECK_LIST_LATER_CANT = "Later couldn't be loaded. Refresh to try again.";
+export const DECK_LIST_HANDED_EMPTY = "Nothing handed off.";
+export const DECK_LIST_LATER_EMPTY = "Nothing put off until later.";
+export const DECK_LIST_BACK_WITH_YOU = "Back with you";
+export const deckListWith = (first: string) => `With ${first}`;
+/** The right-hand pill of a Later row: just when it comes back. Today is the bare time. */
+export const deckLaterTomorrow = (time: string) => `Tomorrow ${time}`;
+export const deckLaterOtherDay = (day: string, time: string) => `${day} ${time}`;
+export const deckListDecidedSub = (what: "Approved" | "Rejected", time: string, tail: string | null) => (tail ? `${what} ${time} · ${tail}` : `${what} ${time}`);
+export const DECK_LIST_TAIL_CLIENT_EMAIL = "client email";
+export const DECK_LIST_TAIL_INTERNAL = "internal";
+export const DECK_LIST_TAIL_NOTE_KEPT = "note kept";
+export const deckListQuote = (note: string) => `“${note}”`;
+export const deckListHandedTo = (first: string, when: string, note: string | null) => (note ? `To ${first} ${when} · ${deckListQuote(note)}` : `To ${first} ${when}`);
+export const deckListSentBack = (first: string, day: string, time: string) => `To ${first} ${day} · sent back ${time}`;
+export const DECK_SIDE_SEE_ALL = "See all";
+export const DECK_SIDE_SEE_ALL_DECIDED_LABEL = "See all decided today";
+export const DECK_SIDE_SEE_ALL_LATER_LABEL = "See all later";
+export const DECK_SIDE_LATER_NOTHING = "Nothing put off.";
+export const DECK_SIDE_LATER_CANT = "Can't show Later right now.";
+export const DECK_LISTS_CHIP_DECIDED = "Decided";
+
+/* Handed-to-you on the Approvals page and the approval item page (Phase 2 item 2, technician shell). */
+export const HANDED_TO_YOU_MARKER = "Handed to you";
+export const handedPillLabel = (n: number) => `Handed to you (${n})`;
+export const handedToYouAt = (name: string, time: string) => `Handed to you by ${name} · ${time}`;
+export const HANDED_NOTE_LABEL = "Their note";
+export const sendBackTo = (name: string) => `Send back to ${name}`;
+export const SEND_BACK_NOTE_LABEL = "Add a note (optional)";
+export const SEND_BACK_NOTE_HINT = "Up to 500 characters. It goes to them with the card.";
+export const SEND_BACK_NEEDS_APPROVER = "This one needs an approver's yes. You can edit it and send it back.";
+export const sendBackNeedsPerson = (name: string) => `This one is for ${name}. You can edit it and send it back.`;
+export const SEND_BACK_DONE = "Sent back. It's on their cards again.";
+export const SEND_BACK_NOTE_TOO_LONG = "That note is too long. Keep it to 500 characters.";
+export const A_TEAMMATE = "a teammate";
+/* The bell: a card handed to someone, or sent back. */
+export const NOTICE_HANDED_LABEL = "Handed to you";
+export const NOTICE_RETURNED_LABEL = "Sent back";
+export const noticeHandedSentence = (first: string) => `${first} handed you an approval`;
+export const noticeReturnedSentence = (first: string) => `${first} sent an approval back`;
+/* Phase 2: each person sets their own two deal times (owner view). */
+export const DEAL_TIMES_TITLE = "Your deal times";
+export const DEAL_TIMES_OPEN = "Change deal times";
+export const DEAL_TIMES_MENU_ITEM = "Deal times";
+export const DEAL_TIMES_FIRST = "First deal";
+export const DEAL_TIMES_SECOND = "Second deal";
+export const DEAL_TIMES_NOTE = "Changes only your own deck.";
+export const dealTimesZoneLine = (zoneLabel: string) => zoneLabel;
+export const DEAL_TIMES_SAVE = "Save";
+export const DEAL_TIMES_SAVING = "Saving…";
+export const DEAL_TIMES_CANCEL = "Cancel";
+export const DEAL_TIMES_NOT_SIGNED_IN = "You are not signed in.";
+export const DEAL_TIMES_NOT_SAVED = "We couldn't save your deal times. Try again.";
+export const DEAL_TIMES_INVALID = "Pick two times from the lists.";
+export const DEAL_TIMES_STEP = "Deal times go in 5-minute steps.";
+export const DEAL_TIMES_APART = "Deal times need to be at least 2 hours apart.";
+
+/* Phase 2 item 5: the welcome deal (owner view's first-sign-in guide; the technician view keeps the tour). */
+export const WELCOME_SOURCE = "Lectual";
+export const WELCOME_TAG = "Welcome · 1 min";
+export const WELCOME_SKIP = "Skip the tour";
+export const WELCOME_NEXT = "Next";
+export const WELCOME_BACK = "Previous step";
+export const WELCOME_FORWARD = "Next step";
+export const WELCOME_FINISH = "Finish";
+export const WELCOME_CARD_1_TITLE = "One card is one thing waiting on you";
+export const WELCOME_CARD_1_BODY =
+  "Each card says who drafted it, who it is to, and the opening of the draft. Nothing on a card has been sent.";
+export const WELCOME_CARD_1_STEP = "when a card has a line at the bottom, it says what to check first.";
+export const WELCOME_CARD_2_TITLE = "The moves";
+export const WELCOME_CARD_2_BODY = `Yes approves after a 5-second hold you can undo. ${DECK_APPROVING_NEVER_SENDS} A client email becomes a draft in your firm's or your own mailbox, when one is connected. Nothing goes out until someone presses Send there. Reject needs a note. Later waits for your next deal; Hand off goes to a colleague. The arrows move between cards.`;
+export const WELCOME_CARD_2_STEP = "try the arrows. They only move between cards, and nothing is stored.";
+export const WELCOME_CARD_3_TITLE = "Two deals a day";
+export const welcomeCard3Body = (first: string, second: string) =>
+  `Your cards are dealt at ${first} and ${second}, firm time. Anything that arrives after a deal waits for the next one, or press ${DECK_DEAL_NOW}. The List view shows everything waiting on you, not only this deal.`;
+export const WELCOME_CARD_3_STEP = `use "${DEAL_TIMES_OPEN}" in the deck header or "${DEAL_TIMES_MENU_ITEM}" in your account menu to pick your own times.`;
+export const WELCOME_CARD_4_TITLE = "The weekly review";
+export const WELCOME_CARD_4_BODY = `${REVIEW_NAME} shows your open matters and active leads by person, with ${OUR_TURN} and Waiting on client. It is built for the Monday meeting.`;
+export const WELCOME_CARD_4_STEP = "open it before Monday's meeting.";
+export const WELCOME_STEPS_NAV = "Steps";
+export const welcomeCardOf = (n: number, total: number) => `Card ${n} of ${total}`;
+
+/** Leads page (item L): sets, paging, board, selection. */
+export const LEADS_SELECT = "Select";
+export const LEADS_SELECT_DONE = "Done selecting";
+export const LEADS_SHOW_MORE = (step: number, left: number) => `Show ${step} more (${left} left)`;
+export const LEADS_SHOWING = (shown: number, total: number) => "Showing " + shown + " of " + total;
+export const LEADS_STAGE_FILTER = "Stage";
+export const LEADS_ANY_STAGE = "Every stage";
+export const LEADS_SUGGESTIONS = "Suggestions";
+export const LEADS_SUGGESTIONS_TITLE = "Leads the system suggests moving to Long-Term Nurture. Nothing moves by itself; open the lead to decide.";
+export const LEADS_NEEDS_STAGE = "Needs a stage";
+export const LEADS_NO_ACTIVITY_YET = "No activity yet";
+export const LEADS_NOTE_UNAVAILABLE = "Note couldn't load";
+export const LEADS_LOST_UNAVAILABLE = "Can't show lost leads right now. Refresh to try again.";
+export const LEADS_WORKING_UNAVAILABLE = "Can't tell which leads are being worked right now, so every open lead is shown. Refresh to try again.";
+export const LEADS_MOVED_TO = (name: string, stage: string) => `Moved ${name} to ${stage}`;
+export const LEADS_ASSIGNED_TO = (name: string, who: string) => `Assigned ${name} to ${who}`;
+export const LEADS_ROW_MENU = (name: string) => `Actions for ${name}`;
+export const LEADS_NO_MATCH_IN_SET = (set: string) => `No lead matches these filters in ${set}.`;
+export const LEADS_SET_EMPTY = (set: string) => `Nobody is in ${set} right now.`;
+export const LEADS_LOST_CUT = (shown: number, total: number) => "Showing the first " + shown + " of " + total + " lost leads.";
+export const LEADS_DUPLICATE = "Possible duplicate";
+export const LEADS_DUPLICATES = "Possible duplicates";
+export const LEADS_DUPLICATES_TITLE = "Leads with the same email or the same name as another open lead. Nothing is merged; open each to compare.";
+export const LEADS_MOVED_MARK = "Moved";
+export const LEADS_MOVED_MARK_TITLE = "You moved this lead; it no longer belongs in this list. It stays until you refresh.";
+export const LEADS_ALL_OPEN_MATCHES = (n: number) => "All open has " + n + (n === 1 ? " match" : " matches");
+export const LEADS_START_TIMER = "Start timer";
+export const LEADS_STOP_TIMER = "Stop timer";
+export const LEADS_ADD_TIME = "Add time";
+export const LEADS_UNKNOWN_TEAMMATE_DROP = "That teammate can't be named, so cards can't be dropped there.";
+export const LEADS_HIDDEN_SELECTED = (n: number) => `${n} selected but not shown`;

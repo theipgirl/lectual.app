@@ -12,7 +12,7 @@ import { ORG, MODULES, OWNER_ID } from "./fixtures";
  * The owner shell exactly as src/app/dashboard/layout.tsx draws it (header, Rail, content, MobileBar), built from the
  * same functions (visibleNav -> drawnNav -> shellFor) with sample data. If the layout changes, mirror it here.
  */
-export function OwnerShell({ children, pendingCount = 6, railPinned = true, railFlyout = false, moreOpen = false }: { children: ReactNode; pendingCount?: number; railPinned?: boolean; railFlyout?: boolean; moreOpen?: boolean }) {
+export function OwnerShell({ children, pendingCount = 6, railPinned = true, railFlyout = false, moreOpen = false, dealReady = null }: { children: ReactNode; pendingCount?: number; railPinned?: boolean; railFlyout?: boolean; moreOpen?: boolean; dealReady?: string | null }) {
   const items = visibleNav(MODULES, "owner");
   const shell = shellFor("owner");
   const drawn = drawnNav(items, "owner");
@@ -47,6 +47,7 @@ export function OwnerShell({ children, pendingCount = 6, railPinned = true, rail
           counts={{}}
           initialPinned={railPinned}
           initialFlyout={railFlyout}
+          dealReady={dealReady}
           showSettings={shell.showSettings}
           showReports={shell.showReports}
           tree={shell.tree}
@@ -56,7 +57,7 @@ export function OwnerShell({ children, pendingCount = 6, railPinned = true, rail
           <div className="lx-page">{children}</div>
         </div>
       </div>
-      <MobileBar items={drawn} queueStatus="ok" pendingCount={pendingCount} counts={{}} bar={shell.bar} groups={shell.moreGroups} variant={shell.variant} initialOpen={moreOpen} />
+      <MobileBar items={drawn} queueStatus="ok" pendingCount={pendingCount} counts={{}} bar={shell.bar} groups={shell.moreGroups} variant={shell.variant} initialOpen={moreOpen} dealReady={dealReady} />
     </div>
   );
 }

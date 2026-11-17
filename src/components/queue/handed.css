@@ -1,0 +1,13 @@
+/* Handed to you (technician approval page and Approvals list, Phase 2 item 2). Drawn only for a card handed to the viewer. Tokens only. */
+.lx-handed { display: grid; gap: 12px; padding: 16px 20px; border-left: 3px solid var(--ox); }
+.lx-handed-by { margin: 0; font-size: 15px; font-weight: 600; color: var(--ink); }
+.lx-handed-note { display: grid; gap: 4px; padding: 10px 12px; border-radius: 8px; background: var(--well); font-size: 14px; color: var(--body); overflow-wrap: anywhere; }
+.lx-sendback { display: grid; gap: 8px; }
+.lx-sendback-label { display: grid; gap: 4px; font-size: 14px; color: var(--ink); }
+.lx-sendback-note { width: 100%; box-sizing: border-box; font: inherit; font-size: 14px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); resize: vertical; }
+.lx-sendback-note:focus-visible { outline: 2px solid var(--ox); outline-offset: 2px; }
+.lx-sendback .lx-btn { justify-self: start; }
+.lx-handed-pill { margin-left: 8px; }
+@media (max-width: 640px) {
+  .lx-sendback .lx-btn { justify-self: stretch; min-height: 44px; }
+}

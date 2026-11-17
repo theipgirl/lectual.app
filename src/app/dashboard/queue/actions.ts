@@ -11,6 +11,9 @@ import { loadApprovalRouting } from "@/lib/queue/routing-load";
 import { loadActiveQueue } from "@/lib/queue/load";
 import { dismissStale, dismissableFollowups, type DismissResult } from "@/lib/queue/dismiss";
 import type { Role } from "@/lib/auth/roles";
+import { cardIdOf, cardNoteOf, sendCardBack } from "@/lib/queue/card-moves";
+import { SEND_BACK_NOTE_MAX } from "@/lib/queue/handed";
+import { DECK_FAILED, SEND_BACK_NOTE_TOO_LONG } from "@/lib/ui/words";
 
 export type ReviewState = { error?: string };
 
@@ -92,4 +95,25 @@ function dismissMessage(r: DismissResult): DismissState {
   if (r.attempted === 0) return { message: "Nothing to dismiss." };
   if (r.failed > 0) return { error: `Dismissed ${r.done}, ${r.failed} couldn't be dismissed. Refresh to try again.${rest}` };
   return { message: `Dismissed ${r.done} ${r.done === 1 ? "follow-up" : "follow-ups"}.${rest}` };
+}
+
+export type SendBackState = { error?: string };
+
+/**
+ * "Send back to <name>" on the approval page, for the colleague a card was handed to. The same core as the deck's Send
+ * back (`sendCardBack`): role and user re-resolved from the session, the item re-read (must be pending), the card events
+ * re-read, refused unless the caller is the CURRENT hand-off target. It records a `returned` event and tells the person who
+ * handed it (bell only). It never changes who may approve and sends nothing. The form posts the id and an optional note only.
+ */
+export async function sendBackAction(_prev: SendBackState, formData: FormData): Promise<SendBackState> {
+  const id = cardIdOf(formData.get("id"));
+  if (!id) return { error: DECK_FAILED };
+  const rawNote = formData.get("note");
+  if (typeof rawNote === "string" && rawNote.trim().length > SEND_BACK_NOTE_MAX) return { error: SEND_BACK_NOTE_TOO_LONG };
+  const sent = await sendCardBack({ id, note: cardNoteOf(rawNote), allowHander: false });
+  if (!sent.ok) return { error: sent.error };
+  revalidatePath("/dashboard/queue/");
+  revalidatePath("/dashboard/queue/deck/");
+  revalidatePath(`/dashboard/queue/${id}/`);
+  redirect(`/dashboard/queue/${id}/?returned=1`);
 }

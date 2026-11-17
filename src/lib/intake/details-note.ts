@@ -5,25 +5,35 @@ export type DetailReads = {
   approvals?: { status: string } | null;
   agentMoves?: { status: "ok"; truncated: boolean } | { status: "unavailable" } | null;
   stageDecisions?: { status: "ok"; truncated: boolean } | { status: "unavailable" } | null;
+  /** The latest-notes read (Next step). */
+  notes?: { status: string } | null;
+  /** This week's time (the clock chips). */
+  time?: { status: string } | null;
+  /** Other optional reads that were down (the Working rule's approvals / proposals / consults / event list), by name. */
+  extra?: readonly string[];
 };
 
 export const DETAIL_NAMES = {
   approvals: APPROVALS_NAME.toLowerCase(),
   agentMoves: "automatic moves",
   stageDecisions: "stage decisions",
+  notes: "latest notes",
+  time: "time",
 } as const;
 
 /**
- * The ONE note the Leads page shows when a side read did not fully land (it replaces three separate
- * warning lines). It names only the parts that failed or were cut short, in a fixed order, and is null
- * when everything loaded. The state logic is untouched: the chips and filters that depend on a failed
- * read stay off exactly as before; this only says so, once, in plain words.
+ * The ONE note the Leads page shows when a side read did not fully land. It names only the parts that failed or were cut
+ * short, in a fixed order, and is null when everything loaded. The chips and filters that depend on a failed read stay off;
+ * this only says so, once, in plain words.
  */
 export function detailsNote(reads: DetailReads): { names: string[]; text: string } | null {
   const names: string[] = [];
   if (reads.approvals?.status === "unavailable") names.push(DETAIL_NAMES.approvals);
   if (reads.agentMoves && (reads.agentMoves.status === "unavailable" || reads.agentMoves.truncated)) names.push(DETAIL_NAMES.agentMoves);
   if (reads.stageDecisions && (reads.stageDecisions.status === "unavailable" || reads.stageDecisions.truncated)) names.push(DETAIL_NAMES.stageDecisions);
+  if (reads.notes?.status === "unavailable") names.push(DETAIL_NAMES.notes);
+  if (reads.time?.status === "unavailable") names.push(DETAIL_NAMES.time);
+  for (const n of reads.extra ?? []) if (!names.includes(n)) names.push(n);
   if (names.length === 0) return null;
   return { names, text: `Some details couldn't load (${names.join(", ")}). Refresh to try again.` };
 }

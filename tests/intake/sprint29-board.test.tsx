@@ -22,6 +22,8 @@ import {
   whyLine,
   type DecisionFlag,
 } from "@/lib/intake/stage-decision";
+import IntakeBoard from "@/app/dashboard/intake/_components/IntakeBoard";
+import { boardModel } from "@/lib/intake/board-columns";
 import IntakeWorkspace from "@/app/dashboard/intake/_components/IntakeWorkspace";
 import BulkMoveBar from "@/app/dashboard/intake/_components/BulkMoveBar";
 
@@ -155,31 +157,32 @@ describe("the flag a Lawmatics import records", () => {
   });
 });
 
-describe("the one-line reason on a board card", () => {
+describe("the board card's markers (changed on purpose in item L: no reason line, no big pill)", () => {
   const html = text(render(BOARD));
 
-  it("a Stage Keeper move reads 'Moved automatically · consult held Oct 23', with the evidence as its tooltip", () => {
-    expect(html).toContain("Moved automatically · consult held Oct 23");
+  it("a Stage Keeper move is a small chip: 'Moved automatically · Consult held Oct 23', with the evidence as its tooltip", () => {
+    expect(html).toContain("Moved automatically · Consult held Oct 23");
     expect(html).toContain('title="Evidence: Zoom meeting "Strategy session" on Oct 23."');
     expect(chipFor(currentAgentMoves(AGENT_ROWS, NOW).get("l-agent")!, NOW, ZONE).why).toBe("Moved automatically · consult held Oct 23");
   });
 
-  it("an imported lead still waiting says 'Lawmatics: <stage>' and carries the decision pill", () => {
-    expect(html).toContain("Lawmatics: Discovery Call Complete");
-    expect(html).toContain(IMPORTED_DECISION_LABEL);
+  it("an imported lead still waiting has ONE small 'Needs a stage' marker, the Lawmatics stage in its title, and no reason line", () => {
+    expect(html).toContain("Needs a stage");
+    expect(html).toContain("Imported from Lawmatics, stage: Discovery Call Complete");
+    expect(html).not.toContain("Lawmatics: Discovery Call Complete");
+    expect(html).not.toContain(IMPORTED_DECISION_LABEL + "<");
     expect(IMPORTED_DECISION_LABEL).toBe("Imported — stage needs a decision");
   });
 
-  it("a hired one says so in the pill", () => {
-    expect(html).toContain("Lawmatics: Hired Client");
-    expect(html).toContain(HIRED_DECISION_LABEL);
+  it("a hired one says so in the marker's title", () => {
+    expect(html).toContain("Hired in Lawmatics. Open a matter for this person.");
+    expect(HIRED_DECISION_LABEL).toBe("Hired in Lawmatics — open a matter");
   });
 
-  it("a decided lead and a plain lead get no reason line and no pill (blank-safe, no empty element)", () => {
-    expect(html.match(/data-why="/g)).toHaveLength(3); // the agent move and the two open flags
+  it("a decided lead and a plain lead get no marker (blank-safe, no empty element)", () => {
+    expect(html).not.toContain("intake-why");
     expect(html.match(/data-needs-decision/g)).toHaveLength(2);
     const decidedCard = html.slice(html.indexOf('data-lead-id="l-decided"'), html.indexOf('data-lead-id="l-agent"'));
-    expect(decidedCard).not.toContain("intake-why");
     expect(decidedCard).not.toContain("data-needs-decision");
   });
 
@@ -215,7 +218,7 @@ describe("the 'Needs a stage decision' filter and the column badge", () => {
 
   it("an unreadable flag list is said out loud: no filter, no badge, no reason line, and a bookmarked filter shows everyone", () => {
     const html = text(render({ ...BOARD, decision: "1" }, { decisions: { status: "unavailable" }, withFlags: false }));
-    expect(html).toContain("Some details couldn't load (stage decisions). Refresh to try again.");
+    expect(html).toContain("Some details couldn't load (stage decisions, time). Refresh to try again.");
     expect(html).not.toContain(NEEDS_DECISION_LABEL + "<");
     expect(html).not.toContain("data-decision-count");
     expect(html).not.toContain("Lawmatics: ");
@@ -229,22 +232,50 @@ describe("the 'Needs a stage decision' filter and the column badge", () => {
 });
 
 describe("selecting several cards and 'Move to...'", () => {
-  it("the board draws a tick box on every card and the bar; the table draws neither", () => {
+  it("the board draws no tick box and no bar until Select is pressed; the table never does", () => {
     const board = text(render(BOARD));
-    expect(board.match(/class="intake-select"/g)).toHaveLength(5);
-    expect(board).toContain("Tick cards to move several at once.");
-    expect(board).toContain("Select the 5 shown");
+    expect(board).not.toContain("intake-select");
+    expect(board).not.toContain("data-bulk-bar");
+    expect(board).toContain(">Select<");
     const table = text(render({}));
     expect(table).not.toContain("intake-select");
     expect(table).not.toContain("data-bulk-bar");
+    expect(table).not.toContain(">Select<");
   });
 
-  it("works on the by-owner board too", () => {
-    expect(text(render({ view: "board", group: "owner" })).match(/class="intake-select"/g)).toHaveLength(5);
-  });
+  function boardHtml(group: "stage" | "owner", selecting: boolean) {
+    const rows = buildIntakeRows({ leads: LEADS, stages: STAGES, members: [], now: NOW });
+    const model = boardModel({ rows, stages: intakeStages(STAGES), members: [], group, pinned: [], extra: {}, showEmpty: false });
+    return text(
+      renderToStaticMarkup(
+        <IntakeBoard
+          group={group}
+          model={model}
+          moveStages={STAGES}
+          members={[]}
+          now={NOW}
+          pendingLeadId={null}
+          errors={{}}
+          time={null}
+          rowById={(id) => rows.find((r) => r.lead.id === id)}
+          showEmpty={false}
+          onToggleEmpty={() => {}}
+          onMoreInColumn={() => {}}
+          onMoveStage={() => {}}
+          onAssign={() => {}}
+          selecting={selecting}
+          selectedIds={new Set()}
+          onToggleSelect={() => {}}
+        />,
+      ),
+    );
+  }
 
-  it("each box is named for its lead", () => {
-    expect(text(render(BOARD))).toContain('aria-label="Select Imported Tester"');
+  it("in select mode every drawn card has a box named for its lead, on both boards", () => {
+    expect(boardHtml("stage", true).match(/class="intake-select"/g)).toHaveLength(5);
+    expect(boardHtml("owner", true).match(/class="intake-select"/g)).toHaveLength(5);
+    expect(boardHtml("stage", true)).toContain('aria-label="Select Imported Tester"');
+    expect(boardHtml("stage", false)).not.toContain("intake-select");
   });
 });
 
@@ -253,18 +284,18 @@ describe("the bulk bar", () => {
   const bar = (over: Record<string, unknown> = {}) =>
     text(
       renderToStaticMarkup(
-        <BulkMoveBar selectedCount={2} shownCount={5} stages={STAGES} pending={false} message={null} onSelectShown={noop} onClear={noop} onMove={noop} {...over} />,
+        <BulkMoveBar selectedCount={2} hiddenCount={0} shownCount={5} stages={STAGES} pending={false} message={null} onSelectShown={noop} onClear={noop} onDone={noop} onMove={noop} {...over} />,
       ),
     );
 
-  it("offers every stage that does not open a matter, with its code, and never a won one", () => {
+  it("offers every stage that does not open a matter (by name), and never a won one", () => {
     const html = bar();
     expect(html).toContain("2 selected");
-    expect(html).toContain("1 · Potential New Client");
-    expect(html).toContain("3 · Post Consultation Email Sent");
+    expect(html).toContain(">Potential New Client<");
+    expect(html).toContain(">Post Consultation Email Sent<");
     expect(html).not.toContain("Signed LOE");
     // Even a won stage handed to it is dropped.
-    expect(bar({ stages: [...STAGES] })).not.toContain("9 · Signed LOE");
+    expect(bar({ stages: [...STAGES] })).not.toContain("Signed LOE");
   });
 
   it("Move is disabled until a stage is chosen, and says so when too many are ticked", () => {

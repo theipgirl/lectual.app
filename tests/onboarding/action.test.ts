@@ -7,7 +7,7 @@ vi.mock("@/lib/db/admin", () => {
   throw new Error("the admin client must never be loaded by the tour action");
 });
 
-import { markTourSeenAction } from "@/lib/onboarding/actions";
+import { markTourSeenAction, markWelcomeSeenAction } from "@/lib/onboarding/actions";
 import { TOUR_VERSION } from "@/lib/onboarding/tour";
 
 function client(opts: { user?: object | null; getUserError?: object; updateError?: object }) {
@@ -87,5 +87,28 @@ describe("source gates", () => {
   it("the action reads no role or module from metadata", () => {
     const src = readFileSync("src/lib/onboarding/actions.ts", "utf8");
     expect(src).not.toMatch(/role|modules/i);
+  });
+});
+
+describe("markWelcomeSeenAction", () => {
+  const TOURED = { id: "u1", user_metadata: { full_name: "Ada", lectual_tour: { version: 1, seen_at: "2026-01-01T00:00:00.000Z", outcome: "finished" } } };
+  it.each(["finished", "skipped"] as const)("writes lectual_welcome (%s), leaves lectual_tour and other keys as they were", async (outcome) => {
+    const { updateUser } = client({ user: TOURED });
+    expect(await markWelcomeSeenAction(outcome)).toEqual({ ok: true });
+    const data = updateUser.mock.calls[0][0].data;
+    expect(data.lectual_tour).toEqual(TOURED.user_metadata.lectual_tour);
+    expect(data.full_name).toBe("Ada");
+    expect(data.lectual_welcome.version).toBe(1);
+    expect(data.lectual_welcome.outcome).toBe(outcome);
+  });
+  it("refuses signed-out, a bad outcome, and a failed save with fixed sentences", async () => {
+    const out = client({ user: null });
+    expect(await markWelcomeSeenAction("finished")).toEqual({ ok: false, error: expect.stringMatching(/not signed in/i) });
+    expect(out.updateUser).not.toHaveBeenCalled();
+    getScopedClient.mockReset();
+    expect((await markWelcomeSeenAction("nope")).ok).toBe(false);
+    expect(getScopedClient).not.toHaveBeenCalled();
+    client({ user: TOURED, updateError: { message: "secret" } });
+    expect(JSON.stringify(await markWelcomeSeenAction("finished"))).not.toContain("secret");
   });
 });

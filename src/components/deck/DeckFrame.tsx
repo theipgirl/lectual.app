@@ -18,7 +18,8 @@ import {
   deckLaterArrivals,
 } from "@/lib/ui/words";
 import type { DeckView } from "@/lib/queue/deck";
-import { DeckSide, type DeckSideRow } from "./DeckSide";
+import { DeckSide, type DeckSideLater, type DeckSideRow } from "./DeckSide";
+import { DealTimesButton } from "./DealTimesButton";
 
 export type { DeckSideRow } from "./DeckSide";
 
@@ -41,10 +42,13 @@ export function DeckFrame({
   side,
   sideNote,
   sideFailed,
+  sideLater,
+  sideDecidedFailed,
   laterArrivals,
   nextDealLabel,
   dealLabel,
   dealNowHref,
+  canChangeDealTimes = false,
   meta,
   wideSub,
   children,
@@ -55,11 +59,16 @@ export function DeckFrame({
   side: DeckSideRow[] | null;
   sideNote?: string | null;
   sideFailed?: boolean;
+  /** The viewer's own Later cards for the side column. */
+  sideLater?: DeckSideLater;
+  sideDecidedFailed?: boolean;
   laterArrivals: number;
   nextDealLabel: string;
   /** The deal that is open now ("7:00 AM"), null before the first. */
   dealLabel?: string | null;
   dealNowHref: string;
+  /** True only in the owner view, where the dialog is mounted. */
+  canChangeDealTimes?: boolean;
   /** "6 left · about 8 min", "All decided", "Can't show". */
   meta?: string | null;
   /** The sentence under the wide head (List and Board). */
@@ -90,6 +99,7 @@ export function DeckFrame({
             {switcher("")}
           </div>
           {wideSub && <p className="dk-sub">{wideSub}</p>}
+          {canChangeDealTimes && <DealTimesButton />}
         </div>
         {children}
       </div>
@@ -112,8 +122,9 @@ export function DeckFrame({
             {switcher("")}
           </div>
           <p className="dk-sub">{DECK_PAGE_SUB}</p>
+          {canChangeDealTimes && <DealTimesButton />}
         </div>
-        <DeckSide rows={side ?? []} failed={sideFailed} note={sideNote} />
+        <DeckSide rows={side ?? []} failed={sideFailed} note={sideNote} later={sideLater} decidedFailed={sideDecidedFailed} />
         {laterArrivals > 0 && dealLabel && (
           <section className="dk-arrived" aria-label={deckArrivedTitle(dealLabel)}>
             <div className="dk-sidecard-head">

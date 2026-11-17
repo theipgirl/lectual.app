@@ -134,11 +134,12 @@ describe("Leads and Matters share the pattern", () => {
   });
 
   it("the Leads table row and the Matters table row use the same row class, and the same pill", () => {
-    expect(read("src/app/dashboard/intake/_components/IntakeTable.tsx")).toContain('className="lp-row lp-row-grid"');
+    // Item L: the Leads rows are their own even-height grid (ix-row) inside the shared panel; the Matters row keeps lp-row.
+    expect(read("src/app/dashboard/intake/_components/IntakeTable.tsx")).toContain('className="ix-row"');
+    expect(read("src/app/dashboard/intake/_components/IntakeTable.tsx")).toContain("lp-panel");
     expect(matters).toContain('className="lp-row"');
-    expect(read("src/app/dashboard/intake/_components/IntakeTable.tsx")).toContain("lp-pill");
     expect(matters).toContain("lp-pill");
-    expect(read("src/app/dashboard/intake/_components/IntakeCard.tsx")).toContain("lp-board-card");
+    expect(read("src/app/dashboard/intake/_components/IntakeCard.tsx")).toContain("ix-card");
     expect(read("src/components/matters/MatterBoard.tsx")).toContain("lp-board-card");
   });
 

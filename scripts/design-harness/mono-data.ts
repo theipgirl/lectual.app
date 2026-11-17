@@ -112,6 +112,33 @@ export const tables: Record<string, Record<string, unknown>[]> = {
 
 type Filter = (r: Record<string, unknown>) => boolean;
 
+function splitTop(str: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let cur = "";
+  for (const ch of str) {
+    if (ch === "(") depth++;
+    if (ch === ")") depth--;
+    if (ch === "," && depth === 0) {
+      out.push(cur);
+      cur = "";
+    } else cur += ch;
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+function clauseMatches(clause: string, row: Record<string, unknown>): boolean {
+  if (clause.startsWith("and(")) return splitTop(clause.slice(4, -1)).every((c) => clauseMatches(c, row));
+  const m = /^(.+?)\.(in|eq|is)\.(.*)$/.exec(clause);
+  if (!m) return true;
+  const [, col, op, val] = m;
+  const v = col === "payload->>actor" ? ((row.payload as Record<string, unknown> | null)?.actor ?? null) : row[col];
+  if (op === "in") return val.slice(1, -1).split(",").includes(String(v));
+  if (op === "eq") return String(v) === val;
+  return val === "null" ? v === null || v === undefined : false;
+}
+const orMatches = (f: string, row: Record<string, unknown>) => splitTop(f).some((c) => clauseMatches(c, row));
+
 class Query {
   private filters: Filter[] = [];
   private mode: "rows" | "single" | "maybe" | "count" = "rows";
@@ -126,7 +153,9 @@ class Query {
   in(c: string, vs: unknown[]) { this.filters.push((r) => vs.includes(r[c])); return this; }
   is(c: string, v: unknown) { this.filters.push((r) => (v === null ? r[c] == null : r[c] === v)); return this; }
   not(c: string, op: string, v: unknown) { if (op === "is") this.filters.push((r) => (v === null ? r[c] != null : r[c] !== v)); return this; }
-  gte() { return this; } gt() { return this; } lte() { return this; } lt() { return this; } like() { return this; } ilike() { return this; } or() { return this; }
+  gte() { return this; } gt() { return this; } lte() { return this; } lt() { return this; } like() { return this; } ilike() { return this; }
+  /** PostgREST `or`: only the shapes the Leads page sends (type.in.(..), and(..), col.eq.v, col.is.null); anything else is ignored like before. */
+  or(f: string) { if (/^type\.in\./.test(f)) this.filters.push((r) => orMatches(f, r)); return this; }
   contains() { return this; } order() { return this; } limit() { return this; } range() { return this; } match() { return this; } filter() { return this; } textSearch() { return this; } overlaps() { return this; }
   insert() { this.writing = true; return this; } update() { this.writing = true; return this; } upsert() { this.writing = true; return this; } delete() { this.writing = true; return this; }
   single() { this.mode = "single"; return this; }
@@ -145,7 +174,7 @@ export function fakeClient() {
   return {
     from: (t: string) => new Query(t),
     rpc: async (name: string) => ({ data: name === "current_org_role" ? "owner" : null, error: null }),
-    auth: { getUser: async () => ({ data: { user: null }, error: null }) },
+    auth: { getUser: async () => ({ data: { user: { id: OWNER_ID, email: "owner@example.test" } }, error: null }) },
     storage: { from: () => ({ createSignedUrl: async () => ({ data: null, error: null }), createSignedUrls: async () => ({ data: [], error: null }) }) },
   };
 }

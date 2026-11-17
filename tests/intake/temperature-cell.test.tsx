@@ -76,7 +76,14 @@ describe("the table row's refusal", () => {
     const html = renderToStaticMarkup(
       <IntakeTable
         rows={rows}
-        totalCount={1}
+        total={1}
+        left={0}
+        setLabel="All open"
+        hasOwnerColumn={false}
+        stages={[stage]}
+        anyLeads
+        onMoveStage={() => {}}
+        onShowMore={() => {}}
         members={[]}
         sortKey="lastTouch"
         sortDir="desc"

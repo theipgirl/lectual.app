@@ -15,7 +15,7 @@ vi.mock("@/lib/firm/session", () => ({
   resolveFirmSession: vi.fn(async () => ({ kind: "ok", user: { id: U.rebecca, email: "rebecca@example.com" }, role: state.role, org: { id: "org-1" } })),
 }));
 vi.mock("@/lib/queue/load", () => ({ loadActiveQueue: vi.fn(async (s: string) => state.loads[s]) }));
-vi.mock("@/lib/queue/routing-load", () => ({ loadApprovalRouting: vi.fn(async () => ({ status: "ok", routing: {}, members: [], dropped: 0, settingsExist: true })) }));
+vi.mock("@/lib/queue/routing-load", () => ({ loadApprovalRouting: vi.fn(async () => ({ status: "ok", routing: {}, members: (await import("./routing-fixtures")).MEMBERS, dropped: 0, settingsExist: true })) }));
 vi.mock("@/lib/queue/card-state", () => ({ loadCardState: vi.fn(async () => state.cardState) }));
 vi.mock("@/lib/queue/audit-context", () => ({ loadAuditContext: vi.fn(async () => ({ signOff: "The Team", teamSignOff: "The Team", memberNames: [] })) }));
 vi.mock("@/lib/queue/stale", () => ({ checkDraftStaleness: vi.fn(async () => ({ status: "not_applicable" })), stalenessRequiresConfirm: vi.fn(() => false) }));
@@ -35,6 +35,26 @@ beforeEach(() => {
   state.modules = ["role-views"];
   state.loads = { pending: empty, approved: empty, rejected: empty };
   state.cardState = { status: "ok", events: [] };
+});
+
+describe("the Change deal times opener", () => {
+  it.each(["cards", "list", "board"])("is drawn for the owner view (%s)", async (view) => {
+    state.role = "owner";
+    expect(await render({ view })).toContain("Change deal times");
+  });
+  it.each(["cards", "list", "board"])("is not drawn for a role in the technician view (%s)", async (view) => {
+    for (const role of ["attorney", "paralegal", "admin"]) {
+      state.role = role;
+      expect(await render({ view })).not.toContain("Change deal times");
+    }
+  });
+  it("is not drawn when the queue can't be read, unless the owner view", async () => {
+    state.loads.pending = { status: "unavailable", items: [] };
+    state.role = "attorney";
+    expect(await render()).not.toContain("Change deal times");
+    state.role = "owner";
+    expect(await render()).toContain("Change deal times");
+  });
 });
 
 describe("the deck page", () => {

@@ -11,6 +11,8 @@ import { getFirmTimeZone } from "@/lib/org/profile";
 import { listMemberDirectory, type MemberIdentity } from "@/lib/members/directory";
 import { QUEUE_EDIT_ROLES } from "@/lib/queue/roles";
 import { whenLabel, dealFor, dealtAt, sameFirmDay } from "@/lib/deal/times";
+import { parseDealTimes } from "@/lib/deal/person-times";
+import { NO_PREVIEW, previewFor, shellFor, viewFor } from "@/lib/views";
 import {
   buildDeck,
   decidedToday,
@@ -18,6 +20,7 @@ import {
   deckEmptyState,
   deckHref,
   draftOpening,
+  eventTrust,
   parseAtParam,
   parseDeckView,
   positionOf,
@@ -26,8 +29,12 @@ import {
   type DeckCard,
 } from "@/lib/queue/deck";
 import type { QueueItem } from "@/lib/queue/api";
+import { DeckSeenMark } from "@/components/deck/DeckSeenMark";
 import { DeckFrame, type DeckSideRow } from "@/components/deck/DeckFrame";
 import { ApprovalCard, type ApprovalCardProps } from "@/components/deck/ApprovalCard";
+import { DeckListsView } from "./lists-view";
+import { laterBackPill, parseListParam } from "@/lib/queue/deck-lists";
+import type { DeckSideLater } from "@/components/deck/DeckSide";
 import { DeckBoard, DeckList, type BoardColumn } from "@/components/deck/DeckList";
 import { DeckClean, DeckEmpty, DeckUnavailable } from "@/components/deck/DeckStates";
 import { queuedLabel, waitingText, ageText, type BoardCard, type ListRow } from "@/components/deck/deck-rows";
@@ -77,7 +84,7 @@ import {
 const FLAG_CHECK_LIMIT = 30;
 
 export type DeckInitial = Pick<NonNullable<ApprovalCardProps["initial"]>, "mode" | "holding" | "result" | "note">;
-type Search = { view?: string | string[]; at?: string | string[]; deal?: string | string[] };
+type Search = { view?: string | string[]; at?: string | string[]; deal?: string | string[]; list?: string | string[] };
 
 function memberName(m: MemberIdentity | undefined): string {
   return m?.displayName?.trim() || m?.email?.trim() || "a teammate";
@@ -112,14 +119,25 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
   if (!session || session.kind !== "ok") notFound();
 
   const params = await searchParams;
+  const list = parseListParam(params.list);
+  if (list) return DeckListsView({ list });
   const view = parseDeckView(params.view);
   const at = parseAtParam(params.at);
   const dealNow = (Array.isArray(params.deal) ? params.deal[0] : params.deal) === "now";
   const viewer = { userId: session.user.id, role: session.role };
+  // The dialog is mounted only in the owner shell, so the opener is drawn only there (the layout's own computation).
+  const actingAsStaff = session.actingAsStaff ?? false;
+  const canChangeDealTimes =
+    shellFor(viewFor({ role: session.role, preview: actingAsStaff ? previewFor(session.user.user_metadata, session.org.id) : NO_PREVIEW, firmHasRoleViews: true, actingAsStaff })).variant === "owner";
+  // Stamps "the deck was opened" (clears the deal-ready dot): only after a real queue load (below), only in the owner's shell,
+  // never for Lectual staff acting inside a firm (the action refuses them too).
+  const seenMark = !actingAsStaff && canChangeDealTimes ? <DeckSeenMark /> : null;
 
   const [load, tz] = await Promise.all([loadActiveQueue("pending"), getFirmTimeZone()]);
   const now = new Date();
-  const deal = dealFor(now, tz);
+  // The person's own two times, from their own account (the same session user resolved above).
+  const myTimes = parseDealTimes(session.user.user_metadata);
+  const deal = dealFor(now, tz, myTimes);
   const dealLine = dealNow ? DECK_DEALT_NOW : deal.current ? dealHeader(deal.current.label) : nextDealHeader(deal.next.label);
   const viewHref = (v: typeof view) => deckHref({ view: v, dealNow });
   const dealNowHref = deckHref({ view, dealNow: true });
@@ -137,6 +155,7 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
         nextDealLabel={deal.next.label}
         dealLabel={deal.current?.label ?? null}
         dealNowHref={dealNowHref}
+        canChangeDealTimes={canChangeDealTimes}
         wideSub={view === "board" ? DECK_BOARD_SUB : undefined}
       >
         <DeckUnavailable status={load.status} reason={load.reason} />
@@ -153,7 +172,7 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
     loadActiveQueue("rejected"),
   ]);
   const routing = routed.status === "ok" ? routed.routing : {};
-  const base = { items: load.items, routing, viewer, cardState, now, dealtAt: dealNow ? null : dealtAt(now, tz), audit };
+  const base = { items: load.items, routing, viewer, cardState, trust: eventTrust(routed), now, dealtAt: dealNow ? null : dealtAt(now, tz, myTimes), audit };
   const first = buildDeck(base);
   const deck: Deck = buildDeck({ ...base, flags: await closerLookFlags(first.cards.map((c) => c.item)) });
 
@@ -171,7 +190,26 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
   const dealLabel = deal.current?.label ?? null;
 
   const waiting = deck.cards.length + deck.laterArrivals.length + deck.later.length;
+  const sideLater: DeckSideLater =
+    cardState.status === "ok"
+      ? {
+          status: "ok",
+          rows: deck.later.map((c) => ({
+            id: `later-${c.item.id}`,
+            title: c.item.headline,
+            sub: `${agentLabel(c.item.agent)} · ${kindRowWord(c.kind)}`,
+            href: `/dashboard/queue/${encodeURIComponent(c.item.id)}/`,
+            current: false,
+            decided: false,
+            chip: laterBackPill(c.until, now, tz),
+            timeChip: true,
+            tone: "quiet" as const,
+          })),
+        }
+      : { status: cardState.status };
   const frameProps = {
+    sideLater,
+    sideDecidedFailed: !decidedReadable,
     dealLine,
     view,
     viewHref,
@@ -180,8 +218,11 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
     nextDealLabel: deal.next.label,
     dealLabel,
     dealNowHref,
+    canChangeDealTimes,
   };
   const frame = (side: DeckSideRow[] | null, meta: string | null, children: React.ReactNode, wideSub?: string) => (
+    <>
+    {seenMark}
     <DeckFrame {...frameProps} side={side} meta={meta} wideSub={wideSub}>
       {routed.status !== "ok" && (
         <p role="status" className="lx-note" style={{ margin: 0 }}>
@@ -190,6 +231,7 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
       )}
       {children}
     </DeckFrame>
+    </>
   );
 
   const statusOf = (c: DeckCard): { label: string; tone: ListRow["statusTone"] } =>

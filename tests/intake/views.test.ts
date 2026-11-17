@@ -266,7 +266,7 @@ describe("nextStepFor", () => {
 
   it("says nothing has happened rather than inventing a next step", () => {
     const [row] = rowsFor([lead({ id: "c" })]);
-    expect(nextStepFor(row, NOW)).toEqual({ text: "No activity yet", urgent: false });
+    expect(nextStepFor(row, NOW)).toEqual({ text: "No activity yet", urgent: false, muted: true });
   });
 
   it("goes urgent once a reply has sat unanswered for three days", () => {
@@ -284,7 +284,7 @@ describe("nextStepFor", () => {
       { a: "Quote sent, waiting" },
     );
     expect(row.stale).toBe(true);
-    expect(nextStepFor(row, NOW)).toEqual({ text: "Quote sent, waiting", urgent: true });
+    expect(nextStepFor(row, NOW)).toEqual({ text: "Quote sent, waiting", urgent: true, muted: false });
   });
 });
 

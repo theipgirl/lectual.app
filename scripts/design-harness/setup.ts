@@ -94,9 +94,17 @@ vi.mock("@/lib/queue/api", async (orig) => ({
 }));
 vi.mock("@/lib/queue/org", async (orig) => ({ ...(await orig<typeof import("@/lib/queue/org")>()), activeQueueOrgKey: async () => "rpb" }));
 vi.mock("@/lib/db/scoped-client", async () => ({ getScopedClient: async () => (await import("./mono-data")).fakeClient() }));
-vi.mock("@/lib/queue/roles", async (orig) => ({ ...(await orig<typeof import("@/lib/queue/roles")>()), resolveQueueRole: async () => "owner" }));
+vi.mock("@/lib/queue/roles", async (orig) => ({ ...(await orig<typeof import("@/lib/queue/roles")>()), resolveQueueRole: async () => (state as { queueRole?: string }).queueRole ?? "owner" }));
 vi.mock("@/lib/queue/view-context", () => ({
-  loadQueueViewContext: async () => ({ viewer: { userId: "00000000-0000-4000-8000-0000000000a1", role: "owner" }, routing: {}, members: [], routingFailed: false, dropped: 0, now: Date.parse("2026-11-10T14:30:00Z") }),
+  // A screen can look as another member (`state.queueViewer`, with `state.queueMembers`); the default is the owner, as before.
+  loadQueueViewContext: async () => ({
+    viewer: (state as { queueViewer?: unknown }).queueViewer ?? { userId: "00000000-0000-4000-8000-0000000000a1", role: "owner" },
+    routing: {},
+    members: (state as { queueMembers?: unknown }).queueMembers ?? [],
+    routingFailed: false,
+    dropped: 0,
+    now: Date.parse("2026-11-10T14:30:00Z"),
+  }),
 }));
 
 // Lets a screen open the item page's draft editor (the page itself always starts in the rendered view).

@@ -7,6 +7,8 @@ import { listMemberDirectory } from "@/lib/members/directory";
 import { greetingName, greetingSuffix } from "@/lib/today/greeting-name";
 import { hourInZone } from "@/lib/today/priorities";
 import { civilInZone } from "@/lib/today/outcomes";
+import { parseDealTimes } from "@/lib/deal/person-times";
+import { dealNudge, parseDeckSeen } from "@/lib/deal/nudge";
 import { loadDeckSummary, type DeckSummary } from "@/lib/queue/deck-summary";
 import { loadTodayConsults, type TodayConsultsResult } from "@/lib/calendar/consult-sources";
 import { liveConsultDeps } from "@/lib/calendar/consult-sources-live";
@@ -72,8 +74,9 @@ export async function OwnerToday({
   now?: Date;
 }) {
   const [hasProposals, tz] = await Promise.all([orgHasModule("proposals").catch(() => false), getFirmTimeZone()]);
+  const dealTimes = parseDealTimes(metadata);
   const [deckS, consultsS, deadlinesS, reviewS, proposalsS, membersS] = await Promise.allSettled([
-    loadDeckSummary({ userId, role }),
+    loadDeckSummary({ userId, role }, dealTimes, now),
     loadTodayConsults(now, tz, liveConsultDeps),
     loadOwnerDeadlines(now, tz),
     loadOwnerNeedsReview(now, tz),
@@ -91,7 +94,9 @@ export async function OwnerToday({
 
   const today = civilInZone(now, tz);
   const firstName = greetingName({ userId, members, metadata, email });
-  const hero = cardsHero(deck);
+  // Ready only when the same read that drew the tile says there are cards in the person's current deal (never from a failed read).
+  const nudge = dealNudge({ now, timeZone: tz, times: dealTimes, seen: parseDeckSeen(metadata), read: deck.status === "ok" ? { status: "ok", undecided: deck.count } : { status: deck.status } });
+  const hero = cardsHero(deck, nudge);
   const week = weekStrip({ now, tz, consults: consults ? consults.consults : null, deadlines, proposals: Array.isArray(proposals) ? proposals : null });
   const weekNote =
     consults === null && deadlines === null
@@ -126,14 +131,14 @@ export async function OwnerToday({
                 <span className="ot-hero-title">
                   {hero.unit} &middot; {hero.about}
                 </span>
-                <span className="ot-hero-sub">{hero.dealLine}</span>
+                <span className="ot-hero-sub" data-ready={hero.ready ? "true" : undefined}>{hero.dealLine}</span>
               </div>
             </div>
             <div className="ot-hero-main ot-only-narrow">
               <p className="ot-hero-count">
                 {hero.big} {hero.cards} <span className="ot-hero-about">&middot; {hero.about}</span>
               </p>
-              <p className="ot-hero-sub">{hero.dealLine}</p>
+              <p className="ot-hero-sub" data-ready={hero.ready ? "true" : undefined}>{hero.dealLine}</p>
             </div>
           </>
         ) : (

@@ -20,6 +20,11 @@ const state = vi.hoisted(() => ({
   routed: { status: "ok", routing: {}, members: [], dropped: 0, settingsExist: true } as unknown,
   sendAccess: "ready" as string,
   send: vi.fn(),
+  notify: vi.fn(),
+  meta: {} as Record<string, unknown>,
+}));
+vi.mock("@/lib/db/scoped-client", () => ({
+  getScopedClient: vi.fn(async () => ({ auth: { getUser: vi.fn(async () => ({ data: { user: { user_metadata: state.meta } }, error: null })) } })),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -44,6 +49,7 @@ vi.mock("@/lib/members/directory", () => ({
     return state.members;
   }),
 }));
+vi.mock("@/lib/notifications/core", () => ({ notify: (...a: unknown[]) => state.notify(...a) }));
 vi.mock("@/lib/org/profile", () => ({ getFirmTimeZone: vi.fn(async () => "America/New_York") }));
 vi.mock("@/lib/mailbox/my-mailbox", () => ({
   mySendAccess: vi.fn(async () => state.sendAccess),
@@ -74,9 +80,12 @@ beforeEach(() => {
   state.cardState = { status: "ok", events: [] };
   state.record.mockReset().mockResolvedValue({ ok: true });
   state.members = MEMBERS;
+  state.routed = { status: "ok", routing: {}, members: MEMBERS, dropped: 0, settingsExist: true };
   state.membersFail = false;
   state.sendAccess = "ready";
   state.send.mockReset().mockResolvedValue({ ok: true });
+  state.notify.mockReset().mockResolvedValue(undefined);
+  state.meta = {};
 });
 
 const NOT_SWITCHED_ON = "This isn't switched on for your firm yet. Lectual will turn it on.";
@@ -164,6 +173,18 @@ describe("every action re-checks the caller", () => {
   });
 });
 
+describe("Lectual staff viewing as the firm (no membership: the fold would drop their events)", () => {
+  const PREVIEW_ONLY = "Preview only: hand-offs aren't saved while you're viewing as the firm.";
+  it("hand off and send back refuse with the preview sentence and write nothing", async () => {
+    state.session = { ...sessionFor(U.rebecca, "attorney"), actingAsStaff: true };
+    state.cardState = { status: "ok", events: [{ queueItemId: "q1", kind: "handoff", actorId: U.rebecca, targetUserId: U.caitlyn, until: null, note: null, createdAt: "2026-11-10T13:00:00Z" }] };
+    expect(await A.handOffCardAction("q1", U.caitlyn, "")).toEqual({ ok: false, error: PREVIEW_ONLY });
+    expect(await A.returnCardAction("q1", "")).toEqual({ ok: false, error: PREVIEW_ONLY });
+    expect(state.record).not.toHaveBeenCalled();
+    expect(state.notify).not.toHaveBeenCalled();
+  });
+});
+
 describe("hand off", () => {
   it("records a hand-off to a staff member, the org from the session", async () => {
     const r = await A.handOffCardAction("q1", U.caitlyn, "  tidy  ");
@@ -228,6 +249,26 @@ describe("later and send back", () => {
     expect(until - Date.now()).toBeLessThanOrEqual(25 * 3600_000);
   });
 
+  it("Later's until is the next deal of the actor's STORED times, and nothing posted changes it", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-10T14:30:00Z")); // 9:30 AM New York (EST)
+    try {
+      state.meta = { lectual_deal_times: { v: 1, times: ["10:00", "16:30"] } };
+      expect((await laterWithExtras()).ok).toBe(true);
+      expect(state.record.mock.calls[0][0].until).toBe("2026-11-10T15:00:00.000Z"); // 10:00 AM EST
+      state.record.mockClear();
+      state.meta = { lectual_deal_times: { v: 1, times: ["08:00", "16:30"] } };
+      await A.laterCardAction("q1");
+      expect(state.record.mock.calls[0][0].until).toBe("2026-11-10T21:30:00.000Z"); // 4:30 PM EST
+      state.record.mockClear();
+      state.meta = {}; // no stored times: the defaults, 2:00 PM
+      await A.laterCardAction("q1");
+      expect(state.record.mock.calls[0][0].until).toBe("2026-11-10T19:00:00.000Z");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("Send back is for the holder (or whoever handed it)", async () => {
     expect((await A.returnCardAction("q1", "")).ok).toBe(false);
     state.cardState = { status: "ok", events: [{ queueItemId: "q1", kind: "handoff", actorId: U.rebecca, targetUserId: U.caitlyn, until: null, note: null, createdAt: "2026-11-10T13:00:00Z" }] };
@@ -273,3 +314,37 @@ describe("Send from Outlook now", () => {
     expect(!r.ok && r.error).toMatch(re);
   });
 });
+
+describe("bell notices for hand-offs (Phase 2 item 2)", () => {
+  it("handing a card off tells the person it was handed to, with ids and the headline only", async () => {
+    state.item = qitem({ id: "q1", headline: "Post-consult follow-up — Ana", draft_body: "SECRET BODY", recipient: "ana@example.com", subject: "SECRET SUBJECT" });
+    expect((await A.handOffCardAction("q1", U.caitlyn, "a private note")).ok).toBe(true);
+    expect(state.notify).toHaveBeenCalledTimes(1);
+    const arg = state.notify.mock.calls[0][0];
+    expect(arg).toMatchObject({ userId: U.caitlyn, kind: "approval_needed", actorId: U.rebecca });
+    expect(arg.payload).toEqual({ source: "card_handoff", queue_id: "q1", headline: "Post-consult follow-up — Ana" });
+    const text = JSON.stringify(arg);
+    for (const leak of ["SECRET BODY", "SECRET SUBJECT", "a private note", "ana@example.com"]) expect(text).not.toContain(leak);
+  });
+
+  it("a hand-off that is refused or fails to save raises no notice", async () => {
+    expect((await A.handOffCardAction("q1", U.ghost, "")).ok).toBe(false);
+    state.record.mockResolvedValue({ ok: false, reason: "failed" });
+    expect((await A.handOffCardAction("q1", U.caitlyn, "")).ok).toBe(false);
+    expect(state.notify).not.toHaveBeenCalled();
+  });
+
+  it("sending a card back tells the person who handed it", async () => {
+    state.cardState = { status: "ok", events: [{ queueItemId: "q1", kind: "handoff", actorId: U.rebecca, targetUserId: U.caitlyn, until: null, note: "my note", createdAt: "2026-11-10T13:00:00Z" }] };
+    state.session = sessionFor(U.caitlyn, "paralegal", "caitlyn@example.com");
+    expect((await A.returnCardAction("q1", "back to you")).ok).toBe(true);
+    const arg = state.notify.mock.calls[0][0];
+    expect(arg).toMatchObject({ userId: U.rebecca, kind: "approval_needed", actorId: U.caitlyn });
+    expect(arg.payload).toEqual({ source: "card_returned", queue_id: "q1", headline: "Post-consult follow-up — Ana" });
+    expect(JSON.stringify(arg)).not.toContain("back to you");
+  });
+});
+/** Calls Later with extra arguments a forged client might add (an "until", times): the action ignores them. */
+function laterWithExtras() {
+  return (A.laterCardAction as unknown as (...a: unknown[]) => Promise<{ ok: boolean }>)("q1", { until: "2030-01-01T00:00:00Z", times: ["23:00", "23:55"] }, "2030-01-01T00:00:00Z");
+}

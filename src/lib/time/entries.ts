@@ -403,15 +403,26 @@ export async function listForLeads(leadIds: string[], since: Date | string): Pro
 
   const sinceIso = typeof since === "string" ? since : since.toISOString();
   const supabase = await getScopedClient();
-  const { data, error } = await supabase
-    .from("crm_time_entry")
-    .select("*")
-    .in("lead_id", ids)
-    .gte("started_at", sinceIso)
-    .order("started_at", { ascending: false });
-  if (error) throw error;
-  return data ?? [];
+  // 300+ uuids in ONE `.in()` is a URL over PostgREST's limit: the read failed and every row showed an em dash. Chunked.
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += LEAD_ID_CHUNK) chunks.push(ids.slice(i, i + LEAD_ID_CHUNK));
+  const parts = await Promise.all(
+    chunks.map(async (chunk) => {
+      const { data, error } = await supabase
+        .from("crm_time_entry")
+        .select("*")
+        .in("lead_id", chunk)
+        .gte("started_at", sinceIso)
+        .order("started_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    }),
+  );
+  return parts.flat().sort((a, b) => (a.started_at < b.started_at ? 1 : a.started_at > b.started_at ? -1 : 0));
 }
+
+/** Lead ids per `.in()`: 80 uuids stay well inside a request URL. */
+export const LEAD_ID_CHUNK = 80;
 
 /**
  * The timeline row for a closed entry (0056 adds the `time_logged` activity

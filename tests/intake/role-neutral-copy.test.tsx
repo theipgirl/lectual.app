@@ -38,6 +38,6 @@ describe("Needs attorney badge and chip", () => {
   it("the filter chip hides its count at zero", () => {
     const src = readFileSync(`${dir}/IntakeControls.tsx`, "utf8");
     expect(src).toContain("Needs attorney");
-    expect(src).toContain("needsRebeccaCount > 0 &&");
+    expect(src).toContain("counts.needsAttorney > 0");
   });
 });
