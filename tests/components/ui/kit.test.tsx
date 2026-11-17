@@ -43,6 +43,10 @@ describe("Board", () => {
     const empty = renderToStaticMarkup(<BoardColumn title="Filed" count={0} empty="No matters here yet." />);
     expect(empty).toContain('<p class="lx-board-empty">No matters here yet.</p>');
     expect(empty).not.toContain("<ul");
+    // A page that maps zero cards passes an empty array: that is still "none", never an empty list with no sentence.
+    const mapped = renderToStaticMarkup(<BoardColumn title="Filed" count={0} empty="No matters here yet.">{[].map((x) => <li key={x}>{x}</li>)}</BoardColumn>);
+    expect(mapped).toContain('<p class="lx-board-empty">No matters here yet.</p>');
+    expect(mapped).not.toContain("<ul");
   });
   it("a column title can link, and passes drag attributes through", () => {
     const html = renderToStaticMarkup(<BoardColumn title="Filed" titleHref="/x" count="3 · 2 gone quiet" data-stage="s1" />);

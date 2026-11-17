@@ -303,11 +303,13 @@ a:focus-visible {
   width: 100%;
   box-sizing: border-box;
 }
-/* Every text box, select and textarea shows a visible ring when focused (never outline: none). */
+/* Every text box, select and textarea in the firm workspace shows a visible ring when focused (never outline: none).
+   The element rules are scoped to the dashboard shell (.lx-app): the public pages (client proposal, intake, quote, sign-in)
+   keep their own focus rings in the firm's own colours. */
 .lx-input:focus-visible,
-input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):focus-visible,
-textarea:focus-visible,
-select:focus-visible {
+.lx-app input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):focus-visible,
+.lx-app textarea:focus-visible,
+.lx-app select:focus-visible {
   outline: 2px solid var(--ox);
   outline-offset: 1px;
   border-color: var(--ox);
@@ -1105,9 +1107,6 @@ select:not([multiple]):not([size]):disabled {
 @media (max-width: 900px) {
   .lx-col-aside { flex: 1 1 auto; }
 }
-@media (max-width: 600px) {
-  .lx-deadline-due { grid-auto-flow: column; justify-items: start; align-items: center; }
-}
 
 /* ── today ────────────────────────────────────────────────────────── */
 .lx-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
@@ -1157,10 +1156,6 @@ select:not([multiple]):not([size]):disabled {
 .lx-int-row[open] .lx-int-chev { transform: rotate(90deg); }
 .lx-int-body { padding: 0 0 16px 60px; display: grid; gap: 0; }
 .lx-int-body .lx-card-head { padding: 12px 0; border: 0; }
-@media (max-width: 600px) {
-  .lx-hero { padding: 24px 20px; }
-  .lx-int-body { padding-left: 0; }
-}
 
 /* ── my mail ──────────────────────────────────────────────────────── */
 .lx-connect { margin: 8vh auto 0; max-width: 620px; width: 100%; padding: 44px 32px; display: grid; justify-items: center; gap: 16px; }
@@ -1175,7 +1170,7 @@ select:not([multiple]):not([size]):disabled {
 .lx-mail-tag { margin-left: 8px; vertical-align: 1px; }
 .lx-mail-tag:hover { text-decoration: none; }
 .lx-mail-meta { display: flex; gap: 12px; align-items: center; color: var(--muted); font-size: var(--fs-1); }
-@media (max-width: 700px) {
+@media (max-width: 900px) {
   .lx-mail-row { grid-template-columns: 1fr auto; }
   .lx-mail-subj { grid-column: 1 / -1; grid-row: 2; white-space: normal; }
 }
@@ -1630,7 +1625,7 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
 .lx-summary { color: var(--body); line-height: 1.6; white-space: pre-wrap; margin: 0; }
 .lx-attendees { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .lx-attendees li { display: grid; font-size: var(--fs-2); }
-@media (max-width: 720px) {
+@media (max-width: 900px) {
   .lx-seg { grid-template-columns: 1fr; gap: 2px; }
 }
 
@@ -1714,6 +1709,10 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
 @media (max-width: 640px) {
   /* The type scale's smallest step is 14px on a phone: every var(--fs-1) text follows. */
   :root { --fs-1: 14px; }
+  /* Moved here from their own 600px blocks (one phone width): */
+  .lx-deadline-due { grid-auto-flow: column; justify-items: start; align-items: center; }
+  .lx-hero { padding: 24px 20px; }
+  .lx-int-body { padding-left: 0; }
   .lx-input { font-size: 16px; } /* 16px stops the phone browser zooming in on focus */
   html,
   body { overflow-x: clip; }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Children } from "react";
 import type { PillTone } from "@/lib/ui/tones";
 
 /**
@@ -33,7 +34,8 @@ export function BoardColumn({
         <span className="lx-board-count">{count}</span>
       </header>
       {note}
-      {children ? <ul className="lx-board-cards">{children}</ul> : empty ? <p className="lx-board-empty">{empty}</p> : null}
+      {/* An empty array (a page mapping zero cards) counts as no cards, so the empty sentence still shows. */}
+      {Children.toArray(children).length > 0 ? <ul className="lx-board-cards">{children}</ul> : empty ? <p className="lx-board-empty">{empty}</p> : null}
     </section>
   );
 }

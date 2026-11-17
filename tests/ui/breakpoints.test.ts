@@ -17,7 +17,7 @@ const BASELINE: Record<string, number> = {
   "src/app/dashboard/forms/_components/event.css": 1,
   "src/app/dashboard/forms/forms.css": 5,
   "src/app/dashboard/proposals/proposals.css": 12,
-  "src/app/globals.css": 5,
+  "src/app/globals.css": 1, // the Team cards at 700px (pinned by tests/sprint34/settings-followups.test.tsx)
   "src/app/i/intake-public.css": 1,
   "src/components/copilot/copilot.css": 1,
   "src/components/deck/deck.css": 1,
