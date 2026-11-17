@@ -1,3 +1,4 @@
+import { formatDay, formatTime } from "@/lib/ui/dates";
 import type { QueueItem } from "@/lib/queue/api";
 import { currentHolder, decidedToday, laterUntil, type CardEvent, type CardState } from "@/lib/queue/deck";
 import { isDoneItem } from "@/lib/queue/done";
@@ -205,12 +206,10 @@ export const listHref = (l: ListParam) => `/dashboard/queue/deck/?list=${l}`;
 
 /** The firm's clock for the lists: time of day, short date, and "same firm day as now". */
 export function makeListFormat(now: Date, tz: string): ListFormat {
-  const time = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit" });
-  const day = new Intl.DateTimeFormat("en-US", { timeZone: tz, month: "short", day: "numeric" });
   const ok = (iso: string) => !Number.isNaN(new Date(iso).getTime());
   return {
-    time: (iso) => (ok(iso) ? time.format(new Date(iso)) : "—"),
-    day: (iso) => (ok(iso) ? day.format(new Date(iso)) : "—"),
+    time: (iso) => (ok(iso) ? formatTime(iso, { tz }) ?? "—" : "—"),
+    day: (iso) => (ok(iso) ? formatDay(iso, { tz, now }) ?? "—" : "—"),
     isToday: (iso) => ok(iso) && sameFirmDay(new Date(iso), now, tz),
   };
 }

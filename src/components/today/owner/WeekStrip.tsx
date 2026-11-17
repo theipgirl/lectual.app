@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { WeekDay } from "@/lib/today/owner-rules";
-import { OWNER_WEEK_NOT_LOADED } from "@/lib/ui/words";
+import { BLANK, OWNER_WEEK_NOT_LOADED } from "@/lib/ui/words";
 
 const DOT_CAP = 3;
 
@@ -17,13 +17,13 @@ export function WeekStrip({ days }: { days: readonly WeekDay[] }) {
         return (
           <Link key={d.date} href="/dashboard/calendar/" prefetch={false} className="ot-day" aria-label={label} aria-current={d.isToday ? "date" : undefined}>
             <span className="ot-day-date">
-              <span className="ot-mono">{d.weekday}</span> {d.num}
+              <span className="ot-weekday">{d.weekday}</span> {d.num}
             </span>
             <span className="ot-day-items" aria-hidden="true">
               {!known ? (
-                <span className="ot-sub">{OWNER_WEEK_NOT_LOADED}</span>
+                <span className="ot-count">{OWNER_WEEK_NOT_LOADED}</span>
               ) : d.items.length === 0 ? (
-                <span className="ot-sub">&mdash;</span>
+                <span className="ot-count">{BLANK}</span>
               ) : (
                 d.items.map((it, i) => (
                   <span key={i} className={it.kind === "consult" ? "ot-item ot-item-consult" : "ot-item ot-item-deadline"}>

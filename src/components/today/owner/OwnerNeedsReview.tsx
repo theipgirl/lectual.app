@@ -1,26 +1,29 @@
 import Link from "next/link";
 import { formatCivilDate } from "@/lib/matters/ip-fields";
 import { NEEDS_REVIEW_PAST_DUE_DAYS, NEEDS_REVIEW_SHOWN, type NeedsReviewItem } from "@/lib/today/needs-review";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Notice } from "@/components/ui/Notice";
+import { Pill } from "@/components/ui/Pill";
 import { NEEDS_REVIEW_FAILED, NEEDS_REVIEW_HEADING, needsReviewCut, needsReviewExplain, needsReviewPastDue } from "@/lib/ui/words";
 
 /** Owner Today's "Needs review" card. `items` null = the read failed; an empty read draws nothing. */
 export function OwnerNeedsReview({ items }: { items: NeedsReviewItem[] | null }) {
   if (items !== null && items.length === 0) return null;
   return (
-    <section className="ot-card" aria-labelledby="ot-review-h">
+    <section className="lx-card ot-card" aria-labelledby="ot-review-h">
       <div className="ot-card-head">
-        <h2 id="ot-review-h" className="ot-card-title">
+        <h2 id="ot-review-h" className="lx-h3">
           {NEEDS_REVIEW_HEADING}
         </h2>
-        {items !== null && <span className="ot-sub">{items.length}</span>}
+        {items !== null && <span className="ot-count">{items.length}</span>}
       </div>
       {items === null ? (
-        <p className="ot-sub ot-note" role="alert">
+        <Notice tone="warn" role="alert">
           {NEEDS_REVIEW_FAILED}
-        </p>
+        </Notice>
       ) : (
         <>
-          <p className="ot-sub ot-empty">{needsReviewExplain(NEEDS_REVIEW_PAST_DUE_DAYS)}</p>
+          <EmptyState variant="line">{needsReviewExplain(NEEDS_REVIEW_PAST_DUE_DAYS)}</EmptyState>
           {items.slice(0, NEEDS_REVIEW_SHOWN).map((d) => (
             <div key={d.key} className="ot-row">
               <div className="ot-row-main">
@@ -31,10 +34,10 @@ export function OwnerNeedsReview({ items }: { items: NeedsReviewItem[] | null })
                   {d.matter} &middot; {formatCivilDate(d.dueDate) ?? d.dueDate}
                 </span>
               </div>
-              <span className="ot-pill ot-pill-warn">{needsReviewPastDue(d.daysPastDue)}</span>
+              <Pill tone="warn">{needsReviewPastDue(d.daysPastDue)}</Pill>
             </div>
           ))}
-          {items.length > NEEDS_REVIEW_SHOWN && <p className="ot-sub ot-foot">{needsReviewCut(NEEDS_REVIEW_SHOWN, items.length)}</p>}
+          {items.length > NEEDS_REVIEW_SHOWN && <p className="lx-note ot-foot">{needsReviewCut(NEEDS_REVIEW_SHOWN, items.length)}</p>}
         </>
       )}
     </section>

@@ -1,5 +1,6 @@
 import { civilDaysBetween } from "@/lib/matters/calendar-rows";
 import { civilInZone } from "@/lib/today/outcomes";
+import { formatTime } from "@/lib/ui/dates";
 import { deadlineKindLabel, deadlineNeedsReview } from "@/lib/matters/deadline-rules";
 import type { UpcomingDeadline } from "@/lib/matters";
 import type { ConsultItem } from "@/lib/calendar/consult-sources";
@@ -203,7 +204,7 @@ export function mondayOf(civil: string): string {
 }
 
 function clock(iso: string, tz: string): string {
-  return new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit" }).format(new Date(iso));
+  return formatTime(iso, { tz }) ?? "";
 }
 
 /**

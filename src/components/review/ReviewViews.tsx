@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { bucketOf, type BucketKey, type ReviewRow } from "@/lib/review/buckets";
 import type { ProposalOut } from "@/lib/review/strips";
-import { laneOf, type Kpis, type Lane } from "@/lib/review/lanes";
+import { type Kpis, type Lane } from "@/lib/review/lanes";
 import { dueText, followUpText } from "@/lib/review/format";
 import { openToken } from "@/lib/review/open";
 import { reviewHref, REVIEW_VIEWS, type ReviewParams, type ReviewView } from "@/lib/review/params";
