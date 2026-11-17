@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Icon } from "@/components/ui/Icon";
 import { READ_MESSAGES, type ReadState } from "@/lib/mailbox/read-message";
 import { PROVIDER_LABEL } from "@/lib/mailbox/providers";
 import { BackLink } from "@/components/ui/PageHeader";
@@ -47,7 +48,7 @@ export function MailReadingPane({ state, backHref, timeZone = DEFAULT_TIME_ZONE,
         {back}
         {state.openUrl && (
           <a href={state.openUrl} target="_blank" rel="noreferrer noopener" className="lx-note">
-            Open in {state.provider === "google" ? "Gmail" : "Outlook"} ↗
+            Open in {state.provider === "google" ? "Gmail" : "Outlook"}{" "}<Icon name="external" size={14} />
           </a>
         )}
       </div>

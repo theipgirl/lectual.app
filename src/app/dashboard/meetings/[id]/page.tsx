@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Icon } from "@/components/ui/Icon";
 import { notFound } from "next/navigation";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { CAN_WRITE_LEAD, listLeads } from "@/lib/pipeline";
@@ -86,7 +87,7 @@ export default async function MeetingPage({
         actions={
           m.share_url ? (
             <a href={m.share_url} target="_blank" rel="noopener noreferrer" className="lx-btn lx-btn-sec">
-              Open in {PROVIDER_LABEL[m.provider]} ↗
+              Open in {PROVIDER_LABEL[m.provider]}{" "}<Icon name="external" size={14} />
             </a>
           ) : undefined
         }

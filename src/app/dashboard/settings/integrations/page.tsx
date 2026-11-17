@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { Icon } from "@/components/ui/Icon";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { orgHasModule } from "@/lib/org/modules";
 import { canManageScope } from "@/lib/mailbox/access";
@@ -224,7 +225,7 @@ export default async function IntegrationsPage({
           {PROVIDERS.map((p) =>
             connectable[p] ? (
               <a key={p} href={connectHref(p, "personal")} className={`lx-btn ${p === "google" ? "lx-btn-cream" : "lx-btn-glass"}`}>
-                <span aria-hidden="true">↗</span> Connect {PROVIDER_LABEL[p]}
+                <Icon name="external" size={14} /> Connect {PROVIDER_LABEL[p]}
               </a>
             ) : (
               <span key={p} className={`lx-btn ${p === "google" ? "lx-btn-cream" : "lx-btn-glass"}`} aria-disabled="true" aria-describedby={`switch-on-hero-${p}`} style={{ opacity: 0.55, cursor: "not-allowed" }}>

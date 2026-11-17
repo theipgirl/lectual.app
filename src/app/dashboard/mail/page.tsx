@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Icon } from "@/components/ui/Icon";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { resolveFirmSession } from "@/lib/firm/session";
@@ -233,7 +234,7 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
                         <span className="lx-num">{mailTime(r.at, now, tz)}</span>
                         {r.link && (
                           <a href={r.link} target="_blank" rel="noreferrer noopener" className="lx-note">
-                            Open in {providerOf.get(r.connectionId ?? "") === "google" ? "Gmail" : "Outlook"} ↗
+                            Open in {providerOf.get(r.connectionId ?? "") === "google" ? "Gmail" : "Outlook"}{" "}<Icon name="external" size={14} />
                           </a>
                         )}
                       </span>

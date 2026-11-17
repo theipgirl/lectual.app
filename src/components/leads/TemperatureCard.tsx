@@ -1,5 +1,6 @@
 "use client";
 
+import { Icon } from "@/components/ui/Icon";
 import { useActionState } from "react";
 import {
   addToNurtureAction,
@@ -162,7 +163,7 @@ export function TemperatureCard(props: {
           ) : nextStep.url ? (
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
               <a href={nextStep.url} target="_blank" rel="noopener noreferrer" className="lx-btn lx-btn-pri lx-btn-sm">
-                {nextStep.label} ↗
+                {nextStep.label}{" "}<Icon name="external" size={14} />
               </a>
               <span className="lx-note" style={{ wordBreak: "break-all" }}>
                 {nextStep.url}
