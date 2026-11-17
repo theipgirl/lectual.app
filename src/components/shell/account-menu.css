@@ -77,7 +77,7 @@
 }
 .lx-am-item:disabled {
   cursor: default;
-  opacity: 0.6;
+  opacity: 0.5;
 }
 .lx-am-item[aria-checked="true"] {
   background: var(--well);

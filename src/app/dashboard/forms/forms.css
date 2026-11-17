@@ -203,7 +203,7 @@ textarea.lx-input {
   left: 18px;
 }
 .ifm-switch:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
 }
 
 /* checklist */
