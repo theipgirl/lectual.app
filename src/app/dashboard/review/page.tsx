@@ -27,6 +27,7 @@ import { buildDeck, chosenPerson, deckPeople } from "@/lib/review/deck";
 import { loadDeckDocuments, loadLatestNote, loadReviewDetail } from "@/lib/review/detail-load";
 import { pageTitle } from "@/lib/ui/page-title";
 import { QUEUE_APPROVE_ROLES } from "@/lib/queue/roles";
+import { FILE_UPLOAD_ROLES } from "@/lib/files/roles";
 import { REVIEW_NAME, REVIEW_SHOW_ALL, REVIEW_SHOWING_ALL, REVIEW_SINCE_LABEL, REVIEW_SINCE_SUSPENDED, reviewIntro, reviewOlderHidden } from "@/lib/ui/words";
 
 export const metadata: Metadata = { title: pageTitle(REVIEW_NAME) };
@@ -271,6 +272,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           timeZone={load.timeZone}
           members={load.members}
           canWrite={canWrite}
+          canUpload={!!role && FILE_UPLOAD_ROLES.includes(role)}
           canMove={canMove}
           closeStages={load.closeStages}
           closeHref={reviewHref({ ...params, open: null })}

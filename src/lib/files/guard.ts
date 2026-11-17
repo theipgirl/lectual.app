@@ -72,7 +72,8 @@ export async function loadParentOrg(supabase: ScopedClient, parent: FileParentIn
   if (parent.kind === "lead") {
     try {
       parent = { kind: "lead", id: await keeperForWrite(supabase, parent.id) };
-    } catch {
+    } catch (err) {
+      logFileFailure("read lead pointer", err);
       return refuse(MERGE_POINTER_UNREADABLE);
     }
   }

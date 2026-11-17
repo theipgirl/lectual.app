@@ -31,10 +31,11 @@ describe("upload in the review panel", () => {
     expect(render({ canUpload: undefined })).not.toContain('type="file"');
   });
 
-  it("the panel's gate is the card's list: canWrite is the same eight roles as FILE_UPLOAD_ROLES", () => {
+  it("the panel's upload gate is FILE_UPLOAD_ROLES, decided by the page like the lead and matter pages", () => {
     expect([...MATTER_WRITE_ROLES].sort()).toEqual([...FILE_UPLOAD_ROLES].sort());
     for (const r of ["viewer", "social_media"]) expect(FILE_UPLOAD_ROLES).not.toContain(r);
-    expect(readFileSync("src/components/review/ReviewPanel.tsx", "utf8")).toContain("canUpload={canWrite}");
+    expect(readFileSync("src/components/review/ReviewPanel.tsx", "utf8")).toContain("canUpload={canUpload}");
+    expect(readFileSync("src/app/dashboard/review/page.tsx", "utf8")).toContain("canUpload={!!role && FILE_UPLOAD_ROLES.includes(role)}");
   });
 
   it("a files table that isn't set up shows its sentence and no control", () => {
