@@ -28,15 +28,17 @@ import { MovedOutNotice } from "@/components/matters/MovedOutNotice";
 import { loadMatterStages, type MatterStageRead } from "@/lib/matters/stages";
 import {
   defaultGroupChoice,
-  PHASE_GROUPS,
+  DRAWN_GROUPS,
   ALL_GROUPS,
+  inIntakeStage,
+  pastLoeStages,
   boardStagesForChoice,
   filterByGroupChoice,
   firmHasPhases,
   parseGroupChoice,
   phaseGroupCounts,
 } from "@/lib/matters/phase-group";
-import { searchPlaceholder, BLANK, MATTERS_NAME, OWNER_COLUMN, TEAMMATE, UNASSIGNED, MATTER_GROUPS_NAV, MATTER_GROUP_ALL, MATTER_GROUP_EMPTY, MATTER_GROUP_LABEL, MATTER_PHASES_UNAVAILABLE, MATTER_STATUS_NAV } from "@/lib/ui/words";
+import { searchPlaceholder, BLANK, MATTERS_NAME, OWNER_COLUMN, TEAMMATE, UNASSIGNED, MATTER_GROUPS_NAV, MATTER_GROUP_ALL, MATTER_INTAKE_STAGES, MATTER_INTAKE_STAGES_LINK, MATTER_GROUP_EMPTY, MATTER_GROUP_LABEL, MATTER_PHASES_UNAVAILABLE, MATTER_STATUS_NAV } from "@/lib/ui/words";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import { matterIdsNeedingReview } from "./list-utils";
@@ -94,17 +96,21 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
   const grouped = stageRead.status === "ok" && firmHasPhases(stageList);
   // The default group depends on the status chip (Pre-filing only while it holds a matter under that filter), so it is
   // worked out for every status once; a link that omits `group` means "the default for the status it names".
-  const groupCountsBySeg = new Map(SEGMENTS.map((s) => [s.key, phaseGroupCounts(filterBySegment(all, s.key, sets))]));
+  // Only matters past Signed LOE are drawn: a matter on an intake-phase stage is counted and named in one line instead.
+  const pastLoe = grouped ? all.filter((m) => !inIntakeStage(m)) : all;
+  const groupCountsBySeg = new Map(SEGMENTS.map((s) => [s.key, phaseGroupCounts(filterBySegment(pastLoe, s.key, sets))]));
   const defaultFor = (s: SegmentKey) => defaultGroupChoice(groupCountsBySeg.get(s)!);
   const group = parseGroupChoice(groupRaw) ?? defaultFor(seg);
-  const inGroup = grouped ? filterByGroupChoice(all, group) : all;
+  const inGroup = grouped ? filterByGroupChoice(pastLoe, group) : all;
   const counts = new Map(SEGMENTS.map((s) => [s.key, filterBySegment(inGroup, s.key, sets).length]));
-  const groupCounts = phaseGroupCounts(filterBySegment(all, seg, sets));
+  const groupCounts = phaseGroupCounts(filterBySegment(pastLoe, seg, sets));
+  const stillInIntake = grouped ? filterBySegment(all.filter(inIntakeStage), seg, sets).length : 0;
+  const drawableStages = grouped ? pastLoeStages(stageList) : stageList;
   // Four chips. Review only when the queue was reached; the bands stay as headings below.
   const segments = LIST_CHIPS.filter((s) => s.key !== "review" || queue.status === "ok");
 
   const shown = searchMatters(filterBySegment(inGroup, seg, sets), search);
-  const boardStages = grouped ? boardStagesForChoice(stageList, group, shown) : stageList;
+  const boardStages = grouped ? boardStagesForChoice(drawableStages, group, shown) : stageList;
   const bands = groupIntoBands(shown);
   const memberName = new Map(members.map((m) => [m.userId, m.displayName ?? m.email ?? TEAMMATE]));
   const leadOptions = leads.map((l) => ({
@@ -144,12 +150,12 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
 
       {grouped && (
         <FilterChips as="nav" label={MATTER_GROUPS_NAV}>
-          {PHASE_GROUPS.map((g) => (
+          {DRAWN_GROUPS.map((g) => (
             <Chip key={g} href={href({ group: g })} active={group === g} count={groupCounts[g]}>
               {MATTER_GROUP_LABEL[g]}
             </Chip>
           ))}
-          <Chip href={href({ group: ALL_GROUPS })} active={group === ALL_GROUPS} count={PHASE_GROUPS.reduce((n, g) => n + groupCounts[g], 0)}>
+          <Chip href={href({ group: ALL_GROUPS })} active={group === ALL_GROUPS} count={DRAWN_GROUPS.reduce((n, g) => n + groupCounts[g], 0)}>
             {MATTER_GROUP_ALL}
           </Chip>
         </FilterChips>
@@ -161,6 +167,12 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
           </Chip>
         ))}
       </FilterChips>
+      {stillInIntake > 0 && (
+        <p role="status" className="lx-note lx-state-line">
+          {MATTER_INTAKE_STAGES(stillInIntake)}{" "}
+          <Link href="/dashboard/pipeline/">{MATTER_INTAKE_STAGES_LINK}</Link>.
+        </p>
+      )}
       {phasesFailed && (
         <Notice tone="warn" role="status">
           {MATTER_PHASES_UNAVAILABLE}
@@ -184,7 +196,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
         {grouped && <MovedOutNotice />}
         <MatterBoard
           stages={boardStages}
-          moveStages={stageList}
+          moveStages={drawableStages}
           collapseEmpty={grouped}
           matters={shown}
           canMove={!!role && MATTER_WRITE_ROLES.includes(role)}

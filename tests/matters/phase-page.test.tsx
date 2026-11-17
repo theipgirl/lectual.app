@@ -74,10 +74,10 @@ const ok: Read = { status: "ok", stages: Object.values(S) };
 beforeEach(() => vi.spyOn(console, "error").mockImplementation(() => {}));
 
 describe("phase groups on the Matters page", () => {
-  it("draws the four group chips with their counts, and the existing status chips as a second row", async () => {
+  it("draws the three group chips plus All, with their counts, and the existing status chips as a second row; no Intake chip", async () => {
     const html = await render({ matters: sample(), read: ok });
     const nav = groupNav(html);
-    expect(nav).toMatch(/>Intake<span class="lp-chip-count">2</);
+    expect(nav).not.toContain(">Intake<");
     expect(nav).toMatch(/>Pre-filing<span class="lp-chip-count">2</);
     expect(nav).toMatch(/>Post-filing<span class="lp-chip-count">3</);
     expect(nav).toMatch(/>Matters<span class="lp-chip-count">3</);
@@ -109,10 +109,10 @@ describe("phase groups on the Matters page", () => {
     expect(groupNav(pre)).toMatch(/aria-current="page"[^>]*>Pre-filing/);
   });
 
-  it("?group= picks the group; a bad value is the default", async () => {
+  it("?group= picks the group; a bad value, and the retired intake, are the default", async () => {
     const intake = await render({ matters: sample(), read: ok, params: { group: "intake" } });
-    expect(groupNav(intake)).toMatch(/aria-current="page"[^>]*>Intake/);
-    expect(intake).toContain("Mk1z");
+    expect(groupNav(intake)).toMatch(/aria-current="page"[^>]*>Pre-filing/);
+    expect(intake).not.toContain("Mk1z<");
     const other = await render({ matters: sample(), read: ok, params: { group: "other" } });
     expect(other).toContain("Mk8z");
     expect(other).toContain("Mk9z");
@@ -124,7 +124,7 @@ describe("phase groups on the Matters page", () => {
 
   it("the links keep the group, status, view and search; the default group is left out of the URL", async () => {
     const html = await render({ matters: sample(), read: ok, params: { group: "post", seg: "unassigned", view: "table", q: "x" } });
-    expect(html).toMatch(/href="\/dashboard\/matters\/?\?group=intake&amp;seg=unassigned&amp;q=x&amp;view=table"/);
+    expect(html).toMatch(/href="\/dashboard\/matters\/?\?group=all&amp;seg=unassigned&amp;q=x&amp;view=table"/);
     expect(html).toMatch(/href="\/dashboard\/matters\/?\?seg=unassigned&amp;q=x&amp;view=table"[^>]*>Pre-filing/);
     expect(html).toContain('name="group" value="post"');
   });
@@ -141,15 +141,52 @@ describe("phase groups on the Matters page", () => {
     expect(html).toContain("No matters in Pre-filing match these filters.");
   });
 
-  it("All lists every matter exactly once, with the All chip last and counting every matter", async () => {
+  it("All means past Signed LOE: every matter outside intake-phase stages exactly once, with the All chip last", async () => {
     const all = sample();
     const html = await render({ matters: all, read: ok, params: { group: "all" } });
     const nav = groupNav(html);
-    expect(nav).toMatch(/aria-current="page"[^>]*>All<span class="lp-chip-count">10</);
+    expect(nav).toMatch(/aria-current="page"[^>]*>All<span class="lp-chip-count">8</);
     expect(nav.lastIndexOf(">All<")).toBeGreaterThan(nav.lastIndexOf(">Matters<"));
-    for (let i = 1; i <= 10; i++) expect(html.split(`Mk${i}z<`).length - 1).toBe(1);
+    for (let i = 3; i <= 10; i++) expect(html.split(`Mk${i}z<`).length - 1).toBe(1);
+    for (const i of [1, 2]) expect(html).not.toContain(`Mk${i}z<`);
     const status = html.slice(html.indexOf('aria-label="Filter matters"'));
-    expect(status).toMatch(/>Open<span class="lp-chip-count">10</);
+    expect(status).toMatch(/>Open<span class="lp-chip-count">8</);
+  });
+
+  it("matters in intake-phase stages are named in one quiet line with a link, not silently dropped", async () => {
+    const html = await render({ matters: sample(), read: ok });
+    expect(html).toContain("2 matters are still in intake stages.");
+    expect(html).toMatch(/<a href="\/dashboard\/pipeline\/?">See them in Pipeline<\/a>/);
+    n = 0;
+    const one = await render({ matters: [m("TM", S.a), m("TM", S.b)], read: ok });
+    expect(one).toContain("1 matter is still in intake stages.");
+    const none = await render({ matters: [m("TM", S.b)], read: ok });
+    expect(none).not.toContain("still in intake stages");
+  });
+
+  it("a contract (non-filing type) sitting on an intake-phase stage is hidden by the stage's phase, and counted", async () => {
+    n = 0;
+    const html = await render({ matters: [m("BL", S.a), m("BL", null)], read: ok, params: { group: "all" } });
+    expect(html).not.toContain("Mk1z<");
+    expect(html).toContain("Mk2z");
+    expect(html).toContain("1 matter is still in intake stages.");
+  });
+
+  it("the board draws no intake-phase column or card, and the Move menu offers no intake stage", async () => {
+    const html = await render({ matters: sample(), read: ok, params: { view: "board", group: "all" } });
+    expect(html).not.toContain("New client");
+    expect(html).not.toContain("Mk1z<");
+    expect(html).toContain("Questionnaire");
+    expect(html).toContain("Published");
+  });
+
+  it("the stage's name never decides: a stage called 'Intake' in pre_filing is drawn, one called 'Filed' in pipeline is not", async () => {
+    n = 0;
+    const tricky = [st("x1", "Intake review", "pre_filing", 1), st("x2", "Filed", "pipeline", 2)];
+    const html = await render({ matters: [m("TM", tricky[0]), m("TM", tricky[1])], read: { status: "ok", stages: tricky }, params: { group: "all" } });
+    expect(html).toContain("Mk1z");
+    expect(html).not.toContain("Mk2z<");
+    expect(html).toContain("1 matter is still in intake stages.");
   });
 
   it("the Matters group has its own empty sentence", async () => {
@@ -206,7 +243,7 @@ describe("a firm without phases sees today's page", () => {
 describe("a failed stage read is a failed read", () => {
   it("shows today's page with one plain warning, never 'no phases' and never the chips", async () => {
     const html = await render({ matters: sample(), read: { status: "unavailable", error: new Error("boom") } });
-    expect(html).toContain("Can&#x27;t show the Intake, Pre-filing and Post-filing groups right now");
+    expect(html).toContain("Can&#x27;t show the Pre-filing and Post-filing groups right now");
     expect(html).not.toContain("Matter group");
     expect(html).toContain("Mk1z");
     expect(html).not.toContain("boom");

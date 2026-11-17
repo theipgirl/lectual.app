@@ -168,8 +168,22 @@ describe("defaultGroupChoice", () => {
   it("an explicit ?group= wins, even an empty group", async () => {
     const { defaultGroupChoice, parseGroupChoice } = await import("../../src/lib/matters/phase-group");
     const c = counts({ post: 4 });
-    expect(parseGroupChoice("intake") ?? defaultGroupChoice(c)).toBe("intake");
+    // Intake is not a choice any more (Nov 17): an old link to it opens the default.
+    expect(parseGroupChoice("intake")).toBeNull();
+    expect(parseGroupChoice("intake") ?? defaultGroupChoice(c)).toBe("all");
     expect(parseGroupChoice("pre") ?? defaultGroupChoice(c)).toBe("pre");
     expect(parseGroupChoice("nope") ?? defaultGroupChoice(c)).toBe("all");
+  });
+});
+
+describe("intake-phase stages are not drawn (Nov 17)", () => {
+  it("inIntakeStage reads the stage's phase only, for every matter type, never a name", async () => {
+    const { inIntakeStage, pastLoeStages, DRAWN_GROUPS } = await import("../../src/lib/matters/phase-group");
+    expect(inIntakeStage({ stage: { phase: "pipeline" } })).toBe(true);
+    for (const phase of ["pre_filing", "post_filing", "maintenance", null, undefined, "intake"]) expect(inIntakeStage({ stage: { phase } })).toBe(false);
+    expect(inIntakeStage({ stage: null })).toBe(false);
+    expect(inIntakeStage({})).toBe(false);
+    expect(DRAWN_GROUPS).toEqual(["pre", "post", "other"]);
+    expect(pastLoeStages([{ phase: "pipeline" }, { phase: "pre_filing" }, { phase: null }, {}]).length).toBe(3);
   });
 });

@@ -17,6 +17,27 @@
 export const PHASE_GROUPS = ["intake", "pre", "post", "other"] as const;
 export type PhaseGroup = (typeof PHASE_GROUPS)[number];
 
+/**
+ * The groups the Matters page OFFERS (Nov 17): matters past Signed LOE / Deposit Received. Intake is still a group of
+ * the pure rule above (so the counts stay one rule) but the page draws no Intake chip, board column or card; those
+ * matters are named in one quiet line that links to the Pipeline. The phase is data (`crm_matter_stage.phase`).
+ */
+export const DRAWN_GROUPS = ["pre", "post", "other"] as const;
+export type DrawnGroup = (typeof DRAWN_GROUPS)[number];
+
+/** The phase that means "still in intake" (the first docket stages, before the engagement is signed and paid). */
+export const INTAKE_PHASE = "pipeline";
+
+/** True when the matter sits on a stage whose phase is intake, whatever its type. Never reads a stage name. */
+export function inIntakeStage(matter: { stage?: StageLike }): boolean {
+  return matter.stage?.phase === INTAKE_PHASE;
+}
+
+/** Stages the Matters page may draw or move a card to: every stage except the intake-phase ones. */
+export function pastLoeStages<T extends { phase?: string | null }>(stages: readonly T[]): T[] {
+  return stages.filter((s) => s.phase !== INTAKE_PHASE);
+}
+
 /** The matter types that are filed at an office and so move through the phases. */
 export const FILING_TYPES: readonly string[] = ["TM", "CR", "PATENT"];
 
@@ -29,14 +50,17 @@ export const DEFAULT_PHASE_GROUP: PhaseGroup = "pre";
 type StageLike = { phase?: string | null } | null | undefined;
 export type PhaseMatter = { type: string; stage: StageLike };
 
-/** The "All" choice: every matter, whatever its phase. Reached by `?group=all`; the links from Today and Pipeline carry it. */
+/** The "All" choice: every matter past signed LOE (the page removes intake-stage matters first). Reached by `?group=all`; the links from Today and Pipeline carry it. */
 export const ALL_GROUPS = "all" as const;
 export type GroupChoice = PhaseGroup | typeof ALL_GROUPS;
 
-/** `?group=` -> a choice, or null for a missing / unknown value (the page then uses its default). */
+/**
+ * `?group=` -> a choice, or null for a missing / unknown value (the page then uses its default). `intake` is not a
+ * choice any more: an old link to it opens the page's default.
+ */
 export function parseGroupChoice(value: unknown): GroupChoice | null {
   if (value === ALL_GROUPS) return ALL_GROUPS;
-  return isPhaseGroup(value) ? value : null;
+  return isPhaseGroup(value) && value !== "intake" ? value : null;
 }
 
 /**
