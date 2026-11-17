@@ -123,8 +123,8 @@ describe("Setup at 640px and under (V4)", () => {
 });
 
 describe("Getting started on a phone (V5)", () => {
-  it("at 560px and under a flow is a 22px column and the button takes its own row in column 2", () => {
-    const m = media(hub, "max-width: 560px");
+  it("at 640px and under a flow is a 22px column and the button takes its own row in column 2", () => {
+    const m = media(hub, "max-width: 640px");
     expect(m).toContain("grid-template-columns: 22px 1fr;");
     expect(m).toMatch(/\.gs-flow > \.lx-btn \{\s*grid-column: 2;/);
   });
