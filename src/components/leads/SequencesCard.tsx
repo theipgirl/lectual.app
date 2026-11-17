@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState } from "react";
 import { stopLeadSequenceAction, type LeadSequenceState } from "@/app/dashboard/leads/[id]/sequence-actions";
 import { MANUAL_STOP_REASONS, STOP_REASON_LABEL } from "@/lib/campaigns/stops";
+import { SAVING } from "@/lib/ui/words";
 
 export type SequenceRow = {
   id: string;
@@ -38,7 +39,7 @@ function StopForm({ leadId, enrollmentId }: { leadId: string; enrollmentId: stri
         ))}
       </select>
       <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending}>
-        {pending ? "Stopping…" : "Stop campaign"}
+        {pending ? SAVING : "Stop campaign"}
       </button>
       {state.error && (
         <span role="alert" className="lx-note" style={{ color: "var(--wine)", flexBasis: "100%" }}>

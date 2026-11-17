@@ -27,7 +27,7 @@ import { InlineConfirm } from "@/components/ui/InlineConfirm";
 import { Notice } from "@/components/ui/Notice";
 import { Pill } from "@/components/ui/Pill";
 import { Toast } from "@/components/ui/Toast";
-import { CANCEL, PROPOSALS_NAME, yesVerb } from "@/lib/ui/words";
+import { CANCEL, PROPOSALS_NAME, yesVerb, DELETE } from "@/lib/ui/words";
 import { QuoteDetailsForm } from "./QuoteForms";
 
 /**
@@ -493,7 +493,7 @@ export function QuoteBuilder(props: BuilderProps) {
                         </button>
                       )}
                       <button type="button" className="lx-link" onClick={() => openPkgForm("remove")}>
-                        {currentPkg ? "Remove package" : "Discard"}
+                        {currentPkg ? "Remove package" : DELETE}
                       </button>
                     </>
                   )}

@@ -9,6 +9,7 @@ import {
 } from "@/app/dashboard/leads/[id]/stage-keeper-actions";
 import { reasonText } from "@/lib/stage-keeper/format";
 import { WHY_TEXT, type StageSuggestion } from "@/lib/stage-keeper/moves";
+import { SAVING } from "@/lib/ui/words";
 
 function Err({ state }: { state: StageKeeperActionState }) {
   return state.error ? (
@@ -26,7 +27,7 @@ export function UndoAgentMoveButton({ leadId, activityId }: { leadId: string; ac
       <input type="hidden" name="leadId" value={leadId} />
       <input type="hidden" name="activityId" value={activityId} />
       <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending}>
-        {pending ? "Undoing…" : "Undo"}
+        {pending ? SAVING : "Undo"}
       </button>
       <Err state={state} />
     </form>
@@ -79,7 +80,7 @@ export function StageSuggestionCard({
               <input type="hidden" name="leadId" value={leadId} />
               <input type="hidden" name="activityId" value={suggestion.activityId} />
               <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={busy}>
-                {accepting ? "Moving…" : "Accept"}
+                {accepting ? SAVING : "Accept"}
               </button>
             </form>
           )}
@@ -87,7 +88,7 @@ export function StageSuggestionCard({
             <input type="hidden" name="leadId" value={leadId} />
             <input type="hidden" name="activityId" value={suggestion.activityId} />
             <button type="submit" className="lx-btn lx-btn-ghost lx-btn-sm" disabled={busy}>
-              {dismissing ? "Dismissing…" : "Dismiss"}
+              {dismissing ? SAVING : "Dismiss"}
             </button>
           </form>
         </div>
