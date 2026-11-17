@@ -3,7 +3,7 @@ import IntakePage from "@/app/dashboard/intake/page";
 import { tables } from "../mono-data";
 import { activities, boothScorecards, stages, NOW_MS } from "../fixtures-leads-real";
 import { l2Leads, l2State } from "../fixtures-leads-l2";
-import { resetState } from "../fixtures";
+import { resetState, members } from "../fixtures";
 import { state } from "../state";
 import { OwnerShell } from "../shell";
 import { TechShell } from "../mono-shell";
@@ -18,7 +18,7 @@ import { shapeCompareSide } from "@/lib/intake/compare";
 const EXTRA = ["crm_drip_enrollment", "crm_meeting", "crm_discovery_session", "crm_drip_step", "crm_time_entry", "crm_calendar_event", "client_proposal"];
 
 async function withL2Data<T>(fn: () => Promise<T>): Promise<T> {
-  const mine: Record<string, Record<string, unknown>[]> = { crm_stage: stages, crm_lead: l2Leads(), crm_activity: activities, crm_booth_scorecard: boothScorecards };
+  const mine: Record<string, Record<string, unknown>[]> = { crm_stage: stages, crm_lead: l2Leads().map((l, i) => (process.env.L2_OWNER && i < 4 ? { ...l, assigned_to: members[1].userId } : l)), crm_activity: activities, crm_booth_scorecard: boothScorecards };
   const keys = [...new Set([...Object.keys(mine), ...EXTRA])];
   const saved = keys.map((k) => [k, Object.getOwnPropertyDescriptor(tables, k)] as const);
   for (const k of keys) {
