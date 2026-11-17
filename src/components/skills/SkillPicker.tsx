@@ -1,4 +1,6 @@
 import "@/components/list-page/list-page.css";
+import { ListSearch } from "@/components/list-page/ListToolbar";
+import { searchPlaceholder } from "@/lib/ui/words";
 import { showingOf } from "@/lib/ui/format";
 import { PICK_LIMIT, SEARCH_MAX, type PickRecord } from "@/lib/skills/pick";
 import type { RecordKind, Skill } from "@/lib/skills/catalog";
@@ -22,33 +24,17 @@ export function SkillPicker({ skill, term, groups }: { skill: Skill; term: strin
   const showHeadings = groups.length > 1;
   return (
     <div style={{ display: "grid", gap: 10 }}>
-      {/* The shared search look (lp-search); a plain GET form so it works without JavaScript and returns to the card. */}
-      <form method="get" action={`#skill-${skill.slug}`} className="lp-search" role="search">
-        <input type="hidden" name="skill" value={skill.slug} />
-        <label htmlFor={inputId} className="lx-sr">
-          Run it on...
-        </label>
-        <input
-          id={inputId}
-          className="lx-input"
-          name="q"
-          type="search"
-          maxLength={SEARCH_MAX}
-          defaultValue={term}
-          aria-label={`Search records to run ${skill.name} on`}
-        />
-        <button type="submit" className="lp-search-submit">
-          Search
-        </button>
-        {term && (
-          <a className="lp-clear" href={`?skill=${encodeURIComponent(skill.slug)}#skill-${skill.slug}`}>
-            Clear
-          </a>
-        )}
-      </form>
-      <p className="lx-note" style={{ margin: 0 }}>
-        Search {skill.picks.length > 1 ? "by name, mark or number" : skill.picks[0] === "lead" ? "by name, business or email" : "by mark, matter number or client"}.
-      </p>
+      {/* The shared search (placeholder, Search, Clear); a plain GET form so it works without JavaScript and returns to the card. */}
+      <ListSearch
+        id={inputId}
+        label={`Search records to run ${skill.name} on`}
+        placeholder={searchPlaceholder(skill.picks.length > 1 ? "by name, mark or number" : skill.picks[0] === "lead" ? "by name, business or email" : "by mark, matter number or client")}
+        maxLength={SEARCH_MAX}
+        defaultValue={term}
+        action={`#skill-${skill.slug}`}
+        hidden={{ skill: skill.slug }}
+        clearHref={`?skill=${encodeURIComponent(skill.slug)}#skill-${skill.slug}`}
+      />
       {groups.map((g) => (
         <div key={g.kind} style={{ display: "grid", gap: 4 }}>
           {showHeadings && <div className="lx-label">{KIND_HEADING[g.kind]}</div>}

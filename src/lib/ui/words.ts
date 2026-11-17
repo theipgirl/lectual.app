@@ -967,3 +967,7 @@ export const LEADS_TOUCH_CONSULT_LATER = (date: string) => `Consult · ${date}`;
 export const LEADS_TOUCH_CONSULT_HELD = (date: string) => `${OUR_TURN} · consult ${date}`;
 export const LEADS_TOUCH_CONSULT_HELD_TITLE = "The consult was held and nothing has been sent since.";
 export const LEADS_TOUCH_CONSULT_TITLE = "A consult is booked on the calendar, so that is the next thing for this lead.";
+
+// Review fixes (2026-11-17)
+/** The busy word on a search button (a search is not a save). */
+export const SEARCHING = "Searching…";

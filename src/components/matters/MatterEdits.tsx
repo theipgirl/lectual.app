@@ -30,7 +30,7 @@ import type { MatterContactsRead } from "@/lib/matters/contacts";
 import { NOTE_KIND_OPTIONS } from "@/lib/pipeline/lead-input";
 import { Err, Field, RowButton, type Action } from "./MatterForms";
 import { InlineConfirm, Notice, SavedNote, Field as UiField } from "@/components/ui";
-import { searchPlaceholder, ADD_TO_TIMELINE, BLANK, DELETE, OWNER_COLUMN, SAVING, UNASSIGNED } from "@/lib/ui/words";
+import { searchPlaceholder, ADD_TO_TIMELINE, BLANK, DELETE, OWNER_COLUMN, SAVING, SEARCHING, UNASSIGNED } from "@/lib/ui/words";
 import "@/components/list-page/list-page.css";
 import "./matter-page.css";
 
@@ -203,6 +203,9 @@ function LinkContactButton({ matterId, contactId, name }: { matterId: string; co
 export function ContactLinker({ matterId }: { matterId: string }) {
   const [search, searchAction, searching] = useActionState<ContactSearchState, FormData>(searchContactsAction, {});
   const formRef = useRef<HTMLFormElement>(null);
+  const searchBox = useRef<HTMLInputElement>(null);
+  const [hasTerm, setHasTerm] = useState(false);
+  const [cleared, setCleared] = useState(false);
   const [added, addAction, adding] = useActionState<MessageActionState, FormData>(async (prev, fd) => {
     const res = await addContactAction(prev, fd);
     if (!res.error) formRef.current?.reset();
@@ -215,20 +218,44 @@ export function ContactLinker({ matterId }: { matterId: string }) {
         <form action={searchAction} className="mx-grid" role="search">
           <input type="hidden" name="matterId" value={matterId} />
           <div className="lp-search">
-            <input className="lx-input" type="search" name="q" placeholder={searchPlaceholder("contacts")} aria-label="Search contacts" />
-            <button type="submit" className="lp-search-submit" disabled={searching}>
-              {searching ? SAVING : "Search"}
+            <input
+              ref={searchBox}
+              className="lx-input"
+              type="search"
+              name="q"
+              placeholder={searchPlaceholder("contacts")}
+              aria-label="Search contacts"
+              onChange={(e) => {
+                setHasTerm(e.target.value.trim().length > 0);
+                setCleared(false);
+              }}
+            />
+            <button type="submit" className="lp-search-submit" disabled={searching} onClick={() => setCleared(false)}>
+              {searching ? SEARCHING : "Search"}
             </button>
+            {hasTerm && (
+              <button
+                type="button"
+                className="lp-clear"
+                onClick={() => {
+                  if (searchBox.current) searchBox.current.value = "";
+                  setHasTerm(false);
+                  setCleared(true);
+                }}
+              >
+                Clear
+              </button>
+            )}
           </div>
-          {search.error && (
+          {!cleared && search.error && (
             <Notice tone="risk" role="alert">
               {search.error}
             </Notice>
           )}
-          {search.tooShort && <p className="lx-note">Type at least 2 characters to search.</p>}
-          {search.hits && search.hits.length === 0 && !search.tooShort && <p className="lx-note">No contacts match. Add a new contact below.</p>}
+          {!cleared && search.tooShort && <p className="lx-note">Type at least 2 characters to search.</p>}
+          {!cleared && search.hits && search.hits.length === 0 && !search.tooShort && <p className="lx-note">No contacts match. Add a new contact below.</p>}
         </form>
-        {search.hits && search.hits.length > 0 && (
+        {!cleared && search.hits && search.hits.length > 0 && (
           <ul className="lx-list">
             {search.hits.map((h) => (
               <li key={h.id} className="mx-between">
