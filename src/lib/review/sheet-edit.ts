@@ -86,6 +86,8 @@ export type SheetEditRow = {
   contactText: string;
   contactIsDate: boolean;
   contactTitle: string | null;
+  /** "3 documents" when the count is known and above 0; absent otherwise (never "0 documents"). */
+  documentsText?: string | null;
 };
 
 /** The typed value of one cell, as the editor saves it and the table draws it. */

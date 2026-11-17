@@ -21,6 +21,7 @@ import {
 import { ActForm } from "./ActForm";
 import { LostNurture } from "./LostNurture";
 import { PanelShell } from "./PanelShell";
+import { ReviewDocuments } from "./ReviewDocuments";
 import "./review.css";
 
 type Member = { userId: string; name: string };
@@ -301,9 +302,11 @@ export function ReviewPanel(props: PanelProps) {
         {open.kind === "lead" && canMove && closeStages.length > 0 && <LostNurture id={open.id} stages={closeStages} />}
       </section>
 
+      <ReviewDocuments open={open} documents={detail.documents} members={members} today={today} timeZone={timeZone} canWrite={canWrite} />
+
       {canWrite && (
-        <section className="rv-panel-sec" aria-labelledby="rv-sec-note">
-          <h3 id="rv-sec-note" className="lx-label">
+        <section className="rv-panel-sec" id="rv-sec-note" aria-labelledby="rv-sec-note-h">
+          <h3 id="rv-sec-note-h" className="lx-label">
             Log what happened
           </h3>
           <ActForm action={logWhatHappenedAction} submit="Add to timeline">

@@ -73,7 +73,7 @@ export function DocumentsCard({
   const lettersCapped = letters?.status === "ok" && letters.capped;
 
   return (
-    <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }} aria-label={DOCS_TITLE}>
+    <section id="documents" className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }} aria-label={DOCS_TITLE}>
       <div>
         <div className="lx-label">Internal to the firm</div>
         <h2 className="lx-h2" style={{ fontSize: 23 }}>

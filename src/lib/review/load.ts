@@ -1,5 +1,8 @@
 import "server-only";
 import { getScopedClient } from "@/lib/db/scoped-client";
+import { countFilesByParent, countLettersByMatter } from "@/lib/files/read";
+import { leadRead } from "@/lib/leads/live";
+import { activeOrgModulesOrNull } from "@/lib/org/modules";
 import type { Database } from "@/lib/db/types";
 import { listMatters } from "@/lib/matters";
 import { listLeads, listStages } from "@/lib/pipeline";
@@ -146,6 +149,63 @@ export async function readLastStageChange(db: ScopedClient, leadIds: readonly st
   return newest;
 }
 
+/**
+ * child lead id -> keeper id, for the leads merged into any of `leadIds`: one batched read per chunk through the live-leads
+ * helper (before 0107 there is no pointer and nothing is merged). Any failure, or a read that may have hit PostgREST's
+ * 1000-row cap, rejects: a keeper's count must never be too low, so the caller draws no tag and names "documents".
+ */
+async function readMergedChildren(db: ScopedClient, leadIds: readonly string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  await Promise.all(
+    chunks(leadIds).map(async (chunk) => {
+      const result = await leadRead<{ data: unknown; error: unknown }>((kit) => {
+        if (!kit.merged) return Promise.resolve({ data: [], error: null });
+        // live-guard: the live-leads helper itself reads the merge pointer
+        return db.from("crm_lead").select("id, merged_into_id").in("merged_into_id", [...chunk]).limit(PAGE);
+      });
+      if (result.error) throw new Error("merged read failed");
+      const rows = (result.data ?? []) as { id: string; merged_into_id: string | null }[];
+      if (rows.length >= PAGE) throw new Error("merged read may be cut short");
+      for (const r of rows) if (r.merged_into_id) out.set(r.id, r.merged_into_id);
+    }),
+  );
+  return out;
+}
+
+/**
+ * Documents per record: stored files (lead and matter) plus, for a matter in a firm with Document Center, its
+ * generated letters. One batched read per chunk of ids and table, never one per record. Keys are `kind:id`; a record
+ * with none has no key. Any failed read, or a module list that cannot be read (the letters would be uncounted),
+ * rejects, so the caller draws no tag and names "documents" in the note, never a 0.
+ */
+export async function readDocumentCounts(db: ScopedClient, matterIds: readonly string[], leadIds: readonly string[]): Promise<Map<string, number>> {
+  const modules = await activeOrgModulesOrNull();
+  if (modules === null) throw new Error("modules unreadable");
+  const withLetters = modules.includes("document-center");
+  const counts = new Map<string, number>();
+  const add = (kind: string, parts: Map<string, number>[]) => {
+    for (const part of parts) for (const [id, n] of part) counts.set(`${kind}:${id}`, (counts.get(`${kind}:${id}`) ?? 0) + n);
+  };
+  const matterParts = chunks(matterIds).map(async (chunk) => {
+    const [files, letters] = await Promise.all([countFilesByParent(db, "matter", chunk), withLetters ? countLettersByMatter(db, chunk) : Promise.resolve(new Map<string, number>())]);
+    return [files, letters];
+  });
+  const leadParts = chunks(leadIds).map((chunk) => countFilesByParent(db, "lead", chunk));
+  // Leads merged into these keep their files on themselves (lectual 0107); the keeper's count includes them, as its page lists them.
+  const mergedChildren = await readMergedChildren(db, leadIds);
+  const childParts = chunks([...mergedChildren.keys()]).map((chunk) => countFilesByParent(db, "lead", chunk));
+  const [matterDone, leadDone, childDone] = await Promise.all([Promise.all(matterParts), Promise.all(leadParts), Promise.all(childParts)]);
+  add("matter", matterDone.flat());
+  add("lead", leadDone);
+  for (const part of childDone) {
+    for (const [childId, n] of part) {
+      const keeper = mergedChildren.get(childId);
+      if (keeper) counts.set(`lead:${keeper}`, (counts.get(`lead:${keeper}`) ?? 0) + n);
+    }
+  }
+  return counts;
+}
+
 /** A matter row also shows proposals filed against its lead (a quote drafted before the matter opened). */
 function proposalsFor(row: ReviewRow, all: readonly ProposalExpiryRead[], matters: readonly { id: string; lead_id: string | null }[]): ProposalExpiryRead[] {
   if (row.kind === "lead") return all.filter((p) => p.lead_id === row.id);
@@ -186,15 +246,16 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
 
   const dependsOnRecords = failedCritical.length === 0;
   const proposalLeadIds = [...new Set([...leadIds, ...matters.filter((m) => m.status === "open" || m.status === "on_hold").map((m) => m.lead_id).filter((x): x is string => !!x)])];
-  const [tasksS, activityS, deadlinesS, changesS, proposalsS] = dependsOnRecords
+  const [tasksS, activityS, deadlinesS, changesS, proposalsS, countsS] = dependsOnRecords
     ? await Promise.allSettled([
         readOpenTasks(db, matterIds, leadIds),
         readContactActivity(db, matterIds, leadIds),
         readOpenDeadlines(db, matterIds),
         readLastStageChange(db, leadIds),
         readProposalExpiries(db, matterIds, proposalLeadIds),
+        readDocumentCounts(db, matterIds, leadIds),
       ])
-    : ([null, null, null, null, null] as const);
+    : ([null, null, null, null, null, null] as const);
   if (dependsOnRecords && tasksS && tasksS.status === "rejected") failedCritical.push("tasks");
   if (failedCritical.length > 0) return { status: "unavailable", failed: failedCritical };
 
@@ -208,6 +269,9 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
 
   const proposals = proposalsS?.status === "fulfilled" ? proposalsS.value : null;
   if (!proposals) failed.push("proposals");
+
+  const docCounts = countsS?.status === "fulfilled" ? countsS.value : null;
+  if (!docCounts) failed.push("documents");
 
   // Approvals: the queue's own three states. Unconfigured = nothing pending to chip; unavailable = chip skipped, said so.
   let pendingMatterIds: Set<string> | null = new Set();
@@ -250,9 +314,12 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
   // Tags only: a failed read draws no tags (and the KPI tile is a dash), never "no proposal".
   const tagged = proposals ? rows.map((r) => ({ ...r, proposalExpiry: proposalExpiryTag(proposalsFor(r, proposals, matters), today) })) : rows;
 
+  // A count only where the read worked; a record with no stored documents is a real 0 (never drawn), a failed read leaves the field unset.
+  const counted = docCounts ? tagged.map((r) => ({ ...r, documentCount: docCounts.get(`${r.kind}:${r.id}`) ?? 0 })) : tagged;
+
   return {
     status: "ok",
-    rows: tagged,
+    rows: counted,
     closeStages: closeStagesOf(leadStages),
     today,
     timeZone,

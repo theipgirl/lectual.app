@@ -60,6 +60,8 @@ export type ReviewRow = {
   deadline: { dueDate: string; title: string | null } | null;
   /** A live proposal's expiry, drawn as a tag only. Never moves a row between sections. Absent = none, or the read failed. */
   proposalExpiry?: ProposalExpiryTag | null;
+  /** Stored files plus (matters, Document Center firms) generated letters. Absent = not counted or the count failed: never drawn as 0. */
+  documentCount?: number | null;
 };
 
 export const BUCKET_KEYS = ["overdue", "week", "needs", "quiet", "uspto", "track"] as const;

@@ -276,3 +276,7 @@
 }
 /* Facts in Geist (founder, Nov 10): the row's mark and stage line and the search label. Counts stay Courier. */
 .rv-owner :is(.rv-card-meta, .rv-search-label) { font-family: var(--sans); }
+
+/* Documents (panel and deck): layout only. */
+.rv-doc-link { overflow-wrap: anywhere; color: var(--ox); font-weight: 500; }
+.rv-docs li { display: block; }

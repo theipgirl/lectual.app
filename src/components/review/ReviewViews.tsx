@@ -7,7 +7,7 @@ import { openToken } from "@/lib/review/open";
 import { reviewHref, REVIEW_VIEWS, type ReviewParams, type ReviewView } from "@/lib/review/params";
 import { NOTHING_WAITING_ON_YOU, OUR_TURN, WAITING_ON_YOU, WAITING_ON_YOU_PARTIAL, REVIEW_BOARD_VIEW, REVIEW_CARDS_VIEW, REVIEW_SHEET_VIEW } from "@/lib/ui/words";
 import { DoneButton } from "./DoneButton";
-import { Avatar, openHref, Tags, type Common } from "./shared";
+import { Avatar, DocTag, openHref, Tags, type Common } from "./shared";
 import "@/components/list-page/list-page.css";
 import "./review.css";
 import { ViewToggle } from "@/components/ViewToggle";
@@ -73,6 +73,7 @@ function LegacyCard({ row, bucket, today, members, canWrite, params, followUp }:
         </span>
         {followUp && <span className="rv-card-followup lx-note">{followUpText(row, today)}</span>}
         <Tags row={row} today={today} max={2} />
+        <DocTag row={row} />
       </Link>
       <div className="rv-card-acts">
         {canWrite && row.nextStep && <DoneButton taskId={row.nextStep.id} />}
@@ -114,6 +115,7 @@ function OwnerCard({ row, bucket, today, canWrite, params, followUp }: Common & 
         </span>
         {followUp && <span className="rv-card-followup lx-note">{followUpText(row, today)}</span>}
         <Tags row={row} today={today} max={2} skip={["waiting", "expiry"]} />
+        <DocTag row={row} />
       </Link>
       <div className="rv-card-acts">
         {canWrite && row.nextStep && <DoneButton taskId={row.nextStep.id} />}
