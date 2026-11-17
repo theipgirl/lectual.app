@@ -71,7 +71,11 @@ describe("stacked cards under 640px (V1)", () => {
       const src = read(file);
       // A table on the sheet table kit gets the stack class from <SheetTable>.
       expect(src.includes("lx-stack") || src.includes("<SheetTable"), file).toBe(true);
-      for (const l of labels) expect(src, `${file} ${l}`).toContain(`data-label="${l}"`);
+      for (const l of labels) {
+        // The Owner column's label comes from the glossary (OWNER_COLUMN).
+        if (l === "Owner" && src.includes("data-label={OWNER_COLUMN}")) continue;
+        expect(src, `${file} ${l}`).toContain(`data-label="${l}"`);
+      }
       // The Leads columns whose labels come from the glossary (Item L2).
       if (file.includes("IntakeTable")) expect(src).toContain("data-label={LEADS_CONTACT_COLUMN}");
     }

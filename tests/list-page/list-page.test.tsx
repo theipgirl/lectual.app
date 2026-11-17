@@ -139,9 +139,9 @@ describe("Leads and Matters share the pattern", () => {
     expect(read("src/app/dashboard/intake/_components/IntakeTable.tsx")).toContain("<SheetCard");
     expect(read("src/app/dashboard/intake/_components/IntakeTable.tsx")).toContain("<SheetTable");
     expect(matters).toContain('className="lp-row"');
-    expect(matters).toContain("lp-pill");
+    expect(matters).toContain("<Pill");
     expect(read("src/app/dashboard/intake/_components/IntakeCard.tsx")).toContain("ix-card");
-    expect(read("src/components/matters/MatterBoard.tsx")).toContain("lp-board-card");
+    expect(read("src/components/matters/MatterBoard.tsx")).toContain("<BoardCard");
   });
 
   it("intake.css no longer defines a page header, status strip or filter chip, and nothing references them", () => {

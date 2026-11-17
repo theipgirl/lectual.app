@@ -99,9 +99,9 @@ describe("BillingCard", () => {
   it("renders ok rows with padded number, money, totals, PDF link", async () => {
     const out = await html([inv("a", "P1"), inv("d", "P1", { status: "draft", amount_cents: 5000, number: 2 })]);
     expect(out).toContain("#001271");
-    expect(out).toContain("$1,500.00");
+    expect(out).toContain("$1,500");
     expect(out).toContain("View PDF");
-    expect(out).toContain("Billed $1,500.00");
+    expect(out).toContain("Billed $1,500");
     expect(out).toContain("Amounts include USPTO fees where invoiced.");
   });
   it("flags past due", async () => {

@@ -52,7 +52,7 @@ describe("the list state", () => {
     expect(html.indexOf("Specimen.png")).toBeLessThan(html.indexOf("Signed LOE.pdf"));
     expect(html).toContain('href="/dashboard/files/f-new/download/"');
     expect(html).toContain('href="/dashboard/files/f-old/download/"');
-    expect(html).not.toContain("Nothing here yet");
+    expect(html).not.toContain("No files yet.");
     expect(html).not.toContain("Generated letter");
   });
 
@@ -87,16 +87,16 @@ describe("the list state", () => {
 });
 
 describe("the empty state", () => {
-  it("says 'Nothing here yet' when every read worked and found nothing, with the upload control for staff", async () => {
+  it("says 'No files yet.' when every read worked and found nothing, with the upload control for staff", async () => {
     const html = await render({ files: okFiles([]), letters: null });
-    expect(html).toContain("Nothing here yet");
+    expect(html).toContain("No files yet.");
     expect(html).toContain('type="file"');
     expect(html).not.toContain("Couldn't be loaded");
   });
 
   it("says it for a matter only when the letters read worked too", async () => {
     const html = await render({ files: okFiles([]), letters: { status: "ok", capped: false, letters: [] } });
-    expect(html).toContain("Nothing here yet");
+    expect(html).toContain("No files yet.");
   });
 
   it("is never shown after a failed read", async () => {
@@ -106,7 +106,7 @@ describe("the empty state", () => {
       { files: okFiles([]), letters: { status: "unavailable" } as const },
       { files: { status: "not-set-up" } as const, letters: null },
     ] satisfies DocumentsRead[]) {
-      expect(await render(read)).not.toContain("Nothing here yet");
+      expect(await render(read)).not.toContain("No files yet.");
     }
   });
 });
@@ -141,7 +141,7 @@ describe("the not-set-up state", () => {
     expect(html).not.toContain('role="alert"');
     expect(html).not.toContain("lx-banner");
     expect(html).not.toMatch(/couldn't be loaded|problem reaching/i);
-    expect(html).not.toContain("Nothing here yet");
+    expect(html).not.toContain("No files yet.");
   });
 });
 
@@ -216,7 +216,7 @@ describe("the delete control", () => {
 describe("the card's wording and style", () => {
   it("uses the app's lx classes, no placeholder text, no inline colours outside the tokens", async () => {
     const html = await render({ files: okFiles([file("f1", "a.pdf", "2026-10-20T10:00:00Z")]), letters: null }, { canDelete: true });
-    expect(html).toMatch(/class="lx-card"/);
+    expect(html).toMatch(/class="lx-card lx-pad fl-card"/);
     expect(html).toMatch(/class="lx-label"/);
     expect(html).toMatch(/class="lx-h2"/);
     expect(html).not.toMatch(/todo|coming soon|lorem/i);

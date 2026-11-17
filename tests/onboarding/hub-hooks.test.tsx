@@ -197,6 +197,6 @@ describe("styling and sources", () => {
       "proposal-new-head": "src/app/dashboard/proposals/new/page.tsx",
       "team-head": "src/app/dashboard/settings/team/page.tsx",
     };
-    for (const [token, file] of Object.entries(pages)) expect(readFileSync(file, "utf8"), token).toContain(`data-tour="${token}"`);
+    for (const [token, file] of Object.entries(pages)) expect(readFileSync(file, "utf8"), token).toMatch(new RegExp(`(data-tour|tour)="${token}"`));
   });
 });

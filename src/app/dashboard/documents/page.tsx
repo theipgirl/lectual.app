@@ -6,7 +6,7 @@ import { formatRelative } from "@/lib/ui/dates";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { EmptyState, LoadFailedCard, Notice, PageHeader, Pill, SheetCard, SheetScroll, SheetTable } from "@/components/ui";
 import { Chip, FilterChips } from "@/components/list-page/Chips";
-import { BLANK, noneYet } from "@/lib/ui/words";
+import { BLANK, DOCUMENTS_NAME, noneYet } from "@/lib/ui/words";
 import "@/components/documents/documents.css";
 import { orgHasModule } from "@/lib/org/modules";
 import type { Metadata } from "next";

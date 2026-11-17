@@ -97,7 +97,7 @@ describe("F5: Matters list", () => {
     expect(html).toContain(">Filed<");
     expect(html).not.toContain("3. Filed");
     expect(html).not.toContain("<th>Status</th>");
-    expect(html).toContain("<th>In stage</th>");
+    expect(html).toContain('<th class="num">In stage</th>');
     expect(html).toContain("On hold");
     expect(html).toMatch(/<a [^>]*href="\/dashboard\/queue\/q9\/?"[^>]*>Review<\/a>/);
     expect(html).toContain("2d");
@@ -105,9 +105,9 @@ describe("F5: Matters list", () => {
 
   it("only a stale matter gets the red pill", async () => {
     const fresh = await render({ queue: ok, matters: [m()] });
-    expect(fresh).not.toContain("lp-pill-risk");
+    expect(fresh).not.toContain("lx-pill-risk");
     const stale = await render({ queue: ok, matters: [m({ stage_entered_at: daysAgo(400) })] });
-    expect(stale).toContain("lp-pill lp-pill-num lp-pill-risk");
+    expect(stale).toContain("lx-pill lx-pill-risk lx-pill-num");
   });
 
   it("an unreachable queue uses the standard warning banner", async () => {
@@ -135,15 +135,15 @@ describe("F6/P2: board cards", () => {
       <MatterBoard stages={stages} matters={[m()]} canMove reviewIds={new Set(["m1"])} reviewItems={new Map([["m1", "q9"]])} ownerName={() => null} />,
     );
     expect(html).toContain('id="matter-card-m1"');
-    expect(html).toContain(">Move</button>");
+    expect(html).toContain('aria-label="Move ');
     expect(html).not.toContain("<select");
-    expect(html).toContain(">None<");
+    expect(html).toContain("No matters here yet.");
     expect(html).toContain(">Filed<");
     expect(html).toMatch(/href="\/dashboard\/queue\/q9\/?"/);
     const noMove = renderToStaticMarkup(
       <MatterBoard stages={stages} matters={[m()]} canMove={false} reviewIds={new Set()} ownerName={() => null} />,
     );
-    expect(noMove).not.toContain(">Move<");
+    expect(noMove).not.toContain('aria-label="Move ');
   });
 
   it("the Move menu closes on Esc and outside click (shared Popover) and calls the existing stage action", () => {

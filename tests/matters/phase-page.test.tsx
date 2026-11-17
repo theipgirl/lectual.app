@@ -165,7 +165,7 @@ describe("phase groups on the Matters page", () => {
     expect(html).not.toContain("Published");
     expect(html).toContain("1 empty stage: Balance received");
     expect(html).toContain("· Show");
-    expect(html).not.toContain(">None<");
+    expect(html).not.toContain("No matters here yet.");
   });
 
   it("the Matters group board keeps unstaged matters visible and a stage-less stage as a column", async () => {
@@ -177,7 +177,7 @@ describe("phase groups on the Matters page", () => {
 
   it("a card can be moved to any stage, not only the group's", async () => {
     const html = await render({ matters: sample(), read: ok, params: { view: "board" } });
-    expect(html).toContain(">Move</button>");
+    expect(html).toContain('aria-label="Move ');
   });
 });
 
@@ -198,7 +198,7 @@ describe("a firm without phases sees today's page", () => {
 
   it("board view draws every stage as before (empty ones included, no empty-stages row)", async () => {
     const html = await render({ matters: [m("TM", st("p1", "Filed", undefined, 1))], read: { status: "not-set-up", stages: plain() }, params: { view: "board" } });
-    expect(html).toContain(">None<");
+    expect(html).toContain("No matters here yet.");
     expect(html).not.toContain("empty stage");
   });
 });
