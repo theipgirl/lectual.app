@@ -66,11 +66,13 @@ describe("css rules", () => {
   it("the card scrolls by default and is overflow visible only after a measurement said the table fits", () => {
     const table = readFileSync("src/app/dashboard/intake/_components/IntakeTable.tsx", "utf8");
     expect(table).toContain("useState(true)");
-    expect(css).toContain('.ix-sheet .rse-scroll[data-scroll="false"] { overflow: visible; }');
-    expect(css).not.toMatch(/\.ix-sheet \.rse-scroll\s*\{[^}]*overflow:\s*visible/);
+    const globals = readFileSync("src/app/globals.css", "utf8");
+    expect(table).toContain("scroll={needsScroll}");
+    expect(globals).toContain('.sheet-scroll[data-scroll="false"] { overflow: visible; }');
+    expect(globals).not.toMatch(/\n\.sheet-scroll\s*\{[^}]*overflow:\s*visible/);
   });
-  it("the Intake-only 13px header and the 14px phone controls are scoped, and the Sheet's CSS file is untouched by them", () => {
-    expect(css).toContain(".ix-leads .rv-owner .rse-tbl thead th");
+  it("the kit's 13px header and the Intake-only 14px phone controls", () => {
+    expect(readFileSync("src/app/globals.css", "utf8")).toMatch(/\.sheet-tbl thead th \{[^}]*font-size: var\(--fs-1\)/);
     expect(css).toMatch(/max-width: 640px\) \{\s*\.ix-marker-dup, \.ix-temp, \.ix-card \.ix-touch, \.ix-cmp-note, \.ix-cmp-close, \.ix-cmp-table tbody th \{ font-size: 14px; \}/);
   });
   it("a drag in progress is torn down when the table unmounts", () => {

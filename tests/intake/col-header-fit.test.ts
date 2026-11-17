@@ -8,7 +8,7 @@ import { LEADS_ASSISTANT_COLUMN, LEADS_CONTACT_COLUMN } from "@/lib/ui/words";
  * estimated from the REAL header font size and letter-spacing in the CSS (read below, so a CSS change moves the estimate), the th's
  * horizontal padding, and ADVANCE_EM.
  *
- * ADVANCE_EM is the advance width of each capital in Geist (the Leads workspace font, `.ix-leads` overrides --mono to Geist),
+ * ADVANCE_EM is the advance width of each capital in Geist (the app's sans face, which the kit's header uses),
  * in em, measured in Chromium at 13px with letter-spacing 0 (A-Z, one run of 20 letters / 20 / 13). The estimate for a word is
  * sum(advance * fontSize) + letterSpacing * letters, matching the rendered "TEMPERATURE" (101.6px measured, 103.2 estimated: kerning is ignored, so the estimate errs wide).
  * A header wraps at spaces (white-space: normal), so a label needs only its LONGEST WORD to fit; the th's border-box must hold
@@ -22,15 +22,16 @@ const SAFETY = 1;
 
 const read = (p: string) => readFileSync(p, "utf8");
 const leadsCss = read("src/app/dashboard/intake/leads.css");
+const globalsCss = read("src/app/globals.css");
 const sheetCss = read("src/components/review/review-sheet-edit.css");
 
-/** The th rule of the Sheet (`.rv-owner .rse-tbl thead th { ... font-size ... }` with `position: relative`) and Leads' 13px override. */
-const thRule = sheetCss.split("\n").find((l) => l.includes(".rv-owner .rse-tbl thead th {") && l.includes("letter-spacing"))!;
-const letterSpacing = Number(/letter-spacing:\s*([\d.]+)px/.exec(thRule)![1]);
-const padX = Number(/padding:\s*\d+px\s+(\d+)px/.exec(thRule)![1]) * 2;
-/** Leads' header size: a px literal, or a type token (`var(--fs-N)`) resolved from the desktop `:root` of globals.css. */
-const globalsCss = read("src/app/globals.css");
-const fontSizeRaw = /\.ix-leads \.rv-owner \.rse-tbl thead th[^{]*\{\s*font-size:\s*([^;]+);/.exec(leadsCss)![1].trim();
+/** The header rule of the sheet table kit (globals.css `.sheet-tbl thead th { ... }`): font size, letter spacing and padding are read from it. */
+const thRule = /\.sheet-tbl thead th \{[^}]*\}/.exec(globalsCss)![0];
+const letterSpacing = Number(/letter-spacing:\s*([\d.]+)(?:px)?;/.exec(thRule)![1]);
+/** `padding: 10px` (one value) or `padding: 10px 12px` (vertical horizontal): the horizontal one counts, twice. */
+const padX = Number(/padding:\s*\d+px(?:\s+(\d+)px)?;/.exec(thRule)!.slice(1).find(Boolean) ?? /padding:\s*(\d+)px;/.exec(thRule)![1]) * 2;
+/** The header size is a type token (`var(--fs-N)`) resolved from the desktop `:root` of globals.css. */
+const fontSizeRaw = /font-size:\s*([^;]+);/.exec(thRule)![1].trim();
 const tokenName = /^var\((--[\w-]+)\)$/.exec(fontSizeRaw)?.[1];
 const fontSize = Number(
   tokenName ? new RegExp(`${tokenName}:\\s*(\\d+)px`).exec(globalsCss)![1] : /^(\d+)px$/.exec(fontSizeRaw)![1],
@@ -48,7 +49,7 @@ const wordWidth = (w: string) => [...w.toUpperCase()].reduce((n, ch) => n + (ADV
 
 describe("Leads list: header labels fit their default column", () => {
   it("reads the header font from the CSS", () => {
-    expect([fontSize, letterSpacing, padX]).toEqual([13, 1, 20]);
+    expect([fontSize, letterSpacing, padX]).toEqual([13, 0, 20]);
     expect(Object.keys(labels).sort()).toEqual([...COL_ORDER].sort());
   });
 
@@ -63,7 +64,7 @@ describe("Leads list: header labels fit their default column", () => {
   });
 
   it("the headers rely on wrapping at words, so the CSS must keep it and must not break inside a word", () => {
-    expect(sheetCss).toMatch(/\.rv-owner \.rse-tbl thead th \{ white-space: normal;/);
+    expect(thRule).toMatch(/white-space: normal;/);
     const rules = [thRule, ...sheetCss.split("\n").filter((l) => l.includes("thead th")), ...leadsCss.split("\n").filter((l) => /thead th|ix-sort/.test(l))].join("\n");
     expect(rules).not.toMatch(/white-space:\s*nowrap|word-break:\s*break-all|overflow-wrap:\s*anywhere|text-overflow/);
   });

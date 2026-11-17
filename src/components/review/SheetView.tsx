@@ -6,21 +6,22 @@ import { SHEET_COLUMNS, sheetSections, waitingCell } from "@/lib/review/sheet";
 import { openHref, type Common } from "./shared";
 import { SheetEdit } from "./SheetEdit";
 import type { SheetPerms } from "@/lib/review/sheet-edit";
+import { SheetCard, SheetScroll, SheetTable } from "@/components/ui/SheetTable";
 import "@/components/list-page/list-page.css";
 import "./review.css";
 
-function SheetTable({ id, title, rows, today, members, params }: Common & { id: string; title: string; rows: ReviewRow[] }) {
+function SheetSection({ id, title, rows, today, members, params }: Common & { id: string; title: string; rows: ReviewRow[] }) {
   const names = new Map(members.map((m) => [m.userId, m.name]));
   return (
-    <section className="lx-card rv-sheet-sec" data-section={id} aria-labelledby={`rv-sheet-${id}`}>
-      <h2 id={`rv-sheet-${id}`} className="lx-h2 rv-sheet-title">
+    <SheetCard as="section" className="rv-sheet-sec" data-section={id} aria-labelledby={`rv-sheet-${id}`}>
+      <h2 id={`rv-sheet-${id}`} className="rv-sheet-title">
         {title} <span className="lx-note">{rows.length}</span>
       </h2>
       {rows.length === 0 ? (
         <p className="lx-note rv-strip-note">Nothing here for this view.</p>
       ) : (
-        <div className="rv-sheet-wrap">
-          <table className="lx-tbl lx-stack rv-sheet">
+        <SheetScroll>
+          <SheetTable className="rv-sheet">
             <thead>
               <tr>
                 {SHEET_COLUMNS.map((c) => (
@@ -59,10 +60,10 @@ function SheetTable({ id, title, rows, today, members, params }: Common & { id: 
                 );
               })}
             </tbody>
-          </table>
-        </div>
+          </SheetTable>
+        </SheetScroll>
       )}
-    </section>
+    </SheetCard>
   );
 }
 
@@ -72,8 +73,8 @@ export function SheetView({ rows, owner, sheetEdit, ...common }: Common & { rows
   const { trademarks, contracts } = sheetSections(rows);
   return (
     <div className="rv-sheets">
-      <SheetTable id="trademarks" title="Trademarks" rows={trademarks} {...common} />
-      <SheetTable id="contracts" title="Contracts" rows={contracts} {...common} />
+      <SheetSection id="trademarks" title="Trademarks" rows={trademarks} {...common} />
+      <SheetSection id="contracts" title="Contracts" rows={contracts} {...common} />
     </div>
   );
 }

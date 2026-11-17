@@ -27,7 +27,7 @@ import "@/components/review/review-sheet-edit.css";
 import SourceCell from "./SourceCell";
 import RowMenu from "./RowMenu";
 import type { Lane } from "@/lib/leads/lane";
-import type { CSSProperties } from "react";
+import { SheetCard, SheetScroll, SheetTable } from "@/components/ui/SheetTable";
 import {
   LEADS_ACTIONS_SR,
   LEADS_ASSISTANT_COLUMN,
@@ -158,13 +158,12 @@ export default function IntakeTable({
     for (const th of el.querySelectorAll("thead th")) observer.observe(th);
     return () => observer.disconnect();
   }, [minWidth, colsKey]);
-  const tableStyle = { "--rse-min": `${minWidth}px` } as CSSProperties;
 
   return (
     <div className="rv-owner ix-sheet" data-leads-sheet>
-      <div className="lx-card rse-card">
-        <div className="rse-scroll ix-scroll" ref={scrollRef} data-scroll={needsScroll ? "true" : "false"}>
-          <table className="lx-tbl lx-stack rse-tbl ix-tbl" style={tableStyle}>
+      <SheetCard>
+        <SheetScroll className="ix-scroll" ref={scrollRef} scroll={needsScroll}>
+          <SheetTable className="ix-tbl" fixed minWidth={minWidth}>
             <colgroup>
               {cols.map((c) => {
                 const w = colWidth(sizes, c);
@@ -181,7 +180,7 @@ export default function IntakeTable({
                   return (
                     <th key={c} scope="col" data-col={c} aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : undefined}>
                       {key ? (
-                        <button type="button" className="ix-sort" onClick={() => onSort(key)} aria-label={`Sort by ${label}`} data-on={active ? "" : undefined}>
+                        <button type="button" className="sheet-sort ix-sort" onClick={() => onSort(key)} aria-label={`Sort by ${label}`} data-on={active ? "" : undefined}>
                           {label}
                           {active ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
                         </button>
@@ -234,7 +233,7 @@ export default function IntakeTable({
                       style={{ opacity: pending ? 0.55 : 1 }}
                     >
                       <td className="ix-lead-td" data-col="lead" data-primary="true">
-                        <Link href={`/dashboard/leads/${lead.id}`} className="ix-name rse-client" title={name}>
+                        <Link href={`/dashboard/leads/${lead.id}`} className="ix-name sheet-link" title={name}>
                           {name}
                         </Link>
                         <span className="ix-subline">
@@ -328,8 +327,8 @@ export default function IntakeTable({
                 );
               })}
             </tbody>
-          </table>
-        </div>
+          </SheetTable>
+        </SheetScroll>
 
         {rows.length === 0 && (
           <div className="lp-empty" data-empty={!anyLeads ? "none" : "filtered"}>
@@ -351,7 +350,7 @@ export default function IntakeTable({
           )}
           <span className="lx-sr">{setLabel}</span>
         </div>
-      </div>
+      </SheetCard>
     </div>
   );
 }

@@ -33,26 +33,16 @@
 .ix-sets .lp-chip, .ix-filters .lp-chip { text-decoration: none; }
 .ix-chip-warn { border-color: var(--warn); color: var(--warn); }
 
-/* ---- the table: the weekly review Sheet's table (Item L2) -------------------------------------------------------------
-   The list is the Sheet's own markup and classes (components/review/review-sheet-edit.css: .rse-card, .rse-scroll, .rse-tbl, the
-   colgroup widths, .rse-col-grip and .rse-col-tip for resizing, zebra rows, 15px cells, the header row) inside the same .rv-owner
-   wrapper those rules are scoped to. Only what the Leads page needs on top of it is here. The table scrolls inside .rse-scroll only if a
-   person makes it wider than the page; the page itself never scrolls sideways. */
+/* ---- the table: the sheet table kit (globals.css .sheet-*, SheetCard / SheetScroll / SheetTable) ----------------------------------
+   The card, the scroller, the sticky header, zebra rows, the header look and the phone cards are the kit's, shared with the weekly
+   review Sheet. The column grips and width tip (.rse-col-grip, .rse-col-tip) are the Sheet's resizing, inside the same .rv-owner
+   wrapper. Only what the Leads page needs on top of that is here. The table scrolls inside its card only if a person makes it wider
+   than the page (data-scroll="true"); once a measurement says it fits, the header stays at the top while the page scrolls. */
 .ix-sheet { min-width: 0; max-width: 100%; }
-.ix-sheet .rse-card { overflow: visible; }
-/* No inner scroll unless the table is wider than the card: an overflow-x scroller would also clip, or add a scrollbar for, a menu
-   that opens below the last row (menus are absolutely positioned). */
-.ix-sheet .rse-scroll[data-scroll="false"] { overflow: visible; }
-/* Intake only (scoped through .ix-leads, the Sheet is untouched): the Sheet's 12px header, width tip and phone labels read 13px here. */
-.ix-leads .rv-owner .rse-tbl thead th, .ix-leads .rv-owner .rse-col-tip { font-size: var(--fs-1); }
-.ix-sheet .ix-sort { font: inherit; letter-spacing: inherit; text-transform: inherit; text-align: left; border: 0; background: transparent; padding: 0; color: inherit; cursor: pointer; }
-.ix-sheet .ix-sort[data-on] { color: var(--ox); }
-.ix-sheet .ix-sort:focus-visible { outline: 2px solid var(--ox); outline-offset: 2px; border-radius: 3px; }
-.ix-sheet .rse-tbl tbody tr.ix-row { cursor: pointer; }
-.ix-sheet .rse-tbl td { overflow-wrap: break-word; white-space: normal; }
+.ix-sheet .sheet-tbl tbody tr.ix-row { cursor: pointer; }
 .ix-sheet .ix-stage-line .ix-marker { white-space: normal; overflow: visible; text-align: left; }
-.ix-sheet .rse-tbl td.ix-menu-td { text-align: right; padding-left: 4px; padding-right: 8px; }
-.ix-sheet .rse-tbl td.ix-lead-td { white-space: normal; overflow: visible; }
+.ix-sheet .sheet-tbl td.ix-menu-td { text-align: right; padding-left: 4px; padding-right: 8px; }
+.ix-sheet .sheet-tbl td.ix-lead-td { white-space: normal; overflow: visible; }
 /* A person's full name always shows: it wraps at its spaces and hyphens, to a second line when it must (never an ellipsis). */
 .ix-name { display: block; font-size: 15px; line-height: 1.35; white-space: normal; overflow-wrap: break-word; word-break: normal; hyphens: none; }
 .ix-sub { display: block; font-size: var(--fs-1); line-height: 1.4; color: var(--mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -62,9 +52,9 @@
 /* The stage pill and the person's own markers (Needs attorney, Needs a stage, Possible duplicate) share one wrapping line. */
 .ix-stage-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-width: 0; }
 /* Last contact, in words, at the cell's own size. "Our turn" is the one risk colour on the row. */
-.ix-sheet .rse-tbl td.ix-touch { font-size: inherit; line-height: 1.4; color: var(--ink); }
-.ix-sheet .rse-tbl td.ix-touch[data-touch="none"], .ix-sheet .rse-tbl td.ix-touch[data-touch="activity-only"] { color: var(--mute); }
-.ix-sheet .rse-tbl td.ix-touch[data-in] { color: var(--burg); font-weight: 500; }
+.ix-sheet .sheet-tbl td.ix-touch { font-size: inherit; line-height: 1.4; color: var(--ink); }
+.ix-sheet .sheet-tbl td.ix-touch[data-touch="none"], .ix-sheet .sheet-tbl td.ix-touch[data-touch="activity-only"] { color: var(--mute); }
+.ix-sheet .sheet-tbl td.ix-touch[data-in] { color: var(--burg); font-weight: 500; }
 .ix-touch { font-family: var(--font-geist), system-ui, sans-serif; font-size: var(--fs-1); line-height: 1.35; color: var(--mute); }
 .ix-touch[data-in] { color: var(--burg); font-weight: 500; }
 .ix-next { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.4; color: var(--ink2); overflow-wrap: anywhere; }
@@ -72,7 +62,7 @@
 .ix-next[data-muted] { color: var(--mute); }
 .ix-next-wrap { display: flex; align-items: flex-start; gap: 6px; min-width: 0; }
 .ix-next-wrap .ix-next { flex: 1; min-width: 0; }
-.ix-sheet .rse-tbl td.ix-err { font-size: var(--fs-1); color: var(--crit); background: var(--critbg); }
+.ix-sheet .sheet-tbl td.ix-err { font-size: var(--fs-1); color: var(--crit); background: var(--critbg); }
 .ix-foot { padding: 10px 16px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; border-top: 1px solid var(--line); font-size: var(--fs-1); color: var(--mute); }
 .ix-more { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 8px; padding: 6px 12px; font: inherit; font-size: var(--fs-1); cursor: pointer; }
 .ix-more:hover { border-color: var(--ox); color: var(--ox); }
@@ -125,13 +115,10 @@
 
 /* ---- under 640px: the Sheet's stacked cards (.lx-stack draws each cell's label) ---------------------------------------- */
 @media (max-width: 640px) {
-  .ix-sheet .rse-scroll { overflow-x: visible; }
-  .ix-sheet .rse-tbl { min-width: 0; }
-  .ix-sheet .rse-tbl td:empty, .ix-sheet .rse-tbl td.ix-asst-td:not(:has(.intake-agent-chip)) { display: none; }
-  .ix-sheet .rse-tbl td.ix-lead-td { display: block; text-align: left; }
+  .ix-sheet .sheet-tbl td:empty, .ix-sheet .sheet-tbl td.ix-asst-td:not(:has(.intake-agent-chip)) { display: none; }
+  .ix-sheet .sheet-tbl td.ix-lead-td { display: block; text-align: left; }
   .ix-next { -webkit-line-clamp: 1; }
   .ix-sub, .ix-stage, .ix-marker { font-size: 14px; }
-  .ix-leads .rv-owner .rse-tbl td[data-label]::before { font-size: var(--fs-1); }
   .ix-board { grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: minmax(0, 1fr); overflow-x: visible; }
 }
 

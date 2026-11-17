@@ -13,3 +13,4 @@ export { SavedNote } from "./SavedNote";
 export { Toast } from "./Toast";
 export { Field } from "./Field";
 export { InlineConfirm } from "./InlineConfirm";
+export { SheetCard, SheetScroll, SheetTable } from "./SheetTable";

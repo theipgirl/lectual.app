@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import {
   closeLeadAction,
   logWhatHappenedAction,
@@ -85,6 +85,7 @@ import {
 } from "@/lib/ui/words";
 import { usePopPlacement } from "./pop-placement";
 import { sheetStatusStore } from "./sheet-status-store";
+import { SheetCard, SheetScroll, SheetTable } from "@/components/ui/SheetTable";
 import "./review-sheet-edit.css";
 
 export type SheetPerson = { userId: string; name: string; /** What the cell shows. */ short: string; roleLabel: string };
@@ -346,9 +347,9 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
           <kbd className="rse-key">Enter</kbd> {SHEET_KEYS_EDIT} <kbd className="rse-key">Tab</kbd> {SHEET_KEYS_NEXT} <kbd className="rse-key">Esc</kbd> {SHEET_KEYS_CANCEL}
         </p>
       )}
-      <div className="lx-card rse-card">
-       <div className="rse-scroll">
-        <table className="rse-tbl lx-stack" style={{ "--rse-min": `${sheetMinWidth(sizes, editing)}px` } as CSSProperties}>
+      <SheetCard>
+       <SheetScroll>
+        <SheetTable className="rse-tbl" fixed minWidth={sheetMinWidth(sizes, editing)}>
           <colgroup>
             {HEADS.map((h) => {
               const cw = colWidth(sizes, h.col);
@@ -421,7 +422,7 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                   return (
                     <tr key={row.key} style={h ? { height: h } : undefined} data-row={row.key}>
                       <td className="pri" title={row.client}>
-                        <Link href={row.openHref} className="rse-client" scroll={false}>
+                        <Link href={row.openHref} className="sheet-link" scroll={false}>
                           {row.client}
                         </Link>
                       </td>
@@ -591,9 +592,9 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
               </SectionRows>
             ))}
           </tbody>
-        </table>
-       </div>
-      </div>
+        </SheetTable>
+       </SheetScroll>
+      </SheetCard>
     </div>
   );
 }
@@ -601,13 +602,13 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
 function SectionRows({ sec, colCount, children }: { sec: SheetSection; colCount: number; children: React.ReactNode }) {
   return (
     <>
-      <tr className="rse-sec" data-section={sec.id}>
+      <tr className="sheet-sec" data-section={sec.id}>
         <th colSpan={colCount} scope="colgroup">
           {sec.title} · {sec.rows.length}
         </th>
       </tr>
       {sec.rows.length === 0 ? (
-        <tr className="rse-empty">
+        <tr className="sheet-empty">
           <td colSpan={colCount}>{SHEET_EMPTY_SECTION}</td>
         </tr>
       ) : (
