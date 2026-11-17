@@ -1,5 +1,7 @@
 import "server-only";
 import { getScopedClient } from "@/lib/db/scoped-client";
+import { countFilesByParent, countLettersByMatter } from "@/lib/files/read";
+import { activeOrgModulesOrNull } from "@/lib/org/modules";
 import type { Database } from "@/lib/db/types";
 import { listMatters } from "@/lib/matters";
 import { listLeads, listStages } from "@/lib/pipeline";
@@ -146,6 +148,31 @@ export async function readLastStageChange(db: ScopedClient, leadIds: readonly st
   return newest;
 }
 
+/**
+ * Documents per record: stored files (lead and matter) plus, for a matter in a firm with Document Center, its
+ * generated letters. One batched read per chunk of ids and table, never one per record. Keys are `kind:id`; a record
+ * with none has no key. Any failed read, or a module list that cannot be read (the letters would be uncounted),
+ * rejects, so the caller draws no tag and names "documents" in the note, never a 0.
+ */
+export async function readDocumentCounts(db: ScopedClient, matterIds: readonly string[], leadIds: readonly string[]): Promise<Map<string, number>> {
+  const modules = await activeOrgModulesOrNull();
+  if (modules === null) throw new Error("modules unreadable");
+  const withLetters = modules.includes("document-center");
+  const counts = new Map<string, number>();
+  const add = (kind: string, parts: Map<string, number>[]) => {
+    for (const part of parts) for (const [id, n] of part) counts.set(`${kind}:${id}`, (counts.get(`${kind}:${id}`) ?? 0) + n);
+  };
+  const matterParts = chunks(matterIds).map(async (chunk) => {
+    const [files, letters] = await Promise.all([countFilesByParent(db, "matter", chunk), withLetters ? countLettersByMatter(db, chunk) : Promise.resolve(new Map<string, number>())]);
+    return [files, letters];
+  });
+  const leadParts = chunks(leadIds).map((chunk) => countFilesByParent(db, "lead", chunk));
+  const [matterDone, leadDone] = await Promise.all([Promise.all(matterParts), Promise.all(leadParts)]);
+  add("matter", matterDone.flat());
+  add("lead", leadDone);
+  return counts;
+}
+
 /** A matter row also shows proposals filed against its lead (a quote drafted before the matter opened). */
 function proposalsFor(row: ReviewRow, all: readonly ProposalExpiryRead[], matters: readonly { id: string; lead_id: string | null }[]): ProposalExpiryRead[] {
   if (row.kind === "lead") return all.filter((p) => p.lead_id === row.id);
@@ -186,15 +213,16 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
 
   const dependsOnRecords = failedCritical.length === 0;
   const proposalLeadIds = [...new Set([...leadIds, ...matters.filter((m) => m.status === "open" || m.status === "on_hold").map((m) => m.lead_id).filter((x): x is string => !!x)])];
-  const [tasksS, activityS, deadlinesS, changesS, proposalsS] = dependsOnRecords
+  const [tasksS, activityS, deadlinesS, changesS, proposalsS, countsS] = dependsOnRecords
     ? await Promise.allSettled([
         readOpenTasks(db, matterIds, leadIds),
         readContactActivity(db, matterIds, leadIds),
         readOpenDeadlines(db, matterIds),
         readLastStageChange(db, leadIds),
         readProposalExpiries(db, matterIds, proposalLeadIds),
+        readDocumentCounts(db, matterIds, leadIds),
       ])
-    : ([null, null, null, null, null] as const);
+    : ([null, null, null, null, null, null] as const);
   if (dependsOnRecords && tasksS && tasksS.status === "rejected") failedCritical.push("tasks");
   if (failedCritical.length > 0) return { status: "unavailable", failed: failedCritical };
 
@@ -208,6 +236,9 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
 
   const proposals = proposalsS?.status === "fulfilled" ? proposalsS.value : null;
   if (!proposals) failed.push("proposals");
+
+  const docCounts = countsS?.status === "fulfilled" ? countsS.value : null;
+  if (!docCounts) failed.push("documents");
 
   // Approvals: the queue's own three states. Unconfigured = nothing pending to chip; unavailable = chip skipped, said so.
   let pendingMatterIds: Set<string> | null = new Set();
@@ -250,9 +281,12 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
   // Tags only: a failed read draws no tags (and the KPI tile is a dash), never "no proposal".
   const tagged = proposals ? rows.map((r) => ({ ...r, proposalExpiry: proposalExpiryTag(proposalsFor(r, proposals, matters), today) })) : rows;
 
+  // A count only where the read worked; a record with no stored documents is a real 0 (never drawn), a failed read leaves the field unset.
+  const counted = docCounts ? tagged.map((r) => ({ ...r, documentCount: docCounts.get(`${r.kind}:${r.id}`) ?? 0 })) : tagged;
+
   return {
     status: "ok",
-    rows: tagged,
+    rows: counted,
     closeStages: closeStagesOf(leadStages),
     today,
     timeZone,

@@ -1,6 +1,8 @@
 import "server-only";
 import { getScopedClient } from "@/lib/db/scoped-client";
+import { loadDocumentsRead, type DocumentsRead } from "@/lib/files/read";
 import { listMatterStages } from "@/lib/matters/stages";
+import { orgHasModule } from "@/lib/org/modules";
 import { listStages } from "@/lib/pipeline/stages";
 import { ACTIVITY_LIMIT, clipNote, leadStageChoices, type ActivityIn, type StageOption } from "./detail";
 import type { OpenRef } from "./open";
@@ -21,6 +23,8 @@ export type DetailLoad =
       steps: { ok: true; items: DetailStep[] } | { ok: false };
       activity: { ok: true; items: ActivityIn[] } | { ok: false };
       stages: { ok: true; options: StageOption[] } | { ok: false };
+      /** The record's stored files and (matter, Document Center firms) generated letters, each read reporting its own state. */
+      documents: DocumentsRead;
     }
   | { status: "missing" }
   | { status: "unavailable" };
@@ -58,11 +62,16 @@ export async function loadReviewDetail(ref: OpenRef): Promise<DetailLoad> {
     return { status: "unavailable" };
   }
 
-  const [stepsS, activityS, stagesS] = await Promise.allSettled([
+  const [settled, documents] = await Promise.all([
+    Promise.allSettled([
     db.from("crm_task").select("id, title, due_at, assignee_id, created_at").eq("status", "open").eq(column, ref.id).order("due_at", { ascending: true, nullsFirst: false }).order("created_at", { ascending: true }),
     db.from("crm_activity").select("id, type, actor_type, created_at, payload").eq(column, ref.id).order("created_at", { ascending: false }).limit(ACTIVITY_LIMIT),
     ref.kind === "matter" ? listMatterStages().then((s) => s.map((x) => ({ id: x.id, name: x.label }))) : listStages().then((s) => leadStageChoices(s)),
+    ]),
+    // Only after the record itself was read through RLS above: a foreign or missing id never gets here.
+    readRecordDocuments(ref),
   ]);
+  const [stepsS, activityS, stagesS] = settled;
 
   const steps: Extract<DetailLoad, { status: "ok" }>["steps"] =
     stepsS.status === "fulfilled" && !stepsS.value.error
@@ -72,7 +81,7 @@ export async function loadReviewDetail(ref: OpenRef): Promise<DetailLoad> {
     activityS.status === "fulfilled" && !activityS.value.error ? { ok: true, items: (activityS.value.data ?? []) as ActivityIn[] } : { ok: false };
   const stages: Extract<DetailLoad, { status: "ok" }>["stages"] = stagesS.status === "fulfilled" ? { ok: true, options: stagesS.value } : { ok: false };
 
-  return { status: "ok", currentStageId, assignedTo, cameFrom, steps, activity, stages };
+  return { status: "ok", currentStageId, assignedTo, cameFrom, steps, activity, stages, documents };
 }
 
 export type LatestNote = { status: "ok"; text: string | null } | { status: "unavailable" };
@@ -89,5 +98,30 @@ export async function loadLatestNote(ref: OpenRef): Promise<LatestNote> {
     return { status: "ok", text: typeof raw === "string" ? clipNote(raw) : null };
   } catch {
     return { status: "unavailable" };
+  }
+}
+
+/**
+ * The record's own documents through the existing Documents & files loader (no second reader of crm_file). A
+ * matter also lists its generated letters, as a separate read, only for a firm with Document Center (an unreadable
+ * module list fails closed, as the matter page does). Never throws: `loadDocumentsRead` reports each state itself.
+ */
+export async function readRecordDocuments(ref: OpenRef): Promise<DocumentsRead> {
+  const includeLetters = ref.kind === "matter" ? await orgHasModule("document-center").catch(() => false) : false;
+  return loadDocumentsRead({ kind: ref.kind, id: ref.id }, { includeLetters });
+}
+
+/**
+ * The newest documents for the Cards deck's CURRENT card only. It is the same reader as the panel (one small
+ * read for one record, up to 100 files and 100 letters, of which the card draws three), not a read per card.
+ * `ok: false` is a read that threw; the loader's own per-source failures ride inside `read`.
+ */
+export type DeckDocuments = { ok: true; read: DocumentsRead } | { ok: false };
+
+export async function loadDeckDocuments(ref: OpenRef): Promise<DeckDocuments> {
+  try {
+    return { ok: true, read: await readRecordDocuments(ref) };
+  } catch {
+    return { ok: false };
   }
 }

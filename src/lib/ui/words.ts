@@ -879,3 +879,14 @@ export const MERGE_OWN_ROWS_UNAVAILABLE = "Suggestions and proposals from email 
 /** An assessment that is scored (the booth card or the firm's assessment page), on the Forms list, its results page and the lead's Answers card. */
 export const SCORED_ASSESSMENT = "Scored assessment";
 export const SCORED_ASSESSMENTS = "Scored assessments";
+
+// Review documents
+/** The weekly review's detail panel and Cards deck: a record's documents, and the way to comment on one. */
+export const REVIEW_DOCS_TITLE = "Documents";
+export const REVIEW_DOCS_EMPTY = "No documents yet.";
+export const REVIEW_DOCS_OPEN_ALL = "Open all documents";
+export const REVIEW_DOCS_COMMENT = "Comment on a document";
+export const REVIEW_DOCS_COMMENT_HINT = "Your comment is added to the timeline.";
+export const REVIEW_DOCS_OPEN = "Open";
+export const reviewDocsMore = (n: number) => `+${n} more`;
+export const reviewDocsCount = (n: number) => `${n} ${n === 1 ? "document" : "documents"}`;

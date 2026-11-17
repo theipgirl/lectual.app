@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReviewRow } from "@/lib/review/buckets";
 import { dueText, lastContactText, shortDate } from "@/lib/review/format";
+import { documentsTag } from "@/lib/review/documents";
 import { laneOf } from "@/lib/review/lanes";
 import { SHEET_COLUMNS, sheetSections, waitingCell } from "@/lib/review/sheet";
 import { openHref, type Common } from "./shared";
@@ -38,6 +39,7 @@ function SheetTable({ id, title, rows, today, members, params }: Common & { id: 
                       <Link href={openHref(params, r)} className="lx-rowlink" scroll={false}>
                         {r.client}
                       </Link>
+                      {documentsTag(r.documentCount) && <span className="lx-note rv-sub">{documentsTag(r.documentCount)}</span>}
                     </td>
                     <td data-label="Mark">{r.mark ?? <span className="lx-note">—</span>}</td>
                     <td data-label="Status">{r.stageLabel ?? <span className="lx-note">—</span>}</td>
