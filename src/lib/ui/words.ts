@@ -891,3 +891,8 @@ export const REVIEW_DOCS_OPEN = "Open";
 export const reviewDocsMore = (n: number, capped = false) => (capped ? `+${n} or more` : `+${n} more`);
 export const REVIEW_DOCS_LOAD_FAILED = "Documents couldn't be loaded.";
 export const reviewDocsCount = (n: number) => `${n} ${n === 1 ? "document" : "documents"}`;
+
+// Leads: a booked consult in the Last contact cell
+export const LEADS_TOUCH_CONSULT_TODAY = (time: string) => `Consult today · ${time}`;
+export const LEADS_TOUCH_CONSULT_LATER = (date: string) => `Consult · ${date}`;
+export const LEADS_TOUCH_CONSULT_TITLE = "A consult is booked on the calendar, so that is the next thing for this lead.";

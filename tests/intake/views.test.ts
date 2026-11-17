@@ -277,6 +277,40 @@ describe("touchDate / touchStampFor", () => {
     expect(touchStampFor(old, { now: NOW }).text).toBe("Waiting on them · Dec\u00a030, 2025");
   });
 
+  describe("a booked consult comes first", () => {
+    const withConsult = (consultAt: string | undefined, over: Partial<Lead> = {}): IntakeRow => {
+      const [row] = rowsFor([lead({ id: "k", last_inbound_at: daysBefore(2), ...over })]);
+      return { ...row, ...(consultAt ? { consultAt } : {}) };
+    };
+
+    it("today: 'Consult today · 12:30 PM' in the firm's zone, over Our turn", () => {
+      // 17:30Z on 14 Sep is 1:30 PM in New York.
+      const row = withConsult("2026-09-14T16:30:00.000Z");
+      expect(touchStampFor(row, { now: NOW, timeZone: "America/New_York" })).toMatchObject({
+        text: "Consult today · 12:30\u00a0PM",
+        state: "consult",
+        waitingOnUs: false,
+      });
+    });
+
+    it("a later day: 'Consult · Sep 19'", () => {
+      expect(touchStampFor(withConsult("2026-09-19T15:00:00.000Z"), { now: NOW }).text).toBe("Consult · Sep\u00a019");
+    });
+
+    it("no consult, or an unparseable one, keeps today's behavior", () => {
+      expect(touchStampFor(withConsult(undefined), { now: NOW })).toMatchObject({ state: "our-turn" });
+      expect(touchStampFor(withConsult("nonsense"), { now: NOW })).toMatchObject({ state: "our-turn" });
+    });
+
+    it("sorts by the consult start (the shown value), not by the older mail date", () => {
+      const early = withConsult("2026-09-15T15:00:00.000Z");
+      const late = { ...withConsult("2026-09-20T15:00:00.000Z"), lead: { ...withConsult(undefined).lead, id: "k2" } };
+      expect(shownTouch(early, NOW)).toEqual({ state: "consult", iso: "2026-09-15T15:00:00.000Z" });
+      const asc = sortRows([late, early], "lastTouch", "asc", { now: NOW });
+      expect(asc.map((r) => r.consultAt)).toEqual(["2026-09-15T15:00:00.000Z", "2026-09-20T15:00:00.000Z"]);
+    });
+  });
+
   it("says 'No contact yet' when nothing has ever happened", () => {
     const [never] = rowsFor([lead({ id: "c" })]);
     expect(touchStampFor(never, { now: NOW })).toMatchObject({ text: "No contact yet", waitingOnUs: false, state: "none" });
