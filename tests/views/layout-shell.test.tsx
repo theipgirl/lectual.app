@@ -132,7 +132,7 @@ describe("switch on", () => {
   it("an owner gets the owner shell: drawn items, owner tree, no Settings/Reports rows, no section label", async () => {
     const m = await mount(session("owner", [...MODULES, "role-views"]));
     const slugs = (m.rail.props.items as { slug: string }[]).map((i) => i.slug);
-    expect(slugs).toEqual(["", "queue", "review", "proposals", "intake", "matters", "calendar"]);
+    expect(slugs).toEqual(["", "queue", "review", "proposals", "intake", "forms", "matters", "calendar"]);
     expect(m.bar.props.items).toBe(m.rail.props.items);
     // The owner shell draws the welcome deal INSTEAD of the tour (Phase 2 item 5).
     expect(m.tour).toBeUndefined();
