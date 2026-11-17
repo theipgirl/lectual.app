@@ -167,7 +167,7 @@ describe("switch on", () => {
     ]) {
       const m = await mount(session(role, [...MODULES, "role-views"], meta, { org: { id: "11111111-1111-4111-8111-111111111111", name: "Hartwell IP", slug: "h", modules: [...MODULES, "role-views"] } }));
       expect(m.menu.props.viewMenu).toBeUndefined();
-      expect(m.rail.props.variant).toBe(role === "owner" ? "owner" : undefined);
+      expect(m.rail.props.variant).toBe(role === "owner" || role === "admin" ? "owner" : undefined);
     }
   });
 
@@ -179,17 +179,17 @@ describe("switch on", () => {
   it("Lectual staff see today's shell by default, with the switch", async () => {
     const m = await mount(staffIn(FIRM_A));
     expect(m.rail.props.variant).toBeUndefined();
-    expect(m.menu.props.viewMenu).toEqual({ pref: "technician", previewRoles: ["owner"] });
+    expect(m.menu.props.viewMenu).toEqual({ pref: "technician", previewRoles: ["owner", "admin"] });
   });
 
   it("a staff preview applies in the firm it was chosen in, never in another", async () => {
     const meta = { lectual_view_preview: { [FIRM_A]: "as:owner" } };
     const a = await mount(staffIn(FIRM_A, meta));
     expect(a.rail.props.variant).toBe("owner");
-    expect(a.menu.props.viewMenu).toEqual({ pref: "as:owner", previewRoles: ["owner"] });
+    expect(a.menu.props.viewMenu).toEqual({ pref: "as:owner", previewRoles: ["owner", "admin"] });
     const b = await mount(staffIn(FIRM_B, meta));
     expect(b.rail.props.variant).toBeUndefined();
-    expect(b.menu.props.viewMenu).toEqual({ pref: "technician", previewRoles: ["owner"] });
+    expect(b.menu.props.viewMenu).toEqual({ pref: "technician", previewRoles: ["owner", "admin"] });
   });
 
   it("Lectual staff in a firm without role views get no switch", async () => {
@@ -218,7 +218,7 @@ describe("account menu", () => {
   });
 
   it("staff see the View group: Technician view current by default, a preview chip, the firm-only sentence", () => {
-    const html = menu({ viewMenu: { pref: "technician", previewRoles: ["owner"] } });
+    const html = menu({ viewMenu: { pref: "technician", previewRoles: ["owner", "admin"] } });
     expect(html).toMatch(/role="menuitemradio" aria-checked="true"[^>]*><span>Technician view<\/span><span class="lx-am-pill">Showing<\/span>/);
     expect(html).toContain("Preview a view");
     expect(html).toMatch(/role="menuitemradio" aria-checked="false" class="lx-am-chip"[^>]*>Owner</);
@@ -227,7 +227,7 @@ describe("account menu", () => {
   });
 
   it("a staff preview marks its chip and the owner menu carries the switch", () => {
-    const html = menu({ variant: "owner", settingsInMenu: true, viewMenu: { pref: "as:owner", previewRoles: ["owner"] } });
+    const html = menu({ variant: "owner", settingsInMenu: true, viewMenu: { pref: "as:owner", previewRoles: ["owner", "admin"] } });
     expect(html).toMatch(/role="menuitemradio" aria-checked="true" class="lx-am-chip"[^>]*>Owner</);
     expect(html).toMatch(/role="menuitemradio" aria-checked="false"[^>]*><span>Technician view<\/span>/);
   });

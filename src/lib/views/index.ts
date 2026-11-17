@@ -15,7 +15,8 @@ export type ViewId = (typeof VIEW_IDS)[number];
 /** The view each role would get. Only views in LIVE_VIEWS are ever drawn; every other role keeps today's shell. */
 export const ROLE_VIEW: Record<Role, ViewId> = {
   owner: "owner",
-  admin: "office",
+  // Firm owner, Nov 17: admins (RPB: Amor) get the simplified owner view too.
+  admin: "owner",
   senior_admin: "office",
   attorney: "attorney",
   intake: "intake",
