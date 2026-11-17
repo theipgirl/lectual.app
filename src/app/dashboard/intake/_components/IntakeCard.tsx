@@ -89,7 +89,7 @@ export default function IntakeCard({
           <input type="checkbox" className="intake-select" aria-label={`Select ${name}`} checked={selected} onChange={() => onToggleSelect(lead.id)} draggable={false} />
         )}
         <span className="lx-board-card-title">
-          <Link href={`/dashboard/leads/${lead.id}`} className="lx-rowlink ix-card-name" title={name} data-in={touch.waitingOnUs ? "" : undefined}>
+          <Link href={`/dashboard/leads/${lead.id}`} className={`${selecting ? "" : "lx-rowlink "}ix-card-name`} title={name} data-in={touch.waitingOnUs ? "" : undefined}>
             {name}
           </Link>
         </span>
