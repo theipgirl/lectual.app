@@ -11,7 +11,9 @@ import {
 import { SlidingWindowThrottle } from "@/lib/intake-forms/spam";
 import { parseWorksheetBody, WORKSHEET_BODY_MAX } from "@/lib/worksheet/schema";
 import { attendeeCopy, firmNotice } from "@/lib/worksheet/email";
-import { STRATEGY_SESSION_URL, WORKSHEET_FOOTER, worksheetIntakeAnswers } from "@/lib/worksheet/answers";
+import { STRATEGY_SESSION_URL, WORKSHEET_FOOTER, worksheetIntakeAnswers, worksheetSummary } from "@/lib/worksheet/answers";
+import { attendeeHtml, esc, WORKSHEET_LOGO_URL } from "@/lib/worksheet/email-html";
+import { sendInternalMail } from "@/lib/mail/internal-mail";
 import type { IntakeHandle } from "@/lib/intake-forms/public";
 
 const ORIGIN = "https://masterclass.rpblawfirm.com";
@@ -295,6 +297,91 @@ describe("emails", () => {
     expect(n.text.split("\n")[0]).toBe("Legal Strategy Session: not right now.");
     expect(n.subject).not.toContain("Wants");
     expect(worksheetIntakeAnswers(p.value).find((a) => a.id === "ws_talk")?.answer).toBe("Not right now");
+  });
+});
+
+describe("attendee HTML email", () => {
+  const now = new Date("2026-11-17T23:30:00Z");
+  const parse = (over: Record<string, unknown> = {}) => {
+    const p = parseWorksheetBody(JSON.stringify(body(over)));
+    if (!p.ok) throw new Error("bad fixture");
+    return p.value;
+  };
+
+  it("keeps the plain text exactly as it was, and adds an html part", () => {
+    const v = parse();
+    const c = attendeeCopy(v, { now });
+    const expected = [
+      "Hi Ana,",
+      "",
+      "Thank you for joining The Trademark Master Class with RPB Law Firm. Here is a copy of the worksheet you filled in, so you can keep it.",
+      "",
+      worksheetSummary(v, now),
+      "",
+      "When you're ready to talk with our team about protecting what you've built, you can book a Legal Strategy Session here:",
+      STRATEGY_SESSION_URL,
+      "",
+      "RPB Law Firm",
+      "",
+      WORKSHEET_FOOTER,
+    ].join("\n");
+    expect(c.text).toBe(expected);
+    expect(c.html).toBeTruthy();
+    expect(firmNotice(v, { now, filedAs: "x", copySent: true }).html).toBeUndefined();
+  });
+
+  it("has the logo, the button, the footer, the numbered sections and the rows", () => {
+    const h = attendeeHtml(parse(), now);
+    expect(h).toContain(`src="${WORKSHEET_LOGO_URL}"`);
+    expect(h).toContain('alt="RPB Law Firm"');
+    expect(h).toContain(`href="${STRATEGY_SESSION_URL.replace(/&/g, "&amp;")}"`);
+    expect(h).toContain("Book your Legal Strategy Session");
+    expect(h).toContain(WORKSHEET_FOOTER);
+    expect(h).toContain("This is a record of what you entered. It is not a legal assessment.");
+    expect(h).toContain("Hi Ana,");
+    expect(h).toContain("2 · Slogans and taglines");
+    expect(h).toContain("Nothing added.");
+    expect(h).toContain("Rivera Roasters");
+    expect(h).toContain("Already using · Both");
+    expect(h).not.toMatch(/\bfree\b|discount|<script/i);
+    expect(h.match(/href="/g)).toHaveLength(1);
+  });
+
+  it("escapes everything the attendee typed", () => {
+    const evil = `<script>alert(1)</script> <a href="http://evil.test">x</a> "q" 'a' &amp; Tom & Jerry`;
+    const v = parse({
+      contact: { firstName: evil, lastName: "<b>L</b>", email: "a@example.com", business: evil },
+      answers: {
+        groups: { business: [{ name: evil, using: evil, where: evil }] },
+        extra: { dba: evil, searched: evil, handles: evil },
+        logo: { has: evil, who: evil, contractors: [evil], agreement: evil },
+        creativeWork: { written: evil, visual: evil, registered: evil },
+        nextStep: { priority: evil, talk: evil },
+      },
+    });
+    const h = attendeeHtml(v, now);
+    expect(h).not.toContain("<script");
+    expect(h).not.toContain("<a href=\"http://evil.test");
+    expect(h).not.toContain("<b>L</b>");
+    expect(h).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+    expect(h).toContain("&lt;a href=&quot;http://evil.test&quot;&gt;x&lt;/a&gt;");
+    expect(h).toContain("&amp;amp; Tom &amp; Jerry");
+    expect(h).toContain("&#39;a&#39;");
+    expect(h.match(/href="/g)).toHaveLength(1);
+    expect(esc(`<>&"'`)).toBe("&lt;&gt;&amp;&quot;&#39;");
+  });
+
+  it("is passed to the mailer for the attendee only, and sent as Resend's html", async () => {
+    const s = setup();
+    await s.post(body());
+    const [copy, notice] = s.mail.mock.calls.map((c) => c[0]);
+    expect(copy.html).toContain(WORKSHEET_LOGO_URL);
+    expect(notice.html).toBeUndefined();
+    const fetchImpl = vi.fn(async () => new Response("{}", { status: 200 }));
+    await sendInternalMail({ apiKey: "k", from: "a@b.c", to: ["x@y.z"], subject: "s", text: "t", html: "<p>h</p>", fetchImpl: fetchImpl as never });
+    const sent = JSON.parse((fetchImpl.mock.calls[0] as unknown as [string, { body: string }])[1].body);
+    expect(sent.html).toBe("<p>h</p>");
+    expect(sent.text).toBe("t");
   });
 });
 

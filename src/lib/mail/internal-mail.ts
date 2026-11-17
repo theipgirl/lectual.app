@@ -22,6 +22,8 @@ export type InternalMail = {
   replyTo?: string;
   subject: string;
   text: string;
+  /** Optional HTML part, sent beside `text`. Never logged. */
+  html?: string;
   fetchImpl?: typeof fetch;
   /** Log prefix, e.g. "failure-alert". */
   label?: string;
@@ -48,6 +50,7 @@ export async function sendInternalMail(mail: InternalMail): Promise<InternalMail
         ...(mail.replyTo ? { reply_to: mail.replyTo } : {}),
         subject: mail.subject,
         text: mail.text,
+        ...(mail.html ? { html: mail.html } : {}),
       }),
     });
     if (!res.ok) {
