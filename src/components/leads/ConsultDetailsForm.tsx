@@ -36,7 +36,7 @@ const BLANK: ConsultMark = {
 function MarkFields({ i, mark, label }: { i: number; mark: ConsultMark; label: string }) {
   const corrected = mark.extracted_basis !== null && mark.extracted_basis !== mark.filing_basis;
   return (
-    <fieldset style={{ border: "1px solid var(--line)", borderRadius: 10, padding: 12, margin: 0, display: "grid", gap: 10, minWidth: 0 }}>
+    <fieldset className="lx-fieldset">
       <legend className="lx-label" style={{ padding: "0 6px" }}>
         {label}
       </legend>

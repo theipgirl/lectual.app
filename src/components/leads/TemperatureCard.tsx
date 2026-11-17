@@ -54,8 +54,7 @@ export function TemperatureCard(props: {
           Temperature
         </h2>
         <span
-          className={`lx-pill ${temperature.value === "hot" ? "lx-pill-risk" : temperature.value === "warm" ? "lx-pill-warn" : "lx-pill-mute"}`}
-          style={person ? undefined : { border: "1px dashed currentColor", background: "transparent", fontStyle: "italic" }}
+          className={`lx-pill ${temperature.value === "hot" ? "lx-pill-risk" : temperature.value === "warm" ? "lx-pill-warn" : "lx-pill-mute"}${person ? "" : " lx-pill-suggested"}`}
         >
           {temperatureLabel(temperature)}
         </span>
@@ -78,7 +77,7 @@ export function TemperatureCard(props: {
       <LtnSuggestion suggestion={temperature.suggestion} leadId={leadId} target="sequences" />
 
       {suggestion ? (
-        <div style={{ borderLeft: "3px dashed var(--line)", paddingLeft: 12 }}>
+        <div className="lx-suggest-rule">
           <div className="lx-label" style={{ marginBottom: 4 }}>
             Triage suggestion — not a decision
           </div>

@@ -107,7 +107,7 @@ export function DisconnectLawPayButton({ merchant }: { merchant: string }) {
       <Status state={state} />
       <dialog ref={dialog} className="lx-dialog" aria-labelledby="lp-dc-title">
         <form action={action} onSubmit={() => dialog.current?.close()}>
-          <div style={{ padding: 22, display: "grid", gap: 10 }}>
+          <div className="lx-pad-grid">
             <h2 id="lp-dc-title" className="lx-modal-title">
               Disconnect {merchant}?
             </h2>
