@@ -56,7 +56,7 @@ export type ViewerFacts = {
   canMoveStage: boolean;
 };
 
-/** A pending approval-queue item linked to this lead through the queue's own resolver (`resolveBatch`). */
+/** A pending approval-queue item linked to this lead through the lead page's own grouping (`groupPendingByLead`, over the queue's resolver). */
 export type PendingDraft = {
   id: string;
   type: string;
@@ -71,7 +71,7 @@ export type PendingDraft = {
   finalBody: string | null;
   createdAt: string | null;
   clientName: string | null;
-  /** `payload.kind` the drafter stamped on its timeline row (`heads_up`, `client_prep`, ...), when the resolver found one. */
+  /** What the lead page's grouping calls it (`rebecca_brief`, `client_draft`, `other`), from the drafter's own marker. */
   payloadKind: string | null;
   /** From `routing.ts`, recomputed from the stored text on every read (an edit can make it attorney-only). */
   kind: QueueKind;

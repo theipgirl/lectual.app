@@ -9,7 +9,7 @@ import { aiConfigured } from "@/lib/ai/claude";
 import { loadAutopilot } from "@/lib/agents/autopilot";
 import { AGENT_IDS, type AgentId, type Autonomy } from "@/lib/agents/types";
 import { loadActiveQueue } from "@/lib/queue/load";
-import { resolveBatch } from "@/lib/queue/resolve-batch";
+import { groupPendingByLead } from "@/lib/queue/lead-pending";
 import type { QueueItem } from "@/lib/queue/api";
 import type { StopDb } from "@/lib/campaigns/stop-db";
 import { classifyQueueItem, isAttorneyOnly } from "@/lib/queue/routing";
@@ -131,17 +131,22 @@ async function enrich(item: QueueItem, payloadKind: string | null, audit: Audit 
   };
 }
 
-/** The pending queue items linked to this lead (any id of its merged set) by the queue's own resolver. */
+/**
+ * The pending queue items linked to this lead (any id of its merged set), by the SAME grouping the lead page's
+ * "waiting on" read uses (`groupPendingByLead`, over the queue's batched resolver), so the two cannot disagree.
+ */
 export async function readLeadApprovals(db: Scoped, leadIds: readonly string[]): Promise<Read<PendingDraft[]>> {
   const queue = await loadActiveQueue("pending");
   if (queue.status === "unconfigured") return notSetUp("queue-off");
   if (queue.status !== "ok") return unavailable();
   try {
-    const resolved = await resolveBatch(db as unknown as StopDb, queue.items);
-    const mine = queue.items.filter((i) => (resolved.get(i.id)?.leadIds ?? []).some((id) => leadIds.includes(id)));
+    const byLead = await groupPendingByLead(db as unknown as StopDb, queue.items);
+    const kinds = new Map<string, string>();
+    for (const id of leadIds) for (const a of byLead[id] ?? []) kinds.set(a.queueId, a.kind);
+    const mine = queue.items.filter((i) => kinds.has(i.id));
     if (mine.length === 0) return ok([]);
     const audit = await loadAuditContext().catch(() => null);
-    const enriched = await Promise.all(mine.slice(0, ENRICH_CAP).map((i) => enrich(i, resolved.get(i.id)?.kind ?? null, audit)));
+    const enriched = await Promise.all(mine.slice(0, ENRICH_CAP).map((i) => enrich(i, kinds.get(i.id) ?? null, audit)));
     return ok(enriched);
   } catch {
     return unavailable();

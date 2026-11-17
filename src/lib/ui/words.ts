@@ -1022,7 +1022,7 @@ export const leadStepDidSuggested = (to: string | null) => (to ? `Suggested movi
 export const LEAD_STEP_DID_FILED_IN = "Filed an email from them on this lead";
 export const LEAD_STEP_DID_FILED_OUT = "Filed an email the firm sent on this lead";
 export const LEAD_STEP_DID_CREATED = "Created the lead";
-export const LEAD_STEP_DID_SEQUENCE_STOPPED = "Stopped a sequence";
+export const LEAD_STEP_DID_SEQUENCE_STOPPED = "Stopped a campaign";
 export const LEAD_STEP_ROW_VERSION = "Version";
 export const LEAD_STEP_ROW_LEGAL = "Legal fee";
 export const LEAD_STEP_ROW_USPTO = "USPTO fees";

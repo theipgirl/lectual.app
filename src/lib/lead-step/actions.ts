@@ -5,7 +5,7 @@ import { getScopedClient } from "@/lib/db/scoped-client";
 import type { StopDb } from "@/lib/campaigns/stop-db";
 import { mergedSetFor, resolveLeadId } from "@/lib/leads/live";
 import { cardCaller, readCardItem, staffPreviewRefusal } from "@/lib/queue/card-moves";
-import { resolveBatch } from "@/lib/queue/resolve-batch";
+import { groupPendingByLead } from "@/lib/queue/lead-pending";
 import { loadApprovalRouting } from "@/lib/queue/routing-load";
 import { runQueueReview } from "@/lib/queue/review-core";
 import { closerLookFor } from "./load";
@@ -39,7 +39,8 @@ const deps: LeadStepActionDeps = {
   leadIdsOf: async (item) => {
     try {
       const db = (await getScopedClient()) as unknown as StopDb;
-      return (await resolveBatch(db, [item])).get(item.id)?.leadIds ?? [];
+      // The lead page's own grouping (the queue's resolver), for this one item.
+      return Object.keys(await groupPendingByLead(db, [item]));
     } catch {
       return null;
     }
