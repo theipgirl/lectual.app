@@ -52,6 +52,7 @@ async function leadNames(
   if (wanted.length === 0) return {};
   try {
     const { data } = await supabase
+      // live-guard: names leads in the bell; notifications stay on a merged lead
       .from("crm_lead")
       .select("id, first_name, last_name, email")
       .in("id", wanted);

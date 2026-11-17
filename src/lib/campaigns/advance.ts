@@ -13,6 +13,7 @@ import { stopLeadSequences } from "./stop";
 import { sessionUserId } from "./stop-staff";
 import type { StopDb } from "./stop-db";
 import { APPROVALS_NOT_READY } from "@/lib/ui/words";
+import { keeperForWrite } from "@/lib/leads/live";
 
 /**
  * Advances ONE enrollment by exactly one step. This is the only place a drip
@@ -64,8 +65,11 @@ async function loadEnrollment(
 
 async function loadLead(
   supabase: Awaited<ReturnType<typeof getScopedClient>>,
-  leadId: string,
+  givenLeadId: string,
 ): Promise<Lead> {
+  // An enrollment still on a merged lead (lectual 0107) drafts for the KEEPER; an unreadable pointer refuses.
+  const leadId = await keeperForWrite(supabase, givenLeadId);
+  // live-guard: a merged lead id was followed to its keeper by keeperForWrite just above
   const { data, error } = await supabase.from("crm_lead").select("*").eq("id", leadId).maybeSingle();
   if (error) throw error;
   if (!data) throw new CampaignAdvanceError("The enrolled lead could not be found.");

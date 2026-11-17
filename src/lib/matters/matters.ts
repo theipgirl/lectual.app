@@ -317,6 +317,7 @@ export async function ensureMatterForLead(leadId: string): Promise<MatterRow | n
   if (existing) return null;
 
   const { data: lead, error: leadError } = await supabase
+    // live-guard: reads a lead's name for a matter opened from it
     .from("crm_lead")
     .select("first_name, last_name, business_name, mark_text")
     .eq("id", leadId)

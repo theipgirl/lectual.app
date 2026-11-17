@@ -26,7 +26,7 @@ function fakeFrom(table: string) {
   state.calls.push(call);
   const result = () => (table === "crm_meeting" ? state.meetingResult : state.leadUpdateResult);
   const q: Record<string, unknown> = {};
-  for (const name of ["update", "eq", "select"]) {
+  for (const name of ["update", "eq", "is", "select"]) {
     q[name] = (...args: unknown[]) => {
       if (table === "crm_lead" && name === "update" && state.leadUpdateThrows) throw new Error("update blew up");
       call.ops.push([name, args]);

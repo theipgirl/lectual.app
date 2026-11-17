@@ -37,6 +37,7 @@ export async function stopLeadSequencesAsStaff(
     const db = supabase as unknown as StopDb;
     const ids = [...new Set(input.leadIds.filter(Boolean))];
     if (ids.length === 0) return { status: "ok", stopped: [] };
+    // live-guard: reads org_id of leads whose sequences stop
     const { data, error } = await db.from("crm_lead").select("id, org_id").in("id", ids);
     if (error) return { status: "failed", error: error.message ?? "lead read failed" };
     const byOrg = new Map<string, string[]>();

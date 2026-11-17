@@ -213,6 +213,11 @@ class Builder implements PromiseLike<Result> {
     this.filters.push((r) => values.includes(r[column]));
     return this;
   }
+  /** `.is(column, null)`: a row without the column reads as null (a database without it would refuse the column; see live.ts). */
+  is(column: string, value: null | boolean) {
+    this.filters.push((r) => (value === null ? r[column] === null || r[column] === undefined : r[column] === value));
+    return this;
+  }
   ilike(column: string, pattern: string) {
     const regex = likeToRegex(pattern);
     this.filters.push((r) => typeof r[column] === "string" && regex.test(r[column] as string));

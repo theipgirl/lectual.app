@@ -405,6 +405,7 @@ function fakeDb() {
           if (cols === "org_id") return { eq: () => ({ single: async () => ({ data: { org_id: "org-1" }, error: null }) }) };
           const chain = {
             order: () => chain,
+            is: () => chain,
             range: () => Promise.resolve({ data: [], error: null }),
             in: (_col: string, ids: string[]) =>
               Promise.resolve({ data: leads.filter((l) => ids.includes(String(l.lawmatics_id))).map((l) => ({ id: l.id, lawmatics_id: l.lawmatics_id })), error: null }),

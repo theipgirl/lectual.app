@@ -23,6 +23,10 @@ class FakeQuery
     this.calls.push(["eq", a]);
     return this;
   }
+  is(...a: unknown[]) {
+    this.calls.push(["is", a]);
+    return this;
+  }
   order(...a: unknown[]) {
     this.calls.push(["order", a]);
     return this;

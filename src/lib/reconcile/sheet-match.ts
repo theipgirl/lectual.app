@@ -62,7 +62,14 @@ export function matchSheetToLeads(entries: readonly SheetEntry[], leads: readonl
       byLead.set(lead.id, { kind: "ambiguous", note: `${candidates.length} sheet rows match this lead` });
       ambiguousLeads += 1;
     } else if (candidates.length === 1) {
-      byLead.set(lead.id, { kind: "entry", entry: candidates[0] });
+      // A lead can be listed under more than one key (a key of a lead merged into it, M5). Two keys reaching two
+      // different rows is ambiguous, never a pick; an earlier ambiguity stays.
+      const earlier = byLead.get(lead.id);
+      if (!earlier) byLead.set(lead.id, { kind: "entry", entry: candidates[0] });
+      else if (earlier.kind === "entry" && earlier.entry !== candidates[0]) {
+        byLead.set(lead.id, { kind: "ambiguous", note: "2 sheet rows match this lead" });
+        ambiguousLeads += 1;
+      }
     }
   }
 

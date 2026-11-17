@@ -1,7 +1,9 @@
 import { z } from "zod";
 import { AGENT_POLICY } from "./policy";
+import { MERGE_AGENT_SKIPPED } from "@/lib/ui/words";
 import { budgetNearlySpent, isUnusableModelAnswer } from "./shared";
 import type { AgentContext, AgentResult } from "./types";
+import { leadRead } from "@/lib/leads/live";
 
 /**
  * Intake triage: every lead that hasn't been scored gets a lane (hot / warm /
@@ -168,13 +170,14 @@ export async function runIntakeTriage(ctx: AgentContext): Promise<AgentResult> {
   const LEAD_COLUMNS =
     "id, first_name, last_name, business_name, email, phone, website, practice_area, mark_text, referral_source, referral_detail, qualification_score, temperature, created_at, ai_enriched_at";
 
-  const { data, error } = await admin
-    .from("crm_lead")
-    .select(LEAD_COLUMNS)
-    .eq("org_id", orgId)
-    .is("ai_enriched_at", null)
-    .order("created_at", { ascending: false })
-    .limit(TRIAGE_BATCH);
+  // A merged lead (lectual 0107) is never triaged: the guard refuses any write to it (src/lib/leads/live.ts).
+  const { data, error } = await leadRead(({ live }) =>
+    live(admin.from("crm_lead").select(LEAD_COLUMNS))
+      .eq("org_id", orgId)
+      .is("ai_enriched_at", null)
+      .order("created_at", { ascending: false })
+      .limit(TRIAGE_BATCH),
+  );
   if (error) throw new Error(`lead read failed: ${error.message}`);
   const leads = (data ?? []) as LeadRow[];
 
@@ -198,11 +201,9 @@ export async function runIntakeTriage(ctx: AgentContext): Promise<AgentResult> {
   const queued = new Set(leads.map((l) => l.id));
   const candidates = [...boothByLead.keys()].filter((id) => !queued.has(id));
   if (candidates.length && leads.length < TRIAGE_BATCH) {
-    const { data: again, error: againErr } = await admin
-      .from("crm_lead")
-      .select(LEAD_COLUMNS)
-      .eq("org_id", orgId)
-      .in("id", candidates);
+    const { data: again, error: againErr } = await leadRead(({ live }) =>
+      live(admin.from("crm_lead").select(LEAD_COLUMNS)).eq("org_id", orgId).in("id", candidates),
+    );
     if (againErr) throw new Error(`lead re-score read failed: ${againErr.message}`);
     for (const l of (again ?? []) as LeadRow[]) {
       if (leads.length >= TRIAGE_BATCH) break;
@@ -217,6 +218,7 @@ export async function runIntakeTriage(ctx: AgentContext): Promise<AgentResult> {
   // A lead whose answer can't be used (cut off, refused, wrong shape) keeps ai_enriched_at null, so
   // the next run tries it again. It costs that lead only, never the rest of the batch.
   let unscored = 0;
+  let merged = 0;
   let deferred = 0;
   for (const [index, lead] of leads.entries()) {
     if (budgetNearlySpent(ctx, TRIAGE_RESERVE_MS)) {
@@ -234,8 +236,13 @@ export async function runIntakeTriage(ctx: AgentContext): Promise<AgentResult> {
     const nowIso = new Date(ctx.now()).toISOString();
 
     const update = triageLeadUpdate(output, autonomy, nowIso);
-    const { error: upErr } = await admin.from("crm_lead").update(update).eq("id", lead.id).eq("org_id", orgId);
+    // A lead merged while the model was answering (lectual 0107) matches no row: skipped and counted, never a failed run.
+    const { data: updated, error: upErr } = await leadRead(({ live }) => live(admin.from("crm_lead").update(update).eq("id", lead.id).eq("org_id", orgId)).select("id"));
     if (upErr) throw new Error(`lead update failed: ${upErr.message}`);
+    if (Array.isArray(updated) && updated.length === 0) {
+      merged += 1;
+      continue;
+    }
 
     const { error: actErr } = await admin.from("crm_activity").insert({
       org_id: orgId,
@@ -284,17 +291,18 @@ export async function runIntakeTriage(ctx: AgentContext): Promise<AgentResult> {
     }
   }
 
-  return { itemsIn: scored, draftsOut: drafts, summary: triageSummary({ found: leads.length, scored, hot, unscored, deferred }) };
+  return { itemsIn: scored, draftsOut: drafts, summary: triageSummary({ found: leads.length, scored, hot, unscored, deferred, merged }) };
 }
 
 /**
  * The run's one line. "N lead(s) scored, H hot." is kept word for word: the digest reads the hot count
  * out of it (`triageHotCount`). Counts only, never a name.
  */
-export function triageSummary(c: { found: number; scored: number; hot: number; unscored: number; deferred: number }): string {
+export function triageSummary(c: { found: number; scored: number; hot: number; unscored: number; deferred: number; merged?: number }): string {
   if (c.found === 0) return "No new leads to score.";
   const parts = [`${c.scored} lead(s) scored, ${c.hot} hot.`];
   if (c.unscored > 0) parts.push(`${c.unscored} ${c.unscored === 1 ? "lead" : "leads"} couldn't be scored, will retry.`);
   if (c.deferred > 0) parts.push(`${c.deferred} ${c.deferred === 1 ? "lead was" : "leads were"} left for the next run (time limit).`);
+  if (c.merged) parts.push(MERGE_AGENT_SKIPPED(c.merged));
   return parts.join(" ");
 }

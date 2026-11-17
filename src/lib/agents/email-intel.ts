@@ -1,9 +1,11 @@
 import { z } from "zod";
 import { AGENT_POLICY } from "./policy";
+import { MERGE_AGENT_SKIPPED } from "@/lib/ui/words";
 import type { AgentContext, AgentResult } from "./types";
 import { fetchMessageBody } from "@/lib/mailbox/fetch";
 import { freshAccessToken, type ConnectionRow } from "@/lib/mailbox/sync";
 import type { MailboxProvider } from "@/lib/mailbox/providers";
+import { leadRead } from "@/lib/leads/live";
 
 /**
  * Email → client intel: reads inbound mail the sync has ALREADY filed on a
@@ -123,6 +125,7 @@ export async function runEmailIntel(ctx: AgentContext): Promise<AgentResult> {
   const tokens = new Map<string, { row: ConnectionRow; accessToken: string } | null>();
   let read = 0;
   let applied = 0;
+  let merged = 0;
   let drafts = 0;
 
   for (const act of todo) {
@@ -156,12 +159,13 @@ export async function runEmailIntel(ctx: AgentContext): Promise<AgentResult> {
     });
     if (!body) continue;
 
-    const { data: lead } = await admin
-      .from("crm_lead")
-      .select("id, first_name, last_name, business_name, phone, website, mark_text, practice_area")
-      .eq("id", act.lead_id as string)
-      .eq("org_id", orgId)
-      .maybeSingle();
+    // The mail row may sit on a merged lead (lectual 0107): that lead is skipped, never written.
+    const { data: lead } = await leadRead(({ live }) =>
+      live(admin.from("crm_lead").select("id, first_name, last_name, business_name, phone, website, mark_text, practice_area"))
+        .eq("id", act.lead_id as string)
+        .eq("org_id", orgId)
+        .maybeSingle(),
+    );
     if (!lead) continue;
     read += 1;
 
@@ -176,8 +180,13 @@ export async function runEmailIntel(ctx: AgentContext): Promise<AgentResult> {
 
     const writable = autonomy === "act" ? fillOnly(lead as LeadRow, output.changes) : {};
     if (Object.keys(writable).length > 0) {
-      const { error: upErr } = await admin.from("crm_lead").update(writable).eq("id", lead.id).eq("org_id", orgId);
+      // A lead merged while the model was answering (lectual 0107) matches no row: skipped and counted, never a failed run.
+      const { data: updated, error: upErr } = await leadRead(({ live }) => live(admin.from("crm_lead").update(writable).eq("id", lead.id).eq("org_id", orgId)).select("id"));
       if (upErr) throw new Error(`lead update failed: ${upErr.message}`);
+      if (Array.isArray(updated) && updated.length === 0) {
+        merged += 1;
+        continue;
+      }
       applied += 1;
     }
 
@@ -218,6 +227,7 @@ export async function runEmailIntel(ctx: AgentContext): Promise<AgentResult> {
   return {
     itemsIn: read,
     draftsOut: drafts,
-    summary: read === 0 ? "No new client email to read." : `${read} email(s) read, ${applied} record(s) filled in.`,
+    summary:
+      (read === 0 ? "No new client email to read." : `${read} email(s) read, ${applied} record(s) filled in.`) + (merged > 0 ? ` ${MERGE_AGENT_SKIPPED(merged)}` : ""),
   };
 }

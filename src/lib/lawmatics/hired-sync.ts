@@ -20,6 +20,7 @@ import {
 } from "./hired-sync-plan";
 import { field, idOf } from "./jsonapi";
 import { readOriginLookups } from "./lead-origin-read";
+import { leadRead } from "@/lib/leads/live";
 
 /**
  * Hired-matter sync runner (Lawmatics -> Lectual). Runs as the SERVICE ROLE, per ACTIVE
@@ -114,7 +115,18 @@ export async function syncFirm(admin: Admin, orgId: string, client: LawmaticsCli
       pageAll<PlanMatter>((a, b) =>
         admin.from("crm_matter").select("id,owner_name,title,mark_text,matter_number,lawmatics_id,lead_id").eq("org_id", orgId).order("created_at", { ascending: true }).range(a, b),
       ),
-      pageAll<PlanLead>((a, b) => admin.from("crm_lead").select("id,email,lawmatics_id,current_stage_id,stage_entered_at").eq("org_id", orgId).order("created_at", { ascending: true }).range(a, b)),
+      // Merged leads (lectual 0107) are read with their pointer, so the planner follows them to the keeper.
+      pageAll<PlanLead>((a, b) =>
+        leadRead(({ merged }) =>
+          admin
+            // live-guard: reads merged leads WITH their pointer; the planner follows them to the keeper (keeperIn)
+            .from("crm_lead")
+            .select(merged ? "id,email,lawmatics_id,current_stage_id,stage_entered_at,merged_into_id" : "id,email,lawmatics_id,current_stage_id,stage_entered_at")
+            .eq("org_id", orgId)
+            .order("created_at", { ascending: true })
+            .range(a, b),
+        ) as unknown as PromiseLike<{ data: PlanLead[] | null; error: unknown }>,
+      ),
       pageAll<PlanStage>((a, b) => admin.from("crm_matter_stage").select("id,label").eq("org_id", orgId).order("order_index", { ascending: true }).range(a, b)),
       pageAll<LeadStageRef>((a, b) => admin.from("crm_stage").select("id,name,category,order_index").eq("org_id", orgId).order("order_index", { ascending: true }).range(a, b)),
     ]);
@@ -207,6 +219,7 @@ export async function syncFirm(admin: Admin, orgId: string, client: LawmaticsCli
 async function moveLead(admin: Admin, orgId: string, m: PlannedLeadMove, previousEnteredAt: string | null, stamp: string): Promise<"moved" | "stale" | "failed"> {
   try {
     const { data, error } = await admin
+      // live-guard: moves the lead the planner followed to the keeper, fenced on its stage
       .from("crm_lead")
       .update({ current_stage_id: m.toStageId, stage_entered_at: stamp, last_activity_at: stamp })
       .eq("id", m.leadId)
@@ -232,6 +245,7 @@ async function moveLead(admin: Admin, orgId: string, m: PlannedLeadMove, previou
     });
     if (logError) {
       await admin
+        // live-guard: moves the lead the planner followed to the keeper, fenced on its stage
         .from("crm_lead")
         .update(previousEnteredAt ? { current_stage_id: m.fromStageId, stage_entered_at: previousEnteredAt } : { current_stage_id: m.fromStageId })
         .eq("id", m.leadId)

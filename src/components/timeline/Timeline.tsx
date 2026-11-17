@@ -3,7 +3,8 @@ import { describeActivity } from "@/components/leads/describe";
 import { UndoAgentMoveButton } from "@/components/leads/StageKeeperControls";
 import { isAgentMoveRow, undoStateFor } from "@/lib/stage-keeper/moves";
 
-type Row = { id: string; type: string; actor_type: string | null; created_at: string; payload: unknown };
+/** `lead_id` (optional): on a kept lead the timeline also holds the rows of leads merged into it (lectual 0107); those offer no Undo. */
+type Row = { id: string; type: string; actor_type: string | null; created_at: string; payload: unknown; lead_id?: string | null };
 
 /** What the lead page tells the timeline so a Stage Keeper move can offer Undo. */
 export type TimelineUndo = {
@@ -36,12 +37,15 @@ export function Timeline({
   undo?: TimelineUndo;
 }) {
   if (rows.length === 0) return <p className="lx-note">Nothing yet.</p>;
+  // Undo reads only the lead's OWN rows: a merged lead's rows (M5) are history, never acted on.
+  const ownRows = undo ? rows.filter((r) => !r.lead_id || r.lead_id === undo.leadId) : rows;
   return (
     <ol className="lx-timeline">
       {rows.slice(0, 100).map((r) => {
         const d = describeActivity(r, { timeZone });
         const audio = mediaUrls[r.id];
-        const undoState = undo && isAgentMoveRow(r) ? undoStateFor(rows, r.id, undo.currentStageId) : null;
+        const ownRow = !r.lead_id || !undo || r.lead_id === undo.leadId;
+        const undoState = undo && ownRow && isAgentMoveRow(r) ? undoStateFor(ownRows, r.id, undo.currentStageId) : null;
         return (
           <li key={r.id} data-tone={d.tone}>
             <div className="lx-timeline-head">

@@ -775,6 +775,107 @@ export const MATTER_GROUP_EMPTY = (group: keyof typeof MATTER_GROUP_LABEL | "all
       : `No matters in ${MATTER_GROUP_LABEL[group]} match these filters.`;
 export const MATTER_MOVED_TO = "Moved to";
 
+// M5: merge duplicate leads (lectual 0107). Owner, admin and senior admin only.
+export const MERGE_LEADS_TITLE = "Merge two leads";
+export const MERGE_LEADS_LINK = "Merge…";
+export const MERGE_LEADS_LINK_TITLE = "Choose which lead to keep and merge the other into it";
+export const MERGE_LEADS_SUB = "One lead is kept. The other is merged into it and stops showing in lists. Its history stays readable on the lead you keep.";
+export const MERGE_KEEP_INSTEAD = "Keep this lead instead";
+export const MERGE_KEEPING = "Keeping";
+export const MERGE_INTO_KEEPER = "Merged into the kept lead";
+export const MERGE_KEEP_WHY = {
+  matter: "Suggested because it has a matter.",
+  lawmatics: "Suggested because it is linked to Lawmatics.",
+  older: "Suggested because it is the older lead.",
+  chosen: "You chose this lead.",
+} as const;
+export const MERGE_FIELDS_HEADING = "Which details to keep";
+export const MERGE_FIELDS_NOTE = "Where the two leads differ, pick the value to keep. The stage of the kept lead never changes.";
+export const MERGE_FIELDS_SAME = "The details match. Nothing to choose.";
+export const MERGE_FIELD_LABELS = {
+  first_name: "First name",
+  last_name: "Last name",
+  email: "Email",
+  phone: "Phone",
+  business_name: "Business",
+  website: "Website",
+  mark_text: "Mark",
+  referral_source: "Source",
+  referral_detail: "Source detail",
+  practice_area: "Practice area",
+  assigned_to: "Assigned to",
+  temperature: "Suggested temperature",
+  lane: "Temperature",
+} as const;
+export const MERGE_EMPTY_VALUE = "Empty";
+export const MERGE_STAGE_LABEL = "Stage";
+export const MERGE_MOVES_HEADING = "Moves to the kept lead";
+export const MERGE_STAYS_HEADING = "Stays on the merged lead, shown on the kept lead";
+export const MERGE_COUNT_UNAVAILABLE = "Couldn't load";
+export const MERGE_COUNTS_NOTE = "Counts are for the lead being merged. Tags are added to the kept lead's tags. A campaign the kept lead is already in is stopped on the merged lead instead of moved.";
+export const MERGE_COUNT_LABELS = {
+  tasks: "Tasks",
+  time: "Time entries",
+  matters: "Matters",
+  meetings: "Meetings",
+  calendar: "Calendar events",
+  discovery: "Discovery sessions",
+  scorecards: "Booth scorecards",
+  submissions: "Form answers",
+  consultNotes: "Consult notes",
+  enrollments: "Campaigns",
+  tags: "Tags",
+  activity: "Timeline entries",
+  files: "Files",
+  proposals: "Proposals",
+  quotes: "Quotes",
+} as const;
+export const MERGE_MATTER_NOTE = (matter: string, keeper: string) => `${matter} belongs to the lead being merged. After the merge it belongs to ${keeper}.`;
+export const MERGE_BUTTON = "Merge leads";
+export const MERGE_CONFIRM = (loser: string, keeper: string) => `Merge ${loser} into ${keeper}? This can't be undone from Lectual.`;
+export const MERGE_CONFIRM_LABEL = "Merge";
+export const MERGE_PENDING = "Merging…";
+export const MERGE_BACK = "Back to Intake";
+export const MERGE_PICK_TWO = "Choose two different leads to merge. Open a possible duplicate from Intake and choose Merge.";
+export const MERGE_LEAD_GONE = "One of these leads couldn't be found. It may have been deleted.";
+export const MERGE_LEAD_ALREADY = (name: string) => `${name} has already been merged into another lead.`;
+export const MERGE_OPEN_KEEPER = "Open the lead it was merged into";
+export const MERGE_NOT_A_LEAD = "This is a matter, not a lead. A lead and a matter can't be merged. Open the matter and link the lead to it there.";
+export const MERGE_OPEN_MATTER = "Open the matter";
+export const MERGE_READ_FAILED = "Can't show these leads right now. Refresh to try again.";
+/** The quiet line on the kept lead after a merge, and on a merged lead's old link. */
+export const MERGE_DONE = "Merged. The other lead's history is shown here.";
+export const LEAD_MERGED_INTO = (name: string) => `This lead was merged into ${name}.`;
+export const MERGE_HISTORY_PARTIAL = "History from merged leads couldn't be loaded. Refresh to try again.";
+/** Any write that reached a merged lead (lectual 0107's crm_lead_merge_guard). */
+export const LEAD_MERGED_WRITE = "This lead was merged into another lead, so it can't be changed here. Refresh and open the lead it was merged into.";
+/** The Lawmatics importer's reason for a person whose lead was merged. */
+export const LEAD_MERGED_IMPORT_SKIP = (keeper: string | null) =>
+  keeper
+    ? `This person's lead was merged into ${keeper} in Lectual, so the import leaves it alone.`
+    : "This person's lead was merged into another lead in Lectual, so the import leaves it alone.";
+/** crm_merge_leads refusals, by the prefix lectual 0107 raises. */
+export const MERGE_REFUSALS = {
+  merge_not_allowed: "Only an owner or admin can merge leads.",
+  merge_same_record: "Those are the same lead. Choose two different leads.",
+  merge_not_found: "One of these leads couldn't be found. It may have been deleted.",
+  merge_already_merged: "One of these leads has already been merged. Refresh to see where it went.",
+  merge_chain: "Other leads were already merged into the lead you chose to merge. Keep this lead and merge the other into it.",
+  merge_open_payment: "A card payment on one of these leads is still being processed. Wait for it to finish, then merge.",
+  merge_proposal_unpaid: "One of these leads has an accepted proposal that isn't paid yet, so it can't be merged now.",
+  merge_bad_choice: "One of the choices wasn't recognised. Refresh the page and choose again.",
+} as const;
+export const MERGE_FAILED = "Couldn't merge these leads. Try again.";
+/** An automation rule whose lead can no longer be found. */
+export const MERGE_RULE_LEAD_GONE = "The lead couldn't be found.";
+/** An agent run that found a lead merged between its read and its write (counted, never an error). */
+export const MERGE_AGENT_SKIPPED = (n: number) => `${n} ${n === 1 ? "lead was" : "leads were"} skipped: merged into another lead.`;
+/** A write from a page opened before a merge, when the merged lead's pointer can't be read: nothing is written. */
+export const MERGE_POINTER_UNREADABLE = "This lead couldn't be checked just now, so nothing was saved. Refresh and try again.";
+/** An automation rule whose lead couldn't be read (a failed read, not a merge). */
+export const MERGE_RULE_LEAD_UNREADABLE = "The lead couldn't be read, so this action was skipped.";
+/** The lead page when its own timeline rows (suggestions, proposals from email) couldn't be read. */
+export const MERGE_OWN_ROWS_UNAVAILABLE = "Suggestions and proposals from email couldn't be loaded. Refresh to try again.";
 /** An assessment that is scored (the booth card or the firm's assessment page), on the Forms list, its results page and the lead's Answers card. */
 export const SCORED_ASSESSMENT = "Scored assessment";
 export const SCORED_ASSESSMENTS = "Scored assessments";

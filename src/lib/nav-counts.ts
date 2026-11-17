@@ -3,6 +3,7 @@ import { getScopedClient } from "@/lib/db/scoped-client";
 import { listStages } from "@/lib/pipeline";
 import { intakeStageIds } from "@/lib/intake/scope";
 import { INTAKE_PRACTICE_AREA_FILTER } from "@/lib/intake/counts";
+import { leadRead } from "@/lib/leads/live";
 
 /**
  * The numbers the pinned rail shows beside a section (design: the prototype's
@@ -21,11 +22,12 @@ export async function loadRailCounts(): Promise<Partial<Record<string, number>>>
       const ids = Array.from(intakeStageIds(await listStages()));
       if (ids.length === 0) return 0;
       // Same scope as the Intake page (src/lib/intake/leads.ts listIntakeLeads).
-      const { count, error } = await supabase
-        .from("crm_lead")
-        .select("id", { count: "exact", head: true })
-        .in("current_stage_id", ids)
-        .or(INTAKE_PRACTICE_AREA_FILTER);
+      // A merged lead (lectual 0107) is never counted: src/lib/leads/live.ts.
+      const { count, error } = await leadRead(({ live }) =>
+        live(supabase.from("crm_lead").select("id", { count: "exact", head: true }))
+          .in("current_stage_id", ids)
+          .or(INTAKE_PRACTICE_AREA_FILTER),
+      );
       if (error) throw error;
       return count ?? 0;
     })(),

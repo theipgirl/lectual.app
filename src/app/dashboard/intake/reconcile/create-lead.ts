@@ -49,6 +49,7 @@ export async function createLeadFromReconcileAction(input: unknown): Promise<Cre
       ["email", candidate.email],
     ] as const) {
       if (!value) continue;
+      // live-guard: duplicate check: a sheet key, Lawmatics id or address held by a merged lead still means the person exists, so no second lead is created
       const { data, error } = await supabase.from("crm_lead").select("id").eq(column, value).limit(1);
       if (error) throw error;
       if ((data ?? []).length > 0) return { ok: false, error: MSG.createExists };

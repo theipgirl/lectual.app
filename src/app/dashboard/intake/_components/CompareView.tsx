@@ -9,13 +9,16 @@ import {
   LEADS_COMPARE_NOTE,
   LEADS_COMPARE_OPEN_LEAD,
   LEADS_COMPARE_TITLE,
+  MERGE_LEADS_LINK,
+  MERGE_LEADS_LINK_TITLE,
 } from "@/lib/ui/words";
+import { mergeHref } from "@/lib/leads/merge-links";
 
 export type CompareState = { status: "loading" } | { status: "failed"; error: string } | { status: "ok"; data: CompareData };
 
 /**
  * The compare panel's contents: a dialog with the two leads side by side and a link to each. Presentational (no hooks), so it is
- * tested and drawn in the design harness as markup. The behaviour (focus, Esc, Tab) is `CompareDialog`'s. It has NO merge action.
+ * tested and drawn in the design harness as markup. The behaviour (focus, Esc, Tab) is `CompareDialog`'s. It merges nothing: for an owner or admin it links to the merge screen (M5), where the merge is confirmed.
  */
 export default function CompareView({
   state,
@@ -85,6 +88,11 @@ export default function CompareView({
             <Link href={`/dashboard/leads/${both.b.id}/`} className="ix-cmp-link">
               {LEADS_COMPARE_OPEN_LEAD(both.b.name)}
             </Link>
+            {data?.merge && (
+              <Link href={mergeHref(both.a.id, both.b.id)} className="ix-cmp-link" title={MERGE_LEADS_LINK_TITLE}>
+                {MERGE_LEADS_LINK}
+              </Link>
+            )}
           </div>
         </>
       )}

@@ -200,6 +200,7 @@ async function runMeetingProposals(ctx: AgentContext, startedAt: number): Promis
     }
     read += 1;
     const [{ data: lead }, { data: full }] = await Promise.all([
+      // live-guard: reads the lead a meeting or consult note is linked to; both move to the keeper in the merge
       admin.from("crm_lead").select("id, first_name, last_name, business_name, email").eq("id", m.lead_id as string).eq("org_id", orgId).maybeSingle(),
       admin.from("crm_meeting").select("transcript").eq("id", m.id as string).eq("org_id", orgId).maybeSingle(),
     ]);
@@ -285,6 +286,7 @@ async function runConsultNotes(ctx: AgentContext): Promise<AgentResult> {
   let drafted = 0;
   for (const note of todo) {
     const { data: lead } = await admin
+      // live-guard: reads the lead a meeting or consult note is linked to; both move to the keeper in the merge
       .from("crm_lead")
       .select("id, first_name, last_name, business_name, email")
       .eq("id", note.lead_id as string)

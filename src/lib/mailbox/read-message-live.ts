@@ -46,6 +46,7 @@ export const liveMailReadDeps: MailReadDeps = {
     const leadIds = [...new Set(rows.map((r) => r.lead_id).filter((x): x is string => !!x))];
     const matterIds = [...new Set(rows.map((r) => r.matter_id).filter((x): x is string => !!x))];
     const [leads, matters] = await Promise.all([
+      // live-guard: names the lead a stored mail row points at (history)
       leadIds.length ? supabase.from("crm_lead").select("id, first_name, last_name, business_name, email").in("id", leadIds) : Promise.resolve({ data: [] as never[] }),
       matterIds.length ? supabase.from("crm_matter").select("id, mark_text, title, matter_number, owner_name").in("id", matterIds) : Promise.resolve({ data: [] as never[] }),
     ]);

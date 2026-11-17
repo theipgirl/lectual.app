@@ -93,6 +93,44 @@ function carriedDetail(p: Record<string, unknown>): string | null {
   return (skipped && WHY[skipped]) || null;
 }
 
+/**
+ * lectual 0107's `lead_merged` row (one on each lead). The payload is read defensively: which side this row is
+ * on (`role` / `side`: "keeper" or "loser"), the fields that changed and the counts that moved. Field VALUES are never shown (an old email or phone is not timeline text); only the field names.
+ */
+const MERGE_FIELD_WORDS: Record<string, string> = { first_name: "first name", last_name: "last name", business_name: "business", mark_text: "mark", referral_source: "source", referral_detail: "source detail", practice_area: "practice area", assigned_to: "assignee", lane: "temperature", temperature: "suggested temperature" };
+
+function mergedSide(p: Record<string, unknown>): "keeper" | "loser" | null {
+  const side = str(p.role) ?? str(p.side);
+  if (side === "keeper" || side === "kept") return "keeper";
+  if (side === "loser" || side === "merged") return "loser";
+  if (str(p.merged_into_id) ?? str(p.keeper_id) ?? str(p.into)) return "loser";
+  if (str(p.merged_lead_id) ?? str(p.loser_id) ?? str(p.from)) return "keeper";
+  return null;
+}
+
+function mergedTitle(p: Record<string, unknown>): string {
+  const side = mergedSide(p);
+  if (side === "keeper") return "Another lead merged into this one";
+  if (side === "loser") return "Merged into another lead";
+  return "Leads merged";
+}
+
+function mergedDetail(p: Record<string, unknown>): string | null {
+  const changes = p.fields ?? p.changes ?? p.changed;
+  const names = Array.isArray(changes)
+    ? (changes as unknown[]).map((f) => (typeof f === "string" ? f : str((f as Record<string, unknown> | null)?.field))).filter((f): f is string => !!f)
+    : changes && typeof changes === "object"
+      ? Object.keys(changes as Record<string, unknown>)
+      : [];
+  const counts = p.counts && typeof p.counts === "object" && !Array.isArray(p.counts) ? (p.counts as Record<string, unknown>) : {};
+  const moved = Object.values(counts).reduce<number>((sum, v) => (typeof v === "number" && Number.isFinite(v) && v > 0 ? sum + v : sum), 0);
+  const parts = [
+    names.length ? `details changed: ${names.map((f) => MERGE_FIELD_WORDS[f] ?? f.replaceAll("_", " ")).join(", ")}` : null,
+    moved > 0 ? `${moved} record${moved === 1 ? "" : "s"} moved` : null,
+  ];
+  return parts.filter(Boolean).join(" · ") || null;
+}
+
 export type DescribeOptions = {
   /** The firm's time zone, for the dates inside a Stage Keeper sentence. Default UTC. */
   timeZone?: string;
@@ -161,6 +199,8 @@ export function describeActivity(row: Row & { id?: string }, options: DescribeOp
       return { title: "Lead created", detail: str(p.source), tone: "system", link: null };
     case "lead_assigned":
       return { title: "Lead assigned", detail: null, tone: "system", link: null };
+    case "lead_merged":
+      return { title: mergedTitle(p), detail: mergedDetail(p), tone: "system", link: null };
     case "lead_updated":
       if (str(p.change) === "consult_details") return { title: "Consult details reviewed", detail: consultReviewDetail(p), tone: "system", link: null };
       if (str(p.field) === "lane") {

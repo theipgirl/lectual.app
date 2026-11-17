@@ -148,7 +148,8 @@ export async function buildPlan(input: PlanInput): Promise<{ view: ReconcileView
 
   const match = matchSheetToLeads(
     sheet.entries,
-    leads.map((l) => ({ id: l.id, sheetKey: l.sheetKey })),
+    // A merged lead's sheet key (M5) is matched as its keeper's: one more key for the same lead.
+    leads.flatMap((l) => [{ id: l.id, sheetKey: l.sheetKey }, ...[...new Set((l.mergedKeys ?? []).map((k) => k.sheetKey).filter((k): k is string => !!k && k !== l.sheetKey))].map((sheetKey) => ({ id: l.id, sheetKey }))]),
   );
   const onTable = tableLeads(stages, leads, new Set(match.byLead.keys()));
 
@@ -164,6 +165,14 @@ export async function buildPlan(input: PlanInput): Promise<{ view: ReconcileView
       if (m.kind === "record") {
         claimedRecords.add(m.record.lawmaticsId);
         recordOf.set(lead.id, m.record);
+      }
+      // A record held by a lead merged into this one (M5) belongs to this lead: claimed, and its record when it has none.
+      for (const k of lead.mergedKeys ?? []) {
+        if (!k.lawmaticsId) continue;
+        const merged = lawmaticsIndex.byId.get(String(k.lawmaticsId));
+        if (!merged) continue;
+        claimedRecords.add(merged.lawmaticsId);
+        if (!recordOf.has(lead.id)) recordOf.set(lead.id, merged);
       }
     }
   }

@@ -13,6 +13,10 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: unknown }> {
     this.calls.push(["eq", a]);
     return this;
   }
+  is(...a: unknown[]) {
+    this.calls.push(["is", a]);
+    return this;
+  }
   order(...a: unknown[]) {
     this.calls.push(["order", a]);
     return this;
@@ -177,6 +181,7 @@ describe("append-only: no update/delete exported", () => {
         "ACTIVITY_TYPES_0045",
         "ACTIVITY_TYPES_0047",
         "ACTIVITY_TYPES_0097",
+        "ACTIVITY_TYPES_0107",
         "activityForLead",
         "activityForMatter",
         "hasMatterActivityType",

@@ -2092,3 +2092,69 @@ The RPB master-class worksheet (lectual-plugin `sites/rpb-masterclass/trademark/
   `WORKSHEET_FROM` must be on a domain verified on `RESEND_API_KEY`'s account; unset sender or key = no email, the lead is still filed.
 - `WORKSHEET_LAWMATICS_SYNC=on` also pushes each new person to the firm's own Lawmatics like any intake (source tag = Lawmatics tag, which can
   fire the firm's Lawmatics automations). Default off.
+
+## Merge duplicate leads (M5, lectual 0107)
+Two leads of one firm become one: the KEEPER stays, the other is MERGED (`crm_lead.merged_into_id` set). The database does the merge
+(`crm_merge_leads`, SECURITY DEFINER, owner/admin/senior_admin, both leads in the active org) and its `crm_lead_merge_guard` trigger refuses
+any update or delete of a merged lead and any direct write of the merged columns (42501, `lead_merge_guarded`). Nothing here sends.
+- **One helper, `src/lib/leads/live.ts`.** `leadRead(({ live, merged }) => ...)` runs a crm_lead query: `live(q)` adds
+  `.is("merged_into_id", null)`; `merged` says the 0107 columns can be named. Before 0107 the filtered query fails with 42703 / PGRST204
+  (judged by CODE only); the same query then runs unfiltered and "missing" is remembered for 5 minutes (a success is remembered for good; if
+  the unfiltered query fails the same way the column wasn't ours and nothing is remembered). `followMerged` / `resolveLeadId` follow the
+  pointer to the keeper (one hop is normal; a loop or more than 4 hops is `unavailable`, never a guess); `mergedSetFor` is the keeper plus
+  the leads merged into it (a failed read is `unavailable` WITH the keeper, so its own history still draws); `foldMergedLeads` (pure) reads a
+  merged row as its keeper with only its old email; `mergeAvailable` hides Merge before 0107 and on a failed probe. Scoped client on every
+  dashboard path; the importers and agents pass their own org-fenced admin client.
+- **Grep guard:** `tests/leads/live-guard.test.ts` (scanner `tests/leads/live-guard-scan.ts`) checks EVERY crm_lead table name in `src/`
+  AND `scripts/`, in any quotes (`"crm_lead"`, `'crm_lead'`, `` `crm_lead` ``; `.from(...)`, `readIn("crm_lead", …)`, `from(x ? … : "crm_lead")`).
+  It passes only when wrapped in `live(...)`, when it is an insert, or when a `// live-guard: <reason>` comment sits on its line or in the
+  three lines above. Naming `merged_into_id` is not enough on its own: a read of the pointer carries a marker saying what it does with it.
+- **Lists drop merged leads:** `listLeads` (Pipeline, Copilot, pickers, Weekly review, reports), `listIntakeLeads` and the Lost / Nurture reads
+  (Leads sets and counts), the rail badge (`nav-counts.ts`), the proposals and quote lead pickers, the hub's first lead, Reconcile's apply
+  re-read, the morning brief's stalled leads, intake triage, the Stage Keeper's lead read and the acceptance note's email match.
+  `findDuplicates` skips a merged row on either side.
+- **Matchers FOLLOW a merged lead to its keeper:** the mailbox sync's lead list (`foldMergedLeads`: the keeper is listed again under the
+  merged lead's old address, its own row first; the Outlook calendar link uses the same list, so two addresses of one keeper are one lead and
+  one address on two live leads stays ambiguous; `buildEmailEvidence` keeps the FIRST row per id), the meetings importer, the queue's recipient
+  match (`resolve-batch.ts`, `stale.ts`: `keeperIdOf`), the hired-matter sync, quote acceptance (`resolveLeadId`), and Reconcile (`readLeads`
+  folds a merged lead's sheet key and Lawmatics id onto its keeper as `mergedKeys`; one lead reaching two sheet rows is ambiguous).
+- **The person behind a lead, for the stop rules** (`src/lib/campaigns/person.ts`, used by `loadStopFactsForPerson` AND `loadClientLeads`):
+  the live lead (the keeper when the asked lead is merged), its live same-address leads, and every lead merged into any of them, because a
+  merged lead's quote, payment and matter stay on it. `leadsForQuote` adds the keeper of a quote's merged lead, so its sequences stop.
+- **Writes from a page opened before a merge go to the keeper** (`keeperForWrite`, `src/lib/leads/live.ts`): a new task (`createTask`, so the
+  weekly review's Set next step too), a time entry, a tag (`applyTag`), consult details, a campaign enrolment (`enrollLead`) and a campaign
+  step (`advance.ts`). The merge guard covers crm_lead only, so a child row filed on a merged lead would vanish. A pointer that can't be read
+  refuses with `MERGE_POINTER_UNREADABLE` and writes nothing.
+- **Agents never fail a run on a merge mid-run:** intake triage and email-intel write with the live filter after their model call; a lead
+  merged in that gap matches no row, is skipped and counted (`MERGE_AGENT_SKIPPED`), and no guard text reaches `agent_run` or an alert.
+- **Writers skip or follow:** `bumpLeadLastTouch`, the mailbox apply's lead update and the public intake's follow-up updates are `live` (a
+  merged lead matches no row); the agent move (`move-as.ts`), email-intel and the held-consult bump read live first; automation rules resolve
+  `ctx.leadId` to the keeper at the top of `executeAction` (tags, enrollments and stage changes land on the keeper; a failed read is
+  `MERGE_RULE_LEAD_UNREADABLE`, never "merged"); the Lawmatics importer
+  reads merged leads with their pointer and never updates or re-creates them (`LEAD_MERGED_IMPORT_SKIP(<keeper name>)`). A write that still
+  reaches a merged lead (a stale page) is shown as `LEAD_MERGED_WRITE` (`friendlyLeadWriteError`, `friendlyMoveStageError`, the automation
+  engine), never raw text.
+- **History stays on the merged lead and is read on the keeper:** the lead page reads `crm_activity`, `crm_file` (`FileParent.mergedIds`) and
+  `client_proposal` (`listProposals({ leadIds })`) over the merged set. Suggestion cards, email proposals and Undo act only on the keeper's own
+  rows, read on their own when leads are merged in (so the 100-row cap can't push them out; a failed read says so,
+  `MERGE_OWN_ROWS_UNAVAILABLE`, and never reads as "nothing waiting"); `Timeline` offers no Undo on a merged lead's row
+  and judges Undo from the keeper's own rows. The "Merged." line shows only when the lead really has leads merged into it. Quotes, notifications, ai_enrichment and automation runs are not drawn on the lead
+  page, so nothing changed there; the signed mailing address card still reads the keeper's own proposals.
+- **The merge screen** `/dashboard/intake/merge/?a=&b=&keep=` (page `notFound()` for anyone but owner/admin/senior_admin, signed out included,
+  and before 0107). Both leads side by side; the keeper is suggested (a matter, else a Lawmatics id, else the older; `suggestKeeper`) and can
+  be swapped by the "Keep this lead instead" link on the other card; per-field radios only where the two differ (`MERGE_FIELDS`; default = the database's own rule); counts of what
+  moves and what stays for the lead being merged, each its own three-state read; a line per matter of the merged lead saying it moves. A matter
+  id is "a lead and a matter can't be merged" with a link to the matter. Confirm is `InlineConfirm`; `mergeLeadsAction` -> `runMergeLeads`
+  (`src/lib/leads/merge.ts`, deps injected) re-resolves the role BEFORE anything, builds `p_choices` only from known fields and sides, calls the
+  rpc once through the scoped client and maps each refusal prefix to its fixed sentence (`MERGE_REFUSALS`; a missing function is
+  `notReadyYet`). Success redirects to `/dashboard/leads/<keeper>/?merged=1` ("Merged." line). Layout-only CSS in `merge/merge.css`; every word
+  is in the `// M5` block at the end of `words.ts`.
+- **Reached from** the Possible duplicate compare dialog's "Merge…" link (`CompareData.merge`, set by `loadCompareAction` only for the merge
+  roles and when `mergeAvailable`). **A merged lead's page** redirects to its keeper with `?from=<id>`, which shows "This lead was merged into
+  <name>." only when that id really is in the keeper's merged set (`mergeNotice`).
+- `lead_merged` (activity type, `ACTIVITY_TYPES_0107`) and the `merged` stop reason are hand-added; the timeline reads the row defensively
+  (side, changed field NAMES, moved count; never a value).
+- **Design harness:** `scripts/design-harness/screens/merge.screen.tsx` renders the merge screen and the kept lead's page (after a merged lead's
+  link) at 1440 / 1280 / 375 with no sideways overflow.
+- **NOT verified:** a real database with 0107 (the payload keys of `lead_merged`, the counts jsonb, the refusal texts beyond their prefixes)
+  and a real browser (the harness is static markup in headless Chromium).

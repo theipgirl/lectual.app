@@ -27,11 +27,13 @@ import {
   type LawmaticsSourceRecord,
 } from "./normalize";
 import { logActivity } from "@/lib/matters/activity";
+import { leadRead } from "@/lib/leads/live";
 
 /**
  * One-way Lawmatics → Lectual importer (orchestration layer).
  *
  * Reads the firm's real book of business out of Lawmatics and lands it in
+ // live-guard: reads merged leads WITH their pointer so the planner neither updates nor re-creates them
  * `crm_lead`. Nothing here runs on its own: `previewImport()` is triggered by an
  * explicit click, and `applyImport()` refuses to write unless it is handed the
  * fingerprint of a plan that still matches what the operator was shown.
@@ -237,15 +239,18 @@ async function loadExistingLeads(supabase: Scoped, maxRows = 20_000): Promise<Ex
   const pageSize = 1000;
   const rows: ExistingLead[] = [];
   for (let from = 0; from < maxRows; from += pageSize) {
-    const { data, error } = await supabase
-      .from("crm_lead")
-      .select(
-        "id,email,first_name,last_name,phone,business_name,website,current_stage_id,lawmatics_id,practice_area,referral_source,referral_detail",
-      )
-      .order("created_at", { ascending: true })
-      .range(from, from + pageSize - 1);
+    // Merged leads (lectual 0107) are read too, with their pointer, so the planner neither updates nor re-creates them.
+    const columns = "id,email,first_name,last_name,phone,business_name,website,current_stage_id,lawmatics_id,practice_area,referral_source,referral_detail";
+    const { data, error } = await leadRead(({ merged }) =>
+      supabase
+        // live-guard: reads merged leads WITH their pointer so the planner neither updates nor re-creates them
+        .from("crm_lead")
+        .select(merged ? `${columns},merged_into_id` : columns)
+        .order("created_at", { ascending: true })
+        .range(from, from + pageSize - 1),
+    );
     if (error) throw error;
-    const page = (data ?? []) as ExistingLead[];
+    const page = (data ?? []) as unknown as ExistingLead[];
     rows.push(...page);
     if (page.length < pageSize) break;
   }
@@ -450,6 +455,7 @@ export async function applyImport(
 
     // RLS scopes the row to the caller's org; the id came from a read through
     // that same policy, so this cannot reach another tenant's lead.
+    // live-guard: the insert files new leads; updates go only to live leads the planner matched (merged ones are skipped)
     const { error } = await supabase.from("crm_lead").update(patch).eq("id", u.leadId);
     if (error) {
       console.error("[lawmatics-import] update failed", error.code);
@@ -500,7 +506,7 @@ async function recordStageDecisions(supabase: Scoped, plan: ImportPlan): Promise
   const ids = [...byLawmaticsId.keys()];
   for (let i = 0; i < ids.length; i += 50) {
     const chunk = ids.slice(i, i + 50);
-    const { data, error } = await supabase.from("crm_lead").select("id,lawmatics_id").in("lawmatics_id", chunk);
+    const { data, error } = await leadRead(({ live }) => live(supabase.from("crm_lead").select("id,lawmatics_id")).in("lawmatics_id", chunk));
     if (error) {
       unreadable += chunk.length;
       continue;
