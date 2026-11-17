@@ -9,6 +9,7 @@
 import type { ProposalDisplayKey } from "./display-status";
 import { stepActivityLabel } from "./paid";
 import { formatDay, formatRelative } from "@/lib/ui/dates";
+import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
 
 const upper = (s: string) => s.trim().toUpperCase();
 
@@ -90,7 +91,7 @@ export function expiresLabel(input: {
 }
 
 /** "just now", "6 min ago", "3 h ago", "2 days ago", else a short date. The Last activity cell's compact form. Uses the firm's zone for the date. */
-export function compactAgo(iso: string | null | undefined, now: number, tz: string = "America/New_York"): string {
+export function compactAgo(iso: string | null | undefined, now: number, tz: string = DEFAULT_TIME_ZONE): string {
   if (!iso) return "";
   return formatRelative(iso, { tz, now: new Date(now) }) ?? "";
 }
