@@ -5,7 +5,7 @@
  *
  * "Whose court is it in" is the exact phrase from the Aug 19 RPB Law team
  * transcript. RPB's own shorthand for it — used in the shared spreadsheet
- * today — is a short code per teammate: TAM (Taylor), C (Caitlyn), RL (Rain),
+ * today — is a short code per teammate: TAM (Taylor), C (Caitlyn), RL (Rayn),
  * DO (Dawn), AM (Amore), RB (Rebecca). That convention is RPB's, not a
  * platform rule, so it is kept as a small override table rather than baked
  * into the algorithm — a firm whose team isn't RPB (e.g. Hartwell IP) still
@@ -19,7 +19,8 @@ const KNOWN_CODES: Record<string, string> = {
   taylor: "TAM",
   caitlyn: "C",
   caitlin: "C",
-  rain: "RL",
+  rayn: "RL",
+  rain: "RL", // the old, misspelled directory name still resolves
   dawn: "DO",
   amore: "AM",
   rebecca: "RB",

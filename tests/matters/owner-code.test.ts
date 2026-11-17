@@ -9,6 +9,7 @@ describe("ownerChipFor — RPB's TAM/C/RL/DO/AM/RB convention", () => {
   it.each([
     ["Taylor McGhee", "TAM"],
     ["Caitlyn Rivera", "C"],
+    ["Rayn Ortiz", "RL"],
     ["Rain Ortiz", "RL"],
     ["Dawn Alvarez", "DO"],
     ["Amore Santos", "AM"],

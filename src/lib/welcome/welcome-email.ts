@@ -51,8 +51,8 @@ Template: **Trademark client welcome email** (Lawmatics — use the firm's saved
 verbatim; this draft fills only the variable fields below, per the welcome-client SOP's
 Hard Rule 2 — never rewrite the template).
 
-From: Rebecca P. Beliard, Esq.
-Cc: Trademarks
+From: Trademarks (trademarks@rpblawfirm.com)
+Cc: Rebecca P. Beliard, Esq.
 To: ${input.clientEmail ?? "[confirm client email on the lead record]"}
 Subject: ${subject}
 
@@ -70,13 +70,13 @@ in Lawmatics before sending rather than trusting a guessed one.
 1. Open the **Trademark client welcome email** template in Lawmatics for this matter.
 2. Confirm the variable fields above and attach/link the trademark questionnaire.
 3. Review, save, send.
-4. Follow-through: once the client completes the questionnaire, notify Rain directly —
+4. Follow-through: once the client completes the questionnaire, notify Rayn directly —
    the automatic notification has been unreliable (per the welcome-client SOP); do not
    rely on it firing on its own.`;
 
   return {
     headline: `Welcome email DRAFT — ${input.clientOrEntityName}${markSuffix}`,
-    summary: `Welcome email for ${input.clientOrEntityName} (${input.matterNumber}) — names the firm's welcome-email template and the trademark questionnaire link; follow-through note: notify Rain once the questionnaire is complete.`,
+    summary: `Welcome email for ${input.clientOrEntityName} (${input.matterNumber}) — names the firm's welcome-email template and the trademark questionnaire link; follow-through note: notify Rayn once the questionnaire is complete.`,
     subject,
     recipient: input.clientEmail,
     draftBody,
