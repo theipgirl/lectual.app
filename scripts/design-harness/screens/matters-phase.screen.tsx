@@ -92,7 +92,7 @@ async function withMatterData<T>(fn: () => Promise<T>): Promise<T> {
 
 const RELEASE = "<style>.lx-app{height:auto!important;min-height:0!important;overflow:visible!important}.lx-main,.lx-content,.lx-page{overflow:visible!important;height:auto!important}</style>";
 const VIEWS = [["list", {}], ["board", { view: "board" }]] as const;
-const GROUPS = [["pre", {}], ["intake", { group: "intake" }], ["post", { group: "post" }], ["other", { group: "other" }]] as const;
+const GROUPS = [["pre", {}], ["intake", { group: "intake" }], ["post", { group: "post" }], ["other", { group: "other" }], ["all", { group: "all" }]] as const;
 
 const mk = (id: string, title: string, shell: "tech" | "owner", viewport: "desktop" | "phone", search: Record<string, string>): Screen => ({
   id,

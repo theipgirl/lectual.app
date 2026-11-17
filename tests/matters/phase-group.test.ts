@@ -117,3 +117,38 @@ describe("small helpers", () => {
     expect(isMissingColumnError(null)).toBe(false);
   });
 });
+
+import { parseGroupChoice, filterByGroupChoice, boardStagesForChoice } from "@/lib/matters/phase-group";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
+describe("the All choice", () => {
+  it("parseGroupChoice accepts all and the four groups, nothing else", () => {
+    expect(parseGroupChoice("all")).toBe("all");
+    expect(parseGroupChoice("post")).toBe("post");
+    expect(parseGroupChoice("nope")).toBeNull();
+    expect(parseGroupChoice(undefined)).toBeNull();
+  });
+  it("lists every matter exactly once", () => {
+    const rows = [m("TM", "pipeline"), m("TM", "pre_filing"), m("BL", undefined), m("CR", "maintenance")];
+    expect(filterByGroupChoice(rows, "all")).toHaveLength(rows.length);
+    expect(filterByGroupChoice(rows, "all")).toEqual(rows);
+  });
+  it("draws every stage on the All board", () => {
+    const stages = [{ id: "a", phase: "pipeline" }, { id: "b", phase: null }];
+    expect(boardStagesForChoice(stages, "all", []).map((s) => s.id)).toEqual(["a", "b"]);
+  });
+});
+
+describe("links from other pages carry group=all so their numbers match on arrival", () => {
+  const src = (f: string) => readFileSync(path.resolve(__dirname, "../..", f), "utf8");
+  it.each([
+    ["src/app/dashboard/page.tsx", ["group=all&seg=firm", "group=all&seg=${w}", "group=all&seg=stalled"]],
+    ["src/app/dashboard/pipeline/page.tsx", ["group=all&view=board"]],
+    ["src/lib/copilot/stats.ts", ["group=all&seg=stalled"]],
+  ])("%s", (file, needles) => {
+    const text = src(file);
+    for (const n of needles) expect(text).toContain(n);
+    expect(text).not.toMatch(/dashboard\/matters\/\?(seg|view)=/);
+  });
+});

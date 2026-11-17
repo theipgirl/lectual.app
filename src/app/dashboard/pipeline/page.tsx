@@ -20,7 +20,7 @@ const CARDS_PER_COLUMN = 40;
 const PRE: readonly PipelineColumn[] = ["intake", "consult"];
 /** Where a column header goes: the Leads board for the lead columns, the Matters board for the rest. */
 const LEADS_BOARD_HREF = "/dashboard/intake/?view=board";
-const MATTERS_BOARD_HREF = "/dashboard/matters/?view=board";
+const MATTERS_BOARD_HREF = "/dashboard/matters/?group=all&view=board";
 
 function Card({ c }: { c: PipelineCard }) {
   return (

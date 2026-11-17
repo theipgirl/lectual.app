@@ -47,4 +47,6 @@ export function reviewHref(queueItemId: string): string {
   return `/dashboard/queue/${encodeURIComponent(queueItemId)}/`;
 }
 
+/** Fired (on window) when a board Move takes a card into another phase group; MovedOutNotice listens. */
+export const MOVED_GROUP_EVENT = "lx-matter-moved-group";
 export const MOVED_CARD_KEY = "lx_moved_matter";

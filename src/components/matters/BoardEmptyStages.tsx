@@ -20,7 +20,7 @@ export function BoardEmptyStages({
 }) {
   const [shown, setShown] = useState(false);
   return (
-    <div className="lx-board-wrap">
+    <div>
       <div className="lx-board" role="region" aria-label="Docket board">
         {children}
         {shown && empty}

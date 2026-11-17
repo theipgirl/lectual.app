@@ -22,17 +22,19 @@ import { Chip, FilterChips } from "@/components/list-page/Chips";
 import "@/components/list-page/list-page.css";
 import { NewMatterForm } from "@/components/matters/MatterForms";
 import { MatterBoard } from "@/components/matters/MatterBoard";
+import { MovedOutNotice } from "@/components/matters/MovedOutNotice";
 import { loadMatterStages, type MatterStageRead } from "@/lib/matters/stages";
 import {
   DEFAULT_PHASE_GROUP,
   PHASE_GROUPS,
-  boardStagesForGroup,
-  filterByPhaseGroup,
+  ALL_GROUPS,
+  boardStagesForChoice,
+  filterByGroupChoice,
   firmHasPhases,
-  isPhaseGroup,
+  parseGroupChoice,
   phaseGroupCounts,
 } from "@/lib/matters/phase-group";
-import { MATTER_GROUPS_NAV, MATTER_GROUP_EMPTY, MATTER_GROUP_LABEL, MATTER_PHASES_UNAVAILABLE, MATTER_STATUS_NAV } from "@/lib/ui/words";
+import { MATTER_GROUPS_NAV, MATTER_GROUP_ALL, MATTER_GROUP_EMPTY, MATTER_GROUP_LABEL, MATTER_PHASES_UNAVAILABLE, MATTER_STATUS_NAV } from "@/lib/ui/words";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import { matterIdsNeedingReview } from "./list-utils";
@@ -86,15 +88,15 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
   const stageList = stageRead.status === "unavailable" ? [] : stageRead.stages;
   const phasesFailed = stageRead.status === "unavailable";
   const grouped = stageRead.status === "ok" && firmHasPhases(stageList);
-  const group = isPhaseGroup(groupRaw) ? groupRaw : DEFAULT_PHASE_GROUP;
-  const inGroup = grouped ? filterByPhaseGroup(all, group) : all;
+  const group = parseGroupChoice(groupRaw) ?? DEFAULT_PHASE_GROUP;
+  const inGroup = grouped ? filterByGroupChoice(all, group) : all;
   const counts = new Map(SEGMENTS.map((s) => [s.key, filterBySegment(inGroup, s.key, sets).length]));
   const groupCounts = phaseGroupCounts(filterBySegment(all, seg, sets));
   // Four chips. Review only when the queue was reached; the bands stay as headings below.
   const segments = LIST_CHIPS.filter((s) => s.key !== "review" || queue.status === "ok");
 
   const shown = searchMatters(filterBySegment(inGroup, seg, sets), search);
-  const boardStages = grouped ? boardStagesForGroup(stageList, group, shown) : stageList;
+  const boardStages = grouped ? boardStagesForChoice(stageList, group, shown) : stageList;
   const bands = groupIntoBands(shown);
   const memberName = new Map(members.map((m) => [m.userId, m.displayName ?? m.email ?? "Teammate"]));
   const leadOptions = leads.map((l) => ({
@@ -139,6 +141,9 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
               {MATTER_GROUP_LABEL[g]}
             </Chip>
           ))}
+          <Chip href={href({ group: ALL_GROUPS })} active={group === ALL_GROUPS} count={PHASE_GROUPS.reduce((n, g) => n + groupCounts[g], 0)}>
+            {MATTER_GROUP_ALL}
+          </Chip>
         </FilterChips>
       )}
       <FilterChips as="nav" label={MATTER_STATUS_NAV}>
@@ -172,6 +177,8 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
           </p>
         </div>
       ) : boardView && shown.length > 0 ? (
+        <>
+        {grouped && <MovedOutNotice />}
         <MatterBoard
           stages={boardStages}
           moveStages={stageList}
@@ -182,6 +189,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
           reviewItems={reviewItems}
           ownerName={(id) => (id ? memberName.get(id) ?? "Teammate" : null)}
         />
+        </>
       ) : bands.length === 0 ? (
         <div className="lx-card lx-empty-card">
           <h2 className="lx-h2" style={{ fontSize: 25 }}>{all.length === 0 ? "No matters yet" : "Nothing matches"}</h2>
@@ -189,7 +197,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
             {all.length === 0
               ? "A matter opens when a lead signs, or from the form above."
               : grouped && !search
-                ? MATTER_GROUP_EMPTY(MATTER_GROUP_LABEL[group])
+                ? MATTER_GROUP_EMPTY(group)
                 : "Try another filter or search."}
           </p>
         </div>

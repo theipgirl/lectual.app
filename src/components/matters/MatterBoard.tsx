@@ -31,7 +31,7 @@ export function MatterBoard(props: {
   ownerName: (id: string | null) => string | null;
 }) {
   const board = buildBoard(props.stages, props.matters);
-  const stageOptions = (props.moveStages ?? props.stages).map((s) => ({ id: s.id, label: s.label }));
+  const stageOptions = (props.moveStages ?? props.stages).map((s) => ({ id: s.id, label: s.label, phase: s.phase ?? null }));
 
   const card = (m: Matter) => {
     const age = stageAge(m);
@@ -54,7 +54,7 @@ export function MatterBoard(props: {
             ))}
           {owner && <span className="lx-note">{owner}</span>}
         </span>
-        {props.canMove && stageOptions.length > 0 && <MoveMenu matterId={m.id} stageId={m.stage_id} stages={stageOptions} />}
+        {props.canMove && stageOptions.length > 0 && <MoveMenu matterId={m.id} stageId={m.stage_id} stages={stageOptions} type={m.type} announceGroup={!!props.collapseEmpty} />}
       </li>
     );
   };

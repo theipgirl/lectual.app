@@ -30,8 +30,8 @@ describe("Pipeline (sprint 31)", () => {
     const href = (column: string) => html.match(new RegExp(`data-column-link="${column}" href="([^"]+)"`))?.[1];
     expect(href("intake")).toMatch(/^\/dashboard\/intake\/?\?view=board$/);
     expect(href("consult")).toMatch(/^\/dashboard\/intake\/?\?view=board$/);
-    expect(href("engaged")).toMatch(/^\/dashboard\/matters\/?\?view=board$/);
-    expect(href("registered")).toMatch(/^\/dashboard\/matters\/?\?view=board$/);
+    expect(href("engaged")).toMatch(/^\/dashboard\/matters\/?\?group=all&amp;view=board$/);
+    expect(href("registered")).toMatch(/^\/dashboard\/matters\/?\?group=all&amp;view=board$/);
   });
 
   it("uses the shared chips for the owner row and the shared search with Clear when a term is set", async () => {

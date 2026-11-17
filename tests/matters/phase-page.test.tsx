@@ -126,6 +126,23 @@ describe("phase groups on the Matters page", () => {
     expect(html).toContain("No matters in Pre-filing match these filters.");
   });
 
+  it("All lists every matter exactly once, with the All chip last and counting every matter", async () => {
+    const all = sample();
+    const html = await render({ matters: all, read: ok, params: { group: "all" } });
+    const nav = groupNav(html);
+    expect(nav).toMatch(/aria-current="page"[^>]*>All<span class="lp-chip-count">10</);
+    expect(nav.lastIndexOf(">All<")).toBeGreaterThan(nav.lastIndexOf(">Matters<"));
+    for (let i = 1; i <= 10; i++) expect(html.split(`Mk${i}z<`).length - 1).toBe(1);
+    const status = html.slice(html.indexOf('aria-label="Filter matters"'));
+    expect(status).toMatch(/>Open<span class="lp-chip-count">10</);
+  });
+
+  it("the Matters group has its own empty sentence", async () => {
+    const html = await render({ matters: [m("TM", S.a)], read: ok, params: { group: "other" } });
+    expect(html).toContain("No contracts or one-offs match these filters.");
+    expect(html).not.toContain("No matters in Matters");
+  });
+
   it("the board draws only the group's stages that hold a matter, and names the empty ones in one row", async () => {
     const html = await render({ matters: sample(), read: ok, params: { view: "board" } });
     expect(html).toContain("Questionnaire");
@@ -158,7 +175,7 @@ describe("a firm without phases sees today's page", () => {
     const html = await render({ matters: sample(), read });
     expect(html).not.toContain("Matter group");
     expect(html).not.toContain("Pre-filing");
-    expect(html).not.toContain("can&#x27;t show the Intake");
+    expect(html).not.toContain("Can&#x27;t show the Intake");
     expect(html).toContain("Mk1z");
     expect(html).toContain("Mk8z");
     expect(html).not.toContain('name="group"');

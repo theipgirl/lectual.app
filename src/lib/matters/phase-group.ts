@@ -29,6 +29,21 @@ export const DEFAULT_PHASE_GROUP: PhaseGroup = "pre";
 type StageLike = { phase?: string | null } | null | undefined;
 export type PhaseMatter = { type: string; stage: StageLike };
 
+/** The "All" choice: every matter, whatever its phase. Reached by `?group=all`; the links from Today and Pipeline carry it. */
+export const ALL_GROUPS = "all" as const;
+export type GroupChoice = PhaseGroup | typeof ALL_GROUPS;
+
+/** `?group=` -> a choice, or null for a missing / unknown value (the page then uses its default). */
+export function parseGroupChoice(value: unknown): GroupChoice | null {
+  if (value === ALL_GROUPS) return ALL_GROUPS;
+  return isPhaseGroup(value) ? value : null;
+}
+
+/** Matters the chosen group shows: all of them for "All", else exactly the group's. */
+export function filterByGroupChoice<T extends PhaseMatter>(matters: readonly T[], choice: GroupChoice): T[] {
+  return choice === ALL_GROUPS ? [...matters] : filterByPhaseGroup(matters, choice);
+}
+
 export function isPhaseGroup(value: unknown): value is PhaseGroup {
   return typeof value === "string" && (PHASE_GROUPS as readonly string[]).includes(value);
 }
@@ -79,6 +94,14 @@ export function stagesForGroup<T extends { phase?: string | null }>(stages: read
  * The stages a group's board draws: the group's own stages, plus any stage that actually holds one of the group's
  * matters (a contract matter filed on a docket stage still shows on that stage, never as "not on the docket").
  */
+export function boardStagesForChoice<T extends { id: string; phase?: string | null }>(
+  stages: readonly T[],
+  choice: GroupChoice,
+  matters: ReadonlyArray<{ stage_id: string | null }>,
+): T[] {
+  return choice === ALL_GROUPS ? [...stages] : boardStagesForGroup(stages, choice, matters);
+}
+
 export function boardStagesForGroup<T extends { id: string; phase?: string | null }>(
   stages: readonly T[],
   group: PhaseGroup,

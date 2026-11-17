@@ -709,4 +709,11 @@ export const MATTER_GROUP_LABEL = {
 export const MATTER_GROUPS_NAV = "Matter group";
 export const MATTER_STATUS_NAV = "Filter matters";
 export const MATTER_PHASES_UNAVAILABLE = "Can't show the Intake, Pre-filing and Post-filing groups right now, so every matter is shown together. Refresh to try again.";
-export const MATTER_GROUP_EMPTY = (group: string) => `No matters in ${group} match these filters.`;
+export const MATTER_GROUP_ALL = "All";
+export const MATTER_GROUP_EMPTY = (group: keyof typeof MATTER_GROUP_LABEL | "all") =>
+  group === "all"
+    ? "No matters match these filters."
+    : group === "other"
+      ? "No contracts or one-offs match these filters."
+      : `No matters in ${MATTER_GROUP_LABEL[group]} match these filters.`;
+export const MATTER_MOVED_TO = "Moved to";
