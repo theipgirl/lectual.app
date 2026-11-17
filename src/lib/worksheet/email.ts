@@ -7,6 +7,7 @@ import {
   WORKSHEET_FOOTER,
   worksheetSummary,
 } from "./answers";
+import { attendeeHtml } from "./email-html";
 import type { WorksheetInput } from "./schema";
 
 /**
@@ -17,7 +18,7 @@ import type { WorksheetInput } from "./schema";
  * ends with the firm's attorney-advertising line.
  */
 
-export type BuiltEmail = { subject: string; text: string };
+export type BuiltEmail = { subject: string; text: string; html?: string };
 
 const SESSION_LINE: Record<ReturnType<typeof strategySessionAnswer>, string> = {
   yes: "WANTS A LEGAL STRATEGY SESSION: YES. They chose \"Yes, I'd like to book a Legal Strategy Session\".",
@@ -65,5 +66,5 @@ export function attendeeCopy(input: WorksheetInput, ctx: { now: Date }): BuiltEm
     "",
     WORKSHEET_FOOTER,
   ];
-  return { subject: `Your IP Portfolio from ${WORKSHEET_EVENT.name}`, text: lines.join("\n") };
+  return { subject: `Your IP Portfolio from ${WORKSHEET_EVENT.name}`, text: lines.join("\n"), html: attendeeHtml(input, ctx.now) };
 }

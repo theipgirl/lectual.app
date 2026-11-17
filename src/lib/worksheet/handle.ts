@@ -222,6 +222,7 @@ export async function handleWorksheetPost(
         ...(config.replyTo ? { replyTo: config.replyTo } : {}),
         subject: mail.subject,
         text: mail.text,
+        ...(mail.html ? { html: mail.html } : {}),
         label: "worksheet",
         idempotencyKey: `worksheet-copy/${input.submissionId.toLowerCase()}`,
       });
