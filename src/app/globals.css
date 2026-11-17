@@ -1839,9 +1839,9 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
 .lx-linkbtn:hover { color: var(--wine); text-decoration: underline; }
 .lx-inline-confirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 
-/* Team: each person is a stacked card under 700px (Sprint 34). */
+/* Team: each person is a stacked card under 900px (Sprint 34). */
 .lx-team-tbl { min-width: 640px; }
-@media (max-width: 700px) {
+@media (max-width: 900px) {
   .lx-team-tbl { min-width: 0; }
   .lx-team-tbl,
   .lx-team-tbl tbody,

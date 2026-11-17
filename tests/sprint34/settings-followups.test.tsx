@@ -111,8 +111,8 @@ describe("item 5: Team", () => {
     expect(read("src/app/dashboard/settings/team/page.tsx")).toContain("open={inviteFormOpen(members.length, loadError) || undefined}");
   });
 
-  it("person cards stack under 700px", () => {
-    const css = media(read("src/app/globals.css"), "max-width: 700px");
+  it("person cards stack under 900px", () => {
+    const css = media(read("src/app/globals.css"), "max-width: 900px");
     expect(css).toMatch(/\.lx-team-tbl td\[data-label\]::before/);
     expect(css).toMatch(/\.lx-team-tbl tr\s*\{[^}]*display:\s*block|\.lx-team-tbl tr\s*\{ display: block/);
   });
