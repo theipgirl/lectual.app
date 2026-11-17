@@ -20,7 +20,14 @@ import type { ActionState } from "@/app/dashboard/quotes/errors";
 // Pure modules only — never the store, which is server-only.
 import { chargeBucket, fullProjectCost, type QuoteTotals } from "@/lib/quotes/pricing";
 import { normalizePackageName, offerProblems, readOffer } from "@/lib/quotes/packages";
-import { formatCents } from "@/lib/quotes/money";
+import { moneyFor } from "@/lib/quotes/staff-money";
+import { quotePillTone } from "@/lib/quotes/labels";
+import { BackLink } from "@/components/ui/PageHeader";
+import { InlineConfirm } from "@/components/ui/InlineConfirm";
+import { Notice } from "@/components/ui/Notice";
+import { Pill } from "@/components/ui/Pill";
+import { Toast } from "@/components/ui/Toast";
+import { CANCEL, PROPOSALS_NAME, yesVerb } from "@/lib/ui/words";
 import { QuoteDetailsForm } from "./QuoteForms";
 
 /**
@@ -105,8 +112,7 @@ function amountInput(cents: number): string {
 }
 
 function shortMoney(cents: number, currency: string): string {
-  const text = formatCents(cents, currency);
-  return text.endsWith(".00") ? text.slice(0, -3) : text;
+  return moneyFor(cents, currency);
 }
 
 export function QuoteBuilder(props: BuilderProps) {
@@ -180,7 +186,6 @@ export function QuoteBuilder(props: BuilderProps) {
   const [pkgName, setPkgName] = useState("");
   const [customOpen, setCustomOpen] = useState(false);
   const [addOnOpen, setAddOnOpen] = useState(false);
-  const [confirmWithdraw, setConfirmWithdraw] = useState(false);
 
   function openPkgForm(kind: "new" | "rename" | "duplicate" | "remove") {
     setPkgForm(kind);
@@ -304,7 +309,7 @@ export function QuoteBuilder(props: BuilderProps) {
   const sendButton = (tall: boolean) => (
     <button
       type="button"
-      className={`qb-btn ${sendIsLive ? "qb-btn-send" : "qb-btn-done"} ${tall ? "qb-btn-tall" : ""}`}
+      className={`lx-btn ${sendIsLive ? "lx-btn-pri" : "lx-btn-sec"}${tall ? " qb-btn-tall" : ""}`}
       onClick={send}
       disabled={pending && sendIsLive}
       aria-disabled={!sendIsLive}
@@ -313,7 +318,7 @@ export function QuoteBuilder(props: BuilderProps) {
     </button>
   );
   const copyButton = (tall: boolean) => (
-    <button type="button" className={`qb-btn ${tall ? "qb-btn-tall" : ""}`} onClick={copyLink}>
+    <button type="button" className={`lx-btn lx-btn-sec${tall ? " qb-btn-tall" : ""}`} onClick={copyLink}>
       Copy client link
     </button>
   );
@@ -324,11 +329,9 @@ export function QuoteBuilder(props: BuilderProps) {
   return (
     <div className="qb-root">
       <div className="qb-bar">
-        <Link href="/dashboard/quotes/" className="lx-back">
-          ← All quotes
-        </Link>
+        <BackLink href="/dashboard/quotes/" label={PROPOSALS_NAME} />
         <div className="qb-bar-rule" />
-        <span className="qb-kicker">Quotes &amp; proposals · {props.reference}</span>
+        <span className="qb-ref">{props.reference}</span>
         <div className="qb-bar-gap" />
         {copyButton(false)}
         {sendButton(false)}
@@ -336,12 +339,10 @@ export function QuoteBuilder(props: BuilderProps) {
 
       <section className="qb-card" aria-label="Quote builder">
         <header className="qb-head">
-          <h1 className="qb-title">{props.title}</h1>
-          <span className="qb-status" data-tone={props.status}>
-            {props.statusLabel}
-          </span>
+          <h1 className="lx-h2 qb-title">{props.title}</h1>
+          <Pill tone={quotePillTone(props.status)}>{props.statusLabel}</Pill>
           {editable && (
-            <button type="button" className="qb-link-btn" onClick={() => setShowDetails((v) => !v)} aria-expanded={showDetails}>
+            <button type="button" className="lx-link" onClick={() => setShowDetails((v) => !v)} aria-expanded={showDetails}>
               {showDetails ? "Close" : "Edit title, intro & expiry"}
             </button>
           )}
@@ -374,37 +375,37 @@ export function QuoteBuilder(props: BuilderProps) {
         )}
 
         {props.mode === "signed-missing" && (
-          <p role="status" className="lx-banner lx-banner-warn qb-banner">
+          <Notice tone="warn" role="status">
             This quote was accepted, but no readable signed copy is stored. The lines below are the quote&rsquo;s{" "}
-            <strong style={{ fontWeight: 500 }}>current</strong> rows, not the signed record.
-          </p>
+            <strong>current</strong> rows, not the signed record.
+          </Notice>
         )}
         {props.drift.length > 0 && (
-          <div role="status" className="lx-banner lx-banner-warn qb-banner">
-            <strong style={{ fontWeight: 500 }}>The live lines no longer match what was signed.</strong> The signed copy is
+          <Notice tone="warn" role="status">
+            <strong>The live lines no longer match what was signed.</strong> The signed copy is
             unchanged and is what governs.
-            <ul className="lx-flags" style={{ color: "inherit" }}>
+            <ul className="lx-flags">
               {props.drift.map((entry) => (
                 <li key={entry}>{entry}</li>
               ))}
             </ul>
-          </div>
+          </Notice>
         )}
         {props.mode === "live" && !editable && (
-          <p role="status" className={`lx-banner ${props.status === "declined" ? "lx-banner-risk" : "lx-banner-mute"} qb-banner`}>
+          <Notice tone={props.status === "declined" ? "risk" : "mute"} role="status">
             {props.status === "declined"
               ? "The client declined this proposal. Nothing was signed."
               : props.status === "withdrawn"
                 ? "You withdrew this proposal. Its link now shows the client that it isn't available."
                 : "This proposal expired before it was signed. Its link now shows the client that it isn't available."}
-          </p>
+          </Notice>
         )}
 
         <div className="qb-cols">
           {/* ── packages, lines, notice, add-ons ── */}
           <div className="qb-main">
             <div>
-              <div className="qb-kicker">Packages offered to the client</div>
+              <div className="lx-label">Packages offered to the client</div>
               <div className="qb-tabs" role="group" aria-label="Packages">
                 {offer.packages.map((pkg) => {
                   const on = current.kind === "package" && current.name === pkg.name;
@@ -483,21 +484,21 @@ export function QuoteBuilder(props: BuilderProps) {
                 <div className="qb-pkg-actions">
                   {current.kind === "package" && (
                     <>
-                      <button type="button" className="qb-link-btn" onClick={() => openPkgForm("rename")}>
+                      <button type="button" className="lx-link" onClick={() => openPkgForm("rename")}>
                         Rename
                       </button>
                       {currentPkg && (
-                        <button type="button" className="qb-link-btn" onClick={() => openPkgForm("duplicate")}>
+                        <button type="button" className="lx-link" onClick={() => openPkgForm("duplicate")}>
                           Duplicate
                         </button>
                       )}
-                      <button type="button" className="qb-link-btn" onClick={() => openPkgForm("remove")}>
+                      <button type="button" className="lx-link" onClick={() => openPkgForm("remove")}>
                         {currentPkg ? "Remove package" : "Discard"}
                       </button>
                     </>
                   )}
                   {current.kind !== "common" && offer.common.length === 0 && (
-                    <button type="button" className="qb-link-btn" onClick={() => setTarget({ kind: "common" })}>
+                    <button type="button" className="lx-link" onClick={() => setTarget({ kind: "common" })}>
                       Add lines every package includes
                     </button>
                   )}
@@ -512,7 +513,7 @@ export function QuoteBuilder(props: BuilderProps) {
                   }}
                 >
                   {pkgForm === "remove" ? (
-                    <span style={{ fontSize: 14, color: "var(--body)" }}>
+                    <span className="qb-confirm-q">
                       {currentPkg
                         ? `Remove “${current.kind === "package" ? current.name : ""}” and its ${currentPkg.lines.length} line${currentPkg.lines.length === 1 ? "" : "s"}?`
                         : "Discard this empty package?"}
@@ -531,7 +532,7 @@ export function QuoteBuilder(props: BuilderProps) {
                     {pkgForm === "new" ? "Start package" : pkgForm === "rename" ? "Rename" : pkgForm === "duplicate" ? "Copy package" : "Remove"}
                   </button>
                   <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={() => setPkgForm(null)}>
-                    Cancel
+                    {CANCEL}
                   </button>
                 </form>
               )}
@@ -564,8 +565,8 @@ export function QuoteBuilder(props: BuilderProps) {
               ))}
               {editable && (
                 <div className="qb-table-foot">
-                  <span>Add a line from the service library →</span>
-                  <button type="button" className="qb-link-btn" onClick={() => setCustomOpen((v) => !v)}>
+                  <span>Add a line from the service library</span>
+                  <button type="button" className="lx-link" onClick={() => setCustomOpen((v) => !v)}>
                     {customOpen ? "Close" : "+ Custom line"}
                   </button>
                 </div>
@@ -578,31 +579,26 @@ export function QuoteBuilder(props: BuilderProps) {
               )}
             </div>
 
-            <div className="qb-notice">
-              <span className="qb-notice-mark" aria-hidden="true">
-                !
-              </span>
-              <span>
-                Government fees can only be charged at filing. The charge schedule on those lines is fixed — clicking the
-                pill tells you so.
-              </span>
-            </div>
+            <Notice tone="warn">
+              Government fees can only be charged at filing. The charge schedule on those lines is fixed — clicking the
+              pill tells you so.
+            </Notice>
 
             {problems.length > 0 && (
-              <div role="status" className="lx-banner lx-banner-warn">
-                <strong style={{ fontWeight: 500 }}>Before the client can sign</strong>
-                <ul className="qb-problems" style={{ color: "inherit" }}>
+              <Notice tone="warn" role="status">
+                <strong>Before the client can sign</strong>
+                <ul className="qb-problems">
                   {problems.map((p, i) => (
                     <li key={`${p.reason}-${p.lineId ?? p.packageName ?? i}`}>{p.message}</li>
                   ))}
                 </ul>
-              </div>
+              </Notice>
             )}
 
             <div>
-              <div className="qb-kicker">Optional add-ons · client chooses</div>
+              <div className="lx-label">Optional add-ons · client chooses</div>
               {offer.addOns.length === 0 && (
-                <p className="lx-note" style={{ margin: "8px 0 0" }}>
+                <p className="lx-note qb-note">
                   No add-ons. {editable ? "Add one the client can tick on their page." : ""}
                 </p>
               )}
@@ -639,9 +635,9 @@ export function QuoteBuilder(props: BuilderProps) {
 
           {/* ── service library ── */}
           <aside className="qb-lib" aria-label="Service library">
-            <div className="qb-kicker">Service library</div>
+            <div className="lx-label">Service library</div>
             {props.library.length === 0 ? (
-              <p className="lx-note" style={{ margin: "12px 0 0" }}>
+              <p className="lx-note qb-note">
                 No services yet.{" "}
                 {props.canManageLibrary ? (
                   <Link href="/dashboard/settings/services/">Add them in Settings</Link>
@@ -672,9 +668,9 @@ export function QuoteBuilder(props: BuilderProps) {
 
           {/* ── totals ── */}
           <aside className="qb-totals" aria-label="Totals">
-            <div className="qb-kicker">Totals · {current.kind === "common" ? (offer.packages.length > 0 ? "every package" : "included") : current.name}</div>
+            <div className="lx-label">Totals · {current.kind === "common" ? (offer.packages.length > 0 ? "every package" : "included") : current.name}</div>
             <div>
-              <div className="qb-big">{formatCents(targetTotals.dueAtSigning, currency)}</div>
+              <div className="qb-big">{moneyFor(targetTotals.dueAtSigning, currency)}</div>
               <div className="qb-sum-label">Due at signing</div>
               <div className="qb-sum-note">
                 Legal fees, due when the client signs.
@@ -683,18 +679,18 @@ export function QuoteBuilder(props: BuilderProps) {
             </div>
             <div className="qb-rule" />
             <div>
-              <div className="qb-mid">{formatCents(targetTotals.dueAtFiling, currency)}</div>
+              <div className="qb-mid">{moneyFor(targetTotals.dueAtFiling, currency)}</div>
               <div className="qb-sum-label">Due at filing (USPTO)</div>
               <div className="qb-sum-note">Government fees. Collected when the applications are filed.</div>
             </div>
-            <div className="qb-project">Full project cost {formatCents(fullProjectCost(targetTotals), currency)}</div>
+            <div className="qb-project">Full project cost {moneyFor(fullProjectCost(targetTotals), currency)}</div>
             {props.signed && (
               <div className="qb-frozen">
                 <div className="qb-frozen-kicker">Accepted · frozen</div>
                 <p>
                   {props.signed.name ?? "The client"} accepted {props.signed.packageName ? `“${props.signed.packageName}”` : "this quote"} on{" "}
-                  {props.signed.acceptedOn} — {formatCents(props.signed.dueAtSigning, currency)} due at signing,{" "}
-                  {formatCents(props.signed.dueAtFiling, currency)} held for filing. This quote is now read-only.
+                  {props.signed.acceptedOn} — {moneyFor(props.signed.dueAtSigning, currency)} due at signing,{" "}
+                  {moneyFor(props.signed.dueAtFiling, currency)} held for filing. This quote is now read-only.
                 </p>
                 {props.matter && (
                   <p>
@@ -715,41 +711,28 @@ export function QuoteBuilder(props: BuilderProps) {
               </div>
               {sendButton(true)}
               {copyButton(true)}
-              {props.status === "sent" && props.mode === "live" &&
-                (confirmWithdraw ? (
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 13, color: "var(--body)" }}>Withdraw? The link stops working.</span>
-                    <button
-                      type="button"
-                      className="lx-btn lx-btn-danger lx-btn-sm"
-                      disabled={pending}
-                      onClick={() => run(withdrawQuoteAction, { quoteId }, "Quote withdrawn.", () => setConfirmWithdraw(false))}
-                    >
-                      Withdraw
-                    </button>
-                    <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={() => setConfirmWithdraw(false)}>
-                      Cancel
-                    </button>
-                  </div>
-                ) : (
-                  <button type="button" className="qb-link-btn" style={{ alignSelf: "center" }} onClick={() => setConfirmWithdraw(true)}>
-                    Withdraw quote
-                  </button>
-                ))}
+              {props.status === "sent" && props.mode === "live" && (
+                <InlineConfirm
+                  label="Withdraw quote"
+                  question="Withdraw? The link stops working."
+                  confirmLabel={yesVerb("withdraw")}
+                  className="lx-link qb-withdraw"
+                  pending={pending}
+                  onConfirm={() => run(withdrawQuoteAction, { quoteId }, "Quote withdrawn.")}
+                />
+              )}
             </div>
           </aside>
         </div>
 
         <footer className="qb-activity">
-          <div className="qb-kicker">Activity</div>
+          <div className="lx-label">Activity</div>
           {props.eventsError ? (
-            <p role="alert" className="lx-note" style={{ margin: 0, color: "var(--wine)" }}>
+            <Notice tone="risk" role="alert">
               Can&rsquo;t show this quote&rsquo;s activity right now. Refresh to try again.
-            </p>
+            </Notice>
           ) : props.events.length === 0 ? (
-            <p className="lx-note" style={{ margin: 0 }}>
-              No activity yet.
-            </p>
+            <p className="lx-note">No activity yet.</p>
           ) : (
             props.events.map((event) => (
               <div key={event.id} className="qb-event" data-actor={event.actor}>
@@ -761,11 +744,14 @@ export function QuoteBuilder(props: BuilderProps) {
         </footer>
       </section>
 
-      {toast && (
-        <div className="qb-toast" role={toast.tone === "error" ? "alert" : "status"} data-tone={toast.tone}>
-          {toast.text}
-        </div>
-      )}
+      {toast &&
+        (toast.tone === "error" ? (
+          <div className="lx-toast qb-toast-error" role="alert" data-tone="error">
+            {toast.text}
+          </div>
+        ) : (
+          <Toast>{toast.text}</Toast>
+        ))}
     </div>
   );
 }
@@ -883,7 +869,7 @@ function CustomLineForm({ pending, onAdd }: { pending: boolean; onAdd: (fields: 
   return (
     <form
       className="qb-inline-form"
-      style={{ padding: "0 14px 12px", marginTop: 0 }}
+      data-flush="true"
       onSubmit={(e) => {
         e.preventDefault();
         if (!label.trim()) return;
@@ -1003,7 +989,7 @@ function AddOnForm(props: {
   const [amount, setAmount] = useState("");
   if (!props.open) {
     return (
-      <button type="button" className="qb-link-btn" style={{ marginTop: 10 }} onClick={() => props.setOpen(true)}>
+      <button type="button" className="lx-link qb-add-addon" onClick={() => props.setOpen(true)}>
         + Add-on
       </button>
     );
@@ -1057,7 +1043,7 @@ function AddOnForm(props: {
         Add add-on
       </button>
       <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={() => props.setOpen(false)}>
-        Cancel
+        {CANCEL}
       </button>
     </form>
   );

@@ -5,16 +5,16 @@ import type { LegacyProposal } from "@/lib/proposals/legacy";
 export function LegacyProposals({ items }: { items: readonly LegacyProposal[] }) {
   if (items.length === 0) return null;
   return (
-    <section className="lx-card" aria-labelledby="legacy-proposals-h" style={{ marginTop: 16 }}>
-      <h2 id="legacy-proposals-h" className="lx-h2" style={{ fontSize: 18, margin: 0 }}>
+    <section className="lx-card lx-pad pq-legacy" aria-labelledby="legacy-proposals-h">
+      <h2 id="legacy-proposals-h" className="lx-h3">
         Earlier proposals
       </h2>
-      <p className="lx-note" style={{ margin: "4px 0 10px" }}>
+      <p className="lx-note">
         Made before the proposal builder. The client keeps the same link. Opens, acceptance and payment aren&apos;t tracked here.
       </p>
-      <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
+      <ul className="pq-legacy-list">
         {items.map((p) => (
-          <li key={p.url} style={{ display: "flex", flexWrap: "wrap", gap: "4px 12px", alignItems: "baseline" }}>
+          <li key={p.url}>
             <strong>{p.client}</strong>
             {p.company && <span>{p.company}</span>}
             <span className="lx-note">

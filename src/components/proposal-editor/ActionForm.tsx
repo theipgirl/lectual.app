@@ -2,6 +2,8 @@
 
 import { startTransition, useActionState, type FormEvent, type ReactNode } from "react";
 import type { ActionState } from "@/app/dashboard/proposals/errors";
+import { SavedNote } from "@/components/ui/SavedNote";
+import { SAVED } from "@/lib/ui/words";
 
 /** A validation problem as the editor shows it: plain words, no path. */
 export type ShownIssue = { level: "error" | "warning"; message: string; where: string; /** The one "Go to first problem" lands on. */ anchor?: boolean };
@@ -18,20 +20,20 @@ type Action = (prev: ActionState, formData: FormData) => Promise<ActionState>;
  * value) and calls the action inside a transition, so a refusal leaves the
  * fields as they were and a success leaves them showing what was saved.
  *
+ * A confirm step (withdraw, remove) is the shared `InlineConfirm`, placed by the caller, whose `onConfirm` calls
+ * `requestSubmit()` on this form (give the form an `id`); never the browser's confirm dialog.
+ *
  * Nothing in here is a boundary: the server action re-checks the module and the
  * caller's role on its own.
  */
 export function ActionForm({
   action,
   children,
-  confirm,
   className,
   id,
 }: {
   action: Action;
   children: (s: { state: ActionState; pending: boolean }) => ReactNode;
-  /** A question to ask before submitting (withdraw, remove). */
-  confirm?: string;
   className?: string;
   /** Lets controls placed elsewhere on the page belong to this form through their `form` attribute. */
   id?: string;
@@ -40,7 +42,6 @@ export function ActionForm({
 
   function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (confirm && !window.confirm(confirm)) return;
     const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLElement | null;
     const data = new FormData(e.currentTarget, submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement ? submitter : null);
     startTransition(() => dispatch(data));
@@ -54,7 +55,7 @@ export function ActionForm({
 }
 
 /** The outcome of the last submit: refusal, notice or "Saved.", then any listed problems. */
-export function Outcome({ state, pending, savedText = "Saved." }: { state: ActionState; pending?: boolean; savedText?: string }) {
+export function Outcome({ state, pending, savedText = SAVED }: { state: ActionState; pending?: boolean; savedText?: string }) {
   if (pending) return null;
   return (
     <>
@@ -72,11 +73,7 @@ export function Outcome({ state, pending, savedText = "Saved." }: { state: Actio
           ))}
         </ul>
       )}
-      {!state.error && state.saved && (
-        <p role="status" className="pe-msg pe-msg-ok">
-          {state.notice ?? savedText}
-        </p>
-      )}
+      <SavedNote show={!state.error && !!state.saved}>{state.notice ?? savedText}</SavedNote>
     </>
   );
 }

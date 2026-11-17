@@ -30,7 +30,7 @@ export function StartDoors({
     <div className="pe-doors" data-doors={doors.length}>
       {doors.includes("consult") && (
         <section className="lx-card pe-door" aria-labelledby="door-consult" data-door="consult">
-          <h2 className="pe-h" id="door-consult">
+          <h2 className="lx-h3" id="door-consult">
             {START_DOORS.consult.title}
           </h2>
           <p className="lx-note pe-hint">{START_DOORS.consult.body}</p>
@@ -49,7 +49,7 @@ export function StartDoors({
       )}
       {doors.includes("copilot") && (
         <section className="lx-card pe-door" aria-labelledby="door-copilot" data-door="copilot">
-          <h2 className="pe-h" id="door-copilot">
+          <h2 className="lx-h3" id="door-copilot">
             {START_DOORS.copilot.title}
           </h2>
           <p className="lx-note pe-hint">{START_DOORS.copilot.body}</p>
@@ -62,7 +62,7 @@ export function StartDoors({
       )}
       {doors.includes("scratch") && (
         <section className="lx-card pe-door" aria-labelledby="door-scratch" data-door="scratch">
-          <h2 className="pe-h" id="door-scratch">
+          <h2 className="lx-h3" id="door-scratch">
             {START_DOORS.scratch.title}
           </h2>
           <p className="lx-note pe-hint">{START_DOORS.scratch.body}</p>

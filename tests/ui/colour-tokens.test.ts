@@ -13,8 +13,6 @@ const CSS: Record<string, number> = {
   "src/app/dashboard/forms/forms.css": 69,
   "src/app/dashboard/intake/intake.css": 2,
   "src/app/dashboard/intake/leads.css": 1,
-  "src/app/dashboard/proposals/proposals.css": 6,
-  "src/app/dashboard/quotes/quotes.css": 7,
   "src/components/copilot/copilot.css": 26,
   "src/components/leads/lead-page.css": 1,
   "src/components/onboarding/welcome-deal.css": 1,

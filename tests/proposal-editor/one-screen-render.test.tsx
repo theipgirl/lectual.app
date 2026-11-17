@@ -244,10 +244,10 @@ describe("F7: live, accepted, replaced and withdrawn versions keep today's behav
   }
 
   it("a live link keeps the Withdraw menu; an accepted version gets its paid panel", async () => {
-    // The menu is named for what it holds: the owner can withdraw or delete.
-    expect(await render(row({ status: "sent" }))).toContain(">Withdraw or delete<");
+    // The menu is the shared "More" for the owner and for everyone else who can withdraw.
+    expect(await render(row({ status: "sent" }))).toContain(">More<");
     vi.resetModules();
-    expect(await render(row({ status: "sent" }), { role: "paralegal" })).toContain(">Withdraw<");
+    expect(await render(row({ status: "sent" }), { role: "paralegal" })).toContain(">More<");
     vi.resetModules();
     expect(await render(row({ status: "accepted" }))).toMatch(/Mark paid|Paid/);
   });

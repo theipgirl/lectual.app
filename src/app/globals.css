@@ -1798,14 +1798,14 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
   .lx-page,
   .lx-content { min-width: 0; overflow-x: clip; }
 
-  .lx-stack:not(.pq-tbl),
-  .lx-stack:not(.pq-tbl) tbody,
-  .lx-stack:not(.pq-tbl) tr { display: block; min-width: 0; width: 100%; }
-  .lx-stack:not(.pq-tbl) colgroup { display: none; }
+  .lx-stack,
+  .lx-stack tbody,
+  .lx-stack tr { display: block; min-width: 0; width: 100%; }
+  .lx-stack colgroup { display: none; }
   .lx-stack thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-  .lx-stack:not(.pq-tbl) tr { height: auto; padding: 12px 14px; border-bottom: 1px solid var(--line-2); }
-  .lx-stack:not(.pq-tbl) tr:last-child { border-bottom: 0; }
-  .lx-stack:not(.pq-tbl) td {
+  .lx-stack tr { height: auto; padding: 12px 14px; border-bottom: 1px solid var(--line-2); }
+  .lx-stack tr:last-child { border-bottom: 0; }
+  .lx-stack td {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
@@ -1817,8 +1817,8 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
     white-space: normal;
     text-align: right;
   }
-  .lx-stack:not(.pq-tbl) td.wrap { min-width: 0; }
-  .lx-stack:not(.pq-tbl) td.pri { display: block; text-align: left; padding-bottom: 6px; }
+  .lx-stack td.wrap { min-width: 0; }
+  .lx-stack td.pri { display: block; text-align: left; padding-bottom: 6px; }
   .lx-stack td[data-label]::before {
     content: attr(data-label);
     flex: 0 0 auto;
@@ -1832,7 +1832,7 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
   }
   .lx-stack td.lx-stack-actions::before { content: none; }
   .lx-stack td.lx-stack-actions { justify-content: flex-start; }
-  .lx-stack:not(.pq-tbl) tbody tr:hover td { background: transparent; }
+  .lx-stack tbody tr:hover td { background: transparent; }
   /* The sheet table kit on a phone: rows become cards inside the card, nothing scrolls sideways, text reads 14px. */
   .sheet-scroll { overflow: visible; }
   .sheet-tbl.lx-stack { min-width: 0; table-layout: auto; font-size: var(--fs-2); }

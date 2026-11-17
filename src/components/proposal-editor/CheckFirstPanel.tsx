@@ -1,6 +1,7 @@
 import type { ProposalCardReceipts } from "@/lib/proposals/card";
 import { parseReviewerSummary } from "@/lib/queue/reviewer-summary";
 import { checkTheseHeading } from "@/lib/proposal-editor/vocabulary";
+import { Pill } from "@/components/ui/Pill";
 
 /**
  * For a draft the assistant made: the things to check before the link goes live, at the top of the page. It is the
@@ -23,7 +24,7 @@ export function CheckFirstPanel({ receipts, letterCheck = null }: { receipts: Pr
   if (receipts.status === "unavailable") {
     return (
       <section className="lx-card pe-check-first" aria-label="Check these things">
-        <h2 className="pe-h">Check these things</h2>
+        <h2 className="lx-h3">Check these things</h2>
         <p className="lx-note" role="status">
           The assistant&rsquo;s notes couldn&rsquo;t be loaded. Refresh to try again.
         </p>
@@ -39,11 +40,11 @@ export function CheckFirstPanel({ receipts, letterCheck = null }: { receipts: Pr
   if (total === 0) return null;
   return (
     <section className="lx-card pe-check-first" aria-label="Check these things" data-check-first>
-      <h2 className="pe-h">{checkTheseHeading(total)}</h2>
+      <h2 className="lx-h3">{checkTheseHeading(total)}</h2>
       <ol className="pe-check-list">
         {flags.map((f, i) => (
           <li key={`f${i}`}>
-            <span className="lx-pill lx-pill-warn">Check first</span> {f.text}
+            <Pill tone="warn">Check first</Pill> {f.text}
           </li>
         ))}
         {unverified.map((q, i) => (

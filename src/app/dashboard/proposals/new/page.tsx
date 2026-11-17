@@ -36,6 +36,10 @@ import { ConsultFillList, ConsultSkipNote, FilledFrom } from "@/components/propo
 import { CreateDraftForm, StartBlankForm } from "@/components/proposal-editor/StartDraft";
 import { StartDoors } from "@/components/proposal-editor/StartDoors";
 import { WhoIsThisFor, type WhoChosen } from "@/components/proposal-editor/WhoIsThisFor";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Notice } from "@/components/ui/Notice";
+import { ViewToggle } from "@/components/ViewToggle";
 import { pageTitle } from "@/lib/ui/page-title";
 import { PROPOSALS_NAME, PROPOSAL_TYPE_GENERAL, PROPOSAL_TYPE_TRADEMARK } from "@/lib/ui/words";
 import { requireProposalsModule } from "../gate";
@@ -89,38 +93,21 @@ function readConsultDoor(now: number, tz: string): Promise<ConsultDoorState> {
   });
 }
 
-function Back() {
-  return (
-    <Link href="/dashboard/proposals/" className="lx-back">
-      ← {PROPOSALS_NAME}
-    </Link>
-  );
+const START_SUB = "Starts as a draft. You can change anything in the editor before a named approver creates the client link.";
+
+/** The page's one header: a back link to Proposals, the title and the one sub-line. */
+function Head({ sub }: { sub?: string }) {
+  return <PageHeader title="New proposal" tour="proposal-new-head" sub={sub} back={{ href: "/dashboard/proposals/", label: PROPOSALS_NAME }} />;
 }
 
-function Head({ sub }: { sub: string }) {
-  return (
-    <div>
-      <div className="lx-label">Intake</div>
-      <h1 className="lx-h1" data-tour="proposal-new-head">
-        New proposal
-      </h1>
-      <p className="lx-sub">{sub}</p>
-    </div>
-  );
-}
+const TYPE_VIEWS: ReadonlyArray<{ value: NewProposalType; label: string }> = [
+  { value: "trademark", label: PROPOSAL_TYPE_TRADEMARK },
+  { value: "general", label: PROPOSAL_TYPE_GENERAL },
+];
 
 /** Spec 9: the "Type" choice. Two links; the trademark proposal is the default. */
 function ProposalTypeSwitch({ type, hrefs }: { type: NewProposalType; hrefs: Record<NewProposalType, string> }) {
-  return (
-    <nav className="lx-segs pe-type" aria-label="Type">
-      <a href={hrefs.trademark} aria-current={type === "trademark" ? "page" : undefined}>
-        {PROPOSAL_TYPE_TRADEMARK}
-      </a>
-      <a href={hrefs.general} aria-current={type === "general" ? "page" : undefined}>
-        {PROPOSAL_TYPE_GENERAL}
-      </a>
-    </nav>
-  );
+  return <ViewToggle<NewProposalType> className="pe-type" label="Type" value={type} views={TYPE_VIEWS} hrefFor={(t) => hrefs[t]} />;
 }
 
 /**
@@ -142,15 +129,10 @@ export default async function NewProposalPage({ searchParams }: { searchParams: 
   if (!canWrite) {
     return (
       <>
-        <Back />
-        <div className="lx-card lx-empty-card">
-          <h2 className="lx-h2" style={{ fontSize: 25 }}>
-            Your role can&apos;t start proposals
-          </h2>
-          <p className="lx-note" style={{ margin: 0 }}>
-            You can open and read proposals, but starting or changing one is for the firm&apos;s staff roles.
-          </p>
-        </div>
+        <Head />
+        <EmptyState title="Your role can't start proposals">
+          You can open and read proposals, but starting or changing one is for the firm&apos;s staff roles.
+        </EmptyState>
       </>
     );
   }
@@ -172,8 +154,7 @@ export default async function NewProposalPage({ searchParams }: { searchParams: 
     ]);
     return (
       <div className="pe-page">
-        <Back />
-        <Head sub="Starts as a draft. You can change anything in the editor before a named approver creates the client link." />
+        <Head sub={START_SUB} />
         <StartDoors
           canWrite={canWrite}
           aiOn={aiOn}
@@ -197,12 +178,11 @@ export default async function NewProposalPage({ searchParams }: { searchParams: 
     if (read.status !== "ok") {
       return (
         <div className="pe-page">
-          <Back />
-          <Head sub="Starts as a draft. You can change anything in the editor before a named approver creates the client link." />
-          <p role="status" className="lx-banner lx-banner-mute" style={{ margin: 0 }}>
+          <Head sub={START_SUB} />
+          <Notice tone="mute" role="status">
             {read.status === "unavailable" ? "That record couldn't be loaded just now. Refresh to try again." : "That lead or matter couldn't be found."}{" "}
             <Link href={`${NEW_PROPOSAL_PATH}?door=scratch`}>Choose who it is for</Link>
-          </p>
+          </Notice>
         </div>
       );
     }
@@ -222,8 +202,7 @@ export default async function NewProposalPage({ searchParams }: { searchParams: 
     const who: WhoChosen = { kind: "chosen", label: s.label, changeHref: withProposalType(`${NEW_PROPOSAL_PATH}?door=scratch`, type) };
     return (
       <div className="pe-page">
-        <Back />
-        <Head sub="Starts as a draft. You can change anything in the editor before a named approver creates the client link." />
+        <Head sub={START_SUB} />
         <ProposalTypeSwitch type={type} hrefs={typeHrefs} />
         <WhoIsThisFor view={null} chosen={who} />
         <FilledFrom line={line} />
@@ -236,7 +215,7 @@ export default async function NewProposalPage({ searchParams }: { searchParams: 
           consult={
             filled ? (
               <div className="pe-consult-use">
-                <label className="pe-check" style={{ whiteSpace: "normal" }}>
+                <label className="pe-check pe-check-wrap">
                   <input type="checkbox" name="useConsult" defaultChecked /> {USE_CONSULT_LABEL}
                 </label>
                 <ConsultFillList brands={filled.brands} />
@@ -245,7 +224,7 @@ export default async function NewProposalPage({ searchParams }: { searchParams: 
           }
         />
         {aiOn && (
-          <p className="lx-note" style={{ margin: 0 }}>
+          <p className="lx-note">
             <a href={copilotHref(s.fullName || null)}>Ask Copilot to draft this one instead</a>
           </p>
         )}
@@ -268,8 +247,7 @@ export default async function NewProposalPage({ searchParams }: { searchParams: 
   }
   return (
     <div className="pe-page">
-      <Back />
-      <Head sub="Starts as a draft. You can change anything in the editor before a named approver creates the client link." />
+      <Head sub={START_SUB} />
       <ProposalTypeSwitch type={type} hrefs={typeHrefs} />
       <WhoIsThisFor view={view} chosen={who} hidden={{ door: "scratch", ...(type === "general" ? { type: "general" } : {}) }} create={{ type }} />
       {blank && <StartBlankForm type={type} />}

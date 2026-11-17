@@ -5,7 +5,7 @@ import { getFirmTimeZone } from "@/lib/org/profile";
 import { listMemberDirectory, type MemberIdentity } from "@/lib/members/directory";
 import { clientLinkOrigin, clientLinkUrl } from "@/lib/proposals/client-link-origin";
 import { firmCivilDate } from "@/lib/quotes/firm-time";
-import { formatCents } from "@/lib/quotes/money";
+import { formatMoney } from "@/lib/ui/format";
 import { formatFirmStamp, formatShortFirmDate } from "@/lib/quotes/labels";
 import { ProposalError } from "@/lib/proposals/errors";
 import { getProposal, getProposalSettings, isCurrentUserApprover, listProposalOpens, listProposalStepEvents, type ProposalDetail } from "@/lib/proposals/store";
@@ -74,7 +74,12 @@ import { requireProposalsModule } from "../gate";
 import "../proposals.css";
 import type { Metadata } from "next";
 import { recordPageTitle } from "@/lib/ui/page-title";
-import { PROPOSALS_NAME } from "@/lib/ui/words";
+import { CANT_SHOW, PROPOSALS_NAME, REFRESH_TO_TRY_AGAIN, TEAMMATE } from "@/lib/ui/words";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { LoadFailedCard } from "@/components/ui/LoadFailed";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Notice } from "@/components/ui/Notice";
+import { Pill } from "@/components/ui/Pill";
 import { packageLineTitle } from "@/lib/proposals/name-package";
 import { opensKind, opensPageText, type OpensRead } from "@/lib/proposals/opens";
 
@@ -120,19 +125,8 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
   } catch (err) {
     return (
       <>
-        <Link href="/dashboard/proposals/" className="lx-back">
-          ← {PROPOSALS_NAME}
-        </Link>
-        <div className="lx-card lx-empty-card">
-          <h2 className="lx-h2" style={{ fontSize: 25 }}>
-            This proposal couldn&apos;t be loaded
-          </h2>
-          <p className="lx-note" style={{ margin: 0 }}>
-            {err instanceof ProposalError && err.code === "unavailable"
-              ? "Can't show this right now. Refresh to try again."
-              : "Try again shortly."}
-          </p>
-        </div>
+        <PageHeader title="Proposal" back={{ href: "/dashboard/proposals/", label: PROPOSALS_NAME }} />
+        <LoadFailedCard what="this proposal" body={err instanceof ProposalError && err.code === "unavailable" ? CANT_SHOW : REFRESH_TO_TRY_AGAIN} />
       </>
     );
   }
@@ -196,7 +190,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
   const card = buildProposalCard(proposal, events);
 
   const nameOf = new Map<string, string>();
-  for (const m of members) nameOf.set(m.userId, firstNameOf(m.displayName) ?? firstNameOf(m.email) ?? "A teammate");
+  for (const m of members) nameOf.set(m.userId, firstNameOf(m.displayName) ?? firstNameOf(m.email) ?? TEAMMATE);
   const approverNames = (settings?.approver_user_ids ?? []).map((uid) => nameOf.get(uid)).filter((n): n is string => !!n);
 
   const statusEditable = isProposalEditable(proposal.status);
@@ -236,7 +230,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
         proposalId: proposal.id,
         matterId: proposal.matter_id,
         events: stepRead.ok ? stepRead.events : null,
-        // Real names only: a teammate we can't name is left out of "marked by", not shown as "A teammate".
+        // Real names only: a teammate we can't name is left out of "marked by", not shown as the teammate word.
         names: new Map(members.flatMap((m): Array<[string, string]> => {
           const n = firstNameOf(m.displayName) ?? firstNameOf(m.email);
           return n ? [[m.userId, n]] : [];
@@ -381,22 +375,22 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
 
   return (
     <div className="pe-page">
-      <Link href="/dashboard/proposals/" className="lx-back">
-        ← {PROPOSALS_NAME}
-      </Link>
+      <PageHeader
+        title={proposal.client_name}
+        back={{ href: "/dashboard/proposals/", label: PROPOSALS_NAME }}
+        details={
+          <>
+            Version {proposal.version}
+            {versions.length > 1 ? ` of ${versions.length}` : ""} · {proposal.title}
+            {proposal.expires_on ? ` · Open until ${formatShortFirmDate(`${proposal.expires_on}T12:00:00Z`, "UTC")}` : ""}
+          </>
+        }
+      />
 
       <div className="pe-head">
         <div className="pe-head-main">
-          <div className="lx-label">{PROPOSALS_NAME}</div>
-          <h1 className="lx-h1">{proposal.client_name}</h1>
           <div className="pe-meta">
-            <span className={`lx-pill lx-pill-${statusTone(proposal.status)}`}>{statusLabelFor(proposal.status, signedAccepted)}</span>
-            <span className="lx-num">
-              Version {proposal.version}
-              {versions.length > 1 ? ` of ${versions.length}` : ""}
-            </span>
-            <span>{proposal.title}</span>
-            {proposal.expires_on && <span>Open until {formatShortFirmDate(`${proposal.expires_on}T12:00:00Z`, "UTC")}</span>}
+            <Pill tone={statusTone(proposal.status)}>{statusLabelFor(proposal.status, signedAccepted)}</Pill>
             {content.made_by ? <MadeByLine content={content} /> : isAssistantDraft && <span className="lx-note">Drafted by an assistant</span>}
           </div>
           <LeadLink
@@ -412,7 +406,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
       </div>
 
       {readOnlyNote && (
-        <div className="pe-readonly" role="note">
+        <Notice tone="mute">
           {readOnlyNote.text}
           {newer && (
             <>
@@ -420,7 +414,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
               <Link href={`/dashboard/proposals/${newer.id}/`}>Open version {newer.version}</Link>.
             </>
           )}
-        </div>
+        </Notice>
       )}
 
       {/* lectual 0100: on a live link only the pay link may change. Never for accepted, replaced or withdrawn. */}
@@ -462,7 +456,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
                 {general ? (
                   <section className="lx-card pe-card" aria-label="Matter and flat fee">
                     <header className="pe-card-head">
-                      <h2 className="pe-h">Matter and flat fee</h2>
+                      <h2 className="lx-h3">Matter and flat fee</h2>
                       <p className="lx-note pe-hint">A contract or other matter at one flat fee. No packages, classes or USPTO fees.</p>
                     </header>
                     <fieldset className="pe-fieldset" disabled={!editable}>
@@ -510,23 +504,23 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
                   .map((n) => (
                     <div key={n.id} className="pe-line">
                       <dt>{packageLineTitle(n)}</dt>
-                      <dd>{formatCents(n.legal_cents)}</dd>
+                      <dd>{formatMoney(n.legal_cents)}</dd>
                     </div>
                   ))}
                 {proposal.accepted_snapshot.quote.general && (
                   <div className="pe-line">
                     <dt>{proposal.accepted_snapshot.content?.general?.matter_title || "Flat fee"}</dt>
-                    <dd>{formatCents(proposal.accepted_snapshot.quote.legal_subtotal_cents)}</dd>
+                    <dd>{formatMoney(proposal.accepted_snapshot.quote.legal_subtotal_cents)}</dd>
                   </div>
                 )}
                 <div className="pe-line pe-line-total">
                   <dt>Legal fee accepted</dt>
-                  <dd>{formatCents(proposal.accepted_snapshot.quote.legal_total_cents)}</dd>
+                  <dd>{formatMoney(proposal.accepted_snapshot.quote.legal_total_cents)}</dd>
                 </div>
                 {!proposal.accepted_snapshot.quote.general && (
                   <div className="pe-line pe-line-mute">
                     <dt>USPTO fees, due at filing</dt>
-                    <dd>{formatCents(proposal.accepted_snapshot.quote.gov_total_cents)}</dd>
+                    <dd>{formatMoney(proposal.accepted_snapshot.quote.gov_total_cents)}</dd>
                   </div>
                 )}
               </dl>
@@ -585,7 +579,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
 
       <section className="lx-card pe-card" aria-label="History">
         <header className="pe-card-head">
-          <h2 className="pe-h">History</h2>
+          <h2 className="lx-h3">History</h2>
           <p className="lx-note pe-hint">
             Every change after the link is live is a new version, so what the client saw is never rewritten. Times are in the firm&apos;s time zone.
           </p>
@@ -593,8 +587,8 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
         <ul className="pe-versions">
           {versions.map((v) => (
             <li key={v.id}>
-              <span className="lx-num">v{v.version}</span>
-              <span className={`lx-pill lx-pill-${statusTone(v.status)}`}>{statusLabelFor(v.status, v.id === proposal.id && signedAccepted)}</span>
+              <span className="pe-version-n">v{v.version}</span>
+              <Pill tone={statusTone(v.status)}>{statusLabelFor(v.status, v.id === proposal.id && signedAccepted)}</Pill>
               {v.id === proposal.id ? <span className="lx-note">You are here</span> : <Link href={`/dashboard/proposals/${v.id}/`}>Open</Link>}
               <span className="lx-note">
                 {v.source === "revision" ? "Revision · " : ""}
@@ -604,9 +598,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
           ))}
         </ul>
         {log.length === 0 ? (
-          <p className="lx-note" style={{ margin: 0 }}>
-            No activity yet.
-          </p>
+          <EmptyState variant="line">No activity yet.</EmptyState>
         ) : (
           <ol className="pe-log">
             {log.map(({ line, type }) => (

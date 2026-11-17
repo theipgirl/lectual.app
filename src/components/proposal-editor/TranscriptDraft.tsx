@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useActionState } from "react";
 import { draftProposalFromUploadAction, type TranscriptDraftState } from "@/app/dashboard/proposals/transcript-actions";
 import { TranscriptFields } from "@/components/leads/TranscriptFields";
+import { Field } from "@/components/ui/Field";
+import { SAVING } from "@/lib/ui/words";
 
 export type LeadOption = { id: string; label: string };
 
@@ -16,9 +18,8 @@ export function TranscriptDraft({ leads, maxChars, defaultLeadId = "" }: { leads
   const [state, action, pending] = useActionState<TranscriptDraftState, FormData>(draftProposalFromUploadAction, {});
   const locked = pending || !!state.ok;
   return (
-    <form action={action} style={{ display: "grid", gap: 8 }}>
-      <label className="lx-field">
-        <span className="lx-label">Lead</span>
+    <form action={action} className="pq-paste-form">
+      <Field label="Lead">
         <select className="lx-input" name="leadId" required defaultValue={leads.some((l) => l.id === defaultLeadId) ? defaultLeadId : ""} disabled={locked}>
           <option value="" disabled>
             Choose the lead this call was with
@@ -29,20 +30,20 @@ export function TranscriptDraft({ leads, maxChars, defaultLeadId = "" }: { leads
             </option>
           ))}
         </select>
-      </label>
+      </Field>
       <TranscriptFields maxChars={maxChars} disabled={locked} />
       <div>
         <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={locked}>
-          {pending ? "Drafting…" : state.ok ? "Drafted" : "Draft proposal + email"}
+          {pending ? SAVING : state.ok ? "Drafted" : "Draft proposal + email"}
         </button>
       </div>
       {state.error && (
-        <p role="alert" className="lx-note" style={{ margin: 0, color: "var(--wine)" }}>
+        <p role="alert" className="pe-msg pe-msg-err">
           {state.error}
         </p>
       )}
       {state.notice && (
-        <p role="status" className="lx-note" style={{ margin: 0, color: "var(--ok)" }}>
+        <p role="status" className="pe-msg pe-msg-ok">
           {state.notice}{" "}
           {state.href && <Link href={state.href}>Open the proposal</Link>}
         </p>

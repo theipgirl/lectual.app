@@ -25,7 +25,7 @@ describe("stacked cards under 640px (V1)", () => {
   const small = media(globals, "max-width: 640px");
 
   it("rows become blocks, cells show their data-label, the header stays for screen readers", () => {
-    expect(small).toMatch(/\.lx-stack:not\(\.pq-tbl\) tr \{ display: block/);
+    expect(small).toMatch(/\.lx-stack tr \{ display: block/);
     expect(small).toContain(".lx-stack td[data-label]::before");
     expect(small).toContain("content: attr(data-label)");
     expect(small).toMatch(/\.lx-stack thead \{ position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect\(0 0 0 0\)/);
@@ -33,7 +33,7 @@ describe("stacked cards under 640px (V1)", () => {
   });
 
   it("a stacked row's fixed height is reset so cards grow to fit (Matters .lp-row)", () => {
-    expect(small).toMatch(/\.lx-stack:not\(\.pq-tbl\) tr \{ height: auto;/);
+    expect(small).toMatch(/\.lx-stack tr \{ height: auto;/);
     expect(listPage).toMatch(/\.lp-row \{ min-height: var\(--lp-row-h\)/);
   });
 
@@ -45,16 +45,15 @@ describe("stacked cards under 640px (V1)", () => {
     expect(lp).toMatch(/\.lp-table-head \{ position: absolute; width: 1px; height: 1px/);
   });
 
-  it("proposals keep their grid card, now with labels", () => {
-    const p = media(proposals, "max-width: 760px", proposals.indexOf("Under 760px a row is a stack"));
-    expect(p).toContain(".pq-tbl { min-width: 0; display: block; }");
-    expect(p).toContain("content: attr(data-label)");
+  it("proposals stack with the shared kit (no private grid)", () => {
+    expect(proposals).not.toContain(".pq-tbl { min-width: 0; display: block; }");
+    expect(proposals).not.toContain("content: attr(data-label)");
+    expect(globals).not.toContain(":not(.pq-tbl)");
   });
 
   it("the minimum widths apply only above the stacking widths", () => {
     expect(globals).toMatch(/@media \(min-width: 641px\) \{\s*\.lx-band \.lx-tbl \{ table-layout: fixed; min-width: 760px; \}/);
     expect(listPage).toMatch(/@media \(min-width: 641px\) \{\s*\.lp-table-min \{ min-width: 1000px; \}/);
-    expect(proposals).toMatch(/@media \(min-width: 761px\) \{\s*\.pq-tbl \{ table-layout: fixed; width: 100%; min-width: 860px; \}/);
     expect(read("src/app/dashboard/forms/forms.css")).toMatch(/@media \(min-width: 641px\) \{\s*\.ifm-tbl \{\s*min-width: 760px;/);
     for (const f of ["src/app/dashboard/documents/page.tsx", "src/app/dashboard/intake/_components/IntakeTable.tsx"]) expect(read(f), f).not.toMatch(/minWidth:\s*(720|1000|MIN_TABLE_WIDTH)/);
   });
@@ -89,7 +88,7 @@ describe("no sideways scroll at 375px (V3)", () => {
     expect(small).toMatch(/\.lx-page,\s*\.lx-content \{ min-width: 0; overflow-x: clip; \}/);
   });
   it("sets no fixed width over 375px in the mobile table rules", () => {
-    const rules = [small, media(listPage, "max-width: 640px", listPage.indexOf("Leads table: wide keeps")), media(proposals, "max-width: 760px", proposals.indexOf("Under 760px a row is a stack"))];
+    const rules = [small, media(listPage, "max-width: 640px", listPage.indexOf("Leads table: wide keeps"))];
     for (const r of rules) for (const m of r.matchAll(/(?<![-\w])(?:min-)?width:\s*(\d+)px/g)) expect(Number(m[1]), m[0]).toBeLessThanOrEqual(375);
   });
 });

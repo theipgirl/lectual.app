@@ -5,7 +5,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import {
   DELETE_CONFIRM,
   DELETE_FAILED,
-  DELETE_LABEL,
   DELETE_NEEDS_DB_UPDATE,
   DELETE_NOT_FOUND,
   DELETE_OWNER_ONLY,
@@ -144,9 +143,8 @@ describe("who may delete, and the More menu", () => {
       ),
     );
 
-  it("an accepted proposal shows the Delete menu only to the owner (the menu is named for what it holds)", async () => {
-    expect(await render(true, "accepted")).toContain(">Delete<");
-    expect(await render(false, "accepted")).not.toContain(">Delete<");
+  it("an accepted proposal shows the More menu (with Delete in it) only to the owner", async () => {
+    expect(await render(true, "accepted")).toContain(">More<");
     expect(await render(false, "accepted")).not.toContain(">More<");
   });
 
@@ -158,7 +156,7 @@ describe("who may delete, and the More menu", () => {
     );
     expect(html).toContain("all its versions");
     expect(html).toContain("can&#x27;t be undone");
-    expect(html).toContain(`>${DELETE_LABEL}<`);
+    expect(html).toContain(">Yes, delete<");
     expect(html).toContain(">Cancel<");
   });
 });

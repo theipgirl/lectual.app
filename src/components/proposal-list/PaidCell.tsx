@@ -2,7 +2,9 @@
 
 import { markPaidAction, undoPaidAction } from "@/app/dashboard/proposals/[id]/paid-actions";
 import { ActionForm, Outcome } from "@/components/proposal-editor/ActionForm";
+import { Pill } from "@/components/ui/Pill";
 import { MARK_PAID_NOTE, type PaidCellView } from "@/lib/proposals/list-rows";
+import { SAVING } from "@/lib/ui/words";
 
 /**
  * The Paid column of a row: "-" for a row that is not accepted, "Paid Oct 21 · Undo", "Not paid · Mark paid" (with a note
@@ -26,18 +28,21 @@ export function PaidCell({ proposalId, cell }: { proposalId: string; cell: PaidC
   const allowed = paid ? cell.canUndo : cell.canMark;
   return (
     <div className="pq-paid" data-paid={paid ? "paid" : "not_paid"}>
-      <span className="pq-paid-text" title={paid ? cell.title : undefined}>
-        {cell.text}
-      </span>
+      {paid ? (
+        <Pill tone="ok" title={cell.title}>
+          {cell.text}
+        </Pill>
+      ) : (
+        <span className="pq-paid-text">{cell.text}</span>
+      )}
       {allowed && (
         <ActionForm action={paid ? undoPaidAction : markPaidAction} className="pq-paid-form">
           {({ state, pending }) => (
             <>
               <input type="hidden" name="proposalId" value={proposalId} />
               <span className="pq-paid-act">
-                <span aria-hidden="true">{"·"}</span>
                 <button type="submit" className={`lx-btn lx-btn-sm ${paid ? "lx-btn-ghost" : "lx-btn-sec"}`} disabled={pending} title={paid ? undefined : MARK_PAID_NOTE}>
-                  {pending ? (paid ? "Undoing…" : "Marking…") : paid ? "Undo" : "Mark paid"}
+                  {pending ? SAVING : paid ? "Undo" : "Mark paid"}
                 </button>
               </span>
               <Outcome state={state} pending={pending} />

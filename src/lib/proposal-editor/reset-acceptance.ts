@@ -2,7 +2,7 @@ import type { Role } from "@/lib/auth/roles";
 import type { ActionState } from "@/app/dashboard/proposals/errors";
 import { PROPOSAL_ADMIN_ROLES, type ProposalRow, type ProposalStatus } from "@/lib/proposals/types";
 import type { PaidState } from "@/lib/proposals/paid";
-import { notReadyYet } from "@/lib/ui/words";
+import { SAVING, notReadyYet } from "@/lib/ui/words";
 
 /**
  * "Reset acceptance" on an ACCEPTED proposal (lectual 0101).
@@ -26,7 +26,7 @@ export const RESET_LABEL = "Reset acceptance";
 export const RESET_CONFIRM =
   "Reset this acceptance? The client link opens again and they can accept again. The Lawmatics note and alerts already sent stay as they are. Earlier signature records are kept.";
 export const RESET_CONFIRM_BUTTON = "Yes, reset";
-export const RESET_PENDING = "Resetting…";
+export const RESET_PENDING = SAVING;
 export const RESET_DONE = "Acceptance reset. The client link is live again, and the client can accept again.";
 export const RESET_NOT_ALLOWED = "Only a senior admin or above, or one of the firm's named approvers, can reset an acceptance.";
 export const RESET_PAID = "Undo Mark paid first.";

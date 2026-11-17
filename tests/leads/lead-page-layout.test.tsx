@@ -161,7 +161,8 @@ describe("P1: composer tabs", () => {
     // The Matters board's move trigger is the shared "⋯" menu button, made 44px in the shared coarse block.
     expect(coarse(rd("src/app/globals.css"), /\.lx-board-menu,[\s\S]*?min-height: 44px; min-width: 44px;/)).toBe(true);
     const pq = rd("src/app/dashboard/proposals/proposals.css");
-    expect(coarse(pq, /\.pq-seg \{ min-height: 44px; \}/)).toBe(true);
+    // The filter chips are the shared .lp-chip (44px in globals), not a private control.
+    expect(pq).not.toMatch(/\.pq-seg\b/);
     // The collapsed consults strip is gone (Spec 8); its row buttons are 44px at every width.
     expect(pq).toMatch(/\.pq-row-actions \.lx-btn[^{]*\{ min-height: 44px;/);
   });

@@ -1,7 +1,8 @@
-import Link from "next/link";
-import { formatCents } from "@/lib/quotes/money";
+import { Chip, ChipCount, FilterChips } from "@/components/list-page";
 import { OPEN_OFFERS_LABEL } from "@/lib/proposals/list-copy";
 import { PROPOSAL_SEGMENTS, SEGMENT_LABEL, type OutWithClients, type ProposalSegment } from "@/lib/proposals/segments";
+import { formatMoney } from "@/lib/ui/format";
+import { BLANK } from "@/lib/ui/words";
 
 /** "1 proposal is out with a client, counted at the cheapest package offered." */
 export function outTileSentence(count: number): string {
@@ -11,10 +12,10 @@ export function outTileSentence(count: number): string {
 }
 
 /**
- * The page's left column: "Show", the segments with their counts (from the unfiltered set), and the
- * "Open offers" dollar tile. A count is null (shown "—") when it can't be known: Paid while the paid read failed. Under 760px the segments lie down as a row of chips. `counts` and
- * `out` are null/unavailable when the proposals read failed: the page then shows "—" and
- * "couldn't be loaded", never 0 and never "$0.00".
+ * The page's filter row: the segments as the shared chips (counts from the unfiltered set, links as before) and the
+ * "Open offers" dollar tile. A count is null (shown as the blank) when it can't be known: Paid while the paid read failed.
+ * `counts` and `out` are null/unavailable when the proposals read failed: the page then shows the blank and
+ * "couldn't be loaded", never 0 and never "$0".
  */
 export function SegmentColumn({
   active,
@@ -27,31 +28,29 @@ export function SegmentColumn({
 }) {
   return (
     <aside className="pq-side" aria-label="Proposal segments">
-      <nav aria-label="Show" className="pq-segs">
-        <div className="lx-label pq-segs-label">Show</div>
+      <FilterChips as="nav" label="Show" className="pq-segs">
         {PROPOSAL_SEGMENTS.map((seg) => (
-          <Link
+          <Chip
             key={seg}
             href={seg === "everything" ? "/dashboard/proposals/" : `/dashboard/proposals/?segment=${seg}`}
-            aria-current={active === seg ? "page" : undefined}
-            className="pq-seg"
+            active={active === seg}
           >
-            <span>{SEGMENT_LABEL[seg]}</span>
-            {counts && <span className="pq-count">{counts[seg] ?? "—"}</span>}
-          </Link>
+            {SEGMENT_LABEL[seg]}
+            {counts ? <ChipCount>{counts[seg] ?? BLANK}</ChipCount> : null}
+          </Chip>
         ))}
-      </nav>
+      </FilterChips>
 
       <div className="lx-card lx-kpi pq-out">
         <span className="lx-label">{OPEN_OFFERS_LABEL}</span>
         {out.status === "ok" ? (
           <>
-            <div className="pq-out-figure">{formatCents(out.cents)}</div>
+            <div className="pq-out-figure">{formatMoney(out.cents)}</div>
             <p className="lx-note">{outTileSentence(out.count)}</p>
           </>
         ) : (
           <>
-            <div className="pq-out-figure">—</div>
+            <div className="pq-out-figure">{BLANK}</div>
             <p className="lx-note">Open offers couldn&apos;t be loaded.</p>
           </>
         )}

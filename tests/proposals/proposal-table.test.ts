@@ -14,7 +14,7 @@ import {
 } from "@/lib/proposals/list-labels";
 import { buildProposalRowView, type ListRowInput } from "@/lib/proposals/list-rows";
 import { ProposalsTable } from "@/components/proposal-list/ProposalsTable";
-import { formatCents } from "@/lib/quotes/money";
+import { formatMoney } from "@/lib/ui/format";
 
 const NOW = Date.parse("2026-10-20T16:00:00Z");
 const TZ = "America/New_York";
@@ -85,8 +85,8 @@ describe("expiresLabel", () => {
     expect(e("draft", "2026-09-30")).toBe("Sep 30");
     expect(e("blocked", "2026-09-30")).toBe("Sep 30");
   });
-  it("Signed 9 Sep once accepted", () => {
-    expect(e("accepted", "2026-11-30", "2026-09-09T15:00:00Z")).toBe("Signed 9 Sep");
+  it("Signed Sep 9 once accepted", () => {
+    expect(e("accepted", "2026-11-30", "2026-09-09T15:00:00Z")).toBe("Signed Sep 9");
     expect(e("accepted", null, null)).toBe("—");
   });
   it("Expired Sep 4 for a derived expiry", () => {
@@ -100,8 +100,8 @@ describe("expiresLabel", () => {
   });
   it("dates do not slip by a day in any zone", () => {
     expect(monthDay("2026-09-04")).toBe("Sep 4");
-    expect(dayMonth("2026-09-10T02:00:00Z", "America/New_York")).toBe("9 Sep");
-    expect(dayMonth("2026-09-10T02:00:00Z", "Asia/Tokyo")).toBe("10 Sep");
+    expect(dayMonth("2026-09-10T02:00:00Z", "America/New_York")).toBe("Sep 9");
+    expect(dayMonth("2026-09-10T02:00:00Z", "Asia/Tokyo")).toBe("Sep 10");
     expect(dayMonth(null, TZ)).toBe("");
   });
 });
@@ -128,23 +128,23 @@ describe("lastActivityLine", () => {
     expect(line({ source: "agent", event: ev({ type: "created", actor: "staff" }) })).toBe("Drafted by the intake agent from the consult");
   });
 
-  it("a staff edit reads 'Edited 3h ago · Taylor'", () => {
-    expect(line({ event: ev() })).toBe("Edited 3h ago · Taylor");
+  it("a staff edit reads 'Edited 3 h ago · Taylor'", () => {
+    expect(line({ event: ev() })).toBe("Edited 3 h ago · Taylor");
   });
 
   it("an edit after the agent's draft is the staff edit, not the agent line", () => {
-    expect(line({ source: "agent", event: ev() })).toBe("Edited 3h ago · Taylor");
+    expect(line({ source: "agent", event: ev() })).toBe("Edited 3 h ago · Taylor");
   });
 
   it("drops the name when it isn't known, never shows an id", () => {
-    expect(line({ event: ev({ actor_user_id: "u-unknown" }) })).toBe("Edited 3h ago");
-    expect(line({ event: ev({ actor_user_id: null }) })).toBe("Edited 3h ago");
+    expect(line({ event: ev({ actor_user_id: "u-unknown" }) })).toBe("Edited 3 h ago");
+    expect(line({ event: ev({ actor_user_id: null }) })).toBe("Edited 3 h ago");
     expect(line({ event: ev({ actor_user_id: "u-unknown" }) })).not.toContain("u-unknown");
   });
 
   it("other events use their own verb", () => {
-    expect(line({ event: ev({ type: "sent", created_at: "2026-10-18T13:00:00Z" }) })).toBe("Link turned on 2d ago · Taylor");
-    expect(line({ event: ev({ type: "approved" }) })).toBe("Saved 3h ago · Taylor");
+    expect(line({ event: ev({ type: "sent", created_at: "2026-10-18T13:00:00Z" }) })).toBe("Link turned on 2 days ago · Taylor");
+    expect(line({ event: ev({ type: "approved" }) })).toBe("Saved 3 h ago · Taylor");
   });
 
   it("a derived expiry says the stored status still says sent", () => {
@@ -157,24 +157,24 @@ describe("lastActivityLine", () => {
   });
 
   it("accepted: 'Accepted by the client · <when>'", () => {
-    expect(line({ key: "accepted", acceptedAt: "2026-10-18T16:00:00Z" })).toBe("Accepted by the client · 2d ago");
+    expect(line({ key: "accepted", acceptedAt: "2026-10-18T16:00:00Z" })).toBe("Accepted by the client · 2 days ago");
   });
 
   it("when the events read failed, every cell falls back to a derived line from updated_at", () => {
-    expect(line({ event: "unavailable" })).toBe("Updated 3h ago");
-    expect(line({ source: "agent", event: "unavailable" })).toBe("Updated 3h ago");
-    expect(line({ key: "sent", event: "unavailable" })).toBe("Updated 3h ago");
+    expect(line({ event: "unavailable" })).toBe("Updated 3 h ago");
+    expect(line({ source: "agent", event: "unavailable" })).toBe("Updated 3 h ago");
+    expect(line({ key: "sent", event: "unavailable" })).toBe("Updated 3 h ago");
   });
 
   it("a row with no event reads from updated_at", () => {
-    expect(line({ event: null })).toBe("Updated 3h ago");
+    expect(line({ event: null })).toBe("Updated 3 h ago");
   });
 
   it("compactAgo", () => {
     expect(compactAgo("2026-10-20T15:59:40Z", NOW)).toBe("just now");
-    expect(compactAgo("2026-10-20T15:54:00Z", NOW)).toBe("6m ago");
-    expect(compactAgo("2026-10-20T13:00:00Z", NOW)).toBe("3h ago");
-    expect(compactAgo("2026-10-18T16:00:00Z", NOW)).toBe("2d ago");
+    expect(compactAgo("2026-10-20T15:54:00Z", NOW)).toBe("6 min ago");
+    expect(compactAgo("2026-10-20T13:00:00Z", NOW)).toBe("3 h ago");
+    expect(compactAgo("2026-10-18T16:00:00Z", NOW)).toBe("2 days ago");
     expect(compactAgo("2026-08-01T16:00:00Z", NOW)).toMatch(/^Aug 1$/);
     expect(compactAgo(null, NOW)).toBe("");
   });
@@ -227,13 +227,13 @@ describe("one table row per status (the design's cells)", () => {
     });
   });
   it("Accepted", () => {
-    expect(accepted).toMatchObject({ key: "accepted", statusLabel: "Accepted by client", statusTone: "ok", subline: "pr-cd34ef · ENHANCED signed · 2 classes", expires: "Signed 9 Sep", activity: expect.stringMatching(/^Accepted by the client · /) });
+    expect(accepted).toMatchObject({ key: "accepted", statusLabel: "Accepted by client", statusTone: "ok", subline: "pr-cd34ef · ENHANCED signed · 2 classes", expires: "Signed Sep 9", activity: expect.stringMatching(/^Accepted by the client · /) });
   });
   it("Expired", () => {
     expect(expired).toMatchObject({ key: "expired", statusLabel: "Expired", statusTone: "warn", headline: "Portfolio renewal — ORIN & HALE", expires: "Expired Sep 4", activity: "Stored status still says sent" });
   });
   it("Draft", () => {
-    expect(draft).toMatchObject({ key: "draft", statusLabel: "Draft", statusTone: "mute", expires: "Not sent", activity: "Edited 3h ago · Taylor", subline: "pr-01ab23 · 1 package offered · 1 class" });
+    expect(draft).toMatchObject({ key: "draft", statusLabel: "Draft", statusTone: "mute", expires: "Not sent", activity: "Edited 3 h ago · Taylor", subline: "pr-01ab23 · 1 package offered · 1 class" });
   });
   it("Blocked", () => {
     expect(blocked).toMatchObject({ key: "blocked", statusLabel: "Blocked", statusTone: "risk", expires: "Sep 30", activity: "No package offered yet", subline: "pr-23cd45 · no package offered · 2 classes", statusSub: "Name the package." });
@@ -244,7 +244,7 @@ describe("one table row per status (the design's cells)", () => {
 
   it("a failed events read leaves every cell with a derived line", () => {
     const rows = [input(), input({ id: "p4", status: "draft", source: "manual" }), input({ id: "p7", status: "sent", source: "manual" })].map((i) => buildProposalRowView(i, ctx({ events: "unavailable" })));
-    for (const r of rows) expect(r.activity).toBe("Updated 3h ago");
+    for (const r of rows) expect(r.activity).toBe("Updated 3 h ago");
   });
 });
 
@@ -264,11 +264,11 @@ describe("the table", () => {
   it("shows the legal fee and the USPTO fees as two separate cells, and never a sum or a 'total'", () => {
     const first = html.slice(html.indexOf("<tr", html.indexOf("<tbody")), html.indexOf("</tr>", html.indexOf("<tbody")));
     const money = [...first.matchAll(/<span class="pq-fee-n">([^<]*)<\/span> <span class="pq-fee-l">([^<]*)<\/span>/g)].map((m) => `${m[1]} ${m[2]}`);
-    expect(money).toEqual([`${formatCents(660_000)} at signing`, `${formatCents(175_000)} at filing`]);
+    expect(money).toEqual([`${formatMoney(660_000)} at signing`, `${formatMoney(175_000)} at filing`]);
     expect(html.toLowerCase()).not.toContain("total");
-    expect(html).not.toContain(formatCents(660_000 + 175_000));
-    expect(html).not.toContain(formatCents(325_000 + 70_000));
-    expect(html).not.toContain(formatCents(490_800 + 70_000));
+    expect(html).not.toContain(formatMoney(660_000 + 175_000));
+    expect(html).not.toContain(formatMoney(325_000 + 70_000));
+    expect(html).not.toContain(formatMoney(490_800 + 70_000));
   });
 
   it("links the title to the proposal, and shows the footer", () => {

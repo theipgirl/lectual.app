@@ -6,7 +6,6 @@ import { join } from "node:path";
 const CEILING: Record<string, number> = {
   "src/components/meetings/MeetingForms.tsx": 1,
   "src/components/lawmatics/LawmaticsImport.tsx": 1,
-  "src/components/proposal-editor/ActionForm.tsx": 1,
 };
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {

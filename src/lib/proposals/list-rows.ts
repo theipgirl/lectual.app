@@ -167,8 +167,9 @@ export function buildProposalRowView(
     event: ctx.events === "unavailable" ? "unavailable" : (ctx.events.get(item.id) ?? null),
     names: ctx.names,
     now: ctx.now,
+    tz: ctx.tz,
   });
-  const updatedAgo = compactAgo(item.updated_at, ctx.now);
+  const updatedAgo = compactAgo(item.updated_at, ctx.now, ctx.tz);
   return {
     id: item.id,
     key: display.key,

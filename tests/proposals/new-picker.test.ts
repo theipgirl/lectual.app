@@ -120,7 +120,7 @@ describe("the cap of 8 and 'Showing N of M'", () => {
     const list = rowsOf(buildPicker({ kind: "lead", term: "", leads: many(n), matters: ok([]) }));
     expect(list.rows).toHaveLength(drawn);
     expect(list.total).toBe(total);
-    expect(showingLine(list.rows.length, list.total)).toBe(`Showing ${drawn} of ${total}.`);
+    expect(showingLine(list.rows.length, list.total)).toBe(`Showing ${drawn} of ${total}`);
   });
 
   it("keeps the order the read returned (recent first)", () => {
