@@ -911,7 +911,7 @@ No migration, no dependency, nothing sends. Words and layout only; every state r
 - **Leads page:** the status strip is gone; the sub-line carries the counts and one hint (`leadsSubline`). Import and Reconcile stages are in More (`leadsMoreItems`; Reconcile only for the
   admin tier). The three warning lines are ONE note (`detailsNote`): "Some details couldn't load (approvals, automatic moves). Refresh to try again." with a Refresh button, naming only the reads
   that failed or were cut short; the chips and filters that depend on a failed read stay off. Empty states: no leads (Add a lead and a link to the intake form) and "No lead matches these
-  filters." (Clear filters). The Last touch header carries the arrow legend; each row's arrow has a title and a hidden label.
+  filters." (Clear filters). (Replaced by Item L2: there are no arrows and no legend; the Last contact column says whose turn it is in words, see "Item L2".)
 - **Pipeline** says "This is a view-only overview. To move a lead, open it in Leads." and its column headers link to the Leads board (lead columns) or the Matters board (the rest).
 - Existing assertions changed on purpose: every test that pinned an old name or sentence (the agents, readiness, run-now, digest, nav, shell, reports, copilot, files, integrations,
   consult-proposal failure, intake, matters-header and feedback tests) now pins the glossary wording.
@@ -2042,6 +2042,27 @@ No new rail row and no My cards page in today's shell. Additive only: with no ca
 - **Source:** `REFERRAL_SOURCES` gained "Assessment" and "Intake form" (what the public form writes). Searching inside a set offers "All open has N matches" when All open has more.
 - **Departure from the list-page pattern, on purpose:** Leads rows and cards use `ix-row` / `ix-card` (`leads.css`), not the shared `lp-row` / `lp-board-card`, so every row is one even height, the page scrolls instead of the table, and nothing scrolls sideways at 1280. `tests/list-page` was changed to match. The section name is one export (`LEADS_NAME`); the page is not renamed.
 - **Not verified:** a real browser, the aria-live announcements, keyboard use of the row menu on the board, the 148px board column floor with 7 or more populated stages at 1280 (it scrolls inside itself).
+
+## Item L2: the Intake list in the weekly review Sheet's layout (no schema)
+Display and derivation only; nothing sends. The list (`IntakeTable`) is the Sheet's own markup and CSS (`rv-owner ix-sheet` > `lx-card rse-card` > `rse-scroll` > `table.lx-tbl.lx-stack.rse-tbl`, `components/review/review.css` and
+`review-sheet-edit.css` imported), so header, zebra rows, 15px cells and the stacked cards under 640px are the Sheet's. Leads-only CSS is in `leads.css`, scoped through `.ix-sheet` / `.ix-leads`.
+- **Full names.** A person's name wraps (never an ellipsis), on the list and the board card. The business line may ellipsis with a title.
+- **Assistant activity column** (`assistant-column.ts`, `AssistantChips`): the "Moved automatically" chip and the Long-Term Nurture suggestion, in the assistants' own green (`--asst-*`). Drawn only while some row in view has something.
+  "Needs attorney" is a person's to-do and sits with the stage pill, "Needs a stage" and "Possible duplicate".
+- **Geist under `.ix-leads`.** The Leads workspace root carries `ix-leads`, which overrides `--mono`, `--font-mono`, `--font-courier-prime` and `--font-jetbrains-mono` to Geist. Not `.intake-root` (Reconcile keeps its look).
+- **Resizable columns** (`col-widths.ts`, `useColWidths.ts`): the Sheet's mechanism (a `<colgroup>`, px defaults, ONE flexible column = Next step, `rse-col-grip`, arrow keys, Home or double click resets). Widths are remembered per person in
+  localStorage `lx-leads-col-widths` (try/catch; the server render and the first client render use the defaults). The card scrolls sideways inside itself BY DEFAULT (`data-scroll="true"`) and switches to overflow visible only after a
+  ResizeObserver measurement shows the table fits (so a menu on the last row is not clipped). The separator reports the drawn width in `aria-valuenow`; a drag ends on pointerup, pointercancel, lost capture or unmount.
+- **Temperature.** Hot red, warm orange, cold blue (`--tp-*` tokens). A level a person set is a FILLED pill; a suggested one is DASHED and says "Warm · suggested". The tokens have a `:root[data-theme="dark"]` pair only: there is no
+  dark theme and no media-query block (a dark OS must not get dark pills on the cream page; a test pins it). Ratios of at least 4.5 are tested.
+- **Last contact in words** (`touchStampFor`, `sheetDay` in `views.ts`): "Our turn · Nov 16" (dated by `last_inbound_at`), "Waiting on them · Nov 15" (`last_outbound_at`), "Last activity · Nov 12" (no email or call recorded; no side is guessed),
+  "No contact yet". Every date on the list and board is the Sheet's `shortDate` on the FIRM's calendar day with a non-breaking space; a date in the future, or one that doesn't parse, is treated as missing. The column still SORTS on the newest
+  touch (the director is asking whether that should change, as well as the "Last activity" state): do not change either without that answer.
+- **Compare dialog** (`loadCompareAction`, `compare-load.ts`, `compare.ts`, `CompareView` / `CompareDialog`): opened from "Possible duplicate"; read only, no merge. The role is resolved FIRST (none = the fixed sentence, nothing read).
+  The Proposals row is counted only for the proposals roles (`compareRoleRules`, `PROPOSAL_STAFF_WRITE_ROLES`) and only with the feature, by `lead_id` only; any other role gets no Proposals row, never a 0. viewer and social_media see no email
+  address (left out of the rows, never in the name). Each count is its own read ("Couldn't load", never 0); stage: none = "—", failed read = "Couldn't load".
+- **Known limits (not built):** an empty state is drawn under the header row; an error row can shift the zebra striping; the dialog's background is not inert; the inline editors of the Sheet are not reused (they are keyed to `SheetEditRow`).
+  Not verified in a real browser: drag, localStorage, the dialog's focus, popovers.
 
 ## Master-class worksheet endpoint (`POST /api/worksheet/`, no schema)
 The RPB master-class worksheet (lectual-plugin `sites/rpb-masterclass/trademark/worksheet/`, a static site) posts JSON here

@@ -22,7 +22,7 @@ export type CompareLeadInput = {
 };
 
 export type CompareSide =
-  | { status: "ok"; id: string; name: string; business: string; email: string; stage: string; source: string; created: string; timeline: CountRead; tasks: CountRead; proposals: CountRead }
+  | { status: "ok"; id: string; name: string; business: string; email: string | null; stage: string; source: string; created: string; timeline: CountRead; tasks: CountRead; proposals: CountRead }
   | { status: "gone"; id: string };
 
 export type CompareData = { a: CompareSide; b: CompareSide };
@@ -34,14 +34,15 @@ const clean = (v: string | null | undefined) => (v ?? "").trim();
 /** The stage read: a lead with no stage is "—"; a read that failed is "Couldn't load" (never the same as no stage). */
 export type CompareStage = { status: "ok"; name: string } | { status: "none" } | { status: "unavailable" };
 
-export function shapeCompareSide(lead: CompareLeadInput, stage: CompareStage, counts: { timeline: CountRead; tasks: CountRead; proposals: CountRead }, dates: { now: Date; timeZone?: string }): CompareSide {
-  const name = `${clean(lead.first_name)} ${clean(lead.last_name)}`.trim() || clean(lead.email) || DASH;
+export function shapeCompareSide(lead: CompareLeadInput, stage: CompareStage, counts: { timeline: CountRead; tasks: CountRead; proposals: CountRead }, dates: { now: Date; timeZone?: string; /** Roles that may not see an email address (viewer, social_media) get none: it is left out. Default true. */ showEmail?: boolean }): CompareSide {
+  const showEmail = dates.showEmail !== false;
+  const name = `${clean(lead.first_name)} ${clean(lead.last_name)}`.trim() || (showEmail ? clean(lead.email) : "") || DASH;
   return {
     status: "ok",
     id: lead.id,
     name,
     business: clean(lead.mark_text) || clean(lead.business_name) || DASH,
-    email: clean(lead.email) || DASH,
+    email: showEmail ? clean(lead.email) || DASH : null,
     stage: stage.status === "ok" ? stage.name : stage.status === "none" ? DASH : LEADS_COMPARE_COULDNT_LOAD,
     source: clean(lead.referral_source) || DASH,
     created: sheetDay(lead.created_at, dates.now, dates.timeZone) ?? DASH,
@@ -72,7 +73,7 @@ export function compareRows(a: Extract<CompareSide, { status: "ok" }>, b: Extrac
   const rows: CompareRow[] = [
     row("name", a.name, b.name),
     row("business", a.business, b.business),
-    row("email", a.email, b.email),
+    ...(a.email !== null && b.email !== null ? [row("email", a.email, b.email)] : []),
     row("stage", a.stage, b.stage, a.stage === LEADS_COMPARE_COULDNT_LOAD || b.stage === LEADS_COMPARE_COULDNT_LOAD),
     row("source", a.source, b.source),
     row("created", a.created, b.created),

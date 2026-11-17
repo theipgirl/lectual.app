@@ -218,14 +218,18 @@ export type TouchStamp = {
  * on the firm's calendar day, with the month and day kept together on one line. Null for no date or one that doesn't parse.
  */
 export function sheetDay(iso: string | null | undefined, now: Date, timeZone: string = DEFAULT_ZONE): string | null {
-  const civil = iso ? civilDay(iso, timeZone) : null;
+  // A date in the future is never shown ("Our turn · Dec 3" before Dec 3): it is treated as missing, like one that doesn't parse.
+  const at = iso ? Date.parse(iso) : NaN;
+  if (!Number.isFinite(at) || at > now.getTime()) return null;
+  const civil = civilDay(iso as string, timeZone);
   const today = civilDay(now.toISOString(), timeZone);
   return civil && today ? shortDate(civil, today).replace(" ", "\u00a0") : null;
 }
 
 export function touchStampFor(row: IntakeRow, opts: { now: Date; timeZone?: string }): TouchStamp {
   const day = (iso: string | null): string | null => sheetDay(iso, opts.now, opts.timeZone);
-  const newest = day(row.lastTouchAt);
+  // The newest date; if that one is in the future (never shown), the lead's own last activity stands in for it.
+  const newest = day(row.lastTouchAt) ?? day(row.lead.last_activity_at);
   if (!newest) return { text: LEADS_TOUCH_NO_CONTACT, waitingOnUs: false, state: "none", title: LEADS_TOUCH_NONE_TITLE };
   // "Our turn" is dated by their last email or call (last_inbound_at), "Waiting on them" by ours (last_outbound_at): a note or a stage
   // move that is newer than either must not re-date who wrote last. `lastTouchAt` (the newest of all three) is for the sort and "Last activity".

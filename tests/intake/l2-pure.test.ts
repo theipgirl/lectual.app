@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { assistantColumnShown, assistantItems } from "@/lib/intake/assistant-column";
 import { COL_ORDER, DEFAULT_COL_WIDTHS, MAX_COL, MENU_COL_WIDTH, MIN_COL, NEXT_MIN_WIDTH, clampWidth, colWidth, parseColSizes, resizedWidth, tableMinWidth, visibleColumns, withoutCol } from "@/lib/intake/col-widths";
 import { compareRows, countText, shapeCompareSide, type CountRead } from "@/lib/intake/compare";
-import { loadCompare, type CompareDeps, type CompareLeadRow } from "@/lib/intake/compare-load";
+import { compareRoleRules, loadCompare, type CompareDeps, type CompareLeadRow } from "@/lib/intake/compare-load";
 import { temperaturePill } from "@/lib/intake/temperature-pill";
 import type { IntakeRow } from "@/lib/intake/rows";
 
@@ -103,6 +103,7 @@ function deps(over: Partial<CompareDeps> = {}): CompareDeps {
     readStageName: async () => "Follow-Up",
     now: new Date("2026-11-10T14:00:00Z"),
     timeZone: "America/New_York",
+    showEmail: true,
     count: async () => 3,
     proposalsOn: async () => true,
     ...over,
@@ -149,5 +150,22 @@ describe("loadCompare (reads through injected scoped reads)", () => {
     const d = deps({ readLead: async (id) => { reads++; return lead(id); } });
     for (const [a, b] of [["x", B], [A, A], [A, "../etc"]]) expect((await loadCompare(a, b, d)).ok).toBe(false);
     expect(reads).toBe(0);
+  });
+});
+
+describe("what a role sees in the comparison", () => {
+  it("proposals are counted only for the proposals roles; viewer and social_media see no email", () => {
+    expect(compareRoleRules("owner")).toEqual({ showEmail: true, mayCountProposals: true });
+    expect(compareRoleRules("paralegal")).toEqual({ showEmail: true, mayCountProposals: true });
+    expect(compareRoleRules("viewer")).toEqual({ showEmail: false, mayCountProposals: false });
+    expect(compareRoleRules("social_media")).toEqual({ showEmail: false, mayCountProposals: false });
+  });
+  it("without showEmail the email is left out of both sides and out of the rows, and never leaks into the name", async () => {
+    const r = await loadCompare(A, B, deps({ showEmail: false, readLead: async (id) => lead(id, { first_name: "", last_name: "" }) }));
+    if (!r.ok || r.data.a.status !== "ok" || r.data.b.status !== "ok") throw new Error("shape");
+    expect(r.data.a.email).toBeNull();
+    expect(r.data.a.name).toBe("—");
+    expect(compareRows(r.data.a, r.data.b).some((x) => x.key === "email")).toBe(false);
+    expect(JSON.stringify(r)).not.toContain("d@example.test");
   });
 });

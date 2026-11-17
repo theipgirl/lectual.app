@@ -36,7 +36,8 @@ describe("source guards", () => {
     const body = src.slice(src.indexOf("export async function loadCompareAction"));
     expect(body.indexOf("resolveCurrentRole(db)")).toBeGreaterThan(-1);
     expect(body.indexOf("resolveCurrentRole(db)")).toBeLessThan(body.indexOf("loadCompare("));
-    expect(body).toContain("PROPOSAL_STAFF_WRITE_ROLES.includes(role)");
+    expect(body).toContain("rules.mayCountProposals");
+    expect(body).toContain("showEmail: rules.showEmail");
   });
   it("the Geist override is the Leads workspace's class only, not .intake-root (Reconcile keeps its look)", () => {
     expect(read("src/app/dashboard/intake/leads.css")).not.toContain(".intake-root.intake-root");
@@ -53,6 +54,28 @@ describe("source guards", () => {
     expect(read("src/app/dashboard/intake/_components/useColWidths.ts")).toMatch(/pointercancel[\s\S]*lostpointercapture/);
     const t = read("src/app/dashboard/intake/_components/IntakeTable.tsx");
     for (const a of ["aria-valuenow", "aria-valuemin", "aria-valuemax"]) expect(t).toContain(a);
+  });
+});
+
+describe("css rules", () => {
+  const css = readFileSync("src/app/dashboard/intake/leads.css", "utf8");
+  it("has no prefers-color-scheme block (the dashboard has no dark theme; a dark OS must not get dark pills on the cream page)", () => {
+    expect(css).not.toContain("prefers-color-scheme");
+    expect(css).toContain(':root[data-theme="dark"]');
+  });
+  it("the card scrolls by default and is overflow visible only after a measurement said the table fits", () => {
+    const table = readFileSync("src/app/dashboard/intake/_components/IntakeTable.tsx", "utf8");
+    expect(table).toContain("useState(true)");
+    expect(css).toContain('.ix-sheet .rse-scroll[data-scroll="false"] { overflow: visible; }');
+    expect(css).not.toMatch(/\.ix-sheet \.rse-scroll\s*\{[^}]*overflow:\s*visible/);
+  });
+  it("the Intake-only 13px header and the 14px phone controls are scoped, and the Sheet's CSS file is untouched by them", () => {
+    expect(css).toContain(".ix-leads .rv-owner .rse-tbl thead th");
+    expect(css).toMatch(/max-width: 640px\) \{\s*\.ix-marker-dup, \.ix-temp, \.ix-card \.ix-touch, \.ix-cmp-note, \.ix-cmp-close, \.ix-cmp-table tbody th \{ font-size: 14px; \}/);
+  });
+  it("a drag in progress is torn down when the table unmounts", () => {
+    const h = readFileSync("src/app/dashboard/intake/_components/useColWidths.ts", "utf8");
+    expect(h).toContain("teardown.current?.()");
   });
 });
 

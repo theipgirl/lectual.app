@@ -136,17 +136,28 @@ export default function IntakeTable({
   const { sizes, drag, startDrag, onKeyDown, reset } = useColWidths();
   const dragCol = drag?.col ?? null;
   const minWidth = tableMinWidth(cols, sizes);
-  // The table scrolls inside its card only when it is wider than the card. Otherwise the card does not scroll at all, so a menu
-  // that opens on the last row is never clipped and never adds a scrollbar.
+  // The card scrolls sideways inside itself by default (so the PAGE never does, whatever the columns add up to). Only after a
+  // measurement shows the table fits does it switch to overflow visible, so a menu opened on the last row is never clipped and adds
+  // no scrollbar. With no ResizeObserver it simply stays scrollable.
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const [needsScroll, setNeedsScroll] = useState(false);
+  const [needsScroll, setNeedsScroll] = useState(true);
+  // The drawn width of each column, for the separator's aria-valuenow (the flexible Next step column has no fixed width).
+  const [drawn, setDrawn] = useState<Partial<Record<ColKey, number>>>({});
+  const colsKey = cols.join(",");
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() => setNeedsScroll(minWidth > el.clientWidth));
+    const measure = () => {
+      setNeedsScroll(minWidth > el.clientWidth);
+      const next: Partial<Record<ColKey, number>> = {};
+      for (const th of el.querySelectorAll<HTMLElement>("thead th[data-col]")) next[th.dataset.col as ColKey] = Math.round(th.getBoundingClientRect().width);
+      setDrawn(next);
+    };
+    const observer = new ResizeObserver(measure);
     observer.observe(el);
+    for (const th of el.querySelectorAll("thead th")) observer.observe(th);
     return () => observer.disconnect();
-  }, [minWidth]);
+  }, [minWidth, colsKey]);
   const tableStyle = { "--rse-min": `${minWidth}px` } as CSSProperties;
 
   return (
@@ -181,7 +192,7 @@ export default function IntakeTable({
                         className={`rse-col-grip${dragCol === c ? " is-active" : ""}`}
                         role="separator"
                         aria-orientation="vertical"
-                        aria-valuenow={w ?? NEXT_MIN_WIDTH}
+                        aria-valuenow={w ?? drawn[c] ?? NEXT_MIN_WIDTH}
                         aria-valuemin={MIN_COL}
                         aria-valuemax={MAX_COL}
                         aria-label={LEADS_RESIZE_COLUMN(label)}
@@ -190,7 +201,7 @@ export default function IntakeTable({
                         onKeyDown={onKeyDown(c)}
                         onDoubleClick={() => reset(c)}
                       />
-                      {dragCol === c && <span className="rse-col-tip">{drag?.width ?? Math.round(w ?? NEXT_MIN_WIDTH)} px</span>}
+                      {dragCol === c && <span className="rse-col-tip">{drag?.width ?? Math.round(w ?? drawn[c] ?? NEXT_MIN_WIDTH)} px</span>}
                     </th>
                   );
                 })}

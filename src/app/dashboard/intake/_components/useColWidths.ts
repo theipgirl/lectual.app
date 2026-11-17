@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 import { LEADS_COL_WIDTHS_KEY, NO_COL_SIZES, parseColSizes, resizedWidth, withoutCol, type ColKey, type ColSizes } from "@/lib/intake/col-widths";
 
@@ -49,6 +49,10 @@ export function useColWidths() {
   /** The column being dragged and its real width in px (also for the flexible Next step column), for the width tip. */
   const [drag, setDrag] = useState<{ col: ColKey; width: number } | null>(null);
 
+  // The teardown of a drag in progress, so a table that unmounts mid-drag never leaves document listeners behind.
+  const teardown = useRef<(() => void) | null>(null);
+  useEffect(() => () => teardown.current?.(), []);
+
   /** Drag a column's right edge. The header cell (the handle's parent) is measured when the drag starts. */
   const startDrag = useCallback((col: ColKey) => (event: ReactPointerEvent<HTMLElement>) => {
     const handle = event.currentTarget;
@@ -70,14 +74,24 @@ export function useColWidths() {
     };
     // One ending for every way a drag can stop: release, cancel (a touch interrupted by the browser) or a lost capture.
     let ended = false;
-    const onUp = () => {
-      if (ended) return;
-      ended = true;
+    const detach = () => {
       document.removeEventListener("pointermove", onMove);
       document.removeEventListener("pointerup", onUp);
       document.removeEventListener("pointercancel", onUp);
       handle.removeEventListener("lostpointercapture", onUp);
+      teardown.current = null;
+    };
+    const onUp = () => {
+      if (ended) return;
+      ended = true;
+      detach();
       setDrag(null);
+      write(store.get());
+    };
+    teardown.current = () => {
+      if (ended) return;
+      ended = true;
+      detach();
       write(store.get());
     };
     document.addEventListener("pointermove", onMove);

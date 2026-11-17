@@ -1,3 +1,5 @@
+import { PROPOSAL_STAFF_WRITE_ROLES } from "@/lib/proposals/types";
+import type { Role } from "@/lib/auth/roles";
 import { LEADS_COMPARE_FAILED } from "@/lib/ui/words";
 import { shapeCompareSide, type CompareData, type CompareStage, type CompareLeadInput, type CompareSide, type CountRead } from "./compare";
 
@@ -20,6 +22,8 @@ export type CompareDeps = {
   /** The Created date is worded like the weekly review Sheet, on the firm's calendar day. */
   now: Date;
   timeZone: string;
+  /** False for the roles that may not see an email address: it is left out of both sides. */
+  showEmail: boolean;
 };
 
 export type CompareResult = { ok: true; data: CompareData } | { ok: false; error: string };
@@ -55,7 +59,7 @@ async function side(id: string, deps: CompareDeps, proposals: boolean): Promise<
     counted(() => deps.count("crm_task", id)),
     proposals ? counted(() => deps.count("client_proposal", id)) : Promise.resolve<CountRead>({ status: "off" }),
   ]);
-  return shapeCompareSide(lead, stage, { timeline, tasks, proposals: proposalCount }, { now: deps.now, timeZone: deps.timeZone });
+  return shapeCompareSide(lead, stage, { timeline, tasks, proposals: proposalCount }, { now: deps.now, timeZone: deps.timeZone, showEmail: deps.showEmail });
 }
 
 export async function loadCompare(aId: string, bId: string, deps: CompareDeps): Promise<CompareResult> {
@@ -67,4 +71,12 @@ export async function loadCompare(aId: string, bId: string, deps: CompareDeps): 
   } catch {
     return { ok: false, error: LEADS_COMPARE_FAILED };
   }
+}
+
+/**
+ * What the caller's role allows in the comparison. The Proposals row is counted only for the proposals roles (lectual 0089's list,
+ * `PROPOSAL_STAFF_WRITE_ROLES`); any other role gets no Proposals row at all, never a 0. viewer and social_media see no email address.
+ */
+export function compareRoleRules(role: Role): { showEmail: boolean; mayCountProposals: boolean } {
+  return { showEmail: role !== "viewer" && role !== "social_media", mayCountProposals: PROPOSAL_STAFF_WRITE_ROLES.includes(role) };
 }

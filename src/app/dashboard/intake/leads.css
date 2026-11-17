@@ -8,22 +8,14 @@
    Each pill carries its own background, so its text contrast holds on any page background. Measured text/background ratios:
    light: hot 6.44, warm 5.66, cold 5.62, suggested (outlined, on #fffdf7) hot 7.71, warm 6.56, cold 6.72, assistant 5.85;
    dark:  hot 8.50, warm 8.22, cold 7.86, suggested (outlined, on #1c1416) hot 10.66, warm 11.72, cold 10.65, assistant 7.93.
-   The dashboard has no dark theme yet; the dark values are ready for the shell's dark pair, as the deck's are. */
+   The dashboard has no dark theme (globals.css), so there is NO media-query dark block here: a dark-mode OS must not give dark pills
+   on the cream page. The dark values apply only under an explicit :root[data-theme="dark"], for when the shell gets one. */
 :root {
   --tp-hot-fg: #a3141f; --tp-hot-bg: #fde3e1;
   --tp-warm-fg: #8f4a00; --tp-warm-bg: #ffe9cf;
   --tp-cold-fg: #1f5aa6; --tp-cold-bg: #dfeaf8;
   --tp-outline-bg: #fffdf7;
   --asst-fg: var(--ok, #43602f); --asst-bg: var(--okbg, rgba(67, 96, 47, 0.12));
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --tp-hot-fg: #ffb4ac; --tp-hot-bg: #4a1a1c;
-    --tp-warm-fg: #ffc58a; --tp-warm-bg: #4a2c0a;
-    --tp-cold-fg: #a9c9f5; --tp-cold-bg: #17304f;
-    --tp-outline-bg: #1c1416;
-    --asst-fg: #b7d9a0; --asst-bg: #243a1a;
-  }
 }
 :root[data-theme="dark"] {
   --tp-hot-fg: #ffb4ac; --tp-hot-bg: #4a1a1c;
@@ -63,6 +55,8 @@
 /* No inner scroll unless the table is wider than the card: an overflow-x scroller would also clip, or add a scrollbar for, a menu
    that opens below the last row (menus are absolutely positioned). */
 .ix-sheet .rse-scroll[data-scroll="false"] { overflow: visible; }
+/* Intake only (scoped through .ix-leads, the Sheet is untouched): the Sheet's 12px header, width tip and phone labels read 13px here. */
+.ix-leads .rv-owner .rse-tbl thead th, .ix-leads .rv-owner .rse-col-tip { font-size: 13px; }
 .ix-sheet .ix-sort { font: inherit; letter-spacing: inherit; text-transform: inherit; text-align: left; border: 0; background: transparent; padding: 0; color: inherit; cursor: pointer; }
 .ix-sheet .ix-sort[data-on] { color: var(--ox); }
 .ix-sheet .ix-sort:focus-visible { outline: 2px solid var(--ox); outline-offset: 2px; border-radius: 3px; }
@@ -149,6 +143,7 @@
   .ix-sheet .rse-tbl td.ix-lead-td { display: block; text-align: left; }
   .ix-next { -webkit-line-clamp: 1; }
   .ix-sub, .ix-stage, .ix-marker { font-size: 14px; }
+  .ix-leads .rv-owner .rse-tbl td[data-label]::before { font-size: 13px; }
   .ix-board { grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: minmax(0, 1fr); overflow-x: visible; }
 }
 
@@ -193,3 +188,8 @@
 .ix-cmp-links { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 14px; }
 .ix-cmp-link { color: var(--ox); font-size: 14px; text-decoration: underline; overflow-wrap: anywhere; }
 @media (max-width: 640px) { .ix-cmp-panel { padding: 14px; } .ix-cmp-table th, .ix-cmp-table td { font-size: 14px; } }
+
+/* Phone: the small controls and labels read 14px (after every base rule, so these win). */
+@media (max-width: 640px) {
+  .ix-marker-dup, .ix-temp, .ix-card .ix-touch, .ix-cmp-note, .ix-cmp-close, .ix-cmp-table tbody th { font-size: 14px; }
+}

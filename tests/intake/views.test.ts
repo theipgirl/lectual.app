@@ -14,6 +14,7 @@ import {
   topBarLine,
   touchDate,
   touchStampFor,
+  sheetDay,
 } from "@/lib/intake/views";
 
 /**
@@ -249,6 +250,15 @@ describe("touchDate / touchStampFor", () => {
     expect(touchStampFor(ours, { now: NOW })).toMatchObject({ text: "Our turn · Sep\u00a09", state: "our-turn" });
     const [theirs] = rowsFor([lead({ id: "f", last_inbound_at: daysBefore(9), last_outbound_at: daysBefore(4), last_activity_at: daysBefore(1) })]);
     expect(touchStampFor(theirs, { now: NOW })).toMatchObject({ text: "Waiting on them · Sep\u00a010", state: "waiting" });
+  });
+
+  it("a future inbound or outbound date is treated as missing, never shown", () => {
+    const [future] = rowsFor([lead({ id: "f", last_inbound_at: new Date(NOW.getTime() + 3 * 86_400_000).toISOString(), last_activity_at: daysBefore(2) })]);
+    expect(touchStampFor(future, { now: NOW }).text).toBe("Last activity · Sep\u00a012");
+    expect(touchStampFor(future, { now: NOW }).state).toBe("activity-only");
+    expect(sheetDay(new Date(NOW.getTime() + 60_000).toISOString(), NOW)).toBeNull();
+    expect(sheetDay("not a date", NOW)).toBeNull();
+    expect(sheetDay(null, NOW)).toBeNull();
   });
 
   it("only a date and no email or call: says so, and does not guess a side", () => {
