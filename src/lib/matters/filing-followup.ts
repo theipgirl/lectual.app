@@ -10,7 +10,7 @@
  *  1. The due-ness computation crew/monthly-status-sweep.md runs on a
  *     schedule — "is this matter due for its next monthly status email?" —
  *     for the dashboard's real-time button instead of an overnight sweep.
- *     Same stage (`18. Awaiting Trademark Registration`), same ~5-month
+ *     Same stage (`18. Awaiting Trademark Registration`), same four-month
  *     sequence, same "queue the NEXT sequential month, never skip ahead"
  *     rule. This dashboard has one advantage the crew task explicitly
  *     doesn't: it can read the real approval queue for what's already been
@@ -30,10 +30,10 @@
  * full code (see stages.ts's own note); this one has no sub-stage letter. */
 export const AWAITING_REGISTRATION_STAGE_CODE = "18";
 
-/** The SOP's "~5 months" monthly sequence length. Past this, the sweep
+/** The SOP's four monthly updates (months 1 to 4). Past this, the sweep
  * stops auto-drafting and flags the matter for a human to verify the stage
  * is even still accurate (crew/monthly-status-sweep.md step 3). */
-export const MONTHLY_SEQUENCE_MAX_MONTHS = 5;
+export const MONTHLY_SEQUENCE_MAX_MONTHS = 4;
 
 /**
  * The single EA-review estimate this feature uses for X (months remaining),
@@ -128,10 +128,11 @@ export function followUpNeedsAttention(status: FollowUpStatus): boolean {
  * queued by the crew task and one queued from this dashboard are
  * indistinguishable to loadFollowUpQueueState's parser. */
 export function monthlyUpdateHeadline(markText: string, monthNumber: number): string {
-  return `Monthly Status Update — Month ${monthNumber} of ~${MONTHLY_SEQUENCE_MAX_MONTHS} — ${markText}`;
+  return `Monthly Status Update — Month ${monthNumber} of ${MONTHLY_SEQUENCE_MAX_MONTHS} — ${markText}`;
 }
 
-const HEADLINE_MONTH_RE = /Monthly Status Update — Month (\d+) of ~\d+/;
+/** Older drafts were queued as "of ~5", so the "~" is optional. */
+const HEADLINE_MONTH_RE = /Monthly Status Update — Month (\d+) of ~?\d+/;
 
 /** Recovers the month number from a queued draft's headline, or null if the
  * headline doesn't match this feature's pattern at all (a different draft
@@ -188,11 +189,11 @@ Warm regards,
 RPB Law Operations
 
 ---
-Internal (not part of the email): Month ${facts.monthNumber} of ~${MONTHLY_SEQUENCE_MAX_MONTHS}, computed from the matter's filing date. Firm EA-review estimate used: ${FIRM_EA_REVIEW_ESTIMATE_MONTHS} months (see filing-followup.ts). Confirm this is genuinely the next update due before approving.`;
+Internal (not part of the email): Month ${facts.monthNumber} of ${MONTHLY_SEQUENCE_MAX_MONTHS}, computed from the matter's filing date. Firm EA-review estimate used: ${FIRM_EA_REVIEW_ESTIMATE_MONTHS} months (see filing-followup.ts). Confirm this is genuinely the next update due before approving.`;
 
   return {
     headline: monthlyUpdateHeadline(facts.markText, facts.monthNumber),
-    summary: `Filing follow-up: month ${facts.monthNumber} of ~${MONTHLY_SEQUENCE_MAX_MONTHS} status update for ${facts.markText}.`,
+    summary: `Filing follow-up: month ${facts.monthNumber} of ${MONTHLY_SEQUENCE_MAX_MONTHS} status update for ${facts.markText}.`,
     subject: "A quick update on your trademark application",
     draftBody,
   };
