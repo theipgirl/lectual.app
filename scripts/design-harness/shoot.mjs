@@ -15,7 +15,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(here, "out");
 const SHOTS = path.join(OUT, "shots");
 // HARNESS_DESKTOP_HEIGHT: a taller desktop viewport, to see a page below the fold (the shell scrolls inside itself).
-const VIEWPORTS = { desktop: { width: 1440, height: Number(process.env.HARNESS_DESKTOP_HEIGHT) || 900 }, phone: { width: 375, height: 812 } };
+const VIEWPORTS = { desktop: { width: 1440, height: Number(process.env.HARNESS_DESKTOP_HEIGHT) || 900 }, desktop1280: { width: 1280, height: 800 }, phone: { width: 375, height: 812 } };
 const TYPES = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".json": "application/json" };
 
 const wanted = process.argv.slice(2);
@@ -80,7 +80,30 @@ try {
         }).join(" ");
       });
       await page.screenshot({ path: path.join(SHOTS, `${s.id}.png`), fullPage: true });
+      // Sideways scroll: the document, and any element wider than its viewport that is not itself a clipped scroller.
+      const m = await page.evaluate((minPx) => {
+        const vw = window.innerWidth;
+        const small = new Map();
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+          const t = n.textContent.trim();
+          const el = n.parentElement;
+          if (!t || !el || ["SCRIPT", "STYLE"].includes(el.tagName)) continue;
+          const r = el.getBoundingClientRect();
+          const cs = getComputedStyle(el);
+          if (r.width === 0 || r.height === 0 || cs.visibility === "hidden" || cs.display === "none") continue;
+          const px = parseFloat(cs.fontSize);
+          if (px < minPx) small.set(`${px}px ${t.slice(0, 40)}`, 1);
+        }
+        const over = [];
+        for (const el of document.querySelectorAll("body *")) {
+          const r = el.getBoundingClientRect();
+          if (r.width && r.right > vw + 1) over.push(`${el.tagName.toLowerCase()}.${String(el.className).slice(0, 40)} right=${Math.round(r.right)}`);
+        }
+        return { vw, docScroll: document.documentElement.scrollWidth, bodyScroll: document.body.scrollWidth, small: [...small.keys()].slice(0, 25), smallCount: small.size, over: over.slice(0, 8) };
+      }, s.viewport === "phone" ? 14 : 13);
       console.log("shot", s.id, fonts);
+      console.log("  measure", JSON.stringify(m));
     } finally {
       await page.close();
     }

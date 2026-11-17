@@ -186,3 +186,21 @@ vi.mock("next/font/google", () => {
   const font = () => ({ className: "", variable: "", style: { fontFamily: "inherit" } });
   return { Bodoni_Moda: font, Source_Serif_4: font, Instrument_Serif: font, Geist: font, Courier_Prime: font };
 });
+
+// Forms page (screens/forms-owner.screen.tsx): the intake-forms loaders. Sample records come from `state.formsList` / `state.formRecord`.
+vi.mock("@/lib/intake-forms/store", async (orig) => ({
+  ...(await orig<typeof import("@/lib/intake-forms/store")>()),
+  listOrCreateIntakeForms: async () => ({ status: "ok", value: state.formsList ?? [] }),
+  loadIntakeForm: async () => ({ status: "ok", form: state.formRecord ?? null }),
+  loadIntakePackages: async () => ({ status: "ok", items: [] }),
+}));
+vi.mock("@/lib/intake-forms/load-performance", async (orig) => ({
+  ...(await orig<typeof import("@/lib/intake-forms/load-performance")>()),
+  loadSubmissionStatRows: async () => ({ status: "ok", value: { rows: (state as { formStatRows?: unknown[] }).formStatRows ?? [], capped: false } }),
+}));
+vi.mock("@/lib/intake-forms/origin", () => ({ intakeOrigin: async () => "https://app.example" }));
+vi.mock("@/lib/intake-forms/load-results", async (orig) => ({
+  ...(await orig<typeof import("@/lib/intake-forms/load-results")>()),
+  loadBoothEventList: async () => ({ status: "ok", value: { rows: (state as { boothList?: never[] }).boothList ?? [], capped: false } }),
+  loadBoothEvent: async () => ({ status: "ok", value: { rows: (state as { boothEventRows?: never[] }).boothEventRows ?? [], capped: false } }),
+}));
