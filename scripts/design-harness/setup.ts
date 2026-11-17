@@ -187,20 +187,6 @@ vi.mock("next/font/google", () => {
   return { Bodoni_Moda: font, Source_Serif_4: font, Instrument_Serif: font, Geist: font, Courier_Prime: font };
 });
 
-// Item L2 sample (screens/leads-l2.screen.tsx): a screen may set these; with none set the real loaders run as before.
-vi.mock("@/lib/queue/lead-pending", async (orig) => {
-  const o = await orig<typeof import("@/lib/queue/lead-pending")>();
-  return { ...o, loadPendingApprovalsByLead: async (...a: Parameters<typeof o.loadPendingApprovalsByLead>) => (state as { l2Pending?: Awaited<ReturnType<typeof o.loadPendingApprovalsByLead>> }).l2Pending ?? o.loadPendingApprovalsByLead(...a) };
-});
-vi.mock("@/lib/stage-keeper/read", async (orig) => {
-  const o = await orig<typeof import("@/lib/stage-keeper/read")>();
-  return { ...o, loadAgentMoves: async (...a: Parameters<typeof o.loadAgentMoves>) => (state as { l2Moves?: Awaited<ReturnType<typeof o.loadAgentMoves>> }).l2Moves ?? o.loadAgentMoves(...a) };
-});
-vi.mock("@/lib/intake/facts", async (orig) => {
-  const o = await orig<typeof import("@/lib/intake/facts")>();
-  return { ...o, loadTemperatureFacts: async (...a: Parameters<typeof o.loadTemperatureFacts>) => (state as { l2Facts?: Awaited<ReturnType<typeof o.loadTemperatureFacts>> }).l2Facts ?? o.loadTemperatureFacts(...a) };
-});
-
 // Forms page (screens/forms-owner.screen.tsx): the intake-forms loaders. Sample records come from `state.formsList` / `state.formRecord`.
 vi.mock("@/lib/intake-forms/store", async (orig) => ({
   ...(await orig<typeof import("@/lib/intake-forms/store")>()),
@@ -240,3 +226,17 @@ vi.mock("@/lib/intake-forms/load-results", async (orig) => ({
     return { status: "ok", value: { cards: p.cards, leads: p.leads, total: p.cards.length, over: false } };
   },
 }));
+
+// Item L2 sample (screens/leads-l2.screen.tsx): a screen may set these; with none set the real loaders run as before.
+vi.mock("@/lib/queue/lead-pending", async (orig) => {
+  const o = await orig<typeof import("@/lib/queue/lead-pending")>();
+  return { ...o, loadPendingApprovalsByLead: async (...a: Parameters<typeof o.loadPendingApprovalsByLead>) => (state as { l2Pending?: Awaited<ReturnType<typeof o.loadPendingApprovalsByLead>> }).l2Pending ?? o.loadPendingApprovalsByLead(...a) };
+});
+vi.mock("@/lib/stage-keeper/read", async (orig) => {
+  const o = await orig<typeof import("@/lib/stage-keeper/read")>();
+  return { ...o, loadAgentMoves: async (...a: Parameters<typeof o.loadAgentMoves>) => (state as { l2Moves?: Awaited<ReturnType<typeof o.loadAgentMoves>> }).l2Moves ?? o.loadAgentMoves(...a) };
+});
+vi.mock("@/lib/intake/facts", async (orig) => {
+  const o = await orig<typeof import("@/lib/intake/facts")>();
+  return { ...o, loadTemperatureFacts: async (...a: Parameters<typeof o.loadTemperatureFacts>) => (state as { l2Facts?: Awaited<ReturnType<typeof o.loadTemperatureFacts>> }).l2Facts ?? o.loadTemperatureFacts(...a) };
+});
