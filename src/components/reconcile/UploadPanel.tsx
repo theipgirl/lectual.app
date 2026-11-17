@@ -1,3 +1,5 @@
+import { Notice } from "@/components/ui/Notice";
+
 /**
  * The file picker. CSV only: Excel workbooks are refused with a sentence on the server too, so the
  * `accept` hint is a courtesy and not the check.
@@ -12,7 +14,7 @@ export function UploadPanel({
   onSubmit?: (form: HTMLFormElement) => void;
 }) {
   return (
-    <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }} aria-label="Upload the sheet">
+    <section className="lx-card rc-panel" aria-label="Upload the sheet">
       <form
         className="rc-file"
         onSubmit={(e) => {
@@ -32,9 +34,9 @@ export function UploadPanel({
       </form>
       <p className="lx-note">Reading changes nothing. You choose what to move on the next screen.</p>
       {error ? (
-        <p role="alert" className="lx-banner lx-banner-risk">
+        <Notice tone="risk" role="alert">
           {error}
-        </p>
+        </Notice>
       ) : null}
     </section>
   );

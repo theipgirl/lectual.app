@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { COL_ORDER, DEFAULT_COL_WIDTHS, MENU_COL_WIDTH, NEXT_MIN_WIDTH, tableMinWidth, type ColKey } from "@/lib/intake/col-widths";
-import { LEADS_ASSISTANT_COLUMN, LEADS_CONTACT_COLUMN } from "@/lib/ui/words";
+import { LEADS_ASSISTANT_COLUMN, LEADS_CONTACT_COLUMN, NEXT_STEP, OWNER_COLUMN } from "@/lib/ui/words";
 
 /**
  * Guard: no column header on the Leads list is cut at its default width. PURE (no browser): the width of a header word is
@@ -42,7 +42,8 @@ const tableSrc = read("src/app/dashboard/intake/_components/IntakeTable.tsx");
 const labels: Record<string, string> = {};
 for (const m of tableSrc.matchAll(/^\s+(\w+): \{ key: [^,]+, label: ([^}]+?) \},?$/gm)) {
   const raw = m[2].trim();
-  labels[m[1]] = raw === "LEADS_ASSISTANT_COLUMN" ? LEADS_ASSISTANT_COLUMN : raw === "LEADS_CONTACT_COLUMN" ? LEADS_CONTACT_COLUMN : JSON.parse(raw);
+  const named: Record<string, string> = { LEADS_ASSISTANT_COLUMN, LEADS_CONTACT_COLUMN, OWNER_COLUMN, NEXT_STEP };
+  labels[m[1]] = named[raw] ?? JSON.parse(raw);
 }
 
 const wordWidth = (w: string) => [...w.toUpperCase()].reduce((n, ch) => n + (ADVANCE_EM[ch] ?? 0.75) * fontSize + letterSpacing, 0);

@@ -304,7 +304,7 @@ describe("the bulk bar", () => {
   });
 
   it("shows the busy state and a message", () => {
-    expect(bar({ pending: true })).toContain("Moving…");
+    expect(bar({ pending: true })).toContain("Saving…");
     expect(bar({ message: { tone: "error", text: "Nope." } })).toMatch(/role="alert"[^>]*>Nope\./);
     expect(bar({ message: { tone: "ok", text: "Moved 2 leads." } })).toMatch(/role="status"[^>]*>Moved 2 leads\./);
   });

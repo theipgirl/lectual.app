@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { Stage } from "@/lib/pipeline";
 import { BULK_MOVE_MAX } from "@/lib/pipeline/bulk-move";
 import { stageLabelFor } from "@/lib/intake/views";
-import { LEADS_HIDDEN_SELECTED, LEADS_SELECT_DONE } from "@/lib/ui/words";
+import { LEADS_HIDDEN_SELECTED, LEADS_SELECT_DONE, SAVING } from "@/lib/ui/words";
 
 /**
  * "Move to..." for the cards ticked on the board, drawn only while the board is in select mode. It only chooses: the move
@@ -49,7 +49,7 @@ export default function BulkMoveBar({
         <>
           <span>Tick cards to move several at once.</span>
           {shownCount > 0 && (
-            <button type="button" className="lx-btn" onClick={onSelectShown}>
+            <button type="button" className="lx-btn lx-btn-sec" onClick={onSelectShown}>
               {`Select the ${Math.min(shownCount, BULK_MOVE_MAX)} shown`}
             </button>
           )}
@@ -57,9 +57,9 @@ export default function BulkMoveBar({
       ) : (
         <>
           <strong data-bulk-count>{`${selectedCount} selected`}</strong>
-          <label style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <label className="ix-bulk-label">
             <span>Move to</span>
-            <select value={stageId} onChange={(event) => setStageId(event.target.value)} aria-label="Move the selected leads to this stage">
+            <select className="lx-input" value={stageId} onChange={(event) => setStageId(event.target.value)} aria-label="Move the selected leads to this stage">
               <option value="">Choose a stage</option>
               {choices.map((stage) => (
                 <option key={stage.id} value={stage.id}>
@@ -69,16 +69,16 @@ export default function BulkMoveBar({
             </select>
           </label>
           <button type="button" className="lx-btn lx-btn-pri" disabled={!canMove} onClick={() => onMove(stageId)}>
-            {pending ? "Moving…" : "Move"}
+            {pending ? SAVING : "Move"}
           </button>
-          <button type="button" className="lx-btn" onClick={onClear} disabled={pending}>
+          <button type="button" className="lx-btn lx-btn-sec" onClick={onClear} disabled={pending}>
             Clear
           </button>
           {tooMany && <span role="status">{`Select at most ${BULK_MOVE_MAX} at a time.`}</span>}
         </>
       )}
       {hiddenCount > 0 && <span className="ix-bulk-note">{LEADS_HIDDEN_SELECTED(hiddenCount)}</span>}
-      <button type="button" className="lx-btn" onClick={onDone} disabled={pending}>
+      <button type="button" className="lx-btn lx-btn-sec" onClick={onDone} disabled={pending}>
         {LEADS_SELECT_DONE}
       </button>
       {message && (

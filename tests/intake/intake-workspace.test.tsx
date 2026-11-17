@@ -384,7 +384,7 @@ describe("the board card's one temperature line", () => {
       const html = card(l);
       expect(html).not.toContain("Lane:");
       // The name row is the link and nothing else: no dot beside the name.
-      expect(html).toMatch(/^<div[^>]*><div class="ix-card-top"><a [^>]*>[^<]*<\/a><\/div>/);
+      expect(html).toMatch(/^<li[^>]*><div class="lx-board-card-top ix-card-top"><span class="lx-board-card-title"><a [^>]*>[^<]*<\/a><\/span><\/div>/);
       expect(html).not.toMatch(/width:7px;height:7px/);
       const lines = html.match(/>(Hot|Warm|Cold)( · suggested)?</g) ?? [];
       expect(lines).toHaveLength(l.id === "c" ? 0 : 1);

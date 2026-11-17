@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { SAVING, ADD_TO_TIMELINE } from "@/lib/ui/words";
+import "./voice.css";
 // Ported from lectual src/components/firm/VoiceNoteRecorder.tsx: recording
 // logic unchanged, restyled onto the lx tokens.
 
@@ -52,20 +54,6 @@ function formatClock(totalSeconds: number): string {
   const s = whole % 60;
   return `${m}:${String(s).padStart(2, "0")}`;
 }
-
-const ghostButtonStyle: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 8,
-  background: "var(--well)",
-  color: "var(--body)",
-  borderRadius: 999,
-  padding: "8px 16px",
-  fontWeight: 600,
-  fontSize: 13,
-  border: "1px solid var(--line)",
-  cursor: "pointer",
-};
 
 type Phase = "idle" | "recording" | "recorded" | "unsupported" | "denied";
 
@@ -229,26 +217,24 @@ export default function VoiceNoteRecorder({
   const noun = target.kind === "lead" ? "client" : "matter";
 
   return (
-    <section className="lx-voice" style={{ display: "grid", gap: 10 }} aria-label="Voice note">
+    <section className="lx-voice" aria-label="Voice note">
       <div className="lx-label">Voice note</div>
 
       {phase === "unsupported" && (
-        <p role="alert" style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>
+        <p role="alert" className="lx-note">
           This browser can&rsquo;t record audio — try Chrome, Edge, Firefox, or Safari.
         </p>
       )}
       {phase === "denied" && (
-        <p role="alert" style={{ fontSize: 13, color: "var(--wine)", margin: 0 }}>
+        <p role="alert" className="lx-voice-error">
           Microphone access was blocked. Allow it in your browser&rsquo;s site settings, then try
           again.
         </p>
       )}
 
       {phase !== "recording" && phase !== "recorded" && (
-        <div
-          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}
-        >
-          <span style={{ fontSize: 13, color: "var(--muted)" }}>
+        <div className="lx-voice-row">
+          <span className="lx-note">
             Record a quick update on this {noun} — saved to the timeline, never sent.
           </span>
           <button
@@ -264,16 +250,10 @@ export default function VoiceNoteRecorder({
       )}
 
       {phase === "recording" && (
-        <div
-          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}
-        >
+        <div className="lx-voice-row">
           {/* Announces the phase change, not each tick — a per-second live
               region would read the clock aloud sixty times a minute. */}
-          <span
-            role="status"
-            className="lx-num"
-            style={{ fontSize: 13, color: "var(--wine)" }}
-          >
+          <span role="status" className="lx-num lx-voice-live">
             Recording {formatClock(seconds)} / {formatClock(MAX_SECONDS)}
           </span>
           <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" onClick={stopRecording} disabled={pending}>
@@ -284,30 +264,23 @@ export default function VoiceNoteRecorder({
       )}
 
       {phase === "recorded" && blob && previewUrl && (
-        <div style={{ display: "grid", gap: 10 }}>
+        <div className="lx-voice-review">
           <audio
             controls
             src={previewUrl}
             aria-label={`Unsaved voice note, ${formatClock(seconds)}`}
-            style={{ width: "100%", height: 36 }}
+            className="lx-voice-audio"
           />
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: 10,
-            }}
-          >
-            <span style={{ fontSize: 13, color: "var(--muted)" }}>
+          <div className="lx-voice-row">
+            <span className="lx-note">
               {formatClock(seconds)} recorded. Listen back, then save or discard.
             </span>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button type="button" style={ghostButtonStyle} onClick={discard} disabled={pending}>
+            <div className="lx-voice-actions">
+              <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={discard} disabled={pending}>
                 Discard
               </button>
               <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" onClick={save} disabled={pending}>
-                {pending ? "Saving…" : "Save to timeline"}
+                {pending ? SAVING : ADD_TO_TIMELINE}
               </button>
             </div>
           </div>
@@ -315,7 +288,7 @@ export default function VoiceNoteRecorder({
       )}
 
       {error && (
-        <p role="alert" style={{ fontSize: 13, color: "var(--wine)", margin: 0 }}>
+        <p role="alert" className="lx-voice-error">
           {error}
         </p>
       )}

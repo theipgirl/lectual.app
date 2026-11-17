@@ -70,7 +70,7 @@ describe("a read that failed is said in the warn tone, never as 'nothing found'"
     expect(s).toContain("No dated touch found.");
     expect(s).toContain("Mailbox search: not done. The Mailboxes module isn't switched on");
     expect(s).toContain("Lawmatics notes: couldn't be read.");
-    expect(html.match(/class="rc-warn"/g)).toHaveLength(2);
+    expect(html.match(/rc-warn|lx-pill-warn/g)).toHaveLength(2);
   });
 
   it("no address is not alarming and a truncated search says so", () => {
@@ -121,16 +121,16 @@ const person = (over: Partial<NotInLectualItem> = {}): NotInLectualItem => ({
 });
 
 describe("Not in Lectual yet", () => {
-  it("lists each person with evidence and a Create lead button with an accessible name", () => {
+  it("lists each person with evidence and an Add a lead button with an accessible name", () => {
     const html = renderToStaticMarkup(<NotInLectual items={[person(), person({ key: "lm:700", found: "lawmatics", name: "Rosalind Fairweather", detail: 'Lawmatics, stage "Proposal Sent"' })]} total={2} created={{}} busyKey={null} />);
     const s = strip(html);
     expect(s).toContain("Not in Lectual yet");
     expect(s).toContain("Ottoline Marchbanks");
     expect(s).toContain("Rosalind Fairweather");
     expect(s).toContain('Lawmatics, stage "Proposal Sent"');
-    expect(html).toContain('aria-label="Create lead for Ottoline Marchbanks"');
-    expect(html).toContain('aria-label="Create lead for Rosalind Fairweather"');
-    expect(s).toContain("Nothing is created until you press Create lead.");
+    expect(html).toContain('aria-label="Add a lead for Ottoline Marchbanks"');
+    expect(html).toContain('aria-label="Add a lead for Rosalind Fairweather"');
+    expect(s).toContain("Nothing is created until you press Add a lead.");
     expect(s).toContain("Mailbox search: not done. Only Gmail mailboxes");
   });
 
@@ -141,7 +141,7 @@ describe("Not in Lectual yet", () => {
   it("while one is being created every button is disabled and that one says so", () => {
     const html = renderToStaticMarkup(<NotInLectual items={[person(), person({ key: "sheet:18", name: "Peregrine Dunmore" })]} total={2} created={{}} busyKey="sheet:17" />);
     expect((html.match(/disabled=""/g) ?? []).length).toBe(2);
-    expect(strip(html)).toContain("Creating…");
+    expect(strip(html)).toContain("Saving…");
   });
 
   it("after creation shows a link to the lead, not a second button; a refusal is an alert", () => {
@@ -150,7 +150,7 @@ describe("Not in Lectual yet", () => {
     );
     // next/link drops the trailing slash when rendered outside the app.
     expect(html).toMatch(/href="\/dashboard\/leads\/lead-1\/?"/);
-    expect(html).not.toContain('aria-label="Create lead for Ottoline Marchbanks"');
+    expect(html).not.toContain('aria-label="Add a lead for Ottoline Marchbanks"');
     expect(html).toContain('role="alert"');
     expect(strip(html)).toContain("Created. Upload the sheet again to reconcile this lead.");
   });
@@ -212,7 +212,7 @@ describe("the summary", () => {
     const view: ReconcileView = { rows: [row()], pickable: [], summary: SUMMARY };
     const html = renderToStaticMarkup(<ReconcilePreview view={view} decisions={{}} accepted={0} busy={false} confirming={false} bulkMessage={null} />);
     expect(strip(html)).toContain("Not in Lectual yet");
-    expect(html).toContain('aria-label="Create lead for Ottoline Marchbanks"');
+    expect(html).toContain('aria-label="Add a lead for Ottoline Marchbanks"');
     expect(strip(html)).not.toContain("These are listed, not created.");
   });
 });

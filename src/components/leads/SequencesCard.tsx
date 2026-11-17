@@ -59,7 +59,7 @@ export function SequencesCard(props: { leadId: string; rows: SequenceRow[] | nul
   const { leadId, rows } = props;
   return (
     <section className="lx-card" style={{ padding: 18, display: "grid", gap: 10 }} aria-labelledby="sequences-heading">
-      <h2 id="sequences-heading" className="lx-h2" style={{ fontSize: 23, margin: 0 }}>
+      <h2 id="sequences-heading" className="lx-h2">
         Campaigns
       </h2>
       {rows === null ? (

@@ -78,10 +78,12 @@ export function civilDay(input: DateInput, tz: string): string | null {
 }
 
 /** "Nov 16"; "Nov 16, 2025" when that year is not the current year in the firm's zone. */
-export function formatDay(input: DateInput | null | undefined, opts: { tz: string; now?: Date }): string | null {
-  const c = civilOf(input, opts.tz);
+export function formatDay(input: DateInput | null | undefined, opts: { tz: string; now?: Date; civil?: boolean }): string | null {
+  // civil: a stored UTC-midnight civil date (a sheet date); read its day in UTC so no zone moves it back a day.
+  const tz = opts.civil ? "UTC" : opts.tz;
+  const c = civilOf(input, tz);
   if (!c) return null;
-  const nowCivil = civilOfInstant(opts.now ?? new Date(), opts.tz);
+  const nowCivil = civilOfInstant(opts.now ?? new Date(), tz);
   const label = `${MONTHS[c.m - 1]} ${c.d}`;
   return nowCivil && nowCivil.y === c.y ? label : `${label}, ${c.y}`;
 }

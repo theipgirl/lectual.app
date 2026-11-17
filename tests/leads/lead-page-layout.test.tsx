@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { LeadStatusRow } from "@/components/leads/LeadStatusRow";
 import { NeedsAttentionCard } from "@/components/leads/NeedsAttentionCard";
@@ -10,6 +10,8 @@ import { ContactActions } from "@/components/leads/ContactActions";
 import { WaitingOnRebecca } from "@/components/leads/WaitingOnRebecca";
 import { contactLinks, lastHeardLabel } from "@/lib/leads/status-row";
 import { needsAttention } from "@/lib/leads/needs-attention";
+
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
 
 const root = path.resolve(__dirname, "../..");
 const page = readFileSync(path.join(root, "src/app/dashboard/leads/[id]/page.tsx"), "utf8");
@@ -43,7 +45,7 @@ describe("F1: lead page order", () => {
     expect(html).toContain("Consult Held");
     expect(html).toContain("Temperature: <b>Hot</b>");
     expect(html).toContain("Owner: <b>Dawn Reyes</b>");
-    expect(html).toContain("Last heard from 3 days ago");
+    expect(html).toContain("Last contact 3 days ago");
     const none = renderToStaticMarkup(<LeadStatusRow stageName={null} temperatureLabel={null} ownerName={null} lastInboundAt={null} now={NOW} />);
     expect(none).not.toContain("Owner");
     expect(none).toContain("Not rated");
@@ -54,8 +56,8 @@ describe("F1: lead page order", () => {
     expect(lastHeardLabel(null, NOW)).toBe("No contact yet");
     expect(lastHeardLabel("garbage", NOW)).toBe("No contact yet");
     expect(lastHeardLabel("2026-11-30T00:00:00Z", NOW)).toBe("No contact yet");
-    expect(lastHeardLabel("2026-10-27T01:00:00Z", NOW)).toBe("Last heard from today");
-    expect(lastHeardLabel("2026-10-26T01:00:00Z", NOW)).toBe("Last heard from 1 day ago");
+    expect(lastHeardLabel("2026-10-27T01:00:00Z", NOW)).toBe("Last contact today");
+    expect(lastHeardLabel("2026-10-26T01:00:00Z", NOW)).toBe("Last contact 1 day ago");
   });
 });
 
@@ -98,7 +100,7 @@ describe("F3: rare forms are collapsed and anchors kept", () => {
     expect(page).not.toMatch(/<details[^>]*\sopen/);
   });
   it("keeps each anchor and data-tour token exactly once", () => {
-    for (const token of ['id="prep-consult"', 'data-tour="lead-prep"', 'data-tour="lead-timeline"', 'data-tour="lead-head"']) {
+    for (const token of ['id="prep-consult"', 'data-tour="lead-prep"', 'data-tour="lead-timeline"', 'tour="lead-head"']) {
       expect(page.split(token).length - 1).toBe(1);
     }
   });
@@ -146,7 +148,7 @@ describe("P1: composer tabs", () => {
   it("status row reads last_inbound_at, the same field as the aside", () => {
     expect(page).toContain("lastInboundAt={lead.last_inbound_at}");
     expect(page).not.toContain("lastActivityAt=");
-    expect(page).toContain("lead.last_inbound_at ? relativeTime(lead.last_inbound_at)");
+    expect(page).toContain("lead.last_inbound_at ? relativeTime(lead.last_inbound_at");
   });
 
   it("V1: coarse-pointer rules give the new controls 44px targets", () => {

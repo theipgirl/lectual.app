@@ -3,7 +3,7 @@
 import type { MemberIdentity } from "@/lib/members/directory";
 import { initialsOf, memberLabel } from "@/lib/intake/views";
 import Popover, { PopoverItem } from "./Popover";
-import { OWNER_TEXT, OWNER_TEXT_NONE } from "./styles";
+import { TEAMMATE, UNASSIGNED, BLANK } from "@/lib/ui/words";
 
 /**
  * "Who owns the next response" (§1.9), reassignable in place.
@@ -32,7 +32,7 @@ export default function OwnerCell({
   // removed since) still needs a row of their own in the menu, or the lead
   // would look unassigned and the next click would write that back.
   const unknownAssignee = assignedTo != null && !members.some((m) => m.userId === assignedTo);
-  const label = owner ? memberLabel(owner) : unknownAssignee ? "Unknown teammate" : null;
+  const label = owner ? memberLabel(owner) : unknownAssignee ? TEAMMATE : null;
 
   return (
     <Popover
@@ -46,17 +46,10 @@ export default function OwnerCell({
           title={label ?? "Nobody owns the next response yet"}
           disabled={pending}
           onClick={onClick}
-          style={{
-            ...(label ? OWNER_TEXT : OWNER_TEXT_NONE),
-            background: "transparent",
-            border: "1px solid transparent",
-            borderRadius: 5,
-            padding: "2px 5px",
-            cursor: pending ? "progress" : "pointer",
-            opacity: pending ? 0.6 : 1,
-          }}
+          className="ix-cell-btn"
+          data-empty={label ? undefined : ""}
         >
-          {owner ? initialsOf(owner) : unknownAssignee ? "?" : "—"}
+          {owner ? initialsOf(owner) : unknownAssignee ? "?" : BLANK}
         </button>
       )}
     >
@@ -70,11 +63,11 @@ export default function OwnerCell({
               onAssign(null);
             }}
           >
-            Unassigned
+            {UNASSIGNED}
           </PopoverItem>
           {unknownAssignee && (
             <PopoverItem checked onSelect={close}>
-              Unknown teammate
+              {TEAMMATE}
             </PopoverItem>
           )}
           {members.map((member) => (

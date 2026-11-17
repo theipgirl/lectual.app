@@ -5,6 +5,7 @@ import { ConfidenceBadge } from "./ConfidenceBadge";
 import { EvidenceBlock } from "./EvidenceBlock";
 import { SourceCell } from "./SourceCell";
 import { mattersListHref } from "@/lib/matters/list-href";
+import { SheetCard, SheetScroll, SheetTable } from "@/components/ui/SheetTable";
 
 export const MATTERS_HREF = mattersListHref();
 
@@ -35,8 +36,9 @@ export function ReconcileTable({
   onSkip?: (leadId: string) => void;
 }) {
   return (
-    <div className="lx-card rc-scroll">
-      <table className="lx-tbl rc-tbl">
+    <SheetCard>
+      <SheetScroll>
+        <SheetTable className="rc-tbl" minWidth={1040}>
         <thead>
           <tr>
             <th scope="col">Lead</th>
@@ -63,8 +65,9 @@ export function ReconcileTable({
             />
           ))}
         </tbody>
-      </table>
-    </div>
+        </SheetTable>
+      </SheetScroll>
+    </SheetCard>
   );
 }
 
@@ -96,23 +99,23 @@ function ReconcileRowView({
   const chosenName = decision ? pickable.find((s) => s.id === decision.stageId)?.name ?? proposal.stage?.name ?? null : null;
   return (
     <tr data-lead={row.leadId} data-kind={proposal.kind} data-confidence={proposal.confidence ?? "needs_matter"}>
-      <td className="rc-name">
+      <td className="pri rc-name">
         <Link href={`/dashboard/leads/${row.leadId}/`}>{row.leadName}</Link>
       </td>
-      <td>{row.currentStageName}</td>
-      <td>
+      <td data-label="Current stage">{row.currentStageName}</td>
+      <td data-label="Sheet">
         <SourceCell source="sheet" signal={row.sheet} />
       </td>
-      <td>
+      <td data-label="Lawmatics">
         <SourceCell source="lawmatics" signal={row.lawmatics} />
       </td>
-      <td>
+      <td data-label="Email / calendar">
         <SourceCell source="email" signal={row.email} />
       </td>
-      <td>
+      <td data-label="Evidence and last touch">
         <EvidenceBlock evidence={row.evidence} lastTouch={row.lastTouch} mailbox={row.mailbox} notes={row.notes} />
       </td>
-      <td>
+      <td data-label="Proposed stage">
         {proposedCell(row)}
         <details className="rc-reasons">
           <summary>Why</summary>
@@ -123,10 +126,10 @@ function ReconcileRowView({
           </ul>
         </details>
       </td>
-      <td>
+      <td data-label="Confidence">
         <ConfidenceBadge proposal={proposal} />
       </td>
-      <td className="rc-actions">
+      <td className="rc-actions" data-label="Decision">
         {needsMatter ? (
           <div className="rc-cell">
             <div className="rc-controls">
@@ -153,7 +156,7 @@ function ReconcileRowView({
                 </button>
               )}
               <select
-                className="rc-select"
+                className="lx-input rc-select"
                 aria-label={`Pick another stage for ${row.leadName}`}
                 value={decision?.picked ? decision.stageId : ""}
                 onChange={(e) => {

@@ -2,6 +2,8 @@
 
 import { useActionState, useRef } from "react";
 import { InlineConfirm } from "@/components/ui/InlineConfirm";
+import { Notice } from "@/components/ui/Notice";
+import { SheetCard, SheetScroll, SheetTable } from "@/components/ui/SheetTable";
 import { choiceName, type MergeField, type MergeSide } from "@/lib/leads/merge";
 import {
   MERGE_BUTTON,
@@ -54,7 +56,9 @@ export function MergeForm({
         {differing.length === 0 ? (
           <p className="lx-note">{MERGE_FIELDS_SAME}</p>
         ) : (
-          <table className="ix-cmp-table">
+          <SheetCard>
+            <SheetScroll>
+          <SheetTable className="ix-cmp-table">
             <thead>
               <tr>
                 <th scope="col">
@@ -73,7 +77,7 @@ export function MergeForm({
                 <tr key={r.field}>
                   <th scope="row">{MERGE_FIELD_LABELS[r.field]}</th>
                   {(["keeper", "loser"] as const).map((side) => (
-                    <td key={side}>
+                    <td key={side} data-label={side === "keeper" ? keeperName : loserName}>
                       <label className="mg-choice">
                         <input type="radio" name={choiceName(r.field)} value={side} defaultChecked={r.choice === side} />
                         <span>{shown(side === "keeper" ? r.keeper : r.loser)}</span>
@@ -83,13 +87,15 @@ export function MergeForm({
                 </tr>
               ))}
             </tbody>
-          </table>
+          </SheetTable>
+            </SheetScroll>
+          </SheetCard>
         )}
       </section>
       {state.error && (
-        <p role="alert" className="lx-note">
+        <Notice tone="risk" role="alert">
           {state.error}
-        </p>
+        </Notice>
       )}
       <div className="mg-actions">
         <InlineConfirm

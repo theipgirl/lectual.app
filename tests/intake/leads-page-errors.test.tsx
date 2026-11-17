@@ -77,7 +77,7 @@ describe("the Leads page when the lead read throws", () => {
     const { metadata } = await import("@/app/dashboard/intake/page");
     expect(String(metadata.title)).toBe("Intake · Lectual");
     const lead = fs.readFileSync(path.join(root, "src/app/dashboard/leads/[id]/page.tsx"), "utf8");
-    expect(lead).toMatch(/className="lx-back">\s*← \{INTAKE_NAME\}/);
+    expect(lead).toMatch(/back=\{\{ href: intakeListHref\(\), label: INTAKE_NAME \}\}/);
     expect(lead).not.toContain("← Leads");
   });
 });

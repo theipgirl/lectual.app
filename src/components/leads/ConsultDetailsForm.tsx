@@ -11,6 +11,7 @@ import {
   type ConsultMark,
   type StoredConsultDetails,
 } from "@/lib/consult/vocab";
+import { SAVING } from "@/lib/ui/words";
 
 /**
  * One consult's details, as a form a person reviews. Every field starts at what
@@ -88,7 +89,7 @@ function MarkFields({ i, mark, label }: { i: number; mark: ConsultMark; label: s
         <span className="lx-note">One per line, as “class: goods”. A line without a class number is goods whose class wasn’t stated.</span>
       </label>
       {mark.id && (
-        <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 14 }}>
+        <label className="lx-check">
           <input type="checkbox" name={`m${i}_remove`} /> Remove this mark
         </label>
       )}
@@ -145,7 +146,7 @@ export function ConsultDetailsForm({
       </p>
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={pending}>
-          {pending ? "Saving…" : reviewed ? "Save changes" : "Confirm and mark reviewed"}
+          {pending ? SAVING : reviewed ? "Save changes" : "Confirm and mark reviewed"}
         </button>
         <span className="lx-note">Saving marks this reviewed by you. Nothing is sent.</span>
       </div>

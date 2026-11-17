@@ -31,7 +31,7 @@ export function SummaryStrip({ summary }: { summary: ReconcileSummary }) {
       ))}
       {summary.sectionsLine ? <span data-sections>{summary.sectionsLine}</span> : null}
       {summary.mappingNote ? (
-        <span className="rc-warn" data-mapping-note>
+        <span className="lx-pill lx-pill-warn lx-pill-wrap" data-mapping-note>
           {summary.mappingNote}
         </span>
       ) : null}
@@ -52,12 +52,12 @@ export function SummaryStrip({ summary }: { summary: ReconcileSummary }) {
       </span>
       {summary.email.status === "ok" && summary.email.note ? <span>{summary.email.note}</span> : null}
       {summary.notes ? (
-        <span data-source="notes" data-status={summary.notes.status} className={summary.notes.status === "unavailable" ? "rc-warn" : undefined}>
+        <span data-source="notes" data-status={summary.notes.status} className={summary.notes.status === "unavailable" ? "lx-pill lx-pill-warn lx-pill-wrap" : undefined}>
           {notesSummaryLine(summary.notes)}
         </span>
       ) : null}
       {summary.mailbox ? (
-        <span data-source="mailbox" className={summary.mailbox.note ? "rc-warn" : undefined}>
+        <span data-source="mailbox" className={summary.mailbox.note ? "lx-pill lx-pill-warn lx-pill-wrap" : undefined}>
           {summary.mailbox.note ? `Mailbox search: ${summary.mailbox.note}` : `Mailbox search: ${summary.mailbox.searched} people searched`}
         </span>
       ) : null}
@@ -84,7 +84,7 @@ export function LeftOutLists({ summary }: { summary: ReconcileSummary }) {
   return (
     <div className="rc-wrap">
       {noLead.length > 0 ? (
-        <details className="lx-card" style={{ padding: "12px 16px" }}>
+        <details className="lx-card rc-details">
           <summary>{`${noLead.length} sheet rows have no lead in the app`}</summary>
           <p className="lx-note">These are listed, not created. The sheet importer files new leads.</p>
           <ul className="rc-lines">
@@ -95,7 +95,7 @@ export function LeftOutLists({ summary }: { summary: ReconcileSummary }) {
         </details>
       ) : null}
       {refused.length > 0 ? (
-        <details className="lx-card" style={{ padding: "12px 16px" }}>
+        <details className="lx-card rc-details">
           <summary>{`${refused.length} sheet rows were not used`}</summary>
           <ul className="rc-lines">
             {refused.map((r) => (
