@@ -210,7 +210,16 @@ export async function runQueueReview(input: ReviewInput): Promise<ReviewOutcome>
         }
       }
 
-      const resolved = await resolveQueueItem({ orgKey: qKey, id, action: "approve", resolvedBy, ...(approvalNote ? { note: approvalNote } : {}) });
+      // With requireShown, the text whose hash matched is sent as the final body, so an edit a colleague saves after the
+      // re-check is never what the drafter sends. Without it, behaviour is unchanged (the queue reads its own final_body).
+      const resolved = await resolveQueueItem({
+        orgKey: qKey,
+        id,
+        action: "approve",
+        resolvedBy,
+        ...(approvalNote ? { note: approvalNote } : {}),
+        ...(input.requireShown ? { finalBody: approvedText } : {}),
+      });
       sendStatus = resolved.send;
       webLink = resolved.sendResult?.webLink ?? null;
 

@@ -99,7 +99,7 @@ export default function RowMenu({
           <div className="ix-menu-scroll">
             {extra.map((item) => {
               if (item.id === "noShow")
-                return noShow.held ? null : (
+                return !noShow.canMark ? null : (
                   <button key="noShow" type="button" className="lp-pop-item" onClick={() => { close(); noShow.begin(); }}>
                     <span className="lp-pop-text">{item.label}</span>
                   </button>

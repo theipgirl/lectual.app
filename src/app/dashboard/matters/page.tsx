@@ -31,6 +31,7 @@ import {
   DRAWN_GROUPS,
   ALL_GROUPS,
   intakeStageIds,
+  matterMoveStages,
   pastLoeView,
   boardStagesForChoice,
   filterByGroupChoice,
@@ -121,6 +122,8 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
   const counts = new Map(SEGMENTS.map((s) => [s.key, filterBySegment(inGroup, s.key, sets).length]));
   const groupCounts = phaseGroupCounts(filterBySegment(pastLoe, seg, sets));
   const drawableStages = intakeView ? intakeView.stages : stageList;
+  // One list for every move control on this page (card, card menu, board drag): never an intake-phase stage while grouped.
+  const moveStages = matterMoveStages(stageList, drawableStages, showIntake);
   // Four chips. Review only when the queue was reached; the bands stay as headings below.
   const segments = LIST_CHIPS.filter((s) => s.key !== "review" || queue.status === "ok");
 
@@ -150,7 +153,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
     ctx: {
       role,
       members: memberRead,
-      stages: stageRead.status === "unavailable" ? { status: "unavailable" } : { status: "ok", value: stageList.map((s) => ({ id: s.id, label: s.label })) },
+      stages: stageRead.status === "unavailable" ? { status: "unavailable" } : { status: "ok", value: moveStages.map((s) => ({ id: s.id, label: s.label })) },
       mergeAvailable: false,
       path: "/dashboard/matters/",
       params: rawParams as Record<string, string | string[] | undefined>,
@@ -249,7 +252,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
         {grouped && !showIntake && <MovedOutNotice />}
         <MatterBoard
           stages={boardStages}
-          moveStages={showIntake ? stageList : drawableStages}
+          moveStages={moveStages}
           collapseEmpty={grouped}
           matters={shown}
           canMove={!!role && MATTER_WRITE_ROLES.includes(role)}

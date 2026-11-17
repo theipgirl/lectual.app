@@ -22,6 +22,7 @@ import { isReferralSource, type ReferralSource } from "@/lib/intake";
 import {
   friendlyLeadWriteError,
   friendlyMoveStageError,
+  MOVE_STAGE_NO_PERMISSION,
 } from "@/app/dashboard/leads/errors";
 
 /**
@@ -105,6 +106,8 @@ export async function moveStageAction(
     // The same refusals as the review's move: never a `won` stage (that move runs the matter handoff), and a lead already
     // there is a no-op. The target is read through the caller's scoped client, so another firm's stage reads as missing.
     const supabase = await getScopedClient();
+    // The role first: a role that may not move a stage reads nothing (not the lead, not the stage) and gets the one sentence.
+    if (!CAN_MOVE_STAGE.includes(await resolveCurrentRole(supabase))) return { ok: false, error: MOVE_STAGE_NO_PERMISSION };
     // live-guard: re-reads one lead (live list) before a move whose guard refusal is mapped to a fixed sentence
     const { data: lead, error: leadErr } = await supabase.from("crm_lead").select("id, current_stage_id").eq("id", leadId).maybeSingle();
     if (leadErr) throw leadErr;

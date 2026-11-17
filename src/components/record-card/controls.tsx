@@ -6,11 +6,19 @@ import Popover, { PopoverItem } from "@/components/list-page/Popover";
 import { Toast } from "@/components/ui/Toast";
 import { setLaneAction, setSourceAction } from "@/app/dashboard/intake/actions";
 import { logConsultOutcomeAction } from "@/app/dashboard/leads/[id]/outcome-actions";
-import { updateMatterHeaderAction } from "@/app/dashboard/matters/[id]/actions";
-import { assignRecordAction, completeNextStepAction, moveStageAction, setNextStepAction, snoozeNextStepAction, updateNextStepAction } from "@/app/dashboard/review/actions";
+import {
+  assignRecordAction,
+  completeNextStepAction,
+  moveStageAction,
+  setNextStepAction,
+  setSourceAction as setRecordSourceAction,
+  snoozeNextStepAction,
+  updateNextStepAction,
+} from "@/app/dashboard/review/actions";
 import { SNOOZE_CHOICES, SNOOZE_LABEL } from "@/lib/review/snooze";
 import { TASK_TITLE_MAX } from "@/lib/matters/task-edit";
-import { beginOnce, type Hold } from "@/lib/record-card/hold";
+import { beginOnce, noShowOffered, type Hold } from "@/lib/record-card/hold";
+import { noShowNotices } from "@/components/record-card/no-show-notices";
 import type { CardMember, CardView, StepLine } from "@/lib/record-card/model";
 import type { TemperatureControl, MenuItem, CardKind } from "@/lib/record-card/rules";
 import type { ReferralSource } from "@/lib/intake";
@@ -18,6 +26,7 @@ import {
   RECORD_CARD_ADD_STEP,
   RECORD_CARD_NO_SHOW_DONE,
   RECORD_CARD_NO_SHOW_NOTE,
+  RECORD_CARD_NO_SHOW_PAUSED,
   RECORD_CARD_NO_SHOW_UNDO,
   RECORD_CARD_NO_SHOW_UNDONE,
   RECORD_CARD_NO_SOURCE,
@@ -152,7 +161,8 @@ export function SourcePick({ kind, id, name, value, choices, compact, onPick }: 
                   if (value === option) return;
                   if (onPick) onPick(option as ReferralSource);
                   else if (kind === "lead") run(() => setSourceAction(id, option as ReferralSource));
-                  else run(viaForm(updateMatterHeaderAction, { matterId: id, referralSource: option }));
+                  // A matter goes through the review's setSourceAction: it checks the role, the record and that the source is a listed one.
+                  else run(viaForm(setRecordSourceAction, { kind: "matter", id, source: option }));
                 }}
               >
                 {option}
@@ -354,30 +364,58 @@ export function NextStepLine({ kind, id, line, dueIso, text }: { kind: CardKind;
 // ---------------------------------------------------------------------------------------------------------------------
 // The ⋯ menu's shared items, and the no-show hold.
 
-/** Mark no-show: NOTHING is posted for 5 seconds; Undo inside the hold posts nothing; then ONE `call_logged` row. */
+/**
+ * Mark no-show: NOTHING is posted for 5 seconds; Undo inside the hold posts nothing; then ONE `call_logged` row. Typing the
+ * optional note PAUSES the countdown (focus or a change pauses it, leaving the field starts a full 5 seconds again), so the
+ * row is never posted with half a note. The menu item is offered only while `canMark` (`noShowOffered`): not during the hold,
+ * not while the post is in flight, not after it saved.
+ */
 export function useNoShow(leadId: string, name: string) {
   const { mark, run } = useRun();
   const [held, setHeld] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [posted, setPosted] = useState(false);
   const [undone, setUndone] = useState(false);
   const holdRef = useRef<Hold | null>(null);
   const noteRef = useRef<HTMLInputElement | null>(null);
-  // Leaving the page inside the hold cancels it, exactly as Undo does, and nothing is posted. There is no component left to say
-  // "Not logged." then, and the page is gone, so the person leaving is the one who knows; nothing was written.
-  useEffect(() => () => void holdRef.current?.cancel(), []);
+  const nameRef = useRef(name);
+  useEffect(() => {
+    nameRef.current = name;
+  });
+  // The card going away inside the hold (the opened card closed, the list re-drawn) cancels it and writes NOTHING. It is
+  // never silent: a notice outside the card (`noShowNotices`, drawn by the dashboard layout) says it wasn't logged.
+  useEffect(
+    () => () => {
+      if (holdRef.current?.cancel()) noShowNotices.push(nameRef.current);
+    },
+    [],
+  );
+  const canMark = noShowOffered({ held, posted, failed: Boolean(mark?.error) });
   const begin = () => {
-    // A second request while one is held is ignored: one hold, one post.
+    // A second request while one is held, in flight or saved is ignored: one hold, one post.
     if (holdRef.current?.settled() === "held") return;
+    if (!canMark) return;
     setUndone(false);
+    setPosted(false);
+    setPaused(false);
     setHeld(true);
     holdRef.current = beginOnce(holdRef.current, () => {
       setHeld(false);
+      setPosted(true);
       run(viaForm(logConsultOutcomeAction, { leadId, outcome: "no_show", note: noteRef.current?.value ?? "" }));
     });
   };
   const undo = () => {
     holdRef.current?.cancel();
     setHeld(false);
+    setPaused(false);
     setUndone(true);
+  };
+  const pause = () => {
+    if (holdRef.current?.pause()) setPaused(true);
+  };
+  const resume = () => {
+    if (holdRef.current?.resume()) setPaused(false);
   };
   // "No-show logged." only from the action's own { saved: true }; never before it answers.
   const doneLine = undone ? RECORD_CARD_NO_SHOW_UNDONE : mark?.saved ? RECORD_CARD_NO_SHOW_DONE : null;
@@ -390,10 +428,20 @@ export function useNoShow(leadId: string, name: string) {
       }
     >
       <span>{recordCardNoShowHeld(name)}</span>{" "}
-      <input ref={noteRef} className="lx-input rc-noshow-note" aria-label={RECORD_CARD_NO_SHOW_NOTE} placeholder={RECORD_CARD_NO_SHOW_NOTE} maxLength={500} />
+      <input
+        ref={noteRef}
+        className="lx-input rc-noshow-note"
+        aria-label={RECORD_CARD_NO_SHOW_NOTE}
+        placeholder={RECORD_CARD_NO_SHOW_NOTE}
+        maxLength={500}
+        onFocus={pause}
+        onChange={pause}
+        onBlur={resume}
+      />
+      {paused && <span className="rc-noshow-paused">{RECORD_CARD_NO_SHOW_PAUSED}</span>}
     </Toast>
   ) : null;
-  return { begin, toast, mark, doneLine, held };
+  return { begin, toast, mark, doneLine, held, canMark };
 }
 
 /** The ⋯ menu for a board card, list row or opened card. Move to stage, Set next step, Mark no-show, Merge, Open full page. */
@@ -434,7 +482,7 @@ export function CardMenu({ card, onMovePick, stepHref }: { card: CardView; onMov
                   </div>
                 );
               if (item.id === "noShow")
-                return noShow.held ? null : (
+                return !noShow.canMark ? null : (
                   <button key="noShow" type="button" className="lp-pop-item" onClick={() => { close(); noShow.begin(); }}>
                     <span className="lp-pop-text">{item.label}</span>
                   </button>

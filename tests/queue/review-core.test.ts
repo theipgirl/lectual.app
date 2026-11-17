@@ -186,6 +186,16 @@ describe("runQueueReview: results", () => {
       expect(state.resolve).toHaveBeenCalledTimes(1);
     });
 
+    it("the resolve carries exactly the text shown as the final body (a later edit never reaches the drafter)", async () => {
+      await runQueueReview({ id: "q1", intent: "approve", requireShown: true, shownSha256: sha(BODY) });
+      expect(state.resolve).toHaveBeenCalledWith(expect.objectContaining({ finalBody: BODY }));
+      const shown = "Hi Ana, the saved edit that was shown.";
+      state.resolve.mockClear();
+      state.item = qitem({ draft_body: BODY, final_body: shown });
+      await runQueueReview({ id: "q1", intent: "approve", requireShown: true, shownSha256: sha(shown) });
+      expect(state.resolve).toHaveBeenCalledWith(expect.objectContaining({ finalBody: shown }));
+    });
+
     it("a colleague's later edit (final_body) is refused, and nothing is saved, resolved or drafted", async () => {
       state.item = qitem({ draft_body: BODY, final_body: "Hi Ana, a colleague changed this." });
       expect(await runQueueReview({ id: "q1", intent: "approve", requireShown: true, shownSha256: sha(BODY) })).toEqual({ kind: "error", error: CHANGED });
@@ -215,6 +225,7 @@ describe("runQueueReview: results", () => {
     it("without requireShown (the full approval page) nothing changes", async () => {
       state.item = qitem({ draft_body: BODY, final_body: "a saved edit" });
       expect(await runQueueReview({ id: "q1", intent: "approve" })).toMatchObject({ kind: "resolved" });
+      expect(state.resolve.mock.calls[0][0]).not.toHaveProperty("finalBody");
     });
   });
 

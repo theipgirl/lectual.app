@@ -72,6 +72,15 @@ export function pastLoeView<M extends { stage_id?: string | null; stage?: { phas
   return { matters: past, intake, stages: stages.filter((s) => !intakeIds.has(s.id)).map(asPre) };
 }
 
+/**
+ * The stages a matter on the Matters page may be moved to (the card's stage control and its menu's "Move to stage", and the
+ * board's drag): with the intake phases grouped away, only the drawn stages (`pastLoeView`'s), so a card never offers an
+ * intake-phase stage it would then disappear into; on the `?intake=1` list, and with no grouping, every stage.
+ */
+export function matterMoveStages<S>(all: readonly S[], drawable: readonly S[], showIntake: boolean): S[] {
+  return [...(showIntake ? all : drawable)];
+}
+
 /** The matter types that are filed at an office and so move through the phases. */
 export const FILING_TYPES: readonly string[] = ["TM", "CR", "PATENT"];
 

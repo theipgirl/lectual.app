@@ -5,7 +5,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Lead, Stage } from "@/lib/pipeline";
 import { buildIntakeRows } from "@/lib/intake/rows";
 import { resyncRows } from "@/lib/intake/resync";
-import { beginOnce } from "@/lib/record-card/hold";
+import { beginOnce, noShowOffered, startHold } from "@/lib/record-card/hold";
+import { createNoticeStore } from "@/components/record-card/no-show-notices";
+import { MOVE_STAGE_NO_PERMISSION, recordCardNoShowNotLogged } from "@/lib/ui/words";
 import { closeHref, openHrefFromHref } from "@/lib/record-card/open";
 import { RecordCardHost } from "@/components/record-card/RecordCardHost";
 import { LEAD, NOW, TZ, facts as stepFacts } from "../lead-step/fixtures";
@@ -55,9 +57,15 @@ describe("the Intake actions' server checks", () => {
   const moveLeadStage = vi.fn(async () => ({}));
   const assignLead = vi.fn(async () => ({}));
   let tables: Record<string, { data: unknown; error: unknown }> = {};
+  let role = "owner";
+  const reads: string[] = [];
+  let directory: () => Promise<Array<{ userId: string }>> = async () => [{ userId: INSIDER }];
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    role = "owner";
+    reads.length = 0;
+    directory = async () => [{ userId: INSIDER }];
     tables = {
       crm_lead: { data: { id: LEAD, current_stage_id: OPEN }, error: null },
       crm_stage: { data: { id: WON, category: "won" }, error: null },
@@ -66,6 +74,7 @@ describe("the Intake actions' server checks", () => {
     vi.doMock("@/lib/db/scoped-client", () => ({
       getScopedClient: async () => ({
         from: (t: string) => {
+          reads.push(t);
           const q: Record<string, unknown> = {};
           for (const k of ["select", "eq"]) q[k] = () => q;
           q.maybeSingle = async () => tables[t];
@@ -74,8 +83,19 @@ describe("the Intake actions' server checks", () => {
       }),
     }));
     vi.doMock("@/lib/pipeline", async (orig) => ({ ...(await orig<typeof import("@/lib/pipeline")>()), moveLeadStage, assignLead }));
-    vi.doMock("@/lib/pipeline/leads", async (orig) => ({ ...(await orig<typeof import("@/lib/pipeline/leads")>()), resolveCurrentRole: async () => "owner" }));
-    vi.doMock("@/lib/members/directory", () => ({ listMemberDirectory: async () => [{ userId: INSIDER }] }));
+    vi.doMock("@/lib/pipeline/leads", async (orig) => ({ ...(await orig<typeof import("@/lib/pipeline/leads")>()), resolveCurrentRole: async () => role }));
+    vi.doMock("@/lib/members/directory", () => ({ listMemberDirectory: () => directory() }));
+  });
+
+  it("checks the role BEFORE reading anything: a viewer gets the no-permission sentence and nothing is read or moved", async () => {
+    const { moveStageAction } = await import("@/app/dashboard/intake/actions");
+    tables.crm_stage = { data: { id: OPEN, category: "open" }, error: null };
+    for (const r of ["viewer", "social_media", "paralegal", ""]) {
+      role = r;
+      expect(await moveStageAction(LEAD, OPEN)).toEqual({ ok: false, error: MOVE_STAGE_NO_PERMISSION });
+    }
+    expect(reads).toEqual([]);
+    expect(moveLeadStage).not.toHaveBeenCalled();
   });
 
   it("refuses a hand-posted won stage and moves nothing", async () => {
@@ -106,7 +126,9 @@ describe("the Intake actions' server checks", () => {
     expect(assignLead).toHaveBeenCalledTimes(2);
   });
   it("an unreadable team list refuses the change", async () => {
-    vi.doMock("@/lib/members/directory", () => ({ listMemberDirectory: async () => { throw new Error("down"); } }));
+    directory = async () => {
+      throw new Error("down");
+    };
     const { assignLeadAction } = await import("@/app/dashboard/intake/actions");
     const r = await assignLeadAction(LEAD, INSIDER);
     expect(r.ok).toBe(false);
@@ -146,16 +168,79 @@ describe("Mark no-show posts at most once", () => {
     first.cancel();
     expect(beginOnce(first, post, c.opts)).not.toBe(first);
   });
-  it("the hook ignores a begin while held, hides the menu item while held, and says 'logged' only from the action's own Saved", () => {
+  it("the hook ignores a begin while held, hides the menu item while held, in flight and saved, and says 'logged' only from the action's own Saved", () => {
     const c = src("src/components/record-card/controls.tsx");
     expect(c).toMatch(/if \(holdRef\.current\?\.settled\(\) === "held"\) return;/);
-    expect(c).toMatch(/noShow\.held \? null/);
+    expect(c).toMatch(/if \(!canMark\) return;/);
+    expect(c).toMatch(/const canMark = noShowOffered\(\{ held, posted, failed: Boolean\(mark\?\.error\) \}\)/);
+    expect(c).toMatch(/!noShow\.canMark \? null/);
     expect(c).toMatch(/mark\?\.saved \? RECORD_CARD_NO_SHOW_DONE/);
     expect(c).not.toMatch(/setDoneLine/);
-    expect(src("src/app/dashboard/intake/_components/RowMenu.tsx")).toMatch(/noShow\.held \? null/);
+    expect(src("src/app/dashboard/intake/_components/RowMenu.tsx")).toMatch(/!noShow\.canMark \? null/);
   });
-  it("leaving the page inside the hold cancels it (documented: nothing is written, there is no component left to say so)", () => {
-    expect(src("src/components/record-card/controls.tsx")).toMatch(/useEffect\(\(\) => \(\) => void holdRef\.current\?\.cancel\(\), \[\]\)/);
+  it("Mark no-show is not offered during the hold, while the post is in flight, or after it saved; a refusal may be tried again", () => {
+    expect(noShowOffered({ held: false, posted: false, failed: false })).toBe(true);
+    expect(noShowOffered({ held: true, posted: false, failed: false })).toBe(false);
+    expect(noShowOffered({ held: false, posted: true, failed: false })).toBe(false);
+    expect(noShowOffered({ held: false, posted: true, failed: true })).toBe(true);
+  });
+  it("typing the note pauses the countdown, leaving the note starts a full hold again, and nothing posts mid-typing", () => {
+    const post = vi.fn();
+    const timers: Array<{ fn: () => void; ms: number; live: boolean }> = [];
+    const hold = startHold(post, { ms: 5000, setTimer: (fn, ms) => (timers.push({ fn, ms, live: true }), timers.length - 1), clearTimer: (id) => void (timers[id as number].live = false) });
+    expect(hold.pause()).toBe(true);
+    expect(hold.paused()).toBe(true);
+    expect(timers[0].live).toBe(false);
+    timers[0].fn(); // a timer that fires anyway while paused does nothing
+    expect(post).not.toHaveBeenCalled();
+    expect(hold.pause()).toBe(false);
+    expect(hold.resume()).toBe(true);
+    expect(timers).toHaveLength(2);
+    expect(timers[1].ms).toBe(5000);
+    timers[1].fn();
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(hold.resume()).toBe(false);
+    expect(hold.pause()).toBe(false);
+  });
+  it("Undo while paused posts nothing", () => {
+    const post = vi.fn();
+    const timers: Array<() => void> = [];
+    const hold = startHold(post, { setTimer: (fn) => (timers.push(fn), timers.length), clearTimer: () => {} });
+    hold.pause();
+    expect(hold.cancel()).toBe(true);
+    expect(hold.resume()).toBe(false);
+    timers.forEach((t) => t());
+    expect(post).not.toHaveBeenCalled();
+  });
+  it("the note field pauses on focus and on change, and resumes on blur", () => {
+    const c = src("src/components/record-card/controls.tsx");
+    expect(c).toMatch(/onFocus=\{pause\}\s*onChange=\{pause\}\s*onBlur=\{resume\}/);
+  });
+  it("a card that goes away inside the hold writes nothing and leaves a visible 'not logged' notice outside the card", () => {
+    const c = src("src/components/record-card/controls.tsx");
+    expect(c).toMatch(/if \(holdRef\.current\?\.cancel\(\)\) noShowNotices\.push\(nameRef\.current\)/);
+    expect(src("src/app/dashboard/layout.tsx")).toMatch(/<NoShowNotices \/>/);
+    const store = createNoticeStore();
+    const seen = vi.fn();
+    const off = store.subscribe(seen);
+    const n = store.push("Ana Ruiz");
+    expect(store.list()).toEqual([{ id: n.id, name: "Ana Ruiz" }]);
+    expect(seen).toHaveBeenCalledTimes(1);
+    store.dismiss(n.id);
+    expect(store.list()).toEqual([]);
+    expect(seen).toHaveBeenCalledTimes(2);
+    off();
+    store.push("B");
+    expect(seen).toHaveBeenCalledTimes(2);
+  });
+  it("the notice says it was not logged, with a Dismiss", async () => {
+    const { noShowNotices } = await import("@/components/record-card/no-show-notices");
+    const { NoShowNotices } = await import("@/components/record-card/NoShowNotices");
+    expect(renderToStaticMarkup(<NoShowNotices />)).toBe("");
+    noShowNotices.push("Ana Ruiz");
+    // The server snapshot is always empty (nothing to say before the browser); the store holds the notice for the browser.
+    expect(noShowNotices.list().map((x) => x.name)).toEqual(["Ana Ruiz"]);
+    expect(recordCardNoShowNotLogged("Ana Ruiz")).toMatch(/^No-show not logged for Ana Ruiz\./);
   });
 });
 

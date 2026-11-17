@@ -9,6 +9,8 @@ import { buildIntakeCards } from "@/lib/record-card/intake-cards";
 import { startHold } from "@/lib/record-card/hold";
 import { leadLabel } from "@/lib/record-card/lead-label";
 import { buildMatterCards } from "@/lib/record-card/matter-cards";
+import { intakeStageIds, matterMoveStages, pastLoeView } from "@/lib/matters/phase-group";
+import { TM_HIRED_STAGE_LABEL } from "@/lib/matters/hired-stage";
 import { type CardContext, type CardRead, type RecordCardLoad } from "@/lib/record-card/model";
 import { NO_SHOW_HOLD_MS } from "@/lib/record-card/rules";
 import { LEAD, NOW, TZ, facts as stepFacts, pending, draft } from "../lead-step/fixtures";
@@ -89,7 +91,8 @@ describe("each control is wired to the right existing action", () => {
   it("temperature, source, owner, stage and the next-step controls", () => {
     expect(c).toMatch(/run\(\(\) => setLaneAction\(leadId, lane\)\)/);
     expect(c).toMatch(/setSourceAction\(id, /);
-    expect(c).toMatch(/viaForm\(updateMatterHeaderAction, \{ matterId: id, referralSource: option \}\)/);
+    expect(c).toMatch(/viaForm\(setRecordSourceAction, \{ kind: "matter", id, source: option \}\)/);
+    expect(c).not.toMatch(/updateMatterHeaderAction/);
     expect(c).toMatch(/viaForm\(assignRecordAction, \{ kind, id, userId/);
     expect(c).toMatch(/viaForm\(moveStageAction, \{ kind, id, stageId: t\.id \}\)/);
     expect(c).toMatch(/updateNextStepAction/);
@@ -202,6 +205,28 @@ describe("the Matters cards", () => {
     expect(cards[MATTER].stage.targets).toEqual([{ id: "m2", name: "Published" }]);
     expect(cards[MATTER].openHref).toBe(`/dashboard/matters/?open=matter%3A${MATTER}`);
     expect(cards[MATTER].bottom.nextStep).toBe("No next step");
+  });
+  it("Move to stage offers only the stages the board's own move offered: never an intake-phase stage while grouped", () => {
+    const all = [
+      { id: "m0", label: "1. Consult held", phase: "pipeline", order_index: 1 },
+      { id: "m-loe", label: TM_HIRED_STAGE_LABEL, phase: "pipeline", order_index: 2 },
+      { id: "m1", label: "3. Filed", phase: "post_filing", order_index: 3 },
+      { id: "m2", label: "4. Published", phase: "post_filing", order_index: 4 },
+    ];
+    const view = pastLoeView([], all, intakeStageIds(all));
+    const grouped = matterMoveStages(all, view.stages, false);
+    expect(grouped.map((s) => s.id)).toEqual(["m-loe", "m1", "m2"]);
+    expect(matterMoveStages(all, view.stages, true).map((s) => s.id)).toEqual(["m0", "m-loe", "m1", "m2"]);
+    const cards = buildMatterCards({
+      matters: [matter],
+      ctx: { ...ctx("attorney"), path: "/dashboard/matters/", params: {}, stages: { status: "ok", value: grouped.map((s) => ({ id: s.id, label: s.label })) } as never },
+      steps: { status: "ok", value: {} },
+    });
+    expect(cards[MATTER].stage.targets.map((t) => t.id)).toEqual(["m-loe", "m2"]);
+    const page = src("src/app/dashboard/matters/page.tsx");
+    expect(page).toMatch(/const moveStages = matterMoveStages\(stageList, drawableStages, showIntake\)/);
+    expect(page).toMatch(/value: moveStages\.map\(\(s\) => \(\{ id: s\.id, label: s\.label \}\)\)/);
+    expect(page).toMatch(/moveStages=\{moveStages\}/);
   });
 });
 

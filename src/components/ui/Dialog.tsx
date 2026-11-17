@@ -49,6 +49,8 @@ export function useDialogKeys(
     const opener = document.activeElement as HTMLElement | null;
     (initialFocus?.current ?? ref.current)?.focus();
     const onKey = (e: KeyboardEvent) => {
+      // A key a menu inside already claimed (its Esc) is not the dialog's.
+      if (e.defaultPrevented) return;
       const root = ref.current;
       if (!root) return;
       const items = Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((el) => el.offsetParent !== null);

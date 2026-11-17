@@ -33,6 +33,7 @@ const createTask = vi.fn(async () => ({}));
 const setReferralSource = vi.fn(async () => ({}));
 const assignLead = vi.fn(async () => ({}));
 const updateMatterStage = vi.fn(async () => {});
+const updateMatterHeader = vi.fn(async () => {});
 
 function client() {
   return {
@@ -56,7 +57,7 @@ function setup() {
   vi.doMock("@/lib/leads/live", () => ({ keeperForWrite }));
   // The review actions' own imports.
   vi.doMock("@/lib/pipeline", () => ({ CAN_WRITE_LEAD: WRITE, CAN_MOVE_STAGE: MOVE, resolveCurrentRole: async () => role, moveLeadStage, assignLead, addLeadNote: vi.fn() }));
-  vi.doMock("@/lib/matters/matters", () => ({ MATTER_WRITE_ROLES: WRITE, assignMatterOwner: vi.fn(), updateMatterHeader: vi.fn() }));
+  vi.doMock("@/lib/matters/matters", () => ({ MATTER_WRITE_ROLES: WRITE, assignMatterOwner: vi.fn(), updateMatterHeader }));
   vi.doMock("@/lib/matters/tasks", () => ({ createTask, completeTask, updateTask }));
   vi.doMock("@/lib/matters/stages", () => ({ updateMatterStage }));
   vi.doMock("@/lib/intake/leads", () => ({ setReferralSource }));
@@ -215,5 +216,18 @@ describe("the existing actions the card calls re-check on the server", () => {
       for (const res of results) expect(res.error).toMatch(/permission/);
     }
     for (const fn of [setReferralSource, assignLead, createTask, updateTask, completeTask, moveLeadStage, updateMatterStage]) expect(fn).not.toHaveBeenCalled();
+  });
+
+  it("a matter's source (the card's Source on Matters) goes through setSourceAction: an unlisted source is refused and nothing is written", async () => {
+    rows.crm_matter = { data: { id: LEAD }, error: null };
+    const { setSourceAction } = await review();
+    expect(await setSourceAction({}, fd({ kind: "matter", id: LEAD, source: "Made up" }))).toEqual({ error: "That isn't one of the sources." });
+    expect(await setSourceAction({}, fd({ kind: "matter", id: LEAD, source: "<script>" }))).toEqual({ error: "That isn't one of the sources." });
+    expect(updateMatterHeader).not.toHaveBeenCalled();
+    expect(await setSourceAction({}, fd({ kind: "matter", id: LEAD, source: "Website" }))).toEqual({ saved: true });
+    expect(updateMatterHeader).toHaveBeenCalledWith(LEAD, { referralSource: "Website" });
+    role = "viewer";
+    expect((await setSourceAction({}, fd({ kind: "matter", id: LEAD, source: "Website" }))).error).toMatch(/permission/);
+    expect(updateMatterHeader).toHaveBeenCalledTimes(1);
   });
 });

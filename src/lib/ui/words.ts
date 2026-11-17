@@ -1210,6 +1210,11 @@ export const RECORD_CARD_NO_SHOW_UNDO = "Undo";
 export const RECORD_CARD_NO_SHOW_UNDONE = "Not logged.";
 export const RECORD_CARD_NO_SHOW_NOTE = "Optional note";
 export const RECORD_CARD_NO_SHOW_DONE = "No-show logged.";
+export const RECORD_CARD_NO_SHOW_PAUSED = "Paused while you type. It logs 5 seconds after you leave the note.";
+export const recordCardNoShowNotLogged = (name: string) => `No-show not logged for ${name}. The card closed before it was saved. Mark it again if it should be logged.`;
+export const RECORD_CARD_NO_SHOW_DISMISS = "Dismiss";
+/** A role that may not move a lead's stage (Intake's move: checked before the lead or stage is read). */
+export const MOVE_STAGE_NO_PERMISSION = "You don't have permission to move this lead to that stage — ask an attorney, admin, or intake lead.";
 export const RECORD_CARD_CLOSE_LABEL = "Close";
 export const RECORD_CARD_OPENED_LABEL = "Record";
 export const RECORD_CARD_ID_NAMES = "Names";

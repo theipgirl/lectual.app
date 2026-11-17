@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import "./list-page.css";
+import { popoverClaimsKey } from "@/lib/ui/dialog-keys";
 
 /**
  * One popover, used by every menu on the list pages: the filter chips, the
@@ -65,15 +66,19 @@ export default function Popover({
       if (wrapRef.current && !wrapRef.current.contains(event.target as Node)) setOpen(false);
     }
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key !== "Escape") return;
+      if (!popoverClaimsKey(event, true)) return;
+      // Esc closes this menu only: a dialog around it (the opened record card) must not close too, which would also
+      // drop anything the card is holding. Capture phase, so this runs before the dialog's document listener.
+      event.preventDefault();
+      event.stopPropagation();
       restoreFocus.current = true;
       setOpen(false);
     }
     document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("keydown", onKeyDown, true);
     return () => {
       document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("keydown", onKeyDown, true);
     };
   }, [open, close]);
 

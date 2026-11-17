@@ -33,6 +33,7 @@ import { dealReadyLine, staffInsideFirm } from "@/lib/ui/words";
 import { friendlyZoneLabel } from "@/lib/org/firm-form";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { YourNameDialog } from "@/components/account/YourNameDialog";
+import { NoShowNotices } from "@/components/record-card/NoShowNotices";
 import { drawnNav, NO_PREVIEW, previewFor, shellFor, viewFor, viewMenuFor } from "@/lib/views";
 
 export const metadata: Metadata = { title: "Lectual" };
@@ -147,6 +148,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <CopilotLauncher configured={aiConfigured()} />
       <FeedbackTrailRecorder />
       <FeedbackDialog />
+      <NoShowNotices />
       {shell.variant === "owner" && <DealTimesDialog current={parseDealTimes(user.user_metadata)} zoneLabel={friendlyZoneLabel(await getFirmTimeZone())} />}
       <YourNameDialog currentFullName={typeof user.user_metadata?.full_name === "string" ? user.user_metadata.full_name : null} />
       {/* One first-sign-in guide, never both: the owner shell draws the welcome deal, every other shell the tour. */}
