@@ -1616,7 +1616,7 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
     bottom: 10px;
     z-index: 70;
     gap: 0;
-    padding: 4px;
+    padding: 2px;
     border-radius: 20px;
     border: 1px solid var(--line-on-deep);
     background: var(--rail-glass);
@@ -1646,7 +1646,7 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
   .lx-mbar svg { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
   .lx-mbar-icon { position: relative; display: flex; }
   /* Five tiles fit at 375px at the 14px floor; a longer name (Weekly review) may take two lines rather than be cut off. */
-  .lx-mbar-label { font-size: var(--fs-1); line-height: 1.1; max-width: 100%; text-align: center; white-space: normal; overflow-wrap: break-word; }
+  .lx-mbar-label { font-size: var(--fs-2); line-height: 1.1; max-width: 100%; text-align: center; white-space: normal; overflow-wrap: break-word; }
   .lx-mbar-badge {
     position: absolute;
     top: -6px;

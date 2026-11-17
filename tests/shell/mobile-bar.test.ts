@@ -117,7 +117,7 @@ describe("the scrim and the sheet's keys (F6, design Area G)", () => {
     const { readFileSync } = await import("node:fs");
     const css = readFileSync("src/app/globals.css", "utf8");
     const rule = css.match(/\.lx-mbar-label \{([^}]*)\}/)?.[1] ?? "";
-    expect(rule).toContain("font-size: var(--fs-1)");
+    expect(rule).toContain("font-size: var(--fs-2)");
     expect(rule).toContain("white-space: normal");
     expect(rule).not.toContain("nowrap");
   });
