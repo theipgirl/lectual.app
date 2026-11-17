@@ -34,7 +34,7 @@ const AGENT_OPTIONS: Array<{ value: AgentMoveFilter; label: string }> = [
  * The control rows. Row one: the sets (Working · Event contacts · Not started · All open · Nurture · Lost), each with its
  * count; a chip with nothing in it is not drawn. Chips for the sets already in the browser switch in place; Lost (its own
  * read) and every chip while viewing Lost are plain links. Row two: Stage, Owner, Source and Temperature menus, then the
- * chips that count something inside the chosen set (Moved automatically, Needs a stage decision, Needs attorney,
+ *  chips that count something inside the chosen set (Moved automatically, Needs a stage decision, Awaiting approval,
  * Suggestions), each drawn only while its count is above zero (or it is on), and Copy link.
  */
 export default function IntakeControls({
@@ -269,8 +269,8 @@ export default function IntakeControls({
         )}
 
         {counts.needsAttorney !== null && (counts.needsAttorney > 0 || filters.needsRebecca) && (
-          <button type="button" className={chipClass(filters.needsRebecca)} aria-pressed={filters.needsRebecca} title="Show only leads with a draft waiting for an attorney's review in the approval queue." onClick={() => onFilters({ ...filters, needsRebecca: !filters.needsRebecca })}>
-            Needs attorney
+          <button type="button" className={chipClass(filters.needsRebecca)} aria-pressed={filters.needsRebecca} title="Show only leads with a draft waiting in the approval queue." onClick={() => onFilters({ ...filters, needsRebecca: !filters.needsRebecca })}>
+            Awaiting approval
             <span className="lp-chip-count">{counts.needsAttorney}</span>
           </button>
         )}

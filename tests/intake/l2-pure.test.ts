@@ -10,7 +10,7 @@ const row = (over: Partial<IntakeRow>): IntakeRow => ({ agentMove: undefined, te
 const move = { activityId: "a1", text: "Moved automatically · LOE sent Oct 20", tooltip: "Evidence", why: "", movedAt: "", today: false };
 
 describe("assistant column", () => {
-  it("lists the move, then the Long-Term Nurture suggestion; Needs attorney is not here", () => {
+  it("lists the move, then the Long-Term Nurture suggestion; Awaiting approval is not here", () => {
     const r = row({ agentMove: move, temperature: { value: "cold", source: "suggested", reason: "x", suggestion: "long_term_nurture" } as IntakeRow["temperature"] });
     expect(assistantItems(r).map((i) => i.kind)).toEqual(["moved", "suggestion"]);
     expect(assistantItems(r)[0].text).toBe("Moved automatically · LOE sent Oct 20");

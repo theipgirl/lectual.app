@@ -7,6 +7,7 @@ import type { OpenRef } from "@/lib/review/open";
 import { REVIEW_DOCS_COMMENT, REVIEW_DOCS_COMMENT_HINT, REVIEW_DOCS_EMPTY, REVIEW_DOCS_LOAD_FAILED, REVIEW_DOCS_OPEN_ALL, REVIEW_DOCS_TITLE, reviewDocsMore } from "@/lib/ui/words";
 import { MERGE_HISTORY_PARTIAL } from "@/lib/ui/words";
 import { FILES_ERROR_LINE, LETTERS_ERROR_LINE } from "@/components/files/DocumentsCard";
+import { ReviewUpload } from "./ReviewUpload";
 import "./review.css";
 
 type Member = { userId: string; name: string };
@@ -67,6 +68,7 @@ export function ReviewDocuments({
   today,
   timeZone,
   canWrite,
+  canUpload = false,
 }: {
   open: OpenRef;
   documents: RecordDocuments;
@@ -74,6 +76,8 @@ export function ReviewDocuments({
   today: string;
   timeZone: string;
   canWrite: boolean;
+  /** Same list as the Documents & files card (FILE_UPLOAD_ROLES). Nothing is drawn for anyone else. */
+  canUpload?: boolean;
 }) {
   const view = documentsView(documents, members, PANEL_DOC_MAX);
   return (
@@ -94,6 +98,7 @@ export function ReviewDocuments({
           {reviewDocsMore(view.more, view.capped)}
         </p>
       )}
+      {canUpload && !view.filesNotSetUp && <ReviewUpload parent={{ kind: open.kind, id: open.id }} />}
       <p style={{ margin: 0, display: "flex", gap: 12, flexWrap: "wrap" }}>
         {/* A plain anchor: the href reaches the page exactly as built (the trailing slash and the #documents anchor). */}
         <a href={documentsCardHref(open.kind, open.id)} className="rv-panel-full">

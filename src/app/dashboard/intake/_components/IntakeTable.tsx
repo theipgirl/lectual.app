@@ -219,7 +219,7 @@ export default function IntakeTable({
                 const touch = touchStampFor(row, { now, timeZone });
                 const error = errors[lead.id];
                 const pending = pendingLeadId === lead.id;
-                const pendingDrafts = pendingFor(pendingApprovals, lead.id);
+                const pendingDrafts = pendingFor(pendingApprovals, lead.id, row.stage);
                 const decision = decisionOpen(row.decision, lead.current_stage_id) ? row.decision : null;
                 const dup = duplicates[lead.id];
                 return (

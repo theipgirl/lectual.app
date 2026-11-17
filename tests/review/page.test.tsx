@@ -2,6 +2,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { row, TODAY } from "./fixtures";
 
+// The panel draws the upload control for writers; it holds a router for its refresh.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }), usePathname: () => "/dashboard/review/", useSearchParams: () => new URLSearchParams() }));
+
 const members = [
   { userId: "u-reb", name: "Rebecca", role: "owner" },
   { userId: "u-rayn", name: "Rayn", role: "paralegal" },

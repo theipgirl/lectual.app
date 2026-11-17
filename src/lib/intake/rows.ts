@@ -67,6 +67,10 @@ export type IntakeRow = {
    * were read and the lead has one; whether it is still OPEN depends on where the lead is now (`decisionOpen`).
    */
   decision?: DecisionFlag;
+  /** Start (ISO) of the lead's soonest booked consult, today (firm day) or later. Absent = none, or the read failed. */
+  consultAt?: string;
+  /** Start (ISO) of the lead's latest consult that already happened (last 30 days). Absent = none, or the read failed. */
+  pastConsultAt?: string;
 };
 
 /** Special `owner` filter value meaning "nobody is on the hook for this one". */
@@ -361,6 +365,10 @@ export type BuildIntakeRowsInput = {
   agentMoveByLeadId?: Record<string, AgentMoveChip>;
   /** lead id → the Lawmatics-import stage flag. Omit entirely when the flags couldn't be read. */
   decisionByLeadId?: Record<string, DecisionFlag>;
+  /** lead id -> start (ISO) of the soonest booked consult today or later. Omit entirely when the consult read failed. */
+  consultStartByLeadId?: Record<string, string>;
+  /** lead id -> start (ISO) of the latest consult already held (last 30 days). Omit entirely when the consult read failed. */
+  pastConsultStartByLeadId?: Record<string, string>;
   now: Date;
 };
 
@@ -380,7 +388,7 @@ function daysBetween(iso: string | null, now: Date): number | null {
  * strip and the row it counts can never disagree.
  */
 export function buildIntakeRows(input: BuildIntakeRowsInput): IntakeRow[] {
-  const { leads, stages, members, latestNoteByLeadId = {}, factsByLeadId = {}, agentMoveByLeadId = {}, decisionByLeadId = {}, now } = input;
+  const { leads, stages, members, latestNoteByLeadId = {}, factsByLeadId = {}, agentMoveByLeadId = {}, decisionByLeadId = {}, consultStartByLeadId = {}, pastConsultStartByLeadId = {}, now } = input;
   const stageById = new Map(stages.map((stage) => [stage.id, stage]));
   const memberById = new Map(members.map((member) => [member.userId, member]));
 
@@ -407,6 +415,9 @@ export function buildIntakeRows(input: BuildIntakeRowsInput): IntakeRow[] {
       // Only present when the agent placed the lead, so a row built without one is unchanged.
       ...(agentMove ? { agentMove } : {}),
       ...(decisionByLeadId[lead.id] ? { decision: decisionByLeadId[lead.id] } : {}),
+      // Only present for a lead with a booked consult today or later, so every other row is unchanged.
+      ...(consultStartByLeadId[lead.id] ? { consultAt: consultStartByLeadId[lead.id] } : {}),
+      ...(pastConsultStartByLeadId[lead.id] ? { pastConsultAt: pastConsultStartByLeadId[lead.id] } : {}),
     };
   });
 }

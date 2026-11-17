@@ -11,6 +11,7 @@ import {
   type ClientCredentials,
   type MailboxProvider,
 } from "./providers";
+import { firmSendersFrom, NO_FIRM_SENDERS, relabelFirmSent, type FirmSenders } from "./firm-sender";
 import { foldMergedLeads, leadRead } from "@/lib/leads/live";
 
 /**
@@ -104,6 +105,8 @@ export type OrgContext = {
   contacts: MatterContact[];
   links: MatterLink[];
   memberRoles: Map<string, string>;
+  /** The addresses of ALL the firm's mailbox connections (any status): mail from them is firm-sent. */
+  firmSenders: FirmSenders;
 };
 
 export async function loadOrgContext(admin: SupabaseClient, orgId: string): Promise<OrgContext> {
@@ -147,6 +150,18 @@ export async function loadOrgContext(admin: SupabaseClient, orgId: string): Prom
     ]);
   for (const e of [cErr, lErr, mErr, rErr]) if (e) throw new Error(`org context read failed: ${e.message}`);
 
+  // Firm senders: the email of every mailbox_connection of THIS org (column `email` only, never a token).
+  // A failed read must not fail the sync: it falls back to no firm senders (today's behaviour).
+  let firmSenders: FirmSenders = NO_FIRM_SENDERS;
+  try {
+    const { data: connRows, error: connErr } = await admin.from("mailbox_connection").select("email").eq("org_id", orgId);
+    if (!connErr && Array.isArray(connRows)) {
+      firmSenders = firmSendersFrom(connRows.map((r) => (r as { email?: string | null }).email));
+    }
+  } catch {
+    firmSenders = NO_FIRM_SENDERS;
+  }
+
   const markByMatter = new Map((matterRows ?? []).map((m) => [m.id as string, (m.mark_text as string | null) ?? null]));
   return {
     leads,
@@ -157,6 +172,7 @@ export async function loadOrgContext(admin: SupabaseClient, orgId: string): Prom
       markText: markByMatter.get(l.matter_id as string) ?? null,
     })),
     memberRoles: new Map((members ?? []).map((m) => [m.user_id as string, m.role as string])),
+    firmSenders,
   };
 }
 
@@ -172,10 +188,12 @@ export async function syncConnection(deps: SyncDeps, row: ConnectionRow, ctx: Or
       now,
     });
 
-    const report = buildEmailEvidence({ messages: fetched.messages, leads: ctx.leads, directory: [] });
+    // Firm mail that reached this mailbox only as a cc is OUTBOUND, before cadence and activity typing.
+    const messages = relabelFirmSent(fetched.messages, ctx.firmSenders ?? NO_FIRM_SENDERS);
+    const report = buildEmailEvidence({ messages, leads: ctx.leads, directory: [] });
     const planned = planActivities({
       report,
-      messages: fetched.messages,
+      messages,
       matterFor: (m) => matchMessageToMatter(m, ctx.contacts, ctx.links),
       connectionId: row.id,
     });

@@ -1041,3 +1041,9 @@ export const LEAD_STEP_SENT_BACK = "Sent back. Nothing was sent to the client.";
 export const LEAD_STEP_HANDED_AWAY = "You handed this card on, so its yes isn't offered to you here.";
 export const LEAD_STEP_LINK_NOT_LIVE = "A yes here would turn the proposal's client link on. Review the proposal, then open this in Approvals.";
 export const LEAD_STEP_ROW_PROPOSAL = "Proposal";
+// Leads: a booked consult in the Last contact cell
+export const LEADS_TOUCH_CONSULT_TODAY = (time: string) => `Consult today · ${time}`;
+export const LEADS_TOUCH_CONSULT_LATER = (date: string) => `Consult · ${date}`;
+export const LEADS_TOUCH_CONSULT_HELD = (date: string) => `${OUR_TURN} · consult ${date}`;
+export const LEADS_TOUCH_CONSULT_HELD_TITLE = "The consult was held and nothing has been sent since.";
+export const LEADS_TOUCH_CONSULT_TITLE = "A consult is booked on the calendar, so that is the next thing for this lead.";

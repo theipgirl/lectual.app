@@ -65,6 +65,10 @@ export type WorkingFacts = {
   consults: FactSet;
   /** Leads with a booth scorecard row. */
   booth: FactSet;
+  /** Soonest booked consult start per lead, today (firm day) or later. Present only when the consult read answered. */
+  consultStarts?: ReadonlyMap<string, string>;
+  /** Latest consult that already started (within 30 days) per lead. Present only when the consult read answered. */
+  pastConsultStarts?: ReadonlyMap<string, string>;
 };
 
 export type FactSource = keyof WorkingFacts;
