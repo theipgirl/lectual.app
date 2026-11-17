@@ -106,13 +106,13 @@ describe("/dashboard/notifications page (F4)", () => {
   it("shows Older only when a further page exists, and Newer only past page 1, carrying the tab", async () => {
     listMinePage.mockResolvedValue({ rows: [note(1)], hasMore: false });
     let html = await render();
-    expect(html).not.toContain(">Older<");
+    expect(html).not.toContain(">Show more<");
     expect(html).not.toContain(">Newer<");
 
     listMinePage.mockResolvedValue({ rows: [note(1)], hasMore: true });
     html = await render({ tab: "unread" });
     expect(html).toContain('href="/dashboard/notifications?tab=unread&amp;page=2"');
-    expect(html).toContain(">Older<");
+    expect(html).toContain(">Show more<");
     expect(html).not.toContain(">Newer<");
 
     html = await render({ tab: "unread", page: "2" });
