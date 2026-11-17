@@ -42,8 +42,7 @@ import {
   LEADS_MOVED_MARK,
   LEADS_MOVED_MARK_TITLE,
   LEADS_NEEDS_STAGE,
-  LEADS_RESIZE_COLUMN,
-} from "@/lib/ui/words";
+  LEADS_RESIZE_COLUMN, BLANK } from "@/lib/ui/words";
 import { duplicateTitle, type DuplicateOf } from "@/lib/intake/duplicates";
 
 /** The sort key and the words of each column. The Assistant activity column has no sort: it is not a value a person ranks by. */
@@ -240,7 +239,7 @@ export default function IntakeTable({
                         </Link>
                         <span className="ix-subline">
                           <span className="ix-sub" title={business || undefined}>
-                            {business || "—"}
+                            {business || BLANK}
                           </span>
                           {movedOut?.has(lead.id) && (
                             <span className="lx-pill lx-pill-mute" data-moved title={LEADS_MOVED_MARK_TITLE}>

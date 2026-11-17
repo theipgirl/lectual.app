@@ -794,7 +794,7 @@ export const LEADS_COMPARE_FIELDS = {
   source: "Source",
   created: "Created",
   timeline: "Timeline entries",
-  tasks: "Tasks",
+  tasks: NEXT_STEPS,
   proposals: "Proposals",
 } as const;
 export const LEADS_MOVED_MARK = "Moved";

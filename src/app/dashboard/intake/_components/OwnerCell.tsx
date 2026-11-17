@@ -3,7 +3,7 @@
 import type { MemberIdentity } from "@/lib/members/directory";
 import { initialsOf, memberLabel } from "@/lib/intake/views";
 import Popover, { PopoverItem } from "./Popover";
-import { TEAMMATE, UNASSIGNED } from "@/lib/ui/words";
+import { TEAMMATE, UNASSIGNED, BLANK } from "@/lib/ui/words";
 
 /**
  * "Who owns the next response" (§1.9), reassignable in place.
@@ -49,7 +49,7 @@ export default function OwnerCell({
           className="ix-cell-btn"
           data-empty={label ? undefined : ""}
         >
-          {owner ? initialsOf(owner) : unknownAssignee ? "?" : "—"}
+          {owner ? initialsOf(owner) : unknownAssignee ? "?" : BLANK}
         </button>
       )}
     >

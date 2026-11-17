@@ -28,3 +28,4 @@
   .lx-split-lead > .lx-aside { order: -1; width: auto; }
 }
 .lx-check { display: flex; gap: 8px; align-items: center; font-size: var(--fs-2); }
+.lx-next-step { padding: 14px; display: grid; gap: 8px; background: var(--well); }

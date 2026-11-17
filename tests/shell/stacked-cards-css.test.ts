@@ -65,7 +65,7 @@ describe("stacked cards under 640px (V1)", () => {
       ["src/app/dashboard/documents/page.tsx", ["Matter", "Status", "Updated"]],
       ["src/app/dashboard/queue/page.tsx", ["Client", "From", "Status", "Queued"]],
       ["src/components/proposal-list/ProposalsTable.tsx", ["Client", "Status", "Client response", "Fees"]],
-      ["src/app/dashboard/intake/_components/IntakeTable.tsx", ["Stage", "Temperature", "Source", "Owner", "Next step"]],
+      ["src/app/dashboard/intake/_components/IntakeTable.tsx", ["Stage", "Temperature", "Source"]],
     ];
     for (const [file, labels] of sources) {
       const src = read(file);
@@ -73,7 +73,7 @@ describe("stacked cards under 640px (V1)", () => {
       expect(src.includes("lx-stack") || src.includes("<SheetTable"), file).toBe(true);
       for (const l of labels) expect(src, `${file} ${l}`).toContain(`data-label="${l}"`);
       // The Leads columns whose labels come from the glossary (Item L2).
-      if (file.includes("IntakeTable")) expect(src).toContain("data-label={LEADS_CONTACT_COLUMN}");
+      if (file.includes("IntakeTable")) for (const word of ["LEADS_CONTACT_COLUMN", "OWNER_COLUMN", "NEXT_STEP"]) expect(src).toContain(`data-label={${word}}`);
     }
   });
 });

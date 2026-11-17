@@ -10,6 +10,7 @@ import { LANES, LANE_LABEL, suggestionLine, type LaneView, type NextStep } from 
 import { temperatureLabel, type EffectiveTemperature } from "@/lib/intake/effective-temperature";
 import { LtnSuggestion } from "@/components/intake/LtnSuggestion";
 import { SAVING } from "@/lib/ui/words";
+import { SavedNote } from "@/components/ui/SavedNote";
 
 /**
  * The lead page's ONE temperature card (intake SOP Stage 2), the twin of the
@@ -124,16 +125,12 @@ export function TemperatureCard(props: {
               {laneState.error}
             </span>
           )}
-          {laneState.message && !laneState.error && (
-            <span role="status" className="lx-note" style={{ color: "var(--ok)" }}>
-              {laneState.message}
-            </span>
-          )}
+          <SavedNote show={Boolean(laneState.message) && !laneState.error}>{laneState.message}</SavedNote>
         </form>
       )}
 
       {nextStep && (
-        <div className="lx-card" style={{ padding: 14, display: "grid", gap: 8, background: "var(--surface2, transparent)" }}>
+        <div className="lx-card lx-next-step">
           <div className="lx-label">{props.nextStepIsSuggested ? "Suggested next step (from triage — set the temperature to confirm)" : "Next step"}</div>
           {nextStep.kind === "nurture" ? (
             props.nurtureStatus ? (
@@ -153,11 +150,7 @@ export function TemperatureCard(props: {
                       {nurtureState.error}
                     </span>
                   )}
-                  {nurtureState.message && !nurtureState.error && (
-                    <span role="status" className="lx-note" style={{ color: "var(--ok)", flexBasis: "100%" }}>
-                      {nurtureState.message}
-                    </span>
-                  )}
+                  <SavedNote show={Boolean(nurtureState.message) && !nurtureState.error}>{nurtureState.message}</SavedNote>
                 </form>
               ) : (
                 <p className="lx-note" style={{ margin: 0 }}>{nextStep.label}</p>

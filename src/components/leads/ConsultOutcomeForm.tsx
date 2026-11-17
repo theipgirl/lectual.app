@@ -4,6 +4,7 @@ import { useActionState, useRef, useState } from "react";
 import { logConsultOutcomeAction, type ConsultOutcomeState } from "@/app/dashboard/leads/[id]/outcome-actions";
 import { CONSULT_OUTCOMES, CONSULT_OUTCOME_LABEL, type ConsultOutcome } from "@/lib/pipeline/consult-outcome-labels";
 import { SAVING } from "@/lib/ui/words";
+import { SavedNote } from "@/components/ui/SavedNote";
 
 /**
  * "Log a consult outcome" on the lead page: no-show, asked to reschedule, or
@@ -54,11 +55,7 @@ export function ConsultOutcomeForm({ leadId }: { leadId: string }) {
           {state.error}
         </p>
       )}
-      {state.saved && (
-        <p role="status" className="lx-note" style={{ margin: 0 }}>
-          Logged on the timeline.
-        </p>
-      )}
+      <SavedNote show={Boolean(state.saved)}>Logged on the timeline.</SavedNote>
     </form>
   );
 }

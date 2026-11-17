@@ -138,3 +138,7 @@
 .ix-menu-ox { color: var(--ox); }
 .ix-time-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .ix-time-wide { grid-column: 1 / -1; }
+
+/* "Long-Term Nurture suggested" (the board, the list and the lead page) */
+.ix-ltn { display: inline-block; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; font-size: var(--fs-1); line-height: 1.4; color: var(--muted); white-space: normal; }
+.ix-ltn-link { color: var(--ox); text-decoration: underline; }

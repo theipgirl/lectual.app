@@ -2,6 +2,7 @@
 
 import { REFERRAL_SOURCES, type ReferralSource } from "@/lib/intake";
 import Popover, { PopoverItem } from "./Popover";
+import { BLANK } from "@/lib/ui/words";
 
 /**
  * A lead's referral source, correctable in place (the same shape as OwnerCell).
@@ -47,7 +48,7 @@ export default function SourceCell({
           className={`ix-cell-btn${compact ? " ix-cell-btn-compact" : ""}`}
           data-empty={current ? undefined : ""}
         >
-          {current ?? (compact ? "Source —" : "—")}
+          {current ?? (compact ? `Source ${BLANK}` : BLANK)}
         </button>
       )}
     >

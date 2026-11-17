@@ -16,7 +16,7 @@ import type { Proposal } from "@/lib/agents/proposals";
 import { FIELD_LABEL } from "@/lib/agents/proposals";
 // Pure module: the composer's four entry types, shared with the matter timeline composer.
 import { NOTE_KIND_OPTIONS } from "@/lib/pipeline/lead-input";
-import { SAVING, ADD_A_LEAD, ADD_TO_TIMELINE } from "@/lib/ui/words";
+import { SAVING, ADD_A_LEAD, ADD_TO_TIMELINE, OWNER_COLUMN, UNASSIGNED } from "@/lib/ui/words";
 import { Notice } from "@/components/ui/Notice";
 import { SavedNote } from "@/components/ui/SavedNote";
 
@@ -105,9 +105,9 @@ export function AssignSelect({ leadId, assignedTo, members }: { leadId: string; 
   return (
     <form action={action} className="lx-inline-form">
       <input type="hidden" name="leadId" value={leadId} />
-      <select name="userId" className="lx-input" defaultValue={assignedTo ?? ""} aria-label="Owner" onChange={(e) => e.currentTarget.form?.requestSubmit()} disabled={pending}>
+      <select name="userId" className="lx-input" defaultValue={assignedTo ?? ""} aria-label={OWNER_COLUMN} onChange={(e) => e.currentTarget.form?.requestSubmit()} disabled={pending}>
         <option value="" disabled>
-          Unassigned
+          {UNASSIGNED}
         </option>
         {members.map((m) => (
           <option key={m.userId} value={m.userId}>

@@ -20,6 +20,8 @@ import {
   LEADS_TOUCH_WAITING_ON_THEM,
   LEADS_TOUCH_WAITING_TITLE,
   TEAMMATE,
+  UNASSIGNED,
+  BLANK,
 } from "@/lib/ui/words";
 
 /**
@@ -173,7 +175,7 @@ export function ownerColumns(rows: IntakeRow[], members: MemberIdentity[]): Owne
   );
 
   return [
-    build(null, "Unassigned", "—"),
+    build(null, UNASSIGNED, BLANK),
     ...members.map((member) => build(member.userId, memberLabel(member), initialsOf(member))),
     ...strays.map((id) => build(id, TEAMMATE, "?")),
   ];

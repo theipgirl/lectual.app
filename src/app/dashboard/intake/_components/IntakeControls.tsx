@@ -14,7 +14,7 @@ import type { LeadSet } from "@/lib/intake/working";
 import type { ChipCounts } from "@/lib/intake/leads-view";
 import Popover, { PopoverItem } from "./Popover";
 import { chipClass } from "@/components/list-page/Chips";
-import { LEADS_DUPLICATES, LEADS_DUPLICATES_TITLE, LEADS_ALL_OPEN_MATCHES, LEADS_ANY_STAGE, LEADS_STAGE_FILTER, LEADS_SUGGESTIONS, LEADS_SUGGESTIONS_TITLE, MOVED_AUTOMATICALLY, NOT_RATED, OUR_TURN, TEMPERATURE_TOOLTIP, UNASSIGNED } from "@/lib/ui/words";
+import { LEADS_DUPLICATES, LEADS_DUPLICATES_TITLE, LEADS_ALL_OPEN_MATCHES, LEADS_ANY_STAGE, LEADS_STAGE_FILTER, LEADS_SUGGESTIONS, LEADS_SUGGESTIONS_TITLE, MOVED_AUTOMATICALLY, NOT_RATED, OUR_TURN, OWNER_COLUMN, TEMPERATURE_TOOLTIP, UNASSIGNED } from "@/lib/ui/words";
 import { COPIED_MS, copyViewLabel, viewUrl } from "@/lib/intake/copy-view";
 
 /** `?reply=` has no chip of its own; the chip below appears ONLY while the filter is active, says what it does, and clears it. */
@@ -85,7 +85,7 @@ export default function IntakeControls({
 
   const selectedStage = stages.find((stage) => stage.id === filters.stage) ?? null;
   const selectedOwner =
-    filters.owner === UNASSIGNED_OWNER ? UNASSIGNED : (members.find((m) => m.userId === filters.owner)?.displayName ?? (filters.owner ? "Owner" : null));
+    filters.owner === UNASSIGNED_OWNER ? UNASSIGNED : (members.find((m) => m.userId === filters.owner)?.displayName ?? (filters.owner ? OWNER_COLUMN : null));
 
   async function saveView() {
     const url = viewUrl(currentHref, typeof window === "undefined" ? null : window.location.origin);
@@ -163,7 +163,7 @@ export default function IntakeControls({
           width={210}
           trigger={({ onClick, ref, ...aria }) => (
             <button {...aria} ref={ref} type="button" onClick={onClick} className={chipClass(filters.owner !== null)}>
-              {selectedOwner ?? "Owner"}
+              {selectedOwner ?? OWNER_COLUMN}
             </button>
           )}
         >
