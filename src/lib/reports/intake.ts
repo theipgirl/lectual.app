@@ -1,4 +1,5 @@
 import "server-only";
+import { OUR_TURN } from "@/lib/ui/words";
 import { INTAKE_NAME } from "@/lib/ui/words";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { listLeads, listStages } from "@/lib/pipeline";
@@ -71,8 +72,8 @@ export async function loadIntakeReport(period: ReportPeriod): Promise<IntakeRepo
   // --- Waiting on us, right now (a backlog snapshot, not a period figure) ---
   const waitingLeads = pnc ? pnc.filter(isWaitingOnUs) : null;
   const waitingCount: Metric = waitingLeads
-    ? { label: "Waiting on us", value: waitingLeads.length, sub: "open leads we haven't answered" }
-    : unavailableMetric("Waiting on us", "Leads couldn't be loaded");
+    ? { label: OUR_TURN, value: waitingLeads.length, sub: "open leads we haven't answered" }
+    : unavailableMetric(OUR_TURN, "Leads couldn't be loaded");
 
   const waiting: WaitingItem[] = waitingLeads
     ? oldestFirst(waitingLeads, waitingSince, 5).map((l) => ({

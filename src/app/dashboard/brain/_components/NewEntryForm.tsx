@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { SIGNAL_IDS, SIGNAL_LABEL, type SignalId } from "@/lib/stage-keeper/signals";
+import { SAVING } from "@/lib/ui/words";
 import { createBrainEntryAction, type ActionState } from "../actions";
 import { ENTRY_TYPES, type EntryTypeValue } from "../enums";
 
@@ -107,7 +108,7 @@ export default function NewEntryForm({
         )}
 
         <button type="submit" className="lx-btn lx-btn-pri" disabled={pending} style={{ justifySelf: "start" }}>
-          {pending ? "Creating…" : "Create entry"}
+          {pending ? SAVING : "Create entry"}
         </button>
 
         {state.error && <p role="alert" className="lx-brain-error">{state.error}</p>}

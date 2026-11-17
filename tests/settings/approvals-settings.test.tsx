@@ -16,6 +16,7 @@ vi.mock("@/lib/auth/current-role", () => ({ currentRole: async () => state.role 
 vi.mock("@/lib/org/modules", () => ({ orgHasModule: async () => state.proposals }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: () => {} }),
   notFound: () => {
     throw new Error("NEXT_NOT_FOUND");
   },
@@ -172,7 +173,7 @@ describe("Settings -> Approvals page", () => {
   it("unreadable members or settings: an alert and no form (never an empty dropdown)", async () => {
     state.directoryFails = true;
     let html = await page();
-    expect(html).toContain('role="alert"');
+    expect(html).toContain("Can&#x27;t show the approval settings right now");
     expect(html).not.toContain("<select");
     state.directoryFails = false;
     state.settingsFail = true;

@@ -110,9 +110,9 @@ describe("touch targets (V2)", () => {
   });
 });
 
-describe("Setup at 720px and under (V4)", () => {
+describe("Setup at 640px and under (V4)", () => {
   it("label and why sit in column 2, with the pill and the button following", () => {
-    const m = media(setup, "max-width: 720px");
+    const m = media(setup, "max-width: 640px");
     expect(m).toMatch(/\.su-item > div,\s*\.su-item > \.su-state,\s*\.su-item > \.su-action \{\s*grid-column: 2;/);
     expect(m).toContain("grid-template-columns: 24px minmax(0, 1fr)");
   });
@@ -125,8 +125,8 @@ describe("Setup at 720px and under (V4)", () => {
 });
 
 describe("Getting started on a phone (V5)", () => {
-  it("at 560px and under a flow is a 22px column and the button takes its own row in column 2", () => {
-    const m = media(hub, "max-width: 560px");
+  it("at 640px and under a flow is a 22px column and the button takes its own row in column 2", () => {
+    const m = media(hub, "max-width: 640px");
     expect(m).toContain("grid-template-columns: 22px 1fr;");
     expect(m).toMatch(/\.gs-flow > \.lx-btn \{\s*grid-column: 2;/);
   });
@@ -154,9 +154,9 @@ describe("the Copilot launcher and a sticky Save bar (P4)", () => {
   it("the sticky Unsaved changes bar is marked", () => {
     expect(read("src/app/dashboard/forms/_components/IntakeFormsWorkspace.tsx")).toContain('className="lx-unsaved" data-save-bar');
   });
-  it("the Esc hint shows only from 900px up", () => {
-    expect(copilot).toMatch(/\.cpd-kbd \{\s*display: none;/);
-    expect(media(copilot, "min-width: 900px")).toContain(".cpd-kbd { display: inline; }");
+  it("the drawer closes with the shared Close button; there is no Esc hint to hide or show", () => {
+    expect(copilot).not.toContain(".cpd-kbd");
+    expect(read("src/components/copilot/CopilotLauncher.tsx")).toContain("<CloseButton");
   });
 });
 

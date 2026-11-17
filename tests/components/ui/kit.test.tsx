@@ -14,6 +14,11 @@ describe("Pill", () => {
   it("can wrap and use tabular digits", () => {
     expect(renderToStaticMarkup(<Pill tone="warn" wrap num>3d</Pill>)).toContain("lx-pill-wrap lx-pill-num");
   });
+  it("passes an extra class and data attributes through (one prop shape for every area)", () => {
+    expect(renderToStaticMarkup(<Pill tone="ok" className="x-hook" data-state="connected">On</Pill>)).toBe(
+      '<span class="lx-pill lx-pill-ok x-hook" data-state="connected">On</span>',
+    );
+  });
 });
 
 describe("PageTabs", () => {

@@ -22,14 +22,6 @@
 }
 
 .lxi-title {
-  font-size: 27px;
-}
-
-.lxi-title-row-size {
-  margin: 0;
-  font-family: var(--sans);
-  font-size: 16px;
-  font-weight: 500;
   color: var(--ink);
 }
 
@@ -49,15 +41,26 @@
 }
 
 .lxi-card {
-  padding: 18px;
+  padding: var(--pad-card);
   display: grid;
   gap: 12px;
 }
 
-.lxi-card .lxi-title {
-  font-size: 23px;
-}
-
 .lxi-card .lxi-help {
   margin: 0;
+}
+
+/* A mailbox row on the Integrations page. */
+.lx-mbx-email {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lx-mbx-problem {
+  color: var(--wine);
+}
+
+.lx-mbx-caution {
+  color: var(--warn);
 }

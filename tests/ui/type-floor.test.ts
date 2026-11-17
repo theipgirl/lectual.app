@@ -13,45 +13,25 @@ import { ceilingCheck, cssFiles, phoneBlocks, pxFontSizes, read, stripCssComment
  * A file that is not listed has a ceiling of 0.
  */
 const A: Record<string, number> = {
-  "src/app/dashboard/brain/brain.css": 10,
-  "src/app/dashboard/copilot/copilot.css": 1,
   "src/app/dashboard/intake/intake.css": 1,
   "src/app/dashboard/intake/leads.css": 1,
   "src/app/dashboard/intake/reconcile/reconcile.css": 5,
-  "src/components/copilot/copilot.css": 8,
-  "src/components/onboarding/hub.css": 1,
-  "src/components/setup/setup.css": 1,
 };
 const B: Record<string, number> = {
 };
 const C: Record<string, number> = {};
 const D: Record<string, number> = {
-  "src/app/dashboard/agents/page.tsx": 1,
   "src/app/dashboard/intake/_components/AddLeadDialog.tsx": 4,
-  "src/components/agents/AgentControls.tsx": 1,
   "src/components/intake/TimeEntryDialog.tsx": 5,
-  "src/components/onboarding/OnboardingTour.tsx": 1,
-  "src/components/skills/SkillCard.tsx": 1,
 };
 const E: Record<string, number> = {
-  "src/app/dashboard/agents/page.tsx": 6,
-  "src/app/dashboard/brain/page.tsx": 3,
-  "src/app/dashboard/copilot/page.tsx": 1,
   "src/app/dashboard/intake/_components/AddLeadDialog.tsx": 6,
   "src/app/dashboard/intake/_components/LeadsNotices.tsx": 1,
   "src/app/dashboard/leads/[id]/page.tsx": 3,
-  "src/app/dashboard/reports/[key]/page.tsx": 3,
-  "src/app/dashboard/reports/page.tsx": 1,
-  "src/app/dashboard/settings/integrations/lawmatics/page.tsx": 5,
-  "src/app/dashboard/settings/integrations/lawpay/page.tsx": 3,
-  "src/app/dashboard/settings/proposals/page.tsx": 1,
-  "src/app/dashboard/settings/services/page.tsx": 2,
   "src/app/not-found.tsx": 1,
-  "src/components/agents/AgentControls.tsx": 1,
   "src/components/answers/AnswersCard.tsx": 1,
   "src/components/intake/TimeChip.tsx": 6,
   "src/components/intake/TimeEntryDialog.tsx": 7,
-  "src/components/lawpay/LawPayForms.tsx": 2,
   "src/components/leads/ConsultDetailsForm.tsx": 1,
   "src/components/leads/ConsultDetailsSection.tsx": 1,
   "src/components/leads/LeadProposalsCard.tsx": 1,
@@ -59,17 +39,12 @@ const E: Record<string, number> = {
   "src/components/leads/SequencesCard.tsx": 1,
   "src/components/leads/TemperatureCard.tsx": 1,
   "src/components/leads/WaitingOnRebecca.tsx": 1,
-  "src/components/onboarding/OnboardingTour.tsx": 1,
   "src/components/proposal/QuoteDocument.tsx": 1,
   "src/components/proposal/Receipt.tsx": 1,
   "src/components/reconcile/ApplyBar.tsx": 2,
   "src/components/reconcile/Explanation.tsx": 1,
   "src/components/reconcile/NotInLectual.tsx": 1,
   "src/components/reconcile/ReconcilePreview.tsx": 1,
-  "src/components/settings/FirmProfileForm.tsx": 2,
-  "src/components/settings/RoleTable.tsx": 1,
-  "src/components/skills/CoworkSkills.tsx": 2,
-  "src/components/skills/SkillCard.tsx": 3,
   "src/components/voice/VoiceNoteRecorder.tsx": 7,
 };
 

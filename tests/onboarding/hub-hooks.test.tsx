@@ -195,7 +195,7 @@ describe("styling and sources", () => {
       "agents-head": "src/app/dashboard/agents/page.tsx",
       "setup-head": "src/app/dashboard/settings/setup/page.tsx",
       "proposal-new-head": "src/app/dashboard/proposals/new/page.tsx",
-      "team-head": "src/app/dashboard/settings/team/page.tsx",
+      "team-head": "src/components/settings/TeamForms.tsx",
     };
     for (const [token, file] of Object.entries(pages)) {
       // The hook is either written out or handed to PageHeader's `tour` prop, which draws it on the h1.

@@ -34,7 +34,7 @@ async function controls(runState: Record<string, unknown>, opts: { running?: boo
   );
 }
 const decode = (s: string) => s.replace(/&#x27;/g, "'").replace(/&amp;/g, "&");
-const runButton = (html: string) => /<button[^>]*>(?:Run now|Running\.\.\.)<\/button>/.exec(html)?.[0] ?? "";
+const runButton = (html: string) => /<button[^>]*>(?:Run now|Running…)<\/button>/.exec(html)?.[0] ?? "";
 
 describe("Run now controls: the result line", () => {
   beforeEach(() => vi.resetModules());
@@ -75,9 +75,9 @@ describe("Run now controls: the result line", () => {
 describe("Run now controls: running and blocked", () => {
   beforeEach(() => vi.resetModules());
 
-  it("while running: the button reads 'Running...', is disabled, and the line says why", async () => {
+  it("while running: the button reads 'Running…', is disabled, and the line says why", async () => {
     const html = await controls({}, { running: true });
-    expect(runButton(html)).toContain("Running...");
+    expect(runButton(html)).toContain("Running…");
     expect(runButton(html)).toContain("disabled");
     expect(html).toContain("Running. This can take a minute.");
     expect(html).toContain('aria-describedby="run-reason-intake-triage"');

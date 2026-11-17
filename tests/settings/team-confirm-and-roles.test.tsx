@@ -31,7 +31,7 @@ describe("F13: role change needs a Confirm", () => {
     expect(select).not.toContain("requestSubmit");
     expect(select).toMatch(/onChange=\{\(e\) => setChosen\(e\.currentTarget\.value\)\}/);
     expect(select).toMatch(/type="submit"[\s\S]*Confirm/);
-    expect(select).toMatch(/onClick=\{\(\) => setChosen\(role\)\}[\s\S]*Cancel/);
+    expect(select).toMatch(/onClick=\{\(\) => setChosen\(role\)\}[\s\S]*\{CANCEL\}/);
   });
 
   it("asks a plain question naming the person and both roles", () => {

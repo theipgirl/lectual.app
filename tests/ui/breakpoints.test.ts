@@ -13,12 +13,8 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 const BASELINE: Record<string, number> = {
-  "src/app/dashboard/copilot/copilot.css": 1,
   "src/app/globals.css": 0,
   "src/app/i/intake-public.css": 1,
-  "src/components/copilot/copilot.css": 1,
-  "src/components/onboarding/hub.css": 1,
-  "src/components/setup/setup.css": 1,
 };
 const counts: Record<string, number> = {};
 for (const file of walk(join(process.cwd(), "src"))) {

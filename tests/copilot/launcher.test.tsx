@@ -138,7 +138,7 @@ describe("CopilotDrawer markup", () => {
     expect(html).toContain('aria-modal="true"');
     expect(html).toMatch(/aria-labelledby="copilot-drawer-title"/);
     expect(html).toContain('id="copilot-drawer-title"');
-    expect(html).toContain(">Close</button>");
+    expect(html).toContain('aria-label="Close"');
     expect(html).toContain('aria-label="Ask Copilot"');
     expect(html).toContain("cpl-composer");
     expect(html).toContain("Nothing sends without your approval.");

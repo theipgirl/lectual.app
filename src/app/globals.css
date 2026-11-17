@@ -1927,23 +1927,6 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
 .lx-linkbtn:hover { color: var(--wine); text-decoration: underline; }
 .lx-inline-confirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 
-/* Team: each person is a stacked card under 900px (Sprint 34). */
-.lx-team-tbl { min-width: 640px; }
-@media (max-width: 900px) {
-  .lx-team-tbl { min-width: 0; }
-  .lx-team-tbl,
-  .lx-team-tbl tbody,
-  .lx-team-tbl tr { display: block; width: 100%; min-width: 0; }
-  .lx-team-tbl thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-  .lx-team-tbl tr { padding: 12px 14px; border-bottom: 1px solid var(--line-2); }
-  .lx-team-tbl tr:last-child { border-bottom: 0; }
-  .lx-team-tbl td { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 4px 0; border: 0; white-space: normal; text-align: right; min-width: 0; }
-  .lx-team-tbl td.pri { display: block; text-align: left; padding-bottom: 6px; }
-  .lx-team-tbl td[data-label]::before { content: attr(data-label); flex: 0 0 auto; font-family: var(--sans); font-size: var(--fs-1); font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--muted); text-align: left; }
-  .lx-team-tbl td.pri::before { content: none; }
-  .lx-team-tbl td.lx-team-actions { justify-content: flex-start; }
-}
-
 /* A sticky "Unsaved changes" bar (marked data-save-bar so the Copilot button lifts above it). */
 .lx-unsaved {
   position: sticky;

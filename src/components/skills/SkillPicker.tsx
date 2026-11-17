@@ -1,3 +1,5 @@
+import "@/components/list-page/list-page.css";
+import { showingOf } from "@/lib/ui/format";
 import { PICK_LIMIT, SEARCH_MAX, type PickRecord } from "@/lib/skills/pick";
 import type { RecordKind, Skill } from "@/lib/skills/catalog";
 
@@ -20,24 +22,29 @@ export function SkillPicker({ skill, term, groups }: { skill: Skill; term: strin
   const showHeadings = groups.length > 1;
   return (
     <div style={{ display: "grid", gap: 10 }}>
-      <form method="get" action={`#skill-${skill.slug}`} className="lx-search-form" role="search" style={{ flex: "none", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+      {/* The shared search look (lp-search); a plain GET form so it works without JavaScript and returns to the card. */}
+      <form method="get" action={`#skill-${skill.slug}`} className="lp-search" role="search">
         <input type="hidden" name="skill" value={skill.slug} />
-        <label htmlFor={inputId} className="lx-label" style={{ whiteSpace: "nowrap" }}>
+        <label htmlFor={inputId} className="lx-sr">
           Run it on...
         </label>
         <input
           id={inputId}
           className="lx-input"
-          style={{ flex: 1, minWidth: 140, width: "auto" }}
           name="q"
           type="search"
           maxLength={SEARCH_MAX}
           defaultValue={term}
           aria-label={`Search records to run ${skill.name} on`}
         />
-        <button type="submit" className="lx-btn lx-btn-ghost lx-btn-sm">
+        <button type="submit" className="lp-search-submit">
           Search
         </button>
+        {term && (
+          <a className="lp-clear" href={`?skill=${encodeURIComponent(skill.slug)}#skill-${skill.slug}`}>
+            Clear
+          </a>
+        )}
       </form>
       <p className="lx-note" style={{ margin: 0 }}>
         Search {skill.picks.length > 1 ? "by name, mark or number" : skill.picks[0] === "lead" ? "by name, business or email" : "by mark, matter number or client"}.
@@ -66,8 +73,8 @@ export function SkillPicker({ skill, term, groups }: { skill: Skill; term: strin
               </ul>
               <p className="lx-note" style={{ margin: 0 }}>
                 {g.read.total > g.read.shown.length
-                  ? `Showing ${g.read.shown.length} of ${g.read.total}. Type a narrower search to find the one you want.`
-                  : `Showing ${g.read.shown.length} of ${g.read.total}.`}
+                  ? `${showingOf(g.read.shown.length, g.read.total)}. Type a narrower search to find the one you want.`
+                  : `${showingOf(g.read.shown.length, g.read.total)}.`}
               </p>
             </>
           )}

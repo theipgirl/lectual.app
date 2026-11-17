@@ -309,7 +309,7 @@ describe("the stylesheets", () => {
     expect(chat).toMatch(/\.cpl-pill\s*{[^}]*width:\s*640px/);
     expect(page).toMatch(/grid-template-columns:\s*repeat\(4, 1fr\)/);
     expect(page).toMatch(/@media \(max-width: 900px\)[^@]*repeat\(2, 1fr\)/);
-    expect(page).toMatch(/@media \(max-width: 560px\)[^@]*grid-template-columns:\s*1fr/);
+    expect(page).toMatch(/@media \(max-width: 640px\)[^@]*grid-template-columns:\s*1fr/);
   });
 
   it("is one scroll area on the page: no fixed or min() height and no thread overflow, only the drawer scrolls inside", () => {
@@ -322,7 +322,7 @@ describe("the stylesheets", () => {
   });
 
   it("styles a visible focus for every control", () => {
-    for (const sel of [".cpl-chip:focus-visible", ".cpl-send:focus-visible", ".cpd-launcher:focus-visible", ".cpd-close:focus-visible", ".cph-stat:focus-visible"]) {
+    for (const sel of [".cpl-chip:focus-visible", ".cpl-send:focus-visible", ".cpd-launcher:focus-visible", ".cph-stat:focus-visible"]) {
       expect(page + chat).toContain(sel);
     }
   });

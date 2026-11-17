@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { saveFullNameAction } from "@/lib/account/actions";
 import { NAME_MAX, SHOW_NAME_EVENT, splitFullName } from "@/lib/account/name";
 import { focusRestoreTarget, tourKeyAction } from "@/lib/onboarding/engine";
 import type { OpenerLike } from "@/lib/feedback/open";
+import { Dialog } from "@/components/ui/Dialog";
+import { CANCEL, SAVING } from "@/lib/ui/words";
 import "@/components/feedback/feedback.css";
 
 type ViewProps = {
@@ -18,46 +20,49 @@ type ViewProps = {
   onSave: () => void;
   onClose: () => void;
   onKeyDown?: (e: React.KeyboardEvent) => void;
-  dialogRef?: React.Ref<HTMLDivElement>;
   firstRef?: React.Ref<HTMLInputElement>;
   lastRef?: React.Ref<HTMLInputElement>;
   cancelRef?: React.Ref<HTMLButtonElement>;
   saveRef?: React.Ref<HTMLButtonElement>;
 };
 
-/** Presentational, so the server renders it the same as the browser. Follows FeedbackDialog. */
-export function YourNameDialogView({ first, last, error, saving, onFirst, onLast, onSave, onClose, onKeyDown, dialogRef, firstRef, lastRef, cancelRef, saveRef }: ViewProps) {
-  const titleId = useId();
+/** Presentational, so the server renders it the same as the browser. The shared `Dialog`, with the same key rules as FeedbackDialog. */
+export function YourNameDialogView({ first, last, error, saving, onFirst, onLast, onSave, onClose, onKeyDown, firstRef, lastRef, cancelRef, saveRef }: ViewProps) {
   return (
-    <div className="fb-root">
-      <div className="fb-backdrop" />
-      <div ref={dialogRef} className="lx-card fb-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} onKeyDown={onKeyDown}>
-        <h2 id={titleId} className="fb-title">
-          Your name
-        </h2>
-        <label className="lx-field">
-          <span className="lx-label">First name</span>
-          <input ref={firstRef} className="lx-input" name="first" required maxLength={NAME_MAX} autoComplete="given-name" value={first} onChange={(e) => onFirst(e.target.value)} disabled={saving} />
-        </label>
-        <label className="lx-field">
-          <span className="lx-label">Last name</span>
-          <input ref={lastRef} className="lx-input" name="last" maxLength={NAME_MAX} autoComplete="family-name" value={last} onChange={(e) => onLast(e.target.value)} disabled={saving} />
-        </label>
-        <p className="lx-note fb-disclosure">Your colleagues see this name, and Today greets you with it.</p>
-        {error && (
-          <p role="alert" className="fb-error">
-            {error}
-          </p>
-        )}
-        <div className="fb-actions">
-          <button type="button" ref={cancelRef} className="lx-btn lx-btn-sec lx-btn-sm" onClick={onClose} disabled={saving}>
-            Cancel
-          </button>
-          <button type="button" ref={saveRef} className="lx-btn lx-btn-pri lx-btn-sm" onClick={onSave} disabled={saving || !first.trim()}>
-            {saving ? "Saving…" : "Save"}
-          </button>
+    <div onKeyDown={onKeyDown}>
+      <Dialog
+        title="Your name"
+        onClose={onClose}
+        handleEsc={false}
+        initialFocus={firstRef as React.RefObject<HTMLElement | null> | undefined}
+        footer={
+          <>
+            <button type="button" ref={cancelRef} className="lx-btn lx-btn-sec lx-btn-sm" onClick={onClose} disabled={saving}>
+              {CANCEL}
+            </button>
+            <button type="button" ref={saveRef} className="lx-btn lx-btn-pri lx-btn-sm" onClick={onSave} disabled={saving || !first.trim()}>
+              {saving ? SAVING : "Save"}
+            </button>
+          </>
+        }
+      >
+        <div className="fb-body">
+          <label className="lx-field">
+            <span className="lx-label">First name</span>
+            <input ref={firstRef} className="lx-input" name="first" required maxLength={NAME_MAX} autoComplete="given-name" value={first} onChange={(e) => onFirst(e.target.value)} disabled={saving} />
+          </label>
+          <label className="lx-field">
+            <span className="lx-label">Last name</span>
+            <input ref={lastRef} className="lx-input" name="last" maxLength={NAME_MAX} autoComplete="family-name" value={last} onChange={(e) => onLast(e.target.value)} disabled={saving} />
+          </label>
+          <p className="lx-note" style={{ margin: 0 }}>Your colleagues see this name, and Today greets you with it.</p>
+          {error && (
+            <p role="alert" className="lx-note fb-error">
+              {error}
+            </p>
+          )}
         </div>
-      </div>
+      </Dialog>
     </div>
   );
 }
@@ -70,7 +75,6 @@ export function YourNameDialog({ currentFullName }: { currentFullName: string | 
   const [last, setLast] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const dialog = useRef<HTMLDivElement>(null);
   const firstEl = useRef<HTMLInputElement>(null);
   const lastEl = useRef<HTMLInputElement>(null);
   const cancel = useRef<HTMLButtonElement>(null);
@@ -92,7 +96,7 @@ export function YourNameDialog({ currentFullName }: { currentFullName: string | 
   }, [currentFullName]);
 
   useEffect(() => {
-    if (open) (firstEl.current ?? dialog.current)?.focus();
+    if (open) firstEl.current?.focus();
   }, [open]);
 
   const close = () => {
@@ -151,7 +155,6 @@ export function YourNameDialog({ currentFullName }: { currentFullName: string | 
       onSave={submit}
       onClose={close}
       onKeyDown={onKeyDown}
-      dialogRef={dialog}
       firstRef={firstEl}
       lastRef={lastEl}
       cancelRef={cancel}

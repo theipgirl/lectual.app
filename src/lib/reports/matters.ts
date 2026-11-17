@@ -1,4 +1,5 @@
 import "server-only";
+import { OUR_TURN } from "@/lib/ui/words";
 import { listMatters, listUpcomingDeadlines, matterLabel, summarizeDocket } from "@/lib/matters";
 import { filterBySegment } from "@/lib/matters/worklist";
 // Straight from the pure module, not the @/lib/matters barrel, so a mock of the barrel keeps working.
@@ -37,7 +38,7 @@ export async function loadMattersReport(period: ReportPeriod): Promise<MattersRe
   if (!matters) {
     const failed = unavailableMetric("", "Matters couldn't be loaded");
     return {
-      kpis: [{ ...failed, label: "Open matters" }, { ...failed, label: "Waiting on us" }, { ...failed, label: "USPTO deadlines · 30 days" }, { ...failed, label: "Registrations" }],
+      kpis: [{ ...failed, label: "Open matters" }, { ...failed, label: OUR_TURN }, { ...failed, label: "USPTO deadlines · 30 days" }, { ...failed, label: "Registrations" }],
       waiting: [],
       links: [
         { label: "All matters", sub: "The full worklist, grouped by client", href: mattersListHref("group=all"), count: null },
@@ -52,7 +53,7 @@ export async function loadMattersReport(period: ReportPeriod): Promise<MattersRe
 
   const openMatters: Metric = { label: "Open matters", value: docket.open, sub: `${docket.waitingOn.firm} waiting on us` };
 
-  const waitingOnFirm: Metric = { label: "Waiting on us", value: docket.waitingOn.firm, sub: "of the open docket" };
+  const waitingOnFirm: Metric = { label: OUR_TURN, value: docket.waitingOn.firm, sub: "of the open docket" };
 
   // The firm's own calendar day. The read is bounded on the far end only, so
   // past-due rows arrive too: the KPI counts upcoming dates, and the rest is

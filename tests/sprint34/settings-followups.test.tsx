@@ -108,13 +108,14 @@ describe("item 5: Team", () => {
     expect(inviteFormOpen(3, false)).toBe(false);
     expect(inviteFormOpen(9, false)).toBe(false);
     expect(inviteFormOpen(0, true)).toBe(false);
-    expect(read("src/app/dashboard/settings/team/page.tsx")).toContain("open={inviteFormOpen(members.length, loadError) || undefined}");
+    expect(read("src/app/dashboard/settings/team/page.tsx")).toContain("defaultOpen={inviteFormOpen(members.length, loadError)}");
   });
 
   it("person cards stack under 900px", () => {
-    const css = media(read("src/app/globals.css"), "max-width: 900px");
-    expect(css).toMatch(/\.lx-team-tbl td\[data-label\]::before/);
-    expect(css).toMatch(/\.lx-team-tbl tr\s*\{[^}]*display:\s*block|\.lx-team-tbl tr\s*\{ display: block/);
+    // The Team table rides the sheet table kit: each person becomes a stacked card through `.lx-stack` + `data-label`.
+    const page = read("src/app/dashboard/settings/team/page.tsx");
+    expect(page).toContain("<SheetTable");
+    expect(page).toContain('data-label="Role"');
   });
 
   it("Confirm acts; Cancel and asking do nothing", () => {

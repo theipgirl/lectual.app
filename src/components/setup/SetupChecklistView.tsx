@@ -29,7 +29,7 @@ export function SetupChecklistView({ checklist }: { checklist: SetupChecklist })
   return (
     <div className="su-wrap">
       <section className="lx-card su-summary" aria-labelledby="setup-count">
-        <h2 id="setup-count" className="su-count">
+        <h2 id="setup-count" className="lx-h2">
           {`${doneCount} of ${total} done`}
         </h2>
         <div

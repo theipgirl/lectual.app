@@ -16,6 +16,8 @@ import { buildFeedbackForm } from "@/lib/feedback/form";
 import { openerFrom, type OpenerLike } from "@/lib/feedback/open";
 import { loadTrail, serializeTrail } from "@/lib/feedback/trail";
 import { focusRestoreTarget, tourKeyAction } from "@/lib/onboarding/engine";
+import { Dialog } from "@/components/ui/Dialog";
+import { CANCEL } from "@/lib/ui/words";
 import "./feedback.css";
 
 type ViewProps = {
@@ -25,39 +27,49 @@ type ViewProps = {
   onSend: () => void;
   onClose: () => void;
   onKeyDown?: (e: React.KeyboardEvent) => void;
-  dialogRef?: React.Ref<HTMLDivElement>;
   selectRef?: React.Ref<HTMLSelectElement>;
   textRef?: React.Ref<HTMLTextAreaElement>;
   cancelRef?: React.Ref<HTMLButtonElement>;
   sendRef?: React.Ref<HTMLButtonElement>;
 };
 
-/** The dialog itself, presentational so the server renders it the same as the browser. */
-export function FeedbackDialogView({ state, onType, onText, onSend, onClose, onKeyDown, dialogRef, selectRef, textRef, cancelRef, sendRef }: ViewProps) {
-  const titleId = useId();
+/**
+ * The dialog itself, presentational so the server renders it the same as the browser. It is the shared `Dialog`: Esc and Tab are
+ * handled by `onKeyDown` (the tour's key rules, with the "sending" guard), so the shared one's own Esc is off.
+ */
+export function FeedbackDialogView({ state, onType, onText, onSend, onClose, onKeyDown, selectRef, textRef, cancelRef, sendRef }: ViewProps) {
   const descId = useId();
   const sending = state.status === "sending";
+  const sent = state.status === "sent";
 
   return (
-    <div className="fb-root">
-      <div className="fb-backdrop" />
-      <div ref={dialogRef} className="lx-card fb-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} onKeyDown={onKeyDown}>
-        <h2 id={titleId} className="fb-title">
-          Send feedback
-        </h2>
-        {state.status === "sent" ? (
-          <>
-            <p role="status" className="fb-sent">
-              {FEEDBACK_MESSAGES.sent}
-            </p>
-            <div className="fb-actions">
-              <button type="button" className="lx-btn lx-btn-pri lx-btn-sm" onClick={onClose} ref={sendRef}>
-                Close
+    <div onKeyDown={onKeyDown}>
+      <Dialog
+        title="Send feedback"
+        onClose={onClose}
+        handleEsc={false}
+        initialFocus={textRef as React.RefObject<HTMLElement | null> | undefined}
+        footer={
+          sent ? (
+            <button type="button" className="lx-btn lx-btn-pri lx-btn-sm" onClick={onClose} ref={sendRef}>
+              Close
+            </button>
+          ) : (
+            <>
+              <button type="button" ref={cancelRef} className="lx-btn lx-btn-sec lx-btn-sm" onClick={onClose} disabled={sending}>
+                {CANCEL}
               </button>
-            </div>
-          </>
+              <button type="button" ref={sendRef} className="lx-btn lx-btn-pri lx-btn-sm" onClick={onSend} disabled={!canSend(state)}>
+                {sending ? "Sending…" : "Send"}
+              </button>
+            </>
+          )
+        }
+      >
+        {sent ? (
+          <p role="status" style={{ margin: 0 }}>{FEEDBACK_MESSAGES.sent}</p>
         ) : (
-          <>
+          <div className="fb-body">
             <label className="lx-field">
               <span className="lx-label">Type</span>
               <select ref={selectRef} className="lx-input" name="type" value={state.type} onChange={(e) => onType(e.target.value as FeedbackType)} disabled={sending}>
@@ -86,23 +98,15 @@ export function FeedbackDialogView({ state, onType, onText, onSend, onClose, onK
                 {`${state.description.length.toLocaleString("en-US")} / ${FEEDBACK_MAX_CHARS.toLocaleString("en-US")}`}
               </span>
             </label>
-            <p className="lx-note fb-disclosure">{FEEDBACK_DISCLOSURE}</p>
+            <p className="lx-note" style={{ margin: 0 }}>{FEEDBACK_DISCLOSURE}</p>
             {state.error && (
-              <p role="alert" className="fb-error">
+              <p role="alert" className="lx-note fb-error">
                 {state.error}
               </p>
             )}
-            <div className="fb-actions">
-              <button type="button" ref={cancelRef} className="lx-btn lx-btn-sec lx-btn-sm" onClick={onClose} disabled={sending}>
-                Cancel
-              </button>
-              <button type="button" ref={sendRef} className="lx-btn lx-btn-pri lx-btn-sm" onClick={onSend} disabled={!canSend(state)}>
-                {sending ? "Sending…" : "Send"}
-              </button>
-            </div>
-          </>
+          </div>
         )}
-      </div>
+      </Dialog>
     </div>
   );
 }
@@ -111,7 +115,6 @@ export function FeedbackDialogView({ state, onType, onText, onSend, onClose, onK
 export function FeedbackDialog() {
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<DialogState>(initialDialogState);
-  const dialog = useRef<HTMLDivElement>(null);
   const select = useRef<HTMLSelectElement>(null);
   const text = useRef<HTMLTextAreaElement>(null);
   const cancel = useRef<HTMLButtonElement>(null);
@@ -130,7 +133,7 @@ export function FeedbackDialog() {
   }, []);
 
   useEffect(() => {
-    if (open) (text.current ?? dialog.current)?.focus();
+    if (open) text.current?.focus();
   }, [open]);
 
   const close = () => {
@@ -175,7 +178,6 @@ export function FeedbackDialog() {
       onSend={submit}
       onClose={close}
       onKeyDown={onKeyDown}
-      dialogRef={dialog}
       selectRef={select}
       textRef={text}
       cancelRef={cancel}

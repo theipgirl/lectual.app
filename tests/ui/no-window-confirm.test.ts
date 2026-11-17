@@ -4,7 +4,6 @@ import { join } from "node:path";
 
 /** Ratchet: confirm with InlineConfirm, never the browser's dialog. Ceilings only go down. */
 const CEILING: Record<string, number> = {
-  "src/components/lawmatics/LawmaticsImport.tsx": 1,
 };
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {

@@ -13,9 +13,6 @@ import { ROOT, walk } from "./_scan";
  * EXEMPT is for good: public client pages and rendered prose are not part of the workspace look.
  */
 const TODO_BY_AREA: Record<string, { area: string; count: number }> = {
-  "src/app/dashboard/agents/page.tsx": { area: "F", count: 1 },
-  "src/app/dashboard/settings/team/page.tsx": { area: "F", count: 1 },
-  "src/components/settings/RoleTable.tsx": { area: "F", count: 1 },
 };
 const EXEMPT = new Set([
   "src/components/ui/SheetTable.tsx",

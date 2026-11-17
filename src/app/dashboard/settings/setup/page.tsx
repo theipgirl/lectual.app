@@ -7,8 +7,10 @@ import { SETUP_PATH } from "@/lib/setup/routes";
 import { GoToIntegrationsLink, SetupChecklistView } from "@/components/setup/SetupChecklistView";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { SETUP_NAME } from "@/lib/ui/words";
+import { PageHeader } from "@/components/ui";
 
-export const metadata: Metadata = { title: pageTitle("Setup") };
+export const metadata: Metadata = { title: pageTitle(SETUP_NAME) };
 
 export const dynamic = "force-dynamic";
 
@@ -26,17 +28,17 @@ export default async function SetupPage() {
 
   return (
     <>
-      <div className="lx-page-head">
-        <div style={{ flex: 1, minWidth: 260 }}>
-          <div className="lx-label">Setup</div>
-          <h1 className="lx-h1" data-tour="setup-head">Get your firm set up</h1>
-          <p className="lx-sub">
+      <PageHeader
+        title={SETUP_NAME}
+        tour="setup-head"
+        sub={
+          <>
             What makes Lectual work for your firm. Each step is checked against what is actually saved, not what someone
             ticked. Steps only Lectual can switch on are marked, and they don&apos;t count against you.
-          </p>
-        </div>
-        <GoToIntegrationsLink />
-      </div>
+          </>
+        }
+        actions={<GoToIntegrationsLink />}
+      />
       <SetupChecklistView checklist={checklist} />
     </>
   );

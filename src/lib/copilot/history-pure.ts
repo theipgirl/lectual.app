@@ -1,3 +1,5 @@
+import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
+import { formatRelative } from "@/lib/ui/dates";
 import type { Exchange } from "./client";
 import type { CopilotCitation } from "./sse";
 
@@ -60,22 +62,9 @@ export function exchangesFromMessages(messages: readonly SavedMessage[]): Exchan
   return out;
 }
 
-const MINUTE = 60_000;
-const HOUR = 60 * MINUTE;
-const DAY = 24 * HOUR;
-
-/** "Just now", "5 min ago", "3 h ago", "Yesterday", "4 days ago", then a date. */
-export function relativeDate(iso: string, now: number): string {
-  const then = Date.parse(iso);
-  if (Number.isNaN(then)) return "";
-  const diff = Math.max(0, now - then);
-  if (diff < MINUTE) return "Just now";
-  if (diff < HOUR) return `${Math.floor(diff / MINUTE)} min ago`;
-  if (diff < DAY) return `${Math.floor(diff / HOUR)} h ago`;
-  if (diff < 2 * DAY) return "Yesterday";
-  if (diff < 7 * DAY) return `${Math.floor(diff / DAY)} days ago`;
-  const sameYear = new Date(then).getUTCFullYear() === new Date(now).getUTCFullYear();
-  return new Date(then).toLocaleDateString("en-US", { month: "short", day: "numeric", ...(sameYear ? {} : { year: "numeric" }), timeZone: "UTC" });
+/** "just now", "5 min ago", "3 h ago", "1 day ago", "4 days ago", then a date in the firm's zone (the one date rule, `lib/ui/dates`). */
+export function relativeDate(iso: string, now: number, tz: string = DEFAULT_TIME_ZONE): string {
+  return formatRelative(iso, { tz, now: new Date(now) }) ?? "";
 }
 
 /** Delete asks first: "idle" shows Delete; "confirming" shows Yes, delete / Cancel. Only "confirm" from "confirming" deletes. */

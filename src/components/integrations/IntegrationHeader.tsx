@@ -37,7 +37,7 @@ export function IntegrationHeader({ id, title, state, help, icon, size = "card",
       ) : null}
       <div className="lxi-main">
         <div className="lxi-title-row">
-          <Heading id={id} className={size === "row" ? "lxi-title lxi-title-row-size" : "lx-h2 lxi-title"}>
+          <Heading id={id} className={size === "row" ? "lx-h3 lxi-title" : "lx-h2 lxi-title"}>
             {title}
           </Heading>
           <StatusPill state={state} />

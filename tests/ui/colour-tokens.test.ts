@@ -9,15 +9,11 @@ import { ceilingCheck, cssFiles, read, removeBlocks, stripCssComments, tsxFiles 
  */
 const ALLOW_TSX = new Set(["src/app/dashboard/forms/_components/IntakePreview.tsx"]);
 const CSS: Record<string, number> = {
-  "src/app/dashboard/copilot/copilot.css": 3,
   "src/app/dashboard/intake/intake.css": 2,
   "src/app/dashboard/intake/leads.css": 1,
-  "src/components/copilot/copilot.css": 26,
   "src/components/leads/lead-page.css": 1,
-  "src/components/onboarding/welcome-deal.css": 1,
 };
 const TSX: Record<string, number> = {
-  "src/app/dashboard/agents/page.tsx": 1,
   "src/app/dashboard/intake/_components/AddLeadDialog.tsx": 1,
   "src/components/intake/TimeEntryDialog.tsx": 1,
 };

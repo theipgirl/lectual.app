@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Icon } from "@/components/ui/Icon";
 import { IntegrationHeader } from "./IntegrationHeader";
 import type { IntegrationState } from "./states";
 import "./integrations.css";
@@ -32,7 +33,7 @@ export function IntegrationRow({ id, title, state, help, icon, badge, actions, c
           {header}
           {actions ? <span className="lxi-actions">{actions}</span> : null}
           <span className="lx-int-chev" aria-hidden="true">
-            ›
+            <Icon name="chevron-right" size={18} />
           </span>
         </summary>
         <div className="lx-int-body">{children}</div>
