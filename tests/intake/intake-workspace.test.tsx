@@ -367,7 +367,7 @@ describe("the board card's one temperature line", () => {
     const html = card(lead("a", "Ana", { last_inbound_at: daysBefore(1) }));
     expect(html).toContain('data-suggested=""');
     expect(html).toContain(">Hot · suggested<");
-    expect(html).toContain("(suggested)");
+    expect(html).toContain("Hot, suggested");
   });
 
   it("reads 'Not rated' for neither", () => {

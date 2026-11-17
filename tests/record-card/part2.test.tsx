@@ -9,7 +9,7 @@ import { buildIntakeCards } from "@/lib/record-card/intake-cards";
 import { startHold } from "@/lib/record-card/hold";
 import { leadLabel } from "@/lib/record-card/lead-label";
 import { buildMatterCards } from "@/lib/record-card/matter-cards";
-import { buildOpenedCard, type CardContext, type CardRead, type RecordCardLoad } from "@/lib/record-card/model";
+import { type CardContext, type CardRead, type RecordCardLoad } from "@/lib/record-card/model";
 import { NO_SHOW_HOLD_MS } from "@/lib/record-card/rules";
 import { LEAD, NOW, TZ, facts as stepFacts, pending, draft } from "../lead-step/fixtures";
 import IntakeCard from "@/app/dashboard/intake/_components/IntakeCard";
