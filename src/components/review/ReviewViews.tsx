@@ -10,19 +10,18 @@ import { DoneButton } from "./DoneButton";
 import { Avatar, openHref, Tags, type Common } from "./shared";
 import "@/components/list-page/list-page.css";
 import "./review.css";
+import { ViewToggle } from "@/components/ViewToggle";
 
 const VIEW_LABEL: Record<ReviewView, string> = { board: REVIEW_BOARD_VIEW, sheet: REVIEW_SHEET_VIEW, cards: REVIEW_CARDS_VIEW };
 
-/** The three views, as links (the URL carries the view), in the design's segmented control. */
+/** The three views, as links (the URL carries the view), in the app's one view switch. */
 export function ViewSwitch({ params }: { params: ReviewParams }) {
   return (
-    <nav className="lx-segs lx-view-toggle" aria-label="View">
-      {REVIEW_VIEWS.map((v) => (
-        <Link key={v} href={reviewHref({ ...params, view: v, i: 1, open: null })} aria-current={params.view === v ? "page" : undefined} className={params.view === v ? "on" : undefined}>
-          {VIEW_LABEL[v]}
-        </Link>
-      ))}
-    </nav>
+    <ViewToggle<ReviewView>
+      value={params.view}
+      views={REVIEW_VIEWS.map((v) => ({ value: v, label: VIEW_LABEL[v] }))}
+      hrefFor={(v) => reviewHref({ ...params, view: v, i: 1, open: null })}
+    />
   );
 }
 

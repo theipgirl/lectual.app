@@ -67,7 +67,7 @@ describe("Weekly review page", () => {
     expect(html).toContain("Waiting on client");
     expect(html).toMatch(/<details[^>]*>\s*<summary[^>]*>Waiting on the USPTO \(1\)/);
     expect(html).toMatch(/<summary[^>]*>On track \(1\)/);
-    expect(html).toMatch(/aria-current="page" class="on" href="[^"]*">Board/);
+    expect(html).toMatch(/aria-current="page" href="[^"]*">Board/);
     expect(html).toContain("rv-kpis");
   });
 
@@ -153,7 +153,7 @@ describe("Weekly review page", () => {
       mock(ok());
       const html = await render({ view });
       expect(html).toContain("rv-board");
-      expect(html).toMatch(/aria-current="page" class="on" href="[^"]*">Board/);
+      expect(html).toMatch(/aria-current="page" href="[^"]*">Board/);
     }
   });
 
@@ -161,7 +161,7 @@ describe("Weekly review page", () => {
     const contract = row({ key: "k", client: "Contract Co", matterType: "BL", stageLabel: "Drafting", stageOrder: 100_001, waiting: "client", lastOutbound: "2026-10-28", source: "Referral" });
     mock(ok({ rows: [...rows, contract] }));
     const html = await render({ view: "sheet" });
-    expect(html).toMatch(/aria-current="page" class="on" href="[^"]*">Sheet/);
+    expect(html).toMatch(/aria-current="page" href="[^"]*">Sheet/);
     expect(html.indexOf("Trademarks")).toBeGreaterThan(-1);
     expect(html.indexOf("Trademarks")).toBeLessThan(html.indexOf("Contracts"));
     expect(html.indexOf("Lapsed Co")).toBeLessThan(html.indexOf("Contracts"));

@@ -44,7 +44,7 @@ describe("ListToolbar", () => {
     expect(html).toContain('role="search"');
     expect(html).toMatch(/<input class="lx-input"[^>]*aria-label="Search things"/);
     expect(html).toContain('<button type="submit" class="lp-search-submit">Search</button>');
-    expect(html).toContain("lx-view-toggle");
+    expect(html).toContain("vs-switch");
     expect(html).toContain("Add thing");
     expect(html).toContain("More-slot");
   });

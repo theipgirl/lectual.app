@@ -44,7 +44,7 @@ describe("Matters page header", () => {
 
   it("labels the toggle Table and Board, never List, inside the page-head", async () => {
     const head = pageHead(await render());
-    expect(head).toContain("lx-view-toggle");
+    expect(head).toContain("vs-switch");
     expect(anchor(head, "Table")).not.toBe("");
     expect(anchor(head, "Board")).not.toBe("");
     expect(head).not.toContain(">List<");
@@ -83,7 +83,7 @@ describe("Matters page header", () => {
     expect(head).not.toContain("lx-label");
     expect(head.indexOf("lp-search")).toBeGreaterThan(0);
     expect(head.indexOf(">Search</button>")).toBeGreaterThan(head.indexOf("lp-search"));
-    expect(head.indexOf("lx-view-toggle")).toBeGreaterThan(head.indexOf(">Search</button>"));
+    expect(head.indexOf("vs-switch")).toBeGreaterThan(head.indexOf(">Search</button>"));
     expect(head).toContain('aria-label="Search matters"');
   });
 

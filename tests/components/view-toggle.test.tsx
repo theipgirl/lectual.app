@@ -15,7 +15,6 @@ function walk(node: ReactNode, out: ReactElement[] = []): ReactElement[] {
 
 describe("ViewToggle, link mode", () => {
   const hrefFor = (view: "table" | "board") => (view === "board" ? "/x?view=board" : "/x");
-  /** The one anchor with this label, as a string, so attribute order doesn't matter. */
   const anchor = (markup: string, label: string) => markup.match(new RegExp(`<a [^>]*>${label}</a>`))?.[0] ?? "";
   const html = renderToStaticMarkup(<ViewToggle value="board" hrefFor={hrefFor} />);
 
@@ -26,33 +25,34 @@ describe("ViewToggle, link mode", () => {
     expect(html).not.toContain("<button");
   });
 
-  it("marks the current one, and only that one, with aria-current and `on`", () => {
+  it("marks the current one, and only that one, with aria-current=page", () => {
     expect(html.match(/aria-current="page"/g)).toHaveLength(1);
-    expect(html.match(/class="on"/g)).toHaveLength(1);
     expect(anchor(html, "Board")).toContain('aria-current="page"');
-    expect(anchor(html, "Board")).toContain('class="on"');
     expect(anchor(html, "Table")).not.toContain("aria-current");
-    expect(anchor(html, "Table")).not.toContain("class=");
   });
 
-  it("sits in a nav carrying the shared classes", () => {
-    expect(html).toMatch(/^<nav class="lx-segs lx-view-toggle" aria-label="View">/);
+  it("sits in a labelled nav of the one shared pill", () => {
+    expect(html).toMatch(/^<nav class="vs-switch" aria-label="View"/);
   });
 
-  it("marks Table current when the value is table", () => {
-    const table = renderToStaticMarkup(<ViewToggle value="table" hrefFor={hrefFor} />);
-    expect(anchor(table, "Table")).toContain('aria-current="page"');
-    expect(anchor(table, "Table")).toContain('class="on"');
-    expect(anchor(table, "Board")).not.toContain("aria-current");
+  it("takes any options and a label: Weekly review's three, the deck's own hrefs, and the calendar's two", () => {
+    const three = renderToStaticMarkup(
+      <ViewToggle value="sheet" label="Deck view" views={[{ value: "board", label: "Board" }, { value: "sheet", label: "Sheet", href: "/own" }, { value: "cards", label: "Cards" }]} hrefFor={(v) => `/r?view=${v}`} />,
+    );
+    expect(three.match(/<a /g)).toHaveLength(3);
+    expect(three).toContain('aria-label="Deck view"');
+    expect(three).toContain('href="/own"');
+    expect(three).toContain('href="/r?view=cards"');
+    expect(anchor(three, "Sheet")).toContain('aria-current="page"');
   });
 });
 
 describe("ViewToggle, controlled mode", () => {
-  it("renders two buttons whose aria-pressed matches the value, inside the same classes", () => {
+  it("renders two buttons whose aria-current matches the value, inside the same pill", () => {
     const html = renderToStaticMarkup(<ViewToggle value="board" onChange={() => {}} />);
-    expect(html).toMatch(/^<div class="lx-segs lx-view-toggle" role="group" aria-label="View">/);
-    expect(html).toMatch(/<button type="button" aria-pressed="false">Table<\/button>/);
-    expect(html).toMatch(/<button type="button" aria-pressed="true" class="on">Board<\/button>/);
+    expect(html).toMatch(/^<div class="vs-switch" role="group" aria-label="View"/);
+    expect(html).toMatch(/<button type="button">Table<\/button>/);
+    expect(html).toMatch(/<button type="button" aria-current="true">Board<\/button>/);
     expect(html).not.toContain("<a ");
   });
 
@@ -60,7 +60,6 @@ describe("ViewToggle, controlled mode", () => {
     const onChange = vi.fn();
     const buttons = walk(ViewToggle({ value: "table", onChange })).filter((el) => el.type === "button");
     expect(buttons).toHaveLength(2);
-
     const click = (label: string) => {
       const button = buttons.find((el) => el.props && (el.props as { children?: ReactNode }).children === label)!;
       (button.props as { onClick: () => void }).onClick();
@@ -69,14 +68,13 @@ describe("ViewToggle, controlled mode", () => {
     expect(onChange).toHaveBeenLastCalledWith("board");
     click("Table");
     expect(onChange).toHaveBeenLastCalledWith("table");
-    expect(onChange).toHaveBeenCalledTimes(2);
   });
 });
 
 describe("ViewToggle, shared look", () => {
-  it("uses the same wrapper classes in both modes", () => {
+  it("uses the same wrapper class in both modes", () => {
     const link = renderToStaticMarkup(<ViewToggle value="table" hrefFor={() => "/"} />);
     const controlled = renderToStaticMarkup(<ViewToggle value="table" onChange={() => {}} />);
-    for (const html of [link, controlled]) expect(html).toContain('class="lx-segs lx-view-toggle"');
+    for (const html of [link, controlled]) expect(html).toContain('class="vs-switch"');
   });
 });

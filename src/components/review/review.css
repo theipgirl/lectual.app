@@ -130,9 +130,6 @@
 .rv-owner .rv-head-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .rv-owner .rv-h1 { margin: 0; font-size: var(--rv-h1); line-height: 1.05; letter-spacing: -0.01em; }
 .rv-owner .rv-sub { margin: 0; font-size: 15px; color: var(--body); max-width: none; line-height: 1.45; }
-.rv-owner .rv-head .lx-segs { background: transparent; padding: 0; gap: 6px; }
-.rv-owner .rv-head .lx-segs a { height: 36px; padding: 0 13px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); font-size: 14px; color: var(--ink); }
-.rv-owner .rv-head .lx-segs a[aria-current="page"] { background: var(--ink); color: var(--cream); border-color: var(--ink); font-weight: 400; box-shadow: none; }
 
 .rv-owner .rv-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .rv-owner .rv-chips { gap: 8px; flex-wrap: nowrap; }

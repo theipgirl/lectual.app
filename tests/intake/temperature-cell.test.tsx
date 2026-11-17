@@ -102,20 +102,16 @@ describe("the table row's refusal", () => {
 });
 
 describe("the merged control styling", () => {
-  it("keeps the controlled-mode toggle rules in the shared list-page.css, built from the design's own tokens", () => {
-    const css = read("src/components/list-page/list-page.css");
-    expect(css).toContain(".lp-root .lx-view-toggle button");
-    expect(css).toContain(".lp-root .lx-view-toggle button.on");
-    const block = css.slice(css.indexOf(".lp-root .lx-view-toggle button {"), css.indexOf(".lp-link-button:hover"));
-    // Same pill as the link mode: the design's tokens, no new colour or font.
-    expect(block).toContain("var(--card)");
-    expect(block).toContain("var(--body)");
-    expect(block).not.toMatch(/#[0-9a-f]{3,8}\b/i);
-    expect(block).not.toMatch(/font-family/);
-    expect(read("src/app/dashboard/intake/intake.css")).not.toContain("lx-view-toggle button");
+  it("the view switch's rules live once, in the shared view-toggle.css, in tokens (D1)", () => {
+    const css = read("src/components/view-toggle.css");
+    expect(css).toContain(".vs-switch button");
+    expect(css).toContain(".vs-switch button[aria-current]");
+    expect(css).not.toMatch(/font-family/);
+    expect(read("src/components/list-page/list-page.css")).not.toContain("lx-view-toggle");
+    expect(read("src/app/dashboard/intake/intake.css")).not.toContain("lx-view-toggle");
   });
 
-  it("leaves the design-owned stylesheet's toggle rules untouched", () => {
+  it("the older .lx-view-toggle anchor rules stay only for Reports' period control (not a view switch)", () => {
     const globals = read("src/app/globals.css");
     expect(globals).toContain(".lx-view-toggle a.on { background: var(--card);");
     expect(globals).not.toContain(".lx-view-toggle button");

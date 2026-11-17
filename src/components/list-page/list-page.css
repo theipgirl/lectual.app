@@ -251,29 +251,6 @@
   .lp-search { flex-basis: 100%; }
 }
 
-/* ---- Table | Board toggle in its button (controlled) form ---- */
-/* ViewToggle draws anchors on server pages and buttons on pages that swap views in the browser. */
-.lp-root .lx-view-toggle button {
-  height: 32px;
-  padding: 6px 12px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  display: flex;
-  align-items: center;
-  font: inherit;
-  font-size: 14px;
-  color: var(--body);
-  white-space: nowrap;
-  cursor: pointer;
-}
-.lp-root .lx-view-toggle button:hover { color: var(--ink); }
-.lp-root .lx-view-toggle button.on {
-  background: var(--card);
-  color: var(--ink);
-  font-weight: 500;
-  box-shadow: var(--shadow);
-}
 .lp-link-button:hover { text-decoration: underline; }
 
 /* ---- Leads table: wide keeps a minimum and scrolls inside the panel; small screens stack (Sprint 32) ---- */
@@ -314,8 +291,7 @@
 @media (pointer: coarse) {
   .lp-chip,
   .lp-clear,
-  .lp-link-button,
-  .lp-root .lx-view-toggle button { min-height: 44px; min-width: 44px; }
+  .lp-link-button { min-height: 44px; min-width: 44px; }
 }
 
 /* ---- Compact top under 640px (Sprint 34): one row of buttons, one scrolling row of chips ---- */

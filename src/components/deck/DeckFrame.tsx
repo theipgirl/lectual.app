@@ -20,6 +20,7 @@ import {
 import type { DeckView } from "@/lib/queue/deck";
 import { DeckSide, type DeckSideLater, type DeckSideRow } from "./DeckSide";
 import { DealTimesButton } from "./DealTimesButton";
+import { ViewToggle } from "@/components/ViewToggle";
 
 export type { DeckSideRow } from "./DeckSide";
 
@@ -81,13 +82,7 @@ export function DeckFrame({
     { v: "board", label: DECK_VIEW_BOARD },
   ];
   const switcher = (cls: string) => (
-    <nav aria-label="Deck view" className={`dk-switch ${cls}`.trim()}>
-      {views.map(({ v, label }) => (
-        <Link key={v} href={viewHref(v)} aria-current={v === view ? "page" : undefined}>
-          {label}
-        </Link>
-      ))}
-    </nav>
+    <ViewToggle<DeckView> label="Deck view" value={view} views={views.map(({ v, label }) => ({ value: v, label, href: viewHref(v) }))} hrefFor={viewHref} className={cls} />
   );
 
   if (view !== "cards") {
