@@ -283,6 +283,15 @@ describe("the opened Matters card's Move to stage", () => {
     expect(targets(matterMoveStages(all, view.stages, false))).toEqual(["m-loe", "m2"]);
     expect(targets(matterMoveStages(all, view.stages, true))).toEqual(["m0", "m-loe", "m2"]);
   });
+  it("a matter opened on an intake stage keeps its stage name but is never offered it as a move", () => {
+    const onIntake = matterLoad("attorney", {
+      matter: { id: MATTER, title: "OKAFOR", mark_text: "OKAFOR", owner_name: "Maya Okafor", matter_number: "TM-1", stage_id: "m0", assigned_to: ME, referral_source: "UGW" },
+      stages: { status: "ok", value: all.map((s) => ({ id: s.id, label: s.label })) },
+    });
+    const v = buildOpenedCard(withMatterMoveStages(onIntake, matterMoveStages(all, view.stages, false)), { path: "/dashboard/matters/", params: {} });
+    expect(v.status === "ok" && v.kind === "matter" ? v.card.stage.name : null).toBe("1. Consult held");
+    expect(v.status === "ok" && v.kind === "matter" ? v.card.stage.targets.map((t) => t.id) : null).toEqual(["m-loe", "m1", "m2"]);
+  });
   it("a lead is untouched", () => {
     const l = leadLoad("attorney");
     expect(withMatterMoveStages(l, [])).toBe(l);

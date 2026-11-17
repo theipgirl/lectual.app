@@ -406,7 +406,12 @@ function proposalView(read: CardRead<CardProposal | null>): ProposalView {
  */
 export function withMatterMoveStages(load: RecordCardLoad, moveStages?: readonly CardStage[]): RecordCardLoad {
   if (!moveStages || load.status !== "ok" || load.kind !== "matter" || load.stages.status !== "ok") return load;
-  return { ...load, stages: { status: "ok", value: moveStages.map((s) => ({ id: s.id, label: s.label })) } };
+  const value = moveStages.map((s) => ({ id: s.id, label: s.label }));
+  // The matter's own stage stays in the list (never a move target: moveTargets drops the current id) so a matter opened on an
+  // intake stage by a direct ?open= link still shows its stage name.
+  const current = load.matter.stage_id ? load.stages.value.find((s) => s.id === load.matter.stage_id) : undefined;
+  if (current && !value.some((s) => s.id === current.id)) value.push({ id: current.id, label: current.label });
+  return { ...load, stages: { status: "ok", value } };
 }
 
 /** The opened card for `?open=`. A foreign or missing id carries no field of the record, only the sentence. */
