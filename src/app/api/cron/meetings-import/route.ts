@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { env } from "@/lib/env";
 import { getAdminClient } from "@/lib/db/admin";
 import { cronAuthorized } from "@/lib/cron-auth";
+import { NOT_THIS_HOUR, shouldRunNow } from "@/lib/cron/ny-hour";
 import { rootKeyOrNull } from "@/lib/mailbox/config";
 import { zoomClientCredentials } from "@/lib/meetings/config";
 import { runMeetingImports } from "@/lib/meetings/import";
@@ -18,6 +19,8 @@ export async function GET(req: NextRequest) {
   if (!cronAuthorized(req.headers.get("authorization"), env.CRON_SECRET)) {
     return new NextResponse(null, { status: 401 });
   }
+  // Two vercel.json entries per job (EST and EDT); only the tick in this job's New York hour works.
+  if (!shouldRunNow("meetings-import", new Date())) return NextResponse.json(NOT_THIS_HOUR);
   const root = rootKeyOrNull();
   if (!root) return NextResponse.json({ ok: false, reason: "MAILBOX_TOKEN_KEY is not configured" }, { status: 503 });
   try {

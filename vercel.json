@@ -1,21 +1,13 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
-    {
-      "path": "/api/cron/mailbox-sync/",
-      "schedule": "53 9 * * *"
-    },
-    {
-      "path": "/api/cron/agents/",
-      "schedule": "23 10 * * *"
-    },
-    {
-      "path": "/api/cron/meetings-import/",
-      "schedule": "38 9 * * *"
-    },
-    {
-      "path": "/api/cron/lawmatics-matters/",
-      "schedule": "8 9 * * *"
-    }
+    { "path": "/api/cron/lawmatics-matters/", "schedule": "8 8 * * *" },
+    { "path": "/api/cron/lawmatics-matters/", "schedule": "8 9 * * *" },
+    { "path": "/api/cron/meetings-import/", "schedule": "38 8 * * *" },
+    { "path": "/api/cron/meetings-import/", "schedule": "38 9 * * *" },
+    { "path": "/api/cron/mailbox-sync/", "schedule": "53 8 * * *" },
+    { "path": "/api/cron/mailbox-sync/", "schedule": "53 9 * * *" },
+    { "path": "/api/cron/agents/", "schedule": "23 9 * * *" },
+    { "path": "/api/cron/agents/", "schedule": "23 10 * * *" }
   ]
 }

@@ -70,7 +70,7 @@ The surface is behind the `mailbox` module (fail-closed). Add it to the firm's
 
 ## 5. The sync (step 4)
 
-`/api/cron/mailbox-sync/` runs on the `vercel.json` schedule. It's **once a day** (09:53 UTC) for now,
+`/api/cron/mailbox-sync/` runs on the `vercel.json` schedule. It's **once a day** for now (about 4:53 AM New York all year: two `vercel.json` entries, 08:53 and 09:53 UTC, and the route runs only in the 4 AM New York hour),
 because the team is on Vercel Hobby.
 - **Auth:** Vercel Cron sends `Authorization: Bearer $CRON_SECRET`. With no `CRON_SECRET`
   set, the route refuses every call.
