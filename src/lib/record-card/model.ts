@@ -11,6 +11,7 @@ import {
   LEAD_STEP_COULDNT_LOAD,
   LEAD_STEP_DID_UNAVAILABLE,
   RECORD_CARD_A_TEAMMATE,
+  RECORD_CARD_ACTIVITY_FAILED,
   RECORD_CARD_ADD_STEP,
   RECORD_CARD_DEADLINE_CONFIRMED,
   RECORD_CARD_DEADLINE_UNCONFIRMED,
@@ -100,6 +101,8 @@ export type CardContext = {
   params: CurrentParams;
   now: Date;
   timeZone: string;
+  /** The Intake page is showing its Lost set: only then are Lost stages a Move-to destination (Item L). */
+  lostShown?: boolean;
 };
 
 export type BoardLeadInput = {
@@ -121,6 +124,8 @@ export type BoardMatterInput = {
   /** The next open USPTO deadline, READ ONLY. Omitted where the page doesn't read it. */
   deadline?: CardRead<CardDeadline | null>;
   lastActivityAt: string | null;
+  /** The read behind `lastActivityAt` failed: the bottom line says so, never "No activity yet". Default false. */
+  lastActivityUnavailable?: boolean;
 };
 
 export type StepLine =
@@ -142,6 +147,11 @@ export type CardView = {
   kind: CardKind;
   id: string;
   name: string;
+  /**
+   * Display only: the business, or a matter's client, and null when it equals the name. Part 2's rename form must
+   * prefill the business from the LEAD ROW's `business_name`, never from `sub` (a blank `sub` would post a blank
+   * business and clear it).
+   */
   sub: string | null;
   openHref: string;
   fullHref: string;
@@ -197,7 +207,8 @@ function stepText(line: StepLine): string {
   return line.step.due === RECORD_CARD_NO_DATE ? `${line.step.title} · ${RECORD_CARD_NO_DATE}` : `${line.step.title} · ${recordCardDue(line.step.due)}`;
 }
 
-function lastActivityText(iso: string | null, timeZone: string): string {
+function lastActivityText(iso: string | null, timeZone: string, unavailable = false): string {
+  if (unavailable) return RECORD_CARD_ACTIVITY_FAILED;
   if (!iso || Number.isNaN(new Date(iso).getTime())) return RECORD_CARD_NO_ACTIVITY;
   return recordCardLastActivity(shortDay(iso, timeZone));
 }
@@ -236,7 +247,7 @@ export function buildBoardCard(input: BoardLeadInput | BoardMatterInput, ctx: Ca
     readable: { members: ctx.members.status === "ok", stages: ctx.stages.status === "ok" },
   });
   const stageId = input.kind === "lead" ? input.lead.current_stage_id : input.matter.stage_id;
-  const targets = edits.stage && ctx.stages.status === "ok" ? moveTargets(ctx.stages.value, kind, stageId) : [];
+  const targets = edits.stage && ctx.stages.status === "ok" ? moveTargets(ctx.stages.value, kind, stageId, { lostShown: ctx.lostShown === true }) : [];
   const nextStep = stepLine(input.nextStep, edits, ctx.now, ctx.timeZone);
   const owner = ownerName(row.assigned_to, ctx.members);
   const open = openHref(ctx.path, ctx.params, { kind, id });
@@ -256,7 +267,7 @@ export function buildBoardCard(input: BoardLeadInput | BoardMatterInput, ctx: Ca
     source: { value: (row.referral_source ?? "").trim() || null, choices: edits.source ? SOURCE_CHOICES : null },
     owner: { id: row.assigned_to, name: owner, choices: edits.owner && ctx.members.status === "ok" ? ctx.members.value : null },
     nextStep,
-    bottom: { owner, nextStep: stepText(nextStep), lastActivity: lastActivityText(lastActivityAt, ctx.timeZone) },
+    bottom: { owner, nextStep: stepText(nextStep), lastActivity: lastActivityText(lastActivityAt, ctx.timeZone, input.kind === "matter" && input.lastActivityUnavailable === true) },
     approvals: input.kind === "lead" ? approvalsChip(input.approvals, open) : null,
     deadline: input.kind === "matter" && input.deadline ? deadlineLine(input.deadline) : null,
     menu: cardMenu({ kind, id, edits, targets, duplicateOf: input.kind === "lead" ? input.duplicateOf : null }),
@@ -373,7 +384,8 @@ export function contactLinks(lead: Pick<CardLeadRow, "phone" | "email">): { call
   const digits = (lead.phone ?? "").replace(/[^\d+]/g, "");
   const tel = /\d{3,}/.test(digits) ? `tel:${digits}` : null;
   const addr = (lead.email ?? "").trim();
-  const mail = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/.test(addr) ? `mailto:${addr}` : null;
+  // `?`, `#`, `&` and `%` would let a stored address add headers (cc=, body=) to the mail link: no link at all then.
+  const mail = /^[^\s@<>"?#&%]+@[^\s@<>"?#&%]+\.[^\s@<>"?#&%]+$/.test(addr) ? `mailto:${addr}` : null;
   return { call: tel, email: mail };
 }
 
@@ -395,7 +407,7 @@ export function buildOpenedCard(load: RecordCardLoad, page: { path: string; para
 
   if (load.kind === "matter") {
     const firstTask: CardRead<CardTask | null> = load.tasks.status === "ok" ? { status: "ok", value: load.tasks.value[0] ?? null } : { status: "unavailable" };
-    const card = buildBoardCard({ kind: "matter", matter: load.matter, nextStep: firstTask, deadline: load.deadline, lastActivityAt: load.activity.status === "ok" ? (load.activity.value.rows[0]?.created_at ?? null) : null }, ctx);
+    const card = buildBoardCard({ kind: "matter", matter: load.matter, nextStep: firstTask, deadline: load.deadline, lastActivityAt: load.activity.status === "ok" ? (load.activity.value.rows[0]?.created_at ?? null) : null, lastActivityUnavailable: load.activity.status !== "ok" }, ctx);
     return {
       status: "ok",
       kind: "matter",

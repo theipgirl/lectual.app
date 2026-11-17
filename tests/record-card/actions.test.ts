@@ -68,7 +68,7 @@ beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
   role = "owner";
-  rows = { crm_tag: { data: { id: TAG }, error: null } };
+  rows = { crm_tag: { data: { id: TAG }, error: null }, crm_lead: { data: { id: LEAD }, error: null }, crm_lead_tag: { data: { tag_id: TAG }, error: null } };
   keeperForWrite.mockImplementation(async (_db: unknown, id: string) => id);
   setup();
 });
@@ -128,6 +128,26 @@ describe("cardTagAction", () => {
     removeTag.mockRejectedValueOnce(new Error("socket hang up at 10.0.0.1"));
     const res = await act({}, fd({ leadId: LEAD, tagId: TAG, op: "remove" }));
     expect(res).toEqual({ error: "Couldn't remove this tag." });
+  });
+
+  it("another firm's (or a missing) lead: add and remove both read as gone, and nothing is written", async () => {
+    rows.crm_lead = { data: null, error: null };
+    const act = await tagAction();
+    expect(await act({}, fd({ leadId: LEAD, tagId: TAG, op: "add" }))).toEqual({ error: "That record couldn't be found. It may have been removed." });
+    expect(await act({}, fd({ leadId: LEAD, tagId: TAG, op: "remove" }))).toEqual({ error: "That record couldn't be found. It may have been removed." });
+    rows.crm_lead = { data: null, error: { message: "boom" } };
+    expect(await act({}, fd({ leadId: LEAD, tagId: TAG, op: "remove" }))).toEqual({ error: "Couldn't remove this tag." });
+    expect(applyTag).not.toHaveBeenCalled();
+    expect(removeTag).not.toHaveBeenCalled();
+  });
+
+  it("removing a tag that isn't on the lead is not Saved and logs nothing", async () => {
+    rows.crm_lead_tag = { data: null, error: null };
+    const act = await tagAction();
+    expect(await act({}, fd({ leadId: LEAD, tagId: TAG, op: "remove" }))).toEqual({ error: "This tag isn't on the lead." });
+    rows.crm_lead_tag = { data: null, error: { message: "boom" } };
+    expect(await act({}, fd({ leadId: LEAD, tagId: TAG, op: "remove" }))).toEqual({ error: "Couldn't remove this tag." });
+    expect(removeTag).not.toHaveBeenCalled();
   });
 
   it("bad input is refused with a sentence", async () => {

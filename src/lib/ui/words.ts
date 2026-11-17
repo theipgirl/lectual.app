@@ -1059,6 +1059,8 @@ export const RECORD_CARD_RENAME_NOTHING = "Change the name or the business first
 export const RECORD_CARD_TAG_CHOOSE = "Choose a tag.";
 export const RECORD_CARD_TAG_NOT_FIRM = "That tag isn't one of your firm's tags.";
 export const RECORD_CARD_TAG_ALREADY = "This tag is already on the lead.";
+export const RECORD_CARD_TAG_NOT_ON = "This tag isn't on the lead.";
+export const RECORD_CARD_NAME_CHARS = "Use letters, numbers and ordinary punctuation only.";
 export const RECORD_CARD_TAG_ADD_FAILED = "Couldn't add this tag.";
 export const RECORD_CARD_TAG_REMOVE_FAILED = "Couldn't remove this tag.";
 export const RECORD_CARD_SUGGESTED_MARK = "suggested";
@@ -1071,6 +1073,7 @@ export const RECORD_CARD_ADD_STEP = "Add a next step";
 export const RECORD_CARD_UNASSIGNED = "Unassigned";
 export const RECORD_CARD_A_TEAMMATE = "A teammate";
 export const RECORD_CARD_NO_ACTIVITY = "No activity yet";
+export const RECORD_CARD_ACTIVITY_FAILED = "Couldn't load last activity";
 export const recordCardLastActivity = (when: string) => `Last activity ${when}`;
 export const recordCardDue = (when: string) => `due ${when}`;
 export const RECORD_CARD_NO_DATE = "No date set";

@@ -13,6 +13,7 @@ const m = {
   scoped: vi.fn(),
   resolveLeadId: vi.fn(),
   mergeAvailable: vi.fn(),
+  mergedSetFor: vi.fn(),
   getLead: vi.fn(),
   listStages: vi.fn(),
   tagsForLead: vi.fn(),
@@ -33,7 +34,7 @@ const m = {
 
 vi.mock("@/lib/firm/session", () => ({ resolveFirmSession: (...a: unknown[]) => m.session(...a) }));
 vi.mock("@/lib/db/scoped-client", () => ({ getScopedClient: (...a: unknown[]) => m.scoped(...a) }));
-vi.mock("@/lib/leads/live", () => ({ resolveLeadId: (...a: unknown[]) => m.resolveLeadId(...a), mergeAvailable: (...a: unknown[]) => m.mergeAvailable(...a) }));
+vi.mock("@/lib/leads/live", () => ({ resolveLeadId: (...a: unknown[]) => m.resolveLeadId(...a), mergeAvailable: (...a: unknown[]) => m.mergeAvailable(...a), mergedSetFor: (...a: unknown[]) => m.mergedSetFor(...a) }));
 vi.mock("@/lib/pipeline/leads", () => ({ getLead: (...a: unknown[]) => m.getLead(...a) }));
 vi.mock("@/lib/pipeline/stages", () => ({ listStages: (...a: unknown[]) => m.listStages(...a) }));
 vi.mock("@/lib/pipeline/tags", () => ({ tagsForLead: (...a: unknown[]) => m.tagsForLead(...a), listTags: (...a: unknown[]) => m.listTags(...a) }));
@@ -89,6 +90,7 @@ beforeEach(() => {
   m.scoped.mockImplementation(async () => client());
   m.resolveLeadId.mockResolvedValue({ status: "ok", id: KEEPER });
   m.mergeAvailable.mockResolvedValue(true);
+  m.mergedSetFor.mockResolvedValue({ status: "ok", ids: [KEEPER, ASKED] });
   m.getLead.mockResolvedValue(LEAD_ROW);
   m.listStages.mockResolvedValue([{ id: "s1", name: "New", category: "open" }]);
   m.tagsForLead.mockResolvedValue([{ id: "t1", label: "VIP", color: null, org_id: "o" }]);
@@ -240,6 +242,27 @@ describe("loadRecordCard: each lead source fails on its own", () => {
     expect(off.proposal).toEqual({ status: "not-set-up" });
     expect(m.listProposals).toHaveBeenCalledTimes(1);
   });
+  it("proposals are never read for the keeper alone when the merged set is unknown", async () => {
+    // Engine unavailable: the set is read directly.
+    m.loadLeadStepFacts.mockResolvedValueOnce({ status: "unavailable" });
+    expect((await leadOk()).proposal.status).toBe("ok");
+    expect(m.mergedSetFor).toHaveBeenCalledTimes(1);
+    expect(m.listProposals).toHaveBeenLastCalledWith({ leadIds: [KEEPER, ASKED] });
+    // Engine's set partial: read directly too.
+    m.loadLeadStepFacts.mockResolvedValueOnce({ ...facts, facts: { ...facts.facts, lead: { mergedIds: [KEEPER], mergedPartial: true } } });
+    await leadOk();
+    expect(m.mergedSetFor).toHaveBeenCalledTimes(2);
+    // Still unknown: couldn't be read, never "none", and proposals aren't read at all.
+    m.listProposals.mockClear();
+    m.loadLeadStepFacts.mockResolvedValueOnce({ status: "unavailable" });
+    m.mergedSetFor.mockResolvedValueOnce({ status: "unavailable", ids: [KEEPER] });
+    expect((await leadOk()).proposal).toEqual({ status: "unavailable" });
+    m.loadLeadStepFacts.mockResolvedValueOnce({ status: "unavailable" });
+    m.mergedSetFor.mockRejectedValueOnce(new Error("x"));
+    expect((await leadOk()).proposal).toEqual({ status: "unavailable" });
+    expect(m.listProposals).not.toHaveBeenCalled();
+  });
+
   it("no proposal yet is ok and null", async () => {
     m.listProposals.mockResolvedValueOnce([]);
     expect((await leadOk()).proposal).toEqual({ status: "ok", value: null });

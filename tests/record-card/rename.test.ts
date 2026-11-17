@@ -12,6 +12,7 @@ const state = vi.hoisted(() => ({
   row: {} as Record<string, unknown>,
   updates: [] as Record<string, unknown>[],
   logged: [] as unknown[],
+  follow: null as null | { status: string; id?: string },
 }));
 
 function fakeClient() {
@@ -44,7 +45,7 @@ function fakeClient() {
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/db/scoped-client", () => ({ getScopedClient: vi.fn(async () => fakeClient()) }));
 vi.mock("@/lib/matters", () => ({ ensureMatterForLead: vi.fn(), logActivitySafe: vi.fn(async (x: unknown) => void state.logged.push(x)) }));
-vi.mock("@/lib/leads/live", async (orig) => ({ ...(await orig<typeof import("@/lib/leads/live")>()), keeperForWrite: vi.fn(async (_db: unknown, id: string) => id) }));
+vi.mock("@/lib/leads/live", async (orig) => ({ ...(await orig<typeof import("@/lib/leads/live")>()), resolveLeadId: vi.fn(async (_db: unknown, id: string) => state.follow ?? { status: "ok", id }) }));
 
 const fd = (o: Record<string, string>) => {
   const f = new FormData();
@@ -67,6 +68,7 @@ beforeEach(() => {
   state.row = { ...ORIGINAL };
   state.updates = [];
   state.logged = [];
+  state.follow = null;
 });
 
 describe("renameLeadAction: only names and business change", () => {
@@ -108,6 +110,31 @@ describe("renameLeadAction: only names and business change", () => {
     }
     expect(state.updates).toEqual([]);
     expect(state.row).toEqual(ORIGINAL);
+  });
+
+  it("a merged lead's id is refused with the merge sentence: the kept lead's name is never overwritten", async () => {
+    const { renameLeadAction } = await import("@/lib/record-card/actions");
+    state.follow = { status: "ok", id: "99999999-9999-4999-8999-999999999999" };
+    expect(await renameLeadAction({}, fd({ leadId: LEAD, firstName: "Stale" }))).toEqual({ error: "This lead was merged into another lead, so it can't be changed here. Refresh and open the lead it was merged into." });
+    state.follow = { status: "unavailable" };
+    expect(await renameLeadAction({}, fd({ leadId: LEAD, firstName: "Stale" }))).toEqual({ error: "This lead couldn't be checked just now, so nothing was saved. Refresh and try again." });
+    state.follow = { status: "not-found" };
+    expect(await renameLeadAction({}, fd({ leadId: LEAD, firstName: "Stale" }))).toEqual({ error: "That record couldn't be found. It may have been removed." });
+    expect(state.updates).toEqual([]);
+    expect(state.row).toEqual(ORIGINAL);
+  });
+
+  it("control characters and bidi overrides are refused with a field sentence, and nothing is written", async () => {
+    const { renameLeadAction } = await import("@/lib/record-card/actions");
+    for (const bad of ["Maya\u0000", "Ma\nya", "Maya\u007f", "\u202eayaM", "Maya\u2066x\u2069"]) {
+      const res = await renameLeadAction({}, fd({ leadId: LEAD, firstName: bad, businessName: "ok" }));
+      expect(res).toEqual({ error: "Check the highlighted fields.", fieldErrors: { firstName: "Use letters, numbers and ordinary punctuation only." } });
+    }
+    const biz = await renameLeadAction({}, fd({ leadId: LEAD, businessName: "Okafor\u202e Co" }));
+    expect(biz.fieldErrors).toEqual({ businessName: "Use letters, numbers and ordinary punctuation only." });
+    expect(state.updates).toEqual([]);
+    // Ordinary accents and punctuation pass.
+    expect(await renameLeadAction({}, fd({ leadId: LEAD, firstName: "Zoë-Anne O'Neil" }))).toEqual({ saved: true });
   });
 
   it("why it exists: the same name edit through editLeadAction blanks the phone and website", async () => {

@@ -121,8 +121,13 @@ describe("moveTargets", () => {
   ];
   it("never offers a won stage for a lead, and leaves out the current stage", () => {
     const t = moveTargets(stages, "lead", "s-new");
-    expect(t.map((s) => s.id)).toEqual(["s-held", "s-lost", "s-nur"]);
+    expect(t.map((s) => s.id)).toEqual(["s-held", "s-nur"]);
     expect(t.some((s) => s.id.startsWith("s-won"))).toBe(false);
+  });
+  it("offers Lost stages only when the Lost set is shown (Item L); nurture always; won never", () => {
+    expect(moveTargets(stages, "lead", "s-new", { lostShown: false }).map((s) => s.id)).toEqual(["s-held", "s-nur"]);
+    expect(moveTargets(stages, "lead", "s-new", { lostShown: true }).map((s) => s.id)).toEqual(["s-held", "s-lost", "s-nur"]);
+    expect(moveTargets(stages, "lead", "s-lost", { lostShown: true }).map((s) => s.id)).toEqual(["s-new", "s-held", "s-nur"]);
   });
   it("offers a matter's docket stages", () => {
     expect(moveTargets([{ id: "a", label: "Filed" }, { id: "b", label: "Registered" }], "matter", "a")).toEqual([{ id: "b", name: "Registered" }]);

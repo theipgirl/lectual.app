@@ -3,14 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { friendlyLeadWriteError } from "@/app/dashboard/leads/errors";
 import { getScopedClient } from "@/lib/db/scoped-client";
-import { keeperForWrite } from "@/lib/leads/live";
+import { keeperForWrite, resolveLeadId } from "@/lib/leads/live";
 import { validateLeadEdit } from "@/lib/pipeline/lead-input";
 import { CAN_WRITE_LEAD, resolveCurrentRole, updateLead } from "@/lib/pipeline/leads";
 import { applyTag, removeTag } from "@/lib/pipeline/tags";
 import {
+  LEAD_MERGED_WRITE,
   MERGE_POINTER_UNREADABLE,
   RECORD_CARD_CHECK_FIELDS,
   RECORD_CARD_GONE,
+  RECORD_CARD_NAME_CHARS,
   RECORD_CARD_NO_PERMISSION,
   RECORD_CARD_RENAME_FAILED,
   RECORD_CARD_RENAME_NOTHING,
@@ -18,6 +20,7 @@ import {
   RECORD_CARD_TAG_ALREADY,
   RECORD_CARD_TAG_CHOOSE,
   RECORD_CARD_TAG_NOT_FIRM,
+  RECORD_CARD_TAG_NOT_ON,
   RECORD_CARD_TAG_REMOVE_FAILED,
 } from "@/lib/ui/words";
 
@@ -30,6 +33,12 @@ import {
 export type CardActionState = { saved?: true; error?: string; fieldErrors?: Record<string, string> };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Control characters and bidi overrides / isolates. Refused in a card's rename ONLY: `validateLeadEdit` is shared by every
+ * lead form and is deliberately left as it is.
+ */
+const UNSAFE_NAME_CHARS = /[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]/;
 
 /** The ONLY fields a card's inline rename may post. Email, phone and website are never read here, so they can't be blanked. */
 const RENAME_FIELDS = ["firstName", "lastName", "businessName"] as const;
@@ -52,7 +61,6 @@ function refresh(leadId: string) {
  */
 export async function renameLeadAction(_prev: CardActionState, formData: FormData): Promise<CardActionState> {
   const leadId = String(formData.get("leadId") ?? "").trim();
-  let lead = leadId;
   try {
     if (!(await mayWriteLead())) return { error: RECORD_CARD_NO_PERMISSION };
   } catch {
@@ -63,21 +71,30 @@ export async function renameLeadAction(_prev: CardActionState, formData: FormDat
   const values: Partial<Record<(typeof RENAME_FIELDS)[number], string>> = {};
   for (const field of RENAME_FIELDS) if (formData.has(field)) values[field] = String(formData.get(field) ?? "");
   if (Object.keys(values).length === 0) return { error: RECORD_CARD_RENAME_NOTHING };
+  const unsafe: Record<string, string> = {};
+  for (const [field, value] of Object.entries(values)) if (UNSAFE_NAME_CHARS.test(value ?? "")) unsafe[field] = RECORD_CARD_NAME_CHARS;
+  if (Object.keys(unsafe).length > 0) return { error: RECORD_CARD_CHECK_FIELDS, fieldErrors: unsafe };
   const validated = validateLeadEdit(values);
   if (!validated.ok) return { error: RECORD_CARD_CHECK_FIELDS, fieldErrors: validated.fieldErrors as Record<string, string> };
 
   try {
-    // A card opened before a merge (lectual 0107) renames the KEEPER; an unreadable pointer writes nothing.
+    // A rename does NOT follow a merge to the keeper: a card opened before the merge would overwrite the name or
+    // business the person chose when merging. A merged id is refused with the merge sentence; nothing is written.
+    let followed: Awaited<ReturnType<typeof resolveLeadId>>;
     try {
-      lead = await keeperForWrite(await getScopedClient(), leadId);
+      followed = await resolveLeadId(await getScopedClient(), leadId);
     } catch {
       return { error: MERGE_POINTER_UNREADABLE };
     }
-    await updateLead(lead, values);
+    if (followed.status === "not-found") return { error: RECORD_CARD_GONE };
+    if (followed.status !== "ok") return { error: MERGE_POINTER_UNREADABLE };
+    if (followed.id.toLowerCase() !== leadId.toLowerCase()) return { error: LEAD_MERGED_WRITE };
+    // 0107's guard still refuses a write to a lead merged since; friendlyLeadWriteError maps that to LEAD_MERGED_WRITE.
+    await updateLead(leadId, values);
   } catch (err) {
     return { error: friendlyLeadWriteError(err, RECORD_CARD_RENAME_FAILED) };
   }
-  refresh(lead);
+  refresh(leadId);
   return { saved: true };
 }
 
@@ -111,8 +128,19 @@ export async function cardTagAction(_prev: CardActionState, formData: FormData):
     } catch {
       return { error: MERGE_POINTER_UNREADABLE };
     }
+    // The lead itself must be visible to the caller: another firm's (or a missing) lead reads as gone.
+    // live-guard: a merged lead id was followed to its keeper by keeperForWrite just above
+    const { data: found, error: leadErr } = await db.from("crm_lead").select("id").eq("id", lead).maybeSingle();
+    if (leadErr) return { error: failed };
+    if (!found) return { error: RECORD_CARD_GONE };
     if (op === "add") await applyTag(lead, tagId, { source: "human" });
-    else await removeTag(lead, tagId);
+    else {
+      // Nothing to remove is not "Saved", and must not log a tag_removed row.
+      const { data: link, error: linkErr } = await db.from("crm_lead_tag").select("tag_id").eq("lead_id", lead).eq("tag_id", tagId).maybeSingle();
+      if (linkErr) return { error: failed };
+      if (!link) return { error: RECORD_CARD_TAG_NOT_ON };
+      await removeTag(lead, tagId);
+    }
   } catch (err) {
     // Adding a tag that is already there is the unique index answering, not a failure a person can fix.
     if (op === "add" && (err as { code?: unknown } | null)?.code === "23505") return { error: RECORD_CARD_TAG_ALREADY };

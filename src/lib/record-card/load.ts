@@ -4,7 +4,7 @@ import { resolveFirmSession } from "@/lib/firm/session";
 import { effectiveTemperature } from "@/lib/intake/effective-temperature";
 import { loadTemperatureFacts } from "@/lib/intake/facts";
 import { loadLeadStepFacts } from "@/lib/lead-step/load";
-import { mergeAvailable, resolveLeadId } from "@/lib/leads/live";
+import { mergeAvailable, mergedSetFor, resolveLeadId } from "@/lib/leads/live";
 import { getMatter } from "@/lib/matters/matters";
 import { listMatterDeadlines } from "@/lib/matters/deadlines";
 import { listMatterStages } from "@/lib/matters/stages";
@@ -110,11 +110,20 @@ async function loadLead(db: Awaited<ReturnType<typeof getScopedClient>>, askedId
   ]);
 
   const facts = leadStep.status === "ok" ? leadStep.facts : null;
-  const leadIds = facts && facts.lead.mergedIds.length > 0 ? facts.lead.mergedIds : [lead.id];
 
   const proposal = await settle<CardProposal | null>(async () => {
     if (modules === null) return UNAVAILABLE;
     if (!modules.includes("proposals")) return NOT_SET_UP;
+    // Proposals are read across the merged set, as the lead page does. Never for the keeper alone when the set is
+    // unknown: a proposal filed on a merged lead would then read as "none". The engine's set when it has it whole,
+    // else the set read directly; still unknown = couldn't be read.
+    let leadIds: string[];
+    if (facts && !facts.lead.mergedPartial && facts.lead.mergedIds.length > 0) leadIds = facts.lead.mergedIds;
+    else {
+      const set = await mergedSetFor(db, lead.id);
+      if (set.status !== "ok") return UNAVAILABLE;
+      leadIds = set.ids.length > 0 ? set.ids : [lead.id];
+    }
     const list = await listProposals(leadIds.length > 1 ? { leadIds } : { leadId: leadIds[0] });
     const p = list[0];
     return ok(p ? { id: p.id, version: p.version, status: p.status, legalCents: p.legal_total_cents, govCents: p.gov_total_cents } : null);

@@ -124,7 +124,9 @@ export function cardEdits(input: CardEditsInput): CardEdits {
     stepEdit: writeMatter,
     stepDone: writeMatter,
     stepSnooze: writeMatter,
-    stage: writeMatter && stages, // updateMatterStageAction / moveStageAction (matter): MATTER_WRITE_ROLES
+    // The review's moveStageAction (kind matter -> updateMatterStage): MATTER_WRITE_ROLES. Part 2 must call THAT action,
+    // which answers { saved: true }; the matter page's updateMatterStageAction answers {} and the card couldn't show "Saved".
+    stage: writeMatter && stages,
     tags: false,
     rename: false,
     title: writeMatter, // updateMatterHeaderAction (title only): MATTER_WRITE_ROLES
@@ -138,18 +140,21 @@ export function cardEdits(input: CardEditsInput): CardEdits {
 export type StageTarget = { id: string; name: string };
 
 /**
- * Where a card may move a record. A lead: its open, lost and nurture stages (the review's own rule,
- * `leadStageChoices`), NEVER a `won` stage: that move runs the matter handoff, and the server refuses it again. A
- * matter: the firm's docket stages. The record's current stage is left out either way.
+ * Where a card may move a record. A lead: its open and nurture stages (the review's own rule, `leadStageChoices`), and
+ * its LOST stages only while the page shows the Lost set (Item L: a lost stage is a Move-to destination only there;
+ * `lostShown`, default false). NEVER a `won` stage: that move runs the matter handoff, and the server refuses it again.
+ * A matter: the firm's docket stages. The record's current stage is left out either way.
  */
 export function moveTargets(
   stages: readonly { id: string; name?: string | null; label?: string | null; category?: string | null }[],
   kind: CardKind,
   currentId: string | null = null,
+  opts: { lostShown?: boolean } = {},
 ): StageTarget[] {
+  const lost = new Set(stages.filter((s) => s.category === "lost").map((s) => s.id));
   const list: StageTarget[] =
     kind === "lead"
-      ? leadStageChoices(stages.map((s) => ({ id: s.id, name: s.name ?? null, category: s.category ?? null })))
+      ? leadStageChoices(stages.map((s) => ({ id: s.id, name: s.name ?? null, category: s.category ?? null }))).filter((s) => opts.lostShown === true || !lost.has(s.id))
       : stages.filter((s) => !!(s.label ?? s.name)).map((s) => ({ id: s.id, name: (s.label ?? s.name) as string }));
   return list.filter((s) => s.id !== currentId);
 }
@@ -169,6 +174,10 @@ export type TemperatureControl = {
  * (`effectiveTemperature`'s `source: "suggested"`) is a quiet OUTLINED pill with a small "suggested" mark, and the menu
  * starts with "Lectual suggests Warm · Accept". Accept writes the suggested level through `setLane` like any other choice.
  * With no suggestion to show (`suggestion` off or unreadable) a suggested level is not drawn at all; a person's still is.
+ *
+ * The suggestion is RULE-BASED (`effectiveTemperature` over the lead's activity and recorded facts), not a model call, so
+ * there is no "AI off" state: `suggestion: "off"` exists only for a caller that chooses not to show one. The `reason`
+ * (the pill's title) may carry the triage assistant's summary appended ("... · Triage: ..."): staff-only text.
  */
 export function temperatureControl(
   temperature: Pick<EffectiveTemperature, "value" | "source" | "reason">,

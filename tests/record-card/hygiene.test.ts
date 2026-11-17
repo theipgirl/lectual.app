@@ -76,7 +76,9 @@ describe("the record card library", () => {
     for (const f of files) expect(code(f), f).not.toMatch(/(?<!params)\.(insert|update|upsert|delete)\(/);
     // The two new actions call exactly the existing writes.
     const actions = code("actions.ts");
-    expect(actions).toMatch(/await updateLead\(lead, values\)/);
+    expect(actions).toMatch(/await updateLead\(leadId, values\)/);
+    // A rename never follows a merge to the keeper (it would overwrite the merge's chosen name).
+    expect(actions.slice(actions.indexOf("export async function renameLeadAction"), actions.indexOf("export async function cardTagAction"))).not.toMatch(/keeperForWrite/);
     expect(actions).toMatch(/applyTag\(lead, tagId, \{ source: "human" \}\)/);
     expect(actions).toMatch(/removeTag\(lead, tagId\)/);
   });

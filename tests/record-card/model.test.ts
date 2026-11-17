@@ -103,6 +103,14 @@ describe("the board card / list row", () => {
     expect(c.menu.some((m) => m.id === "move")).toBe(false);
   });
 
+  it("Lost stages are a target only while the Lost set is shown; won never", () => {
+    const withLost: CardContext["stages"] = { status: "ok", value: [...(stages.status === "ok" ? stages.value : []), { id: "s-lost", name: "Lost", category: "lost" }, { id: "s-nur", name: "Nurture", category: "nurture" }] };
+    const normal = buildBoardCard(leadInput(), ctx({ stages: withLost }));
+    expect(normal.stage.targets.map((t) => t.id)).toEqual(["s-held", "s-nur"]);
+    const lostSet = buildBoardCard(leadInput(), ctx({ stages: withLost, lostShown: true }));
+    expect(lostSet.stage.targets.map((t) => t.id)).toEqual(["s-held", "s-lost", "s-nur"]);
+  });
+
   it("an unassigned lead reads Unassigned; no activity reads No activity yet", () => {
     const c = buildBoardCard(leadInput({ lead: { ...leadRow, assigned_to: null, last_activity_at: null } }), ctx());
     expect(c.bottom.owner).toBe("Unassigned");
@@ -190,6 +198,11 @@ describe("contactLinks: the person's own apps, only for what the lead has", () =
     expect(contactLinks({ phone: null, email: null })).toEqual({ call: null, email: null });
     expect(contactLinks({ phone: "n/a", email: "not an email" })).toEqual({ call: null, email: null });
     expect(contactLinks({ phone: "", email: "x@y.z?cc=a@b.c<script>" }).email).toBeNull();
+  });
+  it("no mail link for an address carrying ?, #, & or %", () => {
+    for (const email of ["maya@example.com?cc=boss@x.com", "maya@example.com?body=hi", "ma#ya@example.com", "maya&cc@example.com", "maya%0a@example.com", "maya@exa%6dple.com"]) {
+      expect(contactLinks({ phone: null, email }).email, email).toBeNull();
+    }
   });
 });
 
@@ -303,5 +316,10 @@ describe("the opened card", () => {
     if (failed.status !== "ok" || failed.kind !== "matter") throw new Error("expected a matter card");
     expect(failed.steps).toEqual({ status: "unavailable", text: "Couldn't load next steps" });
     expect(failed.deadline).toEqual({ status: "unavailable", text: "Couldn't load" });
+    // A failed activity read is never "No activity yet".
+    expect(view.card.bottom.lastActivity).toBe("Couldn't load last activity");
+    const quiet = buildOpenedCard({ ...load, activity: { status: "ok", value: { rows: [], truncated: false } } }, { path: "/dashboard/matters/", params: {} });
+    if (quiet.status !== "ok") throw new Error("expected a card");
+    expect(quiet.card.bottom.lastActivity).toBe("No activity yet");
   });
 });
