@@ -45,8 +45,8 @@ describe("parent rows open the list (F2)", () => {
   const parents = (modules: string[]) =>
     Object.fromEntries(railGroups(visibleNav(modules, "owner"), "/dashboard/").flat().filter((e) => e.kids.length).map((e) => [e.label, e.href]));
 
-  it("Leads, Active matters and AI tools open their lists; Communication opens Mail with the mailbox module, else Meetings", () => {
-    expect(parents(["mailbox"])).toEqual({ Communication: "/dashboard/mail/", Leads: "/dashboard/intake/", "Active matters": "/dashboard/matters/", "AI tools": "/dashboard/copilot/" });
+  it("Intake, Active matters and AI tools open their lists; Communication opens Mail with the mailbox module, else Meetings", () => {
+    expect(parents(["mailbox"])).toEqual({ Communication: "/dashboard/mail/", Intake: "/dashboard/intake/", "Active matters": "/dashboard/matters/", "AI tools": "/dashboard/copilot/" });
     expect(parents([]).Communication).toBe("/dashboard/meetings/");
   });
 

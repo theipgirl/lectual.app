@@ -26,10 +26,10 @@ export const REVIEW_BOARD_VIEW = "Board";
 export const REVIEW_SHEET_VIEW = "Sheet";
 /** The Weekly review view that deals one person's records as cue cards. */
 export const REVIEW_CARDS_VIEW = "Cards";
-/** The people who have asked about work (was "Intake" / "PNC"). */
-export const LEADS_NAME = "Leads";
-/** The rail group that holds Leads and the intake forms. */
-export const LEADS_GROUP = "Leads";
+/** The section where new work arrives: the page, tab title, rail group, phone bar and More sheet (Nov 12: was "Leads"). */
+export const INTAKE_NAME = "Intake";
+/** The rail's list row under Intake: the people who have asked about work. */
+export const INTAKE_LEADS_ROW = "Leads";
 /** Matters whose next step is the firm's (was "Our move"). */
 export const OUR_TURN = "Our turn";
 /** Hot, warm or cold (was "lane"). */
@@ -104,7 +104,7 @@ export const LEADS_LOAD_FAILED_BODY = "Can't show your leads right now. Refresh 
 export const NO_LEAD_STAGES = "Your lead stages haven't been set up yet. An owner or admin can add them in Settings.";
 export const NO_LEADS_YET = "No leads yet. New enquiries from your intake form appear here.";
 export const NO_LEAD_MATCHES = "No lead matches these filters.";
-export const PIPELINE_VIEW_ONLY = "This is a view-only overview. To move a lead, open it in Leads.";
+export const PIPELINE_VIEW_ONLY = "This is a view-only overview. To move a lead, open it in Intake.";
 /** The plural of the same sentence, for labels like "Results" or "Event assessments". */
 export function notReadyPlural(features: string): string {
   return `${features.trim()} aren't switched on for your firm yet. Lectual will turn them on.`;

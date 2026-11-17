@@ -72,7 +72,7 @@ describe("Getting started page", () => {
     const html = await render(GettingStartedPage());
     expect(html).not.toContain(">Admin<");
     expect(html).not.toContain("Reconcile stages");
-    expect(html).toContain(">Leads<");
+    expect(html).toContain(">Intake<");
   });
 
   it("reads a malformed progress flag as zero done without crashing", async () => {

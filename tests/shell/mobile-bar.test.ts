@@ -13,14 +13,14 @@ const more = (modules: string[], role = "owner") => moreSections(visibleNav(modu
 const moreLabels = (modules: string[]) => more(modules).flatMap((g) => g.items.map((i) => i.label));
 
 describe("the phone bar (F6)", () => {
-  it("starts on Today: Today, Leads, Approvals, Mail with the mailbox module", () => {
+  it("starts on Today: Today, Intake, Approvals, Mail with the mailbox module", () => {
     expect(MOBILE_BAR).toEqual(["", "intake", "queue", "mail", "matters"]);
-    expect(bar(ALL).map((i) => i.label)).toEqual(["Today", "Leads", "Approvals", "Mail"]);
+    expect(bar(ALL).map((i) => i.label)).toEqual(["Today", "Intake", "Approvals", "Mail"]);
     expect(bar(ALL).map((i) => i.href)).toEqual(["/dashboard/", "/dashboard/intake/", "/dashboard/queue/", "/dashboard/mail/"]);
   });
 
   it("Matters takes Mail's slot without the mailbox module, and never offers Mail in the sheet either (fails closed)", () => {
-    expect(bar([]).map((i) => i.label)).toEqual(["Today", "Leads", "Approvals", "Matters"]);
+    expect(bar([]).map((i) => i.label)).toEqual(["Today", "Intake", "Approvals", "Matters"]);
     expect(moreLabels([])).not.toContain("My Mail");
     expect(moreLabels([])).not.toContain("All matters");
   });
@@ -35,7 +35,7 @@ describe("the phone bar (F6)", () => {
   it("the sheet carries everything else, only if visible", () => {
     expect(moreLabels(ALL)).toEqual([
       "Weekly review", "Calendar", "Meetings", "Campaigns", "Forms", "Client proposals", "Matters", "Pipeline", "Documents",
-      "Copilot", "Assistants", "Shortcuts", "Firm notes", "Communication", "Leads", "Active matters", "AI tools", "Settings",
+      "Copilot", "Assistants", "Shortcuts", "Firm notes", "Communication", "Intake", "Active matters", "AI tools", "Settings",
     ]);
     const bare = moreLabels([]);
     for (const gated of ["Assistants", "Shortcuts", "Client proposals"]) expect(bare).not.toContain(gated);
@@ -44,7 +44,7 @@ describe("the phone bar (F6)", () => {
   });
 
   it("is grouped by the rail's group labels, and nothing is in both the bar and the sheet", () => {
-    expect(more(ALL).map((g) => g.label)).toEqual(["Workspace", "Communication", "Leads", "Active matters", "AI tools", "Reports", "Firm"]);
+    expect(more(ALL).map((g) => g.label)).toEqual(["Workspace", "Communication", "Intake", "Active matters", "AI tools", "Reports", "Firm"]);
     const inBar = new Set(bar(ALL).map((i) => i.slug));
     for (const g of more(ALL)) for (const i of g.items) expect(inBar.has(i.slug)).toBe(false);
   });
@@ -67,7 +67,7 @@ describe("rendering (F6)", () => {
 
   it("draws a visible text label under every button, and a More button that opens a dialog", () => {
     const html = render(ALL);
-    for (const l of ["Today", "Leads", "Approvals", "Mail", "More"]) expect(html).toContain(`<span class="lx-mbar-label">${l}</span>`);
+    for (const l of ["Today", "Intake", "Approvals", "Mail", "More"]) expect(html).toContain(`<span class="lx-mbar-label">${l}</span>`);
     expect(html).toMatch(/<button[^>]*aria-haspopup="dialog"[^>]*aria-expanded="false"[^>]*aria-controls="lx-more-sheet"/);
     expect(html).not.toContain('role="dialog"');
   });
@@ -119,7 +119,7 @@ describe("a view's own bar and sheet (Phase 1 owner view)", () => {
   it("given groups are drawn as given, with no Reports group and nothing from the bar", () => {
     const sheet = moreSections(visibleNav(ALL, "owner"), "/dashboard/", GROUPS, OWNER_BAR);
     expect(sheet).toEqual([{ label: "More", items: expect.any(Array) }]);
-    expect(sheet[0].items.map((i) => i.label)).toEqual(["Leads", "Matters", "Calendar"]);
+    expect(sheet[0].items.map((i) => i.label)).toEqual(["Intake", "Matters", "Calendar"]);
   });
 
   it("the owner variant keeps the real bar's markup and adds only its class", () => {

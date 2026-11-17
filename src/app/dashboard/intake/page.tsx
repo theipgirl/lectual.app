@@ -29,13 +29,13 @@ import { loadAgentMoves, type AgentMovesRead } from "@/lib/stage-keeper/read";
 import { loadStageDecisions, type StageDecisionsRead } from "@/lib/intake/stage-decisions-read";
 import { canReconcile } from "@/lib/reconcile/roles";
 import { LeadsLoadFailed, NoLeadStages } from "./_components/LeadsNotices";
-import { LEADS_NAME } from "@/lib/ui/words";
+import { INTAKE_NAME } from "@/lib/ui/words";
 import IntakeWorkspace from "./_components/IntakeWorkspace";
 import "./intake.css";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 
-export const metadata: Metadata = { title: pageTitle(LEADS_NAME) };
+export const metadata: Metadata = { title: pageTitle(INTAKE_NAME) };
 
 export const dynamic = "force-dynamic";
 

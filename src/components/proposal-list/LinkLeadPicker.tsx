@@ -43,7 +43,7 @@ export function LinkLeadPicker({
         </p>
       ) : leads.length === 0 ? (
         <p className="lx-note" style={{ margin: "6px 0 0" }}>
-          You have no leads yet. Add one in Leads first.
+          You have no leads yet. Add one in Intake first.
         </p>
       ) : (
         <form action={action} className="pq-link-form">

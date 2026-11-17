@@ -158,7 +158,7 @@ describe("the page header and toolbar (shared list-page components)", () => {
 
   it("uses the shared header: one h1, one sub-line, no eyebrow label", () => {
     expect(html).toContain('class="lp-header"');
-    expect(head).toContain('<h1 class="lx-h1">Leads</h1>');
+    expect(head).toContain('<h1 class="lx-h1">Intake</h1>');
     expect(head).toContain('class="lx-sub lp-sub"');
     expect(head).not.toContain("lx-label");
     expect(head.match(/<h1/g)).toHaveLength(1);
