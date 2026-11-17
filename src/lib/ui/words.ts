@@ -929,3 +929,6 @@ export const MERGE_OWN_ROWS_UNAVAILABLE = "Suggestions and proposals from email 
 /** An assessment that is scored (the booth card or the firm's assessment page), on the Forms list, its results page and the lead's Answers card. */
 export const SCORED_ASSESSMENT = "Scored assessment";
 export const SCORED_ASSESSMENTS = "Scored assessments";
+
+// Area B (Matters, Pipeline, Documents, Files)
+export const MATTERS_NAME = "Matters";

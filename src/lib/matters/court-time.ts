@@ -47,6 +47,8 @@
  */
 
 /** The zone every court in this docket sits in. See the note above. */
+import { formatDayTime } from "@/lib/ui/dates";
+
 export const COURT_TIME_ZONE = "America/New_York";
 
 /**
@@ -143,17 +145,13 @@ export function toCourtDateTimeLocal(iso: string | null): string {
  * the reader this module exists for is a paralegal opening the docket from
  * another state, and an unlabelled time invites them to read it as their own.
  */
-export function formatCourtDateTime(iso: string | null): string | null {
+export function formatCourtDateTime(iso: string | null, now: Date = new Date()): string | null {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone: COURT_TIME_ZONE,
-    timeZoneName: "short",
-  });
+  const when = formatDayTime(d, { tz: COURT_TIME_ZONE, now });
+  const zone = new Intl.DateTimeFormat("en-US", { timeZone: COURT_TIME_ZONE, timeZoneName: "short" })
+    .formatToParts(d)
+    .find((p) => p.type === "timeZoneName")?.value;
+  return when ? (zone ? `${when} ${zone}` : when) : null;
 }

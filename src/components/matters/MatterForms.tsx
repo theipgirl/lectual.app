@@ -1,6 +1,9 @@
 "use client";
 
 import { useActionState, useState, type ReactNode } from "react";
+import { Field as UiField, Notice, SavedNote } from "@/components/ui";
+import { ADD_NEXT_STEP, SAVED, SAVING } from "@/lib/ui/words";
+import "./matter-page.css";
 import {
   assignMatterOwnerAction,
   closeDeadlineAction,
@@ -32,18 +35,19 @@ export type Action = (prev: ActionState, fd: FormData) => Promise<ActionState>;
 
 export function Err({ state }: { state: ActionState }) {
   return state.error ? (
-    <p role="alert" className="lx-note" style={{ color: "var(--wine)", margin: 0 }}>
+    <Notice tone="risk" role="alert">
       {state.error}
-    </p>
+    </Notice>
   ) : null;
 }
 
 export function Field(props: { name: string; label: string; defaultValue?: string | null; type?: string; placeholder?: string; wide?: boolean }) {
   return (
-    <label className="lx-field" style={props.wide ? { gridColumn: "1 / -1" } : undefined}>
-      <span className="lx-label">{props.label}</span>
-      <input className="lx-input" name={props.name} type={props.type ?? "text"} defaultValue={props.defaultValue ?? ""} placeholder={props.placeholder} />
-    </label>
+    <div className={props.wide ? "mx-span" : undefined}>
+      <UiField label={props.label}>
+        <input className="lx-input" name={props.name} type={props.type ?? "text"} defaultValue={props.defaultValue ?? ""} placeholder={props.placeholder} />
+      </UiField>
+    </div>
   );
 }
 
@@ -74,11 +78,7 @@ function AutoSelect(props: {
         ))}
       </select>
       <Err state={state} />
-      {state.saved && !pending && !state.error && (
-        <span role="status" className="lx-note" style={{ color: "var(--ok)" }}>
-          Saved
-        </span>
-      )}
+      <SavedNote show={!!state.saved && !pending && !state.error}>{SAVED}</SavedNote>
     </form>
   );
 }
@@ -90,11 +90,11 @@ function AutoSelect(props: {
  */
 export function StageSelect({ matterId, stageId, stages }: { matterId: string; stageId: string | null; stages: { id: string; code: string; label: string }[] | null }) {
   if (stages === null) {
-    return <span className="lx-note" style={{ alignSelf: "center" }}>Couldn&apos;t load docket stages. Reload to try again.</span>;
+    return <span className="lx-note mx-self-center">Couldn&apos;t load docket stages. Reload to try again.</span>;
   }
   if (stages.length === 0) {
     return (
-      <span className="lx-note" style={{ alignSelf: "center" }}>
+      <span className="lx-note mx-self-center">
         Your firm has no docket stages set up yet, so this matter can&apos;t be placed on the docket. Contact Lectual support to set them up.
       </span>
     );
@@ -169,9 +169,9 @@ export function NewMatterForm({ leads, canCreateLitigation }: { leads: { id: str
       <Field name="title" label="Title" placeholder="Optional" />
       <Field name="matterNumber" label={type === "LIT" ? "Court case number" : "Matter number"} placeholder={type === "LIT" ? "26-CC-011354" : "Assigned for you if blank"} />
       <Field name="packageName" label="Package" placeholder="Optional" />
-      <div style={{ gridColumn: "1 / -1", display: "flex", gap: 10, alignItems: "center" }}>
+      <div className="mx-actions">
         <button type="submit" className="lx-btn lx-btn-pri" disabled={pending}>
-          {pending ? "Opening…" : "Open matter"}
+          {pending ? SAVING : "Open matter"}
         </button>
         <Err state={state} />
       </div>
@@ -218,15 +218,16 @@ export function FilingForm({ matterId, values: v }: { matterId: string; values: 
       <Field name="examiningAttorney" label="Examining attorney" defaultValue={v.examiningAttorney} />
       <Field name="usptoStatus" label="USPTO status" defaultValue={v.usptoStatus} />
       <Field name="usptoStatusAsOf" label="Status read on" type="date" defaultValue={v.usptoStatusAsOf} />
-      <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
-        <span className="lx-label">Goods and services</span>
-        <textarea className="lx-input" name="goodsServices" rows={3} defaultValue={v.goodsServices ?? ""} />
-      </label>
-      <div style={{ gridColumn: "1 / -1", display: "flex", gap: 10, alignItems: "center" }}>
+      <div className="mx-span">
+        <UiField label="Goods and services">
+          <textarea className="lx-input" name="goodsServices" rows={3} defaultValue={v.goodsServices ?? ""} />
+        </UiField>
+      </div>
+      <div className="mx-actions">
         <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending}>
           {pending ? "Saving…" : "Save filing details"}
         </button>
-        {state.saved && !pending && <span className="lx-note" style={{ color: "var(--ok)" }}>Saved.</span>}
+        <SavedNote show={!!state.saved && !pending} />
         <Err state={state} />
       </div>
     </form>
@@ -236,14 +237,14 @@ export function FilingForm({ matterId, values: v }: { matterId: string; values: 
 export function NotesForm({ matterId, notes }: { matterId: string; notes: string | null }) {
   const [state, action, pending] = useActionState<ActionState, FormData>(updateMatterNotesAction, {});
   return (
-    <form action={action} style={{ display: "grid", gap: 8 }}>
+    <form action={action} className="mx-grid">
       <input type="hidden" name="matterId" value={matterId} />
       <textarea className="lx-input" name="notes" rows={5} defaultValue={notes ?? ""} aria-label="Staff notes" placeholder="Internal. Never shown to the client." />
-      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+      <div className="mx-actions">
         <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending}>
           {pending ? "Saving…" : "Save notes"}
         </button>
-        {state.saved && !pending && <span className="lx-note" style={{ color: "var(--ok)" }}>Saved.</span>}
+        <SavedNote show={!!state.saved && !pending} />
         <Err state={state} />
       </div>
     </form>
@@ -295,21 +296,21 @@ export function DeadlineComposer({ matterId, filingBasis }: { matterId: string; 
       </label>
       <Field name="notes" label="Note" placeholder="Optional" />
       {suggestion && (
-        <p className="lx-banner lx-banner-mute" style={{ gridColumn: "1 / -1", margin: 0 }}>
+        <div className="mx-span">
+        <Notice tone="mute">
           Suggested: <b>{suggestion.dueDate}</b> ({suggestion.basis}).{" "}
           {due !== suggestion.dueDate && (
             <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={() => setDue(suggestion.dueDate)}>
               Use it
             </button>
           )}
-          <span className="lx-note" style={{ display: "block", marginTop: 4 }}>
-            {CALCULATED_DEADLINE_NOTICE}
-          </span>
-        </p>
+          <span className="lx-note mx-block">{CALCULATED_DEADLINE_NOTICE}</span>
+        </Notice>
+        </div>
       )}
-      <div style={{ gridColumn: "1 / -1", display: "flex", gap: 10, alignItems: "center" }}>
+      <div className="mx-actions">
         <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={pending}>
-          {pending ? "Docketing…" : "Docket deadline"}
+          {pending ? SAVING : "Docket deadline"}
         </button>
         <span className="lx-note">Saved unconfirmed until an attorney confirms it.</span>
         <Err state={state} />
@@ -327,7 +328,7 @@ export function RowButton({ action, hidden, label, tone = "ghost" }: { action: A
         <input key={k} type="hidden" name={k} value={v} />
       ))}
       <button type="submit" className={`lx-btn lx-btn-${tone} lx-btn-sm`} disabled={pending} title={state.error}>
-        {pending ? "…" : label}
+        {pending ? SAVING : label}
       </button>
       <Err state={state} />
     </form>
@@ -351,7 +352,7 @@ export function DeadlineActions(props: { matterId: string; deadlineId: string; c
             <input type="hidden" name="deadlineId" value={props.deadlineId} />
             <input className="lx-input" type="date" name="dueDate" required aria-label="New due date" />
             <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending}>
-              {pending ? "…" : "Extend"}
+              {pending ? SAVING : "Extend"}
             </button>
             <Err state={state} />
           </form>
@@ -372,13 +373,13 @@ export function TaskComposer({ matterId }: { matterId: string }) {
     return res;
   }, {});
   return (
-    <form action={action} style={{ display: "grid", gap: 8 }}>
+    <form action={action} className="mx-grid">
       <input type="hidden" name="matterId" value={matterId} />
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <input id="lx-task-title" className="lx-input" name="title" placeholder="Add a task" aria-label="Task" style={{ flex: 1, minWidth: 160 }} />
-        <input className="lx-input" type="date" name="dueAt" aria-label="Due" style={{ width: "auto" }} />
+      <div className="mx-row">
+        <input id="lx-task-title" className="lx-input mx-flex-1" name="title" placeholder={ADD_NEXT_STEP} aria-label="Task" />
+        <input className="lx-input mx-auto-w" type="date" name="dueAt" aria-label="Due" />
         <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending}>
-          {pending ? "…" : "Add"}
+          {pending ? SAVING : "Add"}
         </button>
       </div>
       <Err state={state} />
