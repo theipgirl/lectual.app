@@ -44,7 +44,9 @@ function row(label: string, value: string, meta: string, last: boolean): string 
   );
 }
 
-export function attendeeHtml(input: WorksheetInput, now: Date): string {
+export const PERSONAL_BOOKING_SENTENCE = "Your booking form is already filled in with your details.";
+
+export function attendeeHtml(input: WorksheetInput, now: Date, bookingUrl: string | null = null): string {
   const first = input.contact.firstName || "there";
   const prepared = [`Prepared for ${fullName(input) || "you"}`, input.contact.business, worksheetDate(now)].filter(Boolean).join(" · ");
   const sections = worksheetSections(input.answers)
@@ -60,7 +62,7 @@ export function attendeeHtml(input: WorksheetInput, now: Date): string {
       );
     })
     .join("");
-  const url = esc(STRATEGY_SESSION_URL);
+  const url = esc(bookingUrl ?? STRATEGY_SESSION_URL);
   return (
     `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">` +
     `<meta name="color-scheme" content="light"><title>Your IP Portfolio</title></head>` +
@@ -90,6 +92,7 @@ export function attendeeHtml(input: WorksheetInput, now: Date): string {
     `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td align="center" bgcolor="${OXBLOOD}" style="background:${OXBLOOD};border-radius:4px;">` +
     `<a href="${url}" style="display:inline-block;padding:14px 28px;font-family:${SANS};font-size:16px;font-weight:bold;line-height:20px;color:${CREAM};text-decoration:none;">Book your Legal Strategy Session</a></td></tr></table>` +
     `<div style="font-family:${SANS};font-size:12px;line-height:18px;color:${MUTED};padding-top:14px;word-break:break-all;">${url}</div>` +
+    (bookingUrl ? `<div style="font-family:${SANS};font-size:13px;line-height:20px;color:${INK};padding-top:10px;">${esc(PERSONAL_BOOKING_SENTENCE)}</div>` : "") +
     `</td></tr></table></td></tr>` +
     // sign-off and footer
     `<tr><td style="padding:28px 28px 0 28px;font-family:${SERIF};font-size:17px;color:${OXBLOOD};font-weight:bold;">RPB Law Firm</td></tr>` +
