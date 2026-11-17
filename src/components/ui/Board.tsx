@@ -12,8 +12,11 @@ import type { PillTone } from "@/lib/ui/tones";
 export function BoardColumn({
   title,
   titleHref,
+  titleLinkProps,
+  as = "section",
   count,
   note,
+  foot,
   empty,
   ariaLabel,
   children,
@@ -21,21 +24,50 @@ export function BoardColumn({
 }: {
   title: string;
   titleHref?: string;
+  /** Extra attributes for the title link (a data hook a test or the page reads). */
+  titleLinkProps?: Record<`data-${string}`, string>;
+  /** "details" draws a collapsible column (the Closed column): the header sits in the summary, the rest folds. */
+  as?: "section" | "details";
   count: React.ReactNode;
   note?: React.ReactNode;
+  /** Under the cards (a "Showing N of M" line). */
+  foot?: React.ReactNode;
   empty?: string;
   ariaLabel?: string;
   children?: React.ReactNode;
 } & Omit<React.HTMLAttributes<HTMLElement>, "title">) {
+  const header = (
+    <header>
+      <span className="lx-board-title">
+        {titleHref ? (
+          <Link href={titleHref} {...titleLinkProps}>
+            {title}
+          </Link>
+        ) : (
+          title
+        )}
+      </span>
+      <span className="lx-board-count">{count}</span>
+    </header>
+  );
+  // An empty array (a page mapping zero cards) counts as no cards, so the empty sentence still shows.
+  const body = Children.toArray(children).length > 0 ? <ul className="lx-board-cards">{children}</ul> : empty ? <p className="lx-board-empty">{empty}</p> : null;
+  if (as === "details") {
+    return (
+      <details className="lx-board-col" aria-label={ariaLabel ?? title} {...(rest as React.HTMLAttributes<HTMLDetailsElement>)}>
+        <summary>{header}</summary>
+        {note}
+        {body}
+        {foot}
+      </details>
+    );
+  }
   return (
     <section className="lx-board-col" aria-label={ariaLabel ?? title} {...rest}>
-      <header>
-        <span className="lx-board-title">{titleHref ? <Link href={titleHref}>{title}</Link> : title}</span>
-        <span className="lx-board-count">{count}</span>
-      </header>
+      {header}
       {note}
-      {/* An empty array (a page mapping zero cards) counts as no cards, so the empty sentence still shows. */}
-      {Children.toArray(children).length > 0 ? <ul className="lx-board-cards">{children}</ul> : empty ? <p className="lx-board-empty">{empty}</p> : null}
+      {body}
+      {foot}
     </section>
   );
 }

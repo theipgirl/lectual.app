@@ -10,6 +10,7 @@ import {
 import type { LoeKindName } from "@/lib/loe/kinds";
 import type { LetterVersion } from "@/lib/loe/page-model";
 import {
+  SAVING,
   LETTER_APPROVAL_NOTE,
   LETTER_APPROVE,
   LETTER_FIX_BEFORE_APPROVING,
@@ -48,7 +49,7 @@ export function StartDraftForm({ kind }: { kind: LoeKindName }) {
           <LetterFields idPrefix={`start-${kind}`} title="Engagement letter" body="" />
           <div className="loe-actions">
             <button type="submit" className="lx-btn lx-btn-pri" disabled={pending}>
-              {pending ? "Saving…" : LETTER_START_DRAFT}
+              {pending ? SAVING : LETTER_START_DRAFT}
             </button>
             <Outcome state={state} pending={pending} savedText="Draft started." />
           </div>
@@ -66,7 +67,7 @@ export function StartFromVersionForm({ versionId }: { versionId: string }) {
         <div className="loe-actions">
           <input type="hidden" name="versionId" value={versionId} />
           <button type="submit" className="lx-btn lx-btn-sec" disabled={pending}>
-            {pending ? "Starting…" : LETTER_START_FROM_VERSION}
+            {pending ? SAVING : LETTER_START_FROM_VERSION}
           </button>
           <Outcome state={state} pending={pending} savedText="Draft started." />
         </div>
@@ -86,7 +87,7 @@ export function DraftEditor({ version, canApprove, problems }: { version: Letter
             <LetterFields idPrefix={`draft-${version.id}`} title={version.title} body={version.body} />
             <div className="loe-actions">
               <button type="submit" className="lx-btn lx-btn-sec" disabled={pending}>
-                {pending ? "Saving…" : LETTER_SAVE_DRAFT}
+                {pending ? SAVING : LETTER_SAVE_DRAFT}
               </button>
               <Outcome state={state} pending={pending} savedText="Draft saved." />
             </div>
@@ -100,7 +101,7 @@ export function DraftEditor({ version, canApprove, problems }: { version: Letter
               <input type="hidden" name="id" value={version.id} />
               <div className="loe-actions">
                 <button type="submit" className="lx-btn lx-btn-pri" disabled={pending || problems} aria-describedby={problems ? `fix-${version.id}` : undefined}>
-                  {pending ? "Approving…" : LETTER_APPROVE}
+                  {pending ? SAVING : LETTER_APPROVE}
                 </button>
                 {problems && (
                   <span id={`fix-${version.id}`} className="lx-note">

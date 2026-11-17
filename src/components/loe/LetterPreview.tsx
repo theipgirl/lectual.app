@@ -13,12 +13,8 @@ export function LetterPreview({ body, logo }: { body: string; logo?: LetterLogo 
   const result = renderLetter(body, SAMPLE_VALUES);
   return (
     <section className="loe-preview" aria-label={LETTER_PREVIEW_HEADING}>
-      <h3 className="lx-h2" style={{ fontSize: 19, margin: 0 }}>
-        {LETTER_PREVIEW_HEADING}
-      </h3>
-      <p className="lx-note" style={{ margin: 0 }}>
-        {LETTER_PREVIEW_NOTE}
-      </p>
+      <h3 className="lx-h3">{LETTER_PREVIEW_HEADING}</h3>
+      <p className="lx-note">{LETTER_PREVIEW_NOTE}</p>
       {result.ok ? (
         <div className="loe-preview-paper" data-testid="letter-preview">
           {logo ? (

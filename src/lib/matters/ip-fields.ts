@@ -10,6 +10,8 @@
  */
 
 import type { Database } from "@/lib/db/types";
+import { formatDay } from "@/lib/ui/dates";
+import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
 import { ReadableError } from "@/lib/ui/readable-error";
 
 
@@ -114,18 +116,11 @@ export function parseCivilDate(value: FormDataEntryValue | null | undefined): st
 }
 
 /**
- * `Mon D, YYYY` for a civil (`date`) column. Formatted in UTC on purpose: a
- * `date` has no time zone, and letting the runtime localise it shifts a filing
- * or docket date by a day for anyone west of Greenwich.
+ * "Nov 16" ("Nov 16, 2025" in another year) for a civil (`date`) column, through the one date formatter. A `date`
+ * has no time zone, so it is never shifted; `tz` (the firm's zone) only decides which year counts as this one.
  */
-export function formatCivilDate(value: string | null | undefined): string | null {
+export function formatCivilDate(value: string | null | undefined, tz: string = DEFAULT_TIME_ZONE): string | null {
   if (!value) return null;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  const [y, m, d] = value.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  });
+  return formatDay(value, { tz });
 }

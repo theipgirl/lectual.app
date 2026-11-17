@@ -943,3 +943,8 @@ export const WRONG_ACCOUNT_SIGN_OUT = "Wrong account? Sign out";
 export const NO_FIRM_JUST_INVITED = "Just been invited? Your sign-in predates the invite. Refresh to pick up your firm.";
 /** The bar across the top while Lectual staff are inside a firm they are not a member of. */
 export const staffInsideFirm = (firmName: string) => `Lectual staff · you are inside ${firmName}, a firm you are not a member of. This visit is logged.`;
+
+// Area B (Matters, Pipeline, Documents, Files)
+export const MATTERS_NAME = "Matters";
+export const DOCUMENTS_NAME = "Documents";
+export const NEW_LETTER = "New letter";

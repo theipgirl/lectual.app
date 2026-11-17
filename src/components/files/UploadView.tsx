@@ -1,3 +1,5 @@
+import { Notice } from "@/components/ui";
+import "./files.css";
 import { ALLOWED_TYPES_TEXT, FILE_PICKER_ACCEPT, MAX_FILE_LABEL } from "@/lib/files/rules";
 
 /**
@@ -19,7 +21,7 @@ export function UploadView({
   inputKey?: number;
 }) {
   return (
-    <div style={{ display: "grid", gap: 6 }}>
+    <div className="fl-upload">
       <label className="lx-label" htmlFor="client-file-input">
         Add a file
       </label>
@@ -32,18 +34,18 @@ export function UploadView({
         disabled={busy}
         onChange={onPick ? (e) => onPick(e.currentTarget.files?.[0] ?? null) : undefined}
       />
-      <p className="lx-note" style={{ margin: 0 }}>
+      <p className="lx-note">
         {`Allowed: ${ALLOWED_TYPES_TEXT}. Up to ${MAX_FILE_LABEL} each.`}
       </p>
       {busy && (
-        <p role="status" className="lx-note" style={{ margin: 0, color: "var(--ink)" }}>
+        <p role="status" className="lx-note">
           {busyName ? `Uploading ${busyName}…` : "Uploading…"}
         </p>
       )}
       {error && (
-        <p role="alert" className="lx-note" style={{ color: "var(--wine)", margin: 0 }}>
+        <Notice tone="risk" role="alert">
           {error}
-        </p>
+        </Notice>
       )}
     </div>
   );

@@ -76,7 +76,7 @@ describe("F7: matter page", () => {
 
   it("splits the sub-line in two lines", async () => {
     const html = await render();
-    expect(html).toMatch(/<p class="lx-note" style="margin:6px 0 0">[^<]*<\/p><p class="lx-note" style="margin:2px 0 0">/);
+    expect(html).toMatch(/<p class="lx-sub">[^<]*<br\/>[^<]*<\/p>/);
   });
 
   it("says No deadlines yet with a visible Add a deadline button, and renames the headings", async () => {

@@ -23,7 +23,6 @@ const CSS: Record<string, number> = {
 const TSX: Record<string, number> = {
   "src/app/dashboard/agents/page.tsx": 1,
   "src/app/dashboard/intake/_components/AddLeadDialog.tsx": 1,
-  "src/components/billing/BillingCard.tsx": 1,
   "src/components/intake/TimeEntryDialog.tsx": 1,
 };
 const LITERAL = /#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(/g;

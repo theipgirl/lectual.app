@@ -15,11 +15,13 @@ import {
   stageAge,
   type SegmentKey,
 } from "@/lib/matters/worklist";
+import { EmptyState, LoadFailedCard, Notice, Pill, SheetCard, SheetScroll, SheetTable } from "@/components/ui";
 import { ViewToggle } from "@/components/ViewToggle";
 import { ListHeader } from "@/components/list-page/ListHeader";
 import { ListToolbar } from "@/components/list-page/ListToolbar";
 import { Chip, FilterChips } from "@/components/list-page/Chips";
 import "@/components/list-page/list-page.css";
+import "./matters.css";
 import { NewMatterForm } from "@/components/matters/MatterForms";
 import { MatterBoard } from "@/components/matters/MatterBoard";
 import { MovedOutNotice } from "@/components/matters/MovedOutNotice";
@@ -34,7 +36,7 @@ import {
   parseGroupChoice,
   phaseGroupCounts,
 } from "@/lib/matters/phase-group";
-import { MATTER_GROUPS_NAV, MATTER_GROUP_ALL, MATTER_GROUP_EMPTY, MATTER_GROUP_LABEL, MATTER_PHASES_UNAVAILABLE, MATTER_STATUS_NAV } from "@/lib/ui/words";
+import { searchPlaceholder, BLANK, OWNER_COLUMN, TEAMMATE, UNASSIGNED, MATTER_GROUPS_NAV, MATTER_GROUP_ALL, MATTER_GROUP_EMPTY, MATTER_GROUP_LABEL, MATTER_PHASES_UNAVAILABLE, MATTER_STATUS_NAV } from "@/lib/ui/words";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import { matterIdsNeedingReview } from "./list-utils";
@@ -104,7 +106,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
   const shown = searchMatters(filterBySegment(inGroup, seg, sets), search);
   const boardStages = grouped ? boardStagesForChoice(stageList, group, shown) : stageList;
   const bands = groupIntoBands(shown);
-  const memberName = new Map(members.map((m) => [m.userId, m.displayName ?? m.email ?? "Teammate"]));
+  const memberName = new Map(members.map((m) => [m.userId, m.displayName ?? m.email ?? TEAMMATE]));
   const leadOptions = leads.map((l) => ({
     id: l.id,
     label: [l.business_name?.trim() || `${l.first_name} ${l.last_name}`.trim(), l.email].filter(Boolean).join(" · "),
@@ -130,8 +132,8 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
 
       <ListToolbar
         search={{
-          label: "Search matters",
-          placeholder: "Mark, number, owner or serial",
+          label: searchPlaceholder("matters"),
+          placeholder: searchPlaceholder("matters"),
           defaultValue: search,
           hidden: { ...(boardView ? {} : { view: MATTERS_LIST_VALUE }), ...(seg !== "open" ? { seg } : {}), ...(grouped && group !== defaultFor(seg) ? { group } : {}) },
           clearHref: href({ q: "" }),
@@ -160,14 +162,14 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
         ))}
       </FilterChips>
       {phasesFailed && (
-        <p className="lx-banner lx-banner-warn" role="status" style={{ margin: 0 }}>
+        <Notice tone="warn" role="status">
           {MATTER_PHASES_UNAVAILABLE}
-        </p>
+        </Notice>
       )}
       {queue.status === "unavailable" && (
-        <p className="lx-banner lx-banner-warn" role="status" style={{ margin: 0 }}>
+        <Notice tone="warn" role="status">
           The approval queue can&apos;t be reached right now, so matters can&apos;t be checked for drafts waiting on review.
-        </p>
+        </Notice>
       )}
 
       <details id={OPEN_MATTER_PANEL_ID} className="lx-card lx-disclosure">
@@ -176,12 +178,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
       </details>
 
       {loadError ? (
-        <div className="lx-card lx-empty-card">
-          <h2 className="lx-h2" style={{ fontSize: 25 }}>Matters couldn&apos;t be loaded</h2>
-          <p className="lx-note" style={{ margin: 0 }}>
-            Can&apos;t show this right now. Refresh to try again.
-          </p>
-        </div>
+        <LoadFailedCard what="matters" />
       ) : boardView && shown.length > 0 ? (
         <>
         {grouped && <MovedOutNotice />}
@@ -193,23 +190,22 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
           canMove={!!role && MATTER_WRITE_ROLES.includes(role)}
           reviewIds={reviewIds}
           reviewItems={reviewItems}
-          ownerName={(id) => (id ? memberName.get(id) ?? "Teammate" : null)}
+          ownerName={(id) => (id ? memberName.get(id) ?? TEAMMATE : null)}
         />
         </>
       ) : bands.length === 0 ? (
-        <div className="lx-card lx-empty-card">
-          <h2 className="lx-h2" style={{ fontSize: 25 }}>{all.length === 0 ? "No matters yet" : "Nothing matches"}</h2>
-          <p className="lx-note" style={{ margin: 0 }}>
-            {all.length === 0
-              ? "A matter opens when a lead signs, or from the form above."
-              : grouped && !search
-                ? MATTER_GROUP_EMPTY(group)
-                : "Try another filter or search."}
-          </p>
-        </div>
+        all.length === 0 ? (
+          <EmptyState title="No matters yet" action={<OpenMatterButton />}>
+            A matter opens when a lead signs, or from the form above.
+          </EmptyState>
+        ) : (
+          <EmptyState title="Nothing matches">
+            {grouped && !search ? MATTER_GROUP_EMPTY(group) : "Try another filter or search."}
+          </EmptyState>
+        )
       ) : (
         bands.map((band) => (
-          <section key={band.key} className="lx-card lx-band" aria-labelledby={`band-${band.key}`}>
+          <SheetCard as="section" key={band.key} className="lx-band" aria-labelledby={`band-${band.key}`}>
             <header className="lx-band-head">
               <h2 id={`band-${band.key}`} className="lx-h2">
                 {BAND_COPY[band.key].label}
@@ -218,8 +214,8 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
                 {band.matters.length} · {BAND_COPY[band.key].hint}
               </span>
             </header>
-            <div style={{ overflow: "auto" }}>
-              <table className="lx-tbl lx-stack">
+            <SheetScroll>
+              <SheetTable fixed minWidth={760}>
                 <colgroup>
                   <col style={{ width: "36%" }} />
                   <col style={{ width: "13%" }} />
@@ -232,8 +228,8 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
                     <th>Matter</th>
                     <th>Type</th>
                     <th>Stage</th>
-                    <th>In stage</th>
-                    <th>Owner</th>
+                    <th className="num">In stage</th>
+                    <th>{OWNER_COLUMN}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -248,32 +244,36 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
                             {matterLabel(m)}
                           </Link>
                           <div className="lx-note mt-sub">
-                            <span className="lx-num">{m.matter_number}</span>
+                            {m.matter_number}
                             {m.owner_name ? ` · ${m.owner_name}` : ""}
                             {note ? ` · ${note}` : ""}
-                            {reviewIds.has(m.id) &&
-                              (reviewId ? (
-                                <Link href={reviewHref(reviewId)} className="lp-pill lp-pill-warn" style={{ marginLeft: 6, position: "relative", zIndex: 1 }}>
-                                  Review
-                                </Link>
-                              ) : (
-                                <span className="lp-pill lp-pill-warn" style={{ marginLeft: 6 }}>Review</span>
-                              ))}
+                            {reviewIds.has(m.id) && (
+                              <>
+                                {" "}
+                                {reviewId ? (
+                                  <Link href={reviewHref(reviewId)} className="lx-pill lx-pill-warn">
+                                    Review
+                                  </Link>
+                                ) : (
+                                  <Pill tone="warn">Review</Pill>
+                                )}
+                              </>
+                            )}
                           </div>
                         </td>
                         <td data-label="Type">{MATTER_TYPE_LABEL[m.type]}</td>
-                        <td data-label="Stage">{m.stage ? <span className="lp-pill lp-pill-wrap">{stageDisplayName(m.stage.label)}</span> : <span className="lx-note">—</span>}</td>
-                        <td className="lx-num" data-label="In stage">
-                          {age.days === null ? "—" : age.stale ? <span className="lp-pill lp-pill-num lp-pill-risk">{age.days}d</span> : <span>{age.days}d</span>}
+                        <td data-label="Stage">{m.stage ? <Pill wrap>{stageDisplayName(m.stage.label)}</Pill> : BLANK}</td>
+                        <td className="num" data-label="In stage">
+                          {age.days === null ? BLANK : age.stale ? <Pill num tone="risk">{age.days}d</Pill> : `${age.days}d`}
                         </td>
-                        <td data-label="Owner">{m.assigned_to ? memberName.get(m.assigned_to) ?? "Teammate" : <span className="lx-note">Unassigned</span>}</td>
+                        <td data-label={OWNER_COLUMN}>{m.assigned_to ? memberName.get(m.assigned_to) ?? TEAMMATE : UNASSIGNED}</td>
                       </tr>
                     );
                   })}
                 </tbody>
-              </table>
-            </div>
-          </section>
+              </SheetTable>
+            </SheetScroll>
+          </SheetCard>
         ))
       )}
     </div>

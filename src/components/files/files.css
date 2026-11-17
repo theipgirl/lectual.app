@@ -1,0 +1,11 @@
+/* Documents & files card. Tokens only. */
+.fl-card { display: grid; gap: 12px; }
+.fl-card p { margin: 0; }
+.fl-entry { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between; padding: 10px 0; }
+.fl-entry-main { min-width: 0; flex: 1; }
+.fl-entry-name { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.fl-entry-name b { overflow-wrap: anywhere; }
+.fl-entry-actions { display: inline-flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.fl-upload { display: grid; gap: 6px; }
+.fl-upload p { margin: 0; }
+.fl-delete { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }

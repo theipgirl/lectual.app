@@ -135,7 +135,7 @@ describe("engagement letter page — the module gate", () => {
 describe("engagement letter page — no signed quote", () => {
   it("is the blank form it has always been", async () => {
     const html = await render();
-    expect(html).toContain("New letter of engagement");
+    expect(html).toContain("New engagement letter");
     expect(html).toContain('name="packageName"');
     expect(html).not.toContain("Pre-filled from the signed quote");
     expect(html).not.toContain('name="quoteId"');

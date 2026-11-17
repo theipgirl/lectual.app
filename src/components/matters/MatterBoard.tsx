@@ -1,5 +1,6 @@
 import Link from "next/link";
-import "@/components/list-page/list-page.css";
+import { BoardCard, BoardColumn, Pill } from "@/components/ui";
+import { columnEmpty } from "@/lib/ui/words";
 import type { Matter } from "@/lib/matters";
 import type { MatterStage } from "@/lib/matters/stages";
 import { buildBoard } from "@/lib/matters/board";
@@ -36,41 +37,52 @@ export function MatterBoard(props: {
   const card = (m: Matter) => {
     const age = stageAge(m);
     const owner = props.ownerName(m.assigned_to);
+    const reviewId = props.reviewItems?.get(m.id);
+    const needsReview = props.reviewIds.has(m.id);
     return (
-      <li key={m.id} id={matterCardId(m.id)} className="lp-board-card">
-        <Link href={`/dashboard/matters/${m.id}/`} className="lx-rowlink">
-          {matterLabel(m)}
-        </Link>
-        <span className="lx-note lx-num">{m.matter_number}</span>
-        <span style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-          {age.days !== null && <span className={`lp-pill lp-pill-num${age.stale ? " lp-pill-risk" : ""}`}>{age.days}d</span>}
-          {props.reviewIds.has(m.id) &&
-            (props.reviewItems?.get(m.id) ? (
-              <Link href={reviewHref(props.reviewItems.get(m.id)!)} className="lp-pill lp-pill-warn" style={{ position: "relative", zIndex: 1 }}>
+      <BoardCard
+        key={m.id}
+        id={matterCardId(m.id)}
+        href={`/dashboard/matters/${m.id}/`}
+        title={matterLabel(m)}
+        tone={age.stale ? "risk" : needsReview ? "warn" : undefined}
+        meta={owner ? `${m.matter_number} · ${owner}` : m.matter_number}
+        chip={
+          age.days !== null ? (
+            <Pill num tone={age.stale ? "risk" : "mute"}>
+              {age.days}d
+            </Pill>
+          ) : undefined
+        }
+        foot={
+          needsReview ? (
+            reviewId ? (
+              <Link href={reviewHref(reviewId)} className="lx-pill lx-pill-warn">
                 Review
               </Link>
             ) : (
-              <span className="lp-pill lp-pill-warn">Review</span>
-            ))}
-          {owner && <span className="lx-note">{owner}</span>}
-        </span>
-        {props.canMove && stageOptions.length > 0 && <MoveMenu matterId={m.id} stageId={m.stage_id} stages={stageOptions} type={m.type} announceGroup={!!props.collapseEmpty} />}
-      </li>
+              <Pill tone="warn">Review</Pill>
+            )
+          ) : undefined
+        }
+        menu={
+          props.canMove && stageOptions.length > 0 ? (
+            <MoveMenu matterId={m.id} title={matterLabel(m)} stageId={m.stage_id} stages={stageOptions} type={m.type} announceGroup={!!props.collapseEmpty} />
+          ) : undefined
+        }
+      />
     );
   };
 
   const column = (key: string, title: string, sub: string | null, matters: Matter[], stale = 0) => (
-    <section key={key} className="lx-board-col" aria-label={title}>
-      <header>
-        <span className="lx-board-title">{title}</span>
-        <span className="lx-note">
-          {matters.length}
-          {stale ? ` · ${stale} gone quiet` : ""}
-          {sub ? ` · ${sub}` : ""}
-        </span>
-      </header>
-      {matters.length === 0 ? <p className="lx-note" style={{ margin: 0 }}>None</p> : <ul>{matters.map(card)}</ul>}
-    </section>
+    <BoardColumn
+      key={key}
+      title={title}
+      count={`${matters.length}${stale ? ` · ${stale} gone quiet` : ""}${sub ? ` · ${sub}` : ""}`}
+      empty={columnEmpty("matters")}
+    >
+      {matters.map(card)}
+    </BoardColumn>
   );
 
   const unstaged = board.unstaged.length > 0 ? column("unstaged", "Not on the docket yet", null, board.unstaged) : null;

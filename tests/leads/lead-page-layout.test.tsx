@@ -158,7 +158,8 @@ describe("P1: composer tabs", () => {
       return m.some((b) => rule.test(b));
     };
     expect(coarse(rd("src/app/globals.css"), /\.lx-segs button,/)).toBe(true);
-    expect(coarse(rd("src/components/matters/matter-page.css"), /\.lx-board-move \.lp-btn \{ min-height: 44px; \}/)).toBe(true);
+    // The Matters board's move trigger is the shared "⋯" menu button, made 44px in the shared coarse block.
+    expect(coarse(rd("src/app/globals.css"), /\.lx-board-menu,[\s\S]*?min-height: 44px; min-width: 44px;/)).toBe(true);
     const pq = rd("src/app/dashboard/proposals/proposals.css");
     expect(coarse(pq, /\.pq-seg \{ min-height: 44px; \}/)).toBe(true);
     // The collapsed consults strip is gone (Spec 8); its row buttons are 44px at every width.

@@ -1,4 +1,5 @@
 import type { SignedAddressRead } from "@/lib/loe/signed-address";
+import "./loe.css";
 import { MAILING_ADDRESS_HEADING, MAILING_ADDRESS_UNAVAILABLE } from "@/lib/ui/words";
 
 /**
@@ -18,7 +19,7 @@ export function MailingAddressCard({ read }: { read: SignedAddressRead | null })
   return (
     <div className="lx-mailing" data-mailing="ok">
       <div className="lx-label">{MAILING_ADDRESS_HEADING}</div>
-      <address className="lx-mailing-lines" style={{ fontStyle: "normal", whiteSpace: "pre-line", overflowWrap: "anywhere" }}>
+      <address className="lx-mailing-lines loe-address">
         {read.address.lines.join("\n")}
       </address>
     </div>

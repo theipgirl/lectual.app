@@ -2,7 +2,7 @@
 
 // Matter editing for daily work (Sprint 8): header details, the Client contact
 // card, the typed timeline composer, deadline edit/reopen/delete and task
-// edit/assign/delete. Same classes and the same Save / Saving… / error-line
+// edit/assign/delete. Shared look (Field, Notice, SavedNote, InlineConfirm); same Saving… / error-line
 // behaviour as MatterForms.tsx; no new CSS. Every control here is rendered by
 // the page for write roles only, and every action re-checks the role itself.
 
@@ -29,6 +29,10 @@ import { contactLabel } from "@/lib/matters/contact-input";
 import type { MatterContactsRead } from "@/lib/matters/contacts";
 import { NOTE_KIND_OPTIONS } from "@/lib/pipeline/lead-input";
 import { Err, Field, RowButton, type Action } from "./MatterForms";
+import { InlineConfirm, Notice, SavedNote, Field as UiField } from "@/components/ui";
+import { searchPlaceholder, ADD_TO_TIMELINE, BLANK, DELETE, OWNER_COLUMN, SAVING, UNASSIGNED } from "@/lib/ui/words";
+import "@/components/list-page/list-page.css";
+import "./matter-page.css";
 
 // ── Header ────────────────────────────────────────────────────────────────────
 
@@ -46,14 +50,13 @@ export function HeaderEditForm({ matterId, values: v }: { matterId: string; valu
   // Litigation keeps its own case number and case details, so it is never offered as a change.
   const options = MATTER_TYPE_OPTIONS.filter((o) => (isLitigation ? o.value === "LIT" : o.value !== "LIT"));
   return (
-    <details className="lx-disclosure-inline" style={{ marginTop: 10 }}>
+    <details className="lx-disclosure-inline mx-mt-8">
       <summary>Edit details</summary>
       <form action={action} className="lx-form-grid">
         <input type="hidden" name="matterId" value={matterId} />
         <Field name="title" label="Title" defaultValue={v.title} placeholder="Optional" />
         <Field name="packageName" label="Package" defaultValue={v.packageName} placeholder="Optional" />
-        <label className="lx-field">
-          <span className="lx-label">Matter type</span>
+        <UiField label="Matter type">
           <select name="type" className="lx-input" defaultValue={v.type}>
             {options.map((o) => (
               <option key={o.value} value={o.value}>
@@ -61,18 +64,18 @@ export function HeaderEditForm({ matterId, values: v }: { matterId: string; valu
               </option>
             ))}
           </select>
-        </label>
+        </UiField>
         <Field name="referralSource" label="Came from" defaultValue={v.referralSource} placeholder="Optional" />
-        <p className="lx-note" style={{ gridColumn: "1 / -1", margin: 0 }}>
+        <p className="lx-note mx-span">
           {isLitigation
             ? "Litigation matters keep their case number and case details, so the type can't be changed."
             : "Changing the type keeps the matter number as it is. A matter can't be changed to Litigation."}
         </p>
-        <div style={{ gridColumn: "1 / -1", display: "flex", gap: 10, alignItems: "center" }}>
+        <div className="mx-actions">
           <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending}>
-            {pending ? "Saving…" : "Save details"}
+            {pending ? SAVING : "Save details"}
           </button>
-          {state.saved && !pending && <span className="lx-note" style={{ color: "var(--ok)" }}>Saved.</span>}
+          <SavedNote show={!!state.saved && !pending} />
           <Err state={state} />
         </div>
       </form>
@@ -88,9 +91,7 @@ function roleLabel(role: string): string {
 
 function Msg({ state }: { state: MessageActionState }) {
   return state.saved && state.message ? (
-    <p role="status" className="lx-note" style={{ color: "var(--ok)", margin: 0 }}>
-      {state.message}
-    </p>
+    <SavedNote show>{state.message}</SavedNote>
   ) : null;
 }
 
@@ -104,31 +105,29 @@ export function ClientContactCard({ matterId, read, canWrite }: { matterId: stri
     <section className="lx-card lx-aside">
       <div className="lx-label">Client contact</div>
       {read.status === "unavailable" ? (
-        <p className="lx-banner lx-banner-warn" style={{ margin: 0 }}>
+        <Notice tone="warn" role="status">
           The client contact couldn&apos;t be loaded. Refresh to try again.
-        </p>
+        </Notice>
       ) : read.status === "none" ? (
-        <p className="lx-note" style={{ margin: 0 }}>
-          No contact linked yet.
-        </p>
+        <p className="lx-note">No contact linked yet.</p>
       ) : (
         read.contacts.map((c) => (
-          <div key={c.link_id} style={{ display: "grid", gap: 6 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline" }}>
+          <div key={c.link_id} className="mx-grid-6">
+            <div className="mx-between">
               <b>{contactLabel(c)}</b>
               <span className="lx-pill lx-pill-mute">{roleLabel(c.role)}</span>
             </div>
             <div className="lx-meta">
               <span>Email</span>
-              <span>{c.email ?? "—"}</span>
+              <span>{c.email ?? BLANK}</span>
             </div>
             <div className="lx-meta">
               <span>Phone</span>
-              <span>{c.phone ?? "—"}</span>
+              <span>{c.phone ?? BLANK}</span>
             </div>
             <div className="lx-meta">
               <span>Company</span>
-              <span>{c.company_name ?? "—"}</span>
+              <span>{c.company_name ?? BLANK}</span>
             </div>
             {canWrite && (
               <ContactEditForm
@@ -167,14 +166,14 @@ export function ContactEditForm({ matterId, contactId, values: v }: { matterId: 
         <Field name="email" label="Email" type="email" defaultValue={v.email} />
         <Field name="phone" label="Phone" type="tel" defaultValue={v.phone} />
         <Field name="companyName" label="Company" defaultValue={v.companyName} wide />
-        <p className="lx-note" style={{ gridColumn: "1 / -1", margin: 0 }}>
+        <p className="lx-note mx-span">
           This contact is one shared record. A change here shows on every matter they are linked to.
         </p>
-        <div style={{ gridColumn: "1 / -1", display: "flex", gap: 10, alignItems: "center" }}>
+        <div className="mx-actions">
           <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending}>
-            {pending ? "Saving…" : "Save contact"}
+            {pending ? SAVING : "Save contact"}
           </button>
-          {state.saved && !pending && <span className="lx-note" style={{ color: "var(--ok)" }}>Saved.</span>}
+          <SavedNote show={!!state.saved && !pending} />
           <Err state={state} />
         </div>
       </form>
@@ -189,12 +188,10 @@ function LinkContactButton({ matterId, contactId, name }: { matterId: string; co
       <input type="hidden" name="matterId" value={matterId} />
       <input type="hidden" name="contactId" value={contactId} />
       {state.saved ? (
-        <span className="lx-note" style={{ color: "var(--ok)" }}>
-          {state.message}
-        </span>
+        <SavedNote show>{state.message}</SavedNote>
       ) : (
         <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending} aria-label={`Link ${name}`}>
-          {pending ? "Linking…" : "Link"}
+          {pending ? SAVING : "Link"}
         </button>
       )}
       <Err state={state} />
@@ -214,38 +211,30 @@ export function ContactLinker({ matterId }: { matterId: string }) {
   return (
     <details className="lx-disclosure-inline">
       <summary>Link or add contact</summary>
-      <div style={{ display: "grid", gap: 14 }}>
-        <form action={searchAction} style={{ display: "grid", gap: 8 }}>
+      <div className="mx-grid-14">
+        <form action={searchAction} className="mx-grid" role="search">
           <input type="hidden" name="matterId" value={matterId} />
-          <div style={{ display: "flex", gap: 8 }}>
-            <input className="lx-input" name="q" placeholder="Search by name or email" aria-label="Search contacts" style={{ flex: 1, minWidth: 0 }} />
-            <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={searching}>
-              {searching ? "Searching…" : "Search"}
+          <div className="lp-search">
+            <input className="lx-input" type="search" name="q" placeholder={searchPlaceholder("contacts")} aria-label="Search contacts" />
+            <button type="submit" className="lp-search-submit" disabled={searching}>
+              {searching ? SAVING : "Search"}
             </button>
           </div>
           {search.error && (
-            <p role="alert" className="lx-note" style={{ color: "var(--wine)", margin: 0 }}>
+            <Notice tone="risk" role="alert">
               {search.error}
-            </p>
+            </Notice>
           )}
-          {search.tooShort && (
-            <p className="lx-note" style={{ margin: 0 }}>
-              Type at least 2 characters to search.
-            </p>
-          )}
-          {search.hits && search.hits.length === 0 && !search.tooShort && (
-            <p className="lx-note" style={{ margin: 0 }}>
-              No contacts match. Add a new contact below.
-            </p>
-          )}
+          {search.tooShort && <p className="lx-note">Type at least 2 characters to search.</p>}
+          {search.hits && search.hits.length === 0 && !search.tooShort && <p className="lx-note">No contacts match. Add a new contact below.</p>}
         </form>
         {search.hits && search.hits.length > 0 && (
           <ul className="lx-list">
             {search.hits.map((h) => (
-              <li key={h.id} style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
-                <span style={{ minWidth: 0 }}>
+              <li key={h.id} className="mx-between">
+                <span className="mx-min0">
                   <b>{h.name}</b>
-                  <span className="lx-note" style={{ display: "block", overflowWrap: "anywhere" }}>
+                  <span className="lx-note mx-block mx-anywhere">
                     {[h.email, h.phone].filter(Boolean).join(" · ") || "No email or phone"}
                   </span>
                 </span>
@@ -256,19 +245,17 @@ export function ContactLinker({ matterId }: { matterId: string }) {
         )}
         <form ref={formRef} action={addAction} className="lx-form-grid">
           <input type="hidden" name="matterId" value={matterId} />
-          <div className="lx-label" style={{ gridColumn: "1 / -1" }}>
-            Add a new contact
-          </div>
+          <div className="lx-label mx-span">Add a new contact</div>
           <Field name="firstName" label="First name" />
           <Field name="lastName" label="Last name" />
           <Field name="businessName" label="Business name" />
           <Field name="email" label="Email" type="email" />
           <Field name="phone" label="Phone" type="tel" />
           <Field name="companyName" label="Company" />
-          <div style={{ gridColumn: "1 / -1", display: "grid", gap: 6 }}>
-            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <div className="mx-span mx-grid-6">
+            <div className="mx-actions">
               <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={adding}>
-                {adding ? "Adding…" : "Add and link contact"}
+                {adding ? SAVING : "Add and link contact"}
               </button>
               <span className="lx-note">Links as the client. Sends nothing.</span>
             </div>
@@ -292,9 +279,9 @@ export function MatterNoteComposer({ matterId }: { matterId: string }) {
     return res;
   }, {});
   return (
-    <form action={action} style={{ display: "grid", gap: 8 }}>
+    <form action={action} className="mx-grid">
       <input type="hidden" name="matterId" value={matterId} />
-      <div className="lx-segs" role="radiogroup" aria-label="Entry type">
+      <div className="vs-switch" role="radiogroup" aria-label="Entry type">
         {NOTE_KIND_OPTIONS.map(([k, label]) => (
           <label key={k} className={kind === k ? "on" : undefined}>
             <input type="radio" name="kind" value={k} checked={kind === k} onChange={() => setKind(k)} className="lx-sr" />
@@ -304,9 +291,9 @@ export function MatterNoteComposer({ matterId }: { matterId: string }) {
       </div>
       {kind === "email_sent" && <input className="lx-input" name="subject" placeholder="Subject" aria-label="Subject" />}
       <textarea id="lx-matter-note-body" className="lx-input" name="body" rows={3} placeholder="What happened?" aria-label="What happened" />
-      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+      <div className="mx-actions">
         <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={pending}>
-          {pending ? "Saving…" : "Add to timeline"}
+          {pending ? SAVING : ADD_TO_TIMELINE}
         </button>
         <span className="lx-note">Records something that happened. Nothing is sent.</span>
       </div>
@@ -323,29 +310,20 @@ export function MatterNoteComposer({ matterId }: { matterId: string }) {
  * `defaultOpen` shows the question straight away (used by the render tests).
  */
 export function ConfirmDelete(props: { action: Action; hidden: Record<string, string>; question: string; defaultOpen?: boolean }) {
-  const [open, setOpen] = useState(props.defaultOpen ?? false);
+  const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, pending] = useActionState<ActionState, FormData>(props.action, {});
-  if (!open) {
-    return (
-      <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={() => setOpen(true)}>
-        Delete
-      </button>
-    );
-  }
   return (
-    <form action={formAction} className="lx-inline-form" style={{ flexWrap: "wrap" }}>
+    <form ref={formRef} action={formAction} className="lx-inline-form mx-wrap">
       {Object.entries(props.hidden).map(([k, v]) => (
         <input key={k} type="hidden" name={k} value={v} />
       ))}
-      <span className="lx-note" style={{ color: "var(--ink)" }}>
-        {props.question}
-      </span>
-      <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" style={{ color: "var(--wine)" }} disabled={pending}>
-        {pending ? "Deleting…" : "Yes, delete"}
-      </button>
-      <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={() => setOpen(false)} disabled={pending}>
-        Cancel
-      </button>
+      <InlineConfirm
+        label={DELETE}
+        question={props.question}
+        pending={pending}
+        initial={props.defaultOpen ? "asking" : "idle"}
+        onConfirm={() => formRef.current?.requestSubmit()}
+      />
       <Err state={state} />
     </form>
   );
@@ -372,27 +350,26 @@ export function DeadlineEdit(props: {
     );
   }
   return (
-    <form action={action} className="lx-form-grid" style={{ flexBasis: "100%" }}>
+    <form action={action} className="lx-form-grid mx-basis-full">
       <input type="hidden" name="matterId" value={props.matterId} />
       <input type="hidden" name="deadlineId" value={props.deadlineId} />
       <Field name="title" label="Title" defaultValue={props.title} placeholder="Optional" />
-      <label className="lx-field">
-        <span className="lx-label">Due</span>
+      <UiField label="Due">
         <input className="lx-input" type="date" name="dueDate" defaultValue={props.dueDate} required />
-      </label>
+      </UiField>
       {props.confirmed && (
-        <p className="lx-banner lx-banner-warn" style={{ gridColumn: "1 / -1", margin: 0 }}>
-          An attorney has confirmed this date. If you move it, the attorney will need to confirm it again.
-        </p>
+        <div className="mx-span">
+          <Notice tone="warn">An attorney has confirmed this date. If you move it, the attorney will need to confirm it again.</Notice>
+        </div>
       )}
-      <div style={{ gridColumn: "1 / -1", display: "flex", gap: 10, alignItems: "center" }}>
+      <div className="mx-actions">
         <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending}>
-          {pending ? "Saving…" : "Save deadline"}
+          {pending ? SAVING : "Save deadline"}
         </button>
         <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={() => setEditing(false)}>
           Cancel
         </button>
-        {state.saved && !pending && <span className="lx-note" style={{ color: "var(--ok)" }}>Saved.</span>}
+        <SavedNote show={!!state.saved && !pending} />
         <Err state={state} />
       </div>
     </form>
@@ -420,7 +397,7 @@ export function ClosedDeadlineActions(props: {
   canDelete: boolean;
 }) {
   return (
-    <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+    <span className="mx-row">
       <RowButton action={reopenDeadlineAction} hidden={{ matterId: props.matterId, deadlineId: props.deadlineId }} label="Reopen" />
       {props.canDelete && <DeadlineDelete matterId={props.matterId} deadlineId={props.deadlineId} label={props.label} dueDate={props.dueDate} />}
     </span>
@@ -448,15 +425,15 @@ export function TaskControls(props: {
   return (
     <div className="lx-row-actions">
       {editing ? (
-        <form action={action} style={{ display: "grid", gap: 8, flexBasis: "100%" }}>
+        <form action={action} className="mx-grid mx-basis-full">
           <input type="hidden" name="matterId" value={props.matterId} />
           <input type="hidden" name="taskId" value={task.id} />
           <input className="lx-input" name="title" defaultValue={task.title} aria-label="Task title" />
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <input className="lx-input" type="date" name="dueAt" defaultValue={task.dueDate ?? ""} aria-label="Task due date" style={{ width: "auto" }} />
+          <div className="mx-row">
+            <input className="lx-input mx-auto-w" type="date" name="dueAt" defaultValue={task.dueDate ?? ""} aria-label="Task due date" />
             {props.members ? (
-              <select className="lx-input" name="assigneeId" defaultValue={task.assigneeId ?? ""} aria-label="Assign to" style={{ flex: 1, minWidth: 140 }}>
-                <option value="">Unassigned</option>
+              <select className="lx-input mx-flex-1" name="assigneeId" defaultValue={task.assigneeId ?? ""} aria-label={OWNER_COLUMN}>
+                <option value="">{UNASSIGNED}</option>
                 {props.members.map((m) => (
                   <option key={m.userId} value={m.userId}>
                     {m.name}
@@ -467,14 +444,14 @@ export function TaskControls(props: {
               <span className="lx-note">The team list couldn&apos;t be loaded, so this task can&apos;t be reassigned right now.</span>
             )}
           </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div className="mx-row">
             <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending}>
-              {pending ? "Saving…" : "Save task"}
+              {pending ? SAVING : "Save task"}
             </button>
             <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={() => setEditing(false)}>
               Cancel
             </button>
-            {state.saved && !pending && <span className="lx-note" style={{ color: "var(--ok)" }}>Saved.</span>}
+            <SavedNote show={!!state.saved && !pending} />
             <Err state={state} />
           </div>
         </form>
