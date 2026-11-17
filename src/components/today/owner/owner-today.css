@@ -39,6 +39,7 @@ a.ot-row-title:hover { text-decoration: underline; }
 .ot-row .lx-pill { flex: 0 0 auto; }
 .ot-card > .lx-state-line, .ot-card > .lx-banner { margin-top: 8px; }
 .ot-foot { margin: 8px 0 0; }
+.ot-explain { margin: 8px 0 0; }
 .ot-more { display: inline-block; margin-top: 8px; }
 
 /* Three columns on desktop; one ordered stack on a phone. */

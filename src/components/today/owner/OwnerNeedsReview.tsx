@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { formatCivilDate } from "@/lib/matters/ip-fields";
 import { NEEDS_REVIEW_PAST_DUE_DAYS, NEEDS_REVIEW_SHOWN, type NeedsReviewItem } from "@/lib/today/needs-review";
-import { EmptyState } from "@/components/ui/EmptyState";
 import { Notice } from "@/components/ui/Notice";
 import { Pill } from "@/components/ui/Pill";
 import { NEEDS_REVIEW_FAILED, NEEDS_REVIEW_HEADING, needsReviewCut, needsReviewExplain, needsReviewPastDue } from "@/lib/ui/words";
@@ -23,7 +22,7 @@ export function OwnerNeedsReview({ items }: { items: NeedsReviewItem[] | null })
         </Notice>
       ) : (
         <>
-          <EmptyState variant="line">{needsReviewExplain(NEEDS_REVIEW_PAST_DUE_DAYS)}</EmptyState>
+          <p className="lx-note ot-explain">{needsReviewExplain(NEEDS_REVIEW_PAST_DUE_DAYS)}</p>
           {items.slice(0, NEEDS_REVIEW_SHOWN).map((d) => (
             <div key={d.key} className="ot-row">
               <div className="ot-row-main">
