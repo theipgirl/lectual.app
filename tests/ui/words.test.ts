@@ -13,7 +13,7 @@ describe("the glossary (src/lib/ui/words.ts)", () => {
     expect(W.FIRM_NOTES_NAME).toBe("Firm notes");
     expect(W.AI_TOOLS_GROUP).toBe("AI tools");
     expect(W.APPROVALS_NAME).toBe("Approvals");
-    expect(W.LEADS_NAME).toBe("Leads");
+    expect(W.INTAKE_NAME).toBe("Intake");
     expect(W.OUR_TURN).toBe("Our turn");
     expect(W.TEMPERATURE_NAME).toBe("Temperature");
     expect(W.NOT_RATED).toBe("Not rated");
@@ -26,7 +26,7 @@ describe("the glossary (src/lib/ui/words.ts)", () => {
     expect(W.ASSISTANTS_PAUSED).toBe("Assistants paused");
     expect(W.FEATURES_NAME).toBe("Features");
     expect(W.TEMPERATURE_TOOLTIP).toBe("Hot, warm or cold: the level you set, or the system's suggestion if you haven't set one.");
-    expect(W.PIPELINE_VIEW_ONLY).toBe("This is a view-only overview. To move a lead, open it in Leads.");
+    expect(W.PIPELINE_VIEW_ONLY).toBe("This is a view-only overview. To move a lead, open it in Intake.");
   });
 
   it("notReadyYet is the plain 'isn't switched on' sentence, with no build words or digits", () => {
@@ -54,10 +54,10 @@ describe("the rail is built from the glossary", () => {
   const labelsOf = (modules: string[]) =>
     railGroups(visibleNav(modules, "owner"), "/dashboard/").flat().flatMap((e) => [e.label, ...e.kids.map((k) => k.label)]);
 
-  it("shows Approvals, Leads, Assistants, Shortcuts, Firm notes and the AI tools group", () => {
+  it("shows Approvals, Intake and its Leads row, Assistants, Shortcuts, Firm notes and the AI tools group", () => {
     const shown = labelsOf(["mailbox", "agents", "agent-toolkit"]);
-    for (const label of [W.APPROVALS_NAME, W.LEADS_NAME, W.ASSISTANTS_NAME, W.SHORTCUTS_NAME, W.FIRM_NOTES_NAME, W.AI_TOOLS_GROUP, W.COPILOT_NAME]) expect(shown).toContain(label);
-    for (const old of ["Queue", "PNC", "IP.OS", "Agents", "Skills", "Firm brain", "AI copilot", "Intake"]) expect(shown, old).not.toContain(old);
+    for (const label of [W.APPROVALS_NAME, W.INTAKE_NAME, W.INTAKE_LEADS_ROW, W.ASSISTANTS_NAME, W.SHORTCUTS_NAME, W.FIRM_NOTES_NAME, W.AI_TOOLS_GROUP, W.COPILOT_NAME]) expect(shown).toContain(label);
+    for (const old of ["Queue", "PNC", "IP.OS", "Agents", "Skills", "Firm brain", "AI copilot"]) expect(shown, old).not.toContain(old);
   });
 
   it("keeps every route and slug where it was", () => {
@@ -68,7 +68,7 @@ describe("the rail is built from the glossary", () => {
     expect(navItemBySlug("brain")?.href).toBe("/dashboard/brain/");
     expect(RAIL_TREE.flat().some((n) => "label" in n && n.label === W.AI_TOOLS_GROUP)).toBe(true);
     expect(REPORTS.ipos.label).toBe(W.AI_TOOLS_GROUP);
-    expect(NAV.find((n) => n.slug === "intake")?.label).toBe(W.LEADS_NAME);
+    expect(NAV.find((n) => n.slug === "intake")?.label).toBe(W.INTAKE_NAME);
   });
 });
 

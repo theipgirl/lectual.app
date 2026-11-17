@@ -289,6 +289,9 @@ a.dk-move--open { font-size: 15px; }
   .dk-board { grid-template-columns: 1fr; }
   .dk-hint--desk { display: none; }
   .dk-moves5 { gap: 6px; }
+  /* Five small moves (Reject, Done, Later, Edit, Hand off) stay on ONE row at 14px (the phone floor). */
+  .dk-moves5--5 { gap: 4px; }
+  .dk-moves5--5 .dk-move { font-size: 14px; padding: 0 2px; }
   .dk-move { padding: 0 4px; }
   /* Once a card is being decided, only its name and source stay above the sheet. */
   .dk-stage[data-mode="rejecting"] .dk-cardwrap,

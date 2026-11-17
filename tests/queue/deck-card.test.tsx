@@ -46,10 +46,10 @@ const html = (over: Partial<ApprovalCardProps> = {}) => renderToStaticMarkup(<Ap
 const buttons = (h: string) => [...h.replace(/<small>[^<]*<\/small>/g, "").matchAll(/<(?:button|a)[^>]*>([^<]*)<\/(?:button|a)>/g)].map((m) => m[1].trim()).filter(Boolean).filter((t) => !/^[‹›]$/.test(t));
 
 describe("ApprovalCard", () => {
-  it("draws the anatomy and the main row Reject · Later · Edit · Hand off · Yes", () => {
+  it("draws the anatomy and the main row Reject · Done · Later · Edit · Hand off · Yes", () => {
     const h = html();
     for (const t of ["Lectual · Post-consult", "Needs your yes · 2 min", "To ana@example.com.", "Hi Ana, thanks for the call.", "Check the class list", "2 / 6"]) expect(h).toContain(t);
-    expect(buttons(h).slice(0, 5)).toEqual(["Reject", "Later", "Edit", "Hand off", "Yes"]);
+    expect(buttons(h).slice(0, 6)).toEqual(["Reject", "Done", "Later", "Edit", "Hand off", "Yes"]);
     // Back and Skip are small arrows with the keys' hooks, not main buttons.
     expect(h).toMatch(/data-deck-prev/);
     expect(h).toMatch(/data-deck-next/);

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { qitem, U } from "./routing-fixtures";
+import { REJECT_NOTE_IS_DONE_MARKER } from "@/lib/ui/words";
 
 /**
  * The approval deck's actions (src/app/dashboard/queue/deck/actions.ts): behind `role-views` (notFound), the caller
@@ -95,6 +96,7 @@ describe("the role-views gate", () => {
     ["approve", () => A.approveCardAction("q1")],
     ["mark read", () => A.markReadCardAction("q1")],
     ["reject", () => A.rejectCardAction("q1", "no")],
+    ["done", () => A.doneCardAction("q1")],
     ["hand off", () => A.handOffCardAction("q1", U.caitlyn, "")],
     ["later", () => A.laterCardAction("q1")],
     ["send back", () => A.returnCardAction("q1", "")],
@@ -119,7 +121,7 @@ describe("every action re-checks the caller", () => {
     ["a viewer", sessionFor(U.viewer, "viewer")],
   ])("%s gets nothing done", async (_n, session) => {
     state.session = session;
-    for (const r of [await A.approveCardAction("q1"), await A.rejectCardAction("q1", "x"), await A.handOffCardAction("q1", U.caitlyn, ""), await A.laterCardAction("q1"), await A.sendDraftNowAction("q1", "AAMk1")]) {
+    for (const r of [await A.approveCardAction("q1"), await A.rejectCardAction("q1", "x"), await A.doneCardAction("q1"), await A.handOffCardAction("q1", U.caitlyn, ""), await A.laterCardAction("q1"), await A.sendDraftNowAction("q1", "AAMk1")]) {
       expect(r.ok).toBe(false);
     }
     expect(state.core).not.toHaveBeenCalled();
@@ -182,6 +184,38 @@ describe("Lectual staff viewing as the firm (no membership: the fold would drop 
     expect(await A.returnCardAction("q1", "")).toEqual({ ok: false, error: PREVIEW_ONLY });
     expect(state.record).not.toHaveBeenCalled();
     expect(state.notify).not.toHaveBeenCalled();
+  });
+});
+
+describe("a typed Reject note can't be the Done marker", () => {
+  it("refuses the marker (and with a receipt line) without calling the core; a doneCardAction still sends it", async () => {
+    for (const note of ["Done: handled without approving", "  Done: handled without approving \n", "Done: handled without approving\nReceipt: sha256 0123456789ab"]) {
+      state.core.mockClear();
+      expect(await A.rejectCardAction("q1", note)).toEqual({ ok: false, error: REJECT_NOTE_IS_DONE_MARKER });
+      expect(state.core).not.toHaveBeenCalled();
+    }
+    state.core.mockResolvedValue({ kind: "resolved", intent: "reject" });
+    expect((await A.doneCardAction("q1")).ok).toBe(true);
+    expect(state.core).toHaveBeenCalledWith({ id: "q1", intent: "reject", note: "Done: handled without approving" });
+  });
+});
+
+describe("Done", () => {
+  it("resolves through the reject path with exactly the marker note, never approve", async () => {
+    state.core.mockResolvedValue({ kind: "resolved", intent: "reject" });
+    expect(await A.doneCardAction("q1")).toMatchObject({ ok: true });
+    expect(state.core).toHaveBeenCalledTimes(1);
+    expect(state.core).toHaveBeenCalledWith({ id: "q1", intent: "reject", note: "Done: handled without approving" });
+    expect(state.send).not.toHaveBeenCalled();
+  });
+  it("returns the core's refusal (routing is re-resolved there)", async () => {
+    state.core.mockResolvedValue({ kind: "error", error: "Only an attorney can approve this kind of message." });
+    expect(await A.doneCardAction("q1")).toEqual({ ok: false, error: "Only an attorney can approve this kind of message." });
+  });
+  it("Lectual staff previewing a firm are refused before anything runs", async () => {
+    state.session = { ...sessionFor(U.rebecca, "attorney"), actingAsStaff: true };
+    expect(await A.doneCardAction("q1")).toEqual({ ok: false, error: "Preview only: hand-offs aren't saved while you're viewing as the firm." });
+    expect(state.core).not.toHaveBeenCalled();
   });
 });
 

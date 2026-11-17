@@ -1,6 +1,6 @@
 import type { OrgModule } from "@/lib/org/modules";
 import { hasRole, type Role } from "@/lib/auth/roles";
-import { AI_TOOLS_GROUP, APPROVALS_NAME, ASSISTANTS_NAME, COPILOT_NAME, FIRM_NOTES_NAME, LEADS_GROUP, LEADS_NAME, REVIEW_NAME, SHORTCUTS_NAME } from "@/lib/ui/words";
+import { AI_TOOLS_GROUP, APPROVALS_NAME, ASSISTANTS_NAME, COPILOT_NAME, FIRM_NOTES_NAME, INTAKE_LEADS_ROW, INTAKE_NAME, REVIEW_NAME, SHORTCUTS_NAME } from "@/lib/ui/words";
 
 /**
  * Sections of the workspace. One flat list of PAGES, read by the rail and the
@@ -12,7 +12,7 @@ import { AI_TOOLS_GROUP, APPROVALS_NAME, ASSISTANTS_NAME, COPILOT_NAME, FIRM_NOT
 export type NavItem = {
   slug: string;
   label: string;
-  /** Shorter name when shown under its parent in the rail ("Leads" under the Leads group). */
+  /** Shorter name when shown under its parent in the rail ("Leads" under the Intake group). */
   railLabel?: string;
   href: string;
   /** SVG path data, drawn at 24×24 with a 1.5 stroke (design/Rail.dc.html). */
@@ -65,7 +65,7 @@ export const NAV: readonly NavItem[] = [
   // No module: each firm imports only from the Fathom / Zoom account it connected itself (lectual 0081).
   { slug: "meetings", label: "Meetings", href: "/dashboard/meetings/", icon: ICON.video, step: 7 },
   { slug: "calendar", label: "Calendar", href: "/dashboard/calendar/", icon: ICON.cal, step: 6 },
-  { slug: "intake", label: LEADS_NAME, railLabel: LEADS_NAME, href: "/dashboard/intake/", also: ["/dashboard/leads/"], icon: ICON.users, step: 6 },
+  { slug: "intake", label: INTAKE_NAME, railLabel: INTAKE_LEADS_ROW, href: "/dashboard/intake/", also: ["/dashboard/leads/"], icon: ICON.users, step: 6 },
   { slug: "forms", label: "Forms", railLabel: "Forms", href: "/dashboard/forms/", icon: ICON.file, step: 7 },
   { slug: "quotes", label: "Quotes & proposals", href: "/dashboard/quotes/", icon: ICON.file, step: 7 },
   // The client trademark proposal (brand names x marks x classes, a named approver, a /p/<token> page). Opt-in per firm.
@@ -107,7 +107,7 @@ export const RAIL_TREE: readonly (readonly RailNode[])[] = [
     { slug: "calendar" },
   ],
   [
-    { label: LEADS_GROUP, icon: ICON.tray, link: "intake", kids: ["intake", "forms"] },
+    { label: INTAKE_NAME, icon: ICON.tray, link: "intake", kids: ["intake", "forms"] },
     { slug: "quotes" },
     { slug: "proposals" },
     { label: "Active matters", icon: ICON.case, link: "matters", kids: ["matters", "pipeline", "documents", "portals"] },
@@ -123,7 +123,7 @@ export const RAIL_TREE: readonly (readonly RailNode[])[] = [
  */
 export const REPORTS = {
   communication: { label: "Communication", href: "/dashboard/reports/communication/" },
-  intake: { label: LEADS_GROUP, href: "/dashboard/reports/intake/" },
+  intake: { label: INTAKE_NAME, href: "/dashboard/reports/intake/" },
   matters: { label: "Active matters", href: "/dashboard/reports/matters/" },
   ipos: { label: AI_TOOLS_GROUP, href: "/dashboard/reports/ipos/" },
 } as const;
@@ -271,7 +271,7 @@ export function railCountFor(
 export const MOBILE_BAR = ["", "intake", "queue", "mail", "matters"] as const;
 
 /** Short names for the phone bar, where the rail's longer ones would not fit under an icon. */
-const MOBILE_LABEL: Record<string, string> = { "": "Today", intake: LEADS_NAME, queue: APPROVALS_NAME, mail: "Mail", matters: "Matters" };
+const MOBILE_LABEL: Record<string, string> = { "": "Today", intake: INTAKE_NAME, queue: APPROVALS_NAME, mail: "Mail", matters: "Matters" };
 
 export type MobileBarItem = { slug: string; label: string; icon: string; href: string; active: boolean; countKey: string };
 
@@ -279,7 +279,7 @@ export type MobileBarItem = { slug: string; label: string; icon: string; href: s
 export type MobileBarSpec = { slugs: readonly string[]; labels: Readonly<Record<string, string>> };
 
 /**
- * The bar's buttons that exist for this firm and role: Today, Leads, Approvals, then Mail (mailbox module) or Matters.
+ * The bar's buttons that exist for this firm and role: Today, Intake, Approvals, then Mail (mailbox module) or Matters.
  * A view may hand its own `bar`; it is still filtered through `visible` (a slug the firm cannot see is never drawn).
  */
 export function mobileBarItems(visible: readonly NavItem[], pathname: string, bar?: MobileBarSpec): MobileBarItem[] {
@@ -298,7 +298,7 @@ export type MoreGroup = { label: string; slugs: readonly string[] };
 const MORE_GROUPS: readonly MoreGroup[] = [
   { label: "Workspace", slugs: ["", "review", "calendar"] },
   { label: "Communication", slugs: ["meetings", "campaigns"] },
-  { label: LEADS_GROUP, slugs: ["forms", "quotes", "proposals"] },
+  { label: INTAKE_NAME, slugs: ["forms", "quotes", "proposals"] },
   { label: "Active matters", slugs: ["matters", "pipeline", "documents"] },
   { label: AI_TOOLS_GROUP, slugs: ["copilot", "agents", "skills", "brain"] },
   { label: "Firm", slugs: ["settings"] },

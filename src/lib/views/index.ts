@@ -142,7 +142,7 @@ export const DECK_PATH = "/dashboard/queue/deck/";
 /** The sections the owner view draws, in the order the owner rail lists them. */
 export const OWNER_SLUGS = ["", "queue", "review", "proposals", "quotes", "intake", "matters", "calendar"] as const;
 
-/** The owner rail: Today, Approvals, Weekly review, Proposals, then More (Leads, Matters, Calendar). No Settings row, no Reports row. */
+/** The owner rail: Today, Approvals, Weekly review, Proposals, then More (Intake, Matters, Calendar). No Settings row, no Reports row. */
 export const OWNER_TREE: readonly (readonly RailNode[])[] = [
   [{ slug: "" }, { slug: "queue" }, { slug: "review" }, { slug: "proposals" }, { slug: "quotes" }],
   [{ label: MORE_NAME, icon: "M5 12h.01M12 12h.01M19 12h.01", kids: ["intake", "matters", "calendar"] }],
@@ -170,7 +170,7 @@ export function drawnNav(items: NavItem[], view: ViewId): NavItem[] {
     if (slug === "queue") return [{ ...item, href: DECK_PATH, also: [...(item.also ?? []), "/dashboard/queue/"] }];
     // The owner's words (OwnerRail board): one "Proposals" row, and "Matters" under More (not the technician's "All matters").
     if (slug === "proposals" || slug === "quotes") return [{ ...item, label: PROPOSALS_NAME, railLabel: PROPOSALS_NAME }];
-    if (slug === "matters") return [{ ...item, railLabel: item.label }];
+    if (slug === "matters" || slug === "intake") return [{ ...item, railLabel: item.label }];
     return [item];
   });
 }

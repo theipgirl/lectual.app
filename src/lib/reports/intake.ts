@@ -1,5 +1,5 @@
 import "server-only";
-import { LEADS_NAME } from "@/lib/ui/words";
+import { INTAKE_NAME } from "@/lib/ui/words";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { listLeads, listStages } from "@/lib/pipeline";
 import { listIntakeLeads } from "@/lib/intake/leads";
@@ -84,7 +84,7 @@ export async function loadIntakeReport(period: ReportPeriod): Promise<IntakeRepo
     : [];
 
   const links: LinkTile[] = [
-    { label: LEADS_NAME, sub: "Every potential client not yet signed", href: "/dashboard/intake/", count: pnc ? pnc.length : null },
+    { label: INTAKE_NAME, sub: "Every potential client not yet signed", href: "/dashboard/intake/", count: pnc ? pnc.length : null },
     { label: "Intake forms", sub: "Public intake and custom forms", href: "/dashboard/forms/", count: null },
     {
       label: "Quotes & proposals",

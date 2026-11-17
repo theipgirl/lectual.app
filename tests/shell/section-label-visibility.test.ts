@@ -19,7 +19,7 @@ describe("showSectionLabel (F5)", () => {
   });
 
   it("sectionLabelFor is unchanged", () => {
-    expect(sectionLabelFor("/dashboard/leads/abc/")).toBe("Leads");
+    expect(sectionLabelFor("/dashboard/leads/abc/")).toBe("Intake");
     expect(sectionLabelFor("/dashboard/")).toBe("Today");
     expect(sectionLabelFor("/dashboard/reports/matters/")).toBe("Active matters · Report");
   });

@@ -27,6 +27,7 @@ import {
   type CloserLookFlags,
   type Deck,
   type DeckCard,
+  linkGateFlags,
 } from "@/lib/queue/deck";
 import type { QueueItem } from "@/lib/queue/api";
 import { DeckSeenMark } from "@/components/deck/DeckSeenMark";
@@ -42,12 +43,14 @@ import { classifyQueueItem, kindRowWord, kindShort } from "@/lib/queue/routing";
 import { roleLabel } from "@/lib/auth/roles";
 import { DeckKeys } from "@/components/review/DeckKeys";
 import { agentLabel } from "@/components/queue/format";
+import { outcomeOf } from "@/lib/queue/done";
 import {
   DECK_BADGE_INTERNAL,
   DECK_BADGE_REVIEW,
   DECK_BADGE_YES,
   DECK_BOARD_SUB,
   DECK_CHIP_APPROVED,
+  DECK_CHIP_DONE,
   DECK_CHIP_NOW,
   DECK_CHIP_REJECTED,
   DECK_CHIP_SKIPPED,
@@ -97,14 +100,31 @@ async function closerLookFlags(items: readonly QueueItem[]): Promise<Record<stri
     items.slice(0, FLAG_CHECK_LIMIT).map(async (item) => {
       const [stale, gate] = await Promise.all([
         checkDraftStaleness(item).then(stalenessRequiresConfirm, () => true),
-        gateLinkedProposal(item.id).then((g) => !g.ok, () => true),
+        // Three outcomes: passed with a real linked proposal whose link is on, refused, or unreadable. Only the first is a pass.
+        gateLinkedProposal(item.id).then(
+          linkGateFlags,
+          () => ({ failed: true, passedWithProposal: false }),
+        ),
       ]);
-      out[item.id] = { stale, linkedProposal: gate };
+      out[item.id] = { stale, linkedProposal: gate.failed, linkedProposalPassed: gate.passedWithProposal };
     }),
   );
   // Beyond the limit nothing was checked, so those cards go to the full page rather than offering a Yes.
   for (const item of items.slice(FLAG_CHECK_LIMIT)) out[item.id] = { stale: true };
   return out;
+}
+
+/** How a decided card reads on the deck: Approved, Done (a reject carrying the Done marker) or Rejected. One helper, `outcomeOf`. */
+function decidedChip(i: QueueItem): string {
+  const o = outcomeOf(i);
+  return o === "approved" ? DECK_CHIP_APPROVED : o === "done" ? DECK_CHIP_DONE : DECK_CHIP_REJECTED;
+}
+function decidedTone(i: QueueItem): "ok" | "crit" {
+  return outcomeOf(i) === "rejected" ? "crit" : "ok";
+}
+function decidedSub(i: QueueItem, when: string): string {
+  const o = outcomeOf(i);
+  return deckDecidedAt(o === "approved" ? "approved" : o === "done" ? "done" : "rejected", when, o === "rejected" && !!i.resolution_note);
 }
 
 function tagText(card: DeckCard): string {
@@ -257,7 +277,7 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
       ...deck.laterArrivals.map((c) => row(c.item, deal.next.label, { label: DECK_ST_NEXT_DEAL, tone: "line" })),
       ...deck.later.map((c) => row(c.item, deal.next.label, { label: DECK_COL_LATER, tone: "line" })),
       ...deck.handedOff.map((c) => row(c.item, "—", { label: `${DECK_COL_HANDED_OFF} · ${nameOf(c.holder.userId)}`, tone: "line" })),
-      ...decided.map((i) => row(i, "—", i.status === "approved" ? { label: DECK_CHIP_APPROVED, tone: "ok" } : { label: DECK_CHIP_REJECTED, tone: "risk" })),
+      ...decided.map((i) => row(i, "—", outcomeOf(i) === "rejected" ? { label: DECK_CHIP_REJECTED, tone: "risk" } : { label: decidedChip(i), tone: "ok" })),
     ];
     return frame(null, null, <DeckList rows={rows} decidedReadable={decidedReadable} />, deckListSub(waiting, deck.cards.length, deck.laterArrivals.length, dealLabel ?? deal.next.label));
   }
@@ -297,7 +317,7 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
         title: DECK_COL_DECIDED,
         empty: DECK_NOTHING_HERE,
         note: decidedReadable ? null : DECK_DECIDED_UNREAD,
-        cards: decided.map((i) => card(i, i.status === "approved" ? DECK_CHIP_APPROVED : DECK_CHIP_REJECTED, i.status === "approved" ? "ok" : "risk", deckDecidedAt(i.status === "approved" ? "approved" : "rejected", queuedLabel(i.resolved_at, now, tz), i.status !== "approved" && !!i.resolution_note))),
+        cards: decided.map((i) => card(i, decidedChip(i), decidedTone(i) === "crit" ? "risk" : "ok", decidedSub(i, queuedLabel(i.resolved_at, now, tz)))),
       },
     ];
     return frame(null, null, <DeckBoard columns={columns} />, DECK_BOARD_SUB);
@@ -307,12 +327,12 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
   const decidedRows: DeckSideRow[] = decided.map((i) => ({
     id: `done-${i.id}`,
     title: i.headline,
-    sub: deckDecidedAt(i.status === "approved" ? "approved" : "rejected", queuedLabel(i.resolved_at, now, tz), i.status !== "approved" && !!i.resolution_note).replace(/^./, (c) => c.toUpperCase()),
+    sub: decidedSub(i, queuedLabel(i.resolved_at, now, tz)).replace(/^./, (c) => c.toUpperCase()),
     href: `/dashboard/queue/${encodeURIComponent(i.id)}/`,
     current: false,
     decided: true,
-    chip: i.status === "approved" ? DECK_CHIP_APPROVED : DECK_CHIP_REJECTED,
-    tone: i.status === "approved" ? "ok" : "crit",
+    chip: decidedChip(i),
+    tone: decidedTone(i),
   }));
   const side: DeckSideRow[] = [
     ...deck.cards.map((c, idx) => {
@@ -344,7 +364,7 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
       side,
       allDone ? DECK_META_ALL_DECIDED : deckLeft(0, 0),
       allDone ? (
-        <DeckClean headline={empty.headline} approved={decided.filter((i) => i.status === "approved").length} rejected={decided.filter((i) => i.status !== "approved").length} waiting={0} />
+        <DeckClean headline={empty.headline} approved={decided.filter((i) => i.status === "approved").length} rejected={decided.filter((i) => outcomeOf(i) === "rejected").length} done={decided.filter((i) => outcomeOf(i) === "done").length} waiting={0} />
       ) : (
         <DeckEmpty headline={"headline" in empty ? empty.headline : ""} details={"details" in empty ? empty.details : []} />
       ),

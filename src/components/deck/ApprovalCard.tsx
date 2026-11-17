@@ -6,6 +6,7 @@ import { ReviewPanel } from "@/components/queue/ReviewPanel";
 import type { AuditContext } from "@/lib/queue/hygiene";
 import {
   approveCardAction,
+  doneCardAction,
   handOffCardAction,
   laterCardAction,
   markReadCardAction,
@@ -56,9 +57,11 @@ import {
   DECK_SEND_BACK,
   DECK_SEND_NOW,
   DECK_SKIP,
-  DECK_YES, DECK_EDITING_YES,
+  DECK_YES, DECK_EDITING_YES, DECK_EDITING_DONE,
   deckPosition,
   handedBy,
+  DECK_DONE,
+  DECK_SUB_DONE,
 } from "@/lib/ui/words";
 
 export const HOLD_SECONDS = 5;
@@ -115,6 +118,7 @@ export function ApprovalCard(props: ApprovalCardProps) {
   const [result, setResult] = useState<DeckResult | null>(props.initial?.result ?? null);
   const [sendResult, setSendResult] = useState<DeckResult | null>(null);
   const [note, setNote] = useState(props.initial?.note ?? "");
+  const [holdKind, setHoldKind] = useState<"yes" | "done">("yes");
   const [pending, startTransition] = useTransition();
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   const reasonId = useId();
@@ -133,8 +137,9 @@ export function ApprovalCard(props: ApprovalCardProps) {
       }
     });
 
-  const startHold = () => {
+  const startHold = (kind: "yes" | "done" = "yes") => {
     if (holding !== null || pending) return;
+    setHoldKind(kind);
     let left = HOLD_SECONDS;
     setHolding(left);
     timer.current = setInterval(() => {
@@ -146,7 +151,7 @@ export function ApprovalCard(props: ApprovalCardProps) {
       if (timer.current) clearInterval(timer.current);
       timer.current = null;
       setHolding(null);
-      run(() => approveCardAction(props.id));
+      run(() => (kind === "done" ? doneCardAction(props.id) : approveCardAction(props.id)));
     }, 1000);
   };
   const undo = () => {
@@ -162,7 +167,7 @@ export function ApprovalCard(props: ApprovalCardProps) {
   const showYes = props.canYes && !props.closerLook && !props.internal;
   const showMarkRead = props.canYes && props.internal && !props.closerLook;
   const stageMode = decided ? "decided" : holding !== null ? "holding" : mode;
-  const moveCount = (props.canYes ? 1 : 0) + (props.canMove ? 2 : 0) + (props.review.canEdit ? 1 : 0) + (props.handedToMe ? 1 : 0);
+  const moveCount = (props.canYes ? 2 : 0) + (props.canMove ? 2 : 0) + (props.review.canEdit ? 1 : 0) + (props.handedToMe ? 1 : 0);
   const quiet = props.internal;
 
   return (
@@ -244,7 +249,7 @@ export function ApprovalCard(props: ApprovalCardProps) {
         </div>
       )}
 
-      {holding !== null && <HoldToast seconds={holding} onUndo={undo} />}
+      {holding !== null && <HoldToast seconds={holding} onUndo={undo} done={holdKind === "done"} />}
 
       {mode === "rejecting" && !decided && (
         <>
@@ -369,6 +374,12 @@ export function ApprovalCard(props: ApprovalCardProps) {
                 <small>{DECK_SUB_REJECT}</small>
               </button>
             )}
+            {props.canYes && (
+              <button type="button" className="dk-move" disabled={busy || editing} title={editing ? DECK_EDITING_DONE : undefined} onClick={() => startHold("done")}>
+                {DECK_DONE}
+                <small>{DECK_SUB_DONE}</small>
+              </button>
+            )}
             {props.canMove && (
               <button
                 type="button"
@@ -419,7 +430,7 @@ export function ApprovalCard(props: ApprovalCardProps) {
               <small>{DECK_SUB_READ}</small>
             </button>
           ) : showYes ? (
-            <button type="button" className="dk-move dk-move--yes" disabled={busy || editing} title={editing ? DECK_EDITING_YES : undefined} onClick={startHold}>
+            <button type="button" className="dk-move dk-move--yes" disabled={busy || editing} title={editing ? DECK_EDITING_YES : undefined} onClick={() => startHold()}>
               {DECK_YES}
               <small>{DECK_SUB_YES}</small>
             </button>

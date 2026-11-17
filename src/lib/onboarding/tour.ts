@@ -2,7 +2,7 @@ import { ROLES } from "@/lib/auth/roles";
 import { canApproveQueue } from "@/lib/queue/roles";
 import { canSeeSetup } from "@/lib/setup/roles";
 import { SETUP_PATH } from "@/lib/setup/routes";
-import { APPROVALS_NAME, COPILOT_NAME, LEADS_NAME } from "@/lib/ui/words";
+import { APPROVALS_NAME, COPILOT_NAME, INTAKE_NAME } from "@/lib/ui/words";
 
 /**
  * The first-sign-in tour. The seen flag is `user_metadata.lectual_tour` on the
@@ -129,7 +129,7 @@ export function tourSteps({ role, navItems, aiConfigured, firmName }: TourStepsI
       id: "intake",
       target: navTourToken("intake"),
       side: "right",
-      title: LEADS_NAME,
+      title: INTAKE_NAME,
       body: "Your leads, sorted by last touch. Open a lead to see its answers, files and timeline.",
     });
   }

@@ -4,7 +4,7 @@ import { canApproveQueue } from "@/lib/queue/roles";
 import { canSeeSetup } from "@/lib/setup/roles";
 import { SETUP_PATH } from "@/lib/setup/routes";
 import type { TourSide } from "./tour";
-import { APPROVALS_NAME, ASSISTANTS_NAME, COPILOT_NAME, FEATURES_NAME, LEADS_NAME } from "@/lib/ui/words";
+import { APPROVALS_NAME, ASSISTANTS_NAME, COPILOT_NAME, FEATURES_NAME, INTAKE_NAME } from "@/lib/ui/words";
 
 /**
  * The Getting started hub: guided flows over the real screens. This file is the
@@ -55,7 +55,7 @@ type CatalogFlow = Omit<HubFlow, "steps"> & { steps: CatalogStep[] };
 export type HubTrack = { id: HubTrackId; title: string; summary: string; flows: HubFlow[] };
 
 export const HUB_TRACKS: readonly { id: HubTrackId; title: string; summary: string }[] = [
-  { id: "intake", title: LEADS_NAME, summary: "Leads, the board, forms and stages." },
+  { id: "intake", title: INTAKE_NAME, summary: "Leads, the board, forms and stages." },
   { id: "consults", title: "Consults to proposals", summary: "From a booked call to an accepted proposal." },
   { id: "matters", title: "Matters", summary: "Open matters, their pages, files and client updates." },
   { id: "approvals", title: "Approvals and agents", summary: "What waits for a person, and what drafts for you." },

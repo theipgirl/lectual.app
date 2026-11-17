@@ -26,10 +26,10 @@ export const REVIEW_BOARD_VIEW = "Board";
 export const REVIEW_SHEET_VIEW = "Sheet";
 /** The Weekly review view that deals one person's records as cue cards. */
 export const REVIEW_CARDS_VIEW = "Cards";
-/** The people who have asked about work (was "Intake" / "PNC"). */
-export const LEADS_NAME = "Leads";
-/** The rail group that holds Leads and the intake forms. */
-export const LEADS_GROUP = "Leads";
+/** The section where new work arrives: the page, tab title, rail group, phone bar and More sheet (Nov 12: was "Leads"). */
+export const INTAKE_NAME = "Intake";
+/** The rail's list row under Intake: the people who have asked about work. */
+export const INTAKE_LEADS_ROW = "Leads";
 /** Matters whose next step is the firm's (was "Our move"). */
 export const OUR_TURN = "Our turn";
 /** Hot, warm or cold (was "lane"). */
@@ -104,7 +104,7 @@ export const LEADS_LOAD_FAILED_BODY = "Can't show your leads right now. Refresh 
 export const NO_LEAD_STAGES = "Your lead stages haven't been set up yet. An owner or admin can add them in Settings.";
 export const NO_LEADS_YET = "No leads yet. New enquiries from your intake form appear here.";
 export const NO_LEAD_MATCHES = "No lead matches these filters.";
-export const PIPELINE_VIEW_ONLY = "This is a view-only overview. To move a lead, open it in Leads.";
+export const PIPELINE_VIEW_ONLY = "This is a view-only overview. To move a lead, open it in Intake.";
 /** The plural of the same sentence, for labels like "Results" or "Event assessments". */
 export function notReadyPlural(features: string): string {
   return `${features.trim()} aren't switched on for your firm yet. Lectual will turn them on.`;
@@ -246,6 +246,19 @@ export const DECK_REJECTED = "Rejected. The note goes back to the assistant. Not
 export const DECK_HANDED_OFF = "Handed off. It's on their cards now.";
 export const DECK_LATER_DONE = "Put off until the next deal.";
 export const DECK_SENT_BACK = "Sent back.";
+/** Done: a card handled without approving. The ONE marker note a Done resolve carries; every surface reads the outcome through it. */
+export const DONE_NOTE = "Done: handled without approving";
+export const DECK_DONE = "Done";
+export const DECK_SUB_DONE = "no approval";
+export const DECK_DONE_MESSAGE = "Done. Marked as handled. Nothing was approved or sent.";
+export const DECK_CHIP_DONE = "Done";
+/** A typed Reject note may not be the Done marker: it would read as Done everywhere. */
+export const REJECT_NOTE_IS_DONE_MARKER = "Write your own reason for rejecting. That wording is kept for Done.";
+/** The Done button's tooltip while the editor is open. */
+export const DECK_EDITING_DONE = "Close the editor first, then mark it done.";
+export const deckDoneHolding = (seconds: number) => `Marking done in ${seconds}…`;
+export const DECK_DONE_HOLD_NOTE = "Nothing happens until the countdown ends. Done approves nothing and sends nothing.";
+export const DONE_OUTCOME_TEXT = "Done. Marked as handled without approving. Nothing was sent.";
 export const handedBy = (name: string) => `Handed to you by ${name}`;
 export const DECK_HANDED_NO_YES = "You can edit this and send it back. The yes stays with an approver.";
 export const DECK_CLOSER_LOOK = "This one needs a closer look before it can be approved.";
@@ -312,7 +325,8 @@ export const DECK_CHOICE_YOU_PRESS = "You press it yourself";
 export const DECK_COULDNT_LOAD = "Couldn't load";
 export const DECK_TRY_AGAIN = "Try again";
 export const DECK_NOT_CONNECTED = "Not connected";
-export const deckClean = (approved: number, rejected: number, waiting: number) => `${approved} approved · ${rejected} rejected · ${waiting} waiting`;
+export const deckClean = (approved: number, rejected: number, waiting: number, done = 0) =>
+  `${approved} approved · ${rejected} rejected${done > 0 ? ` · ${done} done` : ""} · ${waiting} waiting`;
 export const DECK_LIST_FOOT = "Opening an item shows today's item page, where you can edit, approve or reject it.";
 export const DECK_BOARD_SUB = "Every approval by where it stands. Drag is not offered: each move is a button on the card.";
 export const deckListSub = (waiting: number, inDeal: number, arrived: number, label: string) =>
@@ -442,7 +456,7 @@ export const WAITING_ON_YOU_PARTIAL = "Approvals couldn't load, so only next ste
 export const deckWaiting = (age: string) => `Waiting ${age}`;
 export const deckWaitingTo = (name: string, age: string) => `Waiting to ${name} · ${age}`;
 export const deckWaitingBack = (label: string) => `Waiting back at ${label}`;
-export const deckDecidedAt = (what: "approved" | "rejected", time: string, noteKept: boolean) => `${what} ${time}${noteKept ? " · note kept" : ""}`;
+export const deckDecidedAt = (what: "approved" | "rejected" | "done", time: string, noteKept: boolean) => `${what} ${time}${noteKept ? " · note kept" : ""}`;
 export const DECK_FOR = "for";
 
 /* ── Owner view: the weekly review's editable Sheet ── */
@@ -593,7 +607,7 @@ export const deckListWith = (first: string) => `With ${first}`;
 /** The right-hand pill of a Later row: just when it comes back. Today is the bare time. */
 export const deckLaterTomorrow = (time: string) => `Tomorrow ${time}`;
 export const deckLaterOtherDay = (day: string, time: string) => `${day} ${time}`;
-export const deckListDecidedSub = (what: "Approved" | "Rejected", time: string, tail: string | null) => (tail ? `${what} ${time} · ${tail}` : `${what} ${time}`);
+export const deckListDecidedSub = (what: "Approved" | "Rejected" | "Done", time: string, tail: string | null) => (tail ? `${what} ${time} · ${tail}` : `${what} ${time}`);
 export const DECK_LIST_TAIL_CLIENT_EMAIL = "client email";
 export const DECK_LIST_TAIL_INTERNAL = "internal";
 export const DECK_LIST_TAIL_NOTE_KEPT = "note kept";
@@ -655,7 +669,7 @@ export const WELCOME_CARD_1_BODY =
   "Each card says who drafted it, who it is to, and the opening of the draft. Nothing on a card has been sent.";
 export const WELCOME_CARD_1_STEP = "when a card has a line at the bottom, it says what to check first.";
 export const WELCOME_CARD_2_TITLE = "The moves";
-export const WELCOME_CARD_2_BODY = `Yes approves after a 5-second hold you can undo. ${DECK_APPROVING_NEVER_SENDS} A client email becomes a draft in your firm's or your own mailbox, when one is connected. Nothing goes out until someone presses Send there. Reject needs a note. Later waits for your next deal; Hand off goes to a colleague. The arrows move between cards.`;
+export const WELCOME_CARD_2_BODY = `Yes approves after a 5-second hold you can undo. ${DECK_APPROVING_NEVER_SENDS} A client email becomes a draft in your firm's or your own mailbox, when one is connected. Nothing goes out until someone presses Send there. Reject needs a note. Done marks it handled without approving. Later waits for your next deal; Hand off goes to a colleague. The arrows move between cards.`;
 export const WELCOME_CARD_2_STEP = "try the arrows. They only move between cards, and nothing is stored.";
 export const WELCOME_CARD_3_TITLE = "Two deals a day";
 export const welcomeCard3Body = (first: string, second: string) =>
@@ -698,3 +712,22 @@ export const LEADS_STOP_TIMER = "Stop timer";
 export const LEADS_ADD_TIME = "Add time";
 export const LEADS_UNKNOWN_TEAMMATE_DROP = "That teammate can't be named, so cards can't be dropped there.";
 export const LEADS_HIDDEN_SELECTED = (n: number) => `${n} selected but not shown`;
+
+// Matters page: phase groups (pre-filing / post-filing). The owner's names, Nov 12.
+export const MATTER_GROUP_LABEL = {
+  intake: "Intake",
+  pre: "Pre-filing",
+  post: "Post-filing",
+  other: "Matters",
+} as const;
+export const MATTER_GROUPS_NAV = "Matter group";
+export const MATTER_STATUS_NAV = "Filter matters";
+export const MATTER_PHASES_UNAVAILABLE = "Can't show the Intake, Pre-filing and Post-filing groups right now, so every matter is shown together. Refresh to try again.";
+export const MATTER_GROUP_ALL = "All";
+export const MATTER_GROUP_EMPTY = (group: keyof typeof MATTER_GROUP_LABEL | "all") =>
+  group === "all"
+    ? "No matters match these filters."
+    : group === "other"
+      ? "No contracts or one-offs match these filters."
+      : `No matters in ${MATTER_GROUP_LABEL[group]} match these filters.`;
+export const MATTER_MOVED_TO = "Moved to";

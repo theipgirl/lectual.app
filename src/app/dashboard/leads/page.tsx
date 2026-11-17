@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
+import { INTAKE_NAME } from "@/lib/ui/words";
 import { pageTitle } from "@/lib/ui/page-title";
 
-export const metadata: Metadata = { title: pageTitle("Leads") };
+export const metadata: Metadata = { title: pageTitle(INTAKE_NAME) };
 
 /**
  * The lead list is Intake now (/dashboard/intake/: table, board by stage,

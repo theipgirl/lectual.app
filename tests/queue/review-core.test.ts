@@ -111,6 +111,15 @@ describe("runQueueReview: refusals are the action's own", () => {
     expect(state.save).not.toHaveBeenCalled();
   });
 
+  it("a Yes on a CHECK FIRST card is still refused when the linked-proposal gate refuses (the server is authoritative)", async () => {
+    state.item = { ...(state.item as object), summary: "CHECK FIRST: the fee quoted" };
+    state.gate.mockResolvedValue({ ok: false, error: "Create the proposal's link first." });
+    expect(await runQueueReview({ id: "q1", intent: "approve", body: "Hi\n\nBest,\nThe Team" })).toEqual({ kind: "error", error: "Create the proposal's link first." });
+    expect(state.gate).toHaveBeenCalledWith("q1");
+    expect(state.save).not.toHaveBeenCalled();
+    expect(state.resolve).not.toHaveBeenCalled();
+  });
+
   it("a draft with a banner is refused by approvalBlock", async () => {
     state.item = qitem({ draft_body: "DRAFT — FOR ATTORNEY REVIEW. NOT SENT.\nHi\n\nBest,\nThe Team" });
     const r = await runQueueReview({ id: "q1", intent: "approve" });
@@ -170,6 +179,20 @@ describe("runQueueReview: results", () => {
   it("without withReceipt the note is unchanged (the full approval page)", async () => {
     await runQueueReview({ id: "q1", intent: "approve" });
     expect(state.resolve).toHaveBeenCalledWith(expect.not.objectContaining({ note: expect.anything() }));
+  });
+
+  it("a Done (reject with the marker) resolves with exactly that note and never approves, drafts or checks the proposal gate", async () => {
+    expect(await runQueueReview({ id: "q1", intent: "reject", note: "Done: handled without approving" })).toMatchObject({ kind: "resolved", intent: "reject" });
+    expect(state.resolve).toHaveBeenCalledWith(expect.objectContaining({ action: "reject", note: "Done: handled without approving" }));
+    expect(state.draft).not.toHaveBeenCalled();
+    expect(state.gate).not.toHaveBeenCalled();
+  });
+
+  it("a Done by someone the routing refuses is refused and resolves nothing", async () => {
+    state.item = followup();
+    state.routed = routed({ stalled_followup: U.caitlyn });
+    expect((await runQueueReview({ id: "q1", intent: "reject", note: "Done: handled without approving" })).kind).toBe("error");
+    expect(state.resolve).not.toHaveBeenCalled();
   });
 
   it("a reject resolves with the note", async () => {
