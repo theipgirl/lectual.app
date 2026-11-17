@@ -270,7 +270,7 @@ export type StageMilestone = Exclude<Milestone, "accepted" | "paid" | "hired" | 
 export const MILESTONE_STAGE_NAMES: Record<StageMilestone, readonly string[]> = {
   contacted: ["Potential New Client", "New PNC", "New Inquiry"],
   consult_scheduled: DEFAULT_STAGE_NAMES["consult-scheduled"],
-  consult_held: ["Consultation Held", "Consult Held", "Consultation Completed", "Consult Completed", "Consultation Complete"],
+  consult_held: ["Consult Held – Proposal in Progress", "Consultation Held", "Consult Held", "Consultation Completed", "Consult Completed", "Consultation Complete"],
   questionnaire_sent: DEFAULT_STAGE_NAMES["questionnaire-sent"],
   opinion_letter_sent: ["Opinion Letter Sent", "Search Opinion Sent"],
   proposal_sent: ["Proposal Sent", "Proposal Sent to Client", ...DEFAULT_STAGE_NAMES["post-consult-sent"]],
