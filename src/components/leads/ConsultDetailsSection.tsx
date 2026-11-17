@@ -102,7 +102,7 @@ export async function ConsultDetailsSection({ leadId, canWrite, timeZone }: { le
   );
 
   if (read.status === "unavailable") {
-    return shell(<LoadFailedLine>Consult details couldn&apos;t be loaded. Nothing is shown rather than a guess.</LoadFailedLine>);
+    return shell(<LoadFailedLine>Consult details couldn&apos;t be loaded just now. Nothing is shown rather than a guess.</LoadFailedLine>);
   }
 
   if (read.entries.length === 0) {

@@ -239,14 +239,13 @@ input[type="file"].lx-input::file-selector-button {
   margin-right: 12px;
   border: 1px solid var(--line);
   border-radius: var(--r-md);
-  background: var(--card);
+  background-color: var(--card);
   color: var(--ink);
   cursor: pointer;
 }
 input[type="file"].lx-input:disabled::file-selector-button { cursor: default; opacity: 0.5; }
 /* A pill with a note under it, in one table cell (the cell is a flex row on a phone, so side by side would clip the pill). */
 .lx-cell-stack { display: grid; gap: 4px; justify-items: start; min-width: 0; }
-@media (max-width: 640px) { .lx-stack td > .lx-cell-stack { justify-items: end; text-align: right; } }
 .lx-pill-suggested { border: 1px dashed currentColor; background: transparent; font-style: italic; }
 .lx-suggest-rule { border-left: 3px dashed var(--line); padding-left: 12px; }
 .lx-upl {
@@ -1851,6 +1850,7 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
     text-align: right;
   }
   .lx-stack td.wrap { min-width: 0; }
+  .lx-stack td > .lx-cell-stack { justify-items: end; text-align: right; }
   .lx-stack td.pri { display: block; text-align: left; padding-bottom: 6px; }
   .lx-stack td[data-label]::before {
     content: attr(data-label);

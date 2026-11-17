@@ -218,7 +218,7 @@ describe("the card's wording and style", () => {
     const html = await render({ files: okFiles([file("f1", "a.pdf", "2026-10-20T10:00:00Z")]), letters: null }, { canDelete: true });
     expect(html).toMatch(/class="lx-card lx-pad fl-card"/);
     expect(html).toMatch(/class="lx-label"/);
-    expect(html).toMatch(/class="lx-h2"/);
+    expect(html).toMatch(/class="lx-h3"/);
     expect(html).not.toMatch(/todo|coming soon|lorem/i);
     expect(html).not.toMatch(/#[0-9a-f]{3,8}\b|rgb\(/i);
   });
