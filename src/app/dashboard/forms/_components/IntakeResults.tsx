@@ -9,6 +9,7 @@ import { assessmentExtras, assessmentQuestions } from "@/lib/intake-forms/assess
 import type { IntakeFormRecord } from "@/lib/intake-forms/store";
 import { formQuestions } from "@/lib/intake-forms/form-questions";
 import { getFirmTimeZone } from "@/lib/org/profile";
+import { ShowingCount } from "@/components/ui/ShowingCount";
 import { AssessmentBlocks } from "./AssessmentBlocks";
 import { IntakeDrawer, Unreadable } from "./IntakeDrawer";
 import { drawerStepsFor, questionTexts } from "./IntakePerformance";
@@ -213,7 +214,7 @@ function QuestionLists({
               ))}
             </ul>
           )}
-          {q.capped && <p className="ifm-help">{`Showing the latest ${ANSWERS_PER_QUESTION} of ${q.total.toLocaleString("en-US")}.`}</p>}
+          {q.capped && <ShowingCount shown={ANSWERS_PER_QUESTION} total={q.total} />}
         </section>
       ))}
     </>

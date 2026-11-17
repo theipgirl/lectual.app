@@ -553,7 +553,7 @@ export function IntakeFormsWorkspace(props: Props) {
                         e.dataTransfer.effectAllowed = "move";
                         e.dataTransfer.setData("text/plain", q.id);
                         setDrag(q.id);
-                                          }}
+                      }}
                       onDragOver={(e) => {
                         e.preventDefault();
                         if (over !== q.id) setOver(q.id);

@@ -2,6 +2,7 @@ import { loadBell } from "@/lib/notifications";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { BellPopover, type BellCount, type BellList } from "./BellPopover";
 import { firstNameOf, toRowViews } from "./view";
+import { getFirmTimeZone } from "@/lib/org/profile";
 
 /** User id to first name, for "Taylor assigned you…". A failed read gives {}: the sentences say "Someone". */
 export async function loadActorNames(): Promise<Record<string, string>> {
@@ -29,7 +30,7 @@ export async function NotificationBell() {
     const bell = await loadBell();
     if (bell.count.status === "ok") count = { status: "ok", unread: bell.count.data };
     if (bell.list.status === "ok") {
-      list = { status: "ok", rows: toRowViews(bell.list.data, await loadActorNames()) };
+      list = { status: "ok", rows: toRowViews(bell.list.data, await loadActorNames(), undefined, await getFirmTimeZone()) };
     }
   } catch {
     // Both stay "unavailable".

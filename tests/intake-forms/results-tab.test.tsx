@@ -227,10 +227,10 @@ describe("Results tab, intake form (F12)", () => {
     expect(html).toContain("No answers to this question in this range.");
   });
 
-  it("says 'Showing the latest 50 of N' for a question with more answers", async () => {
+  it("says 'Showing 50 of N' for a question with more answers", async () => {
     const rows = Array.from({ length: 53 }, (_, i) => ({ ...people()[0], id: `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`, started_at: t(i), submitted_at: t(i + 1), answers: [{ id: "q-name", question: "q", answer: `answer ${i}` }] }));
     const html = await renderResults({ read: { status: "ok", value: { rows, capped: false } } });
-    expect(html).toContain("Showing the latest 50 of 53.");
+    expect(html).toContain("Showing 50 of 53");
     expect(html.match(/answer \d+/g)!.length).toBeGreaterThanOrEqual(50);
   });
 
