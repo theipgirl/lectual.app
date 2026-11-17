@@ -32,11 +32,11 @@ const stages: CardRead<typeof stageRows> = { status: "ok", value: stageRows };
 
 describe("a lead is labelled by the PERSON first (Taylor, Nov 17 call)", () => {
   it("the person's name is the name; the business and the mark are the sub-line", () => {
-    expect(leadLabel({ first_name: "Anthony", last_name: "Harris", business_name: "Harris Holdings LLC", mark_text: "HARRIS" })).toEqual({ name: "Anthony Harris", sub: "Harris Holdings LLC · HARRIS" });
-    expect(leadLabel({ first_name: "Anthony", last_name: "Harris", business_name: "Harris Holdings LLC" }).sub).toBe("Harris Holdings LLC");
+    expect(leadLabel({ first_name: "Jordan", last_name: "Pike", business_name: "Pike Holdings LLC", mark_text: "PIKE" })).toEqual({ name: "Jordan Pike", sub: "Pike Holdings LLC · PIKE" });
+    expect(leadLabel({ first_name: "Jordan", last_name: "Pike", business_name: "Pike Holdings LLC" }).sub).toBe("Pike Holdings LLC");
   });
   it("the company stands in only when there is no person's name, then the email", () => {
-    expect(leadLabel({ first_name: "", last_name: " ", business_name: "Harris Holdings LLC", mark_text: "HARRIS" })).toEqual({ name: "Harris Holdings LLC", sub: "HARRIS" });
+    expect(leadLabel({ first_name: "", last_name: " ", business_name: "Pike Holdings LLC", mark_text: "PIKE" })).toEqual({ name: "Pike Holdings LLC", sub: "PIKE" });
     expect(leadLabel({ first_name: null, last_name: null, business_name: null, email: "a@b.co" })).toEqual({ name: "a@b.co", sub: null });
     expect(leadLabel({}, "A teammate")).toEqual({ name: "A teammate", sub: null });
   });
@@ -133,13 +133,13 @@ describe("each control is wired to the right existing action", () => {
 
 const stage = { id: "s-new", org_id: "o", name: "New", order_index: 1, category: "open", aging_threshold_days: 30 } as unknown as Stage;
 const lead = {
-  id: LEAD, first_name: "Anthony", last_name: "Harris", business_name: "Harris Holdings LLC", mark_text: "HARRIS", email: "a@x.test", phone: null,
+  id: LEAD, first_name: "Jordan", last_name: "Pike", business_name: "Pike Holdings LLC", mark_text: "PIKE", email: "a@x.test", phone: null,
   current_stage_id: "s-new", stage_entered_at: "2026-11-10T12:00:00Z", assigned_to: null, temperature: null, lane: null, ai_summary: null,
   last_activity_at: "2026-11-14T12:00:00Z", last_outbound_at: null, last_inbound_at: null, referral_source: "UGW",
 } as unknown as Lead;
 const ctx = (role: string): CardContext => ({ role, members, stages, mergeAvailable: false, path: "/dashboard/intake/", params: { view: "board" }, now: new Date(NOW), timeZone: TZ });
 
-function intakeCard(role: string, steps: Parameters<typeof buildIntakeCards>[0]["steps"] = { status: "ok", value: { [LEAD]: { id: TASK, title: "Call Anthony", dueAt: "2026-11-20T00:00:00Z", assigneeId: null } } }) {
+function intakeCard(role: string, steps: Parameters<typeof buildIntakeCards>[0]["steps"] = { status: "ok", value: { [LEAD]: { id: TASK, title: "Call Jordan", dueAt: "2026-11-20T00:00:00Z", assigneeId: null } } }) {
   const rows = buildIntakeRows({ leads: [lead], stages: [stage], members: [], now: new Date(NOW) });
   const cards = buildIntakeCards({ rows, ctx: ctx(role), steps, approvals: { status: "ok", byLead: { [LEAD]: [{ queueId: "q-1", headline: "Draft", kind: "client_draft", createdAt: null }] } }, duplicates: {} });
   const html = renderToStaticMarkup(
@@ -151,8 +151,8 @@ function intakeCard(role: string, steps: Parameters<typeof buildIntakeCards>[0][
 describe("the Intake card, per role", () => {
   it("names the person first, the business and the mark beside it, and links the name to the opened card keeping the view", () => {
     const { html } = intakeCard("attorney");
-    expect(html).toMatch(/class="[^"]*ix-card-name"[^>]*>Anthony Harris</);
-    expect(html).toContain("Harris Holdings LLC · HARRIS");
+    expect(html).toMatch(/class="[^"]*ix-card-name"[^>]*>Jordan Pike</);
+    expect(html).toContain("Pike Holdings LLC · PIKE");
     expect(html).toContain("view=board&amp;open=lead%3A" + LEAD);
   });
   it("an editor gets the temperature, source, owner and next-step controls, 'Needs attorney · 1' as a link to the approval", () => {
@@ -160,18 +160,18 @@ describe("the Intake card, per role", () => {
     expect(html).toContain('data-testid="temperature-cell"');
     expect(html).toContain("Change source");
     expect(html).toContain("Reassign");
-    expect(html).toContain("Call Anthony");
+    expect(html).toContain("Call Jordan");
     expect(html).toMatch(/<a [^>]*href="\/dashboard\/queue\/q-1\/?"[^>]*>Needs attorney · 1</);
-    expect(html).toContain('aria-label="Actions for Anthony Harris"');
+    expect(html).toContain('aria-label="Actions for Jordan Pike"');
   });
   it("a viewer sees the same card with no control for temperature, source, owner or the next step", () => {
     const { html } = intakeCard("viewer");
-    expect(html).toContain("Anthony Harris");
+    expect(html).toContain("Jordan Pike");
     expect(html).toContain("UGW");
     expect(html).not.toContain("Change source");
     expect(html).not.toContain("Reassign");
-    expect(html).not.toMatch(/<button[^>]*Call Anthony/);
-    expect(html).toContain("Call Anthony");
+    expect(html).not.toMatch(/<button[^>]*Call Jordan/);
+    expect(html).toContain("Call Jordan");
   });
   it("a failed steps read says so on the card, never 'No next step'", () => {
     const { html } = intakeCard("attorney", { status: "unavailable" });
@@ -208,7 +208,7 @@ describe("the Matters cards", () => {
 // ---- the opened card ------------------------------------------------------------------------------------------------
 
 const leadRow = {
-  id: LEAD, first_name: "Anthony", last_name: "Harris", business_name: "Harris Holdings LLC", mark_text: "HARRIS", email: "a@x.test", phone: "(404) 555-0100",
+  id: LEAD, first_name: "Jordan", last_name: "Pike", business_name: "Pike Holdings LLC", mark_text: "PIKE", email: "a@x.test", phone: "(404) 555-0100",
   current_stage_id: "s-new", assigned_to: ME, referral_source: "UGW", last_activity_at: "2026-11-15T14:00:00.000Z",
   last_inbound_at: null, last_outbound_at: null, lane: null, lane_set_at: null, ai_summary: null,
 };
@@ -244,22 +244,22 @@ describe("the opened card's states", () => {
   it("a foreign or missing id shows the sentence and nothing of the record, with a close link that keeps the view", async () => {
     const html = await host({ status: "not-found" });
     expect(html).toContain("This record couldn&#x27;t be found.");
-    for (const secret of ["Anthony", "Harris", "a@x.test", "Rebecca", "UGW"]) expect(html).not.toContain(secret);
+    for (const secret of ["Jordan", "Pike", "a@x.test", "Rebecca", "UGW"]) expect(html).not.toContain(secret);
     expect(html).toMatch(/href="\/dashboard\/intake\/?\?view=board"/);
     expect(html).toContain('role="dialog"');
   });
   it("a failed record read shows its fixed sentence and no fields", async () => {
     const html = await host({ status: "unavailable" });
     expect(html).toContain("This record couldn&#x27;t be loaded.");
-    expect(html).not.toContain("Anthony");
+    expect(html).not.toContain("Jordan");
   });
   it("no ?open= draws nothing", async () => {
     expect(await RecordCardHost({ open: null, path: "/dashboard/intake/", params: {} })).toBeNull();
   });
   it("a lead: the person first, business and mark beside, the engine's top card, Close and Esc are the close LINK", async () => {
     const html = await host(leadLoad("attorney"));
-    expect(html).toMatch(/<h2[^>]*>Anthony Harris<\/h2>/);
-    expect(html).toContain("Harris Holdings LLC · HARRIS");
+    expect(html).toMatch(/<h2[^>]*>Jordan Pike<\/h2>/);
+    expect(html).toContain("Pike Holdings LLC · PIKE");
     expect(html).toContain('data-step="needs-yes"');
     expect(html).toContain("data-close");
     expect(html).toContain("rc-card");

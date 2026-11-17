@@ -48,7 +48,7 @@ describe("the card's timeline line: the newest thing sent out", () => {
 
 const NOW = new Date("2026-11-17T15:00:00Z");
 const lead = (over: Record<string, unknown> = {}) => ({
-  id: "l1", first_name: "Anthony", last_name: "Harris", business_name: "Harris Holdings LLC", email: "a@x.com", mark_text: "HARRIS", current_stage_id: "s2", assigned_to: null,
+  id: "l1", first_name: "Jordan", last_name: "Pike", business_name: "Pike Holdings LLC", email: "a@x.com", mark_text: "PIKE", current_stage_id: "s2", assigned_to: null,
   stage_entered_at: "2026-10-25T00:00:00Z", created_at: "2026-10-01T00:00:00Z", lawmatics_id: null, lawmatics_synced_at: null, sheet_key: null, ...over,
 });
 const input = (over: Partial<ReviewInput> = {}): ReviewInput => ({
@@ -59,25 +59,25 @@ const input = (over: Partial<ReviewInput> = {}): ReviewInput => ({
 describe("lead labels: the person first, company and mark as the sub-line", () => {
   it("a lead with a name and a company is the person's name, company in the sub-line", () => {
     const [r] = buildReviewRows(input());
-    expect(r.client).toBe("Anthony Harris");
-    expect(r.company).toBe("Harris Holdings LLC");
-    expect(cardSubline(r)).toBe("Lead · Harris Holdings LLC · HARRIS · Consultation Scheduled");
+    expect(r.client).toBe("Jordan Pike");
+    expect(r.company).toBe("Pike Holdings LLC");
+    expect(cardSubline(r)).toBe("Lead · Pike Holdings LLC · PIKE · Consultation Scheduled");
   });
   it("the company stands in only when there is no person's name, and is then not repeated", () => {
     const [r] = buildReviewRows(input({ leads: [lead({ first_name: null, last_name: null })] as never }));
-    expect(r.client).toBe("Harris Holdings LLC");
+    expect(r.client).toBe("Pike Holdings LLC");
     expect(r.company).toBeNull();
-    expect(cardSubline(r)).toBe("Lead · HARRIS · Consultation Scheduled");
+    expect(cardSubline(r)).toBe("Lead · PIKE · Consultation Scheduled");
   });
   it("a company equal to the name is not repeated; no name at all falls to the email", () => {
-    const [same] = buildReviewRows(input({ leads: [lead({ business_name: "anthony harris" })] as never }));
+    const [same] = buildReviewRows(input({ leads: [lead({ business_name: "jordan pike" })] as never }));
     expect(same.company).toBeNull();
     const [none] = buildReviewRows(input({ leads: [lead({ first_name: null, last_name: null, business_name: null })] as never }));
     expect(none.client).toBe("a@x.com");
   });
   it("search finds a lead by its company as well as its name and mark", () => {
     const [r] = buildReviewRows(input());
-    for (const q of ["anthony", "holdings", "harris"]) expect(matchesSearch(r, q)).toBe(true);
+    for (const q of ["jordan", "holdings", "pike"]) expect(matchesSearch(r, q)).toBe(true);
     expect(matchesSearch(r, "zzz")).toBe(false);
   });
 });
