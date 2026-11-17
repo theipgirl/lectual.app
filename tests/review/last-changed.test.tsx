@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { LEAD, MATTER, OTHER_LEAD, OTHER_ORG, ORG, makeWorld, seedTables } from "../files/helpers";
 import { actorOf, firstNameOf, lastChangedText, pickLastChanges, CHANGE_SELECT, type ChangeRowIn, type LastChange } from "@/lib/review/last-changed";
-import { row, TODAY } from "./fixtures";
+import { row } from "./fixtures";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
