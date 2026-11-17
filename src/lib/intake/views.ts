@@ -6,6 +6,8 @@ import { inPipelineOrder } from "@/lib/pipeline/stage-order";
 import type { MemberIdentity } from "@/lib/members/directory";
 import { intakeStages } from "./scope";
 import type { IntakeRow } from "./rows";
+import { shortDate } from "@/lib/review/format";
+import { DEFAULT_ZONE, civilDay } from "@/lib/stage-keeper/format";
 import {
   LEADS_NOTE_UNAVAILABLE,
   LEADS_NO_ACTIVITY_YET,
@@ -207,22 +209,28 @@ export type TouchStamp = {
 };
 
 /**
- * The Last-contact cell, in words (no arrows, so no legend). The direction is `row.reply`, the same field the arrows
+ * The Last-contact cell, in words (no arrows, so no legend). Dates are the Sheet's ("Nov 16"), in the firm's time zone. The direction is `row.reply`, the same field the arrows
  * read: "replied" = they wrote last (our turn), "awaiting" = we wrote last. "unknown" means no email or call is
  * recorded, so only the date of the newest activity is known; it says that and does not guess a side.
  */
-export function touchStampFor(row: IntakeRow): TouchStamp {
-  const newest = touchDate(row.lastTouchAt);
+export function touchStampFor(row: IntakeRow, opts: { now: Date; timeZone?: string }): TouchStamp {
+  const zone = opts.timeZone ?? DEFAULT_ZONE;
+  const today = civilDay(opts.now.toISOString(), zone) ?? "";
+  // The weekly review Sheet's own date words ("Nov 16", `shortDate`, the year added only for another year), in the firm's zone, with the
+  // month and day kept together on one line.
+  const day = (iso: string | null): string | null => {
+    const civil = iso ? civilDay(iso, zone) : null;
+    return civil ? shortDate(civil, today).replace(" ", "\u00a0") : null;
+  };
+  const newest = day(row.lastTouchAt);
   if (!newest) return { text: LEADS_TOUCH_NO_CONTACT, waitingOnUs: false, state: "none", title: LEADS_TOUCH_NONE_TITLE };
-  // The day and month never break across lines.
-  const glue = (d: string) => d.replace(" ", "\u00a0");
   // "Our turn" is dated by their last email or call (last_inbound_at), "Waiting on them" by ours (last_outbound_at): a note or a stage
   // move that is newer than either must not re-date who wrote last. `lastTouchAt` (the newest of all three) is for the sort and "Last activity".
-  const inbound = touchDate(row.lead.last_inbound_at);
-  const outbound = touchDate(row.lead.last_outbound_at);
-  if (row.reply === "replied" && inbound) return { text: LEADS_TOUCH_OUR_TURN(glue(inbound)), waitingOnUs: true, state: "our-turn", title: LEADS_TOUCH_OUR_TURN_TITLE };
-  if (row.reply === "awaiting" && outbound) return { text: LEADS_TOUCH_WAITING_ON_THEM(glue(outbound)), waitingOnUs: false, state: "waiting", title: LEADS_TOUCH_WAITING_TITLE };
-  return { text: LEADS_TOUCH_ACTIVITY_ONLY(glue(newest)), waitingOnUs: false, state: "activity-only", title: LEADS_TOUCH_ACTIVITY_ONLY_TITLE };
+  const inbound = day(row.lead.last_inbound_at);
+  const outbound = day(row.lead.last_outbound_at);
+  if (row.reply === "replied" && inbound) return { text: LEADS_TOUCH_OUR_TURN(inbound), waitingOnUs: true, state: "our-turn", title: LEADS_TOUCH_OUR_TURN_TITLE };
+  if (row.reply === "awaiting" && outbound) return { text: LEADS_TOUCH_WAITING_ON_THEM(outbound), waitingOnUs: false, state: "waiting", title: LEADS_TOUCH_WAITING_TITLE };
+  return { text: LEADS_TOUCH_ACTIVITY_ONLY(newest), waitingOnUs: false, state: "activity-only", title: LEADS_TOUCH_ACTIVITY_ONLY_TITLE };
 }
 
 /** Days since a timestamp, or null when there isn't one / it doesn't parse. */

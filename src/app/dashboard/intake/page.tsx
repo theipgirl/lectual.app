@@ -91,7 +91,8 @@ export default async function IntakePage({
 
   // The Stage Keeper's recent moves, for the chip and the "Agent moves" filter. Two states: a read
   // that failed is `unavailable`, which the workspace says out loud and never filters on.
-  const agentMovesPromise: Promise<AgentMovesRead> = getFirmTimeZone()
+  const zonePromise = getFirmTimeZone().catch(() => "UTC");
+  const agentMovesPromise: Promise<AgentMovesRead> = zonePromise
     .then((tz) => loadAgentMoves(now, tz))
     .catch((): AgentMovesRead => ({ status: "unavailable" }));
 
@@ -113,7 +114,7 @@ export default async function IntakePage({
     loadFailed = true;
   }
 
-  const [members, pendingApprovals, agentMoves, decisions] = await Promise.all([membersPromise, approvalsPromise, agentMovesPromise, decisionsPromise]);
+  const [members, pendingApprovals, agentMoves, decisions, firmZone] = await Promise.all([membersPromise, approvalsPromise, agentMovesPromise, decisionsPromise, zonePromise]);
 
   if (loadFailed) {
     return (
@@ -238,6 +239,7 @@ export default async function IntakePage({
       initialViewState={viewState}
       time={time}
       now={now.toISOString()}
+      timeZone={firmZone}
       pendingApprovals={pendingApprovals}
       showReconcile={showReconcile}
       agentMoves={agentMoves.status === "ok" ? { status: "ok", truncated: agentMoves.truncated } : { status: "unavailable" }}

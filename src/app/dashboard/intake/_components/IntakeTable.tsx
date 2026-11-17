@@ -85,6 +85,7 @@ export default function IntakeTable({
   notesUnavailable,
   duplicates = {},
   movedOut,
+  timeZone,
   onSort,
   onSetLane,
   onAssign,
@@ -115,6 +116,7 @@ export default function IntakeTable({
   duplicates?: Record<string, DuplicateOf>;
   /** Leads moved this session out of the set they were listed in: a quiet "Moved" mark. */
   movedOut?: ReadonlySet<string>;
+  timeZone?: string;
   onSort: (key: SortKey) => void;
   onSetLane: (leadId: string, lane: Lane | null) => void;
   onAssign: (leadId: string, userId: string | null) => void;
@@ -203,7 +205,7 @@ export default function IntakeTable({
                 const name = `${lead.first_name} ${lead.last_name}`.trim() || lead.email;
                 const business = lead.mark_text?.trim() || lead.business_name?.trim() || "";
                 const step = nextStepFor(row, now, { notesUnavailable });
-                const touch = touchStampFor(row);
+                const touch = touchStampFor(row, { now, timeZone });
                 const error = errors[lead.id];
                 const pending = pendingLeadId === lead.id;
                 const pendingDrafts = pendingFor(pendingApprovals, lead.id);

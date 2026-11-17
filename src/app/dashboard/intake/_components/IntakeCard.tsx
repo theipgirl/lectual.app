@@ -41,6 +41,8 @@ export default function IntakeCard({
   onToggleSelect,
   duplicate,
   movedOut = false,
+  now,
+  timeZone,
   onCompare,
 }: {
   row: IntakeRow;
@@ -57,6 +59,8 @@ export default function IntakeCard({
   onToggleSelect?: (leadId: string) => void;
   duplicate?: DuplicateOf;
   movedOut?: boolean;
+  now: Date;
+  timeZone?: string;
   onCompare?: (leadId: string, otherId: string, trigger: HTMLElement) => void;
 }) {
   const lead = row.lead;
@@ -64,7 +68,7 @@ export default function IntakeCard({
   const business = lead.mark_text?.trim() || lead.business_name?.trim() || "";
   const source = lead.referral_source?.trim() || "";
   const line = [business, source].filter(Boolean).join(" · ");
-  const touch = touchStampFor(row);
+  const touch = touchStampFor(row, { now, timeZone });
   const pill = temperaturePill(row.temperature);
   const drafts = pendingFor(pendingApprovals, lead.id);
   const decision = decisionOpen(row.decision, lead.current_stage_id) ? row.decision : null;

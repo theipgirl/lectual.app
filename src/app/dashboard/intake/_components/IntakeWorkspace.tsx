@@ -99,6 +99,7 @@ export default function IntakeWorkspace({
   duplicates = {},
   nurtureUnavailable = false,
   now: nowIso,
+  timeZone,
 }: {
   /** The rows of the server's set: the intake list, or the lost leads when `lostView`. */
   rows: IntakeRow[];
@@ -129,6 +130,8 @@ export default function IntakeWorkspace({
   /** The nurture read failed: the Nurture chip has no number and the board says so (never an empty nurture column). */
   nurtureUnavailable?: boolean;
   now: string;
+  /** The firm's time zone: the Last contact dates are its calendar days, as on the weekly review Sheet. */
+  timeZone?: string;
 }) {
   const [rows, setRows] = useState(initialRows);
   const [filters, setFilters] = useState(initialFilters);
@@ -558,6 +561,7 @@ export default function IntakeWorkspace({
             onToggleSelect={toggleSelect}
             duplicates={duplicates}
             movedOut={movedOut}
+            timeZone={timeZone}
             onCompare={openCompare}
           />
         )
@@ -580,6 +584,7 @@ export default function IntakeWorkspace({
           notesUnavailable={notesUnavailable}
           duplicates={duplicates}
           movedOut={movedOut}
+          timeZone={timeZone}
           onSort={toggleSort}
           onSetLane={setLane}
           onAssign={assign}
