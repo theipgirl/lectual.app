@@ -1,12 +1,12 @@
 {
-  "sevetri_default": {
+  "callum_default": {
     "content": {
       "client": {
-        "first_name": "Sevetri",
-        "full_name": "Sevetri Wilson",
-        "company": "Prosperall"
+        "first_name": "Callum",
+        "full_name": "Callum Ferreira",
+        "company": "Larkmoor"
       },
-      "greeting": "Hi Sevetri, thank you again for meeting with us for your strategy call. Your proposal is outlined below for your review and acceptance.",
+      "greeting": "Hi Callum, thank you again for meeting with us for your strategy call. Your proposal is outlined below for your review and acceptance.",
       "recommendation": "Getting a word mark and a logo mark for each of your brands is best practice and provides comprehensive protection. Rebecca's recommendation is preselected below.",
       "pricing": {
         "package": "Concierge",
@@ -19,18 +19,18 @@
       "names": [
         {
           "id": "b1",
-          "name": "Prosperall",
+          "name": "Larkmoor",
           "marks": [
             {
               "id": "b1-word",
               "kind": "word",
-              "desc": "Protects the name Prosperall. It does not protect the font or style.",
+              "desc": "Protects the name Larkmoor. It does not protect the font or style.",
               "preselected": true
             },
             {
               "id": "b1-logo",
               "kind": "logo",
-              "desc": "Protects your Prosperall logo design, including its fonts, styles and colors.",
+              "desc": "Protects your Larkmoor logo design, including its fonts, styles and colors.",
               "preselected": true
             }
           ],
@@ -50,18 +50,18 @@
         },
         {
           "id": "b2",
-          "name": "Tech4PublicGood",
+          "name": "Open4Everyone",
           "marks": [
             {
               "id": "b2-logo",
               "kind": "logo",
-              "desc": "Protects your Tech4PublicGood logo design, including its fonts, styles and colors.",
+              "desc": "Protects your Open4Everyone logo design, including its fonts, styles and colors.",
               "preselected": true
             },
             {
               "id": "b2-word",
               "kind": "word",
-              "desc": "Protects the name Tech4PublicGood. It does not protect the font or style.",
+              "desc": "Protects the name Open4Everyone. It does not protect the font or style.",
               "preselected": true
             }
           ],
@@ -78,7 +78,7 @@
             }
           ],
           "what": "Your nonprofit initiative",
-          "note": "**A note from Rebecca.** Based on the preliminary search, she does think it may be difficult to secure the word mark for Tech4PublicGood. She always recommends both, so both are included. If you choose only one, she thinks the logo mark may be the stronger mark at this stage. If anything changes after the searches, she will update you."
+          "note": "**A note from Rebecca.** Based on the preliminary search, she does think it may be difficult to secure the word mark for Open4Everyone. She always recommends both, so both are included. If you choose only one, she thinks the logo mark may be the stronger mark at this stage. If anything changes after the searches, she will update you."
         }
       ],
       "adjustments": [],
@@ -179,18 +179,18 @@
         "level": "error"
       }
     ],
-    "clientEmail": "sevetri@example.com",
+    "clientEmail": "callum@example.com",
     "expiresOn": "2026-10-26",
     "title": "Trademark Proposal"
   },
-  "sevetri_price_override": {
+  "callum_price_override": {
     "content": {
       "client": {
-        "first_name": "Sevetri",
-        "full_name": "Sevetri Wilson",
-        "company": "Prosperall"
+        "first_name": "Callum",
+        "full_name": "Callum Ferreira",
+        "company": "Larkmoor"
       },
-      "greeting": "Hi Sevetri, thank you again for meeting with us for your strategy call. Your proposal is outlined below for your review and acceptance.",
+      "greeting": "Hi Callum, thank you again for meeting with us for your strategy call. Your proposal is outlined below for your review and acceptance.",
       "recommendation": "Getting a word mark and a logo mark for each of your brands is best practice and provides comprehensive protection. Rebecca's recommendation is preselected below.",
       "pricing": {
         "package": "Concierge",
@@ -203,18 +203,18 @@
       "names": [
         {
           "id": "b1",
-          "name": "Prosperall",
+          "name": "Larkmoor",
           "marks": [
             {
               "id": "b1-word",
               "kind": "word",
-              "desc": "Protects the name Prosperall. It does not protect the font or style.",
+              "desc": "Protects the name Larkmoor. It does not protect the font or style.",
               "preselected": true
             },
             {
               "id": "b1-logo",
               "kind": "logo",
-              "desc": "Protects your Prosperall logo design, including its fonts, styles and colors.",
+              "desc": "Protects your Larkmoor logo design, including its fonts, styles and colors.",
               "preselected": true
             }
           ],
@@ -237,18 +237,18 @@
         },
         {
           "id": "b2",
-          "name": "Tech4PublicGood",
+          "name": "Open4Everyone",
           "marks": [
             {
               "id": "b2-logo",
               "kind": "logo",
-              "desc": "Protects your Tech4PublicGood logo design, including its fonts, styles and colors.",
+              "desc": "Protects your Open4Everyone logo design, including its fonts, styles and colors.",
               "preselected": true
             },
             {
               "id": "b2-word",
               "kind": "word",
-              "desc": "Protects the name Tech4PublicGood. It does not protect the font or style.",
+              "desc": "Protects the name Open4Everyone. It does not protect the font or style.",
               "preselected": true
             }
           ],
@@ -265,7 +265,7 @@
             }
           ],
           "what": "Your nonprofit initiative",
-          "note": "**A note from Rebecca.** Based on the preliminary search, she does think it may be difficult to secure the word mark for Tech4PublicGood. She always recommends both, so both are included. If you choose only one, she thinks the logo mark may be the stronger mark at this stage. If anything changes after the searches, she will update you."
+          "note": "**A note from Rebecca.** Based on the preliminary search, she does think it may be difficult to secure the word mark for Open4Everyone. She always recommends both, so both are included. If you choose only one, she thinks the logo mark may be the stronger mark at this stage. If anything changes after the searches, she will update you."
         }
       ],
       "adjustments": [],
@@ -366,7 +366,7 @@
         "level": "error"
       }
     ],
-    "clientEmail": "sevetri@example.com",
+    "clientEmail": "callum@example.com",
     "expiresOn": "2026-10-26",
     "title": "Trademark Proposal"
   },

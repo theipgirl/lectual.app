@@ -9,7 +9,7 @@ vi.mock("next/font/google", () => ({
 }));
 
 import { ProposalDocument } from "@/components/client-proposal/ProposalDocument";
-import { sevetri } from "../proposals/fixture";
+import { callum } from "../proposals/fixture";
 import { commitmentSentence, firmDisplayName } from "@/lib/proposals/commitment";
 import { contactLine, firmContactFromSignoff } from "@/lib/proposals/firm-contact";
 import { usptoLine } from "@/lib/proposals/uspto-line";
@@ -90,7 +90,7 @@ describe("client page wiring (F8)", () => {
 describe("rendered client page (F8)", () => {
   const page = (firm: { name: string; slug: string; displayName?: string; contactLine?: string | null }) =>
     renderToStaticMarkup(
-      <ProposalDocument content={sevetri()} title="Trademark Proposal" clientName="Sevetri Wilson" expiresOn={null} firm={firm} mode="live" onAccept={async () => ({ ok: true, payUrl: "https://example.com/pay" })} />,
+      <ProposalDocument content={callum()} title="Trademark Proposal" clientName="Callum Ferreira" expiresOn={null} firm={firm} mode="live" onAccept={async () => ({ ok: true, payUrl: "https://example.com/pay" })} />,
     ).replaceAll("&#x27;", "'");
 
   it("names the firm from its profile and shows the contact line only when there is one", () => {

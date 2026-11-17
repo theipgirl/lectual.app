@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import { ProposalError } from "@/lib/proposals/errors";
 import type { ProposalContent } from "@/lib/proposals/types";
-import { sevetri } from "./fixture";
+import { callum } from "./fixture";
 
 /**
  * updateProposal's optimistic concurrency, against a fake scoped client that
@@ -70,10 +70,10 @@ function row(over: Row = {}): Row {
     family_id: ID,
     version: 1,
     status: "draft",
-    client_name: "Sevetri Wilson",
-    client_email: "sevetri@example.com",
+    client_name: "Callum Ferreira",
+    client_email: "callum@example.com",
     title: "Trademark Proposal",
-    content: sevetri(),
+    content: callum(),
     expires_on: null,
     pay_url: null,
     lead_id: null,
@@ -158,7 +158,7 @@ describe("updateProposal: optimistic concurrency", () => {
 describe("updateProposal keeps content.package_basis through a normal save (Sprint 6)", () => {
   it("a content save that carries it stores it, and one made by the editor's own parsers keeps it", async () => {
     const basis = { name: "Enhanced", edited: ["price"] };
-    table = [row({ content: { ...sevetri(), package_basis: basis } })];
+    table = [row({ content: { ...callum(), package_basis: basis } })];
     const current = table[0].content as ProposalContent;
     // The editor's own section parsers spread the current content, so the basis rides along.
     const { parsePricing, parseMessage } = await import("@/lib/proposal-editor/form");

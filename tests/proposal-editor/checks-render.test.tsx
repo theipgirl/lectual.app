@@ -4,7 +4,7 @@ import { writeFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ProposalDetail } from "@/lib/proposals/store";
 import type { ProposalEventRow, ProposalRow, ProposalContent } from "@/lib/proposals/types";
-import { sevetri } from "../proposals/fixture";
+import { callum } from "../proposals/fixture";
 
 /**
  * Sprint 5 (F9, I1, I2): the REAL editor page, data layer mocked (no database, no browser), for an assistant draft and a
@@ -19,7 +19,7 @@ const SETTINGS = { pricing: { packages: [CONCIERGE, ESSENTIAL] }, approver_user_
 function row(over: Partial<ProposalRow> = {}): ProposalRow {
   return {
     id: ID, org_id: "o", family_id: ID, version: 1, public_token: "t".repeat(43), lead_id: null, matter_id: null,
-    client_name: "Sevetri Wilson", client_email: "s@example.com", title: "Trademark Proposal", status: "draft", content: sevetri(),
+    client_name: "Callum Ferreira", client_email: "s@example.com", title: "Trademark Proposal", status: "draft", content: callum(),
     expires_on: "2099-11-10", pay_url: "https://pay.example/x", source: "agent", created_by: null, updated_by: null, approved_by: null,
     approved_at: null, sent_at: null, accepted_at: null, superseded_at: null, withdrawn_at: null, accepted_selection: null, accepted_snapshot: null,
     created_at: "2026-10-18T12:00:00Z", updated_at: "2026-10-18T12:00:00Z", ...over,
@@ -71,7 +71,7 @@ const hasId = (html: string, id: string) => html.includes(`id="${id}"`);
 const headings = (html: string) => html.match(/>Check these \d+ things?</g) ?? [];
 
 const assistantContent = (): ProposalContent => {
-  const c = sevetri();
+  const c = callum();
   c.made_by = "assistant";
   c.made_from = { consult_date: "2026-10-15" };
   c.packages = [{ ...ESSENTIAL }, { ...CONCIERGE }] as never;
@@ -86,7 +86,7 @@ const assistantContent = (): ProposalContent => {
 };
 
 const copilotContent = (): ProposalContent => {
-  const c = sevetri();
+  const c = callum();
   c.made_by = "copilot";
   c.names[0].discount_pct = 10;
   c.checks = [

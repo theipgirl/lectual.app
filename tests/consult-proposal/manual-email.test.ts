@@ -19,8 +19,8 @@ const ORG = "org-1";
 function content(opts: { logo?: boolean; discount?: number } = {}) {
   const marks = [{ id: "m1", kind: "word" }, ...(opts.logo === false ? [] : [{ id: "m2", kind: "logo" }])];
   return {
-    client: { first_name: "Sevetri", full_name: "Sevetri Wilson" },
-    names: [{ id: "n1", name: "Prosperall", marks }],
+    client: { first_name: "Callum", full_name: "Callum Ferreira" },
+    names: [{ id: "n1", name: "Larkmoor", marks }],
     pricing: { second_mark_discount_pct: opts.discount ?? 50 },
   } as unknown as ProposalRow["content"];
 }
@@ -31,8 +31,8 @@ function proposal(over: Partial<ProposalRow> = {}): ProposalRow {
     org_id: ORG,
     status: "sent",
     public_token: "tok_abcdefghijklmnopqrstuvwxyz0123456789",
-    client_name: "Sevetri Wilson",
-    client_email: "sevetri@example.com",
+    client_name: "Callum Ferreira",
+    client_email: "callum@example.com",
     lead_id: "lead-1",
     matter_id: null,
     content: content(),
@@ -82,9 +82,9 @@ describe("buildManualEmail", () => {
   it("renders Rebecca's template: title + url, principle, sign-off, subject", () => {
     const e = buildManualEmail({ ...base, content: content() });
     expect(e.subject).toBe("Your Trademark Proposal from RPB Law");
-    expect(e.body).toContain("Hi Sevetri,");
+    expect(e.body).toContain("Hi Callum,");
     expect(e.body).toContain(REASONING_PRINCIPLE);
-    expect(e.body).toContain("Sevetri Wilson Trademark Proposal\nhttps://proposals.example.com/p/tok/");
+    expect(e.body).toContain("Callum Ferreira Trademark Proposal\nhttps://proposals.example.com/p/tok/");
     expect(e.body.endsWith("Best,\nThe RPB Law Team")).toBe(true);
   });
   it("the second-mark sentence follows the existing rule (word+logo AND a discount)", () => {
@@ -129,7 +129,7 @@ describe("runManualEmail", () => {
       orgKey: "rpb-law",
       agent: "post-consult",
       type: "CLIENT_EMAIL",
-      recipient: "sevetri@example.com",
+      recipient: "callum@example.com",
       leadId: "lead-1",
       teamSignOff: "The RPB Law Team",
       dedupe: false,

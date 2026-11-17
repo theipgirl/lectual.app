@@ -16,7 +16,7 @@ import { FINGERPRINT, signedTrademark } from "./signed-fixtures";
 
 const OK: SignatureRead = {
   status: "ok",
-  signature: { id: "sig-1", signerName: "Sevetri Wilson", signedAt: "2026-11-12T19:14:00.000Z", fingerprint: FINGERPRINT, entityName: "Prosperall Inc.", signerTitle: "Founder", templateVersion: 3 },
+  signature: { id: "sig-1", signerName: "Callum Ferreira", signedAt: "2026-11-12T19:14:00.000Z", fingerprint: FINGERPRINT, entityName: "Larkmoor Inc.", signerTitle: "Founder", templateVersion: 3 },
 };
 
 /** The card as the page builds it for a role: the read is attempted only for a role that may read signatures. */
@@ -83,13 +83,13 @@ describe("the staff card, by role", () => {
   for (const role of ["viewer", "social_media"] as const) {
     it(`${role}: who signed and when, from the accepted snapshot; no Download, no fingerprint, no filing state`, () => {
       const card = cardFor(role);
-      expect(card).toEqual({ kind: "summary", text: "Signed by Sevetri Wilson on November 12, 2026 at 2:14 PM EST" });
+      expect(card).toEqual({ kind: "summary", text: "Signed by Callum Ferreira on November 12, 2026 at 2:14 PM EST" });
       expect(JSON.stringify(card)).not.toContain(FINGERPRINT);
     });
 
     it(`${role}: the same line whatever the database would have answered (it is never asked)`, () => {
       for (const read of [{ status: "none" }, { status: "unavailable" }] as SignatureRead[]) {
-        expect(cardFor(role, read)).toEqual({ kind: "summary", text: "Signed by Sevetri Wilson on November 12, 2026 at 2:14 PM EST" });
+        expect(cardFor(role, read)).toEqual({ kind: "summary", text: "Signed by Callum Ferreira on November 12, 2026 at 2:14 PM EST" });
       }
     });
   }
@@ -97,7 +97,7 @@ describe("the staff card, by role", () => {
   for (const role of ["paralegal", "owner"] as const) {
     it(`${role}: the signature row is the source: signer, zone-named time, fingerprint and Download`, () => {
       const card = cardFor(role);
-      expect(card).toMatchObject({ kind: "signed", signer: "Sevetri Wilson", signedLine: "Signed November 12, 2026 at 2:14 PM EST", fingerprint: FINGERPRINT, canDownload: true, fromStoredText: false });
+      expect(card).toMatchObject({ kind: "signed", signer: "Callum Ferreira", signedLine: "Signed November 12, 2026 at 2:14 PM EST", fingerprint: FINGERPRINT, canDownload: true, fromStoredText: false });
     });
 
     it(`${role}: a read that returns nothing, or fails, is "couldn't be loaded": never "not signed", never a line made up from the snapshot`, () => {

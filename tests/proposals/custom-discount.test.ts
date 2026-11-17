@@ -9,10 +9,10 @@ import { validateContent } from "@/lib/proposals/validate";
 import { publicContent } from "@/lib/proposals/public";
 import { withPackageSnapshot } from "@/lib/proposals/package-snapshot";
 import type { PackageOffer, ProposalContent, Selection } from "@/lib/proposals/types";
-import { sevetri } from "./fixture";
-import { danielle } from "./danielle-fixture";
+import { callum } from "./fixture";
+import { renata } from "./renata-fixture";
 import { fold } from "./mark-fixture";
-import { S_CONCIERGE, S_OPTIONS, sevetriCustom } from "./sevetri-custom-fixture";
+import { S_CONCIERGE, S_OPTIONS, callumCustom } from "./callum-custom-fixture";
 
 /** Every mark of every brand name on `pkg` (all marks and classes ticked, as the default selection has them). */
 function all(content: ProposalContent, pkg: string): Selection {
@@ -23,9 +23,9 @@ function all(content: ProposalContent, pkg: string): Selection {
 
 const errors = (c: unknown) => validateContent(c).filter((i) => i.level === "error");
 
-describe("Sevetri: a custom discount on Concierge only", () => {
+describe("Callum: a custom discount on Concierge only", () => {
   it("all Concierge, every mark and class ticked: $4,125 + $3,300 per name, $14,850 legal, USPTO $2,800", () => {
-    const c = sevetriCustom();
+    const c = callumCustom();
     const q = quoteProposal(c, defaultSelection(c));
     for (const n of q.names) {
       expect(n.marks.map((m) => m.price_cents)).toEqual([412_500, 330_000]);
@@ -45,7 +45,7 @@ describe("Sevetri: a custom discount on Concierge only", () => {
   });
 
   it("all Enhanced: $11,700, and no custom-discount key anywhere", () => {
-    const c = sevetriCustom();
+    const c = callumCustom();
     const q = quoteProposal(c, all(c, "Enhanced"));
     expect(q.legal_total_cents).toBe(1_170_000);
     expect(q.gov_total_cents).toBe(280_000);
@@ -53,14 +53,14 @@ describe("Sevetri: a custom discount on Concierge only", () => {
   });
 
   it("all Essential: $9,990, and no custom-discount key anywhere", () => {
-    const c = sevetriCustom();
+    const c = callumCustom();
     const q = quoteProposal(c, all(c, "Essential"));
     expect(q.legal_total_cents).toBe(999_000);
     expect(JSON.stringify(q)).not.toContain("custom_discount");
   });
 
   it("Concierge with 3 classes on a name (one client-added class): no discount on that name, $4,950 + $3,960", () => {
-    const c = sevetriCustom();
+    const c = callumCustom();
     const r = quoteWithClientClasses(c, defaultSelection(c), { entries: {}, added: { p: [{ text: "Mobile apps", on: true }] } });
     if (!r.ok) throw new Error("refused");
     const [p, t] = r.quote.names;
@@ -75,18 +75,18 @@ describe("Sevetri: a custom discount on Concierge only", () => {
   });
 
   it("mixed: word mark Concierge, design mark Enhanced. The second mark's Enhanced price is untouched", () => {
-    const c = sevetriCustom();
+    const c = callumCustom();
     const q = quoteProposal(c, { ...defaultSelection(c), packages: { "p-word": "Concierge", "p-logo": "Enhanced", "t-logo": "Enhanced", "t-word": "Concierge" } });
     const [p, t] = q.names;
     expect(p.marks.map((m) => [m.price_cents, m.custom_discount_cents])).toEqual([[412_500, 82_500], [260_000, undefined]]);
     expect(p.custom_discount_cents).toBe(82_500);
-    // Tech4PublicGood: logo first (Enhanced $3,250), word second on Concierge: (4,950 - 825) x 80% = $3,300, $660 off.
+    // Open4Everyone: logo first (Enhanced $3,250), word second on Concierge: (4,950 - 825) x 80% = $3,300, $660 off.
     expect(t.marks.map((m) => [m.price_cents, m.custom_discount_cents])).toEqual([[325_000, undefined], [330_000, 66_000]]);
     expect(t.custom_discount_cents).toBe(66_000);
   });
 
   it("one class ticked: $825 x 2 off (never below zero)", () => {
-    const c = sevetriCustom();
+    const c = callumCustom();
     const s = { ...defaultSelection(c), "p-c2": false };
     const p = quoteProposal(c, s).names[0];
     expect(p.marks.map((m) => m.price_cents)).toEqual([495_000 - 165_000, Math.round((495_000 - 165_000) * 0.8)]);
@@ -100,7 +100,7 @@ describe("Sevetri: a custom discount on Concierge only", () => {
   });
 
   it("the global adjustments still come off the subtotal afterwards, unchanged", () => {
-    const c = sevetriCustom();
+    const c = callumCustom();
     c.adjustments = [{ id: "a", label: "Consult credit", kind: "amount", value: 50_000 }];
     const q = quoteProposal(c, defaultSelection(c));
     expect(q.legal_subtotal_cents).toBe(1_485_000);
@@ -108,14 +108,14 @@ describe("Sevetri: a custom discount on Concierge only", () => {
   });
 
   it("a brand-name-level package (Spec 6) with a custom discount: off the name's price, then its own discount_pct", () => {
-    const d = danielle();
+    const d = renata();
     const packages = (d.packages ?? []).map((p) => (p.package === "Concierge" ? { ...p, custom_discount: { label: "Custom proposal discount", per_class_under_cents: 82_500 } } : p));
     const c: ProposalContent = { ...d, packages };
-    // A second mark on The Confidence Interval, to check the order against the second-mark percent.
+    // A second mark on The Margin Note, to check the order against the second-mark percent.
     c.names[1].marks.push({ id: "ci-logo", kind: "logo", desc: "Protects the design.", preselected: true });
     const q = quoteProposal(c, { ...defaultSelection(c), packages: { fold: "Concierge", ci: "Concierge" } });
     const [f, ci] = q.names;
-    // The Confidence Interval: 2 classes, one under Concierge's 3. $4,950 - $825 = $4,125; second mark $3,300; then 10% off.
+    // The Margin Note: 2 classes, one under Concierge's 3. $4,950 - $825 = $4,125; second mark $3,300; then 10% off.
     expect(ci.package).toBe("Concierge");
     expect(ci.marks.map((m) => m.price_cents)).toEqual([412_500, 330_000]);
     expect(ci.marks.map((m) => m.custom_discount_cents)).toEqual([82_500, 66_000]);
@@ -124,7 +124,7 @@ describe("Sevetri: a custom discount on Concierge only", () => {
     expect(ci.discount_cents).toBe(74_250);
     expect(ci.legal_cents).toBe(668_250);
     expect(ci.gov_cents).toBe(2 * 2 * 35_000);
-    // The Fold has 3 classes: nothing under Concierge's 3, no discount.
+    // The Pleat has 3 classes: nothing under Concierge's 3, no discount.
     expect(f.legal_cents).toBe(495_000);
     expect(f.custom_discount_cents).toBeUndefined();
     // On Enhanced nothing applies.
@@ -134,7 +134,7 @@ describe("Sevetri: a custom discount on Concierge only", () => {
   });
 
   it("selection rules are unchanged by the feature", () => {
-    const c = sevetriCustom();
+    const c = callumCustom();
     expect(isFixedOffer(c)).toBe(false);
     expect(normalizeSelection(c, { packages: { "p-word": "Nope" } }).packages?.["p-word"]).toBe("Concierge");
     expect(quoteHasItems(quoteProposal(c, defaultSelection(c)))).toBe(true);
@@ -144,13 +144,13 @@ describe("Sevetri: a custom discount on Concierge only", () => {
 
 describe("validateContent: custom_discount", () => {
   const withCd = (cd: unknown, at: Partial<PackageOffer> = {}) => {
-    const c = sevetriCustom();
+    const c = callumCustom();
     c.packages = [c.packages![0], c.packages![1], { ...S_CONCIERGE, ...at, custom_discount: cd as PackageOffer["custom_discount"] }];
     return c;
   };
 
-  it("Sevetri's content is valid", () => {
-    expect(errors(sevetriCustom())).toEqual([]);
+  it("Callum's content is valid", () => {
+    expect(errors(callumCustom())).toEqual([]);
   });
 
   it("refuses a missing, long or non-plain label", () => {
@@ -175,7 +175,7 @@ describe("validateContent: custom_discount", () => {
   });
 
   it("is allowed only on content.packages entries, never on the proposal's pricing", () => {
-    const c = sevetriCustom();
+    const c = callumCustom();
     (c.pricing as unknown as Record<string, unknown>).custom_discount = { label: "Custom proposal discount", per_class_under_cents: 82_500 };
     expect(errors(c).map((i) => i.path)).toEqual(["pricing.custom_discount"]);
   });
@@ -183,7 +183,7 @@ describe("validateContent: custom_discount", () => {
 
 describe("custom_discount survives the client view and the package snapshot", () => {
   it("publicContent keeps exactly its two keys", () => {
-    const c = sevetriCustom();
+    const c = callumCustom();
     (c.packages![2].custom_discount as unknown as Record<string, unknown>).secret = "x";
     const pub = publicContent(c);
     expect(pub.packages?.[2].custom_discount).toEqual({ label: "Custom proposal discount", per_class_under_cents: 82_500 });
@@ -193,7 +193,7 @@ describe("custom_discount survives the client view and the package snapshot", ()
   });
 
   it("withPackageSnapshot keeps an existing entry's custom discount when it refreshes the firm's list", () => {
-    const c = sevetriCustom();
+    const c = callumCustom();
     const setting = {
       packages: [
         { package: "Essential", base_cents: 195_000, per_class_cents: 82_500, included_classes: 1, gov_per_class_cents: 35_000, second_mark_discount_pct: 20 },
@@ -230,7 +230,7 @@ function withoutCustom(c: ProposalContent): ProposalContent {
 }
 
 describe("without a custom discount, the engine is unchanged", () => {
-  it.skipIf(oldPricing === null)("sevetri, danielle, the fold and Sevetri's per-mark offer quote exactly as on main", async () => {
+  it.skipIf(oldPricing === null)("callum, renata, the pleat and Callum's per-mark offer quote exactly as on main", async () => {
     const dir = mkdtempSync(join(tmpdir(), "custom-discount-pricing-"));
     const file = join(dir, "pricing-before.ts");
     // The old engine imports `isGeneralContent` from "./types" at runtime: point it at this checkout's types.ts.
@@ -245,17 +245,17 @@ describe("without a custom discount, the engine is unchanged", () => {
         cases.push([c, { ...d, ...Object.fromEntries(keys.map((k, i) => [k, ((mask >> i % 4) & 1) === 1])) }]);
       }
     };
-    add(sevetri());
-    const credit = sevetri();
+    add(callum());
+    const credit = callum();
     credit.adjustments = [{ id: "a", label: "Consult credit", kind: "amount", value: 50_000 }];
     add(credit);
-    add(danielle());
+    add(renata());
     add(fold());
-    const plain = withoutCustom(sevetriCustom());
+    const plain = withoutCustom(callumCustom());
     add(plain);
     for (const p of S_OPTIONS) cases.push([plain, all(plain, p)]);
     // A custom discount that never applies (Concierge never chosen) changes nothing either.
-    const unused = sevetriCustom();
+    const unused = callumCustom();
     for (const p of ["Essential", "Enhanced"]) cases.push([unused, all(unused, p)]);
     for (const [content, selection] of cases) {
       expect(JSON.stringify(quoteProposal(content, selection))).toBe(JSON.stringify(before.quoteProposal(content, selection)));

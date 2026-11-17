@@ -5,7 +5,7 @@ import { input } from "./fixtures";
 describe("matchRecord", () => {
   it("matches an exact unique client or mark, case-insensitively", () => {
     expect(matchRecord("  MAYA   chen ", input.rows)).toEqual({ kind: "matter", id: "r1" });
-    expect(matchRecord("the fold", input.rows)).toEqual({ kind: "matter", id: "r1" });
+    expect(matchRecord("the pleat", input.rows)).toEqual({ kind: "matter", id: "r1" });
   });
   it("never guesses", () => {
     expect(matchRecord("Maya", input.rows)).toBe("unmatched");

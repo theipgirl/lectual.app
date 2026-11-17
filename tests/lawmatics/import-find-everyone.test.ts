@@ -306,7 +306,7 @@ describe("the practice-area filter lists everyone it excludes, by name", () => {
 });
 
 describe("Find a person in this pull", () => {
-  const sevetra = rec({ lawmaticsId: "p77", firstName: "Sévetra", lastName: "Wren", email: "sevetra@prospera.example", businessName: "Prosperall", stageName: "Proposal Sent" });
+  const sevetra = rec({ lawmaticsId: "p77", firstName: "Sévetra", lastName: "Wren", email: "sevetra@prospera.example", businessName: "Larkmoor", stageName: "Proposal Sent" });
   const plan = planImport(
     [
       rec({ lawmaticsId: "p1", email: "a@x.example", firstName: "Ansel", lastName: "Greaves" }),
@@ -329,7 +329,7 @@ describe("Find a person in this pull", () => {
   });
 
   it("matches by business and by email", () => {
-    expect(findInPlan(plan, "prosperall").map((p) => p.ref)).toEqual(["p77"]);
+    expect(findInPlan(plan, "larkmoor").map((p) => p.ref)).toEqual(["p77"]);
     expect(findInPlan(plan, "prospera.example").map((p) => p.ref)).toEqual(["p77"]);
   });
 
@@ -488,8 +488,8 @@ describe("applyImport writes the contact leads and flags the stand-in stages", (
 });
 
 describe("a business name finds the person in every bucket", () => {
-  const biz = { businessName: "Prosperall", firstName: "Wen", lastName: "Aldercott", email: "wen@pros.example" };
-  const bucketOf = (plan: ReturnType<typeof planImport>) => findInPlan(plan, "prosperall").map((p) => p.bucket);
+  const biz = { businessName: "Larkmoor", firstName: "Wen", lastName: "Aldercott", email: "wen@pros.example" };
+  const bucketOf = (plan: ReturnType<typeof planImport>) => findInPlan(plan, "larkmoor").map((p) => p.bucket);
 
   it("skipped by the practice-area filter", () => {
     const plan = planImport([rec({ ...biz, lawmaticsId: "pb1", practiceArea: "Patent" })], STAGES, [], FILTER_ON);
@@ -497,14 +497,14 @@ describe("a business name finds the person in every bucket", () => {
   });
 
   it("already linked and current (unchanged)", () => {
-    const lead = existing({ id: "lead-b", email: "wen@pros.example", first_name: "Wen", last_name: "Aldercott", business_name: "Prosperall", lawmatics_id: "pb2", current_stage_id: "s-consult", practice_area: "Trademark" });
+    const lead = existing({ id: "lead-b", email: "wen@pros.example", first_name: "Wen", last_name: "Aldercott", business_name: "Larkmoor", lawmatics_id: "pb2", current_stage_id: "s-consult", practice_area: "Trademark" });
     const plan = planImport([rec({ ...biz, lawmaticsId: "pb2" })], STAGES, [lead]);
     expect(plan.unchanged).toHaveLength(1);
     expect(bucketOf(plan)).toEqual(["unchanged"]);
   });
 
   it("an update", () => {
-    const lead = existing({ id: "lead-c", email: "wen@pros.example", first_name: "Wen", last_name: "Aldercott", business_name: "Prosperall", lawmatics_id: "pb3", phone: null });
+    const lead = existing({ id: "lead-c", email: "wen@pros.example", first_name: "Wen", last_name: "Aldercott", business_name: "Larkmoor", lawmatics_id: "pb3", phone: null });
     const plan = planImport([rec({ ...biz, lawmaticsId: "pb3", phone: "555-0100" })], STAGES, [lead]);
     expect(plan.updates).toHaveLength(1);
     expect(bucketOf(plan)).toEqual(["update"]);

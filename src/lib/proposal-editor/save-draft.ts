@@ -57,7 +57,7 @@ const field = (form: FormData, key: string): string => {
   return typeof v === "string" ? v.trim() : "";
 };
 
-/** "Brand name The Fold: ..." / "Who: ...". The section always leads, so a person knows where to look. */
+/** "Brand name The Pleat: ..." / "Who: ...". The section always leads, so a person knows where to look. */
 const refuse = (section: string, message: string): Parsed<never> => ({ ok: false, error: `${section}: ${message}` });
 
 /** The sub-form one brand name's parser reads: every `b.<n>.<field>` with the prefix removed. */

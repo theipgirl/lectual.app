@@ -3,11 +3,11 @@ import { blockingCount, buildChecklist, targetForPath } from "@/lib/proposal-edi
 import { publicContent } from "@/lib/proposals/public";
 import { validateContent } from "@/lib/proposals/validate";
 import type { ProposalContent } from "@/lib/proposals/types";
-import { sevetri } from "../proposals/fixture";
+import { callum } from "../proposals/fixture";
 
 /** Sprint 5, D4 and D5: `content.checks` (things to check, staff only) in the "Ready to send?" list. */
 
-const withChecks = (checks: unknown): ProposalContent => ({ ...sevetri(), checks: checks as never });
+const withChecks = (checks: unknown): ProposalContent => ({ ...callum(), checks: checks as never });
 const CHECKS = [
   { text: "Add the client's pay link before creating the link.", source: "copilot", path: "pay_url" },
   { text: "A 10% discount was applied. Check it.", source: "copilot", path: "names[0].discount_pct" },
@@ -77,7 +77,7 @@ describe("buildChecklist merges the checks after the issues and never blocks", (
   });
 
   it("a proposal with no checks is unchanged", () => {
-    expect(buildChecklist([], sevetri())).toEqual([]);
+    expect(buildChecklist([], callum())).toEqual([]);
   });
 });
 

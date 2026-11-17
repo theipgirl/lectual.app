@@ -21,7 +21,7 @@ import { centsToInput } from "@/lib/quotes/money";
 import { formatDollars } from "@/lib/proposal-editor/events";
 import type { ProposalInclude, ProposalPricing } from "./types";
 
-/** RPB's Concierge package, from the Sevetri example, in cents. */
+/** RPB's Concierge package, from the Callum example, in cents. */
 export const DEFAULT_PROPOSAL_PRICING: ProposalPricing = {
   package: "Concierge",
   base_cents: 495_000,

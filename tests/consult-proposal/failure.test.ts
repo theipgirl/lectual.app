@@ -77,9 +77,9 @@ describe("consultFailureLine", () => {
 
   it("never logs emails, tokens or more than 500 characters", () => {
     const jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.c2lnbmF0dXJlLXNpZ25hdHVyZQ";
-    const msg = `bad for sevetri@example.com with ${jwt} and Bearer abc.def and ${"A".repeat(60)} ${"z ".repeat(600)}`;
+    const msg = `bad for callum@example.com with ${jwt} and Bearer abc.def and ${"A".repeat(60)} ${"z ".repeat(600)}`;
     const out = JSON.parse(consultFailureLine("draft", new Error(msg))).message as string;
-    expect(out).not.toContain("sevetri@example.com");
+    expect(out).not.toContain("callum@example.com");
     expect(out).not.toContain("eyJ");
     expect(out).not.toContain("abc.def");
     expect(out).not.toContain("AAAAAAAAAA");

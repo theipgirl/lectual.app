@@ -10,21 +10,21 @@ import { filterValue, type Recorded } from "../mailbox/fake-db";
  */
 
 const TURNS = [
-  { speaker: "Rebecca", text: "Thanks for joining, Sevetri. Based on what you've told me I'd file the word mark for Prosperall and the logo too." },
-  { speaker: "Sevetri", text: "Great, that sounds right to me." },
-  { speaker: "Rebecca", text: "For Prosperall the right category is cloud based software as a service, so I'd cover that class." },
+  { speaker: "Rebecca", text: "Thanks for joining, Callum. Based on what you've told me I'd file the word mark for Larkmoor and the logo too." },
+  { speaker: "Callum", text: "Great, that sounds right to me." },
+  { speaker: "Rebecca", text: "For Larkmoor the right category is cloud based software as a service, so I'd cover that class." },
 ];
 const EXTRACT = {
   is_trademark_matter: true,
   recommendation_found: true,
   brands: [
     {
-      name: "Prosperall",
+      name: "Larkmoor",
       what: "Your company name",
       note_from_attorney: null,
       marks: [
-        { kind: "word", preselected: true, why_quote: "I'd file the word mark for Prosperall and the logo too" },
-        { kind: "logo", preselected: true, why_quote: "I'd file the word mark for Prosperall and the logo too" },
+        { kind: "word", preselected: true, why_quote: "I'd file the word mark for Larkmoor and the logo too" },
+        { kind: "logo", preselected: true, why_quote: "I'd file the word mark for Larkmoor and the logo too" },
       ],
       classes: [{ label: "Cloud-Based Software as a Service (SaaS)", preselected: true, why_quote: "the right category is cloud based software as a service" }],
     },
@@ -34,7 +34,7 @@ const EXTRACT = {
   reduced_package: null,
   price_changes: [],
   credits: [],
-  recommendation_summary: "Word and logo for Prosperall.",
+  recommendation_summary: "Word and logo for Larkmoor.",
   reasoning_parts: { principle: true, risk_brand: null, risk_quote: null, fallback_brand: null, fallback_quote: null },
 };
 
@@ -67,7 +67,7 @@ function handler(o: { modules?: string[]; meetings?: ReturnType<typeof meetings>
     }
     if (q.table === "crm_lead") {
       const id = String(filterValue(q, "id"));
-      return { data: { id, first_name: "Sevetri", last_name: "Wilson", business_name: "Prosperall", email: `${id}@example.com` }, error: null };
+      return { data: { id, first_name: "Callum", last_name: "Ferreira", business_name: "Larkmoor", email: `${id}@example.com` }, error: null };
     }
     if (q.table === "crm_activity" && q.action === "select") {
       const one = filterValue(q, "payload->>meeting_id");

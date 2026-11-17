@@ -35,7 +35,7 @@ describe("the staff Download of a signed letter", () => {
     if (!r.ok) return;
     const bytes = new Uint8Array(Buffer.from(r.base64, "base64"));
     expect(Buffer.from(bytes.slice(0, 4)).toString()).toBe("%PDF");
-    expect(r.filename).toBe("Sevetri-Wilson-engagement-letter-signed-2026-11-12.pdf");
+    expect(r.filename).toBe("Callum-Ferreira-engagement-letter-signed-2026-11-12.pdf");
     // The same builder as the client's own signed download and the Lawmatics filing: the same text read back.
     const clientSide = await buildVerifiedSignedPdf({ snapshot: signedTrademark(), firm: { displayName: "RPB Law Firm", timeZone: "America/New_York" }, readStored: async () => null });
     if (!clientSide.ok) throw new Error("no file");
@@ -104,7 +104,7 @@ describe("the staff Download of a signed letter", () => {
 
   it("an unreadable proposal, unreadable firm facts and a failing builder give one fixed sentence", async () => {
     const msg = { ok: false, message: STAFF_DOWNLOAD_MESSAGES.unavailable };
-    expect(await runStaffDownload(deps({ getProposal: async () => { throw new Error("db down: sevetri@example.com"); } }), ID)).toEqual(msg);
+    expect(await runStaffDownload(deps({ getProposal: async () => { throw new Error("db down: callum@example.com"); } }), ID)).toEqual(msg);
     expect(await runStaffDownload(deps({ firmFacts: async () => ({ status: "unavailable" }) }), ID)).toEqual(msg);
     const broken = acceptedProposalRow({ ...signedTrademark(), content: { ...signedTrademark().content, loe: { ...signedTrademark().content.loe!, body: "{{nope}}" } } });
     expect(await runStaffDownload(deps({ getProposal: async () => broken }), ID)).toEqual(msg);

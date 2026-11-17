@@ -87,7 +87,7 @@ const MAX_NOTES = 12_000;
 /** Largest single amount accepted from a call, in cents ($100,000). */
 const MAX_AMOUNT_CENTS = 10_000_000;
 
-/** Rebecca's Sevetri precedent: the offer is open for 10 calendar days. */
+/** Rebecca's Callum precedent: the offer is open for 10 calendar days. */
 export const PROPOSAL_VALID_DAYS = 10;
 
 /* ─────────────────────────── the schema ──────────────────────────────────── */
@@ -501,7 +501,7 @@ function logoDesc(name: string): string {
   return name ? `Protects your ${name} logo design, including its fonts, styles and colors.` : MARK_KIND_DEFAULT_DESC.logo;
 }
 
-/** Rebecca's Sevetri note, for a brand where she flagged a word-mark risk and/or the logo as the stronger single option. */
+/** Rebecca's Callum note, for a brand where she flagged a word-mark risk and/or the logo as the stronger single option. */
 function brandNote(name: string, risk: boolean, fallback: boolean): string | undefined {
   if (!risk && !fallback) return undefined;
   const parts = ["**A note from Rebecca.**"];

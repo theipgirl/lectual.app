@@ -24,8 +24,8 @@ function world(over: { proposal?: Row; leads?: Row[]; matters?: Row[]; failInser
           org_id: "org-1",
           family_id: "fam-1",
           status: "accepted",
-          client_name: "Sevetri Wilson",
-          client_email: "Sevetri@Example.com",
+          client_name: "Callum Ferreira",
+          client_email: "Callum@Example.com",
           lead_id: null,
           matter_id: null,
           accepted_snapshot: snapshot,
@@ -65,19 +65,19 @@ function fakeFetch(status = 200) {
   return { fetchImpl, calls };
 }
 
-const LEAD_WITH_LM = { id: "lead-1", org_id: "org-1", email: "sevetri@example.com", lawmatics_id: "LM-LEAD" };
+const LEAD_WITH_LM = { id: "lead-1", org_id: "org-1", email: "callum@example.com", lawmatics_id: "LM-LEAD" };
 const tokenFor = (tokens: Record<string, string | null>) => async (_db: FollowupDb, orgId: string) => tokens[orgId] ?? null;
 
 afterEach(() => vi.restoreAllMocks());
 
 describe("acceptanceHeadline and the note body", () => {
   it("the headline is client + package + the LEGAL total only", () => {
-    expect(acceptanceHeadline({ clientName: "Sevetri Wilson", packageName: "Concierge", legalTotalCents: 495_000 })).toBe("Sevetri Wilson accepted Concierge · legal $4,950");
+    expect(acceptanceHeadline({ clientName: "Callum Ferreira", packageName: "Concierge", legalTotalCents: 495_000 })).toBe("Callum Ferreira accepted Concierge · legal $4,950");
     expect(acceptanceHeadline({ clientName: "", packageName: "", legalTotalCents: 100 })).toBe("A client accepted their proposal · legal $1");
   });
 
   it("the note shows legal and USPTO as two separate numbers, never summed", () => {
-    const { name, body } = acceptanceNoteBody(snapshot, "Sevetri Wilson");
+    const { name, body } = acceptanceNoteBody(snapshot, "Callum Ferreira");
     expect(name).toBe("Proposal accepted: Concierge");
     const legal = snapshot.quote.legal_total_cents;
     const gov = snapshot.quote.gov_total_cents;
@@ -85,7 +85,7 @@ describe("acceptanceHeadline and the note body", () => {
     expect(body).toContain(`Legal fee, due when accepted: ${fmt(legal)}`);
     expect(body).toContain(`USPTO fees, due at filing: ${fmt(gov)}`);
     expect(body).not.toContain(fmt(legal + gov));
-    expect(body).toContain("Prosperall");
+    expect(body).toContain("Larkmoor");
     expect(body).toContain("Adjustment: Event discount −$250");
   });
 });
@@ -118,7 +118,7 @@ describe("the in-app notice", () => {
       expect(Object.keys(payload).sort()).toEqual(["headline", "proposal_id", "source"]);
       expect(payload).toMatchObject({ source: "proposal_accepted", proposal_id: PROPOSAL });
       const wire = JSON.stringify(row);
-      for (const leak of ["sevetri@example.com", "Prosperall", "accepted_snapshot", "public_token", "usptoFees"]) expect(wire).not.toContain(leak);
+      for (const leak of ["callum@example.com", "Larkmoor", "accepted_snapshot", "public_token", "usptoFees"]) expect(wire).not.toContain(leak);
       // The headline has the legal total only: the USPTO figure is nowhere in the row.
       expect(wire).not.toContain(`$${(snapshot.quote.gov_total_cents / 100).toLocaleString("en-US")}`);
     }
@@ -188,7 +188,7 @@ describe("once per accepted version", () => {
 });
 
 describe("resolveNoteTarget", () => {
-  const base = { orgId: "org-1", matterId: null, leadId: null, clientEmail: "sevetri@example.com" } as const;
+  const base = { orgId: "org-1", matterId: null, leadId: null, clientEmail: "callum@example.com" } as const;
   const dbWith = (matters: Row[], leads: Row[]) => fakeFollowupDb({ crm_matter: matters, crm_lead: leads }).db;
 
   it("the matter id wins over the lead id", async () => {
@@ -197,12 +197,12 @@ describe("resolveNoteTarget", () => {
   });
 
   it("the lead id wins over the email", async () => {
-    const db = dbWith([], [LEAD_WITH_LM, { id: "lead-2", org_id: "org-1", email: "sevetri@example.com", lawmatics_id: "LM-OTHER" }]);
+    const db = dbWith([], [LEAD_WITH_LM, { id: "lead-2", org_id: "org-1", email: "callum@example.com", lawmatics_id: "LM-OTHER" }]);
     expect(await resolveNoteTarget(db, { ...base, leadId: "lead-1" })).toMatchObject({ ok: true, notableId: "LM-LEAD" });
   });
 
   it("exactly one lead with that email (case-insensitive) is used", async () => {
-    const db = dbWith([], [{ id: "lead-9", org_id: "org-1", email: "SEVETRI@example.com", lawmatics_id: 4412 }, { id: "lead-8", org_id: "org-2", email: "sevetri@example.com", lawmatics_id: "LM-OTHER-FIRM" }]);
+    const db = dbWith([], [{ id: "lead-9", org_id: "org-1", email: "CALLUM@example.com", lawmatics_id: 4412 }, { id: "lead-8", org_id: "org-2", email: "callum@example.com", lawmatics_id: "LM-OTHER-FIRM" }]);
     expect(await resolveNoteTarget(db, base)).toEqual({ ok: true, notableType: "Prospect", notableId: "4412" });
   });
 
@@ -220,12 +220,12 @@ describe("resolveNoteTarget", () => {
   });
 
   it("a matter or lead with no lawmatics_id falls through to the next rule", async () => {
-    const db = dbWith([{ id: "m1", org_id: "org-1", lawmatics_id: null }], [{ id: "lead-1", org_id: "org-1", email: "x@y.com", lawmatics_id: "" }, { id: "lead-7", org_id: "org-1", email: "sevetri@example.com", lawmatics_id: "LM-BY-EMAIL" }]);
+    const db = dbWith([{ id: "m1", org_id: "org-1", lawmatics_id: null }], [{ id: "lead-1", org_id: "org-1", email: "x@y.com", lawmatics_id: "" }, { id: "lead-7", org_id: "org-1", email: "callum@example.com", lawmatics_id: "LM-BY-EMAIL" }]);
     expect(await resolveNoteTarget(db, { ...base, matterId: "m1", leadId: "lead-1" })).toMatchObject({ ok: true, notableId: "LM-BY-EMAIL" });
   });
 
   it("an email match with no lawmatics_id does not count", async () => {
-    const db = dbWith([], [{ id: "a", org_id: "org-1", email: "sevetri@example.com", lawmatics_id: null }]);
+    const db = dbWith([], [{ id: "a", org_id: "org-1", email: "callum@example.com", lawmatics_id: null }]);
     expect(await resolveNoteTarget(db, base)).toEqual({ ok: false, reason: "none" });
   });
 
@@ -235,7 +235,7 @@ describe("resolveNoteTarget", () => {
   });
 
   it("is fenced on the proposal's org", async () => {
-    const db = dbWith([{ id: "m1", org_id: "org-2", lawmatics_id: "LM-OTHER" }], [{ id: "lead-1", org_id: "org-2", email: "sevetri@example.com", lawmatics_id: "LM-OTHER" }]);
+    const db = dbWith([{ id: "m1", org_id: "org-2", lawmatics_id: "LM-OTHER" }], [{ id: "lead-1", org_id: "org-2", email: "callum@example.com", lawmatics_id: "LM-OTHER" }]);
     expect(await resolveNoteTarget(db, { ...base, matterId: "m1", leadId: "lead-1" })).toEqual({ ok: false, reason: "none" });
   });
 });
@@ -280,13 +280,13 @@ describe("the Lawmatics note request", () => {
 
     const world2 = world({ leads: [LEAD_WITH_LM], proposal: { lead_id: "lead-1" } });
     const throwing: FetchLike = async () => {
-      throw new Error("socket hang up for sevetri@example.com");
+      throw new Error("socket hang up for callum@example.com");
     };
     await runAcceptanceFollowups(world2.db, { proposalId: PROPOSAL, orgId: "org-1" }, { getToken: tokenFor({ "org-1": "t" }), fetchImpl: throwing });
     const payload = world2.tables.client_proposal_event.find((e) => (e.payload as Record<string, unknown>).step === "lawmatics_note")!.payload;
     expect(payload).toMatchObject({ outcome: "failed" });
     // The error's own text (which could carry client data) never reaches the timeline.
-    expect(JSON.stringify(payload)).not.toContain("sevetri@example.com");
+    expect(JSON.stringify(payload)).not.toContain("callum@example.com");
   });
 
   it("addAcceptanceNote with no token never calls out", async () => {
@@ -315,7 +315,7 @@ describe("nothing here throws, and nothing logs record data", () => {
       await expect(runAcceptanceFollowups(db, { proposalId: PROPOSAL, orgId: "org-1" }, deps), name).resolves.toBeUndefined();
     }
     const everything = JSON.stringify([...errors.mock.calls, ...logs.flatMap((l) => l.mock.calls)]);
-    for (const secret of ["Sevetri", "sevetri@example.com", "Prosperall", "TOKEN", "vault down", "insert exploded"]) expect(everything).not.toContain(secret);
+    for (const secret of ["Callum", "callum@example.com", "Larkmoor", "TOKEN", "vault down", "insert exploded"]) expect(everything).not.toContain(secret);
   });
 
   it("a database that throws on the very first read resolves quietly", async () => {

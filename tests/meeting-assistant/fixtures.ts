@@ -9,7 +9,7 @@ export const input: MeetingAssistantInput = {
   meetingId: "m1",
   meetingDate: "2026-11-16",
   rows: [
-    { id: "r1", kind: "matter", client: "Maya Chen", mark: "The Fold", matterNumber: "TM-1", stage: "Office action", currentNextStep: null, assigneeId: null },
+    { id: "r1", kind: "matter", client: "Maya Chen", mark: "The Pleat", matterNumber: "TM-1", stage: "Office action", currentNextStep: null, assigneeId: null },
     { id: "r2", kind: "lead", client: "Ruiz Holdings", mark: null, matterNumber: null, stage: "Proposal sent", currentNextStep: "Follow up", assigneeId: "u2" },
   ],
   members: [

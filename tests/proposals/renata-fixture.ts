@@ -1,24 +1,24 @@
 import type { PackageOffer, ProposalContent } from "@/lib/proposals/types";
-import { sevetri } from "./fixture";
+import { callum } from "./fixture";
 
-/* ── Danielle Milton's proposal (Spec 6, Taylor 2026-10-29) ─────────────────────────────────────────── */
+/* ── Renata Ostrowski's proposal (Spec 6, Taylor 2026-10-29) ─────────────────────────────────────────── */
 
 export const ESSENTIAL: PackageOffer = { package: "Essential", base_cents: 195_000, per_class_cents: 82_500, included_classes: 1, gov_per_class_cents: 35_000, second_mark_discount_pct: 20 };
 export const ENHANCED: PackageOffer = { package: "Enhanced", base_cents: 325_000, per_class_cents: 82_500, included_classes: 2, gov_per_class_cents: 35_000, second_mark_discount_pct: 20 };
 export const CONCIERGE: PackageOffer = { package: "Concierge", base_cents: 495_000, per_class_cents: 82_500, included_classes: 3, gov_per_class_cents: 35_000, second_mark_discount_pct: 20 };
 export const OPTIONS = ["Essential", "Enhanced", "Concierge"];
 
-export function danielle(): ProposalContent {
-  const base = sevetri();
+export function renata(): ProposalContent {
+  const base = callum();
   return {
     ...base,
-    client: { first_name: "Danielle", full_name: "Danielle Milton" },
+    client: { first_name: "Renata", full_name: "Renata Ostrowski" },
     pricing: { package: "Concierge", base_cents: 495_000, included_classes: 3, per_class_cents: 82_500, second_mark_discount_pct: 20, gov_per_class_cents: 35_000 },
     packages: [ESSENTIAL, ENHANCED, CONCIERGE],
     names: [
       {
         id: "fold",
-        name: "The Fold",
+        name: "The Pleat",
         package_choice: { options: [...OPTIONS], default: "Enhanced" },
         marks: [{ id: "fold-word", kind: "word", desc: "Protects the words.", preselected: true }],
         classes: [
@@ -29,7 +29,7 @@ export function danielle(): ProposalContent {
       },
       {
         id: "ci",
-        name: "The Confidence Interval",
+        name: "The Margin Note",
         package_choice: { options: [...OPTIONS], default: "Enhanced" },
         discount_pct: 10,
         marks: [{ id: "ci-word", kind: "word", desc: "Protects the words.", preselected: true }],

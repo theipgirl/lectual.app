@@ -98,7 +98,7 @@ Spec: `docs/specs/2026-11-12-proposal-loe-and-builder-design.md`
 
 ### Dawn / the firm
 
-- [ ] Sevetri Wilson's engagement letter still needs its fee chart filled by hand. The app can't fill it for a multi-brand, per-mark proposal until this is built.
+- [ ] Callum Ferreira's engagement letter still needs its fee chart filled by hand. The app can't fill it for a multi-brand, per-mark proposal until this is built.
 
 ### Claude, next session
 

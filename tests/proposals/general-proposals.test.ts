@@ -37,9 +37,9 @@ import { ProposalDocument } from "@/components/client-proposal/ProposalDocument"
 import { ProposalsTable } from "@/components/proposal-list/ProposalsTable";
 import { GENERAL_LOE_SENTENCE, PROPOSAL_TYPE_GENERAL, PROPOSAL_TYPE_TRADEMARK } from "@/lib/ui/words";
 import { GENERAL_PRICING_STUB, type AcceptedSnapshot, type ProposalContent, type Selection } from "@/lib/proposals/types";
-import { faithe } from "./general-fixture";
-import { sevetri } from "./fixture";
-import { danielle, OPTIONS } from "./danielle-fixture";
+import { imogen } from "./general-fixture";
+import { callum } from "./fixture";
+import { renata, OPTIONS } from "./renata-fixture";
 import { fold, WORD_OPTIONS, DESIGN_OPTIONS } from "./mark-fixture";
 
 const rand = (() => {
@@ -53,7 +53,7 @@ function form(entries: Record<string, string>): FormData {
   return f;
 }
 
-const FAITHE_FORM = {
+const IMOGEN_FORM = {
   matterTitle: "Management agreement: notice of non-renewal and termination",
   summary: "We will review both management agreements and all correspondence and evidence, then draft your notice.",
   "item.0.label": "Review both management agreements",
@@ -79,9 +79,9 @@ function snapshotOf(content: ProposalContent): AcceptedSnapshot {
 
 /* ─────────────────────────── the quote ─────────────────────────── */
 
-describe("Spec 9 quote: Faithe Williams, value $1,250, fee $500", () => {
+describe("Spec 9 quote: Imogen Pellegrino, value $1,250, fee $500", () => {
   it("charges the flat fee, no USPTO fee, no classes, and carries the value", () => {
-    const q = quoteProposal(faithe(), {});
+    const q = quoteProposal(imogen(), {});
     expect(q.legal_subtotal_cents).toBe(50_000);
     expect(q.legal_total_cents).toBe(50_000);
     expect(q.gov_total_cents).toBe(0);
@@ -110,7 +110,7 @@ describe("Spec 9 quote: Faithe Williams, value $1,250, fee $500", () => {
   });
 
   it("the selection is ignored: nothing on a flat-fee proposal is selectable", () => {
-    const c = faithe();
+    const c = imogen();
     expect(quoteProposal(c, { anything: true, packages: { x: "Concierge" } } as Selection)).toEqual(quoteProposal(c, {}));
     expect(defaultSelection(c)).toEqual({});
     expect(normalizeSelection(c, { anything: true })).toEqual({});
@@ -119,7 +119,7 @@ describe("Spec 9 quote: Faithe Williams, value $1,250, fee $500", () => {
   });
 
   it("a consult credit comes off the fee like on any proposal", () => {
-    const c = faithe();
+    const c = imogen();
     c.adjustments = [{ id: "credit", label: "Consult credit", kind: "amount", value: 10_000 }];
     const q = quoteProposal(c, {});
     expect(q.legal_subtotal_cents).toBe(50_000);
@@ -129,7 +129,7 @@ describe("Spec 9 quote: Faithe Williams, value $1,250, fee $500", () => {
   });
 
   it("value never above the fee shows just the fee; a zero fee has nothing to accept", () => {
-    const c = faithe();
+    const c = imogen();
     c.general!.fee_cents = 125_000;
     expect(generalValueOverFee(quoteProposal(c, {}))).toBeNull();
     c.general!.fee_cents = 0;
@@ -137,7 +137,7 @@ describe("Spec 9 quote: Faithe Williams, value $1,250, fee $500", () => {
   });
 
   it("a trademark quote never carries a general block", () => {
-    expect(quoteProposal(sevetri(), defaultSelection(sevetri())).general).toBeUndefined();
+    expect(quoteProposal(callum(), defaultSelection(callum())).general).toBeUndefined();
   });
 });
 
@@ -146,28 +146,28 @@ describe("Spec 9 quote: Faithe Williams, value $1,250, fee $500", () => {
 describe("Spec 9 validation", () => {
   const errors = (c: unknown, opts = {}) => validateContent(c, opts).filter((i) => i.level === "error");
 
-  it("Faithe's proposal is clean, for approval too", () => {
-    expect(validateContent(faithe())).toEqual([]);
-    expect(errors(faithe(), { forApproval: true, expires_on: "2026-11-16", pay_url: "https://pay.example.com/x", client_email: "faithe@example.com" })).toEqual([]);
+  it("Imogen's proposal is clean, for approval too", () => {
+    expect(validateContent(imogen())).toEqual([]);
+    expect(errors(imogen(), { forApproval: true, expires_on: "2026-11-16", pay_url: "https://pay.example.com/x", client_email: "imogen@example.com" })).toEqual([]);
   });
 
   it("refuses trademark names with classes, a USPTO fee, a package price and a package list", () => {
-    const withNames = faithe();
-    withNames.names = sevetri().names;
+    const withNames = imogen();
+    withNames.names = callum().names;
     expect(errors(withNames).map((i) => i.path)).toContain("names");
-    const withGov = faithe();
+    const withGov = imogen();
     withGov.pricing = { ...GENERAL_PRICING_STUB, gov_per_class_cents: 35_000 };
     expect(errors(withGov).map((i) => i.path)).toContain("pricing.gov_per_class_cents");
-    const withPrice = faithe();
+    const withPrice = imogen();
     withPrice.pricing = { ...GENERAL_PRICING_STUB, base_cents: 495_000 };
     expect(errors(withPrice).map((i) => i.path)).toContain("pricing.base_cents");
-    const withPackages = faithe();
-    withPackages.packages = danielle().packages;
+    const withPackages = imogen();
+    withPackages.packages = renata().packages;
     expect(errors(withPackages).map((i) => i.path)).toContain("packages");
   });
 
   it("checks the matter, the work, the fee, the not-included lines and the terms note", () => {
-    const c = faithe() as unknown as { general: Record<string, unknown> };
+    const c = imogen() as unknown as { general: Record<string, unknown> };
     c.general.matter_title = "";
     c.general.fee_cents = 0;
     c.general.items = [
@@ -193,26 +193,26 @@ describe("Spec 9 validation", () => {
     ]) {
       expect(paths, p).toContain(p);
     }
-    const none = faithe();
+    const none = imogen();
     none.general!.items = [];
     expect(errors(none).map((i) => i.path)).toContain("general.items");
-    const tooMany = faithe();
+    const tooMany = imogen();
     tooMany.general!.items = Array.from({ length: 21 }, (_, i) => ({ id: `w${i}`, label: `Work ${i}`, value_cents: 100 }));
     expect(errors(tooMany).map((i) => i.path)).toContain("general.items");
   });
 
   it("an unknown kind is refused; a trademark proposal carrying a general block is refused", () => {
-    expect(errors({ ...faithe(), kind: "patent" }).map((i) => i.path)).toEqual(["kind"]);
-    expect(errors({ ...sevetri(), general: faithe().general }).map((i) => i.path)).toContain("general");
-    expect(errors({ ...sevetri(), kind: "trademark" })).toEqual(errors(sevetri()));
+    expect(errors({ ...imogen(), kind: "patent" }).map((i) => i.path)).toEqual(["kind"]);
+    expect(errors({ ...callum(), general: imogen().general }).map((i) => i.path)).toContain("general");
+    expect(errors({ ...callum(), kind: "trademark" })).toEqual(errors(callum()));
   });
 });
 
 /* ─────────────────────────── the form ─────────────────────────── */
 
 describe("Spec 9 form parsing", () => {
-  it("reads Faithe's form into the block, skipping the blank spare row", () => {
-    const r = parseGeneralForm(form(FAITHE_FORM), rand);
+  it("reads Imogen's form into the block, skipping the blank spare row", () => {
+    const r = parseGeneralForm(form(IMOGEN_FORM), rand);
     if (!r.ok) throw new Error(r.error);
     expect(r.value.matter_title).toBe("Management agreement: notice of non-renewal and termination");
     expect(r.value.fee_cents).toBe(50_000);
@@ -222,7 +222,7 @@ describe("Spec 9 form parsing", () => {
       ["Draft the notice of non-renewal and termination", 1, 50_000],
     ]);
     expect(r.value.excludes).toEqual(["Litigation or arbitration"]);
-    const content = buildGeneralContent({ firstName: "Faithe", fullName: "Faithe Williams", general: r.value });
+    const content = buildGeneralContent({ firstName: "Imogen", fullName: "Imogen Pellegrino", general: r.value });
     expect(validateContent(content)).toEqual([]);
     const q = quoteProposal(content, {});
     expect([q.legal_total_cents, q.gov_total_cents, q.general?.value_cents]).toEqual([50_000, 0, 125_000]);
@@ -233,7 +233,7 @@ describe("Spec 9 form parsing", () => {
 
   it("refuses with one fixed sentence: no work, no fee, bad hours, a rate without hours, a label-less row", () => {
     const bad = (over: Record<string, string>) => {
-      const r = parseGeneralForm(form({ ...FAITHE_FORM, ...over }), rand);
+      const r = parseGeneralForm(form({ ...IMOGEN_FORM, ...over }), rand);
       return r.ok ? null : r.error;
     };
     expect(bad({ matterTitle: "" })).toBe("Matter: name the matter.");
@@ -247,29 +247,29 @@ describe("Spec 9 form parsing", () => {
   });
 
   it("the editor's save keeps the rest of the document, and refuses a trademark proposal", () => {
-    const current = faithe();
-    const r = applyGeneralForm(form({ ...FAITHE_FORM, fee: "650", greeting: "Hello Faithe." }), current, rand);
+    const current = imogen();
+    const r = applyGeneralForm(form({ ...IMOGEN_FORM, fee: "650", greeting: "Hello Imogen." }), current, rand);
     if (!r.ok) throw new Error(r.error);
     expect(r.value.general?.fee_cents).toBe(65_000);
-    expect(r.value.greeting).toBe("Hello Faithe.");
+    expect(r.value.greeting).toBe("Hello Imogen.");
     expect(r.value.client).toEqual(current.client);
-    expect(applyGeneralForm(form(FAITHE_FORM), sevetri(), rand)).toEqual({
+    expect(applyGeneralForm(form(IMOGEN_FORM), callum(), rand)).toEqual({
       ok: false,
       error: "This is a trademark proposal. Its matter and flat fee can't be set here.",
     });
   });
 
   it("the editor's inputs are pre-filled from the saved block in dollars", () => {
-    const v = generalFormValues(faithe().general);
+    const v = generalFormValues(imogen().general);
     expect(v.fee).toBe("500.00");
     expect(v.items[1]).toMatchObject({ label: "Review all correspondence and evidence", hours: "0.5", rate: "500.00", value: "" });
     expect(v.excludes).toBe("Litigation or arbitration");
   });
 
   it("the history names a change to the fee", () => {
-    const after = faithe();
+    const after = imogen();
     after.general!.fee_cents = 65_000;
-    expect(contentChanges(faithe(), after)).toEqual([expect.objectContaining({ path: "general.fee_cents", label: "Flat fee", before: 50_000, after: 65_000 })]);
+    expect(contentChanges(imogen(), after)).toEqual([expect.objectContaining({ path: "general.fee_cents", label: "Flat fee", before: 50_000, after: 65_000 })]);
   });
 });
 
@@ -300,13 +300,13 @@ describe("the client page for a flat-fee proposal", () => {
   const page = (mode: "live" | "preview" | "accepted" = "live") =>
     renderToStaticMarkup(
       createElement(ProposalDocument, {
-        content: publicContent(faithe()),
+        content: publicContent(imogen()),
         title: "Proposal",
-        clientName: "Faithe Williams",
+        clientName: "Imogen Pellegrino",
         expiresOn: "2026-11-16",
         firm: { name: "Hartwell", slug: "hartwell", displayName: "Hartwell Law" },
         mode,
-        ...(mode === "accepted" ? { acceptedQuote: quoteProposal(faithe(), {}), payUrl: "https://pay.example.com/x" } : { onAccept: async () => ({ ok: true as const, payUrl: "https://pay.example.com/x" }) }),
+        ...(mode === "accepted" ? { acceptedQuote: quoteProposal(imogen(), {}), payUrl: "https://pay.example.com/x" } : { onAccept: async () => ({ ok: true as const, payUrl: "https://pay.example.com/x" }) }),
       }),
     ).replaceAll("&#x27;", "'");
 
@@ -336,7 +336,7 @@ describe("the client page for a flat-fee proposal", () => {
 
   it("only root-relative /_next/static or /brand assets", () => {
     const html = renderToStaticMarkup(
-      createElement(ProposalDocument, { content: faithe(), title: "Proposal", clientName: "Faithe Williams", expiresOn: null, firm: { name: "RPB Law Firm", slug: "rpb-law" }, mode: "live" }),
+      createElement(ProposalDocument, { content: imogen(), title: "Proposal", clientName: "Imogen Pellegrino", expiresOn: null, firm: { name: "RPB Law Firm", slug: "rpb-law" }, mode: "live" }),
     );
     for (const m of html.matchAll(/src="(\/[^"]*)"/g)) expect(m[1]).toMatch(/^\/(?:_next\/static|brand)\//);
   });
@@ -348,7 +348,7 @@ describe("the client page for a flat-fee proposal", () => {
   });
 
   it("the public allowlist keeps the general block and drops anything else", () => {
-    const raw = { ...faithe(), private: { matter_id: "x" } } as unknown as Record<string, unknown>;
+    const raw = { ...imogen(), private: { matter_id: "x" } } as unknown as Record<string, unknown>;
     (raw.general as Record<string, unknown>).secret = "no";
     (raw.general as { items: Array<Record<string, unknown>> }).items[0].internal = "no";
     const pub = publicContent(raw) as unknown as Record<string, unknown>;
@@ -356,7 +356,7 @@ describe("the client page for a flat-fee proposal", () => {
     expect(pub.private).toBeUndefined();
     expect((pub.general as Record<string, unknown>).secret).toBeUndefined();
     expect((pub.general as { items: Array<Record<string, unknown>> }).items[0].internal).toBeUndefined();
-    expect(quoteProposal(pub as unknown as ProposalContent, {})).toEqual(quoteProposal(faithe(), {}));
+    expect(quoteProposal(pub as unknown as ProposalContent, {})).toEqual(quoteProposal(imogen(), {}));
   });
 });
 
@@ -364,7 +364,7 @@ describe("the client page for a flat-fee proposal", () => {
 
 describe("the accept path prices a flat-fee proposal from the stored content", () => {
   it("an empty selection and nothing written: the fee, recomputed, and something to accept", () => {
-    const content = faithe();
+    const content = imogen();
     const picked = normalizeSelection(content, { "w-contracts": true, price: 1 });
     const input = parseClientClassInput(content, { entries: { x: "y" }, added: { n: ["z"] } });
     expect(input).toEqual(emptyClientClassInput());
@@ -381,16 +381,16 @@ describe("the accept path prices a flat-fee proposal from the stored content", (
 /* ─────────────────────────── follow-ups, LOE, list, card, email ─────────────────────────── */
 
 describe("after a flat-fee proposal is accepted", () => {
-  const snap = snapshotOf(faithe());
+  const snap = snapshotOf(imogen());
 
   it("the notice headline names the matter and the fee", () => {
-    expect(acceptanceHeadline({ clientName: "Faithe Williams", packageName: "Management agreement: notice of non-renewal and termination", legalTotalCents: 50_000 })).toBe(
-      "Faithe Williams accepted Management agreement: notice of non-renewal and termination · legal $500",
+    expect(acceptanceHeadline({ clientName: "Imogen Pellegrino", packageName: "Management agreement: notice of non-renewal and termination", legalTotalCents: 50_000 })).toBe(
+      "Imogen Pellegrino accepted Management agreement: notice of non-renewal and termination · legal $500",
     );
   });
 
   it("the Lawmatics note lists the matter, the work and the fee, with no class lines and no USPTO fee", () => {
-    const note = acceptanceNoteBody(snap, "Faithe Williams");
+    const note = acceptanceNoteBody(snap, "Imogen Pellegrino");
     expect(note.name).toBe("Proposal accepted: Management agreement: notice of non-renewal and termination");
     expect(note.body).toContain("Matter: Management agreement: notice of non-renewal and termination");
     expect(note.body).toContain("- Review all correspondence and evidence (0.5 hrs)");
@@ -408,7 +408,7 @@ describe("after a flat-fee proposal is accepted", () => {
   });
 
   it("the staff card shows the matter, its work and the fee, with no USPTO figure", () => {
-    const card = buildProposalCard({ client_name: "Faithe Williams", content: faithe(), expires_on: null }, []);
+    const card = buildProposalCard({ client_name: "Imogen Pellegrino", content: imogen(), expires_on: null }, []);
     expect(card.general).toMatchObject({ matterTitle: "Management agreement: notice of non-renewal and termination", valueCents: 125_000, feeCents: 50_000 });
     expect(card.brands).toEqual([]);
     expect(card.legalAtSigningCents).toBe(50_000);
@@ -420,7 +420,7 @@ describe("after a flat-fee proposal is accepted", () => {
       id: "p1",
       family_id: "ab12cd34-0000-4000-8000-000000000000",
       version: 1,
-      client_name: "Faithe Williams",
+      client_name: "Imogen Pellegrino",
       title: "Proposal",
       status: "sent",
       source: "manual",
@@ -447,16 +447,16 @@ describe("after a flat-fee proposal is accepted", () => {
     expect(html).toContain("at signing");
     expect(html).not.toContain("at filing");
     // A trademark row is unchanged.
-    const tm = buildProposalRowView({ ...item, matter_title: null, brands: ["Prosperall"], gov_total_cents: 70_000 }, { today: "2026-11-02", tz: "America/New_York", now: 0, events: new Map(), names: new Map() });
-    expect(tm.headline).toBe("Proposal — PROSPERALL");
+    const tm = buildProposalRowView({ ...item, matter_title: null, brands: ["Larkmoor"], gov_total_cents: 70_000 }, { today: "2026-11-02", tz: "America/New_York", now: 0, events: new Map(), names: new Map() });
+    expect(tm.headline).toBe("Proposal — LARKMOOR");
     expect(tm.atFilingCents).toBe(70_000);
   });
 
   it("the post-consult email is the general one: subject, summary, fee and link, no trademark words", () => {
-    const email = buildManualEmail({ content: faithe(), firmName: "RPB Law", proposalUrl: "https://proposals.example.com/p/tok/", signOff: "The RPB Law Team" });
+    const email = buildManualEmail({ content: imogen(), firmName: "RPB Law", proposalUrl: "https://proposals.example.com/p/tok/", signOff: "The RPB Law Team" });
     expect(email.subject).toBe("Your Proposal from RPB Law: Management agreement: notice of non-renewal and termination");
     expect(email.subject).toBe(generalProposalEmailSubject("RPB Law", "Management agreement: notice of non-renewal and termination"));
-    expect(email.body).toContain("Hi Faithe,");
+    expect(email.body).toContain("Hi Imogen,");
     expect(email.body).toContain("We will review both management agreements");
     expect(email.body).toContain("The flat fee for this work is $500.");
     expect(email.body).toContain("https://proposals.example.com/p/tok/");
@@ -476,7 +476,7 @@ try {
 }
 
 describe("trademark proposals price byte for byte as before Spec 9", () => {
-  it.skipIf(oldPricing === null)("sevetri, danielle and the fold, across many selections, quote exactly as the pre-Spec 9 engine did", async () => {
+  it.skipIf(oldPricing === null)("callum, renata and the pleat, across many selections, quote exactly as the pre-Spec 9 engine did", async () => {
     const dir = mkdtempSync(join(tmpdir(), "spec9-pricing-"));
     const file = join(dir, "pricing-before.ts");
     writeFileSync(file, oldPricing!);
@@ -490,18 +490,18 @@ describe("trademark proposals price byte for byte as before Spec 9", () => {
       }
       return out;
     };
-    const s = sevetri();
+    const s = callum();
     for (const sel of allSubsets(s)) cases.push([s, sel]);
-    const credited = sevetri();
+    const credited = callum();
     credited.adjustments = [
       { id: "a", label: "Consult credit", kind: "amount", value: 25_000 },
       { id: "b", label: "Event", kind: "percent", value: 10 },
     ];
     for (const sel of allSubsets(credited).slice(0, 64)) cases.push([credited, sel]);
-    const custom = sevetri();
+    const custom = callum();
     custom.pricing.reduce_under_included = true;
     for (const sel of allSubsets(custom).slice(0, 64)) cases.push([custom, sel]);
-    const d = danielle();
+    const d = renata();
     for (const p of OPTIONS) for (const q of OPTIONS) cases.push([d, { ...before.defaultSelection(d), packages: { fold: p, ci: q } }]);
     const f = fold();
     for (const w of WORD_OPTIONS) for (const lg of DESIGN_OPTIONS) for (const on of [true, false]) {

@@ -21,7 +21,7 @@ import { standardProposalPricing } from "@/lib/proposals/types";
 import { quoteProposal, defaultSelection } from "@/lib/proposals/pricing";
 import { validateContent } from "@/lib/proposals/validate";
 import { DEFAULT_CLIENT_ENTRY_PROMPT } from "@/lib/proposals/client-classes";
-import { sevetri } from "../proposals/fixture";
+import { callum } from "../proposals/fixture";
 
 function fd(entries: Record<string, string>): FormData {
   const f = new FormData();
@@ -83,22 +83,22 @@ describe("cleanId", () => {
 describe("details, message and pricing sections", () => {
   it("keeps client_name in step with the full name, and drops an empty company", () => {
     const r = parseDetails(
-      fd({ fullName: "Sevetri Wilson", firstName: "Sevetri", company: "", clientEmail: "s@example.com", title: "Trademark Proposal", expiresOn: "2026-11-01", payUrl: "https://pay.example.com/x" }),
-      sevetri(),
+      fd({ fullName: "Callum Ferreira", firstName: "Callum", company: "", clientEmail: "s@example.com", title: "Trademark Proposal", expiresOn: "2026-11-01", payUrl: "https://pay.example.com/x" }),
+      callum(),
     );
     expect(r.ok).toBe(true);
     if (r.ok) {
-      expect(r.value.clientName).toBe("Sevetri Wilson");
-      expect(r.value.content.client).toEqual({ first_name: "Sevetri", full_name: "Sevetri Wilson" });
+      expect(r.value.clientName).toBe("Callum Ferreira");
+      expect(r.value.content.client).toEqual({ first_name: "Callum", full_name: "Callum Ferreira" });
       expect(r.value.expiresOn).toBe("2026-11-01");
     }
   });
   it("refuses an impossible date and a missing name", () => {
-    expect(parseDetails(fd({ fullName: "A", firstName: "A", title: "T", expiresOn: "2026-02-31" }), sevetri()).ok).toBe(false);
-    expect(parseDetails(fd({ fullName: " ", firstName: "A", title: "T" }), sevetri()).ok).toBe(false);
+    expect(parseDetails(fd({ fullName: "A", firstName: "A", title: "T", expiresOn: "2026-02-31" }), callum()).ok).toBe(false);
+    expect(parseDetails(fd({ fullName: " ", firstName: "A", title: "T" }), callum()).ok).toBe(false);
   });
   it("removes optional text when blanked", () => {
-    const r = parseMessage(fd({ greeting: "Hello", recommendation: "", officeActionNote: "" }), sevetri());
+    const r = parseMessage(fd({ greeting: "Hello", recommendation: "", officeActionNote: "" }), callum());
     expect(r.ok && "recommendation" in r.value).toBe(false);
     expect(r.ok && "office_action_note" in r.value).toBe(false);
     expect(r.ok && r.value.greeting).toBe("Hello");
@@ -114,11 +114,11 @@ describe("details, message and pricing sections", () => {
 });
 
 describe("a brand name form", () => {
-  const content = sevetri();
+  const content = callum();
   const form = (extra: Record<string, string> = {}) =>
     fd({
       nameId: "p",
-      name: "Prosperall",
+      name: "Larkmoor",
       what: "Your company name",
       note: "",
       overrideBase: "",
@@ -208,10 +208,10 @@ describe("a brand name form", () => {
   });
 
   it("replaces only that brand name, and refuses if it was removed meanwhile", () => {
-    const r = parseName(form({ name: "Prosperall Inc" }), content, rand);
+    const r = parseName(form({ name: "Larkmoor Inc" }), content, rand);
     if (!r.ok) throw new Error("parse");
     const replaced = replaceName(content, r.value);
-    expect(replaced.ok && replaced.value.names.map((x) => x.name)).toEqual(["Prosperall Inc", "Tech4PublicGood"]);
+    expect(replaced.ok && replaced.value.names.map((x) => x.name)).toEqual(["Larkmoor Inc", "Open4Everyone"]);
     const gone = removeName(content, "p");
     if (!gone.ok) throw new Error("remove");
     expect(replaceName(gone.value, r.value).ok).toBe(false);
@@ -333,13 +333,13 @@ describe("settings pricing", () => {
 
 describe("the expiry date is saved by the package form, never wiped by the client save", () => {
   it("parseDetails leaves expiresOn out when the form did not post it", () => {
-    const r = parseDetails(fd({ fullName: "A", firstName: "A", title: "T" }), sevetri());
+    const r = parseDetails(fd({ fullName: "A", firstName: "A", title: "T" }), callum());
     expect(r.ok).toBe(true);
     if (r.ok) expect("expiresOn" in r.value).toBe(false);
   });
 
   it("parseDetails still reads an expiresOn that is posted (blank clears it on purpose)", () => {
-    const r = parseDetails(fd({ fullName: "A", firstName: "A", title: "T", expiresOn: "" }), sevetri());
+    const r = parseDetails(fd({ fullName: "A", firstName: "A", title: "T", expiresOn: "" }), callum());
     expect(r.ok && r.value.expiresOn).toBe(null);
   });
 });

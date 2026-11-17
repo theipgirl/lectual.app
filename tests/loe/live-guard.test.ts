@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LETTER_CHANGED_SENTENCE, LETTER_UNREADABLE_SENTENCE, LINK_TURNED_ON } from "@/lib/proposal-editor/vocabulary";
 import { LETTER_PENDING_FIX } from "@/lib/ui/words";
 import type { ProposalContent } from "@/lib/proposals/types";
-import { sevetri } from "../proposals/fixture";
+import { callum } from "../proposals/fixture";
 
 /**
  * Review item 5. ONE guard decides whether a version that carries an engagement letter may go live: the copy on the proposal
@@ -21,7 +21,7 @@ const ORG = "org-1";
 const TEMPLATE = { id: "22222222-2222-4222-8222-222222222222", kind: "trademark", version: 3, status: "approved", title: "Engagement letter", body: "Dear {{client_name}},\n\nThis confirms our engagement.", updated_at: "2026-11-01T00:00:00Z", approved_at: "2026-11-01T00:00:00Z" };
 
 function withLetter(over: Partial<{ template_version: number; body: string; template_id: string }> = {}): ProposalContent {
-  return { ...sevetri(), loe: { kind: "trademark", template_id: TEMPLATE.id, template_version: TEMPLATE.version, title: TEMPLATE.title, body: TEMPLATE.body, ...over } };
+  return { ...callum(), loe: { kind: "trademark", template_id: TEMPLATE.id, template_version: TEMPLATE.version, title: TEMPLATE.title, body: TEMPLATE.body, ...over } };
 }
 
 type Row = Record<string, unknown>;
@@ -45,8 +45,8 @@ function proposalRow(over: Row = {}): Row {
     public_token: "t".repeat(43),
     lead_id: null,
     matter_id: null,
-    client_name: "Sevetri Wilson",
-    client_email: "sevetri@example.com",
+    client_name: "Callum Ferreira",
+    client_email: "callum@example.com",
     title: "Trademark Proposal",
     status: "approved",
     content: withLetter(),
@@ -158,7 +158,7 @@ const firmMovedOn = () => (state.template.data = { ...TEMPLATE, id: "33333333-33
 describe("the guard itself", () => {
   it("no letter on the proposal: nothing to check, and the firm's letter is not even read", async () => {
     const { letterLiveCheck, letterLiveRefusal } = await import("@/lib/loe/live-guard");
-    const check = await letterLiveCheck(fakeClient() as never, { org_id: ORG, content: sevetri() });
+    const check = await letterLiveCheck(fakeClient() as never, { org_id: ORG, content: callum() });
     expect(check).toBe("no_letter");
     expect(letterLiveRefusal(check)).toBeNull();
     expect(state.templateReads).toBe(0);
@@ -239,7 +239,7 @@ describe("path 1: 'Turn on the link' (sendAction, a saved version)", () => {
   });
 
   it("a proposal with no letter turns on as it always did, with no letter read", async () => {
-    state.proposal = proposalRow({ content: sevetri() });
+    state.proposal = proposalRow({ content: callum() });
     const { sendAction } = await import("../../src/app/dashboard/proposals/[id]/actions");
     expect(await sendAction({}, form())).toEqual({ saved: true, notice: LINK_TURNED_ON });
     expect(state.templateReads).toBe(0);
@@ -310,7 +310,7 @@ describe("path 3: 'Save and create link' (createLinkAction)", () => {
 
 describe("a draft whose letter couldn't be attached, still unresolved, never goes live", () => {
   /** No letter on the content, and the check an assistant's draft carries when the firm's letter couldn't be read. */
-  const pending = (): ProposalContent => ({ ...sevetri(), checks: [{ text: "Couldn't read your engagement letter when this draft was made, so it isn't attached yet.", source: "assistant", path: "loe" }] });
+  const pending = (): ProposalContent => ({ ...callum(), checks: [{ text: "Couldn't read your engagement letter when this draft was made, so it isn't attached yet.", source: "assistant", path: "loe" }] });
 
   it("the guard answers 'unattached' without reading the firm's letter, and refuses with the fixed sentence", async () => {
     const { letterLiveCheck, letterLiveRefusal } = await import("@/lib/loe/live-guard");
@@ -350,7 +350,7 @@ describe("checker's m1: Reset acceptance puts a version back to 'Link live', so 
   const accepted = (content: ProposalContent) => (state.proposal = proposalRow({ status: "accepted", content, updated_at: T0 }));
 
   it("a proposal with no letter resets as it always did, with no letter read", async () => {
-    accepted(sevetri());
+    accepted(callum());
     const { resetProposalAcceptance } = await import("@/lib/proposals/store");
     await resetProposalAcceptance(ID, { expectedUpdatedAt: T0 });
     expect(state.updates).toEqual([{ status: "sent" }]);

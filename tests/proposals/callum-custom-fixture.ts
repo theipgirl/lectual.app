@@ -1,7 +1,7 @@
 import type { PackageOffer, ProposalContent } from "@/lib/proposals/types";
-import { sevetri } from "./fixture";
+import { callum } from "./fixture";
 
-/* ── Custom discount on one package (Taylor, 2026-11-03, for Sevetri Wilson). Sevetri's proposal offers
+/* ── Custom discount on one package (Taylor, 2026-11-03, for Callum Ferreira). Callum's proposal offers
  * Essential / Enhanced / Concierge per MARK (Spec 7), default Concierge, 2 classes per brand name. Concierge
  * alone carries a "Custom proposal discount": $825 off for each class under its 3 included classes. ── */
 
@@ -18,9 +18,9 @@ export const S_CONCIERGE: PackageOffer = {
 };
 export const S_OPTIONS = ["Essential", "Enhanced", "Concierge"];
 
-/** Sevetri's two brand names, every mark choosing Essential / Enhanced / Concierge (default Concierge), no global adjustment. */
-export function sevetriCustom(): ProposalContent {
-  const base = sevetri();
+/** Callum's two brand names, every mark choosing Essential / Enhanced / Concierge (default Concierge), no global adjustment. */
+export function callumCustom(): ProposalContent {
+  const base = callum();
   return {
     ...base,
     packages: [{ ...S_ESSENTIAL }, { ...S_ENHANCED }, { ...S_CONCIERGE, custom_discount: { ...S_CONCIERGE.custom_discount! } }],

@@ -4,15 +4,15 @@ import { insertAgentProposal, recordConsultDraftEvent } from "@/lib/proposals/ag
 import { ProposalError } from "@/lib/proposals/errors";
 import { ORG, assertOrgFenced, writes } from "../agents/helpers";
 import { fakeAdmin, type Handler } from "../mailbox/fake-db";
-import { sevetri } from "../proposals/fixture";
+import { callum } from "../proposals/fixture";
 
 const input = {
   orgId: ORG,
   createdBy: null,
-  clientName: "Sevetri Wilson",
+  clientName: "Callum Ferreira",
   clientEmail: "s@example.com",
   title: "Trademark Proposal",
-  content: sevetri(),
+  content: callum(),
   leadId: "lead-1",
   matterId: null,
   expiresOn: "2026-11-01",

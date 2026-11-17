@@ -674,7 +674,7 @@ Display and derivation only: no data is rewritten, nothing is sent, no new depen
 - **Role-neutral copy:** nothing rendered to every firm names a person. The intake chip and badge read "Needs attorney" and hide the
   chip's count at zero. `tests/intake/role-neutral-copy.test.tsx` greps visible text. RPB-specific modules (consult proposal email,
   welcome, prep-consult, document templates, the ported assessment card) keep Rebecca's name on purpose.
-- **Matter titles:** `matterDisplayTitle` (`src/lib/matters/display-title.ts`) treats `TM-enisha-smith` / `TM-97123456` (or a title equal to the
+- **Matter titles:** `matterDisplayTitle` (`src/lib/matters/display-title.ts`) treats `TM-jane-doe` / `TM-97123456` (or a title equal to the
   matter number) as a generated key and shows the mark, then the client (`owner_name`), keeping the stored title only when neither exists.
   `matterLabel` uses it, so lists, cards and the header agree.
 - **Module list:** `activeOrgModules` is wrapped in React `cache`, one `crm_org` read per request across the layouts and the page.
@@ -1224,8 +1224,8 @@ A person marked **Hired** in a firm's OWN Lawmatics gets a `crm_matter` here. A 
   (never a generic duplicate). Owner AND title match matters with `lawmatics_id` NULL: exactly one -> **link** (fills `lawmatics_id` only, guarded by `.is('lawmatics_id', null)`), several -> skip as
   ambiguous. Owner AND title match a matter linked to a DIFFERENT Lawmatics id -> skip ("already in Lectual under another Lawmatics record"), never create. Otherwise **create**. Same owner with a
   different title is a new matter.
-- **Matching is loose on purpose:** owners match when first and last tokens are equal or one normalized name contains the other ("Vivian Olodun Anderson" ~ "Vivian Anderson", "Eli Chazin (Eli Levi)" ~
-  "Eli Chazin"; parentheticals dropped); titles match when normalized-equal or one contains the other (decoration such as "(word mark)" and a "word mark -" prefix is stripped; containment needs 3+ characters).
+- **Matching is loose on purpose:** owners match when first and last tokens are equal or one normalized name contains the other ("Marguerite Ashby Lindqvist" ~ "Marguerite Lindqvist", "Tobias Reinholt (Toby Rhine)" ~
+  "Tobias Reinholt"; parentheticals dropped); titles match when normalized-equal or one contains the other (decoration such as "(word mark)" and a "word mark -" prefix is stripped; containment needs 3+ characters).
 - **Created fields:** type from the practice area (Trademark -> TM, Copyright -> CR, Patent -> PATENT, Litigation -> LIT, Contracts / General Counsel Services / Business Law / Other -> BL; none -> TM when
   the "Practice Area" custom field says Trademark or "Name of Trademark" exists, else BL). Title = `case_title`, else "Name of Trademark", else the practice area, else "Lawmatics matter #<case number>".
   `mark_text` only for TM. `matter_number` = `<TYPE>-<owner slug>-<title slug>`, plus `-<case number or id>` on a collision. Stage for TM = the firm's "Signed LOE / Deposit Received" (null if the firm
@@ -1252,7 +1252,7 @@ A person marked **Hired** in a firm's OWN Lawmatics gets a `crm_matter` here. A 
 - **NOT verified against a live Lawmatics:** the attribute names `status`, `converted_date`, `case_title`, `case_number` and the shape of `custom_fields` come from the public API reference. Check the first run's counts. Also unverified: how tags appear on a prospect (relationship ids, inline names, `tag_ids` are all tried) and `custom_field_values[<id>].formatted_value`.
 
 ## A package per brand name on the client proposal page (Spec 6, 2026-10-29, no schema)
-Taylor, for Danielle Milton: one section per brand name, each with "Select your package" (Essential, Enhanced or Concierge), then the classes as
+Taylor, for Renata Ostrowski: one section per brand name, each with "Select your package" (Essential, Enhanced or Concierge), then the classes as
 before (tickable, plus Spec 3's "Add a class"). Money logic: `quoteProposal` stays the ONE price engine. Nothing sends.
 - **Content (jsonb, additive; old proposals price byte for byte as before):** `content.packages: PackageOffer[]`, a SNAPSHOT of the firm's packages
   (`package`, `base_cents`, `per_class_cents`, `included_classes`, `gov_per_class_cents`, `second_mark_discount_pct`, optional `includes` rows).
@@ -1267,9 +1267,9 @@ before (tickable, plus Spec 3's "Add a class"). Money logic: `quoteProposal` sta
   legal fee, rounded once (`QuotedName.discount_cents`). The USPTO fee is never discounted. Global `adjustments` apply to the subtotal as before.
   `QuotedName.package` / `discount_cents` appear only for names that have them. A choice makes the offer not fixed. `quoteWithClientClasses` (page
   total, $0 lock, accept) carries the picks; added classes are priced under the chosen package.
-- **Danielle's figures (tests/proposals/package-choice.test.ts, fixture `danielle-fixture.ts`):** The Fold, 3 classes: Essential $3,600, Enhanced
-  $4,075, Concierge $4,950, USPTO $1,050. The Confidence Interval, 2 classes, 10% off: $2,497.50 / $2,925 / $4,455, USPTO $700. One added class each:
-  The Fold $4,425 / $4,900 / $5,775 (USPTO $1,400); The Confidence Interval $3,240 / $3,667.50 / $4,455 (USPTO $1,050).
+- **Renata's figures (tests/proposals/package-choice.test.ts, fixture `renata-fixture.ts`):** The Pleat, 3 classes: Essential $3,600, Enhanced
+  $4,075, Concierge $4,950, USPTO $1,050. The Margin Note, 2 classes, 10% off: $2,497.50 / $2,925 / $4,455, USPTO $700. One added class each:
+  The Pleat $4,425 / $4,900 / $5,775 (USPTO $1,400); The Margin Note $3,240 / $3,667.50 / $4,455 (USPTO $1,050).
 - **Client page:** in each brand name's card, above its marks, a labelled `<select>` "Select your package" (stored order, default selected) and the
   line "<Package>: $X legal fee for <name> (after N% off) · includes N classes, each additional class $X". The review panel and the receipt title each
   name "<Brand name> — <Package>" (`packageLineTitle`, `src/lib/proposals/name-package.ts`); a discount is its own line. When an offered package has
@@ -1319,7 +1319,7 @@ Lectual when a proposal has been viewed". Money logic: `quoteProposal` stays the
 - **Client page:** on a name that prices per mark, the first mark keeps its row with its own "Select your package" (`.cp-pkg-sel`) and a price line
   ("Enhanced: $3,250 legal fee for the word mark · includes …"); every later mark is an add-on row ("Add the design mark (logo)", `addMarkLabel`) whose
   select and price line appear only once it is ticked. Locks, the class lock and fixed offers are unchanged. The review panel, receipt, staff page,
-  accept notice and Lawmatics note name the package per mark ("The Fold — word mark, Enhanced; design mark, Essential", `packageLineTitle` /
+  accept notice and Lawmatics note name the package per mark ("The Pleat — word mark, Enhanced; design mark, Essential", `packageLineTitle` /
   `chosenPackagesText`, `MARK_PACKAGE_WORDS`). The LOE adapter drafts when the accepted marks share one package; two different ones are
   `mixed_mark_packages` ("Choose the LOE template", never a guess). `paid-flow.ts` writes that line with `code: "unknown_package"` (plus
   `detail: "mixed_mark_packages"` and its own sentence), so the payment panel's LOE-form link works with `paid-view.ts` untouched (the Sprint 29 hygiene test pins it).
@@ -1343,7 +1343,7 @@ Lectual when a proposal has been viewed". Money logic: `quoteProposal` stays the
   new store read; `tests/client-proposal/commitment.test.tsx`'s "leaves pricing.ts untouched" compares with HEAD, so it passes once this is committed.
 
 ## Custom discount on one package (2026-11-03, no schema)
-Taylor, for Sevetri Wilson: a package offer can carry a discount that applies ONLY when that package is chosen, shown to the client as its own
+Taylor, for Callum Ferreira: a package offer can carry a discount that applies ONLY when that package is chosen, shown to the client as its own
 line, never hidden in the price. Data only for now: there is no editor control to set it (it is written into the content jsonb). Nothing sends.
 - **Content:** `PackageOffer.custom_discount = { label (1..60, plain text: no `<`, `>` or control characters), per_class_under_cents (whole, > 0, at most
   the offer's `per_class_cents`) }`, allowed only on `content.packages` entries (`validateContent` refuses one on `content.pricing`). `publicContent` keeps
@@ -1354,7 +1354,7 @@ line, never hidden in the price. Data only for now: there is no editor control t
   `custom_discount_cents` (what came off its `price_cents`, after the second-mark %), `price_before_custom_discount_cents` and `custom_discount_label`; the
   name carries the sum and the label. Present only when > 0, so content without one quotes byte for byte as before (`tests/proposals/custom-discount.test.ts`
   compares with the engine at `cc959d9`).
-- **Sevetri's figures** (fixture `tests/proposals/sevetri-custom-fixture.ts`, 2 classes per name, per-mark Essential/Enhanced/Concierge, Concierge
+- **Callum's figures** (fixture `tests/proposals/callum-custom-fixture.ts`, 2 classes per name, per-mark Essential/Enhanced/Concierge, Concierge
   `$825` per class under 3): all Concierge $4,125 + $3,300 = $7,425 per name, $14,850 legal, USPTO $2,800; all Enhanced $11,700; all Essential $9,990;
   Concierge with a third (client-added) class on a name: no discount there, $4,950 + $3,960.
 - **Shown:** the client page's package line gives the package price before the discount, then "<label> −$X" on its own line (`.cp-custom-off`); the
@@ -1399,7 +1399,7 @@ The collapsed "Recent consults (N ready to draft)" toggle is gone. Under the pro
 ## Unsaved-changes guard in the proposal editor (2026-10-30, no schema)
 Each editor section (Client, each brand name, Package and pay link, wording, discounts, included items) is saved by its own button, and "Save and create link" does not save them, so a ticked package choice left unsaved used to be missing from the live link. A UX guard now says so. The server stays authoritative: no action reads browser state and no pricing or action changed.
 - **Pure rules** in `src/lib/proposal-editor/unsaved.ts` (`dirtyReducer`, `blockingSentence`, `finishButtonState`). `UnsavedGuard.tsx` holds the provider, pill and `MoreSaveButton`. The provider listens for `input` / `change` on the document and uses the event target's `.form`, which follows the `form=` attribute, so More options fields count. A form is tracked only when `ActionForm` is given an `id` and `unsavedLabel` (it renders `data-unsaved-label`); a successful save (`state.saved`) marks it clean, a refusal does not. New proposal has no provider, so nothing is ever unsaved there.
-- **Effects:** "Save and create link" and "Turn on the link" are disabled with "Save your changes to The Fold and Client first." (`aria-describedby`, brand names use their own name). Each unsaved section shows an "Unsaved changes" pill by its heading and its Save button turns primary. Each brand name's More options holds its own Save button tied to that form by `form=`. `beforeunload` warns while anything is unsaved (browser only).
+- **Effects:** "Save and create link" and "Turn on the link" are disabled with "Save your changes to The Pleat and Client first." (`aria-describedby`, brand names use their own name). Each unsaved section shows an "Unsaved changes" pill by its heading and its Save button turns primary. Each brand name's More options holds its own Save button tied to that form by `form=`. `beforeunload` warns while anything is unsaved (browser only).
 - **Limit:** adding or removing a row with a button (discounts, included items) fires no `input` event, so those forms are marked only once a field is edited. Not verified in a real browser.
 
 ## Owner-only billing card (Lawmatics invoices, no schema)
@@ -1418,7 +1418,7 @@ The matter page's aside shows a "Billing" card listing that matter's invoices, r
 
 ## General (flat-fee) proposals (Spec 9, no schema)
 RPB's contract work (management-contract termination letters, contractor agreements and SOWs, equipment rental agreements) is a "General LOE" matter: one
-flat fee, scope typed by staff, never a trademark package price and never a USPTO fee. First real case and the test fixture: Faithe Williams
+flat fee, scope typed by staff, never a trademark package price and never a USPTO fee. First real case and the test fixture: Imogen Pellegrino
 (`tests/proposals/general-fixture.ts`), value 2.5 hrs x $500/hr = $1,250, fee $500. No migration: everything lives in `client_proposal.content`; statuses,
 RPCs, triggers, approval, link, accept, reset, delete, paid and opens are the existing ones, unchanged.
 - **Content (jsonb, additive):** `content.kind?: "trademark" | "general"` (absent = trademark, every older row) and, for general, `content.general =
@@ -1432,7 +1432,7 @@ RPCs, triggers, approval, link, accept, reset, delete, paid and opens are the ex
   else `value_cents`); `generalValueOverFee` gives "Value $1,250 · Your fee $500" only when the value is MORE than the fee. `quoteHasItems` is `fee_cents > 0`.
   The selection is ignored. **Trademark pricing did not move by a cent:** `tests/proposals/general-proposals.test.ts` compares `quoteProposal`,
   `defaultSelection`, `normalizeSelection`, `isFixedOffer`, `quoteHasItems`, `lockedSelectionIds` and `priceForClassCount` with the engine at `46f47dd`
-  over 300+ selections of the Sevetri, Danielle and Fold fixtures (credits and the custom package included).
+  over 300+ selections of the Callum, Renata and Pleat fixtures (credits and the custom package included).
 - **New proposal:** a "Type" switch at the top (`PROPOSAL_TYPE_TRADEMARK` "Trademark filing", the default and unchanged | `PROPOSAL_TYPE_GENERAL` "Contract or
   other matter (flat fee)", `?type=general`). The picker, its search and Start blank keep the type (`pickerWithType`, `withProposalType`, `WhoIsThisFor`'s
   `hidden`); the switch keeps the chosen lead or matter (`proposalTypeHrefs`). The general form (`NewGeneralProposalForm`, fields in `GeneralFields`) posts
@@ -1682,7 +1682,7 @@ The edit page for a draft is five sections in ONE form with ONE Save. Nothing se
 - **One action, one write.** `saveDraftAction` -> `runSaveDraft` (`src/lib/proposal-editor/save-draft.ts`, deps injected like `create-link.ts`): `gateStaffAction` first (before any
   read), a missing `updatedAt` is refused before any read, then the existing parsers (`parseDetails`, `parseName` per brand, `parsePricing`, `parseMessage`, `parseAdjustments`,
   `parseIncludes`, `applyGeneralForm`) run on the one post and ONE `updateProposal` call carries everything with the `updated_at` fence. A refusal starts with the section and
-  field ("Brand name The Fold: Discount on this brand name: ...") and writes nothing. The per-section save actions are gone; add / remove brand name and link-to-lead stay (they
+  field ("Brand name The Pleat: Discount on this brand name: ...") and writes nothing. The per-section save actions are gone; add / remove brand name and link-to-lead stay (they
   are small forms OUTSIDE the editor form, reached by the `form=` attribute, so forms never nest).
 - **Brand fields are posted as `b.<n>.<field>`** (`brandForm` strips the prefix and hands `parseName` what it always read; `b.<n>.pkgFields=1` is always posted). Sections that
   can be emptied post a marker (`adjFields`, `incFields`) so removing the last row clears it. A package choice reads the firm's CURRENT list into the proposal (`withPackageSnapshot`);
@@ -1731,8 +1731,8 @@ client page, signing and the staff side come in later sprints. Nothing here send
   `src/lib/proposals/types.ts`). `withLoeSnapshot(content, approved | null, wanted)` (`loe-snapshot.ts`, pure) attaches, refreshes or removes it, returns
   a new object and removes it for a template of the other kind; `loeIsCurrent` is the check Sprint 6 uses before creating a link. `validateContent`
   applies `loeIssues` on BOTH kinds (kind must equal the proposal's, title 1..200, body 1..60,000, no unknown merge field, malformed block = error);
-  content with no `loe` key validates and prices exactly as before (`tests/proposals/loe-engine-unchanged.test.ts` compares the Sevetri, Danielle and
-  Faithe fixtures with the engine at the sprint's base commit). `publicContent` publishes `loe.title`, `loe.body` and `loe.kind` only: `template_id`,
+  content with no `loe` key validates and prices exactly as before (`tests/proposals/loe-engine-unchanged.test.ts` compares the Callum, Renata and
+  Imogen fixtures with the engine at the sprint's base commit). `publicContent` publishes `loe.title`, `loe.body` and `loe.kind` only: `template_id`,
   `template_version` and any other key stay staff-side. The DB rule `content ? 'loe'` means even `loe: null` counts as a letter, so `validateContent` refuses
   any `loe` value that is not a well-formed object.
 - **Settings -> Client proposals -> Engagement letter** (`/dashboard/settings/proposals/engagement-letter/`, linked from the proposals settings page).

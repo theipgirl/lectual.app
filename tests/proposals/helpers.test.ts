@@ -16,60 +16,60 @@ import { defaultSelection, quoteProposal } from "@/lib/proposals/pricing";
 import { validateContent } from "@/lib/proposals/validate";
 import { buildChanges, checkDraftColumns, generateProposalToken, offerTotals } from "@/lib/proposals/store";
 import { ROLES } from "@/lib/auth/roles";
-import { sevetri } from "./fixture";
+import { callum } from "./fixture";
 
 describe("contentChanges", () => {
   it("is empty for identical content, even with keys in a different order", () => {
-    const a = sevetri();
+    const a = callum();
     const b = JSON.parse(JSON.stringify(a));
     b.pricing = Object.fromEntries(Object.entries(b.pricing).reverse());
     expect(contentChanges(a, b)).toEqual([]);
   });
 
   it("names the package price change in cents, with a readable label", () => {
-    const after = sevetri();
+    const after = callum();
     after.pricing.base_cents = 450_000;
-    expect(contentChanges(sevetri(), after)).toEqual([
+    expect(contentChanges(callum(), after)).toEqual([
       { path: "pricing.base_cents", label: "Concierge base price", format: "cents", before: 495_000, after: 450_000 },
     ]);
   });
 
   it("describes edits to a brand name's mark by id", () => {
-    const after = sevetri();
+    const after = callum();
     after.names[0].marks[0].desc = "New description";
     after.names[0].marks[1].preselected = false;
-    const changes = contentChanges(sevetri(), after);
+    const changes = contentChanges(callum(), after);
     expect(changes.map((c) => c.path)).toEqual([
       "names[p].marks[p-word].desc",
       "names[p].marks[p-logo].preselected",
     ]);
-    expect(changes[0].label).toBe("Prosperall: Word mark description");
+    expect(changes[0].label).toBe("Larkmoor: Word mark description");
     expect(changes[1]).toMatchObject({ format: "bool", before: true, after: false });
   });
 
   it("reordering is not a change; adding and removing items is", () => {
-    const reordered = sevetri();
+    const reordered = callum();
     reordered.names.reverse();
     reordered.names[1].marks.reverse();
-    expect(contentChanges(sevetri(), reordered)).toEqual([]);
+    expect(contentChanges(callum(), reordered)).toEqual([]);
 
-    const added = sevetri();
+    const added = callum();
     added.adjustments = [{ id: "a1", label: "Consultation credit", kind: "amount", value: 45_000 }];
-    const changes = contentChanges(sevetri(), added);
+    const changes = contentChanges(callum(), added);
     expect(changes).toContainEqual({ path: "adjustments[a1]", label: "Adjustment", format: "text", before: null, after: "Consultation credit" });
     expect(changes).toContainEqual({ path: "adjustments[a1].value", label: "Consultation credit", format: "cents", before: null, after: 45_000 });
 
-    const removed = sevetri();
+    const removed = callum();
     removed.names = removed.names.slice(0, 1);
-    const gone = contentChanges(sevetri(), removed);
-    expect(gone).toContainEqual({ path: "names[t]", label: "Brand name", format: "text", before: "Tech4PublicGood", after: null });
+    const gone = contentChanges(callum(), removed);
+    expect(gone).toContainEqual({ path: "names[t]", label: "Brand name", format: "text", before: "Open4Everyone", after: null });
   });
 
   it("tracks a per-brand override and a percent adjustment's format", () => {
-    const after = sevetri();
+    const after = callum();
     after.names[0].price_override = { base_cents: 400_000 };
     after.adjustments = [{ id: "r", label: "Referral", kind: "percent", value: 10 }];
-    const changes = contentChanges(sevetri(), after);
+    const changes = contentChanges(callum(), after);
     expect(changes).toContainEqual(
       expect.objectContaining({ path: "names[p].price_override.base_cents", format: "cents", before: null, after: 400_000 }),
     );
@@ -77,9 +77,9 @@ describe("contentChanges", () => {
   });
 
   it("tracks includes rows by label", () => {
-    const after = sevetri();
+    const after = callum();
     after.includes[1].included = "2 included";
-    expect(contentChanges(sevetri(), after)).toEqual([
+    expect(contentChanges(callum(), after)).toEqual([
       {
         path: "includes[Non-Substantive Office Action Response].included",
         label: "Non-Substantive Office Action Response: included",
@@ -99,8 +99,8 @@ describe("contentChanges", () => {
 describe("changedColumns and buildChanges", () => {
   const row = (over: Record<string, unknown> = {}) =>
     ({
-      content: sevetri(),
-      client_name: "Sevetri Wilson",
+      content: callum(),
+      client_name: "Callum Ferreira",
       client_email: null,
       title: "Trademark Proposal",
       expires_on: null,
@@ -111,9 +111,9 @@ describe("changedColumns and buildChanges", () => {
     }) as Parameters<typeof buildChanges>[0];
 
   it("lists only the columns in the patch that differ", () => {
-    expect(changedColumns(row(), { client_name: "Sevetri Wilson", expires_on: "2026-10-26" })).toEqual(["expires_on"]);
+    expect(changedColumns(row(), { client_name: "Callum Ferreira", expires_on: "2026-10-26" })).toEqual(["expires_on"]);
     expect(changedColumns(row(), {})).toEqual([]);
-    expect(changedColumns(row(), { content: JSON.parse(JSON.stringify(sevetri())) })).toEqual([]);
+    expect(changedColumns(row(), { content: JSON.parse(JSON.stringify(callum())) })).toEqual([]);
   });
 
   it("buildChanges merges content and plain-column changes and caps the list", () => {
@@ -132,7 +132,7 @@ describe("changedColumns and buildChanges", () => {
 
 describe("offerTotals", () => {
   it("is the firm's preselected offer", () => {
-    expect(offerTotals(sevetri())).toEqual({ legal_total_cents: 1_782_000, gov_total_cents: 280_000 });
+    expect(offerTotals(callum())).toEqual({ legal_total_cents: 1_782_000, gov_total_cents: 280_000 });
   });
 });
 
@@ -140,12 +140,12 @@ describe("checkDraftColumns", () => {
   it("accepts a good draft", () => {
     expect(() =>
       checkDraftColumns({
-        clientName: "Sevetri Wilson",
+        clientName: "Callum Ferreira",
         clientEmail: "s@example.com",
         title: "Trademark Proposal",
         expiresOn: "2026-10-26",
         payUrl: "https://app.lawmatics.com/forms/x",
-        content: sevetri(),
+        content: callum(),
       }),
     ).not.toThrow();
     expect(() => checkDraftColumns({})).not.toThrow();
@@ -172,7 +172,7 @@ describe("checkDraftColumns", () => {
   });
 
   it("a draft with firm-rule problems is still saveable (only approval refuses them)", () => {
-    const c = sevetri();
+    const c = callum();
     c.greeting = "IC 9";
     expect(() => checkDraftColumns({ content: c })).not.toThrow();
   });
@@ -252,7 +252,7 @@ describe("standardProposalPricing", () => {
     expect(s.includes).toEqual([{ label: "Search", included: "✓" }]);
   });
 
-  it("the defaults are the Sevetri numbers in cents and pass validation", () => {
+  it("the defaults are the Callum numbers in cents and pass validation", () => {
     expect(DEFAULT_PROPOSAL_PRICING).toEqual({
       package: "Concierge",
       base_cents: 495_000,
@@ -261,7 +261,7 @@ describe("standardProposalPricing", () => {
       second_mark_discount_pct: 20,
       gov_per_class_cents: 35_000,
     });
-    const c = sevetri();
+    const c = callum();
     c.includes = DEFAULT_PROPOSAL_INCLUDES;
     expect(validateContent(c)).toEqual([]);
     expect(quoteProposal(c, defaultSelection(c)).legal_total_cents).toBe(1_782_000);

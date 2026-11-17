@@ -10,8 +10,8 @@ import { DRAFT_FORM_ID } from "@/lib/proposal-editor/unsaved";
 import { loeIsCurrent, withLoeSnapshot, type ApprovedLetter } from "@/lib/proposals/loe-snapshot";
 import type { ProposalContent, ProposalRow } from "@/lib/proposals/types";
 import type { ApprovedRead } from "@/lib/loe/templates-store";
-import { sevetri } from "../proposals/fixture";
-import { faithe } from "../proposals/general-fixture";
+import { callum } from "../proposals/fixture";
+import { imogen } from "../proposals/general-fixture";
 import { fullLetterBody } from "./full-letter-fixture";
 import { renderLetter } from "@/lib/loe/render";
 import { PLACEHOLDER_VALUES } from "@/lib/loe/editor-state";
@@ -33,7 +33,7 @@ function draw(read: ApprovedRead | null, attached: ProposalContent["loe"], edita
   return renderToStaticMarkup(createElement("form", { id: DRAFT_FORM_ID }, inner));
 }
 
-const ATTACHED = withLoe(sevetri()).loe;
+const ATTACHED = withLoe(callum()).loe;
 
 describe("P1c: the four states each render, and the unreadable state is not the set-up line", () => {
   it("no approved letter: the set-up line and NO switch (no checkbox input in the markup)", () => {
@@ -162,7 +162,7 @@ const UPDATED = "2026-10-18T12:00:00Z";
 function row(content: ProposalContent): ProposalRow {
   return {
     id: "p1", org_id: "o", family_id: "p1", version: 1, public_token: "t".repeat(43), lead_id: null, matter_id: null,
-    client_name: "Sevetri Wilson", client_email: "s@example.com", title: "Trademark Proposal", status: "draft", content,
+    client_name: "Callum Ferreira", client_email: "s@example.com", title: "Trademark Proposal", status: "draft", content,
     expires_on: "2026-11-10", pay_url: null, source: "manual", created_by: null, updated_by: null, approved_by: null, approved_at: null,
     sent_at: null, accepted_at: null, superseded_at: null, withdrawn_at: null, accepted_selection: null, accepted_snapshot: null,
     created_at: UPDATED, updated_at: UPDATED,
@@ -173,13 +173,13 @@ function trademarkForm(over: Record<string, string> = {}): FormData {
   const f = new FormData();
   const base: Record<string, string> = {
     proposalId: "p1", updatedAt: UPDATED,
-    fullName: "Sevetri Wilson", firstName: "Sevetri", company: "Prosperall", clientEmail: "s@example.com", title: "Trademark Proposal",
-    greeting: "Hi Sevetri, here is your proposal.", recommendation: "Both marks are best.", officeActionNote: "",
+    fullName: "Callum Ferreira", firstName: "Callum", company: "Larkmoor", clientEmail: "s@example.com", title: "Trademark Proposal",
+    greeting: "Hi Callum, here is your proposal.", recommendation: "Both marks are best.", officeActionNote: "",
     payUrl: "https://pay.example/x", expiresOn: "2026-11-10",
     package: "Concierge", base: "4950", includedClasses: "3", perClass: "825", secondMarkPct: "20", govPerClass: "350",
     adjFields: "1", incFields: "1",
   };
-  sevetri().names.forEach((n, b) => {
+  callum().names.forEach((n, b) => {
     const p = `b.${b}.`;
     base[`${p}nameId`] = n.id; base[`${p}name`] = n.name; base[`${p}pkgFields`] = "1";
     n.marks.forEach((m, i) => { base[`${p}mark.${i}.id`] = m.id; base[`${p}mark.${i}.kind`] = m.kind; base[`${p}mark.${i}.desc`] = m.desc; base[`${p}mark.${i}.preselected`] = "on"; });
@@ -208,7 +208,7 @@ const written = (update: ReturnType<typeof vi.fn>) => (update.mock.calls[0] as u
 
 describe("P1a: Save attaches, removes and refreshes the copy", () => {
   it("switch on with an approved letter of the right kind: the saved content carries `loe` equal to that version", async () => {
-    const { deps, update } = saveDeps(row(sevetri()), ok(APPROVED));
+    const { deps, update } = saveDeps(row(callum()), ok(APPROVED));
     const r = await runSaveDraft(deps, trademarkForm({ loeFields: "1", loeOn: "on" }));
     expect(r.saved).toBe(true);
     expect(written(update).loe).toEqual({ kind: "trademark", template_id: APPROVED.id, template_version: 3, title: APPROVED.title, body: APPROVED.body });
@@ -216,14 +216,14 @@ describe("P1a: Save attaches, removes and refreshes the copy", () => {
   });
 
   it("switch off: `loe` is removed", async () => {
-    const { deps, update } = saveDeps(row(withLoe(sevetri())), ok(APPROVED));
+    const { deps, update } = saveDeps(row(withLoe(callum())), ok(APPROVED));
     await runSaveDraft(deps, trademarkForm({ loeFields: "1" }));
     expect(written(update).loe).toBeUndefined();
     expect("loe" in written(update)).toBe(false);
   });
 
   it("a re-save after the firm approved a newer version replaces the copy", async () => {
-    const current = row(withLoe(sevetri()));
+    const current = row(withLoe(callum()));
     const { deps, update } = saveDeps(current, ok(NEWER));
     await runSaveDraft(deps, trademarkForm({ loeFields: "1", loeOn: "on" }));
     const loe = written(update).loe!;
@@ -233,47 +233,47 @@ describe("P1a: Save attaches, removes and refreshes the copy", () => {
   });
 
   it("a save from a form that does not carry the switch keeps the copy as it is (on stays on, off stays off), refreshed from the firm's version", async () => {
-    const on = saveDeps(row(withLoe(sevetri())), ok(NEWER));
+    const on = saveDeps(row(withLoe(callum())), ok(NEWER));
     await runSaveDraft(on.deps, trademarkForm());
     expect(written(on.update).loe?.template_version).toBe(4);
-    const off = saveDeps(row(sevetri()), ok(APPROVED));
+    const off = saveDeps(row(callum()), ok(APPROVED));
     await runSaveDraft(off.deps, trademarkForm());
     expect(written(off.update).loe).toBeUndefined();
   });
 
   it("a kind mismatch removes `loe`: a general template is never attached to a trademark proposal", () => {
     const general: ApprovedLetter = { id: "22222222-2222-4222-8222-222222222222", kind: "general", version: 1, title: "Engagement letter", body: GENERAL_LETTER_BODY };
-    expect(withLoeSnapshot(sevetri(), general, true).loe).toBeUndefined();
-    expect(withLoeSnapshot(withLoe(sevetri()), general, true).loe).toBeUndefined();
-    expect(withLoeSnapshot(faithe(), general, true).loe?.kind).toBe("general");
-    expect(withLoeSnapshot(faithe(), APPROVED, true).loe).toBeUndefined();
+    expect(withLoeSnapshot(callum(), general, true).loe).toBeUndefined();
+    expect(withLoeSnapshot(withLoe(callum()), general, true).loe).toBeUndefined();
+    expect(withLoeSnapshot(imogen(), general, true).loe?.kind).toBe("general");
+    expect(withLoeSnapshot(imogen(), APPROVED, true).loe).toBeUndefined();
   });
 
   it("no approved letter: the copy is removed even with the switch on", async () => {
-    const { deps, update } = saveDeps(row(withLoe(sevetri())), ok(null));
+    const { deps, update } = saveDeps(row(withLoe(callum())), ok(null));
     await runSaveDraft(deps, trademarkForm({ loeFields: "1", loeOn: "on" }));
     expect(written(update).loe).toBeUndefined();
   });
 
   it("an unreadable approved-letter read: the switch is not changed on a guess (refused), but an unrelated save keeps the copy untouched", async () => {
-    const turnOff = saveDeps(row(withLoe(sevetri())), { status: "unavailable" });
+    const turnOff = saveDeps(row(withLoe(callum())), { status: "unavailable" });
     const refused = await runSaveDraft(turnOff.deps, trademarkForm({ loeFields: "1" }));
     expect(refused.error).toContain("couldn't load the firm's letter");
     expect(turnOff.update).not.toHaveBeenCalled();
 
-    const same = saveDeps(row(withLoe(sevetri())), { status: "unavailable" });
+    const same = saveDeps(row(withLoe(callum())), { status: "unavailable" });
     const saved = await runSaveDraft(same.deps, trademarkForm({ loeFields: "1", loeOn: "on" }));
     expect(saved.saved).toBe(true);
     expect(written(same.update).loe?.template_version).toBe(3);
   });
 
   it("the general kind reads the general letter", async () => {
-    const { deps } = saveDeps(row({ ...faithe() }), ok(null));
+    const { deps } = saveDeps(row({ ...imogen() }), ok(null));
     const f = new FormData();
-    const fields = { proposalId: "p1", updatedAt: UPDATED, fullName: "Faithe Williams", firstName: "Faithe", title: "T", matterTitle: "Management agreement", summary: "S", "item.0.id": "w1", "item.0.label": "Review the agreements", "item.0.hours": "1", "item.0.rate": "500", fee: "500", loeFields: "1", loeOn: "on" };
+    const fields = { proposalId: "p1", updatedAt: UPDATED, fullName: "Imogen Pellegrino", firstName: "Imogen", title: "T", matterTitle: "Management agreement", summary: "S", "item.0.id": "w1", "item.0.label": "Review the agreements", "item.0.hours": "1", "item.0.rate": "500", fee: "500", loeFields: "1", loeOn: "on" };
     for (const [k, v] of Object.entries(fields)) f.set(k, v);
     const general: ApprovedLetter = { id: "22222222-2222-4222-8222-222222222222", kind: "general", version: 1, title: "Engagement letter", body: GENERAL_LETTER_BODY };
-    const g = saveDeps(row({ ...faithe() }), ok(general));
+    const g = saveDeps(row({ ...imogen() }), ok(general));
     const r = await runSaveDraft(g.deps, f);
     expect(r.error).toBeUndefined();
     expect(g.approvedLetter).toHaveBeenCalledWith("general");
@@ -292,11 +292,11 @@ describe("P1a: Save attaches, removes and refreshes the copy", () => {
     expect(wantedFromForm(f, true)).toBe(false);
     f.set("loeOn", "on");
     expect(wantedFromForm(f, false)).toBe(true);
-    expect(letterCopyCheck(sevetri(), ok(APPROVED))).toBe("no_letter");
-    expect(letterCopyCheck(withLoe(sevetri()), ok(APPROVED))).toBe("current");
-    expect(letterCopyCheck(withLoe(sevetri()), ok(NEWER))).toBe("stale");
-    expect(letterCopyCheck(withLoe(sevetri()), ok(null))).toBe("stale");
-    expect(letterCopyCheck(withLoe(sevetri()), { status: "unavailable" })).toBe("unreadable");
-    expect(loeIsCurrent(withLoe(sevetri()), APPROVED)).toBe(true);
+    expect(letterCopyCheck(callum(), ok(APPROVED))).toBe("no_letter");
+    expect(letterCopyCheck(withLoe(callum()), ok(APPROVED))).toBe("current");
+    expect(letterCopyCheck(withLoe(callum()), ok(NEWER))).toBe("stale");
+    expect(letterCopyCheck(withLoe(callum()), ok(null))).toBe("stale");
+    expect(letterCopyCheck(withLoe(callum()), { status: "unavailable" })).toBe("unreadable");
+    expect(loeIsCurrent(withLoe(callum()), APPROVED)).toBe(true);
   });
 });

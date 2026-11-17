@@ -47,11 +47,11 @@ describe("create link with an engagement letter on the proposal", () => {
 
   it("a check that throws is read as unreadable, never as current (the error text is not shown)", async () => {
     const { d } = deps(async () => {
-      throw new Error("db down: sevetri@example.com");
+      throw new Error("db down: callum@example.com");
     });
     const r = await runCreateLink(d, "p1");
     expect(r).toEqual({ error: LETTER_UNREADABLE_SENTENCE });
-    expect(JSON.stringify(r)).not.toContain("sevetri");
+    expect(JSON.stringify(r)).not.toContain("callum");
   });
 
   it("a matching copy proceeds exactly as today: approve then makeLive", async () => {

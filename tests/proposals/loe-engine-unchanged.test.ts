@@ -7,13 +7,13 @@ import { quoteProposal, defaultSelection } from "@/lib/proposals/pricing";
 import { quoteWithClientClasses, emptyClientClassInput } from "@/lib/proposals/client-classes";
 import { validateContent } from "@/lib/proposals/validate";
 import type { ProposalContent, Selection } from "@/lib/proposals/types";
-import { faithe } from "./general-fixture";
-import { sevetri } from "./fixture";
-import { danielle } from "./danielle-fixture";
+import { imogen } from "./general-fixture";
+import { callum } from "./fixture";
+import { renata } from "./renata-fixture";
 
 /**
- * The engagement letter adds a `loe` key and nothing else. The fixtures for Sevetri (two marks, a package per
- * mark in the mark fixture), Danielle (a package per brand) and Faithe (flat fee) must validate and quote exactly
+ * The engagement letter adds a `loe` key and nothing else. The fixtures for Callum (two marks, a package per
+ * mark in the mark fixture), Renata (a package per brand) and Imogen (flat fee) must validate and quote exactly
  * as they did at the commit this sprint branched from, and `pricing.ts` must have no diff since then.
  */
 
@@ -30,9 +30,9 @@ const oldValidate = show("src/lib/proposals/validate.ts");
 const have = oldPricing !== null && oldValidate !== null;
 
 const FIXTURES: Array<[string, () => ProposalContent]> = [
-  ["sevetri", sevetri],
-  ["danielle", danielle],
-  ["faithe", faithe],
+  ["callum", callum],
+  ["renata", renata],
+  ["imogen", imogen],
 ];
 
 describe("fixtures validate and quote as before the engagement letter", () => {

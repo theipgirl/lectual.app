@@ -53,13 +53,13 @@ describe("P2: the signed trademark PDF", () => {
     const paragraphs = fullLetterBody().split(/\n[ \t]*\n+/).filter((p) => p.trim().length > 0);
     expect(letter.blocks).toHaveLength(paragraphs.length);
 
-    expect(text).toContain("Sevetri Wilson");
+    expect(text).toContain("Callum Ferreira");
     expect(text).toContain("November 12, 2026 at 2:14 PM EST");
     expect(text).toContain(FINGERPRINT);
     expect(FINGERPRINT).toMatch(/^[0-9a-f]{64}$/);
     // Selected marks and their packages.
-    expect(text).toContain("The Fold");
-    expect(text).toContain("The Confidence Interval");
+    expect(text).toContain("The Pleat");
+    expect(text).toContain("The Margin Note");
     expect(text).toContain("Enhanced");
     expect(text).toContain("Concierge");
     expect(text).toContain("Class: Gaming consoles");
@@ -83,7 +83,7 @@ describe("P2: the signed trademark PDF", () => {
   });
 
   it("names the file from the signer and the signed date in the firm's zone", () => {
-    expect(signedLetterFileName("Sevetri Wilson", "2026-11-12T19:14:00.000Z", "America/New_York")).toBe("Sevetri-Wilson-engagement-letter-signed-2026-11-12.pdf");
+    expect(signedLetterFileName("Callum Ferreira", "2026-11-12T19:14:00.000Z", "America/New_York")).toBe("Callum-Ferreira-engagement-letter-signed-2026-11-12.pdf");
     // 02:00 UTC on the 13th is still the 12th in New York.
     expect(signedLetterFileName("Alex", "2026-11-13T02:00:00.000Z", "America/New_York")).toContain("2026-11-12");
   });
@@ -92,7 +92,7 @@ describe("P2: the signed trademark PDF", () => {
 describe("item 7: the signature record names the zone and carries the UTC time", () => {
   it("prints the local time with its zone and the same instant in UTC, ISO 8601", async () => {
     const text = await textOf(signedTrademark());
-    expect(text).toContain("Signed electronically by Sevetri Wilson on November 12, 2026 at 2:14 PM EST.");
+    expect(text).toContain("Signed electronically by Callum Ferreira on November 12, 2026 at 2:14 PM EST.");
     expect(text).toContain("Signed: November 12, 2026 at 2:14 PM EST");
     expect(text).toContain("Signed (UTC): 2026-11-12T19:14:00.000Z");
   });
@@ -162,7 +162,7 @@ describe("item 6: a fingerprint is never printed beside text it does not match",
     expect(text).toContain("Signed: November 12, 2026 at 2:14 PM EST");
     expect(text).toContain("Signed (UTC): 2026-11-12T19:14:00.000Z");
     expect(text.startsWith(FIRM.displayName)).toBe(true);
-    expect(result.signerName).toBe("Sevetri Wilson");
+    expect(result.signerName).toBe("Callum Ferreira");
   });
 
   it("MISMATCH and the stored text cannot be READ: no file, and it is 'unavailable' (trying again may help)", async () => {
@@ -241,7 +241,7 @@ describe("item 6: a fingerprint is never printed beside text it does not match",
   });
 });
 
-describe("P5: the signed flat-fee PDF (Faithe Williams)", () => {
+describe("P5: the signed flat-fee PDF (Imogen Pellegrino)", () => {
   it("has the matter, each work line, Value $1,250 and the $500 flat fee, and no USPTO, brand, package or class lines", async () => {
     const snapshot = signedGeneral();
     const letter = rebuildSignedLetter(snapshot, "America/New_York")!;
@@ -252,7 +252,7 @@ describe("P5: the signed flat-fee PDF (Faithe Williams)", () => {
     expect(text).toMatch(/Value of the work[^$]*\$1,250/);
     expect(text).toContain("$1,250");
     expect(text).toContain("$500");
-    expect(text).toContain("Faithe Williams");
+    expect(text).toContain("Imogen Pellegrino");
     expect(text).not.toMatch(/USPTO/i);
     expect(text).not.toMatch(/Class:/);
     for (const pkg of ["Essential", "Enhanced", "Concierge"]) expect(text).not.toContain(pkg);

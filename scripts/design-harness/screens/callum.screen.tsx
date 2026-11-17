@@ -4,7 +4,7 @@ import { state } from "../state";
 import { resetState } from "../fixtures";
 import { OwnerShell } from "../shell";
 import type { Screen } from "../registry";
-import { sevetriCustom } from "../../../tests/proposals/sevetri-custom-fixture";
+import { callumCustom } from "../../../tests/proposals/callum-custom-fixture";
 import { defaultSelection, quoteProposal } from "@/lib/proposals/pricing";
 import { buildAcceptedSnapshot } from "@/lib/proposals/public";
 import { offeredPackages } from "@/lib/proposals/segments";
@@ -25,7 +25,7 @@ const ID = "44444444-4444-4444-8444-444444444444";
 const ACCEPTED_AT = "2026-11-05T15:00:00.000Z";
 
 function accepted() {
-  const content = sevetriCustom();
+  const content = callumCustom();
   const selection = defaultSelection(content);
   const quote = quoteProposal(content, selection);
   const snap = buildAcceptedSnapshot({ version: 1, content, selection, quote, acceptedAt: ACCEPTED_AT });
@@ -36,7 +36,7 @@ function proposalRow(status: "sent" | "accepted"): ProposalRow {
   const a = accepted();
   return {
     id: ID, org_id: "o", family_id: ID, version: 1, public_token: "t".repeat(43), lead_id: "lead-9", matter_id: null,
-    client_name: "Sevetri Wilson", client_email: "s@example.com", title: "Trademark Proposal", status,
+    client_name: "Callum Ferreira", client_email: "s@example.com", title: "Trademark Proposal", status,
     content: a.content, expires_on: "2026-11-30", pay_url: "https://pay.example/x", source: "manual",
     created_by: null, updated_by: null, approved_by: null, approved_at: "2026-11-04T12:00:00Z", sent_at: "2026-11-04T12:05:00Z",
     accepted_at: status === "accepted" ? ACCEPTED_AT : null, superseded_at: null, withdrawn_at: null,
@@ -56,9 +56,9 @@ function listRows() {
     blocking_issue: null, matter_title: null,
   });
   return [
-    mk("p01", "accepted", true, "Sevetri Wilson"),
-    mk("p02", "sent", false, "Sevetri Wilson (revised)"),
-    mk("p03", "draft", false, "Sevetri Wilson (draft)"),
+    mk("p01", "accepted", true, "Callum Ferreira"),
+    mk("p02", "sent", false, "Callum Ferreira (revised)"),
+    mk("p03", "draft", false, "Callum Ferreira (draft)"),
     { ...mk("p04", "sent", false, "Alder & Finch"), brands: ["Alder"], offered: [{ name: "Concierge", legalAtSigningCents: 495_000, usptoAtFilingCents: 70_000 }], class_count: 2, legal_total_cents: 495_000, gov_total_cents: 70_000 },
   ];
 }
@@ -102,7 +102,7 @@ const staffPrepare = (status: "sent" | "accepted") => () => {
   }));
   vi.doMock("@/lib/consult-proposal/link", () => ({ GOES_LIVE_ON_APPROVAL: "x", proposalSendBlock: async () => ({ blocked: false }) }));
   vi.doMock("@/lib/proposals/consult-strip-load", () => ({ loadConsultStrip: async () => ({ status: "none" }) }));
-  vi.doMock("@/lib/proposals/lead-link", () => ({ loadLeadLink: async (id: string | null) => (id ? { state: "linked", id, name: "Sevetri Wilson" } : { state: "none" }) }));
+  vi.doMock("@/lib/proposals/lead-link", () => ({ loadLeadLink: async (id: string | null) => (id ? { state: "linked", id, name: "Callum Ferreira" } : { state: "none" }) }));
   vi.doMock("@/lib/proposals/lead-options", () => ({ loadLeadOptions: async () => ({ status: "ok", leads: [] }) }));
   vi.doMock("@/app/dashboard/proposals/[id]/paid-actions", () => ({ markPaidAction: async () => undefined, undoPaidAction: async () => undefined, retryUploadAction: async () => undefined }));
 };
@@ -119,7 +119,7 @@ const clientRender = (mode: "live" | "accepted") => async function clientScreen(
   const { ProposalDocument } = await import("@/components/client-proposal/ProposalDocument");
   const a = accepted();
   return createElement(ProposalDocument, {
-    mode, content: a.content, title: "Trademark Proposal", clientName: "Sevetri Wilson", expiresOn: "2026-11-30",
+    mode, content: a.content, title: "Trademark Proposal", clientName: "Callum Ferreira", expiresOn: "2026-11-30",
     firm: { name: "RPB Law", slug: "rpb", displayName: "RPB Law", contactLine: "hello@rpb.example · (555) 010-0100" },
     ...(mode === "accepted" ? { initialSelection: a.selection, acceptedQuote: a.quote, payUrl: "https://pay.example/x" } : { onAccept: async () => ({ ok: true as const, payUrl: "https://pay.example/x" }) }),
   });
@@ -129,12 +129,12 @@ const S = (id: string, title: string, viewport: "desktop" | "phone", shell: "own
   ({ id, title, designBoard: "none", viewport, shell, pathname, prepare, render, ...{ transformHtml: withFonts } });
 
 export const screens: Screen[] = [
-  S("sev-list-d", "Sevetri list (desktop)", "desktop", "owner", listPrepare, listRender),
-  S("sev-list-p", "Sevetri list (phone)", "phone", "owner", listPrepare, listRender),
-  S("sev-staff-d", "Sevetri staff page, accepted (desktop)", "desktop", "owner", staffPrepare("accepted"), staffRender),
-  S("sev-staff-p", "Sevetri staff page, accepted (phone)", "phone", "owner", staffPrepare("accepted"), staffRender),
-  S("sev-client-offer-d", "Sevetri client offer (desktop)", "desktop", "none", baseMocks, clientRender("live")),
-  S("sev-client-offer-p", "Sevetri client offer (phone)", "phone", "none", baseMocks, clientRender("live")),
-  S("sev-client-receipt-d", "Sevetri client receipt (desktop)", "desktop", "none", baseMocks, clientRender("accepted")),
-  S("sev-client-receipt-p", "Sevetri client receipt (phone)", "phone", "none", baseMocks, clientRender("accepted")),
+  S("sev-list-d", "Callum list (desktop)", "desktop", "owner", listPrepare, listRender),
+  S("sev-list-p", "Callum list (phone)", "phone", "owner", listPrepare, listRender),
+  S("sev-staff-d", "Callum staff page, accepted (desktop)", "desktop", "owner", staffPrepare("accepted"), staffRender),
+  S("sev-staff-p", "Callum staff page, accepted (phone)", "phone", "owner", staffPrepare("accepted"), staffRender),
+  S("sev-client-offer-d", "Callum client offer (desktop)", "desktop", "none", baseMocks, clientRender("live")),
+  S("sev-client-offer-p", "Callum client offer (phone)", "phone", "none", baseMocks, clientRender("live")),
+  S("sev-client-receipt-d", "Callum client receipt (desktop)", "desktop", "none", baseMocks, clientRender("accepted")),
+  S("sev-client-receipt-p", "Callum client receipt (phone)", "phone", "none", baseMocks, clientRender("accepted")),
 ];

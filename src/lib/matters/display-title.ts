@@ -4,7 +4,7 @@
  * The tracker import gives a matter without a serial number the number
  * `TM-<owner>-<mark>` (src/lib/matters/tracker-import.ts matterNumberFor), and
  * some imports copied that key into the title as well. A person reads
- * `TM-enisha-smith` as a database key, so a title that is a generated key
+ * `TM-jane-doe` as a database key, so a title that is a generated key
  * yields to the mark, then the client. Display only: nothing here is stored.
  */
 export type DisplayTitleInput = {
@@ -14,7 +14,7 @@ export type DisplayTitleInput = {
   matter_number: string;
 };
 
-/** Type prefix plus a lowercase slug: TM-enisha-smith, CR-acme-co. A serial key (TM-97123456) counts too. */
+/** Type prefix plus a lowercase slug: TM-jane-doe, CR-acme-co. A serial key (TM-97123456) counts too. */
 const GENERATED_KEY = /^[A-Z]{2,4}-[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SERIAL_KEY = /^[A-Z]{2,4}-\d{6,}$/;
 

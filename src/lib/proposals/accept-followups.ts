@@ -115,7 +115,7 @@ export function acceptanceNoteBody(snapshot: AcceptedSnapshot, clientName: strin
   const allClasses = (content.names ?? []).flatMap((n) => n.classes ?? []);
   const addedIds = new Set(allClasses.filter((c) => c.client_added === true && snapshot.selection?.[c.id] === true).map((c) => c.id));
   const describedIds = new Set(allClasses.filter((c) => c.client_entry === true && c.client_added !== true && snapshot.selection?.[c.id] === true).map((c) => c.id));
-  // Spec 6: a brand name priced under a package the client chose names it ("The Fold — Enhanced"); firm text only.
+  // Spec 6: a brand name priced under a package the client chose names it ("The Pleat — Enhanced"); firm text only.
   const pkg = text(chosenPackagesText(quote.names)) || text(content.pricing?.package) || "Proposal";
   const lines: string[] = [`${text(clientName) || "The client"} accepted this proposal. Accepted ${snapshot.accepted_at}.`, `Package: ${pkg}`];
   for (const n of (Array.isArray(quote.names) ? quote.names : []).filter((x) => x.included)) {

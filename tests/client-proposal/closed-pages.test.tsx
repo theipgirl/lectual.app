@@ -30,7 +30,7 @@ vi.mock("@/lib/proposals/public", async (importOriginal) => ({
 vi.mock("@/lib/proposals/staff-view", () => ({ isSignedInFirmMember: vi.fn(async () => true) }));
 vi.mock("../../src/app/p/[token]/actions", () => ({ acceptProposalAction: vi.fn() }));
 
-import { sevetri } from "../proposals/fixture";
+import { callum } from "../proposals/fixture";
 import { acceptedSnapshot } from "../proposals/accepted-fixture";
 
 const FIRM = { name: "RPB Law", slug: "rpb-law", timeZone: "America/New_York" };
@@ -62,12 +62,12 @@ describe("closed client proposal pages carry no add-class control", () => {
   });
 
   it("a superseded version's token resolves to the family's live view, which offers add-class", async () => {
-    const content = sevetri();
+    const content = callum();
     content.names[0].client_add = { max: 2 };
     mocks.read.mockResolvedValue({
       status: "ok",
       handle: { orgId: "o", proposalId: "p2" },
-      view: { status: "sent", version: 2, title: "Trademark Proposal", clientName: "Sevetri Wilson", expiresOn: "2026-12-01", firm: FIRM, content, payUrl: null },
+      view: { status: "sent", version: 2, title: "Trademark Proposal", clientName: "Callum Ferreira", expiresOn: "2026-12-01", firm: FIRM, content, payUrl: null },
     });
     const html = await renderPage();
     expect(html).toContain("cp-add-btn");
@@ -78,7 +78,7 @@ describe("closed client proposal pages carry no add-class control", () => {
     mocks.read.mockResolvedValue({
       status: "ok",
       handle: { orgId: "o", proposalId: "p1" },
-      view: { status: "accepted", version: 1, title: "Trademark Proposal", clientName: "Sevetri Wilson", expiresOn: "2026-12-01", firm: FIRM, content: snap.content, acceptedSelection: snap.selection, acceptedQuote: snap.quote, payUrl: null },
+      view: { status: "accepted", version: 1, title: "Trademark Proposal", clientName: "Callum Ferreira", expiresOn: "2026-12-01", firm: FIRM, content: snap.content, acceptedSelection: snap.selection, acceptedQuote: snap.quote, payUrl: null },
     });
     const html = await renderPage();
     expect(html).not.toContain("Add a class");

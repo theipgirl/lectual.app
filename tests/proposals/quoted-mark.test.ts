@@ -7,14 +7,14 @@ describe("quotedMark", () => {
     expect(quotedMark("  LOVE AS INFRASTRUCTURE ")).toBe("“LOVE AS INFRASTRUCTURE”");
   });
   it("leaves a name that is already wrapped in straight or curly quotes", () => {
-    for (const n of ['"The Fold"', "“The Fold”", "'The Fold'", "‘The Fold’"]) expect(quotedMark(n)).toBe(n);
+    for (const n of ['"The Pleat"', "“The Pleat”", "'The Pleat'", "‘The Pleat’"]) expect(quotedMark(n)).toBe(n);
   });
   it("a lone quote character is still wrapped, and an empty name stays empty", () => {
     expect(quotedMark('"')).toBe('“"”');
     expect(quotedMark("  ")).toBe("");
   });
   it("the shared package-line helper (staff page, Lawmatics note) stays unquoted", () => {
-    expect(packageLineTitle({ name: "The Fold", package: "Enhanced" })).toBe("The Fold — Enhanced");
-    expect(chosenPackagesText([{ name: "The Fold", package: "Enhanced", included: true }])).toBe("The Fold — Enhanced");
+    expect(packageLineTitle({ name: "The Pleat", package: "Enhanced" })).toBe("The Pleat — Enhanced");
+    expect(chosenPackagesText([{ name: "The Pleat", package: "Enhanced", included: true }])).toBe("The Pleat — Enhanced");
   });
 });
