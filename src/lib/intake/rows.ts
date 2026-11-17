@@ -69,6 +69,8 @@ export type IntakeRow = {
   decision?: DecisionFlag;
   /** Start (ISO) of the lead's soonest booked consult, today (firm day) or later. Absent = none, or the read failed. */
   consultAt?: string;
+  /** Start (ISO) of the lead's latest consult that already happened (last 30 days). Absent = none, or the read failed. */
+  pastConsultAt?: string;
 };
 
 /** Special `owner` filter value meaning "nobody is on the hook for this one". */
@@ -365,6 +367,8 @@ export type BuildIntakeRowsInput = {
   decisionByLeadId?: Record<string, DecisionFlag>;
   /** lead id -> start (ISO) of the soonest booked consult today or later. Omit entirely when the consult read failed. */
   consultStartByLeadId?: Record<string, string>;
+  /** lead id -> start (ISO) of the latest consult already held (last 30 days). Omit entirely when the consult read failed. */
+  pastConsultStartByLeadId?: Record<string, string>;
   now: Date;
 };
 
@@ -384,7 +388,7 @@ function daysBetween(iso: string | null, now: Date): number | null {
  * strip and the row it counts can never disagree.
  */
 export function buildIntakeRows(input: BuildIntakeRowsInput): IntakeRow[] {
-  const { leads, stages, members, latestNoteByLeadId = {}, factsByLeadId = {}, agentMoveByLeadId = {}, decisionByLeadId = {}, consultStartByLeadId = {}, now } = input;
+  const { leads, stages, members, latestNoteByLeadId = {}, factsByLeadId = {}, agentMoveByLeadId = {}, decisionByLeadId = {}, consultStartByLeadId = {}, pastConsultStartByLeadId = {}, now } = input;
   const stageById = new Map(stages.map((stage) => [stage.id, stage]));
   const memberById = new Map(members.map((member) => [member.userId, member]));
 
@@ -413,6 +417,7 @@ export function buildIntakeRows(input: BuildIntakeRowsInput): IntakeRow[] {
       ...(decisionByLeadId[lead.id] ? { decision: decisionByLeadId[lead.id] } : {}),
       // Only present for a lead with a booked consult today or later, so every other row is unchanged.
       ...(consultStartByLeadId[lead.id] ? { consultAt: consultStartByLeadId[lead.id] } : {}),
+      ...(pastConsultStartByLeadId[lead.id] ? { pastConsultAt: pastConsultStartByLeadId[lead.id] } : {}),
     };
   });
 }

@@ -895,4 +895,6 @@ export const reviewDocsCount = (n: number) => `${n} ${n === 1 ? "document" : "do
 // Leads: a booked consult in the Last contact cell
 export const LEADS_TOUCH_CONSULT_TODAY = (time: string) => `Consult today · ${time}`;
 export const LEADS_TOUCH_CONSULT_LATER = (date: string) => `Consult · ${date}`;
+export const LEADS_TOUCH_CONSULT_HELD = (date: string) => `${OUR_TURN} · consult ${date}`;
+export const LEADS_TOUCH_CONSULT_HELD_TITLE = "The consult was held and nothing has been sent since.";
 export const LEADS_TOUCH_CONSULT_TITLE = "A consult is booked on the calendar, so that is the next thing for this lead.";

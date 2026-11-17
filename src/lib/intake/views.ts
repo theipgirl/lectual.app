@@ -15,6 +15,8 @@ import {
   LEADS_TOUCH_ACTIVITY_ONLY_TITLE,
   LEADS_TOUCH_NONE_TITLE,
   LEADS_TOUCH_NO_CONTACT,
+  LEADS_TOUCH_CONSULT_HELD,
+  LEADS_TOUCH_CONSULT_HELD_TITLE,
   LEADS_TOUCH_CONSULT_LATER,
   LEADS_TOUCH_CONSULT_TITLE,
   LEADS_TOUCH_CONSULT_TODAY,
@@ -199,7 +201,7 @@ export function touchDate(iso: string | null): string | null {
   return `${at.getUTCDate()} ${MONTHS[at.getUTCMonth()]}`;
 }
 
-export type TouchState = "consult" | "our-turn" | "waiting" | "activity-only" | "none";
+export type TouchState = "consult" | "consult-held" | "our-turn" | "waiting" | "activity-only" | "none";
 
 export type TouchStamp = {
   /** "Our turn · 16 Nov" / "Waiting on them · 15 Nov" / "Last activity · 12 Sep" / "No contact yet". */
@@ -247,6 +249,14 @@ export function usableTime(iso: string | null | undefined, now: Date): string | 
 export function shownTouch(row: IntakeRow, now: Date): { state: TouchState; iso: string | null } {
   // A booked consult outranks every other state. Only a parseable start counts; the load already dropped earlier days.
   if (row.consultAt && Number.isFinite(Date.parse(row.consultAt))) return { state: "consult", iso: row.consultAt };
+  // A consult that already happened, later than anything the firm sent (and than anything they sent): the firm owes the post-consult email.
+  const held = usableTime(row.pastConsultAt, now);
+  if (held && heldWithin30Days(held, now)) {
+    const heldMs = Date.parse(held);
+    const out = usableTime(row.lead.last_outbound_at, now);
+    const inn = usableTime(row.lead.last_inbound_at, now);
+    if ((!out || heldMs > Date.parse(out)) && (!inn || heldMs > Date.parse(inn))) return { state: "consult-held", iso: held };
+  }
   const newest = usableTime(row.lastTouchAt, now) ?? usableTime(row.lead.last_activity_at, now);
   if (!newest) return { state: "none", iso: null };
   const inbound = usableTime(row.lead.last_inbound_at, now);
@@ -254,6 +264,10 @@ export function shownTouch(row: IntakeRow, now: Date): { state: TouchState; iso:
   if (row.reply === "replied" && inbound) return { state: "our-turn", iso: inbound };
   if (row.reply === "awaiting" && outbound) return { state: "waiting", iso: outbound };
   return { state: "activity-only", iso: newest };
+}
+
+function heldWithin30Days(iso: string, now: Date): boolean {
+  return now.getTime() - Date.parse(iso) <= 30 * 86_400_000;
 }
 
 /** "Consult today · 12:30 PM" / "Consult · Nov 19" in the firm's zone, or null for an unusable time. */
@@ -277,6 +291,8 @@ export function touchStampFor(row: IntakeRow, opts: { now: Date; timeZone?: stri
   }
   if (state === "consult") return touchStampFor({ ...row, consultAt: undefined }, opts);
   const day = sheetDay(iso, opts.now, opts.timeZone);
+  if (state === "consult-held" && day) return { text: LEADS_TOUCH_CONSULT_HELD(day), waitingOnUs: true, state, title: LEADS_TOUCH_CONSULT_HELD_TITLE };
+  if (state === "consult-held") return touchStampFor({ ...row, pastConsultAt: undefined }, opts);
   if (state === "none" || !day) return { text: LEADS_TOUCH_NO_CONTACT, waitingOnUs: false, state: "none", title: LEADS_TOUCH_NONE_TITLE };
   if (state === "our-turn") return { text: LEADS_TOUCH_OUR_TURN(day), waitingOnUs: true, state, title: LEADS_TOUCH_OUR_TURN_TITLE };
   if (state === "waiting") return { text: LEADS_TOUCH_WAITING_ON_THEM(day), waitingOnUs: false, state, title: LEADS_TOUCH_WAITING_TITLE };
@@ -317,6 +333,12 @@ export function nextStepFor(row: IntakeRow, now: Date, opts: { notesUnavailable?
 
   const note = row.latestNote?.trim();
   if (note) return { text: note, urgent, muted: false };
+
+  const held = shownTouch(row, now);
+  if (held.state === "consult-held") {
+    const day = sheetDay(held.iso, now, opts.timeZone);
+    if (day) return { text: `Consult held ${day}, nothing sent since`, urgent, muted: false };
+  }
 
   // Dated like the Last contact cell: their last email or call for "our reply", ours for "them", in the Sheet's words.
   const inbound = sheetDay(row.lead.last_inbound_at, now, opts.timeZone);

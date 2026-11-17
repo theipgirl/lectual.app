@@ -37,6 +37,8 @@ export const ACTIVITY_MAX_PAGES = 10;
 export const LEAD_ID_CHUNK = 100;
 export const BOOTH_MAX_PAGES = 20;
 export const CONSULT_MAX_PAGES = 10;
+/** How far back a held consult still says "our turn" on the Leads list. */
+export const PAST_CONSULT_DAYS = 30;
 
 /** The activity types that are real contact, whoever made them. */
 export const REAL_ACTIVITY_TYPES = ["email_sent", "email_received", "call_logged", "note", "voice_note"] as const;
@@ -142,7 +144,7 @@ export async function readBoothLeadIds(db: WorkingDb): Promise<Set<string>> {
 
 /**
  * Booked consults, from ONE paged read: the lead ids with a consult from now on (the Working rule) and, for the Last-contact cell,
- * each lead's SOONEST consult starting today (the firm's calendar day) or later. The query reaches back 26 hours so a consult
+ * each lead's SOONEST consult starting today (the firm's calendar day) or later. The query reaches back 30 days (for the held-consult state), so a consult
  * earlier today still counts in any zone; the Working set keeps its own "from now on" test, applied here in JS.
  * Throws when a page fails; before lectual 0098 (no columns) it is `null`.
  */
@@ -150,11 +152,13 @@ export async function readConsults(
   db: WorkingDb,
   now: Date,
   timeZone: string = DEFAULT_ZONE,
-): Promise<{ leadIds: Set<string>; starts: Map<string, string> } | null> {
+): Promise<{ leadIds: Set<string>; starts: Map<string, string>; pastStarts: Map<string, string> } | null> {
   const leadIds = new Set<string>();
   const starts = new Map<string, string>();
+  // Each lead's LATEST consult that already started, within the last 30 days (the Last-contact cell's "consult held" state).
+  const pastStarts = new Map<string, string>();
   const today = civilDay(now.toISOString(), timeZone);
-  const lower = new Date(now.getTime() - 26 * 3_600_000).toISOString();
+  const lower = new Date(now.getTime() - PAST_CONSULT_DAYS * 86_400_000).toISOString();
   for (let i = 0; i < CONSULT_MAX_PAGES; i++) {
     const { data, error } = await db
       .from("crm_calendar_event")
@@ -179,13 +183,17 @@ export async function readConsults(
         continue;
       }
       if (at >= now.getTime()) leadIds.add(r.lead_id);
+      else {
+        const known = pastStarts.get(r.lead_id);
+        if (!known || at > Date.parse(known)) pastStarts.set(r.lead_id, r.starts_at as string);
+      }
       const day = civilDay(r.starts_at as string, timeZone);
       if (today && day && day >= today) {
         const known = starts.get(r.lead_id);
         if (!known || at < Date.parse(known)) starts.set(r.lead_id, r.starts_at as string);
       }
     }
-    if (rows.length < ACTIVITY_PAGE) return { leadIds, starts };
+    if (rows.length < ACTIVITY_PAGE) return { leadIds, starts, pastStarts };
   }
   throw new Error("consult read exceeded its page budget");
 }
@@ -240,6 +248,7 @@ export async function loadWorkingFacts(
   const { leadIds } = opts;
 
   let consultStarts: ReadonlyMap<string, string> | undefined;
+  let pastConsultStarts: ReadonlyMap<string, string> | undefined;
   const [activity, proposals, consults, booth] = await Promise.all([
     settle(async () => ({ status: "ok", leadIds: await readRealActivityLeadIds(live.db, leadIds, (to) => isPastFirstContact(to, opts.stages)) })),
     settle(async () => ({ status: "ok", leadIds: leadsWithLiveProposal(await live.readProposals(leadIds)) })),
@@ -249,10 +258,11 @@ export async function loadWorkingFacts(
       const read = await readConsults(live.db, live.now, opts.timeZone);
       if (!read) return { status: "skipped" };
       consultStarts = read.starts;
+      pastConsultStarts = read.pastStarts;
       return { status: "ok", leadIds: read.leadIds };
     }),
     settle(async () => ({ status: "ok", leadIds: await readBoothLeadIds(live.db) })),
   ]);
 
-  return { activity, approvals: approvalsFact(opts.approvals), proposals, consults, booth, ...(consultStarts ? { consultStarts } : {}) };
+  return { activity, approvals: approvalsFact(opts.approvals), proposals, consults, booth, ...(consultStarts ? { consultStarts } : {}), ...(pastConsultStarts ? { pastConsultStarts } : {}) };
 }

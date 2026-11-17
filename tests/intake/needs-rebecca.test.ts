@@ -64,6 +64,25 @@ describe("leadsNeedingApproval", () => {
   });
 });
 
+describe("nurture and lost stages ignore approvals", () => {
+  const withStage = [
+    { lead: { id: "a" }, stage: { category: "open" } },
+    { lead: { id: "c" }, stage: { category: "nurture" } },
+    { lead: { id: "x" }, stage: null },
+  ];
+  it("pendingFor gives no badge for a nurture or lost lead, but still for open or unknown stages", () => {
+    expect(pendingFor(OK, "c", { category: "nurture" })).toEqual([]);
+    expect(pendingFor(OK, "c", { category: "lost" })).toEqual([]);
+    expect(pendingFor(OK, "c", { category: "open" })).toHaveLength(1);
+    expect(pendingFor(OK, "c", null)).toHaveLength(1);
+    expect(pendingFor(OK, "c")).toHaveLength(1);
+  });
+  it("the filter drops them; an unreadable queue still returns every row", () => {
+    expect(ids(filterNeedsRebecca(withStage, OK, true))).toEqual(["a"]);
+    expect(ids(filterNeedsRebecca(withStage, UNAVAILABLE, true))).toEqual(["a", "c", "x"]);
+  });
+});
+
 describe("filterNeedsRebecca", () => {
   it("keeps only leads with a pending draft when on and the read was ok", () => {
     expect(ids(filterNeedsRebecca(rows, OK, true))).toEqual(["a", "c"]);

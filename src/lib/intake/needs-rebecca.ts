@@ -18,12 +18,26 @@ export function approvalsShown(
   return approvals?.status === "ok";
 }
 
-/** The pending drafts for one lead; empty for no lead entry or a queue we couldn't read. */
+/** A lead's stage, as far as this module cares: only its category. */
+type StageLike = { category?: string | null } | null | undefined;
+
+/**
+ * A lead in a nurture or lost stage is parked: a draft still pending for it is not something the firm is "awaiting",
+ * so it gets no badge, is not counted and is not matched by the filter. An unknown stage (null) still counts, so a
+ * missing stage never hides a pending draft.
+ */
+export function stageIgnoresApprovals(stage: StageLike): boolean {
+  return stage?.category === "nurture" || stage?.category === "lost";
+}
+
+/** The pending drafts for one lead; empty for no lead entry, a queue we couldn't read, or (when `stage` is given) a nurture or lost lead. */
 export function pendingFor(
   approvals: LeadPendingApprovals | undefined,
   leadId: string,
+  stage?: StageLike,
 ): LeadPendingApproval[] {
   if (!approvalsShown(approvals)) return [];
+  if (stageIgnoresApprovals(stage)) return [];
   return approvals.byLead[leadId] ?? [];
 }
 
@@ -42,14 +56,14 @@ export function leadsNeedingApproval(approvals: LeadPendingApprovals | undefined
  * ignored and the rows come back untouched: filtering to an empty set would read
  * as "nothing is waiting on her" when we simply couldn't look.
  */
-export function filterNeedsRebecca<T extends { lead: { id: string } }>(
+export function filterNeedsRebecca<T extends { lead: { id: string }; stage?: StageLike }>(
   rows: T[],
   approvals: LeadPendingApprovals | undefined,
   on: boolean,
 ): T[] {
   if (!on || !approvalsShown(approvals)) return rows;
   const needing = leadsNeedingApproval(approvals);
-  return rows.filter((row) => needing.has(row.lead.id));
+  return rows.filter((row) => needing.has(row.lead.id) && !stageIgnoresApprovals(row.stage));
 }
 
 /** "Awaiting approval · 2": drafts in the approval queue for this lead (role-neutral: every firm sees this). */

@@ -254,7 +254,7 @@ describe("loadWorkingFacts", () => {
   it("consults: its own query (is_consult, linked, from now, lead_id only), never the calendar read", async () => {
     const { db, calls } = fakeDb(() => ({ data: [{ lead_id: "a" }], error: null }));
     expect([...(await readConsultLeadIds(db, NOW))!]).toEqual(["a"]);
-    expect(calls[0]).toMatchObject({ table: "crm_calendar_event", select: "lead_id, starts_at", eq: ["is_consult", true], not: ["lead_id", "is", null], gte: ["starts_at", new Date(NOW.getTime() - 26 * 3_600_000).toISOString()] });
+    expect(calls[0]).toMatchObject({ table: "crm_calendar_event", select: "lead_id, starts_at", eq: ["is_consult", true], not: ["lead_id", "is", null], gte: ["starts_at", new Date(NOW.getTime() - 30 * 86_400_000).toISOString()] });
   });
 
   it("consults: the Working set keeps 'from now on', while the soonest-start map keeps today (firm day) onward and ignores earlier days", async () => {
@@ -274,6 +274,8 @@ describe("loadWorkingFacts", () => {
     const read = (await readConsults(db, NOW, "UTC"))!;
     expect([...read.leadIds].sort()).toEqual(["both"]);
     expect(Object.fromEntries(read.starts)).toEqual({ today: earlierToday, both: soon });
+    // The latest consult that already started (within 30 days) per lead, for the "consult held" state.
+    expect(Object.fromEntries(read.pastStarts)).toEqual({ yest: yesterday, today: earlierToday });
   });
 
   it("consults: a failed read gives no start map (loadWorkingFacts: unavailable, no consultStarts)", async () => {

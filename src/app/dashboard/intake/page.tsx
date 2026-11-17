@@ -218,6 +218,7 @@ export default async function IntakePage({
     decisionByLeadId: decisions.status === "ok" ? decisions.byLead : undefined,
     // A failed or skipped consult read leaves the map out: Last contact then reads as it always did.
     consultStartByLeadId: workingFacts.consultStarts ? Object.fromEntries(workingFacts.consultStarts) : undefined,
+    pastConsultStartByLeadId: workingFacts.pastConsultStarts ? Object.fromEntries(workingFacts.pastConsultStarts) : undefined,
     now,
   });
 

@@ -70,7 +70,7 @@ export default function IntakeCard({
   const line = [business, source].filter(Boolean).join(" · ");
   const touch = touchStampFor(row, { now, timeZone });
   const pill = temperaturePill(row.temperature);
-  const drafts = pendingFor(pendingApprovals, lead.id);
+  const drafts = pendingFor(pendingApprovals, lead.id, row.stage);
   const decision = decisionOpen(row.decision, lead.current_stage_id) ? row.decision : null;
 
   return (
