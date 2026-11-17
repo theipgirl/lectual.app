@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { APPROVE_PROPOSAL_FIRST, type LinkedPanel } from "@/lib/consult-proposal/link";
 import { statusLabel, statusTone } from "@/lib/proposal-editor/labels";
-import { formatCents } from "@/lib/quotes/money";
+import { Notice } from "@/components/ui/Notice";
+import { Pill } from "@/components/ui/Pill";
+import { formatMoney } from "@/lib/ui/format";
 import { ProposalCard } from "@/components/proposal-editor/ProposalCard";
 
 /**
@@ -13,10 +15,9 @@ export function LinkedProposalPanel({ panel, pending }: { panel: LinkedPanel; pe
   if (panel.status === "none") return null;
   if (panel.status === "unavailable") {
     return (
-      <div role="status" className="lx-banner lx-banner-warn" style={{ display: "grid", gap: 4 }}>
-        <strong>Linked proposal</strong>
+      <Notice tone="warn" role="status" title="Linked proposal">
         <span>This email goes with a proposal, but it couldn&apos;t be loaded. Approving is paused until it can be read.</span>
-      </div>
+      </Notice>
     );
   }
   const p = panel.proposal;
@@ -29,13 +30,11 @@ export function LinkedProposalPanel({ panel, pending }: { panel: LinkedPanel; pe
   return (
     <>
       {p.card && <ProposalCard card={p.card} />}
-      <section className="lx-card" style={{ padding: 14, display: "grid", gap: 8 }} aria-label="Linked proposal">
-        <div className="lx-label" style={{ fontSize: 11 }}>
-          Linked proposal
-        </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <span className={`lx-pill lx-pill-${statusTone(p.status)}`}>{statusLabel(p.status)}</span>
-          <span className="lx-note" style={{ margin: 0 }}>
+      <section className="lx-card lx-linked" aria-label="Linked proposal">
+        <div className="lx-label">Linked proposal</div>
+        <div className="lx-queue-filters">
+          <Pill tone={statusTone(p.status)}>{statusLabel(p.status)}</Pill>
+          <span className="lx-note">
             Version {p.version} · {p.clientName}
           </span>
         </div>
@@ -43,11 +42,11 @@ export function LinkedProposalPanel({ panel, pending }: { panel: LinkedPanel; pe
           <>
             <div className="lx-meta">
               <span>Legal fee</span>
-              <span className="lx-num">{formatCents(p.legalCents)}</span>
+              <span className="lx-num">{formatMoney(p.legalCents)}</span>
             </div>
             <div className="lx-meta">
               <span>USPTO fees</span>
-              <span className="lx-num">{formatCents(p.govCents)}</span>
+              <span className="lx-num">{formatMoney(p.govCents)}</span>
             </div>
           </>
         )}
@@ -59,11 +58,11 @@ export function LinkedProposalPanel({ panel, pending }: { panel: LinkedPanel; pe
               : [p.errorCount ? `${p.errorCount} to fix` : null, p.warningCount ? `${p.warningCount} to check` : null].filter(Boolean).join(", ")}
           </span>
         </div>
-        <Link href={`/dashboard/proposals/${p.id}/`} className="lx-btn lx-btn-sec lx-btn-sm" style={{ justifySelf: "start" }}>
+        <Link href={`/dashboard/proposals/${p.id}/`} className="lx-btn lx-btn-sec lx-btn-sm lx-linked-open">
           Open proposal
         </Link>
         {pending && (
-          <p className="lx-note" style={{ margin: 0 }}>
+          <p className="lx-note">
             {readyNote ?? `${APPROVE_PROPOSAL_FIRST} Only the firm's named proposal approvers can approve this email.`}
           </p>
         )}

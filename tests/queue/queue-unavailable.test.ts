@@ -1,9 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { notReadyYet } from "@/lib/ui/words";
 
 // Ported from lectual tests/queue/queue-load.test.ts (the queueUnavailableCopy block), reworded to the glossary.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
+
 describe("queueUnavailableCopy: a different message for a different cause", () => {
   it("tells a firm with no queue key that approvals aren't switched on yet, with no setting names", async () => {
     const { queueUnavailableCopy } = await import("@/components/queue/QueueUnavailable");
