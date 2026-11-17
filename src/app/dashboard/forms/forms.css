@@ -444,23 +444,12 @@ textarea.ifm-input {
 .ifm-icon-btn:hover {
   background: var(--well);
 }
-.ifm-empty {
-  padding: 20px;
-  border-radius: var(--r-md);
-  border: 1px dashed var(--line-3);
-  font-size: 14px;
-  color: var(--muted);
-  text-align: center;
-}
-.ifm-empty.bad {
-  border-color: var(--wine);
-  color: var(--wine);
-}
+.ifm-empty-bad p { color: var(--wine); }
 .ifm-empty-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  text-align: left;
+  flex-wrap: wrap;
 }
 .ifm-add {
   align-self: flex-start;

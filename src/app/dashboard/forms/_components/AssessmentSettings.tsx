@@ -1,5 +1,6 @@
 "use client";
 
+import { EmptyState } from "@/components/ui/EmptyState";
 import { isHideable } from "@/lib/assessment-card/hideable";
 import { boothVariant } from "@/lib/assessment-card/variants";
 import {
@@ -143,7 +144,7 @@ export function AssessmentSettingsCard({
           Your team sees the answers on the lead and in Results.
         </span>
         {extras.length === 0 ? (
-          <div className="ifm-empty">No questions of your own yet. People answer only the card.</div>
+          <EmptyState variant="line">No questions of your own yet. People answer only the card.</EmptyState>
         ) : (
           <ol className="ifm-extras">
             {extras.map((e, i) => (

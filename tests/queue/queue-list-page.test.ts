@@ -87,11 +87,11 @@ describe("queue list: Possible duplicate (H10)", () => {
       vi.resetModules();
       const html = await render(load);
       expect(html).not.toContain("Possible duplicate");
-      expect(html).not.toContain("All caught up");
+      expect(html).not.toContain("No approvals waiting yet.");
     }
   });
 
   it("an empty pending queue still says all caught up", async () => {
-    expect(await render({ status: "ok", items: [] })).toContain("All caught up");
+    expect(await render({ status: "ok", items: [] })).toContain("No approvals waiting yet.");
   });
 });

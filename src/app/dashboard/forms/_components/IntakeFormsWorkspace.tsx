@@ -1,5 +1,6 @@
 "use client";
 
+import { EmptyState } from "@/components/ui/EmptyState";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import {
@@ -617,7 +618,9 @@ export function IntakeFormsWorkspace(props: Props) {
                   ))}
                 </ol>
               ) : (
-                <div className={`ifm-empty${err("questions") ? " bad" : ""}`}>No questions yet. Prospects will only share contact details.</div>
+                <div className={err("questions") ? "ifm-empty-bad" : undefined}>
+                  <EmptyState variant="line">No questions yet. Prospects will only share contact details.</EmptyState>
+                </div>
               )}
 
               <button
@@ -674,14 +677,14 @@ export function IntakeFormsWorkspace(props: Props) {
                   <p className="ifm-help">Prices come from your packages exactly as written. The assistant never estimates fees.</p>
                 </>
               ) : (
-                <div className="ifm-empty ifm-empty-row">
-                  <span className="ifm-grow">No packages yet.</span>
+                <div className="ifm-empty-row">
+                  <EmptyState variant="line">No packages yet.</EmptyState>
                   {canEdit ? (
                     <Link href="/dashboard/settings/services/" className="ifm-link">
                       Add packages
                     </Link>
                   ) : (
-                    <span>An admin adds them in Settings.</span>
+                    <span className="lx-note">An admin adds them in Settings.</span>
                   )}
                 </div>
               )}

@@ -12,7 +12,7 @@ import { DismissFollowups } from "@/components/queue/DismissFollowups";
 import { agentLabel, statusPill, fmtWhen, parseQueueStatus, preview, typeLabel, type QueueStatus } from "@/components/queue/format";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
-import { APPROVALS_NAME, HANDED_TO_YOU_MARKER } from "@/lib/ui/words";
+import { APPROVALS_NAME, HANDED_TO_YOU_MARKER, noneYet } from "@/lib/ui/words";
 import { loadCardState } from "@/lib/queue/card-state";
 import { handedToViewer, showHandedPill } from "@/lib/queue/handed";
 import { viewEventTrust } from "@/lib/queue/deck";
@@ -33,9 +33,9 @@ const TABS: { status: QueueStatus; label: string }[] = [
 ];
 
 const EMPTY: Record<QueueStatus, { title: string; body: string }> = {
-  pending: { title: "All caught up", body: "Nothing is waiting for review. New drafts from the assistants land here." },
-  approved: { title: "Nothing approved yet", body: "Approved drafts show up here once something has been reviewed." },
-  rejected: { title: "Nothing rejected", body: "Rejected drafts and their notes show up here." },
+  pending: { title: noneYet("approvals waiting"), body: "New drafts from the assistants land here." },
+  approved: { title: noneYet("approved drafts"), body: "Approved drafts show up here once something has been reviewed." },
+  rejected: { title: noneYet("rejected drafts"), body: "Rejected drafts and their notes show up here." },
 };
 
 /**
@@ -105,7 +105,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
       ) : allItems.length === 0 ? (
         <EmptyState title={EMPTY[status].title}>{EMPTY[status].body}</EmptyState>
       ) : shown.length === 0 ? (
-        <EmptyState title={who.kind === "me" ? "Nothing for you right now" : "Nothing here"}>
+        <EmptyState title={who.kind === "me" ? noneYet("approvals for you") : noneYet("approvals for this person")}>
           {who.kind === "me" ? `Nothing is waiting on you. ${waitingOnOthers} ${waitingOnOthers === 1 ? "is" : "are"} waiting on others.` : "Nothing is assigned to this person."}{" "}
           <Link href={`/dashboard/queue/?status=${status}&who=all`}>Show everyone</Link>
         </EmptyState>

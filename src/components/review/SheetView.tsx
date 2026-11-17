@@ -9,7 +9,7 @@ import { SheetEdit } from "./SheetEdit";
 import type { SheetPerms } from "@/lib/review/sheet-edit";
 import { SheetCard, SheetScroll, SheetTable } from "@/components/ui/SheetTable";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { BLANK, LAST_CONTACT, OWNER_COLUMN, TEAMMATE, UNASSIGNED } from "@/lib/ui/words";
+import { BLANK, LAST_CONTACT, OWNER_COLUMN, TEAMMATE, UNASSIGNED, SHEET_EMPTY_SECTION } from "@/lib/ui/words";
 import "@/components/list-page/list-page.css";
 import "./review.css";
 
@@ -21,7 +21,7 @@ function SheetSection({ id, title, rows, today, members, params }: Common & { id
         {title} <span className="lx-note">{rows.length}</span>
       </h2>
       {rows.length === 0 ? (
-        <div className="rv-strip-note"><EmptyState variant="line">Nothing here for this view.</EmptyState></div>
+        <div className="rv-strip-note"><EmptyState variant="line">{SHEET_EMPTY_SECTION}</EmptyState></div>
       ) : (
         <SheetScroll>
           <SheetTable className="rv-sheet">

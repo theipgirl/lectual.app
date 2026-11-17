@@ -546,7 +546,7 @@ export const SHEET_WRITE_NOTE = "Write what happened.";
 export const SHEET_STAGES_UNREADABLE = "The stage list couldn't load, so Status can't be changed here right now. Refresh to try again.";
 export const sheetResizeColumn = (name: string) => `Resize ${name} column`;
 export const SHEET_RESIZE_ROW = "Resize row";
-export const SHEET_EMPTY_SECTION = "Nothing here for this view.";
+export const SHEET_EMPTY_SECTION = noneYet("records in this view");
 export const SHEET_SAVE_FAILED = "Couldn't save this change.";
 
 /* Needs review (Today, both views): old hand-entered dates nobody confirmed. */

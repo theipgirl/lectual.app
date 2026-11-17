@@ -103,7 +103,7 @@ function tableRows(html: string, label: string): string[][] {
     .filter((cells) => cells.length && !/^Question$/.test(cells[0]));
 }
 
-/** The "Stopped at" cell for each person in the All intakes table, by name. */
+/** The "Stopped at" cell for each person in the All forms table, by name. */
 function stoppedCells(html: string): Record<string, string> {
   const out: Record<string, string> = {};
   for (const m of html.matchAll(/<tr[^>]*><td class="pri"><a [^>]*>([^<]*)<\/a>.*?<td class="ifm-stopped[^"]*"[^>]*>([^<]*)<\/td><\/tr>/g)) out[m[1]] = m[2];
@@ -304,7 +304,7 @@ describe("three states (F26)", () => {
     expect(results).toContain("SANKOFA");
     expect(perf).toContain("Gave contact details");
     expect(perf).toContain("Visited");
-    expect(perf).toContain("All intakes");
+    expect(perf).toContain("All forms");
     expect(stoppedCells(perf)).toEqual({ "Person 1": "not recorded", "Person 2": "—" });
   });
 
