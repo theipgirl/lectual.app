@@ -39,6 +39,7 @@ export function ListSearch(props: SearchProps) {
       className={props.className ? `lp-search ${props.className}` : "lp-search"}
       role="search"
       action={props.action}
+      method={props.action ? "get" : undefined}
       // A page that filters as you type has nothing to post: a submit must not reload it.
       onSubmit={props.onChange ? (event) => event.preventDefault() : undefined}
     >
