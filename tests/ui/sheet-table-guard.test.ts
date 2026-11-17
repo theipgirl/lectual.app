@@ -26,7 +26,6 @@ const TODO_BY_AREA: Record<string, { area: string; count: number }> = {
   "src/app/dashboard/campaigns/page.tsx": { area: "E", count: 1 },
   "src/app/dashboard/campaigns/[id]/page.tsx": { area: "E", count: 1 },
   "src/app/dashboard/campaigns/templates/page.tsx": { area: "E", count: 1 },
-  "src/app/dashboard/meetings/page.tsx": { area: "E", count: 1 },
   "src/app/dashboard/forms/_components/StepTables.tsx": { area: "E", count: 2 },
   "src/app/dashboard/forms/_components/IntakePerformance.tsx": { area: "E", count: 1 },
   "src/app/dashboard/forms/_components/WhereTheyCameFrom.tsx": { area: "E", count: 1 },
