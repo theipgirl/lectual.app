@@ -265,19 +265,19 @@ describe("the Temperature column, rendered", () => {
 
   it("shows a suggested temperature as the SAME pill, lighter, with 'suggested' in its title and accessible name", () => {
     const html = render([suggested]);
-    // Item L2: an outlined pill that says "suggested" in its words as well as its title.
-    expect(html).toMatch(/data-testid="temperature-cell"[^>]*>Hot · suggested</);
+    // Sprint 10: an OUTLINED pill with a small "suggested" mark (it replaced Item L2's dashed pill); a person's level is filled.
+    expect(html).toMatch(/data-testid="temperature-cell"[^>]*>Hot<span class="rc-temp-mark">suggested<\/span>/);
     expect(html).toContain('data-tone="hot"');
-    expect(html).toContain('data-suggested=""');
+    expect(html).toContain('data-style="outlined"');
     // The reason is in the tooltip, after "Suggested: Hot".
-    expect(html).toMatch(/<button[^>]*title="Suggested: Hot\nReplied 1 day ago — waiting on us"[^>]*data-testid="temperature-cell"/);
-    expect(html).toContain("Hot, suggested");
+    expect(html).toMatch(/<button[^>]*data-testid="temperature-cell"[^>]*title="Suggested: Hot\nReplied 1 day ago — waiting on us"/);
+    expect(html).toContain("(suggested)");
     expect(html).not.toContain(">Suggested: Hot<");
   });
 
   it("shows a lead with nothing recorded as no pill at all (the button stays, named 'Not rated', for setting one)", () => {
     const html = render([blank]);
-    expect(html).toContain("ix-temp-empty");
+    expect(html).toContain('data-empty=""');
     expect(html).not.toMatch(/data-tone="/);
     expect(html).toContain("Not rated");
   });
@@ -367,7 +367,7 @@ describe("the board card's one temperature line", () => {
     const html = card(lead("a", "Ana", { last_inbound_at: daysBefore(1) }));
     expect(html).toContain('data-suggested=""');
     expect(html).toContain(">Hot · suggested<");
-    expect(html).toContain("Hot, suggested");
+    expect(html).toContain("(suggested)");
   });
 
   it("reads 'Not rated' for neither", () => {

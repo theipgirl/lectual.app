@@ -307,7 +307,7 @@ describe("the opened card", () => {
     };
     const view = buildOpenedCard(load, { path: "/dashboard/matters/", params: {} });
     if (view.status !== "ok" || view.kind !== "matter") throw new Error("expected a matter card");
-    expect(view.steps).toEqual({ status: "ok", items: [{ id: TASK, title: "Check status", due: "No date set", overdue: false }], add: true, done: true, snooze: true, edit: true });
+    expect(view.steps).toEqual({ status: "ok", items: [{ id: TASK, title: "Check status", due: "No date set", dueIso: null, overdue: false }], add: true, done: true, snooze: true, edit: true });
     expect(view.deadline).toEqual({ status: "ok", text: "USPTO deadline Dec 1", marker: "Confirmed by an attorney", confirmed: true });
     expect(view.timeline).toEqual({ status: "unavailable" });
     expect(view.card.stage.targets).toEqual([{ id: "m2", name: "Published" }]);

@@ -39,6 +39,7 @@ describe("links into /dashboard/matters/ (the list)", () => {
       "src/components/reconcile/ReconcileTable.tsx": "Open a matter, no count",
       "src/lib/onboarding/hub.ts": "guided-flow page paths, not links with a count",
       "src/lib/onboarding/hub-runner.ts": "guided-flow page paths",
+      "src/app/dashboard/matters/page.tsx": "its own path for the opened card: the open and close links keep every query key",
       "src/lib/matters/calendar-rows.ts": "last-resort target for a task with no record",
     };
     const bad: string[] = [];

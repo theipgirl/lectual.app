@@ -44,11 +44,11 @@ function forbiddenPaths(start: string): string[] {
   return hits;
 }
 
-const PURE = ["rules.ts", "model.ts", "open.ts"];
+const PURE = ["rules.ts", "model.ts", "open.ts", "hold.ts", "lead-label.ts", "intake-cards.ts", "matter-cards.ts"];
 
 describe("the record card library", () => {
   it("has the files it is meant to have", () => {
-    expect(files.sort()).toEqual(["actions.ts", "load.ts", "model.ts", "open.ts", "rules.ts"]);
+    expect(files.sort()).toEqual(["actions.ts", "hold.ts", "intake-cards.ts", "lead-label.ts", "load.ts", "matter-cards.ts", "model.ts", "open.ts", "rules.ts", "steps-read.ts"]);
   });
 
   it("its pure files reach neither server-only, next/headers nor a node: built-in, through any import", () => {
@@ -104,7 +104,7 @@ describe("the record card library", () => {
     expect(code("open.ts")).not.toMatch(/new RegExp|\/\^\(matter/);
   });
 
-  it("is not wired to a page yet (Part 2 draws it)", () => {
+  it("is wired only into the Intake and Matters pages and their components (Part 2), never the Weekly review", () => {
     const walk = (dir: string, out: string[] = []): string[] => {
       for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
         const p = path.join(dir, e.name);
@@ -113,7 +113,18 @@ describe("the record card library", () => {
       }
       return out;
     };
-    const users = [...walk(path.join(ROOT, "src/app")), ...walk(path.join(ROOT, "src/components"))].filter((f) => /@\/lib\/record-card\//.test(fs.readFileSync(f, "utf8")));
-    expect(users).toEqual([]);
+    const users = [...walk(path.join(ROOT, "src/app")), ...walk(path.join(ROOT, "src/components"))]
+      .filter((f) => /@\/lib\/record-card\//.test(fs.readFileSync(f, "utf8")))
+      .map((f) => path.relative(ROOT, f));
+    for (const f of users) expect(f, f).not.toMatch(/^src\/(app\/dashboard|components)\/review\//);
+    expect(users.length).toBeGreaterThan(0);
+  });
+
+  it("the card components use no service role, no send and no dangerouslySetInnerHTML", () => {
+    const dir = path.join(ROOT, "src/components/record-card");
+    for (const f of fs.readdirSync(dir).filter((x) => /\.tsx?$/.test(x))) {
+      const text = fs.readFileSync(path.join(dir, f), "utf8");
+      expect(text, f).not.toMatch(/@\/lib\/db\/admin|getAdminClient|SERVICE_ROLE|dangerouslySetInnerHTML|sendMail|outlook-send/);
+    }
   });
 });

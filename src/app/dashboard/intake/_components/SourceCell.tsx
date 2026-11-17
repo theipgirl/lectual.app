@@ -21,6 +21,7 @@ export default function SourceCell({
   detail,
   pending,
   compact = false,
+  canEdit = true,
   onSet,
 }: {
   leadName: string;
@@ -29,9 +30,12 @@ export default function SourceCell({
   detail: string | null;
   pending: boolean;
   compact?: boolean;
+  /** A role that can't change the source sees it as text, with no control. */
+  canEdit?: boolean;
   onSet: (source: ReferralSource | null) => void;
 }) {
   const current = source?.trim() || null;
+  if (!canEdit) return <span className="ix-sub" title={detail?.trim() || current || undefined}>{current ?? (compact ? `Source ${BLANK}` : BLANK)}</span>;
 
   return (
     <Popover

@@ -1,81 +1,37 @@
 "use client";
 
-import { LANES, LANE_LABEL, type Lane } from "@/lib/leads/lane";
-import { NOT_RATED } from "@/lib/ui/words";
-import { temperatureLabel, temperatureTitle, type EffectiveTemperature } from "@/lib/intake/effective-temperature";
+import type { Lane } from "@/lib/leads/lane";
+import { temperatureLabel, type EffectiveTemperature } from "@/lib/intake/effective-temperature";
 import { temperaturePill } from "@/lib/intake/temperature-pill";
-import Popover, { PopoverItem } from "./Popover";
+import { temperatureControl, type TemperatureControl } from "@/lib/record-card/rules";
+import { TempMenu } from "@/components/record-card/controls";
 
 /**
- * The one Temperature cell: ONE pill style and the menu that sets it (intake SOP Stage 2). A level a person set is the
- * filled pill ("Hot"); a level the system suggests is the same pill, lighter, with "suggested" in its title and accessible
- * name; no level draws nothing (the button is still there, and shows "Set" on hover and focus). Choosing Hot, Warm or Cold
- * sets the person's lane; Not rated clears it and the suggestion shows again.
+ * The one Temperature cell (Sprint 10): a level a person set is a FILLED pill; a level Lectual only suggested is a quiet OUTLINED
+ * pill with a "suggested" mark, and the menu starts with "Lectual suggests Warm · Accept". Choosing a level (or Accept) sets the
+ * person's lane; Not rated clears it and the suggestion shows again. A role that can't set it (`canEdit` false) gets the pill as
+ * plain text, with no menu. `control` may be passed in; otherwise it is worked out here from the temperature.
  */
 export default function TemperatureCell({
   leadName,
   temperature,
   pending,
   onSet,
+  canEdit = true,
+  control,
 }: {
   leadName: string;
   temperature: EffectiveTemperature;
   pending: boolean;
   onSet: (lane: Lane | null) => void;
+  canEdit?: boolean;
+  control?: TemperatureControl;
 }) {
-  const pill = temperaturePill(temperature);
-  const person = temperature.source === "person" && temperature.value !== null;
-  const title = pill ? pill.title : "No temperature yet. Click to set one.";
-
-  return (
-    <Popover
-      label={`${leadName}: ${pill ? pill.ariaLabel : NOT_RATED}. ${temperatureTitle(temperature).replace("\n", ". ")}. Set temperature`}
-      width={165}
-      trigger={({ onClick, ref, ...aria }) => (
-        <button
-          {...aria}
-          ref={ref}
-          type="button"
-          title={title}
-          disabled={pending}
-          onClick={onClick}
-          data-testid="temperature-cell"
-          className={`ix-temp${pill ? "" : " ix-temp-empty"}`}
-          data-tone={pill?.tone}
-          data-suggested={pill?.suggested ? "" : undefined}
-        >
-          {pill ? pill.text : "Set"}
-        </button>
-      )}
-    >
-      {(close) => (
-        <>
-          {LANES.map((lane) => (
-            <PopoverItem
-              key={lane}
-              checked={person && temperature.value === lane}
-              onSelect={() => {
-                close();
-                onSet(lane);
-              }}
-            >
-              {LANE_LABEL[lane]}
-            </PopoverItem>
-          ))}
-          <PopoverItem
-            muted
-            checked={false}
-            onSelect={() => {
-              close();
-              onSet(null);
-            }}
-          >
-            {NOT_RATED}
-          </PopoverItem>
-        </>
-      )}
-    </Popover>
-  );
+  // No hooks here, so a test can call the cell for its element tree.
+  const base = control ?? temperatureControl(temperature, { canEdit });
+  // The tooltip keeps the Leads page's own wording: "Suggested: Hot" and the reason, or the stale-lane activity hint.
+  const title = temperaturePill(temperature)?.title;
+  return TempMenu({ name: leadName, control: title && base.pill.value ? { ...base, pill: { ...base.pill, title } } : base, pending, onPick: onSet });
 }
 
 export { temperatureLabel };

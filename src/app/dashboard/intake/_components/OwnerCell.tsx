@@ -19,6 +19,7 @@ export default function OwnerCell({
   assignedTo,
   members,
   pending,
+  canEdit = true,
   onAssign,
 }: {
   leadName: string;
@@ -26,6 +27,8 @@ export default function OwnerCell({
   assignedTo: string | null;
   members: MemberIdentity[];
   pending: boolean;
+  /** A role that can't reassign sees who owns it, with no menu. */
+  canEdit?: boolean;
   onAssign: (userId: string | null) => void;
 }) {
   // An assignee the directory couldn't resolve (0031 not applied, or a member
@@ -33,6 +36,7 @@ export default function OwnerCell({
   // would look unassigned and the next click would write that back.
   const unknownAssignee = assignedTo != null && !members.some((m) => m.userId === assignedTo);
   const label = owner ? memberLabel(owner) : unknownAssignee ? TEAMMATE : null;
+  if (!canEdit) return <span className="ix-sub" title={label ?? undefined}>{owner ? initialsOf(owner) : unknownAssignee ? "?" : BLANK}</span>;
 
   return (
     <Popover

@@ -27,6 +27,7 @@ import {
   recordCardDue,
   recordCardLastActivity,
 } from "@/lib/ui/words";
+import { leadLabel } from "./lead-label";
 import { closeHref, openHref, type CurrentParams } from "./open";
 import {
   SOURCE_CHOICES,
@@ -70,6 +71,8 @@ export type CardLeadRow = {
   first_name: string | null;
   last_name: string | null;
   business_name: string | null;
+  /** The mark, when the page has it: shown beside the business (Taylor, Nov 17 call). */
+  mark_text?: string | null;
   email: string | null;
   phone: string | null;
   current_stage_id: string | null;
@@ -169,8 +172,7 @@ export type CardView = {
 };
 
 function leadName(lead: Pick<CardLeadRow, "first_name" | "last_name" | "business_name" | "email">): string {
-  const full = [lead.first_name, lead.last_name].map((s) => (s ?? "").trim()).filter(Boolean).join(" ");
-  return full || (lead.business_name ?? "").trim() || (lead.email ?? "").trim() || RECORD_CARD_A_TEAMMATE;
+  return leadLabel(lead, RECORD_CARD_A_TEAMMATE).name;
 }
 
 function ownerName(id: string | null, members: CardRead<CardMember[]>): string {
@@ -252,7 +254,7 @@ export function buildBoardCard(input: BoardLeadInput | BoardMatterInput, ctx: Ca
   const owner = ownerName(row.assigned_to, ctx.members);
   const open = openHref(ctx.path, ctx.params, { kind, id });
   const name = input.kind === "lead" ? leadName(input.lead) : matterDisplayTitle(input.matter).title;
-  const sub = input.kind === "lead" ? (input.lead.business_name ?? "").trim() || null : (input.matter.owner_name ?? "").trim() || null;
+  const sub = input.kind === "lead" ? leadLabel(input.lead).sub : (input.matter.owner_name ?? "").trim() || null;
   const lastActivityAt = input.kind === "lead" ? input.lead.last_activity_at : input.lastActivityAt;
   return {
     kind,
@@ -332,7 +334,7 @@ export type RecordCardLoad =
 export type ChecklistView =
   | {
       status: "ok";
-      items: { id: string; title: string; due: string; overdue: boolean }[];
+      items: { id: string; title: string; due: string; dueIso: string | null; overdue: boolean }[];
       add: boolean;
       done: boolean;
       snooze: boolean;
@@ -357,6 +359,8 @@ export type OpenedCardView =
   | (OpenedCommon & {
       status: "ok";
       kind: "lead";
+      /** The name fields the rename form prefills from: the LEAD ROW's own values (never `card.sub`, which is display only). */
+      names: { first: string; last: string; business: string };
       /** Sprint 9's card, from the SAME engine (`buildLeadStepView`). A failed engine read never says "Lectual has it". */
       top: TopCardView;
       facts: LeadStepView["facts"] | null;
@@ -371,7 +375,7 @@ function checklist(read: CardRead<CardTask[]>, edits: CardEdits, now: Date, time
   if (read.status !== "ok") return { status: "unavailable", text: RECORD_CARD_STEPS_FAILED };
   return {
     status: "ok",
-    items: read.value.map((t) => ({ id: t.id, title: t.title, ...dueOf(t.dueAt, now, timeZone) })),
+    items: read.value.map((t) => ({ id: t.id, title: t.title, ...dueOf(t.dueAt, now, timeZone), dueIso: t.dueAt && /^\d{4}-\d{2}-\d{2}/.test(t.dueAt) ? t.dueAt.slice(0, 10) : null })),
     add: edits.stepAdd,
     done: edits.stepDone,
     snooze: edits.stepSnooze,
@@ -457,6 +461,7 @@ export function buildOpenedCard(load: RecordCardLoad, page: { path: string; para
   return {
     status: "ok",
     kind: "lead",
+    names: { first: load.lead.first_name ?? "", last: load.lead.last_name ?? "", business: load.lead.business_name ?? "" },
     card,
     titleId,
     closeHref: close,

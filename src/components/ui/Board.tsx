@@ -84,11 +84,14 @@ export function BoardCard({
   foot,
   tone,
   id,
+  scroll,
   children,
   className,
   ...rest
 }: {
   href: string;
+  /** `false` keeps the page where it is when the link only adds `?open=` (the opened card). */
+  scroll?: boolean;
   title: string;
   meta?: React.ReactNode;
   step?: React.ReactNode;
@@ -105,7 +108,7 @@ export function BoardCard({
     <li className={["lx-board-card", className].filter(Boolean).join(" ")} data-tone={tone} id={id} {...rest}>
       <div className="lx-board-card-top">
         <span className="lx-board-card-title">
-          <Link href={href} className="lx-rowlink">
+          <Link href={href} className="lx-rowlink" scroll={scroll}>
             {title}
           </Link>
         </span>

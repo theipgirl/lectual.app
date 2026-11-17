@@ -177,7 +177,8 @@ describe("phase groups on the Matters page", () => {
 
   it("a card can be moved to any stage, not only the group's", async () => {
     const html = await render({ matters: sample(), read: ok, params: { view: "board" } });
-    expect(html).toContain('aria-label="Move ');
+    // Sprint 10: each card's ⋯ menu holds Move to stage… (the old Move button moved into it).
+    expect(html).toContain('aria-label="More for ');
   });
 });
 

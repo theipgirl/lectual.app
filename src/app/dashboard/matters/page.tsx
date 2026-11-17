@@ -44,6 +44,16 @@ import { MATTERS_LIST_VALUE, mattersViewFromParam } from "@/lib/matters/list-hre
 import { LIST_CHIPS, mattersSubtitle, reviewHref, reviewItemByMatter, stageDisplayName, statusNote } from "@/lib/matters/list-view";
 import { OPEN_MATTER_PANEL_ID, OpenMatterButton } from "@/components/matters/OpenMatterButton";
 import { MATTER_TYPE_LABEL } from "./labels";
+import { RecordCardHost } from "@/components/record-card/RecordCardHost";
+import { NextStepLine, OwnerPick, StagePick } from "@/components/record-card/controls";
+import { MatterCardMenu } from "@/components/record-card/MatterBits";
+import { buildMatterCards } from "@/lib/record-card/matter-cards";
+import { parseCardOpen } from "@/lib/record-card/open";
+import { loadOpenSteps } from "@/lib/record-card/steps-read";
+import { getFirmTimeZone } from "@/lib/org/profile";
+import type { CardMember, CardRead } from "@/lib/record-card/model";
+import { leadLabel } from "@/lib/record-card/lead-label";
+import "@/components/record-card/record-card.css";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 
@@ -56,8 +66,9 @@ export const dynamic = "force-dynamic";
  * Filters are links (a filtered worklist is a shareable URL); the server
  * re-filters on navigation.
  */
-export default async function MattersPage({ searchParams }: { searchParams: Promise<{ seg?: string; q?: string; view?: string; group?: string }> }) {
-  const { seg: segRaw, q, view, group: groupRaw } = await searchParams;
+export default async function MattersPage({ searchParams }: { searchParams: Promise<{ seg?: string; q?: string; view?: string; group?: string; open?: string | string[] }> }) {
+  const rawParams = await searchParams;
+  const { seg: segRaw, q, view, group: groupRaw } = rawParams;
   // No `view` opens the Board; the explicit list value (and any other value) is the list, as before.
   const boardView = mattersViewFromParam(view) === "board";
   const seg: SegmentKey = isSegment(segRaw) ? segRaw : "open";
@@ -109,8 +120,30 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
   const memberName = new Map(members.map((m) => [m.userId, m.displayName ?? m.email ?? TEAMMATE]));
   const leadOptions = leads.map((l) => ({
     id: l.id,
-    label: [l.business_name?.trim() || `${l.first_name} ${l.last_name}`.trim(), l.email].filter(Boolean).join(" · "),
+    // The person's name first, the company beside it (Taylor, Nov 17 call); the company stands in only with no person's name.
+    label: [leadLabel(l).name, leadLabel(l).sub, l.email].filter(Boolean).join(" · "),
   }));
+
+  // Sprint 10 Part 2: what each role may do on each matter, the open link and the next-step line. A matter on screen is either in
+  // `shown`; its steps are one batched read, three-state (a failed one says so on the card and is never "No next step").
+  const stepsRead = loadError ? ({ status: "unavailable" } as const) : await loadOpenSteps("matter", shown.map((m) => m.id));
+  const memberRead: CardRead<CardMember[]> = members.length > 0 ? { status: "ok", value: members.map((m) => ({ userId: m.userId, name: (m.displayName ?? m.email ?? "").trim() || TEAMMATE })) } : { status: "unavailable" };
+  const firmZone = await getFirmTimeZone().catch(() => "America/New_York");
+  const cards = buildMatterCards({
+    matters: shown,
+    ctx: {
+      role,
+      members: memberRead,
+      stages: stageRead.status === "unavailable" ? { status: "unavailable" } : { status: "ok", value: stageList.map((s) => ({ id: s.id, label: s.label })) },
+      mergeAvailable: false,
+      path: "/dashboard/matters/",
+      params: rawParams as Record<string, string | string[] | undefined>,
+      now: new Date(),
+      timeZone: firmZone,
+    },
+    steps: stepsRead,
+  });
+  const openRef = parseCardOpen(rawParams.open);
 
   const href = (next: { seg?: string; q?: string; view?: string | null; group?: string }) => {
     const p = new URLSearchParams();
@@ -191,6 +224,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
           reviewIds={reviewIds}
           reviewItems={reviewItems}
           ownerName={(id) => (id ? memberName.get(id) ?? TEAMMATE : null)}
+          cards={cards}
         />
         </>
       ) : bands.length === 0 ? (
@@ -215,13 +249,15 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
               </span>
             </header>
             <SheetScroll>
-              <SheetTable fixed minWidth={760}>
+              <SheetTable fixed minWidth={900}>
                 <colgroup>
-                  <col style={{ width: "36%" }} />
-                  <col style={{ width: "13%" }} />
                   <col style={{ width: "27%" }} />
-                  <col style={{ width: "10%" }} />
-                  <col style={{ width: "14%" }} />
+                  <col style={{ width: "9%" }} />
+                  <col style={{ width: "19%" }} />
+                  <col style={{ width: "8%" }} />
+                  <col style={{ width: "12%" }} />
+                  <col style={{ width: "25%" }} />
+                  <col style={{ width: 52 }} />
                 </colgroup>
                 <thead>
                   <tr>
@@ -230,6 +266,10 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
                     <th>Stage</th>
                     <th className="num">In stage</th>
                     <th>{OWNER_COLUMN}</th>
+                    <th>Next step</th>
+                    <th>
+                      <span className="lx-sr">Actions</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -237,10 +277,11 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
                     const age = stageAge(m);
                     const note = statusNote(m.status);
                     const reviewId = reviewItems.get(m.id);
+                    const rc = cards[m.id];
                     return (
                       <tr key={m.id} className="lp-row">
                         <td className="pri">
-                          <Link href={`/dashboard/matters/${m.id}/`} className="lx-rowlink">
+                          <Link href={rc.openHref} scroll={false} data-card-open="" className="lx-rowlink">
                             {matterLabel(m)}
                           </Link>
                           <div className="lx-note mt-sub">
@@ -262,11 +303,17 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
                           </div>
                         </td>
                         <td data-label="Type">{MATTER_TYPE_LABEL[m.type]}</td>
-                        <td data-label="Stage">{m.stage ? <Pill wrap>{stageDisplayName(m.stage.label)}</Pill> : BLANK}</td>
+                        <td data-label="Stage">{rc.edits.stage ? <StagePick kind="matter" id={m.id} name={matterLabel(m)} stage={rc.stage} /> : m.stage ? <Pill wrap>{stageDisplayName(m.stage.label)}</Pill> : BLANK}</td>
                         <td className="num" data-label="In stage">
                           {age.days === null ? BLANK : age.stale ? <Pill num tone="risk">{age.days}d</Pill> : `${age.days}d`}
                         </td>
-                        <td data-label={OWNER_COLUMN}>{m.assigned_to ? memberName.get(m.assigned_to) ?? TEAMMATE : UNASSIGNED}</td>
+                        <td data-label={OWNER_COLUMN}>{rc.edits.owner ? <OwnerPick kind="matter" id={m.id} name={matterLabel(m)} owner={rc.owner} withName /> : m.assigned_to ? memberName.get(m.assigned_to) ?? TEAMMATE : UNASSIGNED}</td>
+                        <td data-label="Next step">
+                          <NextStepLine kind="matter" id={m.id} line={rc.nextStep} dueIso={rc.dueIso} text={rc.bottom.nextStep} />
+                        </td>
+                        <td data-label="Actions">
+                          <MatterCardMenu card={rc} />
+                        </td>
                       </tr>
                     );
                   })}
@@ -276,6 +323,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
           </SheetCard>
         ))
       )}
+      {openRef ? <RecordCardHost open={openRef} path="/dashboard/matters/" params={rawParams as Record<string, string | string[] | undefined>} /> : null}
     </div>
   );
 }

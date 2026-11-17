@@ -11,6 +11,8 @@ import { MoveMenu } from "./MoveMenu";
 import { MovedCardScroller } from "./MovedCardScroller";
 import { BoardEmptyStages } from "./BoardEmptyStages";
 import { emptyStagesLabel } from "@/lib/intake/board-columns";
+import type { MatterCardData } from "@/lib/record-card/matter-cards";
+import { MatterCardFoot, MatterCardMenu } from "@/components/record-card/MatterBits";
 
 /**
  * The docket as a board: one column per live stage (terminal stages fold into
@@ -30,6 +32,8 @@ export function MatterBoard(props: {
   /** matter id -> the queue item to review; the Review pill links to it. */
   reviewItems?: ReadonlyMap<string, string>;
   ownerName: (id: string | null) => string | null;
+  /** Sprint 10: what each role may do on each card, the open link and the lines. Absent: the plain board, as before. */
+  cards?: Record<string, MatterCardData>;
 }) {
   const board = buildBoard(props.stages, props.matters);
   const stageOptions = (props.moveStages ?? props.stages).map((s) => ({ id: s.id, label: s.label, phase: s.phase ?? null }));
@@ -39,14 +43,16 @@ export function MatterBoard(props: {
     const owner = props.ownerName(m.assigned_to);
     const reviewId = props.reviewItems?.get(m.id);
     const needsReview = props.reviewIds.has(m.id);
+    const rc = props.cards?.[m.id];
     return (
       <BoardCard
         key={m.id}
         id={matterCardId(m.id)}
-        href={`/dashboard/matters/${m.id}/`}
+        href={rc?.openHref ?? `/dashboard/matters/${m.id}/`}
+        scroll={rc ? false : undefined}
         title={matterLabel(m)}
         tone={age.stale ? "risk" : needsReview ? "warn" : undefined}
-        meta={owner ? `${m.matter_number} · ${owner}` : m.matter_number}
+        meta={owner && !rc ? `${m.matter_number} · ${owner}` : m.matter_number}
         chip={
           age.days !== null ? (
             <Pill num tone={age.stale ? "risk" : "mute"}>
@@ -65,8 +71,11 @@ export function MatterBoard(props: {
             )
           ) : undefined
         }
+        step={rc ? <MatterCardFoot card={rc} /> : undefined}
         menu={
-          props.canMove && stageOptions.length > 0 ? (
+          rc ? (
+            <MatterCardMenu card={rc} type={m.type} phases={stageOptions.map((o) => ({ id: o.id, phase: o.phase }))} announceGroup={!!props.collapseEmpty} />
+          ) : props.canMove && stageOptions.length > 0 ? (
             <MoveMenu matterId={m.id} title={matterLabel(m)} stageId={m.stage_id} stages={stageOptions} type={m.type} announceGroup={!!props.collapseEmpty} />
           ) : undefined
         }

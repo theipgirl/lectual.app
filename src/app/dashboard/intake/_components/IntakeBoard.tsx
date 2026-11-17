@@ -13,6 +13,9 @@ import { BoardColumn } from "@/components/ui/Board";
 import { ShowingCount } from "@/components/ui/ShowingCount";
 import IntakeCard from "./IntakeCard";
 import type { DuplicateOf } from "@/lib/intake/duplicates";
+import type { IntakeCardData } from "@/lib/record-card/intake-cards";
+import type { Lane } from "@/lib/leads/lane";
+import type { ReferralSource } from "@/lib/intake";
 
 /**
  * Both boards, drawn from a `BoardModel` (the pure rules live in board-columns.ts). A column's title is its stage name in
@@ -27,6 +30,10 @@ export default function IntakeBoard({
   now,
   pendingLeadId,
   errors,
+  cards,
+  savedId,
+  onSetLane,
+  onSetSource,
   time,
   pendingApprovals,
   rowById,
@@ -50,6 +57,10 @@ export default function IntakeBoard({
   now: Date;
   pendingLeadId: string | null;
   errors: Record<string, string>;
+  cards?: Record<string, IntakeCardData>;
+  savedId?: string | null;
+  onSetLane?: (leadId: string, lane: Lane | null) => void;
+  onSetSource?: (leadId: string, source: ReferralSource | null) => void;
   time: IntakeTime | null;
   pendingApprovals?: LeadPendingApprovals;
   rowById: (id: string) => IntakeRow | undefined;
@@ -129,6 +140,10 @@ export default function IntakeBoard({
                 members={members}
                 pending={pendingLeadId === row.lead.id}
                 error={errors[row.lead.id] || undefined}
+                card={cards?.[row.lead.id]}
+                saved={savedId === row.lead.id}
+                onSetLane={onSetLane}
+                onSetSource={onSetSource}
                 time={time}
                 pendingApprovals={pendingApprovals}
                 onMoveStage={onMoveStage}

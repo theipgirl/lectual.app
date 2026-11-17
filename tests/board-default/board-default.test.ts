@@ -75,6 +75,7 @@ const BARE_ALLOWED = new Set<string>([
   "src/lib/intake/list-href.ts",
   "src/lib/intake/rows.ts", // intakeHref: the Board is the bare address
   "src/lib/matters/list-href.ts",
+  "src/app/dashboard/intake/page.tsx", // its own path for the opened card: the open and close links keep every query key
   "src/app/dashboard/matters/page.tsx", // its own href builder: the Board is the bare address
   "src/app/dashboard/pipeline/page.tsx", // column headers link to the boards, explicitly
   "src/lib/stage-keeper/moves.ts", // "Moved by agent today" opens the board explicitly

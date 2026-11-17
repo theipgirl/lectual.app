@@ -163,6 +163,7 @@ async function loadLead(db: Awaited<ReturnType<typeof getScopedClient>>, askedId
       first_name: lead.first_name,
       last_name: lead.last_name,
       business_name: lead.business_name,
+      mark_text: lead.mark_text ?? null,
       email: lead.email,
       phone: lead.phone,
       current_stage_id: lead.current_stage_id,
