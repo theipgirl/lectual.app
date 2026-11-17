@@ -929,3 +929,17 @@ export const MERGE_OWN_ROWS_UNAVAILABLE = "Suggestions and proposals from email 
 /** An assessment that is scored (the booth card or the firm's assessment page), on the Forms list, its results page and the lead's Answers card. */
 export const SCORED_ASSESSMENT = "Scored assessment";
 export const SCORED_ASSESSMENTS = "Scored assessments";
+
+// Area G
+/** The workspace's own error page (a page's server work failed): the line under "Can't show this page right now". */
+export const PAGE_DIDNT_ANSWER = "Nothing is missing. The page just didn't answer. Refresh to try again, or go back to the page you were on.";
+/** The shell's 404 and no-firm pages. */
+export const NOT_FOUND_TITLE = "This page doesn't exist";
+export const NOT_FOUND_BODY = "The link may be out of date, or the page may have moved.";
+export const GO_BACK = "Go back";
+export const NO_FIRM_ACCESS_TITLE = "No firm access yet";
+export const REFRESH_MY_ACCESS = "Refresh my access";
+export const WRONG_ACCOUNT_SIGN_OUT = "Wrong account? Sign out";
+export const NO_FIRM_JUST_INVITED = "Just been invited? Your sign-in predates the invite. Refresh to pick up your firm.";
+/** The bar across the top while Lectual staff are inside a firm they are not a member of. */
+export const staffInsideFirm = (firmName: string) => `Lectual staff · you are inside ${firmName}, a firm you are not a member of. This visit is logged.`;

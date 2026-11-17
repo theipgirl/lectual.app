@@ -1,0 +1,8 @@
+/* The workspace's standalone pages (404, no firm access): one centred card on the page ground. Tokens only. */
+.lx-center { flex: 1; display: grid; place-items: center; padding: 16px; }
+.lx-center-main { min-height: 100dvh; }
+.lx-center-card { width: 100%; max-width: 440px; display: grid; gap: 12px; }
+.lx-center-card .lx-h1 { overflow-wrap: anywhere; }
+.lx-center-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.lx-center-form { display: grid; gap: 6px; }
+.lx-center-error { margin: 0; font-size: var(--fs-2); color: var(--wine); }

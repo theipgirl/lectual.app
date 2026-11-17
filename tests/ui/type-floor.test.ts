@@ -31,8 +31,6 @@ const A: Record<string, number> = {
   "src/components/review/review-sheet-edit.css": 5,
   "src/components/review/review.css": 7,
   "src/components/setup/setup.css": 1,
-  "src/components/shell/account-menu.css": 1,
-  "src/components/shell/owner-shell.css": 9,
   "src/components/today/owner/owner-today.css": 3,
 };
 const B: Record<string, number> = {
@@ -57,8 +55,6 @@ const D: Record<string, number> = {
   "src/components/onboarding/OnboardingTour.tsx": 1,
   "src/components/queue/LinkedProposalPanel.tsx": 1,
   "src/components/queue/ReviewerSummary.tsx": 1,
-  "src/components/shell/AccountMenu.tsx": 3,
-  "src/components/shell/NoFirmAccess.tsx": 1,
   "src/components/skills/SkillCard.tsx": 1,
 };
 const E: Record<string, number> = {
@@ -81,14 +77,12 @@ const E: Record<string, number> = {
   "src/app/dashboard/forms/page.tsx": 1,
   "src/app/dashboard/intake/_components/AddLeadDialog.tsx": 6,
   "src/app/dashboard/intake/_components/LeadsNotices.tsx": 1,
-  "src/app/dashboard/layout.tsx": 1,
   "src/app/dashboard/leads/[id]/page.tsx": 3,
   "src/app/dashboard/mail/page.tsx": 3,
   "src/app/dashboard/matters/[id]/page.tsx": 5,
   "src/app/dashboard/matters/page.tsx": 2,
   "src/app/dashboard/meetings/[id]/page.tsx": 3,
   "src/app/dashboard/meetings/page.tsx": 4,
-  "src/app/dashboard/not-found.tsx": 1,
   "src/app/dashboard/notifications/page.tsx": 1,
   "src/app/dashboard/page.tsx": 1,
   "src/app/dashboard/pipeline/page.tsx": 1,
@@ -150,8 +144,6 @@ const E: Record<string, number> = {
   "src/components/review/ReviewViews.tsx": 2,
   "src/components/settings/FirmProfileForm.tsx": 2,
   "src/components/settings/RoleTable.tsx": 1,
-  "src/components/shell/AccountMenu.tsx": 3,
-  "src/components/shell/NoFirmAccess.tsx": 2,
   "src/components/skills/CoworkSkills.tsx": 2,
   "src/components/skills/SkillCard.tsx": 3,
   "src/components/today/NeedsYouSection.tsx": 2,

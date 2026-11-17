@@ -21,7 +21,7 @@ describe("the phone bar (F6)", () => {
 
   it("Matters takes Mail's slot without the mailbox module, and never offers Mail in the sheet either (fails closed)", () => {
     expect(bar([]).map((i) => i.label)).toEqual(["Today", "Intake", "Approvals", "Matters"]);
-    expect(moreLabels([])).not.toContain("My Mail");
+    expect(moreLabels([])).not.toContain("Mail");
     expect(moreLabels([])).not.toContain("All matters");
   });
 
@@ -34,11 +34,15 @@ describe("the phone bar (F6)", () => {
 
   it("the sheet carries everything else, only if visible", () => {
     expect(moreLabels(ALL)).toEqual([
-      "Weekly review", "Calendar", "Meetings", "Campaigns", "Forms", "Client proposals", "Matters", "Pipeline", "Documents",
+      "Weekly review", "Calendar", "Meetings", "Campaigns", "Forms", "Proposals", "Matters", "Pipeline", "Documents",
       "Copilot", "Assistants", "Shortcuts", "Firm notes", "Communication", "Intake", "Active matters", "AI tools", "Settings",
     ]);
     const bare = moreLabels([]);
-    for (const gated of ["Assistants", "Shortcuts", "Client proposals"]) expect(bare).not.toContain(gated);
+    for (const gated of ["Assistants", "Shortcuts"]) expect(bare).not.toContain(gated);
+    // Both proposal pages are named "Proposals" now, so the gate is checked by section, not by name: the module's page is absent without it.
+    const slugs = more([]).flatMap((g) => g.items.map((i) => i.slug));
+    expect(slugs).not.toContain("proposals");
+    expect(more(ALL).flatMap((g) => g.items.map((i) => i.slug))).toContain("proposals");
     expect(bare).toContain("Meetings");
     expect(bare).toContain("Settings");
   });
@@ -93,11 +97,29 @@ describe("rendering (F6)", () => {
   });
 });
 
-describe("the scrim (F6)", () => {
-  it("an outside tap closes the sheet and returns focus to the More button", async () => {
+describe("the scrim and the sheet's keys (F6, design Area G)", () => {
+  it("an outside tap closes the sheet; the sheet's own dialog hook returns focus to the More button", async () => {
     const { readFileSync } = await import("node:fs");
     const src = readFileSync("src/components/shell/MobileBar.tsx", "utf8");
-    expect(src).toMatch(/className="lx-more-scrim" onPointerDown=\{\(\) => close\(true\)\}/);
+    expect(src).toMatch(/className="lx-more-scrim" onPointerDown=\{\(\) => setOpen\(false\)\}/);
+    // Esc, the Tab trap and focus back to the opener are the shared dialog hook's, not a copy.
+    expect(src).toContain("useDialogKeys(ref, { onClose })");
+  });
+
+  it("the sheet has its own Close control and a title", () => {
+    const html = renderToStaticMarkup(createElement(MoreSheet, { sections: more(ALL), onClose: () => {} }));
+    expect(html).toContain('<header class="lx-more-head">');
+    expect(html).toMatch(/<button type="button" class="lx-close" aria-label="Close"/);
+    expect(html).toContain('tabindex="-1"');
+  });
+
+  it("a phone bar label may take two lines and never drops under the 14px floor", async () => {
+    const { readFileSync } = await import("node:fs");
+    const css = readFileSync("src/app/globals.css", "utf8");
+    const rule = css.match(/\.lx-mbar-label \{([^}]*)\}/)?.[1] ?? "";
+    expect(rule).toContain("font-size: var(--fs-2)");
+    expect(rule).toContain("white-space: normal");
+    expect(rule).not.toContain("nowrap");
   });
 });
 

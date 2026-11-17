@@ -19,7 +19,6 @@ const CSS: Record<string, number> = {
   "src/components/deck/deck.css": 9,
   "src/components/leads/lead-page.css": 1,
   "src/components/onboarding/welcome-deal.css": 1,
-  "src/components/shell/owner-shell.css": 15,
 };
 const TSX: Record<string, number> = {
   "src/app/dashboard/agents/page.tsx": 1,

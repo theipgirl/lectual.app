@@ -24,12 +24,9 @@ const CSS: Record<string, number> = {
   "src/components/review/review-sheet-edit.css": 5,
   "src/components/review/review.css": 8,
   "src/components/setup/setup.css": 1,
-  "src/components/shell/account-menu.css": 3,
-  "src/components/shell/owner-shell.css": 2,
   "src/components/today/owner/owner-today.css": 3,
 };
 const TSX: Record<string, number> = {
-  "src/app/dashboard/layout.tsx": 1,
   "src/components/intake/TimeChip.tsx": 1,
   "src/components/quotes/QuoteForms.tsx": 1,
   "src/components/quotes/QuoteParts.tsx": 1,
