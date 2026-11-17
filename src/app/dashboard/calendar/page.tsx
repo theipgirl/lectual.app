@@ -26,6 +26,7 @@ import {
 import type { Metadata } from "next";
 import { calendarReadState } from "@/lib/calendar/read-state";
 import { pageTitle } from "@/lib/ui/page-title";
+import { ViewToggle } from "@/components/ViewToggle";
 
 export const metadata: Metadata = { title: pageTitle("Calendar") };
 
@@ -268,13 +269,13 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
                 ›
               </Link>
           </div>
-          <nav className="lx-view-toggle" aria-label="Calendar view">
-            {(["month", "week"] as const).map((v) => (
-              <Link key={v} prefetch={false} href={calendarHref(v, anchor)} className={view === v ? "on" : undefined} aria-current={view === v ? "page" : undefined}>
-                {v === "month" ? "Month" : "Week"}
-              </Link>
-            ))}
-          </nav>
+          <ViewToggle<"month" | "week">
+            label="Calendar view"
+            value={view}
+            views={[{ value: "month", label: "Month" }, { value: "week", label: "Week" }]}
+            hrefFor={(v) => calendarHref(v, anchor)}
+            prefetch={false}
+          />
         </div>
       </div>
 

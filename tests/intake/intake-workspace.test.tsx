@@ -175,7 +175,7 @@ describe("the page header and toolbar (shared list-page components)", () => {
   it("orders search (with its submit button), then the toggle, then More, then Add a lead", () => {
     const search = head.indexOf('aria-label="Search leads"');
     const submit = head.indexOf(">Search</button>");
-    const toggle = head.indexOf("lx-view-toggle");
+    const toggle = head.indexOf("vs-switch");
     const more = head.indexOf("More");
     const add = head.indexOf("Add a lead");
     expect(search).toBeGreaterThan(0);
@@ -205,9 +205,9 @@ describe("the page header and toolbar (shared list-page components)", () => {
   });
 
   it("renders the toggle once, in the toolbar, and not in the control row", () => {
-    expect(html.match(/lx-view-toggle/g)).toHaveLength(1);
+    expect(html.match(/vs-switch/g)).toHaveLength(1);
     const controls = html.slice(html.indexOf('aria-label="Filter by stage"'));
-    expect(controls).not.toContain("lx-view-toggle");
+    expect(controls).not.toContain("vs-switch");
     expect(controls).not.toContain("How to arrange the list");
   });
 
@@ -217,10 +217,10 @@ describe("the page header and toolbar (shared list-page components)", () => {
   });
 
   it("marks the current view on the controlled toggle", () => {
-    expect(head).toMatch(/<button type="button" aria-pressed="true" class="on">Table<\/button>/);
-    expect(head).toMatch(/<button type="button" aria-pressed="false">Board<\/button>/);
+    expect(head).toMatch(/<button type="button" aria-current="true">Table<\/button>/);
+    expect(head).toMatch(/<button type="button">Board<\/button>/);
     const board = render(THREE, { view: "board" });
-    expect(board).toMatch(/<button type="button" aria-pressed="true" class="on">Board<\/button>/);
+    expect(board).toMatch(/<button type="button" aria-current="true">Board<\/button>/);
   });
 
   it("shows Group by in the control row only on the board", () => {

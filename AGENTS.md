@@ -2064,6 +2064,16 @@ Display and derivation only; nothing sends. The list (`IntakeTable`) is the Shee
 - **Known limits (not built):** an empty state is drawn under the header row; an error row can shift the zebra striping; the dialog's background is not inert; the inline editors of the Sheet are not reused (they are keyed to `SheetEditRow`).
   Not verified in a real browser: drag, localStorage, the dialog's focus, popovers.
 
+## D1: one view-style switch for the whole app (no schema)
+Taylor chose the Approvals deck's look for EVERY view switch: one cream pill holding the options, the chosen one filled dark burgundy with light text. It is ONE component, `src/components/ViewToggle.tsx`
+(generic over its options; link mode `hrefFor` = anchors with `aria-current="page"`, controlled mode `onChange` = buttons with `aria-current="true"`), drawn by `src/components/view-toggle.css`
+(`.vs-switch`, the fill is the one token `--view-switch-on`, 14px text, 36px high, 40px under 640px, 44px for a coarse pointer, an `--ox` focus ring). Used by the Approvals deck (Cards | List | Board), Weekly review
+(Board | Sheet | Cards, both views), Intake and Matters (Table | Board) and Calendar (Month | Week); each page keeps its options, URLs, query params and `data-tour` hooks (links stay links).
+`tests/components/one-view-switch.test.ts` fails if a second view switch appears (the old class names, a `<nav>` / group labelled "... view", the shared selectors defined twice).
+**Left alone (not view switches; a checklist for Taylor):** Reports period (`.lx-view-toggle`, still styled by globals.css), Forms date range, Approvals status and "Whose", Notifications filter, New proposal Type and "Who is this for",
+Text | Voice composer, Forms Theme/Device, Assistants autonomy, Settings tabs, segment and filter chips. **Ambiguous, also left alone:** Mail's folder tabs (`aria-label="Mail views"`).
+Not verified in a real browser: the focus ring, the 44px coarse-pointer height, the phone sizes.
+
 ## Master-class worksheet endpoint (`POST /api/worksheet/`, no schema)
 The RPB master-class worksheet (lectual-plugin `sites/rpb-masterclass/trademark/worksheet/`, a static site) posts JSON here
 (`SUBMIT_MODE = "post-json"`). Public, unauthenticated; rules in `src/lib/worksheet/handle.ts` (deps injected, tested in `tests/worksheet/`).

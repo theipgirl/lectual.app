@@ -16,7 +16,7 @@ export const MAX_COL = 640;
 export const MENU_COL_WIDTH = 52;
 
 /** Default widths in px (Next step is flexible: null). Chosen so the list, with the Assistant activity column and without an Owner column, fits 954px (1280 with the rail open). */
-export const DEFAULT_COL_WIDTHS: Record<ColKey, number | null> = { lead: 166, stage: 150, temp: 104, source: 76, owner: 76, assistant: 140, touch: 110, next: null };
+export const DEFAULT_COL_WIDTHS: Record<ColKey, number | null> = { lead: 154, stage: 150, temp: 116, source: 76, owner: 76, assistant: 140, touch: 110, next: null };
 export const NEXT_MIN_WIDTH = 150;
 
 export type ColSizes = Partial<Record<ColKey, number>>;
