@@ -10,6 +10,7 @@ import { REFERRAL_SOURCES } from "./referral-source";
 import { LANE_RANK } from "@/lib/leads/lane";
 import type { AgentMoveChip } from "@/lib/stage-keeper/moves";
 import { decisionOpen, type DecisionFlag } from "./stage-decision";
+import { shownTouch } from "./views";
 import { DEFAULT_LEAD_SET, parseLeadSet, type LeadSet } from "./working";
 import { SHOW_STEP, parseShow } from "./paging";
 
@@ -497,7 +498,7 @@ function touchCompare(a: IntakeRow, b: IntakeRow, dir: SortDir): number {
 }
 
 /** Per-key value extractor: a comparable, or null for "this row has no value". */
-function sortValue(row: IntakeRow, key: SortKey): string | number | null {
+function sortValue(row: IntakeRow, key: SortKey, now: Date): string | number | null {
   switch (key) {
     case "lead":
       return leadName(row) || null;
@@ -514,7 +515,9 @@ function sortValue(row: IntakeRow, key: SortKey): string | number | null {
     case "reply":
       return REPLY_RANK[row.reply];
     case "lastTouch":
-      return timeOf(row.lastTouchAt);
+      // The date the cell SHOWS (shownTouch): inbound for "Our turn", outbound for "Waiting on them", the last activity otherwise.
+      // "No contact yet" (and a future or unparseable date) has no value, so it sorts last in both directions.
+      return timeOf(shownTouch(row, now).iso);
     case "age":
       return row.daysInStage;
     case "notes":
@@ -529,10 +532,12 @@ function sortValue(row: IntakeRow, key: SortKey): string | number | null {
  * whichever direction is selected — flipping "Nurture" ascending shouldn't
  * fill the top of the table with a wall of em-dashes.
  */
-export function sortRows(rows: IntakeRow[], key: SortKey, dir: SortDir): IntakeRow[] {
+export function sortRows(rows: IntakeRow[], key: SortKey, dir: SortDir, opts: { now?: Date } = {}): IntakeRow[] {
+  // `now` decides which dates are in the future (never shown, so never sorted by). With no clock given nothing counts as future.
+  const now = opts.now ?? new Date(8.64e15);
   return [...rows].sort((a, b) => {
-    const av = sortValue(a, key);
-    const bv = sortValue(b, key);
+    const av = sortValue(a, key, now);
+    const bv = sortValue(b, key, now);
 
     if (av === null && bv !== null) return 1;
     if (av !== null && bv === null) return -1;

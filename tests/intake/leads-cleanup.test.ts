@@ -195,7 +195,7 @@ describe("the temperature pill", () => {
   const t = (value: "hot" | "warm" | "cold" | null, source: "person" | "suggested") => ({ value, source, reason: "why" });
   it("a person's level is the filled pill; a suggestion is the same pill marked suggested; no level is nothing", () => {
     expect(temperaturePill(t("hot", "person"))).toMatchObject({ text: "Hot", tone: "hot", suggested: false, ariaLabel: "Hot", title: "why" });
-    expect(temperaturePill(t("warm", "suggested"))).toMatchObject({ text: "Warm", tone: "warm", suggested: true, ariaLabel: "Warm, suggested" });
+    expect(temperaturePill(t("warm", "suggested"))).toMatchObject({ text: "Warm · suggested", tone: "warm", suggested: true, ariaLabel: "Warm, suggested" });
     expect(temperaturePill(t("warm", "suggested"))!.title).toBe("Suggested: Warm\nwhy");
     expect(temperaturePill(t(null, "suggested"))).toBeNull();
   });

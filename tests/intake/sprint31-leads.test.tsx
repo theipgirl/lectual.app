@@ -120,10 +120,10 @@ describe("the arrows, the temperature words and the copy button", () => {
     expect(html).not.toContain("waiting on us, → waiting on them");
   });
 
-  it("gives each row's arrow a title and a visually hidden label", () => {
+  it("says whose turn it is in words (Item L2: the arrows are gone), with the meaning as the cell's title", () => {
     const html = render([lead("a", "Ana")]);
-    expect(html).toMatch(/title="Waiting on (us|them)"/);
-    expect(html).toMatch(/<span class="lx-sr">Waiting on (us|them): <\/span>/);
+    expect(html).toMatch(/data-touch="(our-turn|waiting|activity-only|none)"[^>]*title="[^"]+"/);
+    expect(html).not.toMatch(/ [←→]</);
   });
 
   it("uses the exact temperature tooltip and calls the no-rating level Not rated", () => {

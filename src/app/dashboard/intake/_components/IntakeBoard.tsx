@@ -38,6 +38,8 @@ export default function IntakeBoard({
   onToggleSelect,
   duplicates = {},
   movedOut,
+  timeZone,
+  onCompare,
 }: {
   group: "stage" | "owner";
   model: BoardModel;
@@ -59,6 +61,8 @@ export default function IntakeBoard({
   onToggleSelect: (leadId: string) => void;
   duplicates?: Record<string, DuplicateOf>;
   movedOut?: ReadonlySet<string>;
+  timeZone?: string;
+  onCompare?: (leadId: string, otherId: string, trigger: HTMLElement) => void;
 }) {
   const [over, setOver] = useState<string | null>(null);
   const [refused, setRefused] = useState<string | null>(null);
@@ -123,7 +127,6 @@ export default function IntakeBoard({
                 row={row}
                 stages={moveStages}
                 members={members}
-                now={now}
                 pending={pendingLeadId === row.lead.id}
                 error={errors[row.lead.id] || undefined}
                 time={time}
@@ -135,6 +138,9 @@ export default function IntakeBoard({
                 onToggleSelect={onToggleSelect}
                 duplicate={duplicates[row.lead.id]}
                 movedOut={movedOut?.has(row.lead.id) ?? false}
+                now={now}
+                timeZone={timeZone}
+                onCompare={onCompare}
               />
             ))}
             {column.shown.length === 0 && <p className="ix-empty-stage">Nothing here</p>}

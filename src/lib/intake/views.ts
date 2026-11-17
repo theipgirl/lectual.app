@@ -6,7 +6,20 @@ import { inPipelineOrder } from "@/lib/pipeline/stage-order";
 import type { MemberIdentity } from "@/lib/members/directory";
 import { intakeStages } from "./scope";
 import type { IntakeRow } from "./rows";
-import { LEADS_NOTE_UNAVAILABLE, LEADS_NO_ACTIVITY_YET } from "@/lib/ui/words";
+import { shortDate } from "@/lib/review/format";
+import { DEFAULT_ZONE, civilDay } from "@/lib/stage-keeper/format";
+import {
+  LEADS_NOTE_UNAVAILABLE,
+  LEADS_NO_ACTIVITY_YET,
+  LEADS_TOUCH_ACTIVITY_ONLY,
+  LEADS_TOUCH_ACTIVITY_ONLY_TITLE,
+  LEADS_TOUCH_NONE_TITLE,
+  LEADS_TOUCH_NO_CONTACT,
+  LEADS_TOUCH_OUR_TURN,
+  LEADS_TOUCH_OUR_TURN_TITLE,
+  LEADS_TOUCH_WAITING_ON_THEM,
+  LEADS_TOUCH_WAITING_TITLE,
+} from "@/lib/ui/words";
 
 /**
  * Pure arrangement layer for /intake (blueprint §11): the same rows that
@@ -183,23 +196,67 @@ export function touchDate(iso: string | null): string | null {
   return `${at.getUTCDate()} ${MONTHS[at.getUTCMonth()]}`;
 }
 
+export type TouchState = "our-turn" | "waiting" | "activity-only" | "none";
+
 export type TouchStamp = {
-  /** "12 Sep ←" / "9 Sep →" / "—". */
+  /** "Our turn · 16 Nov" / "Waiting on them · 15 Nov" / "Last activity · 12 Sep" / "No contact yet". */
   text: string;
   /** True when the lead spoke last, i.e. the firm owes the reply. */
   waitingOnUs: boolean;
+  state: TouchState;
+  /** One sentence for the cell's tooltip: what the words mean. */
+  title: string;
 };
 
 /**
- * The Last-touch cell. ← means waiting on US, → means waiting on THEM — the
- * legend is printed in the table footer, because an arrow nobody can decode is
- * decoration.
+ * The Last-contact cell, in words (no arrows, so no legend). Dates are the Sheet's ("Nov 16"), in the firm's time zone. The direction is `row.reply`, the same field the arrows
+ * read: "replied" = they wrote last (our turn), "awaiting" = we wrote last. "unknown" means no email or call is
+ * recorded, so only the date of the newest activity is known; it says that and does not guess a side.
  */
-export function touchStampFor(row: IntakeRow): TouchStamp {
-  const date = touchDate(row.lastTouchAt);
-  if (!date) return { text: "—", waitingOnUs: false };
-  if (row.reply === "replied") return { text: `${date} ←`, waitingOnUs: true };
-  return { text: `${date} →`, waitingOnUs: false };
+/**
+ * Every date on the Intake list and board, in the weekly review Sheet's words ("Nov 16", `shortDate`, the year only for another year),
+ * on the firm's calendar day, with the month and day kept together on one line. Null for no date or one that doesn't parse.
+ */
+export function sheetDay(iso: string | null | undefined, now: Date, timeZone: string = DEFAULT_ZONE): string | null {
+  // A date in the future is never shown ("Our turn · Dec 3" before Dec 3): it is treated as missing, like one that doesn't parse.
+  const usable = usableTime(iso, now);
+  if (!usable) return null;
+  const civil = civilDay(usable, timeZone);
+  const today = civilDay(now.toISOString(), timeZone);
+  return civil && today ? shortDate(civil, today).replace(" ", "\u00a0") : null;
+}
+
+/** The stamp itself when it parses and is not after `now`; else null. The ONE "is this a date we may show" rule: the cell and the sort both use it. */
+export function usableTime(iso: string | null | undefined, now: Date): string | null {
+  const at = iso ? Date.parse(iso) : NaN;
+  return iso && Number.isFinite(at) && at <= now.getTime() ? iso : null;
+}
+
+/**
+ * Which date the Last-contact cell shows, and what kind it is, BEFORE it is worded. `touchStampFor` words it and the sort orders by it, so the
+ * sort key and the shown date cannot disagree.
+ *   our-turn       they wrote or called last: `last_inbound_at`
+ *   waiting        we did: `last_outbound_at`
+ *   activity-only  no email or call to go by: the newest of the lead's own dates (`lastTouchAt`, else `last_activity_at`)
+ *   none           nothing usable (a future or unparseable date is missing): "No contact yet"
+ */
+export function shownTouch(row: IntakeRow, now: Date): { state: TouchState; iso: string | null } {
+  const newest = usableTime(row.lastTouchAt, now) ?? usableTime(row.lead.last_activity_at, now);
+  if (!newest) return { state: "none", iso: null };
+  const inbound = usableTime(row.lead.last_inbound_at, now);
+  const outbound = usableTime(row.lead.last_outbound_at, now);
+  if (row.reply === "replied" && inbound) return { state: "our-turn", iso: inbound };
+  if (row.reply === "awaiting" && outbound) return { state: "waiting", iso: outbound };
+  return { state: "activity-only", iso: newest };
+}
+
+export function touchStampFor(row: IntakeRow, opts: { now: Date; timeZone?: string }): TouchStamp {
+  const { state, iso } = shownTouch(row, opts.now);
+  const day = sheetDay(iso, opts.now, opts.timeZone);
+  if (state === "none" || !day) return { text: LEADS_TOUCH_NO_CONTACT, waitingOnUs: false, state: "none", title: LEADS_TOUCH_NONE_TITLE };
+  if (state === "our-turn") return { text: LEADS_TOUCH_OUR_TURN(day), waitingOnUs: true, state, title: LEADS_TOUCH_OUR_TURN_TITLE };
+  if (state === "waiting") return { text: LEADS_TOUCH_WAITING_ON_THEM(day), waitingOnUs: false, state, title: LEADS_TOUCH_WAITING_TITLE };
+  return { text: LEADS_TOUCH_ACTIVITY_ONLY(day), waitingOnUs: false, state, title: LEADS_TOUCH_ACTIVITY_ONLY_TITLE };
 }
 
 /** Days since a timestamp, or null when there isn't one / it doesn't parse. */
@@ -229,7 +286,7 @@ export type NextStep = {
  * anything a reader could mistake for legal advice. If nobody has written
  * anything and nothing has happened, it says so.
  */
-export function nextStepFor(row: IntakeRow, now: Date, opts: { notesUnavailable?: boolean } = {}): NextStep {
+export function nextStepFor(row: IntakeRow, now: Date, opts: { notesUnavailable?: boolean; timeZone?: string } = {}): NextStep {
   const waited = daysSince(row.lastTouchAt, now);
   const urgent =
     row.stale || (row.reply === "replied" && waited != null && waited >= UNANSWERED_URGENT_DAYS);
@@ -237,12 +294,14 @@ export function nextStepFor(row: IntakeRow, now: Date, opts: { notesUnavailable?
   const note = row.latestNote?.trim();
   if (note) return { text: note, urgent, muted: false };
 
-  const since = touchDate(row.lastTouchAt);
-  if (row.reply === "replied" && since) {
-    return { text: `Waiting on our reply since ${since}`, urgent, muted: false };
+  // Dated like the Last contact cell: their last email or call for "our reply", ours for "them", in the Sheet's words.
+  const inbound = sheetDay(row.lead.last_inbound_at, now, opts.timeZone);
+  const outbound = sheetDay(row.lead.last_outbound_at, now, opts.timeZone);
+  if (row.reply === "replied" && inbound) {
+    return { text: `Waiting on our reply since ${inbound}`, urgent, muted: false };
   }
-  if (row.reply === "awaiting" && since) {
-    return { text: `Waiting on them since ${since}`, urgent, muted: false };
+  if (row.reply === "awaiting" && outbound) {
+    return { text: `Waiting on them since ${outbound}`, urgent, muted: false };
   }
   // A failed notes read is never "no activity": the row says it could not look.
   return { text: opts.notesUnavailable ? LEADS_NOTE_UNAVAILABLE : LEADS_NO_ACTIVITY_YET, urgent, muted: true };

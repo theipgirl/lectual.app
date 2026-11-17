@@ -14,6 +14,8 @@ import {
   topBarLine,
   touchDate,
   touchStampFor,
+  sheetDay,
+  shownTouch,
 } from "@/lib/intake/views";
 
 /**
@@ -232,19 +234,52 @@ describe("ownerColumns", () => {
 });
 
 describe("touchDate / touchStampFor", () => {
-  it("stamps the day and month, with the arrow the legend explains", () => {
+  it("says whose turn it is in words: Our turn / Waiting on them, with the day and month", () => {
     expect(touchDate(daysBefore(2))).toBe("12 Sep");
 
     const [waiting] = rowsFor([lead({ id: "a", last_inbound_at: daysBefore(2), last_outbound_at: daysBefore(5) })]);
-    expect(touchStampFor(waiting)).toEqual({ text: "12 Sep ←", waitingOnUs: true });
+    expect(touchStampFor(waiting, { now: NOW })).toMatchObject({ text: "Our turn · Sep\u00a012", waitingOnUs: true, state: "our-turn" });
 
     const [theirs] = rowsFor([lead({ id: "b", last_outbound_at: daysBefore(5) })]);
-    expect(touchStampFor(theirs)).toEqual({ text: "9 Sep →", waitingOnUs: false });
+    expect(touchStampFor(theirs, { now: NOW })).toMatchObject({ text: "Waiting on them · Sep\u00a09", waitingOnUs: false, state: "waiting" });
   });
 
-  it("shows an em-dash when nothing has ever happened", () => {
+  it("dates the turn by the inbound / outbound mail, not by a newer note or stage move", () => {
+    // A note logged yesterday bumps last_activity_at, but they last wrote 5 days ago: still "Our turn · 9 Sep", sorted by the newest touch.
+    const [ours] = rowsFor([lead({ id: "e", last_inbound_at: daysBefore(5), last_outbound_at: daysBefore(8), last_activity_at: daysBefore(1) })]);
+    expect(ours.lastTouchAt).toBe(daysBefore(1));
+    expect(touchStampFor(ours, { now: NOW })).toMatchObject({ text: "Our turn · Sep\u00a09", state: "our-turn" });
+    const [theirs] = rowsFor([lead({ id: "f", last_inbound_at: daysBefore(9), last_outbound_at: daysBefore(4), last_activity_at: daysBefore(1) })]);
+    expect(touchStampFor(theirs, { now: NOW })).toMatchObject({ text: "Waiting on them · Sep\u00a010", state: "waiting" });
+  });
+
+  it("a future inbound or outbound date is treated as missing, never shown", () => {
+    const [future] = rowsFor([lead({ id: "f", last_inbound_at: new Date(NOW.getTime() + 3 * 86_400_000).toISOString(), last_activity_at: daysBefore(2) })]);
+    expect(touchStampFor(future, { now: NOW }).text).toBe("Last activity · Sep\u00a012");
+    expect(touchStampFor(future, { now: NOW }).state).toBe("activity-only");
+    expect(sheetDay(new Date(NOW.getTime() + 60_000).toISOString(), NOW)).toBeNull();
+    expect(sheetDay("not a date", NOW)).toBeNull();
+    expect(sheetDay(null, NOW)).toBeNull();
+  });
+
+  it("only a date and no email or call: says so, and does not guess a side", () => {
+    const [only] = rowsFor([lead({ id: "d", last_activity_at: daysBefore(3) })]);
+    expect(only.reply).toBe("unknown");
+    expect(touchStampFor(only, { now: NOW })).toMatchObject({ text: "Last activity · Sep\u00a011", waitingOnUs: false, state: "activity-only" });
+  });
+
+  it("uses the Sheet's date words in the firm's zone, and adds the year only for another year", () => {
+    // 02:00Z on 13 Sep is 22:00 on the 12th in New York: the firm's calendar day, as on the weekly review Sheet.
+    const [ny] = rowsFor([lead({ id: "g", last_inbound_at: "2026-09-13T02:00:00.000Z", last_activity_at: "2026-09-13T02:00:00.000Z" })]);
+    expect(touchStampFor(ny, { now: NOW, timeZone: "America/New_York" }).text).toBe("Our turn · Sep\u00a012");
+    expect(touchStampFor(ny, { now: NOW }).text).toBe("Our turn · Sep\u00a013");
+    const [old] = rowsFor([lead({ id: "h", last_outbound_at: "2025-12-30T15:00:00.000Z" })]);
+    expect(touchStampFor(old, { now: NOW }).text).toBe("Waiting on them · Dec\u00a030, 2025");
+  });
+
+  it("says 'No contact yet' when nothing has ever happened", () => {
     const [never] = rowsFor([lead({ id: "c" })]);
-    expect(touchStampFor(never)).toEqual({ text: "—", waitingOnUs: false });
+    expect(touchStampFor(never, { now: NOW })).toMatchObject({ text: "No contact yet", waitingOnUs: false, state: "none" });
     expect(touchDate(null)).toBeNull();
     expect(touchDate("not a date")).toBeNull();
   });
@@ -258,10 +293,10 @@ describe("nextStepFor", () => {
 
   it("otherwise states the reply state as a fact, never a suggestion", () => {
     const [waiting] = rowsFor([lead({ id: "a", last_inbound_at: daysBefore(2), last_outbound_at: daysBefore(6) })]);
-    expect(nextStepFor(waiting, NOW).text).toBe("Waiting on our reply since 12 Sep");
+    expect(nextStepFor(waiting, NOW).text).toBe("Waiting on our reply since Sep\u00a012");
 
     const [theirs] = rowsFor([lead({ id: "b", last_outbound_at: daysBefore(5) })]);
-    expect(nextStepFor(theirs, NOW).text).toBe("Waiting on them since 9 Sep");
+    expect(nextStepFor(theirs, NOW).text).toBe("Waiting on them since Sep\u00a09");
   });
 
   it("says nothing has happened rather than inventing a next step", () => {
@@ -327,5 +362,48 @@ describe("the boards keep the sorted order", () => {
   it("by owner: today, yesterday, never", () => {
     const column = ownerColumns(sorted, MEMBERS).find((c) => c.key === "u-rb")!;
     expect(ids(column.rows)).toEqual(["today", "yesterday", "never"]);
+  });
+});
+
+describe("the whose-turn column sorts by the date it shows (Item L2)", () => {
+  const ids = (rows: { lead: { id: string } }[]) => rows.map((r) => r.lead.id);
+  const sorted = (list: Lead[], dir: "asc" | "desc") => ids(sortRows(rowsFor(list), "lastTouch", dir, { now: NOW }));
+
+  it("orders by the inbound date for Our turn, not by a newer note or stage move", () => {
+    // A: they last wrote 8 days ago, but a note yesterday made its newest touch 1 day. B: they wrote 4 days ago.
+    const a = lead({ id: "A", last_inbound_at: daysBefore(8), last_outbound_at: daysBefore(12), last_activity_at: daysBefore(1) });
+    const b = lead({ id: "B", last_inbound_at: daysBefore(4), last_outbound_at: daysBefore(9), last_activity_at: daysBefore(4) });
+    // The old lastTouchAt sort put A first (1 day); the shown dates put B first (Sep 10 over Sep 6).
+    expect(ids(sortRows(rowsFor([a, b]), "lastTouch", "desc"))).toEqual(["B", "A"]);
+    expect(sorted([a, b], "desc")).toEqual(["B", "A"]);
+    expect(sorted([a, b], "asc")).toEqual(["A", "B"]);
+  });
+
+  it("orders Waiting on them by the outbound date", () => {
+    const c = lead({ id: "C", last_inbound_at: daysBefore(9), last_outbound_at: daysBefore(2), last_activity_at: daysBefore(2) });
+    const d = lead({ id: "D", last_inbound_at: daysBefore(11), last_outbound_at: daysBefore(6), last_activity_at: daysBefore(1) });
+    expect(sorted([d, c], "desc")).toEqual(["C", "D"]);
+  });
+
+  it("puts 'No contact yet' last, ascending and descending", () => {
+    const old = lead({ id: "old", last_inbound_at: daysBefore(30), last_activity_at: daysBefore(30) });
+    const fresh = lead({ id: "fresh", last_inbound_at: daysBefore(1), last_activity_at: daysBefore(1) });
+    const none = lead({ id: "none" });
+    expect(sorted([none, old, fresh], "desc")).toEqual(["fresh", "old", "none"]);
+    expect(sorted([none, old, fresh], "asc")).toEqual(["old", "fresh", "none"]);
+  });
+
+  it("a future date counts as missing, exactly as the cell does: it neither shows nor decides the order", () => {
+    const future = new Date(NOW.getTime() + 5 * 86_400_000).toISOString();
+    const f = lead({ id: "F", last_inbound_at: future, last_activity_at: daysBefore(2) });
+    const g = lead({ id: "G", last_inbound_at: daysBefore(5), last_activity_at: daysBefore(5) });
+    const [fRow] = rowsFor([f]);
+    expect(shownTouch(fRow, NOW)).toEqual({ state: "activity-only", iso: daysBefore(2) });
+    expect(sorted([g, f], "desc")).toEqual(["F", "G"]);
+    // Only a future date and nothing else: "No contact yet", and last.
+    const onlyFuture = lead({ id: "H", last_inbound_at: future });
+    expect(touchStampFor(rowsFor([onlyFuture])[0], { now: NOW }).state).toBe("none");
+    expect(sorted([onlyFuture, g], "desc")).toEqual(["G", "H"]);
+    expect(sorted([onlyFuture, g], "asc")).toEqual(["G", "H"]);
   });
 });

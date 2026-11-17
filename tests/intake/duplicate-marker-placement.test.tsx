@@ -67,9 +67,9 @@ function render(params: IntakeSearchParams) {
   );
 }
 const cell = (html: string, col: string) => {
-  const start = html.indexOf(`data-col="${col}"`);
+  const start = html.search(new RegExp(`<td[^>]*data-col="${col}"`));
   expect(start).toBeGreaterThan(-1);
-  return html.slice(start, html.indexOf('data-col="', start + 10));
+  return html.slice(start, html.indexOf("<td", start + 10));
 };
 
 describe("Possible duplicate marker in the list", () => {
@@ -80,8 +80,9 @@ describe("Possible duplicate marker in the list", () => {
     expect(cell(html, "lead")).not.toContain("data-duplicate");
     expect(cell(html, "lead")).toContain("Maple Home Services");
   });
-  it("still links to the other lead with its tooltip", () => {
-    expect(cell(html, "stage")).toContain('href="/dashboard/leads/b/"');
+  it("is a button that opens the compare panel (changed on purpose: it used to link to the other lead), with its tooltip", () => {
+    expect(cell(html, "stage")).toMatch(/<button[^>]*aria-haspopup="dialog"[^>]*data-duplicate|<button[^>]*data-duplicate[^>]*aria-haspopup="dialog"/);
+    expect(cell(html, "stage")).not.toContain('href="/dashboard/leads/b/"');
     expect(cell(html, "stage")).toContain("title=");
   });
   it("board cards keep the marker where it was", () => {
