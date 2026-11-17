@@ -72,3 +72,18 @@ export function effectiveDirection(
 ): "inbound" | "outbound" {
   return stored === "inbound" && isFirmSender(from, senders) ? "outbound" : stored;
 }
+
+/**
+ * The sync's one relabel: a message read from a mailbox but SENT by the firm (a cc from support@ into
+ * info@) is outbound before cadence and activity typing. Returns the same array contents, with a new
+ * object only for a message that changes; every other message is left untouched. Sender only, pure.
+ */
+export function relabelFirmSent<T extends { direction: "inbound" | "outbound"; from: { address: string | null } }>(
+  messages: ReadonlyArray<T>,
+  senders: FirmSenders,
+): T[] {
+  return messages.map((m) => {
+    const direction = effectiveDirection(m.direction, m.from?.address, senders);
+    return direction === m.direction ? m : { ...m, direction };
+  });
+}
