@@ -3,9 +3,16 @@ import { listMinePage, PAGE_SIZE, type NotificationPage } from "@/lib/notificati
 import { loadActorNames } from "@/components/notifications/NotificationBell";
 import { NotificationRow } from "@/components/notifications/NotificationRow";
 import { MarkAllReadButton } from "@/components/notifications/MarkAllReadButton";
+import "@/components/notifications/notifications.css";
 import { toRowViews } from "@/components/notifications/view";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { PageHeader } from "@/components/ui";
+import { LoadFailedCard } from "@/components/ui/LoadFailed";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ViewToggle } from "@/components/ViewToggle";
+import { getFirmTimeZone } from "@/lib/org/profile";
+import { REFRESH_TO_TRY_AGAIN } from "@/lib/ui/words";
 
 export const metadata: Metadata = { title: pageTitle("Notifications") };
 
@@ -49,50 +56,43 @@ export default async function NotificationsPage({
     loaded = null;
   }
   const names = loaded ? await loadActorNames() : {};
-  const rows = loaded ? toRowViews(loaded.rows, names) : [];
+  const tz = await getFirmTimeZone();
+  const rows = loaded ? toRowViews(loaded.rows, names, Date.now(), tz) : [];
   const anyUnread = rows.some((row) => row.unread);
 
   return (
     <>
-      <div className="lx-page-head">
-        <div style={{ flex: 1, minWidth: 260 }}>
-          <h1 className="lx-h1">Notifications</h1>
-          <p className="lx-sub">Updates on your leads and matters, and drafts waiting for you.</p>
-        </div>
-        <nav aria-label="Notification filter" className="lx-segs">
-          {TABS.map((t) => (
-            <Link key={t.tab} href={hrefFor(t.tab, 1)} aria-current={t.tab === tab ? "page" : undefined}>
-              {t.label}
-            </Link>
-          ))}
-        </nav>
-      </div>
+      <PageHeader
+        title="Notifications"
+        sub="Updates on your leads and matters, and drafts waiting for you."
+        actions={
+          <ViewToggle
+            label="Notification filter"
+            value={tab}
+            views={TABS.map((t) => ({ value: t.tab, label: t.label }))}
+            hrefFor={(t: Tab) => hrefFor(t, 1)}
+          />
+        }
+      />
 
       {!loaded ? (
-        <div role="alert" className="lx-banner lx-banner-risk">
-          We couldn&apos;t load your notifications. Try again in a moment.
-        </div>
+        <LoadFailedCard what="notifications" body={REFRESH_TO_TRY_AGAIN} />
       ) : rows.length === 0 ? (
-        <div className="lx-card lx-empty-card">
-          <h2 className="lx-h2" style={{ fontSize: 25 }}>
-            {page > 1 ? "Nothing on this page" : tab === "unread" ? "No unread notifications" : "You're all caught up"}
-          </h2>
-          <p className="lx-note" style={{ margin: 0 }}>
-            {page > 1 ? (
-              <Link href={hrefFor(tab, 1)}>Back to the newest</Link>
-            ) : (
-              "New assignments, mentions, replies and drafts to approve show up here."
-            )}
-          </p>
-        </div>
+        <EmptyState title={page > 1 ? "Nothing on this page" : tab === "unread" ? "No unread notifications" : "You're all caught up"}>
+          {page > 1 ? (
+            <Link href={hrefFor(tab, 1)}>Back to the newest</Link>
+          ) : (
+            "New assignments, mentions, replies and drafts to approve show up here."
+          )}
+        </EmptyState>
       ) : (
         <div className="lx-card">
           {anyUnread && (
-            <div className="lx-bell-head" style={{ justifyContent: "flex-end" }}>
+            <div className="lx-bell-head lx-bell-head-end">
               <MarkAllReadButton />
             </div>
           )}
-          <ul className="lx-notif-list" style={{ maxHeight: "none" }}>
+          <ul className="lx-notif-list lx-notif-list-full">
             {rows.map((item) => (
               <li key={item.id}>
                 <NotificationRow item={item} />
@@ -107,7 +107,7 @@ export default async function NotificationsPage({
           )}
         </div>
       )}
-      <p className="lx-note" style={{ margin: 0 }}>
+      <p className="lx-note">
         These stay inside Lectual. Nothing here is emailed, texted or sent to a client.
       </p>
     </>
