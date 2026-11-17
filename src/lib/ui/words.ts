@@ -891,3 +891,141 @@ export const REVIEW_DOCS_OPEN = "Open";
 export const reviewDocsMore = (n: number, capped = false) => (capped ? `+${n} or more` : `+${n} more`);
 export const REVIEW_DOCS_LOAD_FAILED = "Documents couldn't be loaded.";
 export const reviewDocsCount = (n: number) => `${n} ${n === 1 ? "document" : "documents"}`;
+
+// Lead step
+/** The lead page's top card ("where Lectual does the step") and "What Lectual did" (src/lib/lead-step/). */
+export const LEAD_STEP_NEEDS_YES = "Needs your yes";
+export const leadStepNeedsYesOf = (name: string) => `Needs ${name}'s yes`;
+export const LEAD_STEP_NEEDS_AN_APPROVER = "Needs an attorney's yes";
+export const LEAD_STEP_HAS_IT = "Lectual has it";
+export const LEAD_STEP_YOURS = "Yours to do";
+export const LEAD_STEP_OVERDUE = "Overdue";
+export const LEAD_STEP_NOT_PREPARED = "Lectual hasn't prepared this yet";
+export const LEAD_STEP_QUIET = "Nothing is lined up";
+export const LEAD_STEP_CANT_SHOW_NEEDS = "Can't show what needs you right now. Refresh to try again.";
+export const LEAD_STEP_CANT_SHOW_NEXT = "Can't show what Lectual will do next. Refresh to try again.";
+export const LEAD_STEP_APPROVALS_OFF = "Approvals aren't connected for your firm, so Lectual can't prepare drafts for a yes. Lectual will turn it on.";
+export const LEAD_STEP_SET_NEXT_STEP = "Set a next step";
+export const leadStepOthers = (n: number) => `${n} more waiting for a yes on this lead`;
+export const leadStepMoreSteps = (n: number) => `${n} more open ${n === 1 ? "step" : "steps"}`;
+/** The buttons. Yes is held for 5 seconds with Undo before anything is posted (the deck's rule). */
+export const LEAD_STEP_YES = "Yes";
+export const LEAD_STEP_EDIT = "Edit";
+export const LEAD_STEP_NOT_THIS = "Not this";
+export const LEAD_STEP_REASON_LABEL = "Short reason, so Lectual learns";
+export const LEAD_STEP_DROP = "Drop this draft";
+export const LEAD_STEP_UNDO = "Undo";
+export const LEAD_STEP_OPEN_PROPOSAL = "Open the proposal";
+export const LEAD_STEP_DRAFT_PROPOSAL = "Draft proposal, not live yet";
+export const LEAD_STEP_TO = "To";
+export const LEAD_STEP_SUBJECT = "Subject";
+/** Read-only: who the yes is waiting on. */
+export const leadStepWaitingOn = (who: string) => `Waiting on ${who}'s yes`;
+export const LEAD_STEP_WAITING_ON_APPROVER = "Waiting on an attorney's yes";
+export const LEAD_STEP_PREVIEW_ONLY = "Preview only: you can't approve while you're viewing as the firm.";
+export const LEAD_STEP_CLOSER_LOOK = "This draft needs a closer look before a yes. Open it in Approvals.";
+export const LEAD_STEP_CANT_CHECK = "This draft couldn't be checked just now, so it can't be approved here. Open it in Approvals.";
+/** The action results. Fixed sentences only. */
+export const LEAD_STEP_NOT_ON_LEAD = "This draft isn't on this lead any more. Refresh to see what's next.";
+export const LEAD_STEP_REASON_NEEDED = "Add a short reason first, up to 200 characters.";
+export const LEAD_STEP_DROPPED = "Dropped. Lectual won't use this draft. Nothing was sent.";
+export const LEAD_STEP_EDIT_SAVED = "Saved. Nothing was sent.";
+export const LEAD_STEP_EDIT_EMPTY = "The draft can't be empty.";
+export const LEAD_STEP_FAILED = "That didn't go through. Nothing was sent. Refresh to try again.";
+export const LEAD_STEP_NO_EDIT = "You don't have permission to edit drafts.";
+/** After a yes: only what the approve core reports really happened. */
+export const leadStepDraftInMailbox = (owner: string | null, mailbox: "Outlook" | "Gmail") =>
+  owner
+    ? `Approved. The draft is in ${owner}'s ${mailbox}. Nothing is sent until ${owner} presses Send.`
+    : `Approved. The draft is in your ${mailbox}. Nothing is sent until you press Send.`;
+export const LEAD_STEP_DRAFT_IN_QUEUE_MAILBOX = "Approved. The approval queue put the draft in the firm's mailbox Drafts. Nothing is sent until someone presses Send.";
+export const LEAD_STEP_APPROVED_NO_DRAFT = "Approved. No mailbox draft was made, so nothing reached a mailbox and nothing was sent. Open the approval to copy it.";
+export const LEAD_STEP_APPROVED_DRAFT_FAILED = "Approved, but the draft couldn't be made, so nothing reached a mailbox. Open the approval to copy it.";
+export const LEAD_STEP_APPROVED_MANUAL = "Approved. This type isn't emailed: file or deliver it the usual way.";
+export const LEAD_STEP_APPROVED = "Approved.";
+/** "Lectual has it": what it waits for, what it does next, and when (only a job that is switched on). */
+export const leadStepWaitingForConsult = (day: string) => `Waiting for the consult on ${day}`;
+export const LEAD_STEP_WAITING_FOR_RUN = "Waiting for the next morning run";
+export const leadStepPrepPromise = (day: string, from: string, to: string, withEmail: boolean) =>
+  `${day}, between ${from} and ${to}, Lectual prepares a consult heads-up${withEmail ? " and the client's prep email" : ""}, then asks for your yes.`;
+export const leadStepProposalAfterConsult = (day: string, from: string, to: string) =>
+  `After the consult, once the recording is imported and linked to this lead, Lectual drafts the proposal and its email, then asks for your yes. The earliest is ${day}, between ${from} and ${to}.`;
+export const leadStepProposalFromRecording = (day: string, from: string, to: string) =>
+  `${day}, between ${from} and ${to}, Lectual drafts the proposal and its email from the recording, then asks for your yes.`;
+/** Why nothing is promised, and what a person does instead. */
+export const LEAD_STEP_OFF: Record<string, string> = {
+  "assistants-off": "Lectual's assistants aren't switched on for your firm, so nothing is lined up. Set a next step instead.",
+  "ai-off": "Lectual's assistants aren't switched on for your firm yet, so nothing is lined up. Set a next step instead.",
+  paused: "Lectual's assistants are paused, so nothing is lined up. Set a next step instead.",
+  "assistant-off": "The assistant that would do this is switched off in Assistants, so nothing is lined up. Set a next step instead.",
+  "suggest-only": "The assistant that would do this only makes suggestions, so nothing is lined up. Set a next step instead.",
+  "approvals-off": "Approvals aren't connected for your firm, so nothing is lined up. Set a next step instead.",
+  "mailbox-off": "Consult prep reads the Outlook calendar, which isn't switched on for your firm. Set a next step instead.",
+  "proposals-off": "Proposals aren't switched on for your firm, so Lectual won't draft one. Set a next step instead.",
+  "no-approvers": "No one is named to approve proposals yet, so Lectual won't draft one. Name an approver in Settings, or set a next step.",
+  "no-recordings": "No meeting recorder is connected, so Lectual won't read the consult. Connect Fathom or Zoom, or set a next step.",
+};
+/** "Lectual hasn't prepared this yet": the draft no assistant makes today, by name. Never a made-up draft. */
+export const LEAD_STEP_GAP: Record<"payment-nudge" | "follow-up" | "outcome-read" | "first-reply", string> = {
+  "payment-nudge": "A reminder to pay the legal fee. Lectual doesn't draft it yet: write it yourself, or set a next step.",
+  "follow-up": "A follow-up on the proposal. Lectual doesn't draft the proposal follow-ups yet: write one yourself, or set a next step.",
+  "outcome-read": "Reading the consult to propose the outcome. Lectual doesn't do this yet: log the consult outcome yourself.",
+  "first-reply": "The first reply to this enquiry. Lectual doesn't draft it yet: write it yourself, or set a next step.",
+};
+export const leadStepFollowUpDay = (day: number) => `Proposal out, day ${day} of 7`;
+export const LEAD_STEP_QUIET_NOTE = "Nothing is waiting on Lectual or on you for this lead. Set a next step if something should happen.";
+/** The four facts. */
+export const LEAD_STEP_FACT_CONTACT = "Last contact";
+export const LEAD_STEP_FACT_CONSULT = "Consult";
+export const LEAD_STEP_FACT_PROPOSAL = "Proposal";
+export const LEAD_STEP_FACT_WAITING = "Waiting on";
+export const LEAD_STEP_COULDNT_LOAD = "Couldn't load";
+export const LEAD_STEP_NO_CONTACT = "No contact yet";
+export const LEAD_STEP_CONTACT_OFF = "Contact from mail isn't switched on";
+export const LEAD_STEP_THEY_WROTE = "They wrote last";
+export const LEAD_STEP_WE_WROTE = "We wrote last";
+export const LEAD_STEP_THEIR_TURN = "Their turn";
+export const LEAD_STEP_NOT_BOOKED = "Not booked";
+export const leadStepConsultHeld = (day: string) => `Held ${day}`;
+export const LEAD_STEP_NO_PROPOSAL = "None yet";
+export const LEAD_STEP_PROPOSAL_DRAFT = "Draft saved, link not live";
+export const LEAD_STEP_PROPOSAL_SAVED = "Saved, link not live";
+export const LEAD_STEP_PROPOSAL_LIVE = "Link live";
+export const leadStepOpened = (n: number) => (n === 0 ? "Not opened yet" : `Opened ${n === 1 ? "once" : `${n} times`}`);
+export const LEAD_STEP_OPENS_UNAVAILABLE = "Opens couldn't load";
+export const leadStepLastDay = (day: string) => `Last day ${day}`;
+export const leadStepAccepted = (day: string | null, signed: boolean) => `${signed ? "Accepted and signed" : "Accepted"}${day ? ` ${day}` : ""}`;
+export const LEAD_STEP_PAID = "Paid";
+export const LEAD_STEP_NOT_PAID = "Not paid";
+export const LEAD_STEP_PAID_UNAVAILABLE = "Paid status couldn't load";
+export const LEAD_STEP_PROPOSAL_CLOSED = "No live proposal";
+export const LEAD_STEP_WAIT_APPROVAL = "Approval";
+export const LEAD_STEP_WAIT_LECTUAL = "Lectual";
+export const LEAD_STEP_WAIT_US = "Us";
+export const LEAD_STEP_WAIT_PERSON = "A person does this";
+export const LEAD_STEP_YOUR_YES = "Your yes";
+/** "What Lectual did": the assistants' work on this lead, newest first. */
+export const LEAD_STEP_DID_TITLE = "What Lectual did";
+export const LEAD_STEP_DID_EMPTY = "Nothing yet.";
+export const LEAD_STEP_DID_UNAVAILABLE = "Couldn't load what Lectual did. Refresh to try again.";
+export const LEAD_STEP_DID_UNDONE = "Undone";
+export const leadStepMoved = (to: string | null) => (to ? `Moved to ${to}` : "Moved the lead forward");
+export const LEAD_STEP_DID_PREP_BRIEF = "Built the consult heads-up";
+export const LEAD_STEP_DID_PREP_EMAIL = "Drafted the client's prep email";
+export const LEAD_STEP_DID_FOLLOW_UP = "Drafted a follow-up email";
+export const LEAD_STEP_DID_PROPOSAL = "Drafted the proposal and its email from the consult";
+export const LEAD_STEP_DID_POST_CONSULT = "Drafted the follow-up email from the consult notes";
+export const LEAD_STEP_DID_DRAFT = "Drafted something for a yes";
+export const LEAD_STEP_DID_FIRST_READ = "Wrote the first read of this lead";
+export const LEAD_STEP_DID_FROM_EMAILS = "Read their emails and suggested changes";
+export const leadStepDidSuggested = (to: string | null) => (to ? `Suggested moving to ${to}` : "Suggested a stage move");
+export const LEAD_STEP_DID_FILED_IN = "Filed an email from them on this lead";
+export const LEAD_STEP_DID_FILED_OUT = "Filed an email the firm sent on this lead";
+export const LEAD_STEP_DID_CREATED = "Created the lead";
+export const LEAD_STEP_DID_SEQUENCE_STOPPED = "Stopped a sequence";
+export const LEAD_STEP_ROW_VERSION = "Version";
+export const LEAD_STEP_ROW_LEGAL = "Legal fee";
+export const LEAD_STEP_ROW_USPTO = "USPTO fees";
+export const LEAD_STEP_NO_APPROVE = "You don't have permission to approve or reject client communications.";
+export const LEAD_STEP_ALREADY_DECIDED = "This draft was already decided. Refresh to see what's next.";
+export const LEAD_STEP_APPROVED_QUEUE_SENT = "Approved. The approval queue reports that it went out.";
