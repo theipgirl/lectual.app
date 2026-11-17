@@ -237,6 +237,7 @@ export async function reviewProposalAction(_prev: ActionState, formData: FormDat
     const update = decision === "apply" ? acceptedUpdate(proposal, fields) : {};
     if (decision === "apply") {
       if (Object.keys(update).length === 0) return { error: "Tick at least one change to apply." };
+      // live-guard: writes to the lead whose page is open; that page redirects a merged lead, and a refusal is LEAD_MERGED_WRITE
       const { error: upErr } = await supabase.from("crm_lead").update(update).eq("id", leadId);
       if (upErr) throw upErr;
     }

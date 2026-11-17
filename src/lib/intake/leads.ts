@@ -91,6 +91,7 @@ export async function setLane(leadId: string, lane: Lane | null): Promise<Lead> 
   if (userError) throw userError;
 
   const { data: before, error: beforeError } = await supabase
+    // live-guard: setLane / setReferralSource read and write ONE lead by id; a merged lead's guard refusal is shown as LEAD_MERGED_WRITE
     .from("crm_lead")
     .select("lane, ai_summary")
     .eq("id", leadId)
@@ -99,12 +100,14 @@ export async function setLane(leadId: string, lane: Lane | null): Promise<Lead> 
   if (!before) throw new LeadWriteError("That lead no longer exists.");
   const from = before.lane ?? null;
   if (from === lane) {
+    // live-guard: setLane / setReferralSource read and write ONE lead by id; a merged lead's guard refusal is shown as LEAD_MERGED_WRITE
     const { data: unchanged, error } = await supabase.from("crm_lead").select("*").eq("id", leadId).single();
     if (error) throw error;
     return unchanged;
   }
 
   const { data, error } = await supabase
+    // live-guard: setLane / setReferralSource read and write ONE lead by id; a merged lead's guard refusal is shown as LEAD_MERGED_WRITE
     .from("crm_lead")
     .update({ lane, updated_at: new Date().toISOString() })
     .eq("id", leadId)
@@ -168,6 +171,7 @@ export async function setReferralSource(
   }
 
   const { data: before, error: beforeError } = await supabase
+    // live-guard: setLane / setReferralSource read and write ONE lead by id; a merged lead's guard refusal is shown as LEAD_MERGED_WRITE
     .from("crm_lead")
     .select("referral_source")
     .eq("id", leadId)
@@ -176,12 +180,14 @@ export async function setReferralSource(
   if (!before) throw new LeadWriteError("That lead no longer exists.");
   const from = before.referral_source ?? null;
   if (from === source) {
+    // live-guard: setLane / setReferralSource read and write ONE lead by id; a merged lead's guard refusal is shown as LEAD_MERGED_WRITE
     const { data: unchanged, error } = await supabase.from("crm_lead").select("*").eq("id", leadId).single();
     if (error) throw error;
     return unchanged;
   }
 
   const { data, error } = await supabase
+    // live-guard: setLane / setReferralSource read and write ONE lead by id; a merged lead's guard refusal is shown as LEAD_MERGED_WRITE
     .from("crm_lead")
     .update({ referral_source: source, updated_at: new Date().toISOString() })
     .eq("id", leadId)

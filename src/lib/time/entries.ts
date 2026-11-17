@@ -109,6 +109,7 @@ async function resolveSubject(
 async function orgIdForTarget(supabase: ScopedClient, target: TimeTarget): Promise<string> {
   if (target.leadId) {
     const { data, error } = await supabase
+      // live-guard: reads the lead a time entry is on; time entries move to the keeper in the merge
       .from("crm_lead")
       .select("org_id")
       .eq("id", target.leadId)
@@ -141,6 +142,7 @@ async function alreadyRunning(
   let where = "something else";
   if (running.lead_id) {
     const { data } = await supabase
+      // live-guard: reads the lead a time entry is on; time entries move to the keeper in the merge
       .from("crm_lead")
       .select("first_name, last_name, business_name")
       .eq("id", running.lead_id)

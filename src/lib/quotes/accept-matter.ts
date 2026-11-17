@@ -98,6 +98,7 @@ export async function openMatterForAcceptedQuote(
     const leadId = resolved.id;
 
     const { data: leadData, error: leadError } = await db
+      // live-guard: the lead resolveLeadId already followed to the keeper
       .from("crm_lead")
       .select("id, first_name, last_name, business_name, mark_text, referral_source")
       .eq("id", leadId)
@@ -262,6 +263,7 @@ export async function advanceLeadForAcceptedQuote(
     const leadId = resolved.id;
 
     const { data: leadData, error: leadError } = await db
+      // live-guard: the lead resolveLeadId already followed to the keeper
       .from("crm_lead")
       .select("id, current_stage_id")
       .eq("id", leadId)
@@ -287,6 +289,7 @@ export async function advanceLeadForAcceptedQuote(
 
     const stamp = context.now.toISOString();
     const { data: moved, error: moveError } = await db
+      // live-guard: the lead resolveLeadId already followed to the keeper
       .from("crm_lead")
       .update({ current_stage_id: wonId, stage_entered_at: stamp, last_activity_at: stamp })
       .eq("id", leadId)

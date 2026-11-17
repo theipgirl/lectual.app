@@ -234,6 +234,7 @@ export async function runIntakeTriage(ctx: AgentContext): Promise<AgentResult> {
     const nowIso = new Date(ctx.now()).toISOString();
 
     const update = triageLeadUpdate(output, autonomy, nowIso);
+    // live-guard: the update writes only leads read through live(...) a moment before
     const { error: upErr } = await admin.from("crm_lead").update(update).eq("id", lead.id).eq("org_id", orgId);
     if (upErr) throw new Error(`lead update failed: ${upErr.message}`);
 

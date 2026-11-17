@@ -6,7 +6,7 @@ import { loadStopFactsForLeads, loadStopFactsForPerson } from "@/lib/campaigns/s
 import { earliest, staleSince, type StopDecision } from "@/lib/campaigns/stops";
 import { rowsOf, str, type StopDb } from "@/lib/campaigns/stop-db";
 import { DRAFT_PAYLOAD_KEYS, MAX_RECIPIENT_LEADS, QUEUE_ID, UUID, recipientAddresses } from "./link-rules";
-import { leadRead } from "@/lib/leads/live";
+import { keeperIdOf, leadRead } from "@/lib/leads/live";
 
 /**
  * The approval-time warning (intake SOP §2.5): a client email queued on
@@ -101,9 +101,10 @@ async function resolveLeads(
   }
   const addresses = recipientAddresses(item.recipient);
   if (addresses) {
-    const { data, error } = await leadRead(({ live }) => live(db.from("crm_lead").select("id")).in("email", addresses));
+    // A merged lead's old address (lectual 0107) still warns, and links to its KEEPER.
+    const { data, error } = await leadRead(({ merged }) => db.from("crm_lead").select(merged ? "id, merged_into_id" : "id").in("email", addresses));
     if (error) return "failed";
-    const ids = rowsOf(data).map((r) => str(r.id)).filter((v): v is string => !!v).slice(0, MAX_RECIPIENT_LEADS);
+    const ids = [...new Set(rowsOf(data).map(keeperIdOf).filter((v): v is string => !!v))].slice(0, MAX_RECIPIENT_LEADS);
     if (ids.length > 0) return { leadIds: ids, linkedBy: "recipient" };
   }
   return null;
@@ -126,6 +127,7 @@ export async function checkDraftStaleness(item: QueueItem, db?: StopDb): Promise
 
   let name: string | null = null;
   try {
+    // live-guard: names the one lead an approval resolved to (the address match folds merged leads to their keeper)
     const { data } = await client.from("crm_lead").select("id, first_name, last_name, business_name").eq("id", resolved.leadIds[0]).maybeSingle();
     name = leadName((data as Record<string, unknown> | null) ?? undefined);
   } catch {

@@ -178,6 +178,7 @@ export async function runEmailIntel(ctx: AgentContext): Promise<AgentResult> {
 
     const writable = autonomy === "act" ? fillOnly(lead as LeadRow, output.changes) : {};
     if (Object.keys(writable).length > 0) {
+      // live-guard: the update writes only a lead read through live(...) a moment before
       const { error: upErr } = await admin.from("crm_lead").update(writable).eq("id", lead.id).eq("org_id", orgId);
       if (upErr) throw new Error(`lead update failed: ${upErr.message}`);
       applied += 1;

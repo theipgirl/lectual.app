@@ -37,7 +37,8 @@ const C = "33333333-3333-4333-8333-333333333333";
 /** A tiny query builder that records the filters it was given and answers from a handler. */
 function recorder(answer: (ops: Array<[string, unknown[]]>) => { data?: unknown; error?: unknown; count?: number }) {
   const calls: Array<Array<[string, unknown[]]>> = [];
-  const from = (table: string) => {
+  type Chain = { select: (...a: unknown[]) => Chain } & Record<string, unknown>;
+  const from = (table: string): Chain => {
     const ops: Array<[string, unknown[]]> = [["from", [table]]];
     calls.push(ops);
     const q: Record<string, unknown> = {};
@@ -49,7 +50,7 @@ function recorder(answer: (ops: Array<[string, unknown[]]>) => { data?: unknown;
     }
     q.maybeSingle = () => Promise.resolve({ data: null, error: null, ...answer(ops) });
     q.then = (ok: (v: unknown) => unknown, bad?: (e: unknown) => unknown) => Promise.resolve({ data: null, error: null, ...answer(ops) }).then(ok, bad);
-    return q;
+    return q as Chain;
   };
   return { db: { from }, calls };
 }
@@ -290,7 +291,8 @@ describe("the links and the quiet lines", () => {
     expect(mergeHref(A, B, B)).toBe(`/dashboard/intake/merge/?a=${A}&b=${B}&keep=${B}`);
   });
   it("the 'merged into' line is shown only for a lead really merged into this one", () => {
-    expect(mergeNotice({ merged: "1" }, [])).toBe("merged");
+    expect(mergeNotice({ merged: "1" }, [B])).toBe("merged");
+    expect(mergeNotice({ merged: "1" }, [])).toBeNull();
     expect(mergeNotice({ from: B }, [B])).toBe("from");
     expect(mergeNotice({ from: C }, [B])).toBeNull();
     expect(mergeNotice({ from: "<script>" }, ["<script>"])).toBeNull();
@@ -400,10 +402,33 @@ describe("matchers and writers skip or follow merged leads", () => {
     const byId = planImport([src({})], stages as never, [ex({})]);
     expect(byId.updates).toEqual([]);
     expect(byId.creates).toEqual([]);
-    expect(byId.skipped[0].reason).toBe(LEAD_MERGED_IMPORT_SKIP);
+    expect(byId.skipped[0].reason).toBe(LEAD_MERGED_IMPORT_SKIP(null));
     const byEmail = planImport([src({ lawmaticsId: "LM-2" })], stages as never, [ex({ lawmatics_id: null })]);
     expect(byEmail.creates).toEqual([]);
-    expect(byEmail.skipped[0].reason).toBe(LEAD_MERGED_IMPORT_SKIP);
+    expect(byEmail.skipped[0].reason).toBe(LEAD_MERGED_IMPORT_SKIP(null));
+    // With the keeper in the list, the reason names it.
+    const keeper = ex({ id: A, email: "new@x.com", first_name: "Ana", last_name: "Ruiz-Keep", lawmatics_id: "LM-K", merged_into_id: null });
+    const named = planImport([src({})], stages as never, [ex({}), keeper]);
+    expect(named.skipped[0].reason).toBe(LEAD_MERGED_IMPORT_SKIP("Ana Ruiz-Keep"));
+    expect(named.skipped[0].reason).toContain("Ana Ruiz-Keep");
+  });
+
+  it("Reconcile folds a merged lead's sheet key and Lawmatics id onto its keeper", async () => {
+    const { foldMergedKeys } = await import("@/lib/reconcile/sources");
+    const keeper = { id: A, firstName: "Ana", lastName: "Ruiz", email: "a@x.com", currentStageId: "s", sheetKey: "k-own", lawmaticsId: "LM-K", practiceArea: null };
+    const out = foldMergedKeys([keeper], [{ into: A, sheetKey: "k-old", lawmaticsId: "LM-OLD" }, { into: "gone", sheetKey: "x", lawmaticsId: null }]);
+    expect(out[0].mergedKeys).toEqual([{ sheetKey: "k-old", lawmaticsId: "LM-OLD" }]);
+  });
+
+  it("a sheet row held only by a merged lead matches its keeper; two keys reaching two rows is ambiguous", async () => {
+    const { matchSheetToLeads } = await import("@/lib/reconcile/sheet-match");
+    const entry = (key: string) => ({ exactKey: key, anyCodeKeys: [], reading: { kind: "ok" } }) as never;
+    const old = entry("k-old");
+    const one = matchSheetToLeads([old], [{ id: A, sheetKey: "k-own" }, { id: A, sheetKey: "k-old" }]);
+    expect(one.byLead.get(A)).toEqual({ kind: "entry", entry: old });
+    expect(one.withoutLead).toEqual([]);
+    const two = matchSheetToLeads([entry("k-own"), old], [{ id: A, sheetKey: "k-own" }, { id: A, sheetKey: "k-old" }]);
+    expect(two.byLead.get(A)?.kind).toBe("ambiguous");
   });
 
   it("the hired-matter sync follows a merged lead to its keeper (matter link and stage move)", () => {

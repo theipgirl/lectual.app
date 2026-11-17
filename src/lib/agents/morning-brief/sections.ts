@@ -78,6 +78,7 @@ export async function readOpenLeads(admin: SupabaseClient, orgId: string, stages
 export async function readLeadNames(admin: SupabaseClient, orgId: string, ids: readonly string[]): Promise<Map<string, string>> {
   const names = new Map<string, string>();
   for (const batch of chunk([...new Set(ids)], IN_CHUNK)) {
+    // live-guard: the stalled-lead list is live; the second read only names leads by id for the brief
     const { data, error } = await admin.from("crm_lead").select("id, first_name, last_name, business_name").eq("org_id", orgId).in("id", batch);
     if (error) throw new Error("lead name read failed");
     for (const row of (data ?? []) as Array<{ id: string; first_name: string | null; last_name: string | null; business_name: string | null }>) {

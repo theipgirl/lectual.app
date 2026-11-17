@@ -111,6 +111,7 @@ async function moveAsAgent(actor: AgentActor, move: AgentMove): Promise<AgentMov
   // Conditional on the stage the decision was made from: a person who moved the lead a moment
   // ago wins, and this matches no row.
   const { data: updated, error: updateErr } = await admin
+    // live-guard: the agent's update writes only a lead read through live(...) a moment before, fenced on its stage
     .from("crm_lead")
     .update({ current_stage_id: move.toStageId, stage_entered_at: enteredAt, last_activity_at: nowIso })
     .eq("id", move.leadId)
@@ -149,6 +150,7 @@ async function moveAsAgent(actor: AgentActor, move: AgentMove): Promise<AgentMov
     // The timeline is append-only, so there is nothing to undo there. A move nobody can see is
     // worse than no move, so the lead goes back (only if it is still where this call put it).
     await admin
+      // live-guard: the agent's update writes only a lead read through live(...) a moment before, fenced on its stage
       .from("crm_lead")
       .update({ current_stage_id: move.fromStageId, stage_entered_at: previousStageEnteredAt })
       .eq("id", move.leadId)

@@ -453,6 +453,7 @@ export async function applyImport(
 
     // RLS scopes the row to the caller's org; the id came from a read through
     // that same policy, so this cannot reach another tenant's lead.
+    // live-guard: the insert files new leads; updates go only to live leads the planner matched (merged ones are skipped)
     const { error } = await supabase.from("crm_lead").update(patch).eq("id", u.leadId);
     if (error) {
       console.error("[lawmatics-import] update failed", error.code);

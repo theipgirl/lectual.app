@@ -72,6 +72,7 @@ export async function bumpHeldConsults(admin: SupabaseClient, orgId: string, now
       const last = touched.get(leadId) ?? null;
       if (last !== null && last >= end) continue; // already touched later: never backwards
       const endIso = new Date(end).toISOString();
+      // live-guard: writes only a lead read through live(...) a moment before, fenced on its last touch
       const base = admin.from("crm_lead").update({ last_activity_at: endIso }).eq("id", leadId).eq("org_id", orgId);
       // Conditional on what was read, so a note written a moment ago is never overwritten with an older date.
       const { error: upErr } = await (last === null ? base.is("last_activity_at", null) : base.lt("last_activity_at", endIso));

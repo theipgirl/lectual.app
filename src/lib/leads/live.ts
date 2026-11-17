@@ -151,24 +151,35 @@ export function foldMergedLeads<T extends MergePointer & { email?: string | null
   const byId = new Map<string, T>(rows.map((r) => [r.id, r]));
   const out: Omit<T, "merged_into_id">[] = [];
   const seen = new Set<string>();
-  for (const row of rows) {
-    let shaped: T;
-    if (row.merged_into_id) {
-      const keeperId = keeperIn(row.id, byId);
-      const keeper = keeperId ? byId.get(keeperId) : undefined;
-      if (!keeper || keeperId === row.id) continue;
-      shaped = { ...keeper, email: row.email ?? null };
-    } else {
-      shaped = row;
-    }
+  const push = (shaped: T) => {
     const key = `${shaped.id}|${String(shaped.email ?? "").trim().toLowerCase()}`;
-    if (seen.has(key)) continue;
+    if (seen.has(key)) return;
     seen.add(key);
     const { merged_into_id: _drop, ...rest } = shaped;
     void _drop;
     out.push(rest);
+  };
+  // Live rows first, so a reader that keeps the FIRST row per id gets the keeper's own row, not a folded copy.
+  for (const row of rows) if (!row.merged_into_id) push(row);
+  for (const row of rows) {
+    if (!row.merged_into_id) continue;
+    const keeperId = keeperIn(row.id, byId);
+    const keeper = keeperId ? byId.get(keeperId) : undefined;
+    if (!keeper || keeperId === row.id) continue;
+    push({ ...keeper, email: row.email ?? null });
   }
   return out;
+}
+
+/**
+ * Pure: the id a matcher should use for a row read with its pointer: the keeper for a merged lead (one hop: lectual
+ * refuses a merge that would make a chain), else the row's own id. For address matchers whose keeper may not be in
+ * the list (the keeper can have another address), unlike `foldMergedLeads`.
+ */
+export function keeperIdOf(row: { id?: unknown; merged_into_id?: unknown }): string | null {
+  const into = typeof row.merged_into_id === "string" && row.merged_into_id ? row.merged_into_id : null;
+  if (into) return into;
+  return typeof row.id === "string" && row.id ? row.id : null;
 }
 
 /** Pure: true when a row read with the merge columns is a merged lead. A row without the column is live. */

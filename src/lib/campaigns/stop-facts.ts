@@ -1,6 +1,7 @@
 import { clientFact, earliest, latest, type StopDecision, type StopFacts } from "./stops";
 import { rowsOf, str, type StopDb, type StopDbQuery } from "./stop-db";
-import { leadRead } from "@/lib/leads/live";
+import { isMergeColumnMissing } from "@/lib/leads/live";
+import { personIds } from "./person";
 
 /**
  * Reads everything recorded about ONE lead that can end a sequence (the
@@ -85,6 +86,7 @@ export async function loadStopFacts(db: StopDb, input: { leadId: string; orgId?:
 
   try {
     const lead = (await read(
+      // live-guard: one lead's own facts by id; loadStopFactsForPerson adds the merged leads of the person (readPersonRows)
       fence(db.from("crm_lead").select("id, current_stage_id, stage_entered_at, last_inbound_at").eq("id", leadId)).maybeSingle(),
       "lead",
     )) as Record<string, unknown> | null;
@@ -179,23 +181,68 @@ function emailVariants(email: string | null): string[] {
  */
 export async function loadStopFactsForPerson(db: StopDb, input: { leadId: string; orgId?: string | null }): Promise<FactsRead> {
   try {
-    const first = db.from("crm_lead").select("id, org_id, email").eq("id", input.leadId);
-    const { data, error } = await (input.orgId ? first.eq("org_id", input.orgId) : first).maybeSingle();
-    if (error) return { status: "unavailable", error: "lead read failed" };
-    const lead = data as Record<string, unknown> | null;
+    const read = await readLeadRows(db, "id", [input.leadId], input.orgId ?? null, null);
+    const lead = read.rows[0];
     const orgId = str(lead?.org_id);
     if (!lead || !orgId) return { status: "unavailable", error: "lead not visible" };
-    const ids = new Set<string>([input.leadId]);
-    const emails = emailVariants(str(lead.email));
-    if (emails.length > 0) {
-      const { data: same, error: sameError } = await leadRead(({ live }) => live(db.from("crm_lead").select("id")).eq("org_id", orgId).in("email", emails));
-      if (sameError) return { status: "unavailable", error: "lead read failed" };
-      for (const row of rowsOf(same)) if (str(row.id)) ids.add(row.id as string);
-    }
-    return await loadStopFactsForLeads(db, { leadIds: [...ids], orgId });
+    const known = await readPersonRows(db, [lead], orgId, read.merged);
+    return await loadStopFactsForLeads(db, { leadIds: personIds(lead, known, emailVariants), orgId });
   } catch (err) {
-    return { status: "unavailable", error: err instanceof Error ? err.message : String(err) };
+    return { status: "unavailable", error: err instanceof ReadFailed ? err.message : "lead read failed" };
   }
+}
+
+/**
+ * crm_lead rows by one column, with `merged_into_id` when the database has it (lectual 0107). `merged` null = not
+ * known yet: the first read tries the column and falls back on 42703 / PGRST204, judged by code.
+ */
+async function readLeadRows(
+  db: StopDb,
+  column: string,
+  values: readonly string[],
+  orgId: string | null,
+  merged: boolean | null,
+): Promise<{ rows: Row[]; merged: boolean }> {
+  if (values.length === 0) return { rows: [], merged: merged ?? false };
+  const base = "id, org_id, email, current_stage_id, stage_entered_at, last_inbound_at";
+  const run = async (withMerge: boolean) => {
+    const parts: Row[] = [];
+    for (let i = 0; i < values.length; i += 75) {
+      // live-guard: reads every lead of a person, merged ones included, with the pointer (M5 stop rules)
+      const q = db.from("crm_lead").select(withMerge ? `${base}, merged_into_id` : base);
+      const fenced = orgId ? q.eq("org_id", orgId) : q;
+      const { data, error } = await fenced.in(column, values.slice(i, i + 75));
+      if (error) return { error };
+      parts.push(...rowsOf(data));
+    }
+    return { rows: parts };
+  };
+  if (merged !== false) {
+    const first = await run(true);
+    if (!("error" in first)) return { rows: first.rows, merged: true };
+    if (!isMergeColumnMissing(first.error) || merged === true) throw new ReadFailed("lead read failed");
+  }
+  const second = await run(false);
+  if ("error" in second) throw new ReadFailed("lead read failed");
+  return { rows: second.rows, merged: false };
+}
+
+/** Every row a person can be made of, for the given leads: their keepers, the same-address leads, and what was merged into those. */
+async function readPersonRows(db: StopDb, leads: readonly Row[], orgId: string | null, merged: boolean): Promise<Map<string, Row>> {
+  const known = new Map<string, Row>();
+  const add = (rows: readonly Row[]) => {
+    for (const r of rows) if (str(r.id)) known.set(r.id as string, r);
+  };
+  add(leads);
+  const keeperIds = [...new Set(leads.map((l) => str(l.merged_into_id)).filter((v): v is string => !!v && !known.has(v)))];
+  add((await readLeadRows(db, "id", keeperIds, orgId, merged)).rows);
+  const addresses = [...new Set([...known.values()].flatMap((r) => emailVariants(str(r.email))))];
+  add((await readLeadRows(db, "email", addresses, orgId, merged)).rows);
+  if (merged) {
+    const live = [...known.values()].filter((r) => !str(r.merged_into_id)).map((r) => r.id as string);
+    add((await readLeadRows(db, "merged_into_id", live, orgId, merged)).rows);
+  }
+  return known;
 }
 
 /* ─────────────────────── which of many leads are clients ──────────────────── */
@@ -254,25 +301,13 @@ export async function loadClientLeads(db: StopDb, input: { leadIds: readonly str
   };
 
   try {
-    const leadColumns = "id, org_id, email, current_stage_id, stage_entered_at";
-    const asked = await readIn("crm_lead", leadColumns, "id", leadIds);
-    const variantsOf = (row: Row) => emailVariants(str(row.email));
-    const addresses = [...new Set(asked.flatMap(variantsOf))];
-    const sameAddress = addresses.length > 0 ? await readIn("crm_lead", leadColumns, "email", addresses) : [];
-
-    // Who is "the person" behind each asked lead: itself plus the same-org rows
-    // whose address is one of its exact variants.
-    const people = new Map<string, Row>();
-    for (const row of [...asked, ...sameAddress]) if (str(row.id)) people.set(row.id as string, row);
+    // Who is "the person" behind each asked lead: the same rule as loadStopFactsForPerson (./person.ts): the live
+    // lead (its keeper when merged), the live same-address leads, and every lead merged into those.
+    const askedRead = await readLeadRows(db, "id", leadIds, input.orgId ?? null, null);
+    const asked = askedRead.rows;
+    const people = await readPersonRows(db, asked, input.orgId ?? null, askedRead.merged);
     const personOf = new Map<string, string[]>();
-    for (const lead of asked) {
-      const mine = new Set(variantsOf(lead));
-      const ids = new Set<string>([lead.id as string]);
-      for (const other of sameAddress) {
-        if (other.org_id === lead.org_id && typeof other.email === "string" && mine.has(other.email) && str(other.id)) ids.add(other.id as string);
-      }
-      personOf.set(lead.id as string, [...ids]);
-    }
+    for (const lead of asked) personOf.set(lead.id as string, personIds(lead, people, emailVariants));
 
     const everyone = [...people.keys()];
     const stageIds = [...new Set([...people.values()].map((p) => str(p.current_stage_id)).filter((v): v is string => !!v))];

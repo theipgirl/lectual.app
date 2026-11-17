@@ -850,7 +850,10 @@ export const MERGE_HISTORY_PARTIAL = "History from merged leads couldn't be load
 /** Any write that reached a merged lead (lectual 0107's crm_lead_merge_guard). */
 export const LEAD_MERGED_WRITE = "This lead was merged into another lead, so it can't be changed here. Refresh and open the lead it was merged into.";
 /** The Lawmatics importer's reason for a person whose lead was merged. */
-export const LEAD_MERGED_IMPORT_SKIP = "This person's lead was merged into another lead in Lectual, so the import leaves it alone.";
+export const LEAD_MERGED_IMPORT_SKIP = (keeper: string | null) =>
+  keeper
+    ? `This person's lead was merged into ${keeper} in Lectual, so the import leaves it alone.`
+    : "This person's lead was merged into another lead in Lectual, so the import leaves it alone.";
 /** crm_merge_leads refusals, by the prefix lectual 0107 raises. */
 export const MERGE_REFUSALS = {
   merge_not_allowed: "Only an owner or admin can merge leads.",
@@ -863,3 +866,5 @@ export const MERGE_REFUSALS = {
   merge_bad_choice: "One of the choices wasn't recognised. Refresh the page and choose again.",
 } as const;
 export const MERGE_FAILED = "Couldn't merge these leads. Try again.";
+/** An automation rule whose lead can no longer be found. */
+export const MERGE_RULE_LEAD_GONE = "The lead couldn't be found.";

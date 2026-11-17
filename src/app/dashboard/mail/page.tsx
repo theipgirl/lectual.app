@@ -97,6 +97,7 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
   const leadIds = [...new Set(activity.map((a) => a.lead_id).filter((x): x is string => !!x))];
   const matterIds = [...new Set(activity.map((a) => a.matter_id).filter((x): x is string => !!x))];
   const [{ data: leads }, { data: matters }] = await Promise.all([
+    // live-guard: names the leads that stored mail rows point at (history: mail stays on a merged lead)
     leadIds.length ? supabase.from("crm_lead").select("id, first_name, last_name, business_name, email").in("id", leadIds) : Promise.resolve({ data: [] as never[] }),
     matterIds.length ? supabase.from("crm_matter").select("id, mark_text, title, matter_number, owner_name").in("id", matterIds) : Promise.resolve({ data: [] as never[] }),
   ]);

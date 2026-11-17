@@ -27,7 +27,7 @@ export function mergedFromRedirect(keeperId: string, loserId: string): string {
  * be made up from the URL.
  */
 export function mergeNotice(params: { merged?: unknown; from?: unknown }, mergedIds: readonly string[]): "merged" | "from" | null {
-  if (params.merged === "1") return "merged";
+  if (params.merged === "1" && mergedIds.length > 0) return "merged";
   if (isLeadId(params.from) && mergedIds.includes(params.from)) return "from";
   return null;
 }

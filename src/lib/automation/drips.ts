@@ -264,6 +264,7 @@ export async function enrollLead(leadId: string, sequenceId: string): Promise<Dr
   await requireAutomationStaffRole(supabase);
 
   const { data: lead, error: leadError } = await supabase
+    // live-guard: reads an enrolled lead's name; enrollments move to the keeper or are stopped in the merge
     .from("crm_lead")
     .select("org_id, first_name, last_name, business_name")
     .eq("id", leadId)

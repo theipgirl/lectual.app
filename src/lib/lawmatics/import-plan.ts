@@ -309,13 +309,20 @@ export function planImport(
   const byLawmaticsId = new Map<string, ExistingLead>();
   const byEmail = new Map<string, ExistingLead[]>();
   // Merged leads (lectual 0107) match nothing to update, but what they hold is not imported again either.
-  const mergedLawmaticsIds = new Set<string>();
-  const mergedEmails = new Set<string>();
+  // Each maps to the reason that names the lead it was merged into (the keeper, when it is in the list).
+  const mergedLawmaticsIds = new Map<string, string>();
+  const mergedEmails = new Map<string, string>();
+  const existingById = new Map(existing.map((l) => [l.id, l]));
+  const keeperName = (lead: ExistingLead) => {
+    const keeper = lead.merged_into_id ? existingById.get(lead.merged_into_id) : undefined;
+    const name = keeper ? [keeper.first_name, keeper.last_name].filter(Boolean).join(" ").trim() || keeper.email : "";
+    return LEAD_MERGED_IMPORT_SKIP(name || null);
+  };
   for (const lead of existing) {
     if (lead.merged_into_id) {
-      if (lead.lawmatics_id) mergedLawmaticsIds.add(lead.lawmatics_id);
+      if (lead.lawmatics_id) mergedLawmaticsIds.set(lead.lawmatics_id, keeperName(lead));
       const merged = normalizedEmail(lead.email);
-      if (merged) mergedEmails.add(merged);
+      if (merged) mergedEmails.set(merged, keeperName(lead));
       continue;
     }
     if (lead.lawmatics_id) byLawmaticsId.set(lead.lawmatics_id, lead);
@@ -431,14 +438,14 @@ export function planImport(
     }
 
     if (mergedLawmaticsIds.has(rec.lawmaticsId)) {
-      skipped.push({ ...base, reason: LEAD_MERGED_IMPORT_SKIP });
+      skipped.push({ ...base, reason: mergedLawmaticsIds.get(rec.lawmaticsId) as string });
       continue;
     }
 
     // ── Not linked → try to adopt a local lead with the same email ─────────
     const emailMatches = byEmail.get(rec.email) ?? [];
     if (emailMatches.length === 0 && mergedEmails.has(normalizedEmail(rec.email) ?? "")) {
-      skipped.push({ ...base, reason: LEAD_MERGED_IMPORT_SKIP });
+      skipped.push({ ...base, reason: mergedEmails.get(normalizedEmail(rec.email) ?? "") as string });
       continue;
     }
     if (emailMatches.length > 1) {
@@ -563,7 +570,7 @@ export function planImport(
       continue;
     }
     if (mergedEmails.has(email)) {
-      skipped.push({ ...base, reason: LEAD_MERGED_IMPORT_SKIP });
+      skipped.push({ ...base, reason: mergedEmails.get(email) as string });
       continue;
     }
     if (pullEmails.has(email)) {

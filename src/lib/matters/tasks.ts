@@ -74,6 +74,7 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
   let orgId: string;
   if (input.leadId) {
     const { data, error } = await supabase
+      // live-guard: reads org_id of a task's lead; tasks move to the keeper in the merge
       .from("crm_lead")
       .select("org_id")
       .eq("id", input.leadId)

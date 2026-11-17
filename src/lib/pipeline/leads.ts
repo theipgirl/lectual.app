@@ -143,6 +143,7 @@ export async function listLeads(filter: LeadFilter = {}): Promise<Lead[]> {
 export async function getLead(id: string): Promise<Lead | null> {
   const supabase = await getScopedClient();
   const { data, error } = await supabase
+    // live-guard: getLead reads by id so the lead page can redirect a merged lead; updateLead / moveLeadStage / assignLead write by id and a merged lead's guard refusal is shown as LEAD_MERGED_WRITE (friendlyLeadWriteError / friendlyMoveStageError)
     .from("crm_lead")
     .select("*")
     .eq("id", id)
@@ -265,6 +266,7 @@ export async function updateLead(id: string, input: UpdateLeadInput): Promise<Le
   if (!validated.ok) throw inputError(validated.fieldErrors);
 
   const { data: before, error: beforeError } = await supabase
+    // live-guard: getLead reads by id so the lead page can redirect a merged lead; updateLead / moveLeadStage / assignLead write by id and a merged lead's guard refusal is shown as LEAD_MERGED_WRITE (friendlyLeadWriteError / friendlyMoveStageError)
     .from("crm_lead")
     .select("first_name, last_name, email, phone, business_name, website")
     .eq("id", id)
@@ -281,6 +283,7 @@ export async function updateLead(id: string, input: UpdateLeadInput): Promise<Le
 
   const now = new Date().toISOString();
   const { data, error } = await supabase
+    // live-guard: getLead reads by id so the lead page can redirect a merged lead; updateLead / moveLeadStage / assignLead write by id and a merged lead's guard refusal is shown as LEAD_MERGED_WRITE (friendlyLeadWriteError / friendlyMoveStageError)
     .from("crm_lead")
     .update({ ...validated.value, updated_at: now, last_activity_at: now })
     .eq("id", id)
@@ -328,6 +331,7 @@ export async function moveLeadStage(
   // Captured before the update so the audit row can name where the lead came
   // from. Best-effort: a missing prior stage id must not block the move.
   const { data: before } = await supabase
+    // live-guard: getLead reads by id so the lead page can redirect a merged lead; updateLead / moveLeadStage / assignLead write by id and a merged lead's guard refusal is shown as LEAD_MERGED_WRITE (friendlyLeadWriteError / friendlyMoveStageError)
     .from("crm_lead")
     .select("current_stage_id")
     .eq("id", id)
@@ -337,6 +341,7 @@ export async function moveLeadStage(
   const now = new Date().toISOString();
   const enteredAt = usableEvidenceDate(evidenceAt, Date.parse(now));
   const { data, error } = await supabase
+    // live-guard: getLead reads by id so the lead page can redirect a merged lead; updateLead / moveLeadStage / assignLead write by id and a merged lead's guard refusal is shown as LEAD_MERGED_WRITE (friendlyLeadWriteError / friendlyMoveStageError)
     .from("crm_lead")
     .update({
       current_stage_id: stageId,
@@ -435,6 +440,7 @@ export async function assignLead(id: string, userId: string | null): Promise<Lea
   const supabase = await getScopedClient();
 
   const { data: before } = await supabase
+    // live-guard: getLead reads by id so the lead page can redirect a merged lead; updateLead / moveLeadStage / assignLead write by id and a merged lead's guard refusal is shown as LEAD_MERGED_WRITE (friendlyLeadWriteError / friendlyMoveStageError)
     .from("crm_lead")
     .select("assigned_to")
     .eq("id", id)
@@ -442,6 +448,7 @@ export async function assignLead(id: string, userId: string | null): Promise<Lea
   const fromUserId = before?.assigned_to ?? null;
 
   const { data, error } = await supabase
+    // live-guard: getLead reads by id so the lead page can redirect a merged lead; updateLead / moveLeadStage / assignLead write by id and a merged lead's guard refusal is shown as LEAD_MERGED_WRITE (friendlyLeadWriteError / friendlyMoveStageError)
     .from("crm_lead")
     .update({ assigned_to: userId })
     .eq("id", id)

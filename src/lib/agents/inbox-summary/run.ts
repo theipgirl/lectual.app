@@ -142,6 +142,7 @@ export async function runInboxSummary(ctx: AgentContext): Promise<AgentResult> {
   if (filedLeadIds.length > 0) {
     try {
       for (const batch of chunk(filedLeadIds, IN_CHUNK)) {
+        // live-guard: names leads for the digest (history: mail stays on a merged lead)
         const res = await admin.from("crm_lead").select("id, first_name, last_name, business_name").eq("org_id", orgId).in("id", batch);
         if (res.error) throw new Error("lead name lookup failed");
         for (const l of (res.data ?? []) as Array<{ id: string; first_name: string | null; last_name: string | null; business_name: string | null }>) {

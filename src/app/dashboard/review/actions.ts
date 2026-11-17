@@ -31,6 +31,7 @@ async function canWrite(kind: "matter" | "lead"): Promise<boolean> {
 /** The record must be visible to the caller's scoped client; another firm's id reads as missing. */
 async function recordVisible(kind: "matter" | "lead", id: string): Promise<boolean> {
   const supabase = await getScopedClient();
+  // live-guard: re-reads one record of a review card (built from live lists) before a write whose guard refusal is mapped to a fixed sentence
   const { data, error } = await supabase.from(kind === "matter" ? "crm_matter" : "crm_lead").select("id").eq("id", id).maybeSingle();
   if (error) throw error;
   return !!data;
@@ -122,6 +123,7 @@ export async function closeLeadAction(_prev: ReviewActionState, formData: FormDa
     const supabase = await getScopedClient();
     const role = await resolveCurrentRole(supabase);
     if (!CAN_MOVE_STAGE.includes(role) || !CAN_WRITE_LEAD.includes(role)) return { error: NO_PERMISSION };
+    // live-guard: re-reads one record of a review card (built from live lists) before a write whose guard refusal is mapped to a fixed sentence
     const { data: lead, error: leadErr } = await supabase.from("crm_lead").select("id, current_stage_id").eq("id", id).maybeSingle();
     if (leadErr) throw leadErr;
     if (!lead) return { error: NOT_FOUND };
@@ -239,6 +241,7 @@ export async function moveStageAction(_prev: ReviewActionState, formData: FormDa
       await updateMatterStage(id, stageId);
     } else {
       if (!CAN_MOVE_STAGE.includes(role) || !CAN_WRITE_LEAD.includes(role)) return { error: NO_PERMISSION };
+      // live-guard: re-reads one record of a review card (built from live lists) before a write whose guard refusal is mapped to a fixed sentence
       const { data: lead, error: leadErr } = await supabase.from("crm_lead").select("id, current_stage_id").eq("id", id).maybeSingle();
       if (leadErr) throw leadErr;
       if (!lead) return { error: NOT_FOUND };

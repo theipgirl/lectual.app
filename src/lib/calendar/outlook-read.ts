@@ -137,6 +137,7 @@ async function withLeadNames(events: OutlookCalendarEvent[]): Promise<TodayConsu
     try {
       const supabase = await getScopedClient();
       const { data, error } = await supabase
+        // live-guard: names the leads stored events point at; events move to the keeper in the merge
         .from("crm_lead")
         .select("id, first_name, last_name, business_name, email")
         .in("id", ids);

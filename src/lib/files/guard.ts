@@ -67,6 +67,7 @@ export async function authorize(
 export async function loadParentOrg(supabase: ScopedClient, parent: FileParentInput): Promise<{ ok: true; orgId: string } | Refusal> {
   const query =
     parent.kind === "lead"
+      // live-guard: checks the parent of a file; files stay on a merged lead and are read on the keeper
       ? supabase.from("crm_lead").select("id, org_id").eq("id", parent.id).maybeSingle()
       : supabase.from("crm_matter").select("id, org_id").eq("id", parent.id).maybeSingle();
   const { data, error } = await query;

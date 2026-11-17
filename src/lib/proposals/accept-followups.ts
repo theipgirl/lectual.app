@@ -201,6 +201,7 @@ export async function resolveNoteTarget(db: LookupDb, input: NoteTargetInput): P
       if (id) return { ok: true, notableType: "Prospect", notableId: id };
     }
     if (input.leadId) {
+      // live-guard: reads the Lawmatics id of a proposal's own lead (the record the note belongs to); the email match is live
       const { data, error } = await db.from("crm_lead").select("lawmatics_id").eq("id", input.leadId).eq("org_id", input.orgId).maybeSingle();
       if (error) return { ok: false, reason: "unreadable" };
       const id = lawmaticsIdOf(data);

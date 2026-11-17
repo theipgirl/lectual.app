@@ -123,6 +123,7 @@ export async function bulkMoveStageAction(leadIds: string[], stageId: string): P
       },
       readLeads: async (ids) => {
         const supabase = await getScopedClient();
+        // live-guard: bulk move re-reads the ticked (live) leads by id and moves each through moveLeadStage (refusal mapped); the compare panel reads two leads by id
         const { data, error } = await supabase.from("crm_lead").select("id, current_stage_id").in("id", ids);
         if (error) throw error;
         return data ?? [];
@@ -204,6 +205,7 @@ export async function loadCompareAction(leadId: string, otherId: string): Promis
     const result = await loadCompare(leadId, otherId, {
       readLead: async (id) => {
         const { data, error } = await db
+          // live-guard: bulk move re-reads the ticked (live) leads by id and moves each through moveLeadStage (refusal mapped); the compare panel reads two leads by id
           .from("crm_lead")
           .select("id, first_name, last_name, business_name, mark_text, email, referral_source, created_at, current_stage_id")
           .eq("id", id)

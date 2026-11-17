@@ -154,6 +154,7 @@ export async function linkLabels(leadIds: string[], matterIds: string[]): Promis
     const supabase = await getScopedClient();
     const [leads, matters] = await Promise.all([
       leadIds.length
+        // live-guard: names the leads stored meetings point at
         ? supabase.from("crm_lead").select("id, first_name, last_name, business_name, email").in("id", [...new Set(leadIds)].slice(0, 500))
         : Promise.resolve({ data: [], error: null }),
       matterIds.length

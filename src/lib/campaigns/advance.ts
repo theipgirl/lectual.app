@@ -66,6 +66,7 @@ async function loadLead(
   supabase: Awaited<ReturnType<typeof getScopedClient>>,
   leadId: string,
 ): Promise<Lead> {
+  // live-guard: reads an enrolled lead; enrollments move or are stopped in the merge
   const { data, error } = await supabase.from("crm_lead").select("*").eq("id", leadId).maybeSingle();
   if (error) throw error;
   if (!data) throw new CampaignAdvanceError("The enrolled lead could not be found.");

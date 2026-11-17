@@ -218,6 +218,7 @@ export async function syncFirm(admin: Admin, orgId: string, client: LawmaticsCli
 async function moveLead(admin: Admin, orgId: string, m: PlannedLeadMove, previousEnteredAt: string | null, stamp: string): Promise<"moved" | "stale" | "failed"> {
   try {
     const { data, error } = await admin
+      // live-guard: moves the lead the planner followed to the keeper, fenced on its stage
       .from("crm_lead")
       .update({ current_stage_id: m.toStageId, stage_entered_at: stamp, last_activity_at: stamp })
       .eq("id", m.leadId)
@@ -243,6 +244,7 @@ async function moveLead(admin: Admin, orgId: string, m: PlannedLeadMove, previou
     });
     if (logError) {
       await admin
+        // live-guard: moves the lead the planner followed to the keeper, fenced on its stage
         .from("crm_lead")
         .update(previousEnteredAt ? { current_stage_id: m.fromStageId, stage_entered_at: previousEnteredAt } : { current_stage_id: m.fromStageId })
         .eq("id", m.leadId)

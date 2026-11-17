@@ -99,6 +99,7 @@ export async function logActivity(input: LogActivityInput): Promise<void> {
   let orgId: string;
   if (input.leadId) {
     const { data, error } = await supabase
+      // live-guard: reads org_id to file a timeline row; a row on a merged lead is history read on the keeper, and the touch skips it (bumpLeadLastTouch is live)
       .from("crm_lead")
       .select("org_id")
       .eq("id", input.leadId)

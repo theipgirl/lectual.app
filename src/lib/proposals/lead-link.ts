@@ -17,6 +17,7 @@ export async function loadLeadLink(leadId: string | null): Promise<LeadLinkState
   try {
     const supabase = await getScopedClient();
     const { data, error } = await supabase
+      // live-guard: reads the lead a proposal is linked to (proposals stay on a merged lead)
       .from("crm_lead")
       .select("id, first_name, last_name, business_name, email")
       .eq("id", leadId)

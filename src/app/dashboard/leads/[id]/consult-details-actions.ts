@@ -36,6 +36,7 @@ export async function saveConsultDetailsAction(_prev: ConsultActionState, formDa
   if (!parsed.ok) return { error: parsed.error };
 
   const supabase = await getScopedClient();
+  // live-guard: checks the lead exists; consult notes move to the keeper in the merge
   const { data: lead, error: leadError } = await supabase.from("crm_lead").select("id").eq("id", leadId).maybeSingle();
   if (leadError) return { error: "Couldn't save the consult details. Try again shortly." };
   if (!lead) return { error: "Lead not found." };

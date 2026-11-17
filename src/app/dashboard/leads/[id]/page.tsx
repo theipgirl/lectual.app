@@ -127,8 +127,18 @@ export default async function LeadPage({
   const proposalCanWrite = CAN_WRITE_LEAD.includes(session.role) && PROPOSAL_STAFF_WRITE_ROLES.includes(session.role);
   const draftBlock = proposalRead && proposalCanWrite ? await loadDraftBlock() : null;
   const rows = activity ?? [];
-  // What a person can act on (suggestions, proposals from email) is this lead's own rows only.
-  const ownRows = rows.filter((r) => !r.lead_id || r.lead_id === id);
+  // What a person can act on (suggestions, proposals from email) is this lead's OWN rows only. With leads merged into
+  // it, they are read on their own, so the 100-row cap over the merged history can't push them out.
+  const ownRows = mergedIds.length
+    ? ((
+        await supabase
+          .from("crm_activity")
+          .select("id, lead_id, type, actor_type, created_at, payload")
+          .eq("lead_id", id)
+          .order("created_at", { ascending: false })
+          .limit(100)
+      ).data ?? [])
+    : rows;
   const voiceUrls = await voiceNotePlaybackUrls(rows);
 
   // Lane + next step (SOP Stage 2) and the lead's sequences (SOP rule 1).

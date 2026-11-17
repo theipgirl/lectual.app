@@ -122,6 +122,7 @@ export async function applyTag(
   const supabase = await getScopedClient();
 
   const { data: lead, error: leadError } = await supabase
+    // live-guard: reads org_id of a lead to tag it; tags are unioned onto the keeper in the merge
     .from("crm_lead")
     .select("org_id")
     .eq("id", leadId)

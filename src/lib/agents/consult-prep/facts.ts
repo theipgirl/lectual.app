@@ -63,6 +63,7 @@ const MISSING_TABLE = new Set(["PGRST205", "42P01"]);
 
 export async function readLeadFacts(admin: SupabaseClient, orgId: string, leadId: string): Promise<LeadFacts | null> {
   const { data, error } = await admin
+    // live-guard: reads the lead a calendar consult is linked to; calendar events move to the keeper in the merge
     .from("crm_lead")
     .select("id, first_name, last_name, business_name, email, phone, practice_area, mark_text, referral_source, referral_detail, current_stage_id")
     .eq("org_id", orgId)

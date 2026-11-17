@@ -76,6 +76,7 @@ export default async function MergeLeadsPage({ searchParams }: { searchParams: P
 
   const view = await loadMergeView(a, b, one(sp.keep), {
     lead: async (id) => {
+      // live-guard: the merge screen reads both leads with their pointer (merged_into_id is in its column list)
       const { data, error } = await loose.from("crm_lead").select(LEAD_COLUMNS).eq("id", id).maybeSingle();
       if (error) throw new Error("lead read failed");
       return (data as MergeLeadRow | null) ?? null;
