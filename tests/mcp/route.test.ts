@@ -86,7 +86,7 @@ describe("/api/mcp/", () => {
   it("no token or a bad one: 401 with the resource-metadata pointer", async () => {
     for (const res of [await POST(rpc("tools/list", {}, "")), await POST(rpc("tools/list", {}, "Bearer bad")), await GET(new Request("https://app.lectual.app/api/mcp/"))]) {
       expect(res.status).toBe(401);
-      expect(res.headers.get("www-authenticate")).toBe('Bearer resource_metadata="https://app.lectual.app/.well-known/oauth-protected-resource/api/mcp/"');
+      expect(res.headers.get("www-authenticate")).toBe('Bearer resource_metadata="https://app.lectual.app/.well-known/oauth-protected-resource/api/mcp"');
     }
     state.caller = null;
     expect((await POST(rpc("tools/list"))).status).toBe(401);

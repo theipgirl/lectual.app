@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { frameAncestors, frameTarget } from "@/lib/intake-forms/frame-policy";
 import { safeNext } from "@/lib/auth/safe-next";
 import { readFrameDomains } from "@/lib/intake-forms/frame-lookup";
+import { trailingSlashTarget } from "@/lib/site/trailing-slash";
 
 /**
  * Session refresh — the piece scoped-client.ts has always assumed existed.
@@ -22,6 +23,11 @@ import { readFrameDomains } from "@/lib/intake-forms/frame-lookup";
  * Security guide: Server Functions can fall outside a matcher).
  */
 export async function proxy(request: NextRequest): Promise<NextResponse> {
+  // next.config.ts skips Next's own trailing-slash redirect so `/api/mcp` can answer without one (Claude
+  // will not follow it). Everything else is redirected here exactly as before: 308, query kept.
+  const slashTarget = trailingSlashTarget(request.url);
+  if (slashTarget) return NextResponse.redirect(slashTarget, 308);
+
   // A magic-link code should land on /auth/callback/, but Supabase falls back
   // to the project's Site URL — "/" — whenever the requested redirect isn't
   // allowlisted. "/" is the marketing homepage and is statically prerendered,

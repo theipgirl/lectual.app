@@ -1621,6 +1621,11 @@ Lectual as a Claude connector at `https://<origin>/api/mcp/`, signed in through 
   `active_org_id` claim is decoded; the tool gate also refuses when that claim and the session's firm disagree.
 - **Every call:** token -> `resolveFirmSession` ok -> `claude-connector` -> the tool's gate (`src/lib/mcp/gate.ts`). Results begin with
   the firm's name. Logs are `[mcp] tool=<name> org=<id> outcome=<ok|refused|failed> ms=<n>`, never arguments or results.
+- **The address has NO trailing slash (2026-11-17).** Claude's "Add custom connector" dialog strips a typed slash and treated the 308 from `/api/mcp` as "Not found", so the connector URL
+  is `https://<origin>/api/mcp` and that path must answer directly. `next.config.ts` sets `skipTrailingSlashRedirect: true` and `src/proxy.ts` now does the trailing-slash redirect itself
+  (`src/lib/site/trailing-slash.ts`: 308, query kept; not for `/api/mcp`, `/.well-known/*`, `/_next/*` or a file with an extension), so every other path behaves as before. The redirect
+  target is a plain `URL`, never `NextURL.clone()`: Next re-formats a `NextURL` and drops the added slash, which made `/sign-in` redirect to itself. Discovery's `resource` and the 401's
+  `resource_metadata` are the slash-less forms; `/api/mcp/` and the slash form of the metadata path still answer. If you touch routing, re-run the curl matrix in the Sprint notes (a built `next start`).
 - **Not verified here:** a real Supabase OAuth server, a real Claude client, a browser. Phase 0 step 2 of the plan is still to do.
 
 ## Sprint 1: Editor: one screen, one Save (no schema)

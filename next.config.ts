@@ -5,6 +5,9 @@ const nextConfig: NextConfig = {
   // Matches lectual: the magic-link callback and every redirect in the ported
   // auth code are written with trailing slashes.
   trailingSlash: true,
+  // proxy.ts adds the trailing slash itself (src/lib/site/trailing-slash.ts), so `/api/mcp` can answer
+  // the Claude connector without a redirect. Same behaviour for every other path.
+  skipTrailingSlashRedirect: true,
   // The engagement letter's PDF builder reads its bundled font (DejaVu Sans) with fs from the project root. Next's file tracing
   // cannot see a path built at run time, so the font files are listed for the route whose server actions build the PDF
   // (the client proposal page); without this the serverless function ships without them and the PDF fails.

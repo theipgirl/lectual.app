@@ -2,13 +2,14 @@
  * OAuth protected-resource metadata (RFC 9728) for the Claude connector, and the 401 that points to
  * it. Pure: the site origin and the Supabase URL are passed in.
  *
- * Every URL is the trailing-slash form (next.config.ts sets `trailingSlash: true`, so `/api/mcp`
- * answers a redirect, and no client should have to follow one on a POST). Paths under
- * `/.well-known/` are exempt from Next's trailing-slash redirect in both directions, so the metadata
- * URL answers as written.
+ * Every URL is the form WITHOUT a trailing slash, which is what Claude's "Add custom connector" dialog
+ * keeps (it strips a typed slash) and what RFC 9728 expects the `resource` to equal. `/api/mcp` answers
+ * directly (next.config.ts skips Next's slash redirect and proxy.ts redirects every other path), the
+ * slash form `/api/mcp/` answers the same, and paths under `/.well-known/` are exempt from the slash
+ * redirect in both directions.
  */
-export const MCP_PATH = "/api/mcp/";
-export const METADATA_PATH = "/.well-known/oauth-protected-resource/api/mcp/";
+export const MCP_PATH = "/api/mcp";
+export const METADATA_PATH = "/.well-known/oauth-protected-resource/api/mcp";
 
 function trimSlash(value: string): string {
   return value.replace(/\/+$/, "");
