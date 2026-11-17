@@ -5,7 +5,7 @@ Owner's direction: **"we want Lectual to be the agentic IP OS."**
 **The test for every sprint:** an assistant does the work, and a person only approves.
 **Nothing in any sprint sends anything to a client.** Assistants draft. People approve. A person presses Send in their own mail client.
 
-This spec covers eight sprints (`sprint-1.md` to `sprint-8.md`), a ninth proposed sprint awaiting Taylor's "build it" (`sprint-9.md`, the lead page where Lectual does the step), and the open questions (`questions.md`, with Taylor's answers of Nov 17 at the end). It adds to `AGENTS.md`. It does not replace it. Where the two disagree, `AGENTS.md` and lectual's `brain/decisions.md` win until the owner changes them.
+This spec covers eight sprints (`sprint-1.md` to `sprint-8.md`), a ninth sprint (`sprint-9.md`, the lead page where Lectual does the step), a tenth approved by Taylor (`sprint-10.md`, editable cards on Intake and Matters and the opened card), and the open questions (`questions.md`, with Taylor's answers of Nov 17 at the end). It adds to `AGENTS.md`. It does not replace it. Where the two disagree, `AGENTS.md` and lectual's `brain/decisions.md` win until the owner changes them.
 
 ## Who is who
 
@@ -91,11 +91,11 @@ The rest (Sprints 1, 2, 4, 7, 8) is the ground these builds stand on: true stage
 | 0113 | 5 | Adobe Sign, as designed in `adobe-sign-design.md` (`adobe_sign_connection`, `client_proposal_esign_request`, the new `client_proposal_signature` columns, `client_proposal_adobe_complete`). That note calls it "0108" because it was written on its own; in sprint order it is 0113 | Yes |
 | 0114 | 8 | `crm_matter_stage.target_days` and `crm_billing_access` (who besides the owner sees billing) | Yes (access table depends on T6) |
 
-Renumbered on Nov 17 when Sprint 1 gained its migration (Taylor, Nov 17, T7). Sprints 6, 7 and 9 plan no migration. If one turns out to need one, it takes the next free number at that time and this table is updated. Numbers are first-merged-wins in lectual: if another branch takes a number first, renumber in order. The Stage 2 stage names and numbers are DATA, not a migration (see `sprint-2.md`).
+Renumbered on Nov 17 when Sprint 1 gained its migration (Taylor, Nov 17, T7). Sprints 6, 7, 9 and 10 plan no migration. If one turns out to need one, it takes the next free number at that time and this table is updated. Numbers are first-merged-wins in lectual: if another branch takes a number first, renumber in order. The Stage 2 stage names and numbers are DATA, not a migration (see `sprint-2.md`).
 
 ## Design rollout comes first
 
-The design rollout now running restyles most dashboard pages. **UI work in Sprints 1 to 9 starts only after it has merged.** Until then, only new files with no UI may start. Three pieces start now, as new files only (no edits to existing files, no imports from pages):
+The design rollout now running restyles most dashboard pages. **UI work in Sprints 1 to 10 starts only after it has merged.** (Sprint 10's Part 1, new files with no UI, may start now.) Until then, only new files with no UI may start. Three pieces start now, as new files only (no edits to existing files, no imports from pages):
 
 - **B1, USPTO status reader** in `src/lib/uspto/**`: a pure parser and a fetcher for one serial number's status, fixtures only, no key needed for tests. Feeds Sprint 3.
 - **B2, meeting-assistant reader** in `src/lib/meeting-assistant/**`: from an imported meeting and the firm's open matters, a pure function that proposes per-matter next step, owner and note (model call injected). Feeds Sprint 6.
@@ -119,7 +119,9 @@ Design rollout merges ─┬─ S1 (small)
                        ├─ S4 (medium; 0103 already on prod) ── S5 (large; B3; Adobe Sign; 0106 prod OK pending)
                        ├─ S6 (medium; B2 now)
                        ├─ S7 (medium; best after S4 so Rayn can clear the drafts)
-                       └─ S9 (proposed, NOT APPROVED; after S4 and S7, S5 for its signed/paid states)
+                       ├─ S9 (after S4 and S7, S5 for its signed/paid states; engine in src/lib/lead-step/, branch s9-engine)
+                       └─ S10 (approved: editable cards and the opened card; Part 1 now, new files only;
+                               Part 2 after the rollout; needs S9 Part 1's engine and S2's S2-2 for no-show)
 ```
 
 ## Out of scope for this plan

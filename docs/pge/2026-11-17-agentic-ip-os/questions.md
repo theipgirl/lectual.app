@@ -15,6 +15,10 @@ Only questions that only these people can answer. No answer is guessed in the co
 | T7 | Should admins see whether a colleague's **personal Outlook** is connected? Today RLS hides it from everyone else, so the accounts checklist can only say "Only Rayn can see this". Showing it needs a small schema change. | 1, 4 | The checklist says "Only <name> can see this" |
 | T10 | Sprint 9 (the lead page where Lectual does the step): **"build it"?** The contract is written and NOT approved. | 9 | Not started |
 | T11 | Stage plan S2-3: remove the thirteen old columns (copied from the matter list, zero leads) from the Intake board? | 2 | They stay |
+| T12 | Sprint 10 default: the card's **source** is picked from the firm's list only (no typed new source). Keep? | 10 | As stated |
+| T13 | Sprint 10 default: **Mark no-show** logs straight away with a 5-second Undo and an optional note (no reason asked first). Keep? | 10 | As stated |
+| T14 | Sprint 10 default: on phones the opened card is a **full-screen sheet** (not a ~90% bottom sheet). Keep? | 10 | As stated |
+| T15 | Sprint 10 default: a board card's **bottom line** shows owner, next step AND last activity (not only owner and next step). Keep? | 10 | As stated |
 | T8 | Approval routing (and the planned "drafts go to" setting) is stored in the Proposals settings row, so a firm without the Proposals feature can't save it. Is that acceptable for RPB, or should routing move to its own table? | 4 | Kept where it is; RPB has Proposals |
 
 ## Caitlyn (operations lead)
