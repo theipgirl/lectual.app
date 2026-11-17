@@ -20,6 +20,7 @@ import { ComposerTabs } from "@/components/leads/ComposerTabs";
 import { CollapsibleAside } from "@/components/leads/CollapsibleAside";
 import { needsAttention } from "@/lib/leads/needs-attention";
 import { LANE_LABEL } from "@/lib/leads/lane";
+import { temperaturePill } from "@/lib/intake/temperature-pill";
 import { AssignSelect, EditLeadForm, NoteComposer, ProposalCard, StageSelect } from "@/components/leads/LeadForms";
 import { LeadTags, PrepConsult } from "@/components/leads/LeadExtras";
 import { LeadMattersLine } from "@/components/leads/LeadMatters";
@@ -263,7 +264,7 @@ export default async function LeadPage({
 
       <LeadStatusRow
         stageName={stageName}
-        temperatureLabel={temperature.value ? LANE_LABEL[temperature.value] : null}
+        temperatureLabel={temperature.value ? (temperaturePill(temperature)?.text ?? LANE_LABEL[temperature.value]) : null}
         ownerName={ownerName}
         lastInboundAt={lead.last_inbound_at}
         now={renderedAt}

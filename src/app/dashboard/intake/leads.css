@@ -96,6 +96,8 @@
   .ix-sheet .sheet-tbl td:empty, .ix-sheet .sheet-tbl td.ix-asst-td:not(:has(.intake-agent-chip)) { display: none; }
   .ix-sheet .sheet-tbl td.ix-lead-td { display: block; text-align: left; }
   .ix-next { -webkit-line-clamp: 1; }
+  /* A stage with an "Awaiting approval" pill beside it sits at the right like every other value on the card. */
+  .ix-sheet .sheet-tbl.lx-stack td .ix-stage-line { flex: 1 1 auto; justify-content: flex-end; }
   /* The row's "..." sits beside the name at the top right of its card, not alone at the foot. */
   .ix-sheet .sheet-tbl.lx-stack tr { position: relative; }
   .ix-sheet .sheet-tbl td.ix-lead-td { padding-right: 52px; }

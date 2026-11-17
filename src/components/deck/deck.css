@@ -165,7 +165,9 @@ a.dk-move--open { font-size: var(--fs-3); }
 .dk-boardcard:hover .lx-board-card-title { text-decoration: underline; }
 .dk-boardcard:focus-visible { outline: 2px solid var(--ox); outline-offset: 2px; }
 /* An approval's headline is a sentence: it gets the card's whole width (two lines) and its chip sits on the line under it. */
-.dk-boardcard .lx-board-card-title { flex-basis: 100%; }
+.dk-boardcard .lx-board-card-title { flex-basis: 100%; -webkit-line-clamp: 3; }
+/* A time ("4:00 AM") is never split over two lines in the Approvals list. */
+.dk-tbl td[data-label="Queued"], .dk-tbl td[data-label="Deal"] { white-space: nowrap; }
 .dk-boardcard .lx-board-card-top > .lx-pill { margin-left: 0; }
 
 /* Decided / Handed off lists and the side column's Later section */
@@ -201,7 +203,10 @@ a.dk-move--open { font-size: var(--fs-3); }
 /* Phone: the left list and page head go; the zone loses its well and takes the width. */
 @media (max-width: 640px) {
   .dk-frame { gap: 12px; }
-  .dk-left { display: none; }
+  /* The left list goes; its page title stays and comes first ("Approvals"), above the switch and Deal new cards. */
+  .dk-left { order: -2; gap: 0; }
+  .dk-left > :not(.dk-pagehead),
+  .dk-left .dk-pagehead > :not(.lx-head-title) { display: none; }
   .dk-zone { border: 0; border-radius: 0; background: transparent; padding: 0; margin: 0; }
   .dk-zone-col { width: 100%; gap: 10px; }
   .dk-phone-switch { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }

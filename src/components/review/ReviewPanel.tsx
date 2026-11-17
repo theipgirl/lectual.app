@@ -7,6 +7,7 @@ import { deadlineIsSoon } from "@/lib/review/format";
 import { SNOOZE_CHOICES, SNOOZE_LABEL } from "@/lib/review/snooze";
 import { WAITING_LABEL } from "@/lib/review/waiting";
 import { TASK_TITLE_MAX } from "@/lib/matters/task-edit";
+import { stageDisplayName } from "@/lib/matters/list-view";
 import type { CloseStage } from "@/lib/review/close-stage";
 import type { OpenRef } from "@/lib/review/open";
 import {
@@ -260,7 +261,7 @@ export function ReviewPanel(props: PanelProps) {
               )}
               {detail.stages.options.map((o) => (
                 <option key={o.id} value={o.id}>
-                  {o.name}
+                  {stageDisplayName(o.name)}
                 </option>
               ))}
             </select>
