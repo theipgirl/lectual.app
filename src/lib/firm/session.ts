@@ -1,5 +1,5 @@
-import { signInRedirect } from "@/lib/auth/return-path";
 import "server-only";
+import { signInRedirect } from "@/lib/auth/return-path";
 import type { User } from "@supabase/supabase-js";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import type { Role } from "@/lib/auth/roles";

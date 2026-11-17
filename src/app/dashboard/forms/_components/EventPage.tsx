@@ -1,3 +1,4 @@
+import { SCORED_ASSESSMENT } from "@/lib/ui/words";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -44,7 +45,7 @@ export async function EventPage({ code, range, role, now = new Date() }: { code:
       </Link>
       <div className="lx-page-head">
         <div style={{ flex: 1, minWidth: 240 }}>
-          <div className="lx-label">Scored assessment</div>
+          <div className="lx-label">{SCORED_ASSESSMENT}</div>
           <h1 className="lx-h1">
             {eventDisplayName(code)}{" "}
             <span className="ev-name-code">{code}</span>
@@ -101,7 +102,7 @@ export async function EventPage({ code, range, role, now = new Date() }: { code:
         {read.value.capped && <p className="ifm-help">{`Numbers cover the latest ${EVENT_ROW_LIMIT.toLocaleString("en-US")} cards.`}</p>}
 
         <h2 className="ifm-title">Results</h2>
-        <AssessmentBlocks results={results} who={range === "all" ? "for this assessment" : `for this assessment in the last ${range} days`} />
+        <AssessmentBlocks results={results} who={range === "all" ? "" : `in the last ${range} days`} />
 
         <h2 className="ifm-title">Drop-off by question</h2>
         <div className="ifm-card ifr-block">

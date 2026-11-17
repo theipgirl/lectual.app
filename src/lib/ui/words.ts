@@ -731,3 +731,7 @@ export const MATTER_GROUP_EMPTY = (group: keyof typeof MATTER_GROUP_LABEL | "all
       ? "No contracts or one-offs match these filters."
       : `No matters in ${MATTER_GROUP_LABEL[group]} match these filters.`;
 export const MATTER_MOVED_TO = "Moved to";
+
+/** An assessment that is scored (the booth card or the firm's assessment page), on the Forms list, its results page and the lead's Answers card. */
+export const SCORED_ASSESSMENT = "Scored assessment";
+export const SCORED_ASSESSMENTS = "Scored assessments";

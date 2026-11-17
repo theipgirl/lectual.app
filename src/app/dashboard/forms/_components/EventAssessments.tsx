@@ -1,3 +1,4 @@
+import { SCORED_ASSESSMENT, SCORED_ASSESSMENTS, notReadyPlural } from "@/lib/ui/words";
 import Link from "next/link";
 import { eventDisplayName } from "@/lib/intake-forms/event-name";
 import "./event.css";
@@ -26,24 +27,24 @@ export function EventAssessments({ read, timeZone }: { read: Awaited<ReturnType<
   if (read.status === "unconfigured") {
     return (
       <p className="ifm-help">
-        Scored assessments aren&apos;t switched on for your firm yet. Lectual will turn them on.
+        {notReadyPlural(SCORED_ASSESSMENTS)}
       </p>
     );
   }
   if (read.status === "unavailable") {
     return (
       <div role="status" className="lx-banner lx-banner-warn" style={{ fontSize: 14 }}>
-        Scored assessments couldn&apos;t be loaded. Refresh to try again.
+        {`${SCORED_ASSESSMENTS} couldn't be loaded. Refresh to try again.`}
       </div>
     );
   }
   const events = eventSummaries(read.value.rows);
   if (events.length === 0) return null;
   return (
-    <section className="ifl-root ife-section" aria-label="Scored assessments">
+    <section className="ifl-root ife-section" aria-label={SCORED_ASSESSMENTS}>
       <div className="ife-head">
         <h2 className="lx-h2" style={{ fontSize: 23 }}>
-          Scored assessments
+          {SCORED_ASSESSMENTS}
         </h2>
         <span className="ifm-help">Taken on the firm&apos;s assessment page or at an event. Read-only, all time.</span>
       </div>
@@ -56,7 +57,7 @@ export function EventAssessments({ read, timeZone }: { read: Awaited<ReturnType<
                   {eventDisplayName(e.code)}
                 </Link>
                 <span className="ev-name-code">{e.code}</span>
-                <span className="ifl-kind">Scored assessment</span>
+                <span className="ifl-kind">{SCORED_ASSESSMENT}</span>
               </div>
             </div>
             <dl className="ifl-stats" aria-label={`${eventDisplayName(e.code)}, all time`}>

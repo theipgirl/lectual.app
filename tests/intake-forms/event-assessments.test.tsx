@@ -149,7 +149,7 @@ describe("event page (F16)", () => {
     expect(kpi("Completion rate")).toBe("66.7%");
     expect(kpi("Typical time (median)")).toBe("4 min");
     for (const heading of ["Score bands", "Hot, warm and cold", "Score distribution", "Most common gaps", "Drop-off by question"]) expect(html).toContain(`>${heading}<`);
-    expect(html).toContain("2 people finished for this assessment. 1 more gave contact details and didn't finish.");
+    expect(html).toContain("2 people finished. 1 more gave contact details and didn't finish.");
     // Option counts use the card's labels, with options nobody chose present.
     expect(html).toContain("Is your business name or logo federally registered?");
     expect(html).toContain("Application pending");

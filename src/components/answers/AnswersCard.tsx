@@ -1,3 +1,4 @@
+import { SCORED_ASSESSMENT, SCORED_ASSESSMENTS } from "@/lib/ui/words";
 import { FIRM_TIME_ZONE } from "@/lib/quotes/firm-time";
 import { formatIntakeTime } from "@/lib/intake-forms/performance";
 import { scoreLine, mergeAnswerItems, type AnswerItem, type ScoreSummary } from "@/lib/answers/items";
@@ -22,7 +23,7 @@ export const EMPTY_LINE = "No intake or assessment answers yet.";
 
 const SOURCES = [
   { key: "submissions", name: "Intake submissions" },
-  { key: "booth", name: "Scored assessments" },
+  { key: "booth", name: SCORED_ASSESSMENTS },
   { key: "requests", name: "Questions sent to the client" },
 ] as const;
 
@@ -92,7 +93,7 @@ function Item({ item, tz }: { item: AnswerItem; tz: string }) {
   const head =
     item.kind === "submission"
       ? `${item.formName} · ${item.formKind === "assessment" ? "Assessment" : "Intake"} · ${when} · ${state}`
-      : `Scored assessment · ${item.eventCode} · ${when} · ${state}`;
+      : `${SCORED_ASSESSMENT} · ${item.eventCode} · ${when} · ${state}`;
   return (
     <details className="lx-disclosure-inline" data-kind={item.kind}>
       <summary>{score ? `${head} · ${score}` : head}</summary>
