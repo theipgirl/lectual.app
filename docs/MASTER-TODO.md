@@ -9,10 +9,19 @@ Recap: `docs/recaps/2026-11-17-marketing-site-redesign-mockups.md`. Omi cross-ch
 (Oct 12); the related open Omi item "Develop a marketing strategy and roadmap" (Oct 1) is not covered by this work.
 
 ### Taylor
-- [ ] Open the three mockups on a laptop and a phone and pick one (or name the parts to combine):
+- [x] Open the three mockups and pick: chose Gate's motion and nav with First light's sky and time-change section (Nov 17).
       A First light https://claude.ai/artifact/7YunU3tNn613D93cxdd2VY ·
       B The docket https://claude.ai/artifact/UZ2SsTDCBJtVnEYEc4fMQH ·
       C The gate https://claude.ai/artifact/EpMgu2jw9oewyXftK7TaS8
+- [ ] Review the merged mockup on a laptop and a phone: Lectual Overnight https://claude.ai/artifact/3xGGg1wSviDdMgKmBvMXrY
+- [ ] Decide the overnight queue example: keep the office action / patent claim chart / copyright deposit rows (no drafting for these was
+      found in the product), or switch to what runs overnight today (inquiry scored, post-consult email and proposal drafted, consult prep,
+      stalled-lead follow-up, morning brief). Claude's recommendation: switch, so every row can be demoed.
+- [ ] Read and edit the six "In the workspace today" panels in the merged mockup (drafted by Claude from what is built), and confirm it is
+      fine to name Outlook, Zoom, Fathom, Lawmatics and LawPay on a public page.
+- [ ] Find a higher-resolution original of the home page sky time-lapse (the file on the site is 720 x 1280 and looks soft on a big screen).
+- [ ] Restate the unreadable comment on the Gate mockup ("jown our firms we wojrws").
+- [ ] Say whether the motion graphic on Gate's "Agents run whole matter workflows" section is enough or should be richer.
 - [ ] Say whether the redesign covers only `/firms/`, or also the front door (`/`, the dusk-sky page) and the founder side.
 - [ ] Decide Astro or Next.js. Claude's recommendation: stay on Next.js (reasons in the recap).
 - [ ] If A or C is chosen: OK a new entry in `lectual/brain/decisions.md` replacing 2026-08-03-01 (the marketing typefaces change).

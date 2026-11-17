@@ -42,6 +42,38 @@ screenshots and file before publishing. Two review fixes: mockup B's matter file
 another matter's draft and deadline, and its first screen now shows the lede and the button;
 mockup A's closing button no longer says "we'll be in touch".
 
+## Round two: Taylor's pick, the real sky, and the features question
+
+Taylor: "i like the motion and nav bar of gate but i like the background and time change section
+of first light", asked for a better sky "like the one we have for the home page", and asked
+whether the page shows the right features.
+
+- **Merged mockup "Lectual Overnight"**: https://claude.ai/artifact/3xGGg1wSviDdMgKmBvMXrY .
+  First light's page and overnight clock scene, Gate's loader (the gate opens), condensing pill
+  nav and motion, on the home page's real sky. The sky is 24 still frames taken from
+  `lectual/public/pathset/door-timelapse.mp4` (sunset to the Milky Way), drawn on a canvas:
+  sunset in the hero, darkening to the Milky Way as the clock runs to 4:26am, running back to
+  the sunset frame as sunrise by 8:30am, then fading to paper for the approval. The footage is
+  720 x 1280, so it is soft on a large monitor; a higher-resolution original would fix that.
+- **Features audit.** The live page's approval-queue example shows an office action response
+  drafted from firm precedent, a patent rejection with a claim chart and a copyright deposit. A
+  search of both repos found deadline tracking for office actions, Statements of Use and
+  renewals, but no drafting for any of those three. Built today and missing from the page:
+  intake forms (link, QR code, scored assessment, source tags), consult recordings to follow-up
+  email and proposal, the client proposal page with package choice and a signed engagement
+  letter, the weekly review, the assistants (morning brief, consult prep, inbox summary, stage
+  moves), Copilot, and the Outlook / Zoom / Fathom / Lawmatics / LawPay connections.
+- **In the merged mockup** the sideways pinned section now walks through six real features
+  (intake, consults, proposals, matters and deadlines, assistants and Copilot, approvals) with
+  copy drafted from what is built. The overnight queue example was left as it was: whether to
+  keep the office action / patent / copyright rows is Taylor's decision.
+- **Comments on the Gate mockup (answered in the artifact threads):** "remove the dot" (large
+  numbers now use the plain sans face, so the zero has no dot; the merged mockup follows the
+  same rule); "can we add a motion graphic animation here" on the "Agents run whole matter
+  workflows" section (added a looping graphic: a matter runs Intake, Draft, Docket, stops at the
+  Attorney gate on "Awaiting approval", turns "Approved ✓", then reaches Sent); one comment was
+  unreadable ("jown our firms we wojrws") and is waiting for Taylor to restate it.
+
 ## Recommendation on Astro (not decided)
 
 Stay on Next.js for this redesign. The loader, pin scrolling and micro-animations are the same
