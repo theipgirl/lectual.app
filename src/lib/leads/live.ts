@@ -121,7 +121,7 @@ export async function followMerged(start: string, read: (id: string) => Promise<
     }
     if (!row) return hop === 0 ? { status: "not-found" } : { status: "unavailable" };
     const next = typeof row.merged_into_id === "string" && row.merged_into_id ? row.merged_into_id : null;
-    if (!next) return { status: "ok", id: row.id, mergedFrom: row.id === start ? null : start };
+    if (!next) return { status: "ok", id, mergedFrom: id === start ? null : start };
     id = next;
   }
   return { status: "unavailable" };
