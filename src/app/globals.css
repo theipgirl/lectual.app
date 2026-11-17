@@ -851,7 +851,10 @@ select:not([multiple]):not([size]):disabled {
   border-top: 1px solid var(--line);
   padding-top: 12px;
   padding-right: 96px; /* room for Run now, which is laid over the footer */
+  flex-wrap: wrap;
 }
+/* The status sentence keeps a readable width; the pills drop under it instead of squeezing it. */
+.lx-agent-foot > .lx-note { flex-basis: 12em !important; min-width: 12em; }
 .lx-agent-slot-run {
   grid-area: foot;
   justify-self: end;
@@ -1942,7 +1945,7 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
   .lx-board { scroll-snap-type: x mandatory; }
   .lx-board-col { flex: 0 0 calc(100% - 28px); min-width: 0; scroll-snap-align: start; }
   .lx-page-head-list .lx-label { display: none; }
-  /* The sub-line wraps (up to three lines) instead of ending in "...". */
+  /* The sub-line wraps whole (the clamp of six is only a backstop) instead of ending in "...". */
   .lx-page-head .lx-sub,
   .lp-header .lp-sub {
     margin: 2px 0 0;
@@ -1951,7 +1954,7 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
     max-width: 100%;
     white-space: normal;
     display: -webkit-box;
-    -webkit-line-clamp: 3;
+    -webkit-line-clamp: 6;
     -webkit-box-orient: vertical;
     overflow: hidden;
     text-wrap: pretty;

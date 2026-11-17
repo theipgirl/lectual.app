@@ -106,7 +106,12 @@
   .ix-filters .lp-chips-end { margin-left: 0; }
   .intake-root .lp-header .lp-sub { white-space: normal; overflow: visible; text-overflow: clip; text-wrap: wrap; }
 }
-@media (pointer: coarse), (max-width: 640px) { .ix-cell-btn, button.ix-temp, .ix-pill-btn { min-height: 44px; } }
+@media (pointer: coarse), (max-width: 640px) {
+  .ix-cell-btn, .ix-pill-btn { min-height: 44px; }
+  /* The temperature pill keeps its normal height; the 44px tap area is an invisible layer around it. */
+  button.ix-temp { position: relative; }
+  button.ix-temp::after { content: ""; position: absolute; inset: -12px 0; }
+}
 
 .ix-sets > *, .ix-filters > * { flex: 0 0 auto; }
 

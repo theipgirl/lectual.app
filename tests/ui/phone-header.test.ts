@@ -26,8 +26,8 @@ describe("compact page tops under 640px (Sprint 34 B)", () => {
     expect(sizes.at(-1)).toBeLessThanOrEqual(24);
   });
 
-  it("the sub-line wraps (up to three lines, never an ellipsis), the title is never cut, the eyebrow is hidden and no gap is stacked", () => {
-    expect(globals).toMatch(/\.lx-page-head \.lx-sub[^{]*\{[^}]*white-space:\s*normal[^}]*-webkit-line-clamp:\s*3/);
+  it("the sub-line wraps (whole, six-line backstop, never an ellipsis), the title is never cut, the eyebrow is hidden and no gap is stacked", () => {
+    expect(globals).toMatch(/\.lx-page-head \.lx-sub[^{]*\{[^}]*white-space:\s*normal[^}]*-webkit-line-clamp:\s*6/);
     expect(globals).toMatch(/\.lp-header \.lp-sub[^{]*\{[^}]*white-space:\s*normal/);
     expect(globals).not.toMatch(/\.lx-page-head \.lx-sub[^{]*\{[^}]*text-overflow:\s*ellipsis/);
     // The phone header never truncates its title: no rule in the phone blocks gives the h1 nowrap or an ellipsis.
