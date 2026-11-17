@@ -1,10 +1,11 @@
 import { FILE_MESSAGES } from "@/lib/files/rules";
-import type { DocEntry, DocumentsRead } from "@/lib/files/read";
+import type { DocEntry } from "@/lib/files/read";
 import { civilDateIn } from "@/lib/review/build";
-import { DECK_DOC_MAX, PANEL_DOC_MAX, documentsCardHref, documentsView, entryHref, entryKindLabel } from "@/lib/review/documents";
+import { DECK_DOC_MAX, type RecordDocuments, PANEL_DOC_MAX, documentsCardHref, documentsView, entryHref, entryKindLabel } from "@/lib/review/documents";
 import { shortDate } from "@/lib/review/format";
 import type { OpenRef } from "@/lib/review/open";
-import { REVIEW_DOCS_COMMENT, REVIEW_DOCS_COMMENT_HINT, REVIEW_DOCS_EMPTY, REVIEW_DOCS_OPEN_ALL, REVIEW_DOCS_TITLE, reviewDocsMore } from "@/lib/ui/words";
+import { REVIEW_DOCS_COMMENT, REVIEW_DOCS_COMMENT_HINT, REVIEW_DOCS_EMPTY, REVIEW_DOCS_LOAD_FAILED, REVIEW_DOCS_OPEN_ALL, REVIEW_DOCS_TITLE, reviewDocsMore } from "@/lib/ui/words";
+import { MERGE_HISTORY_PARTIAL } from "@/lib/ui/words";
 import { FILES_ERROR_LINE, LETTERS_ERROR_LINE } from "@/components/files/DocumentsCard";
 import "./review.css";
 
@@ -22,6 +23,11 @@ function States({ view }: { view: ReturnType<typeof documentsView> }) {
       {view.lettersFailed && (
         <p className="lx-note" role="status" style={{ margin: 0 }}>
           {LETTERS_ERROR_LINE}
+        </p>
+      )}
+      {view.partial && (
+        <p className="lx-note" role="status" style={{ margin: 0 }}>
+          {MERGE_HISTORY_PARTIAL}
         </p>
       )}
       {view.filesNotSetUp && (
@@ -63,7 +69,7 @@ export function ReviewDocuments({
   canWrite,
 }: {
   open: OpenRef;
-  documents: DocumentsRead;
+  documents: RecordDocuments;
   members: Member[];
   today: string;
   timeZone: string;
@@ -85,7 +91,7 @@ export function ReviewDocuments({
       )}
       {view.more > 0 && (
         <p className="lx-note" style={{ margin: 0 }}>
-          {reviewDocsMore(view.more)}
+          {reviewDocsMore(view.more, view.capped)}
         </p>
       )}
       <p style={{ margin: 0, display: "flex", gap: 12, flexWrap: "wrap" }}>
@@ -104,11 +110,11 @@ export function ReviewDocuments({
 }
 
 /** The Cards deck's big card: up to three newest documents and "+N more". `read` is null when the read itself threw. */
-export function DeckDocuments({ read, members, today, timeZone }: { read: DocumentsRead | null; members: Member[]; today: string; timeZone: string }) {
+export function DeckDocuments({ read, members, today, timeZone }: { read: RecordDocuments | null; members: Member[]; today: string; timeZone: string }) {
   if (!read) {
     return (
       <p className="lx-note" role="status" style={{ margin: 0 }}>
-        {FILES_ERROR_LINE}
+        {REVIEW_DOCS_LOAD_FAILED}
       </p>
     );
   }
@@ -125,7 +131,7 @@ export function DeckDocuments({ read, members, today, timeZone }: { read: Docume
       )}
       {view.more > 0 && (
         <p className="lx-note" style={{ margin: 0 }}>
-          {reviewDocsMore(view.more)}
+          {reviewDocsMore(view.more, view.capped)}
         </p>
       )}
     </div>

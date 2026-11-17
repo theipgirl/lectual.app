@@ -75,6 +75,86 @@ describe("the documents reads (reusing loadDocumentsRead)", () => {
   });
 });
 
+describe("capped, merged leads, unreadable modules", () => {
+  const ok = { status: "ok" as const };
+  const lead2 = "77777777-7777-4777-8777-777777777777";
+  const mergedWorld = () =>
+    makeWorld({
+      tables: seedTables({
+        crm_lead: [
+          { id: LEAD, org_id: ORG, first_name: "K", last_name: "Keeper", merged_into_id: null },
+          { id: lead2, org_id: ORG, first_name: "M", last_name: "Merged", merged_into_id: LEAD },
+        ],
+        crm_file: [fileRow({ id: "own" }), fileRow({ id: "child", lead_id: lead2 }), fileRow({ id: "child2", lead_id: lead2 })],
+      }),
+    });
+
+  it("'+N or more' when a reader hit its cap, in the panel and the deck", async () => {
+    const files = Array.from({ length: 10 }, (_, i) => ({ id: `f${i}`, file_name: `n${i}.pdf`, mime: "x", size_bytes: 1, uploaded_by: null, created_at: `2026-10-${10 + i}T10:00:00Z` }));
+    const { ReviewDocuments, DeckDocuments } = await import("../../src/components/review/ReviewDocuments");
+    const read = { files: { ...ok, capped: true, files }, letters: null };
+    const panel = renderToStaticMarkup(<ReviewDocuments open={{ kind: "lead", id: LEAD }} documents={read as never} members={members} today={TODAY} timeZone="America/New_York" canWrite={false} />);
+    expect(panel).toContain("+2 or more");
+    expect(renderToStaticMarkup(<DeckDocuments read={read as never} members={members} today={TODAY} timeZone="America/New_York" />)).toContain("+7 or more");
+  });
+
+  it("a lead's panel lists the merged leads' files, as the lead page does", async () => {
+    const world = mergedWorld();
+    mockDb(world);
+    const { readRecordDocuments } = await import("../../src/lib/review/detail-load");
+    const r = await readRecordDocuments({ kind: "lead", id: LEAD });
+    expect(r.files.status === "ok" && r.files.files.map((f) => f.id).sort()).toEqual(["child", "child2", "own"]);
+    expect(r.mergedPartial).toBe(false);
+  });
+
+  it("an unreadable merged set lists the keeper's own and says the history is partial, never 'No documents yet.'", async () => {
+    const world = makeWorld();
+    world.db.fail("crm_lead", "select");
+    mockDb(world);
+    const { readRecordDocuments } = await import("../../src/lib/review/detail-load");
+    const r = await readRecordDocuments({ kind: "lead", id: LEAD });
+    expect(r.mergedPartial).toBe(true);
+    const { ReviewDocuments } = await import("../../src/components/review/ReviewDocuments");
+    const html = renderToStaticMarkup(<ReviewDocuments open={{ kind: "lead", id: LEAD }} documents={{ files: { ...ok, capped: false, files: [] }, letters: null, mergedPartial: true } as never} members={members} today={TODAY} timeZone="America/New_York" canWrite={false} />);
+    expect(html).toContain("History from merged leads couldn&#x27;t be loaded.");
+    expect(html).not.toContain("No documents yet.");
+  });
+
+  it("a keeper's count includes its merged leads' files", async () => {
+    const world = mergedWorld();
+    mockDb(world);
+    const { readDocumentCounts } = await import("../../src/lib/review/load");
+    const counts = await readDocumentCounts(world.client as never, [], [LEAD]);
+    expect(counts.get(`lead:${LEAD}`)).toBe(3);
+    expect(counts.has(`lead:${lead2}`)).toBe(false);
+  });
+
+  it("a failed merged read rejects the counts (no too-low number); a database without 0107 behaves as before", async () => {
+    const bad = mergedWorld();
+    bad.db.fail("crm_lead", "select");
+    mockDb(bad);
+    const { readDocumentCounts } = await import("../../src/lib/review/load");
+    await expect(readDocumentCounts(bad.client as never, [], [LEAD])).rejects.toThrow();
+    vi.resetModules();
+    const old = makeWorld({ tables: seedTables({ crm_file: [fileRow({ id: "own" })] }) });
+    old.db.fail("crm_lead", "select", { code: "42703", message: "column does not exist" });
+    mockDb(old);
+    const mod = await import("../../src/lib/review/load");
+    const live = await import("../../src/lib/leads/live");
+    live.resetLeadMergeSupport();
+    expect((await mod.readDocumentCounts(old.client as never, [], [LEAD])).get(`lead:${LEAD}`)).toBe(1);
+  });
+
+  it("an unreadable module list makes a matter's letters 'unavailable', so the sentence shows and not 'No documents yet.'", async () => {
+    mockDb(makeWorld(), null);
+    const { readRecordDocuments } = await import("../../src/lib/review/detail-load");
+    const r = await readRecordDocuments({ kind: "matter", id: MATTER });
+    expect(r.letters).toEqual({ status: "unavailable" });
+    const { documentsView } = await import("../../src/lib/review/documents");
+    expect(documentsView(r, null, 8)).toMatchObject({ lettersFailed: true, empty: false });
+  });
+});
+
 describe("documentsView states", () => {
   const ok = { status: "ok" as const, capped: false };
   it("empty only when every read worked and found nothing", async () => {
@@ -248,7 +328,7 @@ describe("the Cards deck's documents", () => {
   });
   it("three or fewer has no '+N more'; a failed read says so", async () => {
     expect(await render({ files: { ...ok, files: files.slice(0, 3) }, letters: null })).not.toContain("more");
-    expect(await render(null)).toContain("couldn&#x27;t be loaded");
+    expect(await render(null)).toContain("Documents couldn&#x27;t be loaded.");
   });
   it("the big card draws them for the current card", async () => {
     const { CardsDeck } = await import("../../src/components/review/CardsDeck");

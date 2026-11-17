@@ -12,6 +12,9 @@ import { reviewDocsCount } from "@/lib/ui/words";
 export const PANEL_DOC_MAX = 8;
 export const DECK_DOC_MAX = 3;
 
+/** The reads plus whether the merged leads' history (lectual 0107) could not be listed. */
+export type RecordDocuments = DocumentsRead & { mergedPartial?: boolean };
+
 export type DocumentsView = {
   /** Newest first, at most `max`. */
   shown: DocEntry[];
@@ -20,11 +23,15 @@ export type DocumentsView = {
   filesNotSetUp: boolean;
   filesFailed: boolean;
   lettersFailed: boolean;
+  /** A reader hit its cap (100 files / 100 letters): the count of the rest is a floor. */
+  capped: boolean;
+  /** Merged leads' files could not be listed: what is shown may be incomplete. */
+  partial: boolean;
   /** Every read worked and nothing was found. */
   empty: boolean;
 };
 
-export function documentsView(read: DocumentsRead, directory: Directory, max: number): DocumentsView {
+export function documentsView(read: RecordDocuments, directory: Directory, max: number): DocumentsView {
   const entries = buildEntries(read, directory);
   const everyReadWorked = read.files.status === "ok" && (read.letters === null || read.letters.status === "ok");
   return {
@@ -33,7 +40,9 @@ export function documentsView(read: DocumentsRead, directory: Directory, max: nu
     filesNotSetUp: read.files.status === "not-set-up",
     filesFailed: read.files.status === "unavailable",
     lettersFailed: read.letters?.status === "unavailable",
-    empty: everyReadWorked && entries.length === 0,
+    capped: (read.files.status === "ok" && read.files.capped) || (read.letters?.status === "ok" && read.letters.capped),
+    partial: !!read.mergedPartial,
+    empty: everyReadWorked && !read.mergedPartial && entries.length === 0,
   };
 }
 

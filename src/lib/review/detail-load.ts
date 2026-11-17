@@ -1,8 +1,10 @@
 import "server-only";
 import { getScopedClient } from "@/lib/db/scoped-client";
-import { loadDocumentsRead, type DocumentsRead } from "@/lib/files/read";
+import { loadDocumentsRead } from "@/lib/files/read";
+import { mergedSetFor } from "@/lib/leads/live";
+import type { RecordDocuments } from "./documents";
 import { listMatterStages } from "@/lib/matters/stages";
-import { orgHasModule } from "@/lib/org/modules";
+import { activeOrgModulesOrNull } from "@/lib/org/modules";
 import { listStages } from "@/lib/pipeline/stages";
 import { ACTIVITY_LIMIT, clipNote, leadStageChoices, type ActivityIn, type StageOption } from "./detail";
 import type { OpenRef } from "./open";
@@ -24,7 +26,7 @@ export type DetailLoad =
       activity: { ok: true; items: ActivityIn[] } | { ok: false };
       stages: { ok: true; options: StageOption[] } | { ok: false };
       /** The record's stored files and (matter, Document Center firms) generated letters, each read reporting its own state. */
-      documents: DocumentsRead;
+      documents: RecordDocuments;
     }
   | { status: "missing" }
   | { status: "unavailable" };
@@ -102,13 +104,37 @@ export async function loadLatestNote(ref: OpenRef): Promise<LatestNote> {
 }
 
 /**
- * The record's own documents through the existing Documents & files loader (no second reader of crm_file). A
- * matter also lists its generated letters, as a separate read, only for a firm with Document Center (an unreadable
- * module list fails closed, as the matter page does). Never throws: `loadDocumentsRead` reports each state itself.
+ * The record's documents through the existing Documents & files loader (no second reader of crm_file). A matter
+ * also lists its generated letters, as a separate read, only for a firm with Document Center; an UNREADABLE module
+ * list makes the letters read "unavailable" (never "none", never "No documents yet."). A lead lists its own files
+ * plus those of leads merged into it, as the lead page does (`mergedSetFor`); when that set can't be read the
+ * keeper's own files are listed and `mergedPartial` says so. Never throws.
  */
-export async function readRecordDocuments(ref: OpenRef): Promise<DocumentsRead> {
-  const includeLetters = ref.kind === "matter" ? await orgHasModule("document-center").catch(() => false) : false;
-  return loadDocumentsRead({ kind: ref.kind, id: ref.id }, { includeLetters });
+export async function readRecordDocuments(ref: OpenRef): Promise<RecordDocuments> {
+  let includeLetters = false;
+  let modulesUnreadable = false;
+  if (ref.kind === "matter") {
+    try {
+      const modules = await activeOrgModulesOrNull();
+      if (modules === null) modulesUnreadable = true;
+      else includeLetters = modules.includes("document-center");
+    } catch {
+      modulesUnreadable = true;
+    }
+  }
+  let mergedIds: string[] = [];
+  let mergedPartial = false;
+  if (ref.kind === "lead") {
+    try {
+      const set = await mergedSetFor(await getScopedClient(), ref.id);
+      mergedIds = set.ids.filter((x) => x !== ref.id);
+      mergedPartial = set.status === "unavailable";
+    } catch {
+      mergedPartial = true;
+    }
+  }
+  const read = await loadDocumentsRead({ kind: ref.kind, id: ref.id, mergedIds }, { includeLetters });
+  return { ...read, letters: modulesUnreadable ? { status: "unavailable" } : read.letters, mergedPartial };
 }
 
 /**
@@ -116,7 +142,7 @@ export async function readRecordDocuments(ref: OpenRef): Promise<DocumentsRead> 
  * read for one record, up to 100 files and 100 letters, of which the card draws three), not a read per card.
  * `ok: false` is a read that threw; the loader's own per-source failures ride inside `read`.
  */
-export type DeckDocuments = { ok: true; read: DocumentsRead } | { ok: false };
+export type DeckDocuments = { ok: true; read: RecordDocuments } | { ok: false };
 
 export async function loadDeckDocuments(ref: OpenRef): Promise<DeckDocuments> {
   try {

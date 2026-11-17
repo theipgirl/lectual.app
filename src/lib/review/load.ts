@@ -1,6 +1,7 @@
 import "server-only";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { countFilesByParent, countLettersByMatter } from "@/lib/files/read";
+import { leadRead } from "@/lib/leads/live";
 import { activeOrgModulesOrNull } from "@/lib/org/modules";
 import type { Database } from "@/lib/db/types";
 import { listMatters } from "@/lib/matters";
@@ -149,6 +150,29 @@ export async function readLastStageChange(db: ScopedClient, leadIds: readonly st
 }
 
 /**
+ * child lead id -> keeper id, for the leads merged into any of `leadIds`: one batched read per chunk through the live-leads
+ * helper (before 0107 there is no pointer and nothing is merged). Any failure, or a read that may have hit PostgREST's
+ * 1000-row cap, rejects: a keeper's count must never be too low, so the caller draws no tag and names "documents".
+ */
+async function readMergedChildren(db: ScopedClient, leadIds: readonly string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  await Promise.all(
+    chunks(leadIds).map(async (chunk) => {
+      const result = await leadRead<{ data: unknown; error: unknown }>((kit) => {
+        if (!kit.merged) return Promise.resolve({ data: [], error: null });
+        // live-guard: the live-leads helper itself reads the merge pointer
+        return db.from("crm_lead").select("id, merged_into_id").in("merged_into_id", [...chunk]).limit(PAGE);
+      });
+      if (result.error) throw new Error("merged read failed");
+      const rows = (result.data ?? []) as { id: string; merged_into_id: string | null }[];
+      if (rows.length >= PAGE) throw new Error("merged read may be cut short");
+      for (const r of rows) if (r.merged_into_id) out.set(r.id, r.merged_into_id);
+    }),
+  );
+  return out;
+}
+
+/**
  * Documents per record: stored files (lead and matter) plus, for a matter in a firm with Document Center, its
  * generated letters. One batched read per chunk of ids and table, never one per record. Keys are `kind:id`; a record
  * with none has no key. Any failed read, or a module list that cannot be read (the letters would be uncounted),
@@ -167,9 +191,18 @@ export async function readDocumentCounts(db: ScopedClient, matterIds: readonly s
     return [files, letters];
   });
   const leadParts = chunks(leadIds).map((chunk) => countFilesByParent(db, "lead", chunk));
-  const [matterDone, leadDone] = await Promise.all([Promise.all(matterParts), Promise.all(leadParts)]);
+  // Leads merged into these keep their files on themselves (lectual 0107); the keeper's count includes them, as its page lists them.
+  const mergedChildren = await readMergedChildren(db, leadIds);
+  const childParts = chunks([...mergedChildren.keys()]).map((chunk) => countFilesByParent(db, "lead", chunk));
+  const [matterDone, leadDone, childDone] = await Promise.all([Promise.all(matterParts), Promise.all(leadParts), Promise.all(childParts)]);
   add("matter", matterDone.flat());
   add("lead", leadDone);
+  for (const part of childDone) {
+    for (const [childId, n] of part) {
+      const keeper = mergedChildren.get(childId);
+      if (keeper) counts.set(`lead:${keeper}`, (counts.get(`lead:${keeper}`) ?? 0) + n);
+    }
+  }
   return counts;
 }
 

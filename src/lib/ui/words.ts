@@ -888,5 +888,6 @@ export const REVIEW_DOCS_OPEN_ALL = "Open all documents";
 export const REVIEW_DOCS_COMMENT = "Comment on a document";
 export const REVIEW_DOCS_COMMENT_HINT = "Your comment is added to the timeline.";
 export const REVIEW_DOCS_OPEN = "Open";
-export const reviewDocsMore = (n: number) => `+${n} more`;
+export const reviewDocsMore = (n: number, capped = false) => (capped ? `+${n} or more` : `+${n} more`);
+export const REVIEW_DOCS_LOAD_FAILED = "Documents couldn't be loaded.";
 export const reviewDocsCount = (n: number) => `${n} ${n === 1 ? "document" : "documents"}`;
