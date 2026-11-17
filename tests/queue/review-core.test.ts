@@ -111,6 +111,15 @@ describe("runQueueReview: refusals are the action's own", () => {
     expect(state.save).not.toHaveBeenCalled();
   });
 
+  it("a Yes on a CHECK FIRST card is still refused when the linked-proposal gate refuses (the server is authoritative)", async () => {
+    state.item = { ...(state.item as object), summary: "CHECK FIRST: the fee quoted" };
+    state.gate.mockResolvedValue({ ok: false, error: "Create the proposal's link first." });
+    expect(await runQueueReview({ id: "q1", intent: "approve", body: "Hi\n\nBest,\nThe Team" })).toEqual({ kind: "error", error: "Create the proposal's link first." });
+    expect(state.gate).toHaveBeenCalledWith("q1");
+    expect(state.save).not.toHaveBeenCalled();
+    expect(state.resolve).not.toHaveBeenCalled();
+  });
+
   it("a draft with a banner is refused by approvalBlock", async () => {
     state.item = qitem({ draft_body: "DRAFT — FOR ATTORNEY REVIEW. NOT SENT.\nHi\n\nBest,\nThe Team" });
     const r = await runQueueReview({ id: "q1", intent: "approve" });

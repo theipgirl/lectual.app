@@ -97,9 +97,13 @@ async function closerLookFlags(items: readonly QueueItem[]): Promise<Record<stri
     items.slice(0, FLAG_CHECK_LIMIT).map(async (item) => {
       const [stale, gate] = await Promise.all([
         checkDraftStaleness(item).then(stalenessRequiresConfirm, () => true),
-        gateLinkedProposal(item.id).then((g) => !g.ok, () => true),
+        // Three outcomes: passed with a real linked proposal, refused, or unreadable. Only the first is a pass.
+        gateLinkedProposal(item.id).then(
+          (g) => ({ failed: !g.ok, passedWithProposal: g.ok && g.proposal !== null }),
+          () => ({ failed: true, passedWithProposal: false }),
+        ),
       ]);
-      out[item.id] = { stale, linkedProposal: gate };
+      out[item.id] = { stale, linkedProposal: gate.failed, linkedProposalPassed: gate.passedWithProposal };
     }),
   );
   // Beyond the limit nothing was checked, so those cards go to the full page rather than offering a Yes.

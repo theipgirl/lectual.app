@@ -136,7 +136,16 @@ export function cardTag(item: QueueItem): CardTag {
 }
 
 /** Facts the page loader reads on the server, per item, that the pure deal cannot: a stale draft, a linked-proposal gate. */
-export type CloserLookFlags = { stale?: boolean; linkedProposal?: boolean };
+export type CloserLookFlags = {
+  stale?: boolean;
+  /** The linked-proposal gate refused, or could not be read. */
+  linkedProposal?: boolean;
+  /**
+   * The gate DEFINITELY passed for a real linked proposal (a named approver saved it and its link is on). Absent, false or
+   * unknown all mean "not passed": only this exact `true` lets a CHECK FIRST line stop forcing "Open to review".
+   */
+  linkedProposalPassed?: boolean;
+};
 
 export type CloserReason = "check-first" | "draft-issue" | "stale" | "linked-proposal";
 
@@ -157,7 +166,10 @@ export type DeckCard = {
 
 export function needsCloserLook(item: QueueItem, audit: Omit<AuditContext, "type"> | null, flags: CloserLookFlags | undefined): CloserReason[] {
   const reasons: CloserReason[] = [];
-  if (parseReviewerSummary(item.summary).some((s) => s.checkFirst)) reasons.push("check-first");
+  // A CHECK FIRST line is waived ONLY for an item whose linked proposal definitely passed the gate (and the gate has not
+  // also said no). Stale, draft-issue and a failed gate are never waived.
+  const checkFirstWaived = flags?.linkedProposalPassed === true && !flags.linkedProposal;
+  if (!checkFirstWaived && parseReviewerSummary(item.summary).some((s) => s.checkFirst)) reasons.push("check-first");
   if (audit && approvalBlock(auditDraft(item.final_body ?? item.draft_body, { type: item.type, ...audit }))) reasons.push("draft-issue");
   if (flags?.stale) reasons.push("stale");
   if (flags?.linkedProposal) reasons.push("linked-proposal");
