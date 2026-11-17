@@ -106,6 +106,7 @@ export async function resolveBatch(db: StopDb, items: QueueItem[]): Promise<Map<
     const rows: Record<string, unknown>[] = [];
     for (const part of chunks(all)) {
       // A merged lead (lectual 0107) is never the lead an item is about: its old address is FOLLOWED to its keeper.
+      // live-guard: reads merged leads WITH their pointer and maps each to its keeper (keeperIdOf)
       const { data, error } = await leadRead(({ merged }) => db.from("crm_lead").select(merged ? "id, email, merged_into_id" : "id, email").in("email", part));
       if (error) throw new Error(error.message ?? "crm_lead read failed");
       rows.push(...rowsOf(data));

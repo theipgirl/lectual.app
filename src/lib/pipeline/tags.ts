@@ -1,6 +1,7 @@
 import { getScopedClient } from "@/lib/db/scoped-client";
 import type { Database } from "@/lib/db/types";
 import { logActivitySafe } from "@/lib/matters";
+import { keeperForWrite } from "@/lib/leads/live";
 
 export type Tag = Database["public"]["Tables"]["crm_tag"]["Row"];
 type TagSource = Database["public"]["Enums"]["crm_tag_source"];
@@ -115,14 +116,16 @@ export function groupTagsByLead(
  * lead's real org.
  */
 export async function applyTag(
-  leadId: string,
+  givenLeadId: string,
   tagId: string,
   opts: { source?: "auto" | "ai" | "human"; confidence?: number; needsReview?: boolean } = {},
 ): Promise<void> {
   const supabase = await getScopedClient();
+  // A page opened before a merge (lectual 0107) tags the KEEPER; an unreadable pointer refuses with a fixed sentence.
+  const leadId = await keeperForWrite(supabase, givenLeadId);
 
   const { data: lead, error: leadError } = await supabase
-    // live-guard: reads org_id of a lead to tag it; tags are unioned onto the keeper in the merge
+    // live-guard: a merged lead id was followed to its keeper by keeperForWrite just above
     .from("crm_lead")
     .select("org_id")
     .eq("id", leadId)

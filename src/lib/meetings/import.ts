@@ -188,6 +188,7 @@ export function adminMeetingStore(admin: SupabaseClient): MeetingStore {
       const read: MergePointer[] = [];
       for (let from = 0; from < 20_000; from += 1000) {
         const { data, error } = await leadRead(({ merged }) =>
+          // live-guard: reads merged leads WITH their pointer and folds them onto the keeper (foldMergedLeads)
           admin.from("crm_lead").select(merged ? "id, email, merged_into_id" : "id, email").eq("org_id", orgId).not("email", "is", null).range(from, from + 999),
         );
         if (error) throw new Error(`lead read failed: ${error.message}`);

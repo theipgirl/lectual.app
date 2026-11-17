@@ -49,7 +49,7 @@ import { TemperatureCard } from "@/components/leads/TemperatureCard";
 import { WaitingOnRebecca } from "@/components/leads/WaitingOnRebecca";
 import { ConsultBookedView } from "@/components/calendar/ConsultBookedLine";
 import { recordPageTitle } from "@/lib/ui/page-title";
-import { AUTOMATIC_STAGE_MOVES, FIRST_READ, FROM_THEIR_EMAILS, INTAKE_NAME, LEAD_MERGED_INTO, MERGE_DONE, MERGE_HISTORY_PARTIAL } from "@/lib/ui/words";
+import { AUTOMATIC_STAGE_MOVES, FIRST_READ, FROM_THEIR_EMAILS, INTAKE_NAME, LEAD_MERGED_INTO, MERGE_DONE, MERGE_HISTORY_PARTIAL, MERGE_OWN_ROWS_UNAVAILABLE } from "@/lib/ui/words";
 import { mergedSetFor, resolveLeadId } from "@/lib/leads/live";
 import { mergeNotice, mergedFromRedirect } from "@/lib/leads/merge-links";
 import { loadBookedConsult } from "@/lib/calendar/outlook-read";
@@ -129,16 +129,21 @@ export default async function LeadPage({
   const rows = activity ?? [];
   // What a person can act on (suggestions, proposals from email) is this lead's OWN rows only. With leads merged into
   // it, they are read on their own, so the 100-row cap over the merged history can't push them out.
-  const ownRows = mergedIds.length
-    ? ((
-        await supabase
-          .from("crm_activity")
-          .select("id, lead_id, type, actor_type, created_at, payload")
-          .eq("lead_id", id)
-          .order("created_at", { ascending: false })
-          .limit(100)
-      ).data ?? [])
+  const ownRead = mergedIds.length
+    ? await supabase
+        .from("crm_activity")
+        .select("id, lead_id, type, actor_type, created_at, payload")
+        .eq("lead_id", id)
+        .order("created_at", { ascending: false })
+        .limit(100)
+        .then(
+          (r) => (r.error ? null : (r.data ?? [])),
+          () => null,
+        )
     : rows;
+  // Three states: rows, none, or couldn't be read (said on the page, never shown as "nothing waiting").
+  const ownRowsFailed = ownRead === null;
+  const ownRows = ownRead ?? [];
   const voiceUrls = await voiceNotePlaybackUrls(rows);
 
   // Lane + next step (SOP Stage 2) and the lead's sequences (SOP rule 1).
@@ -233,6 +238,11 @@ export default async function LeadPage({
       {notice && (
         <p className="lx-note" role="status">
           {notice === "merged" ? MERGE_DONE : LEAD_MERGED_INTO(name)}
+        </p>
+      )}
+      {ownRowsFailed && (
+        <p className="lx-note" role="status">
+          {MERGE_OWN_ROWS_UNAVAILABLE}
         </p>
       )}
       {mergedSet.status === "unavailable" && (

@@ -8,7 +8,6 @@ import { guardOffenders, scanForLeadTable } from "./live-guard-scan";
  * reason. Every occurrence of the table name as a string ("crm_lead": `.from("crm_lead")`, `readIn("crm_lead", …)`,
  * `from(x ? … : "crm_lead")`) passes only when:
  *   - it is wrapped in `live(...)` (src/lib/leads/live.ts), or
- *   - its statement names `merged_into_id` / the `merged` flag (it reads the pointer and follows or skips it), or
  *   - its statement is an insert (a new lead is never merged), or
  *   - a `// live-guard: <reason>` comment sits on its line or in the three lines above it.
  * A new list read uses `live(...)`; anything else says why it may see a merged lead.
@@ -18,16 +17,18 @@ const ROOT = path.resolve(__dirname, "../..");
 function walk(dir: string, out: string[] = []): string[] {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
     const p = path.join(dir, e.name);
-    if (e.isDirectory()) walk(p, out);
-    else if (/\.(ts|tsx)$/.test(e.name)) out.push(p);
+    if (e.isDirectory()) {
+      if (e.name !== "node_modules" && e.name !== "out") walk(p, out);
+    }
+    else if (/\.(ts|tsx|mts|mjs|js)$/.test(e.name)) out.push(p);
   }
   return out;
 }
 
 describe("crm_lead reads and writes respect merged leads (M5)", () => {
-  it("every occurrence in src is live(...), follows the pointer, is an insert, or carries a live-guard reason", () => {
+  it("every occurrence in src and scripts is live(...), an insert, or carries a live-guard reason", () => {
     const bad: string[] = [];
-    for (const file of walk(path.join(ROOT, "src"))) {
+    for (const file of [...walk(path.join(ROOT, "src")), ...walk(path.join(ROOT, "scripts"))]) {
       const rel = path.relative(ROOT, file).split(path.sep).join("/");
       if (rel === "src/lib/db/types.ts") continue;
       for (const line of guardOffenders(fs.readFileSync(file, "utf8"))) bad.push(`${rel}:${line}`);
@@ -52,9 +53,15 @@ describe("the guard itself", () => {
     expect(offenders(`const rows = await readIn("crm_lead", cols, "id", ids);`)).toEqual([1]);
     expect(offenders(`const q = db.from(kind === "matter" ? "crm_matter" : "crm_lead").select("id");`)).toEqual([1]);
   });
-  it("passes live(...), the pointer, an insert and a marked line", () => {
+  it("catches single quotes and template literals too", () => {
+    expect(offenders(`const { data } = await db.from('crm_lead').select('*');`)).toEqual([1]);
+    expect(offenders("const { data } = await db.from(`crm_lead`).select('*');")).toEqual([1]);
+  });
+  it("naming merged_into_id alone is not enough: it needs the live filter or a marker", () => {
+    expect(offenders(`await db.from("crm_lead").select("id, merged_into_id").eq("id", x);`)).toEqual([1]);
+  });
+  it("passes live(...), an insert and a marked line", () => {
     expect(offenders(`await leadRead(({ live }) => live(db.from("crm_lead").select("*")));`)).toEqual([]);
-    expect(offenders(`await db.from("crm_lead").select("id, merged_into_id").eq("id", x);`)).toEqual([]);
     expect(offenders(`await db.from("crm_lead").insert({ a: 1 });`)).toEqual([]);
     expect(offenders(`// live-guard: reads the page's own lead by id, which redirects a merged one\nawait db.from("crm_lead").select("id").eq("id", x);`)).toEqual([]);
     expect(offenders(`await db.from("crm_lead").select("id").eq("id", x); // live-guard: the page's own lead, redirected when merged`)).toEqual([]);
@@ -63,7 +70,10 @@ describe("the guard itself", () => {
     expect(offenders(`// live-guard:\nawait db.from("crm_lead").select("id");`)).toEqual([2]);
     expect(offenders(`// live-guard: a reason long enough\n\n\n\nawait db.from("crm_lead").select("id");`)).toEqual([5]);
   });
+  it("scans scripts/ as well", () => {
+    expect(fs.readFileSync(path.join(ROOT, "scripts/seed-demo-firm.mts"), "utf8")).toMatch(/live-guard:/);
+  });
   it("ignores type references and comments", () => {
-    expect(scanForLeadTable(`type Lead = Database["public"]["Tables"]["crm_lead"]["Row"];\n// from("crm_lead") in a comment`)).toEqual([]);
+    expect(scanForLeadTable(`type Lead = Database["public"]["Tables"]["crm_lead"]["Row"];\n// from("crm_lead") in a comment\n * the \`crm_lead\` table, in a doc comment`)).toEqual([]);
   });
 });

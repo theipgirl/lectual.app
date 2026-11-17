@@ -868,3 +868,11 @@ export const MERGE_REFUSALS = {
 export const MERGE_FAILED = "Couldn't merge these leads. Try again.";
 /** An automation rule whose lead can no longer be found. */
 export const MERGE_RULE_LEAD_GONE = "The lead couldn't be found.";
+/** An agent run that found a lead merged between its read and its write (counted, never an error). */
+export const MERGE_AGENT_SKIPPED = (n: number) => `${n} ${n === 1 ? "lead was" : "leads were"} skipped: merged into another lead.`;
+/** A write from a page opened before a merge, when the merged lead's pointer can't be read: nothing is written. */
+export const MERGE_POINTER_UNREADABLE = "This lead couldn't be checked just now, so nothing was saved. Refresh and try again.";
+/** An automation rule whose lead couldn't be read (a failed read, not a merge). */
+export const MERGE_RULE_LEAD_UNREADABLE = "The lead couldn't be read, so this action was skipped.";
+/** The lead page when its own timeline rows (suggestions, proposals from email) couldn't be read. */
+export const MERGE_OWN_ROWS_UNAVAILABLE = "Suggestions and proposals from email couldn't be loaded. Refresh to try again.";

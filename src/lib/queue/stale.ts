@@ -102,6 +102,7 @@ async function resolveLeads(
   const addresses = recipientAddresses(item.recipient);
   if (addresses) {
     // A merged lead's old address (lectual 0107) still warns, and links to its KEEPER.
+    // live-guard: reads merged leads WITH their pointer and maps each to its keeper (keeperIdOf)
     const { data, error } = await leadRead(({ merged }) => db.from("crm_lead").select(merged ? "id, merged_into_id" : "id").in("email", addresses));
     if (error) return "failed";
     const ids = [...new Set(rowsOf(data).map(keeperIdOf).filter((v): v is string => !!v))].slice(0, MAX_RECIPIENT_LEADS);

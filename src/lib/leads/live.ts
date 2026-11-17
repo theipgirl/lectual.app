@@ -1,3 +1,6 @@
+import { ReadableError } from "@/lib/ui/readable-error";
+import { MERGE_POINTER_UNREADABLE } from "@/lib/ui/words";
+
 /**
  * Live leads (M5, lectual 0107). A lead is MERGED when `crm_lead.merged_into_id` is set: it stays in the
  * database (its timeline, files, proposals and quotes stay on it) but it is no longer a lead anyone works.
@@ -210,6 +213,7 @@ export async function resolveLeadId(db: unknown, id: string, orgId?: string | nu
   const client = asDb(db);
   return followMerged(id, async (current) => {
     const result = await leadRead(({ merged }) => {
+      // live-guard: the live-leads helper itself reads the merge pointer
       const q = client.from("crm_lead").select(merged ? "id, merged_into_id" : "id").eq("id", current);
       return (orgId ? q.eq("org_id", orgId) : q).maybeSingle();
     });
@@ -233,6 +237,7 @@ export async function mergedSetFor(db: unknown, keeperId: string): Promise<Merge
     const result = await leadRead((kit) => {
       merged = kit.merged;
       if (!kit.merged) return Promise.resolve({ data: [], error: null } as QueryResult);
+      // live-guard: the live-leads helper itself reads the merge pointer
       return client.from("crm_lead").select("id").eq("merged_into_id", keeperId).limit(200);
     });
     if (result.error) return { status: "unavailable", ids: [keeperId] };
@@ -253,6 +258,7 @@ export async function mergeAvailable(db: unknown): Promise<boolean> {
   if (leadMergeSupport() === "present") return true;
   if (leadMergeSupport() === "missing") return false;
   try {
+    // live-guard: the live-leads helper itself reads the merge pointer
     const { error } = await asDb(db).from("crm_lead").select("merged_into_id").limit(1);
     if (!error) {
       support = { kind: "present" };
@@ -263,4 +269,17 @@ export async function mergeAvailable(db: unknown): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * The lead a write should land on, for a page opened before a merge: a merged lead's id becomes its keeper's, so a
+ * new task, time entry, tag, consult note, next step or campaign step lands where it will be read. A lead that isn't
+ * there is returned as it is (the write's own read reports it). A pointer that can't be read refuses the write with
+ * a fixed sentence (`MERGE_POINTER_UNREADABLE`): nothing is written on a guess.
+ */
+export async function keeperForWrite(db: unknown, leadId: string, orgId?: string | null): Promise<string> {
+  const resolved = await resolveLeadId(db, leadId, orgId);
+  if (resolved.status === "ok") return resolved.id;
+  if (resolved.status === "not-found") return leadId;
+  throw new ReadableError(MERGE_POINTER_UNREADABLE);
 }

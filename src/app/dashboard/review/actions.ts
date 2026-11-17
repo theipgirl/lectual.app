@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { MERGE_POINTER_UNREADABLE } from "@/lib/ui/words";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { CAN_MOVE_STAGE, CAN_WRITE_LEAD, addLeadNote, assignLead, moveLeadStage, resolveCurrentRole } from "@/lib/pipeline";
 import { MATTER_WRITE_ROLES, assignMatterOwner, updateMatterHeader } from "@/lib/matters/matters";
@@ -15,6 +16,7 @@ import { friendlyMatterError } from "../matters/errors";
 import { isUuid, parseCloseLead, parseKind, parseNextStep, parseWhatHappened } from "@/lib/review/input";
 import { civilDateIn } from "@/lib/review/build";
 import { isSnoozeChoice, snoozeDate } from "@/lib/review/snooze";
+import { keeperForWrite } from "@/lib/leads/live";
 
 export type ReviewActionState = { error?: string; saved?: boolean };
 
@@ -31,7 +33,7 @@ async function canWrite(kind: "matter" | "lead"): Promise<boolean> {
 /** The record must be visible to the caller's scoped client; another firm's id reads as missing. */
 async function recordVisible(kind: "matter" | "lead", id: string): Promise<boolean> {
   const supabase = await getScopedClient();
-  // live-guard: re-reads one record of a review card (built from live lists) before a write whose guard refusal is mapped to a fixed sentence
+  // live-guard: an existence check; Set next step follows a merged lead to its keeper (keeperForWrite) before calling it
   const { data, error } = await supabase.from(kind === "matter" ? "crm_matter" : "crm_lead").select("id").eq("id", id).maybeSingle();
   if (error) throw error;
   return !!data;
@@ -46,9 +48,18 @@ function refresh() {
 export async function setNextStepAction(_prev: ReviewActionState, formData: FormData): Promise<ReviewActionState> {
   const parsed = parseNextStep(formData);
   if (!parsed.ok) return { error: parsed.error };
-  const { kind, id, title, dueAt, assigneeId } = parsed.value;
+  const { kind, title, dueAt, assigneeId } = parsed.value;
+  let id = parsed.value.id;
   try {
     if (!(await canWrite(kind))) return { error: NO_PERMISSION };
+    // A review opened before a merge (lectual 0107) sets the next step on the KEEPER; an unreadable pointer refuses.
+    if (kind === "lead") {
+      try {
+        id = await keeperForWrite(await getScopedClient(), id);
+      } catch {
+        return { error: MERGE_POINTER_UNREADABLE };
+      }
+    }
     if (!(await recordVisible(kind, id))) return { error: NOT_FOUND };
     if (assigneeId) {
       let members;

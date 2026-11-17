@@ -119,6 +119,7 @@ export async function syncFirm(admin: Admin, orgId: string, client: LawmaticsCli
       pageAll<PlanLead>((a, b) =>
         leadRead(({ merged }) =>
           admin
+            // live-guard: reads merged leads WITH their pointer; the planner follows them to the keeper (keeperIn)
             .from("crm_lead")
             .select(merged ? "id,email,lawmatics_id,current_stage_id,stage_entered_at,merged_into_id" : "id,email,lawmatics_id,current_stage_id,stage_entered_at")
             .eq("org_id", orgId)

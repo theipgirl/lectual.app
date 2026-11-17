@@ -2,7 +2,7 @@ import { getScopedClient } from "@/lib/db/scoped-client";
 import type { Database } from "@/lib/db/types";
 import { isLeadMergeGuarded } from "@/lib/leads/merge";
 import { resolveLeadId } from "@/lib/leads/live";
-import { LEAD_MERGED_WRITE, MERGE_RULE_LEAD_GONE } from "@/lib/ui/words";
+import { LEAD_MERGED_WRITE, MERGE_RULE_LEAD_GONE, MERGE_RULE_LEAD_UNREADABLE } from "@/lib/ui/words";
 // @/lib/matters does NOT import automation or pipeline, so this is cycle-free
 // (pipeline → automation → matters; matters is a leaf).
 import { ensureMatterForLead } from "@/lib/matters";
@@ -140,7 +140,7 @@ async function executeAction(
     let ctx = given;
     if (given.leadId) {
       const resolved = await resolveLeadId(supabase, given.leadId, orgId);
-      if (resolved.status !== "ok") return { type, ok: false, error: resolved.status === "not-found" ? MERGE_RULE_LEAD_GONE : LEAD_MERGED_WRITE };
+      if (resolved.status !== "ok") return { type, ok: false, error: resolved.status === "not-found" ? MERGE_RULE_LEAD_GONE : MERGE_RULE_LEAD_UNREADABLE };
       if (resolved.id !== given.leadId) ctx = { ...given, leadId: resolved.id };
     }
     switch (type) {

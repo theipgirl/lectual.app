@@ -57,6 +57,7 @@ export async function readLeads(supabase: Scoped): Promise<LeadsRead> {
     const columns = "id, first_name, last_name, email, current_stage_id, sheet_key, lawmatics_id, practice_area, last_activity_at";
     const { data, error } = await leadRead(({ merged }) =>
       supabase
+        // live-guard: reads merged leads WITH their pointer and folds their keys onto the keeper (foldMergedKeys)
         .from("crm_lead")
         .select(merged ? `${columns}, merged_into_id` : columns)
         .order("created_at", { ascending: true })

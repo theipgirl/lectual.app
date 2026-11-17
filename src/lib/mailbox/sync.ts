@@ -114,6 +114,7 @@ export async function loadOrgContext(admin: SupabaseClient, orgId: string): Prom
     const columns = "id, first_name, last_name, business_name, email, mark_text, assigned_to, last_outbound_at, last_inbound_at";
     const { data, error } = await leadRead(({ merged }) =>
       admin
+        // live-guard: reads merged leads WITH their pointer and folds them onto the keeper (foldMergedLeads)
         .from("crm_lead")
         .select(merged ? `${columns}, merged_into_id` : columns)
         .eq("org_id", orgId)

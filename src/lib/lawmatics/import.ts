@@ -33,6 +33,7 @@ import { leadRead } from "@/lib/leads/live";
  * One-way Lawmatics → Lectual importer (orchestration layer).
  *
  * Reads the firm's real book of business out of Lawmatics and lands it in
+ // live-guard: reads merged leads WITH their pointer so the planner neither updates nor re-creates them
  * `crm_lead`. Nothing here runs on its own: `previewImport()` is triggered by an
  * explicit click, and `applyImport()` refuses to write unless it is handed the
  * fingerprint of a plan that still matches what the operator was shown.
@@ -242,6 +243,7 @@ async function loadExistingLeads(supabase: Scoped, maxRows = 20_000): Promise<Ex
     const columns = "id,email,first_name,last_name,phone,business_name,website,current_stage_id,lawmatics_id,practice_area,referral_source,referral_detail";
     const { data, error } = await leadRead(({ merged }) =>
       supabase
+        // live-guard: reads merged leads WITH their pointer so the planner neither updates nor re-creates them
         .from("crm_lead")
         .select(merged ? `${columns},merged_into_id` : columns)
         .order("created_at", { ascending: true })
