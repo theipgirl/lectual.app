@@ -327,7 +327,7 @@ describe("proposal detail page: the payment panel on an accepted version", () =>
     const { html } = await render(accepted(), [], undefined, { steps: [MARKED], members: [] });
     expect(html).toContain("Paid · Oct 21");
     expect(html).not.toContain("u-dawn");
-    expect(html).not.toContain("A teammate");
+    expect(html).not.toContain("Teammate");
   });
 
   it("paid then undone: back to Not paid, Mark paid offered again", async () => {

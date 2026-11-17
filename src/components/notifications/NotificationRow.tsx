@@ -5,6 +5,7 @@ import { useTransition } from "react";
 import { markNotificationRead } from "@/app/dashboard/notifications/actions";
 import { NotificationIcon } from "./NotificationIcon";
 import type { NotificationRowView } from "./view";
+import "./notifications.css";
 
 /**
  * One notification. With a link it navigates there; without one it is a button.
@@ -24,7 +25,7 @@ export function NotificationRow({ item, onOpen }: { item: NotificationRowView; o
         <NotificationIcon icon={item.icon} />
       </span>
       <span className="lx-notif-text">
-        <span className="lx-label" style={{ fontSize: 11 }}>
+        <span className="lx-label">
           {item.label}
         </span>
         <span className="lx-notif-sentence">{item.sentence}</span>

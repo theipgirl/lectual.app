@@ -7,6 +7,7 @@ import { FirmProfileForm } from "@/components/settings/FirmProfileForm";
 import { listSequences } from "@/lib/automation/drips";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { PageHeader, LoadFailedCard } from "@/components/ui";
 import { FeedbackLink } from "@/components/feedback/SendFeedbackButton";
 
 export const metadata: Metadata = { title: pageTitle("Firm profile") };
@@ -35,15 +36,13 @@ export default async function FirmProfilePage() {
 
   return (
     <>
-      <div>
-        <div className="lx-label">Settings</div>
-        <h1 className="lx-h1" data-tour="firm-head">Firm profile</h1>
-        <p className="lx-sub">How the firm appears on the drafts Lectual prepares for you, and where each temperature&apos;s next step points.</p>
-      </div>
+      <PageHeader
+        title="Firm profile"
+        tour="firm-head"
+        sub={<>How the firm appears on the drafts Lectual prepares for you, and where each temperature&apos;s next step points.</>}
+      />
       {loadError ? (
-        <div role="alert" className="lx-banner lx-banner-risk">
-          We couldn&apos;t load the firm profile. Try again shortly.
-        </div>
+        <LoadFailedCard role="alert" what="the firm profile" />
       ) : (
         <FirmProfileForm
           firmName={session.org.name}

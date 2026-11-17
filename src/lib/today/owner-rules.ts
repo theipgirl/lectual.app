@@ -1,5 +1,6 @@
 import { civilDaysBetween } from "@/lib/matters/calendar-rows";
 import { civilInZone } from "@/lib/today/outcomes";
+import { formatDay, formatTime } from "@/lib/ui/dates";
 import { deadlineKindLabel, deadlineNeedsReview } from "@/lib/matters/deadline-rules";
 import type { UpcomingDeadline } from "@/lib/matters";
 import type { ConsultItem } from "@/lib/calendar/consult-sources";
@@ -96,9 +97,9 @@ export function dayTone(days: number): Tone {
   return days <= 5 ? "risk" : days <= 10 ? "warn" : "plain";
 }
 
-/** "Fri Nov 14" for a civil date. */
-export function weekdayDate(civil: string): string {
-  return new Intl.DateTimeFormat("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric" }).format(new Date(`${civil}T12:00:00Z`));
+/** "Fri, Nov 14" for a civil date (the year only when it is not this year), through the shared day formatter. */
+export function weekdayDate(civil: string, tz = "UTC", now?: Date): string {
+  return formatDay(civil, { tz, now, civil: true, weekday: "short" }) ?? civil;
 }
 
 export function deadlineChip(d: Pick<OwnerDeadline, "dueDate" | "overdueDays">, today: string): { text: string; tone: Tone } {
@@ -203,7 +204,7 @@ export function mondayOf(civil: string): string {
 }
 
 function clock(iso: string, tz: string): string {
-  return new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit" }).format(new Date(iso));
+  return formatTime(iso, { tz }) ?? "";
 }
 
 /**

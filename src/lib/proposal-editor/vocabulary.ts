@@ -1,4 +1,5 @@
 import type { ProposalStatus } from "@/lib/proposals/types";
+import { SAVING } from "@/lib/ui/words";
 
 /**
  * The one place the proposal maker's lifecycle words live (Sprint 27).
@@ -30,14 +31,14 @@ export const LETTER_UNREADABLE_SENTENCE = "Couldn't check the firm's engagement 
 
 export const BUTTON_WORDS = {
   createLink: "Save and create link",
-  creatingLink: "Creating link…",
+  creatingLink: SAVING,
   turnOnLink: "Turn on the link",
-  turningOnLink: "Turning on…",
+  turningOnLink: SAVING,
   editAgain: "Edit again",
   startNewVersion: "Start a new version",
   withdraw: "Withdraw",
   save: "Save",
-  saving: "Saving…",
+  saving: SAVING,
   preview: "Preview as the client",
 } as const;
 

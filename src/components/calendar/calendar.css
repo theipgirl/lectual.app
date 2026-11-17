@@ -1,0 +1,11 @@
+/* Calendar components: Today's Consults card and the "Consult booked" line. Tokens only. */
+.lx-consults-card { display: grid; gap: 10px; }
+.lx-consults-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.lx-consults-text { min-width: 0; }
+.lx-consults-title { font-weight: 500; color: var(--ink); }
+.lx-consults-when { display: block; }
+.lx-consults-warn { color: var(--warn); }
+.lx-booked { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.lx-booked-card { padding: 12px 18px; }
+.lx-booked-title { color: var(--ink); }
+.lx-cal-join { color: var(--ox); font-weight: 500; }

@@ -196,7 +196,7 @@ describe("ReviewPanel: Remove internal notes (H8)", () => {
     expect(src).toContain("const cleaned = audit ? removeInternalNotes(body, audit.type) : null;");
     // ...and any difference from the saved text is an edit: the approve label and the posted field follow it.
     expect(src).toContain("const dirty = body !== initialBody;");
-    expect(src).toContain('{pending ? "Working…" : dirty ? "Approve with edits" : "Approve"}');
+    expect(src).toContain('{pending ? SAVING : dirty ? "Approve with edits" : "Approve"}');
     expect(src).toContain('name={dirty ? "body" : undefined}');
     // The browser bundle only gets the pure module.
     expect(src).toContain('from "@/lib/queue/hygiene"');

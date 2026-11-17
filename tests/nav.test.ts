@@ -16,7 +16,7 @@ describe("rail sections fail closed on modules", () => {
     expect(navItemAllowed(mail, ["mailbox"], "viewer")).toBe(true);
   });
 
-  it("gates My Mail on `mailbox` and Agents on `agents`", () => {
+  it("gates Mail on `mailbox` and Agents on `agents`", () => {
     expect(navItemBySlug("mail")?.module).toBe("mailbox");
     expect(navItemBySlug("agents")?.module).toBe("agents");
   });
@@ -41,11 +41,11 @@ describe("rail tree (design/Rail.dc.html)", () => {
 
   it("drops module-gated children for a firm without the module", () => {
     const shown = labels(railGroups(visibleNav([], "owner"), "/dashboard/"));
-    expect(shown).not.toContain("My Mail");
+    expect(shown).not.toContain("Mail");
     expect(shown).not.toContain("Assistants");
     expect(shown).toContain("Approvals");
     const withAll = labels(railGroups(visibleNav(["mailbox", "agents"], "owner"), "/dashboard/"));
-    expect(withAll).toContain("My Mail");
+    expect(withAll).toContain("Mail");
     expect(withAll).toContain("Assistants");
   });
 
@@ -55,7 +55,7 @@ describe("rail tree (design/Rail.dc.html)", () => {
     expect(intake.childActive).toBe(true);
     expect(intake.kids.find((k) => k.label === "Leads")?.active).toBe(true);
     expect(intake.active).toBe(false);
-    expect(intake.href).toBe("/dashboard/intake/");
+    expect(intake.href).toBe("/dashboard/intake/?view=table");
   });
 
   it("marks Today active only on the home page", () => {
@@ -74,8 +74,8 @@ describe("rail tree (design/Rail.dc.html)", () => {
     const hrefs = Object.fromEntries(groups.flat().filter((x) => x.kids.length).map((e) => [e.label, e.href]));
     expect(hrefs).toEqual({
       Communication: "/dashboard/mail/",
-      Intake: "/dashboard/intake/",
-      "Active matters": "/dashboard/matters/",
+      Intake: "/dashboard/intake/?view=table",
+      "Active matters": "/dashboard/matters/?view=table",
       "AI tools": "/dashboard/copilot/",
     });
     for (const e of groups.flat()) expect(e.href).not.toMatch(/\/reports\//);
@@ -185,7 +185,25 @@ describe("railGroups takes an optional tree (Phase 1 owner view)", () => {
     const tree = [[{ slug: "" }, { slug: "agents" }], [{ label: "More", icon: "M0 0", kids: ["intake", "matters", "brain"] }]];
     expect(railGroups(visibleNav([], "owner"), "/dashboard/matters/", tree).map((g) => g.map((e) => e.key))).toEqual([["today"], ["More"]]);
     const more = railGroups(visibleNav([], "owner"), "/dashboard/matters/", tree)[1][0];
-    expect(more).toMatchObject({ href: "/dashboard/intake/", childActive: true, countKey: null });
+    expect(more).toMatchObject({ href: "/dashboard/intake/?view=table", childActive: true, countKey: null });
     expect(more.kids.map((k) => k.key)).toEqual(["intake", "matters", "brain"]);
+  });
+});
+
+describe("one icon per section (design Area G)", () => {
+  it("no two built sections share an icon", () => {
+    const rows = NAV.filter((i) => i.built !== false && !["portals"].includes(i.slug));
+    const byIcon = new Map<string, string[]>();
+    for (const r of rows) byIcon.set(r.icon, [...(byIcon.get(r.icon) ?? []), r.slug]);
+    const shared = [...byIcon.values()].filter((slugs) => slugs.length > 1);
+    expect(shared).toEqual([]);
+  });
+
+  it("the section names come from the glossary", () => {
+    const label = (slug: string) => NAV.find((i) => i.slug === slug)?.label;
+    expect(label("mail")).toBe("Mail");
+    expect(label("forms")).toBe("Forms");
+    expect(label("quotes")).toBe("Proposals");
+    expect(label("proposals")).toBe("Proposals");
   });
 });

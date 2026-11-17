@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { row, TODAY } from "./fixtures";
+import { Tags } from "@/components/review/shared";
+
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
 
 // The panel draws the upload control for writers; it holds a router for its refresh.
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }), usePathname: () => "/dashboard/review/", useSearchParams: () => new URLSearchParams() }));
@@ -94,7 +97,7 @@ describe("Weekly review page", () => {
     expect(strip.indexOf("Lapsed Co")).toBeLessThan(strip.indexOf("Client Co"));
     expect(strip).toContain("Expired Oct 28");
     expect(strip).toContain("Last day Nov 11");
-    expect(strip).toMatch(/rv-strip-when rv-deadline-soon">Expired Oct 28/);
+    expect(strip).toMatch(/lx-pill lx-pill-risk[^>]*>Lapsed Co[\s\S]*rv-strip-when rv-deadline-soon">Expired Oct 28/);
     expect(strip).toMatch(/href="[^"]*open=lead%3A/);
   });
 
@@ -139,11 +142,11 @@ describe("Weekly review page", () => {
     expect(html).toContain("only next steps assigned to you are listed.");
   });
 
-  it("view switch is exactly Board, Sheet, Cards", async () => {
+  it("view switch is exactly Board, List, Cards", async () => {
     mock(ok());
     const html = await render();
     const nav = html.slice(html.indexOf('aria-label="View"'), html.indexOf("</nav>", html.indexOf('aria-label="View"')));
-    expect([...nav.matchAll(/>([A-Za-z ]+)<\/a>/g)].map((m) => m[1])).toEqual(["Board", "Sheet", "Cards"]);
+    expect([...nav.matchAll(/>([A-Za-z ]+)<\/a>/g)].map((m) => m[1])).toEqual(["Board", "List", "Cards"]);
     expect(nav).toContain("view=sheet");
     expect(nav).toContain("view=cards");
     expect(html).not.toContain("view=meeting");
@@ -165,12 +168,12 @@ describe("Weekly review page", () => {
     const contract = row({ key: "k", client: "Contract Co", matterType: "BL", stageLabel: "Drafting", stageOrder: 100_001, waiting: "client", lastOutbound: "2026-10-28", source: "Referral" });
     mock(ok({ rows: [...rows, contract] }));
     const html = await render({ view: "sheet" });
-    expect(html).toMatch(/aria-current="page" href="[^"]*">Sheet/);
+    expect(html).toMatch(/aria-current="page" href="[^"]*">List/);
     expect(html.indexOf("Trademarks")).toBeGreaterThan(-1);
     expect(html.indexOf("Trademarks")).toBeLessThan(html.indexOf("Contracts"));
     expect(html.indexOf("Lapsed Co")).toBeLessThan(html.indexOf("Contracts"));
     expect(html.indexOf("Contract Co")).toBeGreaterThan(html.indexOf("Contracts"));
-    for (const c of ["Client", "Mark", "Status", "Next step", "Whose court", "Waiting on", "Source", "Last contact"]) expect(html).toContain(`<th>${c}</th>`);
+    for (const c of ["Client", "Mark", "Status", "Next step", "Owner", "Waiting on", "Source", "Last contact"]) expect(html).toContain(`<th>${c}</th>`);
     expect(html).toContain("Client · followed up Oct 28");
     expect(html).toContain("Referral");
     expect(html).toMatch(/class="lx-rowlink" href="[^"]*view=sheet[^"]*open=matter%3A/);
@@ -221,10 +224,13 @@ describe("Weekly review page", () => {
     expect(board).toMatch(/class="rv-card-link" href="[^"]*kind=matters[^"]*open=matter%3A/);
   });
 
-  it("card count per column and at most two tags then +N", async () => {
-    mock(ok({ rows: [row({ key: "t", client: "Tag Co", nextStep: step("2026-10-30", "u-rayn"), deadline: { dueDate: "2026-11-10", title: null }, proposalExpiry: { text: "Proposal expires Nov 4", expiresOn: "2026-11-04", expired: false } })] }));
+  it("at most two tags then +N (a board card leaves out the tags its column and meta line already say)", async () => {
+    const r = row({ key: "t", client: "Tag Co", waiting: "us", nextStep: step("2026-10-30", "u-rayn"), deadline: { dueDate: "2026-11-10", title: null }, proposalExpiry: { text: "Proposal expires Nov 4", expiresOn: "2026-11-04", expired: false } });
+    expect(renderToStaticMarkup(<Tags row={r} today={TODAY} max={2} />)).toContain("+1");
+    mock(ok({ rows: [r] }));
     const html = await render();
-    expect(html).toContain("+1");
+    expect(html).toContain("USPTO deadline");
+    expect(html).not.toContain("+1");
   });
 
   it("empty states are never a blank page", async () => {
@@ -319,7 +325,7 @@ describe("Weekly review page", () => {
       expect(html).toContain("1 of 1");
       expect(html).toContain("Reb Co");
       expect(html).not.toContain("Overdue Co</a></h2>");
-      for (const w of ["Done", "Snooze: Tomorrow", "Snooze: Next Monday", "Hand to", "Add note", "Open"]) expect(html).toContain(w);
+      for (const w of ["Done", "Snooze: Tomorrow", "Snooze: Next Monday", "Hand to", "Add to timeline", "Open"]) expect(html).toContain(w);
       expect(html).toContain("Latest note: Spoke to the client");
       expect(html).toMatch(/aria-current="page"[^>]*>[\s\S]*?Rebecca/);
     });

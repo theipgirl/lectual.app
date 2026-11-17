@@ -1,3 +1,4 @@
+import { formatDayTime } from "@/lib/ui/dates";
 import { FIRM_TIME_ZONE } from "@/lib/quotes/firm-time";
 import { relativeTime } from "@/lib/relative-time";
 import {
@@ -108,15 +109,7 @@ export type IntakeTableRow = {
 
 /** "Sep 25, 8:04 AM", on the firm's clock (Vercel runs UTC; the firm doesn't). */
 export function formatIntakeTime(iso: string, tz: string = FIRM_TIME_ZONE): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: tz,
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(d);
+  return formatDayTime(iso, { tz }) ?? "—";
 }
 
 export function intakeTableRows(rows: SubmissionListRow[], now = Date.now(), tz: string = FIRM_TIME_ZONE): IntakeTableRow[] {
@@ -134,7 +127,7 @@ export function intakeTableRows(rows: SubmissionListRow[], now = Date.now(), tz:
       fitKey: r.temperature ?? r.fit,
       status: submissionStatusLabel(r.status),
       statusKey: r.status,
-      last: relativeTime(r.last_active_at, now),
+      last: relativeTime(r.last_active_at, now, tz),
       finished: r.submitted_at !== null,
     };
   });

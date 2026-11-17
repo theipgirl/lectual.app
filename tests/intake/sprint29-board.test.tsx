@@ -124,7 +124,7 @@ function render(params: IntakeSearchParams = {}, props: Props = {}) {
       intakeStages={intakeStages(STAGES)}
       members={[]}
       initialFilters={parseIntakeFilters(params)}
-      initialViewState={parseIntakeViewState(params)}
+      initialViewState={parseIntakeViewState({ view: "table", ...params })}
       time={null}
       now={NOW.toISOString()}
       agentMoves={{ status: "ok", truncated: false }}
@@ -304,7 +304,7 @@ describe("the bulk bar", () => {
   });
 
   it("shows the busy state and a message", () => {
-    expect(bar({ pending: true })).toContain("Moving…");
+    expect(bar({ pending: true })).toContain("Saving…");
     expect(bar({ message: { tone: "error", text: "Nope." } })).toMatch(/role="alert"[^>]*>Nope\./);
     expect(bar({ message: { tone: "ok", text: "Moved 2 leads." } })).toMatch(/role="status"[^>]*>Moved 2 leads\./);
   });

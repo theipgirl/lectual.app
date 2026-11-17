@@ -55,7 +55,7 @@ function render(leads: Lead[], params: IntakeSearchParams = {}, reads: Reads = {
       intakeStages={intakeStages(STAGES)}
       members={MEMBERS}
       initialFilters={parseIntakeFilters(params)}
-      initialViewState={parseIntakeViewState(params)}
+      initialViewState={parseIntakeViewState({ view: "table", ...params })}
       time={{ weekStartIso: NOW.toISOString(), byLeadId: {}, running: null }}
       now={NOW.toISOString()}
       {...(reads as object)}
@@ -172,7 +172,7 @@ describe("the table starts on the first screen (768px tall)", () => {
   it("above the table there is only the header, one toolbar row and two chip rows (the sets, then the filters)", () => {
     const html = render([lead("a", "Ana")]);
     const above = html.slice(0, html.indexOf('class="lp-panel"'));
-    expect(above.match(/class="lp-header"/g)).toHaveLength(1);
+    expect(above.match(/class="lx-page-head lx-head lp-header"/g)).toHaveLength(1);
     expect(above.match(/class="lp-toolbar"/g)).toHaveLength(1);
     expect(above.match(/class="ix-sets"/g)).toHaveLength(1);
     expect(above.match(/class="ix-filters"/g)).toHaveLength(1);
@@ -186,8 +186,9 @@ describe("the table starts on the first screen (768px tall)", () => {
   it("the shared stylesheet stacks no strips: the header, toolbar and chips are compact rows", () => {
     const css = readFileSync("src/components/list-page/list-page.css", "utf8");
     expect(css).toMatch(/\.lp-root \{[^}]*gap: var\(--lp-gap\)/);
-    expect(css).toMatch(/\.lp-chip \{[^}]*height: 32px/);
-    expect(css).toMatch(/\.lp-search \.lx-input \{[^}]*height: 36px/);
+    const globals = readFileSync("src/app/globals.css", "utf8");
+    expect(globals).toMatch(/\.lp-chip, \.lx-chips a \{[^}]*height: var\(--ctl-h\)/);
+    expect(globals).toMatch(/\.lp-search \.lx-input \{[^}]*height: var\(--ctl-h\)/);
     expect(css).toContain("--lp-row-h: 46px");
   });
 });

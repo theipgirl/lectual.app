@@ -4,6 +4,11 @@ import { useActionState } from "react";
 import { saveApprovalRoutingAction } from "@/app/dashboard/settings/approvals/actions";
 import type { ActionState } from "@/app/dashboard/proposals/errors";
 import { roleLabel } from "@/lib/auth/roles";
+import { Notice } from "@/components/ui/Notice";
+import { Pill } from "@/components/ui/Pill";
+import { SavedNote } from "@/components/ui/SavedNote";
+import { SAVING } from "@/lib/ui/words";
+import "./handed.css";
 
 export type RoutingRow = {
   kind: string;
@@ -18,17 +23,21 @@ export type RoutingRow = {
 export function ApprovalRoutingForm({ rows }: { rows: RoutingRow[] }) {
   const [state, action, pending] = useActionState<ActionState, FormData>(saveApprovalRoutingAction, {});
   return (
-    <form action={action} className="lx-card" style={{ padding: 20, display: "grid", gap: 16 }}>
+    <form action={action} className="lx-card lx-pad lx-routing">
       {rows.map((r) => (
-        <div key={r.kind} style={{ display: "grid", gap: 4 }}>
-          <label htmlFor={`route-${r.kind}`} style={{ fontWeight: 600 }}>
+        <div key={r.kind} className="lx-routing-row">
+          <label htmlFor={`route-${r.kind}`} className="lx-routing-label">
             {r.label}
-            {r.attorneyOnly && <span className="lx-pill lx-pill-mute" style={{ marginLeft: 8 }}>Attorneys only</span>}
+            {r.attorneyOnly && (
+              <span className="lx-handed-pill">
+                <Pill>Attorneys only</Pill>
+              </span>
+            )}
           </label>
-          <p id={`route-${r.kind}-help`} className="lx-note" style={{ margin: 0 }}>
+          <p id={`route-${r.kind}-help`} className="lx-note lx-routing-help">
             {r.help}
           </p>
-          <select id={`route-${r.kind}`} name={`kind.${r.kind}`} defaultValue={r.current} aria-describedby={`route-${r.kind}-help`} className="lx-input" style={{ maxWidth: 420 }}>
+          <select id={`route-${r.kind}`} name={`kind.${r.kind}`} defaultValue={r.current} aria-describedby={`route-${r.kind}-help`} className="lx-input lx-routing-select">
             <option value="">Usual approvers (default)</option>
             {r.options.map((o) => (
               <option key={o.userId} value={o.userId}>
@@ -38,19 +47,15 @@ export function ApprovalRoutingForm({ rows }: { rows: RoutingRow[] }) {
           </select>
         </div>
       ))}
-      <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+      <div className="lx-queue-filters">
         <button type="submit" className="lx-btn lx-btn-pri" disabled={pending}>
-          {pending ? "Saving…" : "Save"}
+          {pending ? SAVING : "Save"}
         </button>
-        {state.saved && (
-          <span role="status" className="lx-note">
-            Saved
-          </span>
-        )}
+        <SavedNote show={!!state.saved} />
         {state.error && (
-          <span role="alert" className="lx-banner lx-banner-risk" style={{ margin: 0 }}>
+          <Notice tone="risk" role="alert">
             {state.error}
-          </span>
+          </Notice>
         )}
       </div>
     </form>

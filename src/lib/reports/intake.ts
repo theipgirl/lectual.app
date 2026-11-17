@@ -1,4 +1,5 @@
 import "server-only";
+import { OUR_TURN, PROPOSALS_NAME } from "@/lib/ui/words";
 import { INTAKE_NAME } from "@/lib/ui/words";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { listLeads, listStages } from "@/lib/pipeline";
@@ -10,6 +11,7 @@ import { isInPeriod, isInPreviousPeriod, isInWindow, type ReportPeriod } from ".
 import { isWaitingOnUs, leadLabel, waitingSince } from "./leads";
 import { oldestFirst, type LinkTile, type WaitingItem } from "./waiting";
 import { relativeTime } from "@/lib/relative-time";
+import { intakeListHref } from "@/lib/intake/list-href";
 
 export type IntakeReport = {
   kpis: Metric[];
@@ -70,8 +72,8 @@ export async function loadIntakeReport(period: ReportPeriod): Promise<IntakeRepo
   // --- Waiting on us, right now (a backlog snapshot, not a period figure) ---
   const waitingLeads = pnc ? pnc.filter(isWaitingOnUs) : null;
   const waitingCount: Metric = waitingLeads
-    ? { label: "Waiting on us", value: waitingLeads.length, sub: "open leads we haven't answered" }
-    : unavailableMetric("Waiting on us", "Leads couldn't be loaded");
+    ? { label: OUR_TURN, value: waitingLeads.length, sub: "open leads we haven't answered" }
+    : unavailableMetric(OUR_TURN, "Leads couldn't be loaded");
 
   const waiting: WaitingItem[] = waitingLeads
     ? oldestFirst(waitingLeads, waitingSince, 5).map((l) => ({
@@ -84,10 +86,10 @@ export async function loadIntakeReport(period: ReportPeriod): Promise<IntakeRepo
     : [];
 
   const links: LinkTile[] = [
-    { label: INTAKE_NAME, sub: "Every potential client not yet signed", href: "/dashboard/intake/", count: pnc ? pnc.length : null },
+    { label: INTAKE_NAME, sub: "Every potential client not yet signed", href: intakeListHref(), count: pnc ? pnc.length : null },
     { label: "Intake forms", sub: "Public intake and custom forms", href: "/dashboard/forms/", count: null },
     {
-      label: "Quotes & proposals",
+      label: PROPOSALS_NAME,
       sub: "Sent and awaiting signature",
       href: "/dashboard/quotes/",
       count: quotesSent.status === "ok" ? quotesSent.quotes.length : null,

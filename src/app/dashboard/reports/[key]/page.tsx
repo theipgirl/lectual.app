@@ -12,6 +12,9 @@ import type { Metric } from "@/lib/reports/metric";
 import type { LinkTile, WaitingItem } from "@/lib/reports/waiting";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { EmptyState, Notice, PageHeader } from "@/components/ui";
+import { ViewToggle } from "@/components/ViewToggle";
+import { MAIL_NAME } from "@/lib/ui/words";
 
 export async function generateMetadata({ params }: { params: Promise<{ key: string }> }): Promise<Metadata> {
   const { key } = await params;
@@ -29,7 +32,7 @@ type ReportData = { kpis: Metric[]; waiting: WaitingItem[]; links: LinkTile[]; b
  */
 const REPORT_COPY: Record<ReportKey, { sub: string; waitingTitle: string; waitingEmpty: string }> = {
   communication: {
-    sub: "How fast the firm answers, where messages come from, and what's still waiting on a reply across intake, My Mail, campaigns and SMS.",
+    sub: `How fast the firm answers, where messages come from, and what's still waiting on a reply across intake, ${MAIL_NAME}, campaigns and SMS.`,
     waitingTitle: "Waiting on the firm",
     waitingEmpty: "Nothing is waiting on a reply right now.",
   },
@@ -55,10 +58,10 @@ function LinkTileCard({ l }: { l: LinkTile }) {
   return (
     <Link href={l.href} className="lx-card lx-kpi" style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 12 }}>
       <span style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ display: "block", fontSize: 15, fontWeight: 600, color: "var(--ink)" }}>{l.label}</span>
+        <span className="lx-h3" style={{ display: "block" }}>{l.label}</span>
         <span className="lx-note">{l.sub}</span>
       </span>
-      {l.count !== null && <span className="lx-kpi-value" style={{ fontSize: 28 }}>{l.count}</span>}
+      {l.count !== null && <span className="lx-kpi-value">{l.count}</span>}
     </Link>
   );
 }
@@ -109,29 +112,22 @@ export default async function ReportPage({
 
   return (
     <>
-      <div className="lx-page-head">
-        <div style={{ flex: 1, minWidth: 260 }}>
-          <Link href={REPORTS_INDEX} className="lx-label">
-            Reports
-          </Link>
-          <h1 className="lx-h1">{REPORTS[key].label}</h1>
-          <p className="lx-sub">{copy.sub}</p>
-        </div>
-        <nav className="lx-segs lx-view-toggle" aria-label="Period">
-          {REPORT_RANGES.map((r) => (
-            <Link key={r} prefetch={false} href={rangeHref(r)} aria-current={range === r ? "page" : undefined} className={range === r ? "on" : undefined}>
-              {r} days
-            </Link>
-          ))}
-        </nav>
-      </div>
+      <PageHeader
+        back={{ href: REPORTS_INDEX, label: "Reports" }}
+        title={REPORTS[key].label}
+        sub={<>{copy.sub}</>}
+        actions={
+          <ViewToggle
+            label="Period"
+            value={String(range)}
+            views={REPORT_RANGES.map((r) => ({ value: String(r), label: `${r} days` }))}
+            hrefFor={(v) => rangeHref(Number(v))}
+            prefetch={false}
+          />
+        }
+      />
 
-      {data.banner && (
-        <p className="lx-banner lx-banner-warn" style={{ margin: 0 }}>
-          {data.banner}
-        </p>
-      )}
-
+      {data.banner && <Notice tone="warn">{data.banner}</Notice>}
 
       <div className="lx-kpis">
         {data.kpis.map((m) => (
@@ -141,14 +137,10 @@ export default async function ReportPage({
 
       <div className="lx-split">
         <div className="lx-col">
-          <section className="lx-card" style={{ padding: 18, display: "grid", gap: 10 }}>
-            <h2 className="lx-h2" style={{ fontSize: 25 }}>
-              {copy.waitingTitle}
-            </h2>
+          <section className="lx-card lx-pad" style={{ display: "grid", gap: 10 }}>
+            <h2 className="lx-h2">{copy.waitingTitle}</h2>
             {data.waiting.length === 0 ? (
-              <p className="lx-note" style={{ margin: 0 }}>
-                {copy.waitingEmpty}
-              </p>
+              <EmptyState variant="line">{copy.waitingEmpty}</EmptyState>
             ) : (
               <ul className="lx-list">
                 {data.waiting.map((w) => (

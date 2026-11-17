@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Icon } from "@/components/ui/Icon";
 import { moreOptionsSummary } from "@/lib/proposal-editor/more-options";
 
 /**
@@ -51,7 +52,9 @@ export function BuilderLayout({
       </ol>
       <div className="pe-create">{create}</div>
       <details className="pe-more" open={moreOpen ? true : undefined}>
-        <summary className="pe-more-sum">{moreOptionsSummary(changed)}</summary>
+        <summary className="lx-btn lx-btn-sec pe-more-sum">
+          {moreOptionsSummary(changed)} <Icon name="chevron-down" size={14} />
+        </summary>
         <div className="pe-more-body">{more}</div>
       </details>
     </div>

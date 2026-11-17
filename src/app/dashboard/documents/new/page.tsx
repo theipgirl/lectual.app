@@ -9,10 +9,12 @@ import { buildLetterPicker, letterKind, NEW_LETTER_PATH, routeLead, type LeadMat
 import { normalizeTerm } from "@/lib/skills/pick";
 import type { RecordKind } from "@/lib/skills/catalog";
 import { WhoIsThisFor } from "@/components/proposal-editor/WhoIsThisFor";
+import { EmptyState, Notice, PageHeader } from "@/components/ui";
+import { DOCUMENTS_NAME, NEW_LETTER } from "@/lib/ui/words";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 
-export const metadata: Metadata = { title: pageTitle("New letter") };
+export const metadata: Metadata = { title: pageTitle(NEW_LETTER) };
 
 export const dynamic = "force-dynamic";
 
@@ -86,20 +88,15 @@ export default async function NewLetterPage({ searchParams }: { searchParams: Pr
 
   return (
     <>
-      <Link href="/dashboard/documents/" className="lx-back">
-        ← Documents
-      </Link>
-      <div className="lx-page-head">
-        <div style={{ flex: 1, minWidth: 260 }}>
-          <div className="lx-label">Document Center</div>
-          <h1 className="lx-h1">New letter</h1>
-          <p className="lx-sub">Choose who it is for. Every letter is drafted into the approval queue; the file is made once an attorney approves it.</p>
-        </div>
-      </div>
+      <PageHeader
+        back={{ href: "/dashboard/documents/", label: DOCUMENTS_NAME }}
+        title={NEW_LETTER}
+        sub="Choose who it is for. Every letter is drafted into the approval queue; the file is made once an attorney approves it."
+      />
       {leadNote && (
-        <p className="lx-note" role="alert">
+        <Notice tone="warn" role="alert">
           {leadNote}
-        </p>
+        </Notice>
       )}
       <WhoIsThisFor
         view={view}
@@ -108,19 +105,14 @@ export default async function NewLetterPage({ searchParams }: { searchParams: Pr
         intro="Pick a matter, or a lead to find its matter. Letters are drafted on a matter."
       />
       {leadView?.body.kind === "none" && (
-        <div className="lx-card lx-empty-card">
-          <h2 className="lx-h2" style={{ fontSize: 25 }}>
-            {leadView.body.message}
-          </h2>
-          <p style={{ margin: 0 }}>
-            <Link href={leadView.body.leadHref}>Open {leadView.label}</Link>
-          </p>
-        </div>
+        <EmptyState title={leadView.body.message}>
+          <Link href={leadView.body.leadHref}>Open {leadView.label}</Link>
+        </EmptyState>
       )}
       {leadView?.body.kind === "failed" && (
-        <div role="alert" className="lx-banner lx-banner-risk">
+        <Notice tone="risk" role="alert">
           {leadView.body.message}
-        </div>
+        </Notice>
       )}
       {leadView?.body.kind === "choose" && (
         <section className="lx-card" aria-label={`Open matters for ${leadView.label}`}>

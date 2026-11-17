@@ -23,7 +23,7 @@ export function ProposalFromTranscript({ leadId, maxChars }: { leadId: string; m
         </p>
       )}
       {state.notice && (
-        <p role="status" className="lx-note" style={{ margin: 0, color: "var(--ok)" }}>
+        <p role="status" className="lx-saved">
           {state.notice}{" "}
           {state.href && <Link href={state.href}>Open the proposal</Link>}
         </p>

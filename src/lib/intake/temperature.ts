@@ -1,4 +1,5 @@
 import type { Lead, Stage } from "@/lib/pipeline";
+import { LAST_CONTACT } from "@/lib/ui/words";
 import { replyState } from "./reply";
 
 /**
@@ -171,5 +172,5 @@ export function deriveTemperature(
   }
 
   // Rule 6.
-  return { level: "warm", reason: `Last touch ${describeDays(daysSinceTouch)}`, overridden: false };
+  return { level: "warm", reason: `${LAST_CONTACT} ${describeDays(daysSinceTouch)}`, overridden: false };
 }

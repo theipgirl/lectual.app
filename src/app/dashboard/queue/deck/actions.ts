@@ -11,6 +11,7 @@ import { recordCardEvent } from "@/lib/queue/card-state";
 import { cardCaller, cardContext, staffPreviewRefusal, cardIdOf, cardNoteOf, noticeHandedTo, readCardItem, sendCardBack } from "@/lib/queue/card-moves";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { getFirmTimeZone } from "@/lib/org/profile";
+import { formatTime } from "@/lib/ui/dates";
 import { dealFor } from "@/lib/deal/times";
 import { readMyDealTimes } from "@/lib/deal/my-times";
 import { mySendAccess, sendFromMyOutlook } from "@/lib/mailbox/my-mailbox";
@@ -228,7 +229,7 @@ export async function sendDraftNowAction(rawId: unknown, rawDraftId: unknown): P
     if (sent.reason === "wrong-recipient") return { ok: false, error: "That draft is no longer addressed to this client, so nothing was sent. Check it in Outlook." };
     return { ok: false, error: "Couldn't send from here, so nothing was sent. Open the draft in Outlook and press Send there." };
   }
-  const time = new Intl.DateTimeFormat("en-US", { timeZone: await getFirmTimeZone(), hour: "numeric", minute: "2-digit" }).format(new Date());
+  const time = formatTime(new Date(), { tz: await getFirmTimeZone() }) ?? "";
   revalidate();
   return { ok: true, message: deckSentAt(time) };
 }

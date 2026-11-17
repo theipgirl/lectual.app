@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { Notice } from "@/components/ui/Notice";
 import { createChatController } from "@/lib/copilot/controller";
 import { SAVE_FAILED_NOTE } from "@/lib/copilot/history-pure";
 import { refreshHistoryAction } from "@/app/dashboard/copilot/actions";
@@ -51,10 +52,10 @@ export function ExchangeView({ ex }: { ex: Exchange }) {
         <div className="cpl-bubble cpl-bubble-copilot">
           <div className="cpl-label">{ex.declined ? "Copilot · not a records question" : "Copilot"}</div>
           {ex.readFailed && (
-            <p className="lx-banner lx-banner-warn" role="alert" style={{ margin: 0 }}>
+            <Notice tone="warn" role="alert">
               Some of the firm&apos;s records couldn&apos;t be read while answering, so this
               answer may be incomplete. Try again, or check the record directly.
-            </p>
+            </Notice>
           )}
           {ex.contextStatus && ex.contextStatus !== "found" && (
             <p className="cpl-status">
@@ -175,7 +176,7 @@ export function CopilotChat({ variant, greeting, stats, pathname, initialExchang
         {!idle && (
           <button
             type="button"
-            className="cpl-ghost"
+            className="lx-btn lx-btn-sec cpl-ghost"
             onClick={() => {
               setExchanges([]);
               setSaveNote(false);

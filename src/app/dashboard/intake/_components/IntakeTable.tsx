@@ -27,8 +27,13 @@ import "@/components/review/review-sheet-edit.css";
 import SourceCell from "./SourceCell";
 import RowMenu from "./RowMenu";
 import type { Lane } from "@/lib/leads/lane";
-import type { CSSProperties } from "react";
+import { SheetCard, SheetScroll, SheetTable } from "@/components/ui/SheetTable";
+import { ShowingCount } from "@/components/ui/ShowingCount";
+import { Pill } from "@/components/ui/Pill";
+import { MEANING_TONE } from "@/lib/ui/tones";
 import {
+  NEXT_STEP,
+  OWNER_COLUMN,
   LEADS_ACTIONS_SR,
   LEADS_ASSISTANT_COLUMN,
   LEADS_COMPARE_OPEN,
@@ -37,12 +42,8 @@ import {
   LEADS_MOVED_MARK,
   LEADS_MOVED_MARK_TITLE,
   LEADS_NEEDS_STAGE,
-  LEADS_RESIZE_COLUMN,
-  LEADS_SHOWING,
-  LEADS_SHOW_MORE,
-} from "@/lib/ui/words";
+  LEADS_RESIZE_COLUMN, BLANK } from "@/lib/ui/words";
 import { duplicateTitle, type DuplicateOf } from "@/lib/intake/duplicates";
-import { SHOW_STEP } from "@/lib/intake/paging";
 
 /** The sort key and the words of each column. The Assistant activity column has no sort: it is not a value a person ranks by. */
 const COLUMNS: Record<ColKey, { key: SortKey | null; label: string }> = {
@@ -50,10 +51,10 @@ const COLUMNS: Record<ColKey, { key: SortKey | null; label: string }> = {
   stage: { key: "stage", label: "Stage" },
   temp: { key: "temperature", label: "Temperature" },
   source: { key: "source", label: "Source" },
-  owner: { key: "owner", label: "Owner" },
+  owner: { key: "owner", label: OWNER_COLUMN },
   assistant: { key: null, label: LEADS_ASSISTANT_COLUMN },
   touch: { key: "lastTouch", label: LEADS_CONTACT_COLUMN },
-  next: { key: "notes", label: "Next step" },
+  next: { key: "notes", label: NEXT_STEP },
 };
 
 /**
@@ -158,13 +159,12 @@ export default function IntakeTable({
     for (const th of el.querySelectorAll("thead th")) observer.observe(th);
     return () => observer.disconnect();
   }, [minWidth, colsKey]);
-  const tableStyle = { "--rse-min": `${minWidth}px` } as CSSProperties;
 
   return (
     <div className="rv-owner ix-sheet" data-leads-sheet>
-      <div className="lx-card rse-card">
-        <div className="rse-scroll ix-scroll" ref={scrollRef} data-scroll={needsScroll ? "true" : "false"}>
-          <table className="lx-tbl lx-stack rse-tbl ix-tbl" style={tableStyle}>
+      <SheetCard>
+        <SheetScroll className="ix-scroll" ref={scrollRef} scroll={needsScroll}>
+          <SheetTable className="ix-tbl" fixed minWidth={minWidth}>
             <colgroup>
               {cols.map((c) => {
                 const w = colWidth(sizes, c);
@@ -181,7 +181,7 @@ export default function IntakeTable({
                   return (
                     <th key={c} scope="col" data-col={c} aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : undefined}>
                       {key ? (
-                        <button type="button" className="ix-sort" onClick={() => onSort(key)} aria-label={`Sort by ${label}`} data-on={active ? "" : undefined}>
+                        <button type="button" className="sheet-sort ix-sort" onClick={() => onSort(key)} aria-label={`Sort by ${label}`} data-on={active ? "" : undefined}>
                           {label}
                           {active ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
                         </button>
@@ -234,15 +234,15 @@ export default function IntakeTable({
                       style={{ opacity: pending ? 0.55 : 1 }}
                     >
                       <td className="ix-lead-td" data-col="lead" data-primary="true">
-                        <Link href={`/dashboard/leads/${lead.id}`} className="ix-name rse-client" title={name}>
+                        <Link href={`/dashboard/leads/${lead.id}`} className="ix-name sheet-link" title={name}>
                           {name}
                         </Link>
                         <span className="ix-subline">
                           <span className="ix-sub" title={business || undefined}>
-                            {business || "—"}
+                            {business || BLANK}
                           </span>
                           {movedOut?.has(lead.id) && (
-                            <span className="ix-marker ix-marker-quiet" data-moved title={LEADS_MOVED_MARK_TITLE}>
+                            <span className="lx-pill lx-pill-mute" data-moved title={LEADS_MOVED_MARK_TITLE}>
                               {LEADS_MOVED_MARK}
                             </span>
                           )}
@@ -251,19 +251,19 @@ export default function IntakeTable({
 
                       <td data-col="stage" data-label="Stage">
                         <span className="ix-stage-line">
-                          <span className={`ix-stage${row.stage ? "" : " ix-stage-warn"}`} title={row.stage?.name ?? "This lead's stage no longer exists"}>
+                          <Pill tone={row.stage ? MEANING_TONE.neutral : MEANING_TONE.needsPerson} wrap title={row.stage?.name ?? "This lead's stage no longer exists"}>
                             {stageLabelFor(row.stage)}
-                          </span>
+                          </Pill>
                           <NeedsRebeccaBadge pending={pendingDrafts} />
                           {decision && (
-                            <span className="ix-marker" data-needs-decision title={needsStageTitle(decision)}>
+                            <span className="lx-pill lx-pill-warn lx-pill-wrap" data-needs-decision title={needsStageTitle(decision)}>
                               {LEADS_NEEDS_STAGE}
                             </span>
                           )}
                           {dup && (
                             <button
                               type="button"
-                              className="ix-marker ix-marker-dup"
+                              className="lx-pill lx-pill-warn lx-pill-wrap ix-pill-btn"
                               data-duplicate
                               aria-haspopup="dialog"
                               aria-label={LEADS_COMPARE_OPEN(name)}
@@ -285,7 +285,7 @@ export default function IntakeTable({
                       </td>
 
                       {hasOwnerColumn && (
-                        <td data-col="owner" data-label="Owner">
+                        <td data-col="owner" data-label={OWNER_COLUMN}>
                           <OwnerCell leadName={name} owner={row.owner} assignedTo={lead.assigned_to} members={members} pending={pending} onAssign={(userId) => onAssign(lead.id, userId)} />
                         </td>
                       )}
@@ -302,9 +302,10 @@ export default function IntakeTable({
                         {touch.text}
                       </td>
 
-                      <td className="rse-next-td" data-col="next" data-label="Next step">
+                      <td className="rse-next-td" data-col="next" data-label={NEXT_STEP}>
                         <div className="ix-next-wrap">
-                          <span className="ix-next" data-urgent={step.urgent ? "" : undefined} data-muted={step.muted ? "" : undefined} title={step.text}>
+                          {/* Amber only on a person's own note; the sentences the page writes (waiting on, consult held) read the same on every row. */}
+                          <span className="ix-next" data-urgent={step.urgent && row.latestNote?.trim() ? "" : undefined} data-muted={step.muted ? "" : undefined} title={step.text}>
                             {step.text}
                           </span>
                           {showTimeChip(time?.byLeadId[lead.id], time?.running ?? null, lead.id, time === null) && (
@@ -328,11 +329,11 @@ export default function IntakeTable({
                 );
               })}
             </tbody>
-          </table>
-        </div>
+          </SheetTable>
+        </SheetScroll>
 
         {rows.length === 0 && (
-          <div className="lp-empty" data-empty={!anyLeads ? "none" : "filtered"}>
+          <div className="lx-state-card" data-empty={!anyLeads ? "none" : "filtered"}>
             {emptyAction}
             {onClearFilters && anyLeads && (
               <button type="button" className="lp-clear" onClick={onClearFilters}>
@@ -343,15 +344,10 @@ export default function IntakeTable({
         )}
 
         <div className="ix-foot">
-          <span>{LEADS_SHOWING(rows.length, total)}</span>
-          {left > 0 && (
-            <button type="button" className="ix-more" onClick={onShowMore}>
-              {LEADS_SHOW_MORE(Math.min(SHOW_STEP, left), left)}
-            </button>
-          )}
+          <ShowingCount shown={rows.length} total={total} onMore={left > 0 ? onShowMore : undefined} />
           <span className="lx-sr">{setLabel}</span>
         </div>
-      </div>
+      </SheetCard>
     </div>
   );
 }

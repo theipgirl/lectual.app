@@ -4,6 +4,7 @@ import { GENERAL_LIMITS } from "@/lib/proposals/validate";
 import type { GeneralFormValues } from "@/lib/proposal-editor/general-form";
 import { fieldId } from "@/lib/proposal-editor/checklist";
 import { newRowId, useRows } from "./rows";
+import { OPTIONAL } from "@/lib/ui/words";
 
 /**
  * Spec 9: the fields of a general (flat-fee) proposal: the matter, a summary, the work (each piece with hours and
@@ -28,7 +29,7 @@ export function GeneralFields({ values, editable = true }: { values: GeneralForm
         />
       </label>
       <label className="lx-field">
-        <span className="lx-label">Summary (optional)</span>
+        <span className="lx-label">Summary<span className="lx-optional"> {OPTIONAL}</span></span>
         <textarea className="lx-input" name="summary" rows={3} maxLength={GENERAL_LIMITS.summary} defaultValue={values.summary} />
         <span className="lx-note">A short paragraph the client reads above the work.</span>
       </label>
@@ -82,7 +83,7 @@ export function GeneralFields({ values, editable = true }: { values: GeneralForm
         <textarea className="lx-input" name="excludes" rows={3} defaultValue={values.excludes} />
       </label>
       <label className="lx-field">
-        <span className="lx-label">Terms note (optional)</span>
+        <span className="lx-label">Terms note<span className="lx-optional"> {OPTIONAL}</span></span>
         <textarea className="lx-input" name="termsNote" rows={2} maxLength={GENERAL_LIMITS.termsNote} defaultValue={values.termsNote} />
       </label>
     </div>

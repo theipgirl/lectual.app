@@ -3,50 +3,12 @@
  * token, it only lays the brain-specific pieces out. Class names are
  * prefixed lx-brain- to stay out of every other feature's way. */
 
-.lx-brain-banner {
-  display: grid;
-  gap: 12px;
-}
-
-.lx-brain-banner-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.lx-brain-badge {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--ox);
-  color: var(--cream);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-}
-
-.lx-brain-lede {
-  margin: 0;
-  font-family: var(--serif);
-  font-size: 18px;
-  line-height: 1.55;
-  max-width: 68ch;
-  color: var(--ink);
-}
-
 .lx-brain-fine {
   margin: 0;
-  font-size: 12.5px;
+  font-size: var(--fs-1);
   line-height: 1.7;
   color: var(--body);
   max-width: 78ch;
-}
-
-.lx-brain-forms {
-  display: grid;
-  gap: 12px;
 }
 
 .lx-brain-form {
@@ -83,20 +45,17 @@
 
 .lx-brain-collection-title h3 {
   margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--ink);
 }
 
 .lx-brain-collection-desc {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--fs-1);
   color: var(--muted);
   max-width: 62ch;
 }
 
 .lx-brain-foot {
-  font-size: 11px;
+  font-size: var(--fs-1);
   color: var(--muted);
   white-space: nowrap;
 }
@@ -132,33 +91,32 @@
 }
 
 .lx-brain-row-title strong {
-  font-size: 14px;
+  font-size: var(--fs-3);
   font-weight: 600;
   color: var(--ink);
 }
 
 .lx-brain-key {
-  font-family: var(--mono);
-  font-size: 11px;
+  font-size: var(--fs-1);
   color: var(--muted);
 }
 
 .lx-brain-body {
   margin: 0;
-  font-size: 12.5px;
+  font-size: var(--fs-2);
   color: var(--body);
   white-space: pre-wrap;
 }
 
 .lx-brain-context {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--fs-1);
   color: var(--muted);
 }
 
 .lx-brain-note {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--fs-1);
   color: var(--muted);
   font-style: italic;
 }
@@ -182,7 +140,7 @@
 
 .lx-brain-full > summary {
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--fs-1);
   color: var(--muted);
   list-style: none;
 }
@@ -192,7 +150,7 @@
 }
 
 .lx-brain-full .lx-md {
-  font-size: 13.5px;
+  font-size: var(--fs-2);
 }
 
 .lx-brain-edit {
@@ -201,36 +159,31 @@
 
 .lx-brain-edit > summary {
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--fs-1);
   color: var(--muted);
   list-style: none;
 }
 
 .lx-brain-error {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--fs-2);
   color: var(--wine);
 }
 
-/* Knowledge | Claim library tabs. */
-.lx-brain-tabs {
-  display: flex;
-  gap: 4px;
-  border-bottom: 1px solid var(--line);
-}
-.lx-brain-tab {
-  padding: 8px 14px;
-  font-size: 14.5px;
-  color: var(--body);
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-}
-.lx-brain-tab:hover {
-  text-decoration: none;
-  color: var(--ink);
-}
-.lx-brain-tab-on {
-  color: var(--ink);
-  font-weight: 500;
-  border-bottom-color: var(--ox);
+/* Phones: one column, the review forms stack, the long key wraps instead of widening the page. */
+@media (max-width: 640px) {
+  .lx-brain-review,
+  .lx-brain-review form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .lx-brain-review .lx-field input {
+    width: 100%;
+  }
+  .lx-brain-form {
+    max-width: none;
+  }
+  .lx-brain-key {
+    overflow-wrap: anywhere;
+  }
 }

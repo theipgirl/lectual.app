@@ -1,3 +1,4 @@
+import { formatDay } from "@/lib/ui/dates";
 import { markKey } from "@/lib/consult/details";
 import { MAX_MARKS, type ConsultMark, type MarkType } from "@/lib/consult/vocab";
 import type { ReviewedConsultRead } from "@/lib/consult/store";
@@ -220,11 +221,9 @@ export function packageFromConsult(recommended: string | null | undefined, packa
 
 /* ───────────────────────── the words on the page ────────────────────────── */
 
-/** "Oct 21, 2026" in the firm's zone; empty when the stamp is not a date. */
+/** "Oct 21" ("Oct 21, 2025" in an earlier year) in the firm's zone; empty when the stamp is not a date. */
 export function reviewDate(value: string | null | undefined, tz: string): string {
-  const ms = Date.parse(value ?? "");
-  if (Number.isNaN(ms)) return "";
-  return new Intl.DateTimeFormat("en-US", { timeZone: tz, month: "short", day: "numeric", year: "numeric" }).format(new Date(ms));
+  return formatDay(value, { tz }) ?? "";
 }
 
 /**

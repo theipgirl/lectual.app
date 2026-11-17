@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { BackLink, PageHeader } from "@/components/ui/PageHeader";
+import { Notice } from "@/components/ui/Notice";
+import { Pill } from "@/components/ui/Pill";
 import { notFound } from "next/navigation";
 import { getQueueItem, type QueueItem } from "@/lib/queue/api";
 import { activeQueueOrgKey } from "@/lib/queue/org";
@@ -80,15 +83,10 @@ export default async function QueueItemPage({
     loadQueueViewContext(),
   ]);
 
-  const back = (
-    <Link href="/dashboard/queue/" className="lx-back lx-qi-back">
-      ← {APPROVALS_NAME}
-    </Link>
-  );
   if (loadError) {
     return (
       <>
-        {back}
+        <BackLink href="/dashboard/queue/" label={APPROVALS_NAME} />
         <QueueUnavailable status={isUnconfiguredError(loadError) ? "unconfigured" : "unavailable"} reason="env" />
       </>
     );
@@ -132,51 +130,44 @@ export default async function QueueItemPage({
 
   return (
     <>
-      {back}
+      <PageHeader back={{ href: "/dashboard/queue/", label: APPROVALS_NAME }} title={item.headline} details={`${typeLabel(item.type)} · ${agentLabel(item.agent)}`} />
       <div className="lx-split lx-qi">
         <div className="lx-col">
           {outcome && (
-            <div role="status" className={`lx-banner lx-banner-${outcome.tone === "ok" ? "ok" : outcome.tone === "risk" ? "risk" : "mute"}`}>
+            <Notice role="status" tone={outcome.tone === "ok" ? "ok" : outcome.tone === "risk" ? "risk" : "mute"}>
               {outcome.text}
-            </div>
+            </Notice>
           )}
           {returned === "1" && (
-            <div role="status" className="lx-banner lx-banner-ok">
+            <Notice role="status" tone="ok">
               {SEND_BACK_DONE}
-            </div>
+            </Notice>
           )}
-          <div>
-            <div className="lx-label lx-qi-kind">
-              {typeLabel(item.type)} · {agentLabel(item.agent)}
-            </div>
-            <h1 className="lx-h1" style={{ fontSize: 32 }}>
-              {item.headline}
-            </h1>
-          </div>
           {warning && (
-            <div
+            <Notice
               role="alert"
-              className={`lx-banner ${stale.status === "stale" ? "lx-banner-risk" : "lx-banner-warn"}`}
-              style={{ display: "grid", gap: 6 }}
+              tone={stale.status === "stale" ? "risk" : "warn"}
+              title={warning.headline}
+              action={
+                stale.status !== "unavailable" && "leadIds" in stale && stale.leadIds[0] ? (
+                  <Link href={`/dashboard/leads/${stale.leadIds[0]}/`}>Open {stale.leadName ?? "the lead"}</Link>
+                ) : undefined
+              }
             >
-              <strong style={{ fontSize: 16 }}>{warning.headline}</strong>
               <span>{warning.detail}</span>
-              {stale.status !== "unavailable" && "leadIds" in stale && stale.leadIds[0] && (
-                <Link href={`/dashboard/leads/${stale.leadIds[0]}/`}>Open {stale.leadName ?? "the lead"}</Link>
-              )}
-            </div>
+            </Notice>
           )}
           {stale.status === "unlinked" && (
-            <p className="lx-note" style={{ margin: 0 }}>
+            <p className="lx-note">
               This draft isn&apos;t linked to a lead, so Lectual couldn&apos;t check whether the client has signed or paid since it
               was queued. Check before approving.
             </p>
           )}
           {handedCard && <HandedToYouCard id={item.id} byName={handedCard.byName} when={handedCard.when} note={handedCard.note} cantApprove={handedCard.cantApprove} />}
-          <section className="lx-card lx-qi-card" style={{ padding: 20 }}>
+          <section className="lx-card lx-qi-card lx-pad">
             {resolved ? (
               <>
-                <div className="lx-label" style={{ marginBottom: 8 }}>
+                <div className="lx-label lx-qi-draft-label">
                   {item.final_body && item.final_body !== item.draft_body ? "Final, as approved" : "Draft"}
                 </div>
                 <Markdown text={item.final_body ?? item.draft_body} />
@@ -184,7 +175,7 @@ export default async function QueueItemPage({
             ) : (
               <>
               {!mayApprove && editRole !== null && refusal && !handedCard && (
-                <p role="status" className="lx-note" data-queue-refusal style={{ margin: "0 0 12px" }}>
+                <p role="status" className="lx-note lx-qi-refusal" data-queue-refusal>
                   {refusal}
                 </p>
               )}
@@ -201,10 +192,10 @@ export default async function QueueItemPage({
           </section>
         </div>
         <aside className="lx-card lx-aside lx-qi-aside">
-          <span className={`lx-pill lx-qi-status ${statusPill(item).tone}`} style={{ justifySelf: "start" }}>
-            {statusPill(item).label}
+          <span className="lx-qi-status">
+            <Pill tone={statusPill(item).tone}>{statusPill(item).label}</Pill>
           </span>
-          <p className="lx-note lx-qi-owner" data-queue-owner style={{ margin: 0 }}>
+          <p className="lx-note lx-qi-owner" data-queue-owner>
             {kindLabel(classifyQueueItem(item))} · {ownerText(item, view.routing, view.members ?? [])}
           </p>
           {/* Client, To, Subject, Send at and Queued as one compact definition list. */}

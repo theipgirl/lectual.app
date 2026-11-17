@@ -10,6 +10,7 @@ const h = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: () => {} }),
   notFound: () => {
     throw new Error("NEXT_NOT_FOUND");
   },
@@ -84,7 +85,7 @@ describe("Firm notes tabs", () => {
   it("a failed load still says so and shows no list", async () => {
     h.listFails = true;
     const html = await render();
-    expect(html).toContain("Couldn&#x27;t load your firm notes");
+    expect(html).toContain("Can&#x27;t show your firm notes right now");
     expect(html).not.toContain("No firm notes yet");
   });
   it("the page source no longer names IP.OS or AI_TOOLS_GROUP", () => {

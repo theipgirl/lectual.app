@@ -3,14 +3,16 @@ import { resolveFirmSession } from "@/lib/firm/session";
 import { ROLES, hasRole } from "@/lib/auth/roles";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { QUEUE_APPROVE_ROLES } from "@/lib/queue/roles";
-import { InviteForm, RemoveMember, ROLE_LABEL, RoleSelect } from "@/components/settings/TeamForms";
+import { LoadFailedCard, Pill, SheetCard, SheetScroll, SheetTable } from "@/components/ui";
+import { RemoveMember, ROLE_LABEL, RoleSelect, TeamHeader } from "@/components/settings/TeamForms";
 import { RoleTable } from "@/components/settings/RoleTable";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 import { inviteFormOpen } from "@/lib/team/invite-open";
 import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
+import { TEAM_NAME } from "@/lib/ui/words";
 
-export const metadata: Metadata = { title: pageTitle("Team") };
+export const metadata: Metadata = { title: pageTitle(TEAM_NAME) };
 
 export const dynamic = "force-dynamic";
 
@@ -37,61 +39,46 @@ export default async function TeamPage() {
 
   return (
     <>
-      <div className="lx-page-head">
-        <div style={{ flex: 1, minWidth: 260 }}>
-          <div className="lx-label">Settings</div>
-          <h1 className="lx-h1" data-tour="team-head">Team &amp; roles</h1>
-          <p className="lx-sub">Ten roles, enforced in the database, not just hidden in the menu. A role decides what someone can open, edit and approve.</p>
-        </div>
-      </div>
-
-      {isAdmin && (
-        <details className="lx-card lx-disclosure" open={inviteFormOpen(members.length, loadError) || undefined}>
-          <summary>Invite teammate</summary>
-          <div style={{ padding: "0 18px 18px" }}>
-            <InviteForm grantable={grantable} />
-          </div>
-        </details>
-      )}
+      <TeamHeader isAdmin={isAdmin} grantable={grantable} defaultOpen={inviteFormOpen(members.length, loadError)} />
 
       {loadError ? (
-        <div role="alert" className="lx-banner lx-banner-risk">
-          We couldn&apos;t load your team. Try again shortly.
-        </div>
+        <LoadFailedCard role="alert" what="your team" />
       ) : (
-        <div className="lx-card" style={{ overflow: "auto" }}>
-          <table className="lx-tbl lx-team-tbl">
-            <thead>
-              <tr>
-                <th>Person</th>
-                <th>Role</th>
-                <th>Can approve client mail</th>
-                {isAdmin && <th aria-label="Actions" />}
-              </tr>
-            </thead>
-            <tbody>
-              {members.map((m) => {
-                const self = m.userId === session.user.id;
-                const manageable = isAdmin && !self && hasRole(session.role, m.role);
-                const name = m.displayName ?? m.email ?? "Teammate";
-                return (
-                  <tr key={m.userId}>
-                    <td className="pri" data-label="Person">
-                      {name}
-                      {self && <span className="lx-note"> (you)</span>}
-                      {m.email && m.displayName && <div className="lx-note">{m.email}</div>}
-                    </td>
-                    <td data-label="Role">{manageable ? <RoleSelect userId={m.userId} role={m.role} grantable={grantable} name={name} /> : ROLE_LABEL[m.role] ?? m.role}</td>
-                    <td data-label="Can approve client mail">
-                      {QUEUE_APPROVE_ROLES.includes(m.role) ? <span className="lx-pill lx-pill-ok">Yes</span> : <span className="lx-pill lx-pill-mute">No</span>}
-                    </td>
-                    {isAdmin && <td className="lx-team-actions" style={{ textAlign: "right" }}>{manageable && <RemoveMember userId={m.userId} name={name} />}</td>}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <SheetCard>
+          <SheetScroll>
+            <SheetTable minWidth={640}>
+              <thead>
+                <tr>
+                  <th>Person</th>
+                  <th>Role</th>
+                  <th>Can approve client mail</th>
+                  {isAdmin && <th aria-label="Actions" />}
+                </tr>
+              </thead>
+              <tbody>
+                {members.map((m) => {
+                  const self = m.userId === session.user.id;
+                  const manageable = isAdmin && !self && hasRole(session.role, m.role);
+                  const name = m.displayName ?? m.email ?? "Teammate";
+                  return (
+                    <tr key={m.userId}>
+                      <td className="pri">
+                        {name}
+                        {self && <span className="lx-note"> (you)</span>}
+                        {m.email && m.displayName && <div className="lx-note">{m.email}</div>}
+                      </td>
+                      <td data-label="Role">{manageable ? <RoleSelect userId={m.userId} role={m.role} grantable={grantable} name={name} /> : ROLE_LABEL[m.role] ?? m.role}</td>
+                      <td data-label="Can approve client mail">
+                        {QUEUE_APPROVE_ROLES.includes(m.role) ? <Pill tone="ok">Yes</Pill> : <Pill tone="mute">No</Pill>}
+                      </td>
+                      {isAdmin && <td className="lx-stack-actions">{manageable && <RemoveMember userId={m.userId} name={name} />}</td>}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </SheetTable>
+          </SheetScroll>
+        </SheetCard>
       )}
       {!isAdmin && <p className="lx-note">{ADMIN_TIER_PHRASE} can manage the team.</p>}
 

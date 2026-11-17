@@ -149,7 +149,7 @@ describe("drawnNav", () => {
     expect(groups.map((g) => g.map((e) => e.label))).toEqual([["Today", "Approvals", "Weekly review", "Proposals"], ["More"]]);
     expect(groups[0][1]).toMatchObject({ href: DECK_PATH, active: true, countKey: "queue" });
     expect(groups[1][0].kids.map((k) => k.label)).toEqual(["Intake", "Forms", "Matters", "Calendar"]);
-    expect(groups[1][0].href).toBe("/dashboard/intake/");
+    expect(groups[1][0].href).toBe("/dashboard/intake/?view=table");
   });
 
   it("the owner phone bar and More sheet: no Reports, no Settings", () => {

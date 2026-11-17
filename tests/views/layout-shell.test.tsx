@@ -219,7 +219,7 @@ describe("account menu", () => {
 
   it("staff see the View group: Technician view current by default, a preview chip, the firm-only sentence", () => {
     const html = menu({ viewMenu: { pref: "technician", previewRoles: ["owner", "admin"] } });
-    expect(html).toMatch(/role="menuitemradio" aria-checked="true"[^>]*><span>Technician view<\/span><span class="lx-am-pill">Showing<\/span>/);
+    expect(html).toMatch(/role="menuitemradio" aria-checked="true"[^>]*><span>Technician view<\/span><span class="lx-pill lx-pill-ox">Showing<\/span>/);
     expect(html).toContain("Preview a view");
     expect(html).toMatch(/role="menuitemradio" aria-checked="false" class="lx-am-chip"[^>]*>Owner</);
     expect(html).toContain("A preview for this firm only. It changes what is drawn, not what can be opened.");

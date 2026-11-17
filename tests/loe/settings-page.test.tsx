@@ -156,7 +156,7 @@ describe("Engagement letter settings: seven states", () => {
     const t = text(html);
     expect(t.indexOf("Version 2")).toBeLessThan(t.indexOf("Version 1"));
     expect(t).toContain("Retired");
-    expect(t).toContain("Approved Nov 12, 2026");
+    expect(t).toMatch(/Approved Nov 12(, 2026)?/);
   });
 
   it("4. tables missing: says it isn't switched on and shows no form", async () => {

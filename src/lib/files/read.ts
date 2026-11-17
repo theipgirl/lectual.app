@@ -2,6 +2,7 @@ import { getScopedClient } from "@/lib/db/scoped-client";
 import { DOC_TYPE_LABEL } from "@/lib/documents/list";
 import { isMissingTableError, logFileFailure } from "./errors";
 import type { FileParentKind } from "./rules";
+import { TEAMMATE } from "@/lib/ui/words";
 
 /**
  * The reads behind the "Documents & files" card. Every read goes through the
@@ -107,7 +108,7 @@ export async function loadDocumentsRead(parent: FileParent, opts: { includeLette
 /** The member directory as the pages already hold it; null = it could not be read. */
 export type Directory = readonly { userId: string; name: string }[] | null;
 
-export const UNKNOWN_WHO = "A teammate";
+export const UNKNOWN_WHO = TEAMMATE;
 
 export type DocEntry =
   | { kind: "file"; id: string; name: string; sizeBytes: number; who: string; at: string }

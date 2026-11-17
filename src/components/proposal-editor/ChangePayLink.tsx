@@ -3,6 +3,7 @@
 import { changePayLinkAction } from "@/app/dashboard/proposals/[id]/actions";
 import { PAY_LINK_LABEL } from "@/lib/proposal-editor/pay-link";
 import { ActionForm, Outcome } from "./ActionForm";
+import { SAVING } from "@/lib/ui/words";
 
 /**
  * "Change pay link" for a version whose link is live (lectual 0100). The page shows it only for a
@@ -13,7 +14,7 @@ export function ChangePayLink({ proposalId, updatedAt, payUrl }: { proposalId: s
   return (
     <section className="lx-card pe-card" aria-label={PAY_LINK_LABEL}>
       <header className="pe-card-head">
-        <h2 className="pe-h">{PAY_LINK_LABEL}</h2>
+        <h2 className="lx-h3">{PAY_LINK_LABEL}</h2>
         <p className="lx-note pe-hint">
           Where &ldquo;Accept&rdquo; sends the client to pay. The link stays live and nothing else in the proposal changes. Nothing is emailed.
         </p>
@@ -37,7 +38,7 @@ export function ChangePayLink({ proposalId, updatedAt, payUrl }: { proposalId: s
             </label>
             <div className="pe-bar">
               <button type="submit" className="lx-btn lx-btn-sec" disabled={pending}>
-                {pending ? "Saving…" : "Save pay link"}
+                {pending ? SAVING : "Save pay link"}
               </button>
               <Outcome state={state} pending={pending} />
             </div>

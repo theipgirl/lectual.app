@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import type { Stage } from "@/lib/pipeline";
 import type { MemberIdentity } from "@/lib/members/directory";
 import type { ReferralSource } from "@/lib/intake";
@@ -53,6 +52,8 @@ import {
   NO_LEADS_YET,
 } from "@/lib/ui/words";
 import { ViewToggle } from "@/components/ViewToggle";
+import { Notice } from "@/components/ui/Notice";
+import { RefreshButton } from "@/components/ui/RefreshButton";
 import { assignLeadAction, bulkMoveStageAction, moveStageAction, setLaneAction, setSourceAction } from "../actions";
 import { bulkMoveSummary } from "@/lib/pipeline/bulk-move";
 import type { Lane } from "@/lib/leads/lane";
@@ -389,7 +390,6 @@ export default function IntakeWorkspace({
     [selected, renderedIds, movedRow, stages, pin],
   );
 
-  const router = useRouter();
   const note = detailsNote({
     approvals: pendingApprovals,
     agentMoves,
@@ -408,16 +408,16 @@ export default function IntakeWorkspace({
 
   const emptyContent = !anyLeads ? (
     <>
-      <p style={{ margin: 0 }}>{NO_LEADS_YET}</p>
-      <span style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
+      <p className="lx-note">{NO_LEADS_YET}</p>
+      <span className="ix-empty-actions">
         <AddLeadDialog stages={intakeStages} members={members} />
         <Link href="/dashboard/forms/">Open your intake form</Link>
       </span>
     </>
   ) : filtersActive ? (
-    <p style={{ margin: 0 }}>{LEADS_NO_MATCH_IN_SET(label)}</p>
+    <p className="lx-note">{LEADS_NO_MATCH_IN_SET(label)}</p>
   ) : (
-    <p style={{ margin: 0 }}>{LEADS_SET_EMPTY(label)}</p>
+    <p className="lx-note">{LEADS_SET_EMPTY(label)}</p>
   );
 
   return (
@@ -474,30 +474,32 @@ export default function IntakeWorkspace({
       />
 
       {setDataProp !== undefined && setData.status === "unavailable" && !lostView && (
-        <p role="status" className="lp-note" data-working-unavailable>
-          <span>{LEADS_WORKING_UNAVAILABLE}</span>
-          <button type="button" className="lp-btn" onClick={() => router.refresh()}>
-            Refresh
-          </button>
-        </p>
+        <div data-working-unavailable>
+          <Notice tone="warn" role="status" action={<RefreshButton />}>
+            {LEADS_WORKING_UNAVAILABLE}
+          </Notice>
+        </div>
       )}
       {note && (
-        <p role="status" className="lp-note" data-details-note>
-          <span>{note.text}</span>
-          <button type="button" className="lp-btn" onClick={() => router.refresh()}>
-            Refresh
-          </button>
-        </p>
+        <div data-details-note>
+          <Notice tone="warn" role="status" action={<RefreshButton />}>
+            {note.text}
+          </Notice>
+        </div>
       )}
       {lostView && lostCut && (
-        <p role="status" className="lp-note" data-lost-cut>
-          <span>{LEADS_LOST_CUT(lostCut.shown, lostCut.total)}</span>
-        </p>
+        <div data-lost-cut>
+          <Notice tone="warn" role="status">
+            {LEADS_LOST_CUT(lostCut.shown, lostCut.total)}
+          </Notice>
+        </div>
       )}
       {lost.status === "unavailable" && lostView && (
-        <p role="alert" className="lp-note" data-lost-unavailable>
-          <span>{LEADS_LOST_UNAVAILABLE}</span>
-        </p>
+        <div data-lost-unavailable>
+          <Notice tone="warn" role="alert">
+            {LEADS_LOST_UNAVAILABLE}
+          </Notice>
+        </div>
       )}
 
       <div className="ix-live" aria-live="polite" data-announce>
@@ -531,7 +533,7 @@ export default function IntakeWorkspace({
 
       {lostFailed ? null : board ? (
         sorted.length === 0 ? (
-          <div className="lp-empty" data-empty={!anyLeads ? "none" : "filtered"}>
+          <div className="lx-card lx-state-card" data-empty={!anyLeads ? "none" : "filtered"}>
             {emptyContent}
             {filtersActive && anyLeads && (
               <button type="button" className="lp-clear" onClick={clearFilters}>

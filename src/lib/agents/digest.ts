@@ -4,6 +4,7 @@ import { AGENT_DEFS, AGENT_IDS, type AgentId } from "./types";
 import { DID_NOT_FINISH_ERROR, isStaleRun } from "./run-status";
 import { friendlyRunError } from "./friendly-run-error";
 import { LECTUAL_TOLD } from "@/lib/ui/words";
+import { intakeListHref } from "@/lib/intake/list-href";
 
 /**
  * The "Overnight run" digest on Today and the Agents page: what each agent
@@ -162,13 +163,13 @@ function lineFor(agent: AgentId, runs: DigestRun[]): DigestLine | null {
 
   switch (agent) {
     case "intake-triage": {
-      if (items === 0) return { agent, name, text: "found no new leads to screen", tone: "quiet", href: "/dashboard/intake/" };
+      if (items === 0) return { agent, name, text: "found no new leads to screen", tone: "quiet", href: intakeListHref() };
       const hots = ok.map((r) => triageHotCount(r.summary));
       const hot = hots.every((h) => h !== null) ? hots.reduce<number>((s, h) => s + (h ?? 0), 0) : null;
       const parts = [`screened ${plural(items, "new lead", "new leads")}`];
       if (hot !== null && hot > 0) parts.push(`${hot} hot, ${hot === 1 ? "needs" : "need"} your review`);
       if (drafts > 0) parts.push(`${plural(drafts, "briefing", "briefings")} in Approvals`);
-      return { agent, name, text: parts.join(" · "), tone: hot ? "attention" : "ok", href: "/dashboard/intake/" };
+      return { agent, name, text: parts.join(" · "), tone: hot ? "attention" : "ok", href: intakeListHref() };
     }
     case "email-intel": {
       if (items === 0) return { agent, name, text: "found no new client email to read", tone: "quiet", href: "/dashboard/agents/" };

@@ -5,6 +5,8 @@ import {
   disconnectMailboxAction,
   type DisconnectState,
 } from "@/app/dashboard/settings/integrations/actions";
+import { SAVING } from "@/lib/ui/words";
+import "./mail-pane.css";
 
 /** "Disconnect" with the design's confirm dialog in front of it. */
 export function DisconnectButton({ id, email }: { id: string; email: string }) {
@@ -20,18 +22,18 @@ export function DisconnectButton({ id, email }: { id: string; email: string }) {
         Disconnect
       </button>
       {state.error && (
-        <span role="alert" className="lx-note" style={{ color: "var(--wine)" }}>
+        <span role="alert" className="lx-note lx-mail-disconnect-error">
           {state.error}
         </span>
       )}
       <dialog ref={dialog} className="lx-dialog" aria-labelledby={`dc-${id}`}>
         <form action={action} onSubmit={() => dialog.current?.close()}>
           <input type="hidden" name="id" value={id} />
-          <div style={{ padding: 22, display: "grid", gap: 10 }}>
-            <h2 id={`dc-${id}`} className="lx-h2" style={{ fontSize: 25 }}>
+          <div className="lx-mail-disconnect-body">
+            <h2 id={`dc-${id}`} className="lx-modal-title">
               Disconnect {email}?
             </h2>
-            <p style={{ margin: 0, color: "var(--body)", lineHeight: 1.55 }}>
+            <p className="lx-mail-disconnect-text">
               Lectual stops reading this mailbox and deletes its stored access. Timeline entries
               already matched to clients stay on their records.
             </p>
@@ -40,8 +42,8 @@ export function DisconnectButton({ id, email }: { id: string; email: string }) {
             <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={() => dialog.current?.close()}>
               Keep it
             </button>
-            <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={pending}>
-              {pending ? "Disconnecting…" : "Disconnect"}
+            <button type="submit" className="lx-btn lx-btn-danger lx-btn-sm" disabled={pending}>
+              {pending ? SAVING : "Disconnect"}
             </button>
           </div>
         </form>

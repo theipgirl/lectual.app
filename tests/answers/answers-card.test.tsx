@@ -254,7 +254,7 @@ describe("states (F5)", () => {
   });
 
   it("says when a source was cut at its row cap", () => {
-    expect(render({ submissions: ok([finishedIntake], true) })).toContain("Showing the latest 200 intake submissions.");
+    expect(render({ submissions: ok([finishedIntake], true) })).toContain("Showing 200 of 200+ intake submissions.");
   });
 
   it("labels the temperature as staff only and never uses raw HTML", () => {

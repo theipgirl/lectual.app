@@ -120,7 +120,7 @@ describe("the import preview shows every person it would place by hand or leave 
   it("has a labelled search box", async () => {
     const out = html(await previewOf(DEFAULT_PLAN_OPTIONS));
     expect(plain(out)).toContain("Find a person in this pull");
-    expect(out).toMatch(/<label class="lx-field"><span class="lx-label">Find a person in this pull<\/span><input[^>]*type="search"/);
+    expect(out).toMatch(/<span class="lx-label">Find a person in this pull<\/span><form class="lp-search" role="search">[\s\S]*?<input[^>]*type="search"/);
   });
 
   it("the view model carries every person for the search, once each", async () => {

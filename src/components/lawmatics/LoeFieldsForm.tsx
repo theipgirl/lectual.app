@@ -1,5 +1,6 @@
 "use client";
 
+import { SAVING } from "@/lib/ui/words";
 import { saveLoeFieldsAction } from "@/app/dashboard/settings/integrations/lawmatics/loe-fields-actions";
 import { ActionForm, Outcome } from "@/components/proposal-editor/ActionForm";
 import { LOE_FIELD_NAMES } from "@/lib/proposals/loe-adapter";
@@ -46,7 +47,7 @@ export function LoeFieldsForm({ config, options }: { config: LoeFieldsConfig; op
           </div>
           <div className="pe-save">
             <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending}>
-              {pending ? "Saving…" : "Save"}
+              {pending ? SAVING : "Save"}
             </button>
             <Outcome state={state} pending={pending} />
           </div>

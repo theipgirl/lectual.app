@@ -1,3 +1,4 @@
+import { formatDay, formatTime } from "@/lib/ui/dates";
 /**
  * When the approval deck is dealt. Pure: the clock and the firm's time zone come in.
  *
@@ -122,13 +123,12 @@ export function sameFirmDay(at: Date, now: Date, timeZone: string): boolean {
  */
 export function whenLabel(at: Date, now: Date, timeZone: string): string {
   const tz = safeZone(timeZone);
-  const time = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit" }).format(at);
+  const time = formatTime(at, { tz }) ?? "";
   const a = partsIn(at, tz);
   const n = partsIn(now, tz);
   const dayNumber = (p: { year: number; month: number; day: number }) => Date.UTC(p.year, p.month - 1, p.day) / 86_400_000;
   const diff = dayNumber(a) - dayNumber(n);
   if (diff === 0) return `today at ${time}`;
   if (diff === 1) return `tomorrow at ${time}`;
-  const day = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short", month: "short", day: "numeric" }).format(at);
-  return `${day} at ${time}`;
+  return `${formatDay(at, { tz, now, weekday: "short" }) ?? ""} at ${time}`;
 }

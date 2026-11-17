@@ -59,19 +59,20 @@ describe("source guards", () => {
 
 describe("css rules", () => {
   const css = readFileSync("src/app/dashboard/intake/leads.css", "utf8");
-  it("has no prefers-color-scheme block (the dashboard has no dark theme; a dark OS must not get dark pills on the cream page)", () => {
+  it("has no dark block at all (the dashboard is light-only; a dark OS must not get dark pills on the cream page)", () => {
     expect(css).not.toContain("prefers-color-scheme");
-    expect(css).toContain(':root[data-theme="dark"]');
+    expect(css).not.toContain('data-theme="dark"');
   });
   it("the card scrolls by default and is overflow visible only after a measurement said the table fits", () => {
     const table = readFileSync("src/app/dashboard/intake/_components/IntakeTable.tsx", "utf8");
     expect(table).toContain("useState(true)");
-    expect(css).toContain('.ix-sheet .rse-scroll[data-scroll="false"] { overflow: visible; }');
-    expect(css).not.toMatch(/\.ix-sheet \.rse-scroll\s*\{[^}]*overflow:\s*visible/);
+    const globals = readFileSync("src/app/globals.css", "utf8");
+    expect(table).toContain("scroll={needsScroll}");
+    expect(globals).toContain('.sheet-scroll[data-scroll="false"] { overflow: visible; }');
+    expect(globals).not.toMatch(/\n\.sheet-scroll\s*\{[^}]*overflow:\s*visible/);
   });
-  it("the Intake-only 13px header and the 14px phone controls are scoped, and the Sheet's CSS file is untouched by them", () => {
-    expect(css).toContain(".ix-leads .rv-owner .rse-tbl thead th");
-    expect(css).toMatch(/max-width: 640px\) \{\s*\.ix-marker-dup, \.ix-temp, \.ix-card \.ix-touch, \.ix-cmp-note, \.ix-cmp-close, \.ix-cmp-table tbody th \{ font-size: 14px; \}/);
+  it("the kit's 13px header; the phone 14px floor comes from --fs-1, so Intake has no private size block", () => {
+    expect(readFileSync("src/app/globals.css", "utf8")).toMatch(/\.sheet-tbl thead th \{[^}]*font-size: var\(--fs-1\)/);
   });
   it("a drag in progress is torn down when the table unmounts", () => {
     const h = readFileSync("src/app/dashboard/intake/_components/useColWidths.ts", "utf8");
@@ -81,10 +82,8 @@ describe("css rules", () => {
 
 describe("one typeface and the colours (CSS)", () => {
   const css = readFileSync("src/app/dashboard/intake/leads.css", "utf8");
-  it("the Leads page overrides every mono variable to Geist, and the file names no Courier or monospace", () => {
-    expect(css).not.toMatch(/courier-prime\), monospace/);
-    const block = css.slice(css.indexOf(".ix-leads.ix-leads"));
-    for (const v of ["--font-courier-prime", "--font-jetbrains-mono", "--font-mono", "--mono"]) expect(block).toContain(`${v}: var(--font-geist)`);
+  it("the Leads page sets no font override and the file names no Courier or monospace (the shared sans face is the only one)", () => {
+    expect(css).not.toMatch(/courier|monospace|--font-mono|--mono|--font-jetbrains-mono/i);
   });
   const lum = (hex: string) => {
     const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
@@ -94,22 +93,19 @@ describe("one typeface and the colours (CSS)", () => {
     const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
     return (x + 0.05) / (y + 0.05);
   };
-  const tokens = (scope: RegExp) => {
-    const m = scope.exec(css);
+  // The temperature colours are defined once, in globals.css :root (light only). The assistant chip uses the shared --ok and --tint-ok.
+  const globals = readFileSync("src/app/globals.css", "utf8");
+  const tokens = () => {
+    const m = /:root \{([\s\S]*?)\n\}/.exec(globals);
     if (!m) throw new Error("scope");
-    return Object.fromEntries([...m[1].matchAll(/--([a-z-]+): (#[0-9a-f]{6})/g)].map((x) => [x[1], x[2]]));
+    return Object.fromEntries([...m[1].matchAll(/--([a-z-]+):\s*(#[0-9a-f]{6})/g)].map((x) => [x[1], x[2]]));
   };
-  for (const [name, scope] of [
-    ["light", /\n:root \{([^}]*)\}/],
-    ["dark", /\n:root\[data-theme="dark"\] \{([^}]*)\}/],
-  ] as const) {
-    it(`temperature and assistant text reaches 4.5:1 on its own background (${name}), filled and outlined`, () => {
-      const t = tokens(scope);
-      for (const tone of ["hot", "warm", "cold"]) {
-        expect(ratio(t[`tp-${tone}-fg`], t[`tp-${tone}-bg`]), `${tone} filled`).toBeGreaterThanOrEqual(4.5);
-        expect(ratio(t[`tp-${tone}-fg`], t["tp-outline-bg"]), `${tone} outlined`).toBeGreaterThanOrEqual(4.5);
-      }
-      if (name === "dark") expect(ratio(t["asst-fg"], t["asst-bg"])).toBeGreaterThanOrEqual(4.5);
-    });
-  }
+  it("temperature text reaches 4.5:1 on its own background (light), filled and outlined", () => {
+    const t = tokens();
+    for (const tone of ["hot", "warm", "cold"]) {
+      expect(ratio(t[`tp-${tone}-fg`], t[`tp-${tone}-bg`]), `${tone} filled`).toBeGreaterThanOrEqual(4.5);
+      expect(ratio(t[`tp-${tone}-fg`], t["card"]), `${tone} outlined`).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(readFileSync("src/app/dashboard/intake/intake.css", "utf8")).toContain("var(--tint-ok)");
+  });
 });

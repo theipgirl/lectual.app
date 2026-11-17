@@ -3,6 +3,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { QueueItem } from "@/lib/queue/api";
 import type { QueueLoad } from "@/lib/queue/load";
 
+// The failed-read card carries a Refresh button, which needs the app router.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
+
 // next.config.ts sets trailingSlash: true, which <Link> reads from this variable.
 process.env.__NEXT_TRAILING_SLASH = "true";
 
@@ -84,11 +87,11 @@ describe("queue list: Possible duplicate (H10)", () => {
       vi.resetModules();
       const html = await render(load);
       expect(html).not.toContain("Possible duplicate");
-      expect(html).not.toContain("All caught up");
+      expect(html).not.toContain("No approvals waiting yet.");
     }
   });
 
   it("an empty pending queue still says all caught up", async () => {
-    expect(await render({ status: "ok", items: [] })).toContain("All caught up");
+    expect(await render({ status: "ok", items: [] })).toContain("No approvals waiting yet.");
   });
 });

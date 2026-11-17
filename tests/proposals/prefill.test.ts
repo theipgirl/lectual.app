@@ -304,12 +304,12 @@ describe("the 'Filled from' line", () => {
     // 02:30 UTC on Oct 21 is still Oct 20 in New York.
     expect(
       filledFromLine({ lead: "Ana Ruiz", consult: { reviewedBy: "Rebecca Beliard", reviewedAt: "2026-10-21T02:30:00Z" }, packageName: "Enhanced", tz }),
-    ).toBe("Filled from: lead Ana Ruiz; consult details reviewed by Rebecca Beliard on Oct 20, 2026; package Enhanced.");
+    ).toBe("Filled from: lead Ana Ruiz; consult details reviewed by Rebecca Beliard on Oct 20; package Enhanced.");
   });
 
   it("a review with no stored name reads 'reviewed on <date>'", () => {
     expect(filledFromLine({ lead: "Ana", consult: { reviewedBy: null, reviewedAt: "2026-10-21T16:00:00Z" }, tz })).toBe(
-      "Filled from: lead Ana; consult details reviewed on Oct 21, 2026.",
+      "Filled from: lead Ana; consult details reviewed on Oct 21.",
     );
   });
 

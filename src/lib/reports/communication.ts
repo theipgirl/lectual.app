@@ -8,7 +8,7 @@ import { isInPeriod, isInPreviousPeriod, type ReportPeriod } from "./period";
 import { isWaitingOnUs, leadLabel, waitingSince } from "./leads";
 import { oldestFirst, type LinkTile, type WaitingItem } from "./waiting";
 import { relativeTime } from "@/lib/relative-time";
-import { APPROVALS_NAME, ASSISTANTS_NAME, notReadyPlural } from "@/lib/ui/words";
+import { APPROVALS_NAME, ASSISTANTS_NAME, notReadyPlural, MAIL_NAME } from "@/lib/ui/words";
 
 export type CommunicationReport = {
   kpis: Metric[];
@@ -113,7 +113,7 @@ export async function loadCommunicationReport(
     : [];
 
   const links: LinkTile[] = [
-    ...(opts.hasMailbox ? [{ label: "My Mail", sub: "Your Outlook or Gmail inbox", href: "/dashboard/mail/", count: null }] : []),
+    ...(opts.hasMailbox ? [{ label: MAIL_NAME, sub: "Your Outlook or Gmail inbox", href: "/dashboard/mail/", count: null }] : []),
     { label: APPROVALS_NAME, sub: "Drafts waiting for your approval", href: "/dashboard/queue/", count: queue.status === "ok" ? queue.items.length : null },
     { label: "Campaigns", sub: "Nurture and follow-up campaigns", href: "/dashboard/campaigns/", count: drips.status === "ok" ? drips.rows.length : null },
   ];

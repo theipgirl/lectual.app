@@ -106,7 +106,7 @@ function render(params: IntakeSearchParams = {}, props: Props = {}) {
       intakeStages={intakeStages(STAGES)}
       members={MEMBERS}
       initialFilters={parseIntakeFilters(params)}
-      initialViewState={parseIntakeViewState(params)}
+      initialViewState={parseIntakeViewState({ view: "table", ...params })}
       time={null}
       now={NOW.toISOString()}
       agentMoves={"agentMoves" in props ? props.agentMoves : { status: "ok", truncated: false }}
@@ -188,7 +188,7 @@ describe("the Agent moves filter", () => {
       expect(filtersToQueryString(filters)).toBe(`agent=${agent}`);
       expect(parseIntakeFilters(Object.fromEntries(new URLSearchParams(intakeQueryString(filters, parseIntakeViewState({})))))).toMatchObject({ agent });
     }
-    expect(intakeHref({ ...EMPTY_INTAKE_FILTERS, agent: "today" }, parseIntakeViewState({ view: "board" }))).toBe("/dashboard/intake/?agent=today&view=board");
+    expect(intakeHref({ ...EMPTY_INTAKE_FILTERS, agent: "today" }, parseIntakeViewState({ view: "table" }))).toBe("/dashboard/intake/?agent=today&view=table");
     expect(filtersToQueryString({ ...EMPTY_INTAKE_FILTERS, agent: null })).toBe("");
     expect(filtersToQueryString(EMPTY_INTAKE_FILTERS)).toBe("");
   });
@@ -277,9 +277,9 @@ describe("styles", () => {
     const block = css.slice(css.indexOf(".intake-agent-chip"));
     // Item L2: the assistants' own colour, never the oxblood tint of a person's pills.
     const chip = block.slice(0, block.indexOf("}"));
-    expect(chip).toContain("var(--asst-bg)");
-    expect(chip).toContain("var(--asst-fg)");
-    expect(chip).not.toContain("var(--oxbg)");
+    expect(chip).toContain("var(--tint-ok)");
+    expect(chip).toContain("var(--ok)");
+    expect(chip).not.toContain("var(--tint-ox)");
     expect(readFileSync("src/app/globals.css", "utf8")).not.toContain("intake-agent-chip");
   });
 });

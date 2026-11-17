@@ -1,4 +1,5 @@
-import Link from "next/link";
+import { PageHeader } from "@/components/ui";
+import { NEW_LETTER_NAMES } from "@/lib/ui/words";
 import { notFound } from "next/navigation";
 import { getMatter } from "@/lib/matters";
 import { matterLabel } from "@/lib/matters/docket-summary";
@@ -6,7 +7,7 @@ import TrademarkClearanceForm from "./_components/TrademarkClearanceForm";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 
-export const metadata: Metadata = { title: pageTitle("Trademark clearance") };
+export const metadata: Metadata = { title: pageTitle(NEW_LETTER_NAMES.clearance) };
 
 export const dynamic = "force-dynamic";
 
@@ -16,14 +17,11 @@ export default async function Page({ params }: { params: Promise<{ matterId: str
   if (!matter) notFound();
   return (
     <>
-      <Link href={`/dashboard/documents/new/${matter.id}/`} className="lx-back">
-        ← {matterLabel(matter)}
-      </Link>
-      <div>
-        <div className="lx-label">Document Center</div>
-        <h1 className="lx-h1">New preliminary trademark clearance</h1>
-        <p className="lx-sub">{"A preliminary, pre-engagement knockout opinion, lighter than the full opinion letter and never a substitute for it. Paste in the preliminary search findings. It is attorney work product, never sent to a client directly."}</p>
-      </div>
+      <PageHeader
+        back={{ href: `/dashboard/documents/new/${matter.id}/`, label: matterLabel(matter) }}
+        title={NEW_LETTER_NAMES.clearance}
+        sub={"A preliminary, pre-engagement knockout opinion, lighter than the full opinion letter and never a substitute for it. Paste in the preliminary search findings. It is attorney work product, never sent to a client directly."}
+      />
       <TrademarkClearanceForm matterId={matter.id} matter={matter} />
     </>
   );

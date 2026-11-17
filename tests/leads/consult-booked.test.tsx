@@ -14,7 +14,7 @@ const text = (html: string) => html.replaceAll("&#x27;", "'").replaceAll("&apos;
 type Read = OutlookRead<{ event: OutlookCalendarEvent | null }>;
 
 // STRATEGY_SESSION is 2026-10-22T18:00Z: 2:00 PM on Thursday in New York.
-const WHEN = "Thu, Oct 22, 2:00 PM";
+const WHEN = "Oct 22, 2:00 PM";
 
 describe("ConsultBookedView", () => {
   it("a future linked consult shows the heading, the firm-zone date and time, and a safe Join link", () => {
@@ -28,7 +28,7 @@ describe("ConsultBookedView", () => {
 
   it("the same instant is drawn in the firm's own zone", () => {
     const html = renderToStaticMarkup(<ConsultBookedView read={{ status: "ok", event: storedConsult() }} timeZone="America/Los_Angeles" />);
-    expect(text(html)).toContain("Thu, Oct 22, 11:00 AM");
+    expect(text(html)).toContain("Oct 22, 11:00 AM");
   });
 
   it("a consult with no join URL shows no Join link", () => {

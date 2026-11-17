@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { groupMailByDay, mailTime, safeMailLink, toMailRows, type MailActivity } from "@/lib/mailbox/my-mail";
 
-const NOW = new Date(2026, 8, 26, 15, 0); // Sat 26 Sep 2026, 3pm local
+const NOW = new Date("2026-09-26T15:00:00Z"); // Sat 26 Sep 2026, 3pm UTC
+const TZ = "UTC";
 const act = (id: string, at: string, o: Partial<MailActivity> = {}, p: Record<string, unknown> = {}): MailActivity => ({
   id,
   type: "email_received",
@@ -43,27 +44,30 @@ describe("groupMailByDay", () => {
   it("buckets into today, yesterday, this week and earlier, skipping empty groups", () => {
     const rows = toMailRows(
       [
-        act("t", new Date(2026, 8, 26, 9).toISOString()),
-        act("y", new Date(2026, 8, 25, 22).toISOString()),
-        act("w", new Date(2026, 8, 22, 9).toISOString()),
-        act("e", new Date(2026, 7, 1, 9).toISOString()),
+        act("t", "2026-09-26T09:00:00Z"),
+        act("y", "2026-09-25T22:00:00Z"),
+        act("w", "2026-09-22T09:00:00Z"),
+        act("e", "2026-08-01T09:00:00Z"),
       ],
       names,
     );
-    expect(groupMailByDay(rows, NOW).map((g) => [g.key, g.rows.map((r) => r.id)])).toEqual([
+    expect(groupMailByDay(rows, NOW, TZ).map((g) => [g.key, g.rows.map((r) => r.id)])).toEqual([
       ["today", ["t"]],
       ["yesterday", ["y"]],
       ["week", ["w"]],
       ["earlier", ["e"]],
     ]);
-    expect(groupMailByDay([], NOW)).toEqual([]);
+    expect(groupMailByDay([], NOW, TZ)).toEqual([]);
   });
 });
 
 describe("mailTime", () => {
-  it("shows a clock today, a weekday this week, a date before that", () => {
-    expect(mailTime(new Date(2026, 8, 26, 8, 12).toISOString(), NOW)).toMatch(/8:12/);
-    expect(mailTime(new Date(2026, 8, 23, 8).toISOString(), NOW)).toBe("Wed");
-    expect(mailTime(new Date(2026, 7, 1, 8).toISOString(), NOW)).toBe("Aug 1");
+  it("shows a clock today, else a date (never a weekday), in the firm's zone", () => {
+    expect(mailTime("2026-09-26T08:12:00Z", NOW, TZ)).toBe("8:12 AM");
+    expect(mailTime("2026-09-23T08:00:00Z", NOW, TZ)).toBe("Sep 23");
+    expect(mailTime("2026-08-01T08:00:00Z", NOW, TZ)).toBe("Aug 1");
+    expect(mailTime("2025-08-01T08:00:00Z", NOW, TZ)).toBe("Aug 1, 2025");
+    // 03:30 UTC on the 26th is still the evening of the 25th in New York.
+    expect(mailTime("2026-09-26T03:30:00Z", NOW, "America/New_York")).toBe("Sep 25");
   });
 });

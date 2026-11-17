@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, type ReactNode } from "react";
 import { DRAFT_FORM_ID, EMPTY_DIRTY, LEAVE_WARNING, UNSAVED_PILL, anyDirty, dirtyReducer, type DirtyState } from "@/lib/proposal-editor/unsaved";
+import { Pill } from "@/components/ui/Pill";
 
 type Ctx = {
   state: DirtyState;
@@ -66,9 +67,9 @@ export function UnsavedMarker() {
   const { any } = useUnsaved();
   if (!any) return null;
   return (
-    <span className="lx-pill lx-pill-warn pe-unsaved" data-unsaved-marker role="status">
+    <Pill tone="warn" className="pe-unsaved" data-unsaved-marker role="status">
       {UNSAVED_PILL}
-    </span>
+    </Pill>
   );
 }
 

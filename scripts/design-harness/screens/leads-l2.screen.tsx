@@ -37,7 +37,7 @@ async function withL2Data<T>(fn: () => Promise<T>): Promise<T> {
 
 const RELEASE = "<style>.lx-app{height:auto!important;min-height:0!important;overflow:visible!important}.lx-main,.lx-content,.lx-page{overflow:visible!important;height:auto!important}</style>";
 const VPS = [["d", "desktop"], ["m", "desktop"], ["p", "phone"]] as const;
-const VIEWS = [["list", { set: "open" }], ["board", { view: "board", set: "open" }]] as const;
+const VIEWS = [["list", { view: "table", set: "open" }], ["board", { view: "board", set: "open" }]] as const;
 
 const mk = (id: string, view: string, shell: "tech" | "owner", vp: string, viewport: "desktop" | "phone", search: Record<string, string>): Screen => ({
   id,
@@ -75,7 +75,7 @@ const comparePanel = (shell: "tech" | "owner", id: string, viewport: "desktop" |
     state.pathname = "/dashboard/intake/";
   },
   render: async () => {
-    const page = (await withL2Data(() => IntakePage({ searchParams: Promise.resolve({ set: "open" }) }))) as unknown as ReactElement;
+    const page = (await withL2Data(() => IntakePage({ searchParams: Promise.resolve({ view: "table", set: "open" }) }))) as unknown as ReactElement;
     const panel = (
       <div className="intake-root">
         <div className="ix-cmp-backdrop">

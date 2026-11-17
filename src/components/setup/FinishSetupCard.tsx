@@ -34,12 +34,12 @@ export function FinishSetupView({ checklist }: { checklist: SetupChecklist }) {
   return (
     <section className="lx-card su-card" aria-labelledby="finish-setup-h">
       <div className="su-card-main">
-        <h2 id="finish-setup-h" className="lx-h2 su-card-title">
+        <h2 id="finish-setup-h" className="lx-h3">
           {`Finish setting up · ${checklist.doneCount} of ${checklist.total}`}
         </h2>
         {next && <p className="lx-sub" style={{ margin: 0 }}>{`Next: ${next.label}`}</p>}
         {unchecked > 0 && (
-          <p className="lx-note" style={{ margin: 0, color: "var(--warn)" }}>
+          <p className="lx-note su-card-warn" style={{ margin: 0 }}>
             {`${unchecked} couldn't be checked`}
           </p>
         )}

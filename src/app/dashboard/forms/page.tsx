@@ -20,10 +20,22 @@ import { parseEventRange } from "@/lib/intake-forms/booth-results";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import "./forms.css";
 import type { Metadata } from "next";
-import { pageTitle } from "@/lib/ui/page-title";
+import { pageTitle, recordPageTitle } from "@/lib/ui/page-title";
 import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
+import { EmptyState, LoadFailedCard, PageHeader } from "@/components/ui";
+import { FORMS_NAME, BLANK } from "@/lib/ui/words";
 
-export const metadata: Metadata = { title: pageTitle("Forms") };
+/** The tab says "Forms" on the list and the form's own name once one is open (the h1 is that name). */
+export async function generateMetadata({ searchParams }: { searchParams: Promise<{ form?: string }> }): Promise<Metadata> {
+  const { form } = await searchParams;
+  if (!form) return { title: pageTitle(FORMS_NAME) };
+  return {
+    title: await recordPageTitle(async () => {
+      const load = await loadIntakeForm(form);
+      return load.status === "ok" ? (load.form?.name ?? null) : null;
+    }, FORMS_NAME),
+  };
+}
 
 export const dynamic = "force-dynamic";
 
@@ -107,7 +119,7 @@ export default async function IntakeFormsPage({
                       completed: st?.completed ?? 0,
                       unfinished: st?.unfinished ?? 0,
                       median: formatDuration(st?.medianMs ?? null),
-                      rate: st?.completionRate ?? "—",
+                      rate: st?.completionRate ?? BLANK,
                     }
                   : null,
               };
@@ -120,7 +132,7 @@ export default async function IntakeFormsPage({
     return <IntakeEmpty status={list.status === "ok" ? "none" : list.status} />;
   }
 
-  const [load, pkgs, origin] = await Promise.all([loadIntakeForm(sp.form), loadIntakePackages(), intakeOrigin()]);
+  const [load, pkgs, origin, timeZone] = await Promise.all([loadIntakeForm(sp.form), loadIntakePackages(), intakeOrigin(), getFirmTimeZone()]);
   if (load.status === "ok" && !load.form) notFound();
 
   if (load.status !== "ok" || !load.form) return <IntakeEmpty status={load.status === "ok" ? "none" : load.status} />;
@@ -138,6 +150,7 @@ export default async function IntakeFormsPage({
     <IntakeFormsWorkspace
       form={form}
       orgName={session.org.name}
+      timeZone={timeZone}
       packages={packages}
       origin={origin}
       canEdit={canEdit}
@@ -166,29 +179,15 @@ export default async function IntakeFormsPage({
 /** No intakes to show: not set up here, unreachable, or none yet (and the caller can't create). */
 function IntakeEmpty({ status }: { status: "none" | "unconfigured" | "unavailable" }) {
   return (
-      <>
-        <div className="lx-page-head">
-          <div style={{ flex: 1, minWidth: 240 }}>
-            <h1 className="lx-h1" data-tour="forms-head">Forms</h1>
-            <p className="lx-sub">Your public intake, how it looks, and where it lives.</p>
-          </div>
-        </div>
-        <div className="lx-card lx-empty-card">
-          <h2 className="lx-h2" style={{ fontSize: 25 }}>
-            {status === "unconfigured"
-              ? "Forms isn't switched on for your firm yet"
-              : status === "unavailable"
-                ? "Your intake couldn't be loaded"
-                : "Your firm hasn't set up its intake yet"}
-          </h2>
-          <p className="lx-note" style={{ margin: 0 }}>
-            {status === "unconfigured"
-              ? "Lectual will turn it on. Nothing is broken."
-              : status === "unavailable"
-                ? "Can't show this intake right now. Nothing was changed. Refresh to try again."
-                : `${ADMIN_TIER_PHRASE} can set it up here.`}
-          </p>
-        </div>
-      </>
+    <>
+      <PageHeader title={FORMS_NAME} tour="forms-head" sub="Your public intake, how it looks, and where it lives." />
+      {status === "unavailable" ? (
+        <LoadFailedCard what="your intake" body="Nothing was changed. Refresh to try again." />
+      ) : (
+        <EmptyState title={status === "unconfigured" ? "Forms isn't switched on for your firm yet" : "Your firm hasn't set up its intake yet"}>
+          {status === "unconfigured" ? "Lectual will turn it on. Nothing is broken." : `${ADMIN_TIER_PHRASE} can set it up here.`}
+        </EmptyState>
+      )}
+    </>
   );
 }

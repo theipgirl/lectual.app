@@ -81,7 +81,7 @@ describe("the owner's editable Sheet", () => {
 
   it("the Client cell is the link to the record panel; an overdue step is marked in words too", async () => {
     const html = await render(OWNER);
-    expect(html).toMatch(/class="rse-client" href="[^"]*open=matter%3A/);
+    expect(html).toMatch(/class="sheet-link" href="[^"]*open=matter%3A/);
     expect(html).toContain("(overdue)");
   });
 });

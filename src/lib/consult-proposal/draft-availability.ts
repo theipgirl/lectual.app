@@ -1,3 +1,4 @@
+import { PROPOSAL_SETTINGS_NAME } from "@/lib/ui/words";
 /**
  * Why "Draft from a transcript" is unavailable on a lead, so the lead page can
  * say so instead of silently dropping the control.
@@ -47,5 +48,5 @@ export const DRAFT_BLOCK_NOTE: Record<DraftBlock, string> = {
   "no-ai":
     "Drafting from a transcript isn't switched on for your firm yet. Lectual will turn it on.",
   "no-queue": "Drafting from a transcript needs your firm's approvals set up, and they aren't connected yet. Lectual will connect them.",
-  "no-settings": "Set up Settings → Client proposals (approvers and prices) first.",
+  "no-settings": `Set up Settings → ${PROPOSAL_SETTINGS_NAME} (approvers and prices) first.`,
 };

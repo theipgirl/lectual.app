@@ -1,3 +1,4 @@
+import { Notice } from "@/components/ui/Notice";
 import { notFound } from "next/navigation";
 import { orgHasModule } from "@/lib/org/modules";
 import { resolveFirmSession } from "@/lib/firm/session";
@@ -45,6 +46,7 @@ import { DeckKeys } from "@/components/review/DeckKeys";
 import { agentLabel } from "@/components/queue/format";
 import { outcomeOf } from "@/lib/queue/done";
 import {
+  BLANK,
   DECK_BADGE_INTERNAL,
   DECK_BADGE_REVIEW,
   DECK_BADGE_YES,
@@ -74,7 +76,7 @@ import {
   DECK_DEALT_NOW,
   DECK_DECIDED_UNREAD,
   DECK_EVENTS_UNREAD,
-  DECK_NOTHING_HERE,
+  DECK_BOARD_EMPTY,
   DECK_TAG_INTERNAL,
   NOT_SWITCHED_ON,
   dealHeader,
@@ -245,9 +247,9 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
     {seenMark}
     <DeckFrame {...frameProps} side={side} meta={meta} wideSub={wideSub}>
       {routed.status !== "ok" && (
-        <p role="status" className="lx-note" style={{ margin: 0 }}>
+        <Notice tone="warn" role="status">
           {DECK_ROUTING_UNREAD}
-        </p>
+        </Notice>
       )}
       {children}
     </DeckFrame>
@@ -276,8 +278,8 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
       ...deck.cards.map((c) => row(c.item, dealAt, statusOf(c))),
       ...deck.laterArrivals.map((c) => row(c.item, deal.next.label, { label: DECK_ST_NEXT_DEAL, tone: "line" })),
       ...deck.later.map((c) => row(c.item, deal.next.label, { label: DECK_COL_LATER, tone: "line" })),
-      ...deck.handedOff.map((c) => row(c.item, "—", { label: `${DECK_COL_HANDED_OFF} · ${nameOf(c.holder.userId)}`, tone: "line" })),
-      ...decided.map((i) => row(i, "—", outcomeOf(i) === "rejected" ? { label: DECK_CHIP_REJECTED, tone: "risk" } : { label: decidedChip(i), tone: "ok" })),
+      ...deck.handedOff.map((c) => row(c.item, BLANK, { label: `${DECK_COL_HANDED_OFF} · ${nameOf(c.holder.userId)}`, tone: "line" })),
+      ...decided.map((i) => row(i, BLANK, outcomeOf(i) === "rejected" ? { label: DECK_CHIP_REJECTED, tone: "risk" } : { label: decidedChip(i), tone: "ok" })),
     ];
     return frame(null, null, <DeckList rows={rows} decidedReadable={decidedReadable} />, deckListSub(waiting, deck.cards.length, deck.laterArrivals.length, dealLabel ?? deal.next.label));
   }
@@ -295,7 +297,7 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
     const columns: BoardColumn[] = [
       {
         title: DECK_COL_NEEDS_YES,
-        empty: DECK_NOTHING_HERE,
+        empty: DECK_BOARD_EMPTY,
         cards: deck.cards.map((c) => {
           const [badge, tone]: [string, BoardCard["badgeTone"]] = c.tag.kind === "internal" ? [DECK_BADGE_INTERNAL, "plain"] : c.closerLook.length > 0 && c.canYes ? [DECK_BADGE_REVIEW, "ox"] : [DECK_BADGE_YES, "warn"];
           return card(c.item, badge, tone, c.handedToMe ? `From ${nameOf(c.handedToMe.by)}` : waitingText(c.item.created_at, now));
@@ -303,19 +305,19 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
       },
       {
         title: DECK_COL_HANDED_OFF,
-        empty: DECK_NOTHING_HERE,
+        empty: DECK_BOARD_EMPTY,
         note: movesUnavailable,
         cards: deck.handedOff.map((c) => card(c.item, nameOf(c.holder.userId), "line", deckWaitingTo(nameOf(c.holder.userId), ageText(c.holder.at, now)))),
       },
       {
         title: DECK_COL_LATER,
-        empty: DECK_NOTHING_HERE,
+        empty: DECK_BOARD_EMPTY,
         note: movesUnavailable,
         cards: deck.later.map((c) => card(c.item, deal.next.label, "line", deckWaitingBack(deal.next.label))),
       },
       {
         title: DECK_COL_DECIDED,
-        empty: DECK_NOTHING_HERE,
+        empty: DECK_BOARD_EMPTY,
         note: decidedReadable ? null : DECK_DECIDED_UNREAD,
         cards: decided.map((i) => card(i, decidedChip(i), decidedTone(i) === "crit" ? "risk" : "ok", decidedSub(i, queuedLabel(i.resolved_at, now, tz)))),
       },

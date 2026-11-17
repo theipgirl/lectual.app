@@ -1,14 +1,16 @@
-import Link from "next/link";
 import { currentRole } from "@/lib/auth/current-role";
 import { AUTOMATION_ADMIN_ROLES, listTemplates } from "@/lib/automation";
 import { relativeTime } from "@/lib/relative-time";
 import { NewTemplateForm } from "./_components/TemplateForms";
+import { EmptyState, LoadFailedCard, PageHeader, SheetCard, SheetScroll, SheetTable } from "@/components/ui";
+import { getFirmTimeZone } from "@/lib/org/profile";
+import { BLANK, EMAIL_TEMPLATES_NAME } from "@/lib/ui/words";
 import "../campaigns.css";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 import { campaignLoadError } from "@/lib/campaigns/load-errors";
 
-export const metadata: Metadata = { title: pageTitle("Campaign templates") };
+export const metadata: Metadata = { title: pageTitle(EMAIL_TEMPLATES_NAME) };
 
 export const dynamic = "force-dynamic";
 
@@ -30,22 +32,15 @@ export default async function CampaignTemplatesPage() {
     loadError = campaignLoadError("templates", err);
   }
 
+  const tz = await getFirmTimeZone();
+
   return (
     <>
-      <Link href="/dashboard/campaigns/" className="lx-back">
-        ← Campaigns
-      </Link>
-
-      <div className="lx-page-head">
-        <div style={{ flex: 1, minWidth: 260 }}>
-          <div className="lx-label">Campaigns</div>
-          <h1 className="lx-h1">Email templates</h1>
-          <p className="lx-sub">
-            The wording a campaign&apos;s email steps draft from. A step never invents its own copy — it fills one of
-            these templates with the enrolled lead&apos;s own details and holds the result for approval.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        back={{ href: "/dashboard/campaigns/", label: "Campaigns" }}
+        title={EMAIL_TEMPLATES_NAME}
+        sub="The wording a campaign's email steps draft from. A step never invents its own copy — it fills one of these templates with the enrolled lead's own details and holds the result for approval."
+      />
 
       {canManage && (
         <details className="lx-card lx-disclosure">
@@ -55,51 +50,41 @@ export default async function CampaignTemplatesPage() {
       )}
 
       {loadError ? (
-        <div className="lx-card lx-empty-card">
-          <h2 className="lx-h2" style={{ fontSize: 25 }}>
-            Templates couldn&apos;t be loaded
-          </h2>
-          <p className="lx-note" style={{ margin: 0 }}>
-            {loadError}
-          </p>
-        </div>
+        <LoadFailedCard what="templates" body={loadError} />
       ) : templates.length === 0 ? (
-        <div className="lx-card lx-empty-card">
-          <h2 className="lx-h2" style={{ fontSize: 25 }}>
-            No templates yet
-          </h2>
-          <p className="lx-note" style={{ margin: 0 }}>
-            {canManage ? "Create one above — an email step needs one to draft from." : "Ask a firm admin to add one."}
-          </p>
-        </div>
+        <EmptyState title="No templates yet">
+          {canManage ? "Create one above — an email step needs one to draft from." : "Ask a firm admin to add one."}
+        </EmptyState>
       ) : (
-        <div className="lx-card" style={{ overflow: "auto" }}>
-          <table className="lx-tbl" style={{ minWidth: 640 }}>
-            <thead>
-              <tr>
-                <th>Template</th>
-                <th>Subject</th>
-                <th>Variables</th>
-                <th>Updated</th>
-              </tr>
-            </thead>
-            <tbody>
-              {templates.map((template) => {
-                const variables = Array.isArray(template.variables) ? (template.variables as unknown[]) : [];
-                return (
-                  <tr key={template.id}>
-                    <td className="pri">{template.name}</td>
-                    <td className="wrap">{template.subject}</td>
-                    <td className="lx-note">
-                      {variables.length === 0 ? "—" : variables.map((v) => `{{${String(v)}}}`).join(", ")}
-                    </td>
-                    <td className="lx-num">{relativeTime(template.updated_at)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <SheetCard>
+          <SheetScroll>
+            <SheetTable minWidth={640}>
+              <thead>
+                <tr>
+                  <th>Template</th>
+                  <th>Subject</th>
+                  <th>Variables</th>
+                  <th>Updated</th>
+                </tr>
+              </thead>
+              <tbody>
+                {templates.map((template) => {
+                  const variables = Array.isArray(template.variables) ? (template.variables as unknown[]) : [];
+                  return (
+                    <tr key={template.id}>
+                      <td className="pri">{template.name}</td>
+                      <td className="wrap" data-label="Subject">{template.subject}</td>
+                      <td className="lx-note" data-label="Variables">
+                        {variables.length === 0 ? BLANK : variables.map((v) => `{{${String(v)}}}`).join(", ")}
+                      </td>
+                      <td data-label="Updated">{relativeTime(template.updated_at, undefined, tz)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </SheetTable>
+          </SheetScroll>
+        </SheetCard>
       )}
     </>
   );

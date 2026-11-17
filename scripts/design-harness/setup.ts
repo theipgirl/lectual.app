@@ -123,10 +123,15 @@ vi.mock("@/lib/review/load", async (orig) => ({
   ...(await orig<typeof import("@/lib/review/load")>()),
   loadReview: async () => state.review,
 }));
-vi.mock("@/lib/review/detail-load", () => ({
-  loadReviewDetail: async () => null,
-  loadLatestNote: async () => null,
-}));
+vi.mock("@/lib/review/detail-load", async (orig) => {
+  const real = await orig<typeof import("@/lib/review/detail-load")>();
+  return {
+    ...real,
+    // `state.reviewDetailReal`: run the real loader over the fake scoped client (visual-review screens open a panel); otherwise none, as before.
+    loadReviewDetail: async (...a: Parameters<typeof real.loadReviewDetail>) => ((state as { reviewDetailReal?: boolean }).reviewDetailReal ? real.loadReviewDetail(...a) : null),
+    loadLatestNote: async () => null,
+  };
+});
 
 // Weekly review, the owner's editable Sheet (screens/review-sheet-edit.screen.tsx): the stage lists and the drawing-only
 // starting state (editors open) come from `state.sheetStages` / `state.sheetEditInitial`.

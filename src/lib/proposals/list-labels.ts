@@ -8,6 +8,8 @@
 
 import type { ProposalDisplayKey } from "./display-status";
 import { stepActivityLabel } from "./paid";
+import { formatDay, formatRelative } from "@/lib/ui/dates";
+import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
 
 const upper = (s: string) => s.trim().toUpperCase();
 
@@ -51,21 +53,15 @@ export function proposalSubline(input: {
 
 /* ─────────────────────────── dates ──────────────────────────────────────── */
 
-/** "Sep 4" for a civil date ("2026-09-04"), whatever zone the server runs in. */
+/** "Sep 4" for a civil date ("2026-09-04"), whatever zone the server runs in (the year only when it is not this year). */
 export function monthDay(civil: string): string {
-  const ms = Date.parse(`${civil}T12:00:00Z`);
-  if (Number.isNaN(ms)) return "";
-  return new Intl.DateTimeFormat("en-US", { timeZone: "UTC", month: "short", day: "numeric" }).format(new Date(ms));
+  return formatDay(civil, { tz: "UTC" }) ?? "";
 }
 
-/** "9 Sep" for an instant, in the firm's zone. Built from parts: en-GB would write "Sept". */
+/** "Sep 9" for an instant, in the firm's zone (the year only when it is not this year). Name kept; the order is month first. */
 export function dayMonth(iso: string | null | undefined, tz: string): string {
   if (!iso) return "";
-  const ms = Date.parse(iso);
-  if (Number.isNaN(ms)) return "";
-  const parts = new Intl.DateTimeFormat("en-US", { timeZone: tz, month: "short", day: "numeric" }).formatToParts(new Date(ms));
-  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
-  return `${get("day")} ${get("month")}`;
+  return formatDay(iso, { tz }) ?? "";
 }
 
 /**
@@ -94,17 +90,10 @@ export function expiresLabel(input: {
   }
 }
 
-/** "just now", "6m ago", "3h ago", "2d ago", else a short date. The Last activity cell's compact form. */
-export function compactAgo(iso: string | null | undefined, now: number): string {
+/** "just now", "6 min ago", "3 h ago", "2 days ago", else a short date. The Last activity cell's compact form. Uses the firm's zone for the date. */
+export function compactAgo(iso: string | null | undefined, now: number, tz: string = DEFAULT_TIME_ZONE): string {
   if (!iso) return "";
-  const t = Date.parse(iso);
-  if (Number.isNaN(t)) return "";
-  const s = Math.round((now - t) / 1000);
-  if (s < 60) return "just now";
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86_400) return `${Math.floor(s / 3600)}h ago`;
-  if (s < 86_400 * 14) return `${Math.floor(s / 86_400)}d ago`;
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(t));
+  return formatRelative(iso, { tz, now: new Date(now) }) ?? "";
 }
 
 /* ─────────────────────────── last activity ──────────────────────────────── */
@@ -157,9 +146,11 @@ export function lastActivityLine(input: {
   event: ActivityEvent | null | "unavailable";
   names: ReadonlyMap<string, string>;
   now: number;
+  /** The firm's zone, for the date a long-ago activity falls back to. */
+  tz?: string;
 }): string {
   const updated = () => {
-    const ago = compactAgo(input.updatedAt, input.now);
+    const ago = compactAgo(input.updatedAt, input.now, input.tz);
     return ago ? `Updated ${ago}` : "Updated";
   };
   switch (input.key) {
@@ -169,7 +160,7 @@ export function lastActivityLine(input: {
       const e = input.event && input.event !== "unavailable" && input.event.type === "edited" && input.event.actor === "staff" ? input.event : null;
       const step = e ? stepActivityLabel(e.payload) : null;
       if (e && step) return withWho(step, e, input);
-      const ago = compactAgo(input.acceptedAt ?? input.updatedAt, input.now);
+      const ago = compactAgo(input.acceptedAt ?? input.updatedAt, input.now, input.tz);
       return ago ? `Accepted by the client · ${ago}` : "Accepted by the client";
     }
     case "expired":
@@ -188,8 +179,8 @@ export function lastActivityLine(input: {
 }
 
 /** "<what> 3h ago · Taylor": the name only for a teammate we can name, never an id. */
-function withWho(what: string, e: ActivityEvent, input: { names: ReadonlyMap<string, string>; now: number }): string {
-  const ago = compactAgo(e.created_at, input.now);
+function withWho(what: string, e: ActivityEvent, input: { names: ReadonlyMap<string, string>; now: number; tz?: string }): string {
+  const ago = compactAgo(e.created_at, input.now, input.tz);
   const name = e.actor === "staff" && e.actor_user_id ? input.names.get(e.actor_user_id) : undefined;
   return `${what}${ago ? ` ${ago}` : ""}${name ? ` · ${name}` : ""}`;
 }
