@@ -26,8 +26,8 @@ const MAIL_LOOKBACK_DAYS = 30;
 const BATCH = 10;
 const ROW_CAP = 2000;
 
-export const FOLLOW_UP_SOURCE = "morning-brief";
-export const FOLLOW_UP_KIND = "stalled_follow_up";
+import { FOLLOW_UP_KIND, FOLLOW_UP_SOURCE } from "./constants";
+export { FOLLOW_UP_KIND, FOLLOW_UP_SOURCE };
 
 export type Skips = { noAddress: number; pendingDraft: number; sensitive: number; recent: number };
 

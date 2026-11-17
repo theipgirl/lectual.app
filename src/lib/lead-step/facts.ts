@@ -1,6 +1,6 @@
 import type { Role } from "@/lib/auth/roles";
 import type { AgentId, Autonomy } from "@/lib/agents/types";
-import type { CloserReason } from "@/lib/queue/deck";
+import type { LeadCloserLook } from "./closer-look";
 import type { ApprovalRouting, QueueKind, RoutingMember } from "@/lib/queue/routing";
 import type { ReviewerItem } from "@/lib/queue/reviewer-summary";
 import type { ActivityRow } from "@/lib/stage-keeper/moves";
@@ -79,13 +79,23 @@ export type PendingDraft = {
   reviewer: ReviewerItem[];
   /**
    * Why this card needs the full approval page instead of a Yes here (the deck's rule, `needsCloserLook`): a CHECK FIRST
-   * line, a draft issue, a stale draft, a linked-proposal gate that refused. `null` = couldn't be checked, which also
-   * keeps Yes off this page.
+   * line, a draft issue, a stale draft, a linked-proposal gate that refused) plus this page's own rule: a linked
+   * proposal that isn't live yet (`leadCloserLook`). `null` = couldn't be checked, which also keeps Yes off this page.
    */
-  closerLook: CloserReason[] | null;
+  closerLook: LeadCloserLook | null;
   /** The proposal the email carries a link to (the consult drafter's marker). */
   linked: LinkedProposalFact;
+  /** Who holds the card now (the deck's hand-offs, folded with the deck's own trust rule). */
+  handoff: HandoffFact;
 };
+
+/**
+ * The card's hand-off state (lectual 0103 `queue_card_event`), folded with `trustedCardState` and `currentHolder`
+ * exactly as the deck does. `unknown` (not set up, or the read failed) shows the card as it is today: no hand-off.
+ */
+export type HandoffFact =
+  | { status: "ok"; holder: { userId: string; by: string; note: string | null; at: string } | null }
+  | { status: "unknown" };
 
 export type LinkedProposalFact =
   | { status: "none" }
@@ -145,15 +155,24 @@ export type JobsFacts = {
   aiOn: boolean;
   /** Autopilot: `paused` (or unknown) means no assistant runs. 0082 missing = not paused. */
   autopilot: "running" | "paused" | "unknown";
-  /** Per assistant: on with this autonomy, or off. No row = off (the runner's rule). */
-  settings: Partial<Record<AgentId, { enabled: boolean; autonomy: Autonomy }>>;
+  /**
+   * Per assistant: on with this autonomy, or off. No row = off (the runner's rule). `null` = unknown: the read failed,
+   * or it came back empty for a role that row-level security may not let read the settings (owner, admin and senior
+   * admin manage them); an empty answer is then not proof that everything is off.
+   */
+  settings: Partial<Record<AgentId, { enabled: boolean; autonomy: Autonomy }>> | null;
   /** The firm's features, for the jobs that need one. */
   modules: { mailbox: boolean; proposals: boolean; agentToolkit: boolean };
-  /** The firm named at least one proposal approver (the post-consult drafter drafts proposals only then). `null` = couldn't read. */
+  /**
+   * The firm named at least one proposal approver (the post-consult drafter drafts proposals only then). `null` =
+   * couldn't read, or no row came back for a role that may not be able to read it.
+   */
   proposalApprovers: boolean | null;
   /** A Fathom or Zoom connection is active, so recordings are imported. `null` = couldn't read. */
   meetingSourceActive: boolean | null;
 };
+
+export type MarkersFact = { preppedEventIds: string[]; handledMeetingIds: string[]; outcomeLogged: boolean };
 
 export type RoutingFacts = { status: "ok"; routing: ApprovalRouting; members: RoutingMember[] } | { status: "failed" };
 
@@ -164,12 +183,22 @@ export type LeadStepFacts = {
   lead: LeadFacts;
   viewer: ViewerFacts;
   routing: RoutingFacts;
-  approvals: Read<PendingDraft[]>;
+  /**
+   * The pending drafts for a yes: internal briefings left out, oldest first, the first ENRICH_CAP enriched. `total`
+   * counts every one of them, so "N more waiting" is never cut short by the cap.
+   */
+  approvals: Read<{ items: PendingDraft[]; total: number }>;
   tasks: Read<OpenTask[]>;
   consult: Read<BookedConsult | null>;
   meetings: Read<MeetingFact[]>;
   proposal: Read<ProposalFact | null>;
-  /** The lead's timeline rows across the merged set, newest first (capped). */
-  activity: Read<ActivityRow[]>;
+  /** The lead's timeline rows across the merged set, newest first. `truncated`: the read hit its row cap. */
+  activity: Read<{ rows: ActivityRow[]; truncated: boolean }>;
+  /**
+   * The assistants' own markers, read with targeted queries (never inferred from the capped timeline): which calendar
+   * events consult prep handled, which recorded calls the consult drafter handled, and whether a person logged a
+   * consult outcome.
+   */
+  markers: Read<MarkersFact>;
   jobs: Read<JobsFacts>;
 };

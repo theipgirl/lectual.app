@@ -1,16 +1,21 @@
 import type { Role } from "@/lib/auth/roles";
 import type { QueueItem } from "@/lib/queue/api";
-import type { CloserReason } from "@/lib/queue/deck";
+import { DOCUMENT_QUEUE_TYPES } from "@/lib/documents/types";
+import { SEND_BACK_NOTE_MAX } from "@/lib/queue/handed";
 import { isDoneNote } from "@/lib/queue/done";
 import { QUEUE_EDIT_ROLES } from "@/lib/queue/roles";
-import { approvalRefusal, canApproveItem, isAttorneyOnly } from "@/lib/queue/routing";
+import { approvalRefusal } from "@/lib/queue/routing";
 import type { ReviewInput, ReviewOutcome } from "@/lib/queue/review-core";
 import {
   LEAD_STEP_ALREADY_DECIDED,
   LEAD_STEP_APPROVED_DRAFT_FAILED,
   LEAD_STEP_APPROVED_MANUAL,
   LEAD_STEP_APPROVED_NO_DRAFT,
-  LEAD_STEP_APPROVED_QUEUE_SENT,
+  LEAD_STEP_APPROVED,
+  LEAD_STEP_APPROVED_LETTER,
+  LEAD_STEP_HANDED_AWAY,
+  LEAD_STEP_LINK_NOT_LIVE,
+  LEAD_STEP_SENT_BACK,
   LEAD_STEP_CANT_CHECK,
   LEAD_STEP_CLOSER_LOOK,
   LEAD_STEP_DRAFT_IN_QUEUE_MAILBOX,
@@ -26,7 +31,8 @@ import {
   REJECT_NOTE_IS_DONE_MARKER,
   leadStepDraftInMailbox,
 } from "@/lib/ui/words";
-import type { RoutingFacts } from "./facts";
+import type { HandoffFact, RoutingFacts } from "./facts";
+import type { LeadCloserLook } from "./closer-look";
 
 /**
  * Yes / Edit / Not this on the lead page's top card, with every dependency injected so the order of the checks is
@@ -45,10 +51,16 @@ import type { RoutingFacts } from "./facts";
  *   4  the item is re-read: it must still be pending and still belong to THIS lead (the queue's own resolver, across
  *      the lead's merged set)
  *   5  approve / reject: the routing rule for the item as re-read (an edit can have made it attorney-only)
- *   6  approve: the deck's closer-look rule (CHECK FIRST, draft issue, stale draft, linked-proposal gate). Any reason,
- *      or a check that couldn't run, refuses with a fixed sentence: the full approval page is where those are handled.
- *      The stale confirm is never passed from here.
- *   7  the existing core, which checks it all again
+ *   6  approve: a card the caller handed on to someone else is not theirs to approve here (the deck's hand-off,
+ *      folded with the deck's trust rule; an unreadable hand-off state changes nothing, as on the deck)
+ *   7  approve: the deck's closer-look rule (CHECK FIRST, draft issue, stale draft, linked-proposal gate) plus this
+ *      page's own: a linked proposal that isn't live yet (the core would turn its link on). Any reason, or a check that
+ *      couldn't run, refuses with a fixed sentence: the full approval page is where those are handled. The stale
+ *      confirm is never passed from here.
+ *   8  the existing core, which checks it all again
+ *
+ * Send back (a card handed to the caller) is the deck's own `sendCardBack`, after steps 1 to 4.
+ * No database and no server-only import (tests/lead-step/hygiene.test.ts walks the import graph).
  *
  * After a Yes the sentence names only what the core REPORTS happened (`afterYesSentence`). It never assumes Outlook.
  */
@@ -66,8 +78,12 @@ export type LeadStepActionDeps = {
   /** The page's lead, followed to its keeper, and the leads merged into it; null when it couldn't be read. */
   leadSet: (leadId: string) => Promise<string[] | null>;
   routing: () => Promise<RoutingFacts>;
-  /** The deck's closer-look reasons for this item; null when they couldn't be checked. */
-  closerLook: (item: QueueItem) => Promise<CloserReason[] | null>;
+  /** The page's closer-look rule for this item (`leadCloserLook`); null when it couldn't be checked. */
+  closerLook: (item: QueueItem) => Promise<LeadCloserLook | null>;
+  /** Who holds the card (trusted hand-off events, as the deck folds them). */
+  handoff: (item: QueueItem) => Promise<HandoffFact>;
+  /** The deck's Send back (`sendCardBack`, which re-checks the caller, the item and the events itself). */
+  sendBack: (id: string, note: string) => Promise<{ ok: true } | { ok: false; error: string }>;
   /** The existing approve / reject / save core. */
   review: (input: ReviewInput) => Promise<ReviewOutcome>;
   revalidate: (leadId: string) => void;
@@ -75,7 +91,9 @@ export type LeadStepActionDeps = {
 
 export type YesResult = { ok: true; message: string; webLink: string | null } | { ok: false; error: string };
 export type NotThisResult = { ok: true; message: string } | { ok: false; error: string };
-export type EditResult = { ok: true; message: string; attorneyOnly: boolean; canYes: boolean } | { ok: false; error: string };
+/** No "may say yes now" in the answer: the page is revalidated and recomputes it from the re-read item. */
+export type EditResult = { ok: true; message: string } | { ok: false; error: string };
+export type SendBackResult = { ok: true; message: string } | { ok: false; error: string };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const QUEUE_ID = /^[A-Za-z0-9_-]{1,128}$/;
@@ -90,10 +108,13 @@ export function itemIdOf(raw: unknown): string | null {
   return typeof raw === "string" && QUEUE_ID.test(raw) ? raw : null;
 }
 
-/** The Not this reason: control characters become spaces, whitespace collapses, 1 to 200 characters. Null otherwise. */
+/**
+ * The Not this reason: format characters (zero-width and bidi controls, \p{Cf}) are removed, control characters
+ * become spaces, whitespace collapses, then 1 to 200 characters. Null otherwise.
+ */
 export function cleanReason(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
-  const cleaned = raw.replace(/[\u0000-\u001F\u007F]/g, " ").replace(/\s+/g, " ").trim();
+  const cleaned = raw.replace(/\p{Cf}/gu, "").replace(/[\u0000-\u001F\u007F]/g, " ").replace(/\s+/g, " ").trim();
   return cleaned.length >= 1 && cleaned.length <= REASON_MAX ? cleaned : null;
 }
 
@@ -108,7 +129,7 @@ export function cleanBody(raw: unknown): string | null {
  * After a Yes, the sentence for what really happened, from the approve core's OWN result: which mailbox (if any) holds
  * the draft. `owner` names the person whose mailbox it is when it isn't the reader's; null reads "your".
  */
-export function afterYesSentence(outcome: Extract<ReviewOutcome, { kind: "resolved" }>, owner: string | null = null): string {
+export function afterYesSentence(outcome: Extract<ReviewOutcome, { kind: "resolved" }>, itemType: string, owner: string | null = null): string {
   const send = outcome.send;
   if (send === "mailbox-microsoft" || send === "mailbox-google") {
     const provider = outcome.provider ?? (send === "mailbox-microsoft" ? "microsoft" : "google");
@@ -117,7 +138,10 @@ export function afterYesSentence(outcome: Extract<ReviewOutcome, { kind: "resolv
   if (send === "drafted") return LEAD_STEP_DRAFT_IN_QUEUE_MAILBOX;
   if (send === "manual") return LEAD_STEP_APPROVED_MANUAL;
   if (send === "failed" || send === "mailbox-failed") return LEAD_STEP_APPROVED_DRAFT_FAILED;
-  if (send === "sent") return LEAD_STEP_APPROVED_QUEUE_SENT;
+  // The queue's own answer; the deck says the same.
+  if (send === "sent") return LEAD_STEP_APPROVED;
+  // A letter is not emailed: approving makes its document (the approve hook, best-effort; a failure shows on Documents).
+  if (DOCUMENT_QUEUE_TYPES.has(itemType)) return LEAD_STEP_APPROVED_LETTER;
   return LEAD_STEP_APPROVED_NO_DRAFT;
 }
 
@@ -156,14 +180,19 @@ export async function runLeadStepYes(deps: LeadStepActionDeps, rawLeadId: unknow
   if (!c.ok) return c;
   const refusal = refusalFor(c);
   if (refusal) return { ok: false, error: refusal };
+  const handoff = await deps.handoff(c.item);
+  if (handoff.status === "ok" && handoff.holder && handoff.holder.by === c.caller.userId && handoff.holder.userId !== c.caller.userId) {
+    return { ok: false, error: LEAD_STEP_HANDED_AWAY };
+  }
   const look = await deps.closerLook(c.item);
   if (look === null) return { ok: false, error: LEAD_STEP_CANT_CHECK };
-  if (look.length > 0) return { ok: false, error: LEAD_STEP_CLOSER_LOOK };
+  if (look.linkNotLive) return { ok: false, error: LEAD_STEP_LINK_NOT_LIVE };
+  if (look.reasons.length > 0) return { ok: false, error: LEAD_STEP_CLOSER_LOOK };
   const outcome = await deps.review({ id: itemId, intent: "approve", withReceipt: true });
   if (outcome.kind === "error") return { ok: false, error: outcome.error };
   if (outcome.kind !== "resolved" || outcome.intent !== "approve") return { ok: false, error: LEAD_STEP_FAILED };
   deps.revalidate(leadId);
-  return { ok: true, message: afterYesSentence(outcome), webLink: outcome.webLink };
+  return { ok: true, message: afterYesSentence(outcome, c.item.type), webLink: outcome.webLink };
 }
 
 export async function runLeadStepNotThis(deps: LeadStepActionDeps, rawLeadId: unknown, rawItemId: unknown, rawReason: unknown): Promise<NotThisResult> {
@@ -196,14 +225,20 @@ export async function runLeadStepEdit(deps: LeadStepActionDeps, rawLeadId: unkno
   const outcome = await deps.review({ id: itemId, intent: "save", body });
   if (outcome.kind === "error") return { ok: false, error: outcome.error };
   if (outcome.kind !== "saved") return { ok: false, error: LEAD_STEP_FAILED };
-  // Re-classify from the saved text: an edit that reads as legal advice makes the item attorney-only.
-  const after = (await deps.readItem(itemId)) ?? { ...c.item, final_body: body };
-  const routing = c.routing.status === "ok" ? c.routing.routing : {};
   deps.revalidate(leadId);
-  return {
-    ok: true,
-    message: LEAD_STEP_EDIT_SAVED,
-    attorneyOnly: isAttorneyOnly(after),
-    canYes: canApproveItem({ role: c.caller.role, userId: c.caller.userId, item: after, routing }),
-  };
+  return { ok: true, message: LEAD_STEP_EDIT_SAVED };
+}
+
+/** Send back a card handed to the caller, through the deck's own path. Steps 1 to 4 first, like the others. */
+export async function runLeadStepSendBack(deps: LeadStepActionDeps, rawLeadId: unknown, rawItemId: unknown, rawNote: unknown): Promise<SendBackResult> {
+  const leadId = leadIdOf(rawLeadId);
+  const itemId = itemIdOf(rawItemId);
+  if (!leadId || !itemId) return { ok: false, error: LEAD_STEP_FAILED };
+  const note = typeof rawNote === "string" ? rawNote.replace(/\p{Cf}/gu, "").replace(/[\u0000-\u001F\u007F]/g, " ").replace(/\s+/g, " ").trim().slice(0, SEND_BACK_NOTE_MAX) : "";
+  const c = await checkCallerAndItem(deps, leadId, itemId, LEAD_STEP_NO_EDIT);
+  if (!c.ok) return c;
+  const sent = await deps.sendBack(itemId, note);
+  if (!sent.ok) return sent;
+  deps.revalidate(leadId);
+  return { ok: true, message: LEAD_STEP_SENT_BACK };
 }

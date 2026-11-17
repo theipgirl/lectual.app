@@ -3,9 +3,7 @@ import { notSetUp, unavailable } from "@/lib/lead-step/facts";
 import { consultPrepGate, nextAction, postConsultGate } from "@/lib/lead-step/next-actions";
 import { firstRunAfterImport, nextRunWindow, prepRunFor, windowWords } from "@/lib/lead-step/schedule";
 import { INTENDED_NY_HOUR, newYorkHour } from "@/lib/cron/ny-hour";
-import { CONSULT_PROPOSAL_SOURCE } from "@/lib/consult-proposal/shared";
-import { PREP_SOURCE } from "@/lib/agents/consult-prep/run";
-import { NOW, THURSDAY_CONSULT, facts, jobsOn, row } from "./fixtures";
+import { NOW, THURSDAY_CONSULT, facts, jobsOn } from "./fixtures";
 
 const booked = { consult: { status: "ok" as const, value: THURSDAY_CONSULT } };
 const recorded = { meetings: { status: "ok" as const, value: [{ id: "m-1", provider: "zoom", title: "Strategy session", startedAt: "2026-11-16T19:00:00.000Z", durationSeconds: 2700, hasMaterial: true }] } };
@@ -76,8 +74,7 @@ describe("a promise only from a job that is switched on", () => {
       [{ proposalApprovers: false }, "no-approvers"],
       [{ meetingSourceActive: false }, "no-recordings"],
     ] as const) {
-      const prepped = row({ id: "a-prep", type: "queue_drafted", payload: { source: PREP_SOURCE, event_id: THURSDAY_CONSULT.eventId } });
-      const next = nextAction(facts({ ...booked, activity: { status: "ok", value: [prepped] }, jobs: { status: "ok", value: jobsOn({ ...over }) } }));
+      const next = nextAction(facts({ ...booked, markers: { status: "ok", value: { preppedEventIds: [THURSDAY_CONSULT.eventId], handledMeetingIds: [], outcomeLogged: false } }, jobs: { status: "ok", value: jobsOn({ ...over }) } }));
       expect(next).toMatchObject({ status: "off", for: "post-consult", why });
       // With prep still to do and its job off, the card says why prep isn't coming first.
       const notPrepped = nextAction(facts({ ...booked, jobs: { status: "ok", value: jobsOn({ settings: prepOff, ...over }) } }));
@@ -91,8 +88,7 @@ describe("a promise only from a job that is switched on", () => {
   });
 
   it("a recording the drafter already handled is not promised again", () => {
-    const handled = row({ id: "a-1", type: "queue_drafted", payload: { source: CONSULT_PROPOSAL_SOURCE, meeting_id: "m-1" } });
-    expect(nextAction(facts({ ...recorded, activity: { status: "ok", value: [handled] } }))).toEqual({ status: "none" });
+    expect(nextAction(facts({ ...recorded, markers: { status: "ok", value: { preppedEventIds: [], handledMeetingIds: ["m-1"], outcomeLogged: false } } }))).toEqual({ status: "none" });
   });
 
   it("a recording without a transcript or summary, or older than the drafter looks, is not promised", () => {

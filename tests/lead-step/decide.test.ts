@@ -2,8 +2,7 @@ import { describe, expect, it } from "vitest";
 import { cardItems, decideTopCard, dueState } from "@/lib/lead-step/decide";
 import { notSetUp, unavailable, type OpenTask } from "@/lib/lead-step/facts";
 import { GAP_FILLED_BY } from "@/lib/lead-step/gaps";
-import { PREP_SOURCE } from "@/lib/agents/consult-prep/run";
-import { LEAD, NOW, THURSDAY_CONSULT, draft, facts, jobsOn, proposal, row } from "./fixtures";
+import { LEAD, NOW, THURSDAY_CONSULT, draft, facts, jobsOn, pending, proposal } from "./fixtures";
 
 const task = (over: Partial<OpenTask> = {}): OpenTask => ({ id: "t-1", title: "Call Maya about the logo versions", type: "call", dueAt: "2026-11-12T15:00:00.000Z", assigneeId: null, createdAt: "2026-11-10T14:15:00.000Z", ...over });
 const heldYesterday = { id: "m-1", provider: "zoom", title: "Strategy session", startedAt: "2026-11-16T19:00:00.000Z", durationSeconds: 2700, hasMaterial: true };
@@ -15,22 +14,27 @@ describe("the precedence table", () => {
   });
 
   it("2. a pending client-facing draft wins over an overdue task and a promise", () => {
-    const top = decideTopCard(facts({ approvals: { status: "ok", value: [draft()] }, tasks: { status: "ok", value: [task()] }, consult: { status: "ok", value: THURSDAY_CONSULT } }));
+    const top = decideTopCard(facts({ approvals: pending(draft()), tasks: { status: "ok", value: [task()] }, consult: { status: "ok", value: THURSDAY_CONSULT } }));
     expect(top.kind).toBe("needs-yes");
   });
 
   it("2. a draft outranks a failed task read (the draft is a real fact)", () => {
-    expect(decideTopCard(facts({ approvals: { status: "ok", value: [draft()] }, tasks: unavailable() })).kind).toBe("needs-yes");
+    expect(decideTopCard(facts({ approvals: pending(draft()), tasks: unavailable() })).kind).toBe("needs-yes");
   });
 
   it("2. the oldest draft is the card, and the rest are counted; internal briefings are never the card", () => {
     const old = draft({ id: "q-old", createdAt: "2026-11-15T10:00:00.000Z" });
     const young = draft({ id: "q-young", createdAt: "2026-11-17T10:00:00.000Z" });
     const brief = draft({ id: "q-brief", type: "BRIEFING", agent: "consult-prep", headline: "Consult heads-up", createdAt: "2026-11-01T10:00:00.000Z" });
-    const top = decideTopCard(facts({ approvals: { status: "ok", value: [young, brief, old] } }));
+    const top = decideTopCard(facts({ approvals: { status: "ok", value: { items: [young, brief, old], total: 2 } } }));
     expect(top).toMatchObject({ kind: "needs-yes", item: { id: "q-old" }, others: 1 });
     expect(cardItems([brief])).toEqual([]);
-    expect(decideTopCard(facts({ approvals: { status: "ok", value: [brief] } })).kind).not.toBe("needs-yes");
+    expect(decideTopCard(facts({ approvals: { status: "ok", value: { items: [brief], total: 0 } } })).kind).not.toBe("needs-yes");
+  });
+
+  it("2. 'N more' counts every draft, not only the ones the loader enriched", () => {
+    const items = Array.from({ length: 10 }, (_, i) => draft({ id: `q-${String(i).padStart(2, "0")}`, createdAt: `2026-11-${String(i + 1).padStart(2, "0")}T10:00:00.000Z` }));
+    expect(decideTopCard(facts({ approvals: { status: "ok", value: { items, total: 14 } } }))).toMatchObject({ kind: "needs-yes", item: { id: "q-00" }, others: 13 });
   });
 
   it("3. a failed task read with no draft is 'couldn't load', never a promise", () => {
@@ -98,11 +102,15 @@ describe("every failed read", () => {
   it("jobs read failed with a consult booked", () => {
     expect(decideTopCard(facts({ consult: { status: "ok", value: THURSDAY_CONSULT }, jobs: unavailable() }))).toEqual({ kind: "couldnt-load", what: "next" });
   });
-  it("activity read failed with a consult booked (prep can't be told apart)", () => {
-    expect(decideTopCard(facts({ consult: { status: "ok", value: THURSDAY_CONSULT }, activity: unavailable() }))).toEqual({ kind: "couldnt-load", what: "next" });
+  it("markers read failed with a consult booked (prep can't be told apart)", () => {
+    expect(decideTopCard(facts({ consult: { status: "ok", value: THURSDAY_CONSULT }, markers: unavailable() }))).toEqual({ kind: "couldnt-load", what: "next" });
   });
-  it("activity read failed with a recorded call", () => {
-    expect(decideTopCard(facts({ meetings: { status: "ok", value: [heldYesterday] }, activity: unavailable() }))).toEqual({ kind: "couldnt-load", what: "next" });
+  it("markers read failed with a recorded call", () => {
+    expect(decideTopCard(facts({ meetings: { status: "ok", value: [heldYesterday] }, markers: unavailable() }))).toEqual({ kind: "couldnt-load", what: "next" });
+  });
+  it("a timeline cut at its cap decides nothing: the markers are their own reads", () => {
+    const capped = { status: "ok" as const, value: { rows: [], truncated: true } };
+    expect(decideTopCard(facts({ consult: { status: "ok", value: THURSDAY_CONSULT }, activity: capped })).kind).toBe("has-it");
   });
   it("autopilot state unknown with a consult booked: nothing is promised on a guess", () => {
     expect(decideTopCard(facts({ consult: { status: "ok", value: THURSDAY_CONSULT }, jobs: { status: "ok", value: jobsOn({ autopilot: "unknown" }) } }))).toEqual({ kind: "couldnt-load", what: "next" });
@@ -129,8 +137,7 @@ describe("the not-prepared gaps", () => {
     expect(top).toMatchObject({ kind: "not-prepared", gap: { id: "outcome-read" }, off: { for: "post-consult", why: "assistant-off" } });
   });
   it("an outcome a person logged closes the reading gap", () => {
-    const logged = row({ id: "a-1", type: "call_logged", actor_type: "user", payload: { consult_outcome: "proposal_to_send" } });
-    const top = decideTopCard(facts({ meetings: { status: "ok", value: [heldYesterday] }, activity: { status: "ok", value: [logged] }, jobs: { status: "ok", value: jobsOn({ settings: {} }) } }));
+    const top = decideTopCard(facts({ meetings: { status: "ok", value: [heldYesterday] }, markers: { status: "ok", value: { preppedEventIds: [], handledMeetingIds: [], outcomeLogged: true } }, jobs: { status: "ok", value: jobsOn({ settings: {} }) } }));
     expect(top.kind).toBe("quiet");
   });
   it("a new enquiry nobody has written to: the first reply", () => {
@@ -156,8 +163,7 @@ describe("the six mockup states", () => {
     expect(top).toMatchObject({ kind: "has-it", promise: { job: "consult-prep", window: { start: "2026-11-19T10:00:00.000Z" } } });
   });
   it("2b consult booked, prep done: Lectual has it (the proposal after the consult)", () => {
-    const prepped = row({ id: "a-prep", type: "queue_drafted", payload: { source: PREP_SOURCE, kind: "heads_up", event_id: "evt-1", queueItemId: "q-9" } });
-    const top = decideTopCard(facts({ consult: { status: "ok", value: THURSDAY_CONSULT }, activity: { status: "ok", value: [prepped] } }));
+    const top = decideTopCard(facts({ consult: { status: "ok", value: THURSDAY_CONSULT }, markers: { status: "ok", value: { preppedEventIds: ["evt-1"], handledMeetingIds: [], outcomeLogged: false } } }));
     expect(top).toMatchObject({ kind: "has-it", promise: { job: "post-consult", source: "after-consult", window: { start: "2026-11-20T10:00:00.000Z" } } });
   });
   it("3 consult happened: the drafter reads the recording at the next run", () => {
@@ -166,7 +172,7 @@ describe("the six mockup states", () => {
   });
   it("3b consult happened and the drafter's email is pending: needs your yes", () => {
     const email = draft({ id: "q-pc", agent: "post-consult", headline: "Proposal for Maya Okafor" });
-    expect(decideTopCard(facts({ approvals: { status: "ok", value: [email] }, meetings: { status: "ok", value: [heldYesterday] } }))).toMatchObject({ kind: "needs-yes", item: { id: "q-pc" } });
+    expect(decideTopCard(facts({ approvals: pending(email), meetings: { status: "ok", value: [heldYesterday] } }))).toMatchObject({ kind: "needs-yes", item: { id: "q-pc" } });
   });
   it("4 proposal out, day 2 of 7", () => {
     expect(decideTopCard(facts({ proposal: { status: "ok", value: proposal() } }))).toMatchObject({ kind: "not-prepared", gap: { id: "follow-up", day: 2 } });

@@ -1,5 +1,5 @@
 import { INTENDED_NY_HOUR, newYorkHour, type CronJob } from "@/lib/cron/ny-hour";
-import { PREP_WINDOW_HOURS } from "@/lib/agents/consult-prep/run";
+import { PREP_WINDOW_HOURS } from "@/lib/agents/consult-prep/constants";
 
 /**
  * WHEN the scheduled jobs run, read from the code that schedules them, never written down a second time:

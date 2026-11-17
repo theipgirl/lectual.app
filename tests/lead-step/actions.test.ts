@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import { afterYesSentence, cleanReason, runLeadStepEdit, runLeadStepNotThis, runLeadStepYes, type LeadStepActionDeps } from "@/lib/lead-step/actions-core";
+import { afterYesSentence, cleanReason, runLeadStepEdit, runLeadStepNotThis, runLeadStepSendBack, runLeadStepYes, type LeadStepActionDeps } from "@/lib/lead-step/actions-core";
 import type { QueueItem } from "@/lib/queue/api";
 import type { ReviewOutcome } from "@/lib/queue/review-core";
 import { DONE_NOTE } from "@/lib/ui/words";
 import * as W from "@/lib/ui/words";
 import type { Role } from "@/lib/auth/roles";
+import type { LeadCloserLook } from "@/lib/lead-step/closer-look";
+import type { HandoffFact } from "@/lib/lead-step/facts";
 import { LEAD, MERGED, ME, RAYN } from "./fixtures";
 
 const ITEM = "q-1";
@@ -44,7 +46,9 @@ function deps(over: Partial<LeadStepActionDeps> = {}, role: Role = "attorney", s
     leadIdsOf: vi.fn(async () => [LEAD]),
     leadSet: vi.fn(async () => [LEAD, MERGED]),
     routing: vi.fn(async () => ({ status: "ok" as const, routing: {}, members: [] })),
-    closerLook: vi.fn(async () => [] as never[]),
+    closerLook: vi.fn(async (): Promise<LeadCloserLook | null> => ({ reasons: [], linkNotLive: false })),
+    handoff: vi.fn(async (): Promise<HandoffFact> => ({ status: "unknown" })),
+    sendBack: vi.fn(async (): Promise<{ ok: true } | { ok: false; error: string }> => ({ ok: true })),
     review: vi.fn(async (): Promise<ReviewOutcome> => resolved()),
     revalidate: vi.fn(),
     ...over,
@@ -100,7 +104,7 @@ describe("Yes", () => {
 
   it("a stale draft or a refused linked proposal: refused here, the core is never called", async () => {
     for (const reasons of [["stale"], ["linked-proposal"], ["check-first"], ["draft-issue"]] as const) {
-      const d = deps({ closerLook: vi.fn(async () => [...reasons]) });
+      const d = deps({ closerLook: vi.fn(async () => ({ reasons: [...reasons], linkNotLive: false })) });
       expect(await runLeadStepYes(d, LEAD, ITEM)).toEqual({ ok: false, error: W.LEAD_STEP_CLOSER_LOOK });
       expect(d.review).not.toHaveBeenCalled();
     }
@@ -137,14 +141,14 @@ describe("Yes", () => {
 
 describe("the after-Yes sentence comes from the approve core's own result", () => {
   it("names the mailbox the core reports, never assumes Outlook", () => {
-    expect(afterYesSentence(resolved() as never)).toBe(W.leadStepDraftInMailbox(null, "Outlook"));
-    expect(afterYesSentence(resolved({ send: "mailbox-google", provider: "google" }) as never)).toBe(W.leadStepDraftInMailbox(null, "Gmail"));
-    expect(afterYesSentence(resolved({ send: "mailbox-microsoft", provider: "microsoft" }) as never, "Rayn")).toBe("Approved. The draft is in Rayn's Outlook. Nothing is sent until Rayn presses Send.");
-    expect(afterYesSentence(resolved({ send: "drafted", provider: null, webLink: null }) as never)).toBe(W.LEAD_STEP_DRAFT_IN_QUEUE_MAILBOX);
-    expect(afterYesSentence(resolved({ send: "none", provider: null }) as never)).toBe(W.LEAD_STEP_APPROVED_NO_DRAFT);
-    expect(afterYesSentence(resolved({ send: null, provider: null }) as never)).toBe(W.LEAD_STEP_APPROVED_NO_DRAFT);
-    expect(afterYesSentence(resolved({ send: "mailbox-failed", provider: null }) as never)).toBe(W.LEAD_STEP_APPROVED_DRAFT_FAILED);
-    expect(afterYesSentence(resolved({ send: "manual", provider: null }) as never)).toBe(W.LEAD_STEP_APPROVED_MANUAL);
+    expect(afterYesSentence(resolved() as never, "CLIENT_EMAIL")).toBe(W.leadStepDraftInMailbox(null, "Outlook"));
+    expect(afterYesSentence(resolved({ send: "mailbox-google", provider: "google" }) as never, "CLIENT_EMAIL")).toBe(W.leadStepDraftInMailbox(null, "Gmail"));
+    expect(afterYesSentence(resolved({ send: "mailbox-microsoft", provider: "microsoft" }) as never, "CLIENT_EMAIL", "Rayn")).toBe("Approved. The draft is in Rayn's Outlook. Nothing is sent until Rayn presses Send.");
+    expect(afterYesSentence(resolved({ send: "drafted", provider: null, webLink: null }) as never, "CLIENT_EMAIL")).toBe(W.LEAD_STEP_DRAFT_IN_QUEUE_MAILBOX);
+    expect(afterYesSentence(resolved({ send: "none", provider: null }) as never, "CLIENT_EMAIL")).toBe(W.LEAD_STEP_APPROVED_NO_DRAFT);
+    expect(afterYesSentence(resolved({ send: null, provider: null }) as never, "CLIENT_EMAIL")).toBe(W.LEAD_STEP_APPROVED_NO_DRAFT);
+    expect(afterYesSentence(resolved({ send: "mailbox-failed", provider: null }) as never, "CLIENT_EMAIL")).toBe(W.LEAD_STEP_APPROVED_DRAFT_FAILED);
+    expect(afterYesSentence(resolved({ send: "manual", provider: null }) as never, "CLIENT_EMAIL")).toBe(W.LEAD_STEP_APPROVED_MANUAL);
     for (const s of [W.LEAD_STEP_DRAFT_IN_QUEUE_MAILBOX, W.LEAD_STEP_APPROVED_NO_DRAFT, W.LEAD_STEP_APPROVED_DRAFT_FAILED, W.LEAD_STEP_APPROVED_MANUAL]) expect(s).not.toMatch(/Outlook/);
   });
 
@@ -190,7 +194,7 @@ describe("Not this", () => {
 });
 
 describe("Edit", () => {
-  it("saves through the queue's save path and recomputes who may say yes", async () => {
+  it("saves through the queue's save path; the next Yes is decided on the saved text", async () => {
     let stored = item();
     const d = deps(
       {
@@ -204,11 +208,13 @@ describe("Edit", () => {
       "law_clerk",
     );
     const plain = await runLeadStepEdit(d, LEAD, ITEM, "Hi Maya,\nJust checking in.");
-    expect(plain).toEqual({ ok: true, message: W.LEAD_STEP_EDIT_SAVED, attorneyOnly: false, canYes: true });
+    // No optimistic "may say yes now": the page is revalidated and works it out from the re-read item.
+    expect(plain).toEqual({ ok: true, message: W.LEAD_STEP_EDIT_SAVED });
     expect(d.review).toHaveBeenCalledWith({ id: ITEM, intent: "save", body: "Hi Maya,\nJust checking in." });
-    // An edit that adds advice text makes the item attorney-only and removes Yes for the clerk.
-    const advice = await runLeadStepEdit(d, LEAD, ITEM, "Hi Maya, your mark is likely to be registered.");
-    expect(advice).toEqual({ ok: true, message: W.LEAD_STEP_EDIT_SAVED, attorneyOnly: true, canYes: false });
+    expect(d.revalidate).toHaveBeenCalledWith(LEAD);
+    // After an edit that adds advice text, the next Yes is refused for the clerk (the item is re-read and re-classified).
+    await runLeadStepEdit(d, LEAD, ITEM, "Hi Maya, your mark is likely to be registered.");
+    expect(await runLeadStepYes(d, LEAD, ITEM)).toEqual({ ok: false, error: "Only an attorney can approve this kind of message." });
   });
 
   it("an empty edit is refused before any read; a viewer is refused before any read", async () => {
@@ -218,5 +224,55 @@ describe("Edit", () => {
     const v = deps({ caller: vi.fn(async () => ({ userId: ME, role: "viewer" as Role })) });
     expect(await runLeadStepEdit(v, LEAD, ITEM, "Hi")).toEqual({ ok: false, error: W.LEAD_STEP_NO_EDIT });
     expect(v.readItem).not.toHaveBeenCalled();
+  });
+});
+
+describe("review findings", () => {
+  it("a linked proposal that isn't live: Yes is refused here with its own sentence (it would turn the link on)", async () => {
+    const d = deps({ closerLook: vi.fn(async () => ({ reasons: ["linked-proposal" as const], linkNotLive: true })) });
+    expect(await runLeadStepYes(d, LEAD, ITEM)).toEqual({ ok: false, error: W.LEAD_STEP_LINK_NOT_LIVE });
+    expect(d.review).not.toHaveBeenCalled();
+  });
+
+  it("the hander of a card now with someone else gets no Yes; the holder and an unknown state are unchanged", async () => {
+    const away = deps({ handoff: vi.fn(async (): Promise<HandoffFact> => ({ status: "ok", holder: { userId: RAYN, by: ME, note: null, at: "2026-11-17T12:00:00.000Z" } })) });
+    expect(await runLeadStepYes(away, LEAD, ITEM)).toEqual({ ok: false, error: W.LEAD_STEP_HANDED_AWAY });
+    expect(away.review).not.toHaveBeenCalled();
+    const held = deps({ handoff: vi.fn(async (): Promise<HandoffFact> => ({ status: "ok", holder: { userId: ME, by: RAYN, note: null, at: "2026-11-17T12:00:00.000Z" } })) });
+    expect((await runLeadStepYes(held, LEAD, ITEM)).ok).toBe(true);
+    expect((await runLeadStepYes(deps(), LEAD, ITEM)).ok).toBe(true);
+  });
+
+  it("Send back goes through the deck's own path after the same checks", async () => {
+    const d = deps();
+    expect(await runLeadStepSendBack(d, LEAD, ITEM, " not mine \u200b")).toEqual({ ok: true, message: W.LEAD_STEP_SENT_BACK });
+    expect(d.sendBack).toHaveBeenCalledWith(ITEM, "not mine");
+    const v = deps({ caller: vi.fn(async () => ({ userId: ME, role: "viewer" as Role })) });
+    expect(await runLeadStepSendBack(v, LEAD, ITEM, "")).toEqual({ ok: false, error: W.LEAD_STEP_NO_EDIT });
+    expect(v.sendBack).not.toHaveBeenCalled();
+    const refused = deps({ sendBack: vi.fn(async () => ({ ok: false as const, error: W.DECK_NOT_YOURS })) });
+    expect(await runLeadStepSendBack(refused, LEAD, ITEM, "")).toEqual({ ok: false, error: W.DECK_NOT_YOURS });
+  });
+
+  it("a lead set that couldn't be read in full says 'failed', never 'not on this lead'", async () => {
+    expect(await runLeadStepYes(deps({ leadSet: vi.fn(async () => null) }), LEAD, ITEM)).toEqual({ ok: false, error: W.LEAD_STEP_FAILED });
+  });
+
+  it("after a yes: 'sent' reads Approved., and a letter says its document is made", () => {
+    expect(afterYesSentence(resolved({ send: "sent", provider: null }) as never, "CLIENT_EMAIL")).toBe(W.LEAD_STEP_APPROVED);
+    expect(W.LEAD_STEP_APPROVED).toBe("Approved.");
+    for (const type of ["ENGAGEMENT_LETTER", "OPINION_LETTER", "TRADEMARK_CLEARANCE"]) {
+      expect(afterYesSentence(resolved({ send: null, provider: null }) as never, type)).toBe(W.LEAD_STEP_APPROVED_LETTER);
+    }
+    expect(afterYesSentence(resolved({ send: null, provider: null }) as never, "CLIENT_EMAIL")).toBe(W.LEAD_STEP_APPROVED_NO_DRAFT);
+  });
+
+  it("a reason of only zero-width or bidi characters is no reason; they never count toward the 200", async () => {
+    expect(cleanReason("\u200b\u200e\u202e\u2066")).toBeNull();
+    expect(cleanReason("ok\u200b".padEnd(250, "\u200b"))).toBe("ok");
+    expect(cleanReason("a\u202eb")).toBe("ab");
+    const d = deps();
+    expect(await runLeadStepNotThis(d, LEAD, ITEM, "\u200b\u200b")).toEqual({ ok: false, error: W.LEAD_STEP_REASON_NEEDED });
+    expect(d.caller).not.toHaveBeenCalled();
   });
 });

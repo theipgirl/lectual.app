@@ -43,10 +43,10 @@ import {
  * content), which is what makes a second run skip the event. Counts only leave this file.
  */
 
-export const PREP_WINDOW_HOURS = 24;
+import { PREP_SOURCE, PREP_WINDOW_HOURS } from "./constants";
+export { PREP_SOURCE, PREP_WINDOW_HOURS };
 /** A safety bound on one run: model calls are serial and the cron has a 300s ceiling. */
 export const PREP_BATCH = 10;
-export const PREP_SOURCE = "consult-prep";
 const EVENT_ROWS = 100;
 
 const GeneratedText = z.object({ text: z.string().describe("The complete plain-text email, in the exact format the instructions give") });

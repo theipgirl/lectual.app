@@ -4,18 +4,20 @@ import { revalidatePath } from "next/cache";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import type { StopDb } from "@/lib/campaigns/stop-db";
 import { mergedSetFor, resolveLeadId } from "@/lib/leads/live";
-import { cardCaller, readCardItem, staffPreviewRefusal } from "@/lib/queue/card-moves";
+import { cardCaller, readCardItem, sendCardBack, staffPreviewRefusal } from "@/lib/queue/card-moves";
 import { groupPendingByLead } from "@/lib/queue/lead-pending";
 import { loadApprovalRouting } from "@/lib/queue/routing-load";
 import { runQueueReview } from "@/lib/queue/review-core";
-import { closerLookFor } from "./load";
+import { closerLookFor, readHandoffs } from "./load";
 import {
   runLeadStepEdit,
   runLeadStepNotThis,
+  runLeadStepSendBack,
   runLeadStepYes,
   type EditResult,
   type LeadStepActionDeps,
   type NotThisResult,
+  type SendBackResult,
   type YesResult,
 } from "./actions-core";
 
@@ -51,7 +53,8 @@ const deps: LeadStepActionDeps = {
       const keeper = await resolveLeadId(db, leadId);
       if (keeper.status !== "ok") return null;
       const set = await mergedSetFor(db, keeper.id);
-      return set.ids;
+      // Only a merged set that was read in full: a partial one could call a draft of this lead "not on this lead".
+      return set.status === "ok" ? set.ids : null;
     } catch {
       return null;
     }
@@ -60,7 +63,12 @@ const deps: LeadStepActionDeps = {
     const r = await loadApprovalRouting();
     return r.status === "ok" ? { status: "ok", routing: r.routing, members: r.members } : { status: "failed" };
   },
-  closerLook: async (item) => (await closerLookFor(item)).reasons,
+  closerLook: async (item) => (await closerLookFor(item)).look,
+  handoff: async (item) => {
+    const routing = await deps.routing();
+    return (await readHandoffs([item], routing)).get(item.id) ?? { status: "unknown" };
+  },
+  sendBack: (id, note) => sendCardBack({ id, note, allowHander: false }),
   review: runQueueReview,
   revalidate: (leadId) => {
     revalidatePath(`/dashboard/leads/${leadId}/`);
@@ -78,4 +86,9 @@ export async function leadStepNotThisAction(leadId: unknown, itemId: unknown, re
 
 export async function leadStepEditAction(leadId: unknown, itemId: unknown, body: unknown): Promise<EditResult> {
   return runLeadStepEdit(deps, leadId, itemId, body);
+}
+
+/** Send a card handed to you back to whoever handed it (the deck's own `sendCardBack`). */
+export async function leadStepSendBackAction(leadId: unknown, itemId: unknown, note: unknown): Promise<SendBackResult> {
+  return runLeadStepSendBack(deps, leadId, itemId, note);
 }

@@ -47,12 +47,13 @@ export function facts(over: Partial<LeadStepFacts> = {}): LeadStepFacts {
     },
     viewer: { userId: ME, role: "attorney", actingAsStaff: false, canMoveStage: true },
     routing: { status: "ok", routing: {}, members: [] },
-    approvals: { status: "ok", value: [] },
+    approvals: { status: "ok", value: { items: [], total: 0 } },
     tasks: { status: "ok", value: [] },
     consult: { status: "ok", value: null },
     meetings: { status: "ok", value: [] },
     proposal: { status: "ok", value: null },
-    activity: { status: "ok", value: [] },
+    activity: { status: "ok", value: { rows: [], truncated: false } },
+    markers: { status: "ok", value: { preppedEventIds: [], handledMeetingIds: [], outcomeLogged: false } },
     jobs: { status: "ok", value: jobsOn() },
     ...over,
   };
@@ -80,8 +81,9 @@ export function draft(over: Partial<PendingDraft> & { id?: string } = {}): Pendi
     kind: classifyQueueItem(item),
     attorneyOnly: isAttorneyOnly(item),
     reviewer: parseReviewerSummary(merged.summary),
-    closerLook: [],
+    closerLook: { reasons: [], linkNotLive: false },
     linked: { status: "none" },
+    handoff: { status: "unknown" },
     ...merged,
   } as PendingDraft;
 }
@@ -109,3 +111,7 @@ export function row(over: Partial<ActivityRow> & { id: string; type: string }): 
 
 /** Thu Nov 19, 2:00 PM to 2:45 PM New York. */
 export const THURSDAY_CONSULT = { eventId: "evt-1", title: "Strategy session: Maya Okafor", startsAt: "2026-11-19T19:00:00.000Z", endsAt: "2026-11-19T19:45:00.000Z", joinUrl: null };
+
+/** The approvals read as the loader returns it: the items given, `total` all of them. */
+export const pending = (...items: PendingDraft[]) => ({ status: "ok" as const, value: { items, total: items.length } });
+export const timeline = (...rows: ActivityRow[]) => ({ status: "ok" as const, value: { rows, truncated: false } });

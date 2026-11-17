@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readDid } from "@/lib/lead-step/did";
+import { leadCloserLook } from "@/lib/lead-step/closer-look";
 import { buildLeadStepView, viewerMayDecide, YES_HOLD_MS } from "@/lib/lead-step/view-model";
 import { notSetUp, unavailable } from "@/lib/lead-step/facts";
 import { AGENT_ACTOR } from "@/lib/stage-keeper/moves";
@@ -7,7 +8,7 @@ import { PREP_SOURCE } from "@/lib/agents/consult-prep/run";
 import { ROLES, type Role } from "@/lib/auth/roles";
 import { QUEUE_APPROVE_ROLES } from "@/lib/queue/roles";
 import * as W from "@/lib/ui/words";
-import { LEAD, MERGED, NOW, RAYN, THURSDAY_CONSULT, draft, facts, jobsOn, proposal, row } from "./fixtures";
+import { LEAD, MERGED, NOW, RAYN, THURSDAY_CONSULT, draft, facts, jobsOn, pending, proposal, row } from "./fixtures";
 
 const move = (id: string, at: string, over: Record<string, unknown> = {}, leadId = LEAD) =>
   row({ id, lead_id: leadId, type: "stage_changed", created_at: at, payload: { actor: AGENT_ACTOR, from_stage_id: "s-new", to_stage_id: "s-booked", from_stage: "Potential New Client", to_stage: "Consult Scheduled", ...over } });
@@ -21,7 +22,7 @@ describe("What Lectual did", () => {
       move("r-move", "2026-11-13T21:40:00.000Z"),
       row({ id: "r-review", type: "ai_insight", actor_type: "user", payload: { source: "stage-keeper-review" } }),
     ];
-    const list = readDid({ status: "ok", value: rows }, LEAD, "s-booked");
+    const list = readDid({ status: "ok", value: { rows, truncated: false } }, LEAD, "s-booked");
     expect(list.status).toBe("ok");
     if (list.status !== "ok") return;
     expect(list.rows.map((r) => [r.id, r.text])).toEqual([
@@ -35,14 +36,14 @@ describe("What Lectual did", () => {
     const own = move("r-own", "2026-11-13T21:40:00.000Z");
     const merged = move("r-merged", "2026-11-12T21:40:00.000Z", {}, MERGED);
     const drafted = row({ id: "r-draft", type: "queue_drafted", payload: { source: "morning-brief" } });
-    const list = readDid({ status: "ok", value: [own, merged, drafted] }, LEAD, "s-booked");
+    const list = readDid({ status: "ok", value: { rows: [own, merged, drafted], truncated: false } }, LEAD, "s-booked");
     if (list.status !== "ok") throw new Error("expected ok");
     const byId = Object.fromEntries(list.rows.map((r) => [r.id, r.undo]));
     expect(byId["r-own"]).toEqual({ kind: "stage-move", activityId: "r-own", state: "available" });
     expect(byId["r-merged"]).toBeNull();
     expect(byId["r-draft"]).toBeNull();
     // Moved since: no Undo.
-    const movedOn = readDid({ status: "ok", value: [own] }, LEAD, "s-elsewhere");
+    const movedOn = readDid({ status: "ok", value: { rows: [own], truncated: false } }, LEAD, "s-elsewhere");
     if (movedOn.status !== "ok") throw new Error("expected ok");
     expect(movedOn.rows[0].undo?.state).toBe("moved-since");
   });
@@ -55,8 +56,8 @@ describe("What Lectual did", () => {
   it("the view offers Undo only to a role that may move stages", () => {
     const value = [move("r-own", "2026-11-13T21:40:00.000Z")];
     const lead = { ...facts().lead, stageId: "s-booked" };
-    const can = buildLeadStepView(facts({ lead, activity: { status: "ok", value } })).did;
-    const cannot = buildLeadStepView(facts({ lead, activity: { status: "ok", value }, viewer: { ...facts().viewer, canMoveStage: false } })).did;
+    const can = buildLeadStepView(facts({ lead, activity: { status: "ok", value: { rows: value, truncated: false } } })).did;
+    const cannot = buildLeadStepView(facts({ lead, activity: { status: "ok", value: { rows: value, truncated: false } }, viewer: { ...facts().viewer, canMoveStage: false } })).did;
     expect(can.status === "ok" && can.rows[0].undo).toEqual({ activityId: "r-own" });
     expect(cannot.status === "ok" && cannot.rows[0].undo).toBeNull();
   });
@@ -64,21 +65,21 @@ describe("What Lectual did", () => {
 
 describe("the top card view", () => {
   it("needs-yes for an approver: Yes, Edit and Not this, held for 5 seconds", () => {
-    const v = buildLeadStepView(facts({ approvals: { status: "ok", value: [draft()] } }));
+    const v = buildLeadStepView(facts({ approvals: pending(draft()) }));
     expect(v.top).toMatchObject({ kind: "needs-yes", eyebrow: W.LEAD_STEP_NEEDS_YES, actions: { yes: true, edit: true, notThis: true }, blocked: null, waitingOn: null, holdMs: YES_HOLD_MS });
     expect(v.readOnly).toBe(false);
     expect(v.facts.waiting).toMatchObject({ value: W.LEAD_STEP_WAIT_APPROVAL, sub: W.LEAD_STEP_YOUR_YES });
   });
 
   it("a viewer who cannot approve sees the same card read-only, with whose yes it waits on", () => {
-    const v = buildLeadStepView(facts({ approvals: { status: "ok", value: [draft()] }, viewer: { ...facts().viewer, role: "viewer" } }));
+    const v = buildLeadStepView(facts({ approvals: pending(draft()), viewer: { ...facts().viewer, role: "viewer" } }));
     expect(v.top).toMatchObject({ kind: "needs-yes", actions: { yes: false, edit: false, notThis: false }, waitingOn: W.LEAD_STEP_WAITING_ON_APPROVER, eyebrow: W.LEAD_STEP_NEEDS_AN_APPROVER });
     expect(v.readOnly).toBe(true);
   });
 
   it("routed to a person: the card names them for everyone else", () => {
     const routing = { status: "ok" as const, routing: { stalled_followup: RAYN }, members: [{ userId: RAYN, role: "law_clerk" as Role, displayName: "Rayn" }] };
-    const v = buildLeadStepView(facts({ approvals: { status: "ok", value: [draft()] }, routing, viewer: { ...facts().viewer, role: "paralegal" } }));
+    const v = buildLeadStepView(facts({ approvals: pending(draft()), routing, viewer: { ...facts().viewer, role: "paralegal" } }));
     expect(v.top).toMatchObject({ eyebrow: W.leadStepNeedsYesOf("Rayn"), waitingOn: W.leadStepWaitingOn("Rayn"), actions: { yes: false, edit: true } });
   });
 
@@ -94,7 +95,7 @@ describe("the top card view", () => {
     ];
     for (const role of ROLES) {
       for (const item of items) {
-        const f = facts({ approvals: { status: "ok", value: [item] }, viewer: { ...facts().viewer, role } });
+        const f = facts({ approvals: pending(item), viewer: { ...facts().viewer, role } });
         const v = buildLeadStepView(f);
         const may = viewerMayDecide(f, item);
         expect(v.top.kind === "needs-yes" && v.top.actions.yes, `${role} ${item.kind}`).toBe(may);
@@ -105,7 +106,7 @@ describe("the top card view", () => {
 
   it("a law clerk sees no Yes on a post-consult email", () => {
     const item = draft({ agent: "post-consult", headline: "Post-consult email" });
-    const v = buildLeadStepView(facts({ approvals: { status: "ok", value: [item] }, viewer: { ...facts().viewer, role: "law_clerk" } }));
+    const v = buildLeadStepView(facts({ approvals: pending(item), viewer: { ...facts().viewer, role: "law_clerk" } }));
     expect(v.top.kind === "needs-yes" && v.top.actions.yes).toBe(false);
   });
 
@@ -119,21 +120,42 @@ describe("the top card view", () => {
   });
 
   it("Lectual staff viewing as the firm: no Yes, the preview sentence", () => {
-    const v = buildLeadStepView(facts({ approvals: { status: "ok", value: [draft()] }, viewer: { ...facts().viewer, actingAsStaff: true } }));
+    const v = buildLeadStepView(facts({ approvals: pending(draft()), viewer: { ...facts().viewer, actingAsStaff: true } }));
     expect(v.top).toMatchObject({ actions: { yes: false, edit: false, notThis: false }, blocked: W.LEAD_STEP_PREVIEW_ONLY });
   });
 
   it("a stale draft, a draft issue or a refused linked proposal: no Yes here, the reason instead", () => {
-    const stale = buildLeadStepView(facts({ approvals: { status: "ok", value: [draft({ closerLook: ["stale"] })] } }));
+    const stale = buildLeadStepView(facts({ approvals: pending(draft({ closerLook: { reasons: ["stale"], linkNotLive: false } })) }));
     expect(stale.top).toMatchObject({ actions: { yes: false, notThis: true }, blocked: W.LEAD_STEP_CLOSER_LOOK });
-    const unchecked = buildLeadStepView(facts({ approvals: { status: "ok", value: [draft({ closerLook: null })] } }));
+    const unchecked = buildLeadStepView(facts({ approvals: pending(draft({ closerLook: null })) }));
     expect(unchecked.top).toMatchObject({ actions: { yes: false }, blocked: W.LEAD_STEP_CANT_CHECK });
+    const unreadLink = buildLeadStepView(facts({ approvals: pending(draft({ linked: { status: "unavailable" } })) }));
+    expect(unreadLink.top).toMatchObject({ actions: { yes: false }, blocked: W.LEAD_STEP_CANT_CHECK });
     const linked = draft({
-      closerLook: ["linked-proposal"],
+      closerLook: { reasons: ["linked-proposal"], linkNotLive: false },
       linked: { status: "ok", id: "p-1", version: 1, proposalStatus: "draft", clientName: "Maya", legalCents: 547000, govCents: 140000, errorCount: 0, gateRefusal: "Create the proposal's link first: open it, review it, and click Save and create link." },
     });
-    const lv = buildLeadStepView(facts({ approvals: { status: "ok", value: [linked] } }));
+    const lv = buildLeadStepView(facts({ approvals: pending(linked) }));
     expect(lv.top).toMatchObject({ actions: { yes: false }, blocked: "Create the proposal's link first: open it, review it, and click Save and create link.", proposal: { href: "/dashboard/proposals/p-1/" } });
+  });
+
+  it("a linked proposal that passed the gate but isn't live: Open to review, never a one-tap Yes that turns the link on", () => {
+    const saved = draft({
+      agent: "post-consult",
+      closerLook: leadCloserLook([], { ok: true, proposal: { status: "approved" } }),
+      linked: { status: "ok", id: "p-1", version: 2, proposalStatus: "approved", clientName: "Maya", legalCents: 547000, govCents: 140000, errorCount: 0, gateRefusal: null },
+    });
+    const v = buildLeadStepView(facts({ approvals: pending(saved) }));
+    expect(v.top).toMatchObject({ actions: { yes: false, notThis: true }, blocked: W.LEAD_STEP_LINK_NOT_LIVE });
+    expect(v.top.kind === "needs-yes" && v.top.proposal?.rows[0]).toEqual({ label: W.LEAD_STEP_ROW_PROPOSAL, value: W.LEAD_STEP_PROPOSAL_SAVED });
+    const draftOne = buildLeadStepView(facts({ approvals: pending({ ...saved, linked: { ...(saved.linked as Extract<typeof saved.linked, { status: "ok" }>), proposalStatus: "draft" } }) }));
+    expect(draftOne.top.kind === "needs-yes" && draftOne.top.proposal?.rows[0].value).toBe(W.LEAD_STEP_DRAFT_PROPOSAL);
+    // A live link (sent) passes: the yes only approves the email.
+    const live = draft({ agent: "post-consult", closerLook: leadCloserLook([], { ok: true, proposal: { status: "sent" } }), linked: { ...(saved.linked as Extract<typeof saved.linked, { status: "ok" }>), proposalStatus: "sent" } });
+    expect(buildLeadStepView(facts({ approvals: pending(live) })).top).toMatchObject({ actions: { yes: true }, blocked: null });
+    expect(leadCloserLook([], { ok: true, proposal: { status: "approved" } })).toEqual({ reasons: ["linked-proposal"], linkNotLive: true });
+    expect(leadCloserLook([], { ok: true, proposal: null })).toEqual({ reasons: [], linkNotLive: false });
+    expect(leadCloserLook([], null)).toBeNull();
   });
 
   it("has-it says what it waits for and what it does, and when, in the firm's zone", () => {

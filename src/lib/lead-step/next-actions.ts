@@ -1,8 +1,5 @@
 import type { AgentId } from "@/lib/agents/types";
-import { PREP_SOURCE } from "@/lib/agents/consult-prep/run";
-import { CONSULT_PROPOSAL_SOURCE } from "@/lib/consult-proposal/shared";
-import type { ActivityRow } from "@/lib/stage-keeper/moves";
-import type { BookedConsult, JobsFacts, LeadStepFacts, MeetingFact, Read } from "./facts";
+import type { BookedConsult, JobsFacts, LeadStepFacts, MarkersFact, MeetingFact, Read } from "./facts";
 import { firstRunAfterImport, nextRunWindow, prepRunFor, type RunWindow } from "./schedule";
 
 /**
@@ -44,6 +41,7 @@ function common(agent: AgentId, jobs: JobsFacts, approvalsOk: boolean, approvals
   if (!jobs.aiOn) return { on: false, why: "ai-off" };
   if (jobs.autopilot === "unknown") return { on: "unknown" };
   if (jobs.autopilot === "paused") return { on: false, why: "paused" };
+  if (jobs.settings === null) return { on: "unknown" };
   const setting = jobs.settings[agent];
   if (!setting || !setting.enabled) return { on: false, why: "assistant-off" };
   if (setting.autonomy === "suggest") return { on: false, why: "suggest-only" };
@@ -73,28 +71,21 @@ export function postConsultGate(jobs: JobsFacts, approvals: Read<unknown>, opts:
 
 /* ─────────────────────────── what has been done already ─────────────────────────── */
 
-const obj = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
-
-/** Consult prep recorded its drafts for this calendar event (its own marker on the timeline). */
-export function prepRecorded(rows: readonly ActivityRow[], eventId: string): boolean {
-  return rows.some((r) => r.type === "queue_drafted" && obj(r.payload).source === PREP_SOURCE && obj(r.payload).event_id === eventId);
-}
-
-/** The consult drafter already handled this recorded call (drafted, or decided not to). The post-consult drafter's own test. */
-export function meetingHandled(rows: readonly ActivityRow[], meetingId: string): boolean {
-  return rows.some((r) => (r.type === "queue_drafted" || r.type === "ai_insight") && obj(r.payload).source === CONSULT_PROPOSAL_SOURCE && obj(r.payload).meeting_id === meetingId);
-}
-
 /** How far back the post-consult drafter looks for recorded calls (its LOOKBACK_DAYS). */
 export const POST_CONSULT_LOOKBACK_DAYS = 14;
 const DAY_MS = 86_400_000;
 
-/** A recorded call the post-consult drafter will pick up on its next run: linked here, in its window, with material, not handled. */
-export function recordingWaiting(meetings: readonly MeetingFact[], rows: readonly ActivityRow[], now: Date): MeetingFact | null {
-  const floor = now.getTime() - POST_CONSULT_LOOKBACK_DAYS * DAY_MS;
+/**
+ * A recorded call the post-consult drafter will pick up at the run in `window`: linked here, with material, not
+ * handled (its own marker), and inside the drafter's look-back measured from the run itself. The run can start
+ * anywhere in its hour, so the floor is taken from the window's END: a call is promised only if every possible
+ * start of that run would still look back far enough to see it.
+ */
+export function recordingWaiting(meetings: readonly MeetingFact[], markers: MarkersFact, window: RunWindow, now: Date): MeetingFact | null {
+  const floor = Date.parse(window.end) - POST_CONSULT_LOOKBACK_DAYS * DAY_MS;
   const candidates = meetings
     .filter((m) => m.hasMaterial && m.startedAt && Date.parse(m.startedAt) >= floor && Date.parse(m.startedAt) <= now.getTime())
-    .filter((m) => !meetingHandled(rows, m.id))
+    .filter((m) => !markers.handledMeetingIds.includes(m.id))
     .sort((a, b) => Date.parse(b.startedAt ?? "") - Date.parse(a.startedAt ?? ""));
   return candidates[0] ?? null;
 }
@@ -124,19 +115,19 @@ function callEnd(c: BookedConsult): string {
  * The next promised action for this lead. Order: a consult still to come (prep, else the proposal after it), then a
  * recorded call waiting for the drafter. A read that would decide it and failed is `unknown`, never "nothing".
  */
-export function nextAction(facts: Pick<LeadStepFacts, "now" | "approvals" | "consult" | "meetings" | "activity" | "jobs">): NextAction {
+export function nextAction(facts: Pick<LeadStepFacts, "now" | "approvals" | "consult" | "meetings" | "markers" | "jobs">): NextAction {
   const now = new Date(facts.now);
-  const { consult, meetings, activity, jobs } = facts;
+  const { consult, meetings, markers, jobs } = facts;
 
   // A consult on the calendar (Mailboxes feature). Not set up = no Outlook consult to speak of.
   if (consult.status === "unavailable") return { status: "unknown" };
   const booked = consult.status === "ok" && consult.value && Date.parse(consult.value.startsAt) > now.getTime() ? consult.value : null;
 
   if (booked) {
-    if (activity.status !== "ok" || jobs.status !== "ok") return { status: "unknown" };
+    if (markers.status !== "ok" || jobs.status !== "ok") return { status: "unknown" };
     const prepGate = consultPrepGate(jobs.value, facts.approvals);
     if (prepGate.on === "unknown") return { status: "unknown" };
-    const prepped = prepRecorded(activity.value, booked.eventId);
+    const prepped = markers.value.preppedEventIds.includes(booked.eventId);
     if (!prepped && prepGate.on === true) {
       const window = prepRunFor(booked.startsAt, now);
       if (window) return { status: "promise", promise: { job: "consult-prep", withClientEmail: jobs.value.modules.agentToolkit, window, consult: booked } };
@@ -156,15 +147,15 @@ export function nextAction(facts: Pick<LeadStepFacts, "now" | "approvals" | "con
   // A recorded call waiting for the post-consult drafter.
   if (meetings.status === "unavailable") return { status: "unknown" };
   if (meetings.status === "ok" && meetings.value.length > 0) {
-    if (activity.status !== "ok") return { status: "unknown" };
-    const waiting = recordingWaiting(meetings.value, activity.value, now);
+    if (markers.status !== "ok") return { status: "unknown" };
+    const window = nextRunWindow("agents", now);
+    if (!window) return { status: "unknown" };
+    const waiting = recordingWaiting(meetings.value, markers.value, window, now);
     if (waiting) {
       if (jobs.status !== "ok") return { status: "unknown" };
       const gate = postConsultGate(jobs.value, facts.approvals, { callStillToCome: false });
       if (gate.on === "unknown") return { status: "unknown" };
       if (gate.on === false) return { status: "off", for: "post-consult", why: gate.why, consult: null };
-      const window = nextRunWindow("agents", now);
-      if (!window) return { status: "unknown" };
       return { status: "promise", promise: { job: "post-consult", source: "recording", window, meeting: waiting } };
     }
   }

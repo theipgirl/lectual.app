@@ -1,6 +1,6 @@
-import { PREP_SOURCE } from "@/lib/agents/consult-prep/run";
-import { FOLLOW_UP_SOURCE } from "@/lib/agents/morning-brief/follow-ups";
-import { CONSULT_PROPOSAL_SOURCE } from "@/lib/consult-proposal/shared";
+import { PREP_SOURCE } from "@/lib/agents/consult-prep/constants";
+import { FOLLOW_UP_SOURCE } from "@/lib/agents/morning-brief/constants";
+import { CONSULT_PROPOSAL_SOURCE } from "@/lib/consult-proposal/source";
 import { AGENT_ACTOR, REVIEW_SOURCE, SUGGESTION_SOURCE, isAgentMoveRow, parseAgentMove, parseSuggestion, undoStateFor, type ActivityRow, type UndoState } from "@/lib/stage-keeper/moves";
 import {
   LEAD_STEP_DID_CREATED,
@@ -29,8 +29,11 @@ import type { Read } from "./facts";
  * A person's decision on a suggestion (`stage-keeper-review`) is the person's, so it is left out too.
  *
  * UNDO only where an undo already exists: the Stage Keeper's move (`undoAgentMoveAction`, its own rule
- * `undoStateFor`), on the lead's OWN rows (a merged lead's rows are history), for a role that may move stages. Every
- * other row has no Undo. No new undo write is invented.
+ * `undoStateFor`), on the lead's OWN rows (a merged lead's rows are history), only when the move recorded the stage it
+ * came from (Undo puts the lead back there), for a role that may move stages and not for Lectual staff viewing as the
+ * firm (the view model checks those two). Every other row has no Undo. No new undo write is invented.
+ *
+ * No database and no server-only import (tests/lead-step/hygiene.test.ts walks the import graph).
  */
 
 export type DidUndo = { kind: "stage-move"; activityId: string; state: UndoState };
@@ -45,7 +48,8 @@ export type DidRow = {
   undo: DidUndo | null;
 };
 
-export type DidList = { status: "ok"; rows: DidRow[] } | { status: "unavailable" };
+/** `truncated`: the timeline read hit its row cap, so older work is not listed (said on the page, never hidden). */
+export type DidList = { status: "ok"; rows: DidRow[]; truncated: boolean } | { status: "unavailable" };
 
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
 const NOT_A_PERSON = new Set(["ai", "system", "automation"]);
@@ -97,23 +101,24 @@ export function didLine(row: ActivityRow): Omit<DidRow, "undo"> | null {
  * The list, newest first. `leadId` is the keeper: only its own rows can be undone. `currentStageId` is where the
  * lead is now (an Undo is offered only while it is still where the assistant put it).
  */
-export function readDid(activity: Read<ActivityRow[]>, leadId: string, currentStageId: string | null): DidList {
+export function readDid(activity: Read<{ rows: ActivityRow[]; truncated: boolean }>, leadId: string, currentStageId: string | null): DidList {
   if (activity.status !== "ok") {
     // Not-set-up does not happen for the timeline; anything but a read that worked is "couldn't load", never "nothing yet".
     return { status: "unavailable" };
   }
-  const own = activity.value.filter((r) => !r.lead_id || r.lead_id === leadId);
+  const all = activity.value.rows;
+  const own = all.filter((r) => !r.lead_id || r.lead_id === leadId);
   const rows: DidRow[] = [];
-  for (const row of activity.value) {
+  for (const row of all) {
     const line = didLine(row);
     if (!line) continue;
     const isOwn = !row.lead_id || row.lead_id === leadId;
     const undo: DidUndo | null =
-      line.source === "stage-move" && isOwn && (obj(row.payload).actor === AGENT_ACTOR)
+      line.source === "stage-move" && isOwn && obj(row.payload).actor === AGENT_ACTOR && parseAgentMove(row)?.fromStageId
         ? { kind: "stage-move", activityId: row.id, state: undoStateFor(own, row.id, currentStageId) }
         : null;
     rows.push({ ...line, undo });
   }
   rows.sort((a, b) => (Date.parse(b.at) || 0) - (Date.parse(a.at) || 0) || a.id.localeCompare(b.id));
-  return { status: "ok", rows };
+  return { status: "ok", rows, truncated: activity.value.truncated };
 }

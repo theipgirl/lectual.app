@@ -896,7 +896,7 @@ export const reviewDocsCount = (n: number) => `${n} ${n === 1 ? "document" : "do
 /** The lead page's top card ("where Lectual does the step") and "What Lectual did" (src/lib/lead-step/). */
 export const LEAD_STEP_NEEDS_YES = "Needs your yes";
 export const leadStepNeedsYesOf = (name: string) => `Needs ${name}'s yes`;
-export const LEAD_STEP_NEEDS_AN_APPROVER = "Needs an attorney's yes";
+export const LEAD_STEP_NEEDS_AN_APPROVER = "Needs an approver's yes";
 export const LEAD_STEP_HAS_IT = "Lectual has it";
 export const LEAD_STEP_YOURS = "Yours to do";
 export const LEAD_STEP_OVERDUE = "Overdue";
@@ -921,7 +921,7 @@ export const LEAD_STEP_TO = "To";
 export const LEAD_STEP_SUBJECT = "Subject";
 /** Read-only: who the yes is waiting on. */
 export const leadStepWaitingOn = (who: string) => `Waiting on ${who}'s yes`;
-export const LEAD_STEP_WAITING_ON_APPROVER = "Waiting on an attorney's yes";
+export const LEAD_STEP_WAITING_ON_APPROVER = "Waiting on an approver's yes";
 export const LEAD_STEP_PREVIEW_ONLY = "Preview only: you can't approve while you're viewing as the firm.";
 export const LEAD_STEP_CLOSER_LOOK = "This draft needs a closer look before a yes. Open it in Approvals.";
 export const LEAD_STEP_CANT_CHECK = "This draft couldn't be checked just now, so it can't be approved here. Open it in Approvals.";
@@ -949,9 +949,9 @@ export const LEAD_STEP_WAITING_FOR_RUN = "Waiting for the next morning run";
 export const leadStepPrepPromise = (day: string, from: string, to: string, withEmail: boolean) =>
   `${day}, between ${from} and ${to}, Lectual prepares a consult heads-up${withEmail ? " and the client's prep email" : ""}, then asks for your yes.`;
 export const leadStepProposalAfterConsult = (day: string, from: string, to: string) =>
-  `After the consult, once the recording is imported and linked to this lead, Lectual drafts the proposal and its email, then asks for your yes. The earliest is ${day}, between ${from} and ${to}.`;
+  `After the consult, once the recording is imported and linked to this lead, Lectual reads the recording and drafts the proposal if it fits, then asks for your yes. The earliest is ${day}, between ${from} and ${to}.`;
 export const leadStepProposalFromRecording = (day: string, from: string, to: string) =>
-  `${day}, between ${from} and ${to}, Lectual drafts the proposal and its email from the recording, then asks for your yes.`;
+  `${day}, between ${from} and ${to}, Lectual reads the recording and drafts the proposal if it fits, then asks for your yes.`;
 /** Why nothing is promised, and what a person does instead. */
 export const LEAD_STEP_OFF: Record<string, string> = {
   "assistants-off": "Lectual's assistants aren't switched on for your firm, so nothing is lined up. Set a next step instead.",
@@ -968,7 +968,7 @@ export const LEAD_STEP_OFF: Record<string, string> = {
 /** "Lectual hasn't prepared this yet": the draft no assistant makes today, by name. Never a made-up draft. */
 export const LEAD_STEP_GAP: Record<"payment-nudge" | "follow-up" | "outcome-read" | "first-reply", string> = {
   "payment-nudge": "A reminder to pay the legal fee. Lectual doesn't draft it yet: write it yourself, or set a next step.",
-  "follow-up": "A follow-up on the proposal. Lectual doesn't draft the proposal follow-ups yet: write one yourself, or set a next step.",
+  "follow-up": "A follow-up on the proposal. Lectual doesn't draft the day-by-day proposal follow-ups yet: write one yourself, or set a next step.",
   "outcome-read": "Reading the consult to propose the outcome. Lectual doesn't do this yet: log the consult outcome yourself.",
   "first-reply": "The first reply to this enquiry. Lectual doesn't draft it yet: write it yourself, or set a next step.",
 };
@@ -1028,4 +1028,16 @@ export const LEAD_STEP_ROW_LEGAL = "Legal fee";
 export const LEAD_STEP_ROW_USPTO = "USPTO fees";
 export const LEAD_STEP_NO_APPROVE = "You don't have permission to approve or reject client communications.";
 export const LEAD_STEP_ALREADY_DECIDED = "This draft was already decided. Refresh to see what's next.";
-export const LEAD_STEP_APPROVED_QUEUE_SENT = "Approved. The approval queue reports that it went out.";
+export const LEAD_STEP_APPROVED_LETTER = "Approved. The letter document is made from the approved text and listed under Documents; if it couldn't be made, Documents says so. Nothing was sent.";
+export const LEAD_STEP_DID_CUT = "Only what is in the newest 100 timeline entries is listed here.";
+export const LEAD_STEP_STALLED_MAY_DRAFT = "The morning brief may still draft a follow-up if the lead goes quiet; it would ask for a yes.";
+export const LEAD_STEP_FOLLOW_UP_PASSED = "The proposal's follow-up window has passed";
+export const LEAD_STEP_FOLLOW_UP_PASSED_TEXT = "Lectual doesn't suggest what comes after the last day yet: decide it yourself (a new version, or Long-Term Nurture), or set a next step.";
+export const leadStepHandedToYou = (by: string) => `Handed to you by ${by}`;
+export const leadStepHandedTo = (name: string) => `Handed to ${name}`;
+export const LEAD_STEP_A_TEAMMATE = "a teammate";
+export const LEAD_STEP_SEND_BACK = "Send back";
+export const LEAD_STEP_SENT_BACK = "Sent back. Nothing was sent to the client.";
+export const LEAD_STEP_HANDED_AWAY = "You handed this card on, so its yes isn't offered to you here.";
+export const LEAD_STEP_LINK_NOT_LIVE = "A yes here would turn the proposal's client link on. Review the proposal, then open this in Approvals.";
+export const LEAD_STEP_ROW_PROPOSAL = "Proposal";

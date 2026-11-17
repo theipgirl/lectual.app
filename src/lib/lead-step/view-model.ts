@@ -3,6 +3,17 @@ import { canApproveItem, kindShort, memberName, ownerOf, type RoutableItem } fro
 import { formatCents } from "@/lib/quotes/money";
 import {
   LEAD_STEP_APPROVALS_OFF,
+  LEAD_STEP_A_TEAMMATE,
+  LEAD_STEP_DID_CUT,
+  LEAD_STEP_DRAFT_PROPOSAL,
+  LEAD_STEP_FOLLOW_UP_PASSED,
+  LEAD_STEP_FOLLOW_UP_PASSED_TEXT,
+  LEAD_STEP_HANDED_AWAY,
+  LEAD_STEP_LINK_NOT_LIVE,
+  LEAD_STEP_ROW_PROPOSAL,
+  LEAD_STEP_STALLED_MAY_DRAFT,
+  leadStepHandedTo,
+  leadStepHandedToYou,
   LEAD_STEP_CANT_CHECK,
   LEAD_STEP_CANT_SHOW_NEEDS,
   LEAD_STEP_CANT_SHOW_NEXT,
@@ -73,7 +84,8 @@ import { dayWord, shortDay, whenWords, windowWords } from "./schedule";
 
 /**
  * Exactly what the lead page draws for "where Lectual does the step": the one top card, the four facts, the
- * "What Lectual did" list and the read-only flags. Pure: the facts in, plain data out (no React, no database).
+ * "What Lectual did" list and the read-only flags. The facts in, plain data out: no React, no database and no
+ * server-only import (tests/lead-step/hygiene.test.ts walks the import graph).
  * Every word comes from words.ts. The page draws this and decides nothing.
  */
 
@@ -100,6 +112,10 @@ export type NeedsYesView = {
   blocked: string | null;
   /** Read-only: whose yes it is waiting on. Null when the viewer may approve. */
   waitingOn: string | null;
+  /** The deck's hand-off: "Handed to you by Rebecca" (with Send back) or "Handed to Rayn". Null when not handed. */
+  handoff: { text: string; toViewer: boolean; note: string | null } | null;
+  /** Send back is offered (the card is handed to this viewer; the existing `sendCardBack` path). */
+  sendBack: boolean;
   /** The full approval page, for Open to review. */
   approvalHref: string;
   holdMs: number;
@@ -108,7 +124,19 @@ export type NeedsYesView = {
 export type TopCardView =
   | NeedsYesView
   | { kind: "has-it"; eyebrow: string; waitingFor: string; line: string }
-  | { kind: "yours"; eyebrow: string; overdue: boolean; taskId: string; title: string; due: DueState; dueText: string | null; assigneeId: string | null; others: string | null }
+  | {
+      kind: "yours";
+      eyebrow: string;
+      overdue: boolean;
+      taskId: string;
+      title: string;
+      due: DueState;
+      dueText: string | null;
+      assigneeId: string | null;
+      others: string | null;
+      /** A read about what Lectual will do next failed: said under the step, never hidden. */
+      note: string | null;
+    }
   | { kind: "not-prepared"; eyebrow: string; gap: GapId; title: string | null; text: string; off: string | null }
   | { kind: "approvals-off"; eyebrow: string; text: string }
   | { kind: "quiet"; eyebrow: string; text: string }
@@ -119,7 +147,7 @@ export type DidRowView = { id: string; at: string; when: string; text: string; u
 export type LeadStepView = {
   top: TopCardView;
   facts: { contact: FactView; consult: FactView; proposal: FactView | null; waiting: FactView };
-  did: { status: "ok"; rows: DidRowView[] } | { status: "unavailable"; text: string };
+  did: { status: "ok"; rows: DidRowView[]; note: string | null } | { status: "unavailable"; text: string };
   /** The viewer can't say yes to the top card's item (or there is none). */
   readOnly: boolean;
 };
@@ -140,15 +168,34 @@ function waitingOnName(facts: Pick<LeadStepFacts, "routing">, item: PendingDraft
   return who ? memberName(who) : null;
 }
 
+function memberLabel(facts: Pick<LeadStepFacts, "routing">, userId: string): string {
+  const who = facts.routing.status === "ok" ? facts.routing.members.find((m) => m.userId === userId) : undefined;
+  return who ? memberName(who) : LEAD_STEP_A_TEAMMATE;
+}
+
+function linkedProposalStatusText(status: string): string {
+  if (status === "draft") return LEAD_STEP_DRAFT_PROPOSAL;
+  if (status === "approved") return LEAD_STEP_PROPOSAL_SAVED;
+  if (status === "sent") return LEAD_STEP_PROPOSAL_LIVE;
+  return LEAD_STEP_PROPOSAL_CLOSED;
+}
+
 function needsYesView(facts: LeadStepFacts, item: PendingDraft, others: number): NeedsYesView {
   const mayDecide = viewerMayDecide(facts, item);
   const preview = facts.viewer.actingAsStaff;
   const owner = waitingOnName(facts, item);
+  const holder = item.handoff.status === "ok" ? item.handoff.holder : null;
+  const handedToViewer = !!holder && holder.userId === facts.viewer.userId;
+  // The hander of a card now with someone else: the yes is theirs (the deck takes it off the hander's cards).
+  const handedAway = !!holder && !handedToViewer && holder.by === facts.viewer.userId;
   let blocked: string | null = null;
   if (mayDecide) {
     if (preview) blocked = LEAD_STEP_PREVIEW_ONLY;
-    else if (item.closerLook === null) blocked = LEAD_STEP_CANT_CHECK;
-    else if (item.closerLook.length > 0) blocked = item.linked.status === "ok" && item.linked.gateRefusal ? item.linked.gateRefusal : LEAD_STEP_CLOSER_LOOK;
+    else if (handedAway) blocked = LEAD_STEP_HANDED_AWAY;
+    else if (item.closerLook === null || item.linked.status === "unavailable") blocked = LEAD_STEP_CANT_CHECK;
+    else if (item.linked.status === "ok" && item.linked.gateRefusal) blocked = item.linked.gateRefusal;
+    else if (item.closerLook.linkNotLive) blocked = LEAD_STEP_LINK_NOT_LIVE;
+    else if (item.closerLook.reasons.length > 0) blocked = LEAD_STEP_CLOSER_LOOK;
   }
   const canYes = mayDecide && blocked === null;
   const canEdit = !preview && QUEUE_EDIT_ROLES.includes(facts.viewer.role);
@@ -156,6 +203,7 @@ function needsYesView(facts: LeadStepFacts, item: PendingDraft, others: number):
     item.linked.status === "ok"
       ? {
           rows: [
+            { label: LEAD_STEP_ROW_PROPOSAL, value: linkedProposalStatusText(item.linked.proposalStatus) },
             { label: LEAD_STEP_ROW_VERSION, value: String(item.linked.version) },
             { label: LEAD_STEP_ROW_LEGAL, value: formatCents(item.linked.legalCents) },
             { label: LEAD_STEP_ROW_USPTO, value: formatCents(item.linked.govCents) },
@@ -177,6 +225,12 @@ function needsYesView(facts: LeadStepFacts, item: PendingDraft, others: number):
     actions: { yes: canYes, edit: canEdit, notThis: mayDecide && !preview },
     blocked,
     waitingOn: mayDecide ? null : owner ? leadStepWaitingOn(owner) : LEAD_STEP_WAITING_ON_APPROVER,
+    handoff: holder
+      ? handedToViewer
+        ? { text: leadStepHandedToYou(memberLabel(facts, holder.by)), toViewer: true, note: holder.note }
+        : { text: leadStepHandedTo(memberLabel(facts, holder.userId)), toViewer: false, note: holder.note }
+      : null,
+    sendBack: handedToViewer && !preview,
     approvalHref: `/dashboard/queue/${encodeURIComponent(item.id)}/`,
     holdMs: YES_HOLD_MS,
   };
@@ -210,16 +264,18 @@ function topView(facts: LeadStepFacts, top: TopCard): TopCardView {
         dueText: top.task.dueAt ? `${top.due === "overdue" ? `${LEAD_STEP_OVERDUE} · ` : ""}${shortDay(top.task.dueAt, tz)}` : null,
         assigneeId: top.task.assigneeId,
         others: top.others > 0 ? leadStepMoreSteps(top.others) : null,
+        note: top.nextUnknown ? LEAD_STEP_CANT_SHOW_NEXT : null,
       };
-    case "not-prepared":
-      return {
-        kind: "not-prepared",
-        eyebrow: LEAD_STEP_NOT_PREPARED,
-        gap: top.gap.id,
-        title: top.gap.id === "follow-up" ? leadStepFollowUpDay(top.gap.day) : null,
-        text: LEAD_STEP_GAP[top.gap.id],
-        off: top.off ? LEAD_STEP_OFF[top.off.why] : null,
-      };
+    case "not-prepared": {
+      const g = top.gap;
+      if (g.id === "follow-up") {
+        const tail = g.stalledFollowUp === "off" ? "" : ` ${LEAD_STEP_STALLED_MAY_DRAFT}`;
+        return g.windowPassed
+          ? { kind: "not-prepared", eyebrow: LEAD_STEP_NOT_PREPARED, gap: g.id, title: LEAD_STEP_FOLLOW_UP_PASSED, text: LEAD_STEP_FOLLOW_UP_PASSED_TEXT, off: null }
+          : { kind: "not-prepared", eyebrow: LEAD_STEP_NOT_PREPARED, gap: g.id, title: leadStepFollowUpDay(g.day), text: `${LEAD_STEP_GAP[g.id]}${tail}`, off: null };
+      }
+      return { kind: "not-prepared", eyebrow: LEAD_STEP_NOT_PREPARED, gap: g.id, title: null, text: LEAD_STEP_GAP[g.id], off: top.off ? LEAD_STEP_OFF[top.off.why] : null };
+    }
     case "approvals-off":
       return { kind: "approvals-off", eyebrow: LEAD_STEP_QUIET, text: LEAD_STEP_APPROVALS_OFF };
     case "quiet":
@@ -311,15 +367,18 @@ function didView(facts: LeadStepFacts): LeadStepView["did"] {
   const list = readDid(facts.activity, facts.lead.id, facts.lead.stageId);
   if (list.status !== "ok") return { status: "unavailable", text: LEAD_STEP_DID_UNAVAILABLE };
   const now = new Date(facts.now);
+  // Undo is a person's move: never for Lectual staff viewing as the firm, and only for a role that may move stages.
+  const mayUndo = facts.viewer.canMoveStage && !facts.viewer.actingAsStaff;
   return {
     status: "ok",
+    note: list.truncated ? LEAD_STEP_DID_CUT : null,
     rows: list.rows.map((r: DidRow) => ({
       id: r.id,
       at: r.at,
       when: whenWords(r.at, now, facts.timeZone),
       text: r.text,
       // Undo only where the Stage Keeper's own Undo exists, it can still undo, and this person may move stages.
-      undo: r.undo && r.undo.state === "available" && facts.viewer.canMoveStage ? { activityId: r.undo.activityId } : null,
+      undo: r.undo && r.undo.state === "available" && mayUndo ? { activityId: r.undo.activityId } : null,
       undone: r.undo?.state === "undone",
     })),
   };
