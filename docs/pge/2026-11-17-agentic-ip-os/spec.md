@@ -43,7 +43,7 @@ This spec covers eight sprints (`sprint-1.md` to `sprint-8.md`), a ninth propose
 
 Full table at the end of `questions.md`. Each change in a sprint file is marked "(Taylor, Nov 17)".
 
-- **T1, production migrations: NOT approved yet.** Her reply was too thin for a production migration; the director asks her directly. **0103 is already on lectual-prod (since Nov 10)**; only **0106** is outstanding.
+- **T1, production migrations: answered.** The director verified 0106 is already on lectual-prod (since 2026-11-12) and 0103 since Nov 10. Nothing is outstanding.
 - **T2:** Taylor gets the USPTO key. **T3:** Rebecca's own Adobe Sign account (per-firm connection).
 - **T4:** Lectual creates no invoice. "The invoice goes out with the proposal" = the firm's custom Lawmatics pay link on the proposal.
 - **T5:** signed and paid moves the lead to `won`: a SECOND, narrow, named exception beside the hired-matter sync (Sprint 5 states it).
@@ -76,7 +76,7 @@ The rest (Sprints 1, 2, 4, 7, 8) is the ground these builds stand on: true stage
 - **Stage Keeper** rules stand: forward only, never into `won`/`lost`/`nurture`, sensitive guard, 7-day person-move card, one action per lead per run, `signal_key` consumption.
 - **Merged leads (0107).** Every `crm_lead` read goes through `live(...)` or carries a `// live-guard:` reason (`tests/leads/live-guard.test.ts`). New writers follow `keeperForWrite`.
 - **LawPay, Lawmatics, Fathom, Zoom, Microsoft, Adobe Sign:** each firm connects its OWN account. No deployment-wide credential. Sealed columns have no SELECT grant. Tests never call the provider.
-- **Engagement letter (0106).** The signed text, fingerprint and guards in `src/lib/loe/` stand. 0106 is on lectual-dev only; production needs the owner's OK, which is NOT given yet (Taylor, Nov 17: T1 to be asked directly). 0103 has been on lectual-prod since Nov 10.
+- **Engagement letter (0106).** The signed text, fingerprint and guards in `src/lib/loe/` stand. 0106 is on lectual-prod (since 2026-11-12, verified Nov 17); 0103 since Nov 10.
 - **Schema.** No migrations in this repo. Each goes in `lectual/supabase/migrations`, next free number **0108**, lectual-dev first, production only with the owner's OK, plus a case in lectual's `tests/tenant-isolation.test.ts` for every new tenant table or policy.
 
 ## Planned migrations (lectual repo, in sprint order)
