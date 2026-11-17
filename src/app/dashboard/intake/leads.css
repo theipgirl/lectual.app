@@ -23,7 +23,6 @@
    than the page (data-scroll="true"); once a measurement says it fits, the header stays at the top while the page scrolls. */
 .ix-sheet { min-width: 0; max-width: 100%; }
 .ix-sheet .sheet-tbl tbody tr.ix-row { cursor: pointer; }
-.ix-sheet .ix-stage-line .ix-marker { white-space: normal; overflow: visible; text-align: left; }
 .ix-sheet .sheet-tbl td.ix-menu-td { text-align: right; padding-left: 4px; padding-right: 8px; }
 .ix-sheet .sheet-tbl td.ix-lead-td { white-space: normal; overflow: visible; }
 /* A person's full name always shows: it wraps at its spaces and hyphens, to a second line when it must (never an ellipsis). */

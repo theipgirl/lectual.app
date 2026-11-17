@@ -213,3 +213,24 @@
 .rc-warn {
   color: var(--warn);
 }
+
+@media (max-width: 640px) {
+  .rc-select {
+    width: 100%;
+    max-width: 100%;
+  }
+  .rc-person-main {
+    min-width: 0;
+  }
+  .rc-bar-group {
+    width: 100%;
+  }
+}
+
+@media (pointer: coarse), (max-width: 640px) {
+  .rc-reasons summary {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+  }
+}
