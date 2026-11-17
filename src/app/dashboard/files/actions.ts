@@ -58,15 +58,17 @@ export async function requestUploadAction(
   size: number,
 ): Promise<RequestUploadResult> {
   return guarded("request upload", async () => {
-    const target = parseParent(parent);
+    let target = parseParent(parent);
     if (!target) return refuse(FILE_MESSAGES.notFound);
 
     const supabase = await getScopedClient();
     const who = await authorize(supabase, FILE_UPLOAD_ROLES, FILE_MESSAGES.cantUpload);
     if (!who.ok) return who;
 
-    const org = await loadParentOrg(supabase, target);
-    if (!org.ok) return org;
+    const resolved = await loadParentOrg(supabase, target);
+    if (!resolved.ok) return resolved;
+    const org = resolved;
+    target = resolved.parent;
 
     const type = checkFileName(typeof fileName === "string" ? fileName : "");
     if (!type.ok) return refuse(type.error);
@@ -94,7 +96,7 @@ export async function requestUploadAction(
  */
 export async function confirmUploadAction(parent: FileParentInput, fileId: string, fileName: string): Promise<ConfirmUploadResult> {
   return guarded("confirm upload", async () => {
-    const target = parseParent(parent);
+    let target = parseParent(parent);
     if (!target) return refuse(FILE_MESSAGES.notFound);
     if (!isUuid(fileId)) return refuse(FILE_MESSAGES.badUpload);
 
@@ -102,8 +104,10 @@ export async function confirmUploadAction(parent: FileParentInput, fileId: strin
     const who = await authorize(supabase, FILE_UPLOAD_ROLES, FILE_MESSAGES.cantUpload);
     if (!who.ok) return who;
 
-    const org = await loadParentOrg(supabase, target);
-    if (!org.ok) return org;
+    const resolved = await loadParentOrg(supabase, target);
+    if (!resolved.ok) return resolved;
+    const org = resolved;
+    target = resolved.parent;
 
     const type = checkFileName(typeof fileName === "string" ? fileName : "");
     if (!type.ok) return refuse(type.error);

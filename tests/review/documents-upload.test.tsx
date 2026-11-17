@@ -66,3 +66,31 @@ describe("upload in the review panel", () => {
     expect(readFileSync("src/app/dashboard/review/actions.ts", "utf8")).not.toMatch(/requestUpload|confirmUpload/);
   });
 });
+
+describe("the panel follows a merged lead to its keeper", () => {
+  it("opened with a merged id it loads the keeper's record and documents", async () => {
+    vi.resetModules();
+    const { makeWorld, seedTables, fileRow, ORG } = await import("../files/helpers");
+    const merged = "77777777-7777-4777-8777-777777777777";
+    const world = makeWorld({
+      tables: seedTables({
+        crm_lead: [
+          { id: LEAD, org_id: ORG, first_name: "K", last_name: "Keeper", merged_into_id: null },
+          { id: merged, org_id: ORG, first_name: "M", last_name: "Merged", merged_into_id: LEAD },
+        ],
+        crm_file: [fileRow({ id: "own" })],
+      }),
+    });
+    vi.doMock("@/lib/db/scoped-client", () => ({ getScopedClient: vi.fn(async () => world.client) }));
+    vi.doMock("@/lib/org/modules", () => ({ orgHasModule: vi.fn(async () => false), activeOrgModulesOrNull: vi.fn(async () => []) }));
+    vi.doMock("@/lib/matters/stages", () => ({ listMatterStages: vi.fn(async () => []) }));
+    vi.doMock("@/lib/pipeline/stages", () => ({ listStages: vi.fn(async () => []) }));
+    const { loadReviewDetail } = await import("../../src/lib/review/detail-load");
+    const d = await loadReviewDetail({ kind: "lead", id: merged });
+    expect(d.status).toBe("ok");
+    expect(d.status === "ok" && d.openId).toBe(LEAD);
+    expect(d.status === "ok" && d.documents.files.status === "ok" && d.documents.files.files.map((f) => f.id)).toEqual(["own"]);
+    world.db.fail("crm_lead", "select");
+    expect((await loadReviewDetail({ kind: "lead", id: merged })).status).toBe("unavailable");
+  });
+});

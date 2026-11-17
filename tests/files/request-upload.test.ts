@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MERGE_POINTER_UNREADABLE } from "../../src/lib/ui/words";
 import { FILE_MESSAGES, EXTENSION_MIME } from "../../src/lib/files/rules";
 import { LEAD, MATTER, NON_STAFF_ROLES, ORG, OTHER_LEAD, OTHER_MATTER, OTHER_ORG, SECRET, STAFF_ROLES, loadActions, makeWorld, seedTables } from "./helpers";
 
@@ -201,9 +202,19 @@ describe("requestUploadAction: storage errors", () => {
     world.db.fail("crm_lead", "select", { code: "XX000", message: SECRET });
     const { requestUploadAction } = await loadActions(world);
     const r = await requestUploadAction({ kind: "lead", id: LEAD }, "a.pdf", "application/pdf", 10);
-    expect(r).toEqual({ ok: false, error: FILE_MESSAGES.generic });
+    // A lead's pointer is read first (M5): the fixed merge sentence, never the database's text.
+    expect(r).toEqual({ ok: false, error: MERGE_POINTER_UNREADABLE });
     expect(JSON.stringify(r)).not.toContain(SECRET);
     expect(world.storage.calls).toEqual([]);
+  });
+
+  it("does not leak a database error from reading a matter parent", async () => {
+    const world = makeWorld();
+    world.db.fail("crm_matter", "select", { code: "XX000", message: SECRET });
+    const { requestUploadAction } = await loadActions(world);
+    const r = await requestUploadAction({ kind: "matter", id: MATTER }, "a.pdf", "application/pdf", 10);
+    expect(r).toEqual({ ok: false, error: FILE_MESSAGES.generic });
+    expect(JSON.stringify(r)).not.toContain(SECRET);
   });
 
   it("never throws when the scoped client itself cannot be built", async () => {

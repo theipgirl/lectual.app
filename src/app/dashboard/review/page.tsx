@@ -117,8 +117,11 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   }
 
   // The detail panel: the record is read AGAIN through the scoped client; the review row only supplies the computed facts.
-  const panel = params.open
-    ? { detail: await loadReviewDetail(params.open), row: load.rows.find((r) => r.kind === params.open!.kind && r.id === params.open!.id) ?? null }
+  const panelDetail = params.open ? await loadReviewDetail(params.open) : null;
+  // A merged lead opened by URL shows its keeper (the loader followed the pointer).
+  const shownOpen = params.open && panelDetail?.status === "ok" ? { kind: params.open.kind, id: panelDetail.openId ?? params.open.id } : params.open;
+  const panel = params.open && panelDetail && shownOpen
+    ? { detail: panelDetail, row: load.rows.find((r) => r.kind === shownOpen.kind && r.id === shownOpen.id) ?? null }
     : null;
   const notice = noticeFor(sp.notice);
 
@@ -259,9 +262,9 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           )}
         </>
       )}
-      {panel && params.open && (
+      {panel && shownOpen && (
         <ReviewPanel
-          open={params.open}
+          open={shownOpen}
           row={panel.row}
           detail={panel.detail}
           today={load.today}
