@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { AiOutputError, aiConfigured as realAiConfigured, callClaude, type StructuredCall } from "@/lib/ai/claude";
 import { buildSystemPrompt, buildUserTurn } from "./prompt";
+import { LIMITS } from "./types";
 import { validateProposals } from "./validate";
 import type { MeetingAssistantInput, MeetingAssistantResult } from "./types";
 
@@ -17,7 +18,7 @@ export const AssistantOutputSchema = z.object({
       dueDate: z.string().nullable().describe("YYYY-MM-DD, ONLY if a specific date is stated in the evidence; otherwise null"),
       ownerId: z.string().nullable().describe("A member id from <members>, ONLY if someone was clearly given it; otherwise null"),
       note: z.string().describe("Context, at most 400 characters"),
-      evidence: z.string().describe("A short verbatim quote from the transcript"),
+      evidence: z.string().describe("A short verbatim quote from the transcript, at most 300 characters"),
       confidence: z.enum(["high", "medium", "low"]),
     }),
   ),
@@ -57,9 +58,14 @@ export async function runMeetingAssistant(input: MeetingAssistantInput, deps: Me
       signal: deps.signal,
     });
     const { proposals, dropped } = validateProposals(res.output, input);
+    // A malformed answer is never "no proposals".
+    if (dropped.malformed > 0 && proposals.length === 0) {
+      log("[meeting-assistant] failed kind=malformed");
+      return { state: "unavailable", reason: UNAVAILABLE };
+    }
     const droppedTotal = Object.values(dropped).reduce((a, b) => a + b, 0);
     log(`[meeting-assistant] rows=${input.rows.length} proposals=${proposals.length} dropped=${droppedTotal}`);
-    return { state: "ok", proposals, dropped };
+    return { state: "ok", proposals, dropped, rowsTruncated: input.rows.length > LIMITS.rows };
   } catch (err) {
     log(`[meeting-assistant] failed kind=${err instanceof AiOutputError ? err.kind : "error"}`);
     return { state: "unavailable", reason: UNAVAILABLE };

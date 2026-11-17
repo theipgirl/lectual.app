@@ -16,30 +16,79 @@ import {
  *
  * EVIDENCE RULE (as in Consult details: a fact counts only when the model quotes words really in the source):
  * a proposal whose evidence quote is not found in the transcript (case, whitespace and punctuation ignored,
- * whole words) is DROPPED, not kept-and-flagged. A proposal with no checkable quote cannot be reviewed on a
- * call, and a later one-click accept must never act on an invented one. Drops are counted in `dropped`.
+ * whole words) is DROPPED, not kept-and-flagged: a proposal with no checkable quote can't be reviewed on a
+ * call, and a later one-click accept must never act on an invented one. A quote over 300 characters or too
+ * short (under 4 words and under 25 characters) is dropped too, never truncated. Drops are counted.
+ * The quote is located in the transcript (the first occurrence); everything below uses that SPAN of the
+ * original text, never the model's own string.
  *
- * Other rules: record id must be a given row (else "unmatched"; a kind that disagrees with the row is also
- * unmatched); no id at all tries `matchRecord` by name; ownerId must be a given member (else null, flagged);
- * dueDate must be a real calendar date that the evidence states in words or numbers (else null, flagged);
- * lengths are cut; one proposal per record (the highest confidence wins, ties keep the first) and per
- * unmatched next step; at most LIMITS.proposals kept.
+ * TIES TO THE QUOTE. The record is kept only if its client, mark or matter number appears in the span or
+ * within ~300 characters either side; the owner only if their first or full name does. Otherwise the record
+ * is "unmatched" / the owner null, with a flag. So a valid id on a generic quote ("okay, next one") keeps nothing.
+ *
+ * DATES come from the span's own text. A date counts when the span states it (ISO, "Nov 20 (2026)", "20 November",
+ * "11/20(/26)"); with no year it is the first such date on or after the meeting date; a past date is refused;
+ * "May"/"Mar" count only when capitalised and followed by a day with an ordinal, a separator or a year; and a
+ * date with "not / don't / won't / isn't / no longer" within five words before it is refused. An invalid meeting
+ * date means no dates at all.
+ *
+ * Also: unknown record ids are "unmatched"; ownerId must be a given member; lengths are cut; one proposal per
+ * record (highest confidence wins, ties keep the first) and per unmatched name+step; at most 50 kept.
  */
 
-const MIN_EVIDENCE_CHARS = 12;
+const MIN_EVIDENCE_WORDS = 4;
+const MIN_EVIDENCE_CHARS = 25;
+const WINDOW = 300;
 
-/** Words and numbers only, lower-cased, single-spaced, padded so a substring test matches whole words. */
-function matchText(text: string): string {
-  const t = text.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
-  return t ? ` ${t} ` : "";
+type Mapped = { text: string; start: number[]; end: number[] };
+
+/** Words and numbers only, lower-cased, single-spaced. `start`/`end` map each output char back to the source. */
+function normalizeMapped(src: string): Mapped {
+  let text = "";
+  const start: number[] = [];
+  const end: number[] = [];
+  let space = false;
+  let i = 0;
+  for (const ch of src) {
+    const len = ch.length;
+    for (const c of ch.normalize("NFKC").toLowerCase()) {
+      if (/[\p{L}\p{N}]/u.test(c)) {
+        if (space && text) {
+          text += " ";
+          start.push(i);
+          end.push(i);
+        }
+        space = false;
+        for (let k = 0; k < c.length; k++) {
+          text += c[k];
+          start.push(i);
+          end.push(i + len);
+        }
+      } else {
+        space = true;
+      }
+    }
+    i += len;
+  }
+  return { text, start, end };
 }
+const norm = (s: string): string => normalizeMapped(s).text;
+const hasWords = (hay: string, needle: string): boolean => needle !== "" && ` ${hay} `.includes(` ${needle} `);
 
-const MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
-const monthIndex = (w: string): number => {
-  const lw = w.toLowerCase();
-  if (lw === "sept") return 8;
-  return MONTHS.findIndex((m) => m === lw || (lw.length === 3 && m.startsWith(lw)));
-};
+/** The [start, end) span in the ORIGINAL text of the first whole-word occurrence of `needle`, or null. */
+function findSpan(hay: Mapped, needle: string): [number, number] | null {
+  let from = 0;
+  while (needle) {
+    const idx = hay.text.indexOf(needle, from);
+    if (idx < 0) return null;
+    const after = idx + needle.length;
+    if ((idx === 0 || hay.text[idx - 1] === " ") && (after === hay.text.length || hay.text[after] === " ")) {
+      return [hay.start[idx], hay.end[after - 1]];
+    }
+    from = idx + 1;
+  }
+  return null;
+}
 
 /** A real YYYY-MM-DD, or null. */
 export function realIsoDate(v: unknown): string | null {
@@ -48,26 +97,79 @@ export function realIsoDate(v: unknown): string | null {
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v ? v : null;
 }
 
-/** True when `evidence` states `date` (YYYY-MM-DD): ISO, "Nov 20 (2026)", "20 November", or "11/20(/26)". */
-export function evidenceStatesDate(evidence: string, date: string, meetingDate: string): boolean {
-  const [y, m, d] = date.split("-").map(Number);
-  const meetingYear = Number(meetingDate.slice(0, 4)) || y;
-  const yearOk = (yr: number | null) => (yr == null ? y === meetingYear || y === meetingYear + 1 : yr === y || (yr < 100 && yr === y % 100));
-  if (evidence.includes(date)) return true;
-  const e = evidence.replace(/(\d)(st|nd|rd|th)\b/gi, "$1");
-  const re1 = /\b([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:,?\s+(\d{4}))?\b/g; // Nov 20, 2026
-  for (const x of e.matchAll(re1)) {
-    if (monthIndex(x[1]) === m - 1 && Number(x[2]) === d && yearOk(x[3] ? Number(x[3]) : null)) return true;
+const MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+const monthIndex = (w: string): number => {
+  const lw = w.toLowerCase();
+  if (lw === "sept") return 8;
+  return MONTHS.findIndex((m) => m === lw || (lw.length === 3 && m.startsWith(lw)));
+};
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/** No year stated: the first real date with this month and day on or after the meeting date. */
+function firstOnOrAfter(m: number, d: number, meetingDate: string): string | null {
+  const y0 = Number(meetingDate.slice(0, 4));
+  for (let y = y0; y <= y0 + 4; y++) {
+    const iso = `${y}-${pad(m)}-${pad(d)}`;
+    if (realIsoDate(iso) && iso >= meetingDate) return iso;
   }
-  const re2 = /\b(\d{1,2})\s+([A-Za-z]{3,9})\.?(?:,?\s+(\d{4}))?\b/g; // 20 November 2026
-  for (const x of e.matchAll(re2)) {
-    if (monthIndex(x[2]) === m - 1 && Number(x[1]) === d && yearOk(x[3] ? Number(x[3]) : null)) return true;
+  return null;
+}
+
+type Mention = { index: number; date: string };
+
+/** Every date the text states, with where, resolved as the rules above say. */
+export function statedDates(text: string, meetingDate: string): Mention[] {
+  if (!realIsoDate(meetingDate)) return [];
+  const out: Mention[] = [];
+  const t = text;
+  const resolve = (m: number, d: number, yr: number | null): string | null => {
+    if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+    return yr == null ? firstOnOrAfter(m, d, meetingDate) : realIsoDate(`${yr}-${pad(m)}-${pad(d)}`);
+  };
+  /** May / Mar are ordinary words: capitalised, and an ordinal, a year or a separator after the day. */
+  const weakOk = (word: string, mi: number, ordinal: boolean, year: boolean, after: string): boolean => {
+    if (mi !== 4 && !(mi === 2 && word.length === 3)) return true;
+    if (!/^[A-Z]/.test(word)) return false;
+    return ordinal || year || /^(?:[,.;:)!?]|$)/.test(after);
+  };
+  const push = (index: number, date: string | null) => {
+    if (date) out.push({ index, date });
+  };
+
+  for (const x of t.matchAll(/\b(\d{4})-(\d{2})-(\d{2})\b/g)) push(x.index!, realIsoDate(x[0]));
+
+  const re1 = /\b([A-Za-z]{3,9})\.?\s+(\d{1,2})(st|nd|rd|th)?\b(?:,?\s+(\d{4})\b)?/g; // Nov 20, 2026
+  for (const x of t.matchAll(re1)) {
+    const mi = monthIndex(x[1]);
+    if (mi < 0) continue;
+    if (!weakOk(x[1], mi, !!x[3], !!x[4], t.slice(x.index! + x[0].length))) continue;
+    push(x.index!, resolve(mi + 1, Number(x[2]), x[4] ? Number(x[4]) : null));
   }
-  const re3 = /\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/g; // 11/20/26
-  for (const x of e.matchAll(re3)) {
-    if (Number(x[1]) === m && Number(x[2]) === d && yearOk(x[3] ? Number(x[3]) : null)) return true;
+  const re2 = /\b(\d{1,2})(st|nd|rd|th)?\s+(?:of\s+)?([A-Za-z]{3,9})\.?(?:,?\s+(\d{4})\b)?/g; // 20 November 2026
+  for (const x of t.matchAll(re2)) {
+    const mi = monthIndex(x[3]);
+    if (mi < 0) continue;
+    if (!weakOk(x[3], mi, !!x[2], !!x[4], t.slice(x.index! + x[0].length))) continue;
+    push(x.index!, resolve(mi + 1, Number(x[1]), x[4] ? Number(x[4]) : null));
   }
-  return false;
+  for (const x of t.matchAll(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2}|\d{4}))?\b/g)) {
+    const yr = x[3] ? (x[3].length === 2 ? 2000 + Number(x[3]) : Number(x[3])) : null;
+    push(x.index!, resolve(Number(x[1]), Number(x[2]), yr));
+  }
+  return out;
+}
+
+const NEGATION = /\b(?:not|don't|won't|isn't|no longer)\b/;
+/** "not / don't / won't / isn't / no longer" within five words before `index`. */
+function negatedBefore(text: string, index: number): boolean {
+  const words = text.slice(0, index).replace(/[’‘]/g, "'").toLowerCase().match(/[\p{L}']+/gu) ?? [];
+  return NEGATION.test(words.slice(-5).join(" "));
+}
+
+/** True when the SOURCE text states `date` (not negated, not in the past). */
+export function evidenceStatesDate(sourceSpan: string, date: string, meetingDate: string): boolean {
+  if (!realIsoDate(meetingDate) || !realIsoDate(date) || date < meetingDate) return false;
+  return statedDates(sourceSpan, meetingDate).some((m) => m.date === date && !negatedBefore(sourceSpan, m.index));
 }
 
 const str = (v: unknown, max: number): string => {
@@ -79,13 +181,16 @@ const str = (v: unknown, max: number): string => {
 const RANK: Record<Confidence, number> = { low: 0, medium: 1, high: 2 };
 
 export function validateProposals(raw: unknown, input: MeetingAssistantInput): ValidationResult {
-  const dropped: DropCounts = { no_evidence: 0, empty_step: 0, duplicate: 0, over_cap: 0, malformed: 0 };
+  const dropped: DropCounts = { no_evidence: 0, evidence_too_long: 0, empty_step: 0, duplicate: 0, over_cap: 0, malformed: 0 };
   const list = (raw as { proposals?: unknown } | null)?.proposals;
   if (!Array.isArray(list)) return { proposals: [], dropped: { ...dropped, malformed: 1 } };
 
-  const haystack = matchText(clampTranscript(input.transcript));
-  const rowById = new Map<string, AssistantRow>(input.rows.map((r) => [r.id, r]));
+  const transcript = clampTranscript(input.transcript);
+  const hay = normalizeMapped(transcript);
+  const rows = input.rows.slice(0, LIMITS.rows); // only rows the model was shown
+  const rowById = new Map<string, AssistantRow>(rows.map((r) => [r.id, r]));
   const memberIds = new Set(input.members.map((m) => m.id));
+  const memberById = new Map(input.members.map((m) => [m.id, m]));
 
   const kept = new Map<string, MeetingProposal>();
   const order: string[] = [];
@@ -98,18 +203,24 @@ export function validateProposals(raw: unknown, input: MeetingAssistantInput): V
     const p = item as Record<string, unknown>;
     const flags: string[] = [];
 
-    const evidenceRaw = str(p.evidence, LIMITS.evidence * 4);
-    const needle = matchText(evidenceRaw);
-    if (needle.trim().length < MIN_EVIDENCE_CHARS || !haystack.includes(needle)) {
+    const evidence = typeof p.evidence === "string" ? p.evidence.replace(/\s+/g, " ").trim() : "";
+    if (evidence.length > LIMITS.evidence) {
+      dropped.evidence_too_long++;
+      continue;
+    }
+    const needle = norm(evidence);
+    const words = needle ? needle.split(" ").length : 0;
+    if (words < MIN_EVIDENCE_WORDS && needle.length < MIN_EVIDENCE_CHARS) {
       dropped.no_evidence++;
       continue;
     }
-    const evidence = str(evidenceRaw, LIMITS.evidence);
-    // A truncated quote is still a prefix of a real one, but re-check so the stored text is exactly verifiable.
-    if (!haystack.includes(matchText(evidence.replace(/…$/, "")))) {
+    const span = findSpan(hay, needle);
+    if (!span) {
       dropped.no_evidence++;
       continue;
     }
+    const spanText = transcript.slice(span[0], span[1]);
+    const windowNorm = norm(transcript.slice(Math.max(0, span[0] - WINDOW), Math.min(transcript.length, span[1] + WINDOW)));
 
     const nextStep = str(p.nextStep, LIMITS.nextStep);
     if (!nextStep) {
@@ -127,26 +238,40 @@ export function validateProposals(raw: unknown, input: MeetingAssistantInput): V
       if (row && (recKind === row.kind || recKind == null)) record = { kind: row.kind, id: row.id };
       else flags.push("The record named wasn't one of this week's rows.");
     } else if (recordName) {
-      record = matchRecord(recordName, input.rows);
+      record = matchRecord(recordName, rows);
+    }
+    if (record !== "unmatched") {
+      const row = rowById.get(record.id)!;
+      const terms = [row.client, row.mark, row.matterNumber].map((t) => norm(t ?? "")).filter(Boolean);
+      if (!terms.some((t) => hasWords(windowNorm, t))) {
+        record = "unmatched";
+        flags.push("That part of the call doesn't name this record, so none is proposed.");
+      }
     }
 
     let ownerId: string | null = null;
     if (typeof p.ownerId === "string" && p.ownerId) {
-      if (memberIds.has(p.ownerId)) ownerId = p.ownerId;
-      else flags.push("The owner named isn't a member of this firm, so none is proposed.");
+      if (!memberIds.has(p.ownerId)) {
+        flags.push("The owner named isn't a member of this firm, so none is proposed.");
+      } else {
+        const name = norm(memberById.get(p.ownerId)!.displayName);
+        const first = name.split(" ")[0];
+        if (hasWords(windowNorm, name) || hasWords(windowNorm, first)) ownerId = p.ownerId;
+        else flags.push("That part of the call doesn't name this person, so no owner is proposed.");
+      }
     }
 
     let dueDate: string | null = null;
     if (p.dueDate != null && p.dueDate !== "") {
       const real = realIsoDate(p.dueDate);
-      if (real && evidenceStatesDate(evidence, real, input.meetingDate)) dueDate = real;
+      if (real && evidenceStatesDate(spanText, real, input.meetingDate)) dueDate = real;
       else flags.push("The due date wasn't stated on the call, so none is proposed.");
     }
 
     const confidence: Confidence = p.confidence === "high" || p.confidence === "medium" || p.confidence === "low" ? p.confidence : "low";
 
     const proposal: MeetingProposal = { record, recordName: record === "unmatched" ? recordName : null, nextStep, dueDate, ownerId, note: str(p.note, LIMITS.note), evidence, confidence, flags };
-    const key = record === "unmatched" ? `u:${nextStep.toLowerCase()}` : `${record.kind}:${record.id}`;
+    const key = record === "unmatched" ? `u:${(recordName ?? "").toLowerCase()}|${nextStep.toLowerCase()}` : `${record.kind}:${record.id}`;
     const prior = kept.get(key);
     if (prior) {
       dropped.duplicate++;

@@ -63,12 +63,12 @@ export const LIMITS = {
   rows: 300,
 } as const;
 
-export type DropReason = "no_evidence" | "empty_step" | "duplicate" | "over_cap" | "malformed";
+export type DropReason = "no_evidence" | "evidence_too_long" | "empty_step" | "duplicate" | "over_cap" | "malformed";
 export type DropCounts = Record<DropReason, number>;
 
 export type ValidationResult = { proposals: MeetingProposal[]; dropped: DropCounts };
 
 export type MeetingAssistantResult =
-  | { state: "ok"; proposals: MeetingProposal[]; dropped: DropCounts }
+  | { state: "ok"; proposals: MeetingProposal[]; dropped: DropCounts; rowsTruncated: boolean }
   | { state: "unavailable"; reason: string }
   | { state: "not-configured"; reason: string };

@@ -43,4 +43,21 @@ describe("runMeetingAssistant", () => {
     expect(r.state).toBe("not-configured");
     expect(call).not.toHaveBeenCalled();
   });
+
+  it("a malformed answer is unavailable, never an empty ok", async () => {
+    const r = await runMeetingAssistant(input, { call: fake({ proposals: "nope" }), aiConfigured: () => true, log: () => {} });
+    expect(r.state).toBe("unavailable");
+    const r2 = await runMeetingAssistant(input, { call: fake({ proposals: [null] }), aiConfigured: () => true, log: () => {} });
+    expect(r2.state).toBe("unavailable");
+  });
+
+  it("exposes dropped counts and whether the rows were cut", async () => {
+    const out = { proposals: [...goodRaw.proposals, { ...goodRaw.proposals[0], evidence: "never said this at all here" }] };
+    const r = await runMeetingAssistant(input, { call: fake(out), aiConfigured: () => true, log: () => {} });
+    expect(r).toMatchObject({ state: "ok", rowsTruncated: false });
+    if (r.state === "ok") expect(r.dropped.no_evidence).toBe(1);
+    const many = Array.from({ length: 301 }, (_, i) => ({ ...input.rows[0], id: `x${i}` }));
+    const r2 = await runMeetingAssistant({ ...input, rows: many }, { call: fake({ proposals: [] }), aiConfigured: () => true, log: () => {} });
+    expect(r2).toMatchObject({ state: "ok", rowsTruncated: true });
+  });
 });

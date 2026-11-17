@@ -4,11 +4,13 @@ import { LIMITS, type MeetingAssistantInput } from "./types";
 
 /** What the model is given of the transcript. Validation checks quotes against exactly this. */
 export function clampTranscript(transcript: string): string {
-  return transcript.length > LIMITS.transcript ? transcript.slice(0, LIMITS.transcript) : transcript;
+  // NFKC first, so a fullwidth "＜/transcript＞" becomes "<" and is made inert below; and validation sees exactly this text.
+  const t = transcript.normalize("NFKC");
+  return t.length > LIMITS.transcript ? t.slice(0, LIMITS.transcript) : t;
 }
 
 const clip = (v: string | null | undefined, max: number): string => {
-  const flat = (v ?? "").replace(/\s+/g, " ").trim();
+  const flat = (v ?? "").normalize("NFKC").replace(/\s+/g, " ").trim();
   return neutralise(flat.length > max ? `${flat.slice(0, max - 1)}…` : flat);
 };
 
@@ -24,7 +26,7 @@ How to answer:
 - ownerId must be a member id from <members>, and only when someone was clearly given the task on the call. Otherwise null. Never invent people.
 - dueDate is YYYY-MM-DD and only when a specific date was said in your evidence quote. "Soon" or "next week" is null. Never compute a date.
 - nextStep is one short action (at most 200 characters). note is at most 400 characters of context. Neither may give legal advice or state a legal conclusion.
-- evidence is a short VERBATIM quote copied from the transcript that supports the proposal. A proposal without a real quote is discarded.
+- evidence is a short VERBATIM quote copied from the transcript that supports the proposal, at most 300 characters, and it must name the client, the mark or the person involved. A proposal without a real quote, or with a quote over 300 characters, is discarded.
 - confidence is high, medium or low.
 - Propose nothing for a record that was not discussed. At most one proposal per record. If nothing was discussed, return an empty list.`;
 }
@@ -47,7 +49,7 @@ export function buildUserTurn(input: MeetingAssistantInput): string {
     .join("\n");
   const members = input.members.map((m) => JSON.stringify({ id: m.id, name: clip(m.displayName, 80) })).join("\n");
   const sent = clampTranscript(input.transcript);
-  const cut = sent.length < input.transcript.length ? "\n(The transcript was cut off at this point for length.)" : "";
+  const cut = sent.length < input.transcript.normalize("NFKC").length ? "\n(The transcript was cut off at this point for length.)" : "";
   return `Meeting date: ${clip(input.meetingDate, 10)}
 
 <rows>
