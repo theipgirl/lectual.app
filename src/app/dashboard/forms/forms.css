@@ -819,11 +819,15 @@ textarea.ifm-input {
   flex: 1;
   min-width: 0;
   border: 0;
-  outline: none;
+  outline: none; /* preview mirror: the ring is drawn on the pill by :focus-within below */
   background: transparent;
   font: inherit;
   font-size: 14px;
   color: var(--pv-ink);
+}
+.ifm-pv-composer:focus-within {
+  outline: 2px solid var(--ox);
+  outline-offset: 2px;
 }
 .ifm-pv-send {
   width: 32px;

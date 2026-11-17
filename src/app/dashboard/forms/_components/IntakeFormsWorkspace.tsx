@@ -600,6 +600,7 @@ export function IntakeFormsWorkspace(props: Props) {
                       </span>
                       <span className="ifm-q-more">
                         <MoreMenu
+                          ariaLabel={`More for question ${i + 1}`}
                           items={[
                             { label: "Move up", disabled: i === 0, onSelect: () => edit((c) => ({ questions: moveQuestion(c.questions, i, -1) })) },
                             { label: "Move down", disabled: i === config.questions.length - 1, onSelect: () => edit((c) => ({ questions: moveQuestion(c.questions, i, 1) })) },

@@ -12,7 +12,7 @@ import { LoadFailedCard } from "@/components/ui/LoadFailed";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ViewToggle } from "@/components/ViewToggle";
 import { getFirmTimeZone } from "@/lib/org/profile";
-import { REFRESH_TO_TRY_AGAIN } from "@/lib/ui/words";
+import { REFRESH_TO_TRY_AGAIN, SHOW_MORE } from "@/lib/ui/words";
 
 export const metadata: Metadata = { title: pageTitle("Notifications") };
 
@@ -102,7 +102,7 @@ export default async function NotificationsPage({
           {(page > 1 || loaded.hasMore) && (
             <nav aria-label="Pages" className="lx-bell-foot">
               {page > 1 ? <Link href={hrefFor(tab, page - 1)}>Newer</Link> : <span />}
-              {loaded.hasMore && <Link href={hrefFor(tab, page + 1)}>Older</Link>}
+              {loaded.hasMore && <Link href={hrefFor(tab, page + 1)}>{SHOW_MORE}</Link>}
             </nav>
           )}
         </div>

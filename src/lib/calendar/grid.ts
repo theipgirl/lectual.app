@@ -8,6 +8,8 @@
  * before they get here.
  */
 
+import { formatMonthDay, formatMonthYear } from "@/lib/ui/dates";
+
 export type CalendarView = "month" | "week";
 
 export type CalendarItem = {
@@ -145,11 +147,11 @@ export function viewTitle(view: CalendarView, anchor: string): string {
   if (view === "week") {
     const from = parseCivil(startOfWeek(anchor));
     const to = parseCivil(addDays(startOfWeek(anchor), 6));
-    const md = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+    const md = (d: Date) => formatMonthDay(d.toISOString().slice(0, 10)) ?? "";
     const sameMonth = from.getUTCMonth() === to.getUTCMonth();
     return `${md(from)} – ${sameMonth ? to.getUTCDate() : md(to)}, ${to.getUTCFullYear()}`;
   }
-  return parseCivil(startOfMonth(anchor)).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+  return formatMonthYear(startOfMonth(anchor)) ?? "";
 }
 
 /** Civil date and "HH:MM" of an instant in `timeZone`. */
