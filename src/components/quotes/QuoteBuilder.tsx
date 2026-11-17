@@ -22,7 +22,7 @@ import { chargeBucket, fullProjectCost, type QuoteTotals } from "@/lib/quotes/pr
 import { normalizePackageName, offerProblems, readOffer } from "@/lib/quotes/packages";
 import { moneyFor } from "@/lib/quotes/staff-money";
 import { quotePillTone } from "@/lib/quotes/labels";
-import { BackLink } from "@/components/ui/PageHeader";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { InlineConfirm } from "@/components/ui/InlineConfirm";
 import { Notice } from "@/components/ui/Notice";
 import { Pill } from "@/components/ui/Pill";
@@ -328,19 +328,21 @@ export function QuoteBuilder(props: BuilderProps) {
 
   return (
     <div className="qb-root">
-      <div className="qb-bar">
-        <BackLink href="/dashboard/quotes/" label={PROPOSALS_NAME} />
-        <div className="qb-bar-rule" />
-        <span className="qb-ref">{props.reference}</span>
-        <div className="qb-bar-gap" />
-        {copyButton(false)}
-        {sendButton(false)}
-      </div>
+      <PageHeader
+        back={{ href: "/dashboard/quotes/", label: PROPOSALS_NAME }}
+        title={props.title}
+        count={<Pill tone={quotePillTone(props.status)}>{props.statusLabel}</Pill>}
+        sub={props.reference}
+        actions={
+          <>
+            {copyButton(false)}
+            {sendButton(false)}
+          </>
+        }
+      />
 
       <section className="qb-card" aria-label="Quote builder">
         <header className="qb-head">
-          <h1 className="lx-h1 qb-title">{props.title}</h1>
-          <Pill tone={quotePillTone(props.status)}>{props.statusLabel}</Pill>
           {editable && (
             <button type="button" className="lx-link" onClick={() => setShowDetails((v) => !v)} aria-expanded={showDetails}>
               {showDetails ? "Close" : "Edit title, intro & expiry"}
