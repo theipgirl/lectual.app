@@ -5,7 +5,7 @@ Owner's direction: **"we want Lectual to be the agentic IP OS."**
 **The test for every sprint:** an assistant does the work, and a person only approves.
 **Nothing in any sprint sends anything to a client.** Assistants draft. People approve. A person presses Send in their own mail client.
 
-This spec covers eight sprints (`sprint-1.md` to `sprint-8.md`) and the open questions (`questions.md`). It adds to `AGENTS.md`. It does not replace it. Where the two disagree, `AGENTS.md` and lectual's `brain/decisions.md` win until the owner changes them.
+This spec covers eight sprints (`sprint-1.md` to `sprint-8.md`), a ninth proposed sprint awaiting Taylor's "build it" (`sprint-9.md`, the lead page where Lectual does the step), and the open questions (`questions.md`, with Taylor's answers of Nov 17 at the end). It adds to `AGENTS.md`. It does not replace it. Where the two disagree, `AGENTS.md` and lectual's `brain/decisions.md` win until the owner changes them.
 
 ## Who is who
 
@@ -13,9 +13,10 @@ This spec covers eight sprints (`sprint-1.md` to `sprint-8.md`) and the open que
 |---|---|---|---|
 | Taylor | Founder and operator of Lectual | platform admin | Decides scope, merges, production migrations |
 | Rebecca | The firm's attorney | attorney-tier (exact role checked in Sprint 1) | Approves legal work only; overrides a close with an open deadline |
-| Caitlyn | The firm's operations lead | to be confirmed (`questions.md`) | Confirms stage list, time targets, accounts |
-| Rayn | Law clerk | `law_clerk` (checked in Sprint 1) | Approves routine kinds (decision 15); gets approved drafts in her Outlook Drafts and sends them (3b) |
-| Dawn | Billing | to be confirmed | Gets a billing view (decision 4) |
+| Caitlyn | The firm's operations lead | in the SOP (Taylor, Nov 17) | Owns the SOP (stage list, roles); time targets; gets the deadline alerts (Taylor, Nov 17) |
+| Rayn | Law clerk | `law_clerk` (checked in Sprint 1) | Approves routine kinds (decision 15); gets approved drafts in her Outlook Drafts and sends them (3b); gets the deadline alerts (Taylor, Nov 17) |
+| Dawn | Billing | to be confirmed; Taylor is getting her access (Taylor, Nov 17) | Gets a billing view (decision 4) |
+| Amor | (to be confirmed) | account and role to be confirmed (`questions.md`) | Receives the Day 1/2/4/6/7 proposal follow-up tasks (Taylor, Nov 17) |
 
 ## Decisions on record (owner, Nov 17). Copied as given.
 
@@ -38,12 +39,25 @@ This spec covers eight sprints (`sprint-1.md` to `sprint-8.md`) and the open que
 
 (There is no decision 13 on record. Do not invent one.)
 
+## Taylor's answers (Nov 17), as folded into the plan
+
+Full table at the end of `questions.md`. Each change in a sprint file is marked "(Taylor, Nov 17)".
+
+- **T1, production migrations: NOT approved yet.** Her reply was too thin for a production migration; the director asks her directly. **0103 is already on lectual-prod (since Nov 10)**; only **0106** is outstanding.
+- **T2:** Taylor gets the USPTO key. **T3:** Rebecca's own Adobe Sign account (per-firm connection).
+- **T4:** Lectual creates no invoice. "The invoice goes out with the proposal" = the firm's custom Lawmatics pay link on the proposal.
+- **T5:** signed and paid moves the lead to `won`: a SECOND, narrow, named exception beside the hired-matter sync (Sprint 5 states it).
+- **T6:** Dawn's access is coming; her role is still open. **T7:** owners can see which mailbox a colleague has connected (address and status only); Sprint 1 gets a small schema change.
+- **C1 / C7:** the stage list and roles are in the SOP (Sprint 2 is contracted from it). **C4:** follow-up tasks go to Amor. **C8:** deadline alerts go to Rayn, Caitlyn and Rebecca.
+- **R8:** the welcome email is the one in the trademarks@ mailbox, used as it stands; Caitlyn or Taylor pastes the text; it is never invented.
+- **Still open:** T6 (Dawn's role), T8, C2, C3, C5, C6 (the Monday call's account and title), R1 to R7, and the questionnaire half of R8.
+
 ## The three agentic builds (decision 12)
 
 | Build | Sprint | The assistant does | The person does |
 |---|---|---|---|
 | USPTO watcher | 3 | Reads each filed matter's USPTO status nightly, spots a mismatch with Lectual's stage, suggests the stage move, the deadline and a client notice draft | Accepts the stage move; adds the suggested deadline (it lands **unconfirmed**); an attorney confirms it; approves the notice |
-| Signed-and-paid chain | 5 | Builds one approval card (proposal + letter + email); sends the letter to Adobe Sign on approval; on signed **and** paid, opens the matter, drafts the welcome email, queues the questionnaire | Approves the card; approves the welcome email; Rayn sends from Outlook |
+| Signed-and-paid chain | 5 | Builds one approval card (proposal + letter + email); creates the client-only Adobe Sign agreement when the client signs (in-app signature as fallback); on signed **and** paid, opens the matter, drafts the welcome email, queues the questionnaire | Approves the card; approves the welcome email; Rayn sends from Outlook |
 | Meeting assistant | 6 | After the Monday call is imported, proposes a next step, owner and note per matter from the transcript | One click accepts each (or edits / dismisses) |
 
 The rest (Sprints 1, 2, 4, 7, 8) is the ground these builds stand on: true stages, who waits on whom, who may approve what, follow-up tasks with drafts, and time targets.
@@ -62,25 +76,26 @@ The rest (Sprints 1, 2, 4, 7, 8) is the ground these builds stand on: true stage
 - **Stage Keeper** rules stand: forward only, never into `won`/`lost`/`nurture`, sensitive guard, 7-day person-move card, one action per lead per run, `signal_key` consumption.
 - **Merged leads (0107).** Every `crm_lead` read goes through `live(...)` or carries a `// live-guard:` reason (`tests/leads/live-guard.test.ts`). New writers follow `keeperForWrite`.
 - **LawPay, Lawmatics, Fathom, Zoom, Microsoft, Adobe Sign:** each firm connects its OWN account. No deployment-wide credential. Sealed columns have no SELECT grant. Tests never call the provider.
-- **Engagement letter (0106).** The signed text, fingerprint and guards in `src/lib/loe/` stand. 0106 is on lectual-dev only; production needs the owner's OK.
+- **Engagement letter (0106).** The signed text, fingerprint and guards in `src/lib/loe/` stand. 0106 is on lectual-dev only; production needs the owner's OK, which is NOT given yet (Taylor, Nov 17: T1 to be asked directly). 0103 has been on lectual-prod since Nov 10.
 - **Schema.** No migrations in this repo. Each goes in `lectual/supabase/migrations`, next free number **0108**, lectual-dev first, production only with the owner's OK, plus a case in lectual's `tests/tenant-isolation.test.ts` for every new tenant table or policy.
 
 ## Planned migrations (lectual repo, in sprint order)
 
 | No. | Sprint | Holds | Certain? |
 |---|---|---|---|
-| 0108 | 2 | `crm_stage.waiting_on` (lead stages: who each stage waits on); consult outcome values only if they are a DB enum | Yes (column); enum part to be checked |
-| 0109 | 3 | Matter close guard: trigger refusing `status = closed` with an open USPTO deadline unless closed through the override function (`crm_close_matter_with_override`, override roles only, reason required); `crm_matter_close_override` log | Yes |
-| 0110 | 3 | `uspto_status_check` (latest USPTO read per matter) and `uspto_finding` (suggestions: stage, deadline, notice; pending / accepted / dismissed); agent CHECKs gain `uspto-watcher` and `meeting-assistant` | Yes |
-| 0111 | 4 | `queue_card_event` kinds `draft_to` / `drafted` (the card passes to Rayn for her draft click) | Likely; decided at the start of Sprint 4 |
-| 0112 | 5 | `adobe_sign_connection` (per firm, sealed tokens) and `adobe_sign_agreement` (proposal version, agreement id, status, signed time, webhook events) | Yes |
-| 0113 | 8 | `crm_matter_stage.target_days` (matter stage time targets; lead stages reuse `crm_stage.aging_threshold_days`) and `crm_billing_access` (who besides the owner sees billing) | Yes (access table depends on Taylor's answer) |
+| 0108 | 1 | Owner-only view of colleagues' mailbox connections: a security-definer function returning id, owner user, provider, address and status only (Taylor, Nov 17, T7) | Yes |
+| 0109 | 2 | `crm_stage.waiting_on` (lead stages: who each stage waits on: firm, client, none, on_hold); consult outcome values only if they are a DB enum | Yes (column); enum part to be checked |
+| 0110 | 3 | Matter close guard: trigger refusing `status = closed` with an open USPTO deadline unless closed through the override function (`crm_close_matter_with_override`, override roles only, reason required); `crm_matter_close_override` log | Yes |
+| 0111 | 3 | `uspto_status_check` and `uspto_finding`; agent CHECKs gain `uspto-watcher` and `meeting-assistant` | Yes |
+| 0112 | 4 | `queue_card_event` kinds `draft_to` / `drafted` (the card passes to Rayn for her draft click) | Likely; decided at the start of Sprint 4 |
+| 0113 | 5 | Adobe Sign, as designed in `adobe-sign-design.md` (`adobe_sign_connection`, `client_proposal_esign_request`, the new `client_proposal_signature` columns, `client_proposal_adobe_complete`). That note calls it "0108" because it was written on its own; in sprint order it is 0113 | Yes |
+| 0114 | 8 | `crm_matter_stage.target_days` and `crm_billing_access` (who besides the owner sees billing) | Yes (access table depends on T6) |
 
-Sprints 1, 6 and 7 plan no migration. If one turns out to need one, it takes the next free number at that time and this table is updated. Numbers are first-merged-wins in lectual: if another branch takes 0108 first, renumber in order.
+Renumbered on Nov 17 when Sprint 1 gained its migration (Taylor, Nov 17, T7). Sprints 6, 7 and 9 plan no migration. If one turns out to need one, it takes the next free number at that time and this table is updated. Numbers are first-merged-wins in lectual: if another branch takes a number first, renumber in order. The Stage 2 stage names and numbers are DATA, not a migration (see `sprint-2.md`).
 
 ## Design rollout comes first
 
-The design rollout now running restyles most dashboard pages. **UI work in Sprints 1 to 8 starts only after it has merged.** Until then, only new files with no UI may start. Three pieces start now, as new files only (no edits to existing files, no imports from pages):
+The design rollout now running restyles most dashboard pages. **UI work in Sprints 1 to 9 starts only after it has merged.** Until then, only new files with no UI may start. Three pieces start now, as new files only (no edits to existing files, no imports from pages):
 
 - **B1, USPTO status reader** in `src/lib/uspto/**`: a pure parser and a fetcher for one serial number's status, fixtures only, no key needed for tests. Feeds Sprint 3.
 - **B2, meeting-assistant reader** in `src/lib/meeting-assistant/**`: from an imported meeting and the firm's open matters, a pure function that proposes per-matter next step, owner and note (model call injected). Feeds Sprint 6.
@@ -101,9 +116,10 @@ The design rollout now running restyles most dashboard pages. **UI work in Sprin
 Design rollout merges ─┬─ S1 (small)
                        ├─ S2 (small) ── needs Caitlyn's stage list ──┬─ S8
                        ├─ S3 (medium; B1 now; live needs USPTO key)  │
-                       ├─ S4 (medium; needs 0103 on prod) ── S5 (large; B3; Adobe Sign; 0106 prod OK)
+                       ├─ S4 (medium; 0103 already on prod) ── S5 (large; B3; Adobe Sign; 0106 prod OK pending)
                        ├─ S6 (medium; B2 now)
-                       └─ S7 (medium; best after S4 so Rayn can clear the drafts)
+                       ├─ S7 (medium; best after S4 so Rayn can clear the drafts)
+                       └─ S9 (proposed, NOT APPROVED; after S4 and S7, S5 for its signed/paid states)
 ```
 
 ## Out of scope for this plan

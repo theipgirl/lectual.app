@@ -1,13 +1,13 @@
 # Sprint 8: Time targets per stage, the "over time" list, and the billing view
 
-**Size:** medium. **Starts:** after Sprint 2 (stages and who they wait on) and the design rollout. **Schema:** lectual 0113.
+**Size:** medium. **Starts:** after Sprint 2 (stages and who they wait on) and the design rollout. **Schema:** lectual 0114.
 
 ## Goal
 Every stage has a time target in calendar days (decision 3). Anything over its target is on ONE "over time" list, and the assistant has already made the follow-up task and drafted the nudge, so a person only approves. Dawn gets a billing view: invoices and an unpaid list from the firm's Lawmatics, where "paid in Lawmatics" counts as cleared (decision 4).
 
 ## Scope
 **In: time targets**
-1. **Targets.** Lead stages use `crm_stage.aging_threshold_days` (exists). Matter docket stages get `crm_matter_stage.target_days` (0113); when null, the existing `STALE_THRESHOLD_DAYS` by `waiting_on` stays the fallback (`src/lib/matters/stage-rules.ts`). Caitlyn's numbers are entered in Settings by the admin tier; nothing is seeded by a migration.
+1. **Targets.** Lead stages use `crm_stage.aging_threshold_days` (exists). Matter docket stages get `crm_matter_stage.target_days` (0114); when null, the existing `STALE_THRESHOLD_DAYS` by `waiting_on` stays the fallback (`src/lib/matters/stage-rules.ts`). Caitlyn's numbers are entered in Settings by the admin tier; nothing is seeded by a migration.
 2. **Days in stage** = calendar days on the firm's calendar from `stage_entered_at` (the existing `stageAgeDisplay` rules: an import stamp with no later move is "in stage since import" and is NOT counted as over time).
 3. **One "over time" list**: a Weekly review strip and filter (`?over=1`), and one count on Today. Each row: record, stage, days / target, who it waits on (Sprint 2 / docket `waiting_on`), the next step. One list for leads and matters; the same rule (`src/lib/review/over-time.ts`, pure) feeds every place.
 4. **The assistant acts** (the morning brief agent; no new agent name): for each record newly over time, at most once per stage entry (keyed `<record>:<stage>:<stage_entered_at>`):
@@ -17,7 +17,7 @@ Every stage has a time target in calendar days (decision 3). Anything over its t
 
 **In: billing view (decision 4)**
 5. `/dashboard/billing/`: every invoice of the firm from Lawmatics (`/invoices`, swept with `listAll`, one shared deadline), matched to Lectual matters by the invoice's own prospect relationship = `crm_matter.lawmatics_id` (the existing matter card's rule: never trust the filter). Columns: client, matter, number, issued, due, total, paid, balance, status. An "Unpaid" tab: not void, not draft, balance > 0, oldest due first; an invoice paid in Lawmatics is cleared. Totals row. "Open in Lawmatics" link only for an https URL Lawmatics gave.
-6. **Access.** Owner, plus the members on the firm's billing access list (0113), managed by the admin tier in Settings → Team. `canSeeBilling` becomes a check of role OR list membership; the page and every action re-check; others get `notFound()`. The matter page's Billing card follows the same rule. (If Taylor prefers a role, see `questions.md`; the list is the default.)
+6. **Access.** Owner, plus the members on the firm's billing access list (0114), managed by the admin tier in Settings → Team. `canSeeBilling` becomes a check of role OR list membership; the page and every action re-check; others get `notFound()`. The matter page's Billing card follows the same rule. Taylor is getting Dawn access (Taylor, Nov 17, T6); her role is still open, so the list stays the default and Dawn is added to it once she is a member.
 
 **Out**
 - Writing to Lawmatics (no invoice created, edited or marked paid). LawPay changes. Money arithmetic beyond summing cents for the totals row. Any send. Automatic stage moves on over-time.
@@ -42,7 +42,7 @@ Every stage has a time target in calendar days (decision 3). Anything over its t
 10. No Lawmatics write call exists in the billing files (grep).
 11. Tests never call Lawmatics. Tests, lint, build; isolation case on lectual-dev.
 
-## New schema: lectual 0113
+## New schema: lectual 0114
 - `alter table crm_matter_stage add column target_days integer null check (target_days between 1 and 3650)`.
 - `crm_billing_access`: `org_id`, `user_id`, `granted_by` (forced `auth.uid()`), `created_at`; unique (`org_id`, `user_id`); RLS: members read their firm's; insert/delete admin tier only, `user_id` must be a member of the same org.
 - Isolation: firm A cannot read or write firm B's `target_days` or access rows; a non-admin cannot grant access.
@@ -50,10 +50,10 @@ Every stage has a time target in calendar days (decision 3). Anything over its t
 ## Reads with three states
 | Read | ok | not set up | couldn't be read |
 |---|---|---|---|
-| Targets | numbers | before 0113: matter targets fall back to `waiting_on` | no over-time marks; note says targets couldn't load |
+| Targets | numbers | before 0114: matter targets fall back to `waiting_on` | no over-time marks; note says targets couldn't load |
 | Over-time list | rows | (n/a) | "Can't show this right now", never "Nothing over time" |
 | Lawmatics invoices | rows / totals | not connected: "Connect Lawmatics" | "Couldn't load invoices"; cut-short says so |
-| Billing access list | gate decided | before 0113: owner only | owner only; others `notFound()` |
+| Billing access list | gate decided | before 0114: owner only | owner only; others `notFound()` |
 
 ## MUST NEVER HAPPEN
 - A send to a client. Legal advice in a nudge. A deadline written. A cross-firm read (invoices matched only to this firm's matters). The service role in dashboard code. A raw error shown (Lawmatics text included). A module gate failing open (billing fails closed to owner-only). A stage moved because it is over time. A Lawmatics write.

@@ -1,6 +1,6 @@
 # Sprint 4: Approval kinds Rayn can clear, and drafts in Rayn's Outlook
 
-**Size:** medium. **Starts:** after the design rollout merges. **Schema:** lectual 0111 (likely). **Evaluator: STRICT.**
+**Size:** medium. **Starts:** after the design rollout merges. **Schema:** lectual 0112 (likely). **Evaluator: STRICT.**
 
 ## Goal
 Rebecca sees only legal work. Rayn clears the routine kinds herself (decision 15), and every approved client email ends up as a draft in Rayn's own Outlook Drafts, made on Rayn's own click, for her to send (decision 3b).
@@ -43,28 +43,28 @@ Rebecca sees only legal work. Rayn clears the routine kinds herself (decision 15
 7. The draft is made with the clicking person's own connection id read from the scoped client, never one from the browser; another person's connection id is refused.
 8. The drafted body equals the approved text (receipt hash); an edit after approval refuses the draft.
 9. The send-call grep (`outlook-send.ts` is the only send file) still passes; no new file contains a Graph `send` path.
-10. Before 0111 (or before 0103 on a database): "Ready to draft" isn't drawn, the attorney's approve falls back to today's behaviour ONLY for the approver's own mailbox, and the page says passing to Rayn isn't switched on yet. (Decided in this contract: never a third person's mailbox.)
+10. Before 0112: "Ready to draft" isn't drawn, the attorney's approve falls back to today's behaviour ONLY for the approver's own mailbox, and the page says passing to Rayn isn't switched on yet. (Decided in this contract: never a third person's mailbox.)
 11. Tests, lint, build; isolation case on lectual-dev.
 
-## New schema: lectual 0111 (likely)
+## New schema: lectual 0112 (likely)
 - Extend `queue_card_event`'s `kind` CHECK with `draft_to` and `drafted`. `actor_id` and `created_at` stay database-forced (as verified for 0103). `target_user_id` required for `draft_to`.
 - No new table: the drafter choice lives in `client_proposal_setting.pricing.approval_routing` (same feature limit as routing today; see `questions.md` for firms without Proposals).
 - Isolation: a member of firm B cannot insert a `draft_to` for firm A's item; a `drafted` row cannot be inserted for another user.
-- If `queue_card_event` has no `kind` CHECK, 0111 is not needed and this is written down in the sprint report.
+- If `queue_card_event` has no `kind` CHECK, 0112 is not needed and this is written down in the sprint report.
 
 ## Reads with three states
 | Read | ok | not set up | couldn't be read |
 |---|---|---|---|
 | Approval queue | items | unconfigured: today's sentence | unreachable: today's sentence; no switch, no counts |
 | Routing and drafter | rules | (n/a) | default approve rule; "Assignments couldn't be loaded"; NO hand-off made (approve still works, draft left for a person) |
-| Card events | Ready to draft list | before 0103/0111: not drawn | every card shown; the draft button disabled with "couldn't check" |
+| Card events | Ready to draft list | before 0112: not drawn | every card shown; the draft button disabled with "couldn't check" |
 | Rayn's own connection | button enabled | not connected: "Connect Outlook" | disabled, "couldn't check your Outlook" |
 
 ## MUST NEVER HAPPEN
 - A send to a client. Legal advice approved by a non-attorney. A deadline written. A cross-firm read. The service role in dashboard code. A raw error shown (Graph error text included). A module gate failing open. **Anybody's mailbox written to without their own click.** An attorney-only item approvable by Rayn through any route (kind, edit, routing, hand-off).
 
 ## Dependencies and blockers
-- **lectual 0103 on production** (hand-off events). Check its state first; applying it needs the owner's OK.
+- lectual 0103 (hand-off events) is already on lectual-prod, since Nov 10 (Taylor, Nov 17: corrected; not pending).
 - Rayn connects her Outlook once (Sprint 1 checklist).
 - Rebecca's confirmation of which existing drafts belong to each new kind (`questions.md`).
 - Sprint 3's watcher notice uses `uspto_notice` once this lands.

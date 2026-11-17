@@ -1,6 +1,6 @@
 # Sprint 6: Meeting assistant
 
-**Size:** medium. **Starts:** UI after the design rollout merges; B2 (the reader) starts now. **Schema:** none of its own (its agent name is added to the CHECKs in 0110; see Sprint 3).
+**Size:** medium. **Starts:** UI after the design rollout merges; B2 (the reader) has landed as new files: `src/lib/meeting-assistant/{types,prompt,validate,match,run,accept-payload}.ts`; this sprint wires it, it does not re-write it. **Schema:** none of its own (its agent name is added to the CHECKs in 0111; see Sprint 3).
 
 ## Goal
 Monday is the meeting day. After the Monday team call is imported (Fathom or Zoom), an assistant reads the transcript and, for each matter discussed, proposes a next step, an owner and a note. A person accepts each with one click. Nobody types up the meeting.
@@ -30,26 +30,26 @@ Monday is the meeting day. After the Monday team call is imported (Fathom or Zoo
 6. Dismiss writes only the decision row.
 7. Roles: only `MATTER_WRITE_ROLES` see Accept / Dismiss; the actions re-resolve the role; a viewer sees the suggestions read-only.
 8. The transcript and suggestion text are never logged and never in `agent_run`, failure alerts or cron JSON; counts only.
-9. Before 0110 (agent CHECK), Settings and Run now say the assistant isn't switched on for the firm yet; nothing is written.
+9. Before 0111 (agent CHECK), Settings and Run now say the assistant isn't switched on for the firm yet; nothing is written.
 10. With no Monday call marked, the agent ends `skipped` with that sentence; no model call.
 11. Tests never call Fathom, Zoom or the model (injected fakes). Tests, lint, build.
 
 ## New schema
-None. The agent name is in 0110 (Sprint 3). Suggestions are `crm_activity` `ai_insight` rows, as the Stage Keeper's are.
+None. The agent name is in 0111 (Sprint 3). Suggestions are `crm_activity` `ai_insight` rows, as the Stage Keeper's are.
 
 ## Reads with three states
 | Read | ok | not set up | couldn't be read |
 |---|---|---|---|
 | Marked meeting / transcript | suggestions made | no meeting marked; transcript still processing | agent run counted failed; no suggestions |
-| Suggestions on a page | rows | before 0110: not switched on | "Couldn't load", never "no suggestions" |
+| Suggestions on a page | rows | before 0111: not switched on | "Couldn't load", never "no suggestions" |
 | Open matters and members (agent input) | used | (n/a) | run ends with no suggestions written (never guess an owner) |
 
 ## MUST NEVER HAPPEN
 - A send to a client. Legal advice (notes record what was said; no opinions added by the model). **A deadline written** (task due dates only, never `crm_matter_deadline`). A cross-firm read. The service role in dashboard code. A raw error shown. A module gate failing open. A task created without a person's click.
 
 ## Dependencies and blockers
-- 0110 on lectual-dev (or carry the CHECK change if this sprint merges first).
-- A connected Fathom or Zoom that records the Monday call; Caitlyn names the call (`questions.md`).
+- 0111 on lectual-dev (or carry the CHECK change if this sprint merges first).
+- A connected Fathom or Zoom that records the Monday call (Taylor, Nov 17, C6: "zoom or fathom"). Still open: which account and the call's title (`questions.md`, C6); until then the assistant ends "no meeting marked".
 - AI configured on the deployment.
 
 ## Models and evaluator

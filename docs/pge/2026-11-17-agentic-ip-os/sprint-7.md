@@ -8,7 +8,7 @@ Once a proposal is out, nobody has to remember to chase it: on Day 1, 2, 4, 6 an
 ## Scope
 **In**
 1. **Proposal follow-up schedule.** Day 0 = the firm calendar day the proposal version's link went live (`sent`). On Day 1, 2, 4, 6 and 7 (calendar days, decision 3) the morning brief agent (no new agent name, so no CHECK change) creates, for each live proposal with no acceptance:
-   - one `crm_task` "Proposal follow-up · Day N" on the lead, assignee per `questions.md` (until answered: the lead's assignee, else unassigned), due that day;
+   - one `crm_task` "Proposal follow-up · Day N" on the lead, assigned to **Amor** (Taylor, Nov 17, C4), due that day. The assignee is a member the admin tier picks in Settings (no name in code). Amor's Lectual account and role are still to be confirmed (`questions.md`, C9); until Amor is a member and picked, the task goes to the lead's assignee, else unassigned, and the brief says so;
    - one queue draft (a follow-up email; Day 7 says it is the last day). Wording from a firm-approved template per day (`questions.md`), never written freehand by a model; the link is the proposal's own (`clientLinkOrigin`).
    - Created on the day, never ahead. Keyed `<proposal family>:<version>:day<N>` on a `queue_drafted` activity marker, so a rerun or Run now never makes a second one.
 2. **Stops.** No further day is created when the proposal is accepted, withdrawn, replaced, deleted, or expired past Day 7; when the client has replied since Day 0 (inbound mail on the lead, `email_received`, firm-sent cc excluded by `firm-sender.ts`); when the lead is merged (follow the keeper) or out of an open stage; or when a thread is sensitive. Open tasks already made are left for a person.
@@ -55,7 +55,7 @@ None planned. Markers are `crm_activity` rows; tasks use `crm_task`. If the agen
 
 ## Dependencies and blockers
 - Sprint 4 (who clears the drafts; Rayn's Outlook).
-- Rebecca: the five follow-up texts, the last-day sentence, whether Rayn may clear proposal follow-ups. Caitlyn: who the tasks go to, the exact grace period (`questions.md`).
+- Rebecca: the five follow-up texts, the last-day sentence, whether Rayn may clear proposal follow-ups. Caitlyn: Amor's account and role (C9), the exact grace period (C5) (`questions.md`). Sprint 2's `on_hold` stage (Undecided / Questions) is skipped by this schedule.
 
 ## Models and evaluator
 - Generator: **Opus** for email wording and the routing change; **Sonnet** for the schedule, duplicates and UI.
